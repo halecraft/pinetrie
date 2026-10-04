@@ -3,14 +3,16 @@
 // as rows and decided by pure code here (`planLaneRead`), with the shared
 // facts (`shared.ts`). It reads what `laneTipIn`, `laneBase`,
 // `startOfOffer`, `readOffer` and `workChanges` read, and says the same
-// (`repo.test.ts` holds them side by side). Only a lane on the line takes
-// this path: a WIP's base reads more of your repo, and keeps the separate
-// reads.
+// (`repo.test.ts` holds them side by side). Only a refresh of a lane on the
+// line takes this path (`gatherRefresh` chooses it): a WIP's base reads more
+// of your repo, and keeps the separate reads.
 
 import {
+  baseOf,
   type CatchUpRead,
   type CommitId,
   commitId,
+  hasTrailer,
   type LaneBase,
   type LaneName,
   type OfferInRepo,
@@ -18,23 +20,23 @@ import {
   offerLedger,
   type StartRead,
   type ThreadName,
-  TRAILERS,
-  trailerValues,
+  trailerRevset,
   type WorkChanges,
 } from "@pineta/core"
 import {
   bookmarkRevset,
+  commitsOf,
   conflictedFilesAt,
   describeFailure,
   type LineConfig,
   laneTipName,
   lines,
   offerBookmark,
-  parseBase,
   type Runner,
   revsetName,
 } from "@pineta/lanes"
 import {
+  offerFiles,
   readCatchUp,
   sinceHost,
   startConflictsOf,
@@ -72,7 +74,7 @@ export interface LaneRow {
 }
 
 /** The revset and template of the one read, for `lane`'s offer under `name`. */
-export function laneRead(input: {
+function laneRead(input: {
   readonly lane: LaneName
   readonly name: ThreadName | undefined
   readonly line: LineConfig
@@ -82,7 +84,7 @@ export function laneRead(input: {
 }): readonly string[] {
   const tip = `present(${laneTipName(input.lane)})`
   const onto = `present(${revsetName(input.line.onto)})`
-  const based = `latest(heads(::${tip} & description(regex:"(?m)^${TRAILERS.base}: ")))`
+  const based = `latest(heads(::${tip} & ${trailerRevset(["base"])}))`
   const line = `latest(heads(::${tip} & ::${onto}))`
   const bookmark =
     input.name === undefined
@@ -124,7 +126,7 @@ export function laneRead(input: {
 }
 
 /** `laneRead`'s output → its rows, newest first, as jj lists them. */
-export function parseLaneRows(stdout: string): LaneRow[] {
+function parseLaneRows(stdout: string): LaneRow[] {
   return lines(stdout).map(row => {
     const [commit = "", change = "", parents = "", flags = "", files = "[]"] =
       row.split("\t")
@@ -175,6 +177,8 @@ export type LanePlan =
         | { readonly kind: "divergent"; readonly changes: readonly string[] }
         | {
             readonly kind: "offer"
+            /** The bookmark it was found under. */
+            readonly bookmark: string
             readonly revisions: readonly {
               readonly commit: CommitId
               readonly change: string
@@ -203,11 +207,7 @@ export function planLaneRead(
   const tip = rows.find(r => r.tip)
   if (tip === undefined) return { kind: "none" }
   const based = rows.find(r => r.base)
-  const value =
-    based === undefined
-      ? undefined
-      : trailerValues(based.description, TRAILERS.base).at(-1)
-  const parsed = value === undefined ? null : parseBase(value)
+  const parsed = based === undefined ? null : baseOf(based.description)
   let base: LaneBase
   if (based !== undefined && parsed !== null) {
     if (parsed.bookmark !== input.line.onto) return { kind: "wip" }
@@ -251,9 +251,11 @@ function offerOf(
 ): Extract<LanePlan, { kind: "line" }>["offer"] {
   if (name === undefined) return { kind: "none" }
   const heads = rows.filter(r => r.bookmark)
-  const thread = new RegExp(`^${TRAILERS.thread}: ${name}$`, "m")
   const found = rows
-    .filter(r => r.region && (r.bookmark || thread.test(r.description)))
+    .filter(
+      r =>
+        r.region && (r.bookmark || hasTrailer(r.description, "thread", name)),
+    )
     .toReversed()
   const [top] = heads
   const [bottom] = found
@@ -271,6 +273,7 @@ function offerOf(
       )
   return {
     kind: "offer",
+    bookmark: offerBookmark(name),
     revisions: found.map(r => ({ commit: r.commit, change: r.change })),
     chained,
     // Its parents are under the line: none is a commit between the line and it.
@@ -358,25 +361,12 @@ export async function gatherLane(
   return { tip, base, target: onto, start, offer, work, catchUp }
 }
 
-const commitsIn = async (jj: Runner, revset: string): Promise<CommitId[]> => {
-  const ran = await jj([
-    "log",
-    "--no-graph",
-    "-r",
-    revset,
-    "-T",
-    'commit_id ++ "\\n"',
-  ])
-  if (!ran.ok) throw new Error(describeFailure("jj log", ran))
-  return lines(ran.stdout).map(commitId)
-}
-
 const startFrom = (
   jj: Runner,
   tip: CommitId,
   start: CommitId,
   sources: readonly CommitId[],
-) => commitsIn(jj, offerStart({ tip, start, sources }))
+) => commitsOf(jj, offerStart({ tip, start, sources }))
 
 async function offerFrom(
   jj: Runner,
@@ -392,26 +382,14 @@ async function offerFrom(
   const top = read.revisions.at(-1)
   if (bottom === undefined || top === undefined) return null
   const parents = read.bottomParents
-  const files =
-    read.files ??
-    lines(
-      (
-        await must(jj, [
-          "diff",
-          "--from",
-          `parents(${bottom.commit})`,
-          "--to",
-          top.commit,
-          "--name-only",
-        ])
-      ).stdout,
-    )
+  const files = read.files ?? (await offerFiles(jj, bottom.commit, top.commit))
   const conflicts = read.conflicted
     ? await conflictedFilesAt(jj, top.commit)
     : []
   const ledger = offerLedger(read.description)
   return {
     kind: "offer",
+    bookmark: read.bookmark,
     revisions,
     chained: read.chained,
     ledger,
@@ -422,10 +400,4 @@ async function offerFrom(
     conflicts,
     startConflicts: await startConflictsOf(jj, ledger, conflicts),
   }
-}
-
-async function must(jj: Runner, args: readonly string[]) {
-  const ran = await jj(args)
-  if (!ran.ok) throw new Error(describeFailure(`jj ${args[0]}`, ran))
-  return ran
 }

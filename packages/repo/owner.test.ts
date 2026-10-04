@@ -4,14 +4,10 @@ import path from "node:path"
 import { NO_EDITOR } from "@pineta/core"
 import { DEFAULT_LINE, run } from "@pineta/lanes"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
-import {
-  headsDir,
-  host,
-  type Moved,
-  type RepoOwner,
-  startRepoOwner,
-} from "./index.ts"
+import type { Moved } from "./observe.ts"
+import { headsDir, type RepoOwner, startRepoOwner } from "./owner.ts"
 import { operationGone, runnerFor } from "./run.ts"
+import { host } from "./step.ts"
 
 let top = ""
 beforeAll(async () => {

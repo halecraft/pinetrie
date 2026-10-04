@@ -1,14 +1,15 @@
-// repo/offer — what the host reads of an offer in your repo (ADR-0038).
+// repo/offer — the separate reads of an offer in your repo (ADR-0038).
 //
 // Reads only, each a query over jj on your repo (a step's, or a pinned read's)
-// returning values: the facts a trigger plans from (`readOffer`,
-// `startOfOffer`, `laneTipIn`, `workChanges`, `readCatchUp`; a lane on the
-// line reads them in one `jj log`, `lane-read.ts`), what a review shows of a commit (`revisionRead`,
-// `fileDiff`), and which of a divergent revision's commits
-// the host made (`hostCommitIn`, from `evologOf`). What the host then does is
-// planned in `plan.ts` (`planOffer`, `planTakeOffer`, `planRepair`) and
-// decided in `@pineta/marginalia`'s `offer.ts`. A lane's base is read by
-// `@pineta/lanes`' `laneBase`, since a lane reads it too.
+// returning values: the facts an offer step plans from (`readOffer`,
+// `startOfOffer`, `laneTipIn`, `workChanges`, `readCatchUp`), what a review
+// shows of a commit (`revisionRead`, `fileDiff`), and which of a divergent
+// revision's commits the host made (`hostCommitIn`, from `evologOf`). The
+// gathers in `offer-gather.ts` call them, or read a lane on the line in one
+// `jj log` instead (`lane-read.ts`). What the facts mean is decided in
+// `@pineta/marginalia`'s `offer.ts`, and its decisions become steps in
+// `offer-steps.ts`. A lane's base is read by `@pineta/lanes`' `laneBase`,
+// since a lane reads it too.
 
 import {
   type CatchUpRead,
@@ -23,9 +24,9 @@ import {
   offerLedger,
   type RevisionFacts,
   type StartRead,
+  sourcesOf,
   type ThreadName,
-  TRAILERS,
-  trailerValues,
+  trailerRevset,
   untracedLanes,
   type WorkChanges,
 } from "@pineta/core"
@@ -46,15 +47,38 @@ import {
   type EvologEntry,
   offerStart,
   parseEvolog,
+  parseTakes,
+  TAKE_ROW,
   takenRevset,
   walkToHost,
 } from "./plan.ts"
 
-async function query(jj: Runner, args: readonly string[]): Promise<string> {
+/** Run a read; throws with jj's own words when it fails. */
+export async function query(
+  jj: Runner,
+  args: readonly string[],
+): Promise<string> {
   const ran = await jj(args)
   if (!ran.ok) throw new Error(describeFailure(`jj ${args[0]}`, ran))
   return ran.stdout
 }
+
+/** The files an offer changes: from its bottom's parents to its top. */
+export const offerFiles = async (
+  jj: Runner,
+  bottom: CommitId,
+  top: string,
+): Promise<string[]> =>
+  lines(
+    await query(jj, [
+      "diff",
+      "--from",
+      `parents(${bottom})`,
+      "--to",
+      top,
+      "--name-only",
+    ]),
+  )
 
 /** The lane's tip in your repo, its remote bookmark; null before its first fetch. */
 export async function laneTipIn(
@@ -86,22 +110,12 @@ async function takenFacts(
     "-r",
     takenRevset(input),
     "-T",
-    'commit_id ++ "\\t" ++ json(description) ++ "\\n"',
+    TAKE_ROW,
   ])
   if (!ran.ok) throw new Error(describeFailure("jj log", ran))
-  const takes = lines(ran.stdout).map(row => {
-    const tab = row.indexOf("\t")
-    return {
-      commit: commitId(row.slice(0, tab)),
-      description: JSON.parse(row.slice(tab + 1)) as string,
-    }
-  })
+  const takes = parseTakes(ran.stdout)
   return {
-    sources: [
-      ...new Set(
-        takes.flatMap(t => trailerValues(t.description, TRAILERS.source)),
-      ),
-    ].map(commitId),
+    sources: [...new Set(takes.flatMap(t => sourcesOf(t.description)))],
     untraced: takes
       .filter(t => untracedLanes(t.description).includes(input.lane))
       .map(t => t.commit),
@@ -218,7 +232,7 @@ export async function readCatchUp(
 }
 
 /** Whether `to` has `from`'s description, and `jj interdiff` between them is empty. */
-export async function sameAs(
+async function sameAs(
   jj: Runner,
   from: CommitId,
   to: CommitId,
@@ -235,7 +249,7 @@ export async function sameAs(
 }
 
 /** A commit's versions in `jj evolog`, newest first; `limit` keeps the newest only. */
-export async function evologOf(
+async function evologOf(
   jj: Runner,
   commit: CommitId,
   limit?: number,
@@ -284,7 +298,7 @@ export async function offerRevisions(
   input: { readonly name: ThreadName; readonly target: string },
 ): Promise<{ readonly commit: CommitId; readonly change: string }[]> {
   const bookmark = bookmarkRevset(offerBookmark(input.name))
-  const thread = `description(regex:"(?m)^${TRAILERS.thread}: ${input.name}$")`
+  const thread = trailerRevset(["thread"], input.name)
   const ran = await jj([
     "log",
     "--no-graph",
@@ -369,16 +383,7 @@ export async function readOffer(
   const target = await commitsOf(jj, input.target)
   const onTarget =
     parents.length === target.length && parents.every(p => target.includes(p))
-  const files = lines(
-    await query(jj, [
-      "diff",
-      "--from",
-      `parents(${bottom.commit})`,
-      "--to",
-      top,
-      "--name-only",
-    ]),
-  )
+  const files = await offerFiles(jj, bottom.commit, top)
   const conflicts = await conflictedFilesAt(jj, top)
   const message = await query(jj, [
     "log",
@@ -391,6 +396,7 @@ export async function readOffer(
   const ledger = offerLedger(message)
   return {
     kind: "offer",
+    bookmark: offerBookmark(input.name),
     revisions,
     chained,
     ledger,
@@ -409,7 +415,7 @@ export async function readOffer(
  * `spanRead` takes from the range's git diff. A change to it bumps
  * `OFFER_WIRE`.
  */
-export const RANGE_FILES =
+const RANGE_FILES =
   '"{\\"path\\":" ++ json(path) ++ ",\\"shown\\":" ++ json(display_diff_path) ++ ' +
   '",\\"change\\":" ++ json(status) ++ "}\\n"'
 
@@ -417,7 +423,7 @@ export const RANGE_FILES =
  * Lines added and removed in each file's section of a git diff, in order.
  * Before a section's first `@@`, `--- a/x` and `+++ b/x` are headers.
  */
-export function gitDiffCounts(
+function gitDiffCounts(
   text: string,
 ): readonly { readonly added: number; readonly removed: number }[] {
   const out: { added: number; removed: number }[] = []

@@ -10,6 +10,7 @@ import {
   type CommitId,
   type EntryId,
   ERR,
+  entryOfMessage,
   firstLine,
   indexTree,
   type LaneName,
@@ -26,7 +27,6 @@ import {
   commitTurn,
   conflictsIn,
   DEFAULT_LINE,
-  entryOfMessage,
   laneBase,
   type Merged,
   mergeUpdate,
@@ -50,7 +50,6 @@ import {
   setRecord,
   type UpdateMessage,
   type UpdateRefusal,
-  wipState,
 } from "@pineta/marginalia"
 import type { Agent, ThreadLaneHandle } from "@pineta/pi"
 import {
@@ -60,7 +59,7 @@ import {
   readRunning,
   readTreeIndex,
 } from "@pineta/reads"
-import { beginFacts, type RepoOwner, wipFacts } from "@pineta/repo"
+import { beginFacts, type RepoOwner, readWipState } from "@pineta/repo"
 import { readEntryMessage, readLaneTip } from "@pineta/schema"
 import { type Basics, failed, messageOf } from "../basics.ts"
 import type { Containers } from "./containers.ts"
@@ -422,7 +421,7 @@ export function createUpdates(deps: {
       const base = await laneBase(jj, bookmarkRevset(bookmarkName(lane)), line)
       // Your repo, pinned to the head its owner last observed.
       const { state, begin } = await owner.read(async ({ jj: yours }) => ({
-        state: wipState(await wipFacts(yours, line, base)),
+        state: await readWipState(yours, line, base),
         begin: await beginFacts(
           yours,
           line,

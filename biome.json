@@ -62,6 +62,7 @@
         "!**/*.test.ts",
         "!**/*.test.tsx",
         "!packages/core/fixtures.ts",
+        "!packages/core/trailers.ts",
         "!packages/client/fixtures.ts",
         "!apps/pineta/host/fakes.ts",
         "!packages/client/layout.ts",

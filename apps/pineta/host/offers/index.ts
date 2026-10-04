@@ -2,22 +2,22 @@
 // owner of your repo (`@pineta/repo`, ADR-0065).
 //
 // A refresh is upkeep, at most one queued per lane (`later("refresh:…")`):
-// gather (`refreshNow`: where the offer sits and starts, and the offer as
-// your repo holds it), plan (`planRefresh`, then `planOfferEffects`), and
-// execute planned jj steps, then write the `pineta.offer` record, the page's
-// cache, from the repo. The host decides nothing from a record (ADR-0060).
+// gather (`gatherRefresh`), decide (`planRefresh`), translate
+// (`offerEffects`), and execute the steps, then write the `pineta.offer`
+// record, the page's cache, from the repo (`refresh.ts`). The host decides
+// nothing from a record (ADR-0060).
 // What marks a lane: a move the owner observes (`planMarks`: the lane's ref
 // after a fetch, its offer bookmark, the line, a WIP, your `@`), a run's end,
-// and a root archived or restored (`moveLanes`). Commands (an offer action, a
-// `line` command, a split's span and end) are owner commands, ahead of every
-// refresh waiting. The reads a page asks for (`read`, ADR-0047) are pinned
+// and a root archived or restored (`moveLanes`); the line's record
+// (`work/line.ts`) is rewritten on the same moves. Commands (an offer action,
+// a split's span and end) are owner commands, ahead of every refresh
+// waiting. The reads a page asks for (`read`, ADR-0047) are pinned
 // reads, which wait on nothing.
 
 import type {
   CommitId,
   ErrCode,
   LaneName,
-  LineAction,
   OfferSeen,
   WriterId,
 } from "@pineta/core"
@@ -25,9 +25,12 @@ import type { LineConfig } from "@pineta/lanes"
 import {
   answerDiff,
   answerReview,
+  isUntaken,
   type OfferAnswer,
   type OfferAsk,
+  offerStatus,
   planOfferRead,
+  planYourEdits,
 } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
 import { readNames, readOffers, readRevisions } from "@pineta/reads"
@@ -38,13 +41,13 @@ import {
   revisionRead,
 } from "@pineta/repo"
 import { type Basics, failed } from "../basics.ts"
+import type { Line } from "../work/line.ts"
 import { act } from "./act.ts"
 import { describe } from "./describe.ts"
-import { createLine } from "./line.ts"
-import { planMarks } from "./plan.ts"
+import { planMarks } from "./marks.ts"
 import { createRefresh } from "./refresh.ts"
 import { stackEnded, stackSpan } from "./stack.ts"
-import { createOfferState } from "./state.ts"
+import { createOfferDeps } from "./state.ts"
 
 export interface Offers {
   /**
@@ -94,26 +97,24 @@ export interface Offers {
    * owner last observed, waiting on no write.
    */
   read(ask: OfferAsk): Promise<OfferAnswer>
-  /** A `line` command (ADR-0060): null when carried out, else why not. */
-  line(action: LineAction): Promise<ErrCode | null>
 }
 
 export function startOffers(input: {
   readonly owner: RepoOwner
   /** The integration line's names (ADR-0060). */
   readonly line: LineConfig
-  /** Whether this host takes `line` commands: it admits no one else. */
-  readonly lineCommands: boolean
   readonly basics: Basics
   readonly agent: () => Agent
   /** Whether a lane is running now: an offer is described once it stops. */
   readonly running: (lane: LaneName) => boolean
-  /** After a take or a land: the base snapshot follows the line. */
+  /** After a take: the base snapshot follows the line. */
   readonly taken: () => void
+  /** The line's record and commands (`host/work/line.ts`): its record is rewritten when the owner observes the line or your `@` move. */
+  readonly lineWork: Line
 }): Offers {
-  const state = createOfferState(input)
-  const { owner, basics } = state
-  const refresh = createRefresh(state)
+  const deps = { ...createOfferDeps(input), describing: new Set<LaneName>() }
+  const { owner, basics, records } = deps
+  const refresh = createRefresh(deps)
 
   /**
    * Refresh `lane`'s offer as upkeep, once however often it is marked
@@ -137,11 +138,11 @@ export function startOffers(input: {
   const touch = (lane: LaneName) =>
     void mark(lane).then(built => {
       // Tracked, and logged on failure, by `describe`.
-      if (built && !state.running(lane))
-        void describe(state, refresh, lane, false)
+      if (built && !deps.running(lane))
+        void describe(deps, refresh, lane, false)
     })
 
-  const line = createLine(state)
+  const line = input.lineWork
   const markLine = () =>
     void line.refresh().catch(failed(basics, "reading the line"))
   /**
@@ -154,12 +155,11 @@ export function startOffers(input: {
       .later("shared", async ops => {
         const { editing } = await ops.shared()
         await line.record(ops)
-        for (const record of readOffers(basics.session).values())
-          if (record.taken === null)
-            await state.write({
-              ...record,
-              yourEdits: record.files.filter(f => editing.has(f)),
-            })
+        for (const record of planYourEdits(
+          readOffers(basics.session).values(),
+          editing,
+        ))
+          await records.write(record)
       })
       .catch(failed(basics, "reading what you are editing"))
   owner.onMoved(moved => {
@@ -167,7 +167,7 @@ export function startOffers(input: {
       moved,
       names: readNames(basics.session),
       open: [...readOffers(basics.session).values()]
-        .filter(o => o.taken === null)
+        .filter(o => isUntaken(offerStatus(o)))
         .map(o => o.lane),
     })
     if (planned.line) markLine()
@@ -184,14 +184,13 @@ export function startOffers(input: {
       // Described whether or not this refresh built: one built while the
       // lane ran was not described then.
       void owner.track(
-        mark(lane).then(() => describe(state, refresh, lane, false)),
+        mark(lane).then(() => describe(deps, refresh, lane, false)),
       )
     },
     act: (lane, action, by, to = null, seen = null) =>
-      act(state, refresh, lane, action, by, to, seen),
-    line: action => line.act(action),
-    stackSpan: lane => stackSpan(state, lane),
-    stackEnded: (lane, stack) => stackEnded(state, refresh, lane, stack),
+      act(deps, refresh, lane, action, by, to, seen),
+    stackSpan: lane => stackSpan(deps, lane),
+    stackEnded: (lane, stack) => stackEnded(deps, refresh, lane, stack),
     async read(ask) {
       const read = planOfferRead(
         {

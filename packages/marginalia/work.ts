@@ -53,7 +53,8 @@ import {
 import { Type } from "typebox"
 import { decodeAt, entryKey, fixedKey, laneKey, textKey } from "./decode.ts"
 import type { LandDetails } from "./land.ts"
-import { effectiveBase, parentAhead } from "./offer.ts"
+import { effectiveBase } from "./line.ts"
+import { parentAhead } from "./offer-view.ts"
 import type { RecordSpec } from "./records.ts"
 
 /** The one `pineta.line` value's key: a host follows one line. */
@@ -609,7 +610,7 @@ export function planUpdateFrom(input: {
   readonly onto: string
   /** The lane's base, from its own history; null for a lane with none, on the line. */
   readonly base: LaneBase | null
-  /** `wipState` of a WIP base; "ok" for the line. */
+  /** `wipState` of a WIP base (`@pineta/repo`); "ok" for the line. */
   readonly state: BaseRecord["state"]
   /** "continue on the line": the thread moves to the line, whatever its base. */
   readonly toLine: boolean
@@ -749,29 +750,6 @@ export const catchUpName = (from: CatchUpFrom): string =>
     : from.kind === "wip"
       ? from.bookmark
       : from.name
-
-/**
- * A WIP base's state (ADR-0060): landed when its bookmark points into the
- * line (moved there, or squashed into the line, which keeps the bookmark and
- * drops the WIP's change, S77 item 2), or, with the bookmark gone, when the
- * commit the lane's `Pineta-Base` names, or its change, is on the line.
- * Gone when the bookmark is gone and the WIP did not land; else ok. No
- * facts, a base on the line, is ok. Pure.
- */
-export function wipState(
-  facts: {
-    /** Where the WIP bookmark points now; null when it is gone. */
-    readonly bookmark: CommitId | null
-    /** The bookmark's commit is in the line's history. */
-    readonly bookmarkInLine: boolean
-    /** The commit `Pineta-Base` names, or its change, is in the line's history. */
-    readonly sourceInLine: boolean
-  } | null,
-): BaseRecord["state"] {
-  if (facts === null) return "ok"
-  if (facts.bookmark !== null) return facts.bookmarkInLine ? "landed" : "ok"
-  return facts.sourceInLine ? "landed" : "gone"
-}
 
 /**
  * Where a new lane of its own starts. With a revision above it: the nearest

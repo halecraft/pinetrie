@@ -8,14 +8,14 @@
 // snapshot rewrites. The lane's work comes back to you as its offer, never by
 // this merge.
 
-import { type CommitId, type LaneName, TRAILERS } from "@pineta/core"
-import { executeOrThrow, type Runners } from "./execute.ts"
 import {
-  bookmarkName,
-  bookmarkRevset,
-  type MergePlan,
-  parseBase,
-} from "./plan.ts"
+  baseOf,
+  type CommitId,
+  type LaneName,
+  trailerRevset,
+} from "@pineta/core"
+import { executeOrThrow, type Runners } from "./execute.ts"
+import { bookmarkName, bookmarkRevset, type MergePlan } from "./plan.ts"
 import {
   changedPaths,
   commitsOf,
@@ -96,7 +96,7 @@ export async function newestBase(
 } | null> {
   const [at] = await commitsOf(
     jj,
-    `latest(heads(::(${rev}) & description(regex:"(?m)^${TRAILERS.base}: ")))`,
+    `latest(heads(::(${rev}) & ${trailerRevset(["base"])}))`,
   )
   if (at === undefined) return null
   const ran = await jj([
@@ -109,12 +109,7 @@ export async function newestBase(
     "description",
   ])
   if (!ran.ok) throw new Error(describeFailure("jj log", ran))
-  const prefix = `${TRAILERS.base}: `
-  const value = lines(ran.stdout)
-    .filter(l => l.startsWith(prefix))
-    .map(l => l.slice(prefix.length).trim())
-    .at(-1)
-  const base = value === undefined ? null : parseBase(value)
+  const base = baseOf(ran.stdout)
   return base === null ? null : { at, ...base }
 }
 

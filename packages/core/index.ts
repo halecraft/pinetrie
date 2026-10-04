@@ -11,6 +11,7 @@
 // Nothing in this file may import pi, Kyneta, or a Node builtin.
 
 import type { Sha256 } from "./images.ts"
+import type { OfferLedger, OfferSeen } from "./offers.ts"
 
 // --- branded identifiers ----------------------------------------------------
 //
@@ -618,160 +619,6 @@ export const NO_EDITOR = {
 export const HOST_OPERATOR = "pineta-host"
 
 /**
- * What a revision's evolog says since the host's newest version of it
- * (`readOffer` in `@pineta/repo` reads it, `revisionEdited` in
- * `@pineta/marginalia` decides from it): whether the walk back reached a
- * version the host made, and whether a version an operation not the host's
- * made on the way changed it. Read from the repo, never from a record the
- * host kept, which can be lost after its jj steps landed (S73).
- */
-export interface RevisionFacts {
-  readonly reached: boolean
-  readonly yoursChanged: boolean
-}
-
-/** One revision of an offer, as your repo holds it now. */
-export interface OfferRevision {
-  readonly commit: CommitId
-  /** Its change id: what jj steps on it name (S48 item 2). */
-  readonly change: string
-  readonly since: RevisionFacts
-}
-
-/** An offer's ledger, as its top's message carries it (`offerLedger`). */
-export interface OfferLedger {
-  /** The lane tip it holds (`Pineta-Source`). */
-  readonly source: CommitId
-  /** Where it starts (`Pineta-Start`). */
-  readonly start: readonly CommitId[]
-}
-
-/**
- * What a take was shown (ADR-0065): the offer's ledger, and whether it
- * conflicted. A take whose offer now brings other work, or newly conflicts,
- * is refused (`OFFER_CHANGED`).
- */
-export interface OfferSeen {
-  readonly ledger: OfferLedger | null
-  readonly conflicted: boolean
-}
-
-/**
- * An offer as your repo holds it now (`readOffer` in `@pineta/repo`): all
- * the host decides an offer from. Facts only; what they mean is decided in
- * `@pineta/marginalia` (`planRefresh`, `offerEdited`, `offerMoved`,
- * `isWipLine`). A divergent offer is only its change ids: the repair needs
- * nothing more, and every other read would name one of two commits.
- */
-export type OfferInRepo =
-  | {
-      readonly kind: "offer"
-      /** Bottom first. */
-      readonly revisions: readonly OfferRevision[]
-      /** Each revision's parent is the one below it: no commit of yours between. */
-      readonly chained: boolean
-      readonly ledger: OfferLedger | null
-      /** The top's first line. */
-      readonly firstLine: string
-      /** The bottom's parent is an ancestor of the target (S48 item 7). */
-      readonly placed: boolean
-      /** The bottom's parents are exactly the target. */
-      readonly onTarget: boolean
-      readonly files: readonly string[]
-      /** Files conflicting in its top: with the work under it (S48 item 3). */
-      readonly conflicts: readonly string[]
-      /** Files conflicted where its ledger says it starts, read only when it conflicts (ADR-0072). */
-      readonly startConflicts: readonly string[]
-    }
-  | { readonly kind: "divergent"; readonly changes: readonly string[] }
-
-/**
- * The trailers the host writes into commit messages: a turn names its entry
- * and lane (ADR-0032), an offer its thread too (ADR-0039). The ledger
- * (ADR-0060): a lane's start or update names its base, `<bookmark>@<commit>`;
- * an offer names the lane tip it holds and where it starts.
- */
-export const TRAILERS = {
-  thread: "Pineta-Thread",
-  lane: "Pineta-Lane",
-  entry: "Pineta-Entry",
-  base: "Pineta-Base",
-  source: "Pineta-Source",
-  start: "Pineta-Start",
-} as const
-
-/**
- * Every value of trailer `key` in a message, from every paragraph, in order.
- * A squash of two commits keeps both messages, so a message can hold two
- * trailer paragraphs; jj's `trailers` template reads only the last (S77).
- */
-export function trailerValues(
-  message: string,
-  key: (typeof TRAILERS)[keyof typeof TRAILERS],
-): string[] {
-  const prefix = `${key}: `
-  return message
-    .split("\n")
-    .filter(line => line.startsWith(prefix))
-    .map(line => line.slice(prefix.length).trim())
-    .filter(v => v !== "")
-}
-
-/**
- * An offer's ledger as its message carries it (ADR-0060): the lane tip it
- * holds (`Pineta-Source`) and where it starts (`Pineta-Start`), from the
- * last paragraph that names a source, so a message holding an older ledger
- * above it reads as the newest. Null when no paragraph names one, as after
- * you rewrote the message without them.
- */
-export function offerLedger(message: string): OfferLedger | null {
-  const paragraph = message
-    .split("\n\n")
-    .filter(p => trailerValues(p, TRAILERS.source).length > 0)
-    .at(-1)
-  if (paragraph === undefined) return null
-  const source = trailerValues(paragraph, TRAILERS.source).at(-1)
-  const start = trailerValues(paragraph, TRAILERS.start)
-  if (source === undefined || start.length === 0) return null
-  return { source: commitId(source), start: start.map(commitId) }
-}
-
-/**
- * The lanes a message's takes name with no source (S97): each paragraph
- * carrying `Pineta-Thread` and `Pineta-Lane` but no `Pineta-Source`, as the
- * takes made before offers carried their ledger did. What such a take brought
- * cannot be placed in its lane's history. A turn's commit carries no
- * `Pineta-Thread`, so it is never one.
- */
-export function untracedLanes(message: string): LaneName[] {
-  return message
-    .split("\n\n")
-    .filter(
-      p =>
-        trailerValues(p, TRAILERS.thread).length > 0 &&
-        trailerValues(p, TRAILERS.source).length === 0,
-    )
-    .flatMap(p => trailerValues(p, TRAILERS.lane))
-    .filter(isLaneName)
-}
-
-/**
- * Whether a lane's work since its start changes any file, as far as jj can
- * tell (ADR-0067): `unknown` when it cannot, which never builds an offer.
- */
-export type WorkChanges = "none" | "some" | "unknown"
-
-/**
- * Where a lane's offer starts (ADR-0060), or `untraced`: a take of this
- * lane above its base names no source (`untracedLanes`), so no start can
- * leave out what it brought, and nothing is offered until the lane catches
- * up past it (ADR-0067).
- */
-export type StartRead =
-  | { readonly kind: "known"; readonly start: readonly CommitId[] }
-  | { readonly kind: "untraced"; readonly takes: readonly CommitId[] }
-
-/**
  * Where a thread's lane starts and is brought up to date from (ADR-0060):
  * the integration line, or a WIP bookmark you chose at its first message.
  */
@@ -958,7 +805,7 @@ export interface LandingRecord {
  * A lane's offer: one revision, or a stack, in your repo, holding the lane's
  * work you do not have yet (ADR-0038). A host-written `pineta.offer` value
  * keyed by lane: the page's cache, written from the repo after each of the
- * host's steps (`offerRecord`). The host never decides from it: it reads the
+ * host's steps (`offerRecord`, marginalia). The host never decides from it: it reads the
  * offer from your repo (`OfferInRepo`), so a record lost or stale changes
  * nothing. What a take would
  * bring, each revision's description, files and diffs, is not stored: the page
@@ -1915,8 +1762,10 @@ export function orderNewEntries(
 export * from "./asks.ts"
 export * from "./edits.ts"
 export * from "./images.ts"
+export * from "./offers.ts"
 export * from "./presence.ts"
 export * from "./roots.ts"
 export * from "./tools.ts"
+export * from "./trailers.ts"
 export * from "./tree.ts"
 export * from "./work.ts"

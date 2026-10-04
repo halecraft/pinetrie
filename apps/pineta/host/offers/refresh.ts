@@ -1,220 +1,118 @@
-// host/offers/refresh — building an offer, writing its record, and what a
-// trigger does to it: gather (`offerNow`), `planRefresh`,
-// `planOfferEffects`, execute. The record is written from the repo after
-// each step, never read back to decide.
+// host/offers/refresh — what a trigger does to a lane's offer, and an offer
+// rebuilt: gather (`gatherRefresh`, `@pineta/repo`), decide (`planRefresh`,
+// marginalia), translate (`offerEffects`, `rebuildEffects`) and execute
+// (`executeOffer`). The record is written from the repo after each step,
+// never read back to decide.
 
-import {
-  type CommitId,
-  firstPromptOf,
-  type LaneName,
-  type OfferInRepo,
-  projectTranscript,
-  type ThreadName,
-} from "@pineta/core"
+import type { LaneName, Placed, Rebuild, ThreadName } from "@pineta/core"
 import { offerBookmark } from "@pineta/lanes"
-import { offerMessage, planRefresh, wipDescription } from "@pineta/marginalia"
-import { readRevisions, readThreadName, readTreeIndex } from "@pineta/reads"
+import { offerRecord, planRefresh } from "@pineta/marginalia"
+import { readThreadName } from "@pineta/reads"
 import {
-  hostCommitIn,
-  type OfferSource,
-  planAbandonOffer,
-  planOffer,
-  planRepair,
+  gatherRefresh,
+  offerEffects,
   type RepoOps,
   readOffer,
+  rebuildEffects,
+  repairOffer,
 } from "@pineta/repo"
-import { type RootDocHandle, readLaneTip } from "@pineta/schema"
-import { executeOffer } from "./execute.ts"
-import { baseWrites, offerRecord, planOfferEffects } from "./plan.ts"
-import type { OfferState, Placed, Reader } from "./state.ts"
-
-/**
- * An offer's line until an agent describes it: the thread's name and its
- * own first message, the first prompt its lane ran (ADR-0039).
- */
-export function wipLine(
-  doc: RootDocHandle | null,
-  lane: LaneName,
-  name: ThreadName,
-): string {
-  if (doc === null) return wipDescription(name, "")
-  const index = readTreeIndex(doc)
-  const tip = readLaneTip(doc, lane)
-  const first = firstPromptOf(index, readRevisions(doc), lane, tip)
-  const text = projectTranscript(index, tip).find(m => m.id === first)?.text
-  return wipDescription(name, text ?? "")
-}
+import { executeOffer, type OfferPorts } from "./execute.ts"
+import type { OfferDeps } from "./state.ts"
 
 export interface Refresh {
-  /**
-   * Abandon the offer's revisions (`changes`), then build a new one from
-   * `sources` (the lane's tip, or a stack's revisions) under the lane's
-   * name; their messages get the host's trailers and the offer's ledger
-   * (`offerMessage`).
-   */
-  rebuild(
-    ops: RepoOps,
-    lane: LaneName,
-    name: ThreadName,
-    place: Placed,
-    changes: readonly string[],
-    sources: readonly OfferSource[],
-  ): Promise<void>
-  /** Write the offer's record from the offer as your repo holds it. */
-  record(
-    ops: RepoOps,
-    lane: LaneName,
-    name: ThreadName,
-    place: Placed,
-    offer: OfferInRepo | null,
-  ): Promise<void>
   /** What a trigger does to one lane's offer: "built" when its content changed. */
   refresh(ops: RepoOps, lane: LaneName): Promise<"built" | "other">
+  /** An offer rebuilt (`planStackEnded`, `planRebuild`), then its record. */
+  rebuild(ops: RepoOps, lane: LaneName, rebuild: Rebuild): Promise<void>
+  /** The ports an offer step's effects run over, for `lane`'s offer under `name`. */
+  ports(ops: RepoOps, lane: LaneName, name: ThreadName): OfferPorts
 }
 
-export function createRefresh(state: OfferState): Refresh {
-  const { basics } = state
-  const { session, docs, log } = basics
-  /** A lane's tip, from its root's document; "" for none. */
-  const tipOf = (lane: LaneName): string => {
-    const doc = docs.docOfLane(lane)
-    return (doc === null ? null : readLaneTip(doc, lane)) ?? ""
+/** A fresh nonce a build names its commits by (`nonceRevset`). */
+const newNonce = () => `pineta-offer-${crypto.randomUUID()}`
+
+export function createRefresh(
+  deps: Pick<OfferDeps, "basics" | "docs" | "records" | "taken">,
+): Refresh {
+  const { basics, docs, records } = deps
+  const { session, log } = basics
+
+  function ports(ops: RepoOps, lane: LaneName, name: ThreadName): OfferPorts {
+    const read = (place: Placed) =>
+      readOffer(ops.jj, { name, target: place.target })
+    return {
+      writeBase: records.writeBase,
+      run: steps => ops.execute(steps),
+      read,
+      // A divergent offer is recorded once repaired.
+      async record(offer, place) {
+        if (offer === null || offer.kind === "divergent") return
+        await records.write(
+          offerRecord({
+            lane,
+            name,
+            offer,
+            place,
+            editing: (await ops.shared()).editing,
+            now: basics.now(),
+          }),
+        )
+      },
+      async repair(changes) {
+        await repairOffer(ops, { bookmark: offerBookmark(name), changes })
+        log(
+          `[host] ${readThreadName(session, lane)}: your edit and the host's crossed; kept yours`,
+        )
+      },
+      remove: () => records.remove(lane),
+      async taken(record) {
+        await records.writeTaken(record)
+        deps.taken()
+      },
+    }
   }
 
-  /** The record is the page's; a divergent offer is recorded once repaired. */
-  async function record(
-    ops: RepoOps,
-    lane: LaneName,
-    name: ThreadName,
-    place: Placed,
-    offer: OfferInRepo | null,
-  ): Promise<void> {
-    if (offer === null || offer.kind === "divergent") return
-    await state.write(
-      offerRecord({
+  return {
+    ports,
+    async refresh(ops, lane) {
+      // gather
+      const now = await gatherRefresh(ops, {
+        ...docs.input(lane),
+        archived: docs.archived(lane),
+      })
+      if (now.kind === "none") return "other"
+      // A WIP gone without landing: nothing moves, and the page says so.
+      if (now.kind === "gone") {
+        await records.writeBase(now.base)
+        return "other"
+      }
+      const { name, facts } = now
+      // plan
+      const effects = offerEffects(planRefresh(facts), {
         lane,
         name,
-        offer,
-        place,
-        editing: (await ops.shared()).editing,
-        now: basics.now(),
-      }),
-    )
-  }
-
-  const readAt = (ops: Reader, name: ThreadName, target: CommitId) =>
-    readOffer(ops.jj, { name, target })
-
-  async function build(
-    ops: RepoOps,
-    lane: LaneName,
-    name: ThreadName,
-    place: Placed,
-    sources: readonly OfferSource[],
-  ): Promise<void> {
-    const at = {
-      lane,
-      name,
-      entry: tipOf(lane),
-      ledger: { source: place.tip, start: place.start },
-    }
-    await ops.execute(
-      planOffer({
-        name,
-        start: place.start,
-        sources: sources.map(source => ({
-          ...source,
-          description: offerMessage(source.description, at),
-        })),
-        target: place.target,
-        nonce: `pineta-offer-${crypto.randomUUID()}`,
-      }),
-    )
-    await record(ops, lane, name, place, await readAt(ops, name, place.target))
-  }
-
-  async function rebuild(
-    ops: RepoOps,
-    lane: LaneName,
-    name: ThreadName,
-    place: Placed,
-    changes: readonly string[],
-    sources: readonly OfferSource[],
-  ): Promise<void> {
-    await ops.execute(planAbandonOffer(changes))
-    await build(ops, lane, name, place, sources)
-  }
-
-  /** Each revision repaired (S48 item 18), then the record. */
-  async function repair(
-    ops: RepoOps,
-    lane: LaneName,
-    name: ThreadName,
-    place: Placed,
-    changes: readonly string[],
-  ) {
-    const last = changes.length - 1
-    for (const [i, change] of changes.entries()) {
-      const split = await hostCommitIn(ops.jj, change)
-      if (split === null) continue
-      await ops.execute(
-        planRepair({
-          bookmark: offerBookmark(name),
-          ...split,
-          top: i === last,
-        }),
+        entry: docs.tipOf(lane),
+        wip: docs.wipLine(lane, name),
+        nonce: newNonce(),
+      })
+      // execute
+      return executeOffer(
+        ports(ops, lane, name),
+        { base: now.base, effects },
+        facts.offer,
       )
-    }
-    log(
-      `[host] ${readThreadName(session, lane)}: your edit and the host's crossed; kept yours`,
-    )
-    await record(ops, lane, name, place, await readAt(ops, name, place.target))
+    },
+    async rebuild(ops, lane, rebuild) {
+      const effects = rebuildEffects(rebuild, {
+        lane,
+        entry: docs.tipOf(lane),
+        nonce: newNonce(),
+      })
+      await executeOffer(
+        ports(ops, lane, rebuild.name),
+        { base: null, effects },
+        null,
+      )
+    },
   }
-
-  async function refresh(
-    ops: RepoOps,
-    lane: LaneName,
-  ): Promise<"built" | "other"> {
-    // gather
-    const now = await state.refreshNow(ops, lane)
-    if (now === null) return "other"
-    if (now.kind === "gone") {
-      // A WIP gone without landing: nothing moves, and the page says so.
-      const writes = baseWrites(now.base)
-      if (writes.length > 0) await state.writeValues(writes)
-      return "other"
-    }
-    const { name, place, facts } = now
-    const { offer } = facts
-    // plan
-    const planned = planRefresh(facts)
-    const effects = planOfferEffects(planned, {
-      base: now.base,
-      place,
-      wip: wipLine(docs.docOfLane(lane), lane, name),
-      trailers: { lane, name, entry: tipOf(lane) },
-      offer,
-    })
-    // execute: with no place, `planOfferEffects` plans none of the steps
-    // that need one.
-    const placed = <T>(go: (at: Placed) => Promise<T>): Promise<T> =>
-      place === null
-        ? Promise.reject(new Error(`${lane}: an offer step needs a place`))
-        : go(place)
-    return executeOffer(
-      {
-        write: state.writeValues,
-        run: steps => ops.execute(steps),
-        build: sources => placed(at => build(ops, lane, name, at, sources)),
-        read: () => placed(at => readAt(ops, name, at.target)),
-        record: read => placed(at => record(ops, lane, name, at, read)),
-        repair: changes => placed(at => repair(ops, lane, name, at, changes)),
-        remove: () => state.remove(lane),
-      },
-      effects,
-      offer,
-    )
-  }
-
-  return { rebuild, record, refresh }
 }

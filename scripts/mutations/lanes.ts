@@ -9,11 +9,11 @@ const plan = "packages/lanes/plan.ts"
 export const mutations: readonly Mutation[] = [
   {
     name: "a take finds no destination below the offer",
-    file: "apps/pineta/host/offers/act.ts",
+    file: "packages/repo/offer-gather.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "              `present(${revsetName(d.bookmark)}) & ::parents(${bottom.commit})`,",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
-    to: "              `present(${revsetName(d.bookmark)}) & ${bottom.commit}::`,",
+    from: "          `present(${revsetName(bookmark)}) & ::parents(${bottom.commit})`,",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    to: "          `present(${revsetName(bookmark)}) & ${bottom.commit}::`,",
     suite: "lanes",
     scenario: "main",
     expect:

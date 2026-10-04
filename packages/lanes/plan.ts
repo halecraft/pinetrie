@@ -9,8 +9,8 @@ import { createHash } from "node:crypto"
 import path from "node:path"
 import {
   type BaseMerge,
+  baseMessage,
   type CommitId,
-  commitId,
   type ForkStart,
   HOST_WORKING_COPY,
   hostPathInLane,
@@ -20,7 +20,6 @@ import {
   type SnapshotId,
   shellWord,
   type ThreadName,
-  TRAILERS,
   WORKSPACE_ROOT,
 } from "@pineta/core"
 
@@ -696,25 +695,6 @@ const restoreVolume = (
   createVolume(volume),
   ...cloneFile(snapshotFile(paths, id), volumeImage(paths, volume)),
 ]
-
-/**
- * A commit's message that names a lane's base (ADR-0060): the line or a WIP
- * bookmark, and the commit it pointed at. The newest such commit in a lane's
- * history is the thread's base (`laneBase`).
- */
-export const baseMessage = (
-  title: string,
-  base: { readonly bookmark: string; readonly commit: CommitId },
-): string => `${title}\n\n${TRAILERS.base}: ${base.bookmark}@${base.commit}\n`
-
-/** `<bookmark>@<commit>`, a `Pineta-Base` value, read back; null if malformed. */
-export function parseBase(
-  value: string,
-): { readonly bookmark: string; readonly commit: CommitId } | null {
-  const at = value.lastIndexOf("@")
-  if (at <= 0 || at === value.length - 1) return null
-  return { bookmark: value.slice(0, at), commit: commitId(value.slice(at + 1)) }
-}
 
 /**
  * The lane steps that start a lane on the line: an empty commit on the line's

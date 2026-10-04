@@ -6,10 +6,9 @@
 
 import {
   type CommitId,
-  commitId,
   type LaneName,
-  TRAILERS,
-  trailerValues,
+  type LineFacts,
+  sourcesOf,
   untracedLanes,
 } from "@pineta/core"
 import {
@@ -19,8 +18,8 @@ import {
   type Runner,
   revsetName,
 } from "@pineta/lanes"
-import { type LineFacts, lineFacts } from "./line.ts"
-import { TAKES } from "./plan.ts"
+import { lineFacts } from "./line.ts"
+import { parseTakes, TAKE_ROW, TAKES } from "./plan.ts"
 
 /** A commit on the line carrying taken offers' `Pineta-Source` trailers. */
 export interface Taken {
@@ -61,20 +60,14 @@ export async function readShared(
     "-r",
     `::present(${revsetName(line.onto)}) & ${TAKES}`,
     "-T",
-    'commit_id ++ "\\t" ++ json(description) ++ "\\n"',
+    TAKE_ROW,
   ])
   if (!ran.ok) throw new Error(describeFailure("jj log", ran))
-  const takes = lines(ran.stdout).map(row => {
-    const tab = row.indexOf("\t")
-    const description = JSON.parse(row.slice(tab + 1)) as string
-    return {
-      commit: commitId(row.slice(0, tab)),
-      sources: [...new Set(trailerValues(description, TRAILERS.source))].map(
-        commitId,
-      ),
-      lanes: untracedLanes(description),
-    }
-  })
+  const takes = parseTakes(ran.stdout).map(({ commit, description }) => ({
+    commit,
+    sources: sourcesOf(description),
+    lanes: untracedLanes(description),
+  }))
   const edited = await jj(["diff", "-r", "@", "--name-only"])
   if (!edited.ok) throw new Error(describeFailure("jj diff", edited))
   return {

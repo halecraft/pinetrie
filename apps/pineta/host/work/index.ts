@@ -1,13 +1,14 @@
 // host/work — lanes' containers and disks, as the host carries them out
 // (ADR-0032 to ADR-0034, ADR-0038).
 //
-// The decisions are pure and live in core, marginalia and lanes; these
-// modules gather what they need, call them, and execute. What is not in the
+// The decisions are pure and live in core, marginalia, lanes and
+// `@pineta/repo`; these modules gather what they need, call them, and
+// execute. What is not in the
 // document, in jj, or on a lane's disk is held here: what startup found
 // (`Setup`), each lane's handle (`LaneRegistry`), and each coordination set in
 // the module that writes it (`turns`' pending records, `update`'s guidance
 // flag). Your repo is its owner's (`Setup.owner`, `@pineta/repo`); offers are
-// `host/offers/`'s.
+// `host/offers/`'s, and the integration line `line.ts`'s.
 
 import type { ProjectRecord } from "@pineta/core"
 import { createKeeper } from "@pineta/keeper"
@@ -21,6 +22,7 @@ import { type Archive, createArchive } from "./archive.ts"
 import { type Containers, createContainers } from "./containers.ts"
 import { createNewLanes, type NewLanes } from "./create.ts"
 import { createFetches } from "./fetch.ts"
+import { createLine, type Line } from "./line.ts"
 import { createRegistry } from "./registry.ts"
 import { startSetup } from "./setup.ts"
 import { createSplits, type Splits } from "./split.ts"
@@ -44,6 +46,8 @@ export type LaneWork = Pick<
     readonly hooks: LaneHooks
     /** Each lane's offer in your repo; null with no lanes of their own. */
     readonly offers: Offers | null
+    /** The integration line in your repo (ADR-0060); null with no lanes of their own. */
+    readonly line: Line | null
     /** The one writer of your repo (ADR-0065); null with no lanes of their own. Shutdown closes it. */
     readonly owner: RepoOwner | null
     /**
@@ -86,18 +90,31 @@ export async function startLaneWork(input: {
   const setup = await startSetup({ ...input, basics, keeper })
   const { root, owner, paths } = setup
   const registry = createRegistry({ session, root })
+  const lineConfig = setup.lanes?.line ?? DEFAULT_LINE
+  /** The integration line in your repo (ADR-0060); none without lanes of their own. */
+  const line: Line | null =
+    owner === null
+      ? null
+      : createLine({
+          owner,
+          basics,
+          line: lineConfig,
+          lineCommands: input.lineCommands,
+          writeValues: writes => input.agent().writeValues(writes),
+          taken: () => setup.refreshBaseSoon(),
+        })
   /** Each lane's offer in your repo (ADR-0038); none without lanes of their own. */
   const offers: Offers | null =
-    owner === null
+    owner === null || line === null
       ? null
       : startOffers({
           owner,
-          line: setup.lanes?.line ?? DEFAULT_LINE,
-          lineCommands: input.lineCommands,
+          line: lineConfig,
           basics,
           agent: input.agent,
           running: lane => readRunning(basics.live, lane),
           taken: () => setup.refreshBaseSoon(),
+          lineWork: line,
         })
   const containers = createContainers({
     basics,
@@ -170,6 +187,7 @@ export async function startLaneWork(input: {
     prepareSplit: splits.prepareSplit,
     splitEnded: splits.splitEnded,
     offers,
+    line,
     owner,
     teardown: archive.teardown,
     async quiet() {

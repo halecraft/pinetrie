@@ -498,23 +498,17 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
   is not a bookmark with the WIP prefix above the line (`bad_base`). The
   host checks it before the lane is created, so a refused send creates
   nothing.
-- **`wipState`** says what became of a WIP base: `ok`, `landed` (its
-  bookmark in the line's history, or, with the bookmark gone, the lane's
-  copy's source there: a squash or a rebase onto the line) or `gone` (S77
-  item 2); with no facts, a base on the line, `ok`. **`planUpdateFrom`**
-  then says what bringing a thread up to date merges, from the lane's
-  `LaneBase`: the base the thread follows by `effectiveBase`, the rule the
+- **What became of a WIP base** (`ok`, `landed` or `gone`, S77 item 2) is
+  read in `@pineta/repo` (`wipState`, `readWipState`), since the gather
+  needs it to know where an offer sits. **`planUpdateFrom`** then says what
+  bringing a thread up to date merges, from the lane's `LaneBase`: the base
+  the thread follows by `effectiveBase` (`line.ts`), the rule the
   page's button words itself from, so the button names what is merged. A
   WIP's copy is made `on` the lane's previous copy (`LaneBase.start`);
   nothing when the lane already holds the WIP's commit. The line once a WIP
   landed; refused (`base_gone`) for a gone WIP until "continue on the
   line", which `mark`s the move even with nothing to merge; refused
   (`no_line`) with no line. Only those two codes (`UpdateRefusal`).
-- **`takeDestinations`** lists where a take may move a bookmark, the
-  default first: the thread's WIP, then the line, with how many of the WIP's
-  commits land along. A conflicted offer never lands on the line: the line
-  is immutable, and the conflict would stay in its history. A gone WIP has
-  none.
 - **`planRetention`** keeps every snapshot of an open root, and each lane's
   newest when the root is archived; the base snapshot is never deleted.
 - **`showHostWorkingCopy`** shows a path under your working copy's root as the same
@@ -533,28 +527,41 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
   claim a success the repository contradicts (ADR-0033). `landingRecord`
   is the record a resolution's end writes, with that outcome.
 
-# Offers (`offer.ts`, ADR-0038)
+# Offers (`offer.ts`, `offer-view.ts`, `review.ts`, ADR-0038)
 
 A lane's work reaches you as an offer: one revision, or a stack, in your
-repo. The decisions are here; the jj steps that carry them out, and where an
-offer starts (`offerStart`), are `@pineta/lanes`'s.
+repo. What the host decides about it is `offer.ts`'s, from the facts
+`@pineta/repo` gathers, as decisions typed in `@pineta/core`
+(`core/offers.ts`): `@pineta/repo` turns each into jj steps
+(`offerEffects` and the rest), and the host connects the two, deciding
+nothing itself. Where an offer starts (`startOfOffer`, `offerStart`) is
+`@pineta/repo`'s. What the page reads is `offer-view.ts`, the review's wire
+`review.ts`, the commit-message format `@pineta/core`'s `trailers.ts`
+(`withTrailers`, `withoutTrailers`, `wipDescription`, `isWipLine`), and the
+commit-message request `request.ts` (`describeRequest`).
 
-- **`planRefresh`** decides what a trigger does, from the lane's tip, where an
-  offer would start (`StartRead`: known, or `untraced`), whether the lane's
-  work changes any file (`WorkChanges`: `none`, `some` or `unknown`), and
-  the offer as your repo holds it (`OfferInRepo`); or, for a thread whose
-  root is archived, the offer alone (ADR-0061): `build` (none: never built,
+## What the host decides (`offer.ts`)
+
+- **`planRefresh`** decides what a trigger does (`RefreshDecision`), from
+  `RefreshFacts`: for a placed lane, its place (`Placed`: tip, base,
+  target, a known start), whether the lane's work changes any file
+  (`WorkChanges`: `none`, `some` or `unknown`) and the offer as your repo
+  holds it (`OfferInRepo`); for an untraced start or a thread whose root is
+  archived (ADR-0061), the offer alone. Each decision carries what its
+  steps need: `build` (none: never built,
   taken, or gone), `follow` (the lane, or where the offer starts, moved under a single
   offer: updated in place, ADR-0039), `withdraw` (where it starts reached the
-  tip, the lane's work changes no file, its start is untraced, or the
-  thread is archived, edited or not), `forget` (no offer and none to build: a record left from one
+  tip, the lane's work changes no file, its start is untraced and the host
+  made it, or the thread is archived, edited or not), `forget` (no offer and none to build: a record left from one
   goes), `stale` (either moved under a stack), `refresh` (only
   the target moved), `leave` (you edited it), `repair` (a race left it
-  divergent), or `none`. Only work known to change a file, from a known
+  divergent), `none`, or `untouched`: an untraced start with an offer you
+  edited, or one divergent, which nothing touches until the lane catches up
+  (a gap ADR-0067's untraced start leaves). Only work known to change a file, from a known
   start, is built (ADR-0067): one built from less would be empty, or bring
   back what you took, and withdrawn after a build it would be built again on
-  the next poll. `unknown` keeps an offer that is there, and builds none. Where it starts is compared as a set: a merge's
-  parents come in any order. `follow` is not `update`, which is "update from
+  the next poll. `unknown` keeps an offer that is there, and builds none. Where it starts is compared as a set
+  (`sameStart`): a merge's parents come in any order. `follow` is not `update`, which is "update from
   my work" (`planUpdate`). An offer is edited (`offerEdited`) when its
   bottom's parent is not an ancestor of the target (S48 item 7), a commit of
   yours sits between its revisions, or any revision is edited
@@ -564,6 +571,37 @@ offer starts (`offerStart`), are `@pineta/lanes`'s.
   writes can hide your version. Moved (`offerMoved`) is its ledger against
   the lane's tip and start; an offer with no ledger reads as moved, and is
   followed once. The record's `stale` uses the same rule.
+- **`offerRecord`** is the record, the page's cache, from the offer as
+  your repo holds it: its files and conflicts, your edits (its files that
+  `@` changes), described (its first line no longer the WIP line), edited,
+  stale (a stack whose lane moved past its ledger), its bookmark (as the
+  gather found it) and its commits. **`planYourEdits`**: only `@` moved, so
+  each untaken record's `yourEdits` is rewritten from one shared read.
+- **`planOfferTake`** decides a take from the offer read in its own command
+  and what only a take reads (`TakeFacts`: the WIP's commits above the line,
+  and which bookmarks sit below the offer). Refused, in this order: no
+  offer (`no_offer`), a WIP gone (`bad_destination`), nothing shown
+  (`offer_changed`), a divergent offer (`no_offer`), other work than was
+  shown or a new conflict (`offer_changed`, ADR-0065), and a destination
+  that is not one of the offer's or not below it (`bad_destination`). Its
+  destinations are `takeDestinations`': the thread's WIP, then the line,
+  with how many of the WIP's commits land along. A conflicted offer never
+  lands on the line: the line is immutable, and the conflict would stay in
+  its history. A gone WIP has none. An untraced place can be taken: a take
+  moves a bookmark and needs no start.
+- **`planStackEnded`**: a split's stack replaces the offer only when its
+  top has exactly the tip's files (`acceptStack`, private), built at the
+  offer's place from the stack's own start and tip, which its ledger names;
+  an untraced place takes it. **`planRebuild`**, for squash and refresh,
+  rebuilds from the lane's tip as one revision on its WIP line, from a known
+  start only. Both are a `Rebuild`, as a build is, with the thread's name.
+- **`describeWanted`** says an offer is one to ask a message for: one
+  revision, not edited, on its WIP line unless asked again.
+  **`planDescribeAsk`** names the commit to ask for; **`planDescribeSettle`**
+  writes the answer only to that commit, read again in the command that
+  writes it, keeping the offer's ledger (or the place's tip and start
+  without one). **`planDescribeAgain`** refuses `describe` without a named
+  offer.
 - **`offerStatus`** decodes a `pineta.offer` record once (ADR-0067): `none`,
   `taken`, `held` or `open`. Every reader on the page switches on it, never
   on the record's fields: the strip, the header's activity badge and the tab's Archive
@@ -572,12 +610,15 @@ offer starts (`offerStart`), are `@pineta/lanes`'s.
   already where it sits, by a route the ledger does not record (S89), so
   nothing counts it, warns about it, reviews it or takes it. One you edited
   is `open` whatever its files.
-- **`catchUpOf`** says what catching up would do, from `pineta.base` and
-  the line's record: `current` (the base has not moved since the lane took
-  from it), `unknown` (it moved, and the host's `catchUp` was not read at
-  the commit it is at now), `nothing-new` (it moved by work the lane holds,
-  as after you took its own offer) or `brings`, with the file count. The
-  commit comparison it starts from (`baseMoved`) is private to it.
+  The host's untaken records, open or held, are `isUntaken`: the lanes it
+  marks on a full observation, and the records `@` rewrites.
+- **An offer's record is the page's cache** (ADR-0060): written from the
+  repo after each of the host's steps, never read back to decide. Its
+  `commits` are the revisions' commits at that read, what a review may
+  read. A divergent offer is recorded only once repaired.
+
+## What the page reads (`offer-view.ts`, `line.ts`)
+
 - **`offerView`** is ADR-0038's state table as a decision, from an
   `OfferStatus`: the offer's state, its buttons, its menu, which of those
   are `quiet` (listed, but changing nothing now), and the facts its words
@@ -596,13 +637,6 @@ offer starts (`offerStart`), are `@pineta/lanes`'s.
   its copy (`conflictCause`) and the parent, ahead, holds none of those
   files conflicted: then `catch-up-parent`. While the parent is ahead,
   `catch-up-parent` is in every idle state's menu, quiet while it runs.
-- **`catchUpName`** (`work.ts`) is the one wording of what a catch-up
-  merges (`CatchUpFrom`): "the project" for the line, the bookmark for a
-  WIP (ADR-0061), the thread's name for the thread a thread branched from
-  (ADR-0072). `updateLine` uses it through the update's `from`, decoded
-  from the stored `parent`, else `base` and its `line` flag; an update
-  stored before the flag names its base by its bookmark. Update and land
-  messages are history, so their old fields still decode.
 - **`conflictCause`** says where an offer's conflict comes from: `start`
   when every file it conflicts in is in its `startConflicts`, the files
   conflicted where it starts, so the conflict came with the lane's copy;
@@ -615,13 +649,37 @@ offer starts (`offerStart`), are `@pineta/lanes`'s.
   the fork commit. A lane's commits only move forward, so the parent is
   ahead when the two differ (`parentAhead`). `planParentUpdate` merges its
   newest commit, or nothing, or refuses `no_parent` and `parent_running`.
-- **`acceptStack`** takes an agent's stack only when its top has exactly the
-  tip's files.
-- **`describeRequest`** is the commit-message request: the skill, your
-  repo's recent messages, the thread's messages and the diff. Over its
-  budget, the thread's oldest messages go first, then the diff is cut; the
-  skill never is. `withTrailers` adds the host's own trailers:
-  `Pineta-Thread`, `Pineta-Lane` and `Pineta-Entry`.
+- **`catchUpOf`** (`line.ts`) says what catching up would do, from `pineta.base` and
+  the line's record: `current` (the base has not moved since the lane took
+  from it), `unknown` (it moved, and the host's `catchUp` was not read at
+  the commit it is at now), `nothing-new` (it moved by work the lane holds,
+  as after you took its own offer) or `brings`, with the file count. The
+  commit comparison it starts from (`baseMoved`) is private to it.
+- **`catchUpName`** (`work.ts`) is the one wording of what a catch-up
+  merges (`CatchUpFrom`): "the project" for the line, the bookmark for a
+  WIP (ADR-0061), the thread's name for the thread a thread branched from
+  (ADR-0072). `updateLine` uses it through the update's `from`, decoded
+  from the stored `parent`, else `base` and its `line` flag; an update
+  stored before the flag names its base by its bookmark. Update and land
+  messages are history, so their old fields still decode.
+
+## The line (`line.ts`, ADR-0060, ADR-0061)
+
+- **`planLineRecord`** is the line's record from what the host read
+  (`LineFacts`), beside what setting the line up would write to your
+  repo's config, which `@pineta/repo` words (`lineProposal`: jj's config
+  text), and whether this host takes `line` commands.
+- **`planLineAction`** decides a `line` command from the record read in
+  its own step (`LineDecision`): refused on a host that admits others
+  (`not_yours`), with no line (`no_line`), or with nothing to do
+  (`refused`); setup writes exactly the heads and log the record proposed,
+  the text you were shown, and follow runs only with the preview you were
+  shown. `@pineta/repo` turns it into steps (`lineSteps`).
+- **`effectiveBase`** and **`catchUpOf`** are the thread's base on the line,
+  as above.
+
+## The review's wire (`review.ts`)
+
 - **The review's wire** (ADR-0047) is here, since the host and the page both
   import it:
   - Every read is of a span (`DiffSpan`, ADR-0056): a revision, or a range
@@ -641,22 +699,6 @@ offer starts (`offerStart`), are `@pineta/lanes`'s.
     refuses an empty path or one with a control character.
     `answerReview` and `answerDiff` settle what was read: 502 when the
     read failed, 413 past `MAX_DIFF_BYTES`.
-- **An offer's record is the page's cache** (ADR-0060): written from the
-  repo after each of the host's steps, never read back to decide. Its
-  `commits` are the revisions' commits at that read, what a review may
-  read. A divergent offer is recorded only once repaired.
-- **`isWipLine`** is the test for "described": the first line is no longer
-  this thread's `wipDescription`. **`describeWanted`** says an offer is one
-  to ask a message for: one revision, not edited, on its WIP line unless
-  asked again.
-- **`withoutTrailers`** drops a last paragraph made only of the host's
-  `TRAILERS` (`@pineta/core`), which `withTrailers` writes. A paragraph
-  with any other line, your own trailers included, stays.
-- **`wipDescription`** is the line an offer carries until an agent describes
-  it: `WIP (<name>): <first line>`, the first line being the lane's own first
-  prompt (`firstPromptOf`, in `@pineta/core`), not its root's, which every
-  branch shares. A follow puts it back when the offer carried the agent's
-  message, which no longer describes it.
 
 # Thread names (`names.ts`, ADR-0039)
 

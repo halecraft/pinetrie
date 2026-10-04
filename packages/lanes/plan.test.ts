@@ -1,5 +1,6 @@
 import {
   BASE_SNAPSHOT,
+  baseMessage,
   commitId,
   laneNameForThread,
   shellWord,
@@ -8,7 +9,6 @@ import {
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import {
-  baseMessage,
   DEFAULT_LINE,
   decodeLaneConfig,
   FETCHED_REF,
@@ -22,7 +22,6 @@ import {
   lineConfig,
   mountArgs,
   NO_GRANTS,
-  parseBase,
   planBaseRefresh,
   planBundle,
   planContainer,
@@ -515,13 +514,6 @@ describe("planMerge: an update's steps (ADR-0060)", () => {
       came: { from: C1, to: C2 },
     })
   })
-})
-
-test("baseMessage and parseBase round-trip a Pineta-Base", () => {
-  const m = baseMessage("copy of wip/a@b", { bookmark: "wip/a@b", commit: C1 })
-  expect(m).toBe("copy of wip/a@b\n\nPineta-Base: wip/a@b@c1\n")
-  expect(parseBase("wip/a@b@c1")).toEqual({ bookmark: "wip/a@b", commit: C1 })
-  expect(parseBase("nope")).toBeNull()
 })
 
 test("fetchById: skipped when every commit is on the disk, else onto branches", () => {

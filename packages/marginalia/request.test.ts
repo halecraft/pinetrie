@@ -1,6 +1,11 @@
 import { entryId, type TranscriptMessage } from "@pineta/core"
 import { describe, expect, test } from "vitest"
-import { fitNewest, leftOut, transcriptLines } from "./request.ts"
+import {
+  describeRequest,
+  fitNewest,
+  leftOut,
+  transcriptLines,
+} from "./request.ts"
 
 const message = (
   role: string,
@@ -63,4 +68,38 @@ describe("fitNewest", () => {
 test("leftOut says how many, and nothing for none", () => {
   expect(leftOut(0)).toBe("")
   expect(leftOut(3)).toBe("- (3 earlier left out)\n")
+})
+
+describe("the commit message", () => {
+  test("describeRequest: the thread's messages go first, then the diff; never the skill", () => {
+    const skill = "Write a commit message."
+    const full = describeRequest({
+      skill,
+      diff: "d".repeat(100),
+      messages: ["first", "second"],
+      recent: ["feat: a thing"],
+      budget: 10_000,
+    })
+    expect(full.system).toBe(skill)
+    expect(full.user).toContain("- first")
+    expect(full.user).toContain("d".repeat(100))
+    const tight = describeRequest({
+      skill,
+      diff: "d".repeat(100),
+      messages: ["an early one", "x"],
+      recent: [],
+      budget: 190,
+    })
+    expect(tight.system).toBe(skill)
+    expect(tight.user).not.toContain("an early one")
+    expect(tight.user).toContain("d".repeat(100))
+    const tighter = describeRequest({
+      skill,
+      diff: "d".repeat(500),
+      messages: ["m"],
+      recent: [],
+      budget: 200,
+    })
+    expect(tighter.user).toContain("the rest of the diff left out")
+  })
 })

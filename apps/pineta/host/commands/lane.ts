@@ -28,7 +28,7 @@ import type { LaneWork } from "../work/index.ts"
 export interface LaneDeps {
   readonly basics: Basics
   readonly agent: Pick<Agent, "lane" | "writeValues">
-  readonly work: Pick<LaneWork, "offers" | "prepareSplit">
+  readonly work: Pick<LaneWork, "offers" | "line" | "prepareSplit">
   readonly start: Runs["start"]
   /** Stop a chat's run that has not reached pi yet (`Runs.cancel`). */
   readonly cancel: Runs["cancel"]
@@ -170,14 +170,14 @@ export async function actOnLine(
   deps: Pick<LaneDeps, "work">,
   action: LineAction,
 ): Promise<Outcome> {
-  const offers = deps.work.offers
-  if (offers === null)
+  const { line } = deps.work
+  if (line === null)
     return {
       kind: "refused",
       code: ERR.NOT_OWN_COPY,
       message: "this host has no lanes of their own",
     }
-  const refused = await offers.line(action)
+  const refused = await line.act(action)
   return refused === null
     ? { kind: "line-moved" }
     : { kind: "refused", code: refused, message: lineRefusal(action, refused) }

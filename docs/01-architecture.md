@@ -118,7 +118,7 @@ packages/     libraries; their boundaries are enforced by resolution
   reads/         @pineta/reads        document reads shared by the host and the client
   lanes/         @pineta/lanes        a lane's container and disk, and jj and git in it (TECHNICAL.md)
   keeper/        @pineta/keeper       declares NOTHING; one step at a time on a resource (TECHNICAL.md)
-  repo/          @pineta/repo         your repo: offers, the line, lanes' refs; jj and git there (TECHNICAL.md)
+  repo/          @pineta/repo         your repo: reads, steps, the owner; offers, the line, lanes' refs (TECHNICAL.md)
   client/        @pineta/client       browser UI and session client; owns its Vite build
 
 (root)        a bare workspace: development tooling only, no dependencies
@@ -197,7 +197,11 @@ message it sends; writers own no lanes. A lane belongs to a thread: created
 where agent work is first wanted there, never moved, never written while it
 runs (ADR-0020). Threads run concurrently. Decisions are pure (`planChat`,
 `planArchive` and the rest in `@pineta/marginalia`, over facts read by `@pineta/reads`);
-the host gathers, plans and executes each command in one serial step.
+the host gathers, plans and executes each command in one serial step. A
+decision that acts on your repo (an offer, the line) is a value typed in
+`@pineta/core`, decided by `@pineta/marginalia` from facts `@pineta/repo`
+reads, and carried out by `@pineta/repo`'s steps: the two packages never
+import each other, and the host only connects them.
 
 Wire sentinels live only in `packages/protocol/codec.ts`. The wire is total, so `""`
 stands for "absent"; the codec decodes commands into an `Intent` union and

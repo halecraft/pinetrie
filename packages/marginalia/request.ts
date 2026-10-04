@@ -1,9 +1,9 @@
 // What a one-shot model request outside a thread is made from: a thread's
 // messages as lines, and the newest of them that fit a budget, as the commit
-// message's request (`describeRequest`) uses them; and a one-line answer
-// read back (`bareLine`).
+// message's request (`describeRequest`, below) uses them; and a one-line
+// answer read back (`bareLine`).
 
-import type { TranscriptMessage } from "@pineta/core"
+import { firstLine, type TranscriptMessage } from "@pineta/core"
 
 /**
  * One message as `speaker: text`. A chat's speaker is its author as sent;
@@ -57,6 +57,40 @@ export const LEFT_OUT_NOTE = 32
 /** The line saying how many older lines `fitNewest` left out; empty for none. */
 export const leftOut = (dropped: number): string =>
   dropped > 0 ? `- (${dropped} earlier left out)\n` : ""
+
+/**
+ * The commit-message request: the skill as the system text, then your repo's
+ * recent descriptions, what the thread said since the last take, and the
+ * diff. Over `budget` characters, the thread's messages go first, oldest
+ * first, then the diff is cut; the skill never is.
+ */
+export function describeRequest(input: {
+  readonly skill: string
+  readonly diff: string
+  readonly messages: readonly string[]
+  readonly recent: readonly string[]
+  readonly budget: number
+}): { readonly system: string; readonly user: string } {
+  const recent = input.recent.map(r => `- ${firstLine(r, 120)}`).join("\n")
+  const head = `Recent commit messages in this repository:\n${recent || "- (none)"}\n\n`
+  let room = Math.max(0, input.budget - head.length)
+  // The diff is kept whole when it fits; the messages share what is left,
+  // less room for the line saying how many were left out.
+  const { text, dropped } = fitNewest(
+    input.messages,
+    Math.max(0, room - Math.min(input.diff.length, room) - LEFT_OUT_NOTE),
+  )
+  const said = leftOut(dropped) + (text || "- (no messages)\n")
+  room -= said.length
+  const diff =
+    input.diff.length <= room
+      ? input.diff
+      : `${input.diff.slice(0, Math.max(0, room - 40))}\n… (the rest of the diff left out)`
+  return {
+    system: input.skill.trim(),
+    user: `${head}What the thread said:\n${said}\nThe change:\n${diff}`,
+  }
+}
 
 /** Wrapping a model may put around a one-line answer. */
 const WRAPPED = /^["'`*_“‘]+|["'`*_”’]+$/g

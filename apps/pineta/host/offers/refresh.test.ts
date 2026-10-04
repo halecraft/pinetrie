@@ -7,6 +7,7 @@ import { mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import {
+  baseMessage,
   type CommitId,
   commitId,
   HOST_OPERATOR,
@@ -16,7 +17,6 @@ import {
   type ThreadName,
 } from "@pineta/core"
 import {
-  baseMessage,
   DEFAULT_LINE,
   laneTipRef,
   lines,
@@ -30,7 +30,7 @@ import { startRepoOwner } from "@pineta/repo"
 import { afterAll, expect, test } from "vitest"
 import { applyWrites, basics, putValue, record } from "../fakes.ts"
 import { createRefresh } from "./refresh.ts"
-import { createOfferState } from "./state.ts"
+import { createOfferDeps } from "./state.ts"
 
 const LANE = laneNameForThread("1")
 const THREAD = "vernal-pine" as ThreadName
@@ -94,16 +94,15 @@ async function settles(dir: string, lane: LaneName, name: ThreadName) {
   })
   const owner = startRepoOwner({ root: dir, line: DEFAULT_LINE })
   try {
-    const state = createOfferState({
+    const deps = createOfferDeps({
       owner,
       line: DEFAULT_LINE,
-      lineCommands: true,
       basics: b,
       agent: () => agent.port,
       running: () => false,
       taken: () => {},
     })
-    const refresh = createRefresh(state)
+    const refresh = createRefresh(deps)
     const op = () =>
       owner.command(
         async ops =>

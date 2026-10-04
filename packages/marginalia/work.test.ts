@@ -37,7 +37,6 @@ import {
   renderableMessage,
   setRecord,
   showHostWorkingCopy,
-  wipState,
 } from "./index.ts"
 
 const LANE = laneNameForThread("1")
@@ -304,37 +303,6 @@ describe("planBegin: the line, or a WIP's copy (ADR-0060)", () => {
     expect(begin(null, { line: null, wip: null })).toBe(ERR.NO_LINE)
     expect(begin("main", { line: L, wip })).toBe(ERR.BAD_BASE)
     expect(begin("wip/x", { line: L, wip: null })).toBe(ERR.BAD_BASE)
-  })
-})
-
-describe("wipState: landed, gone, or ok (ADR-0060, S77 item 2)", () => {
-  const W = commitId("w1")
-  test.each([
-    [
-      "the bookmark above the line",
-      { bookmark: W, bookmarkInLine: false, sourceInLine: false },
-      "ok",
-    ],
-    [
-      "the bookmark on the line (landed, or squashed into it)",
-      { bookmark: W, bookmarkInLine: true, sourceInLine: false },
-      "landed",
-    ],
-    [
-      "the bookmark gone, its work on the line",
-      { bookmark: null, bookmarkInLine: false, sourceInLine: true },
-      "landed",
-    ],
-    [
-      "the bookmark gone, its work not",
-      { bookmark: null, bookmarkInLine: false, sourceInLine: false },
-      "gone",
-    ],
-  ] as const)("%s: %s", (_, facts, state) => {
-    expect(wipState(facts)).toBe(state)
-  })
-  test("a line base, with no WIP facts, is ok", () => {
-    expect(wipState(null)).toBe("ok")
   })
 })
 

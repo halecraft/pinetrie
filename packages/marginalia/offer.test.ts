@@ -2,59 +2,44 @@ import {
   type BaseRecord,
   type CommitId,
   commitId,
-  type EntryId,
-  entryId,
-  type LandingRecord,
-  type LaneName,
+  ERR,
   laneNameForThread,
+  type OfferGather,
   type OfferInRepo,
+  type OfferNow,
   type OfferRecord,
-  type RevisionRecord,
+  type OfferSeen,
+  type Placed,
+  type RefreshFacts,
+  type StackFacts,
   type StartRead,
+  type TakeDecision,
   type ThreadName,
-  TRAILERS,
-  trailerValues,
   type WorkChanges,
   writerId,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import {
-  acceptStack,
-  answerDiff,
-  answerReview,
   BASE as BASE_RECORD,
-  type CatchUpNow,
-  catchUpOf,
-  conflictCause,
   decodeStack,
   decodeUpdate,
-  describeRequest,
-  describeWanted,
-  diffUrl,
   encodeUpdate,
-  isWipLine,
   LINE,
-  MAX_DIFF_BYTES,
   OFFER,
-  OFFER_WIRE,
   offerMoved,
-  offerSeen,
-  offerStatus,
-  offerView,
-  type ParentNow,
-  parseOfferPath,
-  planOfferRead,
+  offerRecord,
+  planDescribeAgain,
+  planDescribeAsk,
+  planDescribeSettle,
+  planOfferTake,
+  planRebuild,
   planRefresh,
   planStack,
-  type RefreshFacts,
+  planStackEnded,
+  planYourEdits,
   renderableMessage,
-  reviewUrl,
   setRecord,
   takeDestinations,
-  wipDescription,
-  withLedger,
-  withoutTrailers,
-  withTrailers,
 } from "./index.ts"
 
 const LANE = laneNameForThread("1")
@@ -81,400 +66,6 @@ const offer: OfferRecord = {
   at: 10,
 }
 
-test("offerSeen: what a take was shown is the record's ledger and whether it conflicted; no record shows none", () => {
-  const ledger = { source: TIP, start: [BASE] }
-  expect(offerSeen({ ...offer, ledger, conflicts: ["a.txt"] })).toEqual({
-    ledger,
-    conflicted: true,
-  })
-  expect(offerSeen(offer)).toEqual({ ledger: null, conflicted: false })
-  expect(offerSeen(undefined)).toEqual({ ledger: null, conflicted: false })
-})
-
-describe("offerView: ADR-0038's table", () => {
-  const MOVE = {
-    base: { kind: "line" },
-    bookmark: "pineta-onto",
-    from: commitId("l1"),
-    to: commitId("l2"),
-  } as const
-  const view = (
-    o: OfferRecord | undefined,
-    activity: "idle" | "turn" | "resolution" | "split" = "idle",
-    landing?: LandingRecord,
-    catching: {
-      catchUp?: CatchUpNow
-      untraced?: boolean
-      catchingUp?: boolean
-      parent?: ParentNow | null
-      parentRunning?: boolean
-    } = {},
-  ) =>
-    offerView({
-      offer: offerStatus(o),
-      activity,
-      landing,
-      base: null,
-      onto: "pineta-onto",
-      wipAhead: 0,
-      catchUp: catching.catchUp ?? { kind: "current" },
-      untraced: catching.untraced ?? false,
-      catchingUp: catching.catchingUp ?? false,
-      parent: catching.parent ?? null,
-      parentRunning: catching.parentRunning ?? false,
-    })
-  const at = (v: ReturnType<typeof view>) => [v.state, v.buttons, v.menu]
-  test("every state, with its buttons", () => {
-    expect(at(view(undefined))).toEqual(["nothing", [], ["update"]])
-    expect(at(view({ ...offer, files: [] }))).toEqual([
-      "nothing",
-      [],
-      ["update"],
-    ])
-    expect(at(view(offer, "turn"))).toEqual(["running", [], []])
-    expect(at(view(offer, "resolution"))).toEqual(["busy", [], []])
-    expect(at(view(offer, "split"))).toEqual(["busy", [], []])
-    expect(at(view(offer))).toEqual([
-      "ready",
-      ["take", "split"],
-      ["describe", "update"],
-    ])
-    // Only a clean offer lands on the line (ADR-0060): no take on a line thread.
-    expect(at(view({ ...offer, conflicts: ["a.txt"] }))).toEqual([
-      "conflicts",
-      ["update"],
-      [],
-    ])
-    expect(at(view({ ...offer, size: 2 }))).toEqual([
-      "stack",
-      ["take", "squash"],
-      ["update"],
-    ])
-    expect(at(view({ ...offer, size: 2, stale: true }))).toEqual([
-      "stale",
-      ["split", "take"],
-      ["update"],
-    ])
-    expect(at(view({ ...offer, edited: true }))).toEqual([
-      "edited",
-      ["take", "refresh"],
-      ["update"],
-    ])
-    expect(at(view({ ...offer, taken: "zz12345678" }))).toEqual([
-      "taken",
-      [],
-      ["update"],
-    ])
-  })
-  test("files you are editing are a fact; the state and buttons stay", () => {
-    const v = view({ ...offer, yourEdits: ["b.txt"] })
-    expect([v.state, v.buttons, v.facts.touchesYourEdits]).toEqual([
-      "ready",
-      ["take", "split"],
-      true,
-    ])
-    expect(view(offer).facts.touchesYourEdits).toBe(false)
-  })
-  test("the facts: an untaken offer's bookmark, files and size", () => {
-    expect(view({ ...offer, size: 2 }).facts).toEqual({
-      activity: "idle",
-      files: 2,
-      size: 2,
-      conflicts: 0,
-      touchesYourEdits: false,
-      bookmark: "pineta-offer/t-1",
-      held: false,
-      taken: null,
-      base: { kind: "line" },
-      onto: "pineta-onto",
-      catchUp: { kind: "current" },
-      untraced: false,
-      conflictCause: "work",
-      parent: null,
-      parentResolves: false,
-    })
-    expect(view(offer, "turn").facts.files).toBe(2)
-    const none = view(undefined).facts
-    expect([none.files, none.bookmark, none.taken]).toEqual([0, null, null])
-    const taken = view({ ...offer, taken: "zz12345678" }).facts
-    expect([taken.files, taken.bookmark, taken.taken]).toEqual([
-      0,
-      null,
-      "zz12345678",
-    ])
-    // Held: its bookmark is a fact in jj, and nothing in it is to take.
-    const held = view({ ...offer, files: [] })
-    expect([held.facts.held, held.facts.bookmark, held.destinations]).toEqual([
-      true,
-      "pineta-offer/t-1",
-      [],
-    ])
-  })
-  test("offerStatus: one decoding of a record, which every reader shares (ADR-0067)", () => {
-    expect(offerStatus(undefined)).toEqual({ kind: "none" })
-    expect(offerStatus({ ...offer, taken: "zz" })).toEqual({
-      kind: "taken",
-      as: "zz",
-    })
-    expect(offerStatus({ ...offer, files: [] }).kind).toBe("held")
-    expect(offerStatus({ ...offer, files: [], edited: true }).kind).toBe("open")
-    expect(offerStatus(offer).kind).toBe("open")
-  })
-  test("behind its base, catching up stands beside the offer; with nothing to take, alone", () => {
-    const behind = {
-      catchUp: { kind: "brings", move: MOVE, files: 2 },
-    } as const
-    expect(at(view(offer, "idle", undefined, behind))).toEqual([
-      "ready",
-      ["take", "split", "update"],
-      ["describe"],
-    ])
-    expect(at(view(undefined, "idle", undefined, behind))).toEqual([
-      "nothing",
-      ["update"],
-      [],
-    ])
-    expect(view(undefined, "idle", undefined, behind).facts.catchUp).toEqual(
-      behind.catchUp,
-    )
-    // Running, nothing to catch up with is offered at all.
-    expect(at(view(offer, "turn", undefined, behind))).toEqual([
-      "running",
-      [],
-      [],
-    ])
-  })
-  test("catching up that would change nothing is listed, but quiet; one not yet read is not (S97)", () => {
-    const quiet = (catchUp: CatchUpNow) =>
-      view(offer, "idle", undefined, { catchUp }).quiet
-    expect(quiet({ kind: "current" })).toEqual(["update"])
-    expect(quiet({ kind: "nothing-new", move: MOVE })).toEqual(["update"])
-    expect(quiet({ kind: "unknown", move: MOVE })).toEqual([])
-    expect(quiet({ kind: "brings", move: MOVE, files: 1 })).toEqual([])
-    // A thread whose WIP is gone continues on the line: never quiet.
-    const gone = offerView({
-      offer: offerStatus(undefined),
-      activity: "idle",
-      landing: undefined,
-      base: { base: { kind: "wip", bookmark: "wip/a" }, state: "gone" },
-      parent: null,
-      parentRunning: false,
-      onto: "pineta-onto",
-      wipAhead: 0,
-      catchUp: { kind: "current" },
-      untraced: false,
-      catchingUp: false,
-    })
-    expect([gone.menu, gone.quiet]).toEqual([["continue"], []])
-  })
-  test("an untraced thread's offer you edited can be taken, never rebuilt (S97)", () => {
-    const edited = view({ ...offer, edited: true }, "idle", undefined, {
-      untraced: true,
-    })
-    expect(at(edited)).toEqual(["edited", ["take", "update"], []])
-  })
-  test("an untraced thread offers nothing, and catching up beside it, never quiet (S97)", () => {
-    const untraced = view(undefined, "idle", undefined, { untraced: true })
-    expect([...at(untraced), untraced.quiet, untraced.facts.untraced]).toEqual([
-      "nothing",
-      ["update"],
-      [],
-      [],
-      true,
-    ])
-  })
-  test("a card bringing the thread up to date, queued on an idle lane: the offer is busy with it", () => {
-    const queued = view(offer, "idle", undefined, { catchingUp: true })
-    expect([queued.state, queued.buttons, queued.facts.activity]).toEqual([
-      "busy",
-      [],
-      "catch-up",
-    ])
-    expect(
-      view(offer, "turn", undefined, { catchingUp: true }).facts.activity,
-    ).toBe("turn")
-  })
-  test("catchUpOf: moved from the commit a lane last took from its base to the base's now, and what the host read of it there (S97)", () => {
-    const moved = (...args: Parameters<typeof catchUpOf>) =>
-      catchUpOf(...args).kind !== "current"
-    const L1 = commitId("l1")
-    const L2 = commitId("l2")
-    const W1 = commitId("w1")
-    const line = (
-      commit: typeof L1 | null,
-      wips = [] as { bookmark: string; commit: typeof L1 }[],
-    ) => ({
-      onto: "pineta-onto",
-      wipPrefix: "wip/",
-      commit,
-      heads: { current: null, proposed: "" },
-      log: { current: null, proposed: "" },
-      wips: wips.map(w => ({ ...w, behind: 0, ahead: 1 })),
-      yours: {
-        behind: 0,
-        ahead: null,
-        follow: null,
-        conflicts: { commits: 0, files: [] },
-      },
-      commands: true,
-    })
-    const onLine: BaseRecord = {
-      lane: LANE,
-      base: { kind: "line" as const },
-      start: L1,
-      state: "ok" as const,
-      catchUp: null,
-      untraced: [],
-    }
-    const onWip: BaseRecord = {
-      lane: LANE,
-      base: { kind: "wip" as const, bookmark: "wip/a" },
-      start: W1,
-      state: "ok" as const,
-      catchUp: null,
-      untraced: [],
-    }
-    expect(moved(onLine, line(L1))).toBe(false)
-    expect(moved(onLine, line(L2))).toBe(true)
-    expect(moved(onLine, line(null))).toBe(false)
-    expect(moved(undefined, line(L2))).toBe(false)
-    expect(moved(onWip, line(L2, [{ bookmark: "wip/a", commit: W1 }]))).toBe(
-      false,
-    )
-    expect(
-      moved(onWip, line(L2, [{ bookmark: "wip/a", commit: commitId("w2") }])),
-    ).toBe(true)
-    // Landed: on the line now, and caught up with it only once merged.
-    expect(moved({ ...onWip, state: "landed" }, line(L2))).toBe(true)
-    expect(moved({ ...onWip, state: "gone" }, line(L2))).toBe(false)
-    const move = {
-      base: { kind: "line" },
-      bookmark: "pineta-onto",
-      from: L1,
-      to: L2,
-    }
-    expect(catchUpOf(onLine, line(L2))).toEqual({ kind: "unknown", move })
-    expect(
-      catchUpOf(
-        onWip,
-        line(L2, [{ bookmark: "wip/a", commit: commitId("w2") }]),
-      ),
-    ).toMatchObject({ move: { bookmark: "wip/a", from: W1, to: "w2" } })
-    // The host's read counts only at the commit the base is at now.
-    const read = (to: typeof L1, files: string[]): BaseRecord => ({
-      ...onLine,
-      catchUp: { tip: commitId("t"), to, files },
-    })
-    expect(catchUpOf(read(L2, []), line(L2))).toEqual({
-      kind: "nothing-new",
-      move,
-    })
-    expect(catchUpOf(read(L2, ["a", "b"]), line(L2))).toEqual({
-      kind: "brings",
-      move,
-      files: 2,
-    })
-    expect(catchUpOf(read(commitId("l0"), []), line(L2))).toEqual({
-      kind: "unknown",
-      move,
-    })
-  })
-  test("a resolution that asked you counts only when newer than the offer", () => {
-    const asked: LandingRecord = {
-      id: "l",
-      lane: LANE,
-      prompt: entryId("e"),
-      state: "needs_you",
-      by: ADA,
-      at: 20,
-    }
-    expect(view(offer, "idle", asked).state).toBe("needs_you")
-    expect(view(offer, "idle", { ...asked, at: 5 }).state).toBe("ready")
-  })
-})
-
-describe("a conflict that came with the copy, and the thread it branched from (ADR-0072)", () => {
-  const P = laneNameForThread("p")
-  const parent = (over: Partial<ParentNow> = {}): ParentNow => ({
-    kind: "parent",
-    lane: P,
-    name: "amber-fox" as ThreadName,
-    newest: T2,
-    taken: TIP,
-    conflicts: [],
-    ...over,
-  })
-  const view = (o: OfferRecord, p: ParentNow | null, parentRunning = false) =>
-    offerView({
-      offer: offerStatus(o),
-      activity: "idle",
-      landing: undefined,
-      base: null,
-      onto: "pineta-onto",
-      wipAhead: 0,
-      catchUp: { kind: "current" },
-      untraced: false,
-      catchingUp: false,
-      parent: p,
-      parentRunning,
-    })
-  const fromStart = {
-    ...offer,
-    conflicts: ["a.txt"],
-    startConflicts: ["a.txt"],
-  }
-  test("conflictCause: the start only when every conflicted file was conflicted there", () => {
-    expect(conflictCause(offer)).toBe("work")
-    expect(conflictCause(fromStart)).toBe("start")
-    expect(
-      conflictCause({
-        ...offer,
-        conflicts: ["a.txt", "b.txt"],
-        startConflicts: ["a.txt"],
-      }),
-    ).toBe("work")
-    expect(
-      conflictCause({ ...offer, conflicts: [], startConflicts: ["a.txt"] }),
-    ).toBe("work")
-  })
-  test("a start conflict the parent has resolved is caught up with the parent", () => {
-    const v = view(fromStart, parent())
-    expect([v.state, v.buttons, v.menu]).toEqual([
-      "conflicts",
-      ["catch-up-parent"],
-      [],
-    ])
-    expect(v.facts).toMatchObject({
-      conflictCause: "start",
-      parent: { kind: "parent", lane: P, name: "amber-fox" },
-      parentResolves: true,
-    })
-  })
-  test("one the parent still has, or a parent not ahead, or a conflict of the lane's own, is caught up with the base", () => {
-    expect(view(fromStart, parent({ conflicts: ["a.txt"] })).buttons).toEqual([
-      "update",
-    ])
-    expect(view(fromStart, parent({ newest: TIP })).buttons).toEqual(["update"])
-    expect(view(fromStart, null).buttons).toEqual(["update"])
-    expect(view({ ...offer, conflicts: ["a.txt"] }, parent()).buttons).toEqual([
-      "update",
-    ])
-  })
-  test("while the parent is ahead it is in the menu, quiet while it runs", () => {
-    expect(view(offer, parent()).menu).toEqual([
-      "describe",
-      "update",
-      "catch-up-parent",
-    ])
-    expect(view(offer, parent({ newest: TIP })).menu).toEqual([
-      "describe",
-      "update",
-    ])
-    expect(view(offer, parent(), true).quiet).toContain("catch-up-parent")
-    expect(view(fromStart, parent(), true).quiet).toEqual(["catch-up-parent"])
-  })
-})
-
 describe("planRefresh", () => {
   const host = { reached: true, yoursChanged: false }
   const rev = (since = host) => ({ commit: TIP, change: "k", since })
@@ -482,6 +73,7 @@ describe("planRefresh", () => {
     o: Partial<Extract<OfferInRepo, { kind: "offer" }>> = {},
   ): OfferInRepo => ({
     kind: "offer",
+    bookmark: `pineta-offer/t-1`,
     revisions: [rev()],
     chained: true,
     ledger: { source: TIP, start: [BASE] },
@@ -498,105 +90,132 @@ describe("planRefresh", () => {
     tip = TIP,
     start: readonly CommitId[] | StartRead = [BASE],
     work: WorkChanges = "some",
-  ): RefreshFacts => ({
-    archived: false,
+  ): RefreshFacts =>
+    "kind" in start
+      ? start.kind === "untraced"
+        ? { kind: "untraced", offer }
+        : { kind: "placed", place: placed(tip, start.start), work, offer }
+      : { kind: "placed", place: placed(tip, start), work, offer }
+  const placed = (tip: CommitId, start: readonly CommitId[]): Placed => ({
+    kind: "placed",
     tip,
-    start: "kind" in start ? start : { kind: "known", start },
-    work,
-    offer,
+    base: { base: { kind: "line" }, start: BASE, source: BASE },
+    state: "ok",
+    target: commitId("l0"),
+    start,
   })
+  /** What `planRefresh` decides, by its kind. */
+  const plan = (f: RefreshFacts) => planRefresh(f).kind
   test("no offer in your repo (never built, taken, or gone): build, unless the lane holds nothing you lack, when a record left from one is forgotten", () => {
-    expect(planRefresh(facts(null))).toBe("build")
-    expect(planRefresh(facts(null, TIP, [TIP]))).toBe("forget")
+    expect(plan(facts(null))).toBe("build")
+    expect(plan(facts(null, TIP, [TIP]))).toBe("forget")
   })
   test("a lane whose work changes no file is never built, and its offer is withdrawn unless you edited it", () => {
-    expect(planRefresh(facts(null, TIP, [BASE], "none"))).toBe("forget")
-    expect(planRefresh(facts(read(), TIP, [BASE], "none"))).toBe("withdraw")
-    expect(
-      planRefresh(facts(read({ chained: false }), TIP, [BASE], "none")),
-    ).toBe("leave")
-  })
-  test("what jj could not tell never builds an offer, and keeps one that is there (ADR-0067)", () => {
-    expect(planRefresh(facts(null, TIP, [BASE], "unknown"))).toBe("forget")
-    expect(planRefresh(facts(read(), TIP, [BASE], "unknown"))).toBe("none")
-    expect(planRefresh(facts(read(), T2, [BASE], "unknown"))).toBe("follow")
-  })
-  test("an untraced start builds nothing, withdraws an offer, and leaves one you edited (S97)", () => {
-    const untraced: StartRead = { kind: "untraced", takes: [BASE] }
-    expect(planRefresh(facts(null, TIP, untraced))).toBe("forget")
-    expect(planRefresh(facts(read(), TIP, untraced))).toBe("withdraw")
-    expect(planRefresh(facts(read({ chained: false }), TIP, untraced))).toBe(
+    expect(plan(facts(null, TIP, [BASE], "none"))).toBe("forget")
+    expect(plan(facts(read(), TIP, [BASE], "none"))).toBe("withdraw")
+    expect(plan(facts(read({ chained: false }), TIP, [BASE], "none"))).toBe(
       "leave",
     )
   })
+  test("what jj could not tell never builds an offer, and keeps one that is there (ADR-0067)", () => {
+    expect(plan(facts(null, TIP, [BASE], "unknown"))).toBe("forget")
+    expect(plan(facts(read(), TIP, [BASE], "unknown"))).toBe("none")
+    expect(plan(facts(read(), T2, [BASE], "unknown"))).toBe("follow")
+  })
+  test("an untraced start builds nothing, withdraws an offer, and leaves one you edited, or one divergent, untouched (S97)", () => {
+    const untraced: StartRead = { kind: "untraced", takes: [BASE] }
+    expect(plan(facts(null, TIP, untraced))).toBe("forget")
+    expect(plan(facts(read(), TIP, untraced))).toBe("withdraw")
+    expect(plan(facts(read({ chained: false }), TIP, untraced))).toBe(
+      "untouched",
+    )
+    expect(
+      plan(facts({ kind: "divergent", changes: ["k"] }, TIP, untraced)),
+    ).toBe("untouched")
+  })
+  test("each decision carries what its steps need: the place, the offer, the changes", () => {
+    const at = placed(TIP, [BASE])
+    expect(planRefresh(facts(null))).toEqual({ kind: "build", place: at })
+    expect(planRefresh(facts(read(), T2))).toEqual({
+      kind: "follow",
+      place: placed(T2, [BASE]),
+      offer: read(),
+    })
+    expect(planRefresh(facts(read({ onTarget: false })))).toEqual({
+      kind: "refresh",
+      place: at,
+      offer: read({ onTarget: false }),
+    })
+    expect(
+      planRefresh(facts({ kind: "divergent", changes: ["ka", "kb"] })),
+    ).toEqual({ kind: "repair", place: at, changes: ["ka", "kb"] })
+    expect(planRefresh({ kind: "archived", offer: read() })).toEqual({
+      kind: "withdraw",
+      offer: read(),
+    })
+  })
   test("an archived thread's offer is withdrawn, an edited one too; with none, its record is forgotten", () => {
-    expect(planRefresh({ archived: true, offer: read() })).toBe("withdraw")
+    expect(plan({ kind: "archived", offer: read() })).toBe("withdraw")
+    expect(plan({ kind: "archived", offer: read({ chained: false }) })).toBe(
+      "withdraw",
+    )
     expect(
-      planRefresh({ archived: true, offer: read({ chained: false }) }),
-    ).toBe("withdraw")
-    expect(
-      planRefresh({
-        archived: true,
+      plan({
+        kind: "archived",
         offer: { kind: "divergent", changes: ["k"] },
       }),
     ).toBe("withdraw")
-    expect(planRefresh({ archived: true, offer: null })).toBe("forget")
+    expect(plan({ kind: "archived", offer: null })).toBe("forget")
   })
   test("only the target moved: refresh; nothing moved: none", () => {
-    expect(planRefresh(facts(read({ onTarget: false })))).toBe("refresh")
-    expect(planRefresh(facts(read()))).toBe("none")
+    expect(plan(facts(read({ onTarget: false })))).toBe("refresh")
+    expect(plan(facts(read()))).toBe("none")
   })
   test("the lane moved on: a single offer follows, a stack goes stale", () => {
-    expect(planRefresh(facts(read(), T2))).toBe("follow")
-    expect(planRefresh(facts(read({ revisions: [rev(), rev()] }), T2))).toBe(
-      "stale",
-    )
+    expect(plan(facts(read(), T2))).toBe("follow")
+    expect(plan(facts(read({ revisions: [rev(), rev()] }), T2))).toBe("stale")
   })
   test("where it starts moved (you took part of it): the same, or withdraw when nothing is left", () => {
-    expect(planRefresh(facts(read(), TIP, [T2]))).toBe("follow")
+    expect(plan(facts(read(), TIP, [T2]))).toBe("follow")
     expect(
-      planRefresh(
+      plan(
         facts(read({ ledger: { source: TIP, start: [BASE, T2] } }), TIP, [
           T2,
           BASE,
         ]),
       ),
     ).toBe("none")
-    expect(
-      planRefresh(facts(read({ revisions: [rev(), rev()] }), TIP, [T2])),
-    ).toBe("stale")
-    expect(planRefresh(facts(read(), TIP, [TIP]))).toBe("withdraw")
+    expect(plan(facts(read({ revisions: [rev(), rev()] }), TIP, [T2]))).toBe(
+      "stale",
+    )
+    expect(plan(facts(read(), TIP, [TIP]))).toBe("withdraw")
   })
   test("an offer with no ledger, built before ADR-0060, reads as moved: it is followed once", () => {
-    expect(planRefresh(facts(read({ ledger: null })))).toBe("follow")
+    expect(plan(facts(read({ ledger: null })))).toBe("follow")
   })
   test("you edited it: a version of yours that changed a revision, a commit of yours between, or its bottom moved (S48 item 7)", () => {
     const changed = { reached: true, yoursChanged: true }
-    expect(planRefresh(facts(read({ revisions: [rev(changed)] })))).toBe(
+    expect(plan(facts(read({ revisions: [rev(changed)] })))).toBe("leave")
+    expect(plan(facts(read({ revisions: [rev(changed), rev()] }), T2))).toBe(
       "leave",
     )
-    expect(
-      planRefresh(facts(read({ revisions: [rev(changed), rev()] }), T2)),
-    ).toBe("leave")
-    expect(planRefresh(facts(read({ chained: false })))).toBe("leave")
-    expect(planRefresh(facts(read({ placed: false, onTarget: false })))).toBe(
-      "leave",
-    )
+    expect(plan(facts(read({ chained: false })))).toBe("leave")
+    expect(plan(facts(read({ placed: false, onTarget: false })))).toBe("leave")
   })
   test("a revision the host never made is yours; a version only the host made is not (S73)", () => {
     expect(
-      planRefresh(
+      plan(
         facts(
           read({ revisions: [rev({ reached: false, yoursChanged: false })] }),
         ),
       ),
     ).toBe("leave")
-    expect(planRefresh(facts(read(), T2))).toBe("follow")
+    expect(plan(facts(read(), T2))).toBe("follow")
   })
   test("divergent: repair, before anything else", () => {
-    expect(
-      planRefresh(facts({ kind: "divergent", changes: ["k"] }, TIP, [TIP])),
-    ).toBe("repair")
+    expect(plan(facts({ kind: "divergent", changes: ["k"] }, TIP, [TIP]))).toBe(
+      "repair",
+    )
   })
 })
 
@@ -604,6 +223,7 @@ describe("isWipLine, offerMoved, describeWanted", () => {
   const NAME = "t-1" as ThreadName
   const one = {
     kind: "offer" as const,
+    bookmark: "pineta-offer/t-1",
     revisions: [
       {
         commit: TIP,
@@ -620,11 +240,6 @@ describe("isWipLine, offerMoved, describeWanted", () => {
     conflicts: [],
     startConflicts: [],
   }
-  test("the WIP line is this thread's; an agent's message is not", () => {
-    expect(isWipLine(NAME, "WIP (t-1): x")).toBe(true)
-    expect(isWipLine(NAME, "fix: x")).toBe(false)
-    expect(isWipLine(NAME, "WIP (t-2): x")).toBe(false)
-  })
   test("offerMoved: the tip, or the start as a set, against the ledger; no ledger is moved", () => {
     const ledger = { source: TIP, start: [BASE, T2] }
     expect(offerMoved(ledger, { tip: TIP, start: [T2, BASE] })).toBe(false)
@@ -633,88 +248,38 @@ describe("isWipLine, offerMoved, describeWanted", () => {
     expect(offerMoved(null, { tip: TIP, start: [BASE] })).toBe(true)
   })
   test("describeWanted: one revision, not yours, on its WIP line unless forced", () => {
-    expect(describeWanted(one, NAME, false)).toBe(true)
-    expect(describeWanted({ ...one, firstLine: "fix: x" }, NAME, false)).toBe(
-      false,
-    )
-    expect(describeWanted({ ...one, firstLine: "fix: x" }, NAME, true)).toBe(
-      true,
-    )
+    const asks = (offer: OfferInRepo | null, force: boolean) =>
+      planDescribeAsk(
+        {
+          place: {
+            kind: "placed",
+            tip: TIP,
+            base: { base: { kind: "line" }, start: BASE, source: BASE },
+            state: "ok",
+            target: T2,
+            start: [BASE],
+          },
+          name: NAME,
+          offer,
+          base: {
+            lane: LANE,
+            base: { kind: "line" },
+            start: BASE,
+            state: "ok",
+            catchUp: null,
+            untraced: [],
+          },
+        },
+        force,
+      ) !== null
+    expect(asks(one, false)).toBe(true)
+    expect(asks({ ...one, firstLine: "fix: x" }, false)).toBe(false)
+    expect(asks({ ...one, firstLine: "fix: x" }, true)).toBe(true)
     expect(
-      describeWanted(
-        { ...one, revisions: [...one.revisions, ...one.revisions] },
-        NAME,
-        true,
-      ),
+      asks({ ...one, revisions: [...one.revisions, ...one.revisions] }, true),
     ).toBe(false)
-    expect(describeWanted({ ...one, chained: false }, NAME, true)).toBe(false)
-    expect(describeWanted(null, NAME, true)).toBe(false)
-  })
-})
-
-test("acceptStack: exactly the tip's files, or refused naming what differs", () => {
-  expect(acceptStack({ revisions: 2, differing: [] })).toEqual({ ok: true })
-  expect(acceptStack({ revisions: 2, differing: ["b.txt"] })).toMatchObject({
-    ok: false,
-    reason: expect.stringContaining("b.txt"),
-  })
-  expect(acceptStack({ revisions: 0, differing: [] })).toMatchObject({
-    ok: false,
-  })
-})
-
-describe("the commit message", () => {
-  test("describeRequest: the thread's messages go first, then the diff; never the skill", () => {
-    const skill = "Write a commit message."
-    const full = describeRequest({
-      skill,
-      diff: "d".repeat(100),
-      messages: ["first", "second"],
-      recent: ["feat: a thing"],
-      budget: 10_000,
-    })
-    expect(full.system).toBe(skill)
-    expect(full.user).toContain("- first")
-    expect(full.user).toContain("d".repeat(100))
-    const tight = describeRequest({
-      skill,
-      diff: "d".repeat(100),
-      messages: ["an early one", "x"],
-      recent: [],
-      budget: 190,
-    })
-    expect(tight.system).toBe(skill)
-    expect(tight.user).not.toContain("an early one")
-    expect(tight.user).toContain("d".repeat(100))
-    const tighter = describeRequest({
-      skill,
-      diff: "d".repeat(500),
-      messages: ["m"],
-      recent: [],
-      budget: 200,
-    })
-    expect(tighter.user).toContain("the rest of the diff left out")
-  })
-  test("withoutTrailers undoes withTrailers, and keeps your own", () => {
-    const at = { lane: LANE, name: "amber-fox" as ThreadName, entry: "e9" }
-    const m = "feat: x\n\nwhy it changed\n"
-    expect(withoutTrailers(withTrailers(m, at))).toBe(m.trim())
-    const yours = "feat: x\n\nSigned-off-by: Ada <ada@x.io>"
-    expect(withoutTrailers(withTrailers(yours, at))).toBe(yours)
-    expect(
-      withoutTrailers(`feat: x\n\nSigned-off-by: Ada\nPineta-Entry: e1`),
-    ).toBe("feat: x\n\nSigned-off-by: Ada\nPineta-Entry: e1")
-    expect(withoutTrailers("Pineta-Entry: e1")).toBe("Pineta-Entry: e1")
-  })
-  test("withTrailers and the WIP line", () => {
-    const name = "amber-fox" as ThreadName
-    expect(withTrailers("feat: x\n", { lane: LANE, name, entry: "e9" })).toBe(
-      `feat: x\n\nPineta-Thread: amber-fox\nPineta-Lane: ${LANE}\nPineta-Entry: e9\n`,
-    )
-    expect(wipDescription(name, "add the offer line\nmore")).toBe(
-      "WIP (amber-fox): add the offer line",
-    )
-    expect(wipDescription(name, "")).toBe("WIP (amber-fox): this thread's work")
+    expect(asks({ ...one, chained: false }, true)).toBe(false)
+    expect(asks(null, true)).toBe(false)
   })
 })
 
@@ -765,150 +330,6 @@ describe("records", () => {
   test("an offer stored before its commits were kept does not decode", () => {
     const { commits: _, ...before } = offer
     expect(OFFER.decode(before, LANE)).toBeUndefined()
-  })
-})
-
-describe("the review (ADR-0047)", () => {
-  const C1 = commitId("c1")
-  const C2 = commitId("c2")
-  const open: OfferRecord = { ...offer, commits: [C1, C2] }
-  const offers = new Map([[LANE, open]])
-  const facts = (
-    o: ReadonlyMap<LaneName, OfferRecord>,
-    revisions: ReadonlyMap<EntryId, RevisionRecord> = new Map(),
-  ) => ({ offers: o, revisions })
-  const rev = (c: string) => ({ kind: "revision", commit: c }) as const
-  test("planOfferRead: only a commit an open offer holds now", () => {
-    expect(
-      planOfferRead(facts(offers), { kind: "review", span: rev(C2) }),
-    ).toEqual({
-      kind: "review",
-      span: rev(C2),
-    })
-    expect(
-      planOfferRead(facts(offers), {
-        kind: "diff",
-        span: rev(C1),
-        path: "a b.txt",
-      }),
-    ).toEqual({ kind: "diff", span: rev(C1), path: "a b.txt" })
-    const status = (o: ReadonlyMap<LaneName, OfferRecord>, commit: string) => {
-      const read = planOfferRead(facts(o), {
-        kind: "review",
-        span: rev(commit),
-      })
-      return read.kind === "refused" ? read.status : read.kind
-    }
-    // A commit the offer no longer is, and one it never was.
-    expect(status(offers, "w1")).toBe(404)
-    expect(status(offers, "ffff")).toBe(404)
-    const taken = new Map([[LANE, { ...open, taken: "t" }]])
-    expect(status(taken, C1)).toBe(404)
-    // One the line already holds brings nothing to review.
-    const held = new Map([[LANE, { ...open, files: [] }]])
-    expect(status(held, C1)).toBe(404)
-    const path = (p: string) => {
-      const read = planOfferRead(facts(offers), {
-        kind: "diff",
-        span: rev(C1),
-        path: p,
-      })
-      return read.kind === "refused" ? read.status : read.kind
-    }
-    expect([path(""), path("a\nb"), path("a\u007f")]).toEqual([400, 400, 400])
-  })
-  test("planOfferRead: a range only between two commits one lane's turns recorded (ADR-0056)", () => {
-    const OTHER = laneNameForThread("other")
-    const record = (entry: string, lane: typeof LANE, commit: string) =>
-      [
-        entryId(entry),
-        {
-          entry: entryId(entry),
-          lane,
-          commit: commitId(commit),
-          snapshot: null,
-          paths: [],
-          conflicts: [],
-        },
-      ] as const
-    const revisions = new Map([
-      record("e1", LANE, "a1"),
-      record("e2", LANE, "a2"),
-      record("e3", OTHER, "b1"),
-    ])
-    const range = (from: string, to: string) =>
-      ({ kind: "range", from, to }) as const
-    const read = (from: string, to: string) =>
-      planOfferRead(facts(new Map(), revisions), {
-        kind: "review",
-        span: range(from, to),
-      })
-    expect(read("a1", "a2")).toEqual({
-      kind: "review",
-      span: range("a1", "a2"),
-    })
-    expect(read("a1", "b1")).toMatchObject({ kind: "refused", status: 404 })
-    expect(read("a1", "ffff")).toMatchObject({ kind: "refused", status: 404 })
-  })
-  test("answers: a review decoded, a diff within its size, else refused", () => {
-    const review = {
-      description: "feat: x\n",
-      files: [
-        {
-          path: "w2",
-          shown: "{w => w2}",
-          change: "renamed",
-          added: 0,
-          removed: 0,
-        },
-      ],
-    }
-    expect(answerReview(structuredClone(review))).toEqual({
-      kind: "review",
-      review,
-    })
-    const status = (a: ReturnType<typeof answerReview>) =>
-      a.kind === "refused" ? a.status : a.kind
-    expect(status(answerReview(null))).toBe(502)
-    expect(
-      status(
-        answerReview({
-          ...review,
-          files: [{ ...review.files[0], added: "1" }],
-        }),
-      ),
-    ).toBe(502)
-    expect(status(answerDiff(null))).toBe(502)
-    expect(status(answerDiff("x".repeat(MAX_DIFF_BYTES)))).toBe("diff")
-    expect(status(answerDiff("x".repeat(MAX_DIFF_BYTES + 1)))).toBe(413)
-    // Bytes of UTF-8, not characters.
-    expect(status(answerDiff("é".repeat(MAX_DIFF_BYTES / 2 + 1)))).toBe(413)
-  })
-  test("the wire: every URL parses back to what built it", () => {
-    const at = (u: string) => parseOfferPath(new URL(u, "http://host"))
-    const c = { kind: "revision", commit: commitId("0123abcd") } as const
-    const r = {
-      kind: "range",
-      from: commitId("0123abcd"),
-      to: commitId("4567ef"),
-    } as const
-    for (const span of [c, r]) {
-      expect(at(reviewUrl(span))).toEqual({ kind: "review", span })
-      for (const path of ["a b.txt", 'we"ird', "q?x&y#z", "dir/é.md"])
-        expect(at(diffUrl(span, path))).toEqual({ kind: "diff", span, path })
-    }
-    expect(
-      at(reviewUrl(c).replace(`/${OFFER_WIRE}/`, `/${OFFER_WIRE + 1}/`)),
-    ).toBe("bad")
-    expect(at(`/offer/${OFFER_WIRE}/diff/${c.commit}`)).toBe("bad")
-    expect(at(`/offer/${OFFER_WIRE}/review/not-hex`)).toBe("bad")
-    expect(at(`/offer/${OFFER_WIRE}/review/0123..not-hex`)).toBe("bad")
-    expect(at(`/offer/${OFFER_WIRE}/review/01..23..45`)).toBe("bad")
-    expect(at(`${reviewUrl(c)}/more`)).toBe("bad")
-    expect(at("/offer/anything")).toBe("bad")
-    expect(at("/offer")).toBe("bad")
-    expect(at("/offers")).toBeNull()
-    expect(at("/other")).toBeNull()
   })
 })
 
@@ -1013,28 +434,471 @@ describe("takeDestinations (ADR-0060)", () => {
   })
 })
 
-describe("withLedger (ADR-0060)", () => {
-  const ledger = {
-    source: commitId("t1"),
-    start: [commitId("s1"), commitId("s2")],
-  }
-  test("joins the host's trailer paragraph, read back from it", () => {
-    const m = withLedger(
-      withTrailers("feat: x", {
-        lane: LANE,
-        name: "amber-fox" as ThreadName,
-        entry: "e",
-      }),
-      ledger,
-    )
-    expect(m.split("\n\n")).toHaveLength(2)
-    expect(trailerValues(m, TRAILERS.source)).toEqual(["t1"])
-    expect(trailerValues(m, TRAILERS.start)).toEqual(["s1", "s2"])
-    expect(withoutTrailers(m)).toBe("feat: x")
+describe("the offer's policy over a gather (ADR-0038, ADR-0060)", () => {
+  const NAME = "amber-fox" as ThreadName
+  const NOT_YOURS = { reached: true, yoursChanged: false }
+  const START = commitId("s0")
+  const NEW_TIP = commitId("t9")
+  const NOW_COMMIT = commitId("c5")
+  const LINE_BASE = {
+    base: { kind: "line" },
+    start: START,
+    source: START,
+  } as const
+  const at = (over: Partial<Placed> = {}): Placed => ({
+    kind: "placed",
+    tip: TIP,
+    base: LINE_BASE,
+    state: "ok",
+    target: commitId("l1"),
+    start: [START],
+    ...over,
   })
-  test("a message with no trailers gets a paragraph of its own", () => {
-    expect(withLedger("WIP (amber-fox): x", ledger).split("\n\n")).toHaveLength(
-      2,
-    )
+  /** An offer as your repo holds it: one revision, the host's, on its WIP line. */
+  const read = (over: Partial<OfferNow> = {}): OfferNow => ({
+    kind: "offer",
+    bookmark: `pineta-offer/${NAME}`,
+    revisions: [{ commit: NOW_COMMIT, change: "kxyz", since: NOT_YOURS }],
+    chained: true,
+    ledger: { source: TIP, start: [START] },
+    firstLine: `WIP (${NAME}): fix it`,
+    placed: true,
+    onTarget: true,
+    files: ["a.txt"],
+    conflicts: [],
+    startConflicts: [],
+    ...over,
+  })
+  const baseRecord: BaseRecord = {
+    lane: LANE,
+    base: { kind: "line" },
+    start: START,
+    state: "ok",
+    catchUp: null,
+    untraced: [],
+  }
+  const gather = (over: Partial<OfferGather> = {}): OfferGather => ({
+    place: at(),
+    name: NAME,
+    offer: read(),
+    base: baseRecord,
+    ...over,
+  })
+
+  describe("offerRecord: the page's cache, from the repo", () => {
+    const record = (o = read(), tip = TIP) =>
+      offerRecord({
+        lane: LANE,
+        name: NAME,
+        offer: o,
+        place: { tip, start: [START] },
+        editing: new Set(["a.txt", "elsewhere.txt"]),
+        now: 7,
+      })
+    test("each revision's commit as it is now, and what the page shows", () => {
+      expect(record()).toEqual({
+        lane: LANE,
+        size: 1,
+        stale: false,
+        files: ["a.txt"],
+        conflicts: [],
+        startConflicts: [],
+        yourEdits: ["a.txt"],
+        described: false,
+        edited: false,
+        bookmark: "pineta-offer/amber-fox",
+        taken: null,
+        commits: [NOW_COMMIT],
+        ledger: { source: TIP, start: [START] },
+        at: 7,
+      })
+    })
+    test("your edits are its files that @ changes, and only those", () => {
+      expect(
+        offerRecord({
+          lane: LANE,
+          name: NAME,
+          offer: read({ files: ["a.txt", "b.txt"] }),
+          place: { tip: TIP, start: [START] },
+          editing: new Set(["b.txt", "c.txt"]),
+          now: 1,
+        }).yourEdits,
+      ).toEqual(["b.txt"])
+    })
+    test("described once its first line is not the WIP line; edited once a version of yours changed it", () => {
+      expect(record(read({ firstLine: "fix: it" })).described).toBe(true)
+      const yours = read({
+        revisions: [
+          {
+            commit: NOW_COMMIT,
+            change: "kxyz",
+            since: { reached: true, yoursChanged: true },
+          },
+        ],
+      })
+      expect(record(yours).edited).toBe(true)
+    })
+    test("a stack is stale when the lane moved past its ledger; a single offer never is", () => {
+      const stack = read({
+        revisions: [
+          { commit: commitId("b1"), change: "kb", since: NOT_YOURS },
+          { commit: commitId("b2"), change: "kt", since: NOT_YOURS },
+        ],
+      })
+      expect(record(stack, NEW_TIP).stale).toBe(true)
+      expect(record(stack, TIP).stale).toBe(false)
+      expect(record(read(), NEW_TIP).stale).toBe(false)
+    })
+  })
+
+  test("planYourEdits: each untaken record's files that @ changes, open and held alike; a taken one is left", () => {
+    const open = { ...offer, files: ["a.txt", "b.txt"], yourEdits: [] }
+    const held = {
+      ...offer,
+      lane: laneNameForThread("2"),
+      files: [],
+      yourEdits: ["x"],
+    }
+    const taken = { ...offer, lane: laneNameForThread("3"), taken: "kt" }
+    expect(
+      planYourEdits([open, held, taken], new Set(["b.txt", "c.txt"])),
+    ).toEqual([
+      { ...open, yourEdits: ["b.txt"] },
+      { ...held, yourEdits: [] },
+    ])
+  })
+
+  describe("planOfferTake (ADR-0060, ADR-0065)", () => {
+    const o = read({
+      revisions: [
+        { commit: commitId("b1"), change: "kbot", since: NOT_YOURS },
+        { commit: commitId("b2"), change: "ktop", since: NOT_YOURS },
+      ],
+    })
+    const WIP_BASE = {
+      base: { kind: "wip", bookmark: "wip/x" },
+      start: START,
+      source: START,
+    } as const
+    /** What the page drew: this offer's ledger, not conflicting. */
+    const SHOWN = { ledger: o.ledger, conflicted: false }
+    const BOTH = new Set(["wip/x", "pineta-onto"])
+    const take = (
+      over: {
+        readonly to?: string | null
+        readonly below?: ReadonlySet<string>
+        readonly gathered?: OfferGather | null
+        readonly seen?: OfferSeen | null
+        readonly offer?: OfferInRepo
+      } = {},
+    ) =>
+      planOfferTake({
+        lane: LANE,
+        gathered:
+          over.gathered === undefined
+            ? gather({
+                place: at({ base: WIP_BASE }),
+                offer: over.offer ?? o,
+              })
+            : over.gathered,
+        seen: over.seen === undefined ? SHOWN : over.seen,
+        take: { wipAhead: 2, below: over.below ?? BOTH },
+        editing: new Set(),
+        onto: "pineta-onto",
+        to: over.to ?? null,
+        now: 9,
+      })
+    const outcome = (t: TakeDecision) =>
+      t.kind === "take" ? t.destination : t.code
+    test("the default destination is the WIP, the offer's top, and the record marked taken", () => {
+      const record = offerRecord({
+        lane: LANE,
+        name: NAME,
+        offer: o,
+        place: { tip: TIP, start: [START] },
+        editing: new Set(),
+        now: 9,
+      })
+      expect(take()).toEqual({
+        kind: "take",
+        name: NAME,
+        bookmark: record.bookmark,
+        destination: "wip/x",
+        top: "ktop",
+        taken: { ...record, taken: "ktop", at: 9 },
+      })
+      expect(outcome(take({ to: "pineta-onto" }))).toBe("pineta-onto")
+    })
+    test("refused in order: no offer, a WIP gone, nothing shown, divergent, other work, no such destination", () => {
+      expect(outcome(take({ gathered: null }))).toBe(ERR.NO_OFFER)
+      expect(outcome(take({ gathered: gather({ offer: null }) }))).toBe(
+        ERR.NO_OFFER,
+      )
+      expect(
+        outcome(
+          take({
+            gathered: gather({
+              place: { kind: "gone", tip: TIP, base: WIP_BASE },
+            }),
+            seen: null,
+          }),
+        ),
+      ).toBe(ERR.BAD_DESTINATION)
+      expect(
+        outcome(
+          take({ seen: null, offer: { kind: "divergent", changes: ["k"] } }),
+        ),
+      ).toBe(ERR.OFFER_CHANGED)
+      expect(
+        outcome(take({ offer: { kind: "divergent", changes: ["k"] } })),
+      ).toBe(ERR.NO_OFFER)
+      expect(outcome(take({ to: "main" }))).toBe(ERR.BAD_DESTINATION)
+      expect(outcome(take({ below: new Set(["pineta-onto"]) }))).toBe(
+        ERR.BAD_DESTINATION,
+      )
+    })
+    test("a conflicted offer never goes to the line; an untraced place is taken where it sits", () => {
+      const conflicted = { ...o, conflicts: ["a.txt"] }
+      const shown = { ledger: o.ledger, conflicted: true }
+      expect(outcome(take({ offer: conflicted, seen: shown }))).toBe("wip/x")
+      expect(
+        outcome(take({ offer: conflicted, seen: shown, to: "pineta-onto" })),
+      ).toBe(ERR.BAD_DESTINATION)
+      const untraced = gather({
+        place: {
+          kind: "untraced",
+          tip: TIP,
+          base: LINE_BASE,
+          state: "ok",
+          target: commitId("l1"),
+        },
+        offer: o,
+      })
+      expect(outcome(take({ gathered: untraced }))).toBe("pineta-onto")
+    })
+    test.each([
+      [
+        "rebased onto a moved target, the same ledger",
+        {
+          offer: read({
+            ...o,
+            revisions: [
+              { commit: commitId("c9"), change: "ktop", since: NOT_YOURS },
+            ],
+          }),
+        },
+        "wip/x",
+      ],
+      [
+        "edited by you, the same ledger",
+        {
+          offer: read({
+            ...o,
+            revisions: [
+              {
+                commit: commitId("c9"),
+                change: "ktop",
+                since: { reached: true, yoursChanged: true },
+              },
+            ],
+          }),
+        },
+        "wip/x",
+      ],
+      [
+        "another ledger: the lane moved on",
+        { offer: read({ ...o, ledger: { source: NEW_TIP, start: [START] } }) },
+        ERR.OFFER_CHANGED,
+      ],
+      [
+        "another start, the same source",
+        {
+          offer: read({
+            ...o,
+            ledger: { source: TIP, start: [START, NEW_TIP] },
+          }),
+        },
+        ERR.OFFER_CHANGED,
+      ],
+      [
+        "the same start, in another order",
+        {
+          offer: read({
+            ...o,
+            ledger: { source: TIP, start: [NEW_TIP, START] },
+          }),
+          seen: {
+            ledger: { source: TIP, start: [START, NEW_TIP] },
+            conflicted: false,
+          },
+        },
+        "wip/x",
+      ],
+      [
+        "newly conflicting",
+        { offer: read({ ...o, conflicts: ["a.txt"] }) },
+        ERR.OFFER_CHANGED,
+      ],
+      [
+        "conflicting, as it was shown",
+        {
+          offer: read({ ...o, conflicts: ["a.txt"] }),
+          seen: { ledger: o.ledger, conflicted: true },
+        },
+        "wip/x",
+      ],
+      [
+        "shown no ledger, now one",
+        { seen: { ledger: null, conflicted: false } },
+        ERR.OFFER_CHANGED,
+      ],
+    ] as const)("a take of the offer it was shown: %s", (_, over, expected) => {
+      expect(outcome(take(over))).toBe(expected)
+    })
+  })
+
+  describe("planStackEnded and planRebuild: an offer built anew", () => {
+    const span = { start: [commitId("s1")], tip: NEW_TIP }
+    const sources = [
+      { commit: commitId("r1"), description: "first" },
+      { commit: commitId("r2"), description: "second" },
+    ]
+    const stack = (
+      facts: StackFacts | "no-top" = { revisions: sources, differing: [] },
+      gathered: OfferGather | null = gather(),
+    ) => planStackEnded({ stack: span, facts, gathered })
+    test("a stack of exactly the tip's files is built from its own start and tip, its revisions bottom first, the offer's abandoned", () => {
+      expect(stack()).toEqual({
+        kind: "rebuild",
+        name: NAME,
+        place: at({ tip: NEW_TIP, start: [commitId("s1")] }),
+        changes: ["kxyz"],
+        sources,
+      })
+    })
+    test("refused, in words the agent reads: no top, no revisions, other files, no lane, no name, a WIP gone", () => {
+      const why = (d: ReturnType<typeof stack>) =>
+        d.kind === "refused" ? d.why : "rebuild"
+      expect(why(stack("no-top"))).toBe("the stack's bookmark was not set")
+      expect(why(stack({ revisions: [], differing: [] }))).toBe(
+        "the stack has no revisions",
+      )
+      expect(
+        why(stack({ revisions: sources, differing: ["b.txt"] })),
+      ).toContain("b.txt")
+      expect(why(stack(undefined, null))).toBe(
+        "the thread's lane is not in your repo",
+      )
+      expect(why(stack(undefined, gather({ name: undefined })))).toBe(
+        "the thread has no name yet",
+      )
+      expect(
+        why(
+          stack(
+            undefined,
+            gather({ place: { kind: "gone", tip: TIP, base: LINE_BASE } }),
+          ),
+        ),
+      ).toBe("the thread's base is gone: continue it on the line")
+    })
+    test("an untraced place takes a stack: it brings its own start", () => {
+      const untraced = gather({
+        place: {
+          kind: "untraced",
+          tip: TIP,
+          base: LINE_BASE,
+          state: "ok",
+          target: commitId("l1"),
+        },
+      })
+      expect(stack(undefined, untraced).kind).toBe("rebuild")
+    })
+    test("planRebuild: the lane's tip as one revision on its WIP line, from a known start only", () => {
+      expect(planRebuild(gather(), "WIP (amber-fox): x")).toEqual({
+        kind: "rebuild",
+        name: NAME,
+        place: at(),
+        changes: ["kxyz"],
+        sources: [{ commit: TIP, description: "WIP (amber-fox): x" }],
+      })
+      expect(planRebuild(null, "")).toEqual({
+        kind: "refused",
+        why: ERR.NO_OFFER,
+      })
+      expect(
+        planRebuild(
+          gather({ place: { kind: "gone", tip: TIP, base: LINE_BASE } }),
+          "",
+        ),
+      ).toEqual({ kind: "refused", why: ERR.BAD_DESTINATION })
+      expect(
+        planRebuild(
+          gather({
+            place: {
+              kind: "untraced",
+              tip: TIP,
+              base: LINE_BASE,
+              state: "ok",
+              target: commitId("l1"),
+            },
+          }),
+          "",
+        ),
+      ).toEqual({ kind: "refused", why: ERR.NO_OFFER })
+    })
+  })
+
+  describe("a commit message: asked, then settled (ADR-0038)", () => {
+    test("planDescribeAsk: the offer's one revision while it is on its WIP line, or forced", () => {
+      expect(planDescribeAsk(gather(), false)).toBe(NOW_COMMIT)
+      expect(
+        planDescribeAsk(
+          gather({ offer: read({ firstLine: "fix: x" }) }),
+          false,
+        ),
+      ).toBeNull()
+      expect(
+        planDescribeAsk(gather({ offer: read({ firstLine: "fix: x" }) }), true),
+      ).toBe(NOW_COMMIT)
+      expect(planDescribeAsk(gather({ name: undefined }), true)).toBeNull()
+      expect(planDescribeAgain(gather())).toBeNull()
+      expect(planDescribeAgain(gather({ offer: null }))).toBe(ERR.NO_OFFER)
+    })
+    test("planDescribeSettle: written only to the commit it was asked for, keeping the offer's ledger", () => {
+      expect(
+        planDescribeSettle({
+          gathered: gather(),
+          asked: NOW_COMMIT,
+          force: false,
+        }),
+      ).toEqual({
+        name: NAME,
+        place: at(),
+        change: "kxyz",
+        ledger: { source: TIP, start: [START] },
+      })
+      expect(
+        planDescribeSettle({
+          gathered: gather(),
+          asked: commitId("other"),
+          force: false,
+        }),
+      ).toBeNull()
+      const edited = read({ chained: false })
+      expect(
+        planDescribeSettle({
+          gathered: gather({ offer: edited }),
+          asked: NOW_COMMIT,
+          force: true,
+        }),
+      ).toBeNull()
+      expect(
+        planDescribeSettle({
+          gathered: gather({ offer: read({ ledger: null }) }),
+          asked: NOW_COMMIT,
+          force: false,
+        })?.ledger,
+      ).toEqual({ source: TIP, start: [START] })
+    })
   })
 })

@@ -1,18 +1,16 @@
 import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { entryId, laneNameForThread } from "@pineta/core"
+import { laneNameForThread } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import {
   changedPaths,
   commitsOf,
   conflictedFilesAt,
-  entryOfMessage,
   execute,
   type LaneStep,
   type Ran,
   type Runner,
-  revisionMessage,
   run,
 } from "./index.ts"
 
@@ -20,17 +18,7 @@ import {
 // it, is `@pineta/repo`'s `repo.test.ts`: every such test fetches into your
 // repo.
 
-const LANE = laneNameForThread("1")
-
-test("revisionMessage and entryOfMessage round-trip the entry trailer", () => {
-  const message = revisionMessage({
-    title: "fix it",
-    entry: entryId("e-1"),
-    lane: LANE,
-  })
-  expect(entryOfMessage(message)).toBe("e-1")
-  expect(entryOfMessage("your commit")).toBeNull()
-})
+const _LANE = laneNameForThread("1")
 
 describe("execute", () => {
   const ok: Ran = { ok: true, code: 0, stdout: "", stderr: "" }

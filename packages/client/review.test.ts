@@ -4,8 +4,8 @@ import {
   laneNameForThread,
   type ReviewFile,
   type RevisionReview,
+  withTrailers,
 } from "@pineta/core"
-import { withTrailers } from "@pineta/marginalia"
 import { describe, expect, test } from "vitest"
 import type { ReviewTarget } from "./column-view.ts"
 import { diffLines, type Loaded, reviewView, sectionState } from "./review.ts"

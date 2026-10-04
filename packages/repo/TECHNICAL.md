@@ -8,19 +8,53 @@ lane also runs, through a `Runner` it is given, stays in `lanes`
 (`laneBase`, `REVISION_READ`, `commitsOf`), and this package calls it. The
 client may not depend on it.
 
+What an offer or a `line` command means is decided in
+`@pineta/marginalia`, which this package cannot declare: marginalia returns
+each decision as a value typed in `@pineta/core` (`core/offers.ts`), this
+package reads the facts it is made from and turns it into steps, and the
+host connects the two. The rule all three packages keep:
+
+> Core holds the vocabulary (ids, intents, every record's type) and the
+> reads of the tree. A format or type that lanes or repo must read, write
+> or name lives in core too, since neither can declare @pineta/marginalia.
+> What a stored shape says, and how the host changes it, is
+> @pineta/marginalia', whoever reads it. One client's own in-flight state
+> (its moves, held roots, slot repair, commands out) is @pineta/session's.
+> What the page draws, and its words, is @pineta/client's.
+
+`index.ts` names its exports: only what other packages use. The separate
+reads, the one-read path and the step planners stay inside, so the host
+reads an offer only through a gather and runs only the steps a decision
+translates to.
+
 ## Where things are
 
 - `owner.ts`: `startRepoOwner`, the one writer of your repo.
 - `observe.ts`: what an outside change moved, pure: the fingerprint
   (`fingerprintRead`, `parseFingerprint`) and `planObserve`.
 - `step.ts`: `RepoStep`, one command on your repo as data.
-- `plan.ts`: every decision about your repo, pure: the line's setup, land
-  and follow, an offer's build, follow, refresh, repair and take, lanes'
-  refs (`laneRefSteps`), a bundle's import (`planImport`), where an offer
-  starts (`offerStart`, `takenRevset`), and the evolog walk (`walkToHost`).
+- `plan.ts`: the steps, pure: the line's setup, land and follow
+  (`lineProposal`, `lineSteps`), an offer's build, follow, refresh, repair
+  and take, lanes' refs (`laneRefSteps`), a bundle's import
+  (`planImport`), where an offer starts (`offerStart`, `takenRevset`), the
+  takes' rows (`TAKES`, `TAKE_ROW`, `parseTakes`), and the evolog walk
+  (`walkToHost`).
 - `run.ts`: the runner factory, private to the package.
-- `offer.ts`: the reads an offer's decisions are made from, and a review's.
-- `line.ts`: the line's facts, a new lane's begin, a WIP's state.
+- `offer.ts`: the separate reads an offer's facts come from, and a
+  review's.
+- `offer-gather.ts`: every read an offer step plans from, one per action
+  (`gatherOffer`, `gatherPlace`, `gatherRefresh`, `gatherTake`,
+  `gatherStack`, `gatherDescribe`), each returning core's facts. Where an
+  offer sits is decided here, once, as an `OfferPlace`, and so is the read
+  path: a refresh of a lane on the line takes the one read, every other
+  gather the separate reads.
+- `offer-steps.ts`: a decision into steps, pure (`offerEffects`,
+  `rebuildEffects`, `takeEffects`, `describeEffects`), with what the host
+  does after (`OfferEffects.after`).
+- `offer-repair.ts`: `repairOffer`, the one offer step that reads between
+  its steps.
+- `line.ts`: the line's facts, a new lane's begin, a WIP's state
+  (`wipState`, `readWipState`).
 - `shared.ts`: the facts every lane and the line share, per operation.
 - `lane-read.ts`: one lane's refresh facts in one `jj log` (`gatherLane`).
 
@@ -78,9 +112,9 @@ operation is read once and kept until the head moves.**
   is at the moment of reading: the one file in the heads directory; any
   other (an outside write, two heads) is observed first. A write in the same
   step observes, so a read after it reads a fresh set.
-- **`yourEdits` is `files ∩ editing`**, decided in `offerRecord`: no lane
-  reads `@`. `@` alone moving rewrites every open record's from one shared
-  read.
+- **`yourEdits` is `files ∩ editing`**, decided in marginalia's
+  `offerRecord`: no lane reads `@`. `@` alone moving rewrites every open
+  record's from one shared read (`planYourEdits`).
 - **A lane on the line is read in one `jj log`** (`laneRead`): its tip, the
   newest commit carrying `Pineta-Base`, the newest line commit in its
   history, the offer's region (`::<bookmark> ~ ::<line>`), and the taken
@@ -114,7 +148,9 @@ operation is read once and kept until the head moves.**
   separate reads (`laneTipIn`, `laneBase`, `startOfOffer`, `readOffer`,
   `workChanges`, `readCatchUp`) at every offer it builds, takes, follows, repairs and
   stacks, and expects the same values. A lane on a WIP reads the separate
-  way (`wipFacts`): its target and state need more of your repo.
+  way (`wipFacts`): its target and state need more of your repo. Which way
+  a lane is read is `gatherRefresh`'s choice; the host never makes it.
+  Whether one read could serve every lane is S100.
 
 ## Steps and runners (`step.ts`, `run.ts`)
 
@@ -139,7 +175,13 @@ operation is read once and kept until the head moves.**
   lane setup's reads of your jj config (`user.name`) use `jjIn` too: config,
   not the repo.
 
-## Offers in your repo (`offer.ts`, `plan.ts`, ADR-0038, ADR-0039)
+## Offers in your repo (`offer.ts`, `offer-gather.ts`, `offer-steps.ts`, `plan.ts`, ADR-0038, ADR-0039)
+
+- **The host runs no jj on an offer.** Each of its offer steps is a gather
+  here, a decision in marginalia, a translation here (`offerEffects` and
+  the rest), then the steps on the owner. A decision carries the facts its
+  steps need (a `Placed`, the offer, its changes), so each kind has one
+  translation and none that runs nothing because a case cannot occur.
 
 - **An offer's bookmark is `pineta-offer/<name>`**, the thread's two-word
   name (`offerBookmark`). Every step finds the offer by it: one built under
@@ -194,7 +236,7 @@ operation is read once and kept until the head moves.**
   resolve. `present()` around the base's source keeps a commit lost to
   `jj util gc` from failing every refresh; it then excludes nothing.
 - **Every revision of an offer carries the host's trailers and its ledger**
-  (`offerMessage`, marginalia): `Pineta-Thread`, `Pineta-Lane`,
+  (`offerMessage`, core's `trailers.ts`): `Pineta-Thread`, `Pineta-Lane`,
   `Pineta-Entry`, then `Pineta-Source: <tip>` and `Pineta-Start`, in one
   paragraph, on its WIP line and kept through a description. The source is
   the lane tip the whole offer holds, a stack's revisions included: taken,
@@ -225,6 +267,12 @@ operation is read once and kept until the head moves.**
   A turn's commit names no thread, so it is never one. Only the lane's own
   takes are matched, by `Pineta-Lane`: an untraced take of a lane it forked
   from is not found.
+- **An untraced place leaves a gap** (`untouched`, ADR-0067): on a lane
+  whose start is untraced, a divergent offer is not repaired and an offer
+  you edited is not recorded again; nothing runs, and its record stays as
+  it was, until the lane catches up past the take. Only an offer the host
+  made is withdrawn there. `RefreshDecision` names it, so nothing reaches
+  it by accident.
 - **`catchUpFiles`** says which files catching up would change in a lane:
   those the base changed between the lane's base start and its commit now
   (`jj diff --from <start> --to <to>`) that the lane's tip does not hold as
@@ -233,8 +281,10 @@ operation is read once and kept until the head moves.**
   copy the update makes has its files. `repo.test.ts` holds it against
   `mergeUpdate`'s files on the line and on a WIP, and against your own take
   (none).
-- **`startOfOffer` is the one path to a start**, or to `untraced`. The host's refresh, its
-  `squash` and `refresh` actions and `stackSpan` all use it: a start from
+- **`startOfOffer` is the one path to a start**, or to `untraced`. Every
+  gather reaches it, the one read included (`gatherLane`'s `offerStart`
+  read): the host's refresh, its `squash` and `refresh` actions and
+  `stackSpan` all plan from it: a start from
   another rule would read as a moved start to `planRefresh`, and a split
   would build on it. The exclusion above is inside it: sources read any
   other way bring S81's conflicted start back.
@@ -261,8 +311,9 @@ operation is read once and kept until the head moves.**
   is under the target; your commits carry none. The bookmark's own commit
   is always the top. A conflicted bookmark, or a change id naming two
   commits, reads as divergent, with only the change ids. Every read after
-  the first names commits (S48 item 2). It returns facts; `planRefresh`,
-  `offerEdited` and `offerMoved` (marginalia) decide what they mean.
+  the first names commits (S48 item 2). It returns facts, and the bookmark it
+  found them under; `planRefresh`, `offerEdited` and `offerMoved`
+  (marginalia) decide what they mean.
 - **Every revision's evolog is read, back to the host's newest version**
   (`evologOf`, one `jj evolog -T EVOLOG_ENTRY`; `walkToHost`, pure),
   through each version's predecessor of the same change. Each version an
@@ -328,7 +379,13 @@ operation is read once and kept until the head moves.**
   take, read either way until the lane catches up past it, and what catching
   up changes against what the merge changed (S97); and a review of an
   offer's commit (its description, a rename, names with a space and a
-  quote, and one file's diff, never a directory's).
+  quote, and one file's diff, never a directory's). The gathers are held to
+  it as well: each place kind (placed, untraced, a WIP gone), what a take
+  reads on a WIP (`gatherTake`), a split's stack bottom first
+  (`gatherStack`), `repairOffer` on a divergent offer, and that
+  `trailerRevset` finds exactly the commits `hasTrailer` matches.
+- **`offer-steps.test.ts`**: each decision's steps, as the planners make
+  them, and that each `after` carries the decision's place.
 - **`apps/pineta/host/offers/refresh.test.ts`** runs the host's own refresh
   (`createRefresh`, a real owner) on the histories S97 found, until a round
   writes nothing: it lives with the host, since this package may not import

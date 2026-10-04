@@ -7,8 +7,8 @@ import {
   type FileChange,
   type RevisionReview,
   spanKey,
+  withoutTrailers,
 } from "@pineta/core"
-import { withoutTrailers } from "@pineta/marginalia"
 import type { ReviewTarget } from "./column-view.ts"
 
 /** A fetch's state. */

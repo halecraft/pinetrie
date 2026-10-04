@@ -2,13 +2,36 @@
 // ADR-0065): the offers, the integration line, and lanes' refs in it, all
 // through one owner (`startRepoOwner`). What a lane also runs, through a
 // runner it is given, stays in `@pineta/lanes`. The runners on your repo are
-// the owner's alone: this package exports none.
+// the owner's alone: this package exports none. Only what other packages
+// use is exported: every read of an offer goes through a gather
+// (`offer-gather.ts`), which picks the read path, so the separate reads and
+// the one-read path stay inside.
 
-export * from "./lane-read.ts"
-export * from "./line.ts"
-export * from "./observe.ts"
-export * from "./offer.ts"
-export * from "./owner.ts"
-export * from "./plan.ts"
-export * from "./shared.ts"
-export * from "./step.ts"
+export { beginFacts, readWipState } from "./line.ts"
+export type { Moved } from "./observe.ts"
+export { fileDiff, readOffer, revisionRead, startOfOffer } from "./offer.ts"
+export {
+  gatherDescribe,
+  gatherOffer,
+  gatherPlace,
+  gatherRefresh,
+  gatherStack,
+  gatherTake,
+  type OfferInput,
+} from "./offer-gather.ts"
+export { repairOffer } from "./offer-repair.ts"
+export {
+  describeEffects,
+  type OfferEffects,
+  offerEffects,
+  rebuildEffects,
+  takeEffects,
+} from "./offer-steps.ts"
+export {
+  type RepoOps,
+  type RepoOwner,
+  type RepoReads,
+  startRepoOwner,
+} from "./owner.ts"
+export { laneRefSteps, lineProposal, lineSteps } from "./plan.ts"
+export type { RepoStep } from "./step.ts"

@@ -11,14 +11,18 @@ import {
   HOST_OPERATOR,
   type LaneBase,
   type LaneName,
+  type LineDecision,
+  type LineFacts,
+  type OfferSource,
   type ThreadName,
-  TRAILERS,
+  trailerRevset,
 } from "@pineta/core"
 import {
   bookmarkName,
   type LineConfig,
   laneStackRef,
   laneTipRef,
+  lines,
   offerBookmark,
   revsetName,
   stackBookmark,
@@ -95,6 +99,33 @@ export const planFollow = (input: { readonly onto: string }): RepoStep[] => [
 ]
 
 /**
+ * What setting the line up would write to your repo's config, from what jj
+ * resolves now (`LineFacts`): its immutable heads and log, each with the
+ * line's own added (`immutableHeads`, `logRevset`). Its record shows them.
+ */
+export const lineProposal = (
+  line: LineConfig,
+  facts: Pick<LineFacts, "heads" | "log">,
+): { readonly heads: string; readonly log: string } => ({
+  heads: immutableHeads(line, facts.heads),
+  log: logRevset(facts.log),
+})
+
+/** A `line` command's steps (`planLineAction`'s decision). */
+export function lineSteps(
+  decision: Exclude<LineDecision, { readonly kind: "refused" }>,
+): RepoStep[] {
+  switch (decision.kind) {
+    case "setup":
+      return planLineSetup(decision)
+    case "land":
+      return planLand(decision)
+    case "follow":
+      return planFollow(decision)
+  }
+}
+
+/**
  * `jj git import` into your repo, as the host. A jj command with
  * `--ignore-working-copy` imports no git refs, so every ref Pineta writes is
  * imported at once. With the flag, the import leaves your working copy
@@ -151,7 +182,27 @@ export const laneRefSteps = (
       ]
 
 /** The commits a take made: its offer's trailers name a source or a thread. */
-export const TAKES = `description(regex:"(?m)^(${TRAILERS.source}|${TRAILERS.thread}): ")`
+export const TAKES = trailerRevset(["source", "thread"])
+
+/** A take as `TAKE_ROW` prints it: its commit, and its message whole. */
+export interface TakeRow {
+  readonly commit: CommitId
+  readonly description: string
+}
+
+/** One take a line: its commit, a tab, and its message as a JSON string. */
+export const TAKE_ROW = 'commit_id ++ "\\t" ++ json(description) ++ "\\n"'
+
+/** `TAKE_ROW`'s output, read back. */
+export function parseTakes(stdout: string): TakeRow[] {
+  return lines(stdout).map(row => {
+    const tab = row.indexOf("\t")
+    return {
+      commit: commitId(row.slice(0, tab)),
+      description: JSON.parse(row.slice(tab + 1)) as string,
+    }
+  })
+}
 
 /**
  * Where an offer starts, as a revset (ADR-0060): the newest ancestors of the
@@ -216,7 +267,7 @@ export const EVOLOG_ENTRY =
   'commit.commit_id() ++ "\t" ++ commit.change_id() ++ "\t" ++ if(operation, operation.user(), "") ++ "\t" ++ predecessors.map(|p| p.commit_id() ++ ":" ++ p.change_id()).join(",") ++ "\n"'
 
 /** Whether an operation's user (`<user>@<hostname>`) is the host's. */
-export const isHostUser = (user: string): boolean =>
+const isHostUser = (user: string): boolean =>
   user.startsWith(`${HOST_OPERATOR}@`)
 
 /** `jj evolog -T EVOLOG_ENTRY`'s output -> its entries, newest first. */
@@ -271,12 +322,6 @@ export function walkToHost(
     yours.push({ from: before.commit, to: at })
     at = before.commit
   }
-}
-
-/** One revision of an offer: the lane commit whose files it has, and its message. */
-export interface OfferSource {
-  readonly commit: CommitId
-  readonly description: string
 }
 
 /**

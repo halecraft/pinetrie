@@ -283,9 +283,13 @@ containers, disks and the helper.
 - **One bookmark in a revset is `bookmarkRevset(name)`**: `bookmarks(exact:…)`
   with the name quoted (`revsetName`), so a name is never parsed as a
   revset.
-- **The host's trailers** (`Pineta-Thread`, `Pineta-Lane`, `Pineta-Entry`)
-  are core's `TRAILERS`: `revisionMessage` and `entryOfMessage` here, and
-  marginalia's `withTrailers` and `withoutTrailers`, read the one constant.
+- **The host's trailers** (`Pineta-Thread`, `Pineta-Lane`, `Pineta-Entry`,
+  `Pineta-Base` and an offer's ledger) are written and read in one file,
+  core's `trailers.ts`: a turn's message (`revisionMessage`,
+  `entryOfMessage`), a base's (`baseMessage`, `parseBase`, `baseOf`), an
+  offer's, and the revset that finds commits by one (`trailerRevset`, here
+  in `newestBase`). A format lanes or repo must read or write lives in
+  core.
 - **Decide from exit status, never from printed text.** Output a program
   reads comes from a `-T` template. `execFile` reads all of it: jj exits 3 on
   a broken pipe.

@@ -4,7 +4,13 @@
 // up, move it and rebase your work onto it are `planLineSetup`, `planLand`
 // and `planFollow` (`plan.ts`).
 
-import { type CommitId, commitId, type LaneBase } from "@pineta/core"
+import {
+  type BaseRecord,
+  type CommitId,
+  commitId,
+  type LaneBase,
+  type LineFacts,
+} from "@pineta/core"
 import {
   commitsOf,
   conflictedFilesAt,
@@ -15,57 +21,8 @@ import {
 } from "@pineta/lanes"
 import { changeOf } from "./offer.ts"
 
-/** What the host reads of the line, each time it looks. */
-export interface LineFacts {
-  /** The line's commit; null before it is set up. */
-  readonly commit: CommitId | null
-  /** Your repo's `immutable_heads()`, as jj resolves it; null for the builtin. */
-  readonly heads: string | null
-  /** Your repo's `revsets.log`, as jj resolves it; null for the default. */
-  readonly log: string | null
-  /**
-   * The WIP bookmarks above the line's ancestry, each with its commit, how
-   * many line commits it lacks, and how many of its own are not on the line.
-   */
-  readonly wips: readonly {
-    readonly bookmark: string
-    readonly commit: CommitId
-    readonly behind: number
-    readonly ahead: number
-  }[]
-  /**
-   * Your `@-` against the line: the line commits it lacks, and, when it
-   * descends from the line, the commits of yours above it (else null); what
-   * updating your files would do (null when it cannot or need not); and the
-   * conflicts jj records in your work above the line.
-   */
-  readonly yours: {
-    readonly behind: number
-    readonly ahead: number | null
-    readonly follow: FollowPreview | null
-    readonly conflicts: YourConflicts
-  }
-}
-
-/**
- * What `planFollow`'s rebase would do to your files (S80), read without
- * writing anything jj or jjui shows: `git merge-tree` of the line and `@`
- * as last snapshotted, from their fork point.
- */
-export interface FollowPreview {
-  /** Files your working copy would see change. */
-  readonly files: readonly string[]
-  /** Of those, the ones that would conflict. */
-  readonly conflicts: readonly string[]
-  /** Heads of yours besides `@` that move with it: `-b @` takes them. */
-  readonly heads: number
-}
-
-/** Your conflicted commits above the line, and the conflicted files in `@`. */
-export interface YourConflicts {
-  readonly commits: number
-  readonly files: readonly string[]
-}
+/** What `planFollow`'s rebase would do to your files (S80): `LineRecord`'s shape. */
+type FollowPreview = NonNullable<LineFacts["yours"]["follow"]>
 
 const count = async (jj: Runner, revset: string): Promise<number> =>
   (await commitsOf(jj, revset)).length
@@ -218,7 +175,7 @@ export async function beginFacts(
  * line, and whether the commit its base names is there. Null for a base on
  * the line, or none.
  */
-export async function wipFacts(
+async function wipFacts(
   jj: Runner,
   line: LineConfig,
   base: LaneBase | null,
@@ -245,3 +202,33 @@ export async function wipFacts(
           ),
   }
 }
+
+/**
+ * A WIP base's state (ADR-0060): landed when its bookmark points into the
+ * line (moved there, or squashed into the line, which keeps the bookmark and
+ * drops the WIP's change, S77 item 2), or, with the bookmark gone, when the
+ * commit the lane's `Pineta-Base` names, or its change, is on the line.
+ * Gone when the bookmark is gone and the WIP did not land; else ok. No
+ * facts, a base on the line, is ok. Pure.
+ */
+export function wipState(
+  facts: {
+    /** Where the WIP bookmark points now; null when it is gone. */
+    readonly bookmark: CommitId | null
+    /** The bookmark's commit is in the line's history. */
+    readonly bookmarkInLine: boolean
+    /** The commit `Pineta-Base` names, or its change, is in the line's history. */
+    readonly sourceInLine: boolean
+  } | null,
+): BaseRecord["state"] {
+  if (facts === null) return "ok"
+  if (facts.bookmark !== null) return facts.bookmarkInLine ? "landed" : "ok"
+  return facts.sourceInLine ? "landed" : "gone"
+}
+
+/** What became of a lane's WIP base (`wipState` of `wipFacts`); "ok" for a base on the line. */
+export const readWipState = async (
+  jj: Runner,
+  line: LineConfig,
+  base: LaneBase | null,
+): Promise<BaseRecord["state"]> => wipState(await wipFacts(jj, line, base))

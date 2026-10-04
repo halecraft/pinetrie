@@ -120,7 +120,7 @@ packages/marginalia/   @pineta/marginalia   Pineta's shapes in pi: chat, cards
 packages/reads/        @pineta/reads        document reads shared by host and client
 packages/lanes/        @pineta/lanes        a lane's container and disk, and jj and git in it (ADR-0032–0034)
 packages/keeper/       @pineta/keeper       declares NOTHING; one step at a time on a resource
-packages/repo/         @pineta/repo         your repo: offers, the line, lanes' refs (ADR-0038, 0060)
+packages/repo/         @pineta/repo         your repo: reads, steps, the owner (ADR-0038, 0060, 0065)
 packages/client/       @pineta/client       browser UI; owns its Vite build
 (root)                                      development tooling only
 ```

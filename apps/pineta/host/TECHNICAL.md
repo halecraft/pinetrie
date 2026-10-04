@@ -33,7 +33,7 @@ wires them.
 | `hot-reload.ts` | Vite's hot updates, held while a direct lane in the project runs |
 | `admission.ts`, `policy.ts`, `lines.ts`, `blobs.ts`, `store.ts` | the invite key and links, the write policy, departed seats, the image store, the SQLite store |
 | `work/` | lane containers and disks (§ Lane work) |
-| `offers/` | each lane's offer in your repo, on the owner of your repo (§ Offers) |
+| `offers/` | each lane's offer in your repo, on the owner of your repo (§ Offers); the line's record and commands are `work/line.ts`'s |
 | `names.ts` | every thread's name (ADR-0039): `ensure` for the lanes pi holds, `reserve` for a lane id a column reserved before its lane exists (ADR-0057), on one queue |
 | `banners.ts` | each thread's column banner (ADR-0050, ADR-0053): made as the thread is named, at reservation or creation, set by `set_banner` |
 | `digests.ts` | each ask's digest (ADR-0056), unless the user config turns them off (ADR-0071) |
@@ -534,11 +534,12 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   record `later("line")`. So a command waits for at most the one step
   running, however many refreshes are marked, and a lane marked many times
   before its refresh starts refreshes once.
-- **What marks a lane** (`planMarks`, pure, from the owner's `onMoved`): a
+- **What marks a lane** (`planMarks`, `marks.ts`, pure, from the owner's `onMoved`): a
   move of the line or a WIP, or the first observation (`all`), marks the
   line's record, every named lane and every open record; your `@` alone
   (`yours`, jjui and your editor) marks no lane: one `later("shared")` step
-  rewrites each open record's `yourEdits` (its files that `@` changes) and
+  rewrites each open record's `yourEdits` (its files that `@` changes,
+  `planYourEdits`) and
   the line's record from the shared facts; a lane's
   ref (a fetch's import) marks that lane; an offer bookmark the lane its
   thread names. A run's end marks its lane, then describes it. A refresh
@@ -555,61 +556,58 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   (`Offers.read`), a description's gather, and lane work's reads of your
   repo run at the head the owner last observed (`owner.read`). A take
   gathers in its own command, unpinned, so it acts on the repo as it is.
-- **Each step carries out a pure plan** (`offers/plan.ts`): `planRefresh`
-  (marginalia) picks the branch, `planOfferEffects` says what it runs and
-  writes, `offerRecord` builds the record, and `planTake` a take.
-  `execute.ts` carries them out over ports (`executeOffer`, `executeTake`).
-  So the offers' rules are tested as values, and what a plan makes the host
-  write is tested over `record<T>()`; `packages/repo/repo.test.ts` proves
-  the jj steps themselves against real jj.
-- `refresh.ts` builds and records, and carries out a refresh; `describe.ts`
-  gathers by a pinned read (the offer, its diff, your recent messages), asks
-  the model outside the owner, one request per lane at a time
-  (`describing`), and writes in an owner command; `act.ts` and `stack.ts`
-  are the actions and a split's stack.
-- **The host decides an offer only from your repo** (ADR-0060), and the
-  archive. A refresh gathers with `refreshNow`: for a thread whose root is
-  archived, only its offer, read against the line; else `offerNow`'s facts
-  and whether the lane's work changes any file (`workChanges`). A place
-  whose start is untraced, or whose WIP is gone, is no `Placed`
-  (`placedOf`): nothing is built from it, so squash, refresh, describe and
-  a split's span refuse it. A take needs no start (a bookmark move), so an
-  offer you edited on an untraced lane can still be taken. Archived
-  is read from the archive record, not from the lane's tip being missing:
-  a tip missing for one import (S78) must not withdraw a live offer. One gather,
-  `offerNow`, reads where it sits and starts (`placeOf`: its base from the
-  lane's newest `Pineta-Base`, its target the line's commit or the WIP's,
-  its start `startOfOffer`) and the offer itself (`readOffer`). Refresh,
-  take, squash, describe and a split's replacement all plan from it.
-  **`placeOf` reads, and writes nothing:** it reads the stored
-  `pineta.base` only as a memo of what catching up changes
-  (`knownCatchUp`, `readCatchUp`), never to decide; the lane's
-  `pineta.base` cache, with that and its untraced takes, is among the writes `planOfferEffects` and `planTake` plan
-  (`baseWrites`, `setIfChanged`), so a gather can run pinned, outside the
-  owner's queue. A WIP gone without landing writes only its base record.
-  `OfferState` has no record reader: `write` compares with the stored
-  record only to skip a write that changes nothing.
-- **A record is written from the repo after each step** (`executeOffer`):
-  from the read made before planning when the plan ran no steps (the
-  common `none` reads nothing more), else from a new read. `withdraw` and
-  `forget` remove it, and `OfferState.remove` skips a record that is not
-  there. A refresh with no place (an archived thread) plans only those two;
-  the ports that need a place reject if reached without one.
+- **The host decides nothing and runs no jj on an offer.** Each step is a
+  gather (`@pineta/repo`: `gatherRefresh`, `gatherOffer`, `gatherTake`,
+  `gatherStack`, `gatherDescribe`), a decision (marginalia: `planRefresh`,
+  `planOfferTake`, `planRebuild`, `planStackEnded`, `planDescribeSettle`),
+  a translation into steps (`@pineta/repo`: `offerEffects`, `takeEffects`,
+  `rebuildEffects`, `describeEffects`), and `executeOffer` (`execute.ts`),
+  which carries out every action over ports: the lane's base record first,
+  when it differs from the page's, then the steps, then what comes after
+  (`OfferEffects.after`). So the rules are tested as values in the two
+  packages, what the host writes is tested over `record<T>()`, and
+  `packages/repo/repo.test.ts` proves the reads and steps against real jj.
+- **What only the documents know is read here, first** (`state.ts`,
+  `OfferDocs`): the thread's name, whether its root is archived (from the
+  archive record, never from the lane's tip being missing: a tip missing
+  for one import, S78, must not withdraw a live offer), the last catch-up
+  read (`pineta.base`, a memo `readCatchUp` keeps at the same tip and base
+  commit, never read to decide), the lane's tip entry and the WIP line.
+  Everything else is read from your repo (ADR-0060), and where an offer
+  sits is decided once there (`OfferPlace`): a WIP gone moves nothing and
+  writes only its base record; an untraced start builds nothing, so squash,
+  refresh, describe and a split's span refuse it, while a take, a bookmark
+  move, can still take an offer you edited there.
+- **The records are written from the repo after each step**
+  (`OfferRecords`): an offer's from the read made before planning when the
+  step ran no steps (the common `none` reads nothing more), else from a new
+  read; `withdraw` and `forget` remove it; a take writes it marked taken.
+  Each write is skipped when it changes nothing, and the records are read
+  only for that.
+- `refresh.ts` carries out a refresh and a rebuild, and gives the ports;
+  `describe.ts` gathers by a pinned read, asks the model outside the owner,
+  one request per lane at a time (`describing`), and writes in an owner
+  command; `act.ts` and `stack.ts` are the actions and a split's stack;
+  `marks.ts` is `planMarks`.
 - **A root archived or restored moves its lanes' refs in an owner
   command** (`Offers.moveLanes`, called by `work/archive.ts`), then marks
   each lane: an archived thread's offer is withdrawn, a restored one's built
   again (ADR-0061).
 - **A take names the offer it was shown** (`OfferSeen`, ADR-0065): the
   ledger its record carried, and whether it conflicted, which the page's
-  session client reads from the record as it sends (`offerSeen`). `planTake`
-  refuses `offer_changed` when the ledger now differs (its source, or its
+  session client reads from the record as it sends (`offerSeen`).
+  `planOfferTake` refuses `offer_changed` when the ledger now differs (its source, or its
   start as a set), or the offer conflicts now and did not then. A rebase
   onto a moved target and your edit keep the ledger, and are taken.
-- **A take names its destination** (`planTake`): one of
+- **A take names its destination** (`planOfferTake`): one of
   `takeDestinations`, and refused (`bad_destination`) unless the bookmark is
-  at or below the offer's bottom's parent, read in the same step. jj's
+  at or below the offer's bottom's parent, read in the same command
+  (`gatherTake`). jj's
   refusal of a backwards move is the second guard (S77 item 1).
-- **The `line` command** (`offers/line.ts`): `setup` creates the line's
+- **The `line` command** (`work/line.ts`, created by `startLaneWork` beside
+  the offers, which rewrite its record when the owner observes the line or
+  your `@` move): decided by marginalia (`planLineAction`), its steps
+  `@pineta/repo`'s (`lineSteps`). `setup` creates the line's
   bookmark at your `@-` and writes `immutable_heads()` and `revsets.log`
   to the repo's config, the text the header's menu showed; `land` moves the line to your
   `@-`, as you; `follow` rebases your work onto the line, as you

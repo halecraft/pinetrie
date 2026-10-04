@@ -10,21 +10,25 @@ import {
 import { tmpdir } from "node:os"
 import path from "node:path"
 import {
+  baseMessage,
   type CatchUpRead,
   type CommitId,
   commitId,
   type EntryId,
   entryId,
+  entryOfMessage,
   firstLine,
+  hasTrailer,
   type LaneBase,
   type LaneName,
   laneNameForThread,
   NO_EDITOR,
+  type OfferSource,
   type ThreadName,
+  trailerRevset,
   WORKSPACE_ROOT,
 } from "@pineta/core"
 import {
-  baseMessage,
   bookmarkName,
   bookmarkOf,
   bookmarkRevset,
@@ -35,7 +39,6 @@ import {
   conflictedFilesAt,
   conflictsIn,
   DEFAULT_LINE,
-  entryOfMessage,
   executeOrThrow,
   fetchById,
   hostBytesRunner,
@@ -64,19 +67,33 @@ import {
   type TouchedRevision,
 } from "@pineta/lanes"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
+import { gatherLane } from "./lane-read.ts"
+import { lineFacts } from "./line.ts"
 import {
   catchUpFiles,
   changeOf,
   fileDiff,
-  gatherLane,
   hostCommitIn,
+  laneTipIn,
+  offerRevisions,
+  readCatchUp,
+  readOffer,
+  revisionRead,
+  startOfOffer,
+  workChanges,
+} from "./offer.ts"
+import {
+  gatherOffer,
+  gatherPlace,
+  gatherStack,
+  gatherTake,
+} from "./offer-gather.ts"
+import { repairOffer } from "./offer-repair.ts"
+import {
   immutableHeads,
   laneRefSteps,
-  laneTipIn,
-  lineFacts,
   logRevset,
-  type OfferSource,
-  offerRevisions,
+  parseTakes,
   planAbandonOffer,
   planDescribe,
   planFollow,
@@ -85,16 +102,11 @@ import {
   planLineSetup,
   planOffer,
   planRefreshOffer,
-  planRepair,
   planTakeOffer,
-  readCatchUp,
-  readOffer,
-  readShared,
-  revisionRead,
-  startOfOffer,
-  workChanges,
-} from "./index.ts"
+  TAKE_ROW,
+} from "./plan.ts"
 import { executeRepo, hostJj, hostOps, runnerFor } from "./run.ts"
+import { readShared } from "./shared.ts"
 
 const LANE = laneNameForThread("1")
 const NAME = "amber-fox" as ThreadName
@@ -1267,7 +1279,10 @@ describe("a lane's repo, with jj", () => {
     await agrees()
     const split = await hostCommitIn(ops, c1)
     if (split === null) throw new Error("no split")
-    await executeRepo(yoursDir, planRepair({ bookmark, ...split, top: true }))
+    await repairOffer(
+      { jj: ops, execute: steps => executeRepo(yoursDir, steps) },
+      { bookmark, changes: [c1] },
+    )
     // Repaired: yours, edited.
     await agrees()
     expect(await commitsOf(yoursJj, "divergent()")).toEqual([])
@@ -1876,6 +1891,26 @@ describe("a lane's repo, with jj", () => {
     expect(
       await startOfOffer(ops, { tip: t2, base: b2, line, lane: LANE }),
     ).toEqual({ kind: "untraced", takes: [await lineNow()] })
+    const input = { lane: LANE, name: NAME, line, known: null }
+    expect(await gatherPlace({ jj: ops }, input)).toEqual({
+      kind: "untraced",
+      tip: t2,
+      base: b2,
+      state: "ok",
+      target: await lineNow(),
+    })
+    // The revset that finds a thread's commits matches what hasTrailer does.
+    const all = parseTakes(
+      (await ops(["log", "--no-graph", "-r", "all()", "-T", TAKE_ROW])).stdout,
+    )
+    const found = await commitsOf(ops, trailerRevset(["thread"], NAME))
+    expect(found.length).toBeGreaterThan(0)
+    expect(
+      all
+        .filter(c => hasTrailer(c.description, "thread", NAME))
+        .map(c => c.commit)
+        .sort(),
+    ).toEqual([...found].sort())
     // Caught up: the take is under its base, and the start is the line.
     await update({ "c.txt": "c\n" })
     await fetch([t2])
@@ -1887,6 +1922,11 @@ describe("a lane's repo, with jj", () => {
     expect(
       await startOfOffer(ops, { tip: t3, base: b3, line, lane: LANE }),
     ).toEqual({ kind: "known", start: [await lineNow()] })
+    expect(await gatherPlace({ jj: ops }, input)).toMatchObject({
+      kind: "placed",
+      tip: t3,
+      start: [await lineNow()],
+    })
   }, 60_000)
 
   test("catching up with your own take of the lane's work changes no file, as catchUpFiles says (S97)", async () => {
@@ -2021,6 +2061,32 @@ describe("a lane's repo, with jj", () => {
     expect(
       lines((await rig.ops(["diff", "-r", o ?? "", "--name-only"])).stdout),
     ).toEqual(["tests.txt"])
+    // What a take reads: the WIP's commit above the line lands with it on
+    // the line, and both bookmarks sit below the offer.
+    const input = { lane: LANE, name: NAME, line: rig.line, known: null }
+    const gathered = await gatherOffer({ jj: rig.ops }, input)
+    expect(gathered?.place).toMatchObject({ kind: "placed", target })
+    if (gathered === null) throw new Error("no gather")
+    expect(await gatherTake({ jj: rig.ops }, gathered, rig.line)).toEqual({
+      wipAhead: 1,
+      below: new Set(["wip/search", rig.line.onto]),
+    })
+    // A split's stack, read bottom first: the WIP's commit, then the offer.
+    const stack = await gatherStack(
+      { jj: rig.ops },
+      { start: [line], tip, top: o === undefined ? null : commitId(o) },
+    )
+    expect(
+      stack === "no-top"
+        ? stack
+        : stack.revisions.map(r => [r.commit, r.description.split("\n")[0]]),
+    ).toEqual([
+      [target, "wip: half done"],
+      [o, "WIP"],
+    ])
+    expect(
+      await gatherStack({ jj: rig.ops }, { start: [line], tip, top: null }),
+    ).toBe("no-top")
     // Taken into the WIP: a forward move; the WIP stays mutable.
     await executeRepo(
       rig.yoursDir,
@@ -2031,6 +2097,13 @@ describe("a lane's repo, with jj", () => {
       }),
     )
     expect(await commitsOf(rig.ops, "wip/search & mutable()")).toEqual([o])
+    // The WIP's bookmark deleted, its work never on the line: gone.
+    await rig.yoursJj(["bookmark", "delete", "wip/search"])
+    expect(await gatherPlace({ jj: rig.ops }, input)).toEqual({
+      kind: "gone",
+      tip,
+      base: await laneBase(rig.ops, tip, rig.line),
+    })
   }, 60_000)
 
   test("a base refreshes after your @- was rewritten, not built on (S74)", async () => {

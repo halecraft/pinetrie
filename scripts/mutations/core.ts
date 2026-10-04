@@ -6,8 +6,52 @@ const tree = "packages/core/tree.ts"
 const roots = "packages/core/roots.ts"
 const asks = "packages/core/asks.ts"
 const core = "packages/core/index.ts"
+const trailers = "packages/core/trailers.ts"
 
 export const mutations: readonly Mutation[] = [
+  {
+    name: "another thread's WIP line counts as this one's",
+    file: trailers,
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "  line.startsWith(`WIP (${name}): `)",
+    to: '  line.startsWith("WIP (")',
+    command: unit,
+    expect: "the WIP line is this thread's",
+  },
+  {
+    name: "the trailers leave out the thread's name",
+    file: trailers,
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "  `${message.trim()}\\n\\n${TRAILERS.thread}: ${at.name}\\n${TRAILERS.lane}: ${at.lane}\\n${TRAILERS.entry}: ${at.entry}\\n`",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    to: "  `${message.trim()}\\n\\n${TRAILERS.lane}: ${at.lane}\\n${TRAILERS.entry}: ${at.entry}\\n`",
+    command: unit,
+    expect: "withTrailers and the WIP line",
+  },
+  {
+    name: "the host's trailers stay",
+    file: trailers,
+    from: "  return cut === null ? text.trim() : text.slice(0, cut).trim()",
+    to: "  return text.trim()",
+    command: unit,
+    expect: "withoutTrailers undoes withTrailers",
+  },
+  {
+    name: "a paragraph with any trailer of ours counts as ours",
+    file: trailers,
+    from: "    .every(line => ours.some(t => line.startsWith(t)))",
+    to: "    .some(line => ours.some(t => line.startsWith(t)))",
+    command: unit,
+    expect: "withoutTrailers undoes withTrailers, and keeps your own",
+  },
+  {
+    name: "a squash's sources are read from its last paragraph only",
+    file: trailers,
+    from: "  [...new Set(trailerValues(message, TRAILERS.source))].map(commitId)",
+    to: "  [...new Set(trailerValues(message, TRAILERS.source).slice(-1))].map(commitId)",
+    command: unit,
+    expect: "sourcesOf reads every paragraph of a squash",
+  },
   {
     name: "an ask of MIN_STRETCH agent messages is short",
     file: asks,
@@ -18,7 +62,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a take that names a source reads as untraced",
-    file: core,
+    file: trailers,
     from: "        trailerValues(p, TRAILERS.source).length === 0,\n",
     to: "        true,\n",
     command: unit,
@@ -27,7 +71,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a turn reads as an untraced take",
-    file: core,
+    file: trailers,
     from: "        trailerValues(p, TRAILERS.thread).length > 0 &&\n",
     to: "        true &&\n",
     command: unit,
@@ -61,7 +105,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "an offer's ledger is read from its oldest paragraph",
-    file: "packages/core/index.ts",
+    file: trailers,
     from: "    .filter(p => trailerValues(p, TRAILERS.source).length > 0)\n    .at(-1)",
     to: "    .filter(p => trailerValues(p, TRAILERS.source).length > 0)\n    .at(0)",
     command: unit,
@@ -69,7 +113,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a trailer is read from the last paragraph only",
-    file: "packages/core/index.ts",
+    file: trailers,
     from: "    .filter(line => line.startsWith(prefix))",
     to: "    .filter(line => line.startsWith(prefix))\n    .slice(-1)",
     command: unit,

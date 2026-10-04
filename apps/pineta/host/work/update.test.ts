@@ -4,10 +4,10 @@ import {
   entryId,
   laneNameForThread,
   NOBODY,
+  revisionMessage,
   type ThreadName,
   writerId,
 } from "@pineta/core"
-import { revisionMessage } from "@pineta/lanes"
 import { encodeChat, encodeUpdate } from "@pineta/marginalia"
 import { readTreeIndex } from "@pineta/reads"
 import { newRootDoc, writeEntry, writeLaneTip } from "@pineta/schema"

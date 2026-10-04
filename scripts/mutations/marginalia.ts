@@ -7,7 +7,7 @@ const archive = "packages/marginalia/archive.ts"
 export const mutations: readonly Mutation[] = [
   {
     name: "behind its base, catching up stays in the menu",
-    file: "packages/marginalia/offer.ts",
+    file: "packages/marginalia/offer-view.ts",
     from: '      (kind === "brings" || input.untraced) && menu.includes("update")',
     to: '      input.untraced && menu.includes("update")',
     command: unit,
@@ -16,7 +16,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a queued catch-up is no activity",
-    file: "packages/marginalia/offer.ts",
+    file: "packages/marginalia/offer-view.ts",
     from: '    input.activity === "idle" && input.catchingUp',
     to: "    false",
     command: unit,
@@ -25,7 +25,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a moved base is never seen",
-    file: "packages/marginalia/offer.ts",
+    file: "packages/marginalia/line.ts",
     from: "  return now === undefined || now.commit === base.start\n",
     to: "  return true\n",
     command: unit,
@@ -34,7 +34,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a WIP thread is measured against the line",
-    file: "packages/marginalia/offer.ts",
+    file: "packages/marginalia/line.ts",
     from: '    thread.kind === "line"\n      ? { bookmark: line.onto, commit: line.commit }',
     to: "    true\n      ? { bookmark: line.onto, commit: line.commit }",
     command: unit,
@@ -61,7 +61,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "an offer of no files can be taken",
-    file: "packages/marginalia/offer.ts",
+    file: "packages/marginalia/offer-view.ts",
     from: '  if (offer.kind === "held") return view("nothing", [], ["update"])\n',
     to: "",
     command: unit,
@@ -78,7 +78,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "an untraced thread's edited offer offers a rebuild",
-    file: "packages/marginalia/offer.ts",
+    file: "packages/marginalia/offer-view.ts",
     from: '      !input.untraced || (b !== "refresh" && b !== "squash" && b !== "split")\n',
     to: "      true\n",
     command: unit,
@@ -87,7 +87,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "an untraced thread keeps catching up in the menu",
-    file: "packages/marginalia/offer.ts",
+    file: "packages/marginalia/offer-view.ts",
     from: '      (kind === "brings" || input.untraced) && menu.includes("update")',
     to: '      kind === "brings" && menu.includes("update")',
     command: unit,
@@ -96,7 +96,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "catching up into the lane's own work is not quiet",
-    file: "packages/marginalia/offer.ts",
+    file: "packages/marginalia/offer-view.ts",
     from: '      ...(!input.untraced && (kind === "current" || kind === "nothing-new")',
     to: '      ...(!input.untraced && kind === "current"',
     command: unit,
@@ -105,7 +105,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the host's read of catching up counts at any commit",
-    file: "packages/marginalia/offer.ts",
+    file: "packages/marginalia/line.ts",
     from: "  if (read === undefined || read === null || read.to !== move.to)",
     to: "  if (read === undefined || read === null)",
     command: unit,
@@ -115,8 +115,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a record left from a gone offer is kept",
     file: "packages/marginalia/offer.ts",
-    from: '    return start === null || work !== "some" || reached ? "forget" : "build"',
-    to: '    return start === null || work !== "some" || reached ? "none" : "build"',
+    from: '      ? { kind: "forget" }\n      : { kind: "build", place }',
+    to: '      ? { kind: "untouched" }\n      : { kind: "build", place }',
     command: unit,
     expect:
       "no offer in your repo (never built, taken, or gone): build, unless the lane holds nothing you lack, when a record left from one is forgotten",
@@ -124,8 +124,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lane whose work undoes itself is offered",
     file: "packages/marginalia/offer.ts",
-    from: '  if (start === null || work === "none") return "withdraw"',
-    to: '  if (start === null) return "withdraw"',
+    from: '  if (work === "none") return { kind: "withdraw", offer }',
+    to: '  if (false) return { kind: "withdraw", offer }',
     command: unit,
     expect:
       "a lane whose work changes no file is never built, and its offer is withdrawn unless you edited it",
@@ -133,26 +133,26 @@ export const mutations: readonly Mutation[] = [
   {
     name: "what jj could not tell builds an offer",
     file: "packages/marginalia/offer.ts",
-    from: '    return start === null || work !== "some" || reached',
-    to: '    return start === null || work === "none" || reached',
+    from: '    return work !== "some" || reached\n',
+    to: '    return work === "none" || reached\n',
     command: unit,
     expect:
       "what jj could not tell never builds an offer, and keeps one that is there (ADR-0067)",
   },
   {
-    name: "an untraced start reads as an empty one",
+    name: "an untraced thread's edited offer is withdrawn",
     file: "packages/marginalia/offer.ts",
-    from: '  const start = facts.start.kind === "known" ? facts.start.start : null\n',
-    to: '  const start = facts.start.kind === "known" ? facts.start.start : []\n',
+    from: '      ? { kind: "untouched" }\n      : { kind: "withdraw", offer }',
+    to: '      ? { kind: "withdraw", offer }\n      : { kind: "withdraw", offer }',
     command: unit,
     expect:
-      "an untraced start builds nothing, withdraws an offer, and leaves one you edited (S97)",
+      "an untraced start builds nothing, withdraws an offer, and leaves one you edited, or one divergent, untouched (S97)",
   },
   {
     name: "an archived thread's offer stays",
     file: "packages/marginalia/offer.ts",
-    from: '  if (facts.archived) return offer === null ? "forget" : "withdraw"',
-    to: '  if (facts.archived) return offer === null ? "forget" : "none"',
+    from: '    return offer === null ? { kind: "forget" } : { kind: "withdraw", offer }',
+    to: '    return offer === null ? { kind: "forget" } : { kind: "untouched" }',
     command: unit,
     expect:
       "an archived thread's offer is withdrawn, an edited one too; with none, its record is forgotten",
@@ -166,29 +166,12 @@ export const mutations: readonly Mutation[] = [
     expect: "describeWanted",
   },
   {
-    name: "another thread's WIP line counts as this one's",
-    file: "packages/marginalia/offer.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "  line.startsWith(`WIP (${name}): `)",
-    to: '  line.startsWith("WIP (")',
-    command: unit,
-    expect: "the WIP line is this thread's",
-  },
-  {
     name: "a conflicted offer lands on the line",
     file: "packages/marginalia/offer.ts",
     from: "    input.conflicted\n      ? []",
     to: "    false\n      ? []",
     command: unit,
     expect: "a conflicted offer never lands on the line",
-  },
-  {
-    name: "a WIP squashed into the line is not landed",
-    file: "packages/marginalia/work.ts",
-    from: '  if (facts.bookmark !== null) return facts.bookmarkInLine ? "landed" : "ok"',
-    to: '  if (facts.bookmark !== null) return "ok"',
-    command: unit,
-    expect: "the bookmark on the line (landed, or squashed into it)",
   },
   {
     name: "a landed WIP's thread stays on the WIP",
@@ -454,19 +437,9 @@ export const mutations: readonly Mutation[] = [
     expect: "names only the unnamed",
   },
   {
-    name: "the trailers leave out the thread's name",
-    file: "packages/marginalia/offer.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "  `${message.trim()}\\n\\n${TRAILERS.thread}: ${at.name}\\n${TRAILERS.lane}: ${at.lane}\\n${TRAILERS.entry}: ${at.entry}\\n`",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    to: "  `${message.trim()}\\n\\n${TRAILERS.lane}: ${at.lane}\\n${TRAILERS.entry}: ${at.entry}\\n`",
-    command: unit,
-    expect: "withTrailers and the WIP line",
-  },
-  {
     name: "an offer ignores a moved start",
     file: "packages/marginalia/offer.ts",
-    from: "  ledger.source !== now.tip ||\n  !sameCommits(ledger.start, now.start)",
+    from: "  ledger.source !== now.tip ||\n  !sameStart(ledger.start, now.start)",
     to: "  ledger.source !== now.tip",
     command: unit,
     expect: "where it starts moved",
@@ -481,7 +454,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the bookmark is left out",
-    file: "packages/marginalia/offer.ts",
+    file: "packages/marginalia/offer-view.ts",
     from: "    bookmark: untaken?.bookmark ?? null,",
     to: "    bookmark: null,",
     command: unit,
@@ -545,7 +518,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a taken offer's commit is read",
-    file: "packages/marginalia/offer.ts",
+    file: "packages/marginalia/review.ts",
     from: '      .flatMap(o => (offerStatus(o).kind === "open" ? o.commits : []))',
     to: "      .flatMap(o => o.commits)",
     command: unit,
@@ -553,7 +526,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a held offer's commit is read",
-    file: "packages/marginalia/offer.ts",
+    file: "packages/marginalia/review.ts",
     from: '      .flatMap(o => (offerStatus(o).kind === "open" ? o.commits : []))',
     to: "      .flatMap(o => (o.taken === null ? o.commits : []))",
     command: unit,
@@ -561,33 +534,25 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a huge diff is answered",
-    file: "packages/marginalia/offer.ts",
+    file: "packages/marginalia/review.ts",
     from: "  if (new TextEncoder().encode(text).length > MAX_DIFF_BYTES)",
     to: "  if (text.length < 0)",
     command: unit,
     expect: "answers: a review decoded, a diff within its size",
   },
   {
-    name: "the host's trailers stay",
-    file: "packages/marginalia/offer.ts",
-    from: "  return onlyOurs ? text.slice(0, cut).trim() : text.trim()",
-    to: "  return text.trim()",
-    command: unit,
-    expect: "withoutTrailers undoes withTrailers",
-  },
-  {
     name: "a review URL carries no version",
-    file: "packages/marginalia/offer.ts",
+    file: "packages/marginalia/review.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "  `${OFFER_PREFIX}${OFFER_WIRE}/review/${spanKey(span)}`",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     to: "  `${OFFER_PREFIX}review/${spanKey(span)}`",
     command: unit,
     expect: "the wire: every URL parses back",
   },
   {
     name: "another version is served",
-    file: "packages/marginalia/offer.ts",
+    file: "packages/marginalia/review.ts",
     from: '  if (version !== String(OFFER_WIRE) || rest.length > 0) return "bad"',
     to: '  if (rest.length > 0) return "bad"',
     command: unit,
@@ -845,7 +810,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a range across two lanes is read",
-    file: "packages/marginalia/offer.ts",
+    file: "packages/marginalia/review.ts",
     from: "      if (f.lane === t.lane && f.commit !== null && t.commit !== null)",
     to: "      if (f.commit !== null && t.commit !== null)",
     command: unit,
@@ -1093,14 +1058,6 @@ export const mutations: readonly Mutation[] = [
     expect: "continue on the line marks a move from a WIP",
   },
   {
-    name: "a line base is gone",
-    file: "packages/marginalia/work.ts",
-    from: '  if (facts === null) return "ok"',
-    to: '  if (facts === null) return "gone"',
-    command: unit,
-    expect: "a line base, with no WIP facts, is ok",
-  },
-  {
     name: "a resolution's record names its landing as its prompt",
     file: "packages/marginalia/work.ts",
     from: "  prompt: input.prompt,",
@@ -1170,7 +1127,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a take is never shown a conflict",
-    file: "packages/marginalia/offer.ts",
+    file: "packages/marginalia/offer-view.ts",
     from: "  conflicted: (record?.conflicts.length ?? 0) > 0,",
     to: "  conflicted: false,",
     command: ["pnpm", "exec", "vitest", "run", "packages/marginalia"],
@@ -1429,7 +1386,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "every conflict counts as come with the copy",
-    file: "packages/marginalia/offer.ts",
+    file: "packages/marginalia/offer-view.ts",
     from: "  return record.conflicts.length > 0 && record.conflicts.every(f => at.has(f))",
     to: "  return record.conflicts.length > 0",
     command: unit,
@@ -1446,7 +1403,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the parent is offered whatever it still has conflicted",
-    file: "packages/marginalia/offer.ts",
+    file: "packages/marginalia/offer-view.ts",
     from: "    open?.conflicts.every(f => !ahead.conflicts.includes(f)) === true",
     to: "    open !== undefined",
     command: unit,
@@ -1460,5 +1417,120 @@ export const mutations: readonly Mutation[] = [
     to: "",
     command: unit,
     expect: "planParentUpdate merges the parent's newest",
+  },
+  {
+    name: "update my files runs with no preview",
+    file: "packages/marginalia/line.ts",
+    from: "      return record.yours.follow === null",
+    to: "      return false",
+    command: unit,
+    expect:
+      "follow: only with a line and a preview, the one you were shown; a conflict in it refuses nothing",
+  },
+  {
+    name: "an offer reads as described from the start",
+    file: "packages/marginalia/offer.ts",
+    from: "    described: !isWipLine(input.name, offer.firstLine),",
+    to: "    described: true,",
+    command: unit,
+    expect: "each revision's commit as it is now, and what the page shows",
+  },
+  {
+    name: "a stack is never stale",
+    file: "packages/marginalia/offer.ts",
+    from: "    stale: size > 1 && offerMoved(offer.ledger, input.place),",
+    to: "    stale: false,",
+    command: unit,
+    expect: "a stack is stale when the lane moved past its ledger",
+  },
+  {
+    name: "a host that admits others acts on the repo as its owner",
+    file: "packages/marginalia/line.ts",
+    from: '  if (!record.commands) return { kind: "refused", code: ERR.NOT_YOURS }',
+    to: '  if (false) return { kind: "refused", code: ERR.NOT_YOURS }',
+    command: unit,
+    expect: "a host that admits others refuses both",
+  },
+  {
+    name: "a take moves a bookmark that is not below the offer",
+    file: "packages/marginalia/offer.ts",
+    from: "  if (destination === undefined || !take.below.has(destination.bookmark))",
+    to: "  if (destination === undefined)",
+    command: unit,
+    expect: "no such destination",
+  },
+  {
+    name: "a take ignores what it was shown",
+    file: "packages/marginalia/offer.ts",
+    from: "  if (offerChanged(offer, seen)) return refused(ERR.OFFER_CHANGED)",
+    to: "  if (false) return refused(ERR.OFFER_CHANGED)",
+    command: unit,
+    expect: "a take of the offer it was shown: another ledger",
+  },
+  {
+    name: "a ledger's start is compared in order",
+    file: "packages/marginalia/offer.ts",
+    from: "  a.length === b.length && a.every(c => b.includes(c))",
+    to: "  a.length === b.length && a.every((c, i) => b[i] === c)",
+    command: unit,
+    expect:
+      "a take of the offer it was shown: the same start, in another order",
+  },
+  {
+    name: "a newly conflicting offer is taken",
+    file: "packages/marginalia/offer.ts",
+    from: "  (offer.conflicts.length > 0 && !seen.conflicted)",
+    to: "  false",
+    command: unit,
+    expect: "a take of the offer it was shown: newly conflicting",
+  },
+  {
+    name: "every file of an offer is your edit",
+    file: "packages/marginalia/offer.ts",
+    from: "    yourEdits: offer.files.filter(f => input.editing.has(f)),",
+    to: "    yourEdits: offer.files,",
+    command: unit,
+    expect: "your edits are its files that @ changes, and only those",
+  },
+  {
+    name: "a conflicted offer is taken onto the line",
+    file: "packages/marginalia/offer.ts",
+    from: "    conflicted: offer.conflicts.length > 0,",
+    to: "    conflicted: false,",
+    command: unit,
+    expect: "a conflicted offer never goes to the line",
+  },
+  {
+    name: "a message is written to whatever the offer holds now",
+    file: "packages/marginalia/offer.ts",
+    from: "  if (revision === undefined || revision.commit !== input.asked) return null",
+    to: "  if (revision === undefined) return null",
+    command: unit,
+    expect: "planDescribeSettle: written only to the commit it was asked for",
+  },
+  {
+    name: "every file of an untaken offer is your edit when @ moves",
+    file: "packages/marginalia/offer.ts",
+    from: "    .map(r => ({ ...r, yourEdits: r.files.filter(f => editing.has(f)) }))",
+    to: "    .map(r => ({ ...r, yourEdits: r.files }))",
+    command: unit,
+    expect: "planYourEdits",
+  },
+  {
+    name: "a taken offer's record is rewritten when @ moves",
+    file: "packages/marginalia/offer.ts",
+    from: "    .filter(r => isUntaken(offerStatus(r)))\n",
+    to: "",
+    command: unit,
+    expect: "planYourEdits",
+  },
+  {
+    name: "a squash rebuilds from an untraced start",
+    file: "packages/marginalia/offer.ts",
+    from: '  if (place.kind === "untraced") return refused(ERR.NO_OFFER)\n',
+    to: "",
+    command: unit,
+    expect:
+      "planRebuild: the lane's tip as one revision on its WIP line, from a known start only",
   },
 ]

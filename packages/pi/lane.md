@@ -69,10 +69,10 @@ changes Pineta can keep this note true. You can skip them.
   offer. They take it when they choose. <!-- packages/lanes/plan.ts offerBookmark -->
 - This thread started from that line, or from a copy of that WIP: the
   commit in your history whose message carries `Pineta-Base`. Leave it as it
-  is. <!-- packages/lanes/plan.ts baseMessage -->
+  is. <!-- packages/core/trailers.ts baseMessage -->
 - While you work, the offer is described `WIP (<thread name>): <first
   message>`. When a run ends, another agent writes its description; you
-  don't need to. <!-- packages/marginalia/offer.ts wipDescription -->
+  don't need to. <!-- packages/core/trailers.ts wipDescription -->
 - The person can ask for the offer as a stack of revisions. A Pineta message
   then asks you to build it, and says how.
   <!-- packages/marginalia/update.ts planStack -->

@@ -1,30 +1,28 @@
 import { commitId, laneNameForThread, type ThreadName } from "@pineta/core"
 import { DEFAULT_LINE } from "@pineta/lanes"
 import { describe, expect, test } from "vitest"
+import { type LaneRow, planLaneRead } from "./lane-read.ts"
+import { wipState } from "./line.ts"
+import { type Fingerprint, parseFingerprint, planObserve } from "./observe.ts"
 import {
-  type Fingerprint,
   immutableHeads,
-  type LaneRow,
   laneRefSteps,
   logRevset,
   nonceRevset,
   offerStart,
   parseEvolog,
-  parseFingerprint,
   planFollow,
   planFollowOffer,
   planImport,
   planLand,
-  planLaneRead,
   planLineSetup,
-  planObserve,
   planOffer,
   planTakeOffer,
-  type RepoStep,
   takenRevset,
   walkToHost,
-} from "./index.ts"
+} from "./plan.ts"
 import { repoCommand } from "./run.ts"
+import type { RepoStep } from "./step.ts"
 
 const LANE = laneNameForThread("1")
 const NAME = "amber-fox" as ThreadName
@@ -495,5 +493,36 @@ describe("planLaneRead: what one lane's rows say", () => {
   })
   test("no tip, no offer", () => {
     expect(read([based])).toEqual({ kind: "none" })
+  })
+})
+
+describe("wipState: landed, gone, or ok (ADR-0060, S77 item 2)", () => {
+  const W = commitId("w1")
+  test.each([
+    [
+      "the bookmark above the line",
+      { bookmark: W, bookmarkInLine: false, sourceInLine: false },
+      "ok",
+    ],
+    [
+      "the bookmark on the line (landed, or squashed into it)",
+      { bookmark: W, bookmarkInLine: true, sourceInLine: false },
+      "landed",
+    ],
+    [
+      "the bookmark gone, its work on the line",
+      { bookmark: null, bookmarkInLine: false, sourceInLine: true },
+      "landed",
+    ],
+    [
+      "the bookmark gone, its work not",
+      { bookmark: null, bookmarkInLine: false, sourceInLine: false },
+      "gone",
+    ],
+  ] as const)("%s: %s", (_, facts, state) => {
+    expect(wipState(facts)).toBe(state)
+  })
+  test("a line base, with no WIP facts, is ok", () => {
+    expect(wipState(null)).toBe("ok")
   })
 })

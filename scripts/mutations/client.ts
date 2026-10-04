@@ -280,7 +280,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a thread whose WIP is gone is offered a plain update",
-    file: "packages/marginalia/offer.ts",
+    file: "packages/marginalia/offer-view.ts",
     from: '      gone ? bs.map(b => (b === "update" ? "continue" : b)) : bs',
     to: "      bs",
     command: unit,

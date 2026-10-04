@@ -11,28 +11,12 @@ import {
   type CommitId,
   commitId,
   type EntryId,
-  entryId,
   type LaneName,
-  TRAILERS,
+  revisionMessage,
 } from "@pineta/core"
 import { setBookmark } from "./bookmarks.ts"
 import { planTurnCommit } from "./plan.ts"
 import { describeFailure, lines, type Runner } from "./run.ts"
-
-/** A revision's description: its title, then the trailers. */
-export const revisionMessage = (input: {
-  readonly title: string
-  readonly entry: EntryId
-  readonly lane: LaneName
-}): string =>
-  `${input.title}\n\n${TRAILERS.entry}: ${input.entry}\n${TRAILERS.lane}: ${input.lane}\n`
-
-/** The entry a revision's description names, or null. */
-export function entryOfMessage(description: string): EntryId | null {
-  const prefix = `${TRAILERS.entry}: `
-  const line = lines(description).find(l => l.startsWith(prefix))
-  return line === undefined ? null : entryId(line.slice(prefix.length).trim())
-}
 
 /** The commit ids a revset names, in jj's order. */
 export async function commitsOf(
