@@ -39,16 +39,16 @@ import {
   laneTipName,
   lines,
   offerBookmark,
+  parseTakes,
   REVISION_READ,
   type Runner,
+  TAKE_ROW,
 } from "@pineta/lanes"
 import {
   EVOLOG_ENTRY,
   type EvologEntry,
   offerStart,
   parseEvolog,
-  parseTakes,
-  TAKE_ROW,
   takenRevset,
   walkToHost,
 } from "./plan.ts"

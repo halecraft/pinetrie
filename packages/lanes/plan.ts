@@ -759,8 +759,8 @@ export interface MergePlan {
   /** With nothing to merge, a commit still names the line (`BaseMerge`). */
   readonly mark: boolean
   /**
-   * The commits whose titles the update lists, `<from>..<to>`; `from` null is
-   * the lane before the merge.
+   * The commits whose titles the update lists, `<from>..<to>` without the
+   * takes it joined (`mergeUpdate`); `from` null is the lane before the merge.
    */
   readonly came: { readonly from: CommitId | null; readonly to: CommitId }
 }
@@ -798,6 +798,51 @@ export function planMerge(from: BaseMerge): MergePlan {
     mark: false,
     came: { from: from.under, to: from.commit },
   }
+}
+
+/** A take on the line the lane lacks, and the sources its message names (`sourcesOf`). */
+export interface TakeAbove {
+  readonly take: CommitId
+  readonly sources: readonly CommitId[]
+}
+
+/** A take to join to the sources the lane holds, before an update's merge (S102). */
+export interface Join {
+  readonly take: CommitId
+  /** Of its sources, those in the lane's history: a squash may name others (S77 item 6). */
+  readonly sources: readonly CommitId[]
+  /**
+   * The join's message. It carries no trailer: the host finds bases and takes
+   * by their trailers (`newestBase`, `takenRevset`), and a join is neither.
+   */
+  readonly message: string
+}
+
+/**
+ * The takes an update joins to their sources before it merges (S102,
+ * ADR-0079), oldest first as `takes` come: each that names a source the lane
+ * holds. A take is a copy of the lane's work on the line, and the join says
+ * so in history, so the merge does not bring that work in twice. One naming a
+ * source the lane lacks too, a squash's, is joined all the same: the rest of
+ * it is the line's. Each join is made on the one before, so a later take's
+ * base holds the earlier ones. Pure.
+ */
+export function planJoins(
+  takes: readonly TakeAbove[],
+  held: ReadonlySet<CommitId>,
+): readonly Join[] {
+  return takes.flatMap(({ take, sources }) => {
+    const ours = sources.filter(s => held.has(s))
+    return ours.length === 0
+      ? []
+      : [
+          {
+            take,
+            sources: ours,
+            message: `join: ${take} holds ${ours.join(" ")}`,
+          },
+        ]
+  })
 }
 
 /**

@@ -23,6 +23,8 @@ it, so an offer after a catch-up starts there alone.
 makes its start untraced, and nothing is offered until it catches up past
 it; `pineta.base` records what catching up would change, and where it was
 read.
+Amended by ADR-0079: a catch-up first joins each take the lane holds to
+its source, so the lane's work is not merged twice.
 
 **Context.**
 

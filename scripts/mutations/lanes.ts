@@ -8,6 +8,22 @@ const plan = "packages/lanes/plan.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a take naming no source the lane holds is joined",
+    file: plan,
+    from: "    return ours.length === 0\n      ? []",
+    to: "    return false\n      ? []",
+    command: unit,
+    expect: "a take whose sources the lane lacks is not joined",
+  },
+  {
+    name: "a take is joined only when the lane holds every source it names",
+    file: plan,
+    from: "    return ours.length === 0\n      ? []",
+    to: "    return ours.length < sources.length\n      ? []",
+    command: unit,
+    expect: "a squash naming one source held and one not is joined",
+  },
+  {
     name: "a take finds no destination below the offer",
     file: "packages/repo/offer-gather.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text

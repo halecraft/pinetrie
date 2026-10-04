@@ -22,7 +22,9 @@ containers, disks and the helper.
 - `execute.ts`: runs a list of `LaneStep`s in order, on the host or in the
   lane.
 - `run.ts`, `bookmarks.ts`, `revisions.ts`, `merge.ts`: jj and git as
-  `Runner`s, and the jj logic over them.
+  `Runner`s, and the jj logic over them. `revisions.ts` holds the reader
+  of a take's row (`TAKE_ROW`, `parseTakes`), which your repo's reads use
+  too. `planJoins` (`plan.ts`) decides which takes an update joins.
 - `host.ts`: startup facts, lane configs and shared directories. Its reads
   of your repo (`jjIn`, git from its root) are the one exception to "only
   `@pineta/repo` runs jj on your repo": they only read, at startup, before
@@ -344,6 +346,26 @@ containers, disks and the helper.
   where its offers start. `laneBase` reads it in the lane's own repo too
   (`bookmarkRevset`), where a lane with none is null: that repo has no
   line bookmark to find a start on.
+- **A take the lane holds is joined to its source first** (`planJoins`,
+  `mergeBase`, S102, ADR-0079). A take is a copy of a lane's work on the
+  line, naming the commit it copies (`Pineta-Source`). Merged as history
+  says, its base is the take's `Pineta-Start`, from before that work, so
+  the work came in twice: any edit the line made to it since conflicted.
+  So a join, a commit merging the source with the take (the same changes,
+  so clean), goes first, and the update merges the lane, the last join and
+  the base in one commit.
+  - **Which takes:** those in `::<from> ~ ::<ours>` (`TAKE_ROW`, one `jj
+    log`) naming any source the lane holds, a squash's included (S77 item
+    6), read with `present()`.
+  - **The order:** oldest first, each join on the last, so a later take's
+    base holds the earlier ones.
+  - **A conflicted join is abandoned:** a take of an offer you edited where
+    the lane wrote, merged as before.
+  - **A join carries no trailer:** bases and takes are found by theirs.
+  - **The update's titles and a conflict's `theirs` leave the takes out**
+    (`withoutTakes`), and keep the line's commits under them.
+  - **A WIP's copy has no take in its history,** so a WIP thread joins
+    nothing.
 - **`mergeUpdate` is an update's whole run in a lane** after its edits,
   on the lane's queue: `planMerge`'s steps (a fetch of the line's commit,
   or of the WIP's commit and its copy), the merge, a mark naming the line

@@ -36,6 +36,30 @@ export async function commitsOf(
   return lines(ran.stdout).map(commitId)
 }
 
+/**
+ * A take on the line as `TAKE_ROW` prints it: its commit, and its message
+ * whole. Your repo reads the takes on the line with it (`@pineta/repo`), and
+ * a lane the takes it lacks before it catches up (`takesAbove`).
+ */
+export interface TakeRow {
+  readonly commit: CommitId
+  readonly description: string
+}
+
+/** One take a line: its commit, a tab, and its message as a JSON string. */
+export const TAKE_ROW = 'commit_id ++ "\\t" ++ json(description) ++ "\\n"'
+
+/** `TAKE_ROW`'s output, read back. */
+export function parseTakes(stdout: string): TakeRow[] {
+  return lines(stdout).map(row => {
+    const tab = row.indexOf("\t")
+    return {
+      commit: commitId(row.slice(0, tab)),
+      description: JSON.parse(row.slice(tab + 1)) as string,
+    }
+  })
+}
+
 /** Whether `ancestor` is `commit` or one of its ancestors. */
 const isAncestor = async (
   jj: Runner,

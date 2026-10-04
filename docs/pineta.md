@@ -398,6 +398,14 @@ page. A subject is a name, never data (`paneView` decides what it draws and
 when it is gone), and nothing about it is stored. Under 76rem the pane is
 a modal dialog over the page, the first piece of the narrow layout.
 
+**ADR-0079 — a catch-up joins each take the lane holds to its source**
+(built). A thread whose work you took conflicted when it caught up, on any
+edit you made to that work on the line, its own work merged twice: a take
+is a copy, and the merge's base was from before it (S102). A branch holding
+its parent's taken work did the same. Now each take the lane holds a source
+of is first joined to it, and the catch-up is clean; a conflict both sides
+made still conflicts, on that hunk alone.
+
 **ADR-0019 — a lane is a line of work, not a unit of parallelism.** A person's
 lane is a *conversation lane* and never touches disk. A *work lane* carries
 agent work and will own a jj workspace, so creating one is deliberate, and fold

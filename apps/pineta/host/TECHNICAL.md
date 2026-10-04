@@ -526,7 +526,8 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   waits on no queue.
 - **An update is one step on the lane's `LaneQueue`** (`updateOnQueue`):
   the lane's base from its own history, the line and the WIP from your
-  repo (pinned), `planUpdateFrom`, the edits committed and `mergeUpdate`, so nothing
+  repo (pinned), `planUpdateFrom`, the edits committed and `mergeUpdate`
+  (which first joins each take the lane holds to its source, ADR-0079), so nothing
   changes the lane between what is read and what is merged. Then
   `planSettle`, pure, decides what the thread gets, the land message
   included, and `applySettle` writes it. `Settle.fetch` alone decides

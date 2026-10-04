@@ -22,7 +22,6 @@ import {
   type LineConfig,
   laneStackRef,
   laneTipRef,
-  lines,
   offerBookmark,
   revsetName,
   stackBookmark,
@@ -206,26 +205,6 @@ export const laneRefSteps = (
 
 /** The commits a take made: its offer's trailers name a source or a thread. */
 export const TAKES = trailerRevset(["source", "thread"])
-
-/** A take as `TAKE_ROW` prints it: its commit, and its message whole. */
-export interface TakeRow {
-  readonly commit: CommitId
-  readonly description: string
-}
-
-/** One take a line: its commit, a tab, and its message as a JSON string. */
-export const TAKE_ROW = 'commit_id ++ "\\t" ++ json(description) ++ "\\n"'
-
-/** `TAKE_ROW`'s output, read back. */
-export function parseTakes(stdout: string): TakeRow[] {
-  return lines(stdout).map(row => {
-    const tab = row.indexOf("\t")
-    return {
-      commit: commitId(row.slice(0, tab)),
-      description: JSON.parse(row.slice(tab + 1)) as string,
-    }
-  })
-}
 
 /**
  * Where an offer starts, as a revset (ADR-0060): the newest ancestors of the

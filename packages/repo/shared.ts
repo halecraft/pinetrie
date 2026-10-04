@@ -15,11 +15,13 @@ import {
   describeFailure,
   type LineConfig,
   lines,
+  parseTakes,
   type Runner,
   revsetName,
+  TAKE_ROW,
 } from "@pineta/lanes"
 import { lineFacts } from "./line.ts"
-import { parseTakes, TAKE_ROW, TAKES } from "./plan.ts"
+import { TAKES } from "./plan.ts"
 
 /** A commit on the line carrying taken offers' `Pineta-Source` trailers. */
 export interface Taken {

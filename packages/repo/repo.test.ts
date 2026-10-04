@@ -53,6 +53,7 @@ import {
   mergeUpdate,
   newestBase,
   offerBookmark,
+  parseTakes,
   planBaseRefresh,
   planBundle,
   planForkSetup,
@@ -64,6 +65,7 @@ import {
   revsetName,
   run,
   stackBookmark,
+  TAKE_ROW,
   type TouchedRevision,
 } from "@pineta/lanes"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
@@ -93,7 +95,6 @@ import {
   immutableHeads,
   laneRefSteps,
   logRevset,
-  parseTakes,
   planAbandonOffer,
   planDescribe,
   planFollow,
@@ -104,7 +105,6 @@ import {
   planPublish,
   planRefreshOffer,
   planTakeOffer,
-  TAKE_ROW,
 } from "./plan.ts"
 import { executeRepo, hostJj, hostOps, runnerFor } from "./run.ts"
 import { readShared } from "./shared.ts"
@@ -1024,8 +1024,8 @@ describe("a lane's repo, with jj", () => {
       if (t === null) throw new Error("the turn committed nothing")
       return t
     }
-    /** "Bring up to date" on the line: its commit merged into the lane; the lane takes `resolve` where they conflict. */
-    const update = async (resolve: Record<string, string>) => {
+    /** "Bring up to date" on the line: its commit merged into the lane. Returns the files it left conflicted. */
+    const update = async () => {
       const commit = await lineNow()
       await inLane([fetchById([commit])])
       await mergeBase(
@@ -1034,9 +1034,27 @@ describe("a lane's repo, with jj", () => {
         commit,
         baseMessage(`update: ${line.onto}`, { bookmark: line.onto, commit }),
       )
-      for (const [file, text] of Object.entries(resolve))
-        await edit(laneDir, file, text)
-      await turn()
+      return conflictsIn(laneJj)
+    }
+    /**
+     * "Bring up to date" with the line as the host runs it, in the lane at
+     * `dir`: `planMerge`, then `mergeUpdate`, which joins the takes it holds
+     * first (S102).
+     */
+    const catchUp = async (dir = laneDir, lane: LaneName = LANE) => {
+      const commit = await lineNow()
+      const plan = planMerge({
+        kind: "line",
+        onto: line.onto,
+        commit,
+        mark: false,
+      })
+      // The plan's fetch names your repo by its path in a lane: run it here.
+      await inLane(plan.steps, dir)
+      return mergeUpdate(laneJjAt(dir), runnersAt(dir), lane, {
+        ...plan,
+        steps: [],
+      })
     }
     /**
      * The one batched read (`gatherLane`) says what the separate reads say:
@@ -1131,6 +1149,7 @@ describe("a lane's repo, with jj", () => {
       build,
       turn,
       update,
+      catchUp,
       offer,
       take,
     }
@@ -1458,12 +1477,16 @@ describe("a lane's repo, with jj", () => {
     const t1 = await laneTipIn(ops, LANE)
     if (t1 === null) throw new Error("no tip")
     // You change the line you took, then the lane catches up with it: the
-    // merge conflicts, and the lane keeps your text.
+    // take is joined to the lane's commit, so the merge is clean, and the
+    // lane has your text (S102).
     await yoursJj(["new", line.onto])
     await edit(yoursDir, "a.txt", "a, then yours\n")
     await yoursJj(["commit", "-m", "yours: a.txt"])
     await yoursJj(["bookmark", "move", line.onto, "--to", "@-"])
-    await update({ "a.txt": "a, then yours\n" })
+    expect(await update()).toEqual([])
+    expect(await readFile(path.join(laneDir, "a.txt"), "utf8")).toBe(
+      "a, then yours\n",
+    )
     await edit(laneDir, "c.txt", "c\n")
     await turn()
     // The taken source is below the line the lane merged: the offer starts
@@ -1967,7 +1990,9 @@ describe("a lane's repo, with jj", () => {
         .sort(),
     ).toEqual([...found].sort())
     // Caught up: the take is under its base, and the start is the line.
-    await update({ "c.txt": "c\n" })
+    expect(await update()).toEqual([])
+    await edit(laneDir, "c.txt", "c\n")
+    await turn()
     await fetch([t2])
     await agrees()
     const t3 = await laneTipIn(ops, LANE)
@@ -2004,6 +2029,154 @@ describe("a lane's repo, with jj", () => {
       ),
     ).toEqual([])
   }, 60_000)
+
+  describe("catching up past a take of the lane's work (S102)", () => {
+    /** Six lines; `at` replaces line n (1-based). */
+    const doc = (at: Record<number, string> = {}) =>
+      `${[1, 2, 3, 4, 5, 6].map(n => at[n] ?? `line ${n}`).join("\n")}\n`
+    /** `turnRig`, with a turn writing `doc.txt`, its offer taken onto the line. */
+    const takenRig = async (tag: string) => {
+      const rig = await turnRig(tag)
+      await rig.edit(rig.laneDir, "doc.txt", doc())
+      const t1 = await rig.turn()
+      await rig.take(await rig.offer(rig.base))
+      return { ...rig, t1 }
+    }
+    /** You change `doc.txt` on the line, landing it. */
+    const yoursOnLine = async (
+      rig: Awaited<ReturnType<typeof takenRig>>,
+      text: string,
+      title: string,
+    ) => {
+      await rig.yoursJj(["new", rig.line.onto])
+      await rig.edit(rig.yoursDir, "doc.txt", text)
+      await rig.yoursJj(["commit", "-m", title])
+      await rig.yoursJj(["bookmark", "move", rig.line.onto, "--to", "@-"])
+    }
+    const read = (dir: string, file: string) =>
+      readFile(path.join(dir, file), "utf8")
+
+    test("your own take, then your edit to it on the line: clean, and the take is not listed as come in", async () => {
+      const rig = await takenRig("past-own")
+      await yoursOnLine(rig, doc({ 1: "yours" }), "yours: doc line 1")
+      await rig.edit(rig.laneDir, "c.txt", "c\n")
+      await rig.turn()
+      const merged = await rig.catchUp()
+      if (merged.kind !== "clean") throw new Error(`not clean: ${merged.kind}`)
+      expect(await read(rig.laneDir, "doc.txt")).toBe(doc({ 1: "yours" }))
+      expect(await read(rig.laneDir, "c.txt")).toBe("c\n")
+      expect(merged.commits).toContain("yours: doc line 1")
+      expect(merged.commits).not.toContain("WIP")
+      // Its next offer holds the lane's own work alone.
+      const next = await rig.offer([rig.t1])
+      expect([next.conflicted, next.files]).toEqual([false, ["c.txt"]])
+    }, 60_000)
+
+    test("the lane re-edits its own taken lines: clean, with both edits", async () => {
+      const rig = await takenRig("past-reedit")
+      await yoursOnLine(rig, doc({ 1: "yours" }), "yours: doc line 1")
+      await rig.edit(rig.laneDir, "doc.txt", doc({ 5: "lane again" }))
+      await rig.turn()
+      expect((await rig.catchUp()).kind).toBe("clean")
+      expect(await read(rig.laneDir, "doc.txt")).toBe(
+        doc({ 1: "yours", 5: "lane again" }),
+      )
+    }, 60_000)
+
+    test("two takes, your edit to the first between them: clean (S102 item 7)", async () => {
+      const rig = await takenRig("past-two")
+      await yoursOnLine(rig, doc({ 1: "yours" }), "yours: doc line 1")
+      await rig.edit(rig.laneDir, "doc.txt", doc({ 5: "lane" }))
+      await rig.turn()
+      await rig.take(await rig.offer([rig.t1]))
+      await yoursOnLine(
+        rig,
+        doc({ 1: "yours", 5: "yours" }),
+        "yours: doc line 5",
+      )
+      expect((await rig.catchUp()).kind).toBe("clean")
+      expect(await read(rig.laneDir, "doc.txt")).toBe(
+        doc({ 1: "yours", 5: "yours" }),
+      )
+    }, 60_000)
+
+    test("a branch holding its parent's taken work catches up clean (ADR-0072)", async () => {
+      const rig = await turnRig("past-parent")
+      await rig.edit(rig.laneDir, "doc.txt", doc())
+      const t1 = await rig.turn()
+      // The branch is cloned at the parent's turn, and works on.
+      const forkDir = path.join(top, "past-parent-fork")
+      await cp(rig.laneDir, forkDir, {
+        recursive: true,
+        verbatimSymlinks: true,
+      })
+      await rig.inLane(
+        planForkSetup(FORK, { kind: "commits", commits: [t1] }),
+        forkDir,
+      )
+      await rig.edit(forkDir, "k.txt", "k\n")
+      await commitTurn(laneJjAt(forkDir), {
+        title: "branch work",
+        entry: entryId("e-past-parent-fork"),
+        lane: FORK,
+        bookmark: await bookmarkOf(laneJjAt(forkDir), FORK),
+      })
+      // The parent's offer is taken, and you edit it on the line.
+      await rig.take(await rig.offer(rig.base))
+      await rig.yoursJj(["new", rig.line.onto])
+      await rig.edit(rig.yoursDir, "doc.txt", doc({ 1: "yours" }))
+      await rig.yoursJj(["commit", "-m", "yours: doc line 1"])
+      await rig.yoursJj(["bookmark", "move", rig.line.onto, "--to", "@-"])
+      expect((await rig.catchUp(forkDir, FORK)).kind).toBe("clean")
+      expect(await read(forkDir, "doc.txt")).toBe(doc({ 1: "yours" }))
+      expect(await read(forkDir, "k.txt")).toBe("k\n")
+    }, 60_000)
+
+    test("a line both rewrote still conflicts, on that file alone, and the take is not its side", async () => {
+      const rig = await takenRig("past-real")
+      await yoursOnLine(rig, doc({ 1: "yours" }), "yours: doc line 1")
+      await rig.edit(rig.laneDir, "doc.txt", doc({ 1: "lane again" }))
+      await rig.edit(rig.laneDir, "c.txt", "c\n")
+      await rig.turn()
+      const merged = await rig.catchUp()
+      if (merged.kind !== "conflicted") throw new Error("not conflicted")
+      expect(merged.contents.map(c => c.path)).toEqual(["doc.txt"])
+      expect(merged.theirs.map(r => firstLine(r.description, 200))).toEqual([
+        "yours: doc line 1",
+      ])
+    }, 60_000)
+
+    test("an offer you edited where the lane wrote: its join conflicts, and is left out", async () => {
+      const rig = await turnRig("past-edited")
+      await rig.edit(rig.laneDir, "doc.txt", doc())
+      await rig.turn()
+      const offered = await rig.offer(rig.base)
+      // You reword the lane's first line in the offer, then take it.
+      const [top] = offered.built.commits
+      if (top === undefined) throw new Error("no offer")
+      await rig.yoursJj(["new", top])
+      await rig.edit(rig.yoursDir, "doc.txt", doc({ 1: "edited by you" }))
+      // The offer keeps its message, and so its `Pineta-Source`.
+      await rig.yoursJj([
+        "squash",
+        "--ignore-immutable",
+        "--use-destination-message",
+      ])
+      expect(
+        await commitsOf(
+          rig.ops,
+          `${bookmarkRevset(offerBookmark(NAME))} & ${trailerRevset(["source"])}`,
+        ),
+      ).toHaveLength(1)
+      await rig.take(offered)
+      const merged = await rig.catchUp()
+      // Merged as before the joins: no join is left in the lane's history.
+      expect(merged.kind).toBe("conflicted")
+      expect(
+        await commitsOf(rig.laneJj, 'description(regex:"^join: ")'),
+      ).toEqual([])
+    }, 60_000)
+  })
 
   test("a lane whose work undoes itself changes no file, over a range jj diffs as one", async () => {
     const { laneDir, ops, turn, fetch, base } = await turnRig("undone")

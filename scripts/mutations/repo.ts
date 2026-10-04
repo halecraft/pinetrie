@@ -245,6 +245,43 @@ export const mutations: readonly Mutation[] = [
     expect: "the whole life of a lane",
   },
   {
+    name: "an update merges without the joins",
+    file: "packages/lanes/merge.ts",
+    from: "  const parents = [ours, ...(last === null ? [] : [last]), from]",
+    to: "  const parents = [ours, from]",
+    command: repoTest,
+    expect:
+      "your own take, then your edit to it on the line: clean, and the take is not listed as come in",
+  },
+  {
+    name: "only the newest take is joined",
+    file: "packages/lanes/merge.ts",
+    from: "  const joins = planJoins(takes, held)",
+    to: "  const joins = planJoins(takes, held).slice(-1)",
+    command: repoTest,
+    expect: "two takes, your edit to the first between them: clean",
+  },
+  {
+    name: "a conflicted join is kept",
+    file: "packages/lanes/merge.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "    if ((await commitsOf(jj, `${at} & conflicts()`)).length > 0) {",
+    to: "    if (false) {",
+    command: repoTest,
+    expect:
+      "an offer you edited where the lane wrote: its join conflicts, and is left out",
+  },
+  {
+    name: "an update lists the takes it joined as come in",
+    file: "packages/lanes/merge.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: '  joined.length === 0 ? range : `(${range}) ~ (${joined.join(" | ")})`',
+    to: "  range",
+    command: repoTest,
+    expect:
+      "your own take, then your edit to it on the line: clean, and the take is not listed as come in",
+  },
+  {
     name: "an update's merge is left uncommitted",
     file: "packages/lanes/merge.ts",
     from: "  return commitToBookmark(jj, lane, message)",

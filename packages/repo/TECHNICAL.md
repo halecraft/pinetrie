@@ -37,7 +37,8 @@ translates to.
   (`lineProposal`, `lineSteps`), an offer's build, follow, refresh, repair
   and take, lanes' refs (`laneRefSteps`), a bundle's import
   (`planImport`), where an offer starts (`offerStart`, `takenRevset`), the
-  takes' rows (`TAKES`, `TAKE_ROW`, `parseTakes`), and the evolog walk
+  takes' revset (`TAKES`, read with `@pineta/lanes`' `TAKE_ROW` and
+  `parseTakes`), and the evolog walk
   (`walkToHost`).
 - `run.ts`: the runner factory, private to the package.
 - `offer.ts`: the separate reads an offer's facts come from, and a
@@ -390,7 +391,10 @@ operation is read once and kept until the head moves.**
   it as well: each place kind (placed, untraced, a WIP gone), what a take
   reads on a WIP (`gatherTake`), a split's stack bottom first
   (`gatherStack`), `repairOffer` on a divergent offer, and that
-  `trailerRevset` finds exactly the commits `hasTrailer` matches.
+  `trailerRevset` finds exactly the commits `hasTrailer` matches. And a
+  catch-up past a take of the lane's own work, of its parent's, two takes,
+  a conflict both sides made, and a take you edited (S102): the lane holds
+  the take's source, so the take is joined to it and the update is clean.
 - **`offer-steps.test.ts`**: each decision's steps, as the planners make
   them, and that each `after` carries the decision's place.
 - **`apps/pineta/host/offers/refresh.test.ts`** runs the host's own refresh
