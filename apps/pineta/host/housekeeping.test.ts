@@ -1,12 +1,12 @@
 import type { Exchange } from "@kyneta/exchange"
 import { cardId, rootDocId, rootIdFor, type Sha256 } from "@pineta/core"
-import { ROOT, setRecord } from "@pineta/marginalia"
 import {
   LIVE_DOC_ID,
   PLACES_DOC_ID,
   SESSION_DOC_ID,
 } from "@pineta/protocol/messages"
 import { readRootRecord } from "@pineta/reads"
+import { ROOT, setRecord } from "@pineta/rules"
 import { newRootDoc } from "@pineta/schema"
 import { expect, test } from "vitest"
 import { memoryBlobs } from "./blobs.ts"

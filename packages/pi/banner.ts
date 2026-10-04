@@ -11,7 +11,7 @@ import {
   type Sha256,
   type StoredImage,
 } from "@pineta/core"
-import type { BannerAnswer, BannerAsk, BannerConfig } from "@pineta/marginalia"
+import type { BannerAnswer, BannerAsk, BannerConfig } from "@pineta/rules"
 import { Type } from "typebox"
 import type { ImagesSetup } from "./config.ts"
 import { prepareImage } from "./images.ts"

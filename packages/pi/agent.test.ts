@@ -30,7 +30,7 @@ import {
   PINNED_TYPE,
   recordsOf,
   setRecord,
-} from "@pineta/marginalia"
+} from "@pineta/rules"
 import {
   newRootDoc,
   newSessionDoc,

@@ -196,7 +196,7 @@ export async function conflictedFilesAt(
 /**
  * A revision's description and per-file stats, printed as the JSON of
  * `RevisionReview` (`@pineta/core`): `json()` quotes every string (S57). A
- * change to it bumps `OFFER_WIRE` (`@pineta/marginalia`).
+ * change to it bumps `OFFER_WIRE` (`@pineta/rules`).
  */
 export const REVISION_READ =
   '"{\\"description\\":" ++ json(description) ++ ",\\"files\\":[" ++ ' +

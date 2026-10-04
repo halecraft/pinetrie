@@ -34,6 +34,15 @@ import {
   type Runner,
   type TouchedRevision,
 } from "@pineta/lanes"
+import type { Agent, ThreadLaneHandle } from "@pineta/pi"
+import {
+  readLatestPrompt,
+  readNames,
+  readRevisions,
+  readRunning,
+  readTreeIndex,
+} from "@pineta/reads"
+import { beginFacts, type RepoOwner, readWipState } from "@pineta/repo"
 import {
   catchUpName,
   decodeLand,
@@ -50,16 +59,7 @@ import {
   setRecord,
   type UpdateMessage,
   type UpdateRefusal,
-} from "@pineta/marginalia"
-import type { Agent, ThreadLaneHandle } from "@pineta/pi"
-import {
-  readLatestPrompt,
-  readNames,
-  readRevisions,
-  readRunning,
-  readTreeIndex,
-} from "@pineta/reads"
-import { beginFacts, type RepoOwner, readWipState } from "@pineta/repo"
+} from "@pineta/rules"
 import { readEntryMessage, readLaneTip } from "@pineta/schema"
 import { type Basics, failed, messageOf } from "../basics.ts"
 import type { Containers } from "./containers.ts"

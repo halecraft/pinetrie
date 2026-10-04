@@ -2,7 +2,7 @@
 // `startOffers`: what the documents say of a lane (`OfferDocs`), the
 // records the host writes (`OfferRecords`), and the owner of your repo
 // (`@pineta/repo`, ADR-0065). Every read of your repo is `@pineta/repo`'s
-// (`gatherOffer`, `gatherRefresh`, …), and every decision marginalia's: the
+// (`gatherOffer`, `gatherRefresh`, …), and every decision `@pineta/rules`': the
 // documents are read here only for what your repo cannot say, and a record
 // only to skip a write that changes nothing (ADR-0060).
 
@@ -17,14 +17,6 @@ import {
   wipDescription,
 } from "@pineta/core"
 import type { LineConfig } from "@pineta/lanes"
-import {
-  archivedIn,
-  BASE,
-  deleteRecord,
-  OFFER,
-  setIfChanged,
-  setRecord,
-} from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
 import {
   readArchive,
@@ -36,6 +28,14 @@ import {
   readTreeIndex,
 } from "@pineta/reads"
 import type { OfferInput, RepoOwner } from "@pineta/repo"
+import {
+  archivedIn,
+  BASE,
+  deleteRecord,
+  OFFER,
+  setIfChanged,
+  setRecord,
+} from "@pineta/rules"
 import { readLaneTip } from "@pineta/schema"
 import type { Basics } from "../basics.ts"
 

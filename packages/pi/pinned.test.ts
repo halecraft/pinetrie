@@ -1,6 +1,6 @@
 import type { AgentMessage, CompactResult } from "@earendil-works/pi-agent-core"
 import { cardId, laneNameForThread, writerId } from "@pineta/core"
-import { encodePinned } from "@pineta/marginalia"
+import { encodePinned } from "@pineta/rules"
 import { describe, expect, test } from "vitest"
 import { carryPinned, withCarried } from "./pinned.ts"
 

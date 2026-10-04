@@ -114,7 +114,7 @@ packages/     libraries; their boundaries are enforced by resolution
   schema/        @pineta/schema       Kyneta only; the document shape (TECHNICAL.md)
   pi/            @pineta/pi           THE pi boundary (TECHNICAL.md)
   protocol/      @pineta/protocol     the wire contract and its codec
-  marginalia/    @pineta/marginalia   Pineta's shapes stored in pi: chat, threads, cards
+  rules/         @pineta/rules        each stored shape and the pure rules about it (TECHNICAL.md)
   reads/         @pineta/reads        document reads shared by the host and the client
   lanes/         @pineta/lanes        a lane's container and disk, and jj and git in it (TECHNICAL.md)
   keeper/        @pineta/keeper       declares NOTHING; one step at a time on a resource (TECHNICAL.md)
@@ -196,10 +196,10 @@ a writer, identified by the transport's `LineSender.peer` and recorded in every
 message it sends; writers own no lanes. A lane belongs to a thread: created
 where agent work is first wanted there, never moved, never written while it
 runs (ADR-0020). Threads run concurrently. Decisions are pure (`planChat`,
-`planArchive` and the rest in `@pineta/marginalia`, over facts read by `@pineta/reads`);
+`planArchive` and the rest in `@pineta/rules`, over facts read by `@pineta/reads`);
 the host gathers, plans and executes each command in one serial step. A
 decision that acts on your repo (an offer, the line) is a value typed in
-`@pineta/core`, decided by `@pineta/marginalia` from facts `@pineta/repo`
+`@pineta/core`, decided by `@pineta/rules` from facts `@pineta/repo`
 reads, and carried out by `@pineta/repo`'s steps: the two packages never
 import each other, and the host only connects them.
 

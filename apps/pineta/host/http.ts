@@ -11,8 +11,8 @@ import {
   wrapNodeWebsocket,
 } from "@kyneta/websocket-transport/server"
 import type { BlobStore, Sha256 } from "@pineta/core"
-import type { OfferAsk } from "@pineta/marginalia"
 import { prepareImage } from "@pineta/pi"
+import type { OfferAsk } from "@pineta/rules"
 import { createServer as createViteServer } from "vite"
 import { WebSocketServer } from "ws"
 import { KEY_COOKIE, planInvites, requestFacts, urlHost } from "./admission.ts"

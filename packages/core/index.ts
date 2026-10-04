@@ -9,6 +9,13 @@
 //     this.state = decision.next;
 //
 // Nothing in this file may import pi, Kyneta, or a Node builtin.
+//
+// What belongs here, as `@pineta/rules`, `@pineta/session` and `@pineta/repo`
+// state it too: core holds the vocabulary (ids, intents, every record's type)
+// and the reads of the tree. A format or type that `lanes` or `repo` must
+// read, write or name lives in core too, since neither can declare
+// `@pineta/rules`. What a stored shape says, and how the host changes it, is
+// `@pineta/rules`', whoever reads it.
 
 import type { Sha256 } from "./images.ts"
 import type { OfferLedger, OfferSeen } from "./offers.ts"
@@ -100,7 +107,7 @@ export const laneNameForThread = (id: string): LaneName =>
 
 /**
  * Whether text names a thread's lane: the check wherever a lane name is read,
- * in the codec, the schema's readers, marginalia's decoders and the pi adapter.
+ * in the codec, the schema's readers, `@pineta/rules`' decoders and the pi adapter.
  */
 export const isLaneName = (s: string): s is LaneName =>
   s.startsWith(LANE_PREFIX) && s.length > LANE_PREFIX.length
@@ -186,7 +193,7 @@ declare const runIdBrand: unique symbol
  * runtime. Positions take an entry id; `activeRuns` holds run ids. Passing
  * one where the other belongs would otherwise compile, run, and fail
  * silently. Mint them only where they enter: the protocol codec, the reads,
- * the schema's readers, marginalia's decoders, the pi adapter, the client's
+ * the schema's readers, `@pineta/rules`' decoders, the pi adapter, the client's
  * stored forms, and the host's id generator. `biome.json` refuses an
  * `entryId` import in core, the client and the host, and a `runId` import in
  * core and the client (S95).
@@ -334,7 +341,7 @@ export const SESSION_TARGET: Target = { kind: "session" }
 /**
  * One write to a pi value at its address, in its document, as the host
  * decides it and pi's session carries it out (ADR-0062). Built by
- * marginalia's `setRecord` and `deleteRecord`, which take the target from
+ * `setRecord` and `deleteRecord` (`@pineta/rules`), which take the target from
  * the record's home.
  */
 export type ValueWrite =
@@ -377,7 +384,7 @@ export type PlanMode = ChatMode | "queue"
  * A command whose SHAPE is already known to be valid. The protocol codec
  * produces it; it owns every shape rule, so this type cannot express a
  * malformed command. What it then does is decided by `planChat` and the
- * other planners in `@pineta/marginalia`, over what the host gathers.
+ * other planners in `@pineta/rules`, over what the host gathers.
  */
 export type Intent =
   /** A human message; `mentions` are parsed from `text` once, at the codec. */
@@ -577,6 +584,28 @@ export interface StopRecord {
   readonly at: number
 }
 
+/** What a digest says (ADR-0075). */
+export interface DigestBody {
+  /**
+   * One line of at most `HEADLINE_WORDS` words (`@pineta/rules`'
+   * `digest.ts`); null when the model found
+   * nothing the reader does not see already.
+   */
+  readonly headline: string | null
+  /** At most `MAX_POINTS` markdown lines, one point each; empty when `headline` is null. */
+  readonly points: readonly string[]
+}
+
+/** An ask's digest: replaced whole on each write, so a value, not a text (ADR-0014). */
+export interface DigestRecord extends DigestBody {
+  /** The ask's prompt: the digest's key. */
+  readonly prompt: EntryId
+  /** When it was written, in ms since the epoch. */
+  readonly at: number
+  /** Written after its run ended: kept, and never replaced by a live one. */
+  readonly final: boolean
+}
+
 /** A title's longest form, in UTF-16 code units. */
 export const MAX_TITLE = 80
 
@@ -714,6 +743,11 @@ export interface CommandRef {
   readonly expanded: string
 }
 
+/** The commands the host's pi loaded, as people see them (ADR-0036). */
+export interface CommandsRecord {
+  readonly commands: readonly CommandSummary[]
+}
+
 declare const snapshotIdBrand: unique symbol
 /**
  * A lane disk snapshot's id: the entry id of the revision record it belongs
@@ -805,7 +839,7 @@ export interface LandingRecord {
  * A lane's offer: one revision, or a stack, in your repo, holding the lane's
  * work you do not have yet (ADR-0038). A host-written `pineta.offer` value
  * keyed by lane: the page's cache, written from the repo after each of the
- * host's steps (`offerRecord`, marginalia). The host never decides from it: it reads the
+ * host's steps (`offerRecord`, `@pineta/rules`). The host never decides from it: it reads the
  * offer from your repo (`OfferInRepo`), so a record lost or stale changes
  * nothing. What a take would
  * bring, each revision's description, files and diffs, is not stored: the page
@@ -955,7 +989,7 @@ export type BaseMerge =
 declare const threadNameBrand: unique symbol
 /**
  * A thread's name as people say it: two words, `amber-fox` (ADR-0039). Minted
- * by `@pineta/marginalia`'s naming and its decoder; stored, never recomputed.
+ * by `@pineta/rules`' naming and its decoder; stored, never recomputed.
  */
 export type ThreadName = string & { readonly [threadNameBrand]: true }
 
@@ -1479,7 +1513,7 @@ export function keyOfFields(f: PlaceFields): PlaceKey | undefined {
 /**
  * A card's record, in the places document, which only the host writes
  * (ADR-0059). Its text is its own document; who wrote in it is read from
- * that document's operations (`writersOf`), never stored here.
+ * that document's operations (`writersOfClients`), never stored here.
  */
 export interface CardRecord {
   readonly id: CardId
@@ -1509,6 +1543,12 @@ export interface SeatRecord {
   readonly writer: WriterId
   /** When the host first saw it, which orders contributors. */
   readonly at: number
+}
+
+/** A writer's display name. */
+export interface ParticipantRecord {
+  readonly writer: WriterId
+  readonly name: string
 }
 
 // --- obligation: collaborators and compelled responders ----------------------

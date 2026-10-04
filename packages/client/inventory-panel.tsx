@@ -6,7 +6,7 @@
 
 import { subscribe } from "@kyneta/schema"
 import type { CardId, CardRecord, WriterId } from "@pineta/core"
-import { displayName } from "@pineta/marginalia"
+import { displayName } from "@pineta/rules"
 import { useEffect, useRef, useState } from "react"
 import { BoundCardEditor, dragCard } from "./card-editor.tsx"
 import type { Refusal } from "./card-moves.ts"

@@ -7,7 +7,7 @@
 // its root and its branch point are in the place (`openFresh`).
 
 import type { PlaceKey } from "@pineta/core"
-import { placeEnd } from "@pineta/marginalia"
+import { placeEnd } from "@pineta/rules"
 import { type ActedAt, AT_INVENTORY } from "./card-moves.ts"
 import { type Effect, type IntentState, planOpenAt } from "./intent.ts"
 import { columnsOf, planOpen, tabOfColumn } from "./layout.ts"

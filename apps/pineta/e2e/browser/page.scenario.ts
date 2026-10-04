@@ -15,7 +15,6 @@ import {
   ROOT,
   writerId,
 } from "@pineta/core"
-import { titleOf } from "@pineta/marginalia"
 import { SCRIPTED_DESCRIPTION } from "@pineta/pi"
 import {
   readMarks,
@@ -25,6 +24,7 @@ import {
   readRoots,
   readTyping,
 } from "@pineta/reads"
+import { titleOf } from "@pineta/rules"
 import type { Page } from "@playwright/test"
 import type { Checks } from "../checks.ts"
 import {

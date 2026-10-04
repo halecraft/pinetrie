@@ -2,7 +2,7 @@
 // its record, and the tree of several held roots at once.
 
 import { entryId, NOBODY, rootIdFor, type Sha256, writerId } from "@pineta/core"
-import { encodeChat, MARK, setRecord } from "@pineta/marginalia"
+import { encodeChat, MARK, setRecord } from "@pineta/rules"
 import {
   newRootDoc,
   newSessionDoc,

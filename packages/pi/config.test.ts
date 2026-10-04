@@ -2,7 +2,7 @@
 // settings list two packages that each have a skill named `hello`.
 
 import path from "node:path"
-import { labelCommands } from "@pineta/marginalia"
+import { labelCommands } from "@pineta/rules"
 import { expect, test } from "vitest"
 import { imageModelFor, setUpModel, titleModelOf } from "./config.ts"
 import { scriptedModel } from "./scripted.ts"

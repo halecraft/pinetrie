@@ -208,7 +208,7 @@ harness never emits them (S22). What each event does to the document is
 
 `createAgent` passes pi's `toProviderMessages` our own: it gathers the bytes
 of every chat's `details.images` from `CreateAgentOptions.blobs`, encodes
-them, and runs `withChatImages` (`@pineta/marginalia`) before pi's own
+them, and runs `withChatImages` (`@pineta/rules`) before pi's own
 `convertToLlm`, which it must still call so every other role converts as pi
 does. It runs once per request, and reads the store each time: no cache
 (S53 item 7). pi's compaction and branch summaries call `convertToLlm`
@@ -226,7 +226,7 @@ pi's null means either undecodable or impossible to fit. After a resize,
 
 - **A run's prompt can be two messages.** `ThreadLaneHandle.run(message,
   pinned)` passes `lane.prompt([pinned, message])` when the host gives a
-  cards entry (`PinnedMessage`, `@pineta/marginalia`): pi writes both in the
+  cards entry (`PinnedMessage`, `@pineta/rules`): pi writes both in the
   commit that admits the run, or neither, so a refused run writes no cards
   entry. Only this keeps the prompt cache when a card changes: cards in the
   system prompt, or in pi's mid-conversation system messages (which pi-ai
@@ -498,7 +498,7 @@ item 18, and in `lanes.test.ts` against the harness.
   - A skill under Pineta's own skills directory is `pineta`.
   - The model's own skill list keeps pi's precedence: one per name.
 - **`createAgent` labels them** with the user config's renames
-  (`commandRenames`) through marginalia's `labelCommands`. `commands()` is
+  (`commandRenames`) through `labelCommands` (`@pineta/rules`). `commands()` is
   the list, `refusedCommands()` what clashed, and `skill(name)` takes a
   qualified name: a conflicted update asks for
   `pineta:skill:resolve-conflicts`.
@@ -506,7 +506,7 @@ item 18, and in `lanes.test.ts` against the harness.
   `expandCommand`, which hashes it. `skill(name)` reads, then runs `skillOf`.
   Both strip frontmatter with `withoutFrontmatter`, which never parses it: a
   file whose YAML broke after pi loaded it still expands.
-  - a skill becomes pi's block through marginalia's `expandSkill`, which
+  - a skill becomes pi's block through `expandSkill` (`@pineta/rules`), which
     copies the format of `_expandSkillCommand` in pi-coding-agent's
     `dist/core/agent-session.js`. That method is private to pi's session, so
     the format is copied, and pinned by a golden test. Diff it on every pi
@@ -550,7 +550,7 @@ as an entry is. The replay test in `storage.test.ts` relies on this.
 ### Values
 
 `writeValues(writes)` writes the host's records (ADR-0062): the
-`ValueWrite`s marginalia's `setRecord` and `deleteRecord` build, in one
+`ValueWrite`s that `setRecord` and `deleteRecord` (`@pineta/rules`) build, in one
 `session.mutate` commit of pi's `setValue` and `deleteValue` writes. That is
 the path `Session.setValue` takes for one write, so conformance covers the
 storage shape. A value can be written while a lane runs (S70): it does not
@@ -558,7 +558,7 @@ go through the lane. A write to a namespace outside `pineta.` throws before
 anything is written: pi's own values (a lane's tip, a checkpoint) are never
 the host's, and type stripping does not check `HostNamespace`. This package
 imports no record namespace or encoder: what a record is lives in
-marginalia.
+`@pineta/rules`.
 
 ### `seq` is derived, not stored
 

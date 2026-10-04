@@ -5,6 +5,7 @@
 import type {
   AskIndex,
   ColumnView,
+  DigestRecord,
   EntryId,
   RevisionRecord,
   StopRecord,
@@ -12,7 +13,6 @@ import type {
   TreeIndex,
   WriterId,
 } from "@pineta/core"
-import type { DigestRecord } from "@pineta/marginalia"
 import type { LiveDocHandle } from "@pineta/schema"
 import type { FoldMemory } from "./ask-fold.ts"
 import type { Density } from "./ask-words.ts"

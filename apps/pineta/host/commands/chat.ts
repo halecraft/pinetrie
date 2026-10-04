@@ -15,17 +15,6 @@ import {
   type WorkSetting,
   type WriterId,
 } from "@pineta/core"
-import {
-  type ChatDecision,
-  type ChatDetails,
-  displayName,
-  encodeChat,
-  parseCommand,
-  pastedImages,
-  planChat,
-  planImages,
-  resolveCommand,
-} from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
 import type { Outcome } from "@pineta/protocol/codec"
 import {
@@ -41,6 +30,17 @@ import {
   workAt,
   worksOwn,
 } from "@pineta/reads"
+import {
+  type ChatDecision,
+  type ChatDetails,
+  displayName,
+  encodeChat,
+  parseCommand,
+  pastedImages,
+  planChat,
+  planImages,
+  resolveCommand,
+} from "@pineta/rules"
 import type { Basics } from "../basics.ts"
 import type { CardPort } from "../cards.ts"
 import type { Runs } from "../runs.ts"

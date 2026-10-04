@@ -13,9 +13,9 @@
 
 import { subscribe } from "@kyneta/schema"
 import type { RootId } from "@pineta/core"
-import { ROOT, setIfChanged } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
 import { readRootRecord, readRoots } from "@pineta/reads"
+import { ROOT, setIfChanged } from "@pineta/rules"
 import type { RootDocHandle } from "@pineta/schema"
 import { type Basics, failed, type HostKeeper } from "./basics.ts"
 

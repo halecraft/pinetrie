@@ -1,0 +1,199 @@
+// rules — each stored shape and the pure rules about it. This lists every
+// name another package imports, grouped by module in the order of
+// TECHNICAL.md's "Where things are". A name only this package and its tests
+// use is not exported here: its tests import it from its module.
+
+export {
+  ARCHIVE,
+  type ArchiveTeardown,
+  archivedIn,
+  planArchive,
+  ROOT_BUSY_REASON,
+  writesIn,
+} from "./archive.ts"
+export {
+  answerOf,
+  BANNER,
+  BANNER_ATTEMPTS,
+  type BannerAnswer,
+  type BannerAsk,
+  type BannerConfig,
+  bannerDue,
+  bannerPrompt,
+  bannerStillWanted,
+  DEFAULT_BANNER,
+  decodeBannerConfig,
+  planAsk,
+} from "./banner.ts"
+export {
+  cardEnd,
+  cardsAt,
+  decodeCard,
+  encodeCard,
+  historyOf,
+  type MoveStep,
+  type MovesStep,
+  type PlaceStep,
+  placeEnd,
+  planCardSweep,
+  planFreshFollow,
+  planHistorySweep,
+  planMoveCommand,
+  planSetCommand,
+  planTake,
+  planUnsent,
+  type QueuedCard,
+  queuedOn,
+  type UndoResult,
+  undoAnswer,
+  yourCard,
+} from "./card.ts"
+export {
+  addressChat,
+  agentByDefault,
+  CHAT_TYPE,
+  type ChatDecision,
+  type ChatDetails,
+  type ChatMessage,
+  chatImageShas,
+  decodeChat,
+  encodeChat,
+  planChat,
+  renderableMessage,
+  settleRun,
+  withChatImages,
+} from "./chat.ts"
+export {
+  COMMANDS,
+  COMMANDS_KEY,
+  type CommandSource,
+  decodeCommandRenames,
+  expandSkill,
+  type GatheredCommand,
+  labelCommands,
+  parseCommand,
+  resolveCommand,
+} from "./commands.ts"
+export type { ModelRef } from "./config.ts"
+export {
+  DIGEST,
+  decodeDigestConfig,
+  digestOf,
+  digestRequest,
+  digestText,
+  digestToWrite,
+  planDigest,
+  pointsText,
+  readsAsk,
+} from "./digest.ts"
+export { pastedImages, planImages } from "./images.ts"
+export {
+  decodeLand,
+  LANDING,
+  type LandMessage,
+  landingRecord,
+  planResolution,
+} from "./land.ts"
+export {
+  BASE,
+  type CatchUpNow,
+  catchUpName,
+  catchUpOf,
+  effectiveBase,
+  type ForkBegin,
+  LINE,
+  LINE_KEY,
+  mergedFrom,
+  type ParentNow,
+  parentNow,
+  planBegin,
+  planLineAction,
+  planLineRecord,
+  planParentUpdate,
+  planUpdateFrom,
+  type UpdateRefusal,
+} from "./line.ts"
+export { MARK, planMark } from "./mark.ts"
+export { NAME, planNames, planReserve, type ReservePlan } from "./names.ts"
+export {
+  isUntaken,
+  OFFER,
+  offerRecord,
+  offerStatus,
+  planDescribeAgain,
+  planDescribeAsk,
+  planDescribeSettle,
+  planOfferTake,
+  planRebuild,
+  planRefresh,
+  planStackEnded,
+  planYourEdits,
+  type TakeDestination,
+} from "./offer.ts"
+export {
+  type OfferActivity,
+  type OfferButton,
+  type OfferView,
+  offerSeen,
+  offerView,
+} from "./offer-view.ts"
+export { displayName, PARTICIPANT, participants } from "./participant.ts"
+export {
+  decodePinned,
+  encodePinned,
+  PINNED_RULE,
+  PINNED_TYPE,
+  type PinnedMessage,
+  type PinnedStatus,
+  pinnedDiff,
+  pinnedReads,
+  planPinnedRead,
+} from "./pinned.ts"
+export {
+  deleteRecord,
+  type Home,
+  type RecordSpec,
+  recordsOf,
+  setIfChanged,
+  setRecord,
+} from "./records.ts"
+export { describeRequest, transcriptLines } from "./request.ts"
+export {
+  answerDiff,
+  answerReview,
+  decodeRevisionReview,
+  diffUrl,
+  type OfferAnswer,
+  type OfferAsk,
+  parseOfferPath,
+  planOfferRead,
+  reviewUrl,
+} from "./review.ts"
+export { ROOT } from "./roots.ts"
+export { planSeatSweep, planSeats, SEAT, writersOfClients } from "./seat.ts"
+export { planStartup } from "./startup.ts"
+export { planStop, STOP } from "./stop.ts"
+export {
+  decodeTitleConfig,
+  planTitling,
+  TITLE_REQUEST_HEAD,
+  type TitleTrigger,
+  titleOf,
+  titleRequest,
+  titleStillWanted,
+} from "./title.ts"
+export {
+  decodeStack,
+  encodeUpdate,
+  planStack,
+  type StackMessage,
+  type UpdateMessage,
+} from "./update.ts"
+export {
+  forkPoint,
+  LANE,
+  PROJECT,
+  PROJECT_KEY,
+  planTurnRecord,
+  REVISION,
+} from "./work.ts"

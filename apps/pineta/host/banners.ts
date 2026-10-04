@@ -4,6 +4,8 @@
 
 import type { BlobStore, LaneName, Sha256, StoredImage } from "@pineta/core"
 import type { Keeper } from "@pineta/keeper"
+import type { Agent } from "@pineta/pi"
+import { readBanners, readNames } from "@pineta/reads"
 import {
   answerOf,
   BANNER,
@@ -15,9 +17,7 @@ import {
   bannerStillWanted,
   planAsk,
   setRecord,
-} from "@pineta/marginalia"
-import type { Agent } from "@pineta/pi"
-import { readBanners, readNames } from "@pineta/reads"
+} from "@pineta/rules"
 import type { Basics } from "./basics.ts"
 import { requestOutside } from "./outside.ts"
 

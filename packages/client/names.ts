@@ -7,7 +7,7 @@
 // message sent before someone named themselves does not read as a stranger's.
 
 import type { WriterId } from "@pineta/core"
-import { displayName } from "@pineta/marginalia"
+import { displayName } from "@pineta/rules"
 
 /**
  * A message written together names its sender, then the others who wrote it
@@ -34,7 +34,7 @@ export const namesOf = (
 
 /**
  * Whose drafting card this is, and who else wrote in it (ADR-0048): "Ada's
- * draft · with Bea". `writers` are everyone who wrote in it (`writersOf`),
+ * draft · with Bea". `writers` are everyone who wrote in it (`writersOfClients`),
  * the owner among them or not.
  */
 export function cardHeading(

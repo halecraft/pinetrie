@@ -1,12 +1,11 @@
 // host/offers/refresh — what a trigger does to a lane's offer, and an offer
 // rebuilt: gather (`gatherRefresh`, `@pineta/repo`), decide (`planRefresh`,
-// marginalia), translate (`offerEffects`, `rebuildEffects`) and execute
+// `@pineta/rules`), translate (`offerEffects`, `rebuildEffects`) and execute
 // (`executeOffer`). The record is written from the repo after each step,
 // never read back to decide.
 
 import type { LaneName, Placed, Rebuild, ThreadName } from "@pineta/core"
 import { offerBookmark } from "@pineta/lanes"
-import { offerRecord, planRefresh } from "@pineta/marginalia"
 import { readThreadName } from "@pineta/reads"
 import {
   gatherRefresh,
@@ -16,6 +15,7 @@ import {
   rebuildEffects,
   repairOffer,
 } from "@pineta/repo"
+import { offerRecord, planRefresh } from "@pineta/rules"
 import { executeOffer, type OfferPorts } from "./execute.ts"
 import type { OfferDeps } from "./state.ts"
 

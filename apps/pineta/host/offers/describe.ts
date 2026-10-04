@@ -2,14 +2,14 @@
 // (ADR-0038): a one-shot model request outside the thread.
 
 import { type LaneName, projectTranscript } from "@pineta/core"
+import { readTreeIndex } from "@pineta/reads"
+import { describeEffects, gatherDescribe, gatherOffer } from "@pineta/repo"
 import {
   describeRequest,
   planDescribeAsk,
   planDescribeSettle,
   transcriptLines,
-} from "@pineta/marginalia"
-import { readTreeIndex } from "@pineta/reads"
-import { describeEffects, gatherDescribe, gatherOffer } from "@pineta/repo"
+} from "@pineta/rules"
 import { readLaneTip } from "@pineta/schema"
 import { failed } from "../basics.ts"
 import { requestOutside } from "../outside.ts"

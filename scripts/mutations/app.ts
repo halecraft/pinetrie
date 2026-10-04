@@ -38,7 +38,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the model is not told who spoke",
-    file: "packages/marginalia/chat.ts",
+    file: "packages/rules/chat.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "  `${d.authorName}: ${d.command?.expanded ?? d.text}`",
     to: "  d.command?.expanded ?? d.text",

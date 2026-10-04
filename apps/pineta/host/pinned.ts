@@ -12,19 +12,19 @@ import {
   type WriterId,
 } from "@pineta/core"
 import {
+  readLanes,
+  readParticipantNames,
+  readPlaces,
+  readTreeIndex,
+} from "@pineta/reads"
+import {
   cardsAt,
   displayName,
   encodePinned,
   type PinnedMessage,
   pinnedReads,
   planPinnedRead,
-} from "@pineta/marginalia"
-import {
-  readLanes,
-  readParticipantNames,
-  readPlaces,
-  readTreeIndex,
-} from "@pineta/reads"
+} from "@pineta/rules"
 import { readLaneTip } from "@pineta/schema"
 import type { Basics } from "./basics.ts"
 import type { CardPort } from "./cards.ts"

@@ -5,9 +5,9 @@ import { mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { ROOT } from "@pineta/core"
-import { TITLE_REQUEST_HEAD } from "@pineta/marginalia"
 import { scriptedModel } from "@pineta/pi"
 import { readRoots } from "@pineta/reads"
+import { TITLE_REQUEST_HEAD } from "@pineta/rules"
 import type { Checks } from "../checks.ts"
 import {
   committedProject,

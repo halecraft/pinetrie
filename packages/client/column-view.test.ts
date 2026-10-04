@@ -25,7 +25,7 @@ import {
   offerStatus,
   offerView,
   type ParentNow,
-} from "@pineta/marginalia"
+} from "@pineta/rules"
 import { describe, expect, test } from "vitest"
 import type { OfferActing } from "./acting.ts"
 import {

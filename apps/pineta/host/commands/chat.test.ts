@@ -13,6 +13,7 @@ import {
   type Sha256,
   writerId,
 } from "@pineta/core"
+import { readTreeIndex } from "@pineta/reads"
 import {
   CHAT_TYPE,
   type ChatDetails,
@@ -20,8 +21,7 @@ import {
   PARTICIPANT,
   PROJECT,
   setRecord,
-} from "@pineta/marginalia"
-import { readTreeIndex } from "@pineta/reads"
+} from "@pineta/rules"
 import { beginRun, writeEntry, writeLaneTip } from "@pineta/schema"
 import { describe, expect, test } from "vitest"
 import {

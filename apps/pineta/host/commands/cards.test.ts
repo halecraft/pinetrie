@@ -9,9 +9,9 @@ import {
   runId,
   writerId,
 } from "@pineta/core"
-import type { UndoResult } from "@pineta/marginalia"
 import { PLACES_DOC_ID } from "@pineta/protocol/messages"
 import { readPlaces, readPlacesRev } from "@pineta/reads"
+import type { UndoResult } from "@pineta/rules"
 import { beginRun, writeEntry, writeLaneTip } from "@pineta/schema"
 import { describe, expect, test } from "vitest"
 import { basics, record, row } from "../fakes.ts"

@@ -116,7 +116,7 @@ packages/core/         @pineta/core         declares NOTHING
 packages/schema/       @pineta/schema       Kyneta only; the document shape
 packages/pi/           @pineta/pi           THE pi boundary
 packages/protocol/     @pineta/protocol     the wire contract and its codec
-packages/marginalia/   @pineta/marginalia   Pineta's shapes in pi: chat, cards
+packages/rules/        @pineta/rules        each stored shape and the pure rules about it
 packages/reads/        @pineta/reads        document reads shared by host and client
 packages/lanes/        @pineta/lanes        a lane's container and disk, and jj and git in it (ADR-0032–0034)
 packages/keeper/       @pineta/keeper       declares NOTHING; one step at a time on a resource
@@ -275,7 +275,7 @@ your work onto the line, as you, after a preview from `git merge-tree`
 files.
 
 **ADR-0062 — each host record is one spec** (built). A `RecordSpec` in
-marginalia names a record's namespace, key, encoding and decoding; the host
+`@pineta/rules` names a record's namespace, key, encoding and decoding; the host
 builds `ValueWrite`s with `setRecord` and `deleteRecord`, and pi's
 `writeValues` carries them in one commit, refusing any namespace outside
 `pineta.`. The address holds a record's key and the contents never repeat
@@ -512,7 +512,7 @@ the root declares only tooling, so a package can import only what it declares.
 **ADRs are encoded as types where possible.** Entry ids, run ids and lane
 names are branded (`EntryId`, `RunId`, `LaneName`), so a swapped argument is
 a compile error. They are minted where they enter: the protocol codec, the
-reads (`renderableEntry`), the schema's readers, marginalia's decoders, a
+reads (`renderableEntry`), the schema's readers, `@pineta/rules`' decoders, a
 commit's trailer (`packages/lanes`), the pi adapter, the client's stored forms,
 and the host's id generator. Biome's `noRestrictedImports` (`biome.json`)
 refuses `entryId` in core, the client and the host, and `runId` in core and

@@ -3,7 +3,7 @@
 // lane is in it unless its record names another.
 
 import { type LaneName, type RootId, rootIdFor } from "@pineta/core"
-import { LANE, recordsOf } from "@pineta/marginalia"
+import { LANE, recordsOf } from "@pineta/rules"
 import {
   newRootDoc,
   newSessionDoc,

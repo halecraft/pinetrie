@@ -8,10 +8,10 @@ import {
   laneStackName,
   stackBookmark,
 } from "@pineta/lanes"
-import { decodeStack, planStack, type StackMessage } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
 import { readThreadName } from "@pineta/reads"
 import type { RepoOwner } from "@pineta/repo"
+import { decodeStack, planStack, type StackMessage } from "@pineta/rules"
 import { readEntryMessage } from "@pineta/schema"
 import { type Basics, messageOf } from "../basics.ts"
 import type { Offers } from "../offers/index.ts"

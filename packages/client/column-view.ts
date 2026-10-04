@@ -50,7 +50,7 @@ import {
   pinnedDiff,
   pinnedReads,
   type TakeDestination,
-} from "@pineta/marginalia"
+} from "@pineta/rules"
 import type { OfferActing } from "./acting.ts"
 import { commandWords } from "./card-words.ts"
 import type { Column } from "./columns.ts"

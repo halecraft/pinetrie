@@ -2,7 +2,7 @@
 import type { Mutation } from "../mutate.ts"
 
 const vitest = (path: string) => ["pnpm", "exec", "vitest", "run", path]
-const commands = "packages/marginalia/commands.ts"
+const commands = "packages/rules/commands.ts"
 
 export const mutations: readonly Mutation[] = [
   {
@@ -11,7 +11,7 @@ export const mutations: readonly Mutation[] = [
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "\\nReferences are relative to ${input.dir}.\\n",
     to: "\\n",
-    command: vitest("packages/marginalia"),
+    command: vitest("packages/rules"),
     expect: "expandSkill: pi's block, byte for byte",
   },
   {
@@ -19,31 +19,31 @@ export const mutations: readonly Mutation[] = [
     file: commands,
     from: '    (parts.length === 2 || (parts.length === 3 && parts[1] === "skill"))',
     to: '    (parts.length >= 1 || (parts.length === 3 && parts[1] === "skill"))',
-    command: vitest("packages/marginalia"),
+    command: vitest("packages/rules"),
     expect: "anything else is ordinary text",
   },
   {
     name: "a command does not compel the agent",
-    file: "packages/marginalia/chat.ts",
+    file: "packages/rules/chat.ts",
     from: "    command: command !== null,\n",
     to: "    command: false,\n",
-    command: vitest("packages/marginalia"),
+    command: vitest("packages/rules"),
     expect: "it is for the agent, whoever else it names",
   },
   {
     name: "an unknown command is sent as text",
-    file: "packages/marginalia/chat.ts",
+    file: "packages/rules/chat.ts",
     from: '  if (command !== null && "unknown" in command)',
     to: "  if (false)",
-    command: vitest("packages/marginalia"),
+    command: vitest("packages/rules"),
     expect: "an unknown command is refused, naming it",
   },
   {
     name: "a host record is written though unchanged",
-    file: "packages/marginalia/records.ts",
+    file: "packages/rules/records.ts",
     from: "  stored === undefined || !sameJson(spec.encode(record), spec.encode(stored))",
     to: "  true",
-    command: vitest("packages/marginalia"),
+    command: vitest("packages/rules"),
     expect: "an unchanged host record is not written again",
   },
   {
@@ -80,10 +80,10 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "an unreadable command is sent as text",
-    file: "packages/marginalia/chat.ts",
+    file: "packages/rules/chat.ts",
     from: '  if (command !== null && "unreadable" in command)',
     to: "  if (false)",
-    command: vitest("packages/marginalia"),
+    command: vitest("packages/rules"),
     expect: "a command whose file cannot be read is refused, saying so",
   },
 ]

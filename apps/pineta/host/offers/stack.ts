@@ -3,8 +3,8 @@
 // (`planStackEnded`).
 
 import type { CommitId, LaneName } from "@pineta/core"
-import { planStackEnded } from "@pineta/marginalia"
 import { gatherOffer, gatherPlace, gatherStack } from "@pineta/repo"
+import { planStackEnded } from "@pineta/rules"
 import type { Refresh } from "./refresh.ts"
 import type { OfferDeps } from "./state.ts"
 

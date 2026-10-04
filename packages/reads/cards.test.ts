@@ -6,7 +6,7 @@ import {
   rootIdFor,
   writerId,
 } from "@pineta/core"
-import { encodeCard } from "@pineta/marginalia"
+import { encodeCard } from "@pineta/rules"
 import { newPlacesDoc } from "@pineta/schema"
 import { expect, test } from "vitest"
 import { readPlaces, readPlacesRev } from "./index.ts"

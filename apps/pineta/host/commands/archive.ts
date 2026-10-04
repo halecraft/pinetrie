@@ -14,12 +14,6 @@ import {
   refused,
   type WriterId,
 } from "@pineta/core"
-import {
-  ARCHIVE,
-  type ArchiveTeardown,
-  planArchive,
-  setRecord,
-} from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
 import type { Outcome } from "@pineta/protocol/codec"
 import {
@@ -30,6 +24,12 @@ import {
   readRevisions,
   readTreeIndex,
 } from "@pineta/reads"
+import {
+  ARCHIVE,
+  type ArchiveTeardown,
+  planArchive,
+  setRecord,
+} from "@pineta/rules"
 import { readLaneTip, type SessionDocHandle } from "@pineta/schema"
 import type { Basics, HostKeeper } from "../basics.ts"
 import type { LaneWork } from "../work/index.ts"

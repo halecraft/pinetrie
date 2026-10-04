@@ -1,7 +1,7 @@
 // repo/offer-steps — what a decision about an offer runs on your repo, and
 // what the host does after (ADR-0038, ADR-0060).
 //
-// Marginalia decides (`planRefresh`, `planOfferTake`, `planStackEnded`,
+// `@pineta/rules` decides (`planRefresh`, `planOfferTake`, `planStackEnded`,
 // `planRebuild`, `planDescribeSettle`); these turn each decision into
 // `RepoStep`s, pure. Every decision carries the facts its steps need, so
 // each kind has exactly one translation, and none that runs nothing because

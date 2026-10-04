@@ -208,7 +208,7 @@ document.
 `PlacesDoc` holds every card's record, keyed by card id: `yjs.bind` of a
 record of flat string rows (`owner`, `kind`, `root`, `at`, `lane`,
 `column`, `order`, `by`, `seen`, `command`, `unsent`, `placer`,
-`holder`, "" for none), decoded in `@pineta/marginalia` (`decodeCard`),
+`holder`, "" for none), decoded in `@pineta/rules` (`decodeCard`),
 and `rev`. Its id is `pineta:card-places` (`PLACES_DOC_ID`). Only the host
 writes it, through `applyPlaceSteps` (`apps/pineta/host/places.ts`).
 

@@ -8,7 +8,7 @@
 // does Archive when such a root has no tab here (ADR-0048, `cardMarks`).
 
 import { MAX_TITLE, type TreeIndex, type WriterId } from "@pineta/core"
-import { ROOT_BUSY_REASON } from "@pineta/marginalia"
+import { ROOT_BUSY_REASON } from "@pineta/rules"
 import {
   type KeyboardEvent,
   useEffect,

@@ -13,7 +13,7 @@ import {
   encodePinned,
   PARTICIPANT,
   setRecord,
-} from "@pineta/marginalia"
+} from "@pineta/rules"
 import { writeEntry } from "@pineta/schema"
 import { describe, expect, test } from "vitest"
 import type { CardPort } from "./cards.ts"

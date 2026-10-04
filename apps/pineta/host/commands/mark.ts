@@ -1,10 +1,10 @@
 // host/commands/mark — a root's title (ADR-0045): gather, `planMark`, execute.
 
 import type { Intent, WriterId } from "@pineta/core"
-import { deleteRecord, MARK, planMark, setRecord } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
 import type { Outcome } from "@pineta/protocol/codec"
 import { readMarks, readTreeIndex } from "@pineta/reads"
+import { deleteRecord, MARK, planMark, setRecord } from "@pineta/rules"
 import type { Basics } from "../basics.ts"
 
 export interface MarkDeps {

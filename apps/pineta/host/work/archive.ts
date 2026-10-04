@@ -12,7 +12,7 @@ import {
   removeLane,
   removeSnapshots,
 } from "@pineta/lanes"
-import type { ArchiveTeardown } from "@pineta/marginalia"
+import type { ArchiveTeardown } from "@pineta/rules"
 import { type Basics, failed } from "../basics.ts"
 import type { Offers } from "../offers/index.ts"
 import type { LaneRegistry } from "./registry.ts"

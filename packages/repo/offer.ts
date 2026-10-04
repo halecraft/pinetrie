@@ -7,7 +7,7 @@
 // revision's commits the host made (`hostCommitIn`, from `evologOf`). The
 // gathers in `offer-gather.ts` call them, or read a lane on the line in one
 // `jj log` instead (`lane-read.ts`). What the facts mean is decided in
-// `@pineta/marginalia`'s `offer.ts`, and its decisions become steps in
+// `@pineta/rules`' `offer.ts`, and its decisions become steps in
 // `offer-steps.ts`. A lane's base is read by `@pineta/lanes`' `laneBase`,
 // since a lane reads it too.
 

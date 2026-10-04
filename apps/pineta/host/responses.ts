@@ -3,7 +3,7 @@
 // `http.ts` writes each one with `send`.
 
 import type { ImageRef, StoredImage } from "@pineta/core"
-import type { OfferAnswer } from "@pineta/marginalia"
+import type { OfferAnswer } from "@pineta/rules"
 
 export interface HttpAnswer<
   Body extends string | Uint8Array = string | Uint8Array,

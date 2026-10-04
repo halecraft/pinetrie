@@ -7,8 +7,8 @@ import {
   NOBODY,
   writerId,
 } from "@pineta/core"
-import { encodeChat, encodePinned, planStack } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
+import { encodeChat, encodePinned, planStack } from "@pineta/rules"
 import {
   readActiveRun,
   readStreams,

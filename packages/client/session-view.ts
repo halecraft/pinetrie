@@ -36,7 +36,6 @@ import {
   type WriterId,
   writerOfPrincipal,
 } from "@pineta/core"
-import { offerSeen } from "@pineta/marginalia"
 import type { Outcome } from "@pineta/protocol/codec"
 import { Control } from "@pineta/protocol/line"
 import {
@@ -47,6 +46,7 @@ import {
 } from "@pineta/protocol/messages"
 import { inventoryDocId, writersPolicy } from "@pineta/protocol/writers"
 import { readOffers, readPlaces, readPlacesRev } from "@pineta/reads"
+import { offerSeen } from "@pineta/rules"
 import {
   asSessionDoc,
   cardDocId,

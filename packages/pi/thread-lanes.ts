@@ -18,7 +18,7 @@ import type {
   PinnedMessage,
   StackMessage,
   UpdateMessage,
-} from "@pineta/marginalia"
+} from "@pineta/rules"
 import {
   hasLaneRecord,
   type RootDocHandle,

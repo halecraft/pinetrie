@@ -1,5 +1,5 @@
 import { laneNameForThread, NOBODY, type Sha256, writerId } from "@pineta/core"
-import { encodeChat } from "@pineta/marginalia"
+import { encodeChat } from "@pineta/rules"
 import { expect, test } from "vitest"
 import { planSweep, referencedBlobs } from "./index.ts"
 

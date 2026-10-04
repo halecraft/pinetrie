@@ -636,14 +636,6 @@ export const mutations: readonly Mutation[] = [
     expect: "over every tree of 6 entries",
   },
   {
-    name: "a second stop overwrites the first",
-    file: tree,
-    from: "      prompt === null || facts.stops.has(prompt)",
-    to: "      prompt === null",
-    command: unit,
-    expect: "the first stop recorded is kept",
-  },
-  {
     name: "an ask's files are its first turn's",
     file: tree,
     from: "    for (const p of revisions.get(id)?.paths ?? []) files.add(p)",

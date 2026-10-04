@@ -5,11 +5,6 @@
 // to the offer (ADR-0060).
 
 import type { ErrCode, LaneName, OfferSeen, WriterId } from "@pineta/core"
-import {
-  planDescribeAgain,
-  planOfferTake,
-  planRebuild,
-} from "@pineta/marginalia"
 import { readThreadName } from "@pineta/reads"
 import {
   gatherOffer,
@@ -17,6 +12,7 @@ import {
   type RepoOps,
   takeEffects,
 } from "@pineta/repo"
+import { planDescribeAgain, planOfferTake, planRebuild } from "@pineta/rules"
 import { describe } from "./describe.ts"
 import { executeOffer } from "./execute.ts"
 import type { Refresh } from "./refresh.ts"

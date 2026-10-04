@@ -15,7 +15,7 @@ import {
   expandSkill,
   type GatheredCommand,
   resolveCommand,
-} from "@pineta/marginalia"
+} from "@pineta/rules"
 import {
   type DefaultResourceLoader,
   loadPromptTemplates,

@@ -59,9 +59,6 @@ importers:
       '@pineta/lanes':
         specifier: workspace:*
         version: link:../../packages/lanes
-      '@pineta/marginalia':
-        specifier: workspace:*
-        version: link:../../packages/marginalia
       '@pineta/pi':
         specifier: workspace:*
         version: link:../../packages/pi
@@ -74,6 +71,9 @@ importers:
       '@pineta/repo':
         specifier: workspace:*
         version: link:../../packages/repo
+      '@pineta/rules':
+        specifier: workspace:*
+        version: link:../../packages/rules
       '@pineta/schema':
         specifier: workspace:*
         version: link:../../packages/schema
@@ -120,15 +120,15 @@ importers:
       '@pineta/core':
         specifier: workspace:*
         version: link:../core
-      '@pineta/marginalia':
-        specifier: workspace:*
-        version: link:../marginalia
       '@pineta/protocol':
         specifier: workspace:*
         version: link:../protocol
       '@pineta/reads':
         specifier: workspace:*
         version: link:../reads
+      '@pineta/rules':
+        specifier: workspace:*
+        version: link:../rules
       '@pineta/schema':
         specifier: workspace:*
         version: link:../schema
@@ -186,24 +186,6 @@ importers:
         specifier: workspace:*
         version: link:../core
 
-  packages/marginalia:
-    dependencies:
-      '@pineta/core':
-        specifier: workspace:*
-        version: link:../core
-      mdast-util-from-markdown:
-        specifier: 2.0.3
-        version: 2.0.3
-      mdast-util-gfm:
-        specifier: 3.1.0
-        version: 3.1.0
-      micromark-extension-gfm:
-        specifier: 3.0.0
-        version: 3.0.0
-      typebox:
-        specifier: 1.3.27
-        version: 1.3.27
-
   packages/pi:
     dependencies:
       '@earendil-works/pi-agent-core':
@@ -221,9 +203,9 @@ importers:
       '@pineta/core':
         specifier: workspace:*
         version: link:../core
-      '@pineta/marginalia':
+      '@pineta/rules':
         specifier: workspace:*
-        version: link:../marginalia
+        version: link:../rules
       '@pineta/schema':
         specifier: workspace:*
         version: link:../schema
@@ -248,9 +230,9 @@ importers:
       '@pineta/core':
         specifier: workspace:*
         version: link:../core
-      '@pineta/marginalia':
+      '@pineta/rules':
         specifier: workspace:*
-        version: link:../marginalia
+        version: link:../rules
       '@pineta/schema':
         specifier: workspace:*
         version: link:../schema
@@ -266,6 +248,24 @@ importers:
       '@pineta/lanes':
         specifier: workspace:*
         version: link:../lanes
+
+  packages/rules:
+    dependencies:
+      '@pineta/core':
+        specifier: workspace:*
+        version: link:../core
+      mdast-util-from-markdown:
+        specifier: 2.0.3
+        version: 2.0.3
+      mdast-util-gfm:
+        specifier: 3.1.0
+        version: 3.1.0
+      micromark-extension-gfm:
+        specifier: 3.0.0
+        version: 3.0.0
+      typebox:
+        specifier: 1.3.27
+        version: 1.3.27
 
   packages/schema:
     dependencies:

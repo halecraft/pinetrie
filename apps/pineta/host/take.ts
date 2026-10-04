@@ -12,14 +12,9 @@ import {
   type LaneName,
   parseMentions,
 } from "@pineta/core"
-import {
-  planTake,
-  planUnsent,
-  type QueuedCard,
-  queuedOn,
-} from "@pineta/marginalia"
 import type { Outcome } from "@pineta/protocol/codec"
 import { readPlaces, readRunning, readThreadName } from "@pineta/reads"
+import { planTake, planUnsent, type QueuedCard, queuedOn } from "@pineta/rules"
 import type { PlacesDocHandle } from "@pineta/schema"
 import { type Basics, messageOf } from "./basics.ts"
 import type { CardPort } from "./cards.ts"

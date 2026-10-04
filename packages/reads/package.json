@@ -8,7 +8,7 @@
   },
   "dependencies": {
     "@pineta/core": "workspace:*",
-    "@pineta/marginalia": "workspace:*",
+    "@pineta/rules": "workspace:*",
     "@pineta/schema": "workspace:*"
   }
 }

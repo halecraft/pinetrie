@@ -12,7 +12,7 @@ import {
   THE_AGENT,
   writerId,
 } from "@pineta/core"
-import { encodeChat } from "@pineta/marginalia"
+import { encodeChat } from "@pineta/rules"
 import { newRootDoc } from "@pineta/schema"
 import { expect, test } from "vitest"
 import { createAgent, newId } from "./agent.ts"

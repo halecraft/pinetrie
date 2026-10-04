@@ -17,6 +17,15 @@ import {
   type WriterId,
 } from "@pineta/core"
 import type { Keeper } from "@pineta/keeper"
+import type { Agent } from "@pineta/pi"
+import type { Outcome } from "@pineta/protocol/codec"
+import {
+  readArchive,
+  readLaneRecords,
+  readMarks,
+  readRoots,
+  readTreeIndex,
+} from "@pineta/reads"
 import {
   archivedIn,
   MARK,
@@ -27,16 +36,7 @@ import {
   titleOf,
   titleRequest,
   titleStillWanted,
-} from "@pineta/marginalia"
-import type { Agent } from "@pineta/pi"
-import type { Outcome } from "@pineta/protocol/codec"
-import {
-  readArchive,
-  readLaneRecords,
-  readMarks,
-  readRoots,
-  readTreeIndex,
-} from "@pineta/reads"
+} from "@pineta/rules"
 import type { RootDocHandle } from "@pineta/schema"
 import { type Basics, failed } from "./basics.ts"
 import { requestOutside } from "./outside.ts"

@@ -64,11 +64,11 @@ test("the protocol declares only Kyneta and core", () => {
   assert.deepEqual(extra, [])
 })
 
-test("marginalia declares only TypeBox, core, and the markdown parser the client's remark wraps", () => {
+test("rules declares only TypeBox, core, and the markdown parser the client's remark wraps", () => {
   // Which images a message shows is read from its markdown on the host, by
   // the parser under the client's remark-parse and remark-gfm, at the same
   // versions, so both read one tree and the bundle holds one copy (ADR-0042).
-  assert.deepEqual(deps(read("packages/marginalia")).sort(), [
+  assert.deepEqual(deps(read("packages/rules")).sort(), [
     "@pineta/core",
     "mdast-util-from-markdown",
     "mdast-util-gfm",
@@ -77,11 +77,11 @@ test("marginalia declares only TypeBox, core, and the markdown parser the client
   ])
 })
 
-test("reads declares only core, schema and marginalia: no pi, no transport", () => {
+test("reads declares only core, schema and rules: no pi, no transport", () => {
   // The host and the client decide from these reads, so they must run in both.
   assert.deepEqual(deps(read("packages/reads")).sort(), [
     "@pineta/core",
-    "@pineta/marginalia",
+    "@pineta/rules",
     "@pineta/schema",
   ])
 })

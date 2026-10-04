@@ -3,7 +3,7 @@
 // closing one redraws it alone, as a tool row does (ADR-0049).
 
 import type { EntryId, Segment } from "@pineta/core"
-import { pointsText } from "@pineta/marginalia"
+import { pointsText } from "@pineta/rules"
 import {
   Fragment,
   type ReactNode,

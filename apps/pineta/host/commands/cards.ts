@@ -23,6 +23,14 @@ import {
   threadOf,
   type WriterId,
 } from "@pineta/core"
+import type { Outcome } from "@pineta/protocol/codec"
+import { PLACES_DOC_ID } from "@pineta/protocol/messages"
+import {
+  readLanes,
+  readPlaces,
+  readRunning,
+  readTreeIndex,
+} from "@pineta/reads"
 import {
   historyOf,
   type MoveStep,
@@ -32,15 +40,7 @@ import {
   planMoveCommand,
   planSetCommand,
   undoAnswer,
-} from "@pineta/marginalia"
-import type { Outcome } from "@pineta/protocol/codec"
-import { PLACES_DOC_ID } from "@pineta/protocol/messages"
-import {
-  readLanes,
-  readPlaces,
-  readRunning,
-  readTreeIndex,
-} from "@pineta/reads"
+} from "@pineta/rules"
 import type { Basics } from "../basics.ts"
 import type { CardPort } from "../cards.ts"
 import type { MoveHistories } from "../move-history.ts"

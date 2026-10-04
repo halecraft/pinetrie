@@ -17,7 +17,7 @@ import {
   type ImagesModels,
 } from "@earendil-works/pi-ai"
 import { openrouterImagesProvider } from "@earendil-works/pi-ai/providers/openrouter-images"
-import type { GatheredCommand } from "@pineta/marginalia"
+import type { GatheredCommand } from "@pineta/rules"
 import { gatherCommands, pinetaCommands } from "./commands.ts"
 import {
   type buildSystemPrompt,

@@ -4,7 +4,7 @@
 // Vite's. `http.ts` carries each plan out.
 
 import { isSha256, type Sha256 } from "@pineta/core"
-import { type OfferAsk, parseOfferPath } from "@pineta/marginalia"
+import { type OfferAsk, parseOfferPath } from "@pineta/rules"
 import { admits, type RequestFacts } from "./admission.ts"
 
 export type Route =

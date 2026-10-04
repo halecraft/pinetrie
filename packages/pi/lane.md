@@ -15,7 +15,7 @@ changes Pineta can keep this note true. You can skip them.
   including its `.git` and `.jj`. A path under their working copy that
   someone writes in a message reaches you as the same path under
   `/mnt/host-working-copy`. <!-- packages/core/index.ts HOST_WORKING_COPY -->
-  <!-- packages/marginalia/work.ts showHostWorkingCopy -->
+  <!-- packages/rules/work.ts showHostWorkingCopy -->
 - A shared directory, such as `/workspace/.plans` when the person shares
   it, is their own directory mounted read-write. Your edits there are
   visible to them and to every other thread at once, are never committed,
@@ -54,7 +54,7 @@ changes Pineta can keep this note true. You can skip them.
   `abandon`, `describe` of an earlier one) unless a Pineta message asks you
   to. Pineta records each turn by the commit id of its revision, and a
   rewrite leaves those records naming commits no longer in your history.
-  <!-- packages/marginalia/work.ts planTurnRecord -->
+  <!-- packages/rules/work.ts planTurnRecord -->
 - `JJ_EDITOR` is `false`, so a jj command that would open an editor fails.
   Always pass `-m`, and don't use interactive commands such as `jj split` or
   `jj diffedit`. <!-- packages/core/index.ts NO_EDITOR -->
@@ -75,7 +75,7 @@ changes Pineta can keep this note true. You can skip them.
   don't need to. <!-- packages/core/trailers.ts wipDescription -->
 - The person can ask for the offer as a stack of revisions. A Pineta message
   then asks you to build it, and says how.
-  <!-- packages/marginalia/update.ts planStack -->
+  <!-- packages/rules/update.ts planStack -->
 - The person sees your files only through the offer, which Pineta brings up
   to date after each turn. Nothing you write appears in their editor.
 
@@ -127,7 +127,7 @@ changes Pineta can keep this note true. You can skip them.
 ## People
 
 - Several people may write in one thread. Each message you read begins with
-  the name of the person who wrote it. <!-- packages/marginalia/chat.ts attributed -->
+  the name of the person who wrote it. <!-- packages/rules/chat.ts attributed -->
 - When someone brings this thread up to date, Pineta merges the thread's
   base into `/workspace`: the integration line's newest commit, or a fresh
   copy of the WIP it started from. A note tells you what changed. What they
@@ -136,7 +136,7 @@ changes Pineta can keep this note true. You can skip them.
 - If the merge conflicts, a Pineta message asks you to resolve it. Then
   use `ask_for_guidance` when the two sides meant different things. You
   always have the tool, but outside such a resolution it only answers that
-  there is nothing to ask. <!-- packages/marginalia/land.ts LAND_TYPE -->
+  there is nothing to ask. <!-- packages/rules/land.ts LAND_TYPE -->
   <!-- packages/pi/lanes.ts GUIDANCE_TOOL -->
   <!-- packages/pi/lanes.ts NOT_LANDING -->
 

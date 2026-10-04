@@ -1,6 +1,6 @@
 // e2e/host/archive — archiving a root (ADR-0029) and titling one (ADR-0045),
 // through the command Line. What either decides is unit-tested
-// (`@pineta/marginalia`'s `archive.test.ts` and `mark.test.ts`, the host's
+// (`@pineta/rules`' `archive.test.ts` and `mark.test.ts`, the host's
 // `commands/*.test.ts`); this proves the dispatcher routes each command to it
 // and the record reaches another client.
 

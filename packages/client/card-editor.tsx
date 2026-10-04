@@ -27,7 +27,7 @@ import type {
   ThreadLane,
   WorkSetting,
 } from "@pineta/core"
-import { type QueuedCard, writersOf } from "@pineta/marginalia"
+import { type QueuedCard, writersOfClients } from "@pineta/rules"
 import { textClients } from "@pineta/schema"
 import { type ReactNode, useEffect, useRef, useState } from "react"
 import type { ReadOnly } from "./app-view.ts"
@@ -172,7 +172,7 @@ export function CardEditor(p: {
   participants: readonly string[]
   /** Who is sending, and everyone's names. */
   reader: Reader
-  /** Every seat the host has seen: who wrote in the card (`writersOf`). */
+  /** Every seat the host has seen: who wrote in the card (`writersOfClients`). */
   seats: readonly SeatRecord[]
   /** What the box starts with, unsent: a fresh column's (`Prefill`). */
   prefill: Prefill | undefined
@@ -467,7 +467,7 @@ export function CardEditor(p: {
   const writers =
     card === undefined
       ? []
-      : writersOf(textClients(session.cardText(card.id)), p.seats)
+      : writersOfClients(textClients(session.cardText(card.id)), p.seats)
   const others = card !== undefined && card.owner !== session.writer
   const { readOnly } = p
 

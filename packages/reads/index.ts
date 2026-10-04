@@ -26,6 +26,7 @@ import {
   type BaseRecord,
   type CardRecord,
   type CommandSummary,
+  type DigestRecord,
   type EntryId,
   type EntryLike,
   entryId,
@@ -68,7 +69,6 @@ import {
   COMMANDS,
   COMMANDS_KEY,
   DIGEST,
-  type DigestRecord,
   decodeCard,
   decodeChat,
   decodePinned,
@@ -93,7 +93,7 @@ import {
   renderableMessage,
   SEAT,
   STOP,
-} from "@pineta/marginalia"
+} from "@pineta/rules"
 import {
   type LiveDocHandle,
   type PlacesDocHandle,

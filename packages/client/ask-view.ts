@@ -10,6 +10,7 @@ import {
   askSpan,
   askStats,
   type DiffSpan,
+  type DigestRecord,
   type EntryId,
   firstLine,
   lastWord,
@@ -20,7 +21,6 @@ import {
   type TreeIndex,
   type WriterId,
 } from "@pineta/core"
-import type { DigestRecord } from "@pineta/marginalia"
 import { outcomeWords, workWords } from "./ask-words.ts"
 
 /** A column's messages as drawn: one on its own, or an ask's work together. */

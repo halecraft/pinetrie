@@ -4,13 +4,6 @@
 // through to the owner of your repo, or an archive's three parts.
 
 import { ERR, type Intent, type RootId, type WriterId } from "@pineta/core"
-import {
-  archivedIn,
-  displayName,
-  PARTICIPANT,
-  setRecord,
-  writesIn,
-} from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
 import {
   decodeCommand,
@@ -19,6 +12,13 @@ import {
   type WireCommand,
 } from "@pineta/protocol/codec"
 import { readArchive, readParticipantNames, readRoots } from "@pineta/reads"
+import {
+  archivedIn,
+  displayName,
+  PARTICIPANT,
+  setRecord,
+  writesIn,
+} from "@pineta/rules"
 import { type Basics, failed, type HostKeeper, messageOf } from "../basics.ts"
 import type { ControlSender } from "../control.ts"
 import type { Names } from "../names.ts"

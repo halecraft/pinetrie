@@ -3,12 +3,13 @@
 
 import {
   type AgentRun,
+  type DigestBody,
   type EntryId,
   type RailRow,
   railLandmarks,
   type WorkStats,
 } from "@pineta/core"
-import { type DigestBody, digestText } from "@pineta/marginalia"
+import { digestText } from "@pineta/rules"
 
 /**
  * The messages this view draws on their own, never inside a stretch: thread

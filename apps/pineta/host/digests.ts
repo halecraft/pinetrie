@@ -11,6 +11,8 @@
 
 import { type EntryId, indexAsks, promptOf, type RootId } from "@pineta/core"
 import type { Keeper } from "@pineta/keeper"
+import type { Agent } from "@pineta/pi"
+import { readDigests, readReading, readTreeIndex } from "@pineta/reads"
 import {
   DIGEST,
   digestOf,
@@ -19,9 +21,7 @@ import {
   planDigest,
   readsAsk,
   setRecord,
-} from "@pineta/marginalia"
-import type { Agent } from "@pineta/pi"
-import { readDigests, readReading, readTreeIndex } from "@pineta/reads"
+} from "@pineta/rules"
 import type { PresenceDocHandle } from "@pineta/schema"
 import type { Basics } from "./basics.ts"
 import { requestOutside } from "./outside.ts"

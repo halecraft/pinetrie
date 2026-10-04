@@ -6,7 +6,7 @@
 // their writer id.
 
 import { type TreeIndex, type WriterId, writersOf } from "@pineta/core"
-import { displayName } from "@pineta/marginalia"
+import { displayName } from "@pineta/rules"
 
 /**
  * The first people's colours: magenta, white and yellow, far apart, and apart

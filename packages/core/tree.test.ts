@@ -22,7 +22,6 @@ import {
   type PinnedView,
   type Position,
   pinnedInView,
-  planStop,
   projectColumns,
   projectRail,
   projectSpine,
@@ -31,7 +30,6 @@ import {
   type RailItem,
   ROOT,
   rootOf,
-  type StopRecord,
   startsRun,
   stretchSpan,
   tailEdit,
@@ -877,52 +875,6 @@ describe("tool calls: paired with their results on the path", () => {
   test("a branch's message count ignores tool results", () => {
     const { spine } = projectSpine(i, entryId("1-q"))
     expect(spine[0]?.branches).toEqual([{ rootId: "2-a", messageCount: 2 }])
-  })
-})
-
-describe("planStop", () => {
-  const i = indexTree({
-    ...tree({ "1-p": null }),
-    ...entriesOf([
-      entry("2-a", "1-p", { role: "assistant", content: "working" }),
-    ]),
-  })
-  const ada = writerId("ada")
-  const lane = (running: boolean) => ({
-    name: laneNameForThread("s"),
-    tip: entryId("2-a"),
-    running,
-    waiting: 0,
-    askedBy: null,
-    lastWaiting: null,
-  })
-  const facts = (stops: ReadonlyMap<EntryId, StopRecord> = new Map()) => ({
-    index: i,
-    stops,
-    by: ada,
-    now: 7,
-  })
-  const s = laneNameForThread("s")
-  test("a running lane is aborted, and its ask's stop recorded under its prompt", () => {
-    expect(planStop([lane(true)], s, facts())).toEqual({
-      kind: "abort",
-      record: { prompt: "1-p", by: ada, at: 7 },
-    })
-  })
-  test("the first stop recorded is kept: a second press records nothing", () => {
-    const first = new Map([
-      [entryId("1-p"), { prompt: entryId("1-p"), by: writerId("bea"), at: 1 }],
-    ])
-    expect(planStop([lane(true)], s, facts(first))).toEqual({
-      kind: "abort",
-      record: null,
-    })
-  })
-  test("an idle lane is already stopped; an unknown one is refused", () => {
-    expect(planStop([lane(false)], s, facts())).toEqual({ kind: "idle" })
-    expect(planStop([lane(true)], laneNameForThread("other"), facts())).toEqual(
-      { kind: "unknown" },
-    )
   })
 })
 

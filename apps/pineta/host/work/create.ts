@@ -22,16 +22,16 @@ import {
   removeLane,
   revsetName,
 } from "@pineta/lanes"
+import type { Agent } from "@pineta/pi"
+import { type RootView, readRevisions, readTreeIndex } from "@pineta/reads"
+import { beginFacts, type RepoOwner } from "@pineta/repo"
 import {
   type ForkBegin,
   forkPoint,
   LANE,
   planBegin,
   setRecord,
-} from "@pineta/marginalia"
-import type { Agent } from "@pineta/pi"
-import { type RootView, readRevisions, readTreeIndex } from "@pineta/reads"
-import { beginFacts, type RepoOwner } from "@pineta/repo"
+} from "@pineta/rules"
 import { type Basics, failed } from "../basics.ts"
 import { lockHashAt } from "./disk.ts"
 import type { LaneRegistry } from "./registry.ts"

@@ -7,12 +7,6 @@
 
 import type { ErrCode, LineAction, LineRecord, ValueWrite } from "@pineta/core"
 import type { LineConfig } from "@pineta/lanes"
-import {
-  LINE,
-  planLineAction,
-  planLineRecord,
-  setIfChanged,
-} from "@pineta/marginalia"
 import { readLine } from "@pineta/reads"
 import {
   lineProposal,
@@ -20,6 +14,12 @@ import {
   type RepoOps,
   type RepoOwner,
 } from "@pineta/repo"
+import {
+  LINE,
+  planLineAction,
+  planLineRecord,
+  setIfChanged,
+} from "@pineta/rules"
 import type { Basics } from "../basics.ts"
 
 export interface Line {

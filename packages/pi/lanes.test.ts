@@ -16,7 +16,7 @@ import {
   THE_AGENT,
   writerId,
 } from "@pineta/core"
-import { encodeChat, PINNED_RULE } from "@pineta/marginalia"
+import { encodeChat, PINNED_RULE } from "@pineta/rules"
 import { newRootDoc, readEntries, rowMessage } from "@pineta/schema"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
 import { createAgent, newId } from "./agent.ts"

@@ -1,12 +1,8 @@
 import { laneNameForThread, type Sha256, type ThreadName } from "@pineta/core"
 import { createKeeper } from "@pineta/keeper"
-import {
-  type BannerAsk,
-  NAME as NAME_RECORD,
-  setRecord,
-} from "@pineta/marginalia"
 import { type Agent, type Drawn, sha256Of } from "@pineta/pi"
 import { readBanners } from "@pineta/reads"
+import { type BannerAsk, NAME as NAME_RECORD, setRecord } from "@pineta/rules"
 import { describe, expect, test } from "vitest"
 import { createBanners } from "./banners.ts"
 import { memoryBlobs } from "./blobs.ts"

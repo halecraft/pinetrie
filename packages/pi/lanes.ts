@@ -22,7 +22,7 @@ import {
   NO_EDITOR,
   type RuntimeProgram,
 } from "@pineta/core"
-import { PINNED_RULE } from "@pineta/marginalia"
+import { PINNED_RULE } from "@pineta/rules"
 import { Type } from "typebox"
 import type { ModelSetup } from "./config.ts"
 import { buildSystemPrompt, ensureTool } from "./deep.ts"

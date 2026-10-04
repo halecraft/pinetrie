@@ -21,9 +21,9 @@ import {
   commitTurn,
   conflictedFilesAt,
 } from "@pineta/lanes"
-import { planTurnRecord, REVISION, setRecord } from "@pineta/marginalia"
 import type { Agent, LaneHooks } from "@pineta/pi"
 import { readTreeIndex } from "@pineta/reads"
+import { planTurnRecord, REVISION, setRecord } from "@pineta/rules"
 import { type Basics, failed } from "../basics.ts"
 import { snapshotOnQueue } from "./disk.ts"
 import type { Fetches } from "./fetch.ts"

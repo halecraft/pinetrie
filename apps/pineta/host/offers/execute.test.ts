@@ -6,8 +6,8 @@ import {
   type Placed,
   type ThreadName,
 } from "@pineta/core"
-import { offerRecord } from "@pineta/marginalia"
 import { offerEffects, takeEffects } from "@pineta/repo"
+import { offerRecord } from "@pineta/rules"
 import { describe, expect, test } from "vitest"
 import { methods, record } from "../fakes.ts"
 import { executeOffer, type OfferPorts } from "./execute.ts"

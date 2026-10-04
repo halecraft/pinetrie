@@ -8,8 +8,8 @@ import {
   type ThreadName,
   writerId,
 } from "@pineta/core"
-import { encodeChat, encodeUpdate } from "@pineta/marginalia"
 import { readTreeIndex } from "@pineta/reads"
+import { encodeChat, encodeUpdate } from "@pineta/rules"
 import { newRootDoc, writeEntry, writeLaneTip } from "@pineta/schema"
 import { describe, expect, test } from "vitest"
 import { basics, record, row } from "../fakes.ts"

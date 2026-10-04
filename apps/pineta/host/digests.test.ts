@@ -1,7 +1,7 @@
 import { entryId, laneNameForThread, runId, writerId } from "@pineta/core"
 import { createKeeper } from "@pineta/keeper"
-import { DIGEST, digestOf, setRecord } from "@pineta/marginalia"
 import { type Agent, SCRIPTED_DESCRIPTION } from "@pineta/pi"
+import { DIGEST, digestOf, setRecord } from "@pineta/rules"
 import {
   beginRun,
   endRun,

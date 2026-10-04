@@ -22,6 +22,14 @@ import type {
   WriterId,
 } from "@pineta/core"
 import type { LineConfig } from "@pineta/lanes"
+import type { Agent } from "@pineta/pi"
+import { readNames, readOffers, readRevisions } from "@pineta/reads"
+import {
+  fileDiff,
+  laneRefSteps,
+  type RepoOwner,
+  revisionRead,
+} from "@pineta/repo"
 import {
   answerDiff,
   answerReview,
@@ -31,15 +39,7 @@ import {
   offerStatus,
   planOfferRead,
   planYourEdits,
-} from "@pineta/marginalia"
-import type { Agent } from "@pineta/pi"
-import { readNames, readOffers, readRevisions } from "@pineta/reads"
-import {
-  fileDiff,
-  laneRefSteps,
-  type RepoOwner,
-  revisionRead,
-} from "@pineta/repo"
+} from "@pineta/rules"
 import { type Basics, failed } from "../basics.ts"
 import type { Line } from "../work/line.ts"
 import { act } from "./act.ts"

@@ -1,7 +1,7 @@
 # The host's shell: technical notes
 
 The host gathers facts, calls the pure decisions in the packages
-(`@pineta/marginalia`, `@pineta/reads`, `@pineta/schema`, `@pineta/lanes`),
+(`@pineta/rules`, `@pineta/reads`, `@pineta/schema`, `@pineta/lanes`),
 and carries them out. This directory is that imperative shell. Each module
 does one thing and takes its dependencies as a parameter; `index.ts` alone
 wires them.
@@ -377,7 +377,7 @@ rejects `shutdown()`.
   had a name already, so a column may send it again; an id pi holds is
   refused `lane_taken`.
 - **Stop records who pressed it before it aborts** (ADR-0056): `planStop`
-  gives the `pineta.stop` record for the running ask's prompt, unless one is
+  (`@pineta/rules`) gives the `pineta.stop` record for the running ask's prompt, unless one is
   there, and `handleStop` writes it, then asks pi to abort, in one step. So
   the record is there when the run's end is drawn, and the first press is
   the one named.
@@ -558,7 +558,7 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   gathers in its own command, unpinned, so it acts on the repo as it is.
 - **The host decides nothing and runs no jj on an offer.** Each step is a
   gather (`@pineta/repo`: `gatherRefresh`, `gatherOffer`, `gatherTake`,
-  `gatherStack`, `gatherDescribe`), a decision (marginalia: `planRefresh`,
+  `gatherStack`, `gatherDescribe`), a decision (`@pineta/rules`: `planRefresh`,
   `planOfferTake`, `planRebuild`, `planStackEnded`, `planDescribeSettle`),
   a translation into steps (`@pineta/repo`: `offerEffects`, `takeEffects`,
   `rebuildEffects`, `describeEffects`), and `executeOffer` (`execute.ts`),
@@ -606,7 +606,7 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   refusal of a backwards move is the second guard (S77 item 1).
 - **The `line` command** (`work/line.ts`, created by `startLaneWork` beside
   the offers, which rewrite its record when the owner observes the line or
-  your `@` move): decided by marginalia (`planLineAction`), its steps
+  your `@` move): decided by `@pineta/rules` (`planLineAction`), its steps
   `@pineta/repo`'s (`lineSteps`). `setup` creates the line's
   bookmark at your `@-` and writes `immutable_heads()` and `revsets.log`
   to the repo's config, the text the header's menu showed; `land` moves the line to your
@@ -624,8 +624,8 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 ## Testing the shell
 
 - **Test a decision as a value** where the shell has one: `planRunEnd`,
-  `planInvites`, `draftSent`, the responses, `planSettle`, and marginalia's
-  `planStartup`.
+  `planInvites`, `draftSent`, the responses, `planSettle`, and `planStartup`
+  (`@pineta/rules`).
 - **Otherwise, drive a module with `record<T>()`** for exactly the port it
   takes, and a real `newSessionDoc()`. A method the test did not give throws,
   naming itself, so a module that touches an undeclared port fails at once.
@@ -646,7 +646,7 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
     run's end compacts; stale command Lines are deleted at start; it serves
     only after `recover`;
   - `http.ts`: the request and upgrade handlers carry out a plan's refusal;
-  - `marginalia/chat.ts`'s `attributed`: the model is told who spoke, which
+  - `packages/rules/chat.ts`'s `attributed`: the model is told who spoke, which
     shows that pi's conversion sends `content`;
 - **Tests in subdirectories run**: `vitest.config.mjs` includes
   `apps/*/host/**/*.test.ts`.

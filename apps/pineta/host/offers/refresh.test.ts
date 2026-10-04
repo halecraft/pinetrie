@@ -23,10 +23,10 @@ import {
   offerBookmark,
   run,
 } from "@pineta/lanes"
-import { NAME, setRecord } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
 import { readBases, readOffers } from "@pineta/reads"
 import { startRepoOwner } from "@pineta/repo"
+import { NAME, setRecord } from "@pineta/rules"
 import { afterAll, expect, test } from "vitest"
 import { applyWrites, basics, putValue, record } from "../fakes.ts"
 import { createRefresh } from "./refresh.ts"

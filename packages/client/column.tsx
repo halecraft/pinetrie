@@ -10,6 +10,7 @@ import {
   type CardRecord,
   type ColumnView,
   conflictsAt,
+  type DigestRecord,
   type EntryId,
   type LaneView,
   messageAt,
@@ -29,12 +30,11 @@ import {
 } from "@pineta/core"
 import {
   cardsAt,
-  type DigestRecord,
   effectiveBase,
   type OfferButton,
   queuedOn,
   yourCard,
-} from "@pineta/marginalia"
+} from "@pineta/rules"
 import {
   type LiveDocHandle,
   readStreamText,

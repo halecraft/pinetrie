@@ -771,7 +771,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a live digest is asked with no one reading",
-    file: "packages/marginalia/digest.ts",
+    file: "packages/rules/digest.ts",
     from: "    input.reading &&\n",
     to: "",
     command: unit,

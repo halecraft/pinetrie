@@ -4,15 +4,15 @@
 
 import type { LaneName, NameRecord } from "@pineta/core"
 import { createKeeper } from "@pineta/keeper"
+import type { Agent } from "@pineta/pi"
+import { readLaneRecords, readNames } from "@pineta/reads"
 import {
   NAME,
   planNames,
   planReserve,
   type ReservePlan,
   setRecord,
-} from "@pineta/marginalia"
-import type { Agent } from "@pineta/pi"
-import { readLaneRecords, readNames } from "@pineta/reads"
+} from "@pineta/rules"
 import type { Basics } from "./basics.ts"
 
 export interface Names {

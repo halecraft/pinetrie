@@ -8,7 +8,7 @@ import type {
   ThreadBase,
   WriterId,
 } from "@pineta/core"
-import { catchUpName, displayName, type PinnedStatus } from "@pineta/marginalia"
+import { catchUpName, displayName, type PinnedStatus } from "@pineta/rules"
 import type { Refusal } from "./card-moves.ts"
 import type { PinnedMarker } from "./column-view.ts"
 import { lineWords, type Reader } from "./send.ts"

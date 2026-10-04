@@ -3,7 +3,7 @@
 // diff, each file's head pinned while its diff is in view. `review.ts` decides what it shows; `useFetched` reads.
 
 import type { RevisionReview } from "@pineta/core"
-import { decodeRevisionReview, diffUrl, reviewUrl } from "@pineta/marginalia"
+import { decodeRevisionReview, diffUrl, reviewUrl } from "@pineta/rules"
 import { memo, useEffect, useLayoutEffect, useRef, useState } from "react"
 import type { ReviewTarget } from "./column-view.ts"
 import {

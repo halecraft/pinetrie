@@ -1,5 +1,5 @@
 import { entryId, writerId } from "@pineta/core"
-import { deleteRecord, MARK, setRecord } from "@pineta/marginalia"
+import { deleteRecord, MARK, setRecord } from "@pineta/rules"
 import { writeEntry } from "@pineta/schema"
 import { expect, test } from "vitest"
 import { basics, putValue, ROOT_ID, record, row, writesOf } from "../fakes.ts"

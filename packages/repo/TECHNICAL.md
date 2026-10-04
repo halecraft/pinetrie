@@ -9,16 +9,16 @@ lane also runs, through a `Runner` it is given, stays in `lanes`
 client may not depend on it.
 
 What an offer or a `line` command means is decided in
-`@pineta/marginalia`, which this package cannot declare: marginalia returns
+`@pineta/rules`, which this package cannot declare: it returns
 each decision as a value typed in `@pineta/core` (`core/offers.ts`), this
 package reads the facts it is made from and turns it into steps, and the
 host connects the two. The rule all three packages keep:
 
 > Core holds the vocabulary (ids, intents, every record's type) and the
 > reads of the tree. A format or type that lanes or repo must read, write
-> or name lives in core too, since neither can declare @pineta/marginalia.
+> or name lives in core too, since neither can declare @pineta/rules.
 > What a stored shape says, and how the host changes it, is
-> @pineta/marginalia', whoever reads it. One client's own in-flight state
+> @pineta/rules', whoever reads it. One client's own in-flight state
 > (its moves, held roots, slot repair, commands out) is @pineta/session's.
 > What the page draws, and its words, is @pineta/client's.
 
@@ -112,8 +112,8 @@ operation is read once and kept until the head moves.**
   is at the moment of reading: the one file in the heads directory; any
   other (an outside write, two heads) is observed first. A write in the same
   step observes, so a read after it reads a fresh set.
-- **`yourEdits` is `files ∩ editing`**, decided in marginalia's
-  `offerRecord`: no lane reads `@`. `@` alone moving rewrites every open
+- **`yourEdits` is `files ∩ editing`**, decided in `offerRecord`
+  (`@pineta/rules`): no lane reads `@`. `@` alone moving rewrites every open
   record's from one shared read (`planYourEdits`).
 - **A lane on the line is read in one `jj log`** (`laneRead`): its tip, the
   newest commit carrying `Pineta-Base`, the newest line commit in its
@@ -178,7 +178,7 @@ operation is read once and kept until the head moves.**
 ## Offers in your repo (`offer.ts`, `offer-gather.ts`, `offer-steps.ts`, `plan.ts`, ADR-0038, ADR-0039)
 
 - **The host runs no jj on an offer.** Each of its offer steps is a gather
-  here, a decision in marginalia, a translation here (`offerEffects` and
+  here, a decision in `@pineta/rules`, a translation here (`offerEffects` and
   the rest), then the steps on the owner. A decision carries the facts its
   steps need (a `Placed`, the offer, its changes), so each kind has one
   translation and none that runs nothing because a case cannot occur.
@@ -313,7 +313,7 @@ operation is read once and kept until the head moves.**
   commits, reads as divergent, with only the change ids. Every read after
   the first names commits (S48 item 2). It returns facts, and the bookmark it
   found them under; `planRefresh`, `offerEdited` and `offerMoved`
-  (marginalia) decide what they mean.
+  (`@pineta/rules`) decide what they mean.
 - **Every revision's evolog is read, back to the host's newest version**
   (`evologOf`, one `jj evolog -T EVOLOG_ENTRY`; `walkToHost`, pure),
   through each version's predecessor of the same change. Each version an

@@ -8,7 +8,7 @@ import {
   createWriteTool,
 } from "@earendil-works/pi-agent-core"
 import type { BlobStore, LaneName } from "@pineta/core"
-import type { BannerAnswer, BannerAsk } from "@pineta/marginalia"
+import type { BannerAnswer, BannerAsk } from "@pineta/rules"
 import { BANNER_TOOL, bannerTool } from "./banner.ts"
 import { readImageProcessor } from "./images.ts"
 import { GUIDANCE_TOOL, guidanceTool, type LaneHooks } from "./lanes.ts"

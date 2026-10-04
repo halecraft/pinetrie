@@ -18,7 +18,6 @@ import {
   rootOf,
 } from "@pineta/core"
 import { DEFAULT_LINE, laneBase, type Runner, run } from "@pineta/lanes"
-import { deleteRecord, OFFER } from "@pineta/marginalia"
 import { scriptedModel } from "@pineta/pi"
 import {
   readLandings,
@@ -30,6 +29,7 @@ import {
   readRevisions,
 } from "@pineta/reads"
 import { startOfOffer } from "@pineta/repo"
+import { deleteRecord, OFFER } from "@pineta/rules"
 import { rowMessage } from "@pineta/schema"
 import type { Checks } from "../checks.ts"
 import {

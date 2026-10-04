@@ -9,7 +9,6 @@ import {
   type RootId,
   rootDocId,
 } from "@pineta/core"
-import { planHistorySweep } from "@pineta/marginalia"
 import {
   LIVE_DOC_ID,
   PLACES_DOC_ID,
@@ -22,6 +21,7 @@ import {
   readReferencedBlobs,
   readRoots,
 } from "@pineta/reads"
+import { planHistorySweep } from "@pineta/rules"
 import type { Basics } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
 import type { MoveHistories } from "./move-history.ts"

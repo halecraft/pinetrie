@@ -38,7 +38,7 @@ import {
   labelCommands,
   type ModelRef,
   withChatImages,
-} from "@pineta/marginalia"
+} from "@pineta/rules"
 import {
   asRootDoc,
   type RootDocHandle,

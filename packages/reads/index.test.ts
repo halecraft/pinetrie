@@ -8,7 +8,7 @@ import {
   runId,
   writerId,
 } from "@pineta/core"
-import { encodePinned } from "@pineta/marginalia"
+import { encodePinned } from "@pineta/rules"
 import {
   beginRun,
   newLiveDoc,

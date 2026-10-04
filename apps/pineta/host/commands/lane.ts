@@ -8,10 +8,8 @@ import {
   isBusy,
   type LaneName,
   type LineAction,
-  planStop,
   type WriterId,
 } from "@pineta/core"
-import { STOP, setRecord } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
 import type { Outcome } from "@pineta/protocol/codec"
 import {
@@ -21,6 +19,7 @@ import {
   readStops,
   readTreeIndex,
 } from "@pineta/reads"
+import { planStop, STOP, setRecord } from "@pineta/rules"
 import type { Basics } from "../basics.ts"
 import type { Runs } from "../runs.ts"
 import type { LaneWork } from "../work/index.ts"

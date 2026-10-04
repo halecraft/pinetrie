@@ -2,7 +2,7 @@
 // a commit, and its readers.
 //
 // A format or type that lanes or repo must read, write or name lives in core
-// too, since neither can declare @pineta/marginalia. This file holds the
+// too, since neither can declare @pineta/rules. This file holds the
 // trailers: what a turn's revision, a lane's base, an offer and its ledger
 // carry, written and read here alone, so `trailers.test.ts` reads back every
 // message it writes. A revset that finds commits by a trailer is

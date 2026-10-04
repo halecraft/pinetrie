@@ -23,7 +23,6 @@ import {
   type PlanMode,
   type Position,
   type RevisionRecord,
-  type StopRecord,
   type WriterId,
 } from "./index.ts"
 import { subjectOf, toolLabel, wholeToolLabel } from "./tools.ts"
@@ -1228,58 +1227,6 @@ export function threadOf(
     race: raceAlong(index, at.id, end, send.me),
   }
 }
-
-/** What stopping a thread's lane does (`planStop`). */
-export type StopPlan =
-  | {
-      readonly kind: "abort"
-      /** Who stopped the ask; null when it is recorded already. */
-      readonly record: StopRecord | null
-    }
-  | { readonly kind: "idle" }
-  | { readonly kind: "unknown" }
-
-/**
- * What stopping a thread's lane does: abort its running turn, recording who
- * stopped its ask (ADR-0056), unless someone's stop is recorded already, so
- * the first press is the one named; nothing when it is idle (stopping is
- * idempotent); refused for a lane that does not exist. Pure.
- */
-export function planStop(
-  lanes: readonly LaneView[],
-  lane: LaneName,
-  facts: {
-    readonly index: TreeIndex
-    readonly stops: ReadonlyMap<EntryId, StopRecord>
-    readonly by: WriterId
-    readonly now: number
-  },
-): StopPlan {
-  const found = lanes.find(l => l.name === lane)
-  if (found === undefined) return { kind: "unknown" }
-  if (!found.running) return { kind: "idle" }
-  const prompt = promptOf(facts.index, found.tip)
-  return {
-    kind: "abort",
-    record:
-      prompt === null || facts.stops.has(prompt)
-        ? null
-        : { prompt, by: facts.by, at: facts.now },
-  }
-}
-
-/**
- * Whether a message with no mention asks the agent: in a thread with a lane,
- * or from a Start Agent column. A branch is a new thread, with no lane of its
- * own yet, so only a Start Agent column makes it ask (ADR-0021). A branch from
- * agent work asks through the `@agent ` its composer starts with.
- */
-export const agentByDefault = (send: {
-  readonly mode: PlanMode
-  readonly lane: ThreadLane
-  readonly asksAgent: boolean
-}): boolean =>
-  (send.mode !== "branch" && send.lane.kind === "lane") || send.asksAgent
 
 /**
  * The newest compelled chat by someone other than `me` on the path from `at`

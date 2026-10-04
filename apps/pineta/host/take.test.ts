@@ -10,9 +10,9 @@ import {
   runId,
   writerId,
 } from "@pineta/core"
-import { encodeCard } from "@pineta/marginalia"
 import type { Outcome } from "@pineta/protocol/codec"
 import { readPlaces, readPlacesRev } from "@pineta/reads"
+import { encodeCard } from "@pineta/rules"
 import { beginRun, newPlacesDoc } from "@pineta/schema"
 import { describe, expect, test } from "vitest"
 import type { CardPort } from "./cards.ts"

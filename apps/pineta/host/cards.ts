@@ -11,8 +11,8 @@
 import { type Exchange, type Store, whenHydrated } from "@kyneta/exchange"
 import { subscribe } from "@kyneta/schema"
 import type { CardId, WriterId } from "@pineta/core"
-import { writersOf } from "@pineta/marginalia"
 import { readSeats } from "@pineta/reads"
+import { writersOfClients } from "@pineta/rules"
 import {
   cardDocId,
   type SessionDocHandle,
@@ -85,7 +85,7 @@ export function startCards(input: {
   }
   return {
     async writers(id) {
-      return writersOf(
+      return writersOfClients(
         textClients(await text(cardDocId(id))),
         readSeats(session),
       )

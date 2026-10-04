@@ -1,6 +1,6 @@
 import type { Sha256 } from "@pineta/core"
 import { commitId } from "@pineta/core"
-import { diffUrl, reviewUrl } from "@pineta/marginalia"
+import { diffUrl, reviewUrl } from "@pineta/rules"
 import { describe, expect, test } from "vitest"
 import { KEY_COOKIE, type RequestFacts } from "./admission.ts"
 import { planRequest, planUpgrade, route } from "./routes.ts"

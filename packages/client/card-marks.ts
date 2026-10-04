@@ -17,7 +17,7 @@ import {
   type TreeIndex,
   type WriterId,
 } from "@pineta/core"
-import { cardEnd } from "@pineta/marginalia"
+import { cardEnd } from "@pineta/rules"
 import { needsCard } from "./card-state.ts"
 import { type Layout, tabBar, tabOfColumn } from "./layout.ts"
 import { AGENT_PREFILL } from "./message-tools.ts"

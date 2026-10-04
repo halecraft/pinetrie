@@ -1,8 +1,8 @@
 // host/work — lanes' containers and disks, as the host carries them out
 // (ADR-0032 to ADR-0034, ADR-0038).
 //
-// The decisions are pure and live in core, marginalia, lanes and
-// `@pineta/repo`; these modules gather what they need, call them, and
+// The decisions are pure and live in `@pineta/core`, `@pineta/rules`,
+// `@pineta/lanes` and `@pineta/repo`; these modules gather what they need, call them, and
 // execute. What is not in the
 // document, in jj, or on a lane's disk is held here: what startup found
 // (`Setup`), each lane's handle (`LaneRegistry`), and each coordination set in

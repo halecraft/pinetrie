@@ -3,9 +3,9 @@
 // ADR-0060).
 //
 // A format or type that lanes or repo must read, write or name lives in core
-// too, since neither can declare @pineta/marginalia. This file holds the
+// too, since neither can declare @pineta/rules. This file holds the
 // facts `repo` reads of an offer and the decisions it carries out:
-// marginalia decides from the one and returns the other, and neither package
+// `@pineta/rules` decides from the one and returns the other, and neither package
 // imports the other.
 
 import type {
@@ -21,7 +21,7 @@ import type {
 /**
  * What a revision's evolog says since the host's newest version of it
  * (`readOffer` in `@pineta/repo` reads it, `revisionEdited` in
- * `@pineta/marginalia` decides from it): whether the walk back reached a
+ * `@pineta/rules` decides from it): whether the walk back reached a
  * version the host made, and whether a version an operation not the host's
  * made on the way changed it. Read from the repo, never from a record the
  * host kept, which can be lost after its jj steps landed (S73).
@@ -60,7 +60,7 @@ export interface OfferSeen {
 /**
  * An offer as your repo holds it now (`readOffer` in `@pineta/repo`): all
  * the host decides an offer from. Facts only; what they mean is decided in
- * `@pineta/marginalia` (`planRefresh`, `offerEdited`, `offerMoved`) and
+ * `@pineta/rules` (`planRefresh`, `offerEdited`, `offerMoved`) and
  * `isWipLine` (`trailers.ts`). A divergent offer is only its change ids: the repair needs
  * nothing more, and every other read would name one of two commits.
  */
@@ -203,7 +203,7 @@ export interface StackFacts {
   readonly differing: readonly string[]
 }
 
-// ── what marginalia decides, and `@pineta/repo` carries out ───────────────
+// ── what `@pineta/rules` decides, and `@pineta/repo` carries out ──────────
 
 /**
  * An offer built anew at `place` from `sources`, after abandoning `changes`:

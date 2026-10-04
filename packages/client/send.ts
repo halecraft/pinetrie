@@ -5,7 +5,6 @@
 
 import {
   type Address,
-  agentByDefault,
   type CardCommand,
   type CardId,
   type ChatMode,
@@ -22,8 +21,13 @@ import {
   type WorkSetting,
   type WriterId,
 } from "@pineta/core"
-import { addressChat, displayName, parseCommand } from "@pineta/marginalia"
 import type { Outcome } from "@pineta/protocol/codec"
+import {
+  addressChat,
+  agentByDefault,
+  displayName,
+  parseCommand,
+} from "@pineta/rules"
 import type { Prefill } from "./columns.ts"
 
 /** How a chat is sent: its mode, its column's lane, and its send id. */
@@ -226,8 +230,8 @@ export interface SendPlan {
 
 /**
  * What a composer's next send does, decided as the host will decide it: who
- * the message is for is `addressChat`, which `planChat` runs too, over the
- * thread `threadOf` gives (ADR-0021).
+ * the message is for is `addressChat`, which `@pineta/rules`' `planChat`
+ * runs too, over the thread `threadOf` gives (ADR-0021).
  *
  * - A fresh column sends `branch`. Elsewhere, a send to a busy lane, plain or
  *   asking the agent, queues its card behind the others; so does a card with

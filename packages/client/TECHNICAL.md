@@ -708,7 +708,7 @@ became of its files (`strip`).
   With no revisions at all (a host without a project), every asked message
   falls back, and the whole path reads as the column's lane.
 - **What a catch-up merges is worded by `catchUpName` alone**
-  (`@pineta/marginalia`, ADR-0061, ADR-0072): the line is "the project", a
+  (`@pineta/rules`, ADR-0061, ADR-0072): the line is "the project", a
   WIP its bookmark, the thread a thread branched from its name. The words
   take core's `CatchUpFrom`, never a bookmark string, and the line's
   bookmark goes only in titles: `offerWords`' button titles ("moves
@@ -750,7 +750,7 @@ became of its files (`strip`).
   `sent` or `said`). A take in flight names its destination by
   `catchUpName`; a refusal or failure is `outcomeWords`, shared with the
   project menu.
-- **`offerView` (`@pineta/marginalia`) decides an offer; `offerWords`
+- **`offerView` (`@pineta/rules`) decides an offer; `offerWords`
   words it**: its line and each button's label and title, by state. An
   offer that conflicts says so even when it is `edited` (S73), and its take
   reads "add anyway" whatever the state, as it does when a resolution asked
@@ -1079,7 +1079,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   the thread (the column's bound lane, or its end), over `readLanes` and
   `readParticipants`, the reads the host decides from. `planSend` (`send.ts`)
   decides the rest: who the message is for is `addressChat`
-  (`@pineta/marginalia`), the function `planChat` runs on the host, so the
+  (`@pineta/rules`), the function `planChat` runs on the host, so the
   button cannot promise a reply the host will not start. `SendPlan.to` is
   `addressChat`'s `Address`, unchanged. A fresh column sends `branch`; a
   send to a busy lane (`isBusy`), plain or asking the agent, and a card
@@ -1308,7 +1308,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   the host carries the command out when it takes it.
 - **Land, update and stack messages** show as one line each, roles `land`
   ("catching up"), `update` ("caught up") and `stack`. The update's line
-  is marginalia's `updateLine`, which names what it merged by
+  is `updateLine` (`@pineta/rules`), which names what it merged by
   `catchUpName`.
 - **The page header counts offers open** in your repo ("work ready to add to
   the project"), as it counts mentions, and the agent's running threads;
@@ -1355,7 +1355,7 @@ One review is open at a time.
   never stored, and is reset during render when the strip's `review` goes
   (a take, a withdrawal), so no frame draws a review that is gone. Hiding
   it instead would let the next offer open it unasked.
-- **Every URL names its commits** (`reviewUrl`, `diffUrl`, `@pineta/marginalia`),
+- **Every URL names its commits** (`reviewUrl`, `diffUrl`, `@pineta/rules`),
   and the answer is immutable, so the browser's HTTP cache is the only
   cache and `useFetched` has no refetch rule. The record's `commits` is what
   changes; the page never keys on its `at`, which every trigger rewrites.
@@ -1579,7 +1579,7 @@ places, the session or someone else's inventory throws before it is made.
 - **The editor's unmount clears its binding's handle** as well as detaching:
   StrictMode mounts twice, and a stale handle leaves the second mount
   unbound.
-- **Who wrote in a card** is `writersOf(textClients(cardText), seats)`: its
+- **Who wrote in a card** is `writersOfClients(textClients(cardText), seats)`: its
   Yjs `clientID`s, through the host's seat records (`readSessionFacts`
   reads them). Provisional (ADR-0048): undo does not remove a `clientID`, so
   someone who undid everything they wrote is still named. Step 6 replaces it

@@ -13,6 +13,8 @@ import {
   type SentCard,
   type StreamEvent,
 } from "@pineta/core"
+import type { Agent } from "@pineta/pi"
+import { readLatestPrompt } from "@pineta/reads"
 import {
   CHAT_TYPE,
   type ChatMessage,
@@ -20,9 +22,7 @@ import {
   type PinnedMessage,
   type StackMessage,
   settleRun,
-} from "@pineta/marginalia"
-import type { Agent } from "@pineta/pi"
-import { readLatestPrompt } from "@pineta/reads"
+} from "@pineta/rules"
 import {
   applyStreamOps,
   beginRun,

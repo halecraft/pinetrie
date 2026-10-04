@@ -10,6 +10,7 @@ import {
   type AgentRun,
   type AskIndex,
   compactRail,
+  type DigestBody,
   type EntryId,
   messageAt,
   PENDING_TRACK,
@@ -20,7 +21,6 @@ import {
   type TreeIndex,
   type WriterId,
 } from "@pineta/core"
-import type { DigestBody } from "@pineta/marginalia"
 import {
   type ComponentProps,
   type CSSProperties,

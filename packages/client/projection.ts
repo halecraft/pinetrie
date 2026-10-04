@@ -17,6 +17,7 @@ import {
   type ArchiveRecord,
   type AskIndex,
   type CardRecord,
+  type DigestRecord,
   type EntryId,
   indexAsks,
   type LaneName,
@@ -27,7 +28,6 @@ import {
   type StopRecord,
   type TreeIndex,
 } from "@pineta/core"
-import type { DigestRecord } from "@pineta/marginalia"
 import {
   readAgentActivity,
   readArchive,

@@ -10,7 +10,7 @@
 // would be refused (S82).
 
 import { batch } from "@kyneta/schema"
-import { encodeCard, type PlaceStep } from "@pineta/marginalia"
+import { encodeCard, type PlaceStep } from "@pineta/rules"
 import type { PlacesDocHandle } from "@pineta/schema"
 
 /** Run a write as one step of an undo stack (`MoveHistories.gesture`). */

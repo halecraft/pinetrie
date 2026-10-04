@@ -21,7 +21,7 @@ import { type CardId, cardId } from "@pineta/core"
 
 /**
  * A card's record as flat strings, "" for none, decoded in
- * `@pineta/marginalia` (`decodeCard`). One leaf (`.json()`), since the host
+ * `@pineta/rules` (`decodeCard`). One leaf (`.json()`), since the host
  * always writes a record whole.
  */
 const StoredCard = Schema.struct.json({

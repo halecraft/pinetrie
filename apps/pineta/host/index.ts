@@ -17,12 +17,6 @@ import { WebsocketServerTransport } from "@kyneta/websocket-transport/server"
 import type { BlobStore, CardId, LaneName } from "@pineta/core"
 import { createKeeper } from "@pineta/keeper"
 import { userConfigFile } from "@pineta/lanes"
-import {
-  decodeBannerConfig,
-  decodeCommandRenames,
-  decodeDigestConfig,
-  decodeTitleConfig,
-} from "@pineta/marginalia"
 import { type Agent, createAgent, type ModelChoice, newId } from "@pineta/pi"
 import { Control } from "@pineta/protocol/line"
 import {
@@ -40,6 +34,12 @@ import {
   readRunning,
   readThreadName,
 } from "@pineta/reads"
+import {
+  decodeBannerConfig,
+  decodeCommandRenames,
+  decodeDigestConfig,
+  decodeTitleConfig,
+} from "@pineta/rules"
 import {
   asSessionDoc,
   cardDocId,

@@ -57,7 +57,7 @@ index after that carries the brand (S95). Presence's `reading` and `typing`
 values are thread ends, written by clients: `presenceField` mints them too.
 Lane names, lane tips and run ids are branded one layer down, by
 `@pineta/schema`'s readers (`readLaneNames`, `readLaneTip`, `readActiveRun`),
-and each record's ids by its decoder in `@pineta/marginalia`. `entryId` is
+and each record's ids by its decoder in `@pineta/rules`. `entryId` is
 the identity at run time, so the frozen entries and the index's cache are
 unchanged by it.
 
@@ -69,13 +69,13 @@ through its card port). `planSweep` decides which
 stored images to delete from it.
 
 **Each record reader is `readRecords(doc, SPEC)`** (ADR-0062): the
-record's values decoded by its marginalia spec and keyed by their address.
+record's values decoded by its spec in `@pineta/rules` and keyed by their address.
 A reader keeps its own name and return type, and shapes the map only where
 its readers want something else: `readSeats` and `readLandings` sort,
 `readNames` and `readParticipantNames` give the name alone, and the
 singletons (`readLine`, `readProject`, `readCommands`) take their one key.
 
-It declares core, schema and marginalia only (`workspace.test.ts`), so it runs
+It declares core, schema and rules only (`workspace.test.ts`), so it runs
 in the host and in the browser alike: no pi, no transport.
 
 A read caches only by an object Kyneta keeps while its content is unchanged

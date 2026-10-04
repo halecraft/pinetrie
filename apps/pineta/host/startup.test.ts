@@ -10,14 +10,14 @@ import {
   writerId,
 } from "@pineta/core"
 import { createKeeper } from "@pineta/keeper"
+import { readPlaces, readPlacesRev } from "@pineta/reads"
 import {
   deleteRecord,
   encodeCard,
   PROJECT,
   SEAT,
   setRecord,
-} from "@pineta/marginalia"
-import { readPlaces, readPlacesRev } from "@pineta/reads"
+} from "@pineta/rules"
 import { newPlacesDoc, writeLaneTip } from "@pineta/schema"
 import { expect, test } from "vitest"
 import { basics, putValue, ROOT_ID, record, writesOf } from "./fakes.ts"

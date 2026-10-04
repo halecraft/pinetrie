@@ -1,6 +1,6 @@
 import { entryId, laneNameForThread, runId, writerId } from "@pineta/core"
-import { STOP, setRecord } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
+import { STOP, setRecord } from "@pineta/rules"
 import { beginRun, writeEntry, writeLaneTip } from "@pineta/schema"
 import { expect, test } from "vitest"
 import {

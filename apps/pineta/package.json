@@ -21,11 +21,11 @@
     "@pineta/core": "workspace:*",
     "@pineta/keeper": "workspace:*",
     "@pineta/lanes": "workspace:*",
-    "@pineta/marginalia": "workspace:*",
     "@pineta/pi": "workspace:*",
     "@pineta/protocol": "workspace:*",
     "@pineta/reads": "workspace:*",
     "@pineta/repo": "workspace:*",
+    "@pineta/rules": "workspace:*",
     "@pineta/schema": "workspace:*",
     "vite": "7.1.11",
     "ws": "^8.18.0"

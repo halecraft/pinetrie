@@ -11,9 +11,9 @@ import {
   type ValueWrite,
   writerId,
 } from "@pineta/core"
-import { LANE, ROOT, setRecord } from "@pineta/marginalia"
 import type { ThreadLaneHandle, WriteOutcome } from "@pineta/pi"
 import { readLaneRecords, readRootRecord, readRoots } from "@pineta/reads"
+import { LANE, ROOT, setRecord } from "@pineta/rules"
 import {
   type LiveDocHandle,
   newLiveDoc,

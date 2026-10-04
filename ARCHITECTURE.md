@@ -31,7 +31,7 @@ browser ──commands (Kyneta Line)──▶ host ──▶ pi agent core
 | `schema` | the document's shape |
 | `pi` | the only package that imports pi |
 | `protocol` | the wire contract |
-| `marginalia` | chat, notes and offers, and the plans over them |
+| `rules` | each stored shape and the pure rules about it |
 | `reads` | document reads shared by host and client |
 | `lanes` | containers, disks, jj and git |
 | `client` | the browser UI |

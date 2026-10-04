@@ -18,7 +18,7 @@ import {
   type BannerAsk,
   DEFAULT_BANNER,
   encodeChat,
-} from "@pineta/marginalia"
+} from "@pineta/rules"
 import {
   newRootDoc,
   type RootDocHandle,

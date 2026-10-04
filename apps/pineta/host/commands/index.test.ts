@@ -8,10 +8,10 @@ import {
   writerId,
 } from "@pineta/core"
 import { createKeeper } from "@pineta/keeper"
-import { ARCHIVE, setRecord } from "@pineta/marginalia"
 import type { WireCommand } from "@pineta/protocol/codec"
 import type { Reply } from "@pineta/protocol/messages"
 import { readPlaces } from "@pineta/reads"
+import { ARCHIVE, setRecord } from "@pineta/rules"
 import { writeEntry } from "@pineta/schema"
 import { expect, test } from "vitest"
 import type { HostKey } from "../basics.ts"

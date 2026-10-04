@@ -19,7 +19,7 @@ import {
   type TreeIndex,
   type WriterId,
 } from "@pineta/core"
-import { displayName, offerStatus } from "@pineta/marginalia"
+import { displayName, offerStatus } from "@pineta/rules"
 import type { Column } from "./columns.ts"
 import type { Intent } from "./intent.ts"
 import type { ActiveTab } from "./layout.ts"
