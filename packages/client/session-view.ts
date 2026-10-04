@@ -259,6 +259,11 @@ export interface SessionClient {
    */
   mark(entry: EntryId, title: string | null): Promise<Outcome>
   /**
+   * Ask a model for the title of the held root whose root entry is `root`
+   * (ADR-0074): it arrives as the root's mark.
+   */
+  retitle(root: EntryId): Promise<Outcome>
+  /**
    * An offer action on a lane's offer in your repo; a take names its
    * destination bookmark, null for the default, and the offer as this tab's
    * record shows it (`offerSeen`). Tracked in `acting`.
@@ -279,11 +284,13 @@ export interface SessionClient {
  * What the host is asked for that is neither tracked nor needs a root found:
  * a chat and a move are tracked in `moves`, an undo of moves waits for this
  * tab's copy of the places, an offer action and a line action are tracked
- * in `acting`, and a mark needs its entry's root.
+ * in `acting`, and a mark and a retitle need their entry's root.
  */
 export type HostRequest = Exclude<
   Intent,
-  { kind: "chat" | "move" | "undo-move" | "mark" | "offer" | "line" }
+  {
+    kind: "chat" | "move" | "undo-move" | "mark" | "retitle" | "offer" | "line"
+  }
 >
 
 /** A card to create: the session makes you its owner and placer. */
@@ -521,6 +528,11 @@ export async function connectSession(
       const root = roots.rootOf(entry)
       if (root === undefined) return Promise.resolve(NO_ROOT)
       return send({ kind: "mark", root, entry, title })
+    },
+    retitle(entry) {
+      const root = roots.rootOf(entry)
+      if (root === undefined) return Promise.resolve(NO_ROOT)
+      return send({ kind: "retitle", root })
     },
     createCard(card, text, how = OFF_PAGE) {
       undo.gesture(() => {

@@ -15,7 +15,7 @@ import path from "node:path"
 import { atEntry, entryId, ROOT } from "@pineta/core"
 import { readRevisions } from "@pineta/reads"
 import type { Checks } from "../checks.ts"
-import { containerProblem, rootRecordsOf } from "../harness.ts"
+import { containerProblem, rootRecordsOf, SUITE_CONFIG } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
 import {
   BRANCH,
@@ -42,7 +42,7 @@ async function sharedSection(check: Checks["check"]): Promise<void> {
   const userConfig = path.join(path.dirname(store), "config.json")
   writeFileSync(
     userConfig,
-    JSON.stringify({ lanes: { shared: [".plans", ".jj/x"] } }),
+    JSON.stringify({ ...SUITE_CONFIG, lanes: { shared: [".plans", ".jj/x"] } }),
   )
   let h = await sectionHost({
     files: { "shared.txt": "one\n" },

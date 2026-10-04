@@ -11,7 +11,6 @@ import { PLACES_DOC_ID } from "@pineta/protocol/messages"
 import { inventoryDocId } from "@pineta/protocol/writers"
 import { readPlaces, readSeats } from "@pineta/reads"
 import { cardDocId, InventoryDoc, PlacesDoc } from "@pineta/schema"
-import { startHost } from "../../host/index.ts"
 import { openStore } from "../../host/store.ts"
 import type { Checks } from "../checks.ts"
 import {
@@ -22,6 +21,7 @@ import {
   queueCard,
   refusedWrite,
   rootAt,
+  startSuiteHost,
   tipIn,
   treeOf,
   unqueueCard,
@@ -44,7 +44,7 @@ async function run(check: Checks["check"]): Promise<void> {
     )
     const script = scriptedModel()
     const open = () =>
-      startHost({
+      startSuiteHost({
         model: { kind: "scripted", script },
         store: dbFile,
         log: () => {},
@@ -558,7 +558,7 @@ async function run(check: Checks["check"]): Promise<void> {
     // The empty card's text loads late, so a host that served before its
     // sweep finished would still hold the card.
     const reopened = openStore(dbFile)
-    ch = await startHost({
+    ch = await startSuiteHost({
       model: { kind: "scripted", script },
       store: slowToLoad(reopened.store, cardDocId(empty), LATE_LOAD_MS),
       blobs: reopened.blobs,

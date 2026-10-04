@@ -6,13 +6,13 @@ import path from "node:path"
 import { ancestry, ROOT } from "@pineta/core"
 import { scriptedModel } from "@pineta/pi"
 import { readLaneRecords, readPlaces } from "@pineta/reads"
-import { startHost } from "../../host/index.ts"
 import type { Checks } from "../checks.ts"
 import {
   committedProject,
   idleNow,
   join,
   lanesOf,
+  startSuiteHost,
   treeOf,
   waitFor,
 } from "../harness.ts"
@@ -35,7 +35,7 @@ async function run(check: Checks["check"]): Promise<void> {
       mkdtempSync(path.join(tmpdir(), "pineta-elsewhere-")),
     )
     const script = scriptedModel()
-    const dh = await startHost({
+    const dh = await startSuiteHost({
       model: { kind: "scripted", script },
       tools: { project },
       containers: false,

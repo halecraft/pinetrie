@@ -3,6 +3,8 @@
 
 import {
   type EntryId,
+  type LaneName,
+  type LaneRecord,
   NO_TEXT,
   parseTitle,
   type RootId,
@@ -72,15 +74,27 @@ export const firstLinesOf = (
 ): ReadonlyMap<EntryId, string> =>
   new Map(withEntries(directory).map(r => [r.entry, r.firstLine]))
 
+/** What an untitled root no agent has worked in is called (ADR-0074). */
+export const CHAT_LABEL = "Chat"
+
 /**
- * Every root's label, by its root entry: its title, else its first line.
- * `App` builds it once per change, and the tabs, the header, the inbox and
- * the Archive tab look labels up in it.
+ * Every root's label, by its root entry: its title; else, for a root no lane
+ * works in (only people have written there), `CHAT_LABEL`; else its first
+ * line. `App` builds it once per change, and the tabs, the header, the inbox
+ * and the Archive tab look labels up in it.
  */
-export const labelsOf = (
+export function labelsOf(
   directory: ReadonlyMap<RootId, RootRecord>,
-): ReadonlyMap<EntryId, string> =>
-  new Map(withEntries(directory).map(r => [r.entry, r.title ?? r.firstLine]))
+  lanes: ReadonlyMap<LaneName, LaneRecord>,
+): ReadonlyMap<EntryId, string> {
+  const worked = new Set([...lanes.values()].map(l => l.root))
+  return new Map(
+    withEntries(directory).map(r => [
+      r.entry,
+      r.title ?? (worked.has(r.root) ? r.firstLine : CHAT_LABEL),
+    ]),
+  )
+}
 
 export type TitlePlan =
   | { readonly kind: "refuse" }

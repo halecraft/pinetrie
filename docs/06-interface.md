@@ -129,11 +129,14 @@ ever in the context of another. That is where the screen splits.
   starts does not, and reaches you through the header, a mention, or the
   Archive tab.
 - **A tab's label** is its title, else its first message's first line, cut
-  short. **Rename** in the tab's `⋯` turns the label into a field: Enter or
-  leaving it saves the title for everyone, Escape cancels, and an empty title
-  brings back the first line. A title is a mark on the root (ADR-0045), and
-  names the root wherever it is shown: the header, the inbox, the Archive
-  tab.
+  short; a root only people have written in, untitled, is **Chat**. When the
+  agent is first asked in a root with no title, a model titles it in one to
+  three words (ADR-0074). **Rename** in the tab's `⋯` turns the label into a
+  field: Enter or leaving it saves the title for everyone, Escape cancels,
+  and an empty title brings back the first line. **Auto-update title**, beside
+  it, asks the model again from what was said in the thread, and replaces the
+  title for everyone. A title is a mark on the root (ADR-0045), and names the
+  root wherever it is shown: the header, the inbox, the Archive tab.
 - **A tab shows what happens in it while you are elsewhere:** a pulse while the
   agent is working there, and small avatars of the others reading there. For
   the roots you have not opened, the header shows the same. A small dot in

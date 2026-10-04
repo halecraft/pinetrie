@@ -278,16 +278,37 @@ function found(
 }
 
 /**
- * One request outside every thread, on `describeModel`: an offer's commit
- * message (ADR-0038) or an ask's digest (ADR-0056). No tools, no session,
- * so nothing enters the tree or a lane's context. Null when it fails.
+ * The model a root's title is asked of (ADR-0074): `named`, unless it is
+ * null, the model is scripted (whose describe provider answers every request
+ * outside a thread), or pi has no such model. `found` is false only for
+ * the last, which the host logs.
+ */
+export function titleModelOf(
+  setup: Pick<ModelSetup, "models" | "describeModel">,
+  named: { readonly provider: string; readonly model: string } | null,
+  scripted: boolean,
+): { readonly model: Model; readonly found: boolean } {
+  if (named === null || scripted)
+    return { model: setup.describeModel, found: true }
+  const model = setup.models.getModel(named.provider, named.model)
+  return model === undefined
+    ? { model: setup.describeModel, found: false }
+    : { model, found: true }
+}
+
+/**
+ * One request outside every thread, on `model`: an offer's commit message
+ * (ADR-0038), an ask's digest (ADR-0056) or a root's title (ADR-0074). No
+ * tools, no session, so nothing enters the tree or a lane's context. Null
+ * when it fails.
  */
 export async function complete(
-  setup: Pick<ModelSetup, "models" | "describeModel">,
+  setup: Pick<ModelSetup, "models">,
+  model: Model,
   request: { readonly system: string; readonly user: string },
 ): Promise<string | null> {
   try {
-    const reply = await setup.models.completeSimple(setup.describeModel, {
+    const reply = await setup.models.completeSimple(model, {
       systemPrompt: request.system,
       messages: [
         { role: "user", content: request.user, timestamp: Date.now() },

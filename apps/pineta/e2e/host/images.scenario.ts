@@ -5,7 +5,6 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { cardId, type ImageRef, type LaneName, ROOT } from "@pineta/core"
 import { scriptedModel, sha256Of } from "@pineta/pi"
-import { startHost } from "../../host/index.ts"
 import { openStore } from "../../host/store.ts"
 import type { Checks } from "../checks.ts"
 import {
@@ -14,6 +13,7 @@ import {
   laneNamesOf,
   queueCard,
   rootAt,
+  startSuiteHost,
   waitFor,
 } from "../harness.ts"
 import { BLUE_PNG, GREEN_PNG, RED_PNG, YELLOW_PNG } from "../images.ts"
@@ -35,7 +35,7 @@ async function run(check: Checks["check"]): Promise<void> {
     let opened = openStore(dbFile)
     const GRACE_MS = 1_500
     const start = () =>
-      startHost({
+      startSuiteHost({
         model: { kind: "scripted", script },
         store: opened.store,
         blobs: opened.blobs,

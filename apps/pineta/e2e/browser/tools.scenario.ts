@@ -25,7 +25,6 @@ import {
   readPlaces,
   readProject,
 } from "@pineta/reads"
-import { startHost } from "../../host/index.ts"
 import type { Checks } from "../checks.ts"
 import {
   committedProject,
@@ -33,6 +32,7 @@ import {
   join,
   lanesOf,
   setUpLine,
+  startSuiteHost,
   treeOf,
   waitFor,
 } from "../harness.ts"
@@ -74,11 +74,10 @@ async function run(
         "notes.txt": "hello\n",
       })
       const script = scriptedModel({ tokensPerSecond: 400 })
-      const askHost = await startHost({
+      const askHost = await startSuiteHost({
         model: { kind: "scripted", script },
         tools: { project: work },
         containers: false,
-        userConfig: path.join(work, "no-user-config.json"),
         log: () => {},
       })
       const ap = await (await browser.newContext()).newPage()
@@ -368,11 +367,9 @@ async function run(
       })
       // Slow enough that a reply is seen while it is still being written.
       const script = scriptedModel({ tokensPerSecond: 60 })
-      const toolHost = await startHost({
+      const toolHost = await startSuiteHost({
         model: { kind: "scripted", script },
         tools: { project: work },
-        // A file of its own, so the person's own config never applies here.
-        userConfig: path.join(work, "no-user-config.json"),
         // A fixture pi directory, for commands (ADR-0036).
         agentDir: path.join(
           import.meta.dirname,

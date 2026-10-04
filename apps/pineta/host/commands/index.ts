@@ -22,6 +22,7 @@ import { readArchive, readParticipantNames, readRoots } from "@pineta/reads"
 import { type Basics, failed, type HostKeeper, messageOf } from "../basics.ts"
 import type { ControlSender } from "../control.ts"
 import type { Names } from "../names.ts"
+import type { Titles } from "../titles.ts"
 import { type ArchiveDeps, handleArchive } from "./archive.ts"
 import {
   type CardCommandDeps,
@@ -45,6 +46,7 @@ export interface CommandDeps {
   readonly cards: ChatDeps["cards"] & CardCommandDeps["cards"]
   readonly start: ChatDeps["start"]
   readonly names: Pick<Names, "reserve">
+  readonly titles: ChatDeps["titles"] & Pick<Titles, "asked">
   readonly drain: CardCommandDeps["drain"]
   readonly histories: CardCommandDeps["histories"]
   /** The documents' keeper: a `documents` command is one step on it. */
@@ -187,6 +189,8 @@ export function createCommands(deps: CommandDeps): Commands {
         return settled(await handleArchive(deps, writer, intent))
       case "mark":
         return settled(await handleMark(deps, writer, intent))
+      case "retitle":
+        return settled(await deps.titles.asked(intent.root, writer))
       case "offer":
         return settled(await actOnOffer(deps, intent, writer))
       case "line":

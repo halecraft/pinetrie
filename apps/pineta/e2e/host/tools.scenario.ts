@@ -17,7 +17,6 @@ import { scriptedModel } from "@pineta/pi"
 import { SESSION_DOC_ID } from "@pineta/protocol/messages"
 import { readParticipantNames, readPlaces, readStops } from "@pineta/reads"
 import { beginRun, readStreams } from "@pineta/schema"
-import { startHost } from "../../host/index.ts"
 import { openStore } from "../../host/store.ts"
 import type { Checks } from "../checks.ts"
 import {
@@ -30,6 +29,7 @@ import {
   queueCard,
   rootAt,
   rootRecordsOf,
+  startSuiteHost,
   treeOf,
   waitFor,
 } from "../harness.ts"
@@ -67,7 +67,7 @@ async function run(check: Checks["check"]): Promise<void> {
     let opened = openStore(dbFile)
     let stored = opened.store
     const open = (log: (m: string) => void, store: Store = stored) =>
-      startHost({
+      startSuiteHost({
         model: { kind: "scripted", script },
         tools: { project: work },
         // `verify` runs anywhere: lanes of their own are `e2e:lanes`'s.

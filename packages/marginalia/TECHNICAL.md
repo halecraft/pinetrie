@@ -339,6 +339,9 @@ one on any entry, since the rule is the same everywhere.
 - **Clearing deletes the record.** A stored empty title would read as chosen.
 - **A mark in an archived root is refused by the archive's gate:** `writesIn`
   names a mark's root, so `planMark` has no check of its own.
+- **`by` is a writer, or the agent for a title it made unasked**
+  (ADR-0074). A writer id always starts `w-`, so the two never collide, and
+  nothing decides by it.
 - **The title rule is `parseTitle`'s** (`@pineta/core`): trimmed, empty
   clears, one line of at most `MAX_TITLE`. The codec and the page both
   decide by it. The decoder checks only the shape (a non-empty title): the
@@ -379,6 +382,38 @@ it.
   "Digests").
 - **`digestRequest`** is the skill, the ask, the run's newest work that fits
   (`fitNewest`: the oldest is cut first), and the last digest.
+
+# The user config (`config.ts`)
+
+Every setting's decoder (`decodeBannerConfig`, `decodeDigestConfig`,
+`decodeTitleConfig`) reads through `recordOf`, and a model setting through
+`modelRef`: `provider/id`, split at its first `/`, since an OpenRouter id
+holds one. Each decoder is total: a missing or malformed setting takes its
+default.
+
+# Titles (`title.ts`, ADR-0074)
+
+A model's few words for a root, written as its mark (`MARK`), so Rename
+edits it and every place a title shows reads it.
+
+- **`decodeTitleConfig`**: on unless `enabled` is `false`, as digests are
+  (banners are off unless `true`); `model` is `modelRef`, or null for the
+  run's.
+- **`planTitling` is the decision and the request's lines.** Unasked (a
+  lane just created, `trigger.kind` `lane`): only for the root's first lane
+  (no other lane record names the root), with titles on, no mark on the
+  root entry, and none in flight; the lines are the path to where the lane
+  starts and its prompt, which the tree does not hold yet. Asked: always,
+  from the path to the root's newest message; refused for a root with no
+  message. It also names the mark's author: the agent, or the person who
+  asked.
+- **`titleRequest`** keeps the first line whatever the budget, since how a
+  thread began usually says what it is for, then the newest that fit
+  (`fitNewest`).
+- **`titleOf` refuses rather than cuts**: more than `TITLE_WORDS` words, or
+  what `parseTitle` refuses, is null, and the root keeps its label.
+- **`titleStillWanted`**: an asked title is always written; an unasked one
+  only over no mark.
 
 # Where lanes work (`work.ts`, ADR-0032 to ADR-0034, ADR-0038, ADR-0039, ADR-0060)
 

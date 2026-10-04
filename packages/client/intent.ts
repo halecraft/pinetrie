@@ -151,6 +151,8 @@ export type Intent =
       readonly root: EntryId
       readonly title: string | null
     }
+  /** Ask a model for the root's title (ADR-0074). */
+  | { readonly kind: "retitle"; readonly root: EntryId }
   /** Show entry `entry`, wherever it is (`planOpen`). */
   | { readonly kind: "openAt"; readonly entry: EntryId }
   /**
@@ -189,6 +191,7 @@ export type Effect =
       readonly root: EntryId
       readonly title: string | null
     }
+  | { readonly kind: "retitle"; readonly root: EntryId }
   | {
       readonly kind: "createCard"
       readonly card: CardRecord
@@ -348,6 +351,8 @@ export function planIntent(
       return [{ kind: "restore", root: intent.root }]
     case "rename":
       return [{ kind: "mark", root: intent.root, title: intent.title }]
+    case "retitle":
+      return [{ kind: "retitle", root: intent.root }]
     case "openAt":
       return planOpenAt(intent.entry, state, fresh)
     case "openIn":

@@ -667,6 +667,14 @@ export const mutations: readonly Mutation[] = [
       "a take that does not say which offer it was shown, well formed, is refused",
   },
   {
+    name: "a retitle may name anything as its root",
+    file: "packages/protocol/codec.ts",
+    from: '    return isRootId(root)\n      ? { kind: "retitle", root }',
+    to: '    return true\n      ? { kind: "retitle", root: root as RootId }',
+    command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
+    expect: "a retitle names its root; anything else is refused",
+  },
+  {
     name: "a fork's parent is the nearest lane, not the commit's",
     file: "packages/core/work.ts",
     from: "      commitLane = record.lane",

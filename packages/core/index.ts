@@ -437,6 +437,8 @@ export type Intent =
       readonly entry: EntryId
       readonly title: string | null
     }
+  /** Ask a model for a root's title, from its messages (ADR-0074). */
+  | { readonly kind: "retitle"; readonly root: RootId }
   /**
    * Act on a lane's offer in your repo (ADR-0038). A take names its
    * destination bookmark, null for the default (ADR-0060), and what it was
@@ -550,7 +552,8 @@ export interface RootRecord {
 export interface MarkRecord {
   readonly entry: EntryId
   readonly title: string
-  readonly by: WriterId
+  /** The person who set it, or the agent for a title it made unasked. */
+  readonly by: WriterId | AgentId
   /** When it was set, in ms since the epoch. */
   readonly at: number
 }

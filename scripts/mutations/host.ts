@@ -1251,4 +1251,56 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "your edits are its files that @ changes, and only those",
   },
+  {
+    name: "an unasked title is written over a mark written meanwhile",
+    file: "apps/pineta/host/titles.ts",
+    from: "        if (!titleStillWanted(marks.get(entry), by)) return\n",
+    to: "",
+    command: unit,
+    expect: "a mark written while the title was asked wins over it",
+  },
+  {
+    name: "an unasked title does not wait for its root's first entry",
+    file: "apps/pineta/host/titles.ts",
+    from: "        const entry = await whenRooted(doc, deps.rootedWait ?? ROOTED_WAIT)",
+    to: "        const entry = rootEntryOf(doc)",
+    command: unit,
+    expect:
+      "a new root's first lane: titled by the agent once the run writes its prompt",
+  },
+  {
+    name: "an archived root takes a title",
+    file: "apps/pineta/host/titles.ts",
+    from: "          archivedIn([root], readRoots(session), readArchive(session)) !== null",
+    to: "          false",
+    command: unit,
+    expect:
+      "a reply that is not a title, or a root archived meanwhile, writes nothing",
+  },
+  {
+    name: "a title is asked of the describe model",
+    file: "apps/pineta/host/titles.ts",
+    from: '          purpose: "title",\n',
+    to: "",
+    command: unit,
+    expect:
+      "a new root's first lane: titled by the agent once the run writes its prompt",
+  },
+  {
+    name: "a new lane never titles its root",
+    file: "apps/pineta/host/commands/chat.ts",
+    from: "      await deps.titles.laneStarted({",
+    to: "      void ({",
+    command: unit,
+    expect:
+      "createAndRun creates the lane, prepares it, may title its root, and runs there",
+  },
+  {
+    name: "a retitle is answered without asking",
+    file: "apps/pineta/host/commands/index.ts",
+    from: "        return settled(await deps.titles.asked(intent.root, writer))",
+    to: '        return settled({ kind: "retitling" })',
+    command: unit,
+    expect: "a retitle asks for its root's title as its sender",
+  },
 ]

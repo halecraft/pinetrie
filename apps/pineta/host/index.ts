@@ -21,6 +21,7 @@ import {
   decodeBannerConfig,
   decodeCommandRenames,
   decodeDigestConfig,
+  decodeTitleConfig,
 } from "@pineta/marginalia"
 import { type Agent, createAgent, type ModelChoice, newId } from "@pineta/pi"
 import { Control } from "@pineta/protocol/line"
@@ -84,6 +85,7 @@ import { planShutdown, type ShutdownStep } from "./shutdown.ts"
 import { recover } from "./startup.ts"
 import { openStore } from "./store.ts"
 import { drain as drainQueue, takenChat } from "./take.ts"
+import { createTitles } from "./titles.ts"
 import { startLaneWork } from "./work/index.ts"
 
 /** How long an unreferenced image is kept (ADR-0042). */
@@ -339,6 +341,15 @@ export async function startHost({
     : null
   const digestFailed = (lane: LaneName) =>
     failed(basics, "summarizing its ask", lane)
+  // Each root's title, unasked as its first lane starts unless the user
+  // config turns that off, or when a person asks (ADR-0074).
+  const titleConfig = decodeTitleConfig(userJson)
+  const titles = createTitles({
+    basics,
+    keeper,
+    enabled: titleConfig.enabled,
+    agent: theAgent,
+  })
   // Every thread's name (ADR-0039, ADR-0057), one plan at a time. A thread's
   // banner is drawn from its name, so it starts as the name is written.
   const names = createNames({
@@ -394,8 +405,13 @@ export async function startHost({
     ...(bannerConfig === null || banners === null
       ? {}
       : { banners: { config: bannerConfig, request: banners.request } }),
+    titleModel: titleConfig.model,
   })
   created = agent
+  if (titleConfig.model !== null && !agent.titleModelFound)
+    log(
+      `[host] titles name ${titleConfig.model.provider}/${titleConfig.model.model}, which pi does not have: titles use the run's model`,
+    )
   if (bannerConfig !== null && !(await agent.canDrawBanners()))
     log(
       `[host] banners are on, but ${bannerConfig.provider}/${bannerConfig.model} cannot be drawn: no key, or no such model`,
@@ -423,6 +439,7 @@ export async function startHost({
     cards: cardPort,
     start: runs.start,
     names,
+    titles,
     drain: lane => queueDrain(lane),
     histories,
     keeper,

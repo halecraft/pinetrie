@@ -99,6 +99,8 @@ export type Outcome =
   | { readonly kind: "restored" }
   /** An entry's title is set or cleared (ADR-0045); also when it already was. */
   | { readonly kind: "marked" }
+  /** A model is asked for a root's title, which arrives as its mark (ADR-0074). */
+  | { readonly kind: "retitling" }
   /** The lane's offer is in your history now (ADR-0038). */
   | { readonly kind: "taken" }
   /** An offer action was carried out (squash, describe, refresh). */
@@ -286,6 +288,12 @@ export function decodeCommand(
       case "set":
         return { kind: "mark", root, entry: entryId(entry), title: title.title }
     }
+  }
+  if (kind === "retitle") {
+    const root = text(wire?.root)
+    return isRootId(root)
+      ? { kind: "retitle", root }
+      : refused(ERR.UNKNOWN_TARGET, `not a root: ${root}`)
   }
   return refused(ERR.UNKNOWN_KIND, `unsupported command kind: ${String(kind)}`)
 }
@@ -515,6 +523,8 @@ export function encodeIntent(id: string, intent: Intent): Command {
         targetId: intent.entry,
         text: intent.title ?? "",
       })
+    case "retitle":
+      return command({ id, kind: "retitle", root: intent.root })
     case "offer":
       return command({
         id,
@@ -579,6 +589,8 @@ function outcomeToWire(id: string, outcome: Outcome): Reply {
       return reply({ id, outcome: "restored" })
     case "marked":
       return reply({ id, outcome: "marked" })
+    case "retitling":
+      return reply({ id, outcome: "retitling" })
     case "taken":
       return reply({ id, outcome: "taken" })
     case "offered":
@@ -643,6 +655,8 @@ export function decodeReply(wire: Reply): Outcome {
       return { kind: "restored" }
     case "marked":
       return { kind: "marked" }
+    case "retitling":
+      return { kind: "retitling" }
     case "taken":
       return { kind: "taken" }
     case "offered":

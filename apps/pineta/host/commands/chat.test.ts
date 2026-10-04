@@ -65,6 +65,7 @@ function setUp(
     prepareLane: async () => {},
   })
   const started: string[] = []
+  const titles = record<ChatDeps["titles"]>({ laneStarted: async () => {} })
   const deps: ChatDeps = {
     basics: b,
     agent: agent.port,
@@ -75,6 +76,7 @@ function setUp(
       started.push(lane)
       return runId("r-1")
     },
+    titles: titles.port,
   }
   const context = {
     view: { root: ROOT_ID, doc: b.root, session: b.session, live: b.live },
@@ -83,7 +85,7 @@ function setUp(
     work: null,
     base: null,
   }
-  return { b, agent, work, started, deps, context }
+  return { b, agent, work, started, titles, deps, context }
 }
 
 describe("executeChat", () => {
@@ -99,8 +101,8 @@ describe("executeChat", () => {
     expect(started).toEqual([])
   })
 
-  test("createAndRun creates the lane, prepares it, and runs there", async () => {
-    const { agent, work, started, deps, context } = setUp(null)
+  test("createAndRun creates the lane, prepares it, may title its root, and runs there", async () => {
+    const { agent, work, started, titles, deps, context } = setUp(null)
     const out = await executeChat(
       deps,
       { kind: "createAndRun", at: ROOT, lane: LANE, details },
@@ -114,6 +116,16 @@ describe("executeChat", () => {
       "checkDirectory",
       "checkBegin",
       "prepareLane",
+    ])
+    expect(titles.calls.map(c => c.args)).toEqual([
+      [
+        {
+          root: ROOT_ID,
+          lane: LANE,
+          at: ROOT,
+          prompt: { author: "Alice", text: "@agent go" },
+        },
+      ],
     ])
     expect(started).toEqual([LANE])
   })
@@ -189,6 +201,7 @@ describe("sendChat", () => {
           started.push(s.message as ChatMessage)
         return runId("r-1")
       },
+      titles: record<ChatDeps["titles"]>({ laneStarted: async () => {} }).port,
     }
     return { b, agent, cards, started, deps }
   }

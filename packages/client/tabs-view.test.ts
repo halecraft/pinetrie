@@ -85,12 +85,20 @@ describe("tabsView", () => {
     const menus = tabs({ archived: new Set([entryId("r1")]) }).map(t =>
       t.kind === "root" ? t.menu.map(i => i.kind) : null,
     )
-    expect(menus).toEqual([null, [], ["rename", "archive"], null])
+    expect(menus).toEqual([null, [], ["rename", "retitle", "archive"], null])
+  })
+
+  test("Auto-update title asks for the tab's own root", () => {
+    const [, r1] = tabs()
+    expect(r1?.kind === "root" && r1.menu[1]).toEqual({
+      kind: "retitle",
+      intent: { kind: "retitle", root: entryId("r1") },
+    })
   })
 
   test("Archive is refused while the agent works in the root", () => {
     const [, r1] = tabs({ work: new Map([["r1", "running"]]) })
-    expect(r1?.kind === "root" && r1.menu[1]).toEqual({
+    expect(r1?.kind === "root" && r1.menu[2]).toEqual({
       kind: "archive",
       busy: "running",
       drops: [],
@@ -101,8 +109,8 @@ describe("tabsView", () => {
   test("Archive names the threads whose offers it withdraws", () => {
     const amber = "amber-fox" as ThreadName
     const [, r1, r2] = tabs({ offered: new Map([[entryId("r1"), [amber]]]) })
-    expect(r1?.kind === "root" && r1.menu[1]).toMatchObject({ drops: [amber] })
-    expect(r2?.kind === "root" && r2.menu[1]).toMatchObject({ drops: [] })
+    expect(r1?.kind === "root" && r1.menu[2]).toMatchObject({ drops: [amber] })
+    expect(r2?.kind === "root" && r2.menu[2]).toMatchObject({ drops: [] })
     expect(dropsWords([amber, "cozy-mallard" as ThreadName])).toBe(
       "work not added to the project goes: amber-fox, cozy-mallard",
     )

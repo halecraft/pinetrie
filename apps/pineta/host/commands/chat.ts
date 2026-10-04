@@ -43,6 +43,7 @@ import {
 import type { Basics } from "../basics.ts"
 import type { CardPort } from "../cards.ts"
 import type { Runs } from "../runs.ts"
+import type { Titles } from "../titles.ts"
 import type { LaneWork } from "../work/index.ts"
 
 /** A chat to send: a `chat` command's, or a taken card's, in mode `queue`. */
@@ -64,6 +65,8 @@ export interface ChatDeps {
   /** Who wrote in a card: its other writers are a message's contributors (ADR-0048). */
   readonly cards: Pick<CardPort, "writers">
   readonly start: Runs["start"]
+  /** A new lane may title its root (ADR-0074). */
+  readonly titles: Pick<Titles, "laneStarted">
 }
 
 /** What `executeChat` needs besides the decision: the facts the send was planned from. */
@@ -308,6 +311,16 @@ export async function executeChat(
       log(
         `[host] ${writer.slice(-8)} starts ${readThreadName(view.session, created.lane)}`,
       )
+      // After `prepareLane`, so the lane's record is among the root's.
+      await deps.titles.laneStarted({
+        root,
+        lane: created.lane,
+        at: planned.at,
+        prompt: {
+          author: planned.details.authorName,
+          text: planned.details.text,
+        },
+      })
       return {
         kind: "started",
         runId: deps.start(created.lane, {

@@ -15,6 +15,7 @@ export interface AppPorts {
     | "request"
     | "offer"
     | "mark"
+    | "retitle"
     | "createCard"
     | "moveCard"
     | "moveCards"
@@ -71,6 +72,9 @@ function performOne(effect: Effect, ports: AppPorts): void {
       return
     case "mark":
       void ports.session.mark(effect.root, effect.title)
+      return
+    case "retitle":
+      void ports.session.retitle(effect.root)
       return
     case "createCard":
       void ports.session.createCard(effect.card, effect.text, effect.how)

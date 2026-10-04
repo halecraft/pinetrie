@@ -5,9 +5,13 @@ import { mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { messageOf } from "../../host/basics.ts"
-import { startHost } from "../../host/index.ts"
 import type { Checks } from "../checks.ts"
-import { suiteModel, waitFor } from "../harness.ts"
+import {
+  SUITE_CONFIG,
+  startSuiteHost,
+  suiteModel,
+  waitFor,
+} from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
 
 import { asPerson, col, launchBrowser } from "./page.ts"
@@ -24,8 +28,11 @@ async function run(check: Checks["check"]): Promise<void> {
         mkdtempSync(path.join(tmpdir(), "pineta-browser-banner-")),
         "config.json",
       )
-      writeFileSync(config, JSON.stringify({ banner: { enabled: true } }))
-      const bannerHost = await startHost({
+      writeFileSync(
+        config,
+        JSON.stringify({ ...SUITE_CONFIG, banner: { enabled: true } }),
+      )
+      const bannerHost = await startSuiteHost({
         model: { kind: "scripted", script: suiteModel() },
         userConfig: config,
         log: () => {},

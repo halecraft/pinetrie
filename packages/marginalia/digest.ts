@@ -10,6 +10,7 @@ import {
   type TreeIndex,
 } from "@pineta/core"
 import { Type } from "typebox"
+import { recordOf } from "./config.ts"
 import { decodeAt, entryKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 import {
@@ -53,11 +54,6 @@ export const DIGEST: RecordSpec<DigestRecord, EntryId, "root"> = {
 }
 
 // ── the setting ───────────────────────────────────────────────────────────
-
-const recordOf = (v: unknown): Record<string, unknown> | undefined =>
-  typeof v === "object" && v !== null && !Array.isArray(v)
-    ? (v as Record<string, unknown>)
-    : undefined
 
 /** The user config's `digests`: on unless `enabled` is `false` (ADR-0071). Total. */
 export const decodeDigestConfig = (json: unknown): boolean =>

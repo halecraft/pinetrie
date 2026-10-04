@@ -208,9 +208,11 @@ in that order. `tabBar(layout)` is Archive, `open`, then new tabs.
 `summarizeRoots` and `rootWork` (`packages/core/roots.ts`)
 give the roots and each tab's signals.
 
-- **A root's label is `labelsOf`'s** (`root-label.ts`, ADR-0045): its
-  title, else its first line (`firstLinesOf`), both from its directory
-  record (ADR-0063). `App` builds both maps once per directory change, and every place that names a root looks one up: the tabs,
+- **A root's label is `labelsOf`'s** (`root-label.ts`, ADR-0045, ADR-0074):
+  its title; else `CHAT_LABEL` for a root no lane works in, read from the
+  session's lane records, so a root only people wrote in needs no field of
+  its own; else its first line (`firstLinesOf`), from its directory record
+  (ADR-0063). `App` builds both maps once per directory change, and every place that names a root looks one up: the tabs,
   the header, the inbox, and the Archive tab, whose search reads labels, so
   it finds a title without knowing about marks. The first lines are also
   the rename field's placeholder: what clearing a title brings back.

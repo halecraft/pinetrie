@@ -1,6 +1,14 @@
-import { entryId, type RootRecord, rootIdFor, writerId } from "@pineta/core"
+import {
+  entryId,
+  type LaneRecord,
+  laneNameForThread,
+  type RootRecord,
+  rootIdFor,
+  writerId,
+} from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import {
+  CHAT_LABEL,
   firstLinesOf,
   labelsOf,
   messageCount,
@@ -35,14 +43,35 @@ const directory = new Map(
 )
 
 describe("labels and summaries, from the directory (ADR-0063)", () => {
+  const laneIn = (n: string): [LaneRecord["lane"], LaneRecord] => {
+    const lane = laneNameForThread(n)
+    return [
+      lane,
+      {
+        lane,
+        root: rootIdFor(n),
+        work: null,
+        by: writerId("p-ada"),
+        createdAt: 0,
+      },
+    ]
+  }
+  const worked = new Map([laneIn("1"), laneIn("2")])
+
   test("a titled root is called by its title, another by its first line; a root with no message by neither", () => {
-    const labels = labelsOf(directory)
+    const labels = labelsOf(directory, worked)
     expect(labels.get(entryId("e-1"))).toBe("Tab names")
     expect(labels.get(entryId("e-2"))).toBe("Plan the release")
     expect(labels.size).toBe(2)
     expect(firstLinesOf(directory).get(entryId("e-1"))).toBe(
       "I'd like to start talking about a change",
     )
+  })
+
+  test("an untitled root no lane works in is a chat; a title still names it", () => {
+    const labels = labelsOf(directory, new Map([laneIn("3")]))
+    expect(labels.get(entryId("e-1"))).toBe("Tab names")
+    expect(labels.get(entryId("e-2"))).toBe(CHAT_LABEL)
   })
 
   test("the header's count: the held roots' messages, of every root's", () => {

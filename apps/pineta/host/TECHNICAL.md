@@ -354,10 +354,10 @@ rejects `shutdown()`.
 ## Requests outside the queue (`outside.ts`)
 
 A model request takes seconds, and no command may wait on it. Banners,
-commit messages and digests ask with `requestOutside`: the request runs
+commit messages, digests and titles ask with `requestOutside`: the request runs
 outside the documents' keeper, tracked so `quiet` waits for it, and its
 answer is written in a step of its own (a keeper step, or for a commit
-message an owner command), after that step decides it is still wanted (`bannerStillWanted`, the offer's checks, `digestStillWanted`). A
+message an owner command), after that step decides it is still wanted (`bannerStillWanted`, the offer's checks, `digestStillWanted`, `titleStillWanted`). A
 failure is logged, never thrown. With `held`, a key is in a set while the
 request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 
@@ -400,6 +400,27 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   so the host stores it as given. `drawWithRetries` asks up to three times.
 - **A failure is logged, never thrown**: `[host] no banner for <name>: …`,
   one line per failed attempt.
+
+## Titles (`titles.ts`, ADR-0074)
+
+- **Planned inside the command that asks**: `executeChat`'s `createAndRun`
+  calls `laneStarted` after `prepareLane`, so the new lane's record is
+  among the root's, and a `retitle` command calls `asked`. Both are steps
+  on the documents' keeper already, so `titles.ts` gathers and plans
+  (`planTitling`) without a step of its own, and only the request goes out.
+- **The prompt is given, not read**: the run writes it after `executeChat`
+  returns, so `laneStarted` takes its author and text from the chat's
+  details. A new root has no entry yet, so the request, outside the keeper,
+  waits for the root's first entry (`whenRooted`, at most 30 s) before its
+  title is settled as the root's mark.
+- **The settle checks again**: an archived root takes nothing, and an
+  unasked title gives way to any mark written meanwhile
+  (`titleStillWanted`). `planMark` writes it, so an unchanged title writes
+  nothing.
+- **Only an unasked request is `held`**: a person's Auto-update goes out
+  even while an unasked one is out for the same root.
+- A missing `tab-title` skill, or a reply `titleOf` refuses, is logged, and
+  nothing is written.
 
 ## HTTP
 

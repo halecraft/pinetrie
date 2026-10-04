@@ -22,7 +22,6 @@ import {
 import { scriptedModel } from "@pineta/pi"
 import { readLaneRecords, readPlaces } from "@pineta/reads"
 import { rowMessage } from "@pineta/schema"
-import { startHost } from "../../host/index.ts"
 import {
   committedProject,
   entriesOf,
@@ -32,6 +31,7 @@ import {
   queueCard,
   rootAt,
   setUpLine,
+  startSuiteHost,
   treeOf,
   waitFor,
 } from "../harness.ts"
@@ -161,12 +161,11 @@ export async function sectionHost(input: {
   const dir =
     input.dir ?? committedProject("pineta-section-", input.files ?? {})
   const script = scriptedModel()
-  const host = await startHost({
+  const host = await startSuiteHost({
     model: { kind: "scripted", script },
     tools: { project: dir },
     ...(input.store === undefined ? {} : { store: input.store }),
-    // A file of its own, so the person's own config never applies here.
-    userConfig: input.userConfig ?? path.join(dir, "no-user-config.json"),
+    ...(input.userConfig === undefined ? {} : { userConfig: input.userConfig }),
     ...(input.agentDir === undefined ? {} : { agentDir: input.agentDir }),
     log: m => {
       input.logs?.push(m)

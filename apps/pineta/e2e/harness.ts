@@ -190,12 +190,40 @@ const SUITE_REPLY =
 export const suiteModel = () =>
   scriptedModel({ tokensPerSecond: 400, answer: { text: SUITE_REPLY } })
 
+/**
+ * The suites' user config: titles off, so a tab keeps its first line and no
+ * request is made that a scenario did not ask for (ADR-0074). A scenario
+ * that writes a config of its own spreads this into it.
+ */
+export const SUITE_CONFIG = { titles: { enabled: false } } as const
+
+let suiteConfig: string | undefined
+
+/** `SUITE_CONFIG` in a file, written once per process. */
+function suiteConfigFile(): string {
+  if (suiteConfig === undefined) {
+    const dir = mkdtempSync(path.join(tmpdir(), "pineta-suite-config-"))
+    suiteConfig = path.join(dir, "config.json")
+    writeFileSync(suiteConfig, JSON.stringify(SUITE_CONFIG))
+  }
+  return suiteConfig
+}
+
+/**
+ * `startHost` with `SUITE_CONFIG` unless the scenario names its own file,
+ * so no suite reads the person's `~/.config/pineta/config.json`.
+ */
+export const startSuiteHost = (
+  options: StartHostOptions,
+): Promise<RunningHost> =>
+  startHost({ userConfig: suiteConfigFile(), ...options })
+
 /** Start a host, give it to `body`, and shut it down however `body` ends. */
 export async function withHost<T>(
   options: StartHostOptions,
   body: (host: RunningHost) => Promise<T>,
 ): Promise<T> {
-  const host = await startHost(options)
+  const host = await startSuiteHost(options)
   try {
     return await body(host)
   } finally {

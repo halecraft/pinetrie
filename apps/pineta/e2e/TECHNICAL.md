@@ -16,6 +16,12 @@ They share `checks.ts` (recording a check, and stopping at one),
 
 ## Scenarios
 
+- **A host reads the suites' user config, not the person's.**
+  `startSuiteHost` (`harness.ts`) passes `SUITE_CONFIG`, which turns the
+  automatic title off (ADR-0074), unless a scenario names its own file; one
+  that writes its own spreads `SUITE_CONFIG` into it. `startHost` without a
+  `userConfig` would read `~/.config/pineta/config.json`.
+
 - **A scenario is one file, and one run against its own host.** It depends
   on no other scenario: what it needs it makes, through the session (`join`)
   wherever making it through the UI is not what it checks. Its name is its

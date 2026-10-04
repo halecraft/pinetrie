@@ -542,4 +542,12 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a lane of its own runs the runtime's programs by path",
   },
+  {
+    name: "a scripted model's titles leave its describe provider",
+    file: "packages/pi/config.ts",
+    from: "  if (named === null || scripted)",
+    to: "  if (named === null)",
+    command: unit,
+    expect: "titleModelOf: the named model, else the describe model",
+  },
 ]

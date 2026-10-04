@@ -5,6 +5,7 @@
 // clearing a title deletes its record.
 
 import {
+  type AgentId,
   type EntryId,
   ERR,
   type MarkRecord,
@@ -35,7 +36,8 @@ export const MARK: RecordSpec<MarkRecord, EntryId, "root"> = {
     decodeAt(MarkSchema, contents, entryKey(key), (r, entry) => ({
       entry,
       title: r.title,
-      by: r.by as WriterId,
+      // A writer id always starts `w-` (`writerId`), so neither is read as the other.
+      by: r.by as WriterId | AgentId,
       at: r.at,
     })),
 }
@@ -51,7 +53,7 @@ export type MarkPlan =
 export function planMark(input: {
   readonly entry: EntryId
   readonly title: string | null
-  readonly by: WriterId
+  readonly by: WriterId | AgentId
   readonly now: number
   readonly index: TreeIndex
   readonly marks: ReadonlyMap<EntryId, MarkRecord>

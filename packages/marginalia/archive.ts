@@ -169,8 +169,8 @@ function planTeardown(
  * The roots a command writes in (ADR-0063), none for a new thread at the
  * root, a name, a stop, an archive action, a reservation, a card's command,
  * or a card's move into an inventory, or its removal. An offer acts in its
- * lane's root; a move in each root its cards go to; an undo of moves in its
- * root (ADR-0066).
+ * lane's root; a move in each root its cards go to; an undo of moves and a
+ * retitle in their root (ADR-0066, ADR-0074).
  */
 export function writesIn(
   intent: Intent,
@@ -186,6 +186,7 @@ export function writesIn(
     case "offer":
       return only(rootOfLane(intent.lane))
     case "mark":
+    case "retitle":
     case "undo-move":
       return [intent.root]
     // A move into a thread or a fresh column writes in its root; an

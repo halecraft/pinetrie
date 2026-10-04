@@ -21,6 +21,7 @@ export {
 } from "./lane-env.ts"
 export type { LaneAccess, LaneHooks } from "./lanes.ts"
 export {
+  SCRIPTED_DESCRIPTION,
   type ScriptedModel,
   type ScriptStep,
   scriptedModel,

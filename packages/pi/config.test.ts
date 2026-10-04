@@ -4,7 +4,7 @@
 import path from "node:path"
 import { labelCommands } from "@pineta/marginalia"
 import { expect, test } from "vitest"
-import { imageModelFor, setUpModel } from "./config.ts"
+import { imageModelFor, setUpModel, titleModelOf } from "./config.ts"
 import { scriptedModel } from "./scripted.ts"
 
 const agentDir = path.join(import.meta.dirname, "fixtures", "pi-agent")
@@ -50,6 +50,7 @@ test("a scripted model given no agent directory loads nothing of pi's, and still
     "pineta:skill:commit-message",
     "pineta:skill:offer-stack",
     "pineta:skill:resolve-conflicts",
+    "pineta:skill:tab-title",
   ])
 })
 
@@ -93,4 +94,28 @@ test("imageModelFor: pi-ai's entry, else one for an unlisted OpenRouter id, else
   if (listed === undefined) throw new Error("no model")
   expect(imageModelFor(listed, "openrouter", "other")).toBe(listed)
   expect(imageModelFor(undefined, "elsewhere", "x")).toBeUndefined()
+})
+
+test("titleModelOf: the named model, else the describe model, and whether pi had the one named", async () => {
+  const setup = await setUpModel(
+    { kind: "scripted", script: scriptedModel() },
+    { cwd: agentDir },
+  )
+  const run = { provider: setup.model.provider, model: setup.model.id }
+  expect(titleModelOf(setup, null, false)).toEqual({
+    model: setup.describeModel,
+    found: true,
+  })
+  expect(titleModelOf(setup, run, false)).toEqual({
+    model: setup.model,
+    found: true,
+  })
+  expect(titleModelOf(setup, { provider: "no", model: "such" }, false)).toEqual(
+    { model: setup.describeModel, found: false },
+  )
+  // A scripted model's titles come from its describe provider, whatever is named.
+  expect(titleModelOf(setup, run, true)).toEqual({
+    model: setup.describeModel,
+    found: true,
+  })
 })

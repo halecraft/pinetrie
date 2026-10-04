@@ -2,7 +2,9 @@
 
 **Status:** Accepted. Implementation: `PLAN-2026-09-30-root-titles`. Amends
 ADR-0028 (a mark's record: keyed by its entry, a title only) and ADR-0029
-(where a root's label comes from).
+(where a root's label comes from). Amended by ADR-0074: a model titles a
+root when its first lane starts, or when a person asks (Auto-update title),
+and an untitled root no agent works in is labelled `Chat`.
 
 **Context.** A root tab's label is its first message's first line, cut to 40
 characters. That line is often a preamble ("I'd like to start talking about a

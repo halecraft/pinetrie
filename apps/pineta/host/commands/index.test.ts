@@ -44,6 +44,10 @@ function setUp(
     destroy: async () => {},
   })
   const drains: string[] = []
+  const titles = record<CommandDeps["titles"]>({
+    laneStarted: async () => {},
+    asked: async () => ({ kind: "retitling" }),
+  })
   writeEntry(b.root, row(ROOT_ENTRY, null))
   writeDirectory(b)
   const agent = record<CommandDeps["agent"]>({
@@ -64,6 +68,7 @@ function setUp(
     }).port,
     drain: lane => void drains.push(lane),
     histories: record<CommandDeps["histories"]>().port,
+    titles: titles.port,
     keeper,
   })
   const replies: Reply[] = []
@@ -79,7 +84,18 @@ function setUp(
       lane: "",
       asksAgent: false,
     }) satisfies WireCommand
-  return { b, keeper, agent, cards, commands, replies, sender, chat, drains }
+  return {
+    b,
+    keeper,
+    agent,
+    cards,
+    commands,
+    replies,
+    sender,
+    chat,
+    drains,
+    titles,
+  }
 }
 
 test.each([
@@ -279,4 +295,17 @@ test("a reservation is answered reserved, and refused for a lane pi holds (ADR-0
     ["c-4", "reserved", ""],
     ["c-5", "refused", "lane_taken"],
   ])
+})
+
+test("a retitle asks for its root's title as its sender, and answers retitling", async () => {
+  const { commands, replies, sender, titles } = setUp()
+  await commands.handle(sender, ALICE, {
+    id: "c-6",
+    kind: "retitle",
+    root: ROOT_ID,
+  } as never)
+  expect(titles.calls.map(c => [c.method, ...c.args])).toEqual([
+    ["asked", ROOT_ID, ALICE],
+  ])
+  expect(replies.map(r => [r.id, r.outcome])).toEqual([["c-6", "retitling"]])
 })

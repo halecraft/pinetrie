@@ -31,7 +31,6 @@ import {
 } from "@pineta/reads"
 import { startOfOffer } from "@pineta/repo"
 import { rowMessage } from "@pineta/schema"
-import { startHost } from "../../host/index.ts"
 import type { Checks } from "../checks.ts"
 import {
   committedProject,
@@ -43,6 +42,7 @@ import {
   lanesOf,
   rootRecordsOf,
   setUpLine,
+  startSuiteHost,
   treeOf,
   waitFor,
 } from "../harness.ts"
@@ -78,11 +78,9 @@ async function mainSection(check: Checks["check"]): Promise<void> {
   })
   const script = scriptedModel()
   const logs: string[] = []
-  const wh = await startHost({
+  const wh = await startSuiteHost({
     model: { kind: "scripted", script },
     tools: { project },
-    // A file of its own, so the person's own config never applies here.
-    userConfig: path.join(project, "no-user-config.json"),
     log: m => {
       logs.push(m)
       if (process.env.PINETA_E2E_LOG === "1") console.log(m)

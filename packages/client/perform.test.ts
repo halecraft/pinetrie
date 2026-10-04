@@ -23,6 +23,7 @@ const ports = () => {
       request: vi.fn(async (): Promise<Outcome> => answer),
       offer: vi.fn(async (): Promise<Outcome> => answer),
       mark: vi.fn(async () => answer),
+      retitle: vi.fn(async () => answer),
       createCard: vi.fn(async () => accepted),
       moveCard: vi.fn(async (): Promise<MoveAnswer> => accepted),
       moveCards: vi.fn(async (): Promise<MoveAnswer> => accepted),
@@ -91,6 +92,11 @@ test.each<Row>([
     effect: { kind: "mark", root, title: "T" },
     port: p => p.session.mark,
     args: [root, "T"],
+  },
+  {
+    effect: { kind: "retitle", root },
+    port: p => p.session.retitle,
+    args: [root],
   },
   {
     effect: { kind: "reveal", entry: entryId("e") },

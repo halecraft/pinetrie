@@ -15,6 +15,8 @@ import {
   ROOT,
   writerId,
 } from "@pineta/core"
+import { titleOf } from "@pineta/marginalia"
+import { SCRIPTED_DESCRIPTION } from "@pineta/pi"
 import {
   readMarks,
   readNames,
@@ -24,7 +26,6 @@ import {
   readTyping,
 } from "@pineta/reads"
 import type { Page } from "@playwright/test"
-import { startHost } from "../../host/index.ts"
 import type { Checks } from "../checks.ts"
 import {
   entriesOf,
@@ -34,6 +35,7 @@ import {
   queueCard,
   rootAt,
   rootRecordsOf,
+  startSuiteHost,
   suiteModel,
   treeOf,
   waitFor,
@@ -61,7 +63,7 @@ async function run(check: Checks["check"]): Promise<void> {
   const browser = await launchBrowser()
   try {
     const script = suiteModel()
-    const host = await startHost({
+    const host = await startSuiteHost({
       model: { kind: "scripted", script },
       log: (m: string) => console.log("    [host]", m),
     })
@@ -1485,6 +1487,20 @@ async function run(check: Checks["check"]): Promise<void> {
           (await labelIs(page, thirdRoot, TITLE)) &&
             (await page.locator(".tab-title-input").count()) === 0 &&
             rootRecordsOf(host, readMarks).get(thirdRoot)?.at === setAt,
+        )
+        await rename("", "Enter")
+
+        // 4c. Auto-update title (ADR-0074): the model's title arrives as the
+        // label. The suites' scripted model answers every request outside a
+        // thread with `SCRIPTED_DESCRIPTION`.
+        const auto = titleOf(SCRIPTED_DESCRIPTION) ?? ""
+        const retitled =
+          (await chooseFromMenu(page, OWN_MENU, ".retitle-root")) &&
+          (await labelIs(page, thirdRoot, auto))
+        check(
+          "Auto-update title in a tab's ⋯ titles its root from the model",
+          retitled,
+          `"${await tabLabel(page, thirdRoot)}"`,
         )
         await rename("", "Enter")
 

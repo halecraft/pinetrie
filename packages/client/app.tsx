@@ -330,7 +330,10 @@ export function App({
   // line (ADR-0045). Which roots have tabs is yours (`layout.open`, ADR-0030).
   const summaries = useMemo(() => summariesOf(directory), [directory])
   const lines = useMemo(() => firstLinesOf(directory), [directory])
-  const labels = useMemo(() => labelsOf(directory), [directory])
+  const labels = useMemo(
+    () => labelsOf(directory, workFacts.lanes),
+    [directory, workFacts.lanes],
+  )
   // Who a mention can name: the names, and every writer held or in the
   // directory, so one who wrote only in a root not held counts.
   const participants = useMemo(

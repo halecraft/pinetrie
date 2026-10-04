@@ -1573,4 +1573,33 @@ export const mutations: readonly Mutation[] = [
     scenario: "banner",
     expect: "the host shuts down with a page still open",
   },
+  {
+    name: "the host never titles a root unasked",
+    file: "apps/pineta/host/index.ts",
+    from: "    enabled: titleConfig.enabled,",
+    to: "    enabled: false,",
+    suite: "host",
+    scenario: "titles",
+    expect:
+      "a new root's first lane titles it from its first message, before its run ends",
+  },
+  {
+    name: "a client's retitle never reaches the host",
+    file: "packages/client/session-view.ts",
+    from: '      return send({ kind: "retitle", root })',
+    to: '      return Promise.resolve({ kind: "retitling" as const })',
+    suite: "host",
+    scenario: "titles",
+    expect:
+      "Auto-update title replaces a person's title with one from the thread's messages",
+  },
+  {
+    name: "Auto-update title in a tab's ⋯ sends nothing",
+    file: "packages/client/tabs.tsx",
+    from: '                                label: "Auto-update title",\n                                onChoose: () => onIntent(item.intent),',
+    to: '                                label: "Auto-update title",\n                                onChoose: () => {},',
+    suite: "browser",
+    scenario: "page",
+    expect: "Auto-update title in a tab's ⋯ titles its root from the model",
+  },
 ]

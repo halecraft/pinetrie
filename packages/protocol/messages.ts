@@ -44,6 +44,7 @@ export const HOST_PRINCIPAL = "pineta-host"
  *     (ADR-0029); `mode` names the action, `archive` or `restore`.
  *   - `mark` titles the entry `targetId` with `text` (ADR-0045); `""`
  *     clears its title.
+ *   - `retitle` asks a model for the root `root`'s title (ADR-0074).
  *   - `offer` acts on that lane's offer in your repo; `mode` names the
  *     action: `take`, `split`, `squash`, `describe` or `refresh`. A take
  *     names its destination bookmark in `targetId`, `""` for the default,
@@ -67,6 +68,7 @@ export const COMMAND_KINDS = [
   "stop",
   "archive",
   "mark",
+  "retitle",
   "offer",
   "reserve",
   "move",
@@ -95,9 +97,9 @@ export interface Command {
    */
   readonly parentId: string
   /**
-   * `chat` and `mark`: the root it writes in (ADR-0063); for a chat at the
-   * root, a new root's id the sender's tab minted. `undo-move`: the root
-   * whose history it acts on. `""` otherwise.
+   * `chat`, `mark` and `retitle`: the root it writes in (ADR-0063); for a
+   * chat at the root, a new root's id the sender's tab minted. `undo-move`:
+   * the root whose history it acts on. `""` otherwise.
    */
   readonly root: string
   /**
@@ -161,6 +163,7 @@ export const OUTCOME_KINDS = [
   "archived",
   "restored",
   "marked",
+  "retitling",
   "taken",
   "offered",
   "reserved",

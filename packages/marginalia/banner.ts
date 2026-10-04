@@ -3,14 +3,12 @@
 // record is `work.ts`'s (`pineta.banner`); the host carries the plan out.
 
 import type { BannerRecord, Sha256, ThreadName } from "@pineta/core"
+import { type ModelRef, modelRef, recordOf } from "./config.ts"
 
 // ── the setting ───────────────────────────────────────────────────────────
 
 /** Banners' image model. */
-export interface BannerConfig {
-  readonly provider: string
-  readonly model: string
-}
+export type BannerConfig = ModelRef
 
 /**
  * Recraft V4.1 Flash: 0.7¢ an image and about 1.5 seconds, as OpenRouter
@@ -21,25 +19,14 @@ export const DEFAULT_BANNER: BannerConfig = {
   model: "recraft/recraft-v4.1-flash",
 }
 
-const recordOf = (v: unknown): Record<string, unknown> | undefined =>
-  typeof v === "object" && v !== null && !Array.isArray(v)
-    ? (v as Record<string, unknown>)
-    : undefined
-
 /**
  * The user config's `banner`: null unless `enabled` is `true`. `model` is
- * `provider/id`, split at its first `/`, as the id may hold more. Total: a
- * malformed model takes the default.
+ * `provider/id` (`modelRef`). Total: a malformed model takes the default.
  */
 export function decodeBannerConfig(json: unknown): BannerConfig | null {
   const banner = recordOf(recordOf(json)?.banner)
   if (banner?.enabled !== true) return null
-  const at = typeof banner.model === "string" ? banner.model.indexOf("/") : -1
-  return typeof banner.model === "string" &&
-    at > 0 &&
-    at < banner.model.length - 1
-    ? { provider: banner.model.slice(0, at), model: banner.model.slice(at + 1) }
-    : DEFAULT_BANNER
+  return modelRef(banner.model) ?? DEFAULT_BANNER
 }
 
 // ── the decision ──────────────────────────────────────────────────────────

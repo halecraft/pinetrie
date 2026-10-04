@@ -593,16 +593,20 @@ Note what it does **not** do: it detects change, it does not design for it.
 Probes P1 and P2 in `sandbox/s17-typed-entries/` could each have failed while
 conformance stayed green, which is why they ran first.
 
-### Requests outside every thread (`Agent.complete`, ADR-0038, ADR-0056)
+### Requests outside every thread (`Agent.complete`, ADR-0038, ADR-0056, ADR-0074)
 
-`complete({ system, user })` is one `completeSimple` request on
-`describeModel`, with no tools and no session: nothing enters the tree or a
-lane's context. It writes an offer's commit message (`describeRequest`)
-and an ask's digest (`digestRequest`, the `ask-digest` skill); the host
+`complete({ system, user, purpose })` is one `completeSimple` request, with
+no tools and no session: nothing enters the tree or a lane's context. It
+writes an offer's commit message (`describeRequest`) and an ask's digest
+(`digestRequest`, the `ask-digest` skill) on `describeModel`, and a root's
+title (`titleRequest`, the `tab-title` skill, `purpose: "title"`) on the
+model `titleModelOf` chose at start: `CreateAgentOptions.titleModel` when pi
+has it (`titleModelFound` says whether), else `describeModel`, and always
+`describeModel` for a scripted model; the host
 builds each request and this package only carries it out. A failed request
-returns null: the offer keeps its placeholder, and the ask its last digest.
-A scripted model answers it from its own provider (`describe`), so neither
-takes a reply from the run's script.
+returns null: the offer keeps its placeholder, the ask its last digest, and
+the root its label. A scripted model answers it from its own provider
+(`describe`), so none takes a reply from the run's script.
 
 ### Banners' images (`Agent.drawBanner`, ADR-0050, ADR-0053)
 

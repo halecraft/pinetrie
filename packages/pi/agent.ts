@@ -35,6 +35,7 @@ import {
   type ChatMessage,
   chatImageShas,
   labelCommands,
+  type ModelRef,
   withChatImages,
 } from "@pineta/marginalia"
 import {
@@ -51,6 +52,7 @@ import {
   DEFAULT_AGENT_DIR,
   type ModelChoice,
   setUpModel,
+  titleModelOf,
 } from "./config.ts"
 import { createAgentHarness } from "./deep.ts"
 import {
@@ -110,7 +112,8 @@ export const newId = (): string => uuidv7()
 
 /**
  * Pineta's own skills, loaded after yours and the repo's: `resolve-conflicts`,
- * `commit-message`, `offer-stack` and `column-banner`.
+ * `commit-message`, `offer-stack`, `column-banner`, `ask-digest` and
+ * `tab-title`.
  */
 const SKILLS_DIR = path.join(import.meta.dirname, "skills")
 
@@ -176,6 +179,8 @@ export interface CreateAgentOptions {
     readonly config: BannerConfig
     request(lane: LaneName, ask: BannerAsk): Promise<BannerAnswer>
   }
+  /** The user config's title model (ADR-0074); null or absent for the run's. */
+  readonly titleModel?: ModelRef | null
 }
 
 /**
@@ -255,12 +260,16 @@ export interface Agent extends CommandFiles, Banners {
   agentDir(): string
   /**
    * One request outside every thread, with no tools and no session
-   * (`complete` in `config.ts`). Null when it fails.
+   * (`complete` in `config.ts`), on the title model for `purpose` `title`,
+   * else the describe model. Null when it fails.
    */
   complete(request: {
     readonly system: string
     readonly user: string
+    readonly purpose?: "title"
   }): Promise<string | null>
+  /** False when the user config names a title model pi does not have: titles use the run's. */
+  readonly titleModelFound: boolean
   close(): Promise<void>
 }
 
@@ -280,6 +289,11 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
     ...(options.agentDir === undefined ? {} : { agentDir: options.agentDir }),
   })
   const resolved = setup.model
+  const titles = titleModelOf(
+    setup,
+    options.titleModel ?? null,
+    options.model.kind === "scripted",
+  )
   // `set_banner` asks only while the agent has tools and banners are on.
   const bannerAsks = tools === null ? undefined : options.banners?.request
   const assembled =
@@ -454,7 +468,13 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
     ...banners(setup.images, options.banners?.config),
     modelLabel: `${resolved.provider}/${resolved.id}`,
 
-    complete: request => complete(setup, request),
+    complete: ({ purpose, ...request }) =>
+      complete(
+        setup,
+        purpose === "title" ? titles.model : setup.describeModel,
+        request,
+      ),
+    titleModelFound: titles.found,
 
     async appendToTree(message, spot) {
       const { session } = await ofRoot(spot.root)

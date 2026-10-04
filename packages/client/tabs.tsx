@@ -186,31 +186,41 @@ export function TabBar({
                               label: "Rename",
                               onChoose: () => setRenaming(root),
                             }
-                          : {
-                              key: "archive",
-                              className: "archive-root",
-                              disabled: item.busy !== null,
-                              title: "hide for everyone; restore from Archive",
-                              label: (
-                                <>
-                                  Archive
-                                  {item.busy !== null && (
-                                    <span className="why">
-                                      {" "}
-                                      · {ROOT_BUSY_REASON[item.busy]}
-                                    </span>
-                                  )}
-                                  {item.busy === null &&
-                                    dropsWords(item.drops) !== null && (
-                                      <span className="why drops">
+                          : item.kind === "retitle"
+                            ? {
+                                key: "retitle",
+                                className: "retitle-root",
+                                title:
+                                  "title this thread from what was said in it, for everyone",
+                                label: "Auto-update title",
+                                onChoose: () => onIntent(item.intent),
+                              }
+                            : {
+                                key: "archive",
+                                className: "archive-root",
+                                disabled: item.busy !== null,
+                                title:
+                                  "hide for everyone; restore from Archive",
+                                label: (
+                                  <>
+                                    Archive
+                                    {item.busy !== null && (
+                                      <span className="why">
                                         {" "}
-                                        · {dropsWords(item.drops)}
+                                        · {ROOT_BUSY_REASON[item.busy]}
                                       </span>
                                     )}
-                                </>
-                              ),
-                              onChoose: () => onIntent(item.intent),
-                            },
+                                    {item.busy === null &&
+                                      dropsWords(item.drops) !== null && (
+                                        <span className="why drops">
+                                          {" "}
+                                          · {dropsWords(item.drops)}
+                                        </span>
+                                      )}
+                                  </>
+                                ),
+                                onChoose: () => onIntent(item.intent),
+                              },
                       ),
                     },
                   ]}

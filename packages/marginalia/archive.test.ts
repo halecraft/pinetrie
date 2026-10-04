@@ -278,6 +278,7 @@ describe("writesIn: the root a command writes in (ADR-0063)", () => {
       },
       [TEST_ROOT],
     ],
+    ["a retitle: its root", { kind: "retitle", root: TEST_ROOT }, [TEST_ROOT]],
     [
       "an offer: its lane's root",
       { kind: "offer", lane: LANE_X, action: "refresh", to: null, seen: null },

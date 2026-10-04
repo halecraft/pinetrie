@@ -11,6 +11,8 @@ import { NO_TEXT } from "./root-label.ts"
 /** What a root tab's ⋯ offers. */
 export type TabMenuItem =
   | { readonly kind: "rename" }
+  /** Ask a model for a title from the root's messages (ADR-0074). */
+  | { readonly kind: "retitle"; readonly intent: Intent }
   /**
    * Archive, refused while the agent works in the root (`rootWork`). It
    * withdraws the offers of its threads named in `drops` (ADR-0061).
@@ -125,6 +127,7 @@ function tabView(tab: ActiveTab, input: TabsViewInput): TabView {
           ? []
           : [
               { kind: "rename" },
+              { kind: "retitle", intent: { kind: "retitle", root } },
               {
                 kind: "archive",
                 busy: input.work.get(root) ?? null,

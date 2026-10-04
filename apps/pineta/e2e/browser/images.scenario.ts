@@ -1,13 +1,17 @@
 // e2e/browser/images — an image pasted into the composer (ADR-0042), and a
 // tool's image, drawn in its row, which opens capped (ADR-0051).
 
-import path from "node:path"
 import { UPLOADING } from "@pineta/client/send"
 import { scriptedModel, sha256Of } from "@pineta/pi"
 import type { Page } from "@playwright/test"
-import { startHost } from "../../host/index.ts"
 import type { Checks } from "../checks.ts"
-import { committedProject, idleNow, suiteModel, waitFor } from "../harness.ts"
+import {
+  committedProject,
+  idleNow,
+  startSuiteHost,
+  suiteModel,
+  waitFor,
+} from "../harness.ts"
 import { greyPng, RED_PNG } from "../images.ts"
 import type { Scenario } from "../scenario.ts"
 
@@ -27,7 +31,7 @@ async function run(check: Checks["check"]): Promise<void> {
   const browser = await launchBrowser()
   try {
     {
-      const imageHost = await startHost({
+      const imageHost = await startSuiteHost({
         model: { kind: "scripted", script: suiteModel() },
         log: () => {},
       })
@@ -207,11 +211,10 @@ async function run(check: Checks["check"]): Promise<void> {
         "tall.png": tall,
       })
       const script = scriptedModel()
-      const imageHost = await startHost({
+      const imageHost = await startSuiteHost({
         model: { kind: "scripted", script },
         tools: { project: work },
         containers: false,
-        userConfig: path.join(work, "no-user-config.json"),
         log: () => {},
       })
       // It may use the clipboard, for copy's check (S68).

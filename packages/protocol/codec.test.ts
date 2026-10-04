@@ -193,6 +193,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       title: "Tab names",
     },
     { kind: "mark", root: TEST_ROOT, entry: entryId("e-1"), title: null },
+    { kind: "retitle", root: TEST_ROOT },
     {
       kind: "offer",
       lane: laneNameForThread("abc"),
@@ -332,6 +333,7 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
     { kind: "archived" },
     { kind: "restored" },
     { kind: "marked" },
+    { kind: "retitling" },
     { kind: "taken" },
     { kind: "offered" },
     { kind: "reserved" },
@@ -517,6 +519,13 @@ test("a mark names its entry; its title is trimmed, blank clears, and a line bre
     )
   assert.equal(
     refusalCode(decodeCommand({ kind: "mark", targetId: "", text: "x" })),
+    ERR.UNKNOWN_TARGET,
+  )
+})
+
+test("a retitle names its root; anything else is refused", () => {
+  assert.equal(
+    refusalCode(decodeCommand({ kind: "retitle", root: "e-1" })),
     ERR.UNKNOWN_TARGET,
   )
 })

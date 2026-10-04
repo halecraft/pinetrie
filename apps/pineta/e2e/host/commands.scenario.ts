@@ -5,13 +5,13 @@ import { ROOT } from "@pineta/core"
 import { scriptedModel } from "@pineta/pi"
 import { readCommands } from "@pineta/reads"
 import { rowMessage } from "@pineta/schema"
-import { startHost } from "../../host/index.ts"
 import type { Checks } from "../checks.ts"
 import {
   committedProject,
   entriesOf,
   idleNow,
   join,
+  startSuiteHost,
   waitFor,
 } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
@@ -31,12 +31,11 @@ async function run(check: Checks["check"]): Promise<void> {
     )
     const project = committedProject("pineta-commands-", { "a.txt": "a\n" })
     const script = scriptedModel()
-    const ch = await startHost({
+    const ch = await startSuiteHost({
       model: { kind: "scripted", script },
       tools: { project },
       containers: false,
       agentDir: path.join(fixtures, "pi-agent"),
-      userConfig: path.join(project, "no-user-config.json"),
       log: () => {},
     })
     const cu = await join(ch, "uma", "containers")

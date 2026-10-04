@@ -6,10 +6,9 @@ import path from "node:path"
 import { batch } from "@kyneta/schema"
 import { scriptedModel } from "@pineta/pi"
 import { readReading, readTyping } from "@pineta/reads"
-import { startHost } from "../../host/index.ts"
 import { openStore } from "../../host/store.ts"
 import type { Checks } from "../checks.ts"
-import { join, refusedWrite, waitFor } from "../harness.ts"
+import { join, refusedWrite, startSuiteHost, waitFor } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
 
 import { sleep } from "./support.ts"
@@ -27,7 +26,7 @@ async function run(check: Checks["check"]): Promise<void> {
       "pineta.db",
     )
     const phStore = openStore(dbFile).store
-    const ph = await startHost({
+    const ph = await startSuiteHost({
       model: { kind: "scripted", script: scriptedModel() },
       store: phStore,
       presenceDecay: decay,

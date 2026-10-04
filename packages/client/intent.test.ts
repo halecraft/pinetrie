@@ -565,7 +565,7 @@ describe("planIntent", () => {
     ])
   })
 
-  test("archive, restore and rename are one write each", () => {
+  test("archive, restore, rename and retitle are one write each", () => {
     const root = entryId("1-r1")
     expect(plan({ kind: "archive", root })).toEqual([
       {
@@ -577,6 +577,7 @@ describe("planIntent", () => {
     expect(plan({ kind: "rename", root, title: "T" })).toEqual([
       { kind: "mark", root, title: "T" },
     ])
+    expect(plan({ kind: "retitle", root })).toEqual([{ kind: "retitle", root }])
   })
 })
 

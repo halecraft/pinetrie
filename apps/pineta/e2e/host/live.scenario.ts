@@ -7,12 +7,13 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { type ImageRef, projectTranscript, ROOT } from "@pineta/core"
 import { readBanners } from "@pineta/reads"
-import { startHost } from "../../host/index.ts"
 import type { Checks } from "../checks.ts"
 import {
   idleNow,
   join,
   laneNamesOf,
+  SUITE_CONFIG,
+  startSuiteHost,
   tipIn,
   treeOf,
   waitFor,
@@ -40,7 +41,7 @@ const LIVE_MODEL = {
 
 async function run(check: Checks["check"]): Promise<void> {
   console.log("\n--- live turn ---")
-  const live = await startHost({
+  const live = await startSuiteHost({
     port: 0,
     model: LIVE_MODEL,
     log: () => {},
@@ -93,9 +94,12 @@ async function run(check: Checks["check"]): Promise<void> {
     mkdtempSync(path.join(tmpdir(), "pineta-live-banner-")),
     "config.json",
   )
-  writeFileSync(bannerConfig, JSON.stringify({ banner: { enabled: true } }))
+  writeFileSync(
+    bannerConfig,
+    JSON.stringify({ ...SUITE_CONFIG, banner: { enabled: true } }),
+  )
   const bannerLog: string[] = []
-  const drawing = await startHost({
+  const drawing = await startSuiteHost({
     port: 0,
     model: LIVE_MODEL,
     userConfig: bannerConfig,

@@ -7,7 +7,6 @@ import { type ImageRef, messageText, ROOT } from "@pineta/core"
 import { scriptedModel } from "@pineta/pi"
 import { readBanners, readPlaces } from "@pineta/reads"
 import { rowMessage } from "@pineta/schema"
-import { startHost } from "../../host/index.ts"
 import type { Checks } from "../checks.ts"
 import {
   committedProject,
@@ -15,6 +14,8 @@ import {
   idleNow,
   join,
   lanesOf,
+  SUITE_CONFIG,
+  startSuiteHost,
   treeOf,
   waitFor,
 } from "../harness.ts"
@@ -36,10 +37,13 @@ async function run(check: Checks["check"]): Promise<void> {
       mkdtempSync(path.join(tmpdir(), "pineta-banner-config-")),
       "config.json",
     )
-    writeFileSync(userConfig, JSON.stringify({ banner: { enabled: true } }))
+    writeFileSync(
+      userConfig,
+      JSON.stringify({ ...SUITE_CONFIG, banner: { enabled: true } }),
+    )
     const script = scriptedModel({ answer: { text: "noted" } })
     const GRACE_MS = 1_000
-    const bh = await startHost({
+    const bh = await startSuiteHost({
       model: { kind: "scripted", script },
       tools: { project },
       containers: false,
