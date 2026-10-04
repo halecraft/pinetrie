@@ -59,6 +59,19 @@ export function columnRows(
   return rows
 }
 
+/**
+ * The column's last ask whose run has ended: outline keeps its last word
+ * (ADR-0070). The running ask is passed over, so a new run leaves the reply
+ * before it in place until it ends itself.
+ */
+export function lastEndedAsk(
+  rows: readonly ColumnRow[],
+  runningAsk: EntryId | null,
+): EntryId | null {
+  const row = rows.findLast(r => r.kind === "ask" && r.ask !== runningAsk)
+  return row?.kind === "ask" ? row.ask : null
+}
+
 /** What an ask's work is drawn with. */
 export interface AskView {
   readonly ask: EntryId
@@ -71,8 +84,11 @@ export interface AskView {
   readonly outcome: string | null
   /** While it runs, what it is doing: its running command, else its latest text. */
   readonly live: string | null
-  /** Its last word (`lastWord`): hidden in outline. */
-  readonly lastWord: EntryId | null
+  /**
+   * What outline folds with its work: its last word (`lastWord`), unless it
+   * is the column's last ended ask (ADR-0070).
+   */
+  readonly outlineHides: EntryId | null
   /** Its model-written digest, when digests are on (ADR-0056). */
   readonly summary: string | null
   /** How many files its turns changed, and the span a review of them reads. */
@@ -110,6 +126,8 @@ export function askView(input: {
   readonly ask: EntryId
   /** The prompt of the ask this column's lane is running, if any. */
   readonly runningAsk: EntryId | null
+  /** The column's last ended ask (`lastEndedAsk`). */
+  readonly lastEnded: EntryId | null
   readonly stops: ReadonlyMap<EntryId, StopRecord>
   readonly revisions: ReadonlyMap<EntryId, RevisionRecord>
   readonly digests: ReadonlyMap<EntryId, { readonly text: string }>
@@ -136,7 +154,7 @@ export function askView(input: {
     digest: workWords(stats, input.nameOf),
     outcome: outcomeWords(outcome, input.nameOf),
     live: running ? liveLine(index, asks, ask) : null,
-    lastWord: lastWord(index, asks, ask),
+    outlineHides: input.lastEnded === ask ? null : lastWord(index, asks, ask),
     summary: input.digests.get(ask)?.text ?? null,
     files: stats.files.length,
     span: askSpan(index, asks, ask, input.revisions),

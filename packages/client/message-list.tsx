@@ -4,7 +4,12 @@
 
 import { ancestry, type EntryId, segmentPath } from "@pineta/core"
 import { memo } from "react"
-import { askView, type ColumnRow, columnRows } from "./ask-view.ts"
+import {
+  askView,
+  type ColumnRow,
+  columnRows,
+  lastEndedAsk,
+} from "./ask-view.ts"
 import { LEFT_WORDS } from "./ask-words.ts"
 import { AskWork } from "./ask-work.tsx"
 import { callStreams } from "./live.ts"
@@ -59,7 +64,9 @@ function MessageListView(p: MessageListProps) {
       : row.parts.some(s =>
           s.kind === "entry" ? s.id === id : s.ids.includes(id),
         )
-  return columnRows(segments, asks).flatMap(row => [
+  const rows = columnRows(segments, asks)
+  const lastEnded = lastEndedAsk(rows, p.runningAsk)
+  return rows.flatMap(row => [
     p.leftBefore !== null && holds(row, p.leftBefore) && (
       <div
         aria-hidden
@@ -83,6 +90,7 @@ function MessageListView(p: MessageListProps) {
           asks,
           ask: row.ask,
           runningAsk: p.runningAsk,
+          lastEnded,
           stops: p.stops,
           revisions: p.revisions,
           digests: p.digests,

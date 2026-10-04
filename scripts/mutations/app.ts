@@ -1272,6 +1272,16 @@ export const mutations: readonly Mutation[] = [
       "a thread left while the page was hidden marks what came since, and the line takes no room",
   },
   {
+    name: "the column passes its asks no last ended one",
+    file: "packages/client/message-list.tsx",
+    from: "          lastEnded,\n",
+    to: "          lastEnded: null,\n",
+    suite: "browser",
+    scenario: "tools",
+    expect:
+      "outline shows the last word of the column's last ended ask, and no other",
+  },
+  {
     name: "an ask's work never folds",
     file: "packages/client/ask-work.tsx",
     from: "  const open = foldOpen({",

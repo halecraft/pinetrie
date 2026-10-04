@@ -16,6 +16,22 @@ const copyText = "packages/client/copy-text.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "the running ask counts as the last ended",
+    file: "packages/client/ask-view.ts",
+    from: '  const row = rows.findLast(r => r.kind === "ask" && r.ask !== runningAsk)',
+    to: '  const row = rows.findLast(r => r.kind === "ask")',
+    command: unit,
+    expect: "lastEndedAsk: the column's last ask, passing over the one running",
+  },
+  {
+    name: "outline hides the last ended ask's last word",
+    file: "packages/client/ask-view.ts",
+    from: "    outlineHides: input.lastEnded === ask ? null : lastWord(index, asks, ask),",
+    to: "    outlineHides: lastWord(index, asks, ask),",
+    command: unit,
+    expect: "outline keeps the last word of the column's last ended ask",
+  },
+  {
     name: "the Archive tab's preview is not held",
     file: "packages/client/held-roots.ts",
     from: '    ...(active?.kind === "archive" && input.preview !== null',

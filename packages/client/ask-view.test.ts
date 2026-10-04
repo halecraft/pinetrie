@@ -8,7 +8,12 @@ import {
   writerId,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
-import { askView, columnRows } from "./ask-view.ts"
+import {
+  askView,
+  type ColumnRow,
+  columnRows,
+  lastEndedAsk,
+} from "./ask-view.ts"
 import { entry, indexOf } from "./fixtures.ts"
 
 type Message = NonNullable<EntryLike["message"]>
@@ -65,6 +70,23 @@ test("columnRows: an ask's work is one row, its prompt and what follows rows of 
   })
 })
 
+test("lastEndedAsk: the column's last ask, passing over the one running", () => {
+  const ask = (id: string): ColumnRow => ({
+    kind: "ask",
+    ask: entryId(id),
+    parts: [{ kind: "entry", id: entryId(`${id}-a`) }],
+  })
+  const rows: readonly ColumnRow[] = [
+    ask("1-p"),
+    { kind: "message", id: entryId("2-p") },
+    ask("2-p"),
+    { kind: "message", id: entryId("3-m") },
+  ]
+  expect(lastEndedAsk(rows, null)).toBe("2-p")
+  expect(lastEndedAsk(rows, entryId("2-p"))).toBe("1-p")
+  expect(lastEndedAsk(rows.slice(1, 2), null)).toBeNull()
+})
+
 describe("askView", () => {
   const view = (over: Partial<Parameters<typeof askView>[0]> = {}) =>
     askView({
@@ -72,6 +94,7 @@ describe("askView", () => {
       asks,
       ask: entryId("1-p"),
       runningAsk: null,
+      lastEnded: null,
       stops: new Map(),
       revisions: noRevisions,
       digests: new Map([[entryId("1-p"), { text: "Fixed it." }]]),
@@ -86,9 +109,12 @@ describe("askView", () => {
       digest: "3 steps · 1 tool call",
       outcome: null,
       live: null,
-      lastWord: "5-a",
+      outlineHides: "5-a",
       summary: "Fixed it.",
     })
+  })
+  test("outline keeps the last word of the column's last ended ask", () => {
+    expect(view({ lastEnded: entryId("1-p") }).outlineHides).toBeNull()
   })
   test("it ended while its reader was away when its last entry is past the tip they left", () => {
     expect(
@@ -125,6 +151,7 @@ describe("askView", () => {
         asks: indexAsks(stopped),
         ask: entryId("1-p"),
         runningAsk: null,
+        lastEnded: null,
         stops: new Map([
           [
             entryId("1-p"),

@@ -345,6 +345,17 @@ async function run(
           kept && lines >= 2,
           `${JSON.stringify({ kept, lines })}`,
         )
+        // Outline keeps the last ended ask's last word, and only that one.
+        const words = await Promise.all(
+          ["Read it eight times.", "Read it again.", "Back to you."].map(t =>
+            ap.locator(`${col(0)} ${msg(t)}`).count(),
+          ),
+        )
+        check(
+          "outline shows the last word of the column's last ended ask, and no other",
+          words.join() === "0,0,1",
+          `${JSON.stringify(words)}`,
+        )
       } finally {
         await ap.context().close()
         await askHost.shutdown()

@@ -294,7 +294,7 @@ the tree.
 
   | density | an ask shows |
   |---|---|
-  | **outline** | its message, and one line: how it ended, or what it is doing, and its digest |
+  | **outline** | its message, and one line: how it ended, or what it is doing, and its digest; the column's last ended ask also its last word (ADR-0070) |
   | **story** | its message, a digest line folding its work, and its last word |
   | **raw** | every message and tool row, under its digest line |
 

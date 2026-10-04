@@ -588,7 +588,8 @@ the columns read one. `segmentPath` (core) decides what a column folds;
   change.
 - **What `askView` decides:** the digest line (`workWords` over
   `askStats`), the outcome's words, the live line while it runs, the last
-  word (hidden in outline), the summary, and the span its files open in a
+  word outline hides (none in the column's last ended ask, `lastEndedAsk`,
+  ADR-0070), the summary, and the span its files open in a
   review (`askSpan`). `askWords` says an ask the same everywhere: the bar,
   the working mark's title, the rail's tooltip, outline.
 - **`openFold`:** `planIntent`'s `openAt` puts it before the reveal when

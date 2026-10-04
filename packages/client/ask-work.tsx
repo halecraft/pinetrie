@@ -74,7 +74,7 @@ export function AskWork({
   for (const s of parts) {
     if (s.kind === "entry") {
       // Outline keeps what the rail draws apart, and folds the rest.
-      if (!(outline && !open && s.id === view.lastWord))
+      if (!(outline && !open && s.id === view.outlineHides))
         drawn.push(message(s.id))
       continue
     }
