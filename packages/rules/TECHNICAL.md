@@ -11,17 +11,16 @@ modules decide, and the host writes.
 The package was `@pineta/marginalia` (`packages/marginalia/`) until it was
 renamed; the ADRs and findings use that name.
 
-Where a rule lives, as `@pineta/core`, `@pineta/repo` and `@pineta/session`
-state it too:
+Where a rule lives, as `@pineta/core` and `@pineta/repo` state it too:
 
 > Core holds the vocabulary (ids, intents, every record's type) and the
 > reads of the tree. A format or type that `lanes` or `repo` must read,
 > write or name lives in core too, since neither can declare
 > `@pineta/rules`. What a stored shape says, and how the host changes it,
 > is `@pineta/rules`', whoever reads it. One client's own in-flight state
-> (its moves, held roots, slot repair, commands out) is
-> `@pineta/session`'s. What the page draws, and its words, is
-> `@pineta/client`'s.
+> (its moves, held roots, slot repair, commands out) is its session's
+> (`connectSession`, in `@pineta/client` for now). What the page draws,
+> and its words, is `@pineta/client`'s.
 
 So `planStop` is here beside `STOP`, and `agentByDefault` beside
 `addressChat`; `address`, `parseMentions` and `moveOf`, which know no

@@ -10,8 +10,7 @@
 //
 // Nothing in this file may import pi, Kyneta, or a Node builtin.
 //
-// What belongs here, as `@pineta/rules`, `@pineta/session` and `@pineta/repo`
-// state it too: core holds the vocabulary (ids, intents, every record's type)
+// What belongs here, as `@pineta/rules` and `@pineta/repo` state it too: core holds the vocabulary (ids, intents, every record's type)
 // and the reads of the tree. A format or type that `lanes` or `repo` must
 // read, write or name lives in core too, since neither can declare
 // `@pineta/rules`. What a stored shape says, and how the host changes it, is
