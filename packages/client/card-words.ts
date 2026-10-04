@@ -8,8 +8,9 @@ import type {
   ThreadBase,
   WriterId,
 } from "@pineta/core"
-import { catchUpName, displayName } from "@pineta/marginalia"
+import { catchUpName, displayName, type PinnedStatus } from "@pineta/marginalia"
 import type { Refusal } from "./card-moves.ts"
+import type { PinnedMarker } from "./column-view.ts"
 import { lineWords, type Reader } from "./send.ts"
 
 /** What a thread catches up with, for a command's words. */
@@ -138,3 +139,44 @@ export const closeAskWords = (n: number): string =>
 /** A refusal's React key: what it is about, and why. */
 export const refusalKey = (refusal: Refusal): string =>
   `${refusal.code}:${refusal.card ?? ""}`
+
+// ── pinned cards (ADR-0048 step 5) ────────────────────────────────────────
+
+/** A drafting card's button that pins it to the top of its column. */
+export const PIN = "pin"
+export const PIN_TITLE =
+  "pin to the top of the column: the agent reads it on every run"
+/** A pinned card's button that puts it back below the line. */
+export const UNPIN = "unpin"
+/** The pinned strip with no cards: where a drop pins one. */
+export const PINNED_EMPTY = "drop a card here to pin it for the agent"
+
+/** A pinned card's heading: who pinned it. */
+export const pinnedWords = (by: WriterId, reader: Reader): string =>
+  `pinned by ${who(by, reader)}`
+
+/** How a pinned card stands against what the agent last read of it. */
+export const pinnedStatusWords = (status: PinnedStatus): string => {
+  switch (status) {
+    case "read":
+      return "read by the agent"
+    case "changed":
+      return "changed since the agent last read it"
+    case "unread":
+      return "not read by the agent yet"
+  }
+}
+
+/** A pinned card's size: what it costs on every run, quietly. */
+export const sizeWords = (tokens: number): string =>
+  `~${tokens} ${tokens === 1 ? "token" : "tokens"}`
+
+/** The marker above a run's prompt: how many pinned cards the agent read. */
+export const pinnedMarkerWords = (marker: PinnedMarker): string =>
+  marker.cards.length === 0
+    ? "the agent was told pinned cards no longer apply"
+    : `the agent read ${marker.cards.length} pinned ${marker.cards.length === 1 ? "card" : "cards"}`
+
+/** A card the agent was told no longer applies, by its first line. */
+export const retiredWords = (line: string): string =>
+  `no longer applies: “${line}”`

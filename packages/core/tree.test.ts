@@ -7,6 +7,7 @@ import {
   atEntry,
   branchColors,
   type ChatMode,
+  cardId,
   compactRail,
   type EntryId,
   type EntryLike,
@@ -18,15 +19,20 @@ import {
   laneNameForThread,
   messageImages,
   PENDING_TRACK,
+  type PinnedView,
   type Position,
+  pinnedInView,
   planStop,
   projectColumns,
   projectRail,
   projectSpine,
+  projectTranscript,
+  promptOf,
   type RailItem,
   ROOT,
   rootOf,
   type StopRecord,
+  startsRun,
   stretchSpan,
   tailEdit,
   threadOf,
@@ -166,10 +172,10 @@ describe("projectColumns", () => {
     ])
     expect([c?.forkFrom, ids(c?.nodes ?? [])]).toEqual([null, ["8-r1", "9-r2"]])
   })
-  test("a pinned column (fresh, or bound to a lane) ends at its anchor and follows nothing", () => {
+  test("an anchored column (fresh, or bound to a lane) ends at its anchor and follows nothing", () => {
     const [, c] = projectColumns(i, [
       { anchor: entryId("3-t3") },
-      { anchor: entryId("2-t2"), pinned: true },
+      { anchor: entryId("2-t2"), anchored: true },
     ])
     expect([c?.tipId, c?.forkFrom, ids(c?.nodes ?? [])]).toEqual([
       "2-t2",
@@ -179,7 +185,7 @@ describe("projectColumns", () => {
     // A fresh column at the root: nothing at all, and no fork.
     const [, root] = projectColumns(i, [
       { anchor: entryId("3-t3") },
-      { anchor: null, pinned: true },
+      { anchor: null, anchored: true },
     ])
     expect([root?.tipId, root?.forkFrom, root?.nodes]).toEqual([null, null, []])
   })
@@ -581,7 +587,7 @@ describe("colour and the agent", () => {
   test("a fresh branch is pending until it has a message", () => {
     const cols = projectColumns(i, [
       { anchor: entryId("3-t3") },
-      { anchor: entryId("2-t2"), pinned: true },
+      { anchor: entryId("2-t2"), anchored: true },
     ])
     expect(branchColors(rail, cols).track).toEqual([0, PENDING_TRACK])
   })
@@ -1010,5 +1016,103 @@ describe("toolLabel and tailEdit", () => {
     expect(edits.reduce((n, x) => n + x.insert.length, 0)).toBeLessThan(
       next.length / 2,
     )
+  })
+})
+
+describe("pinned cards in the tree (ADR-0048)", () => {
+  const card = (id: string, text: string) => ({
+    id: cardId(id),
+    text,
+    by: writerId("ada@example.com"),
+  })
+  const LANE = laneNameForThread("x")
+  const OTHER = laneNameForThread("p")
+  const cards = (
+    id: string,
+    parent: string | null,
+    view: PinnedView,
+  ): EntryLike =>
+    entry(id, parent, { role: "pinned", content: "", pinned: view })
+  const first: PinnedView = {
+    lane: OTHER,
+    cards: [card("c-1", "a")],
+    retired: [],
+  }
+  const second: PinnedView = {
+    lane: LANE,
+    cards: [card("c-2", "b")],
+    retired: [{ id: cardId("c-1"), line: "a" }],
+  }
+  // 1-q -> 2-cards(first) -> 3-p1 -> 4-r1 -> 5-cards(second) -> 6-p2 -> 7-r2
+  const list = [
+    entry("1-q", null, { role: "chat", content: "q", author: "A" }),
+    cards("2-cards", "1-q", first),
+    entry("3-p1", "2-cards", { role: "chat", content: "p1", author: "A" }),
+    entry("4-r1", "3-p1", { role: "assistant", content: "r1" }),
+    cards("5-cards", "4-r1", second),
+    entry("6-p2", "5-cards", { role: "chat", content: "p2", author: "A" }),
+    entry("7-r2", "6-p2", { role: "assistant", content: "r2" }),
+  ]
+  const index = indexTree(entriesOf(list))
+
+  test("a cards entry is no message: not in the transcript, nor the spine, nor a prompt", () => {
+    const tip = entryId("7-r2")
+    expect(projectTranscript(index, tip).map(m => m.id)).toEqual([
+      "1-q",
+      "3-p1",
+      "4-r1",
+      "6-p2",
+      "7-r2",
+    ])
+    expect(ids(projectSpine(index, tip).spine)).toEqual([
+      "1-q",
+      "3-p1",
+      "4-r1",
+      "6-p2",
+      "7-r2",
+    ])
+    expect(startsRun(index.entries[entryId("5-cards")])).toBe(false)
+    expect(promptOf(index, tip)).toBe("6-p2")
+  })
+
+  test("pinnedInView: the newest cards entry on the path; none above the first", () => {
+    expect(pinnedInView(index, entryId("7-r2"))).toEqual(second)
+    expect(pinnedInView(index, entryId("4-r1"))).toEqual(first)
+    expect(pinnedInView(index, entryId("1-q"))).toBeNull()
+    expect(pinnedInView(index, null)).toBeNull()
+  })
+
+  test("pinnedInView: a compaction ends the walk; what its retained tail carries is in view, or none", () => {
+    const carried: EntryLike = {
+      ...entry("8-c", "7-r2", undefined, { type: "compaction" }),
+      carried: first,
+    }
+    const after = entry("9-p3", "8-c", {
+      role: "chat",
+      content: "p3",
+      author: "A",
+    })
+    const bare = entry("8-d", "7-r2", undefined, { type: "compaction" })
+    const afterBare = entry("9-q", "8-d", {
+      role: "chat",
+      content: "q",
+      author: "A",
+    })
+    const grown = indexTree(
+      entriesOf([...list, carried, after, bare, afterBare]),
+    )
+    expect(pinnedInView(grown, entryId("9-p3"))).toEqual(first)
+    // An entry above the compaction was summarised: out of view.
+    expect(pinnedInView(grown, entryId("9-q"))).toBeNull()
+  })
+
+  test("pinnedInView on a branch's path: the parent's entry, read by another lane", () => {
+    const branch = indexTree(
+      entriesOf([
+        ...list,
+        entry("8-b", "3-p1", { role: "chat", content: "b", author: "A" }),
+      ]),
+    )
+    expect(pinnedInView(branch, entryId("8-b"))?.lane).toBe(OTHER)
   })
 })

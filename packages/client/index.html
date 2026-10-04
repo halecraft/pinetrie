@@ -543,6 +543,26 @@
       /* Something of yours refused, said where you acted (ADR-0059). */
       .refused-move { font-size: .75rem; color: #d0a15f; margin: 0 0 1rem; }
       .take { padding: .05rem .45rem; font-size: .72rem; cursor: grab; }
+      /* Pinned cards (ADR-0048 step 5): the thread's direction, at the top of
+         its column and outside its scrolling body; the agent reads them on
+         every run. Empty, a slim drop zone. */
+      .pinned-strip { max-height: 30vh; overflow-y: auto; padding: .35rem .75rem;
+        border-bottom: 1px solid #23272e; background: #16181d; }
+      .pinned-empty { display: block; font-size: .72rem; color: #6f7784; }
+      .pinned-strip[data-empty] { display: none; }
+      body[data-card-drag] .pinned-strip[data-empty] { display: block; }
+      .card-editor.pinned { margin: 0 0 .5rem; padding-left: .5rem; border-left: 2px solid #8ab4f8; }
+      .card-editor.pinned .compose-row { justify-content: flex-start; }
+      .pinned-size, .pinned-status { font-size: .72rem; color: #8b93a1; }
+      .pinned-status[data-status="changed"], .pinned-status[data-status="unread"] { color: #e8c07a; }
+      .pin, .unpin { padding: .05rem .45rem; font-size: .72rem; }
+      /* Where a run read pinned cards: a small marker above its prompt. */
+      .pinned-read { font-size: .72rem; color: #8b93a1; margin: 0 0 .4rem; }
+      .pinned-read summary { cursor: pointer; }
+      .pinned-read-card { margin: .3rem 0 0 .75rem; }
+      .pinned-read-by { color: #6f7784; }
+      .pinned-read-text { white-space: pre-wrap; color: #c3c8d0; }
+      .pinned-read-retired { margin: .3rem 0 0 .75rem; font-style: italic; }
       .card-heading[draggable="true"] { cursor: grab; }
       /* Your inventory (ADR-0048): floating over the columns' middle, docked
          left, centre or right, a 3 × 6 grid beside the selected card. */

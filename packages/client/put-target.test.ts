@@ -39,6 +39,8 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
     { kind: "inventory", slot: 0 },
     { kind: "inventory", slot: 17 },
     { kind: "column", key: "k-closed" },
+    { kind: "pinned", key: "k-thread" },
+    { kind: "pinned", key: "k-fresh" },
   ]
 
   test.each(targets)("a drop on %o lands where a put to it lands", target => {
@@ -68,6 +70,17 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
       holder: ME,
     })
     expect(at(targets[4] as PutTarget)).toBeNull()
+  })
+
+  test("a column's pinned strip lands pinned at its composer's thread end; a fresh column has none", () => {
+    const at = (t: PutTarget) => placeOfTarget(t, store.current(), ME)
+    expect(at(targets[5] as PutTarget)).toEqual({
+      kind: "pinned",
+      root: TEST_ROOT,
+      at: E1,
+      lane: LANE,
+    })
+    expect(at(targets[6] as PutTarget)).toBeNull()
   })
 
   test("an element with no mark, or a slot that is no number, is no target", () => {

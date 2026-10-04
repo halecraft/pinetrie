@@ -8,6 +8,7 @@ import {
   runId,
   writerId,
 } from "@pineta/core"
+import { encodePinned } from "@pineta/marginalia"
 import {
   beginRun,
   newLiveDoc,
@@ -46,6 +47,38 @@ test("readTreeIndex keeps the index, and each unchanged entry, until entries cha
   expect(after.entries[e1]).toBe(before.entries[e1])
   expect(after.entries[e2]).toBe(before.entries[e2])
   expect(after.childrenOf.get(entryId("e2"))).toEqual(["e3"])
+})
+
+test("a compaction carries the newest cards entry of its retained tail; one with none carries nothing", () => {
+  const doc = newRootDoc()
+  const lane = laneNameForThread("0123456789abcdef")
+  const view = (text: string) => ({
+    lane,
+    cards: [{ id: cardId("c-1"), text, by: writerId("ada@x.io") }],
+    retired: [],
+  })
+  const compaction = (id: string, retainedTail: unknown[]): StoredEntryRow => ({
+    id,
+    parentId: "e1",
+    type: "compaction",
+    timestamp: 0,
+    fromId: null,
+    payload: { summary: "s", tokensBefore: 1, retainedTail, fromHook: true },
+  })
+  writeEntry(doc, row("e1", null))
+  writeEntry(
+    doc,
+    compaction("c1", [
+      encodePinned(view("old"), w => w, 1),
+      { role: "user", content: "x" },
+      encodePinned(view("new"), w => w, 2),
+    ]),
+  )
+  writeEntry(doc, compaction("c2", [{ role: "user", content: "x" }]))
+  const index = readTreeIndex(doc)
+  expect(index.entries[entryId("c1")]?.carried).toEqual(view("new"))
+  expect(index.entries[entryId("c2")]?.carried).toBeUndefined()
+  expect(index.entries[entryId("e1")]?.carried).toBeUndefined()
 })
 
 test("readLanes: a lane's queued cards are what waits; askedBy is who queued the first, lastWaiting the last", () => {

@@ -141,8 +141,8 @@ export type ReaderAction =
     }
   | { readonly kind: "details"; readonly key: string; readonly open: boolean }
 
-/** Whether a column's path ends at its anchor (`ColumnSpec.pinned`). */
-export const isPinned = (c: Column): boolean =>
+/** Whether a column's path ends at its anchor (`ColumnSpec.anchored`). */
+export const isAnchored = (c: Column): boolean =>
   c.fresh !== undefined || c.lane !== undefined
 
 /** Insert `column` after position `after`, clamped to the list. */

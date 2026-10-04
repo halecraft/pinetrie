@@ -12,6 +12,7 @@
 import {
   type CardId,
   type CardRecord,
+  draftingOf,
   keyOf,
   type LaneName,
   type Move,
@@ -19,6 +20,7 @@ import {
   moveOf,
   type PlaceKey,
   type Position,
+  pinnedOf,
   queueRoot,
   type RootId,
   sameKey,
@@ -28,6 +30,7 @@ import type { Outcome } from "@pineta/protocol/codec"
 import {
   AT_INVENTORY,
   atColumn,
+  IN_COLUMN,
   type MoveAnswer,
   type MoveHow,
   type Refusal,
@@ -169,6 +172,35 @@ export function planPut(
   if (to === null || sameKey(from, to)) return []
   const move = moveOf(now, to)
   return [moveCard(move, { actedAt: atColumn(target.key), slot: null }, true)]
+}
+
+/**
+ * Pin `card`, below the line at a thread's end, at the top of the same
+ * thread's column. A move like any other: the host records it, and an undo
+ * of moves reverses it (ADR-0066).
+ */
+export function planPin(
+  card: CardId,
+  key: string,
+  state: IntentState,
+): readonly Effect[] {
+  const now = cardOf(state.cards, card)
+  const to = now === undefined ? null : pinnedOf(now.place)
+  return now === undefined || to === null
+    ? []
+    : [moveCard(moveOf(now, to), IN_COLUMN(key), true)]
+}
+
+/** Unpin `card`: below the line where it was pinned. */
+export function planUnpin(
+  card: CardId,
+  key: string,
+  state: IntentState,
+): readonly Effect[] {
+  const now = cardOf(state.cards, card)
+  return now?.place.kind === "pinned"
+    ? [moveCard(moveOf(now, draftingOf(now.place)), IN_COLUMN(key), true)]
+    : []
 }
 
 /** Remove a card from your inventory: final, so not recorded. */

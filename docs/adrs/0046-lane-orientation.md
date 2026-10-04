@@ -6,6 +6,11 @@ not built).
 **Amended by ADR-0064:** every lane of its own is also told to search with
 the `grep` and `find` tools and that rg, fd and sd are on `PATH`; the
 browser fact is `defaultImage`, and its line names python3 too.
+**Amended by ADR-0048** (step 5, `PLAN-2026-10-03-pinned-cards`): every
+agent thread's `<rules>`, a lane of its own or not, holds one more fixed line,
+first: the team pins cards to say what it wants from the thread, they appear
+in `<pinned-cards>` blocks, and the latest block holds. It is constant, so a
+lane's prompt still stays the same between runs.
 
 **Context.** An agent in a lane of its own (ADR-0034) was told two things: its
 copy is at `/workspace`, and your working copy is at `/mnt/host-working-copy`,

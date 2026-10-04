@@ -67,6 +67,7 @@ export function revealOf(
       }
     }
     case "drafting":
+    case "pinned":
     case "queued": {
       const end =
         placeEnd(place, state.cards.me, state.cards.lanes, state.index) ??

@@ -605,6 +605,15 @@ export function readEntryMessage(
 export const rowMessage = (row: StoredEntryRow): unknown =>
   (row.payload as { message?: unknown } | null)?.message
 
+/**
+ * A compaction row's retained tail: the messages pi keeps after its summary,
+ * stored on the compaction itself. Empty for any other row. Pure.
+ */
+export function rowRetainedTail(row: StoredEntryRow): readonly unknown[] {
+  const tail = (row.payload as { retainedTail?: unknown } | null)?.retainedTail
+  return row.type === "compaction" && Array.isArray(tail) ? tail : []
+}
+
 export * from "./inventory.ts"
 export * from "./places.ts"
 export * from "./presence.ts"

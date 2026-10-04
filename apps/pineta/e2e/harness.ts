@@ -130,9 +130,7 @@ export const join = async (
   host: { readonly wsUrl: string },
   name: string,
   scenario: string,
-  options: Partial<
-    Omit<ConnectOptions, "url" | "WebSocket" | "principal">
-  > = {},
+  options: Partial<Omit<ConnectOptions, "url" | "principal">> = {},
 ): Promise<SessionClient> => {
   const client = await connectSession({
     url: host.wsUrl,
@@ -158,6 +156,31 @@ export const join = async (
       return mark(...args)
     },
   })
+}
+
+/**
+ * A WebSocket that sends every frame naming `docId` `ms` late, in order:
+ * a client whose writes to that document reach the host after the commands
+ * it sends behind them, as Kyneta allows (S96). A frame names a document by
+ * its id's bytes, so this needs no reading of Kyneta's wire.
+ */
+export const lateFor = (docId: string, ms: number): typeof WebSocket => {
+  const name = Buffer.from(docId)
+  const bytesOf = (data: unknown): Buffer | null =>
+    typeof data === "string"
+      ? Buffer.from(data)
+      : data instanceof ArrayBuffer
+        ? Buffer.from(data)
+        : ArrayBuffer.isView(data)
+          ? Buffer.from(data.buffer, data.byteOffset, data.byteLength)
+          : null
+  return class extends WebSocket {
+    override send(data: Parameters<WebSocket["send"]>[0]): void {
+      if (bytesOf(data)?.includes(name) === true)
+        setTimeout(() => super.send(data), ms)
+      else super.send(data)
+    }
+  }
 }
 
 /**

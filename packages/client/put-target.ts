@@ -11,6 +11,7 @@ import {
   type CardPlace,
   keyOf,
   type PlaceKey,
+  pinnedOf,
   sameKey,
   type WriterId,
 } from "@pineta/core"
@@ -18,6 +19,8 @@ import {
 export type PutTarget =
   /** Below the line at a column's end, or a fresh column's card. */
   | { readonly kind: "column"; readonly key: string }
+  /** The pinned strip at the top of a thread's column (ADR-0048). */
+  | { readonly kind: "pinned"; readonly key: string }
   /** A slot of your inventory. */
   | { readonly kind: "inventory"; readonly slot: number }
 
@@ -26,17 +29,24 @@ export const CARD_MIME = "application/x-pineta-card"
 
 /** The attribute a column's drop zone carries: its key. */
 const PUT_COLUMN = "data-put-column"
+/** The attribute a column's pinned strip carries: its column's key. */
+const PUT_PINNED = "data-put-pinned"
 /** The attribute a slot carries: its index. */
 const PUT_SLOT = "data-put-slot"
 
-/** What an element a drop may land on matches: either mark. */
-export const DROP_ZONE = `[${PUT_COLUMN}],[${PUT_SLOT}]`
+/** What an element a drop may land on matches: any mark. */
+export const DROP_ZONE = `[${PUT_COLUMN}],[${PUT_PINNED}],[${PUT_SLOT}]`
 
 /** The attributes that mark an element as `target`, spread onto it by the page. */
 export function dropProps(target: PutTarget): Readonly<Record<string, string>> {
-  return target.kind === "column"
-    ? { [PUT_COLUMN]: target.key }
-    : { [PUT_SLOT]: String(target.slot) }
+  switch (target.kind) {
+    case "column":
+      return { [PUT_COLUMN]: target.key }
+    case "pinned":
+      return { [PUT_PINNED]: target.key }
+    case "inventory":
+      return { [PUT_SLOT]: String(target.slot) }
+  }
 }
 
 /** The target an element marks (`dropProps`); null for none. */
@@ -45,6 +55,8 @@ export function targetOfElement(el: {
 }): PutTarget | null {
   const key = el.getAttribute(PUT_COLUMN)
   if (key !== null && key !== "") return { kind: "column", key }
+  const pinned = el.getAttribute(PUT_PINNED)
+  if (pinned !== null && pinned !== "") return { kind: "pinned", key: pinned }
   const slot = el.getAttribute(PUT_SLOT)
   if (slot === null || !/^\d+$/.test(slot)) return null
   return { kind: "inventory", slot: Number(slot) }
@@ -54,8 +66,9 @@ export function targetOfElement(el: {
 export type ComposerPlaces = ReadonlyMap<string, CardPlace>
 
 /**
- * The place `target` names: a column's composer place, or your inventory;
- * null for a column no composer publishes.
+ * The place `target` names: a column's composer place, the same thread end
+ * pinned (`pinnedOf`), or your inventory; null for a column no composer
+ * publishes, and for a fresh column's strip, which it has none of.
  */
 export function placeOfTarget(
   target: PutTarget,
@@ -64,7 +77,8 @@ export function placeOfTarget(
 ): PlaceKey | null {
   if (target.kind === "inventory") return { kind: "inventory", holder: me }
   const place = places.get(target.key)
-  return place === undefined ? null : keyOf(place)
+  if (place === undefined) return null
+  return target.kind === "pinned" ? pinnedOf(place) : keyOf(place)
 }
 
 /** A store each column writes its composer place to as it renders; reading it redraws nothing. */

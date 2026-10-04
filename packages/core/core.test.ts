@@ -382,6 +382,13 @@ describe("a card's place as flat fields (ADR-0059)", () => {
       by: ADA,
       seen: "v",
     },
+    {
+      kind: "pinned",
+      root: TEST_ROOT,
+      at: atEntry(entryId("e-1")),
+      lane: laneNameForThread("x"),
+      order: "b",
+    },
     { kind: "fresh", column: "k", root: TEST_ROOT, at: ROOT },
     {
       kind: "fresh",
@@ -397,6 +404,27 @@ describe("a card's place as flat fields (ADR-0059)", () => {
       expect(placeOfFields(placeFields(place))).toEqual(place)
       expect(keyOfFields(placeFields(keyOf(place)))).toEqual(keyOf(place))
     }
+  })
+
+  test("a pinned card needs its order; its key has none, and keeps its lane", () => {
+    const pinned = places[2] as CardPlace
+    const f = placeFields(pinned)
+    expect(placeOfFields({ ...f, order: "" })).toBeUndefined()
+    expect(keyOf(pinned)).toEqual({
+      kind: "pinned",
+      root: TEST_ROOT,
+      at: atEntry(entryId("e-1")),
+      lane: laneNameForThread("x"),
+    })
+  })
+
+  test("sameKey leaves out the pinned cards' order, and tells pinned from drafting", () => {
+    const pinned = keyOf(places[2] as CardPlace)
+    expect(sameKey(pinned, keyOf({ ...(places[2] as CardPlace) }))).toBe(true)
+    expect(
+      pinned.kind === "pinned" &&
+        sameKey(pinned, { ...pinned, kind: "drafting" }),
+    ).toBe(false)
   })
 
   test("a fresh card needs its root", () => {

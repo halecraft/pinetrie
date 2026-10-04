@@ -262,12 +262,20 @@ export function intentsOf(state: MovesState): Intents {
   return intents
 }
 
+/** An order key after every one the host assigns (`orderAfter`). */
+const LAST = "\uffff"
+
 /**
- * A key as the place it is drawn as. A queued one waits for the host to give
- * it an order, so it is drawn last in its lane's queue, queued by you.
+ * A key as the place it is drawn as. A queued or pinned one waits for the
+ * host to give it an order, so it is drawn last among its kind, a queued one
+ * queued by you.
  */
 const placeOf = (key: PlaceKey, me: WriterId): CardPlace =>
-  key.kind === "queued" ? { ...key, order: "\uffff", by: me } : key
+  key.kind === "queued"
+    ? { ...key, order: LAST, by: me }
+    : key.kind === "pinned"
+      ? { ...key, order: LAST }
+      : key
 
 /**
  * The host's records, with this tab's moves its copy does not yet hold drawn

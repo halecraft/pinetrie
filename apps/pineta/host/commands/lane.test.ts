@@ -38,9 +38,13 @@ function running() {
 
 test("stopping a running lane records who stopped its ask, then aborts its run", async () => {
   const { b, lane, handle, agent } = running()
-  expect(await handleStop({ basics: b, agent: agent.port }, lane, ada)).toEqual(
-    { kind: "stopped" },
-  )
+  expect(
+    await handleStop(
+      { basics: b, agent: agent.port, cancel: () => false },
+      lane,
+      ada,
+    ),
+  ).toEqual({ kind: "stopped" })
   expect(agent.calls).toEqual([
     {
       method: "writeValues",
@@ -65,7 +69,31 @@ test("a second stop of the same ask records nothing more", async () => {
     b,
     setRecord(STOP, { prompt: entryId("e-1"), by: bea, at: 1 }, ROOT_ID),
   )
-  await handleStop({ basics: b, agent: agent.port }, lane, ada)
+  await handleStop(
+    { basics: b, agent: agent.port, cancel: () => false },
+    lane,
+    ada,
+  )
   expect(methods(agent.calls)).toEqual(["lane"])
   expect(methods(handle.calls)).toEqual(["abort"])
+})
+
+test("a stop while a chat's run waits for its pinned cards cancels it there, and asks pi to abort nothing", async () => {
+  const { b, lane, handle, agent } = running()
+  const cancelled: string[] = []
+  await handleStop(
+    {
+      basics: b,
+      agent: agent.port,
+      cancel: l => {
+        cancelled.push(l)
+        return true
+      },
+    },
+    lane,
+    ada,
+  )
+  expect(cancelled).toEqual([lane])
+  expect(methods(agent.calls)).toEqual(["writeValues"])
+  expect(methods(handle.calls)).toEqual([])
 })

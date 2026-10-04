@@ -327,7 +327,7 @@ counter.
 - **`reserve` returns the same list when no column takes it.** A root with
   no stored columns would otherwise store its `first-<root>` column, and a
   new tab moving into that root would land beside it, as a second column. A bound or
-  fresh column is `pinned` in `projectColumns`: its path ends at its anchor.
+  fresh column is `anchored` in `projectColumns`: its path ends at its anchor.
 - **A null anchor** belongs only to a fresh column at the root: a new tab's.
 - **A fresh column** (`openFresh`: `→`, or "branch here" after a conflict; or
   a new tab) has nothing of its own yet. Its first send mints the
@@ -525,7 +525,7 @@ else reads those rows (tab summaries, archive search, `branchColors`).
 - **`railLandmarks` (core) is the rule, and the columns read it too:**
   `railKeep` (`rail-view.ts`) is the view's part, rings, running tips,
   every open column's end, and every thread end holding a card of yours,
-  whose dot carries its mark. A column's end is kept because a pinned column
+  whose dot carries its mark. A column's end is kept because an anchored column
   can end mid-stretch: inside one, half of it would be on the column's path,
   and where the column ends would not show. So a stretch is all on an open
   path or all off it, and `data-open` on its first message speaks for it.
@@ -1500,7 +1500,7 @@ places, the session or someone else's inventory throws before it is made.
 
 - **Where the column's cards are.** `Column` resolves its thread's end with
   `threadOf`, as a reply would go, and finds your card there with `yourCard`
-  and everyone else's with `draftingAt`. A fresh column's cards are found by
+  and everyone else's with `cardsAt("drafting", …)`. A fresh column's cards are found by
   its key (`CardPlace` `fresh`). So a tab switch, a reload or another device
   finds the same card: it belongs to the thread, not to the mounted column.
   Every card there but the one the composer shows is drawn above it: the
@@ -1572,6 +1572,47 @@ places, the session or someone else's inventory throws before it is made.
   to remove them, outside any history, since no column could show them
   again.
 
+## Pinned cards (ADR-0048 step 5)
+
+A thread's pinned cards are drawn in a strip under its column's header,
+outside the scrolling body (`pinned-strip.tsx`), so the thread's direction
+stays in view; the strip scrolls past 30vh.
+
+- **`Column` finds them with `cardsAt("pinned", threadEnd, …)`.** A fresh
+  column, or one with no thread end, has no strip: a card is pinned at a
+  thread's end, and a fresh column has none until its first send.
+- **Each is a `PinnedCardEditor`** (`card-editor.tsx`), a `BoundCardEditor`
+  with its size (`tokensOf`, four characters a token, as pi estimates),
+  its status, **unpin** and **take**. It has no send: Enter is a new line.
+  A drafting card's editor gains **pin**. Pin and unpin are moves
+  (`planPin`, `planUnpin`, `card-intents.ts`), so the host records them and
+  the undo key outside a box reverses them; `revealOf` shows a pinned place
+  as a drafting one, at its thread's end.
+- **A card's status is `pinnedStatus`** (`column-view.ts`): the card's
+  entry in `pinnedDiff(pinnedInView(index, end), …)`, the walk and the
+  comparison the host plans a run's entry from, so the strip and the run
+  agree on what the agent read. A card with no text yet has none.
+- **The empty strip shows only while a card is dragged.** `App` sets
+  `data-card-drag` on the body from a card's `dragenter` to its `dragend`
+  or drop, and the CSS shows `.pinned-strip[data-empty]` then. An empty strip
+  that always took room moved where a column shown again puts its reader.
+- **A send carries the pinned cards' versions.** `Column` puts the strip's
+  card ids in `how.pinned`, and `chatIntent` stamps each with its version as
+  this client has it (`versionOf`, `session-view.ts`, the one reading of
+  "the version I had", as a queue's `seen` is); the run waits for them.
+- **The marker above a run's prompt** is `pinnedMarkers(index, nodes)`,
+  computed in `MessageList` from the index: a node whose parent is a cards
+  entry gets `pinnedMarker(entry, pinnedInView(index, parentOf(entry)))`.
+  A cards entry and its prompt are written in one commit, so the prompt's
+  parent is the only place to look. The marker draws "no longer applies"
+  only when what the entry replaced was read by its own lane: a branch's
+  first run retires its parent's cards, and its column draws nothing for
+  that. A null marker draws nothing.
+- **Selectors for the browser suite:** `.pinned-strip`, its
+  `textarea[data-card]`, a drafting card's `.pin`, a pinned card's `.unpin`,
+  `.pinned-status[data-status]`, and `details.pinned-read` just before its
+  prompt's `.msg`.
+
 ## Marks for your cards (ADR-0048, step 2)
 
 A pip in your colour (`CardPip`, `.card-pip`, the one selector the suites
@@ -1586,6 +1627,7 @@ so it never lights the tab (`elsewhere`).
   placed by `cardEnd` and `rootOf`; a fresh card by `tabOfColumn`, so one
   typed in another browser tab or device, whose layout this one lacks, marks
   nothing. A card in your inventory marks nothing: the inventory is no tab.
+  Nor does a pinned card: it is a thread's direction, not unsent work.
 - **The marks read text, not records:** a record outlives its text (an
   emptied card stays until sent or swept). `holdsText` is `needsCard` with
   the one blank prefill, `AGENT_PREFILL`, so a bare `@agent ` is nothing,
@@ -1665,8 +1707,10 @@ state, never stored.
   `Column` publishes to `ComposerPlaces` as it renders; reading it redraws
   nothing. A drop target carries `data-put-column` (the column's
   `form.composer` and the cards above it) or `data-put-slot`, both written
-  by `datasetOf` and read by `targetOfElement`, so a drop lands exactly
-  where a put can. A slot as the target swaps a card already in your
+  by `dropProps` and read by `targetOfElement`, so a drop lands exactly
+  where a put can. A column's pinned strip carries `data-put-pinned`: it
+  lands where the column's composer would create a card, pinned (`pinnedOf`),
+  and a fresh column's strip, which has no thread, lands nowhere. A slot as the target swaps a card already in your
   inventory, and takes any other into that slot.
 - **Take, put, keep, remove, select and undo are intents** (`intent.ts`,
   `card-intents.ts`), planned from `IntentState.cards` (`CardFacts`: the

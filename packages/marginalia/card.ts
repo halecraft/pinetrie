@@ -141,8 +141,9 @@ export function placeEnd(
 }
 
 /**
- * A drafting card's thread end now; null for a queued or fresh card, or a
- * place gone.
+ * A drafting card's thread end now; null for any other card, or a place
+ * gone. A pinned card's end is `cardsAt`'s alone: resolved here, it would be
+ * drawn among the drafting cards and could take your composer (`yourCard`).
  */
 export const cardEnd = (
   card: CardRecord,
@@ -153,13 +154,41 @@ export const cardEnd = (
     ? placeEnd(card.place, card.owner, lanes, index)
     : null
 
-/** Every drafting card whose thread ends at `end`, everyone's, oldest first. */
-export const draftingAt = (
+/** The kinds of place at a thread's end, resolved through `threadOf`. */
+export type EndKind = "drafting" | "pinned"
+
+/**
+ * Everyone's cards of `kind` whose thread ends at `end`: by `order` when they
+ * have one, then by id, so oldest first. The one way a pinned card's end is
+ * resolved: `cardEnd` stays a drafting card's alone, so a pinned card is
+ * never drawn among the drafting cards or bound to a composer (`yourCard`).
+ */
+export function cardsAt(
+  kind: EndKind,
   end: EntryId,
   cards: readonly CardRecord[],
   lanes: readonly LaneView[],
   index: TreeIndex,
-): readonly CardRecord[] => cards.filter(c => cardEnd(c, lanes, index) === end)
+): readonly CardRecord[] {
+  return cards
+    .filter(
+      c =>
+        c.place.kind === kind &&
+        placeEnd(c.place, c.owner, lanes, index) === end,
+    )
+    .sort(byOrder)
+}
+
+/** The order of a place that has one, else "". */
+const orderOf = (c: CardRecord): string =>
+  c.place.kind === "queued" || c.place.kind === "pinned" ? c.place.order : ""
+
+/** By `order`, then by id (S69). */
+const byOrder = (a: CardRecord, b: CardRecord): number => {
+  const [x, y] = [orderOf(a), orderOf(b)]
+  if (x !== y) return x < y ? -1 : 1
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0
+}
 
 /** Where a column's composer is: a thread's end, or a fresh column by its key. */
 export type CardWhere =
@@ -200,6 +229,12 @@ export type QueuedCard = CardRecord & {
 
 const isQueued = (c: CardRecord): c is QueuedCard => c.place.kind === "queued"
 
+const isPinned = (
+  c: CardRecord,
+): c is CardRecord & {
+  readonly place: Extract<CardPlace, { kind: "pinned" }>
+} => c.place.kind === "pinned"
+
 /** A lane's queued cards, in the order they are taken: by `order`, then id. */
 export function queuedOn(
   cards: readonly CardRecord[],
@@ -208,17 +243,7 @@ export function queuedOn(
   return cards
     .filter(isQueued)
     .filter(c => c.place.lane === lane)
-    .sort((a, b) =>
-      a.place.order !== b.place.order
-        ? a.place.order < b.place.order
-          ? -1
-          : 1
-        : a.id < b.id
-          ? -1
-          : a.id > b.id
-            ? 1
-            : 0,
-    )
+    .sort(byOrder)
 }
 
 /**
@@ -235,9 +260,11 @@ const orderKey = (n: number): string =>
     .toString(36)
     .padStart(ORDER_WIDTH, "0")
 
-/** An order key after every card in `queue`. */
-export function orderAfter(queue: readonly QueuedCard[]): string {
-  const last = queue
+/** An order key after every card in `ordered`: a lane's queue, or every pinned card. */
+export function orderAfter(
+  ordered: readonly { readonly place: { readonly order: string } }[],
+): string {
+  const last = ordered
     .map(c => Number.parseInt(c.place.order, 36))
     .filter(n => Number.isFinite(n))
     .reduce((a, b) => Math.max(a, b), Number.NEGATIVE_INFINITY)
@@ -299,15 +326,29 @@ export type MoveStep =
       readonly now: CardRecord | null
     }
 
-/** A key as the place it becomes, with what the host assigns to a queued one. */
+/**
+ * A key as the place it becomes, with what the host assigns to a queued or
+ * pinned one. A pinned card goes after every pinned card in the session, not
+ * only its thread's: a thread is found through the tree, which a handoff
+ * does not read, and an order only has to grow within a thread.
+ */
 function placeAt(
   key: PlaceKey,
   cards: readonly CardRecord[],
   sender: WriterId,
 ): CardPlace {
-  return key.kind === "queued"
-    ? { ...key, order: orderAfter(queuedOn(cards, key.lane)), by: sender }
-    : key
+  switch (key.kind) {
+    case "queued":
+      return {
+        ...key,
+        order: orderAfter(queuedOn(cards, key.lane)),
+        by: sender,
+      }
+    case "pinned":
+      return { ...key, order: orderAfter(cards.filter(isPinned)) }
+    default:
+      return key
+  }
 }
 
 /**
@@ -348,6 +389,8 @@ function refuseInto(
  *   it holds fewer than `INVENTORY_SLOTS` cards. A creation obeys both.
  * - To the queue: after the lane's last card, queued by the sender, and why
  *   it was not sent before is cleared. Below the line again, it keeps both.
+ * - Pinned: after every pinned card (`placeAt`). Anyone may pin or unpin in
+ *   a shared place, and a pinned card is not removed.
  */
 export function planMove(
   cards: readonly CardRecord[],

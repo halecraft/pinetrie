@@ -60,6 +60,7 @@ function setUp(
     work: record<CommandDeps["work"]>(work).port,
     blobs: record<CommandDeps["blobs"]>({ ref: () => undefined }).port,
     cards: cards.port,
+    cancel: () => false,
     start: () => {
       throw new Error("no run here")
     },
@@ -251,6 +252,7 @@ test("a taken card in an archived root is refused, and the agent is never called
     mentions: [],
     work: null,
     card: null,
+    pinned: [],
     reserved: null,
     base: null,
   })

@@ -439,6 +439,12 @@ export async function connectSession(
   }
 
   /**
+   * A card's text version as this client has it now: what a queued card's
+   * take, and a run's pinned cards, wait for the host to hold (S96).
+   */
+  const versionOf = (id: CardId): string => textVersion(texts.text(id))
+
+  /**
    * A move, tracked; with `draft`, a creation, drawn as that record. A move
    * into a queue carries its text's version as this client has it now: the
    * host takes the card only once it holds that much (S96).
@@ -451,7 +457,7 @@ export async function connectSession(
   ): Promise<MoveAnswer> {
     const move =
       planned.to?.kind === "queued"
-        ? stampSeen(planned, textVersion(texts.text(planned.card)))
+        ? stampSeen(planned, versionOf(planned.card))
         : planned
     return tracked(
       { kind: "move", moves: [move] },
@@ -492,15 +498,13 @@ export async function connectSession(
           : cards.current().find(c => c.id === how.card)
       const root = roots.rootFor(at, how.root)
       if (root === undefined) return Promise.resolve(NO_ROOT)
-      // Queued when the lane is busy, it waits for this much text (S96).
       const intent = chatIntent(
         text,
         at,
         how,
         root,
-        card === undefined
-          ? null
-          : { id: card.id, seen: textVersion(texts.text(card.id)) },
+        card?.id ?? null,
+        versionOf,
       )
       // A chat's request id is stored as its message's `sendId`.
       const id = how.id ?? crypto.randomUUID()

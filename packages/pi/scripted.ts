@@ -80,11 +80,19 @@ export function scriptedModel(
      * describe request never takes a reply from the run's script (S48 item 22).
      */
     readonly describe?: ScriptStep
+    /**
+     * The model's context window, in tokens: small, pi compacts within a
+     * test (S92). pi's own default otherwise.
+     */
+    readonly contextWindow?: number
   } = {},
 ): ScriptedModel {
   const faux = fauxProvider({
     tokensPerSecond: options.tokensPerSecond ?? 4000,
     tokenSize: { min: 3, max: 6 },
+    ...(options.contextWindow === undefined
+      ? {}
+      : { models: [{ id: "faux-1", contextWindow: options.contextWindow }] }),
   })
   const describer = fauxProvider({
     provider: "scripted-describe",

@@ -18,7 +18,9 @@ import { describe, expect, test } from "vitest"
 import type { CardPort } from "./cards.ts"
 import { basics, record } from "./fakes.ts"
 import {
+  createBehind,
   drain,
+  givenUp,
   type TakeDeps,
   type Taken,
   type TakeTop,
@@ -477,5 +479,54 @@ describe("drain: bring up to date (ADR-0055)", () => {
       command: null,
       unsent: "pi refused",
     })
+  })
+})
+
+describe("waiting for a queued card's text (behind)", () => {
+  const queuedCard = (places: ReturnType<typeof newPlacesDoc>, id: string) => {
+    const card = readPlaces(places).find(c => c.id === id)
+    if (card?.place.kind !== "queued") throw new Error("not queued")
+    return { ...card, place: card.place }
+  }
+
+  test("givenUp: the awaited cards no longer queued, and no other", () => {
+    const places = newPlacesDoc()
+    queue(places, "c-1", "a")
+    expect(givenUp([cardId("c-1"), cardId("c-2")], readPlaces(places))).toEqual(
+      ["c-2"],
+    )
+  })
+
+  test("a card that leaves the queue gives its wait up, and drains nothing; one whose text arrives drains its lane", async () => {
+    const places = newPlacesDoc()
+    queue(places, "c-1", "a")
+    queue(places, "c-2", "b")
+    const waits = new Map<
+      string,
+      { arrive: () => void; signal?: AbortSignal }
+    >()
+    const texts: Pick<CardPort, "whenHolds"> = {
+      whenHolds: (id, _seen, signal) =>
+        new Promise(resolve => {
+          waits.set(id, { arrive: resolve, signal })
+          signal?.addEventListener("abort", () => resolve())
+        }),
+    }
+    const drained: string[] = []
+    const behind = createBehind({ places, texts, drain: l => drained.push(l) })
+    behind(queuedCard(places, "c-1"))
+    behind(queuedCard(places, "c-2"))
+    // Asked twice, a card is waited for once.
+    behind(queuedCard(places, "c-1"))
+    expect([...waits.keys()]).toEqual(["c-1", "c-2"])
+    // Someone takes c-1 out of the queue: its wait is given up.
+    places.cards.delete("c-1")
+    await Promise.resolve()
+    expect(waits.get("c-1")?.signal?.aborted).toBe(true)
+    expect(drained).toEqual([])
+    waits.get("c-2")?.arrive()
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(drained).toEqual([LANE])
   })
 })

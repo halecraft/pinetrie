@@ -252,6 +252,7 @@ describe("a chat from a card that found its lane busy", () => {
     mentions: [],
     work: null,
     card: { id: C1, seen: "" },
+    pinned: [],
     reserved: null,
     base: null,
   } as const
@@ -300,6 +301,7 @@ const sentChat = {
   mentions: [],
   work: null,
   card: { id: C1, seen: "" },
+  pinned: [],
   reserved: null,
   base: null,
 } as const

@@ -10,8 +10,13 @@ import {
   cardStatus,
   commandNote,
   commandWords,
+  pinnedMarkerWords,
+  pinnedStatusWords,
+  pinnedWords,
   queuedWords,
   refusalWords,
+  retiredWords,
+  sizeWords,
   unsentWords,
 } from "./card-words.ts"
 
@@ -129,4 +134,43 @@ test("cardStatus: the send's own status first; else why the host could not send 
   expect(cardStatus("sending…", "no such image")).toBe("sending…")
   expect(cardStatus("", "no such image")).toBe("not sent: no such image")
   expect(cardStatus("", null)).toBe("")
+})
+
+describe("pinned card words (ADR-0048 step 5)", () => {
+  const card = { id: cardId("p-1"), text: "x", by: ME }
+  test.each([
+    ["pinned by you", pinnedWords(ME, READER), "pinned by you"],
+    ["pinned by another", pinnedWords(BEA, READER), "pinned by Bea"],
+    ["read", pinnedStatusWords("read"), "read by the agent"],
+    [
+      "changed",
+      pinnedStatusWords("changed"),
+      "changed since the agent last read it",
+    ],
+    ["unread", pinnedStatusWords("unread"), "not read by the agent yet"],
+    ["one token", sizeWords(1), "~1 token"],
+    ["tokens", sizeWords(120), "~120 tokens"],
+    [
+      "a marker, one card",
+      pinnedMarkerWords({ cards: [card], retired: [] }),
+      "the agent read 1 pinned card",
+    ],
+    [
+      "a marker, two cards",
+      pinnedMarkerWords({ cards: [card, card], retired: [] }),
+      "the agent read 2 pinned cards",
+    ],
+    [
+      "a marker, every card unpinned",
+      pinnedMarkerWords({ cards: [], retired: [{ id: card.id, line: "x" }] }),
+      "the agent was told pinned cards no longer apply",
+    ],
+    [
+      "retired",
+      retiredWords("use the old schema"),
+      "no longer applies: “use the old schema”",
+    ],
+  ])("%s", (_, said, expected) => {
+    expect(said).toBe(expected)
+  })
 })

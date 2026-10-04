@@ -5,7 +5,13 @@
 // while it runs (S21). The take is where the cards people still edit meet
 // the tree.
 
-import { type CardId, type LaneName, parseMentions } from "@pineta/core"
+import { subscribe } from "@kyneta/schema"
+import {
+  type CardId,
+  type CardRecord,
+  type LaneName,
+  parseMentions,
+} from "@pineta/core"
 import {
   planTake,
   planUnsent,
@@ -70,6 +76,8 @@ export const takenChat = (taken: Taken): Chat => ({
   mentions: parseMentions(taken.text),
   work: null,
   card: { id: taken.card.id, seen: taken.card.place.seen },
+  // Its thread's pinned cards were edited long before it was taken.
+  pinned: [],
   reserved: null,
   base: null,
 })
@@ -146,7 +154,11 @@ async function carryOut(
     }
     if (prepared.kind === "conflicted") {
       await deps.texts.destroy(card.id)
-      deps.start(lane, { kind: "prompt", message: prepared.message })
+      deps.start(lane, {
+        kind: "prompt",
+        message: prepared.message,
+        pinnedSeen: [],
+      })
       return "ran"
     }
     // Brought up to date: what is left is a plain message.
@@ -189,4 +201,57 @@ function unsent(deps: TakeDeps, card: QueuedCard, reason: string): void {
   log(
     `[host] ${readThreadName(session, card.place.lane)}: a queued card was not sent: ${reason}`,
   )
+}
+
+/**
+ * The waits for a queued card's text to give up (`behind`): each awaited
+ * card no longer queued. The take removed it, someone unqueued, took or
+ * discarded it, or its lane went: its text will not be taken, so nothing is
+ * left to wait for. Pure.
+ */
+export const givenUp = (
+  awaited: Iterable<CardId>,
+  cards: readonly CardRecord[],
+): CardId[] => {
+  const queued = new Set(
+    cards.filter(c => c.place.kind === "queued").map(c => c.id),
+  )
+  return [...awaited].filter(id => !queued.has(id))
+}
+
+/**
+ * The drain's `behind`: wait once per card for its text as its queuer had
+ * it, then drain its lane again. A wait is given up when its card leaves
+ * the queue (`givenUp`), so no subscription outlives a card the take will
+ * never reach. The places are watched only while a wait is out.
+ */
+export function createBehind(deps: {
+  readonly places: PlacesDocHandle
+  readonly texts: Pick<CardPort, "whenHolds">
+  readonly drain: (lane: LaneName) => void
+}): (card: QueuedCard) => void {
+  const awaiting = new Map<CardId, AbortController>()
+  let unwatch: (() => void) | null = null
+  const watch = () => {
+    unwatch ??= subscribe(deps.places, () => {
+      for (const id of givenUp(awaiting.keys(), readPlaces(deps.places)))
+        awaiting.get(id)?.abort()
+    })
+  }
+  return card => {
+    if (awaiting.has(card.id)) return
+    const stop = new AbortController()
+    awaiting.set(card.id, stop)
+    watch()
+    void deps.texts
+      .whenHolds(card.id, card.place.seen, stop.signal)
+      .then(() => {
+        awaiting.delete(card.id)
+        if (awaiting.size === 0) {
+          unwatch?.()
+          unwatch = null
+        }
+        if (!stop.signal.aborted) deps.drain(card.place.lane)
+      })
+  }
 }

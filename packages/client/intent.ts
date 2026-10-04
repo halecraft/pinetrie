@@ -33,11 +33,13 @@ import {
   cardOf,
   moveCard,
   planKeep,
+  planPin,
   planPut,
   planRemove,
   planTake,
   planTakeCopy,
   planUndoMove,
+  planUnpin,
   queueMove,
 } from "./card-intents.ts"
 import {
@@ -94,6 +96,10 @@ export type ColumnAct =
       readonly lane: LaneName
       readonly at: Position
     }
+  /** Pin a card below the line at the top of its thread's column (ADR-0048). */
+  | { readonly kind: "pin"; readonly card: CardId }
+  /** Unpin a card: below the line at the thread's end again. */
+  | { readonly kind: "unpin"; readonly card: CardId }
   /** Take a queued card back below the line; `by` queued it. */
   | {
       readonly kind: "unqueue"
@@ -530,6 +536,10 @@ function planColumn(
       const move = moveOf(now, draftingOf(now.place))
       return [moveCard(move, IN_COLUMN(key), false, act.by)]
     }
+    case "pin":
+      return planPin(act.card, key, state)
+    case "unpin":
+      return planUnpin(act.card, key, state)
     case "setCommand":
       return [
         {

@@ -112,8 +112,9 @@ export function cardMarks(input: {
         break
       }
       // Only drafting and fresh cards are marked (ADR-0048): the inventory
-      // is no tab.
+      // is no tab, and a pinned card is a thread's direction, not unsent work.
       case "queued":
+      case "pinned":
       case "inventory":
         break
     }

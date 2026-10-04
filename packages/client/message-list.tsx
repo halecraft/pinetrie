@@ -12,6 +12,7 @@ import {
 } from "./ask-view.ts"
 import { LEFT_WORDS } from "./ask-words.ts"
 import { AskWork } from "./ask-work.tsx"
+import { pinnedMarkers } from "./column-view.ts"
 import { callStreams } from "./live.ts"
 import { Message } from "./message.tsx"
 import {
@@ -24,6 +25,7 @@ import { nameFor } from "./presence.tsx"
 function MessageListView(p: MessageListProps) {
   const { view, index, asks } = p
   const at = new Map(view.nodes.map((node, i) => [node.id, i]))
+  const markers = pinnedMarkers(index, view.nodes)
   const message = (id: EntryId) => {
     const i = at.get(id)
     const node = i === undefined ? undefined : view.nodes[i]
@@ -37,6 +39,7 @@ function MessageListView(p: MessageListProps) {
         forkTracks={p.forks.get(node.id) ?? []}
         join={p.joins.get(node.id)}
         key={node.id}
+        pinned={markers.get(node.id)}
         nameOf={p.nameOf}
         node={node}
         onAct={p.onAct}

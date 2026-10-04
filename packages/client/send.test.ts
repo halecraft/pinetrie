@@ -489,10 +489,13 @@ describe("where a new lane works: the chip and its menu", () => {
   })
 })
 
-test("a chat fills in what its column left out, and carries its column's reservation", () => {
+test("a chat fills in what its column left out, carries its column's reservation, and each card's version as this client has it", () => {
   const at = atEntry(entryId("e-1"))
   const lane = laneNameForThread("x")
-  expect(chatIntent("hi @bea", at, {}, TEST_ROOT, null)).toMatchObject({
+  const versionOf = (id: string) => `v-${id}`
+  expect(
+    chatIntent("hi @bea", at, {}, TEST_ROOT, null, versionOf),
+  ).toMatchObject({
     kind: "chat",
     root: TEST_ROOT,
     mode: "reply",
@@ -500,23 +503,35 @@ test("a chat fills in what its column left out, and carries its column's reserva
     asksAgent: false,
     work: null,
     card: null,
+    pinned: [],
     reserved: null,
     base: null,
   })
-  const card = { id: cardId("c-1"), seen: "v" }
   expect(
     chatIntent(
       "go",
       at,
-      { mode: "branch", lane, asksAgent: true, reserved: lane, base: "wip" },
+      {
+        mode: "branch",
+        lane,
+        asksAgent: true,
+        reserved: lane,
+        base: "wip",
+        pinned: [cardId("p-1"), cardId("p-2")],
+      },
       TEST_ROOT,
-      card,
+      cardId("c-1"),
+      versionOf,
     ),
   ).toMatchObject({
     mode: "branch",
     lane,
     asksAgent: true,
-    card,
+    card: { id: "c-1", seen: "v-c-1" },
+    pinned: [
+      { id: "p-1", seen: "v-p-1" },
+      { id: "p-2", seen: "v-p-2" },
+    ],
     reserved: lane,
     base: "wip",
   })

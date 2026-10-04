@@ -9,6 +9,7 @@ import {
   type Intent,
   laneNameForThread,
   type PlanMode,
+  type SentCard,
   type TreeIndex,
   threadOf,
   type WorkSetting,
@@ -79,6 +80,8 @@ export interface ChatContext {
   readonly work: WorkSetting | null
   /** The WIP bookmark a new lane begins from; null for the line (ADR-0060). */
   readonly base: string | null
+  /** The thread's pinned cards as the sender had them: a run waits for them. */
+  readonly pinned: readonly SentCard[]
 }
 
 /**
@@ -213,6 +216,7 @@ export async function sendChat(
     writer,
     work: chat.work,
     base: chat.base,
+    pinned: chat.pinned,
   })
   return sent
 }
@@ -261,6 +265,7 @@ export async function executeChat(
         runId: deps.start(planned.lane, {
           kind: "prompt",
           message: message(planned.details),
+          pinnedSeen: context.pinned,
         }),
       }
     case "createAndRun": {
@@ -326,6 +331,7 @@ export async function executeChat(
         runId: deps.start(created.lane, {
           kind: "prompt",
           message: message(planned.details),
+          pinnedSeen: context.pinned,
         }),
       }
     }

@@ -40,6 +40,13 @@ const drafting = {
   at: atEntry(A),
   lane: null,
 } as const
+const pinnedKey = {
+  kind: "pinned",
+  root: TEST_ROOT,
+  at: atEntry(A),
+  lane: null,
+} as const
+const pinnedAtA = { ...pinnedKey, order: "a" } as const
 const freshF1 = {
   kind: "fresh",
   column: "f-1",
@@ -216,6 +223,52 @@ describe("put", () => {
   })
 })
 
+describe("pin and unpin (ADR-0048 step 5)", () => {
+  test("pin: a drafting card to the top of the same thread's column, a move said in the column", () => {
+    const s = state({ cards: [card(C1, drafting)] })
+    expect(plan(inColumn({ kind: "pin", card: C1 }, threadKey), s)).toEqual([
+      {
+        kind: "moveCard",
+        move: { card: C1, from: drafting, to: pinnedKey },
+        how: { actedAt: { kind: "column", key: threadKey }, slot: null },
+        queuedBy: null,
+        fly: true,
+      },
+    ])
+  })
+
+  test("unpin: below the line where it was pinned", () => {
+    const s = state({ cards: [card(C1, pinnedAtA)] })
+    expect(
+      plan(inColumn({ kind: "unpin", card: C1 }, threadKey), s)[0],
+    ).toMatchObject({
+      kind: "moveCard",
+      move: { card: C1, from: pinnedKey, to: drafting },
+    })
+  })
+
+  test("a fresh card has no thread to pin to; an unpin of a card not pinned is nothing", () => {
+    const s = state({ cards: [card(C1, freshF1), card(C2, drafting)] })
+    expect(plan(inColumn({ kind: "pin", card: C1 }), s)).toEqual([])
+    expect(plan(inColumn({ kind: "unpin", card: C2 }, threadKey), s)).toEqual(
+      [],
+    )
+  })
+
+  test("a drop on a column's pinned strip pins", () => {
+    const s = state({ cards: [card(C1, inventory)], slots: { "3": C1 } })
+    expect(
+      plan(
+        { kind: "put", card: C1, target: { kind: "pinned", key: threadKey } },
+        s,
+      )[0],
+    ).toMatchObject({
+      kind: "moveCard",
+      move: { card: C1, from: inventory, to: pinnedKey },
+    })
+  })
+})
+
 describe("keep on close (ADR-0066)", () => {
   test("one move of every card into successive slots, then the close", () => {
     const s = state({
@@ -292,6 +345,12 @@ describe("afterUndo: what an undo's answer brings into view (ADR-0052)", () => {
   test("a card back at a thread's end: shown as openAt shows it", () => {
     expect(
       answered({ kind: "undone", cards: [{ card: C1, place: drafting }] }),
+    ).toContainEqual({ kind: "reveal", entry: A })
+  })
+
+  test("an undone pin: shown at its thread's end, as a drafting card is", () => {
+    expect(
+      answered({ kind: "undone", cards: [{ card: C1, place: pinnedKey }] }),
     ).toContainEqual({ kind: "reveal", entry: A })
   })
 

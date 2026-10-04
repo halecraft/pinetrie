@@ -22,8 +22,8 @@ import {
 import { describe, expect, test } from "vitest"
 import {
   cardEnd,
+  cardsAt,
   decodeCard,
-  draftingAt,
   encodeCard,
   historyOf,
   orderAfter,
@@ -91,6 +91,20 @@ const queued = (id: string, order: string, lane = LANE): QueuedCard => ({
     seen: "",
   },
 })
+const pinned = (
+  id: string,
+  order: string,
+  at = E2,
+): CardRecord & { readonly place: Extract<CardPlace, { kind: "pinned" }> } => ({
+  ...card({ id: cardId(id) }),
+  place: {
+    kind: "pinned",
+    root: TEST_ROOT,
+    at: atEntry(at),
+    lane: null,
+    order,
+  },
+})
 const laneAt = (tip: string): LaneView[] => [
   {
     name: laneNameForThread("x"),
@@ -149,14 +163,14 @@ describe("where a card sits", () => {
     ).toBeNull()
   })
 
-  test("draftingAt: everyone's cards at one end, oldest first, and not a sibling thread's", () => {
+  test("cardsAt drafting: everyone's cards at one end, oldest first, and not a sibling thread's", () => {
     const beas = card({ id: cardId("c-2"), owner: BEA })
     const sibling = card({
       id: cardId("c-3"),
       place: { kind: "drafting", root: TEST_ROOT, at: atEntry(F1), lane: null },
     })
     expect(
-      draftingAt(entryId("e2"), [card(), beas, sibling], [], tree()),
+      cardsAt("drafting", entryId("e2"), [card(), beas, sibling], [], tree()),
     ).toEqual([card(), beas])
   })
 
@@ -199,13 +213,53 @@ describe("where a card sits", () => {
     ).toBe("c-9")
   })
 
-  test("cardEnd and draftingAt see drafting cards only: a queued card is above the line", () => {
+  test("cardEnd and drafting cardsAt see drafting cards only: a queued card is above the line", () => {
     const q = queued("c-2", "a")
     // Its lane ends at e2, where it was queued: it is still not drafting there.
     expect(cardEnd(q, laneAt("e2"), tree())).toBeNull()
     expect(
-      draftingAt(entryId("e2"), [card(), q], laneAt("e2"), tree()),
+      cardsAt("drafting", entryId("e2"), [card(), q], laneAt("e2"), tree()),
     ).toEqual([card()])
+  })
+})
+
+describe("pinned cards", () => {
+  test("cardsAt pinned: a thread's pinned cards by order, then id; not a sibling thread's, nor drafting ones", () => {
+    const cards = [
+      pinned("p-3", "b"),
+      pinned("p-1", "c"),
+      pinned("p-2", "b"),
+      pinned("p-4", "a", F1),
+      card(),
+    ]
+    expect(cardsAt("pinned", E2, cards, [], tree()).map(c => c.id)).toEqual([
+      "p-2",
+      "p-3",
+      "p-1",
+    ])
+  })
+
+  test("a pinned card follows its thread as the thread grows", () => {
+    const grown = tree(entry("e3", "e2"))
+    expect(
+      cardsAt("pinned", entryId("e3"), [pinned("p-1", "a")], [], grown).map(
+        c => c.id,
+      ),
+    ).toEqual(["p-1"])
+  })
+
+  test("drafting cardsAt and yourCard never return a pinned card at the same end as your drafting card", () => {
+    const mine = pinned("p-9", "a")
+    expect(cardEnd(mine, [], tree())).toBeNull()
+    expect(
+      cardsAt("drafting", E2, [card(), mine], [], tree()).map(c => c.id),
+    ).toEqual(["c-1"])
+    expect(
+      yourCard(ADA, { kind: "end", end: E2 }, [card(), mine], [], tree())?.id,
+    ).toBe("c-1")
+    expect(
+      yourCard(ADA, { kind: "end", end: E2 }, [mine], [], tree()),
+    ).toBeUndefined()
   })
 })
 
@@ -350,6 +404,58 @@ describe("handoffs (ADR-0059)", () => {
     expect(step.kind === "write" && step.record).toMatchObject({
       command: "bring-up-to-date",
       unsent: "x",
+    })
+  })
+
+  test("pinning: after every pinned card in the session, any thread's; placed by the sender, who need not own it", () => {
+    const pinnedKey = {
+      kind: "pinned",
+      root: TEST_ROOT,
+      at: atEntry(E2),
+      lane: LANE,
+    } as const
+    const elsewhere = pinned("p-1", orderAfter([]), F1)
+    const c = card({ place: drafting })
+    expect(
+      planMove(
+        [elsewhere, c],
+        { card: C1, from: drafting, to: pinnedKey },
+        BEA,
+      ),
+    ).toEqual({
+      kind: "write",
+      record: {
+        ...c,
+        place: { ...pinnedKey, order: orderAfter([elsewhere]) },
+        placer: BEA,
+      },
+    })
+  })
+
+  test("unpinning goes below the line where it was pinned; a pinned card is not removed", () => {
+    const p = card({
+      place: {
+        kind: "pinned",
+        root: TEST_ROOT,
+        at: atEntry(E2),
+        lane: LANE,
+        order: "a",
+      },
+    })
+    const from = {
+      kind: "pinned",
+      root: TEST_ROOT,
+      at: atEntry(E2),
+      lane: LANE,
+    } as const
+    expect(planMove([p], { card: C1, from, to: drafting }, BEA)).toEqual({
+      kind: "write",
+      record: { ...p, place: drafting, placer: BEA },
+    })
+    expect(planMove([p], { card: C1, from, to: null }, ADA)).toEqual({
+      kind: "refused",
+      code: "not-fresh",
+      now: p,
     })
   })
 
@@ -620,6 +726,16 @@ describe("storage", () => {
       card({ place: freshPlace("k-1") }),
       card({ place: { kind: "inventory", holder: BEA } }),
       queued("c-2", "k"),
+      pinned("c-3", "k"),
+      card({
+        place: {
+          kind: "pinned",
+          root: TEST_ROOT,
+          at: atEntry(E2),
+          lane,
+          order: "m",
+        },
+      }),
       card({ command: "bring-up-to-date", unsent: "refused" }),
       card({ placer: BEA }),
     ])
@@ -630,7 +746,11 @@ describe("storage", () => {
 
   test("a malformed card is dropped, never thrown", () => {
     const ok = encodeCard(card())
+    // A pinned card needs its order.
     expect(decodeCard("c", { ...ok, kind: "pinned" })).toBeUndefined()
+    expect(
+      decodeCard("c", { ...ok, kind: "pinned", at: "", order: "a" }),
+    ).toBeUndefined()
     expect(decodeCard("c", { ...ok, at: "" })).toBeUndefined()
     expect(decodeCard("c", { ...ok, kind: "fresh" })).toBeUndefined()
     expect(decodeCard("c", { ...ok, kind: "inventory" })).toBeUndefined()

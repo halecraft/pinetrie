@@ -8,6 +8,7 @@ import path from "node:path"
 import {
   type AgentMessage,
   BACKGROUND_CONTEXT,
+  compact,
   convertToLlm,
   deleteValue,
   StorageBackedSession,
@@ -63,6 +64,7 @@ import {
   type ToolContext,
   toolContextOf,
 } from "./lanes.ts"
+import { carryPinned, withCarried } from "./pinned.ts"
 import { prefixChange, prefixOf } from "./prefix.ts"
 import { KynetaStorage } from "./storage.ts"
 import { STREAM_SOURCES, streamEventOf } from "./stream.ts"
@@ -376,6 +378,27 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
         return undefined
       })
     }
+    // A compaction keeps the cards the model last read in view (S92): the
+    // newest cards entry summarised is carried into pi's retained tail.
+    // Nothing is thrown: if `compact` fails, pi compacts on its own, and
+    // only the cards are lost, until the next run restates them.
+    harness.hooks.on("before_compaction", async event => {
+      const cards = carryPinned(event.preparation)
+      if (cards === null) return undefined
+      const done = await compact(
+        event.preparation,
+        setup.models,
+        resolved,
+        event.customInstructions,
+        undefined,
+        undefined,
+        undefined,
+        CTX,
+      )
+      return done.ok
+        ? { compaction: withCarried(done.value, cards) }
+        : undefined
+    })
     harness.hooks.on("before_payload", async event => {
       const next = prefixOf(event.payload)
       if (
@@ -442,7 +465,7 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
     return {
       name,
       append: message => on(h => h.append(message), UNKNOWN_LANE),
-      run: message => on(h => h.run(message), UNKNOWN_LANE),
+      run: (message, pinned) => on(h => h.run(message, pinned), UNKNOWN_LANE),
       resume: () => on(h => h.resume(), UNKNOWN_LANE),
       abort: () => on(h => h.abort(), undefined),
     }

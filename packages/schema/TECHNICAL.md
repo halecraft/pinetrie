@@ -19,7 +19,10 @@ plus one sealed `payload`.
 | `payload` | **not** typed: pi's variant data, sealed |
 
 Everything Pineta reasons about is a column. Everything pi owns is in
-`payload`. We type what we traverse.
+`payload`. We type what we traverse. Two readers lift what Pineta reads out
+of it, and nothing else looks inside: `rowMessage` (a message entry's
+message) and `rowRetainedTail` (a compaction's retained tail, where pi's
+compaction hook carries the pinned cards, ADR-0048).
 
 One thing pi wrote is not in `payload`: a message's image bytes. An image
 part there is a reference, `{type: "image", mimeType, sha256, width,
@@ -220,6 +223,8 @@ writes it, through `applyPlaceSteps` (`apps/pineta/host/places.ts`).
 - **A fresh row names its root and its branch point** (`root`, `at`, "" at
   for a new tab), as a drafting one does (ADR-0066). One without a root does
   not decode.
+- **A pinned row carries `order`**, as a queued one does, and no `by` or
+  `seen`: `kind`, `at` and `lane` are a drafting row's. No new field.
 - **A client cannot write it.** Every peer registers `writersPolicy`
   (`@pineta/protocol/writers`), Kyneta's `canWrite`, so a client's write
   throws before it is made, and the host refuses the same operations from

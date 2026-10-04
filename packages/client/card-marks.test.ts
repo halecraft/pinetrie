@@ -123,6 +123,26 @@ describe("cardMarks", () => {
     })
   })
 
+  test("a pinned card marks nothing: it is a thread's direction, not unsent work", () => {
+    const pinned: CardRecord = {
+      ...drafting("p", "e2"),
+      // In a root this tab does not hold, which a drafting card would mark.
+      place: {
+        kind: "pinned",
+        root: FAR_ROOT,
+        at: atEntry(entryId("e2")),
+        lane: null,
+        order: "a",
+      },
+    }
+    expect(sets(marks([pinned]))).toEqual({
+      roots: [],
+      newTabs: [],
+      ends: [],
+      elsewhere: false,
+    })
+  })
+
   test("a drafting card in a root this tab does not hold marks that root, from the directory (ADR-0063)", () => {
     const far = drafting("c", "f2")
     const card = { ...far, place: { ...far.place, root: FAR_ROOT } }

@@ -130,6 +130,15 @@ They share `checks.ts` (recording a check, and stopping at one),
   An undo key may follow a move at once: the host records it as it applies
   it.
 
+- **`lateFor(docId, ms)` is a client whose writes to one document arrive
+  late** (`harness.ts`): a WebSocket that sends every frame naming the
+  document's id `ms` later, in order, passed to `join` as `WebSocket`. Kyneta
+  keeps no order between documents (S96), but on one connection a text
+  usually beats the command behind it, so a check that the host waits for a
+  text (`host/cards`, a pinned card's) needs it late every time. If Kyneta's
+  frames stop carrying a document's id as bytes, nothing is delayed, and the
+  mutation "a run does not wait for its pinned cards' text" survives.
+
 - **`slowToLoad` delays one document's first `currentMeta`**, by
   `LATE_LOAD_MS` (`host/support.ts`). Kyneta's `#hydrate` reads
   `currentMeta` before `loadAll`, so this delays that document's first load

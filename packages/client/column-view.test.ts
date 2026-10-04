@@ -1,6 +1,7 @@
 import {
   type AgentMessageLike,
   type BaseRecord,
+  cardId,
   commitId,
   type EntryId,
   entryId,
@@ -9,6 +10,7 @@ import {
   type LaneView,
   laneNameForThread,
   type OfferRecord,
+  type PinnedView,
   type ProjectRecord,
   projectColumns,
   type RevisionRecord,
@@ -34,7 +36,11 @@ import {
   joinWords,
   lanesAlong,
   offerWords,
+  pinnedMarker,
+  pinnedMarkers,
+  pinnedStatus,
   startedWords,
+  tokensOf,
   type WorkFacts,
   workingWords,
 } from "./column-view.ts"
@@ -196,8 +202,8 @@ const facts = (
 ): ColumnFacts => {
   const index = tree(BRANCH)
   const views = projectColumns(index, [
-    { anchor: entryId("6"), pinned: true },
-    { anchor: entryId("b2"), pinned: true },
+    { anchor: entryId("6"), anchored: true },
+    { anchor: entryId("b2"), anchored: true },
   ])
   const view = views[n]
   if (view === undefined) throw new Error("no view")
@@ -325,8 +331,8 @@ describe("columnView: the header", () => {
     // Column 1 shows only the branch; lane A started at 3, in column 0.
     const index = tree([...BRANCH, ["b3", "b2", chat("more", true)]])
     const view = projectColumns(index, [
-      { anchor: entryId("6"), pinned: true },
-      { anchor: entryId("b3"), pinned: true },
+      { anchor: entryId("6"), anchored: true },
+      { anchor: entryId("b3"), anchored: true },
     ])[1]
     if (view === undefined) throw new Error("no view")
     const shows = columnView({
@@ -356,8 +362,8 @@ describe("columnView: the header", () => {
     expect(columnView(facts(0)).origin).toEqual({ kind: "none" })
     const index = tree(TRUNK)
     const [, fromChat] = projectColumns(index, [
-      { anchor: entryId("6"), pinned: true },
-      { anchor: entryId("2"), pinned: true },
+      { anchor: entryId("6"), anchored: true },
+      { anchor: entryId("2"), anchored: true },
     ])
     if (fromChat === undefined) throw new Error("no view")
     expect(
@@ -422,7 +428,7 @@ describe("columnView: a thread's details (ADR-0073)", () => {
     const index = tree(lines)
     const tip = lines.at(-1)?.[0] ?? ""
     const [view] = projectColumns(index, [
-      { anchor: entryId(tip), pinned: true },
+      { anchor: entryId(tip), anchored: true },
     ])
     if (view === undefined) throw new Error("no view")
     const shows = columnView({
@@ -1012,4 +1018,76 @@ describe("startedWords", () => {
   ])("%d s ago: %s", (seconds, words) => {
     expect(startedWords({ by: "Ada", at: 0 }, seconds * 1000)).toBe(words)
   })
+})
+
+describe("where the agent read pinned cards (ADR-0048)", () => {
+  const card = (id: string, text: string) => ({ id: cardId(id), text, by: ADA })
+  const read = (
+    lane: LaneName,
+    cards: PinnedView["cards"],
+    retired: PinnedView["retired"] = [],
+  ): PinnedView => ({ lane, cards, retired })
+
+  test("pinnedMarker: the cards read, and what no longer applies only after this lane's own read", () => {
+    const before = read(A, [card("c-1", "old")])
+    const entry = read(
+      A,
+      [card("c-2", "new")],
+      [{ id: cardId("c-1"), line: "old" }],
+    )
+    expect(pinnedMarker(entry, before)).toEqual({
+      cards: entry.cards,
+      retired: entry.retired,
+    })
+    // A branch's first run retires its parent's cards, read by another lane.
+    expect(
+      pinnedMarker(read(B, [], [{ id: cardId("c-1"), line: "old" }]), before),
+    ).toBeNull()
+    expect(
+      pinnedMarker(
+        read(B, [card("c-3", "x")], [{ id: cardId("c-1"), line: "old" }]),
+        before,
+      ),
+    ).toEqual({ cards: [card("c-3", "x")], retired: [] })
+  })
+
+  test("pinnedMarkers: above the entry whose parent is a cards entry, its prompt, and nowhere else", () => {
+    const pinned = (view: PinnedView): AgentMessageLike => ({
+      role: "pinned",
+      content: "",
+      pinned: view,
+    })
+    const index = indexOf([
+      entry("1-q", null, chat("q")),
+      entry("2-k", "1-q", pinned(read(A, [card("c-1", "a")]))),
+      entry("3-p", "2-k", chat("p", true)),
+      entry("4-r", "3-p", { role: "assistant", content: "r" }),
+      entry("5-p", "4-r", chat("again", true)),
+    ])
+    const nodes = ["1-q", "3-p", "4-r", "5-p"].map(id => ({ id: entryId(id) }))
+    expect([...pinnedMarkers(index, nodes)]).toEqual([
+      [entryId("3-p"), { cards: [card("c-1", "a")], retired: [] }],
+    ])
+  })
+})
+
+test("pinnedStatus: read, changed or unread against what the agent reads, by the host's comparison; none for a card with no text", () => {
+  const card = {
+    id: cardId("c-1"),
+    owner: ADA,
+    placer: ADA,
+    place: { kind: "inventory", holder: ADA } as const,
+    command: null,
+    unsent: null,
+  }
+  const inView: PinnedView = {
+    lane: A,
+    cards: [{ id: cardId("c-1"), text: "ship it", by: ADA }],
+    retired: [],
+  }
+  expect(pinnedStatus(card, "ship it", inView)).toBe("read")
+  expect(pinnedStatus(card, "ship it now", inView)).toBe("changed")
+  expect(pinnedStatus(card, "ship it", null)).toBe("unread")
+  expect(pinnedStatus(card, " ", inView)).toBeNull()
+  expect(tokensOf("12345")).toBe(2)
 })

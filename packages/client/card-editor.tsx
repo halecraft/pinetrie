@@ -20,6 +20,7 @@ import type {
   CardRecord,
   CommandSummary,
   LineRecord,
+  PinnedView,
   Position,
   ProjectRecord,
   SeatRecord,
@@ -43,11 +44,18 @@ import {
   CLEAR_COMMAND,
   cardStatus,
   commandNote,
+  PIN,
+  PIN_TITLE,
+  pinnedStatusWords,
+  pinnedWords,
   queuedWords,
+  sizeWords,
   TAKE,
   TAKE_TITLE,
+  UNPIN,
   UNQUEUE,
 } from "./card-words.ts"
+import { pinnedStatus, tokensOf } from "./column-view.ts"
 import type { Pending, Prefill } from "./columns.ts"
 import { matchCommands } from "./commands.ts"
 import { newCardId } from "./ids.ts"
@@ -79,6 +87,7 @@ import {
   whereWords,
 } from "./send.ts"
 import type { SessionClient } from "./session-view.ts"
+import { useStable } from "./use-stable.ts"
 
 /**
  * Bind a box to a card's text, its undo reaching only that card's steps
@@ -618,6 +627,16 @@ export function CardEditor(p: {
                 )}
               </div>
             )}
+          {card?.place.kind === "drafting" && (
+            <button
+              className="pin"
+              onClick={() => p.onAct({ kind: "pin", card: card.id })}
+              title={PIN_TITLE}
+              type="button"
+            >
+              {PIN}
+            </button>
+          )}
           {card !== undefined && (
             <TakeButton
               card={card.id}
@@ -689,14 +708,21 @@ export function BoundCardEditor(p: {
   children: ReactNode
   /** `data-queued`: a queued card's, which the browser suite reads. */
   queued: CardId | null
+  /** Told the card's text each time it changes. */
+  onText?: (text: string) => void
 }) {
   const { session, card } = p
   const box = useRef<HTMLTextAreaElement>(null)
   const [text, setText] = useState("")
+  // Of fixed identity, so a new `onText` each render never binds the box again.
+  const told = useStable((t: string) => {
+    setText(t)
+    p.onText?.(t)
+  })
   useEffect(() => {
     const el = box.current
-    return el === null ? undefined : bindText(session, card.id, el, setText)
-  }, [session, card.id])
+    return el === null ? undefined : bindText(session, card.id, el, told)
+  }, [session, card.id, told])
   return (
     <div className={p.className} data-queued={p.queued ?? undefined}>
       <div className="card-heading">{p.heading}</div>
@@ -767,6 +793,62 @@ export function QueuedCardEditor(p: {
             type="button"
           >
             {UNQUEUE}
+          </button>
+          <TakeButton
+            card={card.id}
+            onTake={id => p.onAct({ kind: "take", card: id })}
+          />
+        </>
+      )}
+    </BoundCardEditor>
+  )
+}
+
+/**
+ * A pinned card at the top of its column (ADR-0048): its text, which anyone
+ * here may edit, who pinned it, its size, how it stands against what the
+ * agent last read (`inView`), a button that unpins it, and one that takes
+ * it. It has no send: Enter is a new line.
+ */
+export function PinnedCardEditor(p: {
+  session: SessionClient
+  card: CardRecord
+  /** What the agent reads of the thread's pinned cards now (`pinnedInView`). */
+  inView: PinnedView | null
+  reader: Reader
+  readOnly: ReadOnly | null
+  onAct: (act: ColumnAct) => void
+  onTyping: () => void
+}) {
+  const { card } = p
+  const [text, setText] = useState("")
+  const status = pinnedStatus(card, text, p.inView)
+  return (
+    <BoundCardEditor
+      card={card}
+      className="card-editor pinned"
+      heading={pinnedWords(card.placer, p.reader)}
+      onText={setText}
+      onTyping={p.onTyping}
+      queued={null}
+      readOnly={p.readOnly !== null}
+      rows={1}
+      session={p.session}
+    >
+      <span className="pinned-size">{sizeWords(tokensOf(text))}</span>
+      {status !== null && (
+        <span className="pinned-status" data-status={status}>
+          {pinnedStatusWords(status)}
+        </span>
+      )}
+      {p.readOnly === null && (
+        <>
+          <button
+            className="unpin"
+            onClick={() => p.onAct({ kind: "unpin", card: card.id })}
+            type="button"
+          >
+            {UNPIN}
           </button>
           <TakeButton
             card={card.id}

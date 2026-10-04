@@ -93,13 +93,13 @@ discharged before any non-disposable code was written.
 |---|---|---|
 | lint + format | `pnpm run lint` | clean (Biome, Kyneta's settings) |
 | module boundaries | `workspace.test.ts` (in `pnpm test`) | ok |
-| unit (pure core) | `pnpm test` | 1798/1798 (Vitest) |
-| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 1128 listed; anchors checked in `pnpm test` |
+| unit (pure core) | `pnpm test` | 1875/1875 (Vitest) |
+| mutations | `pnpm mutate scripts/mutations/<list>.ts` | 1172 listed; anchors checked in `pnpm test` |
 | pi's own Storage suite | `pnpm run conformance` | 21/21 + 21/21 control |
-| end-to-end | `pnpm run e2e` | 13 scenarios, 45 checks, on the scripted model (S94) |
+| end-to-end | `pnpm run e2e` | 13 scenarios, 46 checks, on the scripted model (S94) |
 | with a real model | `pnpm run e2e:live` | the `live` scenario: 3 checks |
-| **real browser** | `pnpm run e2e:browser` | 4 scenarios, 165 checks; in a lane with no containers, the 6 that need one report SKIP |
-| test budget | `scripts/budget.test.ts` (in `pnpm test`) | 18 host and lanes scenarios ≤ ⌊√1798⌋; 4 browser ≤ ⌊√18⌋ |
+| **real browser** | `pnpm run e2e:browser` | 4 scenarios, 167 checks; in a lane with no containers, the 6 that need one report SKIP |
+| test budget | `scripts/budget.test.ts` (in `pnpm test`) | 18 host and lanes scenarios ≤ ⌊√1875⌋; 4 browser ≤ ⌊√18⌋ |
 | types | `pnpm run typecheck` | clean (strict) |
 | all-but-browser cascade | `pnpm run verify` | green |
 
@@ -182,9 +182,12 @@ cards. Who wrote in one comes from its `clientID`s, through the host's
 `pineta.seat` records. Text undo is Kyneta's stack, one per tab; moves are undone
 by the host's stacks (ADR-0066). Built
 so far: the drafting card (step 1), marks for your unsent cards (step 2),
-step 3: notes removed, and queued cards, and step 4: your inventory, a
+step 3: notes removed, and queued cards, step 4: your inventory, a
 floating 3 × 6 grid you take cards into and put them out of, by key, button
-or drag, with moves you can undo (ADR-0066). A send
+or drag, with moves you can undo (ADR-0066), and step 5's pinned cards: a
+strip at the top of a thread's column the agent reads on every run, in a
+cards entry pi writes with the run's prompt when they changed, carried
+across pi's compaction (S92). A send
 to a busy thread queues your
 card above the line, in the host's step that found the lane busy, where
 anyone can edit it or unqueue it until the host takes it; the take and an

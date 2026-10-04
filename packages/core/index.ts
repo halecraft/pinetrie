@@ -407,6 +407,11 @@ export type Intent =
        */
       readonly card: SentCard | null
       /**
+       * Each card pinned at the sender's thread end, with its text version
+       * as the sender had it: a run waits for them (ADR-0048, S96).
+       */
+      readonly pinned: readonly SentCard[]
+      /**
        * The lane id the sender's column reserved: the id a lane this message
        * creates is created under, unless pi holds it (ADR-0057).
        */
@@ -1241,7 +1246,8 @@ export const CARD_COMMANDS: readonly CardCommand[] = [
  * Where a card is. Drafting: below the line at a thread's end, kept as a send
  * carries it (where it started, and its column's lane) and resolved through
  * `threadOf` whenever it is needed, so it follows its thread as the thread
- * grows. Queued: above the line, waiting for its thread's lane, until the
+ * grows. Pinned: at the top of a thread's column, kept and resolved as a
+ * drafting card is; the agent reads it on every run. Queued: above the line, waiting for its thread's lane, until the
  * host takes it or someone unqueues it. Fresh: an unsent branch or new tab,
  * by its column's key, in the root it will start or branch in. Inventory: in its holder's inventory; which slot holds
  * it is the holder's own document (`InventoryDoc`), not the host's (ADR-0059).
@@ -1253,6 +1259,15 @@ export type CardPlace =
       readonly root: RootId
       readonly at: Position
       readonly lane: LaneName | null
+    }
+  | {
+      readonly kind: "pinned"
+      /** The root its thread is in (ADR-0063), with `at` a `Spot`. */
+      readonly root: RootId
+      readonly at: Position
+      readonly lane: LaneName | null
+      /** Sorts the thread's pinned cards, in the order they were pinned. */
+      readonly order: string
     }
   | {
       readonly kind: "queued"
@@ -1303,8 +1318,8 @@ export interface SentCard {
 type OmitEach<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never
 
 /**
- * Where a card is, without what the host assigns when it queues one (its
- * order and who queued it). A move compares it and targets it. A queued key
+ * Where a card is, without what the host assigns when it queues or pins one
+ * (its order, and who queued it). A move compares it and targets it. A queued key
  * keeps its text's version (`seen`), which the queuer sends with the move
  * (S96).
  */
@@ -1314,6 +1329,13 @@ export function keyOf(place: CardPlace): PlaceKey {
   switch (place.kind) {
     case "drafting":
       return place
+    case "pinned":
+      return {
+        kind: "pinned",
+        root: place.root,
+        at: place.at,
+        lane: place.lane,
+      }
     case "queued":
       return {
         kind: "queued",
@@ -1329,14 +1351,18 @@ export function keyOf(place: CardPlace): PlaceKey {
 }
 
 /**
- * Whether two keys name one place. A queue's order is not part of a key, so
- * a reorder does not make someone else's unqueue fail.
+ * Whether two keys name one place. A queue's or the pinned cards' order is
+ * not part of a key, so a reorder does not make someone else's move fail.
  */
 export function sameKey(a: PlaceKey, b: PlaceKey): boolean {
   switch (a.kind) {
     case "drafting":
       return (
         b.kind === "drafting" && samePosition(a.at, b.at) && a.lane === b.lane
+      )
+    case "pinned":
+      return (
+        b.kind === "pinned" && samePosition(a.at, b.at) && a.lane === b.lane
       )
     case "queued":
       return (
@@ -1371,15 +1397,27 @@ export const moveOf = (card: CardRecord, to: PlaceKey | null): Move => ({
   to,
 })
 
-/** Where an unqueue puts a queued card back: drafting where it was queued. */
+/**
+ * Where an unqueue or an unpin puts a card: drafting where it was queued or
+ * pinned.
+ */
 export const draftingOf = (
-  place: Extract<CardPlace, { kind: "queued" }>,
+  place: Extract<CardPlace, { kind: "queued" | "pinned" }>,
 ): PlaceKey => ({
   kind: "drafting",
   root: place.root,
   at: place.at,
   lane: place.lane,
 })
+
+/**
+ * Where a pin puts a card below the line: pinned at the same thread end.
+ * Null for any other place: a fresh column has no thread to pin it to yet.
+ */
+export const pinnedOf = (place: CardPlace | PlaceKey): PlaceKey | null =>
+  place.kind === "drafting"
+    ? { kind: "pinned", root: place.root, at: place.at, lane: place.lane }
+    : null
 
 /**
  * The root a card queued on `lane` takes: its lane's, since the host takes
@@ -1420,7 +1458,7 @@ export type MoveRefusal =
  */
 export interface PlaceFields {
   readonly kind: string
-  /** A drafting, queued or fresh card's root (ADR-0063); "" for any other. */
+  /** A drafting, pinned, queued or fresh card's root (ADR-0063); "" for an inventory's. */
   readonly root: string
   readonly at: string
   readonly lane: string
@@ -1444,6 +1482,18 @@ export function placeFields(place: CardPlace | PlaceKey): PlaceFields {
         lane: place.lane ?? "",
         column: "",
         order: "",
+        by: "",
+        seen: "",
+        holder: "",
+      }
+    case "pinned":
+      return {
+        kind: "pinned",
+        root: place.root,
+        at: entryOrEmpty(place.at),
+        lane: place.lane ?? "",
+        column: "",
+        order: "order" in place ? place.order : "",
         by: "",
         seen: "",
         holder: "",
@@ -1494,7 +1544,8 @@ export function placeFields(place: CardPlace | PlaceKey): PlaceFields {
  * never "", nor an inventory card's holder. A drafting card whose lane is
  * not a thread's keeps its place with no lane: dropped, its text would be
  * swept at the next start, and the lane only says which thread it follows.
- * A queued card needs its lane, its order and who queued it.
+ * A pinned card is read as a drafting one, and needs its order. A queued
+ * card needs its lane, its order and who queued it.
  */
 export function placeOfFields(f: PlaceFields): CardPlace | undefined {
   switch (f.kind) {
@@ -1520,6 +1571,16 @@ export function placeOfFields(f: PlaceFields): CardPlace | undefined {
             at: atEntry(entryId(f.at)),
             lane: isLaneName(f.lane) ? f.lane : null,
           }
+    case "pinned":
+      return f.at === "" || !isRootId(f.root) || f.order === ""
+        ? undefined
+        : {
+            kind: "pinned",
+            root: f.root,
+            at: atEntry(entryId(f.at)),
+            lane: isLaneName(f.lane) ? f.lane : null,
+            order: f.order,
+          }
     case "queued":
       return f.at === "" ||
         !isRootId(f.root) ||
@@ -1544,9 +1605,18 @@ export function placeOfFields(f: PlaceFields): CardPlace | undefined {
 /**
  * Flat strings -> a key, as a move names one; undefined for one that is
  * malformed. A queued key has no order and no queuer, and keeps its text's
- * version.
+ * version; a pinned key has no order.
  */
 export function keyOfFields(f: PlaceFields): PlaceKey | undefined {
+  if (f.kind === "pinned")
+    return f.at === "" || !isRootId(f.root)
+      ? undefined
+      : {
+          kind: "pinned",
+          root: f.root,
+          at: atEntry(entryId(f.at)),
+          lane: isLaneName(f.lane) ? f.lane : null,
+        }
   if (f.kind !== "queued") return placeOfFields(f)
   return f.at === "" || !isRootId(f.root) || !isLaneName(f.lane)
     ? undefined

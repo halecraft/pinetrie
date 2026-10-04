@@ -180,6 +180,9 @@ export function decodeCommand(
     const reservedLane = reserved === "" ? null : parseNewLane(reserved)
     if (reservedLane === undefined) return notNewLane(reserved)
     const base = text(wire?.base)
+    const pinned = pinnedFromWire(text(wire?.pinned))
+    if (pinned === undefined)
+      return refused(ERR.UNKNOWN_TARGET, "malformed pinned cards")
     const rootText = text(wire?.root)
     // A thread at the root starts a root, under the id its tab minted.
     const root =
@@ -201,6 +204,7 @@ export function decodeCommand(
       mentions: parseMentions(body),
       work,
       card: cardFromWire(text(wire?.cardId), text(wire?.seen)),
+      pinned,
       reserved: reservedLane,
       base: base === "" ? null : base,
     }
@@ -336,6 +340,27 @@ function offerSeenFromWire(wire: string): OfferSeen | null {
 /** A chat's card on the wire, with its text's version: `""` is none. */
 const cardFromWire = (id: string, seen: string): SentCard | null =>
   id === "" ? null : { id: cardId(id), seen }
+
+/** A chat's pinned cards -> the wire: a JSON list of `{ card, seen }`, `""` for none. */
+const pinnedToWire = (pinned: readonly SentCard[]): string =>
+  pinned.length === 0
+    ? ""
+    : JSON.stringify(pinned.map(p => ({ card: p.id, seen: p.seen })))
+
+/** The wire -> a chat's pinned cards; undefined for anything malformed. */
+function pinnedFromWire(s: string): readonly SentCard[] | undefined {
+  if (s === "") return []
+  const value = parsed(s)
+  if (!Array.isArray(value)) return undefined
+  const out: SentCard[] = []
+  for (const item of value) {
+    const { card, seen } = (item ?? {}) as Record<string, unknown>
+    if (typeof card !== "string" || card === "" || typeof seen !== "string")
+      return undefined
+    out.push({ id: cardId(card), seen })
+  }
+  return out
+}
 
 const isCardCommand = (c: string): c is CardCommand =>
   (CARD_COMMANDS as readonly string[]).includes(c)
@@ -501,6 +526,7 @@ export function encodeIntent(id: string, intent: Intent): Command {
         ...workToWire(intent.work),
         cardId: intent.card?.id ?? "",
         seen: intent.card?.seen ?? "",
+        pinned: pinnedToWire(intent.pinned),
         reserved: intent.reserved ?? "",
         base: intent.base ?? "",
       })

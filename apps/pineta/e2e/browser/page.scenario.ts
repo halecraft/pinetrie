@@ -2943,6 +2943,71 @@ async function run(check: Checks["check"]): Promise<void> {
         `slot ${keptOnClose}, closed ${closedFresh}, ${placeOf(thought)?.kind}`,
       )
 
+      // Pinned cards (ADR-0048 step 5), in the DOWN thread's agent column:
+      // pin moves the composer's card to the strip at the column's top, above
+      // its scrolling messages, and the composer is empty again.
+      const pinBox = `${col(0)} .composer .input`
+      await page.click(pinBox)
+      await page.keyboard.type("keep the tests green")
+      await page.waitForFunction(
+        s => document.querySelector(s)?.getAttribute("data-card") != null,
+        pinBox,
+        { timeout: 10_000 },
+      )
+      const pinnedCard = (await page.getAttribute(pinBox, "data-card")) ?? ""
+      await page.click(`${col(0)} .composer .pin`)
+      const inStrip = await appears(
+        `${col(0)} .pinned-strip textarea[data-card="${pinnedCard}"]`,
+      )
+      const pinEmptied = await valueIs(pinBox, "")
+      const stripAbove = await page
+        .$eval(col(0), c => {
+          const strip = c
+            .querySelector(".pinned-strip")
+            ?.getBoundingClientRect()
+          const body = c.querySelector(".column-body")?.getBoundingClientRect()
+          return (
+            strip !== undefined &&
+            body !== undefined &&
+            strip.bottom <= body.top + 1
+          )
+        })
+        .catch(() => false)
+      await waitFor(() => placeOf(pinnedCard)?.kind === "pinned", 5_000)
+      check(
+        "pin draws the card in the strip at the top of its column, above the messages, and empties the composer",
+        inStrip &&
+          pinEmptied &&
+          stripAbove &&
+          placeOf(pinnedCard)?.kind === "pinned",
+        `strip ${inStrip}, emptied ${pinEmptied}, above ${stripAbove}, ${placeOf(pinnedCard)?.kind}`,
+      )
+      // The next run reads it: a marker is drawn just above its prompt.
+      await send(0, "@agent with the pinned card")
+      await idle()
+      const readMarked = await page
+        .waitForFunction(
+          sel => {
+            const marker = document.querySelector(sel)
+            return (
+              marker?.nextElementSibling?.matches(".msg.chat") === true &&
+              (marker.nextElementSibling.textContent ?? "").includes(
+                "with the pinned card",
+              )
+            )
+          },
+          `${col(0)} details.pinned-read`,
+          { timeout: 15_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        )
+      check(
+        "after a run, the marker of the pinned cards it read is drawn above its prompt",
+        readMarked,
+      )
+
       // A reload keeps the tab you are on, and its open columns (ADR-0027).
       const columnKeys = (p: typeof page) =>
         p.$$eval(".column", cs => cs.map(c => c.getAttribute("data-key") ?? ""))

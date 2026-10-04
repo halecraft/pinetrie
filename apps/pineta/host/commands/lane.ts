@@ -30,15 +30,19 @@ export interface LaneDeps {
   readonly agent: Pick<Agent, "lane" | "writeValues">
   readonly work: Pick<LaneWork, "offers" | "prepareSplit">
   readonly start: Runs["start"]
+  /** Stop a chat's run that has not reached pi yet (`Runs.cancel`). */
+  readonly cancel: Runs["cancel"]
 }
 
 /**
  * Stop a thread's turn, recording who stopped its ask first (ADR-0056): the
- * record is written before pi is asked to abort, so it is there when the
- * run's end is drawn. The run's end then drains the lane, as any run's does.
+ * record is written before the run is stopped, so it is there when the
+ * run's end is drawn. A chat's run still waiting for its pinned cards' text
+ * has not reached pi, whose abort would reach nothing: it is cancelled
+ * instead. The run's end then drains the lane, as any run's does.
  */
 export async function handleStop(
-  deps: Pick<LaneDeps, "basics" | "agent">,
+  deps: Pick<LaneDeps, "basics" | "agent" | "cancel">,
   lane: LaneName,
   by: WriterId,
 ): Promise<Outcome> {
@@ -73,7 +77,7 @@ export async function handleStop(
   if (planned.kind === "abort") {
     if (planned.record !== null)
       await agent.writeValues([setRecord(STOP, planned.record, root)])
-    await agent.lane(lane).abort()
+    if (!deps.cancel(lane)) await agent.lane(lane).abort()
   }
   return { kind: "stopped" }
 }
@@ -118,7 +122,7 @@ export async function actOnOffer(
       return { kind: "refused", code: ERR.REFUSED, message: message.refused }
     return {
       kind: "started",
-      runId: deps.start(lane, { kind: "prompt", message }),
+      runId: deps.start(lane, { kind: "prompt", message, pinnedSeen: [] }),
     }
   }
   const refused = await offers.act(lane, action, by, to, seen)

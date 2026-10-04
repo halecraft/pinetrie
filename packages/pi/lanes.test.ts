@@ -16,7 +16,7 @@ import {
   THE_AGENT,
   writerId,
 } from "@pineta/core"
-import { encodeChat } from "@pineta/marginalia"
+import { encodeChat, PINNED_RULE } from "@pineta/marginalia"
 import { newRootDoc, readEntries, rowMessage } from "@pineta/schema"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
 import { createAgent, newId } from "./agent.ts"
@@ -117,6 +117,16 @@ test("the prompt no longer tells the model to search with bash", () => {
     "bash",
   ])(toolContextOf({ kind: "direct", dir: "/repo", ready: Promise.resolve() }))
   expect(without).toContain("file operations like ls, rg, find")
+})
+
+test("every thread is told what pinned cards are, once, in a line of its own (ADR-0048)", () => {
+  const prompt = systemPromptFor(
+    { contextFiles: [], skills: [] },
+    [],
+  )(toolContextOf({ kind: "direct", dir: "/repo", ready: Promise.resolve() }))
+  expect(prompt.split(PINNED_RULE).length - 1).toBe(1)
+  // pi drops a guideline equal to another: the lane's lines stay distinct.
+  expect(laneGuidelines(facts())).not.toContain(PINNED_RULE)
 })
 
 describe("ask_for_guidance", () => {
@@ -318,8 +328,8 @@ describe("lanes in a harness", () => {
       { text: "done" },
     ])
     await Promise.all([
-      agent.lane(la).run(prompt("go a")),
-      agent.lane(lb).run(prompt("go b")),
+      agent.lane(la).run(prompt("go a"), null),
+      agent.lane(lb).run(prompt("go b"), null),
     ])
     const results = texts()
       .filter(t => (t.message as { role?: string }).role === "toolResult")
@@ -340,7 +350,7 @@ describe("lanes in a harness", () => {
       { tool: "bash", args: { command: "cat marker.txt" } },
       { text: "done" },
     ])
-    const running = agent.lane(lane).run(prompt("read the marker"))
+    const running = agent.lane(lane).run(prompt("read the marker"), null)
     // The directory only exists once "setup" makes it.
     await new Promise(r => setTimeout(r, 100))
     const { mkdir } = await import("node:fs/promises")
@@ -384,7 +394,7 @@ describe("lanes in a harness", () => {
       },
     ])
     let told = ""
-    await agent.lane(lane).run(prompt("write, then look"))
+    await agent.lane(lane).run(prompt("write, then look"), null)
     const all = texts().map(t => messageText(t.message as never))
     expect(all.some(t => t.includes(`${dir}\nin the lane`))).toBe(true)
     // In <rules>: `pi-anthropic-auth` keeps it when it rebuilds the prompt (S23).
@@ -426,7 +436,7 @@ describe("lanes in a harness", () => {
       { tool: "grep", args: { pattern: "it's", glob: "*.txt" } },
       { text: "done" },
     ])
-    await agent.lane(lane).run(prompt("search"))
+    await agent.lane(lane).run(prompt("search"), null)
     const found =
       texts()
         .map(t => messageText(t.message as never))
@@ -455,7 +465,7 @@ describe("lanes in a harness", () => {
         },
       },
     ])
-    await agent.lane(lane).run(prompt("look"))
+    await agent.lane(lane).run(prompt("look"), null)
     expect(told).toContain("<rules>")
     expect(told).not.toContain("Pineta lane")
     expect(told).not.toContain("Pineta commits your changes")
@@ -471,7 +481,7 @@ describe("lanes in a harness", () => {
     const first = await setUp(new Map())
     const lane = await first.newLane(where(before))
     first.script.use([{ tool: "bash", args: { command: "sleep 2" } }])
-    void first.agent.lane(lane).run(prompt("crash"))
+    void first.agent.lane(lane).run(prompt("crash"), null)
     await new Promise(r => setTimeout(r, 300))
     // The next process, over the same document: a second agent.
     const wheres = new Map([[lane, where(after)]])
@@ -487,7 +497,7 @@ describe("lanes in a harness", () => {
       },
     })
     expect(await second.interrupted([ONE_ROOT])).toEqual([lane])
-    expect(await second.lane(lane).run(prompt("again"))).toMatchObject({
+    expect(await second.lane(lane).run(prompt("again"), null)).toMatchObject({
       kind: "refused",
     })
     script.use([{ tool: "bash", args: { command: "pwd" } }, { text: "done" }])
@@ -518,7 +528,7 @@ describe("lanes in a harness", () => {
         },
       },
     ])
-    await agent.lane(lane).run(prompt("turns"))
+    await agent.lane(lane).run(prompt("turns"), null)
     const ids = texts().map(t => t.id)
     const [promptId, , resultId, finalId] = ids as EntryId[]
     expect(turns).toEqual([

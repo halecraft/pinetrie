@@ -159,4 +159,12 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "each followed end's root, as its column reported it",
   },
+  {
+    name: "a compaction carries no cards",
+    file: "packages/reads/index.ts",
+    from: "    ...(carried === undefined ? {} : { carried }),\n",
+    to: "\n",
+    command: unit,
+    expect: "a compaction carries the newest cards entry",
+  },
 ]

@@ -237,6 +237,7 @@ describe("writesIn: the root a command writes in (ADR-0063)", () => {
         mentions: [],
         work: null,
         card: null,
+        pinned: [],
         reserved: null,
         base: null,
       }),
@@ -255,6 +256,7 @@ describe("writesIn: the root a command writes in (ADR-0063)", () => {
         mentions: [],
         work: null,
         card: null,
+        pinned: [],
         reserved: null,
         base: null,
       }),
@@ -294,6 +296,30 @@ describe("writesIn: the root a command writes in (ADR-0063)", () => {
             from: null,
             to: {
               kind: "drafting",
+              root: TEST_ROOT,
+              at: atEntry(entryId("b")),
+              lane: null,
+            },
+          },
+        ],
+      },
+      [TEST_ROOT],
+    ],
+    [
+      "a pin: the root of the thread it is pinned at",
+      {
+        kind: "move",
+        moves: [
+          {
+            card: cardId("c"),
+            from: {
+              kind: "drafting",
+              root: TEST_ROOT,
+              at: atEntry(entryId("b")),
+              lane: null,
+            },
+            to: {
+              kind: "pinned",
               root: TEST_ROOT,
               at: atEntry(entryId("b")),
               lane: null,

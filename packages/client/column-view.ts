@@ -8,6 +8,7 @@ import {
   type BaseRecord,
   blobUrl,
   type CardPlace,
+  type CardRecord,
   type ColumnView,
   type CommandSummary,
   type DiffSpan,
@@ -20,8 +21,11 @@ import {
   type LineRecord,
   messageText,
   type OfferRecord,
+  type PinnedCardRead,
+  type PinnedView,
   type Position,
   type ProjectRecord,
+  pinnedInView,
   promptOf,
   type RevisionRecord,
   type RootId,
@@ -41,7 +45,10 @@ import {
   offerStatus,
   offerView,
   type ParentNow,
+  type PinnedStatus,
   parentNow,
+  pinnedDiff,
+  pinnedReads,
   type TakeDestination,
 } from "@pineta/marginalia"
 import type { OfferActing } from "./acting.ts"
@@ -861,3 +868,69 @@ export function composerPlace(
     ? { kind: "drafting", root, at, lane: column.lane ?? null }
     : null
 }
+
+/** What a column draws above a run's prompt for the pinned cards the run read. */
+export interface PinnedMarker {
+  readonly cards: readonly PinnedCardRead[]
+  /** Shown only when the cards replaced were read by the entry's own lane. */
+  readonly retired: PinnedView["retired"]
+}
+
+/**
+ * The marker for a cards entry, from `previous`, what it replaced
+ * (`pinnedInView` from its parent). A branch's first run retires its
+ * parent's cards, read by another lane: the column draws nothing of those,
+ * since the branch never showed them. Null when nothing is left to draw.
+ */
+export function pinnedMarker(
+  entry: PinnedView,
+  previous: PinnedView | null,
+): PinnedMarker | null {
+  const retired = previous?.lane === entry.lane ? entry.retired : []
+  return entry.cards.length === 0 && retired.length === 0
+    ? null
+    : { cards: entry.cards, retired }
+}
+
+/**
+ * The markers among `nodes`, by the prompt each is drawn above. A cards
+ * entry is written in one commit with its run's prompt, so a prompt's parent
+ * is the only place one can be.
+ */
+export function pinnedMarkers(
+  index: TreeIndex,
+  nodes: readonly { readonly id: EntryId }[],
+): ReadonlyMap<EntryId, PinnedMarker> {
+  const out = new Map<EntryId, PinnedMarker>()
+  for (const node of nodes) {
+    const parent = index.parentOf(node.id)
+    const pinned =
+      parent === null ? undefined : index.entries[parent]?.message?.pinned
+    if (parent === null || pinned === undefined) continue
+    const marker = pinnedMarker(
+      pinned,
+      pinnedInView(index, index.parentOf(parent)),
+    )
+    if (marker !== null) out.set(node.id, marker)
+  }
+  return out
+}
+
+/**
+ * How a pinned card stands against what the agent last read (`inView`, the
+ * walk the host plans a run's entry from), by the same comparison the host
+ * makes (`pinnedDiff`); null for a card with no text yet, which no run reads.
+ */
+export const pinnedStatus = (
+  card: CardRecord,
+  text: string,
+  inView: PinnedView | null,
+): PinnedStatus | null => {
+  const [read] = pinnedReads([card], () => text)
+  return read === undefined
+    ? null
+    : (pinnedDiff(inView, [read]).status.get(read.id) ?? null)
+}
+
+/** A text's size in tokens, as pi estimates it: four characters a token. */
+export const tokensOf = (text: string): number => Math.ceil(text.length / 4)

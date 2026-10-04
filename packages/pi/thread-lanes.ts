@@ -15,6 +15,7 @@ import {
 import type {
   ChatMessage,
   LandMessage,
+  PinnedMessage,
   StackMessage,
   UpdateMessage,
 } from "@pineta/marginalia"
@@ -110,9 +111,14 @@ export interface ThreadLaneHandle {
   append(message: ChatMessage | UpdateMessage): Promise<AppendOutcome>
   /**
    * Run one turn with `message` as the prompt itself (S19): a compelled chat,
-   * a land message (ADR-0033), or a stack message (ADR-0038).
+   * a land message (ADR-0033), or a stack message (ADR-0038). With `pinned`,
+   * the cards entry goes in first, and pi writes both in the commit that
+   * admits the run, or neither (S92).
    */
-  run(message: ChatMessage | LandMessage | StackMessage): Promise<WriteOutcome>
+  run(
+    message: ChatMessage | LandMessage | StackMessage,
+    pinned: PinnedMessage | null,
+  ): Promise<WriteOutcome>
   /** Resume the operation a crash interrupted, in the lane's own directory. */
   resume(): Promise<WriteOutcome>
   /**
@@ -192,7 +198,10 @@ export function threadLanes(input: {
             id: entryId(await lane.appendMessage(message, ctx)),
           })),
         ),
-      run: message => turn(lane => lane.prompt(message, ctx)),
+      run: (message, pinned) =>
+        turn(lane =>
+          lane.prompt(pinned === null ? message : [pinned, message], ctx),
+        ),
       // pi records a tool call the crash interrupted as interrupted, never
       // running it again; the run then continues in the lane's directory.
       resume: () => turn(lane => lane.resume(ctx)),

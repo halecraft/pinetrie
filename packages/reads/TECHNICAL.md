@@ -127,6 +127,11 @@ Kyneta has let go.
 - **`readRenderableEntries` decodes chat** (`renderableMessage`), so the index
   carries each chat's writer, whether it compelled the agent, and its send id:
   `threadOf`'s race reads the first two, a fresh column the third.
+- **A compaction entry carries the pinned cards its retained tail holds**
+  (`carried`, ADR-0048 step 5): the tail's newest cards entry, read from the
+  row's payload (`rowRetainedTail`, `@pineta/schema`). pi stores the tail on
+  the compaction itself, and the model reads it after the summary, so
+  `pinnedInView` stops there.
 - **`readPlaces` keeps an unchanged card the same object.** Kyneta gives an
   unchanged `json` row the same object across writes, so the decoded record
   is kept in a `WeakMap` keyed by the row (S54's rule). A change to one card

@@ -15,13 +15,14 @@ wires them.
 | `places.ts` | `applyPlaceSteps`: the one writer of the places document (ADR-0059), which writes its records in one batch, in an undo step when given one, then raises its `rev` in a batch of its own (`raiseRev`) |
 | `move-history.ts` | each person's history of moves per root (ADR-0066): `MoveHistories`, a shell over Kyneta's undo stacks |
 | `shutdown.ts` | the order a host stops in (`planShutdown`) |
-| `runs.ts` | a run from its start to its end (`createRuns`, `planRunEnd`), and the agent's `onStream` (`streamInto`) |
+| `runs.ts` | a run from its start to its end (`createRuns`, `planRunEnd`), a Stop before pi starts (`cancel`), and the agent's `onStream` (`streamInto`) |
+| `pinned.ts` | what a run reads of its thread's pinned cards (ADR-0048 step 5): `readPinned` gathers, waits a bounded time for the sender's text (`waitFor`), and plans the cards entry |
 | `take.ts` | taking a lane's queued cards (ADR-0048): `takeTop`, and `drain`, which sends each through its command (ADR-0055) |
 | `settle.ts` | what happens between runs: drains, then the compaction and sweep as upkeep (the keeper's `later`) |
 | `housekeeping.ts` | which documents a run's end compacts (`planCompaction`: its roots, the session, the places, `pineta:live`), deleting images nothing shows, and retiring histories of moves (`sweepHistories`) |
 | `docs.ts` | `HostDocuments`: every document the host holds, a root's opened as it is asked for; `planLoads` |
 | `directory.ts` | each root's directory record, refreshed as its document changes |
-| `cards.ts` | the card port (ADR-0048), about texts only: who wrote in a card, destroying one, loading and reading texts for the take, and the texts of given cards gathered for the sweeps; where the shell opens card documents |
+| `cards.ts` | the card port (ADR-0048), about texts only: who wrote in a card, destroying one, loading and reading texts for the take and a run's pinned cards, waiting until a text holds a version (`whenHolds`, which an `AbortSignal` gives up), and the texts of given cards gathered for the sweeps; where the shell opens card documents |
 | `seats.ts` | each connected seat's person, written once as a `pineta.seat` record (started after `recover`), and unloading the histories of moves of a person with no seat left |
 | `startup.ts` | `recover`: what a starting host does before it takes a command |
 | `control.ts` | the command Line of each client seat, and who its writer is |
@@ -89,6 +90,28 @@ wires them.
   `quiet()`, then `exchange.flush()`. The suites await it before they check,
   so any background promise must be a keeper step or `track`ed, or `quiet`
   resolves early and the suites turn flaky rather than failing.
+
+## A run's start
+
+- **A prompt's run reads its pinned cards first** (`readPinned`,
+  `pinned.ts`): a chat's, a take's, a resolution's and a split's. It
+  gathers the thread's pinned cards at the lane's tip (`cardsAt`), loads
+  their texts, waits for each as the chat's sender had it (`seen`, at most
+  `PINNED_WAIT_MS`, 2 s), gathers again (a card may have been pinned or
+  unpinned meanwhile), and plans against what the model last read on the
+  path (`pinnedInView`, `planPinnedRead`). `runs.ts` only awaits it and
+  passes the entry to `handle.run`; a failure is logged and the run goes
+  without cards. A resume reads nothing: its prompt and entry were written
+  when it began.
+- **The wait is a window in which pi's `abort` reaches nothing**: the run is
+  begun (`beginRun`, so the lane is busy and the suites count it running),
+  but pi has no run yet. `Runs.cancel(lane)` aborts a chat's wait; the run
+  then appends the chat, as a refused run does, and ends. `handleStop`
+  cancels first and asks pi to abort only when nothing was cancelled. A
+  land or stack start cannot be cancelled: it writes no prompt then, and
+  `end()` would read the lane's previous one and record an old landing's
+  outcome again. They carry no `seen`, so their window is as short as
+  before.
 
 ## A run's end
 
@@ -228,6 +251,11 @@ rejects `shutdown()`.
   step, so no move gets between. The take destroys
   a taken card's text itself, since it removed the record. The command's
   text is what is sent: the text its sender saw.
+- **A chat carries its sender's pinned versions** (`pinned`, each card
+  pinned at the sender's thread end with its text version): `executeChat`
+  passes them to `start` for a `run` or `createAndRun`, and the run waits
+  for them. A taken card's chat (`takenChat`) carries none: its thread's
+  cards were edited long before.
 - **A busy lane answers a chat from a card `queued`** (ADR-0059): the
   dispatcher queues the card behind the others in the same step
   (`queueBusy`), so no other send gets between. A chat with no card, or one
@@ -315,7 +343,10 @@ rejects `shutdown()`.
   order between documents, so a card's record can arrive before its text.
   The record carries the text's version (`seen`); a top card the host's
   copy does not yet hold is `behind`, and stays on top, and the host drains
-  the lane again once it holds it (`CardPort.whenHolds`, one wait per card).
+  the lane again once it holds it (`createBehind`, one wait per card). A
+  wait whose card leaves the queue, taken, unqueued or discarded, is given
+  up (`givenUp`), so it neither stays subscribed nor drains; the places are
+  watched only while a wait is out.
 - **A taken card is sent through its command.** `bring-up-to-date` runs
   `prepareUpdate` first: clean, the update is written, then the text, if
   any, is sent; conflicted, the resolution run carries the text; nothing

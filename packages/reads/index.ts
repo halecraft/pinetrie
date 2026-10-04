@@ -41,6 +41,7 @@ import {
   messageText,
   nearestRevision,
   type OfferRecord,
+  type PinnedView,
   type PlanMode,
   type Position,
   type ProjectRecord,
@@ -70,6 +71,7 @@ import {
   type DigestRecord,
   decodeCard,
   decodeChat,
+  decodePinned,
   type Home,
   LANDING,
   LANE,
@@ -103,6 +105,7 @@ import {
   readLaneTip,
   readValues,
   rowMessage,
+  rowRetainedTail,
   type SessionDocHandle,
   type StoredEntryRow,
   writerOfKey,
@@ -121,14 +124,30 @@ const indexOfEntries = new WeakMap<
   TreeIndex
 >()
 
+/**
+ * The pinned cards a compaction's retained tail carries: its newest cards
+ * entry, which pi's compaction hook puts there (ADR-0048, S92); absent for
+ * none.
+ */
+function carriedBy(row: StoredEntryRow): PinnedView | undefined {
+  const tail = rowRetainedTail(row)
+  for (let i = tail.length - 1; i >= 0; i--) {
+    const view = decodePinned(tail[i])
+    if (view !== undefined) return view
+  }
+  return undefined
+}
+
 function renderableEntry(row: StoredEntryRow): EntryLike {
   const known = entryOfRow.get(row)
   if (known !== undefined) return known
+  const carried = carriedBy(row)
   const entry: EntryLike = Object.freeze({
     id: entryId(row.id),
     parentId: row.parentId === null ? null : entryId(row.parentId),
     type: row.type,
     message: renderableMessage(rowMessage(row)),
+    ...(carried === undefined ? {} : { carried }),
   })
   entryOfRow.set(row, entry)
   return entry

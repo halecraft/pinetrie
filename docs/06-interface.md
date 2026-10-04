@@ -586,6 +586,30 @@ The rail is E; the column is T. Seeing both at once is the product.
 - **A new branch shows every card in it**, a card put there among them, and
   its first message leaves the others drafting below it.
 
+### Pinned cards (ADR-0048 step 5)
+
+- **A pinned card says what a thread is for**, and the agent reads it on
+  every run. It sits in a strip at the top of the thread's column, under the
+  header, and stays there as the messages scroll. A new tab or a new branch
+  has none until its first message is sent.
+- **Pin** a card below the line with its **pin** button, or drop a card on
+  the strip: while you drag a card, a thread with no pinned card shows "drop
+  a card here to pin it for the agent" there. **Unpin** puts it back below
+  the line; **take** moves it into your inventory. Both pin and unpin are
+  moves the undo key outside a box undoes.
+- **Anyone here can edit a pinned card**, as a queued one. Each is headed
+  "pinned by Bea", and shows its size, "~120 tokens", since a long one costs
+  that on every run, and how it stands: "read by the agent", "changed since
+  the agent last read it", or "not read by the agent yet".
+- **Where a run read them**, a small "the agent read 2 pinned cards" sits
+  above its prompt; it opens to the text the agent read, and to "no longer
+  applies: “…”" for a card unpinned since. A card edited just before you
+  send reaches that run.
+- **A branch starts with no pinned cards.** Its agent is told its parent's
+  no longer apply, quietly: the branch's column shows nothing for that. To
+  keep a direction, take a copy of the card and pin it in the branch.
+- **Pinned cards are not unsent work:** they mark no tab and no rail dot.
+
 ### Your inventory (ADR-0048 step 4)
 
 - **A panel of your own, floating over the columns**, opened and closed by

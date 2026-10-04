@@ -9,6 +9,7 @@ import {
   parseMentions,
   ROOT,
   runId,
+  type SentCard,
   type Sha256,
   writerId,
 } from "@pineta/core"
@@ -65,6 +66,7 @@ function setUp(
     prepareLane: async () => {},
   })
   const started: string[] = []
+  const seen: (readonly SentCard[])[] = []
   const titles = record<ChatDeps["titles"]>({ laneStarted: async () => {} })
   const deps: ChatDeps = {
     basics: b,
@@ -72,8 +74,9 @@ function setUp(
     work: work.port,
     blobs: record<ChatDeps["blobs"]>().port,
     cards: record<ChatDeps["cards"]>().port,
-    start: lane => {
+    start: (lane, start) => {
       started.push(lane)
+      if (start.kind === "prompt") seen.push(start.pinnedSeen)
       return runId("r-1")
     },
     titles: titles.port,
@@ -84,8 +87,9 @@ function setUp(
     writer: ALICE,
     work: null,
     base: null,
+    pinned: [],
   }
-  return { b, agent, work, started, titles, deps, context }
+  return { b, agent, work, started, seen, titles, deps, context }
 }
 
 describe("executeChat", () => {
@@ -130,6 +134,25 @@ describe("executeChat", () => {
     expect(started).toEqual([LANE])
   })
 
+  test("a run carries the sender's pinned versions, for it to wait for", async () => {
+    const { seen, deps, context } = setUp(null)
+    const pinned = [{ id: cardId("c-1"), seen: "v-1" }]
+    await executeChat(
+      deps,
+      { kind: "run", lane: LANE, details },
+      {
+        ...context,
+        pinned,
+      },
+    )
+    await executeChat(
+      deps,
+      { kind: "createAndRun", at: ROOT, lane: LANE, details },
+      { ...context, pinned },
+    )
+    expect(seen).toEqual([pinned, pinned])
+  })
+
   test("createAndRun from a base that cannot begin refuses, and never creates the lane (ADR-0060)", async () => {
     const { agent, started, deps, context } = setUp(null, ERR.BAD_BASE)
     const out = await executeChat(
@@ -164,6 +187,7 @@ describe("sendChat", () => {
     mentions: parseMentions(text),
     work: null,
     card: null,
+    pinned: [],
     reserved: null,
     base: null,
   })
@@ -180,6 +204,7 @@ describe("sendChat", () => {
       createThreadLane: async () => ({ kind: "created", lane: LANE }),
     })
     const started: ChatMessage[] = []
+    const seen: (readonly SentCard[])[] = []
     const deps: ChatDeps = {
       basics: b,
       agent: agent.port,
@@ -197,13 +222,15 @@ describe("sendChat", () => {
       }).port,
       cards: cards.port,
       start: (_lane, s) => {
-        if (s.kind === "prompt" && s.message.customType === CHAT_TYPE)
+        if (s.kind === "prompt" && s.message.customType === CHAT_TYPE) {
           started.push(s.message as ChatMessage)
+          seen.push(s.pinnedSeen)
+        }
         return runId("r-1")
       },
       titles: record<ChatDeps["titles"]>({ laneStarted: async () => {} }).port,
     }
-    return { b, agent, cards, started, deps }
+    return { b, agent, cards, started, seen, deps }
   }
 
   test("a thread at the root under a taken root's id is refused, and nothing is written", async () => {
@@ -223,6 +250,13 @@ describe("sendChat", () => {
     const out = await sendChat(deps, ALICE, "s-1", chat("do it", true))
     expect(out).toEqual({ kind: "started", runId: "r-1" })
     expect(started).toHaveLength(1)
+  })
+
+  test("the chat command's pinned versions reach its run", async () => {
+    const { seen, deps } = setUp()
+    const pinned = [{ id: cardId("c-1"), seen: "v-1" }]
+    await sendChat(deps, ALICE, "s-1", { ...chat("do it", true), pinned })
+    expect(seen).toEqual([pinned])
   })
 
   test("a new lane is created under the column's reserved id (ADR-0057)", async () => {
@@ -267,6 +301,7 @@ describe("sendChat", () => {
         writer: ALICE,
         work: null,
         base: null,
+        pinned: [],
       },
     )
     expect(out).toEqual({ kind: "conflict", by: BEA })

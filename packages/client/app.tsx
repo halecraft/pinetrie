@@ -65,7 +65,7 @@ import { Column, type ColumnProps } from "./column.tsx"
 import {
   type Column as ColumnSpec,
   columnsReducer,
-  isPinned,
+  isAnchored,
 } from "./columns.ts"
 import type { SeenEnd } from "./follow.ts"
 import { Header } from "./header.tsx"
@@ -453,7 +453,7 @@ export function App({
     () =>
       projectColumns(
         index,
-        columns.map(c => ({ anchor: c.anchor, pinned: isPinned(c) })),
+        columns.map(c => ({ anchor: c.anchor, anchored: isAnchored(c) })),
       ),
     [index, columns],
   )
@@ -841,7 +841,18 @@ export function App({
       }
       if (targetOf(e) !== null) e.preventDefault()
     }
+    // While a card is dragged, the page says so (`data-card-drag`): an empty
+    // pinned strip shows only then, as somewhere to drop it.
+    const dragging = (on: boolean) => {
+      if (on) document.body.dataset.cardDrag = ""
+      else delete document.body.dataset.cardDrag
+    }
+    const onEnter = (e: DragEvent) => {
+      if (carriesCard(e)) dragging(true)
+    }
+    const onEnd = () => dragging(false)
     const onDrop = (e: DragEvent) => {
+      dragging(false)
       const target = targetOf(e)
       const card = e.dataTransfer?.getData(CARD_MIME) ?? ""
       if (target === null || card === "") return
@@ -849,10 +860,15 @@ export function App({
       onIntent({ kind: "put", card: cardId(card), target })
     }
     document.addEventListener("dragover", onOver)
+    document.addEventListener("dragenter", onEnter)
+    document.addEventListener("dragend", onEnd)
     document.addEventListener("drop", onDrop)
     return () => {
       if (hover !== null) clearTimeout(hover.timer)
+      dragging(false)
       document.removeEventListener("dragover", onOver)
+      document.removeEventListener("dragenter", onEnter)
+      document.removeEventListener("dragend", onEnd)
       document.removeEventListener("drop", onDrop)
     }
   }, [onIntent, layout.open])

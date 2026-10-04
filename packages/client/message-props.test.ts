@@ -35,6 +35,7 @@ const props = (
     }),
     onAct: ACT,
     join: undefined,
+    pinned: undefined,
     forkTracks: [],
     closedBranches: [],
     ...over,

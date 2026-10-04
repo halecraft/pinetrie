@@ -15,6 +15,8 @@ import {
   messageAt,
   nearestRevision,
   type Position,
+  pinnedInView,
+  pinnedOf,
   promptOf,
   ROOT,
   type SeatRecord,
@@ -26,8 +28,8 @@ import {
   workFor,
 } from "@pineta/core"
 import {
+  cardsAt,
   type DigestRecord,
-  draftingAt,
   effectiveBase,
   type OfferButton,
   queuedOn,
@@ -90,6 +92,7 @@ import type { LiveWork } from "./live.ts"
 import { Menu } from "./menu.tsx"
 import { MessageList } from "./message-list.tsx"
 import { MessageText } from "./message-text.tsx"
+import { PinnedStrip } from "./pinned-strip.tsx"
 import { Avatars, nameFor } from "./presence.tsx"
 import { type ComposerPlacesStore, dropProps } from "./put-target.ts"
 import { colorSlot, trackStyle } from "./rail.tsx"
@@ -392,6 +395,14 @@ export function Column(p: ColumnProps) {
           p.lanes,
           index,
         )
+  // The thread's pinned cards (ADR-0048 step 5), and what the agent reads of
+  // them now, from the walk the host plans a run's cards from. A fresh
+  // column has no thread, so none.
+  const pinned =
+    fresh || threadEnd === null
+      ? []
+      : cardsAt("pinned", threadEnd, p.cards, p.lanes, index)
+  const inView = threadEnd === null ? null : pinnedInView(index, threadEnd)
   // Your last offer command on this lane: in flight, refused or failed.
   const acting = useSyncExternalStore(
     p.session.acting.subscribe,
@@ -452,6 +463,7 @@ export function Column(p: ColumnProps) {
     ...(p.column.fresh?.root === undefined
       ? {}
       : { root: p.column.fresh.root }),
+    ...(pinned.length === 0 ? {} : { pinned: pinned.map(c => c.id) }),
   }
   // The review of the offer beside the thread (ADR-0047): your choice, kept
   // only while the column is mounted. Reset when the offer goes, so the
@@ -568,7 +580,7 @@ export function Column(p: ColumnProps) {
         )
       : threadEnd === null
         ? []
-        : draftingAt(threadEnd, p.cards, p.lanes, index)
+        : cardsAt("drafting", threadEnd, p.cards, p.lanes, index)
   ).filter(c => c.id !== shownBelow)
   const place =
     composerPlace(
@@ -595,6 +607,8 @@ export function Column(p: ColumnProps) {
   }
   // Where a drop lands: exactly where a put can.
   const putColumn = writable && place !== undefined ? key : null
+  const putPinned =
+    writable && place !== undefined && pinnedOf(place) !== null ? key : null
   // Closing a fresh column whose cards hold text asks first: they have no
   // thread to stay on. Keeping them in your inventory is the default, and can
   // be undone; discarding them is final (ADR-0048).
@@ -749,6 +763,18 @@ export function Column(p: ColumnProps) {
             spinFirst={openedHere}
             track={p.track}
             working={working}
+          />
+        )}
+        {!fresh && threadEnd !== null && (
+          <PinnedStrip
+            cards={pinned}
+            inView={inView}
+            onAct={act}
+            onTyping={p.onTyping}
+            putKey={putPinned}
+            readOnly={p.readOnly}
+            reader={reader}
+            session={p.session}
           />
         )}
         <div className="column-body" ref={body}>

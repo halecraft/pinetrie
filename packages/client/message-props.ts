@@ -3,7 +3,7 @@
 
 import type { BranchSummary, SpineNode, WriterId } from "@pineta/core"
 import type { LiveDocHandle } from "@pineta/schema"
-import type { LaneJoin } from "./column-view.ts"
+import type { LaneJoin, PinnedMarker } from "./column-view.ts"
 import type { MessageAct, MessageTools } from "./message-tools.ts"
 import { type PropRule, sameProps } from "./same-props.ts"
 import type { ScreenMemory } from "./screen-memory.ts"
@@ -29,6 +29,8 @@ export interface MessageProps {
   onAct: (act: MessageAct) => void
   /** A lane starts here: a divider above the message names it. */
   join: LaneJoin | undefined
+  /** The pinned cards its run read, when it is a run's prompt (`pinnedMarkers`). */
+  pinned: PinnedMarker | undefined
   /** Tracks of open columns that fork here: a dot of each colour. */
   forkTracks: readonly number[]
   /** Branches leaving here that no column shows. */
@@ -48,6 +50,7 @@ const MESSAGE_PROPS = {
   rows: "identity",
   tools: "value",
   join: "value",
+  pinned: "value",
   forkTracks: "value",
   closedBranches: "value",
   nameOf: "identity",

@@ -7,7 +7,12 @@ import type { ToolCallView, TranscriptMessage } from "@pineta/core"
 import { type LiveDocHandle, readStreamText } from "@pineta/schema"
 import { memo, useCallback, useEffect, useRef, useState } from "react"
 import { StoredImage } from "./blob-image.tsx"
-import { TAKE, TAKE_COPY } from "./card-words.ts"
+import {
+  pinnedMarkerWords,
+  retiredWords,
+  TAKE,
+  TAKE_COPY,
+} from "./card-words.ts"
 import { joinWords } from "./column-view.ts"
 import { COPIED, useCopy } from "./copy.ts"
 import { copyText } from "./copy-text.ts"
@@ -65,6 +70,22 @@ function MessageView(p: MessageProps) {
         <div className="lane-join" data-thread={p.join.name}>
           {joinWords(p.join)}
         </div>
+      )}
+      {p.pinned !== undefined && (
+        <details className="pinned-read">
+          <summary>{pinnedMarkerWords(p.pinned)}</summary>
+          {p.pinned.cards.map(c => (
+            <div className="pinned-read-card" key={c.id}>
+              <span className="pinned-read-by">{nameFor(p.nameOf, c.by)}</span>
+              <div className="pinned-read-text">{c.text}</div>
+            </div>
+          ))}
+          {p.pinned.retired.map(r => (
+            <div className="pinned-read-retired" key={r.id}>
+              {retiredWords(r.line)}
+            </div>
+          ))}
+        </details>
       )}
       <div className={classes.join(" ")} data-entry={node.id}>
         <span className="role">{speaker}</span>

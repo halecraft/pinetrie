@@ -222,6 +222,40 @@ thread, to 2000×2000 and 4.5 MB of base64. A type no provider takes inline
 pi's null means either undecodable or impossible to fit. After a resize,
 `resized` is pi's note of the original size (`formatDimensionNote`).
 
+### Pinned cards: what the model reads (ADR-0048, S92)
+
+- **A run's prompt can be two messages.** `ThreadLaneHandle.run(message,
+  pinned)` passes `lane.prompt([pinned, message])` when the host gives a
+  cards entry (`PinnedMessage`, `@pineta/marginalia`): pi writes both in the
+  commit that admits the run, or neither, so a refused run writes no cards
+  entry. Only this keeps the prompt cache when a card changes: cards in the
+  system prompt, or in pi's mid-conversation system messages (which pi-ai
+  folds into the system prompt on most Anthropic models), lose the whole
+  conversation's cache; cards moved to the end of each request lose it on
+  every request (S92).
+- **Every thread's `<rules>` holds `PINNED_RULE`**, first (`systemPromptFor`),
+  for a direct thread too. It is constant, so a lane's prompt stays the same
+  between runs; each lane's prompt changed once when it was added. pi drops
+  a guideline equal to another, so the lane's own lines stay distinct.
+- **pi's compaction carries the cards** (`before_compaction`, `agent.ts`;
+  `pinned.ts`). pi compacts in the middle of a run, and a cards entry
+  summarised away would leave the model without its cards. `carryPinned`
+  decides, pure: the newest cards entry among the summarised messages, when
+  the retained tail has none. The hook then runs pi's own `compact()` and
+  returns `withCarried(result, cards)`, the cards at the head of the
+  retained tail, so the stored compaction entry holds them. pi's
+  preparation is stored before the hook runs, so changing it in place would
+  not stick: the hook returns a result instead.
+- **A failed hook costs only the cards.** It throws nothing on purpose: when
+  `compact()` fails it returns nothing, and pi compacts on its own. The
+  next run's entry restates the cards, since none is in view
+  (`pinnedInView`, `@pineta/core`).
+- **The faux provider caches per lane** (`withUsageEstimate`), and pi stores
+  each reply's `usage`, so `agent.test.ts` checks that an edited card keeps
+  the cache with no model key. Each part is estimated rounding up, so a
+  request can read one token less than the one before it sent.
+  `scriptedModel({ contextWindow })` makes pi compact within a test.
+
 ### A tool's images (ADR-0051)
 
 `read` is built with `readImageProcessor`, which runs `prepareImage` on an

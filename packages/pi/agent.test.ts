@@ -6,6 +6,7 @@
 // boundary ADR-0003 holds.
 
 import {
+  cardId,
   ERR,
   entryId,
   type LaneName,
@@ -14,6 +15,7 @@ import {
   ROOT,
   type RootId,
   rootIdFor,
+  THE_AGENT,
   type ThreadName,
   type ValueWrite,
   writerId,
@@ -21,9 +23,11 @@ import {
 import {
   deleteRecord,
   encodeChat,
+  encodePinned,
   LANE,
   MARK,
   NAME,
+  PINNED_TYPE,
   recordsOf,
   setRecord,
 } from "@pineta/marginalia"
@@ -35,6 +39,7 @@ import {
   readLaneNames,
   readValues,
   rowMessage,
+  rowRetainedTail,
   type SessionDocHandle,
 } from "@pineta/schema"
 import { describe, expect, test } from "vitest"
@@ -122,7 +127,7 @@ describe("createThreadLane (ADR-0057)", () => {
       0,
     )
     expect(await lane.append(message)).toEqual(unknown)
-    expect(await lane.run(message)).toEqual(unknown)
+    expect(await lane.run(message, null)).toEqual(unknown)
     expect(await lane.resume()).toEqual(unknown)
     await agent.close()
   })
@@ -237,7 +242,7 @@ describe("a pi session per root (ADR-0063)", () => {
           createdAt: 1,
         }),
       ])
-      expect(await first.lane(lane).run(chat(`in ${root}`))).toEqual({
+      expect(await first.lane(lane).run(chat(`in ${root}`), null)).toEqual({
         kind: "ok",
       })
     }
@@ -258,7 +263,9 @@ describe("a pi session per root (ADR-0063)", () => {
       tools: null,
     })
     for (const lane of lanes)
-      expect(await second.lane(lane).run(chat("again"))).toEqual({ kind: "ok" })
+      expect(await second.lane(lane).run(chat("again"), null)).toEqual({
+        kind: "ok",
+      })
     expect(await second.interrupted([ONE_ROOT, OTHER])).toEqual([])
     await second.close()
   })
@@ -296,5 +303,134 @@ describe("a pi session per root (ADR-0063)", () => {
     ).toHaveLength(1)
     await agent.release(OTHER)
     await agent.close()
+  })
+})
+
+describe("pinned cards: what the model reads (ADR-0048, S92)", () => {
+  const ADA = writerId("ada@x.io")
+  const asked = (text: string) =>
+    encodeChat(
+      {
+        author: ADA,
+        authorName: "Ada",
+        text,
+        compels: { kind: "agent", agent: THE_AGENT },
+        sendId: newId(),
+      },
+      1,
+    )
+  const cardsOf = (lane: LaneName, text: string) =>
+    encodePinned(
+      { lane, cards: [{ id: cardId("c-1"), text, by: ADA }], retired: [] },
+      () => "Ada",
+      1,
+    )
+  const rows = (doc: RootDocHandle) =>
+    Object.values(readEntries(doc)).sort((a, b) => (a.id < b.id ? -1 : 1))
+  const messageOf = (row: { payload: unknown }) =>
+    rowMessage(row as never) as {
+      role?: string
+      customType?: string
+      usage?: { cacheRead: number; cacheWrite: number }
+    } | null
+  async function laneOver(
+    script: ReturnType<typeof scriptedModel>,
+    doc = newRootDoc(),
+  ) {
+    const agent = await createAgent({
+      documents: oneRoot(doc),
+      replicaId: "test",
+      model: { kind: "scripted", script },
+      tools: null,
+    })
+    const made = await agent.createThreadLane(
+      { root: ONE_ROOT, at: ROOT },
+      laneNameForThread(newId()),
+    )
+    if (made.kind !== "created") throw new Error("no lane")
+    return { agent, doc, lane: made.lane }
+  }
+
+  test("a run's cards entry is stored first, its prompt as its child; the model reads the cards before the message", async () => {
+    const script = scriptedModel()
+    let seen: readonly string[] = []
+    script.use([
+      {
+        reply: context => {
+          seen = context
+          return "ok"
+        },
+      },
+    ])
+    const { agent, doc, lane } = await laneOver(script)
+    const pinned = cardsOf(lane, "ship the sync fix")
+    expect(await agent.lane(lane).run(asked("go"), pinned)).toEqual({
+      kind: "ok",
+    })
+    await agent.close()
+    const cards = rows(doc).find(r => messageOf(r)?.customType === PINNED_TYPE)
+    const prompt = rows(doc).find(r => r.parentId === cards?.id)
+    expect(messageOf(prompt ?? { payload: null })?.customType).toBe(
+      "pineta.chat",
+    )
+    expect(seen.at(-2)).toBe(pinned.content)
+    expect(seen.at(-1)).toBe("Ada: go")
+  })
+
+  test("an edited card keeps the cache: the request after it reads everything the request before it sent", async () => {
+    const script = scriptedModel({ answer: { text: "ok" } })
+    const { agent, doc, lane } = await laneOver(script)
+    const pad = (s: string) => `${s} ${"words ".repeat(200)}`
+    const handle = agent.lane(lane)
+    await handle.run(asked(pad("one")), cardsOf(lane, pad("card v1")))
+    await handle.run(asked(pad("two")), null)
+    await handle.run(asked(pad("three")), cardsOf(lane, pad("card v2")))
+    await agent.close()
+    const usage = rows(doc)
+      .map(r => messageOf(r))
+      .filter(m => m?.role === "assistant")
+      .map(m => m?.usage)
+    const [, before, after] = usage
+    if (before === undefined || after === undefined)
+      throw new Error("three replies, each with its usage")
+    expect(after.cacheRead).toBeGreaterThan(0)
+    // Each part is estimated rounding up, so the whole can read one token
+    // less than its two parts summed.
+    expect(after.cacheRead).toBeGreaterThanOrEqual(
+      before.cacheRead + before.cacheWrite - 1,
+    )
+  })
+
+  test("pi's compaction carries the cards the model last read: the next request reads them after the summary, and the compaction entry holds them", async () => {
+    // Every request's context, the summary's among them.
+    const contexts: (readonly string[])[] = []
+    const script = scriptedModel({
+      answer: {
+        reply: context => {
+          contexts.push(context)
+          return "ok"
+        },
+      },
+      contextWindow: 30_000,
+    })
+    const { agent, doc, lane } = await laneOver(script)
+    const big = (s: string) => `${s} ${"words ".repeat(10_000)}`
+    const handle = agent.lane(lane)
+    const pinned = cardsOf(lane, "ship the sync fix")
+    await handle.run(asked(big("one")), pinned)
+    await handle.run(asked(big("two")), null)
+    await handle.run(asked("three"), null)
+    await agent.close()
+    const compaction = rows(doc).find(r => r.type === "compaction")
+    expect(
+      (compaction === undefined ? [] : rowRetainedTail(compaction)).some(
+        m => (m as { customType?: string }).customType === PINNED_TYPE,
+      ),
+    ).toBe(true)
+    const seen = contexts.at(-1) ?? []
+    expect(seen.at(-1)).toBe("Ada: three")
+    const summary = seen.findIndex(t => t.includes("summary"))
+    expect(summary).toBeGreaterThanOrEqual(0)
+    expect(seen.indexOf(pinned.content)).toBeGreaterThan(summary)
   })
 })

@@ -31,7 +31,7 @@ import {
   type Outcome,
   revOfReply,
 } from "./codec.ts"
-import { EMPTY_COMMAND, OUTCOME_KINDS, reply } from "./messages.ts"
+import { command, EMPTY_COMMAND, OUTCOME_KINDS, reply } from "./messages.ts"
 
 const TEST_ROOT = rootIdFor("test-root")
 const NEW_ROOT = rootIdFor("01a0f9eb-86e1-77ad-a822-2a3067862240")
@@ -151,6 +151,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       mentions: [{ kind: "agent", agent: THE_AGENT }],
       work: null,
       card: null,
+      pinned: [],
       reserved: NEW_LANE,
       base: "wip/search",
     },
@@ -165,6 +166,10 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       mentions: [{ kind: "person", name: "bob" }],
       work: { kind: "own" },
       card: { id: cardId("c-7"), seen: "v-1" },
+      pinned: [
+        { id: cardId("c-8"), seen: "v-2" },
+        { id: cardId("c-9"), seen: "" },
+      ],
       reserved: null,
       base: null,
     },
@@ -179,6 +184,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       mentions: [],
       work: { kind: "direct", dir: "/tmp/elsewhere" },
       card: null,
+      pinned: [],
       reserved: null,
       base: null,
     },
@@ -294,6 +300,29 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
   }
 })
 
+test("a chat's malformed pinned cards are refused", () => {
+  const chat = (pinned: string) =>
+    decodeCommand(
+      command({
+        id: "c",
+        kind: "chat",
+        text: "hi",
+        parentId: "e-1",
+        root: TEST_ROOT,
+        mode: "reply",
+        pinned,
+      }),
+    )
+  for (const bad of [
+    "{",
+    '{"card":"c-1"}',
+    '[{"card":"c-1"}]',
+    '[{"card":"","seen":""}]',
+  ])
+    assert.equal(chat(bad).kind, "refused")
+  assert.equal(chat("").kind, "chat")
+})
+
 test("a take that does not say which offer it was shown, well formed, is refused", () => {
   const take = (seen: string) =>
     decodeCommand({
@@ -398,6 +427,13 @@ test('decodeKey: "" is none; anything malformed is undefined', () => {
     at: ROOT,
   } as const
   assert.deepEqual(decodeKey(encodeKey(fresh)), fresh)
+  const pinned = {
+    kind: "pinned",
+    root: TEST_ROOT,
+    at: atEntry(entryId("e-1")),
+    lane: laneNameForThread("x"),
+  } as const
+  assert.deepEqual(decodeKey(encodeKey(pinned)), pinned)
   // A fresh key with no root names no place the host can record.
   assert.equal(decodeKey('{"kind":"fresh","column":"k"}'), undefined)
 })

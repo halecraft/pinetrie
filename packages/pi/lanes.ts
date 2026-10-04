@@ -22,6 +22,7 @@ import {
   NO_EDITOR,
   type RuntimeProgram,
 } from "@pineta/core"
+import { PINNED_RULE } from "@pineta/marginalia"
 import { Type } from "typebox"
 import type { ModelSetup } from "./config.ts"
 import { buildSystemPrompt, ensureTool } from "./deep.ts"
@@ -275,9 +276,10 @@ function skillsInLane<S extends { filePath: string; baseDir: string }>(
 /**
  * pi's own prompt, with the repo's context files and the person's skills, so
  * an extension that shapes pi's prompt sections finds them (S23). It names
- * the lane's directory, and does not wait for its setup. A lane of its own
- * is told about itself (`laneGuidelines`), and sees its skills at the paths
- * it can read them (`skillsInLane`).
+ * the lane's directory, and does not wait for its setup. Every thread is told
+ * what pinned cards are (`PINNED_RULE`); a lane of its own is also told about
+ * itself (`laneGuidelines`), and sees its skills at the paths it can read
+ * them (`skillsInLane`).
  */
 export const systemPromptFor =
   (
@@ -293,9 +295,10 @@ export const systemPromptFor =
         toolContext.lane === null
           ? setup.skills
           : skillsInLane(setup.skills, toolContext.lane.hostPaths),
-      ...(toolContext.lane === null
-        ? {}
-        : { promptGuidelines: laneGuidelines(toolContext.lane.facts) }),
+      promptGuidelines:
+        toolContext.lane === null
+          ? [PINNED_RULE]
+          : [PINNED_RULE, ...laneGuidelines(toolContext.lane.facts)],
     })
 
 export const GUIDANCE_TOOL = "ask_for_guidance"

@@ -18,6 +18,7 @@ import {
   join,
   laneNamesOf,
   lanesOf,
+  lateFor,
   queueCard,
   refusedWrite,
   rootAt,
@@ -288,6 +289,99 @@ async function run(check: Checks["check"]): Promise<void> {
       told >= 0 && sent7 && onHost(c7) === undefined,
       `${told}; sent ${sent7}`,
     )
+
+    // 4e. Pinned cards (ADR-0048 step 5, S92): a card pinned at the thread's
+    // end is read by the agent's next run, in a cards entry pi writes with
+    // the run's prompt, before it.
+    const pinEnd = tipOf()
+    const pin = newCard(ada, pinEnd, "ship the sync fix")
+    await waitFor(
+      () =>
+        onHost(pin) !== undefined && ch.cardText(pin) === "ship the sync fix",
+      5_000,
+    )
+    await ada.moveCard(
+      {
+        card: pin,
+        from: drafting(pinEnd),
+        to: {
+          kind: "pinned",
+          root: rootAt(ch, at(pinEnd)),
+          at: at(pinEnd),
+          lane: null,
+        },
+      },
+      { actedAt: { kind: "column", key: "k-pin" }, slot: null },
+    )
+    let readCards: readonly string[] = []
+    script.use([
+      {
+        reply: context => {
+          readCards = context
+          return "Pinned, noted."
+        },
+      },
+    ])
+    await ada.chat("@agent go on", at(pinEnd), { pinned: [pin] })
+    await cIdle()
+    const prompt = Object.values(treeOf(ch).entries).find(
+      e => e.message?.role === "chat" && e.message.content === "@agent go on",
+    )
+    const parent =
+      prompt?.parentId == null ? undefined : treeOf(ch).entries[prompt.parentId]
+    // The system prompt names the block too (`PINNED_RULE`): the entry starts with it.
+    const cardsAt = readCards.findIndex(t => t.startsWith("<pinned-cards>"))
+    check(
+      "a run's prompt follows a cards entry holding the thread's pinned cards, and the model is given them",
+      parent?.message?.role === "pinned" &&
+        parent.message.pinned?.cards[0]?.text === "ship the sync fix" &&
+        cardsAt === readCards.length - 2 &&
+        (readCards[cardsAt] ?? "").includes("ship the sync fix") &&
+        readCards.at(-1) === "Ada: @agent go on",
+      `${parent?.message?.role}; ${cardsAt} of ${readCards.length}`,
+    )
+
+    // 4f. A pinned card's text typed just before a send reaches that run:
+    // Kyneta keeps no order between documents (S96), so the run waits for
+    // the text as its sender had it (`seen`). A second session of Ada's
+    // sends her writes to the card's document 300 ms late (`lateFor`): her
+    // card is made, pinned and sent at once, and the commands arrive first.
+    const editEnd = tipOf()
+    const late = cardId(crypto.randomUUID())
+    const adaLate = await join(ch, "ada", "cards", {
+      WebSocket: lateFor(cardDocId(late), 300),
+    })
+    script.use([
+      {
+        reply: context => {
+          readCards = context
+          return "Edited, noted."
+        },
+      },
+    ])
+    const pinnedHere = {
+      kind: "pinned",
+      root: rootAt(ch, at(editEnd)),
+      at: at(editEnd),
+      lane: null,
+      // The host gives it its order: a key carries none.
+      order: "",
+    } as const
+    void adaLate.createCard(
+      { id: late, place: pinnedHere, command: null, unsent: null },
+      "typed just before the send",
+    )
+    await adaLate.chat("@agent and now", at(editEnd), { pinned: [pin, late] })
+    await cIdle()
+    const lastCards =
+      readCards.findLast(t => t.startsWith("<pinned-cards>")) ?? ""
+    check(
+      "an edit to a pinned card made just before a send reaches that run",
+      lastCards.includes("typed just before the send"),
+      lastCards.slice(0, 200),
+    )
+    await adaLate.close()
+    await ch.quiet()
 
     // 4d. A client cannot write the places document: only the host writes it
     // (ADR-0059), and every peer declares so (`writersPolicy`), so the write

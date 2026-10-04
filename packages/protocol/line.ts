@@ -35,6 +35,7 @@ const Command = Schema.struct({
   base: Schema.string(),
   seen: Schema.string(),
   moves: Schema.string(),
+  pinned: Schema.string(),
 })
 
 const Reply = Schema.struct({

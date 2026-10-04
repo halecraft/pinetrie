@@ -37,7 +37,14 @@ message, the host's write (*Physics*, 1); clipboard copy and cut of cards
 wait for the key system's redesign (*Input*). Amended by ADR-0066: moves are
 undone by the host's Kyneta stacks, one per person and root, whole or
 refused (*Undo is Kyneta's* covers moves too, on the host); step 4's
-decision 11, the page's own history of moves, is withdrawn.
+decision 11, the page's own history of moves, is withdrawn. Step 5's first
+part, pinned cards, implemented by `PLAN-2026-10-03-pinned-cards`, with S92
+as its evidence, and *Pinned cards and the agent* amended in place
+(2026-10-04, with Duane): each run's cards entry restates every pinned card
+and names those unpinned since; it goes in with the run's prompt, only when
+the cards changed; pi's compaction carries it; the run waits for its
+sender's text; a branch starts with no pinned cards. Its second part, "+ card"
+and "+ pin", is `PLAN-2026-10-04-cards-per-place`.
 
 **Context.**
 
@@ -295,27 +302,43 @@ you wrote it, and when a reminder on it is due.
 *Pinned cards and the agent.* Pinned cards are, figuratively, the thread's
 system prompt: the agent reads every one on every run.
 - **Where they go in the context.** The system prompt holds one fixed line
-  saying that the thread's pinned cards follow and express the team's intent;
-  the cards' text goes near the end of the context. The system prompt stays
-  the same on every request, as ADR-0046 already requires, so an edited card
-  does not throw away the prompt cache for the whole conversation.
-- **What the agent read is in the tree** (ADR-0004). When a run starts and a
-  pinned card changed since the last run, the host writes an entry holding its
-  text. That entry is also what the model reads, so the tree records the
-  context and supplies it in one place. On screen it is a small marker in the
-  column, not a message.
-- **A run reads the cards as they were when it started.** An edit during a
-  run reaches the next one, and until then the card is marked "changed since
+  saying that the thread's pinned cards follow in `<pinned-cards>` blocks and
+  the latest one holds, in every agent thread's `<rules>`; the cards' text
+  goes in with each run's prompt. The system prompt stays the same on every
+  request, as ADR-0046 already requires, so an edited card does not throw
+  away the prompt cache for the whole conversation (S92). *Amended in place,
+  step 5:* not "near the end of the context", which loses the cache on every
+  request.
+- **What the agent read is in the tree** (ADR-0004). When a run starts and
+  the thread's pinned cards differ from those the model last read on the
+  run's path, the host writes one cards entry, which pi writes with the
+  run's prompt, in the commit that admits the run (`prompt([cards,
+  message])`). It restates every card pinned now and names, by its first
+  line, each card unpinned since ("no longer applies"), so the latest entry
+  is all that holds. A run whose cards have not changed writes none. That
+  entry is also what the model reads, so the tree records the context and
+  supplies it in one place. On screen it is a small marker above the run's
+  prompt, not a message.
+- **pi's compaction keeps them in view.** pi compacts in the middle of a
+  run; a hook carries the newest cards entry summarised into the retained
+  tail, so the compaction entry holds the cards the model reads after it.
+  If the hook fails, pi compacts on its own and the next run restates them.
+- **A run reads the cards as they were when it started.** A send carries
+  each pinned card's text version as its sender had it, and the run waits
+  for it, at most 2 s, then reads what the host holds. An edit during a run
+  reaches the next one, and until then the card is marked "changed since
   the agent last read it".
 - **Anyone can steer.** Anyone can edit a pinned card, and so change what the
   agent works towards, as anyone can edit a queued card. The card's history
   records who did.
 - **A card shows its size**, quietly, since a long one costs tokens on every
   run.
-- **A branch inherits its parent's pinned cards as they were at the fork**,
-  read-only, like the rest of the path above it, and its agent reads them.
-  Cards pinned in the branch are its own. To change an inherited card for the
-  branch, take a copy and pin that; this should be rare.
+- **A branch starts with no pinned cards**, and its first run tells the
+  model its parent's no longer apply: the branch shares its parent's path,
+  which carries the parent's cards entries. That entry is quiet: the column
+  draws nothing for what it retires. A branch that wants its parent's
+  direction takes a copy and pins it. *Amended in place, step 5:* it did
+  inherit them, read-only.
 - **A conversation thread** has no agent, so its pinned cards are the team's
   until someone asks the agent, whose first run reads them.
 
@@ -540,8 +563,10 @@ two hosts).
   prefix and throw away the cache for the whole conversation.
 - **A branch copying its parent's pinned cards**, to change on their own.
   It fits "cards belong to a thread", but the branch's path above the fork is
-  its parent's as it was, and its pinned cards should be too. Taking a copy
-  covers the rare exception.
+  its parent's as it was. Taking a copy covers the rare exception. Inheriting
+  them read-only, as this ADR first said, was dropped too (step 5): the
+  branch's column would show cards nobody in the branch pinned or can
+  change.
 - **One undo stack per device, shared by its tabs.** Cmd+Z in one tab could
   undo a move made in another, and Kyneta's stack is a document that one
   runtime writes, while each tab is its own runtime.

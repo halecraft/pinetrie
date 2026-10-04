@@ -2,19 +2,22 @@
 //
 // The one way a run starts. It announces its end and knows nothing of what
 // follows: `startHost` wires the drain and hot reload to `onEnded`, which is
-// what keeps the queue's take and the commands out of this module.
+// what keeps the queue's take and the commands out of this module. What a
+// run reads of its pinned cards is `readPinned`'s (`pinned.ts`).
 
 import {
   type EntryId,
   type LaneName,
   type RunId,
   runId,
+  type SentCard,
   type StreamEvent,
 } from "@pineta/core"
 import {
   CHAT_TYPE,
   type ChatMessage,
   type LandMessage,
+  type PinnedMessage,
   type StackMessage,
   settleRun,
 } from "@pineta/marginalia"
@@ -36,12 +39,34 @@ export type RunStart =
   | {
       readonly kind: "prompt"
       readonly message: ChatMessage | LandMessage | StackMessage
+      /**
+       * The thread's pinned cards as the sender had them, which the run
+       * waits for (ADR-0048, S96): a chat's; none for a take, a landing or
+       * a stack.
+       */
+      readonly pinnedSeen: readonly SentCard[]
     }
   | { readonly kind: "resume" }
 
+/** The cards entry a run on `lane` starts with, or null (`pinned.ts`). */
+export type ReadPinned = (
+  lane: LaneName,
+  seen: readonly SentCard[],
+  signal: AbortSignal,
+) => Promise<PinnedMessage | null>
+
 export interface Runs {
-  /** Start one turn on a thread's lane, streaming into the document. */
+  /**
+   * Start one turn on a thread's lane, streaming into the document. A
+   * prompt's run reads its pinned cards first, which may wait for their text.
+   */
   start(lane: LaneName, start: RunStart): RunId
+  /**
+   * Stop a chat's run that has not reached pi yet: it is waiting for its
+   * pinned cards' text, where pi's `abort` reaches nothing. Its message is
+   * kept, unrun. False when no such run waits on `lane`.
+   */
+  cancel(lane: LaneName): boolean
   /**
    * Set once: called after each run's end has closed its streams and stopped
    * its lane. Set after `createRuns`, since what it calls starts runs.
@@ -103,10 +128,17 @@ export function createRuns(deps: {
     LaneWork,
     "beforeRun" | "runEnded" | "landingEnded" | "splitEnded"
   >
+  readonly readPinned: ReadPinned
 }): Runs {
-  const { basics, agent, work } = deps
+  const { basics, agent, work, readPinned } = deps
   const { docs, live, log } = basics
   let ended: (lane: LaneName, prompt: EntryId | null) => void = () => {}
+  /**
+   * A chat's run between its start and pi's, by lane. Only a chat's: a land
+   * or stack run cancelled here would write no prompt, and `end` would read
+   * the lane's previous one, recording an old landing's outcome again.
+   */
+  const waiting = new Map<LaneName, AbortController>()
 
   /**
    * Carry out `planRunEnd`. The steps before `endRun` may fail, and a failure
@@ -148,22 +180,40 @@ export function createRuns(deps: {
       const id = runId(basics.newId())
       beginRun(live, lane, id)
       const handle = agent.lane(lane)
+      // A chat's message, which is kept if its run never happens.
+      const chat =
+        start.kind === "prompt" && start.message.customType === CHAT_TYPE
+          ? start.message
+          : null
+      const stop = new AbortController()
+      if (chat !== null) waiting.set(lane, stop)
       void (async () => {
         try {
           work.beforeRun(lane)
-          const ran =
-            start.kind === "prompt"
-              ? await handle.run(start.message)
-              : await handle.resume()
-          if (
-            start.kind === "prompt" &&
-            start.message.customType === CHAT_TYPE &&
-            settleRun(ran) === "keep"
-          ) {
+          if (start.kind === "resume") {
+            await handle.resume()
+            return
+          }
+          const pinned = await readPinned(
+            lane,
+            start.pinnedSeen,
+            stop.signal,
+          ).catch(error => {
+            failed(basics, "pinned cards")(error)
+            return null
+          })
+          if (waiting.get(lane) === stop) waiting.delete(lane)
+          if (chat !== null && stop.signal.aborted) {
+            log(`[host] run ${id.slice(-8)} stopped before it started`)
+            await handle.append(chat)
+            return
+          }
+          const ran = await handle.run(start.message, pinned)
+          if (chat !== null && settleRun(ran) === "keep") {
             // The reply was already `started`, so the author cannot be told;
             // at least their message is not lost.
             log(`[host] run ${id.slice(-8)} REFUSED: kept as a message`)
-            await handle.append(start.message)
+            await handle.append(chat)
           }
         } catch (error) {
           failed(basics, "run")(error)
@@ -172,6 +222,13 @@ export function createRuns(deps: {
         }
       })()
       return id
+    },
+    cancel(lane) {
+      const stop = waiting.get(lane)
+      if (stop === undefined) return false
+      waiting.delete(lane)
+      stop.abort()
+      return true
     },
     onEnded(listener) {
       ended = listener

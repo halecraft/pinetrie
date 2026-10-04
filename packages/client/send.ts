@@ -39,6 +39,11 @@ export interface ChatHow {
   readonly id?: string
   /** The card the text is sent from, which the host spends once it is sent. */
   readonly card?: CardId
+  /**
+   * The cards pinned at the column's thread end: the run waits for each as
+   * this client has it (ADR-0048).
+   */
+  readonly pinned?: readonly CardId[]
   /** The column it is sent from, where a refusal of its card's move is said. */
   readonly column?: string
   /** The lane id the column reserved: what a lane this send creates is called (ADR-0057). */
@@ -50,19 +55,28 @@ export interface ChatHow {
 }
 
 /** What every send from one column carries, whichever card it is sent from. */
-export type ColumnHow = Pick<ChatHow, "lane" | "reserved" | "base" | "root"> & {
+export type ColumnHow = Pick<
+  ChatHow,
+  "lane" | "reserved" | "base" | "root" | "pinned"
+> & {
   readonly asksAgent: boolean
   readonly column: string
 }
 
-/** A chat as the host is asked for it: `how`'s defaults filled in. */
+/**
+ * A chat as the host is asked for it: `how`'s defaults filled in, and its
+ * card and the column's pinned cards each with its text version as this
+ * client has it (`versionOf`), which the host waits for (S96).
+ */
 export function chatIntent(
   text: string,
   at: Position,
   how: ChatHow,
   root: RootId,
-  card: SentCard | null,
+  card: CardId | null,
+  versionOf: (card: CardId) => string,
 ): Extract<Intent, { kind: "chat" }> {
+  const sent = (id: CardId): SentCard => ({ id, seen: versionOf(id) })
   return {
     kind: "chat",
     text,
@@ -73,7 +87,8 @@ export function chatIntent(
     asksAgent: how.asksAgent === true,
     mentions: parseMentions(text),
     work: how.work ?? null,
-    card,
+    card: card === null ? null : sent(card),
+    pinned: (how.pinned ?? []).map(sent),
     reserved: how.reserved ?? null,
     base: how.base ?? null,
   }

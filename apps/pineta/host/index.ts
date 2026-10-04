@@ -77,6 +77,7 @@ import { startHttp } from "./http.ts"
 import { lineDocPrefix } from "./lines.ts"
 import { createMoveHistories } from "./move-history.ts"
 import { createNames } from "./names.ts"
+import { createPinned } from "./pinned.ts"
 import { hostPolicy, resolveDoc } from "./policy.ts"
 import { createRuns, streamInto } from "./runs.ts"
 import { startSeats } from "./seats.ts"
@@ -84,7 +85,7 @@ import { createSettle } from "./settle.ts"
 import { planShutdown, type ShutdownStep } from "./shutdown.ts"
 import { recover } from "./startup.ts"
 import { openStore } from "./store.ts"
-import { drain as drainQueue, takenChat } from "./take.ts"
+import { createBehind, drain as drainQueue, takenChat } from "./take.ts"
 import { createTitles } from "./titles.ts"
 import { startLaneWork } from "./work/index.ts"
 
@@ -430,7 +431,8 @@ export async function startHost({
   // Commands are received only from `startControl`, after `recover`.
   const listener = Control.listen(exchange)
   const cardPort = startCards({ exchange, store, session })
-  const runs = createRuns({ basics, agent, work })
+  const { readPinned } = createPinned({ basics, cards: cardPort })
+  const runs = createRuns({ basics, agent, work, readPinned })
   const commands = createCommands({
     basics,
     agent,
@@ -438,14 +440,18 @@ export async function startHost({
     blobs,
     cards: cardPort,
     start: runs.start,
+    cancel: runs.cancel,
     names,
     titles,
     drain: lane => queueDrain(lane),
     histories,
     keeper,
   })
-  // Cards whose text the host is waiting for, each once (`behind`).
-  const awaiting = new Set<CardId>()
+  const behind = createBehind({
+    places,
+    texts: cardPort,
+    drain: lane => queueDrain(lane),
+  })
   const drain = (lane: LaneName) =>
     drainQueue(
       {
@@ -455,14 +461,7 @@ export async function startHost({
         start: runs.start,
         send: taken =>
           commands.sendTaken(taken.card.place.by, newId(), takenChat(taken)),
-        behind: card => {
-          if (awaiting.has(card.id)) return
-          awaiting.add(card.id)
-          void cardPort.whenHolds(card.id, card.place.seen).then(() => {
-            awaiting.delete(card.id)
-            queueDrain(card.place.lane)
-          })
-        },
+        behind,
       },
       lane,
     )

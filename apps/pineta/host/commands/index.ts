@@ -45,6 +45,7 @@ export interface CommandDeps {
   readonly blobs: ChatDeps["blobs"]
   readonly cards: ChatDeps["cards"] & CardCommandDeps["cards"]
   readonly start: ChatDeps["start"]
+  readonly cancel: LaneDeps["cancel"]
   readonly names: Pick<Names, "reserve">
   readonly titles: ChatDeps["titles"] & Pick<Titles, "asked">
   readonly drain: CardCommandDeps["drain"]

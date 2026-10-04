@@ -16,6 +16,7 @@ import type { AskIndex } from "./asks.ts"
 import { type ImageRef, isImageMime, isSha256 } from "./images.ts"
 import {
   atEntry,
+  type CardId,
   type CommitId,
   type EntryId,
   type LaneName,
@@ -47,6 +48,27 @@ export interface MessagePart {
   readonly data?: string
 }
 
+/** One pinned card as a run read it (ADR-0048). */
+export interface PinnedCardRead {
+  readonly id: CardId
+  readonly text: string
+  /** The card's owner, named in what the model read by their display name then. */
+  readonly by: WriterId
+}
+
+/** The pinned cards a run read: a cards entry's details, decoded. */
+export interface PinnedView {
+  /** The lane of the run that read them. */
+  readonly lane: LaneName
+  /** Every card pinned at the run's start, in order. */
+  readonly cards: readonly PinnedCardRead[]
+  /** Cards the model had read that are no longer pinned, with their first line. */
+  readonly retired: readonly {
+    readonly id: CardId
+    readonly line: string
+  }[]
+}
+
 export interface AgentMessageLike {
   readonly role?: string
   readonly content?: string | readonly MessagePart[]
@@ -73,6 +95,8 @@ export interface AgentMessageLike {
    */
   readonly stopReason?: string
   readonly errorMessage?: string
+  /** Role `pinned` only: the cards a run read (ADR-0048). */
+  readonly pinned?: PinnedView
   /** Roles `update` and `land` only: the commits merged into the lane (ADR-0072). */
   readonly merged?: readonly CommitId[]
 }
@@ -83,6 +107,11 @@ export interface EntryLike {
   readonly type: string
   /** Absent on entries that carry no message, e.g. a compaction. */
   readonly message?: AgentMessageLike
+  /**
+   * A compaction only: the pinned cards its retained tail carries, which the
+   * model reads after the summary; absent when it carries none.
+   */
+  readonly carried?: PinnedView
   /** When it was written, in ms since the epoch: the row's column. */
   readonly timestamp?: number
 }
@@ -326,6 +355,8 @@ export function turnEntry(index: TreeIndex, tip: EntryId): EntryId {
 /**
  * The roles a run can start with: a person's message, pi's own, a land message
  * or a stack message. An update never starts one: it is a fact in the thread.
+ * Nor does a cards entry (role `pinned`): it is written with a run's prompt,
+ * as its parent.
  */
 const PROMPT_ROLES: ReadonlySet<string> = new Set([
   "chat",
@@ -352,6 +383,27 @@ export function promptOf(
 ): EntryId | null {
   for (const id of ancestry(index, tip).path)
     if (startsRun(index.entries[id])) return id
+  return null
+}
+
+/**
+ * The pinned cards the model reads on a run from `tip`: the newest cards
+ * entry on the path. A compaction ends the walk, since pi replaces
+ * everything above it with its summary and its retained tail: the cards
+ * that tail carries are in view, or none. pi builds a run's context by the
+ * same walk; the host plans a run's cards entry from this, and the column
+ * shows what changed since from it, so the two cannot disagree.
+ */
+export function pinnedInView(
+  index: TreeIndex,
+  tip: EntryId | null,
+): PinnedView | null {
+  for (const id of ancestry(index, tip).path) {
+    const entry = index.entries[id]
+    if (entry?.type === "compaction") return entry.carried ?? null
+    const pinned = entry?.message?.pinned
+    if (pinned !== undefined) return pinned
+  }
   return null
 }
 
@@ -647,11 +699,11 @@ export interface ColumnSpec {
    * a lane, whose anchor is the lane's tip and whose thread goes on only
    * through the lane.
    */
-  readonly pinned?: boolean
+  readonly anchored?: boolean
 }
 
 export interface ColumnView {
-  /** Where this column's path ends: its anchor if pinned or null, else `followTip`. */
+  /** Where this column's path ends: its anchor if anchored or null, else `followTip`. */
   readonly tipId: EntryId | null
   /**
    * The deepest message this path shares with ANY column to its left, or null
@@ -677,7 +729,7 @@ export function projectColumns(
   const shown = new Set<EntryId>()
   return columns.map(column => {
     const tipId =
-      column.pinned === true || column.anchor === null
+      column.anchored === true || column.anchor === null
         ? column.anchor
         : followTip(index, column.anchor)
     const { spine } = projectSpine(index, tipId)

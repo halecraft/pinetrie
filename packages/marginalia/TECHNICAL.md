@@ -248,13 +248,24 @@ which are swept.
   `ARCHIVED_HISTORY_MS` (7 days) after it was archived, and, at startup
   only, those of a root the directory does not name. After a run's end that
   second rule would retire a new tab's history while it is open.
-- **A drafting card is resolved, never stored as an end.** `placeEnd` runs
-  `threadOf` from where it started and its column's lane, as a reply from
-  there would go, so the card follows its thread as the thread grows.
-  `cardEnd` is that for a drafting card; `draftingAt(end, …)` is everyone's
-  drafting cards whose end is `end`; `yourCard` is your own at an end or a
-  fresh column, never another writer's, and the newest of yours there (ids
-  are uuidv7), so a card someone unqueued does not take your composer.
+- **A drafting or pinned card is resolved, never stored as an end.**
+  `placeEnd` runs `threadOf` from where it started and its column's lane, as
+  a reply from there would go, so the card follows its thread as the thread
+  grows. `cardsAt(kind, end, …)` is everyone's cards of that kind (`drafting`
+  or `pinned`) whose end is `end`, by `order` when they have one, then by
+  id. `cardEnd` is a drafting card's end only, and `yourCard` finds your own
+  through it, at an end or a fresh column, never another writer's, and the
+  newest of yours there (ids are uuidv7), so a card someone unqueued does not
+  take your composer. Were `cardEnd` to resolve pinned cards too, a column
+  would draw them again among its drafting cards, and your composer could
+  bind to a pinned card of yours.
+- **A pinned card** (ADR-0048 step 5) is a drafting card's place with an
+  `order`. Pinning moves it from drafting to pinned at the same `at` and
+  lane (`pinnedOf`); unpinning back (`draftingOf`). Anyone may do either in
+  a shared place, and a pinned card is not removed (`not-fresh`). The host
+  orders it after every pinned card in the session (`placeAt`), not only its
+  thread's: a thread is found through the tree, which a handoff does not
+  read, and an order only has to grow within a thread.
 - **The queue is fields, not a list** (S69): `queuedOn(cards, lane)` sorts
   a lane's queued cards by `order`, then id. `orderAfter` keys are
   fixed-width base-36 integers, started mid-range and stepped, so string
@@ -666,6 +677,38 @@ offer starts (`offerStart`), are `@pineta/lanes`'s.
 - **`bannerPrompt`** fills the template's `{adjective}` and `{noun}` from
   the thread's name and puts the person's direction after it. A record written when banners had a crop still decodes: its `focus`
   is ignored.
+
+# Pinned cards (`pinned.ts`, ADR-0048 step 5, S92)
+
+A cards entry is a pi `CustomMessage`, `customType: "pineta.pinned"`,
+`display: false`, in `update.ts`'s pattern: `content` is what the model reads,
+`details` the `PinnedView` (`@pineta/core`) Pineta reads back. `encodePinned`
+and the total `decodePinned` are the only code that builds or reads it, and
+`renderableMessage` makes it role `pinned`, which no projection draws.
+
+- **It restates every card pinned now** and names, by its first line, each
+  card the model had read that is no longer pinned ("No longer applies"), so
+  the newest entry is all that holds. `pinnedContent` words it, each card
+  under its owner's display name then. A card's `</card>` and
+  `</pinned-cards>` are neutralised (`<\/card>`), so a card cannot close the
+  block the model is told to trust.
+- **What the model reads now is `pinnedInView`** (`@pineta/core`, beside
+  `promptOf`): the newest cards entry on the path; at a compaction, the
+  cards its retained tail carries, or none, since pi replaces what is above
+  it. The host plans a run's entry from it, and the column shows each card's
+  status from it.
+- **`pinnedDiff` is the one comparison** of the cards pinned now with those
+  in view: each card `read`, `changed` or `unread`, by id then text, what
+  is retired, and whether the order changed. `planPinnedRead` is null when
+  every card is read, none retired and the order the same; else the view to
+  write. A branch's first run is the case where the path holds its parent's
+  cards and the thread none, so they are all retired, with no rule of its
+  own.
+- **`pinnedReads`** is a thread's pinned cards as a run reads them, leaving
+  out a card with no text yet: the host's plan and the column's statuses use
+  it, so they agree on which cards count.
+- **`PINNED_RULE`** is the line every agent thread's `<rules>` holds
+  (`packages/pi`).
 
 # Updates and stacks (`update.ts`, ADR-0038)
 

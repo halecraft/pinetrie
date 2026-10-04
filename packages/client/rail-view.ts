@@ -13,7 +13,7 @@ import {
  * The messages this view draws on their own, never inside a stretch: thread
  * ends someone else follows, running lanes' tips, each open
  * column's end, and each thread end holding a card of yours, whose dot
- * carries its mark. A column's end is kept because a pinned column can end
+ * carries its mark. A column's end is kept because an anchored column can end
  * mid-stretch: inside one, half of it would be on the column's path and half
  * not, and where the column ends would not show. The columns fold around the
  * same messages (`railLandmarks`), without the rings: a thread end on a

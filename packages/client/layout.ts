@@ -30,7 +30,7 @@ import {
   type Column,
   type ColumnAction,
   columnsReducer,
-  isPinned,
+  isAnchored,
   type Prefill,
   type ReaderAction,
 } from "./columns.ts"
@@ -419,7 +419,7 @@ export function planOpen(
   const columns = columnsOf(layout, root)
   const views = projectColumns(
     index,
-    columns.map(c => ({ anchor: c.anchor, pinned: isPinned(c) })),
+    columns.map(c => ({ anchor: c.anchor, anchored: isAnchored(c) })),
   )
   const paths = views.map(v =>
     v.tipId === null ? new Set<EntryId>() : pathIds(index, v.tipId),

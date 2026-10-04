@@ -4,8 +4,9 @@
 //
 // Where a card is lives in the places document, which `places.ts` writes;
 // this port is about texts alone: who wrote in one, loading them for the
-// take and whether they hold what a queuer had, destroying a spent one, and
-// gathering them for the sweeps, so no text is read twice.
+// take and a run's pinned cards, whether they hold what a queuer or a sender
+// had, destroying a spent one, and gathering them for the sweeps, so no text
+// is read twice.
 
 import { type Exchange, type Store, whenHydrated } from "@kyneta/exchange"
 import { subscribe } from "@kyneta/schema"
@@ -45,8 +46,11 @@ export interface CardPort {
    * its queuer had when they queued it.
    */
   holds(id: CardId, seen: string): boolean
-  /** Resolves once the host's copy holds `seen`. */
-  whenHolds(id: CardId, seen: string): Promise<void>
+  /**
+   * Resolves once the host's copy holds `seen`, or once `signal` aborts:
+   * either way it unsubscribes, so a wait given up leaves nothing behind.
+   */
+  whenHolds(id: CardId, seen: string, signal?: AbortSignal): Promise<void>
   /** These cards' texts, with who wrote in each. */
   texts(ids: readonly CardId[]): Promise<readonly GatheredText[]>
   /** Every stored card text document, by id. */
@@ -92,15 +96,19 @@ export function startCards(input: {
     },
     textNow: id => exchange.get(cardDocId(id), TextDoc).text(),
     holds: (id, seen) => textHolds(exchange.get(cardDocId(id), TextDoc), seen),
-    whenHolds(id, seen) {
+    whenHolds(id, seen, signal) {
       const t = exchange.get(cardDocId(id), TextDoc)
       return new Promise(resolve => {
-        if (textHolds(t, seen)) return resolve()
-        const stop = subscribe(t, () => {
-          if (!textHolds(t, seen)) return
+        if (textHolds(t, seen) || signal?.aborted === true) return resolve()
+        const done = () => {
           stop()
+          signal?.removeEventListener("abort", done)
           resolve()
+        }
+        const stop = subscribe(t, () => {
+          if (textHolds(t, seen)) done()
         })
+        signal?.addEventListener("abort", done, { once: true })
       })
     },
     async texts(ids) {

@@ -1323,8 +1323,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a queue move asks for no drain",
     file: "apps/pineta/host/index.ts",
-    from: "    drain: lane => queueDrain(lane),\n",
-    to: "    drain: () => {},\n",
+    from: "    drain: lane => queueDrain(lane),\n    histories,",
+    to: "    drain: () => {},\n    histories,",
     suite: "host",
     scenario: "cards",
     expect:
@@ -1353,7 +1353,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a queued card carries no version of its text",
     file: "packages/client/session-view.ts",
-    from: "        ? stampSeen(planned, textVersion(texts.text(planned.card)))",
+    from: "        ? stampSeen(planned, versionOf(planned.card))",
     to: '        ? stampSeen(planned, "")',
     suite: "host",
     scenario: "cards",
@@ -1620,5 +1620,44 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "page",
     expect: "Auto-update title in a tab's ⋯ titles its root from the model",
+  },
+  {
+    name: "startHost runs read no pinned cards",
+    file: "apps/pineta/host/index.ts",
+    from: "  const runs = createRuns({ basics, agent, work, readPinned })",
+    to: "  const runs = createRuns({\n    basics,\n    agent,\n    work,\n    readPinned: async () => null,\n  })",
+    suite: "host",
+    scenario: "cards",
+    expect:
+      "a run's prompt follows a cards entry holding the thread's pinned cards, and the model is given them",
+  },
+  {
+    name: "a run does not wait for its pinned cards' text",
+    file: "apps/pineta/host/pinned.ts",
+    from: "      seen.filter(s => ids.has(s.id)),",
+    to: "      [],",
+    suite: "host",
+    scenario: "cards",
+    expect: "an edit to a pinned card made just before a send reaches that run",
+  },
+  {
+    name: "the pinned strip is drawn at the column's foot",
+    file: "packages/client/index.html",
+    from: "      .pinned-strip { max-height: 30vh;",
+    to: "      .pinned-strip { position: absolute; bottom: 0; max-height: 30vh;",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "pin draws the card in the strip at the top of its column, above the messages, and empties the composer",
+  },
+  {
+    name: "a run's prompt draws no marker of the pinned cards it read",
+    file: "packages/client/message-list.tsx",
+    from: "        pinned={markers.get(node.id)}",
+    to: "        pinned={undefined}",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "after a run, the marker of the pinned cards it read is drawn above its prompt",
   },
 ]

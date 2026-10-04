@@ -36,8 +36,9 @@ export const HOST_PRINCIPAL = "pineta-host"
  *     `mode` says how it joins the tree (`CHAT_MODES` in @pineta/core); `lane`
  *     names the thread's lane when the sender's column is bound to one;
  *     `asksAgent` marks a Start Agent column; `cardId` names the card its text
- *     was sent from, which the host spends once it is sent (ADR-0048). It
- *     runs the agent only when the agent is its addressee (`address`).
+ *     was sent from, which the host spends once it is sent (ADR-0048), and
+ *     `pinned` the versions of the thread's pinned cards its run waits for.
+ *     It runs the agent only when the agent is its addressee (`address`).
  *   - `name` sets the sender's display name to `text`.
  *   - `stop` ends the running turn of the thread whose lane is `lane`.
  *   - `archive` hides the root `targetId` for everyone, or restores it
@@ -137,6 +138,12 @@ export interface Command {
    */
   readonly moves: string
   /**
+   * `chat`: a JSON list of `{ card, seen }`, each card pinned at the
+   * sender's thread end with its text version as the sender had it, which
+   * the run waits for (ADR-0048, S96); `""` otherwise.
+   */
+  readonly pinned: string
+  /**
    * `chat`: the lane id the sender's column reserved, or `""`: what a lane
    * it creates is called (ADR-0057). Apart from `lane`, which decides where
    * the message goes.
@@ -229,6 +236,7 @@ export const EMPTY_COMMAND: Command = Object.freeze({
   base: "",
   seen: "",
   moves: "",
+  pinned: "",
 })
 
 export const EMPTY_REPLY: Reply = Object.freeze({
