@@ -53,12 +53,15 @@ import type { ReadOnly } from "./app-view.ts"
 import type { FoldMemory } from "./ask-fold.ts"
 import { askWords, DENSITIES, type Density, densityWords } from "./ask-words.ts"
 import { CardEditor, QueuedCardEditor } from "./card-editor.tsx"
-import { type EditorState, shownBelow } from "./card-state.ts"
+import { drawnPlace } from "./card-moves.ts"
+import { type EditorState, shownBelow, shownBy } from "./card-state.ts"
 import {
   type CatchUps,
   closeAskWords,
   DISCARD,
   KEEP_IN_INVENTORY,
+  NEW_PIN,
+  NEW_PIN_TITLE,
   refusalKey,
   refusalWords,
 } from "./card-words.ts"
@@ -73,6 +76,7 @@ import {
   type HeadOrigin,
   headLane,
   identityWords,
+  newPinAt,
   type ReserveStep,
   type ReviewTarget,
   START_WORDS,
@@ -608,8 +612,23 @@ export function Column(p: ColumnProps) {
   }
   // Where a drop lands: exactly where a put can.
   const putColumn = writable && place !== undefined ? key : null
-  const putPinned =
-    writable && place !== undefined && pinnedOf(place) !== null ? key : null
+  const pinKey = writable && place !== undefined ? pinnedOf(place) : null
+  const putPinned = pinKey === null ? null : key
+  // "+ pin" opens a box that makes a pinned card (ADR-0048). While it is
+  // open, the strip leaves out the card it shows, as the column leaves out
+  // the composer's. It closes when focus leaves it.
+  const [pinning, setPinning] = useState(false)
+  const [pinBox, setPinBox] = useState<EditorState | undefined>(undefined)
+  const pinShown = pinning && pinBox !== undefined ? shownBy(pinBox) : null
+  const newPin = newPinAt({
+    canPin: pinKey !== null && !fresh && threadEnd !== null,
+    pinning,
+    pinned: pinned.length,
+  })
+  const openPin = () => {
+    setPinBox(undefined)
+    setPinning(true)
+  }
   // Closing a fresh column whose cards hold text asks first: they have no
   // thread to stay on. Keeping them in your inventory is the default, and can
   // be undone; discarding them is final (ADR-0048).
@@ -685,6 +704,16 @@ export function Column(p: ColumnProps) {
               </span>
             )}
             <span className="head-space" />
+            {newPin === "header" && (
+              <button
+                className="new-pin"
+                onClick={openPin}
+                title={NEW_PIN_TITLE}
+                type="button"
+              >
+                {NEW_PIN}
+              </button>
+            )}
             {view.nodes.length > 0 && (
               <DensityControl
                 density={density}
@@ -768,8 +797,40 @@ export function Column(p: ColumnProps) {
         )}
         {!fresh && threadEnd !== null && (
           <PinnedStrip
-            cards={pinned}
+            box={
+              pinning && pinKey !== null ? (
+                <CardEditor
+                  at={at}
+                  card={pinned.find(c => c.id === pinShown)}
+                  catchUps={catchUps}
+                  commands={[]}
+                  fresh={false}
+                  how={how}
+                  lane={lane}
+                  onAct={act}
+                  onBranchInstead={branchInstead}
+                  onCreatesLane={undefined}
+                  onIntent={p.onIntent}
+                  onLeave={() => setPinning(false)}
+                  onSend={onSend}
+                  onShows={setPinBox}
+                  onTyping={p.onTyping}
+                  participants={p.participants}
+                  pending={undefined}
+                  place={drawnPlace(pinKey, p.session.writer)}
+                  prefill={undefined}
+                  readOnly={p.readOnly}
+                  reader={reader}
+                  seats={p.seats}
+                  session={p.session}
+                  takeFocus={() => true}
+                  where={undefined}
+                />
+              ) : null
+            }
+            cards={pinned.filter(c => c.id !== pinShown)}
             inView={inView}
+            onNewPin={newPin === "strip" ? openPin : null}
             onAct={act}
             onTyping={p.onTyping}
             putKey={putPinned}
@@ -918,6 +979,7 @@ export function Column(p: ColumnProps) {
                 seats={p.seats}
                 session={p.session}
                 takeFocus={undefined}
+                onLeave={undefined}
                 catchUps={catchUps}
                 where={undefined}
               />

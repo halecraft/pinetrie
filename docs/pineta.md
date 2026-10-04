@@ -184,7 +184,8 @@ by the host's stacks (ADR-0066). Built
 so far: the drafting card (step 1), marks for your unsent cards (step 2),
 step 3: notes removed, and queued cards, step 4: your inventory, a
 floating 3 × 6 grid you take cards into and put them out of, by key, button
-or drag, with moves you can undo (ADR-0066), and step 5's pinned cards: a
+or drag, with moves you can undo (ADR-0066), and step 5: several cards
+per place ("+ card", "+ pin"), and pinned cards, a
 strip at the top of a thread's column the agent reads on every run, in a
 cards entry pi writes with the run's prompt when they changed, carried
 across pi's compaction (S92). A send

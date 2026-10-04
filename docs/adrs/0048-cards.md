@@ -44,7 +44,9 @@ as its evidence, and *Pinned cards and the agent* amended in place
 and names those unpinned since; it goes in with the run's prompt, only when
 the cards changed; pi's compaction carries it; the run waits for its
 sender's text; a branch starts with no pinned cards. Its second part, "+ card"
-and "+ pin", is `PLAN-2026-10-04-cards-per-place`: "+ card" is implemented.
+and "+ pin", implemented by `PLAN-2026-10-04-cards-per-place`, with "+ pin"
+in the column's header while a thread has no pinned card (2026-10-05, with
+Duane).
 
 **Context.**
 
@@ -124,7 +126,9 @@ who reads a card: a thought only for the team goes below the line.
   card; nothing stops two people each pinning one, or one person drafting the
   next instruction beside a card about the bigger picture. "+ card" in the
   composer asks for another drafting card; the one you were writing is drawn
-  above the box with the column's other cards.
+  above the box with the column's other cards. "+ pin" opens a box that
+  makes a pinned card: in the strip once it has one, else in the column's
+  header, since the empty strip shows only while a card is dragged.
 
 *The column, read as time.*
 

@@ -150,6 +150,13 @@ export const refusalKey = (refusal: Refusal): string =>
 export const PIN = "pin"
 export const PIN_TITLE =
   "pin to the top of the column: the agent reads it on every run"
+/** A column's button that opens a box for a new pinned card. */
+export const NEW_PIN = "+ pin"
+export const NEW_PIN_TITLE =
+  "write a new card pinned to the top of the column: the agent reads it on every run"
+/** That box, empty. */
+export const NEW_PIN_PLACEHOLDER =
+  "what the agent should keep in mind on every run"
 /** A pinned card's button that puts it back below the line. */
 export const UNPIN = "unpin"
 /** The pinned strip with no cards: where a drop pins one. */

@@ -1609,6 +1609,16 @@ stays in view; the strip scrolls past 30vh.
   entry in `pinnedDiff(pinnedInView(index, end), …)`, the walk and the
   comparison the host plans a run's entry from, so the strip and the run
   agree on what the agent read. A card with no text yet has none.
+- **"+ pin" opens a box at the strip's end** that makes a pinned card. It
+  is a `CardEditor` whose `place` is pinned (`drawnPlace(pinnedOf(…))`):
+  the composer's create-on-first-keystroke rule, and the same element goes
+  on editing the card, so nothing typed between the create and the binding
+  is lost, which a hand-over to a `PinnedCardEditor` would. It never sends:
+  Enter is a new line, it offers no commands, and Escape or blur closes
+  it. While it is open, the strip leaves out the card it shows, as the
+  column does for the composer's. `newPinAt` puts "+ pin" in the header
+  while the thread has no pinned card, in the strip after, and nowhere while
+  the box is open.
 - **The empty strip shows only while a card is dragged.** `App` sets
   `data-card-drag` on the body from a card's `dragenter` to its `dragend`
   or drop, and the CSS shows `.pinned-strip[data-empty]` then. An empty strip

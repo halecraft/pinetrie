@@ -270,7 +270,7 @@ const LAST = "\uffff"
  * host to give it an order, so it is drawn last among its kind, a queued one
  * queued by you.
  */
-const placeOf = (key: PlaceKey, me: WriterId): CardPlace =>
+export const drawnPlace = (key: PlaceKey, me: WriterId): CardPlace =>
   key.kind === "queued"
     ? { ...key, order: LAST, by: me }
     : key.kind === "pinned"
@@ -299,7 +299,7 @@ export function withPending(
     const now = cards.get(p.move.card)
     if (now === undefined) continue
     if (p.move.to === null) cards.delete(p.move.card)
-    else cards.set(p.move.card, { ...now, place: placeOf(p.move.to, me) })
+    else cards.set(p.move.card, { ...now, place: drawnPlace(p.move.to, me) })
   }
   return [...cards.values()].sort((a, b) =>
     a.id < b.id ? -1 : a.id > b.id ? 1 : 0,

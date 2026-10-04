@@ -3049,6 +3049,46 @@ async function run(check: Checks["check"]): Promise<void> {
         `emptied ${blanked}, focused ${blankFocused}, above ${drawnAbove}, another ${another}`,
       )
 
+      // "+ pin" (ADR-0048), in the conversation below, which has no pinned
+      // card: the header offers it, and the box it opens in the strip makes a
+      // pinned card. Enter there is a new line; Escape closes the box, the
+      // card stays pinned, and "+ pin" moves into the strip.
+      await page.click(`${col(1)} .column-head .new-pin`)
+      const pinningBox = `${col(1)} .pinned-strip .pinning .input`
+      const pinFocused = await page
+        .waitForFunction(
+          s => document.querySelector(s) === document.activeElement,
+          pinningBox,
+          { timeout: 10_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        )
+      await page.keyboard.type("line one")
+      await page.keyboard.press("Enter")
+      await page.keyboard.type("line two")
+      const twoLines = await valueIs(pinningBox, "line one\nline two")
+      const newPinned = (await page.getAttribute(pinningBox, "data-card")) ?? ""
+      await page.keyboard.press("Escape")
+      const drawnPinned = await valueIs(
+        `${col(1)} .pinned-strip .card-editor.pinned:not(.pinning) textarea[data-card="${newPinned}"]`,
+        "line one\nline two",
+      )
+      await waitFor(() => placeOf(newPinned)?.kind === "pinned", 5_000)
+      const pinMoved =
+        (await page.locator(`${col(1)} .column-head .new-pin`).count()) === 0 &&
+        (await page.locator(`${col(1)} .pinned-strip .new-pin`).count()) === 1
+      check(
+        '"+ pin" in a header opens a box in the strip where Enter is a new line, and the card it makes stays pinned',
+        pinFocused &&
+          twoLines &&
+          drawnPinned &&
+          placeOf(newPinned)?.kind === "pinned" &&
+          pinMoved,
+        `focused ${pinFocused}, lines ${twoLines}, drawn ${drawnPinned}, ${placeOf(newPinned)?.kind}, moved ${pinMoved}`,
+      )
+
       // A reload keeps the tab you are on, and its open columns (ADR-0027).
       const columnKeys = (p: typeof page) =>
         p.$$eval(".column", cs => cs.map(c => c.getAttribute("data-key") ?? ""))

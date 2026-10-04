@@ -1474,6 +1474,22 @@ export const mutations: readonly Mutation[] = [
     expect: "a blank box shows nothing",
   },
   {
+    name: "newPinAt: + pin stays in the header once a card is pinned",
+    file: columnView,
+    from: '  !f.canPin || f.pinning ? null : f.pinned === 0 ? "header" : "strip"',
+    to: '  !f.canPin || f.pinning ? null : "header"',
+    command: unit,
+    expect: "newPinAt(",
+  },
+  {
+    name: "newPinAt: + pin shows while its box is open",
+    file: columnView,
+    from: '  !f.canPin || f.pinning ? null : f.pinned === 0 ? "header" : "strip"',
+    to: '  !f.canPin ? null : f.pinned === 0 ? "header" : "strip"',
+    command: unit,
+    expect: "newPinAt(",
+  },
+  {
     name: "hostLetGo counts a card the host never reached",
     file: "packages/client/card-state.ts",
     from: "}): boolean => input.hadHost && !input.hasHost && input.hostConnected",

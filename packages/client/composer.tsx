@@ -103,6 +103,7 @@ export function Composer(p: {
         seats={p.seats}
         session={p.session}
         takeFocus={p.takeFocus}
+        onLeave={undefined}
         where={p.where}
       />
     </form>

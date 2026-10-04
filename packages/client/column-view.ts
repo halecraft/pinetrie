@@ -869,6 +869,19 @@ export function composerPlace(
     : null
 }
 
+/**
+ * Where a column offers "+ pin", which opens a box that pins a new card:
+ * in its header while the thread has no pinned card, since the empty strip
+ * shows only while a card is dragged; in the strip once it has one. None
+ * while that box is open, and none where no card can be pinned.
+ */
+export const newPinAt = (f: {
+  readonly canPin: boolean
+  readonly pinning: boolean
+  readonly pinned: number
+}): "header" | "strip" | null =>
+  !f.canPin || f.pinning ? null : f.pinned === 0 ? "header" : "strip"
+
 /** What a column draws above a run's prompt for the pinned cards the run read. */
 export interface PinnedMarker {
   readonly cards: readonly PinnedCardRead[]

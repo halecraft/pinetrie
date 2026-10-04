@@ -1,7 +1,7 @@
 // client/card-editor — one card's editor (ADR-0048): your composer's box,
-// every other drafting card at a thread's end, and each queued card above
-// the line (`QueuedCardEditor`), and the card selected in your inventory, both
-// a `BoundCardEditor`.
+// every other drafting card at a thread's end, the box "+ pin" opens, and
+// each queued card above the line (`QueuedCardEditor`), each pinned card and
+// the card selected in your inventory, all a `BoundCardEditor`.
 //
 // One uncontrolled textarea for the editor's whole life. Until there is
 // something worth keeping it is local; the input that makes it worth keeping
@@ -49,6 +49,7 @@ import {
   commandNote,
   NEW_CARD,
   NEW_CARD_TITLE,
+  NEW_PIN_PLACEHOLDER,
   PIN,
   PIN_TITLE,
   pinnedStatusWords,
@@ -142,6 +143,11 @@ export interface Where {
  * back, because nothing was taken away. A send to a busy lane, or of a card
  * with a command, queues the card instead: this client asks the host to, and
  * the host takes it in turn (ADR-0055, ADR-0059).
+ *
+ * A box whose `place` is pinned is the one "+ pin" opens: it makes a pinned
+ * card at the first keystroke worth keeping and goes on editing it, the same
+ * element, so nothing typed is lost. It never sends: Enter is a new line,
+ * and Escape or leaving it closes it (`onLeave`).
  */
 export function CardEditor(p: {
   session: SessionClient
@@ -203,8 +209,11 @@ export function CardEditor(p: {
   catchUps: CatchUps
   /** Whether this column asked for focus, just opened. Asked on mounting. */
   takeFocus: (() => boolean) | undefined
+  /** A pinning box's focus left it: the column closes it. */
+  onLeave: (() => void) | undefined
 }) {
   const { session, prefill, pending } = p
+  const pins = p.place?.kind === "pinned"
   const box = useRef<HTMLTextAreaElement>(null)
   const [state, setState] = useState<EditorState>(() =>
     p.card === undefined
@@ -249,7 +258,7 @@ export function CardEditor(p: {
   const queue = queueWords(plan.queue)
   const [hidden, setHidden] = useState<string | null>(null)
   const [picked, setPicked] = useState(0)
-  const matches = hidden === text ? [] : matchCommands(text, p.commands)
+  const matches = pins || hidden === text ? [] : matchCommands(text, p.commands)
   const highlighted = matches[Math.min(picked, matches.length - 1)]
   const work = choice ?? p.where?.defaultWork ?? null
   const { onCreatesLane, onShows } = p
@@ -472,7 +481,15 @@ export function CardEditor(p: {
   const { readOnly } = p
 
   return (
-    <div className={others ? "card-editor others" : "card-editor"}>
+    <div
+      className={
+        pins
+          ? "card-editor pinned pinning"
+          : others
+            ? "card-editor others"
+            : "card-editor"
+      }
+    >
       {others && card !== undefined && (
         <div className="card-heading">
           {cardHeading(p.reader.nameOf, card.owner, writers)}
@@ -552,14 +569,16 @@ export function CardEditor(p: {
           ))}
         </div>
       )}
-      {/* Enter sends; Shift+Enter is a new line. It grows with what is
-          typed, up to a limit, then scrolls. Uncontrolled: while bound, the
-          card's binding owns its value. */}
+      {/* Enter sends; Shift+Enter is a new line; in a pinning box, Enter is
+          a new line. It grows with what is typed, up to a limit, then
+          scrolls. Uncontrolled: while bound, the card's binding owns its
+          value. */}
       <textarea
         autoComplete="off"
         className="input"
         data-card={card?.id}
         defaultValue={text}
+        onBlur={pins ? p.onLeave : undefined}
         onFocus={e => {
           // Focused while it holds only what it started with: type after it.
           if (prefill === undefined || e.currentTarget.value !== prefill.text)
@@ -606,16 +625,22 @@ export function CardEditor(p: {
               return
             }
           }
+          if (pins) {
+            if (e.key !== "Escape") return
+            e.preventDefault()
+            e.currentTarget.blur()
+            return
+          }
           if (e.key !== "Enter" || e.shiftKey) return
           e.preventDefault()
           void submit()
         }}
-        placeholder={placeholderWords(plan)}
+        placeholder={pins ? NEW_PIN_PLACEHOLDER : placeholderWords(plan)}
         readOnly={p.readOnly !== null || state.kind === "sending"}
         ref={box}
         rows={Math.min(8, Math.max(2, text.split("\n").length))}
       />
-      {readOnly !== null ? (
+      {pins ? null : readOnly !== null ? (
         <div className="read-only">
           <span className="read-only-label">{readOnly.label}</span>
           <button

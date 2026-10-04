@@ -1661,6 +1661,16 @@ export const mutations: readonly Mutation[] = [
       '"+ card" empties the focused composer, draws your card above it, and typing makes another',
   },
   {
+    name: "Enter in a + pin box sends",
+    file: "packages/client/card-editor.tsx",
+    from: '            if (e.key !== "Escape") return\n',
+    to: '            if (e.key === "Enter") return void submit()\n            if (e.key !== "Escape") return\n',
+    suite: "browser",
+    scenario: "page",
+    expect:
+      '"+ pin" in a header opens a box in the strip where Enter is a new line, and the card it makes stays pinned',
+  },
+  {
     name: "a run's prompt draws no marker of the pinned cards it read",
     file: "packages/client/message-list.tsx",
     from: "        pinned={markers.get(node.id)}",

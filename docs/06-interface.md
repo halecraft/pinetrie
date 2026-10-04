@@ -601,6 +601,10 @@ The rail is E; the column is T. Seeing both at once is the product.
   a card here to pin it for the agent" there. **Unpin** puts it back below
   the line; **take** moves it into your inventory. Both pin and unpin are
   moves the undo key outside a box undoes.
+- **"+ pin" writes a new pinned card**: in the column's header while the
+  thread has none, at the end of the strip once it has one. The box it
+  opens pins what you type from the first keystroke; Enter is a new line,
+  and Escape or clicking away closes it.
 - **Anyone here can edit a pinned card**, as a queued one. Each is headed
   "pinned by Bea", and shows its size, "~120 tokens", since a long one costs
   that on every run, and how it stands: "read by the agent", "changed since

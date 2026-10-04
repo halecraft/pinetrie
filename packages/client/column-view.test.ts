@@ -35,6 +35,7 @@ import {
   identityWords,
   joinWords,
   lanesAlong,
+  newPinAt,
   offerWords,
   pinnedMarker,
   pinnedMarkers,
@@ -1090,4 +1091,15 @@ test("pinnedStatus: read, changed or unread against what the agent reads, by the
   expect(pinnedStatus(card, "ship it", null)).toBe("unread")
   expect(pinnedStatus(card, " ", inView)).toBeNull()
   expect(tokensOf("12345")).toBe(2)
+})
+
+test.each([
+  [{ canPin: true, pinning: false, pinned: 0 }, "header"],
+  [{ canPin: true, pinning: false, pinned: 2 }, "strip"],
+  [{ canPin: true, pinning: true, pinned: 0 }, null],
+  [{ canPin: true, pinning: true, pinned: 2 }, null],
+  [{ canPin: false, pinning: false, pinned: 0 }, null],
+  [{ canPin: false, pinning: false, pinned: 2 }, null],
+] as const)("newPinAt(%o): %s", (facts, want) => {
+  expect(newPinAt(facts)).toBe(want)
 })
