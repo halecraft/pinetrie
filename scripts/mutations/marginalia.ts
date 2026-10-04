@@ -44,8 +44,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the line is named by its bookmark",
     file: "packages/marginalia/work.ts",
-    from: '  base.kind === "line" ? "the project" : base.bookmark',
-    to: '  base.kind === "line" ? "pineta-onto" : base.bookmark',
+    from: '  from.kind === "line"\n    ? "the project"',
+    to: '  from.kind === "line"\n    ? "pineta-onto"',
     command: unit,
     expect:
       "an update round-trips, shows one line, and tells the model what changed",
@@ -53,8 +53,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an update on the line is stored as a WIP's",
     file: "packages/marginalia/update.ts",
-    from: '            line: details.base.kind === "line",',
-    to: "            line: false,",
+    from: '          : { base: details.bookmark, line: from.kind === "line" }),',
+    to: "          : { base: details.bookmark, line: false }),",
     command: unit,
     expect:
       "an update round-trips, shows one line, and tells the model what changed",
@@ -97,8 +97,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "catching up into the lane's own work is not quiet",
     file: "packages/marginalia/offer.ts",
-    from: '      !input.untraced && (kind === "current" || kind === "nothing-new")',
-    to: '      !input.untraced && kind === "current"',
+    from: '      ...(!input.untraced && (kind === "current" || kind === "nothing-new")',
+    to: '      ...(!input.untraced && kind === "current"',
     command: unit,
     expect:
       "catching up that would change nothing is listed, but quiet; one not yet read is not (S97)",
@@ -1160,5 +1160,39 @@ export const mutations: readonly Mutation[] = [
     to: "    unload: false,",
     command: ["pnpm", "exec", "vitest", "run", "packages/marginalia"],
     expect: "archive: its lanes forgotten",
+  },
+  {
+    name: "every conflict counts as come with the copy",
+    file: "packages/marginalia/offer.ts",
+    from: "  return record.conflicts.length > 0 && record.conflicts.every(f => at.has(f))",
+    to: "  return record.conflicts.length > 0",
+    command: unit,
+    expect:
+      "conflictCause: the start only when every conflicted file was conflicted there",
+  },
+  {
+    name: "a catch-up with the parent is forgotten",
+    file: "packages/marginalia/work.ts",
+    from: "    if (merged !== undefined) {\n      taken = merged",
+    to: "    if (merged !== undefined) {\n      taken = fork.commit",
+    command: unit,
+    expect: "a catch-up's merged commit is what it took",
+  },
+  {
+    name: "the parent is offered whatever it still has conflicted",
+    file: "packages/marginalia/offer.ts",
+    from: "    open?.conflicts.every(f => !ahead.conflicts.includes(f)) === true",
+    to: "    open !== undefined",
+    command: unit,
+    expect:
+      "one the parent still has, or a parent not ahead, or a conflict of the lane's own",
+  },
+  {
+    name: "a catch-up with the parent runs while it works",
+    file: "packages/marginalia/work.ts",
+    from: "  if (running) return ERR.PARENT_RUNNING\n",
+    to: "",
+    command: unit,
+    expect: "planParentUpdate merges the parent's newest",
   },
 ]

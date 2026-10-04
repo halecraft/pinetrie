@@ -288,6 +288,10 @@ export const ERR = {
   BAD_BASE: "bad_base",
   /** Bringing a thread up to date with a WIP bookmark that is gone (ADR-0060). */
   BASE_GONE: "base_gone",
+  /** Catching up with the thread it branched from, for a thread that began at its base (ADR-0072). */
+  NO_PARENT: "no_parent",
+  /** Catching up with the thread it branched from while that thread's agent runs (ADR-0072). */
+  PARENT_RUNNING: "parent_running",
   /**
    * A take of an offer that now brings other work than the one it was shown
    * (another ledger), or now conflicts where it did not (ADR-0065).
@@ -668,6 +672,8 @@ export type OfferInRepo =
       readonly files: readonly string[]
       /** Files conflicting in its top: with the work under it (S48 item 3). */
       readonly conflicts: readonly string[]
+      /** Files conflicted where its ledger says it starts, read only when it conflicts (ADR-0072). */
+      readonly startConflicts: readonly string[]
     }
   | { readonly kind: "divergent"; readonly changes: readonly string[] }
 
@@ -764,6 +770,16 @@ export type StartRead =
 export type ThreadBase =
   | { readonly kind: "line" }
   | { readonly kind: "wip"; readonly bookmark: string }
+
+/** The thread a lane's copy was cloned from, by its lane and its name (ADR-0072). */
+export interface ParentThread {
+  readonly kind: "parent"
+  readonly lane: LaneName
+  readonly name: ThreadName
+}
+
+/** What a catch-up merges from: the thread's base, or the thread it branched from. */
+export type CatchUpFrom = ThreadBase | ParentThread
 
 /** A lane's base, read from its history (`@pineta/lanes`' `laneBase`, ADR-0060). */
 export interface LaneBase {
@@ -896,6 +912,8 @@ export interface RevisionRecord {
    * for a prompt's record or a turn with no commit (ADR-0056).
    */
   readonly paths: readonly string[]
+  /** The files conflicted in `commit`: what a branch from here starts with (ADR-0072). */
+  readonly conflicts: readonly string[]
 }
 
 /**
@@ -948,6 +966,12 @@ export interface OfferRecord {
   readonly files: readonly string[]
   /** Files that conflict with your committed work (S48 item 3). */
   readonly conflicts: readonly string[]
+  /**
+   * The files conflicted where it starts, read only when it conflicts:
+   * those of `conflicts` among them came with the lane's copy
+   * (`conflictCause`, ADR-0072).
+   */
+  readonly startConflicts: readonly string[]
   /** Files it touches that you are editing in `@` (S48 item 4). */
   readonly yourEdits: readonly string[]
   /** An agent wrote its description; false while it carries the placeholder. */
@@ -973,6 +997,13 @@ export interface OfferRecord {
   readonly ledger: OfferLedger | null
   readonly at: number
 }
+
+/**
+ * Where an offer's conflict comes from (`conflictCause`): the lane's work
+ * against its target, or the copy it was cloned with, every conflicted file
+ * already conflicted where it starts (ADR-0072).
+ */
+export type ConflictCause = "work" | "start"
 
 /** How jj says a file changed in a revision. */
 export type FileChange = "added" | "modified" | "removed" | "copied" | "renamed"
@@ -1034,8 +1065,9 @@ export type ForkStart =
     }
 
 /**
- * What bringing a thread up to date merges into its lane (ADR-0060): the
- * line's commit, or a fresh copy of a WIP.
+ * What bringing a thread up to date merges into its lane: the line's
+ * commit, or a fresh copy of a WIP (ADR-0060); or the newest commit of the
+ * thread it branched from (ADR-0072).
  */
 export type BaseMerge =
   | {
@@ -1058,6 +1090,12 @@ export type BaseMerge =
        */
       readonly on: CommitId
     }
+  | (ParentThread & {
+      /** The parent's newest commit (`ParentNow.newest`). */
+      readonly commit: CommitId
+      /** What the lane last took from it: where the commits that came in start. */
+      readonly taken: CommitId
+    })
 
 declare const threadNameBrand: unique symbol
 /**
@@ -1181,14 +1219,19 @@ export interface CatchUpRead {
 // --- cards (ADR-0048) --------------------------------------------------------
 
 /**
- * A command a card is sent through (ADR-0055); a plain card has none. Both
- * bring the thread up to date with its base; `continue-on-line` moves a
- * thread whose WIP is gone to the line first (ADR-0060).
+ * A command a card is sent through (ADR-0055); a plain card has none. The
+ * first two bring the thread up to date with its base, `continue-on-line`
+ * moving a thread whose WIP is gone to the line first (ADR-0060);
+ * `catch-up-with-parent` merges the thread it branched from (ADR-0072).
  */
-export type CardCommand = "bring-up-to-date" | "continue-on-line"
+export type CardCommand =
+  | "bring-up-to-date"
+  | "continue-on-line"
+  | "catch-up-with-parent"
 export const CARD_COMMANDS: readonly CardCommand[] = [
   "bring-up-to-date",
   "continue-on-line",
+  "catch-up-with-parent",
 ]
 
 /**

@@ -454,7 +454,7 @@ const StoredColumn = Type.Object({
       Type.Literal("raw"),
     ]),
   ),
-  // Optional too, and for the same reason: absent is closed (ADR-0071).
+  // Optional too, and for the same reason: absent is closed (ADR-0073).
   details: Type.Optional(Type.Literal(true)),
   fresh: Type.Optional(
     Type.Object({

@@ -310,18 +310,32 @@ containers, disks and the helper.
   The caller passes the bookmark it read (`turnDone` also records it as the
   prompt's `newest`). The ancestry query (`isAncestor`) runs only when `@`
   is empty and its one parent is not the bookmark: most turns change
-  nothing, and cost no extra command.
+  nothing, and cost no extra command. The same `jj log` reads `@`'s and
+  each parent's `conflict`, so `commitTurn` also says whether the turn's
+  commit, or the bookmark when it has none, is conflicted; only then does
+  `turnDone` list the files (`conflictedFilesAt`) into the record, which a
+  branch's warning reads (ADR-0072).
 - **`commitToBookmark`** is the one tail of every commit the host makes in
   a lane: `jj commit`, read `@-`, move the lane's bookmark. `commitTurn`,
   `mergeBase` and the mark of a move to the line all end with it.
 - **`changedPaths`** is a turn's paths, from the bookmark before it to its
-  commit, made or adopted, which its revision records (ADR-0056): read with
-  git, from the root, with `-z`, since git quotes a path with non-ASCII
-  characters otherwise (S70). An update's changed files use it too.
+  commit, made or adopted, which its revision records (ADR-0056): `jj diff
+  -T PATH_LINE`, `json(path)` a line, which is from the repo's root
+  whatever the process's directory, and quotes any character (S70). An
+  update's changed files use it too. **Not git:** git reads a conflicted jj
+  commit as every side's whole tree under `.jjconflict-base-<n>/` and
+  `.jjconflict-side-<n>/`, plus `JJ-CONFLICT-README`, so a turn that
+  resolved one file in a repo of 694 counted 2084 (S99).
+- **`conflictedFilesAt(jj, rev)`** is the one read of a commit's conflicted
+  files (`jj file list -T 'if(conflict, …)'`), in a lane and in your repo;
+  it throws, and a caller that reads none on failure says so at the call.
+  `conflictsIn` snapshots the lane first, then reads `@`.
 - **An update merges the thread's base** (`mergeBase`, ADR-0060): the
   line's commit, or a fresh copy of the WIP (`planWipCopy`) made on the
   lane's previous copy, so conflicts the lane already resolved do not come
-  back. The line's merge carries `Pineta-Base`, a WIP's copy its own, and
+  back. Or the newest commit of the thread it branched from (`planMerge`'s
+  `parent`, ADR-0072), merged as the line's commit is but with no
+  `Pineta-Base`: ancestry says what the lane holds of it. The line's merge carries `Pineta-Base`, a WIP's copy its own, and
   `newestBase` reads the newest one in a lane's history: its base, and
   where its offers start. `laneBase` reads it in the lane's own repo too
   (`bookmarkRevset`), where a lane with none is null: that repo has no
@@ -342,12 +356,16 @@ containers, disks and the helper.
 - **The merge is committed at once,** even with nothing to resolve.
   Otherwise an empty merge stays the lane's working copy, which every snapshot
   rewrites. A mutation shows `repo.test.ts` fails without it.
-- **Conflicts** are read with `jj file list -T 'if(conflict, path ++ "\n")'`,
-  and a conflicted file's content with `jj file show`: the host cannot read a
-  lane's disk.
-- **A clean update's changed files come from git** (`changedPaths`): jj's
-  `--name-only` prints paths from the process's directory, which in a lane
-  is not the repo's.
+- **Conflicts** are read with `conflictedFilesAt`, and a conflicted file's
+  content with `jj file show`: the host cannot read a lane's disk.
+- **A file both sides hold alike is merged as it is** (`heldAlike`): jj
+  keeps a conflict when the merge's base is itself conflicted, as when a
+  branch cloned at a conflicted catch-up and its parent resolved it alike
+  (S99). `mergeUpdate` restores such files from the side merged in into the
+  merge (`jj restore --into`, the bookmark following), then reads the
+  conflicts again. With a clean base jj already takes them.
+- **A clean update's changed files come from `changedPaths`**, the turn's
+  read.
 
 ## Tests
 

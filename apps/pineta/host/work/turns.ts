@@ -15,7 +15,12 @@ import {
   turnEntry,
 } from "@pineta/core"
 import type { Keeper } from "@pineta/keeper"
-import { bookmarkOf, changedPaths, commitTurn } from "@pineta/lanes"
+import {
+  bookmarkOf,
+  changedPaths,
+  commitTurn,
+  conflictedFilesAt,
+} from "@pineta/lanes"
 import { planTurnRecord, REVISION, setRecord } from "@pineta/marginalia"
 import type { Agent, LaneHooks } from "@pineta/pi"
 import { readTreeIndex } from "@pineta/reads"
@@ -111,6 +116,7 @@ export function createTurns(deps: {
             newest: null,
             snapshot: null,
             paths: [],
+            conflicts: [],
           })
           if (revision !== null) await writeRevision(revision)
           return
@@ -123,6 +129,7 @@ export function createTurns(deps: {
           committed,
           newest,
           paths: changed,
+          conflicts,
         } = await handle.queue.enqueue(async () => {
           const before = await bookmarkOf(jj, lane)
           const made = await commitTurn(jj, {
@@ -134,10 +141,22 @@ export function createTurns(deps: {
           // An adopted turn may be several of the agent's commits: its
           // paths run from the bookmark before it.
           const changed =
-            made === null
+            made.commit === null
               ? []
-              : await changedPaths(handle.runners.lane, before, made)
-          return { committed: made, newest: before, paths: changed }
+              : await changedPaths(jj, before, made.commit)
+          // The files conflicted in the commit its record names: its own,
+          // else the bookmark's, which a branch from it clones (ADR-0072).
+          const named = made.commit ?? before
+          const conflicts =
+            made.conflicted && named !== null
+              ? await conflictedFilesAt(jj, named)
+              : []
+          return {
+            committed: made.commit,
+            newest: before,
+            paths: changed,
+            conflicts,
+          }
         })
         const planned = planTurnRecord({
           entry,
@@ -149,6 +168,7 @@ export function createTurns(deps: {
           newest,
           snapshot: snapshotId(entry),
           paths: changed,
+          conflicts,
         })
         if (planned === null) return
         // The snapshot is queued and not awaited: the next tool call waits

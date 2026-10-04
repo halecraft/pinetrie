@@ -1,4 +1,5 @@
-# ADR-0071 — A thread's name opens its details, under the header: its icon magnified, who started it, where it works
+# ADR-0073 — A thread's name opens its details, under the header: its icon magnified, who started it, where it works
+Numbered 0071 until 2026-10-04, when two files held that number.
 
 **Status:** Accepted. Implementation: `PLAN-2026-10-04-thread-details`.
 Amends ADR-0040 (the name revealed where the lane started) and ADR-0053

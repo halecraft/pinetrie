@@ -417,6 +417,10 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
     paths decodes with none. An ask's file count is the union of its turns'
     paths (`workStats`), so it is what its review lists. A project record of kind `workspaces` no longer decodes; the
     host rewrites it at start.
+  - Every record with a commit carries that commit's `conflicts`, a
+    prompt's included, since a branch from it is cloned with them
+    (ADR-0072); `conflictsAt` (core) reads them by commit. A record from
+    before decodes with none.
 - **`pineta.line` and `pineta.base` are caches** (ADR-0060): the repo is
   the ledger, and the host rewrites each from it. A lost one costs a read.
   A `pineta.base` from before `catchUp` and `untraced` does not decode, and
@@ -525,11 +529,30 @@ offer starts (`offerStart`), are `@pineta/lanes`'s.
   `nothing-new` it stays in the menu, quiet; `unknown` leaves it there,
   enabled. An untraced thread offers no refresh, squash or split: each
   rebuilds from a start it does not have. A card with the command queued
-  makes the offer busy (`catch-up`).
-- **`baseName`** (`work.ts`) is the one wording of a base: "the project"
-  for the line, the bookmark for a WIP (ADR-0061). `updateLine` uses it
-  through the update's stored `line` flag; an update stored before the flag
-  names its base by its bookmark.
+  makes the offer busy (`catch-up`). A conflicted offer's catch-up is the
+  base's `update` (there is no `resolve`), unless its conflict came with
+  its copy (`conflictCause`) and the parent, ahead, holds none of those
+  files conflicted: then `catch-up-parent`. While the parent is ahead,
+  `catch-up-parent` is in every idle state's menu, quiet while it runs.
+- **`catchUpName`** (`work.ts`) is the one wording of what a catch-up
+  merges (`CatchUpFrom`): "the project" for the line, the bookmark for a
+  WIP (ADR-0061), the thread's name for the thread a thread branched from
+  (ADR-0072). `updateLine` uses it through the update's `from`, decoded
+  from the stored `parent`, else `base` and its `line` flag; an update
+  stored before the flag names its base by its bookmark. Update and land
+  messages are history, so their old fields still decode.
+- **`conflictCause`** says where an offer's conflict comes from: `start`
+  when every file it conflicts in is in its `startConflicts`, the files
+  conflicted where it starts, so the conflict came with the lane's copy;
+  else `work` (ADR-0072).
+- **`parentNow`** (`work.ts`) is the thread a lane branched from, read from
+  the document alone: `forkParent` (core) names it and the fork commit; its
+  newest commit is the nearest above its thread's end; what the lane took
+  is the newest of the parent's commits that an update or land message
+  below the lane's first prompt merged (`TranscriptMessage.merged`), else
+  the fork commit. A lane's commits only move forward, so the parent is
+  ahead when the two differ (`parentAhead`). `planParentUpdate` merges its
+  newest commit, or nothing, or refuses `no_parent` and `parent_running`.
 - **`acceptStack`** takes an agent's stack only when its top has exactly the
   tip's files.
 - **`describeRequest`** is the commit-message request: the skill, your

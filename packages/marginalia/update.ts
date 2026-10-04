@@ -1,5 +1,5 @@
-// update — a thread's base merged into it (ADR-0060), and the offer split
-// into a stack (ADR-0038).
+// update — a thread's base, or the thread it branched from, merged into it
+// (ADR-0060, ADR-0072), and the offer split into a stack (ADR-0038).
 //
 // Two pi `CustomMessage`s in `land.ts`'s pattern: `content` is what the model
 // reads, `details` what the column shows. An update is a fact in the thread,
@@ -8,17 +8,18 @@
 // offer, under the `offer-stack` skill.
 
 import {
+  type CatchUpFrom,
   type CommitId,
   commitId,
   firstLine,
   isLaneName,
   type LaneName,
-  type ThreadBase,
+  type ThreadName,
   type WriterId,
 } from "@pineta/core"
 import { type Static, Type } from "typebox"
 import { decodeWith } from "./decode.ts"
-import { baseName } from "./work.ts"
+import { catchUpName } from "./work.ts"
 
 export const UPDATE_TYPE = "pineta.update"
 export const STACK_TYPE = "pineta.stack"
@@ -35,6 +36,13 @@ const UpdateDetailsSchema = Type.Object({
    * written, whose base is named by its bookmark.
    */
   line: Type.Optional(Type.Boolean()),
+  /** The thread it branched from, when that was merged (ADR-0072); then no `base`. */
+  parent: Type.Optional(
+    Type.Object({
+      lane: Type.String({ minLength: 1 }),
+      name: Type.String({ minLength: 1 }),
+    }),
+  ),
   /** The commit merged: the line's, or the WIP's copy; `copy` before ADR-0060. */
   copy: Type.String({ minLength: 1 }),
   /** The commits that came in, newest first: each one's first line. */
@@ -51,11 +59,10 @@ const UpdateSchema = Type.Object({
 
 export interface UpdateDetails {
   readonly lane: LaneName
-  /**
-   * The base merged in, with its bookmark, which the model reads; null for
-   * an update stored before ADR-0060.
-   */
-  readonly base: (ThreadBase & { readonly bookmark: string }) | null
+  /** What was merged in; null for an update stored before ADR-0060. */
+  readonly from: CatchUpFrom | null
+  /** The base's bookmark, which the model reads; null for a parent. */
+  readonly bookmark: string | null
   /** The commit merged: the line's, or the WIP's copy. */
   readonly merged: CommitId
   readonly commits: readonly string[]
@@ -74,16 +81,28 @@ export interface UpdateMessage {
   readonly timestamp: number
 }
 
+/** What a stored update merged: its parent, else its base by its bookmark. */
+function storedFrom(d: Static<typeof UpdateDetailsSchema>): CatchUpFrom | null {
+  if (d.parent !== undefined)
+    return isLaneName(d.parent.lane)
+      ? {
+          kind: "parent",
+          lane: d.parent.lane,
+          name: d.parent.name as ThreadName,
+        }
+      : null
+  if (d.base === undefined) return null
+  return d.line === true ? { kind: "line" } : { kind: "wip", bookmark: d.base }
+}
+
 const fromStoredUpdate = (
   d: Static<typeof UpdateDetailsSchema>,
 ): UpdateDetails | undefined =>
   isLaneName(d.lane)
     ? {
         lane: d.lane,
-        base:
-          d.base === undefined
-            ? null
-            : { kind: d.line === true ? "line" : "wip", bookmark: d.base },
+        from: storedFrom(d),
+        bookmark: d.parent === undefined ? (d.base ?? null) : null,
         merged: commitId(d.copy),
         commits: d.commits,
         files: d.files,
@@ -100,7 +119,7 @@ const plural = (n: number, one: string, many: string) =>
 
 /** The one line a column shows for an update. */
 export const updateLine = (d: UpdateDetails): string =>
-  `↓ caught up${d.base === null ? "" : ` with ${baseName(d.base)}`}: ${plural(d.files.length, "file", "files")} changed`
+  `↓ caught up${d.from === null ? "" : ` with ${catchUpName(d.from)}`}: ${plural(d.files.length, "file", "files")} changed`
 
 /** The update message: what changed in this thread's files, for the model. */
 export function encodeUpdate(
@@ -111,7 +130,11 @@ export function encodeUpdate(
     details.commits.length === 0
       ? "- (none named)\n"
       : details.commits.map(c => `- ${firstLine(c, 200)}\n`).join("")
-  const what = details.base?.bookmark ?? "The person's work"
+  const { from } = details
+  const what =
+    from?.kind === "parent"
+      ? `The work of the thread this one branched from (${from.name})`
+      : (details.bookmark ?? "The person's work")
   const files = details.files.map(f => `- ${f}\n`).join("") || "- (none)\n"
   return {
     role: "custom",
@@ -122,12 +145,11 @@ export function encodeUpdate(
     display: true,
     details: {
       lane: details.lane,
-      ...(details.base === null
-        ? {}
-        : {
-            base: details.base.bookmark,
-            line: details.base.kind === "line",
-          }),
+      ...(from?.kind === "parent"
+        ? { parent: { lane: from.lane, name: from.name } }
+        : from === null || details.bookmark === null
+          ? {}
+          : { base: details.bookmark, line: from.kind === "line" }),
       copy: details.merged,
       commits: [...details.commits],
       files: [...details.files],

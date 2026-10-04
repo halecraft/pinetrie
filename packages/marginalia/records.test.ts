@@ -49,6 +49,7 @@ const offer: OfferRecord = {
   stale: false,
   files: ["a.txt"],
   conflicts: [],
+  startConflicts: [],
   yourEdits: [],
   described: true,
   edited: false,
@@ -113,7 +114,14 @@ const SAMPLES: readonly Sample[] = [
   sample(
     "revision",
     REVISION,
-    { entry: E, lane: L, commit: C, snapshot: snapshotId("e-1"), paths: [] },
+    {
+      entry: E,
+      lane: L,
+      commit: C,
+      snapshot: snapshotId("e-1"),
+      paths: [],
+      conflicts: [],
+    },
     "entry",
   ),
   sample(

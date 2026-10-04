@@ -248,7 +248,7 @@ export const mutations: readonly Mutation[] = [
     name: "a take does not say where it goes",
     file: "packages/client/column-view.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: '      first === undefined ? "" : ` to ${baseName(destinationBase(first))}`',
+    from: '      first === undefined ? "" : ` to ${catchUpName(destinationBase(first))}`',
     to: '      ""',
     command: unit,
     expect: "the labels follow the state, and name where a take adds the work",
@@ -264,8 +264,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a thread whose WIP is gone is offered a plain update",
     file: "packages/marginalia/offer.ts",
-    from: '      ? listed.map(b => (b === "update" ? "continue" : b))',
-    to: "      ? listed",
+    from: '      gone ? bs.map(b => (b === "update" ? "continue" : b)) : bs',
+    to: "      bs",
     command: unit,
     expect:
       "a WIP gone without landing offers no take, and continuing from the project",
@@ -1771,7 +1771,7 @@ export const mutations: readonly Mutation[] = [
     from: "      return action === null ? [] : onColumn(action)",
     to: "      return action === null ? [] : onRoot(action)",
     command: unit,
-    expect: "a column's details (ADR-0071) is set by its key",
+    expect: "a column's details (ADR-0073) is set by its key",
   },
   {
     name: "a thread's details are open whatever the column keeps",

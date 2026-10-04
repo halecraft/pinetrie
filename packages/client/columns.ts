@@ -70,7 +70,7 @@ export interface Column {
    */
   readonly density?: Density
   /**
-   * The thread's details are open under the header (ADR-0071). The reader's
+   * The thread's details are open under the header (ADR-0073). The reader's
    * choice, never the document's.
    */
   readonly details?: true
@@ -129,7 +129,7 @@ export type ColumnAction =
 
 /**
  * The reader's settings for column `key`: how much of each ask it draws
- * (ADR-0056), and whether its thread's details are open (ADR-0071). By key,
+ * (ADR-0056), and whether its thread's details are open (ADR-0073). By key,
  * so they reach a new tab's one column and the Archive preview's as they
  * reach a root's.
  */

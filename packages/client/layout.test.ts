@@ -163,7 +163,7 @@ describe("layoutReducer", () => {
     ])
   })
 
-  test("a new tab's column takes the reader's settings, and keeps them as it becomes its root's (ADR-0071)", () => {
+  test("a new tab's column takes the reader's settings, and keeps them as it becomes its root's (ADR-0073)", () => {
     const opened = layoutReducer(at(initialLayout()), {
       kind: "newTab",
       key: "n",
@@ -520,7 +520,7 @@ describe("encodeLayout / decodeLayout", () => {
     })
   })
 
-  test("a column's open details are kept, and a layout stored before them decodes closed (ADR-0071)", () => {
+  test("a column's open details are kept, and a layout stored before them decodes closed (ADR-0073)", () => {
     const l: Layout = {
       active: { kind: "root", root: entryId("1-r1") },
       open: [entryId("1-r1")],

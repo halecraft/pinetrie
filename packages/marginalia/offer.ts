@@ -14,6 +14,7 @@
 import {
   type BaseRecord,
   type CommitId,
+  type ConflictCause,
   type DiffSpan,
   type EntryId,
   firstLine,
@@ -24,6 +25,7 @@ import {
   type OfferLedger,
   type OfferRecord,
   type OfferSeen,
+  type ParentThread,
   type RevisionFacts,
   type RevisionRecord,
   type RevisionReview,
@@ -37,6 +39,7 @@ import {
 import { Type } from "typebox"
 import { decodeWith } from "./decode.ts"
 import { fitNewest, LEFT_OUT_NOTE, leftOut } from "./request.ts"
+import type { ParentNow } from "./work.ts"
 
 /**
  * Whether you edited a revision: a version an operation not the host's made
@@ -230,8 +233,8 @@ export type OfferButton =
   | "squash"
   | "describe"
   | "refresh"
-  | "resolve"
   | "update"
+  | "catch-up-parent"
 
 /**
  * What the lane is running now, as far as the offer cares; `catch-up`: a
@@ -323,6 +326,12 @@ export interface OfferFacts {
   readonly catchUp: CatchUpNow
   /** A take of this thread names no source: nothing is offered until it catches up (S97). */
   readonly untraced: boolean
+  /** Where its conflict comes from (`conflictCause`); `work` with none. */
+  readonly conflictCause: ConflictCause
+  /** The thread this one branched from, while it is ahead of what this lane took (ADR-0072). */
+  readonly parent: ParentThread | null
+  /** That parent's newest commit holds every file of the offer's conflict resolved. */
+  readonly parentResolves: boolean
 }
 
 /**
@@ -391,6 +400,24 @@ export type CatchUpNow =
     }
 
 /**
+ * Where an offer's conflict comes from: `start` when it conflicts, and every
+ * file it conflicts in was already conflicted where it starts, so the
+ * conflict came with the lane's copy; else `work` (ADR-0072). Pure.
+ */
+export function conflictCause(
+  record: Pick<OfferRecord, "conflicts" | "startConflicts">,
+): ConflictCause {
+  const at = new Set(record.startConflicts)
+  return record.conflicts.length > 0 && record.conflicts.every(f => at.has(f))
+    ? "start"
+    : "work"
+}
+
+/** The parent's newest commit is not the one the lane last took (`ParentNow`). */
+export const parentAhead = (parent: ParentNow): boolean =>
+  parent.newest !== parent.taken
+
+/**
  * `CatchUpNow` from the lane's base record and the line's: the host's read
  * (`BaseRecord.catchUp`) counts only when it was made at the commit the base
  * is at now; else what it would change is unknown.
@@ -429,6 +456,10 @@ export function offerView(input: {
   readonly untraced: boolean
   /** A card bringing the thread up to date is queued on its lane. */
   readonly catchingUp: boolean
+  /** The thread this one branched from (`parentNow`); null for one that began at its base. */
+  readonly parent: ParentNow | null
+  /** That thread's agent runs: its copy moves with every turn. */
+  readonly parentRunning: boolean
 }): OfferView {
   const { offer, landing } = input
   const activity: OfferActivity =
@@ -436,6 +467,12 @@ export function offerView(input: {
   const untaken =
     offer.kind === "open" || offer.kind === "held" ? offer.record : undefined
   const open = offer.kind === "open" ? offer.record : undefined
+  const ahead =
+    input.parent !== null && parentAhead(input.parent) ? input.parent : null
+  const cause: ConflictCause = open === undefined ? "work" : conflictCause(open)
+  const parentResolves =
+    ahead !== null &&
+    open?.conflicts.every(f => !ahead.conflicts.includes(f)) === true
   const facts: OfferFacts = {
     activity,
     files: open?.files.length ?? 0,
@@ -449,6 +486,12 @@ export function offerView(input: {
     onto: input.onto,
     catchUp: input.catchUp,
     untraced: input.untraced,
+    conflictCause: cause,
+    parent:
+      ahead === null
+        ? null
+        : { kind: "parent", lane: ahead.lane, name: ahead.name },
+    parentResolves,
   }
   const destinations =
     open === undefined
@@ -470,9 +513,16 @@ export function offerView(input: {
   ): OfferView => {
     // A thread whose WIP is gone is brought up to date only by moving it to
     // the line.
-    const menu = gone
-      ? listed.map(b => (b === "update" ? "continue" : b))
-      : listed
+    const toLine = (bs: readonly OfferButton[]) =>
+      gone ? bs.map(b => (b === "update" ? "continue" : b)) : bs
+    // While the parent is ahead, catching up with it is listed, unless it
+    // already stands beside the offer (ADR-0072).
+    const menu = [
+      ...toLine(listed),
+      ...(ahead !== null && !buttons.includes("catch-up-parent")
+        ? (["catch-up-parent"] as const)
+        : []),
+    ]
     // When it brings work, or must come before any offer, catching up
     // stands beside the offer; when it would change nothing, it is quiet.
     const { kind } = input.catchUp
@@ -483,16 +533,21 @@ export function offerView(input: {
             menu: menu.filter(b => b !== "update"),
           }
         : { buttons, menu }
-    const quiet =
-      !input.untraced && (kind === "current" || kind === "nothing-new")
+    const quiet: OfferButton[] = [
+      ...(!input.untraced && (kind === "current" || kind === "nothing-new")
         ? (["update"] as const).filter(b => shown.menu.includes(b))
-        : []
+        : []),
+      // The parent's copy moves with every turn: not while it runs.
+      ...(ahead !== null && input.parentRunning
+        ? (["catch-up-parent"] as const)
+        : []),
+    ]
     // An untraced start rebuilds nothing: only your edited offer is left.
     const rebuilds = (b: OfferButton) =>
       !input.untraced || (b !== "refresh" && b !== "squash" && b !== "split")
     return {
       state,
-      buttons: takes(shown.buttons).filter(rebuilds),
+      buttons: takes(toLine(shown.buttons)).filter(rebuilds),
       menu: [
         ...shown.menu.filter(rebuilds),
         ...(destinations.length > 1 ? (["take-line"] as const) : []),
@@ -511,8 +566,17 @@ export function offerView(input: {
     return view("needs_you", ["take"], ["update"])
   if (offer.kind === "held") return view("nothing", [], ["update"])
   if (record.edited) return view("edited", ["take", "refresh"], ["update"])
+  // A conflict that came with the lane's copy, which the parent has since
+  // resolved, is settled by catching up with the parent; any other by
+  // catching up with the base and resolving (ADR-0072).
   if (record.conflicts.length > 0)
-    return view("conflicts", ["resolve", "take"], [])
+    return view(
+      "conflicts",
+      cause === "start" && parentResolves
+        ? ["catch-up-parent", "take"]
+        : ["update", "take"],
+      [],
+    )
   if (record.size > 1)
     return record.stale
       ? view("stale", ["split", "take"], ["update"])

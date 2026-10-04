@@ -18,6 +18,7 @@ import {
   type ComposerMode,
   chatIntent,
   failedWords,
+  forkWords,
   lineWords,
   placeholderWords,
   planSend,
@@ -423,6 +424,12 @@ describe("where a new lane works: the chip and its menu", () => {
     root: "/work",
     reason: "not a jj repo",
   }
+  test("forkWords: a new lane cloned from a conflicted commit says so (ADR-0072)", () => {
+    expect(forkWords(1)).toBe(
+      "starts from a copy with an unresolved conflict in 1 file",
+    )
+    expect(forkWords(3)).toMatch(/in 3 files$/)
+  })
   test("whereWords says each setting by what it does to your files", () => {
     expect(whereWords({ kind: "own" }, lanes)).toBe(
       "works on its own copy · your files stay as they are",

@@ -33,6 +33,7 @@ const offer = (commit: string): Extract<OfferInRepo, { kind: "offer" }> => ({
   onTarget: true,
   files: [],
   conflicts: [],
+  startConflicts: [],
 })
 const BEFORE = offer("b0")
 const AFTER = offer("a1")

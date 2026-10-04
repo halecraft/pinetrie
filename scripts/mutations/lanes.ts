@@ -291,12 +291,10 @@ export const mutations: readonly Mutation[] = [
       "a card that brings the thread up to date writes the update in the thread, then sends its text",
   },
   {
-    name: "a turn's paths are read quoted",
+    name: "a turn's paths are read from the process's directory",
     file: "packages/lanes/revisions.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: '    "-z",\n    from ?? `${to}^`,',
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
-    to: "    from ?? `${to}^`,",
+    from: "export const PATH_LINE = 'json(path) ++ \"\\\\n\"'",
+    to: "export const PATH_LINE = 'json(display_diff_path) ++ \"\\\\n\"'",
     command: unit,
     expect: "a path with a space and an accent",
   },

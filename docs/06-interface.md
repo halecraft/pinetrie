@@ -192,7 +192,7 @@ so it is the one behind the menu. What each does is under "Starting" below.
   the fork point into view. A thread that started from a WIP says so, "on
   wip/search", or "wip/search is gone" once it is (ADR-0060); one on the
   line says nothing.
-- **A thread's name opens its details** (ADR-0071), under the header, and a
+- **A thread's name opens its details** (ADR-0073), under the header, and a
   second click on it closes them; a chevron after the name turns as they
   open. They show the thread's icon magnified, which spins in as they open
   and again at a click, its name, "started by Ada · 3 h ago", where it
@@ -254,11 +254,19 @@ so it is the one behind the menu. What each does is under "Starting" below.
   done: the offer changed since you looked at it: review it again"), and
   the strip shows the new offer. A rebase onto a moved project, or your own
   edit of the offer, is still the offer you saw, and is added. An offer that conflicts is
-  never added to the project; its button is **resolve in the thread**. One
+  never added to the project; its button is **catch up with the project
+  and resolve**: the agent resolves what the merge leaves. An offer whose
+  every conflicted file was already conflicted where its thread's copy
+  started says so instead: "began from a copy with an unresolved conflict
+  in 1 file", and, when the thread it branched from has since resolved
+  those files, "· amber-fox has resolved it", with **catch up with
+  amber-fox** as its button (ADR-0072). One
   working directly says "edits your files directly", and warns while
   another agent works in the same directory. Its **⋯** menu holds **catch
   up with** the thread's base (the project, or its WIP), or, once its WIP is
-  gone, **continue from the project**. When catching up would change files
+  gone, **continue from the project**; and, while the thread it branched
+  from has new commits, **catch up with** that thread by its name, greyed
+  out while that thread's agent works. When catching up would change files
   in the thread, the strip says so ("2 files ready · the project has new
   work"), catching up stands beside the offer, titled with how many files it
   changes, and the column's header shows ↓, titled with the count, the
@@ -271,8 +279,8 @@ so it is the one behind the menu. What each does is under "Starting" below.
   count it, and archiving its thread warns of nothing. A thread whose
   earlier add was made before Pineta recorded what an add took says "an
   earlier add of this thread can't be traced: catch up with the project to
-  offer what's new", with catching up beside it. Catching up, and **resolve
-  in the thread** when your edits and the offer conflict, do it at once
+  offer what's new", with catching up beside it. Every catch-up button does
+  it at once
   (ADR-0061): each queues a new card holding the command and no text, which
   the host takes when the lane is free, and your composer is left as it
   was. The queued card says "↓ catches up with the project first", and the
@@ -281,6 +289,10 @@ so it is the one behind the menu. What each does is under "Starting" below.
   as a plain message instead, and its button reads "catch up", or "catch up
   and send"; what you write is what the agent should do with the new work
   (ADR-0055).
+- **A branch from a conflicted copy is warned** (ADR-0072): when the next
+  send would start a thread on its own copy cloned from a commit with
+  conflicts, the line under the box says "starts from a copy with an
+  unresolved conflict in 1 file".
 - **A column widens to review its offer** (ADR-0047). The offer's line opens
   the review to the right of the thread, which keeps its place and width: a
   file list when there is more than one file, and one scroll of every file's diff, each file's head pinned

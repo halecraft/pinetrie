@@ -338,7 +338,16 @@ and takes the leftmost place free for its whole height (`placeRail`). A
 track is a branch's colour, by creation order, apart from its place, since
 places follow capsule sizes and so presence, which `App` does not read.
 
-**ADR-0071 — a thread's name opens its details** (built). The name and
+**ADR-0072 — a thread catches up with the thread it branched from** (built).
+A branch cloned from a conflicted copy kept that conflict in its offer, even
+after it and its parent resolved it alike (S99). Now a thread can catch up
+with the thread its copy was cloned from, offered while that one is ahead,
+which the document says (`parentNow`); a merge takes a file both sides hold
+alike whatever its base; an offer says when its conflict came with its copy;
+a branch from a conflicted copy is warned; and a turn's paths are read with
+jj, not git, which listed a conflicted commit's every side as files.
+
+**ADR-0073 — a thread's name opens its details** (built). The name and
 icon toggle a panel under the header: the icon magnified, spinning in as it
 opens, who started the thread and when, where it works, and the `↓` in
 full. The reveal of the lane's start moves there, offered only below the

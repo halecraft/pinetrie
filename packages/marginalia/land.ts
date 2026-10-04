@@ -1,7 +1,8 @@
 // land — the prompt of a resolution run (ADR-0033, ADR-0038, ADR-0055).
 //
-// Bringing a thread up to date merges the project's work into its lane, in
-// the lane's own copy; when that conflicts, the agent resolves it. The run starts with a land
+// Bringing a thread up to date merges the project's work, or the work of the
+// thread it branched from (ADR-0072), into its lane, in the lane's own copy;
+// when that conflicts, the agent resolves it. The run starts with a land
 // message: a pi
 // `CustomMessage`, like chat, whose `content` is what the model reads (the
 // resolution skill and the conflict material) and whose `details` are what the
@@ -123,13 +124,15 @@ export function planResolution(input: {
   readonly details: Omit<LandDetails, "files" | "skill">
   /** The card's text: what the person wants done with the new work; "" for nothing. */
   readonly intent: string
+  /** Whose work came in, as the model reads it: "The project's work", or a thread's. */
+  readonly incoming: string
   readonly timestamp: number
 }): LandMessage {
-  const { files } = input
+  const { files, incoming } = input
   const intro =
     files.length === 0
-      ? "The project's work was merged into this thread's own copy with no conflicts. Check that both sides still work together."
-      : `The project's work was merged into this thread's own copy, and ${files.length} ${files.length === 1 ? "file conflicts" : "files conflict"}. Resolve them there.`
+      ? `${incoming} was merged into this thread's own copy with no conflicts. Check that both sides still work together.`
+      : `${incoming} was merged into this thread's own copy, and ${files.length} ${files.length === 1 ? "file conflicts" : "files conflict"}. Resolve them there.`
   const intent = input.intent.trim()
   const asked = intent === "" ? "" : `\n\n## What the person asked\n\n${intent}`
   const skill = input.skill === null ? "" : `${input.skill.content.trim()}\n\n`

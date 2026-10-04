@@ -32,6 +32,7 @@ import {
   commitsOf,
   commitTurn,
   conflictContent,
+  conflictedFilesAt,
   conflictsIn,
   DEFAULT_LINE,
   entryOfMessage,
@@ -123,7 +124,13 @@ const turnOn = async (
     readonly entry: EntryId
     readonly lane: LaneName
   },
-) => commitTurn(jj, { ...input, bookmark: await bookmarkOf(jj, input.lane) })
+) =>
+  (
+    await commitTurn(jj, {
+      ...input,
+      bookmark: await bookmarkOf(jj, input.lane),
+    })
+  ).commit
 
 /** Your default `jj log`, as descriptions. */
 const defaultLog = async (jj: Runner): Promise<string> =>
@@ -308,13 +315,11 @@ describe("a lane's repo, with jj", () => {
     expect(committed.stdout).toContain("shared.txt")
     expect(committed.stdout).not.toContain(".plans")
     // The turn's paths, from the lane's root, as its revision records them
-    // (ADR-0056): what git says changed, from the bookmark before it.
-    const laneGit: Runner = args =>
-      hostRunner(laneDir)(args.map(a => (a === WORKSPACE_ROOT ? laneDir : a)))
-    expect(await changedPaths(laneGit, base[0] ?? null, r1)).toEqual([
+    // (ADR-0056): what jj says changed, from the bookmark before it.
+    expect(await changedPaths(laneJj, base[0] ?? null, r1)).toEqual([
       "shared.txt",
     ])
-    expect(await changedPaths(laneGit, null, r1)).toEqual(["shared.txt"])
+    expect(await changedPaths(laneJj, null, r1)).toEqual(["shared.txt"])
 
     // Your repo fetches it by bundle, as the lane's remote bookmark: out of
     // your default log, and immutable with jj's builtin config, your commit
@@ -1456,6 +1461,166 @@ describe("a lane's repo, with jj", () => {
     expect(await knownStart(ops, { tip, base: b, line })).toEqual([
       await lineNow(),
     ])
+  }, 60_000)
+
+  test("a branch cloned from a conflicted catch-up: its offer's conflict came with its copy, and catching up with its parent settles it (ADR-0072, S99)", async () => {
+    const rig = await turnRig("parent")
+    const { laneDir, yoursDir, yoursJj, ops, line, edit, offer, take, turn } =
+      rig
+    const BRANCH = "copper-owl" as ThreadName
+    // The parent changes base.txt; you change the same line on the line;
+    // the parent catches up, and the merge stays conflicted.
+    await edit(laneDir, "base.txt", "base, lane\n")
+    await turn()
+    await yoursJj(["new", line.onto])
+    await edit(yoursDir, "base.txt", "base, yours\n")
+    await yoursJj(["commit", "-m", "yours: base.txt"])
+    await yoursJj(["bookmark", "move", line.onto, "--to", "@-"])
+    const l2 = await rig.lineNow()
+    await rig.inLane([fetchById([l2])])
+    const { merge } = await mergeBase(
+      rig.laneJj,
+      LANE,
+      l2,
+      baseMessage(`update: ${line.onto}`, { bookmark: line.onto, commit: l2 }),
+    )
+    if (merge === null) throw new Error("nothing merged")
+    expect(await conflictedFilesAt(rig.laneJj, merge)).toEqual(["base.txt"])
+    // A prompt on it commits nothing, and its record names the merge: the
+    // turn says it is conflicted, as a branch from it would start.
+    expect(
+      await commitTurn(rig.laneJj, {
+        title: "a prompt",
+        entry: entryId("e-parent-prompt"),
+        lane: LANE,
+        bookmark: merge,
+      }),
+    ).toEqual({ commit: null, conflicted: true })
+    // The branch is cloned there, conflicted.
+    const forkDir = path.join(top, "parent-fork")
+    await cp(laneDir, forkDir, { recursive: true, verbatimSymlinks: true })
+    await rig.inLane(
+      planForkSetup(FORK, { kind: "commits", commits: [merge] }),
+      forkDir,
+    )
+    const forkJj = laneJjAt(forkDir)
+    const forkRunners = {
+      host: hostRunner(),
+      lane: hostRunner(forkDir),
+      laneBytes: hostBytesRunner(forkDir),
+    }
+    const fetchFork = (have: readonly CommitId[]) =>
+      fetchLane(forkRunners, yoursDir, {
+        lane: FORK,
+        have,
+        bundle: path.join(top, "parent-fork.bundle"),
+      })
+    // Both resolve it the same way; the parent's is taken.
+    const resolved = "base, yours, lane\n"
+    await edit(laneDir, "base.txt", resolved)
+    const parentResolved = await turn()
+    await take(await offer(rig.base))
+    await edit(forkDir, "base.txt", resolved)
+    const resolving = await commitTurn(forkJj, {
+      title: "resolve",
+      entry: entryId("e-fork-1"),
+      lane: FORK,
+      bookmark: await bookmarkOf(forkJj, FORK),
+    })
+    expect(resolving.conflicted).toBe(false)
+    await fetchFork(rig.base)
+    // The branch's offer starts at the conflicted merge, and conflicts in
+    // the file it started conflicted in.
+    const branchOffer = async () => {
+      const tip = await laneTipIn(ops, FORK)
+      if (tip === null) throw new Error("no tip")
+      const b = await laneBase(ops, tip, line)
+      if (b === null) throw new Error("no base")
+      const read = await startOfOffer(ops, { tip, base: b, line, lane: FORK })
+      if (read.kind !== "known") throw new Error("an untraced start")
+      return { tip, base: b, start: read.start }
+    }
+    const before = await branchOffer()
+    expect(before.start).toEqual([merge])
+    await executeRepo(
+      yoursDir,
+      planOffer({
+        name: BRANCH,
+        start: before.start,
+        sources: [
+          {
+            commit: before.tip,
+            description: `WIP\n\nPineta-Thread: ${BRANCH}\nPineta-Source: ${before.tip}\nPineta-Start: ${merge}\n`,
+          },
+        ],
+        target: await rig.lineNow(),
+        nonce: "n-parent",
+      }),
+    )
+    const read = await readOffer(ops, {
+      name: BRANCH,
+      target: await rig.lineNow(),
+    })
+    expect(read).toMatchObject({
+      kind: "offer",
+      conflicts: ["base.txt"],
+      startConflicts: ["base.txt"],
+    })
+    const op = (await ops(["op", "log", "--no-graph", "-n", "1", "-T", "id"]))
+      .stdout
+    const gathered = await gatherLane(ops, {
+      lane: FORK,
+      name: BRANCH,
+      line,
+      shared: await readShared(op, ops, runnerFor(yoursDir, "git"), line),
+      known: null,
+    })
+    expect(gathered).toMatchObject({
+      offer: { conflicts: ["base.txt"], startConflicts: ["base.txt"] },
+    })
+    // The parent catches up with the line after the fork, past its own take;
+    // then the branch catches up with the parent's newest commit, fetched
+    // from your repo, where only the parent's ref reaches it.
+    const taken = await rig.lineNow()
+    await rig.inLane([fetchById([taken])])
+    const caughtUp = await mergeBase(
+      rig.laneJj,
+      LANE,
+      taken,
+      baseMessage(`update: ${line.onto}`, {
+        bookmark: line.onto,
+        commit: taken,
+      }),
+    )
+    expect(caughtUp.merge).not.toBeNull()
+    await rig.fetch([parentResolved])
+    const newest = await laneTipIn(ops, LANE)
+    if (newest === null) throw new Error("no parent tip")
+    const plan = planMerge({
+      kind: "parent",
+      lane: LANE,
+      name: NAME,
+      commit: newest,
+      taken: merge,
+    })
+    // The plan's fetch names your repo by its path in a lane: run it here.
+    await rig.inLane(plan.steps, forkDir)
+    const merged = await mergeUpdate(forkJj, forkRunners, FORK, {
+      ...plan,
+      steps: [],
+    })
+    expect(merged.kind).toBe("clean")
+    await fetchFork([merge])
+    // Its base is now the parent's newer one, and its work changes no file:
+    // its offer is withdrawn.
+    const after = await branchOffer()
+    expect(after.base.start).toBe(taken)
+    expect(
+      await workChanges(ops, {
+        start: { kind: "known", start: after.start },
+        tip: after.tip,
+      }),
+    ).toBe("none")
   }, 60_000)
 
   test("a lane's ref deleted and imported: the history under the line is kept (S78)", async () => {

@@ -24,6 +24,7 @@ import {
 } from "@pineta/core"
 import {
   bookmarkRevset,
+  conflictedFilesAt,
   describeFailure,
   type LineConfig,
   laneTipName,
@@ -33,7 +34,12 @@ import {
   type Runner,
   revsetName,
 } from "@pineta/lanes"
-import { readCatchUp, sinceHost, workChanges } from "./offer.ts"
+import {
+  readCatchUp,
+  sinceHost,
+  startConflictsOf,
+  workChanges,
+} from "./offer.ts"
 import { offerStart } from "./plan.ts"
 import type { SharedFacts } from "./shared.ts"
 
@@ -401,29 +407,20 @@ async function offerFrom(
       ).stdout,
     )
   const conflicts = read.conflicted
-    ? lines(
-        (
-          await must(jj, [
-            "file",
-            "list",
-            "-r",
-            top.commit,
-            "-T",
-            'if(conflict, path ++ "\\n")',
-          ])
-        ).stdout,
-      )
+    ? await conflictedFilesAt(jj, top.commit)
     : []
+  const ledger = offerLedger(read.description)
   return {
     kind: "offer",
     revisions,
     chained: read.chained,
-    ledger: offerLedger(read.description),
+    ledger,
     firstLine: read.description.split("\n")[0] ?? "",
     placed: read.placed,
     onTarget: parents.length === 1 && parents[0] === onto,
     files,
     conflicts,
+    startConflicts: await startConflictsOf(jj, ledger, conflicts),
   }
 }
 

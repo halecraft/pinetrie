@@ -157,6 +157,7 @@ describe("planArchive", () => {
       commit: commit === null ? null : commitId(commit),
       snapshot: snapshot === null ? null : snapshotId(snapshot),
       paths: [],
+      conflicts: [],
     })
     const revisions = new Map([
       [entryId("a"), revision("a", A, "c-a", "s-a1")],

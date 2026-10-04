@@ -4,6 +4,7 @@ import {
   entryId,
   laneNameForThread,
   NOBODY,
+  type ThreadName,
   writerId,
 } from "@pineta/core"
 import { revisionMessage } from "@pineta/lanes"
@@ -93,7 +94,8 @@ describe("planSettle: what a merge comes to (ADR-0060, ADR-0033)", () => {
       message: encodeUpdate(
         {
           lane: LANE,
-          base: { kind: "line", bookmark: "pineta-onto" },
+          from: { kind: "line" },
+          bookmark: "pineta-onto",
           merged: LINE,
           files: ["a.txt"],
           commits: ["yours one"],
@@ -115,7 +117,8 @@ describe("planSettle: what a merge comes to (ADR-0060, ADR-0033)", () => {
       message: encodeUpdate(
         {
           lane: LANE,
-          base: { kind: "wip", bookmark: "wip/x" },
+          from: { kind: "wip", bookmark: "wip/x" },
+          bookmark: "wip/x",
           merged: LINE,
           files: ["a.txt"],
           commits: ["yours one"],
@@ -184,6 +187,49 @@ describe("planSettle: what a merge comes to (ADR-0060, ADR-0033)", () => {
     expect(content.split("yours b").length).toBe(2)
     expect(content.endsWith("keep both sides")).toBe(true)
   })
+  test("from the thread it branched from: the update and the resolution name it (ADR-0072)", () => {
+    const parent: BaseMerge = {
+      kind: "parent",
+      lane: laneNameForThread("p"),
+      name: "amber-fox" as ThreadName,
+      commit: LINE,
+      taken: OURS,
+    }
+    const clean = planSettle(
+      {
+        kind: "clean",
+        from: LINE,
+        ours: OURS,
+        merge: MERGE,
+        files: ["a.txt"],
+        commits: [],
+      },
+      { ...ctx, from: parent },
+    )
+    if (clean.kind !== "clean") throw new Error("not clean")
+    expect(clean.message.details).toMatchObject({
+      parent: { name: "amber-fox" },
+    })
+    const conflicted = planSettle(
+      {
+        kind: "conflicted",
+        from: LINE,
+        contents: [{ path: "a.txt", content: "<<<<<<< a" }],
+        ours: [],
+        theirs: [],
+        skill: null,
+        landing: "l-2",
+      },
+      { ...ctx, from: parent },
+    )
+    if (conflicted.kind !== "conflicted") throw new Error("not conflicted")
+    expect(conflicted.message.content).toContain(
+      "The work of the thread this one branched from (amber-fox) was merged",
+    )
+    expect(conflicted.message.content).toContain(
+      "### theirs: the thread amber-fox",
+    )
+  })
 })
 
 describe("applySettle: a settle's writes", () => {
@@ -207,7 +253,8 @@ describe("applySettle: a settle's writes", () => {
     message: encodeUpdate(
       {
         lane: LANE,
-        base: { kind: "line", bookmark: "pineta-onto" },
+        from: { kind: "line" },
+        bookmark: "pineta-onto",
         merged: LINE,
         commits: [],
         files: ["a.txt"],

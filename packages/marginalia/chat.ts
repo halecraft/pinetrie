@@ -233,10 +233,15 @@ export const decodeChat = (message: unknown): ChatDetails | undefined =>
  */
 export function renderableMessage(message: unknown): AgentMessageLike {
   const land = decodeLand(message)
-  if (land !== undefined) return { role: "land", content: landLine(land) }
+  if (land !== undefined)
+    return { role: "land", content: landLine(land), merged: land.yours }
   const update = decodeUpdate(message)
   if (update !== undefined)
-    return { role: "update", content: updateLine(update) }
+    return {
+      role: "update",
+      content: updateLine(update),
+      merged: [update.merged],
+    }
   const stack = decodeStack(message)
   if (stack !== undefined) return { role: "stack", content: stackLine(stack) }
   const chat = decodeChat(message)

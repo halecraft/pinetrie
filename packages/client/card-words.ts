@@ -1,40 +1,61 @@
 // client/card-words — what a card says about its place and its command
 // (ADR-0048, ADR-0055), each label in one function. Pure.
 
-import type { CardCommand, ThreadBase, WriterId } from "@pineta/core"
-import { baseName, displayName } from "@pineta/marginalia"
+import type {
+  CardCommand,
+  CatchUpFrom,
+  ParentThread,
+  ThreadBase,
+  WriterId,
+} from "@pineta/core"
+import { catchUpName, displayName } from "@pineta/marginalia"
 import type { Refusal } from "./card-moves.ts"
 import { lineWords, type Reader } from "./send.ts"
 
+/** What a thread catches up with, for a command's words. */
+export interface CatchUps {
+  /** The thread's base (`effectiveBase`). */
+  readonly base: ThreadBase
+  /** The thread it branched from; null for one that began at its base (ADR-0072). */
+  readonly parent: ParentThread | null
+}
+
 /**
- * A command's name as people read it: the strip's button. `base` is the
- * thread's (`effectiveBase`); `continue-on-line` always moves it to the
- * project (ADR-0060).
+ * What a command merges: the base for `bring-up-to-date`, the project for
+ * `continue-on-line` (ADR-0060), the thread it branched from for
+ * `catch-up-with-parent` (ADR-0072). Null for that one without a parent.
  */
-export const commandWords = (
+const commandFrom = (
   command: CardCommand,
-  base: ThreadBase,
-): string => {
+  { base, parent }: CatchUps,
+): CatchUpFrom | null => {
   switch (command) {
     case "bring-up-to-date":
-      return `catch up with ${baseName(base)}`
+      return base
     case "continue-on-line":
-      return "continue from the project"
+      return { kind: "line" }
+    case "catch-up-with-parent":
+      return parent
   }
 }
+
+const fromName = (from: CatchUpFrom | null) =>
+  from === null ? "the thread this one branched from" : catchUpName(from)
+
+/** A command's name as people read it: the strip's button. */
+export const commandWords = (command: CardCommand, at: CatchUps): string =>
+  command === "continue-on-line"
+    ? "continue from the project"
+    : `catch up with ${fromName(commandFrom(command, at))}`
 
 /**
  * What a card with a command does when sent, above its box, and on a queued
  * one: the command first, then the card's text as the agent's next message.
  */
-export const commandNote = (command: CardCommand, base: ThreadBase): string => {
-  switch (command) {
-    case "bring-up-to-date":
-      return `↓ catches up with ${baseName(base)} first, then sends what you write`
-    case "continue-on-line":
-      return "↓ continues from the project first, then sends what you write"
-  }
-}
+export const commandNote = (command: CardCommand, at: CatchUps): string =>
+  command === "continue-on-line"
+    ? "↓ continues from the project first, then sends what you write"
+    : `↓ catches up with ${fromName(commandFrom(command, at))} first, then sends what you write`
 
 /** A queued card's button that takes it back below the line. */
 export const UNQUEUE = "unqueue"

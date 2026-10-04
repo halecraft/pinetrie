@@ -14,7 +14,6 @@ import {
   entryId,
   type LaneName,
   TRAILERS,
-  WORKSPACE_ROOT,
 } from "@pineta/core"
 import { setBookmark } from "./bookmarks.ts"
 import { planTurnCommit } from "./plan.ts"
@@ -61,11 +60,19 @@ const isAncestor = async (
 ): Promise<boolean> =>
   (await commitsOf(jj, `${ancestor} & ::${commit}`)).length > 0
 
+/** A turn's revision (`commitTurn`), and whether it, or the bookmark when it has none, is conflicted. */
+export interface TurnCommitted {
+  readonly commit: CommitId | null
+  readonly conflicted: boolean
+}
+
 /**
  * Snapshot the lane's working copy and record the turn's revision: what
  * changed in `@`, committed, or a commit the agent made itself
  * (`planTurnCommit`). Move the lane's bookmark to it and return it; null when
  * the turn has none. `bookmark` is the lane's bookmark as the caller read it.
+ * The one `jj log` also says whether the turn's commit, or the bookmark when
+ * there is none, is conflicted (ADR-0072).
  */
 export async function commitTurn(
   jj: Runner,
@@ -75,7 +82,7 @@ export async function commitTurn(
     readonly lane: LaneName
     readonly bookmark: CommitId | null
   },
-): Promise<CommitId | null> {
+): Promise<TurnCommitted> {
   const snap = await jj(["util", "snapshot"])
   if (!snap.ok) throw new Error(describeFailure("jj util snapshot", snap))
   const at = await jj([
@@ -85,12 +92,19 @@ export async function commitTurn(
     "-r",
     "@",
     "-T",
-    'empty ++ "\\n" ++ parents.map(|c| c.commit_id()).join("\\n") ++ "\\n"',
+    'empty ++ " " ++ conflict ++ "\\n" ++ parents.map(|c| c.commit_id() ++ " " ++ c.conflict()).join("\\n") ++ "\\n"',
   ])
   if (!at.ok) throw new Error(describeFailure("jj log", at))
-  const [empty, ...parentIds] = lines(at.stdout)
+  const [head = "", ...parentRows] = lines(at.stdout)
+  const [empty, atConflict] = head.split(" ")
   const atEmpty = empty === "true"
-  const parents = parentIds.map(commitId)
+  const parentFlags = new Map(
+    parentRows.map(row => {
+      const [id = "", flag] = row.split(" ")
+      return [commitId(id), flag === "true"] as const
+    }),
+  )
+  const parents = [...parentFlags.keys()]
   const { bookmark } = input
   // Asked only when the plan could adopt: before most requests the turn
   // changed nothing, and `@-` is the bookmark.
@@ -104,12 +118,22 @@ export async function commitTurn(
       ? await isAncestor(jj, bookmark, parent)
       : false
   const plan = planTurnCommit({ atEmpty, parents, bookmark, parentDescends })
-  if (plan.kind === "none") return null
+  if (plan.kind === "none")
+    return {
+      commit: null,
+      conflicted: bookmark !== null && parentFlags.get(bookmark) === true,
+    }
   if (plan.kind === "adopt") {
     await setBookmark(jj, input.lane, plan.commit)
-    return plan.commit
+    return {
+      commit: plan.commit,
+      conflicted: parentFlags.get(plan.commit) === true,
+    }
   }
-  return commitToBookmark(jj, input.lane, revisionMessage(input))
+  return {
+    commit: await commitToBookmark(jj, input.lane, revisionMessage(input)),
+    conflicted: atConflict === "true",
+  }
 }
 
 /**
@@ -145,29 +169,44 @@ export async function titlesOf(jj: Runner, revset: string): Promise<string[]> {
 }
 
 /**
- * The paths changed from `from` to `to` in the lane's repo, from its root;
- * from `to`'s parent when there is no `from` (ADR-0056): read with git, since jj's `--name-only` prints them from the
- * process's directory, and with `-z`, since git quotes a path with
- * non-ASCII characters otherwise (S70). `lane` runs in the lane, as
- * `LaneHandle.runners.lane` does.
+ * A diff entry's path, from the repo's root, as one JSON string a line:
+ * `--name-only` prints paths from the process's directory, and `json()`
+ * quotes a path with any character in it (S70).
+ */
+export const PATH_LINE = 'json(path) ++ "\\n"'
+
+/**
+ * The paths changed from `from` to `to`, from the repo's root; those `to`
+ * changed when there is no `from` (ADR-0056). Read with jj, not git: git
+ * reads a conflicted commit as every side's whole tree under
+ * `.jjconflict-*` (S99).
  */
 export async function changedPaths(
-  lane: Runner,
+  jj: Runner,
   from: CommitId | null,
   to: CommitId,
 ): Promise<readonly string[]> {
-  const ran = await lane([
-    "git",
-    "-C",
-    WORKSPACE_ROOT,
-    "diff",
-    "--name-only",
-    "-z",
-    from ?? `${to}^`,
-    to,
+  const range = from === null ? ["-r", to] : ["--from", from, "--to", to]
+  const ran = await jj(["diff", ...range, "-T", PATH_LINE])
+  if (!ran.ok) throw new Error(describeFailure("jj diff", ran))
+  return lines(ran.stdout).map(line => String(JSON.parse(line)))
+}
+
+/** The files with conflicts in `rev`. */
+export async function conflictedFilesAt(
+  jj: Runner,
+  rev: string,
+): Promise<string[]> {
+  const ran = await jj([
+    "file",
+    "list",
+    "-r",
+    rev,
+    "-T",
+    'if(conflict, path ++ "\\n")',
   ])
-  if (!ran.ok) throw new Error(describeFailure("git diff --name-only", ran))
-  return ran.stdout.split("\0").filter(p => p !== "")
+  if (!ran.ok) throw new Error(describeFailure("jj file list", ran))
+  return lines(ran.stdout)
 }
 
 /**

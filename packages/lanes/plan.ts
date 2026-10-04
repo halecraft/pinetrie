@@ -763,7 +763,7 @@ export interface MergePlan {
   readonly steps: readonly LaneStep[]
   /** The commit to merge, or the copy the steps leave as `@-`. */
   readonly source: CommitId | "copy"
-  /** The line's names the base (`Pineta-Base`); a WIP's copy names its own. */
+  /** The line's names the base (`Pineta-Base`); a WIP's copy names its own; a parent's none (ADR-0072). */
   readonly message: string
   /** With nothing to merge, a commit still names the line (`BaseMerge`). */
   readonly mark: boolean
@@ -776,7 +776,9 @@ export interface MergePlan {
 
 /**
  * An update's steps (ADR-0060). A WIP's copy fetches only the WIP's commit:
- * the copy's parent is the lane's own.
+ * the copy's parent is the lane's own. The thread it branched from is merged
+ * as the line's commit is, with no `Pineta-Base`: it is no base, and what
+ * the lane holds of it is its history (ADR-0072).
  */
 export function planMerge(from: BaseMerge): MergePlan {
   if (from.kind === "line")
@@ -789,6 +791,14 @@ export function planMerge(from: BaseMerge): MergePlan {
       }),
       mark: from.mark,
       came: { from: null, to: from.commit },
+    }
+  if (from.kind === "parent")
+    return {
+      steps: [fetchById([from.commit])],
+      source: from.commit,
+      message: `update: ${from.name}`,
+      mark: false,
+      came: { from: from.taken, to: from.commit },
     }
   return {
     steps: [fetchById([from.commit]), ...planWipCopy(from, from.on)],

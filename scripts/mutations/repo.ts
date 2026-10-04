@@ -550,4 +550,28 @@ export const mutations: readonly Mutation[] = [
     command: ["pnpm", "exec", "vitest", "run", "packages/repo/owner.test.ts"],
     expect: "a write reads them anew",
   },
+  {
+    name: "an offer's start conflicts go unread",
+    file: "packages/repo/lane-read.ts",
+    from: "    startConflicts: await startConflictsOf(jj, ledger, conflicts),",
+    to: "    startConflicts: [],",
+    command: repoTest,
+    expect: "a branch cloned from a conflicted catch-up",
+  },
+  {
+    name: "a merge keeps a conflict both sides resolved alike",
+    file: "packages/lanes/merge.ts",
+    from: "  const alike = heldAlike(conflicted, await changedPaths(jj, ours, from))",
+    to: "  const alike: readonly string[] = []",
+    command: repoTest,
+    expect: "a branch cloned from a conflicted catch-up",
+  },
+  {
+    name: "a prompt's record never says its commit is conflicted",
+    file: "packages/lanes/revisions.ts",
+    from: "      conflicted: bookmark !== null && parentFlags.get(bookmark) === true,",
+    to: "      conflicted: false,",
+    command: repoTest,
+    expect: "a branch cloned from a conflicted catch-up",
+  },
 ]

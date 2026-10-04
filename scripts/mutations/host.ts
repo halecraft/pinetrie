@@ -897,8 +897,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an update that throws loses its card",
     file: "apps/pineta/host/take.ts",
-    from: '        card.command === "continue-on-line",\n      )\n      .catch(hostFailed)',
-    to: '        card.command === "continue-on-line",\n      )',
+    from: "      .prepareUpdate(lane, card.place.by, taken.text, card.command)\n      .catch(hostFailed)",
+    to: "      .prepareUpdate(lane, card.place.by, taken.text, card.command)",
     command: unit,
     expect: "an update that throws writes the card back with its command",
   },

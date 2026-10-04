@@ -25,6 +25,7 @@ import {
   BASE as BASE_RECORD,
   type CatchUpNow,
   catchUpOf,
+  conflictCause,
   decodeStack,
   decodeUpdate,
   describeRequest,
@@ -40,6 +41,7 @@ import {
   offerSeen,
   offerStatus,
   offerView,
+  type ParentNow,
   parseOfferPath,
   planOfferRead,
   planRefresh,
@@ -68,6 +70,7 @@ const offer: OfferRecord = {
   stale: false,
   files: ["a.txt", "b.txt"],
   conflicts: [],
+  startConflicts: [],
   yourEdits: [],
   described: true,
   edited: false,
@@ -103,6 +106,8 @@ describe("offerView: ADR-0038's table", () => {
       catchUp?: CatchUpNow
       untraced?: boolean
       catchingUp?: boolean
+      parent?: ParentNow | null
+      parentRunning?: boolean
     } = {},
   ) =>
     offerView({
@@ -115,6 +120,8 @@ describe("offerView: ADR-0038's table", () => {
       catchUp: catching.catchUp ?? { kind: "current" },
       untraced: catching.untraced ?? false,
       catchingUp: catching.catchingUp ?? false,
+      parent: catching.parent ?? null,
+      parentRunning: catching.parentRunning ?? false,
     })
   const at = (v: ReturnType<typeof view>) => [v.state, v.buttons, v.menu]
   test("every state, with its buttons", () => {
@@ -135,7 +142,7 @@ describe("offerView: ADR-0038's table", () => {
     // Only a clean offer lands on the line (ADR-0060): no take on a line thread.
     expect(at(view({ ...offer, conflicts: ["a.txt"] }))).toEqual([
       "conflicts",
-      ["resolve"],
+      ["update"],
       [],
     ])
     expect(at(view({ ...offer, size: 2 }))).toEqual([
@@ -182,6 +189,9 @@ describe("offerView: ADR-0038's table", () => {
       onto: "pineta-onto",
       catchUp: { kind: "current" },
       untraced: false,
+      conflictCause: "work",
+      parent: null,
+      parentResolves: false,
     })
     expect(view(offer, "turn").facts.files).toBe(2)
     const none = view(undefined).facts
@@ -247,6 +257,8 @@ describe("offerView: ADR-0038's table", () => {
       activity: "idle",
       landing: undefined,
       base: { base: { kind: "wip", bookmark: "wip/a" }, state: "gone" },
+      parent: null,
+      parentRunning: false,
       onto: "pineta-onto",
       wipAhead: 0,
       catchUp: { kind: "current" },
@@ -381,6 +393,88 @@ describe("offerView: ADR-0038's table", () => {
   })
 })
 
+describe("a conflict that came with the copy, and the thread it branched from (ADR-0072)", () => {
+  const P = laneNameForThread("p")
+  const parent = (over: Partial<ParentNow> = {}): ParentNow => ({
+    kind: "parent",
+    lane: P,
+    name: "amber-fox" as ThreadName,
+    newest: T2,
+    taken: TIP,
+    conflicts: [],
+    ...over,
+  })
+  const view = (o: OfferRecord, p: ParentNow | null, parentRunning = false) =>
+    offerView({
+      offer: offerStatus(o),
+      activity: "idle",
+      landing: undefined,
+      base: null,
+      onto: "pineta-onto",
+      wipAhead: 0,
+      catchUp: { kind: "current" },
+      untraced: false,
+      catchingUp: false,
+      parent: p,
+      parentRunning,
+    })
+  const fromStart = {
+    ...offer,
+    conflicts: ["a.txt"],
+    startConflicts: ["a.txt"],
+  }
+  test("conflictCause: the start only when every conflicted file was conflicted there", () => {
+    expect(conflictCause(offer)).toBe("work")
+    expect(conflictCause(fromStart)).toBe("start")
+    expect(
+      conflictCause({
+        ...offer,
+        conflicts: ["a.txt", "b.txt"],
+        startConflicts: ["a.txt"],
+      }),
+    ).toBe("work")
+    expect(
+      conflictCause({ ...offer, conflicts: [], startConflicts: ["a.txt"] }),
+    ).toBe("work")
+  })
+  test("a start conflict the parent has resolved is caught up with the parent", () => {
+    const v = view(fromStart, parent())
+    expect([v.state, v.buttons, v.menu]).toEqual([
+      "conflicts",
+      ["catch-up-parent"],
+      [],
+    ])
+    expect(v.facts).toMatchObject({
+      conflictCause: "start",
+      parent: { kind: "parent", lane: P, name: "amber-fox" },
+      parentResolves: true,
+    })
+  })
+  test("one the parent still has, or a parent not ahead, or a conflict of the lane's own, is caught up with the base", () => {
+    expect(view(fromStart, parent({ conflicts: ["a.txt"] })).buttons).toEqual([
+      "update",
+    ])
+    expect(view(fromStart, parent({ newest: TIP })).buttons).toEqual(["update"])
+    expect(view(fromStart, null).buttons).toEqual(["update"])
+    expect(view({ ...offer, conflicts: ["a.txt"] }, parent()).buttons).toEqual([
+      "update",
+    ])
+  })
+  test("while the parent is ahead it is in the menu, quiet while it runs", () => {
+    expect(view(offer, parent()).menu).toEqual([
+      "describe",
+      "update",
+      "catch-up-parent",
+    ])
+    expect(view(offer, parent({ newest: TIP })).menu).toEqual([
+      "describe",
+      "update",
+    ])
+    expect(view(offer, parent(), true).quiet).toContain("catch-up-parent")
+    expect(view(fromStart, parent(), true).quiet).toEqual(["catch-up-parent"])
+  })
+})
+
 describe("planRefresh", () => {
   const host = { reached: true, yoursChanged: false }
   const rev = (since = host) => ({ commit: TIP, change: "k", since })
@@ -396,6 +490,7 @@ describe("planRefresh", () => {
     onTarget: true,
     files: [],
     conflicts: [],
+    startConflicts: [],
     ...o,
   })
   const facts = (
@@ -523,6 +618,7 @@ describe("isWipLine, offerMoved, describeWanted", () => {
     onTarget: true,
     files: [],
     conflicts: [],
+    startConflicts: [],
   }
   test("the WIP line is this thread's; an agent's message is not", () => {
     expect(isWipLine(NAME, "WIP (t-1): x")).toBe(true)
@@ -732,6 +828,7 @@ describe("the review (ADR-0047)", () => {
           commit: commitId(commit),
           snapshot: null,
           paths: [],
+          conflicts: [],
         },
       ] as const
     const revisions = new Map([
@@ -818,7 +915,8 @@ describe("the review (ADR-0047)", () => {
 describe("the update and stack messages", () => {
   const details = {
     lane: LANE,
-    base: { kind: "line" as const, bookmark: "pineta-onto" },
+    from: { kind: "line" as const },
+    bookmark: "pineta-onto",
     merged: COPY,
     commits: ["feat: yours"],
     files: ["a.txt", "c.txt"],
@@ -831,15 +929,38 @@ describe("the update and stack messages", () => {
     expect(renderableMessage(m)).toEqual({
       role: "update",
       content: "↓ caught up with the project: 2 files changed",
+      merged: [COPY],
     })
     expect(m.content).toContain("pineta-onto was merged into this thread")
     const wip = {
       ...details,
-      base: { kind: "wip" as const, bookmark: "wip/a" },
+      from: { kind: "wip" as const, bookmark: "wip/a" },
+      bookmark: "wip/a",
     }
     expect(renderableMessage(encodeUpdate(wip, 5))).toMatchObject({
       content: "↓ caught up with wip/a: 2 files changed",
     })
+  })
+  test("an update from the thread it branched from names it, for the column and the model (ADR-0072)", () => {
+    const fromParent = {
+      ...details,
+      from: {
+        kind: "parent" as const,
+        lane: laneNameForThread("p"),
+        name: "amber-fox" as ThreadName,
+      },
+      bookmark: null,
+    }
+    const m = encodeUpdate(fromParent, 5)
+    expect(decodeUpdate(structuredClone(m))).toEqual(fromParent)
+    expect(renderableMessage(m)).toEqual({
+      role: "update",
+      content: "↓ caught up with amber-fox: 2 files changed",
+      merged: [COPY],
+    })
+    expect(m.content).toContain(
+      "The work of the thread this one branched from (amber-fox) was merged",
+    )
   })
   test("a stack message names where it starts and ends, and the bookmark to set", () => {
     const m = planStack({

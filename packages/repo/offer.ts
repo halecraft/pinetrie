@@ -18,6 +18,7 @@ import {
   type LaneBase,
   type LaneName,
   type OfferInRepo,
+  type OfferLedger,
   type OfferRevision,
   offerLedger,
   type RevisionFacts,
@@ -31,6 +32,7 @@ import {
 import {
   bookmarkRevset,
   commitsOf,
+  conflictedFilesAt,
   describeFailure,
   type LineConfig,
   laneTipName,
@@ -301,6 +303,25 @@ export async function offerRevisions(
 }
 
 /**
+ * The files conflicted at an offer's start, as its ledger names it: read
+ * only when the offer conflicts, since only then can its conflict have come
+ * with the lane's copy (`conflictCause`, ADR-0072). A start your repo no
+ * longer has names none.
+ */
+export async function startConflictsOf(
+  jj: Runner,
+  ledger: OfferLedger | null,
+  conflicts: readonly string[],
+): Promise<readonly string[]> {
+  if (conflicts.length === 0 || ledger === null) return []
+  const files = new Set<string>()
+  for (const commit of ledger.start)
+    for (const f of await conflictedFilesAt(jj, commit).catch(() => []))
+      files.add(f)
+  return [...files].sort()
+}
+
+/**
  * An offer as your repo holds it now (`OfferInRepo`): its revisions and
  * what each one's evolog says since the host's newest version, its ledger
  * and first line, where it sits, its files and conflicts. Null when its
@@ -358,16 +379,7 @@ export async function readOffer(
       "--name-only",
     ]),
   )
-  const conflicts = lines(
-    await query(jj, [
-      "file",
-      "list",
-      "-r",
-      top,
-      "-T",
-      'if(conflict, path ++ "\\n")',
-    ]),
-  )
+  const conflicts = await conflictedFilesAt(jj, top)
   const message = await query(jj, [
     "log",
     "--no-graph",
@@ -376,16 +388,18 @@ export async function readOffer(
     "-T",
     "description",
   ])
+  const ledger = offerLedger(message)
   return {
     kind: "offer",
     revisions,
     chained,
-    ledger: offerLedger(message),
+    ledger,
     firstLine: message.split("\n")[0] ?? "",
     placed,
     onTarget,
     files,
     conflicts,
+    startConflicts: await startConflictsOf(jj, ledger, conflicts),
   }
 }
 

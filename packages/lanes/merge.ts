@@ -20,6 +20,7 @@ import {
   changedPaths,
   commitsOf,
   commitToBookmark,
+  conflictedFilesAt,
   titlesOf,
 } from "./revisions.ts"
 import { describeFailure, lines, type Runner } from "./run.ts"
@@ -117,21 +118,41 @@ export async function newestBase(
   return base === null ? null : { at, ...base }
 }
 
+/**
+ * Of a merge's `conflicted` files, those its two sides hold alike: not among
+ * the files that `differ` between them. Pure.
+ */
+export const heldAlike = (
+  conflicted: readonly string[],
+  differ: readonly string[],
+): readonly string[] => {
+  const differing = new Set(differ)
+  return conflicted.filter(f => !differing.has(f))
+}
+
+/** `files` restored from `from` into `into`, rewriting it; the bookmark on it follows. */
+async function restoreInto(
+  jj: Runner,
+  from: CommitId,
+  into: CommitId,
+  files: readonly string[],
+): Promise<void> {
+  const ran = await jj([
+    "restore",
+    "--from",
+    from,
+    "--into",
+    into,
+    ...files.map(f => `root-file:${JSON.stringify(f)}`),
+  ])
+  if (!ran.ok) throw new Error(describeFailure("jj restore", ran))
+}
+
 /** The files with conflicts in the lane's working copy. */
 export async function conflictsIn(jj: Runner): Promise<string[]> {
   const snap = await jj(["util", "snapshot"])
   if (!snap.ok) throw new Error(describeFailure("jj util snapshot", snap))
-  const ran = await jj([
-    "file",
-    "list",
-    "--ignore-working-copy",
-    "-r",
-    "@",
-    "-T",
-    'if(conflict, path ++ "\\n")',
-  ])
-  if (!ran.ok) throw new Error(describeFailure("jj file list", ran))
-  return lines(ran.stdout)
+  return conflictedFilesAt(jj, "@")
 }
 
 /**
@@ -239,21 +260,31 @@ export async function mergeUpdate(
   const [from] =
     plan.source === "copy" ? await commitsOf(jj, "@-") : [plan.source]
   if (from === undefined) throw new Error("the WIP's copy is missing")
-  const { ours, merge } = await mergeBase(jj, lane, from, plan.message)
-  if (merge === null)
+  const { ours, merge: made } = await mergeBase(jj, lane, from, plan.message)
+  if (made === null)
     return {
       kind: "nothing",
       ours,
       mark: plan.mark ? await markBase(jj, lane, plan.message) : null,
     }
-  const conflicted = await conflictsIn(jj)
+  let merge = made
+  let conflicted = await conflictsIn(jj)
+  // A file both sides hold alike is merged whatever the base says: jj keeps
+  // a conflict when the base is itself conflicted, as when a branch and the
+  // thread it was cloned from resolved the same conflict alike (S99).
+  const alike = heldAlike(conflicted, await changedPaths(jj, ours, from))
+  if (alike.length > 0) {
+    await restoreInto(jj, from, merge, alike)
+    merge = await laneHead(jj, lane)
+    conflicted = await conflictsIn(jj)
+  }
   if (conflicted.length === 0)
     return {
       kind: "clean",
       from,
       ours,
       merge,
-      files: await changedPaths(runners.lane, ours, merge),
+      files: await changedPaths(jj, ours, merge),
       commits: await titlesOf(jj, `${plan.came.from ?? ours}..${plan.came.to}`),
     }
   const contents: { path: string; content: string }[] = []

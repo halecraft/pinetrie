@@ -9,6 +9,7 @@ import {
   type CardId,
   type CardRecord,
   type ColumnView,
+  conflictsAt,
   type EntryId,
   type LaneView,
   messageAt,
@@ -51,6 +52,7 @@ import type { FoldMemory } from "./ask-fold.ts"
 import { askWords, DENSITIES, type Density, densityWords } from "./ask-words.ts"
 import { CardEditor, QueuedCardEditor } from "./card-editor.tsx"
 import {
+  type CatchUps,
   closeAskWords,
   DISCARD,
   KEEP_IN_INVENTORY,
@@ -68,6 +70,7 @@ import {
   type HeadOrigin,
   headLane,
   identityWords,
+  parentOfLane,
   type ReserveStep,
   type ReviewTarget,
   START_WORDS,
@@ -363,7 +366,7 @@ export function Column(p: ColumnProps) {
   )
   // Whether the reader opened the thread's details here, since the column
   // mounted: they spin only then, and not when a reload or a tab switch
-  // mounts them open (ADR-0071), as a banner there at mount does not fade.
+  // mounts them open (ADR-0073), as a banner there at mount does not fade.
   const [openedHere, setOpenedHere] = useState(false)
   const working = workingWords(running, askLine(runningAsk))
   // The cards at this column's end (ADR-0048): yours, which the composer
@@ -390,9 +393,26 @@ export function Column(p: ColumnProps) {
           p.lanes,
           index,
         )
-  // What a card's command catches up with (ADR-0060).
-  const threadBase = effectiveBase(
-    lane.kind === "lane" ? (p.work.bases.get(lane.name) ?? null) : null,
+  // What a card's command catches up with: the thread's base (ADR-0060),
+  // or the thread it branched from (ADR-0072).
+  const parent =
+    lane.kind === "lane"
+      ? parentOfLane(index, p.work, p.lanes, lane.name)
+      : null
+  const baseRecord =
+    lane.kind === "lane" ? (p.work.bases.get(lane.name) ?? null) : null
+  // One object while what it says is the same: the composer is memoised.
+  const parentLane = parent?.lane ?? null
+  const parentName = parent?.name ?? null
+  const catchUps: CatchUps = useMemo(
+    () => ({
+      base: effectiveBase(baseRecord),
+      parent:
+        parentLane === null || parentName === null
+          ? null
+          : { kind: "parent", lane: parentLane, name: parentName },
+    }),
+    [baseRecord, parentLane, parentName],
   )
   // Your last offer command on this lane: in flight, refused or failed.
   const acting = useSyncExternalStore(
@@ -499,14 +519,23 @@ export function Column(p: ColumnProps) {
         to: to.bookmark,
       })
     }
-    if (button !== "update" && button !== "resolve" && button !== "continue")
+    if (
+      button !== "update" &&
+      button !== "continue" &&
+      button !== "catch-up-parent"
+    )
       return act({ kind: "offer", lane: lane.name, action: button, to: null })
     if (at.kind !== "entry") return
     const root = p.session.rootOf(at.id)
     if (root === undefined) return
     act({
       kind: "bringUpToDate",
-      command: button === "continue" ? "continue-on-line" : "bring-up-to-date",
+      command:
+        button === "continue"
+          ? "continue-on-line"
+          : button === "catch-up-parent"
+            ? "catch-up-with-parent"
+            : "bring-up-to-date",
       lane: lane.name,
       at,
       create: {
@@ -519,13 +548,17 @@ export function Column(p: ColumnProps) {
       },
     })
   }
-  // Where a lane this column's next send creates would work, before a choice.
+  // Where a lane this column's next send creates would work, before a choice,
+  // and what its copy would start with.
+  const above = nearestRevision(index, p.work.revisions, at)
   const defaultWork = workFor({
     choice: null,
-    above: nearestRevision(index, p.work.revisions, at).lane,
+    above: above.lane,
     lanes: p.work.lanes,
     project: p.work.project,
   })
+  const forkConflicts =
+    above.commit === null ? [] : conflictsAt(p.work.revisions, above.commit)
 
   // Every card here but the one the composer shows: everyone else's, and
   // any other of yours, such as one someone unqueued while you typed this
@@ -804,7 +837,7 @@ export function Column(p: ColumnProps) {
                 readOnly={p.readOnly}
                 reader={reader}
                 session={p.session}
-                threadBase={threadBase}
+                catchUps={catchUps}
               />
             ))}
             {refused.map(r => (
@@ -863,7 +896,7 @@ export function Column(p: ColumnProps) {
                 seats={p.seats}
                 session={p.session}
                 takeFocus={undefined}
-                threadBase={threadBase}
+                catchUps={catchUps}
                 where={undefined}
               />
             ))}
@@ -894,6 +927,7 @@ export function Column(p: ColumnProps) {
             defaultWork,
             project: p.work.project,
             line: p.work.line,
+            forkConflicts: forkConflicts.length,
             usedDirs: [
               ...new Set(
                 [...p.work.lanes.values()].flatMap(r =>
@@ -917,7 +951,7 @@ export function Column(p: ColumnProps) {
           onIntent={p.onIntent}
           onTyping={p.onTyping}
           takeFocus={() => p.takeFocus(p.column.key)}
-          threadBase={threadBase}
+          catchUps={catchUps}
           putColumn={putColumn}
           participants={p.participants}
           pending={p.column.fresh?.pending}
@@ -1046,7 +1080,7 @@ function BannerImage({ url, fade }: { url: string; fade: boolean }) {
 
 /**
  * Who works in the column: its lane's name, which opens or closes the
- * thread's details (ADR-0071); a lane about to start; or nothing, in a
+ * thread's details (ADR-0073); a lane about to start; or nothing, in a
  * conversation. Its mark pulses while the lane runs. The name's chevron is
  * CSS, so its text is the mark and the name alone.
  */
@@ -1092,7 +1126,7 @@ function Identity({
 }
 
 /**
- * A named thread's details, under its header (ADR-0071): its mark
+ * A named thread's details, under its header (ADR-0073): its mark
  * magnified, its name, who started it and where it works, what it works on
  * now, whether its base has moved on, and where its lane started on this
  * path. The mark is `ThreadMark` itself, scaled by CSS. It spins as the

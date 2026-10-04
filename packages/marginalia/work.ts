@@ -10,18 +10,23 @@
 
 import {
   type Above,
+  ancestry,
   BASE_SNAPSHOT,
   type BannerRecord,
   type BaseMerge,
   type BaseRecord,
+  type CatchUpFrom,
   type CommandSummary,
   type CommitId,
   commitId,
+  conflictsAt,
   type EntryId,
   ERR,
   type ErrCode,
   entryId,
   type ForkStart,
+  firstPromptOf,
+  forkParent,
   HOST_WORKING_COPY,
   isLaneName,
   isRootId,
@@ -31,20 +36,24 @@ import {
   type LaneName,
   type LaneRecord,
   type LineRecord,
+  messageAt,
   type NameRecord,
+  nearestRevision,
   type OfferRecord,
+  type ParentThread,
   type ProjectRecord,
   type RevisionRecord,
   type SnapshotId,
   snapshotId,
   type ThreadBase,
   type ThreadName,
+  type TreeIndex,
   type WriterId,
 } from "@pineta/core"
 import { Type } from "typebox"
 import { decodeAt, entryKey, fixedKey, laneKey, textKey } from "./decode.ts"
 import type { LandDetails } from "./land.ts"
-import { effectiveBase } from "./offer.ts"
+import { effectiveBase, parentAhead } from "./offer.ts"
 import type { RecordSpec } from "./records.ts"
 
 /** The one `pineta.line` value's key: a host follows one line. */
@@ -78,6 +87,8 @@ const RevisionRecordSchema = Type.Object({
   ),
   // Absent in records written before turns recorded their paths (ADR-0056).
   paths: Type.Optional(Type.Array(Type.String())),
+  // Absent in records written before they recorded conflicts (ADR-0072).
+  conflicts: Type.Optional(Type.Array(Type.String())),
 })
 
 const ProjectRecordSchema = Type.Union([
@@ -119,6 +130,8 @@ const OfferRecordSchema = Type.Object({
   stale: Type.Boolean(),
   files: Type.Array(Type.String()),
   conflicts: Type.Array(Type.String()),
+  // Absent from a record written before it (ADR-0072): read as none.
+  startConflicts: Type.Optional(Type.Array(Type.String())),
   yourEdits: Type.Array(Type.String()),
   described: Type.Boolean(),
   edited: Type.Boolean(),
@@ -231,7 +244,7 @@ export const LANE: RecordSpec<LaneRecord, LaneName, "session"> = {
     ),
 }
 
-/** The commit and disk at an entry, and its turn's paths, at the entry. */
+/** The commit and disk at an entry, and its turn's paths and conflicts, at the entry. */
 export const REVISION: RecordSpec<RevisionRecord, EntryId, "root"> = {
   namespace: "pineta.revision",
   home: "root",
@@ -239,6 +252,7 @@ export const REVISION: RecordSpec<RevisionRecord, EntryId, "root"> = {
   encode: ({ entry, ...contents }) => ({
     ...contents,
     paths: [...contents.paths],
+    conflicts: [...contents.conflicts],
   }),
   decode: (contents, key) =>
     decodeAt(RevisionRecordSchema, contents, entryKey(key), (r, entry) =>
@@ -252,6 +266,7 @@ export const REVISION: RecordSpec<RevisionRecord, EntryId, "root"> = {
                 ? null
                 : snapshotId(r.snapshot),
             paths: r.paths ?? [],
+            conflicts: r.conflicts ?? [],
           }
         : undefined,
     ),
@@ -287,6 +302,7 @@ export const OFFER: RecordSpec<OfferRecord, LaneName, "session"> = {
     ...contents,
     files: [...contents.files],
     conflicts: [...contents.conflicts],
+    startConflicts: [...contents.startConflicts],
     yourEdits: [...contents.yourEdits],
     commits: [...contents.commits],
     ledger:
@@ -303,6 +319,7 @@ export const OFFER: RecordSpec<OfferRecord, LaneName, "session"> = {
       stale: r.stale,
       files: r.files,
       conflicts: r.conflicts,
+      startConflicts: r.startConflicts ?? [],
       yourEdits: r.yourEdits,
       described: r.described,
       edited: r.edited,
@@ -492,6 +509,8 @@ export const landingRecord = (input: {
  * its disk was at even after its base moved. A lane working directly records
  * its prompts only, with neither. Only a turn's own commit carries the paths
  * it changed: a prompt's newest revision is what came before it (ADR-0056).
+ * Every record with a commit carries that commit's conflicts, so a branch
+ * from any of them knows its copy's (ADR-0072).
  */
 export function planTurnRecord(input: {
   readonly entry: EntryId
@@ -508,11 +527,13 @@ export function planTurnRecord(input: {
   readonly snapshot: SnapshotId | null
   /** The paths `committed` changed (`changedPaths`); none without one. */
   readonly paths: readonly string[]
+  /** The files conflicted in the commit the record names: `committed`, else `newest`. */
+  readonly conflicts: readonly string[]
 }): RevisionRecord | null {
   const { entry, lane } = input
   if (!input.own)
     return input.isPrompt
-      ? { entry, lane, commit: null, snapshot: null, paths: [] }
+      ? { entry, lane, commit: null, snapshot: null, paths: [], conflicts: [] }
       : null
   if (!input.isPrompt && !input.toolCalls && input.committed === null)
     return null
@@ -523,6 +544,7 @@ export function planTurnRecord(input: {
     commit,
     snapshot: input.snapshot,
     paths: input.committed === null ? [] : input.paths,
+    conflicts: commit === null ? [] : input.conflicts,
   }
 }
 
@@ -563,8 +585,15 @@ export type UpdateFrom =
   /** The WIP already holds nothing the lane lacks. */
   | { readonly kind: "nothing" }
 
-/** Why an update is refused: no line, or a WIP gone without landing. */
-export type UpdateRefusal = typeof ERR.NO_LINE | typeof ERR.BASE_GONE
+/**
+ * Why an update is refused: no line, or a WIP gone without landing; for a
+ * catch-up with the parent, none, or its agent running (ADR-0072).
+ */
+export type UpdateRefusal =
+  | typeof ERR.NO_LINE
+  | typeof ERR.BASE_GONE
+  | typeof ERR.NO_PARENT
+  | typeof ERR.PARENT_RUNNING
 
 /**
  * What bringing a thread up to date merges (ADR-0060): the base the thread
@@ -610,13 +639,108 @@ export function planUpdateFrom(input: {
     : { kind: "wip", bookmark: followed.bookmark, ...wipNow, on: base.start }
 }
 
+/** The thread a lane branched from, as the document says it now (`parentNow`, ADR-0072). */
+export interface ParentNow extends ParentThread {
+  /** Its newest commit: the nearest above its thread's end. */
+  readonly newest: CommitId
+  /** The newest of its commits this lane holds: its fork commit, or what a catch-up merged. */
+  readonly taken: CommitId
+  /** The files conflicted in `newest` (`conflictsAt`). */
+  readonly conflicts: readonly string[]
+}
+
 /**
- * A thread's base as people read it: the integration line is "the project",
- * whatever its bookmark is called; a WIP is its bookmark. The one place a
- * base is worded: the bookmark of the line goes in titles only.
+ * The thread `lane` branched from (`forkParent`) and where both stand, read
+ * from the document alone: a lane's commits only move forward along its
+ * bookmark, so the parent is ahead exactly when its newest commit is not the
+ * one this lane last took. What it took is the fork commit, or the newest
+ * commit of the parent's that an update or a resolution below the lane's
+ * first prompt merged. Null for a lane that began at its base, or a parent
+ * with no name or no commit yet. Pure.
  */
-export const baseName = (base: ThreadBase): string =>
-  base.kind === "line" ? "the project" : base.bookmark
+export function parentNow(input: {
+  readonly index: TreeIndex
+  readonly revisions: ReadonlyMap<EntryId, RevisionRecord>
+  readonly lane: LaneName
+  /** The lane's thread's end. */
+  readonly tip: EntryId | null
+  /** Each lane's thread's end. */
+  readonly tipOf: (lane: LaneName) => EntryId | null
+  readonly names: ReadonlyMap<LaneName, ThreadName>
+}): ParentNow | null {
+  const { index, revisions, tip } = input
+  const fork = forkParent(index, revisions, input.lane, tip)
+  if (fork === null || tip === null) return null
+  const name = input.names.get(fork.lane)
+  const parentTip = input.tipOf(fork.lane)
+  const newest =
+    parentTip === null
+      ? null
+      : nearestRevision(index, revisions, { kind: "entry", id: parentTip })
+          .commit
+  if (name === undefined || newest === null) return null
+  const parents = new Set(
+    [...revisions.values()].flatMap(r =>
+      r.lane === fork.lane && r.commit !== null ? [r.commit] : [],
+    ),
+  )
+  const first = firstPromptOf(index, revisions, input.lane, tip)
+  let taken = fork.commit
+  for (const id of ancestry(index, tip).path) {
+    const merged = messageAt(index, id)?.merged?.find(c => parents.has(c))
+    if (merged !== undefined) {
+      taken = merged
+      break
+    }
+    if (id === first) break
+  }
+  return {
+    kind: "parent",
+    lane: fork.lane,
+    name,
+    newest,
+    taken,
+    conflicts: conflictsAt(revisions, newest),
+  }
+}
+
+/**
+ * What catching up with the parent merges (ADR-0072): its newest commit;
+ * nothing when the lane holds it; refused with no parent, or while the
+ * parent's agent runs, since its copy moves with every turn. Pure.
+ */
+export function planParentUpdate(
+  parent: ParentNow | null,
+  running: boolean,
+):
+  | Extract<BaseMerge, { readonly kind: "parent" }>
+  | { readonly kind: "nothing" }
+  | typeof ERR.NO_PARENT
+  | typeof ERR.PARENT_RUNNING {
+  if (parent === null) return ERR.NO_PARENT
+  if (running) return ERR.PARENT_RUNNING
+  if (!parentAhead(parent)) return { kind: "nothing" }
+  return {
+    kind: "parent",
+    lane: parent.lane,
+    name: parent.name,
+    commit: parent.newest,
+    taken: parent.taken,
+  }
+}
+
+/**
+ * What a catch-up merges, as people read it: the integration line is "the
+ * project", whatever its bookmark is called; a WIP is its bookmark; the
+ * thread a thread branched from is its name (ADR-0072). The one place it is
+ * worded: the bookmark of the line goes in titles only.
+ */
+export const catchUpName = (from: CatchUpFrom): string =>
+  from.kind === "line"
+    ? "the project"
+    : from.kind === "wip"
+      ? from.bookmark
+      : from.name
 
 /**
  * A WIP base's state (ADR-0060): landed when its bookmark points into the

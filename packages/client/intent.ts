@@ -75,7 +75,7 @@ export type ColumnAct =
   | { readonly kind: "move"; readonly to: number }
   /** Read the column at `density` (ADR-0056). */
   | { readonly kind: "density"; readonly density: Density }
-  /** Open or close the thread's details under the header (ADR-0071). */
+  /** Open or close the thread's details under the header (ADR-0073). */
   | { readonly kind: "details"; readonly open: boolean }
   /** A fresh column's first send, as send `sendId`. */
   | { readonly kind: "sent"; readonly key: string; readonly sendId: string }

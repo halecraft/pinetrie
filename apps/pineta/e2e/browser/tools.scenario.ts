@@ -1734,7 +1734,9 @@ async function run(
             capsule.count >= 30 &&
             capsule.span === 1 + String(capsule.count).length &&
             capsule.height > 8 &&
-            capsule.label.endsWith("· 1 failed") &&
+            // Its first line counts; a digest, on by default (ADR-0071),
+            // follows on the next.
+            (capsule.label.split("\n")[0] ?? "").endsWith("· 1 failed") &&
             capsule.fill === "agent" &&
             accounted === loopRows.length,
           `${capsule?.count ?? 0} messages, ${capsule?.span ?? 0} rows, ${capsule?.fill ?? "no"} fill, "${capsule?.label ?? ""}"; ${accounted} of ${loopRows.length} accounted for`,

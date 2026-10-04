@@ -13,7 +13,7 @@ test("forkFacts reads nothing before every pending turn record is written", asyn
     pendingRecords: () => pending.promise,
     nearest: () => {
       read.push("nearest")
-      return { lane: null, commit: null, snapshot: null }
+      return { lane: null, commit: null, commitLane: null, snapshot: null }
     },
     begin: async () => {
       read.push("begin")

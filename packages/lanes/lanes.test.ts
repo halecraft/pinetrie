@@ -1,14 +1,14 @@
 import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { entryId, laneNameForThread, WORKSPACE_ROOT } from "@pineta/core"
+import { entryId, laneNameForThread } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import {
   changedPaths,
   commitsOf,
+  conflictedFilesAt,
   entryOfMessage,
   execute,
-  hostRunner,
   type LaneStep,
   type Ran,
   type Runner,
@@ -60,13 +60,11 @@ describe("execute", () => {
   })
 })
 
-test("changedPaths: a path with a space and an accent comes back as it is named (S70)", async () => {
+test("changedPaths: a path with a space and an accent comes back as it is named (S70), and a conflicted commit's paths are its files (S99)", async () => {
   const dir = await realpath(
     await mkdtemp(path.join(tmpdir(), "pineta-paths-")),
   )
   try {
-    const git: Runner = args =>
-      hostRunner(dir)(args.map(a => (a === WORKSPACE_ROOT ? dir : a)))
     const env = {
       ...process.env,
       JJ_USER: "Probe",
@@ -74,7 +72,7 @@ test("changedPaths: a path with a space and an accent comes back as it is named 
     }
     await run("jj", ["git", "init", "--colocate", dir], { env })
     const jj = (args: string[]) => run("jj", ["-R", dir, ...args], { env })
-    const jjAt: Runner = args => run("jj", ["-R", dir, ...args])
+    const jjAt: Runner = args => run("jj", ["-R", dir, ...args], { env })
     await writeFile(path.join(dir, "a.txt"), "a\n")
     await jj(["commit", "-m", "one"])
     const [from] = await commitsOf(jjAt, "@-")
@@ -83,7 +81,29 @@ test("changedPaths: a path with a space and an accent comes back as it is named 
     await jj(["commit", "-m", "two"])
     const [to] = await commitsOf(jjAt, "@-")
     if (from === undefined || to === undefined) throw new Error("no commits")
-    expect(await changedPaths(git, from, to)).toEqual(["d/c é.txt"])
+    expect(await changedPaths(jjAt, from, to)).toEqual(["d/c é.txt"])
+    // Two sides change one file; their merge conflicts, and a commit
+    // resolves it. Git would list every side's tree under `.jjconflict-*`.
+    await writeFile(path.join(dir, "a.txt"), "left\n")
+    await jj(["commit", "-m", "left"])
+    const [left] = await commitsOf(jjAt, "@-")
+    await jj(["new", from])
+    await writeFile(path.join(dir, "a.txt"), "right\n")
+    await jj(["commit", "-m", "right"])
+    const [right] = await commitsOf(jjAt, "@-")
+    if (left === undefined || right === undefined) throw new Error("no sides")
+    await jj(["new", left, right])
+    await jj(["commit", "-m", "merge"])
+    const [merged] = await commitsOf(jjAt, "@-")
+    if (merged === undefined) throw new Error("no merge")
+    expect(await conflictedFilesAt(jjAt, merged)).toEqual(["a.txt"])
+    await writeFile(path.join(dir, "a.txt"), "both\n")
+    await jj(["commit", "-m", "resolved"])
+    const [resolved] = await commitsOf(jjAt, "@-")
+    if (resolved === undefined) throw new Error("no resolution")
+    expect(await changedPaths(jjAt, merged, resolved)).toEqual(["a.txt"])
+    expect(await changedPaths(jjAt, null, resolved)).toEqual(["a.txt"])
+    expect(await conflictedFilesAt(jjAt, resolved)).toEqual([])
   } finally {
     await rm(dir, { recursive: true, force: true })
   }

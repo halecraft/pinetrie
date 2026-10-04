@@ -1,4 +1,9 @@
-import { cardId, writerId } from "@pineta/core"
+import {
+  cardId,
+  laneNameForThread,
+  type ThreadName,
+  writerId,
+} from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import type { Refusal } from "./card-moves.ts"
 import {
@@ -27,23 +32,52 @@ describe("card words", () => {
   test.each([
     [
       "commandWords, on the line",
-      commandWords("bring-up-to-date", { kind: "line" }),
+      commandWords("bring-up-to-date", {
+        base: { kind: "line" },
+        parent: null,
+      }),
       "catch up with the project",
     ],
     [
       "commandWords, on a WIP",
-      commandWords("bring-up-to-date", { kind: "wip", bookmark: "wip/a" }),
+      commandWords("bring-up-to-date", {
+        base: { kind: "wip", bookmark: "wip/a" },
+        parent: null,
+      }),
       "catch up with wip/a",
     ],
     [
       "commandWords, a WIP gone",
-      commandWords("continue-on-line", { kind: "line" }),
+      commandWords("continue-on-line", {
+        base: { kind: "line" },
+        parent: null,
+      }),
       "continue from the project",
     ],
     [
       "commandNote",
-      commandNote("bring-up-to-date", { kind: "line" }),
+      commandNote("bring-up-to-date", { base: { kind: "line" }, parent: null }),
       "↓ catches up with the project first, then sends what you write",
+    ],
+    [
+      "commandWords, the thread it branched from (ADR-0072)",
+      commandWords("catch-up-with-parent", {
+        base: { kind: "line" },
+        parent: {
+          kind: "parent",
+          lane: laneNameForThread("p"),
+          name: "amber-fox" as ThreadName,
+        },
+      }),
+      "catch up with amber-fox",
+    ],
+    [
+      "commandNote, the thread it branched from, unknown",
+      commandNote("catch-up-with-parent", {
+        base: { kind: "line" },
+        parent: null,
+      }),
+      "↓ catches up with the thread this one branched from first, then sends what you write",
     ],
     [
       "queuedWords, yours",

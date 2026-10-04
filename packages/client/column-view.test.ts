@@ -18,7 +18,12 @@ import {
   type TreeIndex,
   writerId,
 } from "@pineta/core"
-import { type CatchUpNow, offerStatus, offerView } from "@pineta/marginalia"
+import {
+  type CatchUpNow,
+  offerStatus,
+  offerView,
+  type ParentNow,
+} from "@pineta/marginalia"
 import { describe, expect, test } from "vitest"
 import type { OfferActing } from "./acting.ts"
 import {
@@ -67,7 +72,14 @@ const revisions = (
   new Map(
     Object.entries(owners).map(([id, lane]) => [
       entryId(id),
-      { entry: entryId(id), lane, commit: null, snapshot: null, paths: [] },
+      {
+        entry: entryId(id),
+        lane,
+        commit: null,
+        snapshot: null,
+        paths: [],
+        conflicts: [],
+      },
     ]),
   )
 const stretches = (
@@ -354,7 +366,7 @@ describe("columnView: the header", () => {
   })
 })
 
-describe("columnView: a thread's details (ADR-0071)", () => {
+describe("columnView: a thread's details (ADR-0073)", () => {
   const detailsOf = (shows: ReturnType<typeof columnView>) =>
     shows.identity.kind === "agent" ? shows.identity.details : null
   const onB = (over: Partial<ColumnFacts> = {}) =>
@@ -501,6 +513,7 @@ describe("columnView: the work strip", () => {
       stale: false,
       files: ["a.txt"],
       conflicts: [],
+      startConflicts: [],
       yourEdits: ["a.txt"],
       described: true,
       edited: false,
@@ -608,6 +621,7 @@ describe("offerWords", () => {
     stale: false,
     files: ["a.txt", "b.txt"],
     conflicts: [],
+    startConflicts: [],
     yourEdits: [],
     described: true,
     edited: false,
@@ -626,6 +640,8 @@ describe("offerWords", () => {
       catchUp?: CatchUpNow
       untraced?: boolean
       catchingUp?: boolean
+      parent?: ParentNow | null
+      parentRunning?: boolean
     } = {},
     acting: OfferActing | null = null,
   ) =>
@@ -640,6 +656,8 @@ describe("offerWords", () => {
         catchUp: catching.catchUp ?? { kind: "current" },
         untraced: catching.untraced ?? false,
         catchingUp: catching.catchingUp ?? false,
+        parent: catching.parent ?? null,
+        parentRunning: catching.parentRunning ?? false,
       }),
       acting,
     )
@@ -799,17 +817,60 @@ describe("offerWords", () => {
       "catching up with the project…",
     )
   })
-  test("only a clean offer lands on the line: a conflicted one on the line is resolved, on a WIP added anyway to it", () => {
+  test("only a clean offer lands on the line: a conflicted one on the line is caught up and resolved, on a WIP added anyway to it", () => {
     const conflicted = { ...offer, conflicts: ["a.txt"] }
     expect(words(conflicted).buttons.map(b => b.label)).toEqual([
-      "resolve in the thread",
+      "catch up with the project and resolve",
     ])
     expect(
       words(conflicted, "idle", WIP_BASE).buttons.map(b => b.label),
-    ).toEqual(["resolve in the thread", "add anyway to wip/search"])
+    ).toEqual([
+      "catch up with wip/search and resolve",
+      "add anyway to wip/search",
+    ])
     expect(
       words(conflicted, "idle", WIP_BASE).menu.map(b => b.label),
     ).not.toContain("add to the project, with your 2 commits beneath it")
+  })
+  test("a conflict that came with the copy says so, and names the thread that resolved it (ADR-0072)", () => {
+    const parent: ParentNow = {
+      kind: "parent",
+      lane: B,
+      name: "copper-owl" as ThreadName,
+      newest: commitId("p2"),
+      taken: commitId("p1"),
+      conflicts: [],
+    }
+    const fromStart = {
+      ...offer,
+      conflicts: ["a.txt"],
+      startConflicts: ["a.txt"],
+    }
+    const resolved = words(fromStart, "idle", LINE_BASE, { parent })
+    expect(resolved.line).toBe(
+      "began from a copy with an unresolved conflict in 1 file · copper-owl has resolved it",
+    )
+    expect(resolved.buttons.map(b => b.label)).toEqual([
+      "catch up with copper-owl",
+    ])
+    const unresolved = words(fromStart, "idle", LINE_BASE, {
+      parent: { ...parent, conflicts: ["a.txt"] },
+    })
+    expect(unresolved.line).toBe(
+      "began from a copy with an unresolved conflict in 1 file",
+    )
+    expect(unresolved.buttons.map(b => b.label)).toEqual([
+      "catch up with the project and resolve",
+    ])
+    const running = words(offer, "idle", LINE_BASE, {
+      parent,
+      parentRunning: true,
+    }).menu.find(b => b.button === "catch-up-parent")
+    expect(running).toMatchObject({
+      label: "catch up with copper-owl",
+      disabled: true,
+      title: "copper-owl is working: catch up when its run ends",
+    })
   })
   test("a WIP thread adds to its WIP, and offers the project with its commits", () => {
     const w = words(offer, "idle", WIP_BASE)
@@ -898,7 +959,7 @@ describe("behindMark: the header's mark for a base that moved on", () => {
         "the project has new work since this thread started, in 2 files · pineta-onto: aaaaaaaa → bbbbbbbb",
     })
   })
-  test("a thread's details say it in full (ADR-0071)", () => {
+  test("a thread's details say it in full (ADR-0073)", () => {
     const shows = columnView(
       facts(1, {
         lane: onLane(laneView(B, "b2")),

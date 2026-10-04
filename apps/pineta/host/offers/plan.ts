@@ -82,6 +82,7 @@ export function offerRecord(input: {
     stale: size > 1 && offerMoved(offer.ledger, input.place),
     files: offer.files,
     conflicts: offer.conflicts,
+    startConflicts: offer.startConflicts,
     yourEdits: offer.files.filter(f => input.editing.has(f)),
     described: !isWipLine(input.name, offer.firstLine),
     edited: offerEdited(offer),

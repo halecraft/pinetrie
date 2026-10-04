@@ -587,7 +587,7 @@ the columns read one. `segmentPath` (core) decides what a column folds;
   with no new `v`: a layout stored before it decodes. A change dispatches
   `PLACED`, so a column at its end stays there and no floor holds the
   change. Whether its thread's details are open (`Column.details`,
-  ADR-0071) is kept the same way.
+  ADR-0073) is kept the same way.
 - **Both are `ReaderAction`s, by the column's key** (`readerAction`,
   `intent.ts`), as `sent` and `reserve` are: `planColumn` sends them
   through `onColumn`, so a new tab's one column takes them
@@ -688,11 +688,28 @@ became of its files (`strip`).
   column's lane's running prompt, so it falls back to the column's lane.
   With no revisions at all (a host without a project), every asked message
   falls back, and the whole path reads as the column's lane.
-- **A base is worded by `baseName` alone** (`@pineta/marginalia`,
-  ADR-0061): the line is "the project", a WIP its bookmark. The words take
-  core's `ThreadBase`, never a bookmark string, and the line's bookmark
-  goes only in titles: `offerWords`' button titles ("moves pineta-onto
-  forward to pineta-offer/amber-fox"), `behindMark`'s, `baseChoices`'.
+- **What a catch-up merges is worded by `catchUpName` alone**
+  (`@pineta/marginalia`, ADR-0061, ADR-0072): the line is "the project", a
+  WIP its bookmark, the thread a thread branched from its name. The words
+  take core's `CatchUpFrom`, never a bookmark string, and the line's
+  bookmark goes only in titles: `offerWords`' button titles ("moves
+  pineta-onto forward to pineta-offer/amber-fox"), `behindMark`'s,
+  `baseChoices`'. A card's command is worded from `CatchUps` (the thread's
+  base and its parent), which `Column` keeps as one object while it says
+  the same, since the composer is memoised.
+- **The thread a thread branched from** (`parentOfLane`, `parentNow`,
+  ADR-0072) is read from the column's tree, the revisions and each lane's
+  thread end, with no read of your repo. `offerView` takes it and whether
+  its lane runs. A conflicted offer whose conflict came with its copy says
+  "began from a copy with an unresolved conflict in N files", adding "·
+  \<parent\> has resolved it" with "catch up with \<parent\>" as its button
+  when the parent holds those files resolved; every other conflicted offer's
+  button is "catch up with \<base\> and resolve". The parent's catch-up,
+  quiet while it runs, is titled why.
+- **A branch from a conflicted copy is warned** (`forkWords`, ADR-0072): a
+  column whose next send creates a lane of its own, at a commit whose
+  records carry conflicts (`conflictsAt` of `nearestRevision`'s commit),
+  shows `.where-fork-conflict` under the where line.
 - **A take names the offer this tab shows** (ADR-0065): `SessionClient.offer`
   reads the lane's record from its session document as it sends, the one
   the strip was drawn from, and sends `offerSeen` of it (its ledger, and
@@ -711,7 +728,7 @@ became of its files (`strip`).
   its buttons and menu rows while it is `sent`, and `offerWords` words it
   as the strip's `note` (`.offer-note`, `role="status"`, `data-acting`
   `sent` or `said`). A take in flight names its destination by
-  `baseName`; a refusal or failure is `outcomeWords`, shared with the
+  `catchUpName`; a refusal or failure is `outcomeWords`, shared with the
   project menu.
 - **`offerView` (`@pineta/marginalia`) decides an offer; `offerWords`
   words it**: its line and each button's label and title, by state. An
@@ -763,7 +780,7 @@ became of its files (`strip`).
 - **The origin row and the details' "where it started" are `openAt`
   intents** (`planOpen`), which reveal the entry in whichever column shows
   it. A column's lane may have started in a column to its left.
-- **A named thread's details (ADR-0071) are `ThreadDetails`**, built by
+- **A named thread's details (ADR-0073) are `ThreadDetails`**, built by
   `detailsOf` and carried in `HeadIdentity`'s agent variant, so a pending or
   absent identity cannot have any, by type. The name is their toggle
   (`aria-expanded`); its chevron is `::after`, so `.agent-name`'s text stays
@@ -1271,8 +1288,8 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   the host carries the command out when it takes it.
 - **Land, update and stack messages** show as one line each, roles `land`
   ("catching up"), `update` ("caught up") and `stack`. The update's line
-  is marginalia's `updateLine`, which names its base by `baseName` from
-  the update's stored `line` flag.
+  is marginalia's `updateLine`, which names what it merged by
+  `catchUpName`.
 - **The page header counts offers open** in your repo ("work ready to add to
   the project"), as it counts mentions, and the agent's running threads;
   each row leads with the thread's name and opens its thread. Archive in a

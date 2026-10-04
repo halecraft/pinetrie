@@ -1,11 +1,13 @@
-// host/work/update — a thread's base merged into its lane, when the host
-// takes a card whose command is `bring-up-to-date` or `continue-on-line`
-// (ADR-0055, ADR-0060), and the resolution run's outcome when it conflicts
-// (ADR-0033). One step on the lane's queue gathers, plans and merges; then
+// host/work/update — a thread's base, or the thread it branched from,
+// merged into its lane, when the host takes a card with a command
+// (ADR-0055, ADR-0060, ADR-0072), and the resolution run's outcome when it
+// conflicts (ADR-0033). One step on the lane's queue gathers, plans and merges; then
 // `planSettle` decides what the thread gets, and `applySettle` writes it.
 
 import {
   type BaseMerge,
+  type CardCommand,
+  type CatchUpFrom,
   type CommitId,
   type EntryId,
   ERR,
@@ -34,11 +36,15 @@ import {
   type TouchedRevision,
 } from "@pineta/lanes"
 import {
+  catchUpName,
   decodeLand,
   encodeUpdate,
   LANDING,
   type LandMessage,
   landingRecord,
+  type ParentNow,
+  parentNow,
+  planParentUpdate,
   planResolution,
   planUpdateFrom,
   setRecord,
@@ -47,7 +53,13 @@ import {
   wipState,
 } from "@pineta/marginalia"
 import type { Agent, ThreadLaneHandle } from "@pineta/pi"
-import { readLatestPrompt, readTreeIndex } from "@pineta/reads"
+import {
+  readLatestPrompt,
+  readNames,
+  readRevisions,
+  readRunning,
+  readTreeIndex,
+} from "@pineta/reads"
 import { beginFacts, type RepoOwner, wipFacts } from "@pineta/repo"
 import { readEntryMessage, readLaneTip } from "@pineta/schema"
 import { type Basics, failed, messageOf } from "../basics.ts"
@@ -60,9 +72,16 @@ import type { Turns } from "./turns.ts"
 
 /** Why an update was refused, worded once (ADR-0060). */
 function updateRefusal(code: UpdateRefusal): string {
-  return code === ERR.NO_LINE
-    ? "set up the line first"
-    : "this thread's WIP bookmark is gone: continue it on the line"
+  switch (code) {
+    case ERR.NO_LINE:
+      return "set up the line first"
+    case ERR.BASE_GONE:
+      return "this thread's WIP bookmark is gone: continue it on the line"
+    case ERR.NO_PARENT:
+      return "this thread began from the project, not from another thread"
+    case ERR.PARENT_RUNNING:
+      return "the thread this one branched from is working: catch up when its run ends"
+  }
 }
 
 /** How long a resolution prompt's reasons may run before the oldest go (ADR-0033). */
@@ -158,7 +177,18 @@ export function planSettle(
   },
 ): Settle {
   const { lane, by, from } = ctx
-  const bookmark = from.kind === "line" ? from.onto : from.bookmark
+  const caughtUp: CatchUpFrom =
+    from.kind === "line"
+      ? { kind: "line" }
+      : from.kind === "wip"
+        ? { kind: "wip", bookmark: from.bookmark }
+        : { kind: "parent", lane: from.lane, name: from.name }
+  const bookmark =
+    from.kind === "line"
+      ? from.onto
+      : from.kind === "wip"
+        ? from.bookmark
+        : null
   switch (facts.kind) {
     case "nothing":
       return {
@@ -171,7 +201,8 @@ export function planSettle(
         message: encodeUpdate(
           {
             lane,
-            base: { kind: from.kind, bookmark },
+            from: caughtUp,
+            bookmark,
             merged: facts.from,
             files: facts.files,
             commits: facts.commits,
@@ -199,13 +230,17 @@ export function planSettle(
             },
             theirs: {
               label: "theirs",
-              who: bookmark,
+              who: bookmark ?? `the thread ${catchUpName(caughtUp)}`,
               reasons: touching(facts.theirs, path).map(d => firstLine(d, 200)),
             },
           })),
           budget: RESOLUTION_BUDGET,
           details: { landing: facts.landing, lane, yours: [facts.from], by },
           intent: ctx.intent,
+          incoming:
+            caughtUp.kind === "parent"
+              ? `The work of the thread this one branched from (${caughtUp.name})`
+              : "The project's work",
           timestamp: ctx.now,
         }),
         fetch: null,
@@ -244,8 +279,10 @@ export async function applySettle(
 
 export interface Updates {
   /**
-   * Merge the thread's base into the lane (ADR-0060): the line's commit, or a
-   * fresh copy of its WIP; with `toLine`, the line, moving the thread there.
+   * Merge what `command` names into the lane: the thread's base (ADR-0060),
+   * the line's commit or a fresh copy of its WIP; with `continue-on-line`,
+   * the line, moving the thread there; with `catch-up-with-parent`, the
+   * newest commit of the thread it branched from (ADR-0072).
    * Clean: the update is appended to the thread. Conflicted: the land
    * message for the resolution run, with `intent` (the card's text) after
    * the conflicts. Nothing new: nothing to do, but a move to the line is
@@ -255,7 +292,7 @@ export interface Updates {
     lane: LaneName,
     by: WriterId,
     intent: string,
-    toLine: boolean,
+    command: CardCommand,
   ): Promise<Prepared>
   /** A resolution run ended: its outcome, from the repository. */
   landingEnded(lane: LaneName, prompt: EntryId): Promise<void>
@@ -303,6 +340,8 @@ export function createUpdates(deps: {
       snapshot: snapped ? snapshotId(entry) : null,
       // The update belongs to no ask, so its files count toward none.
       paths: [],
+      // A clean merge.
+      conflicts: [],
     })
   }
 
@@ -321,12 +360,40 @@ export function createUpdates(deps: {
   }
 
   /**
-   * One step on the lane's queue, so nothing changes the lane between what
-   * is read and what is merged: the lane's base from its own history, the
-   * line and the WIP from your repo (a pinned read), the plan, and, unless it is refused or
-   * has nothing to merge, the edits committed and the base merged.
+   * The thread `lane` branched from, as its root's document says it now
+   * (`parentNow`), and whether its agent runs (ADR-0072).
    */
-  const updateOnQueue = (lane: LaneName, owner: RepoOwner, toLine: boolean) => {
+  async function parentOf(
+    lane: LaneName,
+  ): Promise<{ readonly now: ParentNow | null; readonly running: boolean }> {
+    const doc = await docs.laneDoc(lane)
+    if (doc === null) return { now: null, running: false }
+    const now = parentNow({
+      index: readTreeIndex(doc),
+      revisions: readRevisions(doc),
+      lane,
+      tip: readLaneTip(doc, lane),
+      tipOf: other => readLaneTip(doc, other),
+      names: readNames(docs.session),
+    })
+    return {
+      now,
+      running: now !== null && readRunning(docs.live, now.lane),
+    }
+  }
+
+  /**
+   * One step on the lane's queue, so nothing changes the lane between what
+   * is read and what is merged: what the command merges (the lane's base
+   * from its own history, the line and the WIP from your repo, a pinned
+   * read; or the parent, from the document), the plan, and, unless it is
+   * refused or has nothing to merge, the edits committed and the merge.
+   */
+  const updateOnQueue = (
+    lane: LaneName,
+    owner: RepoOwner,
+    command: CardCommand,
+  ) => {
     const handle = registry.handleOf(lane)
     const jj = registry.laneJjOf(lane)
     return handle.queue.enqueue(
@@ -338,28 +405,10 @@ export function createUpdates(deps: {
             readonly merged: Merged
           }
       > => {
-        const base = await laneBase(
-          jj,
-          bookmarkRevset(bookmarkName(lane)),
-          line,
-        )
-        // Your repo, pinned to the head its owner last observed.
-        const { state, begin } = await owner.read(async ({ jj: yours }) => ({
-          state: wipState(await wipFacts(yours, line, base)),
-          begin: await beginFacts(
-            yours,
-            line,
-            base?.base.kind === "wip" ? base.base.bookmark : null,
-          ),
-        }))
-        const from = planUpdateFrom({
-          onto: line.onto,
-          base,
-          state,
-          toLine,
-          line: begin.line,
-          wipNow: begin.wip,
-        })
+        const from =
+          command === "catch-up-with-parent"
+            ? await parentOf(lane).then(p => planParentUpdate(p.now, p.running))
+            : await baseUpdate(command === "continue-on-line")
         if (typeof from === "string") return refused(updateRefusal(from))
         if (from.kind === "nothing") return { kind: "nothing" }
         await commitEdits(lane, jj)
@@ -372,6 +421,28 @@ export function createUpdates(deps: {
         return { kind: "merged", from, merged }
       },
     )
+
+    /** What catching up with the base merges (`planUpdateFrom`). */
+    async function baseUpdate(toLine: boolean) {
+      const base = await laneBase(jj, bookmarkRevset(bookmarkName(lane)), line)
+      // Your repo, pinned to the head its owner last observed.
+      const { state, begin } = await owner.read(async ({ jj: yours }) => ({
+        state: wipState(await wipFacts(yours, line, base)),
+        begin: await beginFacts(
+          yours,
+          line,
+          base?.base.kind === "wip" ? base.base.bookmark : null,
+        ),
+      }))
+      return planUpdateFrom({
+        onto: line.onto,
+        base,
+        state,
+        toLine,
+        line: begin.line,
+        wipNow: begin.wip,
+      })
+    }
   }
 
   return {
@@ -383,7 +454,7 @@ export function createUpdates(deps: {
       return true
     },
 
-    async prepareUpdate(lane, by, intent, toLine) {
+    async prepareUpdate(lane, by, intent, command) {
       const { owner } = setup
       if (!registry.isOwn(lane) || owner === null)
         return refused("the lane has no copy of its own")
@@ -393,7 +464,7 @@ export function createUpdates(deps: {
           runEnded: () => containers.runEnded(lane),
         },
         async () => {
-          const done = await updateOnQueue(lane, owner, toLine)
+          const done = await updateOnQueue(lane, owner, command)
           if (done.kind !== "merged") return done
           const { from, merged } = done
           const facts: SettleFacts =

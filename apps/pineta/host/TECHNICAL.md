@@ -454,6 +454,12 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   merge, whose mark your repo would otherwise learn of only at a later
   fetch. Its list is `fetchLane`'s `have`: commits your repo may hold,
   which the bundle leaves out.
+- **A catch-up with the thread a thread branched from** (ADR-0072) is the
+  same step: the card's command picks the rule. Its facts come from the
+  lane's root document, not your repo (`parentNow`, with whether the
+  parent's lane runs from `pineta:live`), and `planParentUpdate` decides;
+  the parent's newest commit is fetched by id into the lane like the line's.
+  A resolution's prompt names the incoming side as that thread's work.
 - **An update stops the lane it started** (`withLaneStarted`), whatever it
   comes to, unless a resolution runs: that run's end stops it. A split
   reads its skill before `beforeRun`, so nothing between the lane's start

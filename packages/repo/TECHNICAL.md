@@ -94,7 +94,10 @@ operation is read once and kept until the head moves.**
   source, and a taken commit is a line commit.
 - **What the rows cannot say is read only when needed:** the start, when a
   taken source above the base names more (`offerStart`); a stack's files,
-  and the top's conflicted files when it conflicts. Each revision's evolog
+  and the top's conflicted files when it conflicts, with the files
+  conflicted where its ledger says it starts (`startConflictsOf`,
+  ADR-0072): `conflictCause` reads both. An unconflicted offer pays
+  nothing. Each revision's evolog
   (`sinceHost`) is always read, and whether the lane's work changes any
   file (`workChanges`) unless the start is untraced. The second is asked of
   the lane's own work, never read from the offer's files: those are a diff
@@ -251,7 +254,10 @@ operation is read once and kept until the head moves.**
   nothing. Its revisions (`offerRevisions`) are what is under the bookmark,
   not already under the target, and carries the thread's trailer:
   `(::<bookmark> ~ ::<target>) & (description(regex:"(?m)^Pineta-Thread:
-  <name>$") | <bookmark>)`. A taken offer below carries the same trailer, but
+  <name>$") | <bookmark>)`. A conflicted offer's `startConflicts` are the
+  files conflicted at each commit its `Pineta-Start` names
+  (`startConflictsOf`, shared with `gatherLane`); a start your repo lacks
+  names none. A taken offer below carries the same trailer, but
   is under the target; your commits carry none. The bookmark's own commit
   is always the top. A conflicted bookmark, or a change id naming two
   commits, reads as divergent, with only the change ids. Every read after

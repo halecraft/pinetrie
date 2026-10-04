@@ -1,14 +1,18 @@
 import {
   BASE_SNAPSHOT,
+  type CommitId,
   commitId,
+  type EntryLike,
   ERR,
   entryId,
+  indexTree,
   type LandingRecord,
   type LaneBase,
   laneNameForThread,
   type RevisionRecord,
   rootIdFor,
   snapshotId,
+  type ThreadName,
   writerId,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
@@ -21,7 +25,9 @@ import {
   landingOutcome,
   landingRecord,
   PROJECT,
+  parentNow,
   planBegin,
+  planParentUpdate,
   planResolution,
   planRetention,
   planTurnRecord,
@@ -53,6 +59,7 @@ describe("records: one spec each, total decoders", () => {
     commit: C1,
     snapshot: snapshotId("e1"),
     paths: ["a.txt", "d/c é.txt"],
+    conflicts: ["b.txt"],
   }
   const landing: LandingRecord = {
     id: "l1",
@@ -89,6 +96,10 @@ describe("records: one spec each, total decoders", () => {
   test("a record from before lane containers has no snapshot key: it decodes as none", () => {
     const { snapshot: _, ...old } = revision
     expect(REVISION.decode(old, "e1")).toEqual({ ...old, snapshot: null })
+  })
+  test("a record from before conflicts were recorded decodes with none (ADR-0072)", () => {
+    const { conflicts: _, ...old } = revision
+    expect(REVISION.decode(old, "e1")).toEqual({ ...old, conflicts: [] })
   })
   test("a project record from before lane containers is dropped, and rewritten at start", () => {
     expect(
@@ -155,6 +166,7 @@ describe("planTurnRecord: every prompt, and every turn with tool calls", () => {
     toolCalls: false,
     own: true,
     paths: ["a.txt"],
+    conflicts: ["x.txt"],
   }
   test("a prompt always gets a record: its disk, and a commit of edits, else the newest revision", () => {
     expect(planTurnRecord({ ...base, isPrompt: true, committed: C2 })).toEqual({
@@ -163,6 +175,7 @@ describe("planTurnRecord: every prompt, and every turn with tool calls", () => {
       commit: C2,
       snapshot: S,
       paths: ["a.txt"],
+      conflicts: ["x.txt"],
     })
     // The newest revision is what came before the prompt: no paths of its own.
     expect(
@@ -173,6 +186,8 @@ describe("planTurnRecord: every prompt, and every turn with tool calls", () => {
       commit: C1,
       snapshot: S,
       paths: [],
+      // The newest revision's conflicts: a branch from the prompt clones it.
+      conflicts: ["x.txt"],
     })
   })
   test("a turn with tool calls gets its disk, and a commit only when one was made", () => {
@@ -189,6 +204,7 @@ describe("planTurnRecord: every prompt, and every turn with tool calls", () => {
       commit: C2,
       snapshot: S,
       paths: ["a.txt"],
+      conflicts: ["x.txt"],
     })
     expect(
       planTurnRecord({
@@ -203,6 +219,7 @@ describe("planTurnRecord: every prompt, and every turn with tool calls", () => {
       commit: null,
       snapshot: S,
       paths: [],
+      conflicts: [],
     })
   })
   test("a turn with no tool calls and nothing committed gets none", () => {
@@ -218,6 +235,7 @@ describe("planTurnRecord: every prompt, and every turn with tool calls", () => {
       commit: null,
       snapshot: null,
       paths: [],
+      conflicts: [],
     })
     expect(
       planTurnRecord({ ...direct, isPrompt: false, toolCalls: true }),
@@ -234,12 +252,18 @@ describe("forkPoint: a snapshot to clone, and what to start on", () => {
   } as const
   test("from a turn: its snapshot and the commit above", () => {
     expect(
-      forkPoint({ above: { lane: LANE, commit: C2, snapshot: S }, begin }),
+      forkPoint({
+        above: { lane: LANE, commit: C2, commitLane: LANE, snapshot: S },
+        begin,
+      }),
     ).toEqual({ snapshot: S, start: { kind: "commits", commits: [C2] } })
   })
   test("from a lane before lane containers: the base snapshot at its commit", () => {
     expect(
-      forkPoint({ above: { lane: LANE, commit: C2, snapshot: null }, begin }),
+      forkPoint({
+        above: { lane: LANE, commit: C2, commitLane: LANE, snapshot: null },
+        begin,
+      }),
     ).toEqual({
       snapshot: BASE_SNAPSHOT,
       start: { kind: "commits", commits: [C2] },
@@ -247,7 +271,10 @@ describe("forkPoint: a snapshot to clone, and what to start on", () => {
   })
   test("from nothing: the base snapshot, and where agent work begins (ADR-0060)", () => {
     expect(
-      forkPoint({ above: { lane: null, commit: null, snapshot: null }, begin }),
+      forkPoint({
+        above: { lane: null, commit: null, commitLane: null, snapshot: null },
+        begin,
+      }),
     ).toEqual({ snapshot: BASE_SNAPSHOT, start: begin })
   })
 })
@@ -308,6 +335,112 @@ describe("wipState: landed, gone, or ok (ADR-0060, S77 item 2)", () => {
   })
   test("a line base, with no WIP facts, is ok", () => {
     expect(wipState(null)).toBe("ok")
+  })
+})
+
+describe("parentNow and planParentUpdate: the thread a lane branched from (ADR-0072)", () => {
+  const P = laneNameForThread("p")
+  const L = laneNameForThread("l")
+  const C = (n: number) => commitId(`c${n}`)
+  const node = (
+    id: string,
+    parentId: string | null,
+    role: string,
+    merged?: CommitId[],
+  ): EntryLike => ({
+    id: entryId(id),
+    parentId: parentId === null ? null : entryId(parentId),
+    type: "message",
+    message: { role, content: id, ...(merged === undefined ? {} : { merged }) },
+  })
+  // P's prompt and two turns; L branches below P's first turn and later
+  // catches up with P's third commit; P goes on to a fourth, conflicted.
+  const index = indexTree(
+    Object.fromEntries(
+      [
+        node("1-p", null, "user"),
+        node("2-m", "1-p", "assistant"),
+        node("3-b", "2-m", "user"),
+        node("4-u", "3-b", "update", [C(3)]),
+        node("5-m", "2-m", "assistant"),
+        node("6-m", "5-m", "assistant"),
+      ].map(e => [e.id, e]),
+    ),
+  )
+  const rec = (
+    entry: string,
+    lane: typeof P,
+    commit: CommitId,
+    conflicts: string[] = [],
+  ): [ReturnType<typeof entryId>, RevisionRecord] => [
+    entryId(entry),
+    {
+      entry: entryId(entry),
+      lane,
+      commit,
+      snapshot: null,
+      paths: [],
+      conflicts,
+    },
+  ]
+  const revisions = new Map([
+    rec("1-p", P, C(1)),
+    rec("2-m", P, C(2)),
+    rec("3-b", L, C(2)),
+    rec("5-m", P, C(3)),
+    rec("6-m", P, C(4), ["a.txt"]),
+  ])
+  const names = new Map([[P, "amber-fox" as ThreadName]])
+  const now = (lTip: string, pTip: string, named = names) =>
+    parentNow({
+      index,
+      revisions,
+      lane: L,
+      tip: entryId(lTip),
+      tipOf: lane =>
+        lane === P ? entryId(pTip) : lane === L ? entryId(lTip) : null,
+      names: named,
+    })
+  test("before any catch-up, the lane holds its fork commit", () => {
+    expect(now("3-b", "6-m")).toEqual({
+      kind: "parent",
+      lane: P,
+      name: "amber-fox",
+      newest: C(4),
+      taken: C(2),
+      conflicts: ["a.txt"],
+    })
+  })
+  test("a catch-up's merged commit is what it took", () => {
+    expect(now("4-u", "6-m")?.taken).toBe(C(3))
+    expect(now("4-u", "5-m")).toMatchObject({ newest: C(3), taken: C(3) })
+  })
+  test("no parent: a lane that began at its base, or a parent with no name", () => {
+    expect(
+      parentNow({
+        index,
+        revisions,
+        lane: P,
+        tip: entryId("6-m"),
+        tipOf: () => entryId("6-m"),
+        names,
+      }),
+    ).toBeNull()
+    expect(now("3-b", "6-m", new Map())).toBeNull()
+  })
+  test("planParentUpdate merges the parent's newest; nothing when held; refused without one, or while it runs", () => {
+    expect(planParentUpdate(now("3-b", "6-m"), false)).toEqual({
+      kind: "parent",
+      lane: P,
+      name: "amber-fox",
+      commit: C(4),
+      taken: C(2),
+    })
+    expect(planParentUpdate(now("4-u", "5-m"), false)).toEqual({
+      kind: "nothing",
+    })
+    expect(planParentUpdate(null, false)).toBe(ERR.NO_PARENT)
+    expect(planParentUpdate(now("3-b", "6-m"), true)).toBe(ERR.PARENT_RUNNING)
   })
 })
 
@@ -377,6 +510,7 @@ describe("planRetention: which snapshots go", () => {
     commit: null,
     snapshot: snapshotId(entry),
     paths: [],
+    conflicts: [],
   })
   const records = [
     rec("01-a"),
@@ -454,6 +588,7 @@ describe("planResolution: the land message", () => {
       budget,
       details,
       intent,
+      incoming: "The project's work",
       timestamp: 1,
     })
   test("the person's text follows the conflict material, whole, under any budget", () => {

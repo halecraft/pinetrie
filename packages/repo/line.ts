@@ -7,6 +7,7 @@
 import { type CommitId, commitId, type LaneBase } from "@pineta/core"
 import {
   commitsOf,
+  conflictedFilesAt,
   type LineConfig,
   lines,
   type Runner,
@@ -139,7 +140,7 @@ export async function lineFacts(
       follow: behind === 0 ? null : await followPreview(jj, git, onto),
       conflicts: {
         commits: await count(jj, `(::@ ~ ::${onto}) & conflicts()`),
-        files: await conflictedFiles(jj),
+        files: await conflictedFilesAt(jj, "@").catch(() => []),
       },
     },
   }
@@ -181,19 +182,6 @@ async function followPreview(
     conflicts,
     heads: await count(jj, `heads(roots(${onto}..@)::) ~ @`),
   }
-}
-
-/** The conflicted files in `@`, as last snapshotted. */
-async function conflictedFiles(jj: Runner): Promise<string[]> {
-  const ran = await jj([
-    "file",
-    "list",
-    "-r",
-    "@",
-    "-T",
-    'if(conflict, path ++ "\\n")',
-  ])
-  return ran.ok ? lines(ran.stdout) : []
 }
 
 /**

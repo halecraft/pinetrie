@@ -244,7 +244,7 @@ describe("planIntent", () => {
       { kind: "density", key: "col-k", density: "outline" },
     ],
     [
-      "details (ADR-0071)",
+      "details (ADR-0073)",
       { kind: "details", open: true },
       { kind: "details", key: "col-k", open: true },
     ],

@@ -31,8 +31,8 @@ import {
   type WriterId,
 } from "@pineta/core"
 import {
-  baseName,
   type CatchUpNow,
+  catchUpName,
   catchUpOf,
   displayName,
   type OfferActivity,
@@ -40,6 +40,8 @@ import {
   type OfferView,
   offerStatus,
   offerView,
+  type ParentNow,
+  parentNow,
   type TakeDestination,
 } from "@pineta/marginalia"
 import type { OfferActing } from "./acting.ts"
@@ -85,6 +87,28 @@ export interface WorkFacts {
   readonly line: LineRecord | null
   /** Each lane's base, as its history says it (ADR-0060). */
   readonly bases: ReadonlyMap<LaneName, BaseRecord>
+}
+
+/**
+ * The thread `lane` branched from, and where both stand (`parentNow`,
+ * ADR-0072), from the column's tree and each lane's thread end.
+ */
+export const parentOfLane = (
+  index: TreeIndex,
+  work: Pick<WorkFacts, "revisions" | "names">,
+  lanes: readonly LaneView[],
+  lane: LaneName,
+): ParentNow | null => {
+  const tipOf = (name: LaneName) =>
+    lanes.find(l => l.name === name)?.tip ?? null
+  return parentNow({
+    index,
+    revisions: work.revisions,
+    lane,
+    tip: tipOf(lane),
+    tipOf,
+    names: work.names,
+  })
 }
 
 // ── which lane worked where ───────────────────────────────────────────────
@@ -137,7 +161,7 @@ export type HeadIdentity =
   | { readonly kind: "none" }
 
 /**
- * What a named thread's details show, under the header (ADR-0071). Only a
+ * What a named thread's details show, under the header (ADR-0073). Only a
  * named agent has them: a conversation has no thread to describe, and a new
  * agent not yet named has nothing to show.
  */
@@ -349,7 +373,7 @@ export function behindMark(
   const { move } = now
   return {
     mark: "↓",
-    title: `${baseName(move.base)} has new work since this thread started, in ${count(now.files, "file", "files")} · ${move.bookmark}: ${move.from.slice(0, 8)} → ${move.to.slice(0, 8)}`,
+    title: `${catchUpName(move.base)} has new work since this thread started, in ${count(now.files, "file", "files")} · ${move.bookmark}: ${move.from.slice(0, 8)} → ${move.to.slice(0, 8)}`,
   }
 }
 
@@ -539,6 +563,7 @@ function workStrip(f: ColumnFacts): WorkStrip {
   if (project.kind !== "lanes") return NO_STRIP
   const offer = offerStatus(work.offers.get(lane.name))
   const base = work.bases.get(lane.name) ?? null
+  const parent = parentOfLane(f.index, work, f.lanes, lane.name)
   const view = offerView({
     offer,
     activity: activityOf(f.index, lane),
@@ -552,6 +577,9 @@ function workStrip(f: ColumnFacts): WorkStrip {
     catchUp: catchUpOf(base ?? undefined, work.line),
     untraced: (base?.untraced.length ?? 0) > 0,
     catchingUp: f.catchingUp,
+    parent,
+    parentRunning:
+      parent !== null && f.lanes.some(l => l.name === parent.lane && l.running),
   })
   return {
     kind: "offer",
@@ -593,17 +621,19 @@ const count = (n: number, one: string, many: string) =>
   `${n} ${n === 1 ? one : many}`
 
 const BUTTON_LABEL: Record<
-  Exclude<OfferButton, "take" | "take-line" | "update" | "continue">,
+  Exclude<
+    OfferButton,
+    "take" | "take-line" | "update" | "continue" | "catch-up-parent"
+  >,
   string
 > = {
   split: "split into a stack",
   squash: "squash to one",
   describe: "rewrite description",
   refresh: "refresh (discards your edits)",
-  resolve: "resolve in the thread",
 }
 
-/** A take's destination as a base, to be named by `baseName`. */
+/** A take's destination as a base, to be named by `catchUpName`. */
 const destinationBase = (d: TakeDestination) =>
   d.kind === "line"
     ? ({ kind: "line" } as const)
@@ -630,7 +660,7 @@ function actingWords(
   if (acting.kind !== "sent") return outcomeWords(acting)
   if (acting.action !== "take") return SENDING[acting.action]
   const to = destinations.find(d => d.bookmark === acting.to) ?? destinations[0]
-  return `adding to ${baseName(to === undefined ? { kind: "line" } : destinationBase(to))}…`
+  return `adding to ${catchUpName(to === undefined ? { kind: "line" } : destinationBase(to))}…`
 }
 
 /** Every word an offer shows: its line, and its buttons' labels by state. */
@@ -641,11 +671,18 @@ export function offerWords(
   const { state, facts } = view
   const files = count(facts.files, "file", "files")
   const yours = facts.touchesYourEdits ? " · touches files you're editing" : ""
-  const base = baseName(facts.base)
+  const base = catchUpName(facts.base)
+  const parent = facts.parent === null ? null : catchUpName(facts.parent)
+  const conflicted = count(facts.conflicts, "file", "files")
+  // A conflict that came with the lane's copy says so, and whether the
+  // thread it branched from has resolved it (ADR-0072).
   const conflicts =
     facts.conflicts === 0
       ? ""
-      : `conflicts with ${base} in ${count(facts.conflicts, "file", "files")}`
+      : facts.conflictCause === "start"
+        ? `began from a copy with an unresolved conflict in ${conflicted}${facts.parentResolves && parent !== null ? ` · ${parent} has resolved it` : ""}`
+        : `conflicts with ${base} in ${conflicted}`
+  const catchUps = { base: facts.base, parent: facts.parent }
   const moved = `${base} has new work since this thread started`
   const brings = facts.catchUp.kind === "brings"
   const said =
@@ -693,7 +730,7 @@ export function offerWords(
       : `moves ${bookmark} forward to ${facts.bookmark}`
   const take = (): string => {
     const where =
-      first === undefined ? "" : ` to ${baseName(destinationBase(first))}`
+      first === undefined ? "" : ` to ${catchUpName(destinationBase(first))}`
     return state === "stack"
       ? `add stack${where}`
       : state === "stale"
@@ -721,17 +758,29 @@ export function offerWords(
               : `add to the project, with your ${count(toLine.bringsAlong, "commit", "commits")} beneath it`,
           ...titled(moves(facts.onto)),
         }
-      case "update":
+      case "update": {
+        const label = commandWords("bring-up-to-date", catchUps)
         return {
           button,
-          label: commandWords("bring-up-to-date", facts.base),
+          // Catching up is how a conflict is resolved: the agent resolves
+          // what the merge leaves.
+          label: state === "conflicts" ? `${label} and resolve` : label,
           title: catchUpTitle(facts.catchUp, base, baseBookmark),
         }
+      }
       case "continue":
         return {
           button,
-          label: commandWords("continue-on-line", facts.base),
+          label: commandWords("continue-on-line", catchUps),
           title: `merges ${facts.onto} into this thread's copy, its base from then on`,
+        }
+      case "catch-up-parent":
+        return {
+          button,
+          label: commandWords("catch-up-with-parent", catchUps),
+          title: view.quiet.includes(button)
+            ? `${parent ?? "the thread this one branched from"} is working: catch up when its run ends`
+            : `merges ${parent ?? "the thread this one branched from"}'s newest work into this thread's copy`,
         }
       case "split":
         return {

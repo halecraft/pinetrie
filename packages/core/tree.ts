@@ -16,6 +16,7 @@ import type { AskIndex } from "./asks.ts"
 import { type ImageRef, isImageMime, isSha256 } from "./images.ts"
 import {
   atEntry,
+  type CommitId,
   type EntryId,
   type LaneName,
   type PlanMode,
@@ -72,6 +73,8 @@ export interface AgentMessageLike {
    */
   readonly stopReason?: string
   readonly errorMessage?: string
+  /** Roles `update` and `land` only: the commits merged into the lane (ADR-0072). */
+  readonly merged?: readonly CommitId[]
 }
 
 export interface EntryLike {
@@ -104,6 +107,8 @@ export interface TranscriptMessage {
   readonly images?: readonly ImageRef[]
   /** Role `assistant` only: the tools it called, each with its result once known. */
   readonly toolCalls?: readonly ToolCallView[]
+  /** Roles `update` and `land` only: the commits merged into the lane (ADR-0072). */
+  readonly merged?: readonly CommitId[]
 }
 
 /** A tool call as a reader sees it. */
@@ -243,6 +248,9 @@ function renderableMessage(entry: EntryLike): TranscriptMessage | null {
   )
     return null
   const message = { id: entry.id, role, text: messageText(entry.message) }
+  const merged = entry.message?.merged
+  if ((role === "update" || role === "land") && merged !== undefined)
+    return { ...message, merged }
   const calls = role === "assistant" ? toolCallsOf(entry.message) : []
   return calls.length === 0 ? message : { ...message, toolCalls: calls }
 }

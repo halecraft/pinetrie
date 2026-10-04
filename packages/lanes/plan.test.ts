@@ -4,6 +4,7 @@ import {
   laneNameForThread,
   shellWord,
   snapshotId,
+  type ThreadName,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import {
@@ -495,6 +496,23 @@ describe("planMerge: an update's steps (ADR-0060)", () => {
       message: "update: wip/x",
       mark: false,
       came: { from: C2, to: W },
+    })
+  })
+  test("the thread it branched from is merged as a commit, named, with no Pineta-Base (ADR-0072)", () => {
+    expect(
+      planMerge({
+        kind: "parent",
+        lane: laneNameForThread("p"),
+        name: "amber-fox" as ThreadName,
+        commit: C2,
+        taken: C1,
+      }),
+    ).toEqual({
+      steps: [fetchById([C2])],
+      source: C2,
+      message: "update: amber-fox",
+      mark: false,
+      came: { from: C1, to: C2 },
     })
   })
 })

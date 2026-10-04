@@ -23,7 +23,6 @@ import type {
   Position,
   ProjectRecord,
   SeatRecord,
-  ThreadBase,
   ThreadLane,
   WorkSetting,
 } from "@pineta/core"
@@ -40,6 +39,7 @@ import {
   startText,
 } from "./card-state.ts"
 import {
+  type CatchUps,
   CLEAR_COMMAND,
   cardStatus,
   commandNote,
@@ -66,6 +66,7 @@ import type { ColumnHow } from "./send.ts"
 import {
   baseChoices,
   type ComposerMode,
+  forkWords,
   placeholderWords,
   planSend,
   queueWords,
@@ -109,6 +110,8 @@ export interface Where {
   readonly usedDirs: readonly string[]
   /** The integration line, for the bases a new lane may start from (ADR-0060). */
   readonly line: LineRecord | null
+  /** Files conflicted in the commit a new lane here would be cloned from (ADR-0072). */
+  readonly forkConflicts: number
 }
 
 /**
@@ -178,8 +181,8 @@ export function CardEditor(p: {
   onIntent: (intent: Intent) => void
   /** The column's acts: queueing a card, clearing its command. */
   onAct: (act: ColumnAct) => void
-  /** The thread's base (`effectiveBase`): what a card's command catches up with. */
-  threadBase: ThreadBase
+  /** What a card's command catches up with: the thread's base, or the thread it branched from. */
+  catchUps: CatchUps
   /** Whether this column asked for focus, just opened. Asked on mounting. */
   takeFocus: (() => boolean) | undefined
 }) {
@@ -475,7 +478,7 @@ export function CardEditor(p: {
       )}
       {card !== undefined && command !== null && p.readOnly === null && (
         <div className="card-command">
-          {commandNote(command, p.threadBase)}{" "}
+          {commandNote(command, p.catchUps)}{" "}
           <button
             aria-label={CLEAR_COMMAND}
             className="card-command-clear"
@@ -608,6 +611,11 @@ export function CardEditor(p: {
                   base={base}
                   chooseBase={setBase}
                 />
+                {work.kind === "own" && p.where.forkConflicts > 0 && (
+                  <span className="where-fork-conflict">
+                    {forkWords(p.where.forkConflicts)}
+                  </span>
+                )}
               </div>
             )}
           {card !== undefined && (
@@ -718,8 +726,8 @@ export function QueuedCardEditor(p: {
   n: number
   reader: Reader
   readOnly: ReadOnly | null
-  /** The thread's base (`effectiveBase`): what its command catches up with. */
-  threadBase: ThreadBase
+  /** What its command catches up with: the thread's base, or the thread it branched from. */
+  catchUps: CatchUps
   onAct: (act: ColumnAct) => void
   onTyping: () => void
 }) {
@@ -733,7 +741,7 @@ export function QueuedCardEditor(p: {
           {queuedWords(card.place.by, p.n, p.reader)}
           {card.command !== null && (
             <div className="card-command">
-              {commandNote(card.command, p.threadBase)}
+              {commandNote(card.command, p.catchUps)}
             </div>
           )}
         </>

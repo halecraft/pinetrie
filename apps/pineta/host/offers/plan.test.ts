@@ -55,6 +55,7 @@ const offer = (
   onTarget: true,
   files: ["a.txt"],
   conflicts: [],
+  startConflicts: [],
   ...over,
 })
 
@@ -94,6 +95,7 @@ describe("offerRecord: the page's cache, from the repo", () => {
       stale: false,
       files: ["a.txt"],
       conflicts: [],
+      startConflicts: [],
       yourEdits: ["a.txt"],
       described: false,
       edited: false,

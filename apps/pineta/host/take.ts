@@ -137,12 +137,7 @@ async function carryOut(
   }
   if (card.command !== null) {
     const prepared = await deps.work
-      .prepareUpdate(
-        lane,
-        card.place.by,
-        taken.text,
-        card.command === "continue-on-line",
-      )
+      .prepareUpdate(lane, card.place.by, taken.text, card.command)
       .catch(hostFailed)
     if (prepared === null) return "next"
     if (prepared.kind === "refused") {

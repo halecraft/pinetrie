@@ -433,8 +433,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a turn with no commit hides the commit above it",
     file: "packages/core/work.ts",
-    from: "    commit ??= record.commit",
-    to: "    if (snapshot === null) commit = record.commit",
+    from: "    if (commit === null && record.commit !== null) {",
+    to: "    if (snapshot === null && record.commit !== null) {",
     command: unit,
     expect: "a turn that changed only ignored files",
   },
@@ -665,5 +665,14 @@ export const mutations: readonly Mutation[] = [
     command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
     expect:
       "a take that does not say which offer it was shown, well formed, is refused",
+  },
+  {
+    name: "a fork's parent is the nearest lane, not the commit's",
+    file: "packages/core/work.ts",
+    from: "      commitLane = record.lane",
+    to: "      commitLane = lane ?? record.lane",
+    command: unit,
+    expect:
+      "a lane working directly records no commit: a fork below it is cloned from the lane above",
   },
 ]

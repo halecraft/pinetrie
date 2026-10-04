@@ -12,6 +12,8 @@ Amended by ADR-0061: the line is "the project" in every word the page
 shows, its bookmark in titles; and "update my files", a rebase of your
 work onto the line you ask for after a preview, is the one act that moves
 your `@`.
+Amended by ADR-0072: a thread also catches up with the thread its copy was
+cloned from, which is no base: its offers still go to the line or its WIP.
 Amended in place (S81, `PLAN-2026-10-02-offer-start-after-catch-up`): a
 source taken at or below the commit the lane's base names is superseded by
 it, so an offer after a catch-up starts there alone.

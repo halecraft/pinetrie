@@ -14,6 +14,8 @@ Amended by ADR-0061: "bring up to date" is worded "catch up"; its button
 queues a card with the command and no text at once, rather than giving
 your card the command to send; a card with a command says above its box
 what sending it does, and its button names the command.
+Amended by ADR-0072: a third command, `catch-up-with-parent`, merges the
+thread a thread branched from.
 
 **Context.** ADR-0048 makes queued messages queued cards, and removes
 `pineta.outbox`. The outbox holds two kinds of thing: messages, and "Update

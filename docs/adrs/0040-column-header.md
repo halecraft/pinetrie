@@ -8,7 +8,7 @@ and ADR-0039 (the header's "amber-fox · own copy").
 copies on a press.
 **Amended by ADR-0057:** a fresh column that wants an agent is
 named at once, so `✦ new agent` shows only until its name arrives.
-**Amended by ADR-0071:** the name opens the thread's details; the reveal of
+**Amended by ADR-0073:** the name opens the thread's details; the reveal of
 where its lane started is in them, offered only below the path's first
 message.
 

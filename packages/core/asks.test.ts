@@ -170,6 +170,7 @@ describe("workStats", () => {
       commit: null,
       snapshot: null,
       paths,
+      conflicts: [],
     },
   ]
   const revisions = new Map([
@@ -240,6 +241,7 @@ describe("askSpan", () => {
       commit: commit === null ? null : commitId(commit),
       snapshot: null,
       paths: [],
+      conflicts: [],
     },
   ]
   test("from what the lane had before the ask to its last turn's commit", () => {

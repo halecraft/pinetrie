@@ -9,11 +9,11 @@ import type {
   EntryId,
   Position,
   SeatRecord,
-  ThreadBase,
   ThreadLane,
 } from "@pineta/core"
 import type { ReadOnly } from "./app-view.ts"
 import { CardEditor, type Where } from "./card-editor.tsx"
+import type { CatchUps } from "./card-words.ts"
 import type { Pending, Prefill } from "./columns.ts"
 import type { ColumnAct, Intent } from "./intent.ts"
 import { nameFor } from "./presence.tsx"
@@ -59,8 +59,8 @@ export function Composer(p: {
   /** The column's acts: queueing your card, clearing its command. */
   onAct: (act: ColumnAct) => void
   readOnly: ReadOnly | null
-  /** The thread's base: what a card's command catches up with. */
-  threadBase: ThreadBase
+  /** What a card's command catches up with: the thread's base, or the thread it branched from. */
+  catchUps: CatchUps
   takeFocus: () => boolean
   /** The column's key when a card may be put or dropped here (`put-target.ts`). */
   putColumn: string | null
@@ -91,7 +91,7 @@ export function Composer(p: {
         onCreatesLane={p.onCreatesLane}
         onShows={p.onShows}
         onIntent={p.onIntent}
-        threadBase={p.threadBase}
+        catchUps={p.catchUps}
         onSend={p.onSend}
         onTyping={p.onTyping}
         participants={p.participants}

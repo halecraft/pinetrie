@@ -321,7 +321,7 @@ export function commandSendWords(
   command: NonNullable<SendPlan["command"]>,
   queue: QueuePlace,
 ): ButtonWords {
-  const verb = command.command === "bring-up-to-date" ? "catch up" : "continue"
+  const verb = command.command === "continue-on-line" ? "continue" : "catch up"
   return {
     label: command.text ? `${verb} and send` : verb,
     title: queue.kind === "next" ? null : queueWords(queue).label,
@@ -412,6 +412,13 @@ export function whereWords(
     ? "edits your files directly"
     : `edits files in ${work.dir}`
 }
+
+/**
+ * A new lane here would be cloned from a commit with conflicts: its offer
+ * would start conflicted until it catches up (ADR-0072).
+ */
+export const forkWords = (files: number): string =>
+  `starts from a copy with an unresolved conflict in ${files} ${files === 1 ? "file" : "files"}`
 
 /** A row of the where menu: its name, what it means, and whether it is chosen. */
 export interface WhereChoice {
