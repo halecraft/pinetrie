@@ -1,6 +1,5 @@
 // host/startup — what a starting host does before it accepts a command.
 
-import { type Exchange, type Store, whenHydrated } from "@kyneta/exchange"
 import type { LaneName, RootId } from "@pineta/core"
 import type { Keeper } from "@pineta/keeper"
 import {
@@ -9,14 +8,12 @@ import {
   deleteRecord,
   PROJECT,
   planCardSweep,
-  planPlacesCarryOver,
   planSeatSweep,
   planStartup,
   SEAT,
   setIfChanged,
 } from "@pineta/marginalia"
 import type { Agent } from "@pineta/pi"
-import { LEGACY_PLACES_DOC_ID, PLACES_DOC_ID } from "@pineta/protocol/messages"
 import {
   readPlaces,
   readProject,
@@ -24,13 +21,7 @@ import {
   readSeats,
   readThreadName,
 } from "@pineta/reads"
-import {
-  cardIdOfDoc,
-  clearStreams,
-  LegacyPlacesDoc,
-  type PlacesDocHandle,
-  readStoredLanes,
-} from "@pineta/schema"
+import { cardIdOfDoc, clearStreams, readStoredLanes } from "@pineta/schema"
 import type { Basics } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
 import { applyPlaceSteps } from "./places.ts"
@@ -147,38 +138,4 @@ async function sweepTexts(deps: StartupDeps): Promise<void> {
     log(
       `[host] swept ${swept.records.length} empty card(s), ${swept.docs.length} unused text(s), ${staleSeats.length} seat(s)`,
     )
-}
-
-/**
- * Carry the places stored before ADR-0066 into the Yjs document, once
- * (`planPlacesCarryOver`), before the host serves. In order: write the rows,
- * flush, then destroy the old document, so a crash at any step leaves the
- * old document to carry over at the next start.
- */
-export async function carryPlacesOver(input: {
-  readonly exchange: Pick<Exchange, "get" | "flush" | "destroy">
-  readonly store: Pick<Store, "listDocIds">
-  readonly places: PlacesDocHandle
-  readonly log: (line: string) => void
-}): Promise<void> {
-  const { exchange, store, places, log } = input
-  // gather
-  let stored = false
-  for await (const id of store.listDocIds(LEGACY_PLACES_DOC_ID))
-    if (id === LEGACY_PLACES_DOC_ID) stored = true
-  if (!stored) return
-  const old = exchange.get(LEGACY_PLACES_DOC_ID, LegacyPlacesDoc)
-  await whenHydrated(old)
-  // plan
-  const carried = planPlacesCarryOver(old.cards(), readPlaces(places))
-  // execute
-  applyPlaceSteps(
-    places,
-    carried.cards.map(record => ({ kind: "write", record })),
-  )
-  await exchange.flush()
-  await exchange.destroy(LEGACY_PLACES_DOC_ID)
-  log(
-    `[host] carried ${carried.cards.length} card place(s) over to ${PLACES_DOC_ID}; dropped ${carried.dropped}`,
-  )
 }

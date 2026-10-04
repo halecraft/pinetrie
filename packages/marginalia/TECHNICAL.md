@@ -248,8 +248,6 @@ which are swept.
   `ARCHIVED_HISTORY_MS` (7 days) after it was archived, and, at startup
   only, those of a root the directory does not name. After a run's end that
   second rule would retire a new tab's history while it is open.
-- **`planPlacesCarryOver`**: the rows of the places stored before ADR-0066
-  that decode now, once, into a document with no cards.
 - **A drafting card is resolved, never stored as an end.** `placeEnd` runs
   `threadOf` from where it started and its column's lane, as a reply from
   there would go, so the card follows its thread as the thread grows.

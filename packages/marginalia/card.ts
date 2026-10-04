@@ -631,25 +631,6 @@ export function planSetCommand(
 }
 
 /**
- * Which rows of the places stored before ADR-0066 go into the new document:
- * none once it has cards, since it was carried over already; else every row
- * that decodes as a card now. A fresh card stored before ADR-0066 names no
- * root, which the host cannot find, so it is dropped, and its text is swept
- * with the others at that start. Pure.
- */
-export function planPlacesCarryOver(
-  old: Readonly<Record<string, unknown>>,
-  now: readonly CardRecord[],
-): { readonly cards: readonly CardRecord[]; readonly dropped: number } {
-  if (now.length > 0) return { cards: [], dropped: 0 }
-  const cards = Object.entries(old).flatMap(([id, value]) => {
-    const card = decodeCard(id, value)
-    return card === undefined ? [] : [card]
-  })
-  return { cards, dropped: Object.keys(old).length - cards.length }
-}
-
-/**
  * What a starting host deletes: records whose text is empty and that carry
  * no command, and stored `card:` documents with no record. Pure.
  */

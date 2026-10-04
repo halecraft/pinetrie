@@ -35,7 +35,6 @@ import {
   planMove,
   planMoveCommand,
   planMoves,
-  planPlacesCarryOver,
   planSetCommand,
   planTake,
   planUnsent,
@@ -660,31 +659,6 @@ describe("storage", () => {
       at: atEntry(E2),
       lane: null,
     })
-  })
-})
-
-describe("planPlacesCarryOver (ADR-0066)", () => {
-  const kept = card()
-  const inventory = card({
-    id: cardId("c-2"),
-    place: { kind: "inventory", holder: ADA },
-  })
-  const old = {
-    [kept.id]: encodeCard(kept),
-    [inventory.id]: encodeCard(inventory),
-    // A fresh card as stored before ADR-0066: no root.
-    "c-3": { ...encodeCard(card()), kind: "fresh", root: "", column: "k" },
-  }
-
-  test("every row that decodes now, into an empty document; a rootless fresh row dropped", () => {
-    expect(planPlacesCarryOver(old, [])).toEqual({
-      cards: [kept, inventory],
-      dropped: 1,
-    })
-  })
-
-  test("nothing into a document that has cards: it was carried over already", () => {
-    expect(planPlacesCarryOver(old, [kept])).toEqual({ cards: [], dropped: 0 })
   })
 })
 

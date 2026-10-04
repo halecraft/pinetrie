@@ -1046,15 +1046,6 @@ export const mutations: readonly Mutation[] = [
     expect: "a resolution's record names its prompt",
   },
   {
-    name: "the places are carried over again at every start",
-    file: "packages/marginalia/card.ts",
-    from: "  if (now.length > 0) return { cards: [], dropped: 0 }\n",
-    to: "",
-    command: unit,
-    expect:
-      "nothing into a document that has cards: it was carried over already",
-  },
-  {
     name: "a fresh column's cards follow a message in another root",
     file: "packages/marginalia/card.ts",
     from: '  if (place?.kind !== "fresh" || place.root !== root) return []',

@@ -261,7 +261,14 @@ root:<RootId>    StorageDoc, one a root   that root's pi storage (entries,
 pineta:live      LiveDoc                  streams and active runs: compacted
                                           at every run's end, needed by no
                                           restarted host
-pineta:places    the cards' places        (ADR-0059)
+pineta:card-places
+                 PlacesDoc, Yjs           where every card is (ADR-0059),
+                                          Yjs so the host undoes moves
+                                          (ADR-0066)
+moves:<writer>:<RootId>
+                 UndoDoc, one a person    a person's history of moves in
+                 and root                 that root (ADR-0066): the host's
+                                          only, shared with no client
 presence         ephemeral                who reads which thread, in which root
 ```
 

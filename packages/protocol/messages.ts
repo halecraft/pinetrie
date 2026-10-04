@@ -16,8 +16,6 @@ export const PRESENCE_DOC_ID = "pineta:presence"
  * new schema under one id.
  */
 export const PLACES_DOC_ID = "pineta:card-places"
-/** The places as stored before ADR-0066: carried over once, then destroyed. */
-export const LEGACY_PLACES_DOC_ID = "pineta:places"
 /** What is streaming now (ADR-0063): written only by the host, and compacted at every run's end. */
 export const LIVE_DOC_ID = "pineta:live"
 

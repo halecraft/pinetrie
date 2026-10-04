@@ -215,10 +215,8 @@ writes it, through `applyPlaceSteps` (`apps/pineta/host/places.ts`).
 - **It grows about 25 bytes a move, for good** (S90): Kyneta compacts its
   storage, and gives none of it back, since Yjs keeps every item's id. 250 KB
   over 10,000 moves, accepted.
-- **A new id, not the old one** (ADR-0066): a store from before holds its
-  `json` places under `pineta:places` (`LEGACY_PLACES_DOC_ID`,
-  `LegacyPlacesDoc`), which the host carries over once at startup and then
-  destroys, so the two schemas never meet under one id.
+- **A new id, not the old one** (ADR-0066), so a store's `json` places and
+  the Yjs schema never meet under one id.
 - **A fresh row names its root and its branch point** (`root`, `at`, "" at
   for a new tab), as a drafting one does (ADR-0066). One without a root does
   not decode.
@@ -240,9 +238,10 @@ writes it, through `applyPlaceSteps` (`apps/pineta/host/places.ts`).
 - **Its storage is compacted after each run** (`planCompaction`); nothing
   in memory is trimmed (S90).
 - **`newPlacesDoc()`** is one with no Exchange, for tests.
-- **A store from before ADR-0059 holds a `pineta:cards` document** that no
-  code opens; delete it by hand. The startup sweep removes the texts no
-  record names.
+- **A store from before ADR-0059 holds a `pineta:cards` document**, and one
+  from before ADR-0066 a `json` `pineta:places` document, that no code
+  opens; delete them by hand. The startup sweep removes the texts no record
+  names.
 - **`holder`** is whose inventory holds a card (`CardPlace` `inventory`);
   rows written before it existed do not decode, and no stored session held
   any.

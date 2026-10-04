@@ -80,6 +80,12 @@ own runtime made, and only the host writes `places`. Probed:
 - If anyone sets a card's command after your move, its row changed, and the
   undo is refused.
 - `places` costs about 25 bytes a move, kept: 250 KB over 10,000 moves.
+- Duane's store was carried over once, on 2026-10-03, by startup code
+  (`carryPlacesOver`) that read the old `json` `pineta:places` into the new
+  `pineta:card-places` and destroyed it, deleted once it had run. A store
+  from before this ADR keeps its old places unread, and its cards' texts are
+  swept at its first start; to keep them, restore that code from the
+  revision before its deletion.
 
 **Alternatives rejected.**
 

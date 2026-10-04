@@ -23,7 +23,7 @@ wires them.
 | `directory.ts` | each root's directory record, refreshed as its document changes |
 | `cards.ts` | the card port (ADR-0048), about texts only: who wrote in a card, destroying one, loading and reading texts for the take, and the texts of given cards gathered for the sweeps; where the shell opens card documents |
 | `seats.ts` | each connected seat's person, written once as a `pineta.seat` record (started after `recover`), and unloading the histories of moves of a person with no seat left |
-| `startup.ts` | `carryPlacesOver` (the places stored before ADR-0066, once) and `recover`: what a starting host does before it takes a command |
+| `startup.ts` | `recover`: what a starting host does before it takes a command |
 | `control.ts` | the command Line of each client seat, and who its writer is |
 | `commands/` | one module per command: `chat`, `archive`, `mark`, `lane` (stop, offer), `cards` (a move, an undo of moves, a command, a busy chat's card queued, a sent card spent: ADR-0059, ADR-0066); `index.ts` decodes, decides where it runs (`placeOfCommand`), checks the archive, routes, and sends a taken card behind the same check (`sendTaken`) |
 | `http.ts` | the HTTP server: admission, Vite, the websocket, blobs, offer reads, invites |
@@ -148,12 +148,7 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
 
 ## Startup
 
-Before `recover`, `carryPlacesOver` carries the places stored before
-ADR-0066 (`pineta:places`, `json`) into the Yjs document, once
-(`planPlacesCarryOver`): it writes the rows, flushes, then destroys the old
-document, so a crash at any step leaves it to carry over at the next start.
-A fresh card stored then has no root, and is dropped. After `recover`,
-`sweepHistories` retires the histories of moves no one will undo again (§
+After `recover`, `sweepHistories` retires the histories of moves no one will undo again (§
 Moves' history).
 
 `recover` runs, in order: `clearStreams` (no stream survives a process), a

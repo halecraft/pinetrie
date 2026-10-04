@@ -14,7 +14,6 @@ import {
   type BoundSchema,
   createDoc,
   type DocRef,
-  json,
   Schema,
 } from "@kyneta/schema"
 import { yjs } from "@kyneta/yjs-schema"
@@ -67,25 +66,12 @@ const placesSchema = Schema.struct({
 
 export const PlacesDoc = yjs.bind(placesSchema)
 
-/**
- * The places as stored before ADR-0066, under `LEGACY_PLACES_DOC_ID`: the
- * same shape in `json`. Read once by the host's carry-over, which then
- * destroys it.
- */
-export const LegacyPlacesDoc = json.bind(placesSchema)
-
 /** The places document, as the Exchange gives it. */
 export type PlacesDocHandle =
   typeof PlacesDoc extends BoundSchema<infer S, infer N> ? DocRef<S, N> : never
 
 /** A places document on its own, with no Exchange: for tests. */
 export const newPlacesDoc = (): PlacesDocHandle => createDoc(PlacesDoc)
-
-/** The places document stored before ADR-0066, as the Exchange gives it. */
-export type LegacyPlacesDocHandle =
-  typeof LegacyPlacesDoc extends BoundSchema<infer S, infer N>
-    ? DocRef<S, N>
-    : never
 
 const CARD_PREFIX = "card:"
 

@@ -81,7 +81,7 @@ import { createRuns, streamInto } from "./runs.ts"
 import { startSeats } from "./seats.ts"
 import { createSettle } from "./settle.ts"
 import { planShutdown, type ShutdownStep } from "./shutdown.ts"
-import { carryPlacesOver, recover } from "./startup.ts"
+import { recover } from "./startup.ts"
 import { openStore } from "./store.ts"
 import { drain as drainQueue, takenChat } from "./take.ts"
 import { startLaneWork } from "./work/index.ts"
@@ -267,7 +267,6 @@ export async function startHost({
   await whenHydrated(session)
   await whenHydrated(places)
   await whenHydrated(live)
-  await carryPlacesOver({ exchange, store, places, log })
   // Each person's history of moves, per root (ADR-0066).
   const histories = createMoveHistories(exchange)
   // Each root's document as it is first opened is followed by the directory,
