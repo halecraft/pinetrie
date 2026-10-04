@@ -53,7 +53,7 @@ client-only read, in `packages/client/archive-rows.ts`. Live streams are read wi
 A stored row's id is a plain `string` (Kyneta's `Schema.string()` carries no
 brand), and `renderableEntry` is the first Pineta code to see one: it mints
 the entry's `id` and `parentId` as `EntryId`s, and everything read from the
-index after that carries the brand (S71). Presence's `reading` and `typing`
+index after that carries the brand (S95). Presence's `reading` and `typing`
 values are thread ends, written by clients: `presenceField` mints them too.
 Lane names, lane tips and run ids are branded one layer down, by
 `@pineta/schema`'s readers (`readLaneNames`, `readLaneTip`, `readActiveRun`),
@@ -123,7 +123,7 @@ Kyneta has let go.
 - **A map keyed by an entry or a lane says so in its type** (`readArchive`,
   `readRevisions`, `readOffers`…). A `string`-keyed map still accepts an
   `EntryId`, so a key type left `string` compiles and leaves its lookups
-  unchecked (S71).
+  unchecked (S95).
 - **`readRenderableEntries` decodes chat** (`renderableMessage`), so the index
   carries each chat's writer, whether it compelled the agent, and its send id:
   `threadOf`'s race reads the first two, a fresh column the third.

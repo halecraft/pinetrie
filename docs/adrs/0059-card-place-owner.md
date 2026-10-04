@@ -98,7 +98,7 @@ card, the place the sender saw it in, and the place it should go.
   decided where it happens).
 - **A queue names the text it queues.** The request, like the text, can
   reach the host first, since Kyneta keeps no order between a Line and a
-  document (S72). A queued key carries the text's version as its queuer had
+  document (S96). A queued key carries the text's version as its queuer had
   it (`seen`), and so does a chat whose busy lane queues its card; the
   host takes the card only once its copy of the text holds that much.
 - **A move is drawn at once.** The tab draws its waiting handoffs over the

@@ -1,4 +1,6 @@
-# S71 — how far the id brands reach, and what keeps them there
+# S95 — how far the id brands reach, and what keeps them there
+
+Numbered S71 until 2026-10-03, when two spikes held that number.
 
 Measured in a lane (Linux, Node 24, TypeScript 5.9.3, Biome 2.4.8), for
 `PLAN-2026-10-02-brand-ids-through-tree`. The type probes were edits to the

@@ -1,4 +1,6 @@
-# S67 — the suites as scenarios
+# S94 — the suites as scenarios
+
+Numbered S67 until 2026-10-03, when two spikes held that number.
 
 Measured in a lane (Linux, Node 24, Chromium's headless shell, no
 `container` runtime), against the suites before and after

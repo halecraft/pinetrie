@@ -100,13 +100,13 @@ Four rules hold them together:
    `rejoinImages` restores `{type, data, mimeType}`, so pi reads what it
    wrote. The same pair runs on `pi.pending.entry` values, pi's copy of a
    message before its entry, since a deleted value stays in the history until
-   compaction (S59); `stored-values.ts` decides which namespaces. Before its
+   compaction (S93); `stored-values.ts` decides which namespaces. Before its
    batch, `#applyCommit` gathers the lookups for the images `imagesOf` finds:
    the SHA-256 of each part's bytes, and `blobs.ref`. A part the store lacks stays
    inline, which is every part without `KynetaStorageOptions.blobs`, as
    conformance runs. A blob gone from the store rejoins as "[image <sha256>
    is no longer stored]". There is no cache: pi rejoins each entry on a
-   branch about twice a model request, at 0.65 ms for a 2 MB image (S59).
+   branch about twice a model request, at 0.65 ms for a 2 MB image (S93).
 
 These tests are co-located here on purpose: `toStoredRow` takes pi's
 `Entry`, so a test under `test/` would import a pi type across the boundary
@@ -227,7 +227,7 @@ pi's null means either undecodable or impossible to fit. After a resize,
 `read` is built with `readImageProcessor`, which runs `prepareImage` on an
 image file, puts it in `CreateAgentOptions.blobs`, and returns its base64 and
 the resize note as pi's `hints`, which pi appends to the caption. It runs
-before pi writes the result (S59), so both of pi's writes find the image in
+before pi writes the result (S93), so both of pi's writes find the image in
 the store and keep a reference (rule 4 above). Without a store, `read` gets
 no processor and behaves as pi's own.
 

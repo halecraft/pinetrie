@@ -63,7 +63,7 @@ export const textClients = (doc: TextDocHandle): number[] => {
  * The text's version, serialized: what a client writes on a card it queues,
  * so the host takes the card only once it holds that much of the text.
  * Kyneta keeps no order between documents, so a card's record can reach the
- * host before the text typed just before it (S72).
+ * host before the text typed just before it (S96).
  */
 export const textVersion = (doc: TextDocHandle): string =>
   version(doc).serialize()

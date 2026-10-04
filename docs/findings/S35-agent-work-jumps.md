@@ -1,5 +1,7 @@
 # S35 — why an agent's column jumps while it works
 
+**Status:** Answered. With S55, led to ADR-0044.
+
 **Answers.**
 1. **Each tool call changes the column's height five or six times, and each
    shrink moves everything down.** A column following its end sits at the

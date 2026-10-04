@@ -13,8 +13,18 @@ once do not edit the same file. This directory is the list of them.
 in place ("Amended by ADR-NNNN: …", "Superseded by ADR-NNNN"), never deleted:
 the rejected reasoning is the valuable part.
 
-**Numbering.** Take the next number free on the trunk. If two lanes take the
-same one, whichever lands second renumbers its file and its references.
+**Numbering.** Take the next number free both on the trunk and in the plans
+in flight, which may have written theirs already. Two files with the
+same number and different slugs merge without a conflict, so
+`scripts/numbering.test.ts` is what catches a clash, in the first
+`pnpm test` after both have landed. Whoever finds the clash fixes it: the
+file that landed second (by jj ancestry, the one whose adding commit
+descends from the other's) takes the next free number, with its title and
+every reference to it, and a line "Numbered <old> until <date>, when two
+files held that number" goes under its title, since commit messages keep
+the old number. Whoever resolves a landing that adds an ADR or a spike runs
+`npx vitest run scripts/numbering.test.ts` before finishing. Spikes
+(`docs/findings/`) are numbered the same way.
 
 **Slugs.** One or two words that name the decision, not the work that
 implemented it: `0023-session-json.md`, `0048-cards.md`.

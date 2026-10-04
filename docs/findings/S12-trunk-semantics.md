@@ -1,5 +1,30 @@
 # S12 — What is "the trunk" when every writer has its own lane?
 
+**Status:** Answered. Led to ADR-0012; spawned S15.
+
+## Brief
+
+**Size:** S · **Depends on:** nothing · **Raised by:** S8 residual #1 + ADR-0011
+
+**Question.** Under ADR-0011 every writer owns a lane, so no lane is canonical.
+But the product has a *trunk* — `docs/00-vision.md` is built on "fold an exploration
+back into the trunk." What represents it?
+
+**Candidates (none evaluated):** a designated lane name; a label on an entry; a
+separate `pi.session.*` pointer; simply the path to a designated leaf.
+
+**Why it matters beyond naming.** It interacts directly with fold: ADR-0010
+establishes a fold is **destination-relative** — so "fold into the trunk" needs
+a well-defined destination *tip*. If the trunk is a lane, whose lane is it, and
+who may write it? If it is a pointer, it is a contended LWW register and
+ADR-0011's reasoning applies to it too.
+
+**Kill criterion.** If the trunk cannot be expressed without reintroducing a
+shared-writer register, we have moved the ADR-0011 hazard rather than removed
+it.
+
+## Report
+
 **Date:** 2026-09-20 · **Sandbox:** `sandbox/s12-trunk` · **Node:** v24.19.0
 **pi-agent-core:** 0.85.0 · **`@kyneta/*`:** local workspace (symlinked) · **loro-crdt:** 1.16.1
 
@@ -335,3 +360,36 @@ The trunk is not stored mutable state. Promotions are records in `Schema.record`
 - That candidate (b) cannot be made competitive (§5.6).
 - That the promotion log belongs in the same document as entries. Plausible and untested; a cross-document trunk would raise sync-ordering questions this spike did not touch.
 - That `00-vision.md`'s "the trunk" denotes a single shared artifact per session. Design (d) is coherent if it does not, and the product question was not re-litigated here.
+
+## Review
+
+**Verdict:** kill criterion NOT met
+
+The trunk **can** be expressed without a
+shared-writer register → **ADR-0012**. 1000/1000 property trials; **0/600** on
+two independent controls; re-verified at a fresh seed.
+
+- **Reframed the question.** Two concurrent folds onto one trunk tip are a
+  *semantic* conflict in every representation — a linear path holds one of two
+  siblings. All five candidates scored 1/2 or 0/2 on "folds on the trunk path."
+  The real question is **loud vs. silent failure**, not contention avoidance.
+- **The idiomatic-looking option fails.** Candidate (c), a keyless
+  `pi.session.trunk` register, has real precedent — pi ships
+  `sessionName = value("pi.session.name")` at `values.js:79`. It loses folds
+  silently, 0/600. Exactly why it needed measuring rather than reasoning about.
+- **The experiment corrected the design.** Single-`prev` promotions leave losers
+  as permanent leaves ⇒ permanent false-positive fork detection. `prev` must be
+  a **list** (merge-commit shaped). Caught by `refold.mjs` failing, then passing.
+- **ADR-0010 pays off twice:** fold destination-relativity makes fork repair
+  *free* — re-fold the source at the new tip; the stale merge node survives as
+  immutable provenance.
+- **Wiring note:** `link:` is a pnpm/yarn protocol — npm rejects it
+  (`EUNSUPPORTEDPROTOCOL`), and `pnpm --ignore-workspace` couldn't reach the
+  registry. The agent **symlinked the local packages into `node_modules/@kyneta/`**
+  instead, which is a *truer* link than S14's dist overlay: the real local
+  `package.json` and its `exports` are used. `workspace:^` never has to resolve
+  because npm is never asked to install those packages.
+- **Noticed a concurrent rebuild** of `~/halecraft/kyneta` mid-spike (not its own
+  doing — your team's), and **re-ran the entire scorecard afterwards**; results
+  identical before and after.
+- Spawned **S15**.

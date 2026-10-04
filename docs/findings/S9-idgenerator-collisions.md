@@ -1,5 +1,21 @@
 # S9 — Does pi's `IdGenerator` collide under concurrent multi-peer use?
 
+**Status:** Answered.
+
+## Brief
+
+**Size:** S · **Depends on:** nothing · **Raised by:** S7 residual #7
+
+**Question.** ADR-0009 makes id uniqueness safety-critical. S7 used its *own*
+UUIDv7 implementation. pi ships an injectable `IdGenerator`. Does pi's produce
+collisions across peers — same millisecond, same process, forked processes?
+
+**Kill criterion.** Any collision path means we must supply our own generator
+rather than use pi's default. Cheap to check, expensive to discover later:
+failure is *silent data loss*.
+
+## Report
+
 **Date:** 2026-09-20 · **pi / pi-ai:** 0.85.0 · **Node:** v24.19.0 · **Sandbox:** `sandbox/s9-idgen`
 
 ---
@@ -357,3 +373,29 @@ Per S13's lesson, the control exercises the **same** configuration as the subjec
 **Assumed, not verified:** that `crypto.getRandomValues` is cryptographically sound; that no pi code path outside `harness/session` injects a non-default `idGenerator`; that fresh-module-instance semantics faithfully model `worker_threads`; that seeds are independent and uniform (supported by the histogram, not proven); that 2⁻⁷³ pairwise generalises to the 10⁴-instance regime, which was computed rather than measured.
 
 **Explicitly not claimed:** that pi's generator is immune to VM-image cloning (§5.3); that it is stock RFC 9562 UUIDv7 (it is not); that the observed min seed gap is a guarantee rather than a sample.
+
+## Review
+
+**Verdict:** PASS — safe *structurally*, not statistically
+
+41 assertions, zero failures.
+Independently re-verified: the pinned-millisecond test, the fork test, and the
+end-to-end ADR-0009 test with its control.
+
+- **pi's `uuidv7` is not stock RFC 9562.** A 41-bit monotonic counter (seeded
+  once per module instance from 40 CSPRNG bits, never reset per ms) + 33 fresh
+  bits. Intra-process collision probability is **exactly 0**, not 2⁻⁷⁴.
+- **Answered "why is it safe", not "no collisions in N trials"** — which is what
+  the brief demanded, and it ran the brute-force volume test *last*, noting it
+  "can only fail to disprove" the arithmetic.
+- **Imported pi's real module** rather than reimplementing it, and verified the
+  bundled TUI copy is semantically identical.
+- **Proved the field layout** by lossless decode→re-encode over 2 000 ids — all
+  128 bits accounted for — before drawing any conclusion from it.
+- **Distinguished sampling noise from signal:** r(pid, seed) read 0.25 at n=64,
+  so it re-ran at n=256 where it collapsed to −0.08.
+- **Checked its own read-only compliance carefully**, and correctly identified
+  recent `~/.pi` writes as the *orchestrating* session's own transcripts rather
+  than its doing.
+- Spawns nothing. Bonus for S1: pi's per-id `sequence` is already a per-peer
+  monotonic ordering key, recoverable via its `decode.mjs`.

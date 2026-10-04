@@ -1,5 +1,27 @@
 # S5 — Destination-aware three-way conversation fold
 
+**Status:** Answered. Led to ADR-0010.
+
+## Brief
+
+**Size:** S · **Depends on:** nothing
+
+**Question.** Given base/`ours`/`theirs`, does a strong model produce a summary
+of `theirs` that is genuinely useful at the destination — specific, non-redundant,
+and correctly scoped?
+
+**Method.** Generate a real branched session in pi's TUI (`/tree`, Esc-Esc).
+Hand-construct the three-way prompt. No infrastructure. Vary: short aside vs
+long scout; related vs unrelated tangent; contradictory branches.
+
+**Kill criterion.** If output is generic mush, or reliably smuggles in
+irrelevant context, or cannot tell common ground from divergence, the product
+thesis needs rework before any architecture is committed.
+
+**Throw away.** Everything. Keep the prompt and a written judgement.
+
+## Report
+
 **Date:** 2026-09-20 · **pi:** 0.85.0 · **Sandbox:** `sandbox/s5-fold`
 
 ---
@@ -153,7 +175,7 @@ That is a cross-leg consequence requiring simultaneous knowledge of both branche
 
 **New, unplanned finding — folds are not idempotent in an unexpected way.** Already flagged in ADR-0005 that two peers folding concurrently produce different nodes. Stronger version: fold output depends on `ours`, so **the same branch folded at different destinations yields different — and correctly different — summaries.** Re-foldability isn't just a nicety; a fold node is only valid *relative to its destination*. The UI must not present a merge node as a property of the source branch.
 
-**Unblocks the prompt** in `03-spikes.md` § S5 "Throw away… keep the prompt." Kept verbatim at `out/*.foldprompt.txt`; the rule list is in `fold.mjs` `buildFoldPrompt()`. The rules earning their keep: *do not restate*, *name contradictions plainly*, *say irrelevant in one line*, *cite concrete numbers*.
+**Keeps the prompt**, as the brief above asks ("Throw away… keep the prompt"). Kept verbatim at `out/*.foldprompt.txt`; the rule list is in `fold.mjs` `buildFoldPrompt()`. The rules earning their keep: *do not restate*, *name contradictions plainly*, *say irrelevant in one line*, *cite concrete numbers*.
 
 **Incidental pi finding.** `get_last_assistant_text` returned `{"data":{}}` on every call despite `docs/rpc.md` documenting `{"text": "..."}`. Reading `message_end` events is the reliable path. Minor, but relevant if the Pineta host ever uses that RPC command.
 
@@ -177,3 +199,30 @@ That is a cross-leg consequence requiring simultaneous knowledge of both branche
 - Token counts are `chars/4` approximations, **not** provider-reported usage.
 - "Naive baseline" is my construction (concatenate + "summarize"); a better-engineered two-way prompt might narrow the gap — though ablation A/B suggests the partition, not the wording, is what matters.
 - Entry-ID preservation across file copy is verified for this build path; **not** verified for pi's own `--fork`/`clone`, which we did not use.
+
+## Review
+
+**Verdict:** PASS
+
+Four scenarios (aside / scout / contradict /
+irrelevant control) plus a three-way ablation, on a genuinely branched session
+(verified: all four `theirs` files share real entry-id `lca=7ffc796c`).
+
+- **The ablation is the result.** Labelled three-way (254 words, finds a
+  cross-leg implication) > `theirs`-only (221 words, confidently recommends a
+  design the destination already rejected) > **same bytes unlabelled (167 words,
+  *worst* — state confusion).** The lift comes from the *partition*, not the
+  model.
+- Irrelevant control dismissed in one line — directly refutes the
+  "smuggles in irrelevant context" kill condition.
+- Naive concatenate-and-summarise is 2–4× longer and is the **wrong artifact**
+  (a whole-conversation summary, not a fold).
+- Token saving is exactly one base leg (16–27%) — real but **secondary**; the
+  semantic argument carries the design.
+- Produced **ADR-0010**. Prompt kept at `out/*.foldprompt.txt`.
+- **Incidental pi finding:** `get_last_assistant_text` returns `{"data":{}}`
+  despite `docs/rpc.md` documenting `{"text": "..."}`. Read `message_end` events
+  instead.
+- **Method note:** pi RPC has *no* in-place tree navigation (no `navigate_tree`,
+  `branch`, or `set_leaf`); `/tree` is TUI-only. Branching headlessly required
+  snapshotting the session file and extending copies.

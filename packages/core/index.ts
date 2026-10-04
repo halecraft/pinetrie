@@ -188,7 +188,7 @@ declare const runIdBrand: unique symbol
  * the schema's readers, marginalia's decoders, the pi adapter, the client's
  * stored forms, and the host's id generator. `biome.json` refuses an
  * `entryId` import in core, the client and the host, and a `runId` import in
- * core and the client (S71).
+ * core and the client (S95).
  */
 export type EntryId = string & { readonly [entryIdBrand]: true }
 export type RunId = string & { readonly [runIdBrand]: true }
@@ -1166,7 +1166,7 @@ export type CardPlace =
       readonly by: WriterId
       /**
        * The text's version as its queuer had it (`textVersion`), "" for none:
-       * the host takes the card only once it holds that much (S72).
+       * the host takes the card only once it holds that much (S96).
        */
       readonly seen: string
     }
@@ -1192,7 +1192,7 @@ export const INVENTORY_COLUMNS = 6
 /**
  * The card a chat is sent from, with its text's version as its sender had it
  * (`textVersion`): queued, the host takes it only once it holds that much
- * of the text (S72).
+ * of the text (S96).
  */
 export interface SentCard {
   readonly id: CardId
@@ -1205,7 +1205,7 @@ type OmitEach<T, K extends PropertyKey> = T extends unknown ? Omit<T, K> : never
  * Where a card is, without what the host assigns when it queues one (its
  * order and who queued it). A move compares it and targets it. A queued key
  * keeps its text's version (`seen`), which the queuer sends with the move
- * (S72).
+ * (S96).
  */
 export type PlaceKey = OmitEach<CardPlace, "order" | "by">
 

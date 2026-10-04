@@ -1,5 +1,7 @@
 # S14 — Re-validate the evidence base against FIXED Kyneta + the new loro floor
 
+**Status:** Answered. Closed S13, and partly discharged S10.
+
 **Date:** 2026-09-20 · **Sandbox:** `sandbox/s14-revalidate` · **Node:** v24.19.0
 
 ---
@@ -435,3 +437,29 @@ whereas the working copy declares `>=1.13.4`. A republish that ships the code fi
 - That the landed fix passes Kyneta's own 2062-test suite (not re-run here).
 - That config D's n=8 000 → n=10 000 extrapolation (~1.8 s) is accurate; I measured D only on the doubling series, not at 10 000.
 - That `@kyneta/changefeed` and `@kyneta/random` were unaffected by `da978ec` — they were overlaid for consistency, but their dists were not diffed against npm.
+
+## Review
+
+**Verdict:** NOTHING REGRESSED
+
+A 2×2 factorial (kyneta npm/local ×
+loro 1.10.8/1.16.1) — the agent added config D itself, correctly noting the
+factorial was incomplete without it and that S13 could not otherwise be answered.
+
+- **Correctness invariant across all four configs.** S2 21/21; S7 900/900; S8
+  1000/1000; S3 step1 12/12, step7 10/10. **Every entry total byte-identical to
+  published figures** — behaviour unperturbed, not merely "still passing." Both
+  negative controls still fail as designed.
+- **Performance, Pineta shape n=10 000:** entries **38 444 → 93 ms (413×)**,
+  lists **12 731 → 92 ms (138×)**. Linear to **n=50 000**. Independently
+  re-verified at n=8 000: entries `26 234 → 75 ms`, ×4.54 → ×1.75.
+- **The factorial is the interesting part.** Lists need only the Kyneta fix
+  (loro version irrelevant). **Maps need BOTH**: Kyneta alone takes 24 316 →
+  1 159 ms but leaves ×3.77; the loro bump then takes it to 67 ms and ×1.83.
+  **The loro fix alone buys ~4%** — the Kyneta defects mask it entirely.
+- **S10 partially discharged** — linearity confirmed to n=50 000. Snapshot-size
+  and sync-payload questions remain.
+- **Flagged for you:** `da978ec` is **not an ancestor of git `HEAD`** in the
+  colocated repo (`HEAD` = `c84a5ca`, a datalog line). The *working copy* carries
+  the fix and the dist is built from it, but anyone rebuilding from git `HEAD`
+  would not get it. A jj/git bookkeeping question, not a code one.

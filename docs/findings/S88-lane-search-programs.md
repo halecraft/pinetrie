@@ -1,5 +1,7 @@
 # S88 — rg, fd and sd for every lane, and how they behave as tools
 
+**Status:** Answered. Basis of ADR-0064.
+
 `PLAN-2026-10-03-lane-search` gives every lane of its own `rg`, `fd` and `sd`
 through the lane runtime (S44), and gives the agent `grep` and `find` tools
 that run them. pi's prompt already told every lane to "use bash for file

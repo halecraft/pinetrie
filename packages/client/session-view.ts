@@ -739,7 +739,7 @@ export async function connectSession(
         asksAgent: how.asksAgent === true,
         mentions: parseMentions(text),
         work: how.work ?? null,
-        // Queued when the lane is busy, it waits for this much text (S72).
+        // Queued when the lane is busy, it waits for this much text (S96).
         card:
           card === undefined
             ? null
@@ -866,7 +866,7 @@ export async function connectSession(
     queueCard(id, { lane, at }, how = OFF_PAGE) {
       const card = cardNow(id)
       if (card === undefined) return
-      // The text as this client has it: the host waits for that much (S72).
+      // The text as this client has it: the host waits for that much (S96).
       const seen = textVersion(cardText(id))
       void sendMove(
         {

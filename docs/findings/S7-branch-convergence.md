@@ -1,5 +1,24 @@
 # S7 — Do divergent branches persist distinctly in one Kyneta doc?
 
+**Status:** Answered. Led to ADR-0009; spawned S8, S9 and S10.
+
+## Brief
+
+**Size:** S · **Depends on:** nothing
+
+**Question.** Two peers, one Kyneta document, concurrent entry appends under
+*different* parents. Do both branches survive as distinct siblings and converge
+as a tree — with no interleaving and no auto-merge?
+
+**Method.** Direct `@kyneta/schema` + Loro test. No pi involved.
+
+**Kill criterion.** Any interleaving or collapse means our document shape is
+wrong (not that ADR-0008 is wrong — that would mean we modelled the tree in a
+substrate-merged container by mistake).
+
+**Throw away.** The harness; promote the assertion into the permanent
+convergence property test.
+
 ## 1. VERDICT
 
 **PASS.** Divergent conversation branches modelled as `Schema.record` keyed by UUIDv7 survive concurrent multi-peer appends with zero interleaving, zero loss, and byte-identical convergence across replicas (34/34 assertions; 900/900 randomized property trials). The kill criterion was not triggered.
@@ -209,7 +228,7 @@ Loro's map yields identical key order across replicas regardless of write origin
 
 **Confirms ADR-0004** ("entries are immutable"). Immutability is what makes `Schema.struct.json` values safe and what makes the per-key LWW register uncontended. The two decisions are load-bearing for each other.
 
-**Resolves S7.** Per `03-spikes.md`, S7 can move to Resolved and the assertion promoted to a permanent fitness function.
+**Resolves S7.** Per the brief above, the assertion can be promoted to a permanent fitness function.
 
 **Feeds `01-architecture.md` § "Document shape (sketch — S2 will refine)".** The `entries` line can be firmed up from "grow-only set keyed by UUIDv7" to the concrete construct: `Schema.record(Schema.struct.json({...}))`, with the id-uniqueness invariant stated explicitly.
 
@@ -230,3 +249,22 @@ Loro's map yields identical key order across replicas regardless of write origin
 7. **UUIDv7 generator is mine, not pi's.** I wrote a minimal v7 with a 12-bit monotonic counter for same-millisecond ordering. pi has its own injectable `IdGenerator`. Collision behaviour of *pi's* generator under concurrent multi-peer use is unverified — and §3.4 shows that is the one thing that must not fail.
 8. **`Schema.struct.json` value semantics under partial update** were not probed. I only ever wrote whole entries once. If any code path ever does a partial update to an entry value, the LWW-whole-blob semantics may surprise — though ADR-0004 forbids it.
 9. **loro-crdt 1.10.8 only.** Not tested against npm-latest 1.16.1, nor against the `>=1.8.0` floor the backend declares.
+
+## Review
+
+**Verdict:** PASS
+
+34/34 assertions, 900 property trials,
+~15.9k entries, zero failures. Independently re-verified at a fresh seed.
+
+- Settled the document shape: `Schema.record(Schema.struct.json({...}))`
+- Produced **ADR-0009** (id uniqueness as a safety invariant)
+- Reproduced the ADR-0008 failure mode locally (§3.5)
+- Delivered `convergence.property.mjs` + `negative-control.mjs`, ready to promote
+  to a permanent fitness function
+- Spawned S8, S9, S10 from its residuals
+
+**One claim in the report is wrong:** it states it is "correcting"
+`docs/01-architecture.md` regarding `Schema.set` type-level rejection. Our docs never
+mentioned `Schema.set`. The underlying finding (runtime rejection) is retained;
+the attribution was invented and no correction was applied.

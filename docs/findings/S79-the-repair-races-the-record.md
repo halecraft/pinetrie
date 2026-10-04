@@ -22,7 +22,7 @@ naming a card that is not yours, and keeps the lower of two slots.
    slots, and the lower wins, which is not always the one chosen.
 3. **Nothing orders the two.** The host's record and another tab's slot
    write travel on two documents, which Kyneta keeps no order between
-   (S72), so either can arrive first.
+   (S96), so either can arrive first.
 4. **Waiting fixes it.** With the repair acting on a card only once it has
    been held, or not, for 2 s (`steadiness`, `STEADY_MS`), the second
    session showed the card in slot 3 within a fraction of a second, and the

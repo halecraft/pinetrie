@@ -17,6 +17,7 @@ const proofs = [
   "scripts/proofs.test.ts",
   "scripts/budget.test.ts",
 ]
+const numbering = ["pnpm", "exec", "vitest", "run", "scripts/numbering.test.ts"]
 const scenarios = [
   "pnpm",
   "exec",
@@ -146,5 +147,21 @@ export const mutations: readonly Mutation[] = [
     to: 'const LABEL = /(?<![\\w.])check\\(\\s*(["])((?:\\\\.|(?!\\1).)*)\\1/g',
     command: proofs,
     expect: "reads labels in either quote style",
+  },
+  {
+    name: "numberingGaps lets two files share a number",
+    file: "scripts/numbering.ts",
+    from: "    .filter(([, same]) => same.length > 1)",
+    to: "    .filter(([, same]) => same.length > 2)",
+    command: numbering,
+    expect: "two files with one number clash, and S7 is not S72",
+  },
+  {
+    name: "numberingGaps passes every title",
+    file: "scripts/numbering.ts",
+    from: "    .filter(f => !n.title(f.digits).test(f.firstLine))",
+    to: "    .filter(() => false)",
+    command: numbering,
+    expect: "is a mismatch",
   },
 ]

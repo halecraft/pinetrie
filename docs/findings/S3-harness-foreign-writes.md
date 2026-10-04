@@ -1,5 +1,27 @@
 # S3 — Does `pi-agent-core` tolerate storage it did not write?
 
+**Status:** Answered. Led to ADR-0011.
+
+## Brief
+
+**Size:** M · **Depends on:** S2
+
+**Question.** Two harness instances against one Kyneta doc, appending on
+different tips. Does the harness cope with `scanBranch`/`getEntries` returning
+entries that appeared from another peer mid-run?
+
+**Why it matters.** `SessionMutation` is documented as an *"exclusive keyless
+mutation barrier for one Session"* — a per-process mutex. It may assume a
+private world. Measured behaviour today: two clients on one lane **serialize**.
+
+**Kill criterion.** If the harness caches, assumes monotonic local growth, or
+corrupts on foreign entries, multi-writer needs *harness* changes, not just
+storage — a materially larger project.
+
+**Throw away.** The driver. Keep a written list of every assumption violated.
+
+## Report
+
 **Date:** 2026-09-20 · **pi-agent-core:** 0.85.0 · **Sandbox:** `sandbox/s3-harness`
 
 ---
@@ -312,3 +334,25 @@ Concurrent writers MUST each own a distinct lane name. A shared lane produces st
 **Assumed, not verified:** that lane-per-peer survives the drive loop (residual #1) — the strongest claim in this report rests on append/read paths only; that no *other* pi subsystem caches session state (I audited `Lane`, `StorageBackedSession`, `Harness`, and `restore`, not compaction/hooks/tools); that two replicas generalise to N; that `seq` collision is the *only* remaining storage-level blocker under lane-per-peer.
 
 **Explicitly not claimed:** that counter regression occurs naturally; that the `Storage` contract is violated by concurrency (it was not, in any probe); that lane-per-peer is sufficient for the v1 demo without S1 being solved.
+
+## Review
+
+**Verdict:** (kill criterion met; mitigated by design)
+
+**Closed S2 residual #5: a real
+`AgentHarness` runs over `KynetaStorage`** (step1 12/12, re-verified).
+
+- **Confirmed:** the harness **caches** and **assumes monotonic local growth**.
+  It does **not** crash or corrupt. `StorageBackedSession` does *not* cache —
+  **`Lane` does** (`lane.js:128-131`, `getTipId` ignores its context param).
+- **Mitigation proven:** lane-per-writer → 10/10, re-verified, zero orphans,
+  producing exactly the branched tree Pineta wants from two partitioned writers
+  with zero coordination.
+- **T5 answered: yes, the mutex can be per-replica.** The question was aimed at
+  the wrong object — no probe produced a `Storage`-contract violation. The real
+  coupling is the shared `branchTip` register and the global `seq`.
+- **Itemised 10 exclusive-ownership assumptions (A1–A10) with file:line
+  evidence**, plus 5 escape hatches (P1–P5) — notably `MutationLine` is
+  *injectable*, so a distributed barrier is possible without forking.
+- **Net: multi-writer Pineta stays a STORAGE project**, conditional on ADR-0011.
+- Model layer was **stubbed**; the drive/inference loop is untested (residual #1).

@@ -141,7 +141,7 @@ describe("takeTop", () => {
     ).toBe("idle")
   })
 
-  test("a top card whose text the host does not yet hold is behind, and stays: the next waits behind it (S72)", () => {
+  test("a top card whose text the host does not yet hold is behind, and stays: the next waits behind it (S96)", () => {
     const cards = newPlacesDoc()
     queue(cards, "c-1", "a")
     queue(cards, "c-2", "b")

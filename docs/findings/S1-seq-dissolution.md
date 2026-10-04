@@ -1,5 +1,25 @@
 # S1 — Dissolve the global dense `seq`
 
+**Status:** Answered. Led to ADR-0013.
+
+## Brief
+
+**Size:** S · **Depends on:** S2's failure taxonomy
+
+**Question.** `EntryScan{fromSeq,toSeq}` requires **range scans**, and
+`EntryCursor`/`ListCursor` require stable pagination. Can these be served by
+Lamport+peer ordering plus a local index, without a dense global counter?
+
+**Kill criterion.** If range scans genuinely require density, we need a
+materialized local index per replica — acceptable, but it must be designed, and
+it means `seq` becomes a *derived local view*, not stored state.
+
+**Output.** If the answer is clean, write it as an **upstream proposal**, not a
+private workaround: *"replace a global commit counter with per-op causal
+metadata so the log can merge."*
+
+## Report
+
 **Date:** 2026-09-19 · **Sandbox:** `sandbox/s1-seq` · **Node:** v24.19.0
 **Build:** local fixed Kyneta (`stepInPlace` present) + `loro-crdt` **1.16.1**
 
@@ -355,3 +375,30 @@ Its third claim — *"Entries need no `seq` at all"* — is confirmed in the sen
 **Assumed, not verified:** that the 21 conformance cases fully characterise the `Storage` contract (S2's assumption, inherited — `session-repo.js` ships a second, unexercised suite); that Loro guarantees causal delivery of parent before child in all transports (relied upon, fallback never exercised — residual #3); that passing with a stubbed model implies the drive loop is safe (residual #1); that no consumer outside `dist/harness` persists a cursor.
 
 **Explicitly not claimed:** that arrival order is a *good* order for display — it is not, and nothing should use it for that; the tree's `parentId` walk is the semantic order. That this design survives a real transport. That a cursor is safe across a restart — it is not, by construction.
+
+## Review
+
+**Verdict:** SOLVED, no upstream renegotiation needed
+
+The top blocker is cleared.
+Independently re-verified: conformance 21/21 (+ `memory` control), fresh-seed
+property 100/100, control 0/40, S3's reproduction showing 0 collisions and 0
+skipped entries.
+
+- **Refuted the architecture doc's own plan.** "Replay order → Lamport + peer
+  tiebreak, inherited free from Loro" cannot work: **a convergent order and
+  stable integer cursors are mutually exclusive.** Only arrival order — where
+  new observations always land at the end — keeps `cursor.seq + 1` sound.
+- **Also refuted the S2/T7 "API-visible break."** `ListReadOptions` is unchanged;
+  no Loro `Cursor` required.
+- **Found pi's own proof that density was never required:** a conformance fixture
+  named `"sequence gap"` (`conformance/storage.js:522`).
+- **Wrote its own property wrong first and let the test correct it** — an initial
+  "seq is gapless" assertion failed immediately, correctly.
+- **Instrumented its own dead code:** the causal-delivery fallback was made to
+  `throw` and never fired across 400 trials + conformance — so it reports that
+  path as *untested* rather than claiming coverage.
+- Cost: cold index rebuild **57 ms @ n=10 000**; incremental reconcile **O(δ),
+  0 ms** at both 10 000 and 50 000 entries. Linear to n=50 000.
+- **Supersedes the roadmap's deliberately-failing fitness function** — "no two
+  entries share a `seq` after a partition heal" now **passes**.

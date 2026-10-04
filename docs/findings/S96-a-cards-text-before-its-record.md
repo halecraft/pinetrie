@@ -1,4 +1,6 @@
-# S72 — a card's text can reach the host after its record
+# S96 — a card's text can reach the host after its record
+
+Numbered S72 until 2026-10-03, when two spikes held that number.
 
 Measured in a lane (Linux, Node 24) for `PLAN-2026-10-01-queued-cards`,
 after `e2e:lanes` failed on the Mac: the conflicted bring-up-to-date check

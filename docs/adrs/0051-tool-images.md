@@ -1,6 +1,6 @@
 # ADR-0051 — A tool's image is a blob; what pi stores holds its reference, and the rejoin restores its bytes
 
-**Status:** Accepted. Evidence: S59. Implementation:
+**Status:** Accepted. Evidence: S93. Implementation:
 `PLAN-2026-09-30-tool-images`. Extends ADR-0042, whose "Other images are
 unchanged here" left tool results for later. Amends ADR-0015 (a message's
 image parts in `payload` are references) and ADR-0049 (a row whose result has
@@ -8,7 +8,7 @@ an image opens capped, and draws the image in place of its text).
 
 **Context.** A `read` of an image showed only its caption, "Read image file
 [image/png]". pi's `read` returns the image as a base64 part, and
-`KynetaStorage` stored it inline. pi writes a tool result twice (S59): first
+`KynetaStorage` stored it inline. pi writes a tool result twice (S93): first
 as a `pi.pending.entry` value, then as the entry. Both held the bytes, and a
 deleted value stays in the history until compaction (S22). So every client
 that joined received each image twice, compaction rewrote the entry's copy,
@@ -23,7 +23,7 @@ image was never drawn.
   After a resize, pi's own note of the original size and scale goes to the
   model with the caption. An image the store does not keep (BMP, SVG) or
   cannot read is omitted, with a line saying why. The processor runs before
-  pi writes anything (S59), and awaiting is allowed there, where
+  pi writes anything (S93), and awaiting is allowed there, where
   `KynetaStorage`'s commit is synchronous.
 - **What pi stores holds a reference.** When pi commits a message entry or a
   `pi.pending.entry` value, each image part whose blob the store has, found
@@ -36,7 +36,7 @@ image was never drawn.
   `toProviderMessages` seam, see the image. A blob no longer stored rejoins
   as ADR-0042's "[image <sha256> is no longer stored]". There is no cache:
   pi rejoins each entry on a branch about twice a model request, and a rejoin
-  of a 2 MB image costs 0.65 ms (S59).
+  of a 2 MB image costs 0.65 ms (S93).
 - **A reader sees the reference.** `messageImages` (core) admits a stored
   reference, never an inline part, and a tool call's result carries its
   images. The sweep counts them, so a tool's image lives as long as an entry
@@ -64,7 +64,7 @@ image was never drawn.
 - Drawing the inline base64 as it was: two small changes, but the bytes stay
   in the document twice, and the model still gets the whole file.
 - Splitting the entry alone: the pending value put the bytes in the history
-  until compaction (S59).
+  until compaction (S93).
 - The reference in what pi reads, with the bytes added in
   `toProviderMessages`, as a chat's are: pi would hold image parts without
   `data`, its compaction reads entries without the seam, and conformance

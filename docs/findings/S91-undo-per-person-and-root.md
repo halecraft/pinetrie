@@ -1,5 +1,7 @@
 # S91 — Undo stacks per person and root, stored by the host
 
+**Status:** Answered. With S82 and S90, led to ADR-0066.
+
 Asked while planning undo of moves on the host (ADR-0066): can the host keep
 one stack per person and root in its store, so a person's tabs share it,
 it outlives a restart, it unloads when idle, and it can be destroyed without

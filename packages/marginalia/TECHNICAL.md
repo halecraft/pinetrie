@@ -11,7 +11,7 @@ A decoder brands the ids it reads, and its `build` may refuse a value too.
 record keyed by lane (`laneKey`), and in `build` for a lane in its
 contents (as `BANNER` checks `isSha256`). A value whose lane fails is
 dropped. That is what keeps a malformed lane out of the host's writes:
-`agent.lane` finds any lane pi holds (S71). A card is the exception
+`agent.lane` finds any lane pi holds (S95). A card is the exception
 (`card.ts`, below).
 
 Namespaces are stored data and name the owner, `pineta.`, following pi's own
@@ -194,7 +194,7 @@ which are swept.
   cannot drift. A drafting or queued card's `at` is never the root; a fresh
   card's `column` is never "", and it carries its root and its branch
   point (a `Spot`, ADR-0066), the root for a new tab; a queued card has its `lane`, `order` and
-  `by`, and `seen`, its text's version as its queuer had it (S72), which
+  `by`, and `seen`, its text's version as its queuer had it (S96), which
   the queue's key carries from the client. Every field is required: the
   host writes a record whole. A
   `command` this build does not know makes the card malformed. A drafting

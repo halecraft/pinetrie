@@ -374,7 +374,7 @@ swapped. The readers mint them: `readLaneTip` an `EntryId`, `readActiveRun` a
   `malformed`, and `readLaneNames` gives only `lanes`, so no reader is
   handed a name like `"main"`, which would become a container's or a
   bookmark's name. The host logs the malformed ones at startup (`recover`).
-  Every lane name in a measured store passed (S71).
+  Every lane name in a measured store passed (S95).
 - **`readStreamRecords` drops a stream whose lane fails `isLaneName`.** Only
   the host writes streams, and `clearStreams` deletes them all at startup.
 

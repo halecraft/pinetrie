@@ -241,7 +241,7 @@ async function run(check: Checks["check"]): Promise<void> {
 
     // 4b. A card queued on an idle thread is taken at once. It is queued as
     // soon as it is made, as the bring-up-to-date button's card can be: its
-    // record can reach the host before its text (S72), and the take waits.
+    // record can reach the host before its text (S96), and the take waits.
     const idleEnd = tipOf()
     const c6 = newCard(ada, idleEnd, "@Bea while it is quiet")
     ada.queueCard(c6, { lane, at: at(idleEnd) })

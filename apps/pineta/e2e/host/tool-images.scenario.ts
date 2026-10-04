@@ -66,7 +66,7 @@ async function run(check: Checks["check"]): Promise<void> {
     const tu = await join(th, "tia", "tool-images")
 
     // pi's pending entries, as each change of the document leaves them: a
-    // compaction after the run rewrites the history they were in (S59).
+    // compaction after the run rewrites the history they were in (S93).
     const pendings: string[] = []
     // Each root's document, followed as the host opens it: a run is in
     // its root's (ADR-0063), which a start makes, and starting a run is a
@@ -113,7 +113,7 @@ async function run(check: Checks["check"]): Promise<void> {
     )
 
     // 2. No bytes in the session: not in the entry, nor in pi's pending entry,
-    // which a delete leaves in the history until a compaction (S59).
+    // which a delete leaves in the history until a compaction (S93).
     unwatch()
     await th.quiet()
     const base64Slice = RED_PNG.toString("base64").slice(20, 70)

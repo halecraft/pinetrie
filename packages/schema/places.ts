@@ -41,7 +41,7 @@ const StoredCard = Schema.struct.json({
   order: Schema.string(),
   /** Who queued it. */
   by: Schema.string(),
-  /** A queued card's text version as its queuer had it (`textVersion`, S72). */
+  /** A queued card's text version as its queuer had it (`textVersion`, S96). */
   seen: Schema.string(),
   /** Its command (ADR-0055). */
   command: Schema.string(),

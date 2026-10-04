@@ -53,12 +53,17 @@ They share `checks.ts` (recording a check, and stopping at one),
   and lanes scenarios together are at most ⌊√n⌋ of the n unit tests, and
   the browser's at most ⌊√n⌋ of those. A scenario, like a `test()`, holds
   many checks; only scenarios count.
+- **Numbered docs** (`scripts/numbering.ts`, `scripts/numbering.test.ts`): no
+  two files in `docs/findings` or `docs/adrs` share a number, and each
+  title carries its file's number. Two lanes taking one number merge
+  without a conflict, so the test fails in the first `pnpm test` after both
+  land, not in either lane.
 
 ## What a run costs
 
 - **A wait costs once per run, and once more per mutant whose check comes
   after it in its scenario.** S65 measures where the time went before the
-  suites were scenarios; S67, after.
+  suites were scenarios; S94, after.
 - **A wait must be able to end early.** A fixed `sleep`, or a `waitFor`
   whose condition cannot hold, costs its whole length every run. A negative
   check, which shows that nothing arrives, has to wait: wait as briefly as

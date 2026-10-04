@@ -1,5 +1,39 @@
 # S11 — Why are `@kyneta/schema` writes quadratic?
 
+**Status:** Answered. Spawned S13.
+
+## Brief
+
+**Size:** M · **Depends on:** nothing · **Raised by:** S2 §3.4
+
+**Question.** S2 measured `@kyneta/schema` write throughput as **O(n²) in
+container size**, against raw `loro-crdt`'s O(n) — **~650× slower at n=8000**.
+Independently reproduced: 138 / 515 / 1965 / 7743 ms for 1k/2k/4k/8k (≈ 4× per
+doubling) vs raw Loro 2 / 3 / 6 / 12 ms (≈ 2×). Why?
+
+**What is already ruled out.** Batch size (chunking into 100-write batches
+changes nothing — it is quadratic in *container* size). The Loro binding (the
+plain-JS substrate shows the same curve, so it is **`@kyneta/schema` core**).
+`.at()` navigation overhead (hoisting it out of the loop changes nothing).
+
+**Suspects, unverified:** changefeed materialisation per op; per-op path/address
+construction.
+
+**Why this is top priority.** It is *first-party code you own and can fix*, and
+it sits directly under Pineta's two unbounded containers — the session entry
+record and `pi.pending.assistant_frame`. Every later design decision about
+document granularity depends on whether this is a bug or a law.
+
+**Mitigating fact:** the realistic streaming shape is fine *today* — 1 000
+separate single-append commits took 247ms (≈0.25ms/commit). Reads are also cheap
+(42ms to materialise 10 001 elements). This bites on bulk load, replay, and
+long sessions, not on interactive use.
+
+**Kill criterion.** If it is inherent to the schema algebra rather than an
+implementation defect, Pineta needs per-entry document granularity — a
+document-shape change, so it must be known **before** the production adapter is
+built on the current shape. (Supersedes part of S10.)
+
 ## 1. VERDICT
 
 **DEFECT, not inherent — and there are two independent defects, both fixed.** Cause A is a redundant deep clone that **is already fixed in Kyneta's `main` source but is still present in the published 3.0.0 dist**; cause B is `step`'s pure-arrow container rebuild, fixed here with an in-place fast path that passes Kyneta's own 2062-test suite unchanged. On the real Pineta shape at n=10 000, list append goes **13 106 ms → 185 ms (71×)** and entry writes **41 270 ms → 1 904 ms (22×)**. **The kill criterion is not met: Pineta does not need per-entry document granularity on account of write throughput.**
@@ -434,3 +468,61 @@ Raw `loro-crdt` map-set is linear (`raw loro map set x4000 → 7ms`), so this is
 - That the profiler's collapse of callees into `prepare` (§3.2) is V8 inlining. I worked around it rather than confirming the cause; the conclusion rests on code reading plus the bisection in §3.4/§3.5, not on that profile.
 - That republishing is sufficient for cause A — I verified the *source* is fixed, but did not build the packages from source and re-measure. The patched-dist measurements are a proxy for that.
 - That `x2.0` per doubling constitutes linearity over the measured range (1k–8k). Confirmed to 10 000 on the Pineta shape for lists (x1.84), not beyond.
+
+## Review
+
+**Verdict:** DEFECT, not inherent — both causes fixed
+
+> **✅ FIXED UPSTREAM — `da978ec perf(schema,machine)!: writes cost O(δ), not O(σ)`
+> (2026-09-19).** Kyneta took the *systematic* route S11 raised as §6 item 4
+> rather than its call-site patch: `step` is now `copy ∘ core`, `stepInPlace` is
+> the core, `applyChange` uses the dual. S11's `fixB-reader.patch` is **superseded**.
+>
+> **Three further causes S11 did not find**, per the commit message:
+> 1. `createDispatcher` walked the stack on every write to decorate an error —
+>    now late and lazy (`@kyneta/machine`).
+> 2. **`loro-crdt` built a commit's event in O(keys²)** when a subscriber is
+>    attached — always, for this substrate. Bisected to 1.13.3, fixed in 1.13.4.
+>    **This is the S13 residual.**
+> 3. `stepSequence` silently dropped `undefined` elements — the exact hazard S11
+>    guarded against in its fast path. Now fixed, so the guard is unnecessary.
+>
+> S11's cause-A finding stands and is called out in the commit as still
+> actionable: *"the published `@kyneta/schema@3.0.0` dist predates `a5e2c8f` …
+> Republishing is most of the win for anyone installing from npm."*
+
+**Kill criterion not met: Pineta does not
+need per-entry document granularity for write-throughput reasons.** The shape S7
+settled stands.
+
+- **Cause A — already fixed in your source, never published.** The published dist
+  does `deepClonePlain(path.read(doc))` on *every* write; `path.read` resolves to
+  the **whole container**, so it is O(n) per op ⇒ O(n²) per batch. Kyneta `main`
+  replaced it with "Read, don't copy" in **`a5e2c8f` (2026-09-06)** — but
+  `@kyneta/schema@3.0.0` was published **2026-08-18**. *Independently verified:
+  the clone is present in the pristine published dist of both `@kyneta/schema`
+  and `@kyneta/loro-schema`, and absent from source.* **Every measurement in S2
+  was taken against code `main` had already fixed.**
+- **Cause B — `step` rebuilds the whole container per op.** `step` is a pure
+  arrow, which is right for the algebra; but `applyChange` materialises every
+  intermediate state. Fixed with in-place fast paths for map set/delete and pure
+  append; everything else falls through to the existing path. Argued safe from
+  the documented liveness invariant plus `invert`-before-`applyChange` ordering.
+- **Verification:** Kyneta's own **2062 tests pass unchanged** (84 files, patched
+  and unpatched); S2's conformance **21/21** on the patched build; S7's
+  convergence property **400 trials with entry counts byte-identical** to S7's
+  published figures; negative control still fails.
+- **Measured (re-verified independently):** n=8000 list `7793 → 142 ms`,
+  record `18976 → 1205 ms`. Pineta shape at n=10 000: entries
+  `41 270 → 1 904 ms` (22×), pending list `13 106 → 185 ms` (71×). S2's slowest
+  conformance case dropped `12 198 → 267 ms`.
+- **Methodological note worth keeping:** the first CPU profile was *misleading* —
+  92.8% self-time collapsed into `prepare` with `applyChange` absent entirely.
+  The agent stopped trusting it and bisected instead. On bundled ESM builds V8
+  attribution localised the statement group correctly but named the wrong
+  function.
+- **Not verified:** `tsc --noEmit` OOM'd, so the patch's two `as` casts are
+  type-unchecked. `@kyneta/react` and `@kyneta/devtools` were never exercised —
+  they are the most likely holders of an object-identity assumption that in-place
+  mutation could break.
+- Spawned **S13**.

@@ -1021,7 +1021,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
 - **A queue sends the text's version too** (`seen`, `textVersion`), in the
   queued key, and so does a chat sent from a card (`SentCard`), which the
   host queues when the lane is busy: the host takes the card only once it
-  holds that much of the text, since the request can reach it first (S72).
+  holds that much of the text, since the request can reach it first (S96).
 - **Queue, unqueue and a command are requests to the host, outside the undo
   stack** (`SessionClient.queueCard`, `unqueueCard`, `setCommand`): a card's
   box undoes only its text (ADR-0052). A queue and an unqueue are moves, so

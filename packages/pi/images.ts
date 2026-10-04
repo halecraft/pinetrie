@@ -67,7 +67,7 @@ const OMITTED: Record<Extract<PreparedImage, { ok: false }>["reason"], string> =
 /**
  * pi's `read`, for an image: fitted as a pasted image is, and put in `blobs`
  * before it is returned, so every write pi makes of the result finds it there
- * by hash and stores a reference (S59). pi adds `hints` to the result's text.
+ * by hash and stores a reference (S93). pi adds `hints` to the result's text.
  */
 export const readImageProcessor =
   (blobs: Pick<BlobStore, "put">): ReadImageProcessor =>

@@ -1,5 +1,24 @@
 # S2 — Does a minimal `KynetaStorage` pass pi's conformance suite?
 
+**Status:** Answered. Confirmed ADR-0003; spawned S11.
+
+## Brief
+
+**Size:** M · **Depends on:** nothing
+
+**Question.** Can `Storage`'s 10 methods be satisfied over a Kyneta/Loro
+document? Single-writer, in-memory is fine for this spike.
+
+**Method.** Stub `KynetaStorage`, point
+`pi-agent-core/harness/session/testing/conformance/storage.js` at it, count
+failures and classify them.
+
+**Kill criterion.** Binary. Systematic failure ⇒ ADR-0003 is wrong and the plan
+changes shape.
+
+**Throw away.** The implementation. Keep the failure taxonomy — it *is* the
+implementation plan.
+
 ## 1. Verdict
 
 **PASS (21/21), with one serious non-contractual finding: `@kyneta/schema` write
@@ -316,3 +335,22 @@ suite does not probe — `session-repo.js` ships a second, unexercised suite); t
 passing implies the harness will accept the adapter (see unknown #5); that
 `Schema.any()` round-trips every payload pi can produce (only suite-generated
 payloads were exercised).
+
+## Review
+
+**Verdict:** PASS (21/21)
+
+Passed **first execution**, stable over
+three runs, independently re-verified. `MemoryStorage` control also 21/21.
+Adapter is ~305 lines.
+
+- **ADR-0003 confirmed.** Third-party `Storage` backends are a genuinely
+  supported extension point.
+- **ADR-0002 supported:** full export → fresh replica → re-read with byte
+  fidelity, including `\u0000`-separated and astral-plane keys.
+- **No shadow index** — every read materialises from the Loro doc, so the
+  document really is the source of truth.
+- pi supplies far more than the interface: `prepareStorageCommit`,
+  `validateCommittedWrites`, `resolveListReadOptions`, `addUsage`, and
+  `MemoryStorage` as a reference state machine. This is why it passed first try.
+- **Spawned S11** (the quadratic-write finding).

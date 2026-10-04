@@ -126,7 +126,7 @@ export interface Command {
   /** `chat`: the card its text was sent from, or `""` (ADR-0048); `move`, `set-command`: the card. */
   readonly cardId: string
   /**
-   * `chat`: the card's text version as the sender had it (S72), or `""`.
+   * `chat`: the card's text version as the sender had it (S96), or `""`.
    * `offer` `take`: what the take was shown (`OfferSeen`, ADR-0065), as JSON;
    * a take without it is refused.
    */

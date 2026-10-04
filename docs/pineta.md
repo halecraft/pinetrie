@@ -96,7 +96,7 @@ discharged before any non-disposable code was written.
 | unit (pure core) | `pnpm test` | 1671/1671 (Vitest) |
 | mutations | `pnpm mutate scripts/mutations/<list>.ts` | 1025 listed; anchors checked in `pnpm test` |
 | pi's own Storage suite | `pnpm run conformance` | 21/21 + 21/21 control |
-| end-to-end | `pnpm run e2e` | 12 scenarios, 43 checks, on the scripted model (S67) |
+| end-to-end | `pnpm run e2e` | 12 scenarios, 43 checks, on the scripted model (S94) |
 | with a real model | `pnpm run e2e:live` | the `live` scenario: 3 checks |
 | **real browser** | `pnpm run e2e:browser` | 4 scenarios, 161 checks; in a lane with no containers, the 6 that need one report SKIP |
 | test budget | `scripts/budget.test.ts` (in `pnpm test`) | 17 host and lanes scenarios ≤ ⌊√1671⌋; 4 browser ≤ ⌊√17⌋ |
@@ -462,7 +462,7 @@ reads (`renderableEntry`), the schema's readers, marginalia's decoders, a
 commit's trailer (`packages/lanes`), the pi adapter, the client's stored forms,
 and the host's id generator. Biome's `noRestrictedImports` (`biome.json`)
 refuses `entryId` in core, the client and the host, and `runId` in core and
-the client (S71). A `LocalSeq` brand was deleted (ADR-0013
+the client (S95). A `LocalSeq` brand was deleted (ADR-0013
 above); `projectTranscript(entries, tipId)` cannot even accept a seq.
 
 **FC/IS — gather → plan → execute. Decisions are values.** `packages/core` is
@@ -611,7 +611,7 @@ context.**
   threads' lanes run at once, and one thread's writers queue.
 - **The suites and their mutations spend most of their time waiting** (S65).
   What remains after the dead waits were removed, and the suites became
-  scenarios (S67): the image clean-up delay and presence expiry as host
+  scenarios (S94): the image clean-up delay and presence expiry as host
   options, short in the suites; mutants run in parallel, each in its own
   copy of the repository; and the suite checks listed in
   `scripts/unproven.ts` proved by a mutation, or deleted (the `lanes/*`
@@ -749,8 +749,7 @@ Adopted from Kyneta's `AGENTS.md` because they match how this project has run:
 | `docs/00-vision.md` | product thesis, branch kinds, v1 scope |
 | `docs/01-architecture.md` | evidence base, layer cake, data model, module layout |
 | `docs/adrs/` | the ADRs, one file each, with rationale |
-| `docs/03-spikes.md` | S1–S16, each with question + kill criterion |
 | `docs/04-roadmap.md` | sequencing, invariants, action items |
 | `docs/05-stack.md` | stack decisions, sandbox constraints |
-| `docs/findings/` | 21 spike reports — the evidence |
+| `docs/findings/` | the spikes, one file each: briefs, answers, evidence |
 | `sandbox/` | disposable spike code (gitignored), kept for reproduction |

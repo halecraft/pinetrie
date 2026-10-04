@@ -298,7 +298,7 @@ it out, each step in its own `try`: `intake` (seats, control), `close` (the docu
 - **`drain` loads each queued card's text before the take** (`hydrate`),
   and checks again after every wait, so a card queued while texts load is
   loaded too. `textNow` then reads a text with no wait.
-- **The take waits for the text its queuer had** (S72). Kyneta keeps no
+- **The take waits for the text its queuer had** (S96). Kyneta keeps no
   order between documents, so a card's record can arrive before its text.
   The record carries the text's version (`seen`); a top card the host's
   copy does not yet hold is `behind`, and stays on top, and the host drains

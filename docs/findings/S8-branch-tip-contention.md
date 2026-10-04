@@ -1,5 +1,30 @@
 # S8 — Is `pi.branch.tip` a contended LWW register, and what are the right semantics?
 
+**Status:** Answered. Led to ADR-0011; spawned S12.
+
+## Brief
+
+**Size:** S · **Depends on:** nothing · **Raised by:** S7 residual #4
+
+**Question.** S7 only modelled the `entries` collection. `pi.branch.tip` is a
+**genuinely contended** LWW register — two peers moving the same lane tip
+concurrently is exactly the silent-clobber case S7 §3.4 demonstrated. What are
+the correct semantics?
+
+**Hypothesis to test.** Per `docs/00-vision.md`, tips should be **per-peer presence**,
+not shared session state — which would dissolve the contention entirely. But pi
+models `pi.branch.tip` as keyed-by-lane *shared* state, and `AgentLane.getTipId`
+assumes it. Do these reconcile, or does per-peer tip require a lane per peer?
+
+**Kill criterion.** If per-peer tips cannot be reconciled with pi's lane model,
+concurrent branch navigation needs a design we do not have, and it lands on the
+critical path for the v1 demo.
+
+**Priority.** High — this is the one unexamined case that is *known* to be
+contended, and the v1 demo depends on it.
+
+## Report
+
 **Date:** 2026-09-20 · **pi-agent-core:** 0.85.0 · **Sandbox:** `sandbox/s8-tip`
 
 ---
@@ -329,7 +354,7 @@ The hazard needs ≥2 harness processes on one logical session. Under ADR-0001/A
 
 **Kill criterion not met.** Per-peer tips reconcile with pi's lane model. Concurrent branch navigation does **not** move onto the v1 critical path.
 
-**Answers the S8 hypothesis as posed.** `03-spikes.md` asks: *"Do these reconcile, or does per-peer tip require a LANE PER PEER?"* — the answer is the second disjunct, and it is good news rather than bad: lane-per-peer is pi's native grain, not a workaround.
+**Answers the S8 hypothesis as posed.** The brief above asks: *"Do these reconcile, or does per-peer tip require a LANE PER PEER?"* — the answer is the second disjunct, and it is good news rather than bad: lane-per-peer is pi's native grain, not a workaround.
 
 **Spawns a proposed ADR-0011 — "Lane name carries writer identity."** Same shape as ADR-0009: a uniqueness requirement on a key, enforced mechanically, whose violation is silent data loss.
 
@@ -364,3 +389,24 @@ The hazard needs ≥2 harness processes on one logical session. Under ADR-0001/A
 **Verified by source reading (quoted above with file:line):** `branchTip`/`laneConfig`/`laneState` addresses; `appendToBranch` read-modify-write; `getTipId` returning cached in-memory state; tip read from storage only at restore; 12 non-test `setValue(branchTip(...))` sites incl. `navigateTree`; 11 `setValue(laneState(...))` sites in `lane.js`; branch-name validation; `AcquireLaneOptions.createAt`; `lanesByName` as a Map; three-lane conformance fixtures.
 
 **Assumed, not verified:** that modelling pi's writes over a Kyneta doc faithfully predicts a real two-harness deployment (S3 owns this); that operation-scoped namespaces are uncontended because `operationId` is unique; that the v1 single-host architecture holds as written in ADR-0001/0007 (read from the plans, not re-derived); that no pi code path outside `dist/harness` writes lane-keyed registers (I searched `dist/harness` only).
+
+## Review
+
+**Verdict:** PASS
+
+1000/1000 property trials for
+lane-per-writer across 5 seeds; **0/300 for the shared-lane control**; both
+re-verified at a fresh seed.
+
+- **It is not one register, it is three.** `pi.lane.state` carries the steering
+  **inbox**, so a clobber drops queued user messages too.
+- 12 non-test `setValue(branchTip(...))` sites — the tip is rewritten on
+  essentially **every commit in the drive loop**, not once per turn.
+- Evaluated 4 designs under one workload; (b) key-rewriting **leaks** through
+  pi's prefix scan; (d) `Schema.set` **rejected at runtime**.
+- **v1 is not exposed** — the hazard needs ≥2 harness processes.
+- **Caught its own bad invariant.** Its first property was "every entry is
+  reachable from some tip" — which failed 169/200 *even for the correct design*,
+  because `navigateTree` **intentionally** orphans entries. Abandoning a branch
+  is what branching *is* (ADR-0004). See "Fitness-function correction" in `docs/04-roadmap.md`.
+- Spawned **S12**.

@@ -56,7 +56,7 @@ test("a card's document id names its card, and no other document does", () => {
   expect(cardIdOfDoc("note:0199-card")).toBeUndefined()
 })
 
-test("textHolds: a copy holds a version once every write in it has arrived, others' later writes included (S72)", () => {
+test("textHolds: a copy holds a version once every write in it has arrived, others' later writes included (S96)", () => {
   const ada = createDocAs("0f3c9a2b7d1e4f60a8b9c0d1e2f3a4b5", TextDoc)
   const host = createDocAs("a1b2c3d4e5f60718293a4b5c6d7e8f90", TextDoc)
   const bea = createDocAs("9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b", TextDoc)

@@ -278,7 +278,7 @@ export class KynetaStorage implements Storage {
 
   /**
    * The stored image of each inline image in `writes`, by its base64. `read`
-   * stores its images before pi writes them (S59), so each is found by the
+   * stores its images before pi writes them (S93), so each is found by the
    * hash of its bytes.
    */
   #refOf(writes: readonly CommittedWrite[]): RefOf {

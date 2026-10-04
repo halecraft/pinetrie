@@ -32,7 +32,7 @@ reasons are the ADRs, one file each in `docs/adrs/`. Each package has a
   resolution; `workspace.test.ts` checks the manifests.
 - Verify, don't assume: read the source of pi and Kyneta, or measure with a
   disposable probe, before planning on a belief. Record probes in
-  `docs/findings/`.
+  `docs/findings/`, one file per spike (`docs/findings/README.md`).
 
 ## Gates
 

@@ -1,5 +1,24 @@
 # S4 — Browser ↔ Node host over a Kyneta Line
 
+**Status:** Answered. Led to ADR-0014; spawned S16.
+
+## Brief
+
+**Size:** M · **Depends on:** nothing (cheap now that ADR-0007 fixes the design)
+
+**Question.** Does a Line over `@kyneta/websocket-transport` carry command
+traffic and replicated transcript state to a browser at streaming rates
+(~50 token-deltas/sec)?
+
+**Sub-question.** Should token deltas ride ephemeral presence or the durable
+doc? pi already separates these (`message_update` vs `entry_appended`;
+`pi.pending.assistant_frame` list ops are appended then deleted on commit).
+
+**Kill criterion.** If delta rates saturate the doc layer, streaming moves to
+presence and the durable doc only receives committed entries.
+
+## Report
+
 > ## ⚠️ CORRECTION (post-review) — §3.4's "connected client loses text" is a TEST-HARNESS BUG
 >
 > The report claims: *"C's early client: 2701/2702 … a client connected for the
@@ -394,3 +413,23 @@ Error: Document 'line:o:client→host' already exists with a different BoundSche
 - That the 9.6 KB residue scales linearly with message length; measured at one size only.
 - That `Line`'s json-bound docs are unaffected by the Loro `compact()` failure — inferred from `line.ts` using `json.bind()`, and consistent with E6's flat growth, but the two were not connected by a direct test.
 - That `cerebras/qwen-3.8-27b`'s 202.6/s delta rate is representative of the fast end of the range.
+
+## Review
+
+**Verdict:** PASS (and it inverted the hypothesis)
+
+Re-verified: E2's table and
+E3's 2701/2702 reproduce exactly.
+
+- **ADR-0007 confirmed** over a real websocket: 7 command kinds in order,
+  p50 **1.67 ms**, ~1 050 cmd/s, 2 000 commands at **1.01×** outbox growth.
+- **Used a REAL captured pi stream**, not a synthetic one — and found the real
+  rate is **202.6 deltas/sec, 4× the 50/s** the brief assumed.
+- **The design question resolved AGAINST the brief's hypothesis** — durable, not
+  presence. See ADR-0014.
+- **Honest about scope:** the browser *module* was exercised under Node over a
+  real socket; **no browser runtime was run**, and it says so unambiguously.
+  Host and client share a process, so latencies are a floor, not a forecast.
+- **Explained its own outlier** instead of just reporting it: the p99 157 ms was
+  sample #0 only — a one-time post-burst outbox prune; a clean run has no tail.
+- Spawned **S16**; gave **S10** a concrete measurement method.
