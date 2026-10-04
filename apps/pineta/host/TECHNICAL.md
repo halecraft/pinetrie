@@ -177,8 +177,26 @@ any refresh they queued.
 ## Shutdown
 
 `planShutdown` (`shutdown.ts`) returns the order, and `shutdown()` carries
-it out, each step in its own `try`: `intake` (seats, control), `close` (the documents' keeper and the owner of your repo, which stops its watch), `quiet`, `agent`,
-`work` (the containers), `exchange`, `server`.
+it out, each step but `server` in its own `try`: `intake` (seats, control), `close` (the documents' keeper and the owner of your repo, which stops its watch), `quiet`, `agent`,
+`work` (the containers), `exchange`, `server`. Only a failure in `server`
+rejects `shutdown()`.
+
+- **`shutdown()` runs once.** A later call returns the first call's
+  promise, so a second signal, a scenario's `finally` and `withHost` never
+  close anything twice.
+- **`server` stops accepting, then closes Vite and every socket.**
+  `httpServer.close` calls back only when every socket has ended, upgraded
+  ones included, and neither `wss.close()` nor `closeAllConnections()`
+  closes an upgraded socket. Vite's HMR socket kept a host with a page open
+  from ever stopping (S98). So `close()` (`http.ts`) starts
+  `httpServer.close`, closes Vite, terminates the exchange's sockets (one
+  that reconnected after the `exchange` step was accepted again), cuts any
+  request in flight, then waits. Accepting must stop before Vite closes: a
+  page retries Vite's socket once a second, and once Vite's `upgrade`
+  listener is gone, the `"vite"` route leaves that socket open.
+- **Only the first signal shuts down** (`server.ts`). It takes the SIGINT
+  and SIGTERM listeners off, so a second Ctrl-C gets Node's default action
+  and ends the process, even while `shutdown()` hangs.
 
 - **The queues close before `quiet`.** `quiet` waits only for what is queued
   when it looks. A step started after it (an offer refresh marked by an

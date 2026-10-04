@@ -1564,4 +1564,13 @@ export const mutations: readonly Mutation[] = [
     expect:
       "a sent card leaves the box empty, and a tab switch does not bring it back",
   },
+  {
+    name: "a host leaves Vite open as it stops",
+    file: "apps/pineta/host/http.ts",
+    from: "      await vite.close()\n",
+    to: "",
+    suite: "browser",
+    scenario: "banner",
+    expect: "the host shuts down with a page still open",
+  },
 ]

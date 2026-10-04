@@ -18,6 +18,8 @@
 //   PINETA_PROVIDER, PINETA_MODEL
 //                    override the model; by default, pi's settings' default,
 //                    with the providers your pi extensions register
+//
+// The first SIGINT or SIGTERM shuts the host down; a second ends the process.
 import path from "node:path"
 import { startHost } from "./index.ts"
 
@@ -46,12 +48,14 @@ console.log(
   "[host] lanes       one per thread where agent work is wanted (ADR-0020)",
 )
 
-for (const signal of ["SIGINT", "SIGTERM"] as const) {
-  process.on(signal, () => {
-    console.log("\n[host] shutting down")
-    host.shutdown().then(
-      () => process.exit(0),
-      () => process.exit(1),
-    )
-  })
+const signals = ["SIGINT", "SIGTERM"] as const
+// Once the listeners are off, Node's default action ends the process.
+const stop = () => {
+  for (const signal of signals) process.off(signal, stop)
+  console.log("\n[host] shutting down")
+  host.shutdown().then(
+    () => process.exit(0),
+    () => process.exit(1),
+  )
 }
+for (const signal of signals) process.on(signal, stop)

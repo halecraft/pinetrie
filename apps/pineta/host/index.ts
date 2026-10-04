@@ -179,6 +179,7 @@ export interface RunningHost {
    * and every write has reached the store. Checks await this rather than guess.
    */
   quiet(): Promise<void>
+  /** Stops the host in `planShutdown`'s order, once: a later call gets the first call's promise. */
   shutdown(): Promise<void>
 }
 
@@ -528,6 +529,43 @@ export async function startHost({
     log,
   })
 
+  const stop = async (): Promise<void> => {
+    const carry = async (step: ShutdownStep): Promise<void> => {
+      switch (step) {
+        case "intake":
+          seats.stop()
+          control.stop()
+          return
+        case "close":
+          keeper.close()
+          work.owner?.close()
+          return
+        case "quiet":
+          // Queued steps, a compaction among them, finish their writes.
+          return quiet()
+        case "agent":
+          return agent.close()
+        case "work":
+          // A container runs only while its lane runs (ADR-0034).
+          return work.close()
+        case "exchange":
+          histories.dispose()
+          await exchange.flush()
+          return exchange.shutdown()
+        case "server":
+          return server.close()
+      }
+    }
+    for (const step of planShutdown()) {
+      if (step === "server") await carry(step)
+      else
+        try {
+          await carry(step)
+        } catch {}
+    }
+  }
+  let stopping: Promise<void> | null = null
+
   return {
     port: server.port,
     httpUrl: server.httpUrl,
@@ -542,40 +580,9 @@ export async function startHost({
     key,
     invites: server.invites,
     quiet,
-    async shutdown() {
-      const carry = async (step: ShutdownStep): Promise<void> => {
-        switch (step) {
-          case "intake":
-            seats.stop()
-            control.stop()
-            return
-          case "close":
-            keeper.close()
-            work.owner?.close()
-            return
-          case "quiet":
-            // Queued steps, a compaction among them, finish their writes.
-            return quiet()
-          case "agent":
-            return agent.close()
-          case "work":
-            // A container runs only while its lane runs (ADR-0034).
-            return work.close()
-          case "exchange":
-            histories.dispose()
-            await exchange.flush()
-            return exchange.shutdown()
-          case "server":
-            return server.close()
-        }
-      }
-      for (const step of planShutdown()) {
-        if (step === "server") await carry(step)
-        else
-          try {
-            await carry(step)
-          } catch {}
-      }
+    shutdown() {
+      stopping ??= stop()
+      return stopping
     },
   }
 }

@@ -13,6 +13,7 @@ export type ShutdownStep =
   /** Every lane's container stops. */
   | "work"
   | "exchange"
+  /** The HTTP server stops accepting; Vite, every socket and request close; then the server. */
   | "server"
 
 /**

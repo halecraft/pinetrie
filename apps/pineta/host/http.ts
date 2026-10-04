@@ -34,7 +34,10 @@ export interface RunningHttp {
   readonly httpUrl: string
   readonly wsUrl: string
   readonly invites: readonly string[]
-  /** Close the websocket server, then the HTTP server. */
+  /**
+   * Stop accepting, close Vite and every socket and request still open, then
+   * wait for the HTTP server to close.
+   */
   close(): Promise<void>
 }
 
@@ -193,6 +196,8 @@ export async function startHttp(input: {
         )
         return
       case "vite":
+        // Vite's own listener answers, on loopback, where hot reload is on.
+        // After `vite.close()` none does, so `close()` stops accepting first.
         return
     }
   })
@@ -241,12 +246,23 @@ export async function startHttp(input: {
     wsUrl: `ws://${local}:${actualPort}/ws`,
     invites,
     async close() {
+      // `close` stops accepting at once, but calls back only when every
+      // socket has ended, upgraded ones too, which `closeAllConnections`
+      // does not reach (S98). Accepting stops before Vite closes: a page
+      // retries Vite's socket, and once Vite's listener is gone that
+      // upgrade would be left open.
+      const closed = new Promise<void>(resolve => {
+        httpServer.close(() => resolve())
+      })
+      await vite.close()
       try {
         wss.close()
       } catch {}
-      await new Promise<void>(resolve => {
-        httpServer.close(() => resolve())
-      })
+      // The exchange's transport accepts again once stopped, so a client
+      // that reconnected after `exchange.shutdown()` has a socket here.
+      for (const ws of wss.clients) ws.terminate()
+      httpServer.closeAllConnections()
+      await closed
     },
   }
 }

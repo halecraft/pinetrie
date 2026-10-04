@@ -4,9 +4,10 @@
 import { mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
+import { messageOf } from "../../host/basics.ts"
 import { startHost } from "../../host/index.ts"
 import type { Checks } from "../checks.ts"
-import { suiteModel } from "../harness.ts"
+import { suiteModel, waitFor } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
 
 import { asPerson, col, launchBrowser } from "./page.ts"
@@ -123,6 +124,24 @@ async function run(check: Checks["check"]): Promise<void> {
           "a banner already there shows at once when its column mounts again, without fading in",
           !again.fade && again.opacity === "1",
           `${JSON.stringify(again)}`,
+        )
+
+        // The other scenarios close their pages first. An open page holds
+        // Vite's HMR socket, which kept the host's server from closing (S98).
+        const end: { outcome: string | null } = { outcome: null }
+        void bannerHost.shutdown().then(
+          () => {
+            end.outcome = "stopped"
+          },
+          (e: unknown) => {
+            end.outcome = `failed: ${messageOf(e)}`
+          },
+        )
+        const took = await waitFor(() => end.outcome !== null, 10_000)
+        check(
+          "the host shuts down with a page still open",
+          end.outcome === "stopped",
+          end.outcome === null ? "timed out" : `${end.outcome} in ${took} ms`,
         )
       } finally {
         await bp.context().close()

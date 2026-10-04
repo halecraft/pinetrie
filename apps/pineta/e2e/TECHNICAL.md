@@ -131,6 +131,11 @@ They share `checks.ts` (recording a check, and stopping at one),
   stops reading `currentMeta`, nothing is delayed, and the mutations "the
   host does not wait for its stored session" and "the host serves before it
   has recovered" survive.
+- **A browser scenario closes its pages before its host stops, but
+  `banner`.** A page holds Vite's HMR socket, and `banner` shuts its host
+  down with its page still open, to check that the host stops anyway
+  (S98). A host's `shutdown()` runs once, so its `finally` calling it again
+  waits for that same shutdown.
 - **Presence outlives a closed page by its decay.** The browser's `page`
   closes a second tab of Ada's before a second window follows her; until
   that tab's entries decay, her avatar's menu offers its thread too, so the
