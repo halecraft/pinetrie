@@ -191,6 +191,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     },
     { kind: "name", name: "Alice" },
     { kind: "stop", lane: laneNameForThread("abc") },
+    { kind: "carry-on", lane: laneNameForThread("abc") },
     { kind: "archive", action: "archive", root: entryId("e-1") },
     { kind: "archive", action: "restore", root: entryId("e-1") },
     {
@@ -492,11 +493,12 @@ test("decodeReply: an unrecognised code stays inside the ErrCode set", () => {
   assert.equal(out.kind === "refused" ? out.code : "", ERR.UNKNOWN_KIND)
 })
 
-test("decode: stop must name a thread's lane", () => {
-  assert.equal(
-    refusalCode(decodeCommand({ kind: "stop", lane: "w-someone" })),
-    ERR.UNKNOWN_TARGET,
-  )
+test("decode: stop and carry-on must name a thread's lane", () => {
+  for (const kind of ["stop", "carry-on"])
+    assert.equal(
+      refusalCode(decodeCommand({ kind, lane: "w-someone" })),
+      ERR.UNKNOWN_TARGET,
+    )
 })
 
 test("decode: notes on messages are gone (ADR-0048): a note command is an unknown kind", () => {

@@ -41,6 +41,8 @@ export const HOST_PRINCIPAL = "pineta-host"
  *     It runs the agent only when the agent is its addressee (`address`).
  *   - `name` sets the sender's display name to `text`.
  *   - `stop` ends the running turn of the thread whose lane is `lane`.
+ *   - `carry-on` starts a new turn on that thread after a stop, its prompt
+ *     the host's carry-on message (ADR-0082).
  *   - `archive` hides the root `targetId` for everyone, or restores it
  *     (ADR-0029); `mode` names the action, `archive` or `restore`.
  *   - `mark` titles the entry `targetId` with `text` (ADR-0045); `""`
@@ -69,6 +71,7 @@ export const COMMAND_KINDS = [
   "chat",
   "name",
   "stop",
+  "carry-on",
   "archive",
   "mark",
   "retitle",

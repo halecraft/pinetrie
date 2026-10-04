@@ -5,6 +5,7 @@ import {
   commitId,
   type EntryId,
   entryId,
+  indexAsks,
   type LaneName,
   type LaneRecord,
   type LaneView,
@@ -40,6 +41,7 @@ import {
   pinnedMarker,
   pinnedMarkers,
   pinnedStatus,
+  runWords,
   startedWords,
   tokensOf,
   type WorkFacts,
@@ -210,6 +212,7 @@ const facts = (
   if (view === undefined) throw new Error("no view")
   return {
     index,
+    asks: indexAsks(over.index ?? index),
     view,
     lane: { kind: "none" },
     createsLane: false,
@@ -1104,4 +1107,59 @@ test.each([
   [{ canPin: false, pinning: false, pinned: 2 }, null],
 ] as const)("newPinAt(%o): %s", (facts, want) => {
   expect(newPinAt(facts)).toBe(want)
+})
+
+describe("columnView: the run button (ADR-0082)", () => {
+  /** A thread of a prompt and its reply, `tail` after; its lane's tip the last. */
+  const thread = (
+    reply: AgentMessageLike,
+    tail: readonly AgentMessageLike[] = [],
+    lane: Partial<LaneView> = {},
+  ) => {
+    const messages = [{ role: "chat", content: "go" }, reply, ...tail]
+    const index = indexOf(
+      messages.map((m, n) =>
+        entry(`${n + 1}`, n === 0 ? null : `${n}`, m as AgentMessageLike),
+      ),
+    )
+    const tip = `${messages.length}`
+    return columnView(
+      facts(0, {
+        index,
+        lane: onLane({ ...laneView(A, tip), ...lane }),
+      }),
+    ).run
+  }
+  const stopped: AgentMessageLike = {
+    role: "assistant",
+    content: [{ type: "text", text: "half" }],
+    stopReason: "aborted",
+  }
+  test("Stop while the lane runs; Resume once it stopped, idle", () => {
+    expect(thread(stopped, [], { running: true })).toEqual({ kind: "stop" })
+    expect(thread(stopped)).toEqual({ kind: "carry-on" })
+    expect(runWords({ kind: "carry-on" }).label).toBe("Resume")
+  })
+  test("nothing once a message follows the stop, a card waits, or the ask answered", () => {
+    expect(thread(stopped, [{ role: "chat", content: "to Bea" }])).toBeNull()
+    expect(thread(stopped, [], { waiting: 1 })).toBeNull()
+    expect(thread({ ...stopped, stopReason: "stop" })).toBeNull()
+  })
+  test("an update after the stop leaves Resume", () => {
+    expect(thread(stopped, [{ role: "update", content: "caught up" }])).toEqual(
+      { kind: "carry-on" },
+    )
+  })
+  test("read-only, no button at all", () => {
+    const index = indexOf([entry("1", null, { role: "chat", content: "go" })])
+    expect(
+      columnView(
+        facts(0, {
+          index,
+          writable: false,
+          lane: onLane(laneView(A, "1", true)),
+        }),
+      ).run,
+    ).toBeNull()
+  })
 })

@@ -1,6 +1,6 @@
 import { entryId, laneNameForThread, runId, writerId } from "@pineta/core"
 import type { Agent } from "@pineta/pi"
-import { STOP, setRecord } from "@pineta/rules"
+import { PARTICIPANT, STOP, setRecord } from "@pineta/rules"
 import { beginRun, writeEntry, writeLaneTip } from "@pineta/schema"
 import { expect, test } from "vitest"
 import {
@@ -12,7 +12,8 @@ import {
   record,
   row,
 } from "../fakes.ts"
-import { handleStop } from "./lane.ts"
+import type { RunStart } from "../runs.ts"
+import { handleCarryOn, handleStop } from "./lane.ts"
 
 const ada = writerId("ada@example.com")
 const bea = writerId("bea@example.com")
@@ -96,4 +97,67 @@ test("a stop while a chat's run waits for its pinned cards cancels it there, and
   expect(cancelled).toEqual([lane])
   expect(methods(agent.calls)).toEqual(["writeValues"])
   expect(methods(handle.calls)).toEqual([])
+})
+
+/** A lane whose ask Ada stopped mid-reply: her prompt `e-1`, the partial `e-2`. */
+function stopped() {
+  const b = basics()
+  const lane = laneNameForThread("0123456789abcdef")
+  writeEntry(b.root, row(entryId("e-1"), null))
+  writeEntry(
+    b.root,
+    row(entryId("e-2"), "e-1", {
+      role: "assistant",
+      content: [{ type: "text", text: "half a reply" }],
+      stopReason: "aborted",
+    }),
+  )
+  writeLaneTip(b.root, lane, entryId("e-2"))
+  putValue(b, setRecord(PARTICIPANT, { writer: ada, name: "Ada" }))
+  const started: [string, RunStart][] = []
+  const start = (l: string, s: RunStart) => {
+    started.push([l, s])
+    return runId("r-2")
+  }
+  return { b, lane, started, start }
+}
+
+test("carrying on a stopped lane starts a run whose prompt is the carry-on message", async () => {
+  const { b, lane, started, start } = stopped()
+  expect(await handleCarryOn({ basics: b, start }, lane, ada)).toEqual({
+    kind: "started",
+    runId: runId("r-2"),
+  })
+  expect(started).toMatchObject([
+    [
+      lane,
+      {
+        kind: "prompt",
+        pinnedSeen: [],
+        message: {
+          customType: "pineta.carry-on",
+          details: { lane, by: ada, name: "Ada" },
+          timestamp: 1_000,
+        },
+      },
+    ],
+  ])
+})
+
+test("a carry-on the rule refuses is answered with its refusal, and starts nothing", async () => {
+  const { b, lane, started, start } = stopped()
+  beginRun(b.live, lane, runId("r-1"))
+  expect(await handleCarryOn({ basics: b, start }, lane, ada)).toEqual({
+    kind: "refused",
+    code: "busy",
+    message: "the thread is working",
+  })
+  expect(
+    await handleCarryOn(
+      { basics: b, start },
+      laneNameForThread("fedcba9876543210"),
+      ada,
+    ),
+  ).toMatchObject({ kind: "refused", code: "unknown_target" })
+  expect(started).toEqual([])
 })

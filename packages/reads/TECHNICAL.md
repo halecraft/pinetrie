@@ -101,8 +101,8 @@ Kyneta has let go.
   `readLaneNames`, as `readAgentActivity` does.
 - **`readLanes`' `askedBy`** is the writer of the message a running lane is
   answering, its run's prompt (`promptOf`, the ask, ADR-0056), when a
-  person's message started it; or else who queued its first card. A land or
-  stack message names no one. It is what a `conflict` names.
+  person's message started it; or else who queued its first card. A land,
+  stack or carry-on message names no one. It is what a `conflict` names.
 - **`readLanes`' `lastWaiting`** is who queued the lane's last card: a card
   queued now waits behind it, so it is who the queue button names. It is null exactly when `waiting` is 0. It
   differs from `askedBy` while a run goes: `askedBy` is who the agent

@@ -264,6 +264,11 @@ describe("writesIn: the root a command writes in (ADR-0063)", () => {
     ],
     ["a name", { kind: "name", name: "Ada" }, []],
     ["a stop", { kind: "stop", lane: laneNameForThread("x") }, []],
+    [
+      "a carry-on: its lane's root",
+      { kind: "carry-on", lane: LANE_X },
+      [OTHER_ROOT],
+    ],
     ["a reservation", { kind: "reserve", lane: laneNameForThread("x") }, []],
     [
       "an archive action",

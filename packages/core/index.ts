@@ -439,6 +439,8 @@ export type Intent =
   | { readonly kind: "name"; readonly name: string }
   /** End a thread's running turn. Idempotent: an idle lane is already stopped. */
   | { readonly kind: "stop"; readonly lane: LaneName }
+  /** Start a new turn on a thread whose last ask was stopped (ADR-0082). */
+  | { readonly kind: "carry-on"; readonly lane: LaneName }
   /** Hide a root for everyone, or bring it back (ADR-0029). */
   | {
       readonly kind: "archive"

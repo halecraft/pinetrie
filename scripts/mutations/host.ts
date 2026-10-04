@@ -1331,4 +1331,12 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "leaves the verdict unclassified, never pending",
   },
+  {
+    name: "a refused carry-on still starts",
+    file: "apps/pineta/host/commands/lane.ts",
+    from: '  if (planned.kind === "refused") return planned\n  return {\n    kind: "started",',
+    to: '  return {\n    kind: "started",',
+    command: unit,
+    expect: "a carry-on the rule refuses is answered with its refusal",
+  },
 ]

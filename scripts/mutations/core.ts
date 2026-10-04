@@ -774,4 +774,20 @@ export const mutations: readonly Mutation[] = [
     command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
     expect: "a chat's malformed pinned cards are refused",
   },
+  {
+    name: "a carry-on message starts no run",
+    file: tree,
+    from: '  "land",\n  "stack",\n  "carry-on",\n])',
+    to: '  "land",\n  "stack",\n])',
+    command: unit,
+    expect: "a carry-on message starts an ask of its own",
+  },
+  {
+    name: "a carry-on message is no message",
+    file: tree,
+    from: '  "stack",\n  "carry-on",\n])\n\n/**\n * One entry',
+    to: '  "stack",\n])\n\n/**\n * One entry',
+    command: unit,
+    expect: "messageAt: the host's own messages show as their line",
+  },
 ]

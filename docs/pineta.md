@@ -409,6 +409,14 @@ its parent's taken work did the same. Now each take the lane holds a source
 of is first joined to it, and the catch-up is clean; a conflict both sides
 made still conflicts, on that hunk alone.
 
+**ADR-0082 — after a Stop, Resume carries on with a new turn** (built).
+pi cannot continue a run that Stop ended, and parking it instead costs a
+wrapping provider and a parked state through the host (S105). So Resume,
+in Stop's place while the thread ends with a stopped ask, starts a new run
+with a host-written carry-on message, an ask of its own. Anything written
+at the thread's end hides it. One rule (`carryOnState`) decides it for the
+host and the page.
+
 **ADR-0019 — a lane is a line of work, not a unit of parallelism.** A person's
 lane is a *conversation lane* and never touches disk. A *work lane* carries
 agent work and will own a jj workspace, so creating one is deliberate, and fold

@@ -73,6 +73,27 @@ describe("indexAsks", () => {
   })
 })
 
+test("a carry-on message starts an ask of its own; the stopped ask before it stays stopped", () => {
+  const index = build([
+    entry("1-p", null, chat()),
+    entry("2-a", "1-p", said("word wo", { stopReason: "aborted" })),
+    entry("3-c", "2-a", { role: "carry-on", content: "↻ resumed by Ada" }),
+    entry("4-a", "3-c", said("done", { stopReason: "stop" })),
+  ])
+  const asks = indexAsks(index)
+  expect(startsRun(index.entries[entryId("3-c")])).toBe(true)
+  expect(asks.work.get(entryId("3-c"))).toEqual(["4-a"])
+  expect(asks.work.get(entryId("1-p"))).toEqual(["2-a"])
+  const facts = { running: false, stop: undefined }
+  expect(askOutcome(index, asks, entryId("1-p"), facts)).toEqual({
+    kind: "stopped",
+    by: null,
+  })
+  expect(askOutcome(index, asks, entryId("3-c"), facts)).toEqual({
+    kind: "answered",
+  })
+})
+
 test("isLongAsk: a run of MIN_STRETCH agent messages, not one fewer", () => {
   const rows = (n: number) =>
     build([

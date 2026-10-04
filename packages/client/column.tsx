@@ -11,6 +11,7 @@ import {
   conflictsAt,
   type DigestRecord,
   type EntryId,
+  type LaneName,
   type LaneView,
   messageAt,
   nearestRevision,
@@ -86,6 +87,8 @@ import {
   identityWords,
   newPinAt,
   type ReserveStep,
+  type RunButton,
+  runWords,
   START_WORDS,
   startedWords,
   type ThreadDetails,
@@ -458,6 +461,7 @@ export function Column(p: ColumnProps) {
     mountedBanner,
     catchingUp: queued.some(c => c.command !== null),
     index,
+    asks: p.asks,
     view,
     lane,
     createsLane,
@@ -1079,17 +1083,12 @@ export function Column(p: ColumnProps) {
             }}
             strip={shows.strip}
           />
-          {writable && running && (
-            <button
-              className="stop"
-              onClick={() =>
-                void p.session.request({ kind: "stop", lane: lane.name })
-              }
-              title="end the agent's turn here; cards queued are then taken"
-              type="button"
-            >
-              Stop
-            </button>
+          {shows.run !== null && lane.kind === "lane" && (
+            <RunButtonView
+              lane={lane.name}
+              run={shows.run}
+              session={p.session}
+            />
           )}
           <Composer
             card={mine}
@@ -1150,6 +1149,28 @@ export function Column(p: ColumnProps) {
  * Others reading this column's thread, in its header. It reads presence
  * itself, so a presence write redraws this and not the column.
  */
+/**
+ * Stop or Resume (`RunButton`): the column's, not a card's. Each is a
+ * request on the thread's lane; the host decides it again.
+ */
+function RunButtonView(p: {
+  run: RunButton
+  lane: LaneName
+  session: SessionClient
+}) {
+  const words = runWords(p.run)
+  return (
+    <button
+      className={words.className}
+      onClick={() => void p.session.request({ kind: p.run.kind, lane: p.lane })}
+      title={words.title}
+      type="button"
+    >
+      {words.label}
+    </button>
+  )
+}
+
 function SeenBy(p: {
   session: SessionClient
   index: TreeIndex

@@ -14,9 +14,8 @@ import {
 } from "@pineta/core"
 import type {
   ChatMessage,
-  LandMessage,
   PinnedMessage,
-  StackMessage,
+  PromptMessage,
   UpdateMessage,
 } from "@pineta/rules"
 import {
@@ -110,13 +109,12 @@ export interface ThreadLaneHandle {
    */
   append(message: ChatMessage | UpdateMessage): Promise<AppendOutcome>
   /**
-   * Run one turn with `message` as the prompt itself (S19): a compelled chat,
-   * a land message (ADR-0033), or a stack message (ADR-0038). With `pinned`,
+   * Run one turn with `message` as the prompt itself (S19). With `pinned`,
    * the cards entry goes in first, and pi writes both in the commit that
    * admits the run, or neither (S92).
    */
   run(
-    message: ChatMessage | LandMessage | StackMessage,
+    message: PromptMessage,
     pinned: PinnedMessage | null,
   ): Promise<WriteOutcome>
   /** Resume the operation a crash interrupted, in the lane's own directory. */

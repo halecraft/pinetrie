@@ -38,9 +38,16 @@ import {
 } from "@pineta/core"
 import { type Static, Type } from "typebox"
 import { decodeWith } from "./decode.ts"
-import { decodeLand, landLine } from "./land.ts"
+import { decodeLand, type LandMessage, landLine } from "./land.ts"
 import { decodePinned } from "./pinned.ts"
-import { decodeStack, decodeUpdate, stackLine, updateLine } from "./update.ts"
+import { type CarryOnMessage, carryOnLine, decodeCarryOn } from "./stop.ts"
+import {
+  decodeStack,
+  decodeUpdate,
+  type StackMessage,
+  stackLine,
+  updateLine,
+} from "./update.ts"
 import { showHostWorkingCopy } from "./work.ts"
 
 export const CHAT_TYPE = "pineta.chat"
@@ -119,6 +126,16 @@ export interface ChatMessage {
   readonly details: ChatDetails
   readonly timestamp: number
 }
+
+/**
+ * What a run can start with: a compelled chat, a land message (ADR-0033), a
+ * stack message (ADR-0038), or a carry-on message (ADR-0082).
+ */
+export type PromptMessage =
+  | ChatMessage
+  | LandMessage
+  | StackMessage
+  | CarryOnMessage
 
 /**
  * The text the model reads: what was typed, or for a command its expansion,
@@ -227,8 +244,9 @@ export const decodeChat = (message: unknown): ChatDetails | undefined =>
 
 /**
  * A stored message -> what the projections render. A chat becomes role `chat`
- * with its author; a land, update or stack message becomes role `land`,
- * `update` or `stack` with its one line (ADR-0033, ADR-0038); a cards entry
+ * with its author; a land, update, stack or carry-on message becomes role
+ * `land`, `update`, `stack` or `carry-on` with its one line (ADR-0033,
+ * ADR-0038, ADR-0082); a cards entry
  * becomes role `pinned` with the cards it read (ADR-0048); anything else
  * passes through unchanged for `core` to judge.
  */
@@ -245,6 +263,9 @@ export function renderableMessage(message: unknown): AgentMessageLike {
     }
   const stack = decodeStack(message)
   if (stack !== undefined) return { role: "stack", content: stackLine(stack) }
+  const carryOn = decodeCarryOn(message)
+  if (carryOn !== undefined)
+    return { role: "carry-on", content: carryOnLine(carryOn) }
   // Not a message: the column draws a marker above the prompt it came with.
   const pinned = decodePinned(message)
   if (pinned !== undefined) return { role: "pinned", content: "", pinned }

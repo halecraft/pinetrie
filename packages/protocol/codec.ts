@@ -155,10 +155,10 @@ export function decodeCommand(
         )
       : { kind: "name", name }
   }
-  if (kind === "stop") {
+  if (kind === "stop" || kind === "carry-on") {
     const lane = text(wire?.lane)
     return isLaneName(lane)
-      ? { kind: "stop", lane }
+      ? { kind, lane }
       : refused(ERR.UNKNOWN_TARGET, `not a thread's lane: ${lane}`)
   }
   if (kind === "chat") {
@@ -560,7 +560,8 @@ export function encodeIntent(id: string, intent: Intent): Command {
     case "name":
       return command({ id, kind: "name", text: intent.name })
     case "stop":
-      return command({ id, kind: "stop", lane: intent.lane })
+    case "carry-on":
+      return command({ id, kind: intent.kind, lane: intent.lane })
     case "archive":
       return command({
         id,

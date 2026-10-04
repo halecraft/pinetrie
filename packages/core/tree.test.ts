@@ -17,6 +17,7 @@ import {
   indexTree,
   type LaneName,
   laneNameForThread,
+  messageAt,
   messageImages,
   PENDING_TRACK,
   type PinnedView,
@@ -1067,4 +1068,20 @@ describe("pinned cards in the tree (ADR-0048)", () => {
     )
     expect(pinnedInView(branch, entryId("8-b"))?.lane).toBe(OTHER)
   })
+})
+
+test("messageAt: the host's own messages show as their line; other roles are none", () => {
+  const index = indexTree(
+    entriesOf([
+      entry("1-p", null, { role: "chat", content: "hi", author: "A" }),
+      entry("2-c", "1-p", { role: "carry-on", content: "↻ resumed by Ada" }),
+      entry("3-x", "2-c", { role: "custom", content: "raw" }),
+    ]),
+  )
+  expect(messageAt(index, entryId("2-c"))).toEqual({
+    id: "2-c",
+    role: "carry-on",
+    text: "↻ resumed by Ada",
+  })
+  expect(messageAt(index, entryId("3-x"))).toBeNull()
 })

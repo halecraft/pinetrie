@@ -548,7 +548,10 @@ The rail is E; the column is T. Seeing both at once is the product.
   place, and a column at its end does not get shorter while the agent works
   (ADR-0044).
   **Stop** ends the turn, and records who pressed it under the ask
-  (ADR-0056); cards queued are then taken.
+  (ADR-0056); cards queued are then taken. Once it has stopped, **Resume**
+  takes its place: it starts a new turn with a message from the host,
+  "↻ resumed by <name>" (ADR-0082), until anything else is written at the
+  thread's end.
 - **A column says what its agent is doing** (ADR-0054), and none of it moves
   the column. While the agent works, the mark before the thread's name in the
   header (its `✦`, or its banner, ADR-0053) pulses, titled with the ask it

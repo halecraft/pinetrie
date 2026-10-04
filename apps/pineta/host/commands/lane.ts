@@ -5,21 +5,32 @@ import {
   ERR,
   type ErrCode,
   type Intent,
+  indexAsks,
   isBusy,
   type LaneName,
+  type LaneView,
   type LineAction,
+  type RootId,
+  type TreeIndex,
   type WriterId,
 } from "@pineta/core"
 import type { Agent } from "@pineta/pi"
 import type { Outcome } from "@pineta/protocol/codec"
 import {
-  readLane,
   readLanes,
+  readParticipantNames,
   readPlaces,
   readStops,
   readTreeIndex,
 } from "@pineta/reads"
-import { planStop, STOP, setRecord } from "@pineta/rules"
+import {
+  displayName,
+  planCarryOn,
+  planStop,
+  STOP,
+  setRecord,
+} from "@pineta/rules"
+import type { RootDocHandle } from "@pineta/schema"
 import type { Basics } from "../basics.ts"
 import type { Runs } from "../runs.ts"
 import type { LaneWork } from "../work/index.ts"
@@ -31,6 +42,33 @@ export interface LaneDeps {
   readonly start: Runs["start"]
   /** Stop a chat's run that has not reached pi yet (`Runs.cancel`). */
   readonly cancel: Runs["cancel"]
+}
+
+/** A thread's lane as its root's document has it now (`laneAt`). */
+interface LaneHere {
+  readonly root: RootId
+  readonly doc: RootDocHandle
+  readonly index: TreeIndex
+  readonly lane: LaneView
+}
+
+/**
+ * The lane's root's document (ADR-0063), its tree and the lane's view; null
+ * for a lane no root holds.
+ */
+async function laneAt(
+  basics: Pick<Basics, "docs" | "live" | "places">,
+  lane: LaneName,
+): Promise<LaneHere | null> {
+  const { docs, live, places } = basics
+  const root = docs.rootOfLane(lane)
+  if (root === null) return null
+  const doc = await docs.root(root)
+  const index = readTreeIndex(doc)
+  const view = readLanes({ doc, live }, index, readPlaces(places)).find(
+    l => l.name === lane,
+  )
+  return view === undefined ? null : { root, doc, index, lane: view }
 }
 
 /**
@@ -46,39 +84,57 @@ export async function handleStop(
   by: WriterId,
 ): Promise<Outcome> {
   const { agent } = deps
-  const { docs, live, places, now } = deps.basics
-  // The lane's root's document (ADR-0063); a lane no root holds is unknown.
-  const root = docs.rootOfLane(lane)
-  if (root === null)
+  const here = await laneAt(deps.basics, lane)
+  if (here === null)
     return {
       kind: "refused",
       code: ERR.UNKNOWN_TARGET,
       message: "no such lane to stop",
     }
-  const doc = await docs.root(root)
-  const index = readTreeIndex(doc)
-  const planned = planStop(
-    readLanes({ doc, live }, index, readPlaces(places)),
-    lane,
-    {
-      index,
-      stops: readStops(doc),
-      by,
-      now: now(),
-    },
-  )
-  if (planned.kind === "unknown")
-    return {
-      kind: "refused",
-      code: ERR.UNKNOWN_TARGET,
-      message: "no such lane to stop",
-    }
+  const { root, doc, index } = here
+  const planned = planStop(here.lane, {
+    index,
+    stops: readStops(doc),
+    by,
+    now: deps.basics.now(),
+  })
   if (planned.kind === "abort") {
     if (planned.record !== null)
       await agent.writeValues([setRecord(STOP, planned.record, root)])
     if (!deps.cancel(lane)) await agent.lane(lane).abort()
   }
   return { kind: "stopped" }
+}
+
+/**
+ * Carry on a thread whose last ask was stopped (ADR-0082): a new run whose
+ * prompt is the host's carry-on message, decided by `planCarryOn`. A step on
+ * the documents' keeper, so a second press finds the lane busy.
+ */
+export async function handleCarryOn(
+  deps: Pick<LaneDeps, "basics" | "start">,
+  lane: LaneName,
+  by: WriterId,
+): Promise<Outcome> {
+  const { basics } = deps
+  const here = await laneAt(basics, lane)
+  const planned = planCarryOn(
+    here === null ? null : { ...here, asks: indexAsks(here.index) },
+    {
+      by,
+      name: displayName(by, readParticipantNames(basics.session).get(by)),
+      timestamp: basics.now(),
+    },
+  )
+  if (planned.kind === "refused") return planned
+  return {
+    kind: "started",
+    runId: deps.start(lane, {
+      kind: "prompt",
+      message: planned.message,
+      pinnedSeen: [],
+    }),
+  }
 }
 
 /**
@@ -100,16 +156,7 @@ export async function actOnOffer(
       message: "this host has no lanes of their own",
     }
   if (action === "split") {
-    const { docs, live, places } = deps.basics
-    const root = docs.rootOfLane(lane)
-    const view =
-      root === null
-        ? undefined
-        : readLane(
-            { doc: await docs.root(root), live },
-            lane,
-            readPlaces(places),
-          )
+    const view = (await laneAt(deps.basics, lane))?.lane
     if (view === undefined || isBusy(view))
       return {
         kind: "refused",

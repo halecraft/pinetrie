@@ -1723,4 +1723,29 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a root record written before its threads reads with none",
   },
+  {
+    name: "a busy lane may carry on",
+    file: "packages/rules/stop.ts",
+    from: "  if (isBusy(lane)) return refusedFor(ERR.BUSY)\n",
+    to: "",
+    command: unit,
+    expect: "a running lane, or one with a card queued, is busy",
+  },
+  {
+    name: "any ended ask may carry on",
+    file: "packages/rules/stop.ts",
+    from: '  return outcome.kind === "stopped"',
+    to: '  return outcome.kind !== "running"',
+    command: unit,
+    expect: "an answered ask, or a message after the stop, refuses",
+  },
+  {
+    name: "a carry-on message is not decoded",
+    file: "packages/rules/chat.ts",
+    from: "  if (carryOn !== undefined)\n    return",
+    to: "  if (carryOn === null)\n    return",
+    command: unit,
+    expect:
+      "planCarryOn: a run whose prompt names who resumed, read back as its line",
+  },
 ]

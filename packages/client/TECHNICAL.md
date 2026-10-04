@@ -1319,9 +1319,14 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   `.msg.assistant.streaming`, and its mark is a 2px bar in the gutter, drawn
   by a border image outside the box, which takes no width: text wraps as its
   entry will.
-- **Stop** shows above the composer while the thread's lane runs, and sends
-  `stop`. It is the column's, not a card's. The host records who sent it
-  under the ask (`pineta.stop`, ADR-0056).
+- **The run button** shows above the composer: **Stop** while the thread's
+  lane runs, sending `stop`; **Resume** while the lane may carry on after a
+  stop (`carryOnState`, ADR-0082), sending `carry-on`. `columnView` decides
+  it (`run`) and `runWords` words it. It is the column's, not a card's, and
+  never shows read-only. The host records who stopped under the ask
+  (`pineta.stop`, ADR-0056). The button is `.stop` or `.resume`: the
+  browser suite reads `.stop` as "the lane runs" (`page.ts`), and a
+  carry-on message's row is `.msg.carry-on`.
 - **What the agent is doing shows in three places, none taking layout**
   (ADR-0054). `running` (`lane.running`, Stop's fact) is computed once in
   `Column`.
@@ -1391,8 +1396,9 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   up", "catch up and send"), its queue place in the title. The card is
   then queued like any other (`planSend`, which carries the command), and
   the host carries the command out when it takes it.
-- **Land, update and stack messages** show as one line each, roles `land`
-  ("catching up"), `update` ("caught up") and `stack`. The update's line
+- **Land, update, stack and carry-on messages** show as one line each,
+  roles `land` ("catching up"), `update` ("caught up"), `stack` and
+  `carry-on` ("resumed"). The update's line
   is `updateLine` (`@pineta/rules`), which names what it merged by
   `catchUpName`.
 - **The page header counts offers open** in your repo ("work ready to add to

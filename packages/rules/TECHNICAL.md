@@ -46,7 +46,8 @@ follow this list. A name only this package uses is imported from its module.
   text, what a starting host resumes.
 - `archive.ts`, `roots.ts`, `mark.ts`, `title.ts`, `stop.ts`, `digest.ts`,
   `verdict.ts`: a root put aside, the directory of roots, titles, who
-  stopped a run, an ask's digest, and how a thread's last run ended.
+  stopped a run and carrying on after it, an ask's digest, and how a
+  thread's last run ended.
 - `names.ts`, `banner.ts`: a thread's name and its banner, each with its
   record.
 - `work.ts`: where lanes work (`pineta.lane`, `pineta.revision`,
@@ -465,6 +466,24 @@ aborted (S70), so this is the only place a stop is named. `planStop`
 decides it, and writes none when the ask has one: the first press is
 the one named. A stop recorded for a run that answered anyway is ignored
 (`askOutcome`).
+
+**Carrying on** (ADR-0082). pi cannot continue a run that Stop ended
+(S105), so Resume starts a new run whose prompt is a carry-on message
+(`pineta.carry-on`, role `carry-on`), a pi `CustomMessage` in `land.ts`'s
+pattern. Its `content` tells the model who asked it to carry on, and that
+what it was writing when stopped was not kept; its `details` hold the lane,
+who resumed and their name then, for the column's line ("↻ resumed by
+Ada"). It is a prompt, so its run is an ask of its own (`PROMPT_ROLES`).
+
+- **`carryOnState` is the one rule**, read by the host's `planCarryOn` and
+  the column's run button: the lane is idle (`isBusy`), and the ask at its
+  tip ended stopped (`askOutcome`). A message written after the stop is
+  the tip's ask, with no work, so it refuses; an update is no ask, so it
+  does not. It refuses with `UNKNOWN_TARGET` (no tip), `BUSY` or
+  `REFUSED`.
+- **`planCarryOn`** returns the run's message, or core's `Refusal`, worded
+  once (`refusedCarryOn`). It takes the lane with its tree and asks, or
+  null for a lane no root holds, which it refuses `UNKNOWN_TARGET`.
 
 # Digests (`digest.ts`, ADR-0056, ADR-0075)
 
@@ -905,7 +924,8 @@ and the total `decodePinned` are the only code that builds or reads it, and
 
 # Updates and stacks (`update.ts`, ADR-0038)
 
-Two pi `CustomMessage`s in `land.ts`'s pattern. An update (`pineta.update`,
+Two pi `CustomMessage`s in `land.ts`'s pattern, as is the carry-on message
+(`stop.ts`, above). An update (`pineta.update`,
 role `update`) is a fact in the thread, never a prompt: which of your commits
 came in and which files changed, so the agent's next run reads them again.
 The card that brought the thread up to date carries what the person wants

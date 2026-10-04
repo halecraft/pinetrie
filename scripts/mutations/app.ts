@@ -1327,6 +1327,16 @@ export const mutations: readonly Mutation[] = [
     expect: "the stop is recorded under its ask, naming who stopped it",
   },
   {
+    name: "Resume stops the thread instead",
+    file: "apps/pineta/host/commands/index.ts",
+    from: "        return settled(await handleCarryOn(deps, intent.lane, writer))",
+    to: "        return settled(await handleStop(deps, intent.lane, writer))",
+    suite: "host",
+    scenario: "tools",
+    expect:
+      "Resume starts a run whose prompt is the carry-on message, and a second press is refused busy",
+  },
+  {
     name: "the ask bar takes room",
     file: "packages/client/index.html",
     from: "      .ask-bar-slot { position: sticky; top: -.75rem; height: 0; z-index: 2; }",

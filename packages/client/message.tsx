@@ -43,6 +43,14 @@ import {
 } from "./tool-row.ts"
 import { useFollow } from "./use-follow.ts"
 
+/** What a message's role is called above it, where it is not its own name. */
+const ROLE_LABEL: Readonly<Record<string, string>> = {
+  assistant: "agent",
+  land: "catching up",
+  update: "caught up",
+  "carry-on": "resumed",
+}
+
 function MessageView(p: MessageProps) {
   const { node } = p
   const speaker =
@@ -51,15 +59,7 @@ function MessageView(p: MessageProps) {
           speakerLabel(p.nameOf, node.writer, node.author ?? ""),
           (node.contributors ?? []).map(w => nameFor(p.nameOf, w)),
         )
-      : node.role === "assistant"
-        ? "agent"
-        : node.role === "land"
-          ? "catching up"
-          : node.role === "update"
-            ? "caught up"
-            : node.role === "stack"
-              ? "stack"
-              : node.role
+      : (ROLE_LABEL[node.role] ?? node.role)
   const classes = [
     "msg",
     node.role,

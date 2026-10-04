@@ -72,6 +72,7 @@ export {
   chatImageShas,
   decodeChat,
   encodeChat,
+  type PromptMessage,
   planChat,
   renderableMessage,
   settleRun,
@@ -194,7 +195,13 @@ export {
 export { ROOT } from "./roots.ts"
 export { planSeatSweep, planSeats, SEAT, writersOfClients } from "./seat.ts"
 export { planStartup } from "./startup.ts"
-export { planStop, STOP } from "./stop.ts"
+export {
+  type CarryOnMessage,
+  carryOnState,
+  planCarryOn,
+  planStop,
+  STOP,
+} from "./stop.ts"
 export {
   decodeTitleConfig,
   planTitling,

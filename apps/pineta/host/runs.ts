@@ -17,10 +17,8 @@ import type { Agent } from "@pineta/pi"
 import { readLatestPrompt } from "@pineta/reads"
 import {
   CHAT_TYPE,
-  type ChatMessage,
-  type LandMessage,
   type PinnedMessage,
-  type StackMessage,
+  type PromptMessage,
   settleRun,
 } from "@pineta/rules"
 import {
@@ -38,7 +36,7 @@ import type { LaneWork } from "./work/index.ts"
 export type RunStart =
   | {
       readonly kind: "prompt"
-      readonly message: ChatMessage | LandMessage | StackMessage
+      readonly message: PromptMessage
       /**
        * The thread's pinned cards as the sender had them, which the run
        * waits for (ADR-0048, S96): a chat's; none for a take, a landing or

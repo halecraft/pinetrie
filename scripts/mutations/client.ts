@@ -2777,4 +2777,20 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "their count in the title",
   },
+  {
+    name: "Resume never shows",
+    file: "packages/client/column-view.ts",
+    from: '    ? { kind: "carry-on" }\n    : null',
+    to: "    ? null\n    : null",
+    command: unit,
+    expect: "Stop while the lane runs; Resume once it stopped, idle",
+  },
+  {
+    name: "a read-only column has the run button",
+    file: "packages/client/column-view.ts",
+    from: '  if (!f.writable || lane.kind !== "lane") return null\n  if (lane.running)',
+    to: '  if (lane.kind !== "lane") return null\n  if (lane.running)',
+    command: unit,
+    expect: "read-only, no button at all",
+  },
 ]

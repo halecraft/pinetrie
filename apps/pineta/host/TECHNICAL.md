@@ -27,7 +27,7 @@ wires them.
 | `seats.ts` | each connected seat's person, written once as a `pineta.seat` record (started after `recover`), and unloading the histories of moves of a person with no seat left |
 | `startup.ts` | `recover`: what a starting host does before it takes a command |
 | `control.ts` | the command Line of each client seat, and who its writer is |
-| `commands/` | one module per command: `chat`, `archive`, `mark`, `lane` (stop, offer), `cards` (a move, an undo of moves, a command, a busy chat's card queued, a sent card spent: ADR-0059, ADR-0066); `index.ts` decodes, decides where it runs (`placeOfCommand`), checks the archive, routes, and sends a taken card behind the same check (`sendTaken`) |
+| `commands/` | one module per command: `chat`, `archive`, `mark`, `lane` (stop, carry on, offer: each finds its lane through `laneAt`), `cards` (a move, an undo of moves, a command, a busy chat's card queued, a sent card spent: ADR-0059, ADR-0066); `index.ts` decodes, decides where it runs (`placeOfCommand`), checks the archive, routes, and sends a taken card behind the same check (`sendTaken`) |
 | `http.ts` | the HTTP server: admission, Vite, the websocket, blobs, offer reads, invites |
 | `responses.ts` | every answer the host writes itself, as a pure `HttpAnswer` |
 | `routes.ts` | what a request or an upgrade gets, pure: admission first (`planRequest`, `planUpgrade`), then which requests are the host's (`route`) |
@@ -95,7 +95,8 @@ wires them.
 ## A run's start
 
 - **A prompt's run reads its pinned cards first** (`readPinned`,
-  `pinned.ts`): a chat's, a take's, a resolution's and a split's. It
+  `pinned.ts`): a chat's, a take's, a resolution's, a split's and a
+  carry-on's. It
   gathers the thread's pinned cards at the lane's tip (`cardsAt`), loads
   their texts, waits for each as the chat's sender had it (`seen`, at most
   `PINNED_WAIT_MS`, 2 s), gathers again (a card may have been pinned or
@@ -112,7 +113,8 @@ wires them.
   land or stack start cannot be cancelled: it writes no prompt then, and
   `end()` would read the lane's previous one and record an old landing's
   outcome again. They carry no `seen`, so their window is as short as
-  before.
+  before. A carry-on's start cannot be cancelled either, for the same
+  reason: a Stop in its window reaches nothing.
 
 ## A run's end
 
@@ -402,6 +404,10 @@ rejects `shutdown()`.
   there, and `handleStop` writes it, then asks pi to abort, in one step. So
   the record is there when the run's end is drawn, and the first press is
   the one named.
+- **Resume is `carry-on`** (ADR-0082): `handleCarryOn` starts a run whose
+  prompt is `planCarryOn`'s carry-on message, or answers its refusal. It is
+  one step on the documents' keeper, as a split is, so a second press finds
+  the lane busy and is refused.
 
 ## Requests outside the queue (`outside.ts`)
 

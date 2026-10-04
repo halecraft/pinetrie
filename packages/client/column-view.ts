@@ -3,6 +3,7 @@
 // facts, `columnView` decides, and `Column` draws what it returns.
 
 import {
+  type AskIndex,
   ancestry,
   type BannerRecord,
   type BaseRecord,
@@ -36,6 +37,7 @@ import {
 } from "@pineta/core"
 import {
   type CatchUpNow,
+  carryOnState,
   catchUpName,
   catchUpOf,
   displayName,
@@ -274,6 +276,8 @@ export type WorkStrip =
 
 export interface ColumnFacts {
   readonly index: TreeIndex
+  /** Every ask (`indexAsks`), from the same moment as `index`. */
+  readonly asks: AskIndex
   readonly view: ColumnView
   /** The column's thread's lane (`threadOf`). */
   readonly lane: ThreadLane
@@ -311,6 +315,26 @@ export interface ColumnShows {
   readonly behind: { readonly mark: string; readonly title: string } | null
   /** The thread this one branched from, and where both stand (ADR-0072); null for none. */
   readonly parent: ParentNow | null
+  /** The button for the thread's run, above the composer; null for none. */
+  readonly run: RunButton | null
+}
+
+/**
+ * Stop while the thread's lane runs; Resume while it may carry on after a
+ * stop (`carryOnState`, ADR-0082), each named by the request it sends. One
+ * needs the lane running, the other idle, so the two never hold at once.
+ */
+export interface RunButton {
+  readonly kind: "stop" | "carry-on"
+}
+
+function runButton(f: ColumnFacts): RunButton | null {
+  const { lane } = f
+  if (!f.writable || lane.kind !== "lane") return null
+  if (lane.running) return { kind: "stop" }
+  return carryOnState(lane, { index: f.index, asks: f.asks }).kind === "ok"
+    ? { kind: "carry-on" }
+    : null
 }
 
 /**
@@ -368,6 +392,7 @@ export function columnView(f: ColumnFacts): ColumnShows {
     base: baseWords(head === null ? undefined : work.bases.get(head)),
     behind,
     parent,
+    run: runButton(f),
   }
 }
 
@@ -627,6 +652,27 @@ export function activityOf(
 }
 
 // ── words ─────────────────────────────────────────────────────────────────
+
+/** The run button's label, title and class. */
+export const runWords = (
+  run: RunButton,
+): {
+  readonly label: string
+  readonly title: string
+  readonly className: string
+} =>
+  run.kind === "stop"
+    ? {
+        label: "Stop",
+        title: "end the agent's turn here; cards queued are then taken",
+        className: "stop",
+      }
+    : {
+        label: "Resume",
+        title:
+          "carry on from where the agent was stopped: a new turn, with a message from the host",
+        className: "resume",
+      }
 
 const BUTTON_LABEL: Record<
   Exclude<

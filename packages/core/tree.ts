@@ -228,12 +228,25 @@ export function messageImages(
 }
 
 /**
+ * The host's own messages: a land, update, stack or carry-on message
+ * (ADR-0033, ADR-0038, ADR-0082). Each shows as its short line: the reader
+ * decodes it into its role, with that line as its content.
+ */
+const HOST_MESSAGE_ROLES: ReadonlySet<string> = new Set([
+  "land",
+  "update",
+  "stack",
+  "carry-on",
+])
+
+/**
  * One entry -> the message a reader sees, or `null` if it is not one.
  *
  * The one rule for which entries are messages, shared by every view so they
- * cannot disagree. Non-message entries and roles other than user, assistant
- * and chat are dropped, `toolResult` included: a result belongs to its call,
- * which `projectSpine` pairs it with. An assistant message carries its tool
+ * cannot disagree. Non-message entries, and roles other than user,
+ * assistant, chat and the host's own (`HOST_MESSAGE_ROLES`), are dropped,
+ * `toolResult` included: a result belongs to its call, which `projectSpine`
+ * pairs it with. An assistant message carries its tool
  * calls. A `chat` message is a human's, already decoded by the reader
  * (`readRenderableEntries` in `@pineta/reads`); core only admits the role, so it
  * needs no schema library.
@@ -265,15 +278,7 @@ function renderableMessage(entry: EntryLike): TranscriptMessage | null {
         : { images: entry.message.images }),
     }
   }
-  // A land, update or stack message (ADR-0033, ADR-0038) shows as its short
-  // line: the reader decodes it into its role with that line as its content.
-  if (
-    role !== "user" &&
-    role !== "assistant" &&
-    role !== "land" &&
-    role !== "update" &&
-    role !== "stack"
-  )
+  if (role !== "user" && role !== "assistant" && !HOST_MESSAGE_ROLES.has(role))
     return null
   const message = { id: entry.id, role, text: messageText(entry.message) }
   const merged = entry.message?.merged
@@ -352,16 +357,17 @@ export function turnEntry(index: TreeIndex, tip: EntryId): EntryId {
 }
 
 /**
- * The roles a run can start with: a person's message, pi's own, a land message
- * or a stack message. An update never starts one: it is a fact in the thread.
- * Nor does a cards entry (role `pinned`): it is written with a run's prompt,
- * as its parent.
+ * The roles a run can start with: a person's message, pi's own, and a land,
+ * stack or carry-on message. An update never starts one: it is a fact in the
+ * thread. Nor does a cards entry (role `pinned`): it is written with a run's
+ * prompt, as its parent.
  */
 const PROMPT_ROLES: ReadonlySet<string> = new Set([
   "chat",
   "user",
   "land",
   "stack",
+  "carry-on",
 ])
 
 /** Whether a run can start with `entry` (`PROMPT_ROLES`). */

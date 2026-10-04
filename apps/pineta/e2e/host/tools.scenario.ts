@@ -233,6 +233,36 @@ async function run(check: Checks["check"]): Promise<void> {
       `${stop?.by ?? "none"}, ${rootRecordsOf(th, readStops).size} recorded`,
     )
 
+    // Resume (ADR-0082): a new run whose prompt is the host's carry-on
+    // message, which the model reads. Held, so a second press finds it busy.
+    script.use([{ reply: context => context.at(-1) ?? "" }])
+    const carrying = script.pause("asked you to carry on")
+    const carried =
+      l5 === undefined
+        ? undefined
+        : await u.request({ kind: "carry-on", lane: l5.name })
+    await waitFor(() => carrying.reached, 10_000)
+    const again =
+      l5 === undefined
+        ? undefined
+        : await bob.request({ kind: "carry-on", lane: l5.name })
+    carrying.resume()
+    await tidle()
+    const [prompt, reply] = projectSpine(
+      ttree(),
+      tlane()?.tip ?? null,
+    ).spine.slice(-2)
+    check(
+      "Resume starts a run whose prompt is the carry-on message, and a second press is refused busy",
+      carried?.kind === "started" &&
+        again?.kind === "refused" &&
+        again.code === "busy" &&
+        prompt?.role === "carry-on" &&
+        prompt.text === "↻ resumed by Uma" &&
+        reply?.text.startsWith("Uma asked you to carry on") === true,
+      `${carried?.kind}, then ${again?.kind}; ${prompt?.role}: ${reply?.text.slice(0, 40)}`,
+    )
+
     // 6. Restart over the same store: everything is there, and a card queued
     // while the lane ran is taken by the new host's startup, since no run's
     // end will. The run is the document's record alone, which a stopping
