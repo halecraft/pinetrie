@@ -16,6 +16,10 @@ import {
   digestRequest,
   digestText,
   digestToWrite,
+  HEADLINE_WORDS,
+  MAX_POINTS,
+  NOTHING_TO_ADD,
+  POINT_WORDS,
   planDigest,
   recordsOf,
   setRecord,
@@ -60,7 +64,9 @@ describe("digestDue", () => {
 })
 
 describe("digestOf and digestText", () => {
-  const headline = (n: number) => Array.from({ length: n }, () => "w").join(" ")
+  const words = (n: number) => Array.from({ length: n }, () => "w").join(" ")
+  const list = (n: number) =>
+    Array.from({ length: n }, (_, i) => `- point ${i}`).join("\n")
   test.each<[string, string, DigestBody | null]>([
     [
       "a headline alone",
@@ -110,9 +116,20 @@ describe("digestOf and digestText", () => {
         points: [],
       },
     ],
-    ["refused: a long headline", headline(15), null],
-    ["refused: a fifth point", "H\n- a\n- b\n- c\n- d\n- e", null],
-    ["refused: a long point", `H\n- ${headline(41)}`, null],
+    [
+      "a headline and points at their limits",
+      `${words(HEADLINE_WORDS)}\n${list(MAX_POINTS - 1)}\n- ${words(POINT_WORDS)}`,
+      {
+        headline: words(HEADLINE_WORDS),
+        points: [
+          ...Array.from({ length: MAX_POINTS - 1 }, (_, i) => `point ${i}`),
+          words(POINT_WORDS),
+        ],
+      },
+    ],
+    ["refused: a long headline", words(HEADLINE_WORDS + 1), null],
+    ["refused: a point too many", `H\n${list(MAX_POINTS + 1)}`, null],
+    ["refused: a long point", `H\n- ${words(POINT_WORDS + 1)}`, null],
     ["refused: a prose second line", "H\nIt went well.", null],
     ["refused: a bullet for a headline", "- a\n- b", null],
     ["refused: an empty reply", "  \n ", null],
@@ -121,7 +138,7 @@ describe("digestOf and digestText", () => {
     if (body !== null) expect(digestOf(digestText(body))).toEqual(body)
   })
   test("digestText words no headline as nothing to add", () => {
-    expect(digestText({ headline: null, points: [] })).toBe("nothing to add")
+    expect(digestText({ headline: null, points: [] })).toBe(NOTHING_TO_ADD)
     expect(digestText({ headline: "H", points: ["a", "b"] })).toBe(
       "H\n- a\n- b",
     )

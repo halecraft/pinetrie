@@ -889,7 +889,7 @@ export const mutations: readonly Mutation[] = [
     from: "  if (rest.length > MAX_POINTS || !rest.every(l => BULLET.test(l))) return null\n",
     to: "  if (!rest.every(l => BULLET.test(l))) return null\n",
     command: unit,
-    expect: "refused: a fifth point",
+    expect: "refused: a point too many",
   },
   {
     name: "nothing to add is read as a headline",

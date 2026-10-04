@@ -13,7 +13,6 @@ import { type EntryId, indexAsks, promptOf, type RootId } from "@pineta/core"
 import type { Keeper } from "@pineta/keeper"
 import {
   DIGEST,
-  type DigestBody,
   digestOf,
   digestRequest,
   digestToWrite,
@@ -90,7 +89,7 @@ export function createDigests(deps: {
         })
         if (plan === null) return
         const { final } = plan
-        void requestOutside<{ readonly body: DigestBody | null }, EntryId>({
+        void requestOutside({
           keeper,
           held: { set: asking, key: ask },
           failed,

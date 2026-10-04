@@ -20,7 +20,7 @@ import {
   type TreeIndex,
   type WriterId,
 } from "@pineta/core"
-import type { DigestBody } from "@pineta/marginalia"
+import type { DigestRecord } from "@pineta/marginalia"
 import { outcomeWords, workWords } from "./ask-words.ts"
 
 /** A column's messages as drawn: one on its own, or an ask's work together. */
@@ -135,7 +135,7 @@ export function askView(input: {
   readonly revisions: ReadonlyMap<EntryId, RevisionRecord>
   readonly digests: ReadonlyMap<
     EntryId,
-    DigestBody & { readonly final: boolean }
+    Pick<DigestRecord, "headline" | "points" | "final">
   >
   /** The column's path up to `releasedTip`; null while it follows its end. */
   readonly releasedPath: ReadonlySet<EntryId> | null
