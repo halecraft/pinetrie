@@ -9,7 +9,8 @@ import type { Moved } from "@pineta/repo"
  * What a move the owner observed marks for a refresh (ADR-0065): the line's
  * record, and each lane whose offer it may change. Everything, the line, a
  * WIP or the first observation (`all`), marks every named lane and every
- * open record. `@` alone (`yours`) marks no lane: it changes only each
+ * open record. The publish bookmark (`line`) marks the line's record alone.
+ * `@` alone (`yours`) marks no lane: it changes only each
  * record's `yourEdits` and the line's preview, which one shared read
  * rewrites (`shared`). A lane's ref marks that lane, and an offer bookmark
  * the lane its thread names.
@@ -36,5 +37,9 @@ export function planMarks(input: {
       return lane === undefined ? [] : [lane]
     }),
   ])
-  return { line: every, shared: !every && moved.yours, lanes: [...lanes] }
+  return {
+    line: every || moved.line,
+    shared: !every && moved.yours,
+    lanes: [...lanes],
+  }
 }

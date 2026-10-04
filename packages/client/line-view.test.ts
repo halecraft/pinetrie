@@ -1,12 +1,20 @@
 import { commitId, type LineRecord, laneNameForThread } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import { baseWords } from "./column-view.ts"
-import { lineNote, lineView, lineWords, resolveIntent } from "./line-view.ts"
+import {
+  type LineSection,
+  lineNote,
+  lineView,
+  lineWords,
+  resolveIntent,
+} from "./line-view.ts"
 import { baseChoices } from "./send.ts"
 
 const record = (over: Partial<LineRecord> = {}): LineRecord => ({
   onto: "pineta-onto",
   wipPrefix: "wip/",
+  publish: "main",
+  published: { commit: commitId("m0"), behind: 0, ahead: 0 },
   commit: commitId("c1"),
   heads: { current: null, proposed: "builtin_immutable_heads() | …" },
   log: { current: null, proposed: "builtin_log() | …" },
@@ -21,133 +29,170 @@ const record = (over: Partial<LineRecord> = {}): LineRecord => ({
   ...over,
 })
 
+/** A section's words, by its key. */
+const section = (
+  record: LineRecord,
+  key: "project" | "yours",
+): LineSection | undefined =>
+  lineWords(lineView(record)).sections.find(s => s.key === key)
+
+const yours = (over: Partial<LineRecord["yours"]>): LineRecord["yours"] => ({
+  behind: 2,
+  ahead: null,
+  follow: null,
+  conflicts: { commits: 0, files: [] },
+  ...over,
+})
+
 describe("lineView and lineWords (ADR-0060)", () => {
   test("no line yet: set up at your @-, showing the heads it writes", () => {
     const view = lineView(record({ commit: null }))
-    expect(view).toMatchObject({ state: "unset", actions: ["setup"] })
-    const words = lineWords(view)
-    expect(words.actions).toEqual([
+    expect(view).toMatchObject({
+      state: "unset",
+      project: { actions: ["setup"] },
+      yours: null,
+    })
+    const [project] = lineWords(view).sections
+    expect(project?.actions).toEqual([
       { action: "setup", label: "set up the project" },
     ])
-    expect(words.notes[1]).toContain("builtin_immutable_heads() | …")
-    expect(words.notes[2]).toContain("builtin_log() | …")
-    expect(words.notes[3]).toContain('bookmarks(glob:"pineta-offer/*")')
+    expect(project?.notes[1]).toContain("builtin_immutable_heads() | …")
+    expect(project?.notes[2]).toContain("builtin_log() | …")
+    expect(project?.notes[3]).toContain('bookmarks(glob:"pineta-offer/*")')
   })
-  test("a host that admits others offers no line action, and says why", () => {
-    const view = lineView(record({ commit: null, commands: false }))
-    expect(view.actions).toEqual([])
-    expect(lineWords(view).notes[0]).toContain("with jj on its machine")
-    expect(
-      lineView(
-        record({
-          yours: {
-            behind: 0,
-            ahead: 2,
-            follow: null,
-            conflicts: { commits: 0, files: [] },
-          },
-          commands: false,
-        }),
-      ).actions,
-    ).toEqual([])
+  test("a host that admits others, before setup: not set up yet, the jj instructions in its title", () => {
+    const words = lineWords(lineView(record({ commit: null, commands: false })))
+    expect(words.trigger).toBe("◆ project")
+    expect(words.label).toContain(
+      "create pineta-onto with jj on the host's machine",
+    )
+    expect(words.sections).toEqual([
+      {
+        key: "project",
+        heading: "The project",
+        notes: ["the project is not set up yet"],
+        actions: [],
+      },
+    ])
   })
-  test("your work above the line: add it to the project, counted; behind it: say so", () => {
-    const ahead = lineView(
+  test("a host that admits others has no section for your files, nor their actions", () => {
+    const view = lineView(
       record({
-        yours: {
-          behind: 0,
+        commands: false,
+        yours: yours({
           ahead: 2,
-          follow: null,
-          conflicts: { commits: 0, files: [] },
-        },
+          follow: { changes: 1, conflicts: [], heads: 0 },
+          conflicts: { commits: 1, files: ["g.txt"] },
+        }),
       }),
     )
-    expect(lineWords(ahead).actions).toEqual([
-      { action: "land", label: "add my work to the project (2 commits)" },
+    expect(view.yours).toBe(null)
+    expect(lineWords(view).sections.map(s => s.key)).toEqual(["project"])
+  })
+  test("your work above the line: add it to the project, counted", () => {
+    const words = section(
+      record({ yours: yours({ behind: 0, ahead: 2 }) }),
+      "yours",
+    )
+    expect(words?.actions).toEqual([
+      {
+        action: "land",
+        label: "add my work to the project (2 commits)",
+        title: "moves pineta-onto forward to your @-",
+      },
     ])
-    expect(lineWords(ahead).notes).toEqual([
-      "your files have everything in the project",
-    ])
-    const behind = lineWords(
+    expect(words?.notes).toEqual(["your files have everything in the project"])
+  })
+  test("the trigger counts what is not yet on main, never your files being behind; its bookmark only in the label", () => {
+    const quiet = lineWords(lineView(record({ yours: yours({ behind: 3 }) })))
+    expect(quiet.trigger).toBe("◆ project")
+    expect(quiet.label).toContain("pineta-onto")
+    const unpublished = lineWords(
       lineView(
-        record({
-          yours: {
-            behind: 3,
-            ahead: null,
-            follow: null,
-            conflicts: { commits: 0, files: [] },
-          },
-        }),
+        record({ published: { commit: commitId("m0"), behind: 2, ahead: 0 } }),
       ),
     )
-    expect(behind.actions).toEqual([])
-    expect(behind.notes[0]).toBe(
-      "the project has 3 commits your files don't: rebase onto pineta-onto in jj",
-    )
-  })
-  test("the header's button says project; its bookmark only in the label", () => {
-    const words = lineWords(lineView(record()))
-    expect([words.trigger, words.heading]).toEqual(["◆ project", "The project"])
-    expect(words.label).toContain("pineta-onto")
-  })
-  test("your files behind the project: the button marks it ↓, its label counts it", () => {
-    const words = lineWords(
-      lineView(
-        record({
-          yours: {
-            behind: 2,
-            ahead: null,
-            follow: null,
-            conflicts: { commits: 0, files: [] },
-          },
-        }),
-      ),
-    )
-    expect(words.trigger).toBe("◆ project ↓")
-    expect(words.label).toContain("it has 2 commits your files don't")
+    expect(unpublished.trigger).toBe("◆ project · 2 unpublished")
+    expect(unpublished.label).toContain("2 commits not yet on main")
+    expect(unpublished.sections[0]?.heading).toBe("The project")
   })
   test("no record: absent", () => {
     expect(lineView(null).state).toBe("absent")
   })
 })
 
-describe("update my files, and resolving what conflicts (ADR-0061)", () => {
-  const yours = (over: Partial<LineRecord["yours"]>): LineRecord["yours"] => ({
-    behind: 2,
-    ahead: null,
-    follow: null,
-    conflicts: { commits: 0, files: [] },
-    ...over,
+describe("publishing the project (ADR-0076)", () => {
+  const published = (behind: number, ahead = 0, commit: string | null = "m0") =>
+    record({
+      published: {
+        commit: commit === null ? null : commitId(commit),
+        behind,
+        ahead,
+      },
+    })
+  test("unpublished commits: counted, and published to main on any host", () => {
+    for (const commands of [true, false]) {
+      const words = section({ ...published(2), commands }, "project")
+      expect(words?.notes).toEqual(["2 commits not yet on main"])
+      expect(words?.actions).toEqual([
+        {
+          action: "publish",
+          label: "publish to main (2 commits)",
+          title: "moves main forward to pineta-onto",
+        },
+      ])
+    }
   })
-  test("behind, with a preview: what updating changes and what would conflict, then the action", () => {
-    const words = lineWords(
-      lineView(
-        record({
-          yours: yours({
-            follow: {
-              files: ["a.txt", "b.txt", "c.txt", "d.txt"],
-              conflicts: ["b.txt"],
-              heads: 1,
-            },
-          }),
+  test("everything on main: said, and nothing to publish", () => {
+    const words = section(published(0), "project")
+    expect(words?.notes).toEqual(["everything in the project is on main"])
+    expect(words?.actions).toEqual([])
+  })
+  test("main with commits the project lacks, or no main: not offered, and why", () => {
+    expect(section(published(3, 1), "project")).toMatchObject({
+      notes: [
+        "main has 1 commit the project doesn't: bring it into the project first",
+      ],
+      actions: [],
+    })
+    expect(section(published(0, 0, null), "project")).toMatchObject({
+      notes: ["this repo has no main bookmark to publish to"],
+      actions: [],
+    })
+    expect(lineWords(lineView(published(0, 0, null))).trigger).toBe("◆ project")
+  })
+})
+
+describe("update my files, and resolving what conflicts (ADR-0061)", () => {
+  test("behind, with a preview: what is new and what would conflict, never the files it changes; their count in the title", () => {
+    const words = section(
+      record({
+        yours: yours({
+          follow: { changes: 116, conflicts: ["b.txt"], heads: 1 },
         }),
-      ),
+      }),
+      "yours",
     )
-    expect(words.notes).toEqual([
-      "the project has 2 commits your files don't",
-      "updating changes 4 files: a.txt, b.txt, c.txt and 1 more",
+    expect(words?.heading).toBe("Your files")
+    expect(words?.notes).toEqual([
+      "2 new commits in the project since you last updated",
       "1 file would conflict: b.txt; the agent can resolve them after",
       "1 other line of your work moves with it",
     ])
-    expect(words.actions).toEqual([
-      { action: "follow", label: "update my files" },
+    expect(words?.actions).toEqual([
+      {
+        action: "follow",
+        label: "update my files",
+        title:
+          "changes 116 files · your work stays on top · jj diff --from 'fork_point(@ | pineta-onto)' --to pineta-onto",
+      },
     ])
   })
   test("behind with no preview (no commit in common): no action, and jj said", () => {
-    const words = lineWords(lineView(record({ yours: yours({}) })))
-    expect(words.actions).toEqual([])
-    expect(words.notes).toEqual([
-      "the project has 2 commits your files don't: rebase onto pineta-onto in jj",
+    const words = section(record({ yours: yours({}) }), "yours")
+    expect(words?.actions).toEqual([])
+    expect(words?.notes).toEqual([
+      "2 new commits in the project since you last updated: rebase onto pineta-onto in jj",
     ])
   })
   test("conflicts in your files: said first, and resolved with the agent", () => {
@@ -159,35 +204,18 @@ describe("update my files, and resolving what conflicts (ADR-0061)", () => {
         }),
       }),
     )
-    expect(view.actions).toEqual(["resolve"])
-    expect(lineWords(view).notes).toEqual([
+    expect(view.yours?.actions).toEqual(["resolve"])
+    expect(lineWords(view).sections[1]?.notes).toEqual([
       "your files have conflicts in 1 file: g.txt",
     ])
     expect(
-      lineWords(
-        lineView(
-          record({
-            yours: yours({
-              behind: 0,
-              conflicts: { commits: 1, files: [] },
-            }),
-          }),
-        ),
-      ).notes,
-    ).toEqual(["1 commit of yours has conflicts"])
-  })
-  test("a host that admits others offers neither", () => {
-    expect(
-      lineView(
+      section(
         record({
-          commands: false,
-          yours: yours({
-            follow: { files: [], conflicts: [], heads: 0 },
-            conflicts: { commits: 1, files: ["g.txt"] },
-          }),
+          yours: yours({ behind: 0, conflicts: { commits: 1, files: [] } }),
         }),
-      ).actions,
-    ).toEqual([])
+        "yours",
+      )?.notes,
+    ).toEqual(["1 commit of yours has conflicts"])
   })
   test("resolveIntent: a new agent tab in your files, its box holding the skill and the files", () => {
     const facts = lineView(
@@ -227,6 +255,11 @@ describe("update my files, and resolving what conflicts (ADR-0061)", () => {
       "a follow out",
       { kind: "sent", id: "s", action: "follow", to: null },
       "updating your files…",
+    ],
+    [
+      "a publish out",
+      { kind: "sent", id: "s", action: "publish", to: null },
+      "publishing the project…",
     ],
     [
       "a refusal",

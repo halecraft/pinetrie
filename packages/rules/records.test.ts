@@ -142,6 +142,8 @@ const SAMPLES: readonly Sample[] = [
     {
       onto: "pineta-onto",
       wipPrefix: "wip/",
+      publish: "main",
+      published: { commit: C, behind: 1, ahead: 0 },
       commit: C,
       heads: { current: null, proposed: "h" },
       log: { current: null, proposed: "l" },

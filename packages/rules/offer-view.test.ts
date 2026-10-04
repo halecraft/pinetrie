@@ -268,6 +268,8 @@ describe("offerView: ADR-0038's table", () => {
     ) => ({
       onto: "pineta-onto",
       wipPrefix: "wip/",
+      publish: "main",
+      published: { commit: null, behind: 0, ahead: 0 },
       commit,
       heads: { current: null, proposed: "" },
       log: { current: null, proposed: "" },

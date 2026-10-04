@@ -1,8 +1,8 @@
 // repo/line — the integration line in your repo (ADR-0060): what it is now,
 // read as values for the host to plan from, and what updating your files
 // from it would do (ADR-0061, S80). Reads only; the host's steps that set it
-// up, move it and rebase your work onto it are `planLineSetup`, `planLand`
-// and `planFollow` (`plan.ts`).
+// up, move it, rebase your work onto it and publish it are `planLineSetup`,
+// `planLand`, `planFollow` and `planPublish` (`plan.ts`).
 
 import {
   type BaseRecord,
@@ -51,6 +51,7 @@ export async function lineFacts(
       heads: heads.ok ? heads.stdout.trim() : null,
       log,
       wips: [],
+      published: { commit: null, behind: 0, ahead: 0 },
       yours: {
         behind: 0,
         ahead: null,
@@ -91,6 +92,7 @@ export async function lineFacts(
     heads: heads.ok ? heads.stdout.trim() : null,
     log,
     wips,
+    published: await publishedFacts(jj, onto, revsetName(line.publish)),
     yours: {
       behind,
       ahead: descends ? await count(jj, `${onto}..@-`) : null,
@@ -100,6 +102,24 @@ export async function lineFacts(
         files: await conflictedFilesAt(jj, "@").catch(() => []),
       },
     },
+  }
+}
+
+/**
+ * The publish bookmark against the line (ADR-0076), read as a WIP's pair:
+ * the line commits it lacks, and its commits the line lacks.
+ */
+async function publishedFacts(
+  jj: Runner,
+  onto: string,
+  publish: string,
+): Promise<LineFacts["published"]> {
+  const [commit] = await commitsOf(jj, `present(${publish})`)
+  if (commit === undefined) return { commit: null, behind: 0, ahead: 0 }
+  return {
+    commit,
+    behind: await count(jj, `::${onto} ~ ::${publish}`),
+    ahead: await count(jj, `::${publish} ~ ::${onto}`),
   }
 }
 
@@ -135,7 +155,7 @@ async function followPreview(
   const changed = await git(["diff", "--name-only", at, tree.trim()])
   if (!changed.ok) return null
   return {
-    files: lines(changed.stdout),
+    changes: lines(changed.stdout).length,
     conflicts,
     heads: await count(jj, `heads(roots(${onto}..@)::) ~ @`),
   }

@@ -142,28 +142,9 @@ export function offerRefusal(code: ErrCode): string {
   }
 }
 
-/** Why a `line` command was refused, worded once (ADR-0060). */
-export function lineRefusal(action: LineAction, code: ErrCode): string {
-  switch (code) {
-    case ERR.NOT_YOURS:
-      return "this host admits others, so it does not act on the repo as its owner: use jj on its machine"
-    case ERR.NO_LINE:
-      return "set up the line first"
-    default:
-      switch (action) {
-        case "setup":
-          return "the line is already set up"
-        case "land":
-          return "your @- is not above the line: rebase onto it first"
-        case "follow":
-          return "your files have nothing to take from the project, or share no commit with it"
-      }
-  }
-}
-
 /**
  * A `line` command: set up the integration line, land your work (ADR-0060),
- * or update your files from it (ADR-0061).
+ * update your files from it (ADR-0061), or publish it (ADR-0076).
  */
 export async function actOnLine(
   deps: Pick<LaneDeps, "work">,
@@ -179,5 +160,5 @@ export async function actOnLine(
   const refused = await line.act(action)
   return refused === null
     ? { kind: "line-moved" }
-    : { kind: "refused", code: refused, message: lineRefusal(action, refused) }
+    : { kind: "refused", ...refused }
 }

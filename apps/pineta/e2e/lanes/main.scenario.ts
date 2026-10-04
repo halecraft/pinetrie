@@ -826,6 +826,35 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       `${JSON.stringify({ preview, updated, followedBy })}`,
     )
     await wu.line("land")
+    // Publish (ADR-0076): main, set at the project's first commit, moves
+    // forward to the line, and the record then has nothing unpublished.
+    jj(
+      project,
+      "bookmark",
+      "create",
+      "main",
+      "-r",
+      "roots(::pineta-onto ~ root())",
+    )
+    const unpublished = await waitFor(
+      () => (readLine(wh.session)?.published.behind ?? 0) > 0,
+      30_000,
+    )
+    const published = await wu.line("publish")
+    const caughtUp = await waitFor(
+      () => readLine(wh.session)?.published.behind === 0,
+      30_000,
+    )
+    const commitAt = (rev: string) =>
+      jj(project, "log", "--no-graph", "-r", rev, "-T", "commit_id")
+    check(
+      "publish moves main forward to the project, and nothing is left unpublished",
+      unpublished >= 0 &&
+        published.kind === "line-moved" &&
+        caughtUp >= 0 &&
+        commitAt("main") === commitAt("pineta-onto"),
+      `${JSON.stringify({ published, line: readLine(wh.session)?.published })}`,
+    )
     script.use([{ text: "it fits" }])
     if (two !== undefined)
       bringUpToDate(wu, two.name, laneTip(two.name), "check yours still fits")

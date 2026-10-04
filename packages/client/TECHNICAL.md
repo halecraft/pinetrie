@@ -394,6 +394,14 @@ in it opens a tab until you choose.
   `onToggle`, so an open menu keeps a section whose rows have gone and says
   so. Its first section has a heading and no items: it names the menu, and
   its empty `.menu-section` is hidden, with no rule under it.
+- **The project menu** (`line-view.ts`, ADR-0076): `lineView` decides two
+  sections, the project's (setting it up, publishing it, on every host) and
+  your files' (null on a host that admits others), each offering what
+  `@pineta/rules`' `lineActionState` allows, the rule the host decides by;
+  `lineWords` words them, a publish it does not offer with `lineRefusal`.
+  Notes name no files but those that would conflict; how many files
+  updating changes is the action's title. The trigger counts unpublished
+  commits, never your files being behind.
 - **The inbox** (`inbox.ts`, pure): `mentionsOf` is every chat, from each
   root's directory record (`RootRecord.mentions`), whose mentions
   `address` resolves to your display name, never your own; `InboxItem` is one

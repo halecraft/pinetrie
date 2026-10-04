@@ -935,6 +935,8 @@ describe("behindMark: the header's mark for a base that moved on", () => {
   const line = {
     onto: "pineta-onto",
     wipPrefix: "wip/",
+    publish: "main",
+    published: { commit: null, behind: 0, ahead: 0 },
     commit: commitId("bbbbbbbbbbbb"),
     heads: { current: null, proposed: "" },
     log: { current: null, proposed: "" },

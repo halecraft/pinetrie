@@ -13,6 +13,8 @@ import {
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import {
+  lineActionState,
+  lineRefusal,
   parentNow,
   planBegin,
   planLineAction,
@@ -27,6 +29,7 @@ describe("the line (ADR-0060)", () => {
     heads: "trunk()",
     log: null,
     wips: [],
+    published: { commit: null, behind: 0, ahead: 0 },
     yours: {
       behind: 0,
       ahead: null,
@@ -38,7 +41,7 @@ describe("the line (ADR-0060)", () => {
   const record = (over: Partial<LineRecord> = {}): LineRecord => ({
     ...planLineRecord({
       facts,
-      line: { onto: "pineta-onto", wipPrefix: "wip/" },
+      line: { onto: "pineta-onto", wipPrefix: "wip/", publish: "main" },
       proposed,
       commands: true,
     }),
@@ -50,11 +53,12 @@ describe("the line (ADR-0060)", () => {
       proposed: proposed.heads,
     })
     expect(record().log).toEqual({ current: null, proposed: "logged" })
-    expect([record().onto, record().wipPrefix, record().commands]).toEqual([
-      "pineta-onto",
-      "wip/",
-      true,
-    ])
+    expect([
+      record().onto,
+      record().wipPrefix,
+      record().publish,
+      record().commands,
+    ]).toEqual(["pineta-onto", "wip/", "main", true])
   })
   test("setup writes the bookmark at your @- and exactly the proposed heads and log", () => {
     expect(planLineAction("setup", record())).toEqual({
@@ -100,7 +104,7 @@ describe("the line (ADR-0060)", () => {
     })
   })
   test("follow: only with a line and a preview, the one you were shown; a conflict in it refuses nothing", () => {
-    const preview = { files: ["a.txt"], conflicts: ["a.txt"], heads: 0 }
+    const preview = { changes: 1, conflicts: ["a.txt"], heads: 0 }
     const set = (follow: typeof preview | null) =>
       record({
         commit: commitId("c1"),
@@ -126,6 +130,57 @@ describe("the line (ADR-0060)", () => {
     expect(
       planLineAction("follow", { ...set(preview), commands: false }),
     ).toEqual({ kind: "refused", code: ERR.NOT_YOURS })
+  })
+
+  describe("publish (ADR-0076)", () => {
+    const at = (published: LineRecord["published"], commands = true) =>
+      record({ commit: commitId("c1"), published, commands })
+    const main = commitId("m1")
+    test("moves the publish bookmark forward to the line, as the host, on any host", () => {
+      for (const commands of [true, false])
+        expect(
+          planLineAction(
+            "publish",
+            at({ commit: main, behind: 2, ahead: 0 }, commands),
+          ),
+        ).toEqual({ kind: "publish", onto: "pineta-onto", publish: "main" })
+    })
+    test("refused with no line, no bookmark, nothing unpublished, or commits the line lacks", () => {
+      const code = (r: LineRecord) => {
+        const s = lineActionState("publish", r)
+        return s.kind === "refused" ? s.code : null
+      }
+      expect(code(record())).toBe(ERR.NO_LINE)
+      expect(code(at({ commit: null, behind: 0, ahead: 0 }))).toBe(
+        ERR.NO_PUBLISH,
+      )
+      expect(code(at({ commit: main, behind: 0, ahead: 0 }))).toBe(ERR.REFUSED)
+      expect(code(at({ commit: main, behind: 3, ahead: 2 }))).toBe(
+        ERR.NOT_FAST_FORWARD,
+      )
+    })
+    test("the owner's three stay the host's alone", () => {
+      for (const action of ["setup", "land", "follow"] as const)
+        expect(lineActionState(action, record({ commands: false }))).toEqual({
+          kind: "refused",
+          code: ERR.NOT_YOURS,
+        })
+    })
+    test("lineRefusal words each refusal once, naming the bookmark and counting", () => {
+      const r = at({ commit: main, behind: 3, ahead: 2 })
+      expect(lineRefusal("publish", ERR.NOT_FAST_FORWARD, r)).toBe(
+        "main has 2 commits the project doesn't: bring them into the project first",
+      )
+      expect(lineRefusal("publish", ERR.NO_PUBLISH, r)).toBe(
+        "this repo has no main bookmark to publish to",
+      )
+      expect(lineRefusal("publish", ERR.REFUSED, r)).toBe(
+        "everything in the project is on main already",
+      )
+      expect(lineRefusal("land", ERR.NOT_YOURS, r)).toContain(
+        "use jj on its machine",
+      )
+    })
   })
 })
 

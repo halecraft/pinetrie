@@ -16,6 +16,7 @@ import {
 } from "@pineta/repo"
 import {
   LINE,
+  lineRefusal,
   planLineAction,
   planLineRecord,
   setIfChanged,
@@ -27,8 +28,13 @@ export interface Line {
   refresh(): Promise<void>
   /** The line's record, from the step's shared facts, written when it changed. */
   record(ops: RepoOps): Promise<LineRecord>
-  /** A `line` command; null when carried out, else why not. */
-  act(action: LineAction): Promise<ErrCode | null>
+  /**
+   * A `line` command; null when carried out, else why not, worded
+   * (`lineRefusal`) from the record it was decided on.
+   */
+  act(
+    action: LineAction,
+  ): Promise<{ readonly code: ErrCode; readonly message: string } | null>
 }
 
 export function createLine(deps: {
@@ -36,10 +42,13 @@ export function createLine(deps: {
   readonly basics: Pick<Basics, "session">
   /** The integration line's names (ADR-0060). */
   readonly line: LineConfig
-  /** Whether this host takes `line` commands: it admits no one else. */
+  /**
+   * Whether this host takes the owner's `line` commands: it admits no one
+   * else. Publishing is anyone's (ADR-0076).
+   */
   readonly lineCommands: boolean
   readonly writeValues: (writes: readonly ValueWrite[]) => Promise<void>
-  /** After a land: the base snapshot follows the line. */
+  /** After the line moved (set up, or your work added): the base snapshot follows it. */
   readonly taken: () => void
 }): Line {
   const { owner, line } = deps
@@ -63,11 +72,17 @@ export function createLine(deps: {
     record,
     act: action =>
       owner.command(async ops => {
-        const planned = planLineAction(action, await record(ops))
-        if (planned.kind === "refused") return planned.code
+        const now = await record(ops)
+        const planned = planLineAction(action, now)
+        if (planned.kind === "refused")
+          return {
+            code: planned.code,
+            message: lineRefusal(action, planned.code, now),
+          }
         await ops.execute(lineSteps(planned))
         await record(ops)
-        deps.taken()
+        // Updating your files and publishing leave the line where it was.
+        if (planned.kind === "setup" || planned.kind === "land") deps.taken()
         return null
       }),
   }

@@ -1,10 +1,12 @@
 // line — the integration line and a thread's base on it (ADR-0060,
-// ADR-0061, ADR-0072): the line's and each lane's base's records
+// ADR-0061, ADR-0072, ADR-0076): the line's and each lane's base's records
 // (`pineta.line`, `pineta.base`), the line's record from what the host read
-// (`planLineRecord`), a `line` command (`planLineAction`), where a new lane
-// begins (`planBegin`), the base a thread follows (`effectiveBase`), what
-// catching up with it would do (`catchUpOf`) and merge (`planUpdateFrom`),
-// and the thread a lane branched from (`parentNow`, `planParentUpdate`).
+// (`planLineRecord`), whether a `line` command may run (`lineActionState`)
+// and why not (`lineRefusal`), the command (`planLineAction`), where a new
+// lane begins (`planBegin`), the base a thread follows (`effectiveBase`),
+// what catching up with it would do (`catchUpOf`) and merge
+// (`planUpdateFrom`), and the thread a lane branched from (`parentNow`,
+// `planParentUpdate`).
 // A `line` command's steps are `@pineta/repo`'s (`lineSteps`).
 
 import {
@@ -45,6 +47,7 @@ export const LINE_KEY = "line"
 const LineRecordSchema = Type.Object({
   onto: Type.String({ minLength: 1 }),
   wipPrefix: Type.String({ minLength: 1 }),
+  publish: Type.String({ minLength: 1 }),
   commit: Type.Union([CommitSchema, Type.Null()]),
   heads: Type.Object({
     current: Type.Union([Type.String(), Type.Null()]),
@@ -62,12 +65,17 @@ const LineRecordSchema = Type.Object({
       ahead: Type.Integer({ minimum: 0 }),
     }),
   ),
+  published: Type.Object({
+    commit: Type.Union([CommitSchema, Type.Null()]),
+    behind: Type.Integer({ minimum: 0 }),
+    ahead: Type.Integer({ minimum: 0 }),
+  }),
   yours: Type.Object({
     behind: Type.Integer({ minimum: 0 }),
     ahead: Type.Union([Type.Integer({ minimum: 0 }), Type.Null()]),
     follow: Type.Union([
       Type.Object({
-        files: Type.Array(Type.String()),
+        changes: Type.Integer({ minimum: 0 }),
         conflicts: Type.Array(Type.String()),
         heads: Type.Integer({ minimum: 0 }),
       }),
@@ -116,6 +124,7 @@ export const LINE: RecordSpec<LineRecord, typeof LINE_KEY, "session"> = {
     heads: { ...r.heads },
     log: { ...r.log },
     wips: r.wips.map(w => ({ ...w })),
+    published: { ...r.published },
     yours: {
       ...r.yours,
       follow:
@@ -123,7 +132,6 @@ export const LINE: RecordSpec<LineRecord, typeof LINE_KEY, "session"> = {
           ? null
           : {
               ...r.yours.follow,
-              files: [...r.yours.follow.files],
               conflicts: [...r.yours.follow.conflicts],
             },
       conflicts: {
@@ -137,6 +145,11 @@ export const LINE: RecordSpec<LineRecord, typeof LINE_KEY, "session"> = {
       ...r,
       commit: r.commit === null ? null : commitId(r.commit),
       wips: r.wips.map(w => ({ ...w, commit: commitId(w.commit) })),
+      published: {
+        ...r.published,
+        commit:
+          r.published.commit === null ? null : commitId(r.published.commit),
+      },
     })),
 }
 
@@ -175,13 +188,17 @@ export const BASE: RecordSpec<BaseRecord, LaneName, "session"> = {
 /**
  * The line's record, the page's cache, from what the host read of it
  * (ADR-0060): what setting it up would write to your repo's config
- * (`proposed`, `lineProposal`), and whether this host takes `line`
- * commands.
+ * (`proposed`, `lineProposal`), and whether this host takes the `line`
+ * commands that act on the repo as its owner.
  */
 export function planLineRecord(input: {
   readonly facts: LineFacts
-  /** The line's bookmark, and the prefix that makes a bookmark a WIP. */
-  readonly line: { readonly onto: string; readonly wipPrefix: string }
+  /** The line's bookmark, the WIP prefix and the publish bookmark. */
+  readonly line: {
+    readonly onto: string
+    readonly wipPrefix: string
+    readonly publish: string
+  }
   readonly proposed: { readonly heads: string; readonly log: string }
   readonly commands: boolean
 }): LineRecord {
@@ -189,48 +206,120 @@ export function planLineRecord(input: {
   return {
     onto: line.onto,
     wipPrefix: line.wipPrefix,
+    publish: line.publish,
     commit: facts.commit,
     heads: { current: facts.heads, proposed: proposed.heads },
     log: { current: facts.log, proposed: proposed.log },
     wips: facts.wips,
+    published: facts.published,
     yours: facts.yours,
     commands: input.commands,
   }
 }
 
 /**
- * A `line` command, decided from the record read in its own step: refused
- * on a host that admits others (it acts on the repo as its owner), refused
- * when there is nothing to do. Setting up writes exactly the immutable heads
- * and log the record proposed, the text you were shown.
+ * The `line` commands that act on the repo as its owner: refused on a host
+ * that admits others. Publishing moves a bookmark forward to work already on
+ * the line, so anyone admitted may (ADR-0076).
+ */
+const HOST_ONLY: ReadonlySet<LineAction> = new Set(["setup", "land", "follow"])
+
+/** Whether a `line` command may run now, and if not, why. */
+export type LineActionState =
+  | { readonly kind: "ok" }
+  | { readonly kind: "refused"; readonly code: ErrCode }
+
+const OK: LineActionState = { kind: "ok" }
+const refused = (code: ErrCode): LineActionState => ({ kind: "refused", code })
+
+/**
+ * Whether `action` may run on the line as `record` has it: the one rule the
+ * host's `planLineAction` and the page's menu both read. Update your files
+ * only with a preview, since it is what you were shown before you chose it.
+ */
+export function lineActionState(
+  action: LineAction,
+  record: LineRecord,
+): LineActionState {
+  if (HOST_ONLY.has(action) && !record.commands) return refused(ERR.NOT_YOURS)
+  if (action === "setup")
+    return record.commit === null ? OK : refused(ERR.REFUSED)
+  if (record.commit === null) return refused(ERR.NO_LINE)
+  switch (action) {
+    case "land":
+      return record.yours.ahead === null || record.yours.ahead === 0
+        ? refused(ERR.REFUSED)
+        : OK
+    case "follow":
+      return record.yours.follow === null ? refused(ERR.REFUSED) : OK
+    case "publish": {
+      const { commit, behind, ahead } = record.published
+      if (commit === null) return refused(ERR.NO_PUBLISH)
+      if (ahead > 0) return refused(ERR.NOT_FAST_FORWARD)
+      return behind === 0 ? refused(ERR.REFUSED) : OK
+    }
+  }
+}
+
+/**
+ * A `line` command, decided from the record read in its own step
+ * (`lineActionState`). Setting up writes exactly the immutable heads and log
+ * the record proposed, the text you were shown.
  */
 export function planLineAction(
   action: LineAction,
   record: LineRecord,
 ): LineDecision {
+  const state = lineActionState(action, record)
+  if (state.kind === "refused") return state
   const { onto } = record
-  if (!record.commands) return { kind: "refused", code: ERR.NOT_YOURS }
   switch (action) {
     case "setup":
-      return record.commit !== null
-        ? { kind: "refused", code: ERR.REFUSED }
-        : {
-            kind: "setup",
-            onto,
-            heads: record.heads.proposed,
-            log: record.log.proposed,
-          }
+      return {
+        kind: "setup",
+        onto,
+        heads: record.heads.proposed,
+        log: record.log.proposed,
+      }
     case "land":
-      if (record.commit === null) return { kind: "refused", code: ERR.NO_LINE }
-      return record.yours.ahead === null || record.yours.ahead === 0
-        ? { kind: "refused", code: ERR.REFUSED }
-        : { kind: "land", onto }
     case "follow":
-      // Only with a preview: it is what you were shown before you chose it.
-      if (record.commit === null) return { kind: "refused", code: ERR.NO_LINE }
-      return record.yours.follow === null
-        ? { kind: "refused", code: ERR.REFUSED }
-        : { kind: "follow", onto }
+      return { kind: action, onto }
+    case "publish":
+      return { kind: "publish", onto, publish: record.publish }
+  }
+}
+
+/**
+ * Why a `line` command was refused, worded once: the host's answer, and the
+ * project menu's reason for a publish it does not offer. `record` names the
+ * bookmarks and counts.
+ */
+export function lineRefusal(
+  action: LineAction,
+  code: ErrCode,
+  record: Pick<LineRecord, "publish" | "published">,
+): string {
+  const { publish, published } = record
+  switch (code) {
+    case ERR.NOT_YOURS:
+      return "this host admits others, so it does not act on the repo as its owner: use jj on its machine"
+    case ERR.NO_LINE:
+      return "set up the project first"
+    case ERR.NO_PUBLISH:
+      return `this repo has no ${publish} bookmark to publish to`
+    case ERR.NOT_FAST_FORWARD:
+      return `${publish} has ${published.ahead === 1 ? "1 commit" : `${published.ahead} commits`} the project doesn't: bring ${published.ahead === 1 ? "it" : "them"} into the project first`
+    default:
+      switch (action) {
+        case "setup":
+          return "the project is already set up"
+        case "land":
+          return "your @- is not above the project: rebase onto it first"
+        case "follow":
+          return "your files have nothing to take from the project, or share no commit with it"
+        case "publish":
+          return `everything in the project is on ${publish} already`
+      }
   }
 }
 

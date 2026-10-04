@@ -240,6 +240,7 @@ export function startRepoOwner(input: {
           if (listeners.has(listener))
             listener({
               all: true,
+              line: true,
               yours: true,
               lanes: new Set(),
               offers: new Set(),

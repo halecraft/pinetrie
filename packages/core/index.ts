@@ -289,6 +289,10 @@ export const ERR = {
   NOT_YOURS: "not_yours",
   /** An offer taken, or work landed, before the line is set up (ADR-0060). */
   NO_LINE: "no_line",
+  /** Publishing in a repo with no publish bookmark (ADR-0076). */
+  NO_PUBLISH: "no_publish",
+  /** Publishing while the publish bookmark has commits the line lacks (ADR-0076). */
+  NOT_FAST_FORWARD: "not_fast_forward",
   /** A take to a bookmark that is not one of the offer's destinations now. */
   BAD_DESTINATION: "bad_destination",
   /** A new thread's base that is not a WIP bookmark above the line. */
@@ -502,8 +506,13 @@ export const OFFER_ACTIONS: readonly OfferAction[] = [
  * What can be done with the integration line (ADR-0060): set it up at your
  * `@-`, writing your repo's immutable heads, or land your work on it.
  */
-export type LineAction = "setup" | "land" | "follow"
-export const LINE_ACTIONS: readonly LineAction[] = ["setup", "land", "follow"]
+export type LineAction = "setup" | "land" | "follow" | "publish"
+export const LINE_ACTIONS: readonly LineAction[] = [
+  "setup",
+  "land",
+  "follow",
+  "publish",
+]
 
 // --- the archive (ADR-0029) --------------------------------------------------
 
@@ -1019,6 +1028,8 @@ export interface LineRecord {
   /** The line's bookmark, and the prefix that makes a bookmark a WIP. */
   readonly onto: string
   readonly wipPrefix: string
+  /** The bookmark publishing moves forward to the line (ADR-0076). */
+  readonly publish: string
   /** The line's commit; null before it is set up. */
   readonly commit: CommitId | null
   /**
@@ -1042,10 +1053,21 @@ export interface LineRecord {
     readonly ahead: number
   }[]
   /**
+   * The publish bookmark against the line (ADR-0076): its commit (null when
+   * the repo has none), the line commits it lacks (`behind`: what publishing
+   * moves it over) and its commits the line lacks (`ahead`: publishing is a
+   * fast-forward only at 0). Both 0 before the line is set up.
+   */
+  readonly published: {
+    readonly commit: CommitId | null
+    readonly behind: number
+    readonly ahead: number
+  }
+  /**
    * Your `@-` against the line: the line commits it lacks, and the commits
    * of yours above the line when it descends from it (null when it does
    * not). `follow` is what updating your files would do (ADR-0061, S80):
-   * the files that change, those that conflict, and your other heads that
+   * how many files change, those that conflict, and your other heads that
    * move with `@`; null when nothing is behind, or `@` descends from no
    * line commit. `conflicts` are your conflicted commits above the line and
    * the conflicted files in `@`.
@@ -1054,7 +1076,7 @@ export interface LineRecord {
     readonly behind: number
     readonly ahead: number | null
     readonly follow: {
-      readonly files: readonly string[]
+      readonly changes: number
       readonly conflicts: readonly string[]
       readonly heads: number
     } | null
@@ -1064,9 +1086,9 @@ export interface LineRecord {
     }
   }
   /**
-   * Whether this host takes `line` commands (set up, land): only when it
-   * admits no one but this machine (no invite key), since they act on the
-   * repo as its owner.
+   * Whether this host takes the `line` commands that act on the repo as its
+   * owner (set up, land, update your files): only when it admits no one but
+   * this machine (no invite key). Publishing is anyone's (ADR-0076).
    */
   readonly commands: boolean
 }

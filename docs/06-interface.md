@@ -74,30 +74,40 @@ the session, from live data only, as a document editor shows the people in it.
   root, each opening its thread). With nothing in it, it is not shown.
   Nothing in the header animates: the tab, the column and the rail show
   where the agent works.
-- **The project** (ADR-0060, ADR-0061): a menu for the integration line,
-  "◆ project", where finished work is added; its bookmark is in its
-  title. While the project has commits your files don't, it reads "◆
-  project ↓", the count in its title; that is not on the activity badge. Before it exists it offers **set up the project**, showing the
+- **The project** (ADR-0060, ADR-0061, ADR-0076): a menu for the
+  integration line, "◆ project", where finished work is added; its
+  bookmark is in its title. While the project has commits not yet on `main`
+  (`offers.publish`), it reads "◆ project · 2 unpublished". Before the line
+  exists, the host's own machine offers **set up the project**, showing the
   bookmark it makes at your `@-` and the exact `immutable_heads()` and
   `revsets.log` text it writes to your repo's config (the log, so jj and
   jjui show the offers), and what to add to a jjui revset of its own
-  (`docs/the-jujutsu-repo.md`), done only when you choose it. After, it says
-  where your files stand ("your files have everything in the project", or
-  "the project has 3 commits your files don't", with what updating would
-  change, what would conflict, and how many other lines of your work move
-  with it) and offers **update my files**, which rebases your work onto the
-  project, as you (ADR-0061); **add my work to the project (N commits)**,
-  which moves the line forward to your `@-`; and, when your files have
-  conflicts, **resolve with the agent**, which opens a new agent tab working
-  in your files, its box holding the `resolve-conflicts` skill and the
-  files, for you to send. While a command is out the menu says what it is
-  doing ("setting up the project…", "adding your work to the project…",
-  "updating your files…") and offers nothing else; refused, it says "not
+  (`docs/the-jujutsu-repo.md`), done only when you choose it; a host that
+  admits others says the project is not set up yet, with the jj
+  instructions in its title. After, the menu has two sections:
+  - **The project**, on every host: "2 commits not yet on main", or
+    "everything in the project is on main", and **publish to main (N
+    commits)**, which moves `main` forward to the line, as the host, for
+    anyone admitted. It does not push. With no `main`, or `main` holding
+    commits the project lacks, it is not offered, and the menu says why.
+  - **Your files**, only on the host's own machine: where they stand ("3 new
+    commits in the project since you last updated", or "your files have
+    everything in the project"), conflicts in them, and what updating would
+    conflict, at most three files named; then **update my files**, which
+    rebases your work onto the project, as you (its title says how many
+    files it changes, that your work stays on top, and the jj command that
+    shows the diff); **add my work to the project (N commits)**, which moves
+    the line forward to your `@-`; and, when your files have conflicts,
+    **resolve with the agent**, which opens a new agent tab working in your
+    files, its box holding the `resolve-conflicts` skill and the files, for
+    you to send. With no commit in common with the project, it says to
+    rebase in jj.
+
+  While a command is out the menu says what it is doing ("setting up the
+  project…", "adding your work to the project…", "updating your files…",
+  "publishing the project…") and offers nothing else; refused, it says "not
   done:" and why; failed, "it failed, and may be part done:" and why. That
-  stays, menu closed or open, until your next command there. With
-  no commit in common with the project, it says to rebase in jj. A host
-  that admits others offers none of these, and says to use jj on its
-  machine.
+  stays, menu closed or open, until your next command there.
 - **A menu you opened stays open until you close it.** The header's avatars
   and counts come from live data, but when what one stands for goes while
   its menu is open (a person leaves, the agent finishes, the last offer is

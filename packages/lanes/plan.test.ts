@@ -247,22 +247,26 @@ describe("planRun: a lane's container", () => {
 })
 
 describe("lineConfig: the project's names win, and a bad one falls back", () => {
-  const none = { onto: null, wipPrefix: null }
+  const none = { onto: null, wipPrefix: null, publish: null }
   test("defaults with nothing set", () => {
     expect(lineConfig(none, none)).toEqual({ line: DEFAULT_LINE, refused: [] })
   })
   test("the project's name wins over the user's", () => {
     expect(
       lineConfig(
-        { onto: "mine", wipPrefix: "draft/" },
-        { onto: "trunk", wipPrefix: null },
+        { onto: "mine", wipPrefix: "draft/", publish: "master" },
+        { onto: "trunk", wipPrefix: null, publish: null },
       ).line,
-    ).toEqual({ onto: "trunk", wipPrefix: "draft/" })
+    ).toEqual({ onto: "trunk", wipPrefix: "draft/", publish: "master" })
   })
   test("a name that is no bookmark falls back, saying why", () => {
-    const r = lineConfig(none, { onto: "has space", wipPrefix: "a..b/" })
+    const r = lineConfig(none, {
+      onto: "has space",
+      wipPrefix: "a..b/",
+      publish: "a:b",
+    })
     expect(r.line).toEqual(DEFAULT_LINE)
-    expect(r.refused).toHaveLength(2)
+    expect(r.refused).toHaveLength(3)
     expect(r.refused[0]).toContain("has space")
   })
   test("isBookmarkName: git's rules", () => {
@@ -281,7 +285,7 @@ describe("decodeLaneConfig: grants, the install and shared directories, total", 
         grants: NO_GRANTS,
         install: null,
         shared: [],
-        offers: { onto: null, wipPrefix: null },
+        offers: { onto: null, wipPrefix: null, publish: null },
       })
     expect(
       decodeLaneConfig(
@@ -300,14 +304,17 @@ describe("decodeLaneConfig: grants, the install and shared directories, total", 
       grants: { ssh: false, env: ["OK_1"], mounts: [] },
       install: null,
       shared: [".plans"],
-      offers: { onto: null, wipPrefix: null },
+      offers: { onto: null, wipPrefix: null, publish: null },
     })
   })
   test("offers: the line's names, as written", () => {
     expect(
-      decodeLaneConfig({ offers: { onto: "trunk", wipPrefix: 3 } }, "/p", false)
-        .offers,
-    ).toEqual({ onto: "trunk", wipPrefix: null })
+      decodeLaneConfig(
+        { offers: { onto: "trunk", wipPrefix: 3, publish: "master" } },
+        "/p",
+        false,
+      ).offers,
+    ).toEqual({ onto: "trunk", wipPrefix: null, publish: "master" })
   })
   test("mount sources are relative to the project", () => {
     expect(

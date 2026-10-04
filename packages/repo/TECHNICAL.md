@@ -86,10 +86,12 @@ everything else reads at the head it last saw.**
   --no-graph -n 1 -T id`, which merges divergent heads and names the result
   (S87 item 4). The same id ends it. Else one `jj log`, pinned to that id,
   reads the fingerprint: the line's bookmark, the WIP bookmarks, the
-  offers' bookmarks, the lanes' `pineta-*` remote bookmarks, each with its
-  commit (a conflicted one with all its targets), and `@`'s commit. A
-  bookmark of yours outside those is not read, so moving it moves nothing.
-  `planObserve` says what moved; the listeners hear it, and the fingerprint
+  publish bookmark (`main`, ADR-0076), the offers' bookmarks, the lanes'
+  `pineta-*` remote bookmarks, each with its commit (a conflicted one with
+  all its targets), and `@`'s commit. A bookmark of yours outside those is
+  not read, so moving it moves nothing. The publish bookmark moving is
+  `Moved.line`, not `all`: no offer depends on it, so it refreshes the
+  line's record alone (`planMarks`). `planObserve` says what moved; the listeners hear it, and the fingerprint
   advances. The first observation reports `all`; a listener that subscribes
   after it hears one `all` of its own.
 - **The watch** (`fs.watch` on `op_heads/heads`, S87 items 5 and 6) and a
@@ -192,7 +194,9 @@ operation is read once and kept until the head moves.**
   `--config operation.username=pineta-host`** (`as: "host"`, `RepoOps.jj`): it
   never snapshots your working copy, and the evolog says which commits the
   host made (S48 items 1 and 8). The import of a lane's bundle is the host's
-  too (`planImport`), so it is `pineta-host`'s in your op log (S87 item 7).
+  too (`planImport`), so it is `pineta-host`'s in your op log (S87 item 7),
+  and so is publishing (`planPublish`, ADR-0076), which changes no file and
+  is anyone's command.
   Updating your files (`planFollow`: `jj rebase -b @ -d <onto>`) is one
   exception, since it changes your files; landing your work is the other: it
   moves the line to your commits, your act, so it runs as you (`as: "you"`,
@@ -297,9 +301,12 @@ operation is read once and kept until the head moves.**
   `planRefreshOffer`'s rebase.
 - **A take is a forward bookmark move** (`planTakeOffer`, ADR-0060): `jj
   bookmark move <destination> --to <top>` as the host, then the offer's
-  bookmark deleted. Never `--allow-backwards`: jj refuses a move that is
-  not forward, so a stale take fails rather than drops commits (S77 item 1).
-  It never rebases and never touches your `@`.
+  bookmark deleted. It never rebases and never touches your `@`. A take, a
+  land and a publish each move a bookmark with `moveForward`, which never
+  passes `--allow-backwards`: jj refuses a move that is not forward, so a
+  stale move fails rather than drops commits (S77 item 1). A colocated
+  repo's git ref follows a host move made with `--ignore-working-copy`
+  (`repo.test.ts`, publish).
 - **`readOffer` reads an offer from your repo alone** (`OfferInRepo`,
   ADR-0060): nothing the host remembers is needed, so a lost record costs
   nothing. Its revisions (`offerRevisions`) are what is under the bookmark,

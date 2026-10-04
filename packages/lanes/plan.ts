@@ -340,6 +340,7 @@ export interface LaneConfig {
   readonly offers: {
     readonly onto: string | null
     readonly wipPrefix: string | null
+    readonly publish: string | null
   }
 }
 
@@ -360,8 +361,12 @@ export function decodeLaneConfig(
   const offersKey = isRecord(json) ? json.offers : undefined
   const named = (v: unknown) => (typeof v === "string" ? v : null)
   const offers = isRecord(offersKey)
-    ? { onto: named(offersKey.onto), wipPrefix: named(offersKey.wipPrefix) }
-    : { onto: null, wipPrefix: null }
+    ? {
+        onto: named(offersKey.onto),
+        wipPrefix: named(offersKey.wipPrefix),
+        publish: named(offersKey.publish),
+      }
+    : { onto: null, wipPrefix: null, publish: null }
   const pnpm: Install | null = pnpmLock
     ? { command: "pnpm install --frozen-lockfile", lockfile: "pnpm-lock.yaml" }
     : null
@@ -403,15 +408,20 @@ export function decodeLaneConfig(
   }
 }
 
-/** The integration line's bookmark and the WIP bookmarks' prefix (ADR-0060). */
+/**
+ * The integration line's bookmark, the WIP bookmarks' prefix (ADR-0060), and
+ * the bookmark publishing moves to the line (ADR-0076).
+ */
 export interface LineConfig {
   readonly onto: string
   readonly wipPrefix: string
+  readonly publish: string
 }
 
 export const DEFAULT_LINE: LineConfig = {
   onto: "pineta-onto",
   wipPrefix: "wip/",
+  publish: "main",
 }
 
 /**
@@ -459,6 +469,7 @@ export function lineConfig(
     line: {
       onto: pick("onto", isBookmarkName),
       wipPrefix: pick("wipPrefix", v => isBookmarkName(`${v}x`)),
+      publish: pick("publish", isBookmarkName),
     },
     refused,
   }

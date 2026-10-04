@@ -729,8 +729,16 @@ commit-message request `request.ts` (`describeRequest`).
 - **`effectiveBase`**, **`catchUpOf`**, **`parentNow`** and
   **`catchUpName`** are here too. How the page reads them is under Offers,
   "What the page reads".
+- **`lineActionState` is the one rule for a `line` command** (ADR-0076):
+  the host's `planLineAction` decides from it, and the page's `lineView`
+  offers what it allows. `HOST_ONLY` (setup, land, follow) act on the repo
+  as its owner and are refused on a host that admits others; publishing is
+  anyone's. `lineRefusal` words each refusal once, for the host's answer
+  and the menu's reason for a publish it does not offer.
 - **`pineta.line` and `pineta.base` are caches** (ADR-0060): the repo is
   the ledger, and the host rewrites each from it. A lost one costs a read.
+  A `pineta.line` from before `publish` and `published` (ADR-0076) does not
+  decode, and is read as unknown until the host writes it again.
   A `pineta.base` from before `catchUp` and `untraced` does not decode, and
   is dropped (ADR-0067): the page reads catching up as unknown until the
   host writes it again. `catchUp` names the lane tip and base commit it was

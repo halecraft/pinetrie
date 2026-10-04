@@ -4,6 +4,8 @@
 `PLAN-2026-10-04-header-activity`. Amends ADR-0030 (`@` becomes the
 activity menu's mentions, and its count part of the menu's badge) and
 ADR-0061 (the ⇣ trigger goes; its threads are the menu's "Ready to add").
+Amended by ADR-0076: the project's trigger counts unpublished commits, and
+no longer marks your files being behind.
 
 **Context.** Using the header alone, with the agent working most of the time,
 Duane found its right end noisy and unclear:

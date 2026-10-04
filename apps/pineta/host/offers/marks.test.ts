@@ -13,6 +13,7 @@ describe("planMarks: what a move the owner observed refreshes", () => {
   ])
   const moved = (over: Partial<Moved> = {}): Moved => ({
     all: false,
+    line: false,
     yours: false,
     lanes: new Set(),
     offers: new Set(),
@@ -25,6 +26,13 @@ describe("planMarks: what a move the owner observed refreshes", () => {
       line: true,
       shared: false,
       lanes: [A, B, C],
+    })
+  })
+  test("the publish bookmark marks the line's record, and no lane (ADR-0076)", () => {
+    expect(marks(moved({ line: true }))).toEqual({
+      line: true,
+      shared: false,
+      lanes: [],
     })
   })
   test("your @ alone marks no lane: one shared read rewrites your edits and the line's record", () => {

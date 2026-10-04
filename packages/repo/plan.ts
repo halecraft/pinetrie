@@ -80,13 +80,34 @@ export const planLineSetup = (input: {
 ]
 
 /**
+ * `bookmark` moved forward to `to`: a take, a land and a publish are each
+ * one. Never `--allow-backwards`: jj refuses a move that is not forward, so
+ * a move planned on stale facts fails rather than dropping commits (S77
+ * item 1).
+ */
+export const moveForward = (
+  as: "host" | "you",
+  bookmark: string,
+  to: string,
+): RepoStep =>
+  (as === "host" ? host : you)("bookmark", "move", bookmark, "--to", to)
+
+/**
  * Land your work (ADR-0060): the line moved to your `@-`, as you, since it is
- * your act. Without `--allow-backwards`, jj refuses a move that is not
- * forward (S77 item 1).
+ * your act.
  */
 export const planLand = (input: { readonly onto: string }): RepoStep[] => [
-  you("bookmark", "move", input.onto, "--to", "@-"),
+  moveForward("you", input.onto, "@-"),
 ]
+
+/**
+ * Publish the line (ADR-0076): the publish bookmark moved forward to the
+ * line, as the host, since it changes no file and anyone admitted may.
+ */
+export const planPublish = (input: {
+  readonly onto: string
+  readonly publish: string
+}): RepoStep[] => [moveForward("host", input.publish, revsetName(input.onto))]
 
 /**
  * Update your files from the line (ADR-0061): your work above it rebased onto
@@ -122,6 +143,8 @@ export function lineSteps(
       return planLand(decision)
     case "follow":
       return planFollow(decision)
+    case "publish":
+      return planPublish(decision)
   }
 }
 
@@ -455,10 +478,8 @@ export const planRepair = (input: {
 
 /**
  * Take an offer (ADR-0060): its destination bookmark moved forward to its
- * top, as the host, then the offer's bookmark deleted. Never a rebase, and
- * never your `@`. Without `--allow-backwards`, jj itself refuses a move that
- * is not forward (S77 item 1), so a take planned on stale facts fails rather
- * than moving the bookmark anywhere else.
+ * top (`moveForward`), as the host, then the offer's bookmark deleted. Never
+ * a rebase, and never your `@`.
  */
 export function planTakeOffer(input: {
   /** The offer's bookmark, as its record holds it. */
@@ -468,7 +489,7 @@ export function planTakeOffer(input: {
   readonly destination: string
 }): RepoStep[] {
   return [
-    host("bookmark", "move", input.destination, "--to", input.top),
+    moveForward("host", input.destination, input.top),
     host("bookmark", "delete", input.bookmark),
   ]
 }

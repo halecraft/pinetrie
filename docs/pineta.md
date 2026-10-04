@@ -348,8 +348,8 @@ always, and seven triggers looked alike. Now one activity menu holds the
 threads ready to add to the project, mentions of you (only once someone has
 mentioned you) and where the agent works. Its badge counts open offers and
 unseen mentions; running work is a steady count beside it, and nothing in
-the header animates. The project stays apart, marked ↓ when your files are
-behind it; your inventory and you sit at the far right.
+the header animates. The project stays apart, marked with what is not yet
+on main (ADR-0076); your inventory and you sit at the far right.
 
 **ADR-0072 — a thread catches up with the thread it branched from** (built).
 A branch cloned from a conflicted copy kept that conflict in its offer, even
@@ -375,6 +375,18 @@ mark by the agent; a mark written meanwhile wins. **Auto-update title** in
 the tab's `⋯` asks again from the root's messages, and replaces any title.
 An untitled root no lane works in is labelled `Chat`. On by default;
 `titles.enabled: false` in the user config stops the automatic one.
+
+**ADR-0076 — the project is published to main** (built). The project menu
+mixed the line with one working copy, listed paths it could not fit, and
+said nothing useful on a host a team shares. Now its first section is the
+project's own: how many commits are not yet on `main` (`offers.publish`),
+and **publish to main**, which moves that bookmark forward to the line as
+the host, on anyone's command, and only as a fast-forward; it does not
+push. *Your files* is a second section, only on the host's own machine,
+with counts in place of file lists. One rule (`lineActionState`) decides
+what may run for the host and the page; the trigger counts unpublished
+commits, and a move of `main` outside Pineta refreshes the line's record
+alone.
 
 **ADR-0019 — a lane is a line of work, not a unit of parallelism.** A person's
 lane is a *conversation lane* and never touches disk. A *work lane* carries

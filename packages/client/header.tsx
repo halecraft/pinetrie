@@ -34,7 +34,13 @@ import {
 } from "./here.ts"
 import type { InboxItem } from "./inbox.ts"
 import type { Intent } from "./intent.ts"
-import { lineNote, lineView, lineWords, resolveIntent } from "./line-view.ts"
+import {
+  type LineSection,
+  lineNote,
+  lineView,
+  lineWords,
+  resolveIntent,
+} from "./line-view.ts"
 import { Menu, type MenuItem } from "./menu.tsx"
 import { Avatar, nameFor } from "./presence.tsx"
 import { type Me, Profile } from "./profile.tsx"
@@ -325,9 +331,10 @@ function ActivityMenu({
 }
 
 /**
- * The project, the integration line (ADR-0060, ADR-0061): set it up, where
- * your files stand against it, and moving work between them. Absent on a
- * host with no lanes of their own.
+ * The project, the integration line (ADR-0060, ADR-0061): setting it up and
+ * publishing it, on every host (ADR-0076); then, on this machine's host,
+ * where your files stand against it, and moving work between them. Absent on
+ * a host with no lanes of their own.
  */
 function LineMenu({
   line,
@@ -350,32 +357,34 @@ function LineMenu({
   ).line
   const said = lineNote(acting)
   const waiting = acting?.kind === "sent"
-  const actions = words.actions.flatMap(({ action, label }): MenuItem[] => {
-    const item = (onChoose: () => void): MenuItem[] => [
-      {
-        key: action,
-        className: "line-action",
-        data: { action },
-        label,
-        disabled: waiting,
-        onChoose,
-      },
-    ]
-    if (action !== "resolve") return item(() => void session.line(action))
-    return resolve === null ? [] : item(() => onIntent(resolve))
-  })
+  const items = (section: LineSection): MenuItem[] =>
+    section.actions.flatMap(({ action, label, title }): MenuItem[] => {
+      const item = (onChoose: () => void): MenuItem[] => [
+        {
+          key: action,
+          className: "line-action",
+          data: { action },
+          label,
+          ...(title === undefined ? {} : { title }),
+          disabled: waiting,
+          onChoose,
+        },
+      ]
+      if (action !== "resolve") return item(() => void session.line(action))
+      return resolve === null ? [] : item(() => onIntent(resolve))
+    })
   return (
     <Menu
       className={`line line-${view.state}`}
       gone={view.state === "absent"}
-      sections={[
-        {
-          key: "line",
-          heading: words.heading,
-          notes: said === null ? words.notes : [said, ...words.notes],
-          items: actions,
-        },
-      ]}
+      // What your last command here said leads the menu, above every section.
+      sections={words.sections.map((section, i) => ({
+        key: section.key,
+        heading: section.heading,
+        notes:
+          i === 0 && said !== null ? [said, ...section.notes] : section.notes,
+        items: items(section),
+      }))}
       label={words.label}
       title={words.label}
       trigger={<span className="line-mark">{words.trigger}</span>}

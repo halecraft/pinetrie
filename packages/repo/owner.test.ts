@@ -108,6 +108,30 @@ describe("the owner of your repo", () => {
     close(owner)
   })
 
+  test("a move of the publish bookmark is observed as the line's alone (ADR-0076)", async () => {
+    const { dir, jj } = await repo("publish")
+    // A commit nothing else the owner watches points at: main alone reads it.
+    await jj("new", "root()", "-m", "side")
+    const side = (
+      await jj("log", "--no-graph", "-r", "@", "-T", "commit_id")
+    ).stdout.trim()
+    await jj("new", DEFAULT_LINE.onto)
+    const { owner, moves } = own(dir)
+    await owner.idle()
+    await owner.command(ops =>
+      ops.execute([host("bookmark", "create", "main", "-r", side)]),
+    )
+    await owner.idle()
+    expect(moves.at(-1)).toEqual({
+      all: false,
+      line: true,
+      yours: false,
+      lanes: new Set(),
+      offers: new Set(),
+    })
+    close(owner)
+  })
+
   test("a write by the owner moves only what it moved; a step that only read queues no observation", async () => {
     const { dir } = await repo("own-write")
     const { owner, steps, moves } = own(dir)
@@ -127,6 +151,7 @@ describe("the owner of your repo", () => {
     await owner.idle()
     expect(moves.at(-1)).toEqual({
       all: false,
+      line: false,
       yours: false,
       lanes: new Set(),
       offers: new Set(["amber-fox"]),

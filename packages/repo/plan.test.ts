@@ -17,6 +17,7 @@ import {
   planLand,
   planLineSetup,
   planOffer,
+  planPublish,
   planTakeOffer,
   takenRevset,
   walkToHost,
@@ -197,7 +198,7 @@ describe("offers (ADR-0038)", () => {
       `git fetch -q /tmp/b.bundle +refs/heads/pineta/${LANE}-stack:refs/remotes/pineta-${LANE}/stack`,
     )
   })
-  test("the line's setup is the host's bookmark and your config; a land and a follow are yours (ADR-0060, ADR-0061)", () => {
+  test("the line's setup is the host's bookmark and your config; a land and a follow are yours; a publish the host's (ADR-0060, ADR-0061, ADR-0076)", () => {
     expect(
       argvs(planLineSetup({ onto: "pineta-onto", heads: "H", log: "L" })),
     ).toEqual([
@@ -208,6 +209,9 @@ describe("offers (ADR-0038)", () => {
     expect(argvs(planLand({ onto: "pineta-onto" }))).toEqual([
       "jj as you: bookmark move pineta-onto --to @-",
     ])
+    expect(
+      argvs(planPublish({ onto: "pineta-onto", publish: "main" })),
+    ).toEqual([op("bookmark", "move", "main", "--to", '"pineta-onto"')])
     expect(argvs(planFollow({ onto: "pineta-onto" }))).toEqual([
       'jj as you: rebase -b @ -d "pineta-onto"',
     ])
@@ -329,10 +333,17 @@ describe("planObserve: what moved between two fingerprints", () => {
   const base = {
     "pineta-onto": "c1",
     "wip/a": "c2",
+    main: "c0",
     "pineta-offer/amber-fox": "c3",
     [`tip@pineta-${LANE}`]: "c4",
   }
-  const none = { all: false, yours: false, lanes: new Set(), offers: new Set() }
+  const none = {
+    all: false,
+    line: false,
+    yours: false,
+    lanes: new Set(),
+    offers: new Set(),
+  }
   test.each([
     ["nothing moved", fp(base), none],
     [
@@ -343,6 +354,11 @@ describe("planObserve: what moved between two fingerprints", () => {
     ["a WIP moved", fp({ ...base, "wip/a": "c9" }), { ...none, all: true }],
     ["a WIP appeared", fp({ ...base, "wip/b": "c9" }), { ...none, all: true }],
     ["@ alone moved", fp(base, "c-new"), { ...none, yours: true }],
+    [
+      "the publish bookmark moved: the line's record alone (ADR-0076)",
+      fp({ ...base, main: "c1" }),
+      { ...none, line: true },
+    ],
     [
       "a lane's ref moved",
       fp({ ...base, [`tip@pineta-${LANE}`]: "c9" }),
@@ -360,7 +376,12 @@ describe("planObserve: what moved between two fingerprints", () => {
     ],
     [
       "an offer went",
-      fp({ "pineta-onto": "c1", "wip/a": "c2", [`tip@pineta-${LANE}`]: "c4" }),
+      fp({
+        "pineta-onto": "c1",
+        "wip/a": "c2",
+        main: "c0",
+        [`tip@pineta-${LANE}`]: "c4",
+      }),
       { ...none, offers: new Set(["amber-fox"]) },
     ],
   ] as const)("%s", (_, next, moved) => {
@@ -369,15 +390,16 @@ describe("planObserve: what moved between two fingerprints", () => {
   test("the first observation is all, even with no line in the repo yet", () => {
     expect(planObserve(null, fp({}), DEFAULT_LINE).all).toBe(true)
   })
-  test("a bookmark of yours outside the line, the WIPs, the offers and the lanes' remotes is not read", () => {
+  test("a bookmark of yours outside the line, the WIPs, the publish bookmark, the offers and the lanes' remotes is not read", () => {
     const stdout = [
-      "c1\t\tpineta-onto,main\tmain@origin,pineta-onto@git",
+      "c1\t\tpineta-onto,main,feature\tmain@origin,pineta-onto@git",
       `c4\t@\t\ttip@pineta-${LANE}`,
     ].join("\n")
     const read = parseFingerprint("op", stdout, DEFAULT_LINE)
     expect(read.bookmarks).toEqual(
       new Map([
         ["pineta-onto", "c1"],
+        ["main", "c1"],
         [`tip@pineta-${LANE}`, "c4"],
       ]),
     )

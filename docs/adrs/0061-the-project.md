@@ -6,7 +6,10 @@ words; and "Pineta never touches your files or your `@`", for one act you
 ask for), ADR-0055 ("bring up to date" is "catch up", its button acts at once,
 and how a card with a command says so), ADR-0032 (where the composer says where an agent
 works), ADR-0029 and ADR-0038 (archiving a root withdraws its threads'
-offers). Amended by ADR-0069: the header's ⇣ goes; its threads are the
+offers). Amended by ADR-0076: the project menu has two sections, the
+project's (publishing it to main) and your files' (only on the host's own
+machine), and lists no files but those that would conflict. Amended by
+ADR-0069: the header's ⇣ goes; its threads are the
 activity menu's "Ready to add", counted on its badge.
 
 **Context.** Using ADR-0060's build, Duane found:

@@ -101,6 +101,7 @@ import {
   planImport,
   planLineSetup,
   planOffer,
+  planPublish,
   planRefreshOffer,
   planTakeOffer,
   TAKE_ROW,
@@ -1685,7 +1686,7 @@ describe("a lane's repo, with jj", () => {
     const facts = await lineFacts(ops, git, line)
     expect(facts.yours.behind).toBe(1)
     expect(facts.yours.follow).toEqual({
-      files: ["f.txt", "g.txt"],
+      changes: 2,
       conflicts: ["g.txt"],
       heads: 1,
     })
@@ -1721,6 +1722,60 @@ describe("a lane's repo, with jj", () => {
         `description(exact:"sibling\\n") & ${revsetName(line.onto)}::`,
       ),
     ).toHaveLength(1)
+  }, 60_000)
+
+  test("publish (ADR-0076): main moved forward to the line as the host, git's main with it; refused once main has its own commits", async () => {
+    const { yoursDir, yoursJj, ops, edit, line, setUpLine } =
+      await offerRig("publish")
+    const git: Runner = args => hostRunner(yoursDir)(["git", ...args])
+    const gitMain = async () =>
+      (await git(["rev-parse", "refs/heads/main"])).stdout.trim()
+    await edit(yoursDir, "a.txt", "a\n")
+    await yoursJj(["commit", "-m", "M0"])
+    await yoursJj(["bookmark", "create", "main", "-r", "@-"])
+    await setUpLine()
+    // No unpublished work yet: the line is main.
+    expect((await lineFacts(ops, git, line)).published).toMatchObject({
+      behind: 0,
+      ahead: 0,
+    })
+    await edit(yoursDir, "b.txt", "b\n")
+    await yoursJj(["commit", "-m", "L1"])
+    await edit(yoursDir, "c.txt", "c\n")
+    await yoursJj(["commit", "-m", "L2"])
+    await yoursJj(["bookmark", "move", line.onto, "--to", "@-"])
+    const before = await lineFacts(ops, git, line)
+    expect(before.published).toMatchObject({ behind: 2, ahead: 0 })
+    await executeRepo(
+      yoursDir,
+      planPublish({ onto: line.onto, publish: line.publish }),
+    )
+    const after = await lineFacts(ops, git, line)
+    expect(after.published).toEqual({
+      commit: before.commit,
+      behind: 0,
+      ahead: 0,
+    })
+    // The host's move, with --ignore-working-copy, still reaches git.
+    expect(await gitMain()).toBe(before.commit)
+    // main moved sideways, outside Pineta: its own commit, which the line lacks.
+    await yoursJj(["new", "main", "-m", "hotfix"])
+    await edit(yoursDir, "h.txt", "h\n")
+    await yoursJj(["bookmark", "move", "main", "--to", "@"])
+    await yoursJj(["new", line.onto])
+    await edit(yoursDir, "d.txt", "d\n")
+    await yoursJj(["commit", "-m", "L3"])
+    await yoursJj(["bookmark", "move", line.onto, "--to", "@-"])
+    const sideways = await lineFacts(ops, git, line)
+    expect(sideways.published).toMatchObject({ behind: 1, ahead: 1 })
+    const moved = (await lineFacts(ops, git, line)).published.commit
+    await expect(
+      executeRepo(
+        yoursDir,
+        planPublish({ onto: line.onto, publish: line.publish }),
+      ),
+    ).rejects.toThrow()
+    expect((await lineFacts(ops, git, line)).published.commit).toBe(moved)
   }, 60_000)
 
   test("an unchanged offer's refresh reads at most 3 jj processes (ADR-0065), and what catching up changes is read once per move (S97)", async () => {

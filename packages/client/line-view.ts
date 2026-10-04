@@ -1,8 +1,20 @@
 // client/line-view — the integration line in the header (ADR-0060), "the
-// project" (ADR-0061): what the host last read of it, decided as a value
-// (`lineView`) and worded in one function (`lineWords`).
+// project" (ADR-0061), and publishing it (ADR-0076): what the host last read
+// of it, decided as a value (`lineView`) and worded in one function
+// (`lineWords`). Which actions may run is `@pineta/rules`' `lineActionState`,
+// the rule the host decides commands by.
 
-import type { LineAction, LineRecord, ProjectRecord } from "@pineta/core"
+import {
+  ERR,
+  type LineAction,
+  type LineRecord,
+  type ProjectRecord,
+} from "@pineta/core"
+import {
+  type LineActionState,
+  lineActionState,
+  lineRefusal,
+} from "@pineta/rules"
 import type { LineActing } from "./acting.ts"
 import { count } from "./counts.ts"
 import type { Intent } from "./intent.ts"
@@ -14,72 +26,105 @@ import { outcomeWords } from "./outcome-words.ts"
  */
 export type LineMenuAction = LineAction | "resolve"
 
+/** The project's own actions, on every host. */
+type ProjectAction = Extract<LineAction, "setup" | "publish">
+/** What moves work between your files and the project: this machine's host only. */
+type YoursAction = Extract<LineMenuAction, "resolve" | "follow" | "land">
+
 /** The line as the header shows it. */
 export interface LineView {
   /** absent: no lanes of their own here; unset: no line yet. */
   readonly state: "absent" | "unset" | "set"
-  /** The actions this page may offer: none on a host that admits others. */
-  readonly actions: readonly LineMenuAction[]
-  readonly facts: {
-    readonly onto: string
+  /** The project's own state, on every host: setting it up, publishing it. */
+  readonly project: {
+    readonly actions: readonly ProjectAction[]
+    /** Whether publishing may run now, and if not, why. */
+    readonly publish: LineActionState
+  }
+  /** Your files against the project: null on a host that admits others, or with no line. */
+  readonly yours: { readonly actions: readonly YoursAction[] } | null
+  readonly facts: Pick<
+    LineRecord,
+    "onto" | "publish" | "published" | "commands"
+  > & {
     /** What setting up writes to your repo's `immutable_heads()`. */
     readonly heads: string
     /** What setting up writes to your repo's `revsets.log`. */
     readonly log: string
-    /** Line commits your `@-` lacks. */
-    readonly behind: number
-    /** Your commits above the line; null when your `@-` is not above it. */
-    readonly ahead: number | null
-    /** What updating your files would do; null when it cannot or need not. */
-    readonly follow: LineRecord["yours"]["follow"]
-    /** Your conflicted commits above the line, and files in `@`. */
-    readonly conflicts: LineRecord["yours"]["conflicts"]
-    /** This host takes `line` commands. */
-    readonly commands: boolean
-  }
+  } & LineRecord["yours"]
 }
 
 const NO_CONFLICTS = { commits: 0, files: [] }
+const NOTHING: LineActionState = { kind: "refused", code: ERR.REFUSED }
 
 export function lineView(record: LineRecord | null): LineView {
   if (record === null)
     return {
       state: "absent",
-      actions: [],
+      project: { actions: [], publish: NOTHING },
+      yours: null,
       facts: {
         onto: "",
+        publish: "",
+        published: { commit: null, behind: 0, ahead: 0 },
+        commands: false,
         heads: "",
         log: "",
         behind: 0,
         ahead: null,
         follow: null,
         conflicts: NO_CONFLICTS,
-        commands: false,
       },
     }
-  const { yours, commands } = record
   const facts = {
     onto: record.onto,
+    publish: record.publish,
+    published: record.published,
+    commands: record.commands,
     heads: record.heads.proposed,
     log: record.log.proposed,
-    behind: yours.behind,
-    ahead: yours.ahead,
-    follow: yours.follow,
-    conflicts: yours.conflicts,
-    commands,
+    ...record.yours,
   }
+  const may = (action: LineAction) =>
+    lineActionState(action, record).kind === "ok"
+  const publish = lineActionState("publish", record)
   if (record.commit === null)
-    return { state: "unset", actions: commands ? ["setup"] : [], facts }
-  const conflicted =
-    yours.conflicts.commits > 0 || yours.conflicts.files.length > 0
-  const actions: LineMenuAction[] = !commands
-    ? []
-    : [
-        ...(conflicted ? (["resolve"] as const) : []),
-        ...(yours.follow !== null ? (["follow"] as const) : []),
-        ...(yours.ahead !== null && yours.ahead > 0 ? (["land"] as const) : []),
-      ]
-  return { state: "set", actions, facts }
+    return {
+      state: "unset",
+      project: { actions: may("setup") ? ["setup"] : [], publish },
+      yours: null,
+      facts,
+    }
+  const { conflicts } = record.yours
+  const conflicted = conflicts.commits > 0 || conflicts.files.length > 0
+  return {
+    state: "set",
+    project: { actions: publish.kind === "ok" ? ["publish"] : [], publish },
+    yours: record.commands
+      ? {
+          actions: [
+            ...(conflicted ? (["resolve"] as const) : []),
+            ...(may("follow") ? (["follow"] as const) : []),
+            ...(may("land") ? (["land"] as const) : []),
+          ],
+        }
+      : null,
+    facts,
+  }
+}
+
+/** One section of the project's menu: what it says, then what it offers. */
+export interface LineSection {
+  readonly key: "project" | "yours"
+  readonly heading: string
+  /** Lines of fact, drawn above the actions. */
+  readonly notes: readonly string[]
+  readonly actions: readonly {
+    readonly action: LineMenuAction
+    readonly label: string
+    /** What it does, in words and in jj. */
+    readonly title?: string
+  }[]
 }
 
 export interface LineWords {
@@ -87,16 +132,11 @@ export interface LineWords {
   readonly trigger: string
   /** Its accessible name and title, with the line's bookmark. */
   readonly label: string
-  readonly heading: string
-  /** Lines of fact, drawn above the actions: where your files stand. */
-  readonly notes: readonly string[]
-  readonly actions: readonly {
-    readonly action: LineMenuAction
-    readonly label: string
-  }[]
+  /** The project first, whose heading names the menu; your files after it. */
+  readonly sections: readonly LineSection[]
 }
 
-/** Files named, the first three, then how many more. */
+/** Files named, the first three, then how many more: only files that conflict. */
 const named = (files: readonly string[]): string =>
   files.length <= 3
     ? files.join(", ")
@@ -109,6 +149,19 @@ const named = (files: readonly string[]): string =>
 const JJUI_NOTE =
   'jjui with a revset of its own: add | bookmarks(glob:"pineta-offer/*") to it'
 
+const commits = (n: number) => count(n, "commit", "commits")
+
+/** The project against its publish bookmark, and why publishing is not offered. */
+function projectNotes(view: LineView): string[] {
+  const { publish, published } = view.facts
+  const state = view.project.publish
+  if (state.kind === "refused" && state.code !== ERR.REFUSED)
+    return [lineRefusal("publish", state.code, view.facts)]
+  return published.behind === 0
+    ? [`everything in the project is on ${publish}`]
+    : [`${commits(published.behind)} not yet on ${publish}`]
+}
+
 /** Where your files stand against the project, a line each. */
 function yourFiles(facts: LineView["facts"]): string[] {
   const { onto, behind, follow, conflicts } = facts
@@ -119,24 +172,19 @@ function yourFiles(facts: LineView["facts"]): string[] {
     )
   else if (conflicts.commits > 0)
     notes.push(
-      `${count(conflicts.commits, "commit", "commits")} of yours ${conflicts.commits === 1 ? "has" : "have"} conflicts`,
+      `${commits(conflicts.commits)} of yours ${conflicts.commits === 1 ? "has" : "have"} conflicts`,
     )
   if (behind === 0) {
     if (notes.length === 0)
       notes.push("your files have everything in the project")
     return notes
   }
-  const missing = `the project has ${count(behind, "commit", "commits")} your files don't`
+  const fresh = `${count(behind, "new commit", "new commits")} in the project since you last updated`
   if (follow === null) {
-    notes.push(`${missing}: rebase onto ${onto} in jj`)
+    notes.push(`${fresh}: rebase onto ${onto} in jj`)
     return notes
   }
-  notes.push(missing)
-  notes.push(
-    follow.files.length === 0
-      ? "updating changes none of your files"
-      : `updating changes ${count(follow.files.length, "file", "files")}: ${named(follow.files)}`,
-  )
+  notes.push(fresh)
   if (follow.conflicts.length > 0)
     notes.push(
       `${count(follow.conflicts.length, "file", "files")} would conflict: ${named(follow.conflicts)}; the agent can resolve them after`,
@@ -148,50 +196,92 @@ function yourFiles(facts: LineView["facts"]): string[] {
   return notes
 }
 
-export function lineWords(view: LineView): LineWords {
-  const { onto, heads, log, ahead, commands } = view.facts
-  if (view.state !== "set")
-    return {
-      trigger: "set up the project",
-      label: `the project's line, ${onto}, is not set up`,
-      heading: `Set up the project's line: ${onto}`,
-      notes: commands
-        ? [
-            `${onto} goes at your @-`,
-            `your repo's immutable heads become: ${heads}`,
-            `its log, so jj and jjui show the offers: ${log}`,
-            JJUI_NOTE,
-          ]
-        : [`this host admits others: create ${onto} with jj on its machine`],
-      actions: view.actions.map(action => ({
+/** An action on your files, labelled, with what it does as its title. */
+function yoursAction(
+  action: YoursAction,
+  facts: LineView["facts"],
+): LineSection["actions"][number] {
+  const { onto, ahead, follow } = facts
+  switch (action) {
+    case "resolve":
+      return { action, label: "resolve with the agent" }
+    case "follow":
+      return {
         action,
-        label: "set up the project",
-      })),
-    }
-  const label = (action: LineMenuAction): string => {
-    switch (action) {
-      case "resolve":
-        return "resolve with the agent"
-      case "follow":
-        return "update my files"
-      case "land":
-      case "setup":
-        return `add my work to the project (${count(ahead ?? 0, "commit", "commits")})`
+        label: "update my files",
+        title: `changes ${count(follow?.changes ?? 0, "file", "files")} · your work stays on top · jj diff --from 'fork_point(@ | ${onto})' --to ${onto}`,
+      }
+    case "land":
+      return {
+        action,
+        label: `add my work to the project (${commits(ahead ?? 0)})`,
+        title: `moves ${onto} forward to your @-`,
+      }
+  }
+}
+
+export function lineWords(view: LineView): LineWords {
+  const { onto, publish, published, heads, log, commands } = view.facts
+  if (view.state !== "set") {
+    const notSet = `the project is not set up: create ${onto} with jj on the host's machine`
+    return {
+      trigger: commands ? "set up the project" : "◆ project",
+      label: commands ? `the project's line, ${onto}, is not set up` : notSet,
+      sections: [
+        {
+          key: "project",
+          heading: commands
+            ? `Set up the project's line: ${onto}`
+            : "The project",
+          notes: commands
+            ? [
+                `${onto} goes at your @-`,
+                `your repo's immutable heads become: ${heads}`,
+                `its log, so jj and jjui show the offers: ${log}`,
+                JJUI_NOTE,
+              ]
+            : ["the project is not set up yet"],
+          actions: view.project.actions.map(action => ({
+            action,
+            label: "set up the project",
+          })),
+        },
+      ],
     }
   }
   const where = `the project: where finished work is added, ${onto} in jj`
-  // Being behind marks this trigger only; the activity badge leaves it out
-  // (ADR-0069).
-  const behind = view.facts.behind
-  return {
-    trigger: behind > 0 ? "◆ project ↓" : "◆ project",
-    label:
-      behind > 0
-        ? `${where}; it has ${count(behind, "commit", "commits")} your files don't`
-        : where,
+  // Unpublished work marks the trigger; your files being behind does not,
+  // so ↓ keeps its one meaning on a column's header (ADR-0076).
+  const unpublished = published.commit === null ? 0 : published.behind
+  const project: LineSection = {
+    key: "project",
     heading: "The project",
-    notes: yourFiles(view.facts),
-    actions: view.actions.map(action => ({ action, label: label(action) })),
+    notes: projectNotes(view),
+    actions: view.project.actions.map(action => ({
+      action,
+      label: `publish to ${publish} (${commits(published.behind)})`,
+      title: `moves ${publish} forward to ${onto}`,
+    })),
+  }
+  const yours: LineSection | null =
+    view.yours === null
+      ? null
+      : {
+          key: "yours",
+          heading: "Your files",
+          notes: yourFiles(view.facts),
+          actions: view.yours.actions.map(action =>
+            yoursAction(action, view.facts),
+          ),
+        }
+  return {
+    trigger:
+      unpublished > 0 ? `◆ project · ${unpublished} unpublished` : "◆ project",
+    label:
+      unpublished > 0
+        ? `${where}; ${commits(unpublished)} not yet on ${publish}`
+        : where,
+    sections: yours === null ? [project] : [project, yours],
   }
 }
 
@@ -200,6 +290,7 @@ const LINE_SENDING: Record<LineAction, string> = {
   setup: "setting up the project…",
   land: "adding your work to the project…",
   follow: "updating your files…",
+  publish: "publishing the project…",
 }
 
 /**

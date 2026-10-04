@@ -4,7 +4,8 @@ The host serves one jj repo: the project's working copy on the machine the
 host runs on. This page is for someone who works in that repo with jj or
 jjui beside Pineta. It says what Pineta puts there, what it expects, and
 what to configure. Why each piece is shaped as it is: ADR-0038 (offers),
-ADR-0039 (thread names), ADR-0060 (the integration line and the ledger).
+ADR-0039 (thread names), ADR-0060 (the integration line and the ledger),
+ADR-0076 (publishing).
 
 Two parties act on the repo. **The host** runs its jj commands as the
 operation user `pineta-host@<hostname>`. **The owner** is whoever runs the
@@ -23,15 +24,16 @@ bringing a thread up to date is **catch up**, and landing your work is
 |---|---|---|
 | `pineta-onto` | the owner's, moved by the host on a take | **The integration line**: where finished work lands. It only moves forward. Immutable once set up. |
 | `pineta-offer/<name>` | the host's | **An offer**: a thread's work as one revision, or a stack, on the thread's base. Immutable while it sits on the line. `<name>` is the thread's two-word name. |
+| `main` | the owner's, moved by the host on a publish | **Where the project is published**: moved forward to `pineta-onto`, never anywhere else. |
 | `wip/*` | the owner's | **A work in progress** a thread may start from, chosen at its first message. Never touched by the host, except a take into it. |
 | `tip@pineta-<lane>` | the host's | **A lane's history**, fetched from the lane. A remote bookmark, untracked, so jj treats it as immutable and leaves it out of the default log. Archiving a thread deletes its lane's, and abandons its offer; restoring brings both back. |
 
-The names `pineta-onto` and `wip/` are the defaults. A project sets its own
+The names `pineta-onto`, `main` and `wip/` are the defaults. A project sets its own
 in `pineta.json`, or a person in `$XDG_CONFIG_HOME/pineta/config.json`; the
 project's wins:
 
 ```json
-{ "offers": { "onto": "trunk", "wipPrefix": "wip/" } }
+{ "offers": { "onto": "trunk", "wipPrefix": "wip/", "publish": "master" } }
 ```
 
 **A take** moves one bookmark forward to an offer: `pineta-onto`, or the
@@ -39,6 +41,15 @@ thread's `wip/` bookmark. It never rebases, and never touches `@`. jj itself
 refuses a move that is not forward, so a stale take fails instead of
 dropping commits. Only an offer with no conflicts can be taken onto the
 line.
+
+**Publish** ("publish to main", in the page's project menu) moves `main`
+forward to `pineta-onto`, as `pineta-host`: `jj bookmark move main --to
+pineta-onto`. It changes no file, so anyone in the session may, on a host
+that admits others too. It does not push. jj refuses a move that is not
+forward, so once `main` has commits the line lacks (someone pushed to it
+outside Pineta), publishing is refused until they are brought into the
+line. The host watches `main` as it watches the line, so moving it in jj
+updates the menu's count of unpublished commits.
 
 **Update my files**, in the page's project menu, is the one act of
 Pineta's that moves the owner's `@` (ADR-0061, S80): `jj rebase -b @ -d

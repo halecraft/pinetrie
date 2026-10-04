@@ -73,15 +73,6 @@ export const mutations: readonly Mutation[] = [
     expect: "conflicts in your files: said first, and resolved with the agent",
   },
   {
-    name: "a preview offers no update",
-    file: "packages/client/line-view.ts",
-    from: '        ...(yours.follow !== null ? (["follow"] as const) : []),',
-    to: "",
-    command: unit,
-    expect:
-      "behind, with a preview: what updating changes and what would conflict, then the action",
-  },
-  {
     name: "the preview hides what would conflict",
     file: "packages/client/line-view.ts",
     from: "  if (follow.conflicts.length > 0)\n",
@@ -269,14 +260,6 @@ export const mutations: readonly Mutation[] = [
     to: '      ""',
     command: unit,
     expect: "the labels follow the state, and name where a take adds the work",
-  },
-  {
-    name: "a host that admits others offers the line's actions",
-    file: "packages/client/line-view.ts",
-    from: '    return { state: "unset", actions: commands ? ["setup"] : [], facts }',
-    to: '    return { state: "unset", actions: ["setup"], facts }',
-    command: unit,
-    expect: "a host that admits others offers no line action",
   },
   {
     name: "a thread whose WIP is gone is offered a plain update",
@@ -2026,10 +2009,12 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the project's button says the project",
     file: "packages/client/line-view.ts",
-    from: '    trigger: behind > 0 ? "◆ project ↓" : "◆ project",',
-    to: '    trigger: behind > 0 ? "◆ project ↓" : "◆ the project",',
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: '      unpublished > 0 ? `◆ project · ${unpublished} unpublished` : "◆ project",',
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
+    to: '      unpublished > 0 ? `◆ project · ${unpublished} unpublished` : "◆ the project",',
     command: unit,
-    expect: "the header's button says project",
+    expect: "the trigger counts what is not yet on main",
   },
   {
     name: "a busy answer spends the card",
@@ -2697,14 +2682,6 @@ export const mutations: readonly Mutation[] = [
     expect: "each card's version as this client has it",
   },
   {
-    name: "the project hides that your files are behind",
-    file: "packages/client/line-view.ts",
-    from: '    trigger: behind > 0 ? "◆ project ↓" : "◆ project",',
-    to: '    trigger: "◆ project",',
-    command: unit,
-    expect: "your files behind the project: the button marks it ↓",
-  },
-  {
     name: "the activity badge counts running work",
     file: activity,
     from: "    needsYou: input.ready + input.unseen,",
@@ -2799,5 +2776,41 @@ export const mutations: readonly Mutation[] = [
     to: "",
     command: unit,
     expect: "the 'retitle' effect is one port call",
+  },
+  // ── the project menu (ADR-0076) ──
+  {
+    name: "the trigger marks your files behind",
+    file: "packages/client/line-view.ts",
+    from: "  const unpublished = published.commit === null ? 0 : published.behind",
+    to: "  const unpublished = published.commit === null ? 0 : published.behind + view.facts.behind",
+    command: unit,
+    expect:
+      "the trigger counts what is not yet on main, never your files being behind",
+  },
+  {
+    name: "your files are shown on a host that admits others",
+    file: "packages/client/line-view.ts",
+    from: "    yours: record.commands\n      ? {",
+    to: "    yours: true\n      ? {",
+    command: unit,
+    expect: "a host that admits others has no section for your files",
+  },
+  {
+    name: "the menu says nothing of a publish it does not offer",
+    file: "packages/client/line-view.ts",
+    from: '    return [lineRefusal("publish", state.code, view.facts)]',
+    to: "    return []",
+    command: unit,
+    expect:
+      "main with commits the project lacks, or no main: not offered, and why",
+  },
+  {
+    name: "update my files names no count of what it changes",
+    file: "packages/client/line-view.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: '        title: `changes ${count(follow?.changes ?? 0, "file", "files")} · your work stays on top',
+    to: "        title: `your work stays on top",
+    command: unit,
+    expect: "their count in the title",
   },
 ]

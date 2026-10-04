@@ -291,6 +291,8 @@ describe("records", () => {
     const line = {
       onto: "pineta-onto",
       wipPrefix: "wip/",
+      publish: "main",
+      published: { commit: null, behind: 0, ahead: 0 },
       commit: COPY,
       heads: { current: null, proposed: "builtin_immutable_heads() | …" },
       log: { current: null, proposed: "builtin_log() | …" },

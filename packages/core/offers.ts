@@ -283,7 +283,7 @@ export interface DescribeDecision {
  * `revsets.log` as jj resolves them (null for jj's own).
  */
 export interface LineFacts
-  extends Pick<LineRecord, "commit" | "wips" | "yours"> {
+  extends Pick<LineRecord, "commit" | "wips" | "published" | "yours"> {
   readonly heads: string | null
   readonly log: string | null
 }
@@ -301,4 +301,10 @@ export type LineDecision =
   | { readonly kind: "land"; readonly onto: string }
   /** Rebase your work onto the line, as you. */
   | { readonly kind: "follow"; readonly onto: string }
+  /** Move the publish bookmark forward to the line, as the host (ADR-0076). */
+  | {
+      readonly kind: "publish"
+      readonly onto: string
+      readonly publish: string
+    }
   | { readonly kind: "refused"; readonly code: ErrCode }

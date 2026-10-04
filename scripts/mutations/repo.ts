@@ -102,8 +102,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "landing leaves the line where it was",
     file: "packages/repo/plan.ts",
-    from: '  you("bookmark", "move", input.onto, "--to", "@-"),',
-    to: '  you("bookmark", "move", input.onto, "--to", "@--"),',
+    from: '  moveForward("you", input.onto, "@-"),',
+    to: '  moveForward("you", input.onto, "@--"),',
     suite: "lanes",
     scenario: "main",
     expect:
@@ -163,10 +163,45 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a take may move the line backwards",
     file: "packages/repo/plan.ts",
-    from: '    host("bookmark", "move", input.destination, "--to", input.top),',
-    to: '    host("bookmark", "move", "--allow-backwards", input.destination, "--to", input.top),',
+    from: '  (as === "host" ? host : you)("bookmark", "move", bookmark, "--to", to)',
+    to: '  (as === "host" ? host : you)("bookmark", "move", "--allow-backwards", bookmark, "--to", to)',
     command: unit,
     expect: "planTakeOffer: the destination moved forward to the top",
+  },
+  {
+    name: "a publish moves nothing",
+    file: "packages/repo/plan.ts",
+    from: '}): RepoStep[] => [moveForward("host", input.publish, revsetName(input.onto))]',
+    to: "}): RepoStep[] => []",
+    suite: "lanes",
+    scenario: "main",
+    expect:
+      "publish moves main forward to the project, and nothing is left unpublished",
+  },
+  {
+    name: "a publish moves main as you",
+    file: "packages/repo/plan.ts",
+    from: '}): RepoStep[] => [moveForward("host", input.publish, revsetName(input.onto))]',
+    to: '}): RepoStep[] => [moveForward("you", input.publish, revsetName(input.onto))]',
+    command: unit,
+    expect: "a publish the host's",
+  },
+  {
+    name: "a move of main is not watched",
+    file: "packages/repo/observe.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "    `present(${revsetName(line.publish)})`,\n",
+    to: "",
+    command: unit,
+    expect: "a move of the publish bookmark is observed as the line's alone",
+  },
+  {
+    name: "a move of main refreshes every offer",
+    file: "packages/repo/observe.ts",
+    from: "    else if (name === line.publish) published = true\n",
+    to: "",
+    command: unit,
+    expect: "the publish bookmark moved: the line's record alone",
   },
   {
     name: "taken offers' sources are not read",

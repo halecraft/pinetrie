@@ -11,7 +11,10 @@ import {
 } from "@pineta/core"
 import { type LineConfig, offerBookmark, revsetName } from "@pineta/lanes"
 
-/** What an outside change can move: the line, the WIPs, the offers, the lanes' refs, and `@`. */
+/**
+ * What an outside change can move: the line, the WIPs, the publish bookmark,
+ * the offers, the lanes' refs, and `@`.
+ */
 export interface Fingerprint {
   readonly op: string
   /**
@@ -23,13 +26,15 @@ export interface Fingerprint {
 }
 
 /**
- * `all`: the line or a WIP moved, or this is the first observation. `yours`:
- * `@` moved, which changes only each record's `yourEdits` and the line's
- * preview. `lanes`: lanes' refs moved. `offers`: offer bookmarks moved, by
- * thread name.
+ * `all`: the line or a WIP moved, or this is the first observation. `line`:
+ * the publish bookmark moved, which changes only the line's record, since no
+ * offer depends on it (ADR-0076). `yours`: `@` moved, which changes only each
+ * record's `yourEdits` and the line's preview. `lanes`: lanes' refs moved.
+ * `offers`: offer bookmarks moved, by thread name.
  */
 export interface Moved {
   readonly all: boolean
+  readonly line: boolean
   readonly yours: boolean
   readonly lanes: ReadonlySet<LaneName>
   readonly offers: ReadonlySet<ThreadName>
@@ -44,21 +49,24 @@ const laneOfRemote = (remote: string): LaneName | null => {
   return remote.startsWith(LANE_REMOTE) && isLaneName(lane) ? lane : null
 }
 
-/** Whether a local bookmark is one an offer or the line depends on. */
+/** Whether a local bookmark is one an offer or the line's record depends on. */
 const watchedLocal = (name: string, line: LineConfig): boolean =>
   name === line.onto ||
+  name === line.publish ||
   name.startsWith(line.wipPrefix) ||
   name.startsWith(OFFER_PREFIX)
 
 /**
  * The one `jj log` the fingerprint is read from: the commits of the line,
- * the WIPs, the offers, the lanes' remote bookmarks, and `@`; each with
+ * the WIPs, the publish bookmark, the offers, the lanes' remote bookmarks,
+ * and `@`; each with
  * whether it is `@`, and its local and remote bookmarks.
  */
 export function fingerprintRead(line: LineConfig): readonly string[] {
   const revset = [
     `present(${revsetName(line.onto)})`,
     `bookmarks(glob:${revsetName(`${line.wipPrefix}*`)})`,
+    `present(${revsetName(line.publish)})`,
     `bookmarks(glob:${revsetName(`${OFFER_PREFIX}*`)})`,
     `remote_bookmarks(remote=glob:${revsetName(`${LANE_REMOTE}*`)})`,
     "@",
@@ -111,6 +119,7 @@ export function planObserve(
   const lanes = new Set<LaneName>()
   const offers = new Set<ThreadName>()
   let all = prev === null
+  let published = false
   const names = new Set([
     ...(prev?.bookmarks.keys() ?? []),
     ...next.bookmarks.keys(),
@@ -124,10 +133,12 @@ export function planObserve(
       if (lane !== null) lanes.add(lane)
     } else if (name.startsWith(OFFER_PREFIX))
       offers.add(name.slice(OFFER_PREFIX.length) as ThreadName)
+    else if (name === line.publish) published = true
     else if (watchedLocal(name, line)) all = true
   }
   return {
     all,
+    line: published,
     yours: prev === null || prev.at !== next.at,
     lanes,
     offers,
