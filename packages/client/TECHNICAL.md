@@ -537,7 +537,8 @@ else reads those rows (tab summaries, archive search, `branchColors`).
   an ask whose run holds `MIN_STRETCH` agent messages is a landmark, and a
   stretch never crosses its work's edge. Short exchanges merge as before.
   The stretch carries its ask (`RailStretch.ask`), and its tooltip is
-  `stretchWords`: `askWords`, `workWords`, then the ask's digest.
+  `stretchWords`: `askWords`, `workWords`, then the ask's digest as
+  `digestText` words it (ADR-0075).
 - **Every item has `slot`, `span`, `ids`, `track` and `across`;** a dot is
   an item with one id and a span of 1. An edge leaves its parent item's last
   slot, so the renderer never asks which kind an item is, only how to draw
@@ -603,12 +604,20 @@ the columns read one. `segmentPath` (core) decides what a column folds;
   through `onColumn`, so a new tab's one column takes them
   (`newTabColumn`), and the Archive preview reduces its own column with
   `columnsReducer`, keeping them only while it shows.
-- **What `askView` decides:** the digest line (`workWords` over
-  `askStats`), the outcome's words, the live line while it runs, the last
-  word outline hides (none in the column's last ended ask, `lastEndedAsk`,
-  ADR-0070), the summary, and the span its files open in a
-  review (`askSpan`). `askWords` says an ask the same everywhere: the bar,
-  the working mark's title, the rail's tooltip, outline.
+- **What `askView` decides:** what its work holds (`work`, `workWords`
+  over `askStats`), the outcome's words, the live line while it runs, the
+  last word outline hides (none in the column's last ended ask,
+  `lastEndedAsk`, ADR-0070), its digest's headline and, once final, its
+  points (ADR-0075), and the span its files open in a review (`askSpan`).
+  `askWords` says an ask the same everywhere: the bar, the working mark's
+  title, the rail's tooltip, outline.
+- **`foldWords` orders an ask's line** (`line`, outline's) and first fold
+  (`fold`, story's) as parts, a model's headline marked as one, so
+  `AskWork` only lays them out and wraps the headline in `.ask-headline`.
+  Outline's running line has no headline: `live` is newer than a digest.
+  The points are one `MessageText` over `pointsText`, in `.ask-digest`,
+  under the first fold's head; with no fold to carry the headline (raw, or
+  an ask with no fold), `.ask-digest` holds the headline too.
 - **`openFold`:** `planIntent`'s `openAt` puts it before the reveal when
   the entry is in an ask's work. `perform` sets the fold's memory and
   renders `App` once, so `useReveal`'s wait finds the message drawn.
@@ -627,7 +636,7 @@ the columns read one. `segmentPath` (core) decides what a column folds;
   mounts and when the page shows again, and `.left-line` takes no height.
 - **Selectors:** `.column[data-density]`, `.density-choice[data-density]`
   (`aria-pressed`), `.ask-work[data-ask-of]`, `.ask-fold` (`aria-expanded`,
-  `data-first`), `.ask-files`, `.ask-line` (`.running`), `.ask-digest`,
+  `data-first`), `.ask-files`, `.ask-line` (`.running`), `.ask-headline`, `.ask-digest`,
   `.ask-outcome`, `.ask-bar` (`data-ask`, `data-where`), `.left-line`.
   The browser suite reads finished work raw (`readRaw`).
 

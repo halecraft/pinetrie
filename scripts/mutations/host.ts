@@ -857,8 +857,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a late live digest overwrites the final one",
     file: "apps/pineta/host/digests.ts",
-    from: "            if (!digestStillWanted(readDigests(doc).get(ask), { final })) return\n",
-    to: "",
+    from: "              stored: readDigests(doc).get(ask),\n",
+    to: "              stored: undefined,\n",
     command: unit,
     expect: "a live digest that comes back after the final one is dropped",
   },

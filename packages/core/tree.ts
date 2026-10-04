@@ -12,7 +12,7 @@
 // A tool's result is its own entry, but it belongs to its call: `projectSpine`
 // pairs it with the call on the same path, and it is never a message itself.
 
-import type { AskIndex } from "./asks.ts"
+import { type AskIndex, isLongAsk } from "./asks.ts"
 import { type ImageRef, isImageMime, isSha256 } from "./images.ts"
 import {
   atEntry,
@@ -928,9 +928,9 @@ export interface RailAsks {
  * uneventful messages drawn as one capsule.
  *
  * A row is uneventful when it is not one of `railLandmarks`, and not the
- * prompt of a long ask: one whose run holds `MIN_STRETCH` agent messages
- * or more (ADR-0056). A stretch never crosses a long ask's edge, so a long
- * ask is a dot and a capsule of its own, while short exchanges still merge.
+ * prompt of a long ask (`isLongAsk`, ADR-0056). A stretch never crosses a
+ * long ask's edge, so a long ask is a dot and a capsule of its own, while
+ * short exchanges still merge.
  * So a stretch holds no structure, and the compacted rail has every branch
  * the full one has.
  * An uneventful row's only child is the next row in depth-first order, so a
@@ -945,9 +945,7 @@ export function compactRail(
 ): readonly RailItem[] {
   const landmarks = railLandmarks(rows, keep)
   const long = new Set<EntryId>(
-    [...asks.work].flatMap(([prompt, work]) =>
-      work.length >= MIN_STRETCH ? [prompt] : [],
-    ),
+    [...asks.work.keys()].filter(prompt => isLongAsk(asks, prompt)),
   )
   const uneventful = (r: RailRow): boolean =>
     !landmarks.has(r.id) && !long.has(r.id)

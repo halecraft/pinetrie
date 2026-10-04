@@ -20,6 +20,7 @@ import {
   type TreeIndex,
   type WriterId,
 } from "@pineta/core"
+import type { DigestBody } from "@pineta/marginalia"
 import { outcomeWords, workWords } from "./ask-words.ts"
 
 /** A column's messages as drawn: one on its own, or an ask's work together. */
@@ -79,7 +80,7 @@ export interface AskView {
   /** Its run ended after the reader left the column's end (`releasedTip`). */
   readonly endedWhileAway: boolean
   /** What its work holds (`workWords`). */
-  readonly digest: string
+  readonly work: string
   /** How it ended, when that needs saying (`outcomeWords`). */
   readonly outcome: string | null
   /** While it runs, what it is doing: its running command, else its latest text. */
@@ -89,8 +90,10 @@ export interface AskView {
    * is the column's last ended ask (ADR-0070).
    */
   readonly outlineHides: EntryId | null
-  /** Its model-written digest, when digests are on (ADR-0056). */
-  readonly summary: string | null
+  /** Its model-written digest's headline, live or final (ADR-0075). */
+  readonly headline: string | null
+  /** Its final digest's points; none while its digest is live, since those change each time. */
+  readonly points: readonly string[]
   /** How many files its turns changed, and the span a review of them reads. */
   readonly files: number
   readonly span: DiffSpan | null
@@ -130,7 +133,10 @@ export function askView(input: {
   readonly lastEnded: EntryId | null
   readonly stops: ReadonlyMap<EntryId, StopRecord>
   readonly revisions: ReadonlyMap<EntryId, RevisionRecord>
-  readonly digests: ReadonlyMap<EntryId, { readonly text: string }>
+  readonly digests: ReadonlyMap<
+    EntryId,
+    DigestBody & { readonly final: boolean }
+  >
   /** The column's path up to `releasedTip`; null while it follows its end. */
   readonly releasedPath: ReadonlySet<EntryId> | null
   readonly nameOf: (writer: WriterId) => string
@@ -143,6 +149,7 @@ export function askView(input: {
   })
   const last = asks.last.get(ask)
   const stats = askStats(index, asks, ask, input.revisions)
+  const digest = input.digests.get(ask)
   return {
     ask,
     running,
@@ -151,11 +158,12 @@ export function askView(input: {
       input.releasedPath !== null &&
       last !== undefined &&
       !input.releasedPath.has(last),
-    digest: workWords(stats, input.nameOf),
+    work: workWords(stats, input.nameOf),
     outcome: outcomeWords(outcome, input.nameOf),
     live: running ? liveLine(index, asks, ask) : null,
     outlineHides: input.lastEnded === ask ? null : lastWord(index, asks, ask),
-    summary: input.digests.get(ask)?.text ?? null,
+    headline: digest?.headline ?? null,
+    points: digest?.final === true ? digest.points : [],
     files: stats.files.length,
     span: askSpan(index, asks, ask, input.revisions),
   }

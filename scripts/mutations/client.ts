@@ -17,6 +17,22 @@ const copyText = "packages/client/copy-text.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a live digest's points are drawn",
+    file: "packages/client/ask-view.ts",
+    from: "    points: digest?.final === true ? digest.points : [],\n",
+    to: "    points: digest?.points ?? [],\n",
+    command: unit,
+    expect: "a live digest shows its headline, never its points",
+  },
+  {
+    name: "outline's running line carries a headline",
+    file: "packages/client/ask-words.ts",
+    from: "    ? [...part(view.live), ...part(view.work)]\n",
+    to: "    ? [...part(view.live), ...headline, ...part(view.work)]\n",
+    command: unit,
+    expect: "outline, running: what it does now, never a headline",
+  },
+  {
     name: "the running ask counts as the last ended",
     file: "packages/client/ask-view.ts",
     from: '  const row = rows.findLast(r => r.kind === "ask" && r.ask !== runningAsk)',

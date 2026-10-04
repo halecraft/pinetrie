@@ -453,10 +453,15 @@
          as wide as the column past it. */
       .ask-line.running { animation: pulse-ask 1.2s ease-in-out infinite; color: #9ecbff; }
       @keyframes pulse-ask { 50% { opacity: .45; } }
-      /* A model's summary of an ask's work: set apart from the agent's words. */
-      .ask-digest { margin: -.6rem 0 1rem; padding: .2rem .5rem; font-size: .8rem; font-style: italic;
-        color: #b2ccd6; border-left: 2px dotted #4a6577; }
-      .ask-digest::before { content: "summary · "; font-style: normal; color: #6f7784; }
+      /* A model's words about an ask's work (ADR-0075): its headline, marked
+         wherever it is drawn, and its points, a short list under the fold. */
+      .ask-headline { color: #c9d3dc; }
+      .ask-headline::before { content: "✦ "; color: #6f7784; }
+      .ask-digest { margin: -.6rem 0 1rem; padding: .1rem .5rem .1rem 1rem; font-size: .78rem;
+        line-height: 1.45; color: #b2ccd6; border-left: 2px dotted #4a6577; }
+      .ask-digest .text { margin-top: 0; }
+      .ask-digest p, .ask-digest ul { margin: 0; }
+      .ask-digest ul { padding-left: 1rem; }
       .ask-outcome { margin: -.6rem 0 1rem; padding-left: .5rem; font-size: .78rem; color: #e0a080; }
       /* Which ask the work at the top answers, while its message is out of
          sight. The slot is sticky and zero-height, as .jump-slot is, so the

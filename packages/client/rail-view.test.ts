@@ -20,11 +20,22 @@ test("railKeep: rings, running tips, open columns' ends and your cards' ends", (
   expect([...keep].sort()).toEqual(["c", "e", "r", "t"])
 })
 
-test("stretchWords: a long ask's capsule leads with its ask", () => {
-  expect(stretchWords('Ada: "Fix the rail"', "31 steps")).toBe(
+test("stretchWords: a long ask's capsule leads with its ask, then its digest as written", () => {
+  expect(stretchWords('Ada: "Fix the rail"', "31 steps", null)).toBe(
     'Ada: "Fix the rail" · 31 steps',
   )
-  expect(stretchWords(null, "4 messages from Bea")).toBe("4 messages from Bea")
+  expect(stretchWords(null, "4 messages from Bea", null)).toBe(
+    "4 messages from Bea",
+  )
+  expect(
+    stretchWords("ask", "31 steps", {
+      headline: "Fixed the rail",
+      points: ["`rail.tsx`"],
+    }),
+  ).toBe("ask · 31 steps\nFixed the rail\n- `rail.tsx`")
+  expect(stretchWords("ask", "31 steps", { headline: null, points: [] })).toBe(
+    "ask · 31 steps",
+  )
 })
 
 test("pickAt: the message as far through the run as the click is down it", () => {

@@ -9,6 +9,14 @@ const core = "packages/core/index.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "an ask of MIN_STRETCH agent messages is short",
+    file: asks,
+    from: "  (asks.work.get(prompt)?.length ?? 0) >= MIN_STRETCH\n",
+    to: "  (asks.work.get(prompt)?.length ?? 0) > MIN_STRETCH\n",
+    command: unit,
+    expect: "isLongAsk: a run of MIN_STRETCH agent messages, not one fewer",
+  },
+  {
     name: "a take that names a source reads as untraced",
     file: core,
     from: "        trailerValues(p, TRAILERS.source).length === 0,\n",

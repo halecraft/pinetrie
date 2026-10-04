@@ -440,8 +440,9 @@ item 18, and in `lanes.test.ts` against the harness.
   (`additionalSkillPaths`; pi's loader keeps the first of a name):
   `resolve-conflicts` (ADR-0033), `commit-message` and `offer-stack`
   (ADR-0038), `column-banner` (ADR-0053), whose whole body is the image
-  model's prompt, and `ask-digest` (ADR-0056). So one of yours or the repo's
-  of the same name replaces Pineta's. All five are
+  model's prompt, and `ask-digest` (ADR-0056), whose reply has a shape the
+  host reads (`digestOf`, ADR-0075): a replacement must ask for it too. So
+  one of yours or the repo's of the same name replaces Pineta's. All five are
   `disable-model-invocation: true`: only the host asks for them.
   `Agent.skill(name)` reads the file at call time, without its frontmatter,
   and hashes it. The scripted and named model choices load no resources, so

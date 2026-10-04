@@ -95,7 +95,7 @@ const SAMPLES: readonly Sample[] = [
   sample(
     "digest",
     DIGEST,
-    { prompt: E, text: "done", at: 1, final: true },
+    { prompt: E, headline: "Done", points: ["`a.ts`"], at: 1, final: true },
     "prompt",
   ),
   sample(

@@ -97,21 +97,40 @@ describe("askView", () => {
       lastEnded: null,
       stops: new Map(),
       revisions: noRevisions,
-      digests: new Map([[entryId("1-p"), { text: "Fixed it." }]]),
+      digests: new Map([
+        [
+          entryId("1-p"),
+          { headline: "Fixed it", points: ["`rail.tsx`"], final: true },
+        ],
+      ]),
       releasedPath: null,
       nameOf: () => "Bea",
       ...over,
     })
-  test("an ended ask: its digest, no outcome to say, its last word", () => {
+  test("an ended ask: its work, no outcome to say, its last word, its final digest", () => {
     expect(view()).toMatchObject({
       running: false,
       endedWhileAway: false,
-      digest: "3 steps · 1 tool call",
+      work: "3 steps · 1 tool call",
       outcome: null,
       live: null,
       outlineHides: "5-a",
-      summary: "Fixed it.",
+      headline: "Fixed it",
+      points: ["`rail.tsx`"],
     })
+  })
+  test("a live digest shows its headline, never its points", () => {
+    expect(
+      view({
+        runningAsk: entryId("1-p"),
+        digests: new Map([
+          [
+            entryId("1-p"),
+            { headline: "Fixing it", points: ["`rail.tsx`"], final: false },
+          ],
+        ]),
+      }),
+    ).toMatchObject({ headline: "Fixing it", points: [] })
   })
   test("outline keeps the last word of the column's last ended ask", () => {
     expect(view({ lastEnded: entryId("1-p") }).outlineHides).toBeNull()

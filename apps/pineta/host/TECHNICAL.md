@@ -388,7 +388,7 @@ A model request takes seconds, and no command may wait on it. Banners,
 commit messages, digests and titles ask with `requestOutside`: the request runs
 outside the documents' keeper, tracked so `quiet` waits for it, and its
 answer is written in a step of its own (a keeper step, or for a commit
-message an owner command), after that step decides it is still wanted (`bannerStillWanted`, the offer's checks, `digestStillWanted`, `titleStillWanted`). A
+message an owner command), after that step decides it is still wanted (`bannerStillWanted`, the offer's checks, `digestToWrite`, `titleStillWanted`). A
 failure is logged, never thrown. With `held`, a key is in a set while the
 request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 
@@ -407,8 +407,13 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   reads its `reading` ends (S70).
 - **Only the ask goes out**: its message, worded from its prompt entry so a
   land or stack ask is named too, its run's messages read up from the run's
-  last entry, newest first within the budget, and the last digest. No agent
-  reads the answer.
+  last entry, newest first within the budget, its last word, and the last
+  digest. No agent reads the answer.
+- **The reply is read in `request`, as a title's is** (`titles.ts`):
+  `digestOf` there, and a refused reply logged ("the model's digest is not
+  one"). `settle` gets the parsed digest, or null for a refused one, and
+  writes what `digestToWrite` returns. A failed request (`complete` null)
+  writes nothing, even at the end.
 - A missing `ask-digest` skill is logged, and nothing is asked.
 
 ## Banners (`banners.ts`, ADR-0050, ADR-0053)

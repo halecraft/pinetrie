@@ -1,6 +1,7 @@
 // What a one-shot model request outside a thread is made from: a thread's
 // messages as lines, and the newest of them that fit a budget, as the commit
-// message's request (`describeRequest`) uses them.
+// message's request (`describeRequest`) uses them; and a one-line answer
+// read back (`bareLine`).
 
 import type { TranscriptMessage } from "@pineta/core"
 
@@ -56,3 +57,18 @@ export const LEFT_OUT_NOTE = 32
 /** The line saying how many older lines `fitNewest` left out; empty for none. */
 export const leftOut = (dropped: number): string =>
   dropped > 0 ? `- (${dropped} earlier left out)\n` : ""
+
+/** Wrapping a model may put around a one-line answer. */
+const WRAPPED = /^["'`*_“‘]+|["'`*_”’]+$/g
+
+/**
+ * Pure. A model's one-line answer (a title, a digest's headline) without
+ * surrounding quotes or emphasis, or a trailing full stop, colon or the
+ * like.
+ */
+export const bareLine = (text: string): string =>
+  text
+    .trim()
+    .replace(WRAPPED, "")
+    .replace(/[.:;,!]+$/, "")
+    .trim()

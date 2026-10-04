@@ -8,6 +8,7 @@ import {
   railLandmarks,
   type WorkStats,
 } from "@pineta/core"
+import { type DigestBody, digestText } from "@pineta/marginalia"
 
 /**
  * The messages this view draws on their own, never inside a stretch: thread
@@ -52,14 +53,18 @@ export function columnLandmarks(
 
 /**
  * A capsule's tooltip: its ask, when it is one long ask's work (ADR-0056),
- * then what it holds (`workWords`), then its digest on a line of its own.
+ * then what it holds (`workWords`), then its digest as the model wrote it
+ * (`digestText`), when it has a headline.
  */
 export const stretchWords = (
   ask: string | null,
   work: string,
-  summary: string | null = null,
+  digest: DigestBody | null,
 ): string =>
-  [ask === null ? work : `${ask} · ${work}`, summary]
+  [
+    ask === null ? work : `${ask} · ${work}`,
+    digest === null || digest.headline === null ? null : digestText(digest),
+  ]
     .filter(t => t !== null)
     .join("\n")
 

@@ -367,32 +367,46 @@ aborted (S70), so this is the only place a stop is named. `planStop`
 the one named. A stop recorded for a run that answered anyway is ignored
 (`askOutcome`).
 
-# Digests (`digest.ts`, ADR-0056)
+# Digests (`digest.ts`, ADR-0056, ADR-0075)
 
-A model's short summary of an ask's work, unless `{ "digests": { "enabled":
-false } }` is in the user config (`decodeDigestConfig`, ADR-0071). A host-written
-`pineta.digest` value keyed by the ask's prompt, replaced whole each time:
-a value, not a text, since nothing accumulates (ADR-0014). No agent reads
-it.
+A model's headline and few points for a long ask's work, unless
+`{ "digests": { "enabled": false } }` is in the user config
+(`decodeDigestConfig`, ADR-0071). A host-written `pineta.digest` value keyed
+by the ask's prompt, `{ headline, points, at, final }`, replaced whole each
+time: a value, not a text, since nothing accumulates (ADR-0014). A null
+headline is a digest with nothing to draw. No agent reads it.
 
 - **`digestDue` is asked on events, never on a timer**: each turn done,
   and the run's end. While the run lasts, only when nothing is asked
   already, someone reads the thread (`readsAsk`, over presence's
   `reading`) and `DIGEST_EVERY` has passed; at the end, once, for the
   final one.
-- **`planDigest`** is the decision and the request's parts: `digestDue`,
-  then the ask's message as one line and its run's messages, walked up from
-  the run's last entry (`AskIndex.last`) and kept to the ask's own. The
-  ask's line is worded from its prompt entry (`transcriptLine`), since
-  `transcriptLines` leaves out land and stack messages.
-- **`digestStillWanted` is the race a write settles:** a live digest asked
-  during the run can come back after the final one was written, and is
-  dropped. A digest is keyed by its prompt, so no other ask's can land on
-  it, as long as the host names the right prompt: it takes the ask from
-  the entry an event names, never a lane's tip (`apps/pineta/host/TECHNICAL.md`,
-  "Digests").
+- **`planDigest`** is the decision and the request's parts: a long ask only
+  (`isLongAsk`, core, the rail's capsule rule), then `digestDue`, then the
+  ask's message as one line, its run's messages walked up from the run's
+  last entry (`AskIndex.last`) and kept to the ask's own, and its last word
+  (`lastWord`) apart from them as `shown`, since the reader sees it after
+  the fold. The ask's line is worded from its prompt entry
+  (`transcriptLine`), since `transcriptLines` leaves out land and stack
+  messages.
+- **`digestOf` refuses rather than cuts**, as `titleOf` does, and shares its
+  unwrapping (`bareLine`, `request.ts`): the first line is the headline,
+  every other line a `- ` or `* ` point, or the whole reply `nothing to
+  add`. A headline over `HEADLINE_WORDS`, more than `MAX_POINTS` points, a
+  point over `POINT_WORDS`, or a line of prose is null.
+- **`digestText` is `digestOf`'s inverse**, and `pointsText` its list: the
+  one wording of a digest, for the next request's summary so far, the
+  rail's tooltip and the client's list. `nothing to add` round-trips.
+- **`digestToWrite` is the whole write decision.** A live reply that comes
+  back after the final one was written is dropped: a digest is keyed by its
+  prompt, so no other ask's can land on it, as long as the host names the
+  right prompt (`apps/pineta/host/TECHNICAL.md`, "Digests"). A refused live
+  reply writes nothing, so the last good digest stays. A refused final
+  reply writes an empty final digest: a live headline says what the run
+  was doing, which is no longer true.
 - **`digestRequest`** is the skill, the ask, the run's newest work that fits
-  (`fitNewest`: the oldest is cut first), and the last digest.
+  (`fitNewest`: the oldest is cut first), the last word, and the last
+  digest. The ask and the last word are never cut.
 
 # The user config (`config.ts`)
 
@@ -422,7 +436,9 @@ edits it and every place a title shows reads it.
   thread began usually says what it is for, then the newest that fit
   (`fitNewest`).
 - **`titleOf` refuses rather than cuts**: more than `TITLE_WORDS` words, or
-  what `parseTitle` refuses, is null, and the root keeps its label.
+  what `parseTitle` refuses, is null, and the root keeps its label. It
+  unwraps quotes and trailing punctuation with `bareLine` (`request.ts`),
+  as a digest's headline is.
 - **`titleStillWanted`**: an asked title is always written; an unasked one
   only over no mark.
 

@@ -1,8 +1,8 @@
-// host/digests — each ask's digest, when the user config turns digests on
-// (ADR-0056): asked as its run goes, while someone reads it, at most once a
-// `DIGEST_EVERY`, and once more at its run's end. `planDigest` and
-// `digestStillWanted` decide; this carries them out, outside the queue
-// (`requestOutside`).
+// host/digests — each long ask's digest, unless the user config turns
+// digests off (ADR-0056, ADR-0071, ADR-0075): asked as its run goes, while
+// someone reads it, at most once a `DIGEST_EVERY`, and once more at its
+// run's end. `planDigest` and `digestToWrite` decide, and `digestOf` reads
+// the reply; this carries them out, outside the queue (`requestOutside`).
 //
 // Each event names an entry, and the ask is `promptOf` that entry. An entry
 // is written once, so its ask never changes; a lane's tip moves with every
@@ -13,8 +13,10 @@ import { type EntryId, indexAsks, promptOf, type RootId } from "@pineta/core"
 import type { Keeper } from "@pineta/keeper"
 import {
   DIGEST,
+  type DigestBody,
+  digestOf,
   digestRequest,
-  digestStillWanted,
+  digestToWrite,
   planDigest,
   readsAsk,
   setRecord,
@@ -25,7 +27,10 @@ import type { PresenceDocHandle } from "@pineta/schema"
 import type { Basics } from "./basics.ts"
 import { requestOutside } from "./outside.ts"
 
-/** A digest request's size: the skill aside, the ask, its newest work, the last digest. */
+/**
+ * A digest request's size: the skill aside, the ask, its newest work, its
+ * last word, the last digest.
+ */
 const DIGEST_BUDGET = 12_000
 
 /** Where a failure is logged: the caller words it with its thread's name. */
@@ -85,7 +90,7 @@ export function createDigests(deps: {
         })
         if (plan === null) return
         const { final } = plan
-        void requestOutside({
+        void requestOutside<{ readonly body: DigestBody | null }, EntryId>({
           keeper,
           held: { set: asking, key: ask },
           failed,
@@ -95,27 +100,34 @@ export function createDigests(deps: {
               basics.log("[host] no ask-digest skill")
               return null
             }
-            return deps.agent().complete(
+            const reply = await deps.agent().complete(
               digestRequest({
                 skill: skill.content,
                 ask: plan.said,
                 work: plan.work,
+                shown: plan.shown,
                 previous: plan.previous,
                 budget: DIGEST_BUDGET,
               }),
             )
+            if (reply === null) return null
+            const body = digestOf(reply)
+            if (body === null)
+              basics.log(
+                `[host] the model's digest is not one: ${JSON.stringify(reply)}`,
+              )
+            return { body }
           },
-          settle: async text => {
-            if (!digestStillWanted(readDigests(doc).get(ask), { final })) return
-            await deps
-              .agent()
-              .writeValues([
-                setRecord(
-                  DIGEST,
-                  { prompt: ask, text, at: basics.now(), final },
-                  root,
-                ),
-              ])
+          settle: async ({ body }) => {
+            const record = digestToWrite({
+              stored: readDigests(doc).get(ask),
+              asked: { final },
+              body,
+              prompt: ask,
+              at: basics.now(),
+            })
+            if (record !== null)
+              await deps.agent().writeValues([setRecord(DIGEST, record, root)])
           },
         })
       })

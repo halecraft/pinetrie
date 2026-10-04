@@ -1,7 +1,8 @@
 # ADR-0071 — Digests are on by default; the user config turns them off
 
 **Status:** Accepted. Amends ADR-0056 (a summary written by a model is no
-longer opt-in).
+longer opt-in). Amended by ADR-0075: only a long ask is digested, so a
+short one costs no request.
 
 **Context.** ADR-0056 made each ask's digest opt-in: only
 `{ "digests": { "enabled": true } }` in `~/.config/pineta/config.json` turned

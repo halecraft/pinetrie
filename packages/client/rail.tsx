@@ -20,6 +20,7 @@ import {
   type TreeIndex,
   type WriterId,
 } from "@pineta/core"
+import type { DigestBody } from "@pineta/marginalia"
 import {
   type ComponentProps,
   type CSSProperties,
@@ -101,7 +102,7 @@ export function Rail({
   /** The tree the items were compacted from: a long ask's capsule names its ask. */
   index: TreeIndex
   /** Each ask's model-written digest, which a long ask's capsule shows. */
-  digests: ReadonlyMap<EntryId, { readonly text: string }>
+  digests: ReadonlyMap<EntryId, DigestBody>
   items: readonly RailItem[]
   /** Ids on any open column's path: marked `data-open`. */
   open: ReadonlySet<EntryId>
@@ -164,7 +165,7 @@ export function Rail({
               label={stretchWords(
                 askLine(index, it.ask, nameOf),
                 workWords(it.stats, nameOf),
-                it.ask === null ? null : (digests.get(it.ask)?.text ?? null),
+                it.ask === null ? null : (digests.get(it.ask) ?? null),
               )}
               onPick={onPick}
               open={marks.open}

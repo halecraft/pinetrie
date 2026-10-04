@@ -12,8 +12,10 @@ import {
   entryId,
   indexAsks,
   indexTree,
+  isLongAsk,
   laneNameForThread,
   lastWord,
+  MIN_STRETCH,
   projectRail,
   type RevisionRecord,
   railLandmarks,
@@ -69,6 +71,20 @@ describe("indexAsks", () => {
   test("is kept per index", () => {
     expect(indexAsks(index)).toBe(asks)
   })
+})
+
+test("isLongAsk: a run of MIN_STRETCH agent messages, not one fewer", () => {
+  const rows = (n: number) =>
+    build([
+      entry("0-p", null, chat()),
+      ...Array.from({ length: n }, (_, i) =>
+        entry(`${i + 1}-a`, `${i === 0 ? "0-p" : `${i}-a`}`, said(`step ${i}`)),
+      ),
+    ])
+  const long = (n: number) => isLongAsk(indexAsks(rows(n)), entryId("0-p"))
+  expect(long(MIN_STRETCH - 1)).toBe(false)
+  expect(long(MIN_STRETCH)).toBe(true)
+  expect(isLongAsk(indexAsks(rows(0)), entryId("0-p"))).toBe(false)
 })
 
 describe("askOutcome and lastWord, over S70's endings", () => {

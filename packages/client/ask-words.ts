@@ -8,6 +8,7 @@ import {
   type WorkStats,
   type WriterId,
 } from "@pineta/core"
+import type { AskView } from "./ask-view.ts"
 import { listOf, plural } from "./counts.ts"
 
 /** How long an ask's first line is shown. */
@@ -30,7 +31,7 @@ export function askWords(
   return who === "" ? `"${line}"` : `${who}: "${line}"`
 }
 
-/** A span of time as it reads in a digest: "42s", "4m 12s", "2h 5m". */
+/** A span of time as it reads in a fold's line: "42s", "4m 12s", "2h 5m". */
 export function durationWords(ms: number): string {
   const s = Math.round(ms / 1000)
   if (s < 60) return `${s}s`
@@ -42,8 +43,8 @@ export function durationWords(ms: number): string {
 /**
  * What some work holds, as one line: "12 messages from Ada and Bea · 38 steps
  * · 61 tool calls · 7 files · 4m 12s · 2 failed". A part that is zero is left
- * out; failures come last. A capsule's tooltip and a fold's digest line are
- * this line.
+ * out; failures come last. A capsule's tooltip and a fold's line hold this
+ * line.
  */
 export function workWords(
   stats: WorkStats,
@@ -64,6 +65,34 @@ export function workWords(
   ]
     .filter(part => part !== "")
     .join(" · ")
+}
+
+/** A part of an ask's fold line, and whether a model wrote it (a digest's headline). */
+export interface FoldPart {
+  readonly text: string
+  readonly byModel: boolean
+}
+
+/**
+ * An ask's fold line, in order, the parts drawn with " · " between them.
+ * `line` is outline's: while its run lasts, what it does now and what its
+ * work holds; once ended, how it ended, the headline, and what its work
+ * holds. `fold` is story's first fold: the headline, what its work holds,
+ * and how it ended. Outline's running line leaves the headline out: `live`
+ * is newer than a digest asked at most once a minute.
+ */
+export function foldWords(
+  view: Pick<AskView, "running" | "headline" | "work" | "outcome" | "live">,
+  where: "line" | "fold",
+): readonly FoldPart[] {
+  const part = (text: string | null, byModel = false) =>
+    text === null || text === "" ? [] : [{ text, byModel }]
+  const headline = part(view.headline, true)
+  if (where === "fold")
+    return [...headline, ...part(view.work), ...part(view.outcome)]
+  return view.running
+    ? [...part(view.live), ...part(view.work)]
+    : [...part(view.outcome), ...headline, ...part(view.work)]
 }
 
 /** How an ask ended, when that needs saying: a stop or a failure. */

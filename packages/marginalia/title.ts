@@ -23,6 +23,7 @@ import {
 } from "@pineta/core"
 import { type ModelRef, modelRef, recordOf } from "./config.ts"
 import {
+  bareLine,
   fitNewest,
   LEFT_OUT_NOTE,
   leftOut,
@@ -160,22 +161,14 @@ export function titleRequest(input: {
 /** The most words a title may have: the skill asks for one to three. */
 export const TITLE_WORDS = 5
 
-/** Wrapping a model may put around a title. */
-const WRAPPED = /^["'`*_“‘]+|["'`*_”’]+$/g
-
 /**
- * Pure. The model's reply as a title: without surrounding quotes or a
- * trailing full stop, colon or the like. Null for a reply of more than
- * `TITLE_WORDS` words, or one `parseTitle` refuses (more than one line, or
- * too long): the root keeps its label. It never cuts a reply, which could leave "Fixing
- * the".
+ * Pure. The model's reply as a title (`bareLine`). Null for a reply of more
+ * than `TITLE_WORDS` words, or one `parseTitle` refuses (more than one line,
+ * or too long): the root keeps its label. It never cuts a reply, which could
+ * leave "Fixing the".
  */
 export function titleOf(reply: string): string | null {
-  const bare = reply
-    .trim()
-    .replace(WRAPPED, "")
-    .replace(/[.:;,!]+$/, "")
-    .trim()
+  const bare = bareLine(reply)
   if (bare.split(/\s+/).length > TITLE_WORDS) return null
   const parsed = parseTitle(bare)
   return parsed.kind === "set" ? parsed.title : null

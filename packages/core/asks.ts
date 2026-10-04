@@ -19,6 +19,7 @@ import {
 } from "./index.ts"
 import {
   type EntryLike,
+  MIN_STRETCH,
   messageText,
   startsRun,
   statsOf,
@@ -120,6 +121,14 @@ export function indexAsks(index: TreeIndex): AskIndex {
   known.set(index, asks)
   return asks
 }
+
+/**
+ * A long ask: its run holds `MIN_STRETCH` agent messages or more. The rail
+ * draws it as a dot and a capsule of its own (`compactRail`), and only it is
+ * given a digest (ADR-0075).
+ */
+export const isLongAsk = (asks: AskIndex, prompt: EntryId): boolean =>
+  (asks.work.get(prompt)?.length ?? 0) >= MIN_STRETCH
 
 /**
  * How `prompt`'s run ended, from its last entries (S70): an assistant

@@ -3,6 +3,7 @@ import { describe, expect, test } from "vitest"
 import {
   askWords,
   durationWords,
+  foldWords,
   outcomeWords,
   workWords,
 } from "./ask-words.ts"
@@ -107,5 +108,62 @@ describe("outcomeWords", () => {
     ["a run says nothing", { kind: "running" }, null],
   ])("%s", (_, outcome, words) => {
     expect(outcomeWords(outcome, nameOf)).toBe(words)
+  })
+})
+
+describe("foldWords", () => {
+  const ended = {
+    running: false,
+    headline: "Moved offers out of core",
+    work: "30 steps · 12 files",
+    outcome: "stopped by Bea",
+    live: null,
+  }
+  const running = {
+    ...ended,
+    running: true,
+    outcome: null,
+    live: "$ pnpm test",
+  }
+  // Each part as it reads, a model's in brackets.
+  const read = (...args: Parameters<typeof foldWords>) =>
+    foldWords(...args)
+      .map(p => (p.byModel ? `[${p.text}]` : p.text))
+      .join(" · ")
+  test.each<[string, Parameters<typeof foldWords>[0], "line" | "fold", string]>(
+    [
+      [
+        "story: the headline leads, then the work and how it ended",
+        ended,
+        "fold",
+        "[Moved offers out of core] · 30 steps · 12 files · stopped by Bea",
+      ],
+      [
+        "outline: how it ended leads, then the headline and the work",
+        ended,
+        "line",
+        "stopped by Bea · [Moved offers out of core] · 30 steps · 12 files",
+      ],
+      [
+        "outline, running: what it does now, never a headline",
+        running,
+        "line",
+        "$ pnpm test · 30 steps · 12 files",
+      ],
+      [
+        "story, running: the live headline",
+        running,
+        "fold",
+        "[Moved offers out of core] · 30 steps · 12 files",
+      ],
+      [
+        "no headline: the words as before digests",
+        { ...ended, headline: null },
+        "fold",
+        "30 steps · 12 files · stopped by Bea",
+      ],
+    ],
+  )("%s", (_, view, where, words) => {
+    expect(read(view, where)).toBe(words)
   })
 })

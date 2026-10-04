@@ -596,8 +596,10 @@ capsule of its own. A bar names the ask whose work is at the column's top; a
 "since you were here" line marks where this device last left a thread; an
 ask's files open a review of its range of revisions, from the paths each
 turn's revision records. Stop records who pressed it (`pineta.stop`). Unless
-`{ "digests": { "enabled": false } }` turns it off, a model writes each ask a
-short summary (`pineta.digest`, the `ask-digest` skill), which no agent reads.
+`{ "digests": { "enabled": false } }` turns it off, a model writes each long
+ask a digest (`pineta.digest`, the `ask-digest` skill, ADR-0075), which no
+agent reads: a headline that leads the ask's fold line, and a few points
+under it in story, or nothing when the agent's last message says it all.
 
 **The rail outlines what each column shows** (ADR-0058), in the column's
 colour, and scrolls to keep the outline of the column you move in view. A
@@ -758,11 +760,15 @@ context.**
   your working copy, or any directory, with no container, as you. A branch
   inherits its thread's setting. `PINETA_LANES=0` makes it the default. Such
   a thread shares its directory, and hot reload waits while one runs in yours.
-- **Summaries of asks** (ADR-0056, on by default since ADR-0071): a model,
-  the one commit messages use, writes each ask's work a short summary while someone reads the running
-  thread, at most once a minute, and once more when its run ends.
-  `{ "digests": { "enabled": false } }` in `~/.config/pineta/config.json`
-  turns them off. Replace the `ask-digest` skill to change what it asks.
+- **Summaries of asks** (ADR-0056, on by default since ADR-0071, shaped by
+  ADR-0075): a model, the one commit messages use, writes each long ask's
+  work a headline and a few points while someone reads the running thread,
+  at most once a minute, and once more when its run ends. An ask of one or
+  two agent messages gets none. `{ "digests": { "enabled": false } }` in
+  `~/.config/pineta/config.json` turns them off. Replace the `ask-digest`
+  skill to change what it asks; yours must still ask for a headline line
+  and `- ` points, or `nothing to add`, since a reply in another shape is
+  logged and dropped.
 - `PINETA_TOOLS=0` removes the tools. A thread's agent that starts the
   development host itself needs `PINETA_PORT=0`, or it collides on 7391.
 - **Inviting a collaborator:** `PINETA_BIND=0.0.0.0` (or an address). The host
