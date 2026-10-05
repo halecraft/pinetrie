@@ -13,7 +13,6 @@ import { MAX_TITLE, type TreeIndex, type WriterId } from "@pineta/core"
 import { ROOT_BUSY_REASON } from "@pineta/rules"
 import type { SessionClient } from "@pineta/session"
 import {
-  type DragEvent,
   type KeyboardEvent,
   useEffect,
   useLayoutEffect,
@@ -32,12 +31,8 @@ import {
 } from "./open-list-view.ts"
 import { planTitle, renameKey } from "./root-label.ts"
 import { Readers, RootStatus } from "./root-signals.tsx"
-import {
-  encodeRootDrag,
-  ROOT_MIME,
-  type RootDrag,
-  rootDropProps,
-} from "./root-target.ts"
+import { type RootDrag, rootDropProps } from "./root-target.ts"
+import { startRootDrag } from "./use-root-drag.ts"
 
 /** Up and Down move focus between items. */
 function moveFocus(e: KeyboardEvent<HTMLElement>) {
@@ -51,13 +46,6 @@ function moveFocus(e: KeyboardEvent<HTMLElement>) {
   const next =
     items[(at + (e.key === "ArrowDown" ? 1 : items.length - 1)) % items.length]
   next?.focus()
-}
-
-/** A root's drag, from your list: it carries its id and its state on the board. */
-const startDrag = (drag: RootDrag | null) => (e: DragEvent<HTMLElement>) => {
-  if (drag === null || e.dataTransfer === null) return
-  e.dataTransfer.setData(ROOT_MIME, encodeRootDrag(drag))
-  e.dataTransfer.effectAllowed = "move"
 }
 
 export function OpenList({
@@ -173,7 +161,7 @@ export function OpenList({
                   .join(" ")}
                 data-root={root}
                 draggable
-                onDragStart={startDrag(dragOf(root))}
+                onDragStart={startRootDrag(dragOf(root))}
                 onClick={() => onIntent(item.show)}
                 title={item.label}
                 type="button"

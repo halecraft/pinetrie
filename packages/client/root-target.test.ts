@@ -2,6 +2,7 @@ import { entryId, rootIdFor, workflowStateIdFor } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import {
   encodeRootDrag,
+  landingOf,
   parseRootDrag,
   planRootDrop,
   type RootDrag,
@@ -32,7 +33,12 @@ describe("a root's drop lands where a key could move it", () => {
   test("a drop and the keyboard's move give the same intent", () => {
     // Move to ▸ Done, as `boardView` and `openListView` offer it.
     expect(
-      planRootDrop(drag, { kind: "state", state: DONE, before: null }, DONE),
+      planRootDrop(
+        drag,
+        { kind: "state", state: DONE, before: null },
+        DONE,
+        null,
+      ),
     ).toEqual({
       kind: "moveRoot",
       root: R1,
@@ -43,17 +49,44 @@ describe("a root's drop lands where a key could move it", () => {
     })
     // Move up, as `openListView` offers it.
     expect(
-      planRootDrop(drag, { kind: "list", before: entryId("2-r") }, DONE),
+      planRootDrop(drag, { kind: "list", before: entryId("2-r") }, DONE, null),
     ).toEqual({ kind: "moveInList", root: "1-r", before: "2-r" })
   })
 
   test("a root dropped before itself does nothing", () => {
     expect(
-      planRootDrop(drag, { kind: "list", before: entryId("1-r") }, DONE),
+      planRootDrop(drag, { kind: "list", before: entryId("1-r") }, DONE, null),
     ).toBeNull()
     expect(
-      planRootDrop(drag, { kind: "state", state: DOING, before: R1 }, DONE),
+      planRootDrop(
+        drag,
+        { kind: "state", state: DOING, before: R1 },
+        DONE,
+        null,
+      ),
     ).toBeNull()
+  })
+
+  test("a root dropped just after itself, where it was dragged from, does nothing", () => {
+    const home: RootTarget = { kind: "state", state: DOING, before: R2 }
+    expect(planRootDrop(drag, home, DONE, home)).toBeNull()
+    expect(
+      planRootDrop(
+        drag,
+        { kind: "state", state: DONE, before: R2 },
+        DONE,
+        home,
+      ),
+    ).not.toBeNull()
+    const end: RootTarget = { kind: "list", before: null }
+    expect(planRootDrop(drag, end, DONE, end)).toBeNull()
+    expect(
+      planRootDrop(drag, end, DONE, {
+        kind: "state",
+        state: DOING,
+        before: null,
+      }),
+    ).not.toBeNull()
   })
 
   test("an element with no mark, or a drag that is no root's, lands nowhere", () => {
@@ -66,6 +99,21 @@ describe("a root's drop lands where a key could move it", () => {
       JSON.stringify({ ...drag, state: "doing" }),
     ])
       expect(parseRootDrag(bad)).toBeNull()
+  })
+})
+
+describe("landingOf", () => {
+  test("an item's upper half lands before it, its lower half on the zone after it", () => {
+    const item = { here: "b", next: "c", item: true }
+    expect(landingOf(item, false)).toBe("b")
+    expect(landingOf(item, true)).toBe("c")
+  })
+
+  test("an end lands on itself, whichever half", () => {
+    const end = { here: "end", next: "past", item: false }
+    expect(landingOf(end, false)).toBe("end")
+    expect(landingOf(end, true)).toBe("end")
+    expect(landingOf({ here: "b", next: null, item: true }, true)).toBe("b")
   })
 })
 

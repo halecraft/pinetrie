@@ -78,6 +78,13 @@
       .open-item:hover .open-close, .open-item:focus-within .open-close { visibility: visible; }
       /* Where a root dragged to the end of your list lands. */
       .open-end { display: block; min-height: .6rem; }
+      /* Where a dragged root would land (use-root-drag.ts): a line in the gap
+         above the item it goes before, or at the list's end. */
+      .open-item[data-root-drop]::before { content: ""; position: absolute; z-index: 1;
+        left: 0; right: 0; top: calc(-.05rem - 1.5px); height: 3px; border-radius: 2px;
+        background: #8ab4f8; pointer-events: none; }
+      .open-end[data-root-drop] { box-shadow: inset 0 3px 0 #8ab4f8; }
+      .open-item[data-root-dragging] { opacity: .4; }
       /* A root's status, before its label (ADR-0077), in your list and on the
          board. Working is a still ring: it needs nothing from you, so it does
          not move. What needs you is a filled amber dot, the colour of the
@@ -770,10 +777,24 @@
       .board-count { color: #6f7784; font-size: .7rem; }
       .state-more { position: relative; margin-left: auto; }
       .state-menu, .item-menu { padding: 0 .3rem; background: none; color: #aaa; }
-      .board-items { display: flex; flex-direction: column; gap: .4rem; min-height: 1.5rem; }
+      .board-items { position: relative; display: flex; flex-direction: column; gap: .4rem;
+        min-height: 1.5rem; }
       .board-item { position: relative; display: flex; flex-direction: column; gap: .2rem;
         padding: .5rem .6rem; background: var(--page); border: 1px solid var(--edge);
         border-radius: 6px; --surface: var(--page); }
+      /* Where a dragged root would land (use-root-drag.ts): a line in the gap
+         above the card it goes before, or below a column's last card. The
+         closed state keeps no order of its own, so it is outlined whole. The
+         card dragged stays, dimmed, in its place until it is dropped. */
+      .board-item[data-root-drop]::before, .board-column[data-root-drop] > .board-items::after {
+        content: ""; position: absolute; left: -1px; right: -1px; height: 3px;
+        border-radius: 2px; background: #8ab4f8; pointer-events: none; }
+      .board-item[data-root-drop]::before { top: calc(-.2rem - 2.5px); }
+      .board-column[data-root-drop] > .board-items::after { bottom: calc(-.2rem - 1.5px); }
+      .board-column[data-root-drop] > .board-items:empty::after { top: calc(50% - 1.5px); bottom: auto; }
+      .board-closed[data-root-drop] { outline: 2px solid #8ab4f8; outline-offset: .3rem;
+        border-radius: 4px; }
+      .board-item[data-root-dragging] { opacity: .4; border-style: dashed; }
       .board-open { display: flex; gap: .35rem; align-items: center; padding: 0; background: none;
         color: #e6e6e6; text-align: left; line-height: 1.25; }
       .board-label { flex: 1; min-width: 0; }

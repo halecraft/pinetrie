@@ -113,14 +113,7 @@ import {
   NO_TEXT,
   summariesOf,
 } from "./root-label.ts"
-import {
-  parseRootDrag,
-  planRootDrop,
-  ROOT_DROP_ZONE,
-  ROOT_MIME,
-  type RootDrag,
-  rootTargetOfElement,
-} from "./root-target.ts"
+import type { RootDrag } from "./root-target.ts"
 import { screenMemory } from "./screen-memory.ts"
 import type { DeviceState, TabState } from "./tab-state.ts"
 import type { RowMemory } from "./tool-row.ts"
@@ -131,6 +124,7 @@ import { FLIGHT_MS, useFlight } from "./use-flight.ts"
 import { PLACED } from "./use-follow.ts"
 import { useInbox } from "./use-inbox.ts"
 import { useReveal } from "./use-reveal.ts"
+import { useRootDrag } from "./use-root-drag.ts"
 import { useStable } from "./use-stable.ts"
 import {
   placeAt,
@@ -927,7 +921,7 @@ export function App({
   // A card's drag (HTML drag and drop: it crosses elements and roots). A
   // drop lands only where put can (`targetOfElement`); held over a root in
   // your list, the drag opens it. A root's drag is not a card's: it is
-  // `ROOT_MIME`, and lands below.
+  // `ROOT_MIME`, and lands by `useRootDrag`.
   useEffect(() => {
     let hover: {
       readonly root: EntryId
@@ -1000,38 +994,8 @@ export function App({
       document.removeEventListener("drop", onDrop)
     }
   }, [onIntent, layout.open])
-  // A root's drag, from the board or your list (ADR-0085): it lands only
-  // where a key could move it (`planRootDrop`).
-  const closedState = workflow?.closed.id ?? null
-  useEffect(() => {
-    const carriesRoot = (e: DragEvent) =>
-      e.dataTransfer?.types.includes(ROOT_MIME) === true
-    const targetOf = (e: DragEvent) => {
-      const el =
-        e.target instanceof Element
-          ? e.target.closest<HTMLElement>(ROOT_DROP_ZONE)
-          : null
-      return el === null ? null : rootTargetOfElement(el)
-    }
-    const onOver = (e: DragEvent) => {
-      if (carriesRoot(e) && targetOf(e) !== null) e.preventDefault()
-    }
-    const onDrop = (e: DragEvent) => {
-      if (!carriesRoot(e) || closedState === null) return
-      const target = targetOf(e)
-      const drag = parseRootDrag(e.dataTransfer?.getData(ROOT_MIME) ?? "")
-      if (target === null || drag === null) return
-      e.preventDefault()
-      const intent = planRootDrop(drag, target, closedState)
-      if (intent !== null) onIntent(intent)
-    }
-    document.addEventListener("dragover", onOver)
-    document.addEventListener("drop", onDrop)
-    return () => {
-      document.removeEventListener("dragover", onOver)
-      document.removeEventListener("drop", onDrop)
-    }
-  }, [onIntent, closedState])
+  // A root's drag, from the board or your list (ADR-0085).
+  useRootDrag(onIntent, workflow?.closed.id ?? null)
   /** A root's drag from your list: its id and state, or null with no id yet. */
   const dragOf = (root: string): RootDrag | null => {
     const entry = root as EntryId

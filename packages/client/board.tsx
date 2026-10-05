@@ -13,7 +13,7 @@
 
 import type { EntryId, WriterId } from "@pineta/core"
 import { ROOT_BUSY_REASON } from "@pineta/rules"
-import { type DragEvent, useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { LEVEL_CLASS, LEVEL_WORDS, type Level } from "./attention.ts"
 import {
   type BoardItem,
@@ -33,7 +33,8 @@ import {
   RootStatus,
   StatusMark,
 } from "./root-signals.tsx"
-import { encodeRootDrag, ROOT_MIME, rootDropProps } from "./root-target.ts"
+import { rootDropProps } from "./root-target.ts"
+import { startRootDrag } from "./use-root-drag.ts"
 
 /** ▦'s mark's title: what the roots not in your list raise. */
 const elsewhereWords = (level: Level): string =>
@@ -128,16 +129,6 @@ function StripStateButton({
   )
 }
 
-/** A board item's drag: its id, its root entry and its state. */
-const startDrag = (item: BoardItem) => (e: DragEvent<HTMLElement>) => {
-  if (e.dataTransfer === null) return
-  e.dataTransfer.setData(
-    ROOT_MIME,
-    encodeRootDrag({ root: item.root, entry: item.entry, state: item.state }),
-  )
-  e.dataTransfer.effectAllowed = "move"
-}
-
 /** The board, open over the columns. */
 export function Board({
   view,
@@ -171,8 +162,15 @@ export function Board({
     return () => document.removeEventListener("keydown", onKey)
   }, [onIntent])
   const [adding, setAdding] = useState(false)
-  const item = (t: BoardItem) => (
+  // An open column's item is a place to drop before; a closed row is not,
+  // since the closed state shows its roots by activity, not by place.
+  const item = (t: BoardItem, place: boolean) => (
     <ItemCard
+      drop={
+        place
+          ? rootDropProps({ kind: "state", state: t.state, before: t.root })
+          : {}
+      }
       item={t}
       key={t.root}
       onIntent={onIntent}
@@ -242,7 +240,9 @@ export function Board({
               triggerClassName="state-menu"
             />
           </div>
-          <div className="board-items">{column.items.map(item)}</div>
+          <div className="board-items">
+            {column.items.map(t => item(t, true))}
+          </div>
           <AddButton add={column.add} onIntent={onIntent} />
         </div>
       ))}
@@ -300,7 +300,9 @@ export function Board({
           />{" "}
           mine
         </label>
-        <div className="board-items">{view.closed.rows.map(item)}</div>
+        <div className="board-items">
+          {view.closed.rows.map(t => item(t, false))}
+        </div>
       </div>
     </section>
   )
@@ -321,12 +323,15 @@ const moveItem = (
 /** A root on the board: its status, label and pip; its readers; its ⋯. */
 function ItemCard({
   item,
+  drop,
   onIntent,
   readers,
   thread,
   pip,
 }: {
   item: BoardItem
+  /** Its drop zone's attributes (`rootDropProps`), or none. */
+  drop: Readonly<Record<string, string>>
   onIntent: (intent: Intent) => void
   readers: ReadersProps
   thread: (end: EntryId, root: EntryId) => MenuItem
@@ -337,17 +342,17 @@ function ItemCard({
       className="board-item"
       data-entry={item.entry}
       data-root={item.root}
-      {...rootDropProps({
-        kind: "state",
-        state: item.state,
-        before: item.root,
-      })}
+      {...drop}
     >
       <button
         className="board-open"
         draggable
         onClick={() => onIntent(item.show)}
-        onDragStart={startDrag(item)}
+        onDragStart={startRootDrag({
+          root: item.root,
+          entry: item.entry,
+          state: item.state,
+        })}
         title={item.label}
         type="button"
       >

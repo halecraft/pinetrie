@@ -340,8 +340,22 @@ and each item's signals.
   or your list (`data-root-state`, `data-root-before`, `data-list-before`),
   `rootTargetOfElement` reads it, and `planRootDrop` gives the same intent
   the keyboard's moves send. A root's drag carries `ROOT_MIME`, never a
-  card's; `App`'s card handlers ignore it, and its root handlers ignore
+  card's; `App`'s card handlers ignore it, and `useRootDrag`'s ignore
   `CARD_MIME`.
+- **A drag shows where it lands** (`use-root-drag.ts`). Over an item, the
+  pointer's half picks the side (`landingOf`): the upper lands before it,
+  the lower on the zone after it (the next item, or the column's or list's
+  end), so the gap between two items is one place. That zone carries
+  `data-root-drop`, drawn as a line in the gap; the item dragged carries
+  `data-root-dragging`, set a tick after `dragstart` so the drag's image is
+  not dimmed. The place just after the item dragged is its `home`, where a
+  drop moves nothing (`planRootDrop`), so neither its own halves draw a
+  line. The closed state is one target: its rows are a search, newest
+  activity first, so no row is a place to drop before, and the panel is
+  outlined instead. One drag start, `startRootDrag`, serves the board and
+  your list; its image is the whole item, held where the pointer took it
+  (`setDragImage`). All of it is DOM attributes, never React state, as a
+  column's drag is.
 - **`markOf` is the one rule for a mark over several roots** (`attention.ts`):
   a board column's, a strip state's and ▦'s (the roots not in your list,
   `unlisted`).

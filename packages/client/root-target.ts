@@ -4,7 +4,8 @@
 // A root is dragged from the board or from your list. A drop names a target
 // by the attributes the drop code marks it with (`rootDropProps`), and
 // `planRootDrop` turns it into the intent a keyboard move sends: a board
-// item's Move to ▸, and Move up and Move down (`stepsIn`) on both.
+// item's Move to ▸, and Move up and Move down (`stepsIn`) on both. Over an
+// item, which side of it the drop lands is `landingOf`'s.
 
 import {
   type EntryId,
@@ -75,6 +76,24 @@ export function rootTargetOfElement(el: {
   return { kind: "list", before: list === END ? null : entryId(list) }
 }
 
+/** Whether two targets are the same place. */
+export const sameTarget = (a: RootTarget, b: RootTarget): boolean =>
+  a.kind === "state"
+    ? b.kind === "state" && a.state === b.state && a.before === b.before
+    : b.kind === "list" && a.before === b.before
+
+/**
+ * Where a drop over `here` lands. An item's upper half lands before it, its
+ * lower half on the zone after it (`next`), so the gap between two items is
+ * one place whichever side the pointer is on. An end lands on itself.
+ */
+export function landingOf<Z>(
+  zone: { readonly here: Z; readonly next: Z | null; readonly item: boolean },
+  lower: boolean,
+): Z {
+  return zone.item && lower && zone.next !== null ? zone.next : zone.here
+}
+
 /** Where Move up or Move down puts an item: before `before`, or at the end. */
 export interface Step<T> {
   readonly before: T | null
@@ -124,13 +143,16 @@ export function parseRootDrag(text: string): RootDrag | null {
 /**
  * What a drop of `drag` on `target` asks: a move on the board, for a state
  * other than its own or a place in it; a place in your list. Null when it
- * would do nothing: a root dropped before itself.
+ * would do nothing: a root dropped before itself, or on `home`, the place
+ * just after it where it was dragged from (null when not known).
  */
 export function planRootDrop(
   drag: RootDrag,
   target: RootTarget,
   closed: WorkflowStateId,
+  home: RootTarget | null,
 ): Intent | null {
+  if (home !== null && sameTarget(target, home)) return null
   if (target.kind === "list")
     return target.before === drag.entry
       ? null

@@ -545,9 +545,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a root's drag lands nowhere",
-    file: "packages/client/app.tsx",
-    from: "      if (carriesRoot(e) && targetOf(e) !== null) e.preventDefault()",
-    to: "      if (carriesRoot(e) && targetOf(e) === undefined) e.preventDefault()",
+    file: "packages/client/use-root-drag.ts",
+    from: "      if (closed === null || landing === null) return mark(null)\n      e.preventDefault()\n",
+    to: "      if (closed === null || landing === null) return mark(null)\n",
     suite: "browser",
     scenario: "page",
     expect:
