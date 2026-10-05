@@ -12,10 +12,12 @@ import {
   type ArchiveRecord,
   atEntry,
   CARD_COMMANDS,
+  type CardCarries,
   type CardCommand,
   type CardId,
   type CardPlace,
   type CardRecord,
+  type CatchUpCommand,
   cardId,
   type EntryId,
   INVENTORY_SLOTS,
@@ -25,6 +27,8 @@ import {
   type Move,
   type MoveRefusal,
   movesOfDocId,
+  type OfferFact,
+  PLAIN,
   type PlaceKey,
   type Position,
   placeFields,
@@ -38,6 +42,7 @@ import {
 } from "@pineta/core"
 import { Type } from "typebox"
 import { decodeWith } from "./decode.ts"
+import { decodeOfferFact, encodeOfferFact } from "./fact.ts"
 
 /**
  * A card as the places document stores it: flat strings, "" for none. The
@@ -54,6 +59,8 @@ const StoredCard = Type.Object({
   by: Type.String(),
   seen: Type.String(),
   command: Type.String(),
+  /** A fact the card carries (ADR-0080), as JSON; absent before facts were. */
+  fact: Type.Optional(Type.String()),
   unsent: Type.String(),
   placer: Type.String({ minLength: 1 }),
   holder: Type.String(),
@@ -71,6 +78,7 @@ interface StoredCardFields {
   readonly by: string
   readonly seen: string
   readonly command: string
+  readonly fact: string
   readonly unsent: string
   readonly placer: string
   readonly holder: string
@@ -81,12 +89,13 @@ export const encodeCard = ({
   owner,
   place,
   placer,
-  command,
+  carries,
   unsent,
 }: CardRecord): StoredCardFields => ({
   owner,
   ...placeFields(place),
-  command: command ?? "",
+  command: carries.kind === "message" ? (carries.command ?? "") : "",
+  fact: carries.kind === "fact" ? encodeOfferFact(carries.fact) : "",
   unsent: unsent ?? "",
   placer,
 })
@@ -94,10 +103,25 @@ export const encodeCard = ({
 const isCommand = (s: string): s is CardCommand =>
   (CARD_COMMANDS as readonly string[]).includes(s)
 
+/** A card's stored command and fact -> what it carries; undefined for neither readable, or both. */
+function carriesOf(command: string, fact: string): CardCarries | undefined {
+  if (fact === "")
+    return command === ""
+      ? PLAIN
+      : isCommand(command)
+        ? { kind: "message", command }
+        : undefined
+  if (command !== "") return undefined
+  const decoded = decodeOfferFact(fact)
+  return decoded === undefined ? undefined : { kind: "fact", fact: decoded }
+}
+
 /**
  * A stored card -> its record; undefined for one that is malformed, a
- * command this build does not know among them. Total. Where it is is read by
- * core's `placeOfFields`, as a move's key on the wire is by `keyOfFields`.
+ * command or a fact this build does not know among them, or a fact with a
+ * command. Total. Where it is is read by core's `placeOfFields`, as a move's
+ * key on the wire is by `keyOfFields`. A record stored before facts has no
+ * `fact`, and is a message.
  */
 export const decodeCard = (
   id: string,
@@ -106,14 +130,14 @@ export const decodeCard = (
   decodeWith(StoredCard, value, c => {
     const place = placeOfFields(c)
     if (place === undefined) return undefined
-    const { command } = c
-    if (command !== "" && !isCommand(command)) return undefined
+    const carries = carriesOf(c.command, c.fact ?? "")
+    if (carries === undefined) return undefined
     return {
       id: cardId(id),
       owner: c.owner as WriterId,
       place,
       placer: c.placer as WriterId,
-      command: command === "" ? null : command,
+      carries,
       unsent: c.unsent === "" ? null : c.unsent,
     }
   })
@@ -310,6 +334,71 @@ export const planUnsent = (card: QueuedCard, reason: string): PlaceStep => ({
   },
 })
 
+/**
+ * The card a fact rides in (ADR-0080): queued on its lane after every card
+ * there, owned and queued by whoever acted, with no text to wait for (`seen`
+ * ""). `at` is the thread's end, where an unqueue would put it, though
+ * nobody unqueues a fact. The drain pops it in order. Pure.
+ */
+export function planFactCard(input: {
+  readonly cards: readonly CardRecord[]
+  readonly id: CardId
+  readonly fact: OfferFact
+  readonly root: RootId
+  readonly at: Position
+}): PlaceStep {
+  const { fact } = input
+  return {
+    kind: "write",
+    record: {
+      id: input.id,
+      owner: fact.by,
+      place: {
+        kind: "queued",
+        root: input.root,
+        at: input.at,
+        lane: fact.lane,
+        order: orderAfter(queuedOn(input.cards, fact.lane)),
+        by: fact.by,
+        seen: "",
+      },
+      placer: fact.by,
+      carries: { kind: "fact", fact },
+      unsent: null,
+    },
+  }
+}
+
+/**
+ * What the drain does with a popped card (ADR-0080), decided before it acts:
+ * append a fact; catch up through a command, then send the text or, with
+ * none, nothing; send a plain message; or discard an empty card.
+ */
+export type CarryPlan =
+  | { readonly kind: "fact"; readonly fact: OfferFact }
+  | {
+      readonly kind: "catch-up"
+      readonly command: CatchUpCommand
+      /** After a clean update or nothing new: the card's text, or nothing to send. */
+      readonly after: "send" | "discard"
+    }
+  /** Split the offer in a run of its own, the card's text its intent. */
+  | { readonly kind: "split"; readonly intent: string }
+  | { readonly kind: "send" }
+  | { readonly kind: "discard" }
+
+/** A popped card and its text -> what the drain does with it. Pure. */
+export function planCarry(card: CardRecord, text: string): CarryPlan {
+  if (card.carries.kind === "fact")
+    return { kind: "fact", fact: card.carries.fact }
+  const blank = text.trim() === ""
+  const { command } = card.carries
+  if (command === "split") return { kind: "split", intent: text.trim() }
+  if (command !== null)
+    return { kind: "catch-up", command, after: blank ? "discard" : "send" }
+  return blank ? { kind: "discard" } : { kind: "send" }
+}
+
 // ── handoffs (ADR-0059) ───────────────────────────────────────────────────
 
 /** A write to the places document, as the host's one writer carries it out. */
@@ -384,6 +473,8 @@ function refuseInto(
  * card's placer. Pure.
  *
  * - No `from`: the card is created, its sender its owner, with no command.
+ * - A card carrying a fact is the host's (ADR-0080): every move of it is
+ *   refused `fact`.
  * - No `to`: the card is removed. Only a fresh column's card is, or one in
  *   the sender's own inventory: neither is anywhere anyone else sees.
  * - Into or out of an inventory: only its holder's, and into it only while
@@ -411,12 +502,14 @@ export function planMove(
         owner: sender,
         place: placeAt(move.to, cards, sender),
         placer: sender,
-        command: null,
+        carries: PLAIN,
         unsent: null,
       },
     }
   }
   if (now === undefined) return { kind: "refused", code: "gone", now: null }
+  // A fact is the host's, on its way into the thread: nobody moves it.
+  if (now.carries.kind === "fact") return { kind: "refused", code: "fact", now }
   if (!sameKey(keyOf(now.place), move.from))
     return { kind: "refused", code: "moved", now }
   if (!ownsPlace(move.from, sender))
@@ -672,12 +765,17 @@ export function planSetCommand(
   const now = cards.find(c => c.id === card)
   return now === undefined
     ? { kind: "refused", code: "gone", now: null }
-    : { kind: "write", record: { ...now, command } }
+    : now.carries.kind === "fact"
+      ? { kind: "refused", code: "fact", now }
+      : {
+          kind: "write",
+          record: { ...now, carries: { kind: "message", command } },
+        }
 }
 
 /**
  * What a starting host deletes: records whose text is empty and that carry
- * no command, and stored `card:` documents with no record. Pure.
+ * no command and no fact, and stored `card:` documents with no record. Pure.
  */
 export function planCardSweep(input: {
   readonly cards: readonly CardRecord[]
@@ -688,7 +786,12 @@ export function planCardSweep(input: {
   readonly cardOfDoc: (docId: string) => CardId | undefined
 }): { readonly records: CardId[]; readonly docs: string[] } {
   const records = input.cards
-    .filter(c => c.command === null && (input.texts.get(c.id) ?? "") === "")
+    .filter(
+      c =>
+        c.carries.kind === "message" &&
+        c.carries.command === null &&
+        (input.texts.get(c.id) ?? "") === "",
+    )
     .map(c => c.id)
   const live = new Set<string>(
     input.cards.map(c => c.id).filter(id => !records.includes(id)),

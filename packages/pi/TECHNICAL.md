@@ -168,6 +168,15 @@ the alternative a second host would need: read the thread's end inside
   while a queued question is never answered (S21 Q3). A message for a busy
   lane is a queued card instead (ADR-0048), which the host pops when the
   lane is idle; see `apps/pineta/host/TECHNICAL.md`.
+- **A host's fact enters a running lane two ways only** (ADR-0080): as a
+  tool's result (`catch_up`'s update), which pi writes in the turn; or by a
+  steer (`ThreadLaneHandle.steer`, pi's `Lane.steer`), which pi places after
+  the tool results of the turn in flight, at its next boundary, appended, so
+  the prompt cache holds (S103 item 4). A steer that arrives after the
+  run's last tool call makes one more request; one still queued when a run
+  ends is accepted before the next run's prompt (S71 item 4); pi's abort
+  drops it. `before_request` then sees the steer as the lane's tip, and
+  `turnEntry` climbs past it.
 - **A pi run can only start with `prompt`**, so a compelled chat is passed to
   `ThreadLaneHandle.run` as the prompt itself: a pi `CustomMessage`, which pi's
   default `convertToLlm` sends as a `user` message with its `content`.
@@ -224,11 +233,12 @@ pi's null means either undecodable or impossible to fit. After a resize,
 
 ### Pinned cards: what the model reads (ADR-0048, S92)
 
-- **A run's prompt can be two messages.** `ThreadLaneHandle.run(message,
-  pinned)` passes `lane.prompt([pinned, message])` when the host gives a
-  cards entry (`PinnedMessage`, `@pineta/rules`): pi writes both in the
-  commit that admits the run, or neither, so a refused run writes no cards
-  entry. Only this keeps the prompt cache when a card changes: cards in the
+- **A run's prompt can come with entries before it.** `ThreadLaneHandle.run(message,
+  before)` passes `lane.prompt([...before, message])`: a base's news
+  (`BehindMessage`, ADR-0080) and a cards entry (`PinnedMessage`,
+  `@pineta/rules`), in that order, so the cards entry stays the prompt's
+  parent. pi writes them all in the commit that admits the run, or none, so
+  a refused run writes no cards entry. Only this keeps the prompt cache when a card changes: cards in the
   system prompt, or in pi's mid-conversation system messages (which pi-ai
   folds into the system prompt on most Anthropic models), lose the whole
   conversation's cache; cards moved to the end of each request lose it on
@@ -430,10 +440,16 @@ item 18, and in `lanes.test.ts` against the harness.
   in the request changed since it was written, and pi asks it to
   (`drop_block`): a changed tool list or prompt costs the lane its earlier
   reasoning, and its cache from the top.
-  - **`ask_for_guidance` is active in every lane** (`activeToolNames`,
-    `tools.ts`). Its `onAsk` says whether a landing took the question; the
-    host answers from the lane's latest prompt (`readLatestPrompt`). Outside
-    a landing the tool answers `NOT_LANDING`.
+  - **The host's tools are active in every lane** (`activeToolNames`,
+    `tools.ts`): `ask_about_conflict`, `catch_up` and `split_offer`
+    (ADR-0080). A call that does not apply answers why: the tool list never
+    names who may call it.
+  - **`ask_about_conflict`** (`conflictTool`, `lanes.ts`; renamed from
+    `ask_for_guidance` by ADR-0080) is taken while jj finds a conflict in the
+    lane's copy, in any run (`LaneHooks.askedAboutConflict`, async). Taken,
+    its result's `details` are `{ asked: true }`, which the page reads
+    (`renderableMessage`, `conflictAskedAt`), never its text. Refused, it
+    answers `NO_CONFLICTS`.
   - **The list is set once, where a lane is held** (`existing()` in
     `thread-lanes.ts`). A new lane takes the harness's seed. A restored lane
     stored with another list (banners turned on or off since) is given the
@@ -445,6 +461,16 @@ item 18, and in `lanes.test.ts` against the harness.
     without its messages (`prefixOf`, `prefix.ts`), and calls
     `onPrefixChange(lane)` when it differs from the lane's last request
     (`prefixChange`). The host logs it.
+- **`catch_up` and `split_offer`** (`thread-tools.ts`, ADR-0080) read their
+  arguments (`parseCatchUpArgs`) and hand the call to the host
+  (`LaneHooks.catchUp`, `LaneHooks.askSplit`), whose `ToolAnswer`
+  (`@pineta/rules`) becomes the result: its text, and as `details` the
+  commits a `catch_up` merged, which `parentNow` and the turn's record read.
+  The host's answer to `catch_up` arrives while the run waits on it: the
+  merge runs on the lane's queue, which no tool call holds (S103 item 1).
+  pi's harness reads only the run's `toolExecution`, never a tool's
+  `executionMode`, so `catch_up` cannot ask to run alone; the host refuses a
+  call with a sibling instead.
 - **`set_banner`** (`banner.ts`, ADR-0050) is registered whenever the host
   has tools, and active when `createAgent` is given `banners`. pi fails a
   run whose stored list names a tool not registered, so every tool is

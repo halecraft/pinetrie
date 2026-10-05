@@ -2,11 +2,15 @@ import assert from "node:assert/strict"
 import {
   address,
   atEntry,
+  CATCH_UP_TOOL,
+  CONFLICT_TOOL,
   cardId,
+  commitId,
   ERR,
   entryId,
   laneNameForThread,
   NOBODY,
+  PLAIN,
   parseMentions,
   type Responder,
   rootIdFor,
@@ -23,14 +27,31 @@ import {
   chatImageShas,
   decodeChat,
   encodeChat,
+  type Floor,
   participants,
   pendingVerdict,
   planChat,
+  planResolution,
+  planStack,
   planStartup,
+  promptAuthor,
   renderableMessage,
+  resolutionFloor,
   settleRun,
   withChatImages,
 } from "./index.ts"
+
+/** A resolution's floor with room to spare (ADR-0084). */
+function floor(): Floor {
+  const found = resolutionFloor({
+    budget: { tokens: 10_000, estimate: c => Math.ceil(c.length / 4) },
+    skill: null,
+    intent: "",
+    incoming: "The project's work",
+  })
+  if (found.kind !== "fits") throw new Error("the floor does not fit")
+  return found.floor
+}
 
 const ALICE: WriterId = writerId("alice")
 const BO: WriterId = writerId("bo")
@@ -76,6 +97,8 @@ const plan = (over: Partial<PlanInput>) => {
     asksAgent: false,
     sendId: "s-1",
     newLane: { reserved: null, held: new Set(), spare: SPARE },
+    news: "nothing",
+    caughtUp: false,
     ...over,
   }
   const { end, race, lane: l, ...rest } = i
@@ -456,7 +479,7 @@ describe("settling and starting up", () => {
       by: ALICE,
       seen: "",
     },
-    command: null,
+    carries: PLAIN,
     unsent: null,
   })
   test("settleRun: a refused run keeps the message; an admitted one is done", () => {
@@ -494,5 +517,113 @@ describe("settling and starting up", () => {
     expect(plan.unclassified).toEqual([
       { ...pending(LANE2), verdict: { kind: "unclassified" } },
     ])
+  })
+})
+
+describe("a host tool's result as a fact (ADR-0080)", () => {
+  const result = (toolName: string, details: unknown, text = "Asked.") => ({
+    role: "toolResult",
+    toolCallId: "c-1",
+    toolName,
+    content: [{ type: "text", text }],
+    details,
+    isError: false,
+  })
+
+  test("an ask_about_conflict the host took is asked, from its details alone", () => {
+    expect(
+      renderableMessage(result(CONFLICT_TOOL, { asked: true })),
+    ).toMatchObject({ role: "toolResult", asked: true })
+    expect(
+      renderableMessage(result(CONFLICT_TOOL, undefined)).asked,
+    ).toBeUndefined()
+    expect(
+      renderableMessage(result("bash", { asked: true })).asked,
+    ).toBeUndefined()
+  })
+
+  test("a catch_up result carries the commits it merged", () => {
+    expect(
+      renderableMessage(result(CATCH_UP_TOOL, { merged: ["c1"] }, "merged"))
+        .merged,
+    ).toEqual(["c1"])
+    expect(
+      renderableMessage(result(CATCH_UP_TOOL, { merged: [3] })).merged,
+    ).toBeUndefined()
+  })
+})
+
+describe("promptAuthor (ADR-0080)", () => {
+  const ADA = writerId("ada@example.com")
+  test("a chat's author, a land or stack message's by; none for anything else", () => {
+    expect(
+      promptAuthor(
+        encodeChat(
+          {
+            author: ADA,
+            authorName: "Ada",
+            text: "go",
+            compels: NOBODY,
+            sendId: "s-1",
+          },
+          1,
+        ),
+      ),
+    ).toBe(ADA)
+    expect(
+      promptAuthor(
+        planResolution({
+          floor: floor(),
+          files: [],
+          details: { lane: laneNameForThread("1"), yours: [], by: ADA },
+          timestamp: 1,
+        }),
+      ),
+    ).toBe(ADA)
+    expect(
+      promptAuthor(
+        planStack({
+          skill: null,
+          bookmark: "pineta-stack/x",
+          details: {
+            lane: laneNameForThread("1"),
+            start: [],
+            tip: commitId("t"),
+            by: ADA,
+          },
+          timestamp: 1,
+        }),
+      ),
+    ).toBe(ADA)
+    expect(promptAuthor({ role: "user", content: "hi" })).toBeNull()
+  })
+})
+
+describe("planChat: a lane with no work of its own catches up first (ADR-0080)", () => {
+  const ask = { mentions: ASK, text: "@agent please", lane: lane() }
+  test("a run on a lane whose news is catch-up catches it up first, once per send", () => {
+    expect(plan({ ...ask, news: "catch-up" })).toEqual({
+      kind: "catch-up-first",
+      lane: LANE,
+    })
+    expect(kind(plan({ ...ask, news: "catch-up", caughtUp: true }))).toBe("run")
+    expect(kind(plan({ ...ask, news: "tell" }))).toBe("run")
+  })
+  test("an append, a busy lane and a new lane never catch up", () => {
+    expect(
+      kind(
+        plan({
+          lane: lane(),
+          mentions: parseMentions("@bo look"),
+          news: "catch-up",
+        }),
+      ),
+    ).toBe("appendToLane")
+    expect(
+      kind(plan({ ...ask, lane: lane({ running: true }), news: "catch-up" })),
+    ).toBe("conflict")
+    expect(kind(plan({ ...ask, lane: NONE, news: "catch-up" }))).toBe(
+      "createAndRun",
+    )
   })
 })

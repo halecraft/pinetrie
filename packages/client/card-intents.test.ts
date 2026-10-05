@@ -72,7 +72,7 @@ const card = (id: typeof C1, place: CardPlace): CardRecord => ({
   owner: ADA,
   placer: ADA,
   place,
-  command: null,
+  carries: { kind: "message", command: null },
   unsent: null,
 })
 const facts = (over: Partial<CardFacts> = {}): CardFacts => ({
@@ -161,7 +161,7 @@ describe("take into the inventory (ADR-0048 step 4)", () => {
         owner: ADA,
         placer: ADA,
         place: inventory,
-        command: null,
+        carries: { kind: "message", command: null },
         unsent: null,
       },
       text: "hello",

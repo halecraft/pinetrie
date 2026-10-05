@@ -289,7 +289,7 @@ async function run(check: Checks["check"]): Promise<void> {
             at: where,
             lane: l6.name,
           },
-          command: null,
+          carries: { kind: "message", command: null },
           unsent: null,
         },
         heldText,

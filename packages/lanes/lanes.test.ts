@@ -1,12 +1,16 @@
 import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { laneNameForThread } from "@pineta/core"
+import { entryId, laneNameForThread } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import {
+  bookmarkOf,
   changedPaths,
   commitsOf,
+  commitToBookmark,
+  commitTurn,
   conflictedFilesAt,
+  copyFacts,
   execute,
   type LaneStep,
   type Ran,
@@ -92,6 +96,78 @@ test("changedPaths: a path with a space and an accent comes back as it is named 
     expect(await changedPaths(jjAt, merged, resolved)).toEqual(["a.txt"])
     expect(await changedPaths(jjAt, null, resolved)).toEqual(["a.txt"])
     expect(await conflictedFilesAt(jjAt, resolved)).toEqual([])
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test("copyFacts (S103, ADR-0080): the copy on its bookmark, on the merge whose turn commits nothing of its own, on the agent's own commit, and on a split's stack", async () => {
+  const dir = await realpath(await mkdtemp(path.join(tmpdir(), "pineta-copy-")))
+  try {
+    const env = {
+      ...process.env,
+      JJ_USER: "Probe",
+      JJ_EMAIL: "probe@example.com",
+    }
+    await run("jj", ["git", "init", "--colocate", dir], { env })
+    const jj: Runner = args => run("jj", ["-R", dir, ...args], { env })
+    const lane = laneNameForThread("0123456789abcdef")
+    const head = async (rev: string) => {
+      const [id] = await commitsOf(jj, rev)
+      if (id === undefined) throw new Error(`no ${rev}`)
+      return id
+    }
+    await writeFile(path.join(dir, "base.txt"), "base\n")
+    await jj(["commit", "-m", "B"])
+    const base = await head("@-")
+    await writeFile(path.join(dir, "line.txt"), "line\n")
+    await jj(["commit", "-m", "B2"])
+    const line = await head("@-")
+    await jj(["new", base])
+    await writeFile(path.join(dir, "lane.txt"), "lane\n")
+    const own = await commitToBookmark(jj, lane, "L")
+    // On the bookmark.
+    expect(await copyFacts(jj, lane)).toEqual({
+      parents: [own],
+      bookmark: own,
+      descends: false,
+    })
+    // The merge as `mergeUpdate` makes it: the bookmark moves to it, and the
+    // next turn has no commit of its own to record (S103 item 3).
+    await jj(["new", (await bookmarkOf(jj, lane)) ?? "", line, "-m", "merge"])
+    const merge = await commitToBookmark(jj, lane, "merge")
+    expect(
+      await commitTurn(jj, {
+        title: "catch_up",
+        entry: entryId("e-1"),
+        lane,
+        bookmark: merge,
+      }),
+    ).toEqual({ commit: null, conflicted: false })
+    expect(await copyFacts(jj, lane)).toEqual({
+      parents: [merge],
+      bookmark: merge,
+      descends: false,
+    })
+    // The agent's own commit on the line descends from the bookmark.
+    await writeFile(path.join(dir, "mine.txt"), "mine\n")
+    await jj(["commit", "-m", "mine"])
+    const mine = await head("@-")
+    expect(await copyFacts(jj, lane)).toEqual({
+      parents: [mine],
+      bookmark: merge,
+      descends: true,
+    })
+    // A split's stack, built on the base: off the lane's line.
+    await jj(["new", base])
+    await writeFile(path.join(dir, "stack.txt"), "stack\n")
+    await jj(["commit", "-m", "stack 1"])
+    const stack = await head("@-")
+    expect(await copyFacts(jj, lane)).toEqual({
+      parents: [stack],
+      bookmark: merge,
+      descends: false,
+    })
   } finally {
     await rm(dir, { recursive: true, force: true })
   }

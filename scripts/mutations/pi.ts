@@ -5,6 +5,14 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/pi"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a steer is never queued",
+    file: "packages/pi/thread-lanes.ts",
+    from: "          const queued = await lane.steer(message, undefined, ctx)",
+    to: '          const queued = { ok: true as const, error: { _tag: "" } }',
+    command: unit,
+    expect: "a steer lands after the tool results of the turn in flight",
+  },
+  {
     name: "the land budget is a number of its own",
     file: "packages/pi/compaction.ts",
     from: "  tokens: PINETA_COMPACTION.keepRecentTokens,",
@@ -392,24 +400,43 @@ export const mutations: readonly Mutation[] = [
     to: "    ...(input.banners ? [] : []),",
     command: unit,
     expect:
-      "the file tools and ask_for_guidance always; set_banner with banners",
+      "the file tools and ask_about_conflict always; set_banner with banners",
   },
   {
-    name: "ask_for_guidance is in a lane's tools only sometimes",
+    name: "ask_about_conflict is in a lane's tools only sometimes",
     file: "packages/pi/tools.ts",
-    from: "    GUIDANCE_TOOL,\n",
+    from: "    CONFLICT_TOOL,\n",
     to: "",
     command: unit,
     expect:
-      "the file tools and ask_for_guidance always; set_banner with banners",
+      "the file tools and ask_about_conflict always; set_banner with banners",
   },
   {
-    name: "ask_for_guidance says it asked outside a landing",
+    name: "ask_about_conflict says it asked with no conflict",
     file: "packages/pi/lanes.ts",
-    from: "              : NOT_LANDING,",
+    from: "              : NO_CONFLICTS,",
     to: '              : "Asked. Stop here: the person will answer in this thread.",',
     command: unit,
-    expect: "in a landing, it asks; elsewhere it says there is nothing to ask",
+    expect:
+      "with a conflict in the copy, it asks, and its details say so; with none, there is nothing to ask",
+  },
+  {
+    name: "ask_about_conflict's result does not say it asked",
+    file: "packages/pi/lanes.ts",
+    from: "        details: asked ? { asked: true } : undefined,",
+    to: "        details: undefined,",
+    command: unit,
+    expect:
+      "with a conflict in the copy, it asks, and its details say so; with none, there is nothing to ask",
+  },
+  {
+    name: "a stopped run's last turn is never recorded",
+    file: "packages/pi/thread-lanes.ts",
+    from: "        await input.recordTurn(name)\n",
+    to: "",
+    command: unit,
+    expect:
+      "a run's last turn is recorded at its newest entry, however it ends: a Stop, or a model that fails (S104)",
   },
   {
     name: "a lane stored before banners were on keeps its old tools",
@@ -593,8 +620,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a run drops its cards entry",
     file: "packages/pi/thread-lanes.ts",
-    from: "          lane.prompt(pinned === null ? message : [pinned, message], ctx),",
-    to: "          lane.prompt(message, ctx),",
+    from: "            before.length === 0 ? message : [...before, message],",
+    to: "            message,",
     command: unit,
     expect: "a run's cards entry is stored first",
   },

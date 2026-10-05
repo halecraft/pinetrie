@@ -39,9 +39,11 @@ follow this list. A name only this package uses is imported from its module.
 - `chat.ts`, `participant.ts`, `images.ts`, `commands.ts`: a person's
   message, who is in the session, the images a message shows, and `/`
   commands (`pineta.commands`).
-- `land.ts`, `update.ts`, `pinned.ts`: the resolution's prompt and how it
-  ended (`pineta.landing`), the update and stack messages, the pinned cards
-  a run reads.
+- `land.ts`, `update.ts`, `pinned.ts`: the resolution's prompt, the
+  update and stack messages, the pinned cards a run reads.
+- `fact.ts`, `behind.ts`, `agent-commands.ts`: what a command on an offer
+  did, as a fact in the thread; the base's new work, told or caught up; the
+  agent's `catch_up` and `split_offer` (ADR-0080).
 - `card.ts`, `seat.ts`, `startup.ts`: cards and their moves, who wrote in a
   text, what a starting host resumes.
 - `archive.ts`, `roots.ts`, `mark.ts`, `title.ts`, `stop.ts`, `digest.ts`,
@@ -262,7 +264,12 @@ which are swept.
   `by`, and `seen`, its text's version as its queuer had it (S96), which
   the queue's key carries from the client. Every field is required: the
   host writes a record whole. A
-  `command` this build does not know makes the card malformed. A drafting
+  `command` this build does not know makes the card malformed. A card
+  carries a message, with its command or none, or a fact the host queued
+  (`CardCarries`, ADR-0080): stored as `command` and `fact`, one of them
+  "". A record with both does not decode; one stored before facts has no
+  `fact`, and is a message. Every move of a fact's card is refused
+  `fact`: it is the host's. A drafting
   card whose lane fails `isLaneName` keeps its place with no lane: dropped,
   it would be swept with its text at the next start (`planCardSweep`), and
   the lane only says which thread it follows. A queued card with such a
@@ -939,6 +946,41 @@ done with it (ADR-0055); its text is sent after the update. A stack message (`pi
 splits an offer: the `offer-stack` skill, the commit the stack starts from,
 the tip it must match, and the bookmark to leave on it.
 
+# Facts, base news and agent commands (`fact.ts`, `behind.ts`, `agent-commands.ts`, ADR-0080)
+
+- **A fact is a `CustomMessage`** in `update.ts`'s pattern (`pineta.fact`,
+  role `fact`): `content` is what the model reads, `details` the
+  `OfferFact`, which the column words as one line (`factLine`). Each offer
+  action has one: an integration (`integratedFact`: the change, the
+  bookmark, and that bookmark as the thread knows it, the line or a WIP),
+  and a description asked for again, a squash, a refresh (`actionFact`).
+- **A fact always reaches the thread through a queued card**
+  (`planFactCard`, at the thread's end, after the cards there), popped in
+  order with the others: at once on an idle lane, when the run ends on a
+  running one. It is never written into a running lane.
+- **The drain plans before it acts** (`planCarry`, `card.ts`): a fact, a
+  catch-up and what follows it (`after`: the text, or nothing), a split
+  with its brief, a message, or a discard. A property named `then` is
+  forbidden by the linter, hence `after`.
+- **`planBaseNews` is one decision** for a lane whose base has new work:
+  `tell` (a behind entry, `pineta.behind`, before the run's prompt and its
+  cards entry, or a steer into a running lane), `catch-up` (a lane whose
+  work changes no file, `BaseRecord.work`, is caught up quietly before a
+  chat's run: `planChat`'s `catch-up-first`), or `nothing`. What the thread
+  already heard of or merged is read from the tree (`baseKnown`, core), so
+  a commit is told once, and again only past a compaction.
+- **`planCatchUpCall`** decides `catch_up` from the documents before
+  anything is queued: a lane of its own, the only call in its turn, and new
+  work (`brings`, or `unknown`, which the merge's own read decides). The
+  parent only when it is ahead and idle. `planCopyReady` refuses a working
+  copy off its lane's line (`off-line`), for every catch-up. Each refusal
+  says what to do (`catchUpRefusal`); `catchUpAnswer` is the tool's result,
+  whose `details.merged` the turn's record reads.
+- **`planSplitCall`** queues a split card, or refuses: no offer open, a
+  split running (the lane's latest prompt is a stack message), or one
+  already queued. The tool answers `SPLIT_QUEUED`, or the refusal
+  (`splitRefusal`).
+
 # The resolution's prompt (`land.ts`, ADR-0033)
 
 A land message is a pi `CustomMessage`, `customType: "pineta.land"`, like a
@@ -985,21 +1027,14 @@ Gotchas:
 - pi never compacts the newest message, so this budget is the only guard on
   the prompt's size.
 
-| record | namespace | key | written |
-|---|---|---|---|
-| how a resolution ended | `pineta.landing` | its own id | when its run ends |
-
 - **`planResolution`**'s prompt names the project's work, and ends with the
   card's text, whole, under its own heading (ADR-0055).
-- **A resolution in progress has no record**: it is a running lane whose
-  prompt is a land message. A `running` state would repeat that, and a crash
-  would leave it stale. A run whose prompt is a land message ends with its
-  outcome, however it started: from a card that brought the thread up to
-  date, or a resume.
-- **`landingOutcome`** is resolved only when the agent did not ask for
-  guidance and jj finds no conflicts: the agent can always stop, and can never
-  claim a success the repository contradicts (ADR-0033). `landingRecord`
-  is the record a resolution's end writes, with that outcome.
+- **A resolution has no record** (ADR-0080, S104): in progress, it is a
+  running lane whose prompt is a land message; ended, it ended as any run
+  does. What it left conflicted is the offer's, and whether the agent asked
+  for you is its newest `ask_about_conflict` in the tree
+  (`conflictAskedAt`, core), which the strip reads as "needs you" while it
+  is newer than the offer's record.
 
 # Participants (`participant.ts`)
 

@@ -16,6 +16,7 @@ import { DEFAULT_LINE } from "@pineta/lanes"
 import type { Agent, LaneHooks } from "@pineta/pi"
 import { readRunning } from "@pineta/reads"
 import type { RepoOwner } from "@pineta/repo"
+import type { BaseNews } from "../base-news.ts"
 import type { Basics } from "../basics.ts"
 import { type Offers, startOffers } from "../offers/index.ts"
 import { type Archive, createArchive } from "./archive.ts"
@@ -38,12 +39,13 @@ export type LaneWork = Pick<
   "access" | "beforeRun" | "runEnded" | "close"
 > &
   Pick<NewLanes, "checkDirectory" | "checkBegin" | "prepareLane"> &
-  Pick<Updates, "prepareUpdate" | "landingEnded"> &
+  Pick<Updates, "prepareUpdate"> &
   Pick<Splits, "prepareSplit" | "splitEnded"> &
   Archive & {
     /** What the host found where it runs; null when it has no tools. */
     readonly project: ProjectRecord | null
-    readonly hooks: LaneHooks
+    /** pi's hooks lane work answers; `askSplit` is the documents' (`host/split-call.ts`). */
+    readonly hooks: Omit<LaneHooks, "askSplit">
     /** Each lane's offer in your repo; null with no lanes of their own. */
     readonly offers: Offers | null
     /** The integration line in your repo (ADR-0060); null with no lanes of their own. */
@@ -75,6 +77,8 @@ export async function startLaneWork(input: {
   /** The user's config, as read at startup (ADR-0035): its file, for logs. */
   readonly userConfig: { readonly file: string; readonly json: unknown }
   readonly agent: () => Agent
+  /** A thread's base and its news (`base-news.ts`, ADR-0080). */
+  readonly baseNews: Pick<BaseNews, "baseChanged" | "runEnded">
   /** Name every lane that has none (`host/names.ts`): a new lane, before its first run. */
   readonly ensureNames: () => Promise<void>
   /**
@@ -114,6 +118,7 @@ export async function startLaneWork(input: {
           agent: input.agent,
           running: lane => readRunning(basics.live, lane),
           bookmarkMoved: () => setup.refreshBaseSoon(),
+          baseChanged: input.baseNews.baseChanged,
           lineWork: line,
         })
   const containers = createContainers({
@@ -171,19 +176,21 @@ export async function startLaneWork(input: {
   return {
     project: setup.project,
     access: containers.access,
-    // One `turns` and one `updates`: the fork waits on the records this
-    // `turnDone` adds, and `landingEnded` reads the flag this hook sets.
+    // One `turns`: the fork waits on the records this `turnDone` adds.
     hooks: {
       turnDone: turns.turnDone,
-      askedForGuidance: updates.askedForGuidance,
+      askedAboutConflict: updates.askedAboutConflict,
+      catchUp: updates.catchUpInRun,
     },
     checkDirectory: newLanes.checkDirectory,
     checkBegin: newLanes.checkBegin,
     prepareLane: newLanes.prepareLane,
     beforeRun: containers.beforeRun,
-    runEnded: containers.runEnded,
+    runEnded(lane) {
+      containers.runEnded(lane)
+      input.baseNews.runEnded(lane)
+    },
     prepareUpdate: updates.prepareUpdate,
-    landingEnded: updates.landingEnded,
     prepareSplit: splits.prepareSplit,
     splitEnded: splits.splitEnded,
     offers,

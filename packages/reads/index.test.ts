@@ -101,7 +101,7 @@ test("readLanes: a lane's queued cards are what waits; askedBy is who queued the
       by: writerId(email),
       seen: "",
     },
-    command: null,
+    carries: { kind: "message", command: null },
     unsent: null,
   })
   const drafting: CardRecord = {
@@ -114,7 +114,7 @@ test("readLanes: a lane's queued cards are what waits; askedBy is who queued the
       at: atEntry(entryId("e1")),
       lane,
     },
-    command: null,
+    carries: { kind: "message", command: null },
     unsent: null,
   }
   const cards = [

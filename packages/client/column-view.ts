@@ -8,14 +8,15 @@ import {
   type BannerRecord,
   type BaseRecord,
   blobUrl,
+  type CardCommand,
   type CardPlace,
   type CardRecord,
   type ColumnView,
   type CommandSummary,
+  conflictAskedAt,
   type DiffSpan,
   type EntryId,
   firstLine,
-  type LandingRecord,
   type LaneName,
   type LaneRecord,
   type LaneView,
@@ -85,7 +86,6 @@ export interface WorkFacts {
   readonly commands: readonly CommandSummary[]
   readonly lanes: ReadonlyMap<LaneName, LaneRecord>
   readonly revisions: ReadonlyMap<EntryId, RevisionRecord>
-  readonly landings: readonly LandingRecord[]
   /** Each lane's offer in your repo (ADR-0038). */
   readonly offers: ReadonlyMap<LaneName, OfferRecord>
   /** Each lane's name (ADR-0039). */
@@ -293,8 +293,8 @@ export interface ColumnFacts {
   readonly nameOf: ReadonlyMap<WriterId, string>
   readonly lanes: readonly LaneView[]
   readonly work: WorkFacts
-  /** A card bringing the thread up to date is queued on its lane (ADR-0055). */
-  readonly catchingUp: boolean
+  /** The commands of the cards queued on its lane (ADR-0055, ADR-0080). */
+  readonly queuedCommands: readonly CardCommand[]
   /** Your last offer command on the column's lane (`acting.ts`); null for none. */
   readonly acting: OfferActing | null
 }
@@ -603,7 +603,7 @@ function workStrip(f: ColumnFacts, parent: ParentNow | null): WorkStrip {
   const view = offerView({
     offer,
     activity: activityOf(f.index, lane),
-    landing: work.landings.filter(l => l.lane === lane.name).at(-1),
+    asked: conflictAskedAt(f.index, lane.tip),
     base,
     onto: work.line?.onto ?? "",
     wipAhead:
@@ -612,7 +612,7 @@ function workStrip(f: ColumnFacts, parent: ParentNow | null): WorkStrip {
       )?.ahead ?? 0,
     catchUp: catchUpOf(base ?? undefined, work.line),
     untraced: (base?.untraced.length ?? 0) > 0,
-    catchingUp: f.catchingUp,
+    queued: f.queuedCommands,
     parent,
     parentRunning:
       parent !== null && f.lanes.some(l => l.name === parent.lane && l.running),
@@ -699,7 +699,6 @@ const destinationBase = (d: OfferIntegrationDestination) =>
 
 /** What an offer command in flight says, until the host answers. */
 const SENDING: Record<Exclude<OfferActing["action"], "integrate">, string> = {
-  split: "splitting into a stack…",
   squash: "squashing to one…",
   describe: "rewriting the description…",
   refresh: "refreshing…",

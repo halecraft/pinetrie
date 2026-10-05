@@ -59,6 +59,7 @@ import {
 } from "@pineta/schema"
 import { DEFAULT_BIND, isLoopback, newKey } from "./admission.ts"
 import { createBanners } from "./banners.ts"
+import { createBaseNews } from "./base-news.ts"
 import {
   type Basics,
   failed,
@@ -96,6 +97,7 @@ import { createRuns, streamInto } from "./runs.ts"
 import { startSeats } from "./seats.ts"
 import { createSettle } from "./settle.ts"
 import { planShutdown, type ShutdownStep } from "./shutdown.ts"
+import { createSplitCall } from "./split-call.ts"
 import { recover } from "./startup.ts"
 import { openStore } from "./store.ts"
 import { createTitles } from "./titles.ts"
@@ -374,8 +376,12 @@ export async function startHost({
       banners?.due(lane).catch(failed(basics, "banner"))
     },
   })
+  // What each thread is told of its base's new work (ADR-0080). Made before
+  // lane work, whose refreshes tell it, so it reads the agent lazily.
+  const baseNews = createBaseNews({ basics, agent: theAgent, keeper })
   const work = await startLaneWork({
     basics,
+    baseNews,
     ensureNames: names.ensure,
     dir: tools?.project ?? null,
     defaultDirect: !lanes,
@@ -402,6 +408,9 @@ export async function startHost({
             access: work.access,
             hooks: {
               ...work.hooks,
+              // A split the agent asks for is a card queued on its lane: the
+              // documents' keeper writes it (ADR-0080).
+              askSplit: lane => askSplit(lane),
               // A turn recorded, then a live digest of the ask `tip` is in,
               // when due.
               turnDone: async (lane, tip) => {
@@ -455,6 +464,7 @@ export async function startHost({
     agent,
     work,
     readPinned,
+    readBehind: baseNews.atStart,
     pending: digests.pending,
   })
   const commands = createCommands({
@@ -482,6 +492,7 @@ export async function startHost({
       {
         basics,
         texts: cardPort,
+        agent,
         work,
         start: runs.start,
         send: popped =>
@@ -533,6 +544,13 @@ export async function startHost({
     if (readRunning(live, lane)) return
     void keeper.once(`drain:${lane}`, () => drain(lane))
   }
+  // `split_offer`: a split card queued on the agent's lane (ADR-0080).
+  const askSplit = createSplitCall({
+    basics,
+    keeper,
+    drain: queueDrain,
+    provenance,
+  })
 
   /**
    * Resolves when no queued step remains (a compaction after a run among

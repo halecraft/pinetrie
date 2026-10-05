@@ -10,28 +10,23 @@
 // column shows (one short line, and the files). The model never reads the
 // details; the column never shows the content. The content fits what pi
 // keeps when it compacts (`resolutionFloor`, `planResolution`). How the run
-// ended is a `pineta.landing` record (`LANDING`, `landingRecord`).
+// ended is read as any run's is (ADR-0080, S104): the conflicts left are the
+// offer's, and an ask is the agent's `ask_about_conflict` in the tree.
 
 import {
   type CommitId,
   commitId,
-  type EntryId,
-  entryId,
   isLaneName,
-  type LandingRecord,
   type LaneName,
   type WriterId,
 } from "@pineta/core"
 import { type Static, Type } from "typebox"
-import { CommitSchema, decodeAt, decodeWith, textKey } from "./decode.ts"
-import type { RecordSpec } from "./records.ts"
+import { CommitSchema, decodeWith } from "./decode.ts"
 import { leftOut } from "./request.ts"
 
 export const LAND_TYPE = "pineta.land"
 
 const LandDetailsSchema = Type.Object({
-  /** The resolution's id: its record takes it when the run ends. */
-  landing: Type.String({ minLength: 1 }),
   lane: Type.String({ minLength: 1 }),
   /** The base's commit that was merged: the line's, or a WIP's copy (ADR-0060). */
   yours: Type.Array(CommitSchema),
@@ -52,7 +47,6 @@ const LandSchema = Type.Object({
 })
 
 interface LandDetails {
-  readonly landing: string
   readonly lane: LaneName
   readonly yours: readonly CommitId[]
   readonly files: readonly string[]
@@ -75,7 +69,6 @@ const fromStored = (
 ): LandDetails | undefined =>
   isLaneName(d.lane)
     ? {
-        landing: d.landing,
         lane: d.lane,
         yours: d.yours.map(commitId),
         files: d.files,
@@ -376,60 +369,3 @@ export function planResolution(input: {
     timestamp: input.timestamp,
   }
 }
-
-const LandingRecordSchema = Type.Object({
-  lane: Type.String({ minLength: 1 }),
-  prompt: Type.String({ minLength: 1 }),
-  state: Type.Union([Type.Literal("resolved"), Type.Literal("needs_you")]),
-  by: Type.String(),
-  at: Type.Number(),
-})
-
-/** How each resolution ended, at its own id. */
-export const LANDING: RecordSpec<LandingRecord, string, "session"> = {
-  namespace: "pineta.landing",
-  home: "session",
-  keyOf: r => r.id,
-  encode: ({ id, ...contents }) => contents,
-  decode: (contents, key) =>
-    decodeAt(LandingRecordSchema, contents, textKey(key), (r, id) =>
-      isLaneName(r.lane)
-        ? {
-            id,
-            lane: r.lane,
-            prompt: entryId(r.prompt),
-            state: r.state,
-            by: r.by as WriterId,
-            at: r.at,
-          }
-        : undefined,
-    ),
-}
-
-/**
- * How a resolution run ended. The agent can always stop by asking; it can
- * never claim a success the repository contradicts (ADR-0033).
- */
-export const landingOutcome = (input: {
-  readonly askedForGuidance: boolean
-  readonly conflictsLeft: number
-}): "resolved" | "needs_you" =>
-  input.askedForGuidance || input.conflictsLeft > 0 ? "needs_you" : "resolved"
-
-/** The record of a resolution run that ended in `lane`, from its land message. */
-export const landingRecord = (input: {
-  readonly details: Pick<LandDetails, "landing" | "by">
-  readonly lane: LaneName
-  /** The land message that started it. */
-  readonly prompt: EntryId
-  readonly askedForGuidance: boolean
-  readonly conflictsLeft: number
-  readonly now: number
-}): LandingRecord => ({
-  id: input.details.landing,
-  lane: input.lane,
-  prompt: input.prompt,
-  state: landingOutcome(input),
-  by: input.details.by,
-  at: input.now,
-})

@@ -11,8 +11,9 @@ import {
   type RevisionRecord,
   snapshotId,
   type TreeIndex,
-  toolLabel,
+  toolCallsOf,
   turnEntry,
+  turnMerged,
 } from "@pineta/core"
 import type { Keeper } from "@pineta/keeper"
 import {
@@ -33,20 +34,6 @@ import type { Setup } from "./setup.ts"
 /** A revision's title: a message's first line, cut. */
 const TITLE_LENGTH = 72
 
-/** The tool calls of the message at `entry`, in order. */
-function toolCallsOf(
-  index: TreeIndex,
-  entry: EntryId,
-): { readonly name: string; readonly arguments: unknown }[] {
-  const message = index.entries[entry]?.message
-  const content = Array.isArray(message?.content) ? message.content : []
-  return content.flatMap(p =>
-    p?.type === "toolCall" && typeof p.name === "string"
-      ? [{ name: p.name, arguments: p.arguments }]
-      : [],
-  )
-}
-
 /** The title a revision is described with: the message's first line, or its first tool. */
 export function titleOf(index: TreeIndex, entry: EntryId): string {
   const text = firstLine(
@@ -54,8 +41,8 @@ export function titleOf(index: TreeIndex, entry: EntryId): string {
     TITLE_LENGTH,
   )
   if (text !== "") return text
-  const call = toolCallsOf(index, entry)[0]
-  return call === undefined ? "turn" : toolLabel(call.name, call.arguments)
+  const call = toolCallsOf(index.entries[entry]?.message)[0]
+  return call === undefined ? "turn" : call.label
 }
 
 export interface Turns {
@@ -103,7 +90,10 @@ export function createTurns(deps: {
         const index = readTreeIndex(doc)
         const entry = turnEntry(index, tip)
         const isPrompt = promptOf(index, entry) === entry
-        const toolCalls = toolCallsOf(index, entry).length > 0
+        const toolCalls = toolCallsOf(index.entries[entry]?.message).length > 0
+        // A `catch_up` in the turn moved the bookmark (ADR-0080): read from
+        // the tree, so a restart before this record changes nothing.
+        const merged = turnMerged(index, tip)
         const paths = setup.paths
         if (!registry.isOwn(lane) || paths === null) {
           const revision = planTurnRecord({
@@ -117,6 +107,7 @@ export function createTurns(deps: {
             snapshot: null,
             paths: [],
             conflicts: [],
+            merged: false,
           })
           if (revision !== null) await writeRevision(revision)
           return
@@ -169,6 +160,7 @@ export function createTurns(deps: {
           snapshot: snapshotId(entry),
           paths: changed,
           conflicts,
+          merged,
         })
         if (planned === null) return
         // The snapshot is queued and not awaited: the next tool call waits

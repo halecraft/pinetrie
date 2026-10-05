@@ -9,6 +9,7 @@ import path from "node:path"
 import {
   ancestry,
   atEntry,
+  type CardCommand,
   type CardId,
   cardId,
   entryId,
@@ -47,11 +48,20 @@ export const at = (id: string | null): Position =>
  * at the lane's tip with the command and `text`, queued. On an idle lane the
  * host pops it at once.
  */
-export function bringUpToDate(
+export const bringUpToDate = (
   session: SessionClient,
   lane: LaneName,
   tip: string | null,
   text: string,
+): CardId => queueCommand(session, lane, tip, text, "bring-up-to-date")
+
+/** A card with `command` and `text`, made at the thread's end and queued, as a command button does (ADR-0080). */
+export function queueCommand(
+  session: SessionClient,
+  lane: LaneName,
+  tip: string | null,
+  text: string,
+  command: CardCommand,
 ): CardId {
   const id = cardId(crypto.randomUUID())
   const where = at(tip)
@@ -64,7 +74,7 @@ export function bringUpToDate(
         at: where,
         lane,
       },
-      command: "bring-up-to-date",
+      carries: { kind: "message", command },
       unsent: null,
     },
     text,

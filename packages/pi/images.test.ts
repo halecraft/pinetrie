@@ -151,7 +151,7 @@ test("the model reads a chat's text, then its image's bytes, from the store", as
       },
       1,
     ),
-    null,
+    [],
   )
   await agent.close()
   expect(seen.at(-1)).toBe(`Ada: ${text}[image image/png ${sha}]`)

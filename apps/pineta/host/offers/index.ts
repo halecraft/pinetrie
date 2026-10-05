@@ -18,6 +18,7 @@ import type {
   CommitId,
   ErrCode,
   LaneName,
+  OfferFact,
   OfferSeen,
   WriterId,
 } from "@pineta/core"
@@ -65,7 +66,8 @@ export interface Offers {
   runEnded(lane: LaneName): void
   /**
    * An offer action other than a split; an integration names its destination, null
-   * for the default, and what it was shown (ADR-0065).
+   * for the default, and what it was shown (ADR-0065). Carried out, it
+   * answers with its fact, which the thread is told (ADR-0080).
    */
   act(
     lane: LaneName,
@@ -73,7 +75,10 @@ export interface Offers {
     by: WriterId,
     to?: string | null,
     seen?: OfferSeen | null,
-  ): Promise<ErrCode | null>
+  ): Promise<
+    | { readonly kind: "refused"; readonly code: ErrCode }
+    | { readonly kind: "done"; readonly fact: OfferFact }
+  >
   /** Where a split's stack starts and ends: the offer's start and the lane's tip. */
   stackSpan(
     lane: LaneName,
@@ -109,6 +114,8 @@ export function startOffers(input: {
   readonly running: (lane: LaneName) => boolean
   /** After an offer integration: the base snapshot follows the bookmark it moved. */
   readonly bookmarkMoved: () => void
+  /** A lane's base record changed: a running thread is told its news (`base-news.ts`). */
+  readonly baseChanged: (lane: LaneName) => void
   /** The line's record and commands (`host/work/line.ts`): its record is rewritten when the owner observes the line or your `@` move. */
   readonly lineWork: Line
 }): Offers {

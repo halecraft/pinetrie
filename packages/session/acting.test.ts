@@ -66,12 +66,6 @@ describe("nextActing: what is said of your last command on one thing", () => {
     ],
     ["offered clears it", sent("1"), answered("1", { kind: "offered" }), null],
     [
-      "a split's start clears it",
-      sent("1", "split"),
-      answered("1", { kind: "started", runId: "r" as never }),
-      null,
-    ],
-    [
       "an answer to a send since replaced changes nothing",
       sent("2"),
       answered("1", REFUSED),

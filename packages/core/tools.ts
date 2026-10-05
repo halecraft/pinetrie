@@ -1,4 +1,12 @@
-// core/tools — how a tool call is named on screen.
+// core/tools — how a tool call is named on screen, and the names of the
+// tools the host answers.
+
+/** Leave a conflict whose two sides meant different things for the person (ADR-0080). */
+export const CONFLICT_TOOL = "ask_about_conflict"
+/** Merge the thread's base, or its parent's work, into its copy during a run (ADR-0080). */
+export const CATCH_UP_TOOL = "catch_up"
+/** Queue a split of the thread's offer, run when the thread is free (ADR-0080). */
+export const SPLIT_TOOL = "split_offer"
 
 /** The longest label shown; a long command is cut with an ellipsis. */
 const MAX_LABEL = 120
@@ -28,6 +36,7 @@ const SUBJECTS: ReadonlyMap<string, (args: unknown) => string | undefined> =
     ["edit", args => field(args, "path")],
     ["grep", searched],
     ["find", searched],
+    [CATCH_UP_TOOL, args => field(args, "from") ?? "base"],
   ])
 
 /**

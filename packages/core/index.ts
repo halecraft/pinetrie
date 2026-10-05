@@ -17,7 +17,7 @@
 // `@pineta/rules`', whoever reads it.
 
 import type { Sha256 } from "./images.ts"
-import type { OfferLedger, OfferSeen } from "./offers.ts"
+import type { OfferLedger, OfferSeen, WorkChanges } from "./offers.ts"
 
 // --- branded identifiers ----------------------------------------------------
 //
@@ -497,19 +497,14 @@ export type Intent =
 
 /**
  * What can be done with an offer: integrate it into the line or a WIP
- * (ADR-0060, ADR-0083), have the agent split it into a stack, squash a stack
- * back to one revision, have the agent write its description again, or
- * rebuild it, discarding your edits (ADR-0038).
+ * (ADR-0060, ADR-0083), squash a stack back to one revision, have the agent
+ * write its description again, or rebuild it, discarding your edits
+ * (ADR-0038). Splitting it is a card's command, `split`, popped when the
+ * thread is free (ADR-0080).
  */
-export type OfferAction =
-  | "integrate"
-  | "split"
-  | "squash"
-  | "describe"
-  | "refresh"
+export type OfferAction = "integrate" | "squash" | "describe" | "refresh"
 export const OFFER_ACTIONS: readonly OfferAction[] = [
   "integrate",
-  "split",
   "squash",
   "describe",
   "refresh",
@@ -725,6 +720,17 @@ export interface ParentThread {
   readonly name: ThreadName
 }
 
+/**
+ * Where a lane's working copy sits against its bookmark (ADR-0080), read
+ * before a catch-up merges: `@`'s parents, the lane's bookmark, and whether
+ * `@`'s one parent descends from it (the agent's own commit).
+ */
+export interface CopyFacts {
+  readonly parents: readonly CommitId[]
+  readonly bookmark: CommitId | null
+  readonly descends: boolean
+}
+
 /** What a catch-up merges from: the thread's base, or the thread it branched from. */
 export type CatchUpFrom = ThreadBase | ParentThread
 
@@ -882,21 +888,6 @@ export type ProjectRecord =
       readonly rootDefault: "own" | "direct"
     }
   | { readonly kind: "direct"; readonly root: string; readonly reason: string }
-
-/**
- * How a resolution run ended: a host-written `pineta.landing` value keyed by
- * its own id, written when its run ends. A resolution in progress has no
- * record: it is a running lane whose prompt is a land message (ADR-0033).
- */
-export interface LandingRecord {
-  readonly id: string
-  readonly lane: LaneName
-  /** The land message that started it. */
-  readonly prompt: EntryId
-  readonly state: "resolved" | "needs_you"
-  readonly by: WriterId
-  readonly at: number
-}
 
 /**
  * A lane's offer: one revision, or a stack, in your repo, holding the lane's
@@ -1176,6 +1167,13 @@ export interface BaseRecord {
    * catches up past them.
    */
   readonly untraced: readonly CommitId[]
+  /**
+   * Whether the lane's work since its start changes any file (ADR-0067):
+   * `unknown` for an untraced start, or one jj could not diff. A thread is
+   * told its base has new work only with `some`, and caught up quietly only
+   * with `none` (ADR-0080).
+   */
+  readonly work: WorkChanges
 }
 
 /** What catching up would change in a lane (`catchUpFiles`), and what it was read at. */
@@ -1189,20 +1187,75 @@ export interface CatchUpRead {
 // --- cards (ADR-0048) --------------------------------------------------------
 
 /**
- * A command a card is sent through (ADR-0055); a plain card has none. The
- * first two bring the thread up to date with its base, `continue-on-line`
- * moving a thread whose WIP is gone to the line first (ADR-0060);
- * `catch-up-with-parent` merges the thread it branched from (ADR-0072).
+ * The commands that catch a thread up (ADR-0055). The first two bring the
+ * thread up to date with its base, `continue-on-line` moving a thread whose
+ * WIP is gone to the line first (ADR-0060); `catch-up-with-parent` merges
+ * the thread it branched from (ADR-0072).
  */
-export type CardCommand =
+export type CatchUpCommand =
   | "bring-up-to-date"
   | "continue-on-line"
   | "catch-up-with-parent"
-export const CARD_COMMANDS: readonly CardCommand[] = [
+export const CATCH_UP_COMMANDS: readonly CatchUpCommand[] = [
   "bring-up-to-date",
   "continue-on-line",
   "catch-up-with-parent",
 ]
+
+/**
+ * A command a card is sent through (ADR-0055); a plain card has none. The
+ * catch-up commands, and `split`, which splits the thread's offer into a
+ * stack in a run of its own, its text the person's intent (ADR-0080).
+ */
+export type CardCommand = CatchUpCommand | "split"
+export const CARD_COMMANDS: readonly CardCommand[] = [
+  ...CATCH_UP_COMMANDS,
+  "split",
+]
+
+/** Whether `command` catches the thread up, rather than doing something else. */
+export const isCatchUp = (command: CardCommand): command is CatchUpCommand =>
+  (CATCH_UP_COMMANDS as readonly string[]).includes(command)
+
+/**
+ * What a command on a thread's offer did, as a fact in the thread
+ * (ADR-0080): an integration, with the change it was added as, the bookmark it moved
+ * and what that bookmark is to the thread; or a description asked for again,
+ * a squash, a refresh. `by` is who asked.
+ */
+export type OfferFact =
+  | {
+      readonly kind: "integrated"
+      readonly lane: LaneName
+      readonly by: WriterId
+      /** The change id the offer was added as. */
+      readonly as: string
+      readonly bookmark: string
+      readonly to: CatchUpFrom
+    }
+  | {
+      readonly kind: "described" | "squashed" | "refreshed"
+      readonly lane: LaneName
+      readonly by: WriterId
+    }
+
+/**
+ * What a card carries (ADR-0080): a message, sent through its command when
+ * it has one, or a fact the host queued, which has no text and no command,
+ * and which nobody moves.
+ */
+export type CardCarries =
+  | { readonly kind: "message"; readonly command: CardCommand | null }
+  | { readonly kind: "fact"; readonly fact: OfferFact }
+
+/** A plain message's carry: no command. */
+export const PLAIN: CardCarries = { kind: "message", command: null }
+
+/** A card's command, or null: a plain message and a fact have none. */
+export const commandOf = (card: {
+  readonly carries: CardCarries
+}): CardCommand | null =>
+  card.carries.kind === "message" ? card.carries.command : null
 
 /**
  * Where a card is. Drafting: below the line at a thread's end, kept as a send
@@ -1412,6 +1465,8 @@ export type MoveRefusal =
   | "full"
   /** A move into or out of someone else's inventory. */
   | "not-yours"
+  /** A card carrying a fact: the host's, on its way into the thread (ADR-0080). */
+  | "fact"
 
 /**
  * A place as flat strings, "" for none: how the places document stores it,
@@ -1608,8 +1663,8 @@ export interface CardRecord {
    * When someone else moves the card, the trace is for them (ADR-0048).
    */
   readonly placer: WriterId
-  /** What it is sent through when popped (ADR-0055); null for a plain message. */
-  readonly command: CardCommand | null
+  /** A message, and the command it is sent through when popped (ADR-0055); or a fact (ADR-0080). */
+  readonly carries: CardCarries
   /** Why the host could not send it, until it is queued again; null when it never failed. */
   readonly unsent: string | null
 }

@@ -4,6 +4,7 @@ import {
   laneNameForThread,
   type PinnedCardRead,
   type PinnedView,
+  PLAIN,
   type WriterId,
   writerId,
 } from "@pineta/core"
@@ -193,7 +194,7 @@ test("pinnedReads: each card with its text and owner, in order; a card with no t
     owner,
     placer: owner,
     place: { kind: "inventory", holder: owner } as const,
-    command: null,
+    carries: PLAIN,
     unsent: null,
   })
   const texts: Record<string, string> = {

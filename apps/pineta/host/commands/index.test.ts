@@ -109,11 +109,7 @@ function setUp(
 test.each([
   ["an offer integration", { kind: "offer", action: "integrate" }, "repo"],
   ["a squash", { kind: "offer", action: "squash" }, "repo"],
-  [
-    "a split, which starts a run",
-    { kind: "offer", action: "split" },
-    "documents",
-  ],
+  ["a description again", { kind: "offer", action: "describe" }, "repo"],
   ["a line command", { kind: "line", action: "land" }, "repo"],
   ["an archive", { kind: "archive", action: "archive" }, "archive"],
   ["a chat", { kind: "chat" }, "documents"],
@@ -124,7 +120,8 @@ test.each([
 })
 
 test("a chat completes while an offer integration is held open on your repo's owner", async () => {
-  const held = Promise.withResolvers<null>()
+  const held =
+    Promise.withResolvers<Awaited<ReturnType<NonNullable<Offers>["act"]>>>()
   const { commands, replies, sender, chat } = setUp({
     offers: record<NonNullable<Offers>>({ act: () => held.promise }).port,
   })
@@ -137,7 +134,10 @@ test("a chat completes while an offer integration is held open on your repo's ow
   })
   await commands.handle(sender, ALICE, chat("c-1"))
   expect(replies.map(r => r.id)).toEqual(["c-1"])
-  held.resolve(null)
+  held.resolve({
+    kind: "done",
+    fact: { kind: "squashed", lane: HELD, by: ALICE },
+  })
   await integration
   expect(replies.map(r => [r.id, r.outcome])).toEqual([
     ["c-1", "appended"],
@@ -216,7 +216,7 @@ test("a chat command spends its card once written, record then text, answering w
             at: atEntry(ROOT_ENTRY),
             lane: null,
           },
-          command: null,
+          carries: { kind: "message", command: null },
           unsent: null,
         },
       },

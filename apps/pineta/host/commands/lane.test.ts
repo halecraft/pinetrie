@@ -1,19 +1,34 @@
-import { entryId, laneNameForThread, runId, writerId } from "@pineta/core"
+import {
+  atEntry,
+  entryId,
+  laneNameForThread,
+  runId,
+  writerId,
+} from "@pineta/core"
 import type { Agent } from "@pineta/pi"
+import { readCardHistories, readPlaces } from "@pineta/reads"
 import { PARTICIPANT, STOP, setRecord } from "@pineta/rules"
-import { beginRun, writeEntry, writeLaneTip } from "@pineta/schema"
+import {
+  beginRun,
+  newPresenceDoc,
+  writeEntry,
+  writeLaneTip,
+} from "@pineta/schema"
 import { expect, test } from "vitest"
 import {
+  applyWrites,
   basics,
   fakeLane,
   methods,
+  putLane,
   putValue,
   ROOT_ID,
   record,
   row,
 } from "../fakes.ts"
+import { createProvenance } from "../provenance.ts"
 import type { RunStart } from "../runs.ts"
-import { handleCarryOn, handleStop } from "./lane.ts"
+import { handleCarryOn, handleStop, recordFact } from "./lane.ts"
 
 const ada = writerId("ada@example.com")
 const bea = writerId("bea@example.com")
@@ -97,6 +112,56 @@ test("a stop while a chat's run waits for its pinned cards cancels it there, and
   expect(cancelled).toEqual([lane])
   expect(methods(agent.calls)).toEqual(["writeValues"])
   expect(methods(handle.calls)).toEqual([])
+})
+
+test("an offer's fact is queued as a card at the thread's end, after the cards there, and the lane's drain asked for (ADR-0080)", async () => {
+  const b = basics()
+  const lane = laneNameForThread("0123456789abcdef")
+  putLane(b, lane, entryId("e-2"))
+  writeEntry(b.root, row(entryId("e-2"), null))
+  writeLaneTip(b.root, lane, entryId("e-2"))
+  const drained: string[] = []
+  const fact = {
+    kind: "integrated",
+    lane,
+    by: ada,
+    as: "kabcdefgh",
+    bookmark: "pineta-onto",
+    to: { kind: "line" },
+  } as const
+  await recordFact(
+    {
+      basics: b,
+      drain: l => drained.push(l),
+      provenance: createProvenance({
+        basics: b,
+        presence: newPresenceDoc(),
+        agent: () => ({ writeValues: async w => applyWrites(b, w) }),
+      }),
+    },
+    fact,
+  )
+  expect(readPlaces(b.places)).toMatchObject([
+    {
+      owner: ada,
+      placer: ada,
+      place: {
+        kind: "queued",
+        lane,
+        at: atEntry(entryId("e-2")),
+        by: ada,
+        seen: "",
+      },
+      carries: { kind: "fact", fact },
+    },
+  ])
+  const [card] = readPlaces(b.places)
+  expect(
+    card === undefined
+      ? undefined
+      : readCardHistories(b.session).get(card.id)?.events,
+  ).toMatchObject([{ kind: "created", by: null }])
+  expect(drained).toEqual([lane])
 })
 
 /** A lane whose ask Ada stopped mid-reply: her prompt `e-1`, the partial `e-2`. */

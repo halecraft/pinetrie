@@ -6,6 +6,27 @@
 import type { Mutation } from "../mutate.ts"
 
 export const mutations: readonly Mutation[] = [
+  {
+    // Needs `container`: run on the Mac.
+    name: "a catch-up's turn names no commit",
+    file: "apps/pineta/host/work/turns.ts",
+    from: "        const merged = turnMerged(index, tip)",
+    to: "        const merged = false && turnMerged(index, tip)",
+    suite: "lanes",
+    scenario: "catch-up",
+    expect:
+      "a catch_up mid-run merges the line, and a branch at its turn has the line's file",
+  },
+  {
+    // Needs `container`: run on the Mac.
+    name: "an offer integration's fact is never written",
+    file: "apps/pineta/host/commands/lane.ts",
+    from: "    .run(() => recordFact(deps, done.fact))",
+    to: "    .run(async () => {})",
+    suite: "lanes",
+    scenario: "catch-up",
+    expect: "an offer integration leaves a fact the thread shows",
+  },
   // ── card history and traces (ADR-0048 step 6) ──
   {
     name: "the host reads no presence for traces",
@@ -1408,8 +1429,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "queued cards are not drawn",
     file: "packages/client/column.tsx",
-    from: "            {queued.map((c, n) => (",
-    to: "            {queued.slice(0, 0).map((c, n) => (",
+    from: "              {queued.map((c, n) =>",
+    to: "              {queued.slice(0, 0).map((c, n) =>",
     suite: "browser",
     scenario: "page",
     expect:
@@ -1527,8 +1548,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a client cannot read a full inventory",
     file: "packages/protocol/codec.ts",
-    from: '  "full",\n  "not-yours",\n]',
-    to: '  "not-yours",\n]',
+    from: '  "full",\n  "not-yours",\n  "fact",\n]',
+    to: '  "not-yours",\n  "fact",\n]',
     suite: "host",
     scenario: "cards",
     expect: "the nineteenth card is refused: the inventory is full",
@@ -1689,8 +1710,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "startHost runs read no pinned cards",
     file: "apps/pineta/host/index.ts",
-    from: "    readPinned,\n    pending: digests.pending,\n",
-    to: "    readPinned: async () => null,\n    pending: digests.pending,\n",
+    from: "    readPinned,\n    readBehind: baseNews.atStart,\n",
+    to: "    readPinned: async () => null,\n    readBehind: baseNews.atStart,\n",
     suite: "host",
     scenario: "cards",
     expect:

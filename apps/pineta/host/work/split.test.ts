@@ -67,7 +67,7 @@ test("a split whose skill read fails starts no container", async () => {
     fetchLane: async () => {},
   })
   await expect(
-    splits.prepareSplit(lane, writerId("ada@example.com")),
+    splits.prepareSplit(lane, writerId("ada@example.com"), ""),
   ).rejects.toThrow("no skill")
   expect(started).toEqual([])
 })

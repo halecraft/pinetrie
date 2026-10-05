@@ -5,10 +5,12 @@ import {
   ancestry,
   applyEdits,
   atEntry,
+  baseKnown,
   branchColors,
   type ChatMode,
   cardId,
   compactRail,
+  conflictAskedAt,
   type EntryId,
   type EntryLike,
   entryId,
@@ -19,6 +21,7 @@ import {
   laneNameForThread,
   messageAt,
   messageImages,
+  newestOnPath,
   PENDING_TRACK,
   type PinnedView,
   type Position,
@@ -36,6 +39,8 @@ import {
   tailEdit,
   threadOf,
   toolLabel,
+  turnEntry,
+  turnMerged,
   wholeToolLabel,
   writerId,
   writersOf,
@@ -1067,6 +1072,149 @@ describe("pinned cards in the tree (ADR-0048)", () => {
       ]),
     )
     expect(pinnedInView(branch, entryId("8-b"))?.lane).toBe(OTHER)
+  })
+})
+
+describe("conflictAskedAt (ADR-0080)", () => {
+  const asked = (id: string, parent: string | null, at: number) =>
+    entry(
+      id,
+      parent,
+      { role: "toolResult", content: "Asked.", asked: true },
+      { timestamp: at },
+    )
+  const list = [
+    entry("1-p", null, { role: "chat", content: "p", author: "A" }),
+    asked("2-a", "1-p", 20),
+    entry("3-c", "2-a", undefined, { type: "compaction" }),
+    entry("4-r", "3-c", { role: "toolResult", content: "No conflict." }),
+    asked("5-a", "4-r", 50),
+    entry("6-q", "5-a", { role: "chat", content: "q", author: "A" }),
+  ]
+  const index = indexTree(entriesOf(list))
+
+  test("the newest ask on the path, by its time; none before the first", () => {
+    expect(conflictAskedAt(index, entryId("6-q"))).toBe(50)
+    expect(conflictAskedAt(index, entryId("1-p"))).toBeNull()
+    expect(conflictAskedAt(index, null)).toBeNull()
+  })
+
+  test("an ask stays a fact past a compaction, and a result that did not ask is none", () => {
+    expect(conflictAskedAt(index, entryId("4-r"))).toBe(20)
+  })
+})
+
+describe("newestOnPath", () => {
+  const list = [
+    entry("1-a", null, { role: "chat", content: "a", author: "A" }),
+    entry("2-c", "1-a", undefined, { type: "compaction" }),
+    entry("3-b", "2-c", { role: "chat", content: "b", author: "B" }),
+  ]
+  const index = indexTree(entriesOf(list))
+  const author = (e: EntryLike) => e.message?.author
+
+  test("the newest entry read, below a compaction", () => {
+    expect(newestOnPath(index, entryId("3-b"), author, () => null)).toBe("B")
+  })
+
+  test("a compaction ends the walk with its answer, unless the read passes it", () => {
+    const skip = (e: EntryLike) =>
+      e.message?.author === "B" ? undefined : e.message?.author
+    expect(newestOnPath(index, entryId("3-b"), skip, () => "summary")).toBe(
+      "summary",
+    )
+    expect(newestOnPath(index, entryId("3-b"), skip, "pass")).toBe("A")
+  })
+})
+
+describe("one-line messages (LINE_ROLES, ADR-0080)", () => {
+  test("a host's fact and its base's news show as their one line; a pinned entry does not", () => {
+    const index = indexTree(
+      entriesOf([
+        entry("1-p", null, { role: "chat", content: "p", author: "A" }),
+        entry("2-f", "1-p", { role: "fact", content: "✓ added" }),
+        entry("3-b", "2-f", { role: "behind", content: "↓ new work" }),
+        entry("4-c", "3-b", { role: "pinned", content: "" }),
+      ]),
+    )
+    expect(
+      projectTranscript(index, entryId("4-c")).map(m => [m.role, m.text]),
+    ).toEqual([
+      ["chat", "p"],
+      ["fact", "✓ added"],
+      ["behind", "↓ new work"],
+    ])
+  })
+})
+
+describe("baseKnown (ADR-0080)", () => {
+  const C = (s: string) => s as never
+  const list = [
+    entry("1-p", null, { role: "chat", content: "p", author: "A" }),
+    entry("2-u", "1-p", { role: "update", content: "u", merged: [C("l1")] }),
+    entry("3-b", "2-u", {
+      role: "behind",
+      content: "b",
+      behind: {
+        from: { kind: "line" },
+        to: C("l2"),
+        files: [],
+        overlap: [],
+        conflicts: [],
+      },
+    }),
+    entry("4-r", "3-b", {
+      role: "toolResult",
+      content: "merged",
+      merged: [C("l3")],
+    }),
+    entry("5-c", "4-r", undefined, { type: "compaction" }),
+    entry("6-q", "5-c", { role: "chat", content: "q", author: "A" }),
+  ]
+  const index = indexTree(entriesOf(list))
+
+  test("the newest base commit heard of or merged on the path: an update's, a behind entry's, a catch_up result's", () => {
+    expect(baseKnown(index, entryId("2-u"))).toEqual(["l1"])
+    expect(baseKnown(index, entryId("3-b"))).toEqual(["l2"])
+    expect(baseKnown(index, entryId("4-r"))).toEqual(["l3"])
+    expect(baseKnown(index, entryId("1-p"))).toBeNull()
+  })
+
+  test("none past a compaction: a summarised fact is told again", () => {
+    expect(baseKnown(index, entryId("6-q"))).toBeNull()
+  })
+})
+
+describe("a turn's tail (ADR-0080)", () => {
+  const C = (s: string) => s as never
+  const list = [
+    entry("1-p", null, { role: "chat", content: "p", author: "A" }),
+    entry("2-a", "1-p", { role: "assistant", content: "calls" }),
+    entry("3-r", "2-a", {
+      role: "toolResult",
+      toolCallId: "c1",
+      content: "merged",
+      merged: [C("l2")],
+    }),
+    entry("4-b", "3-r", { role: "behind", content: "↓ new work" }),
+    entry("5-a", "4-b", { role: "assistant", content: "next" }),
+    entry("6-r", "5-a", {
+      role: "toolResult",
+      toolCallId: "c2",
+      content: "ok",
+    }),
+  ]
+  const index = indexTree(entriesOf(list))
+
+  test("turnEntry climbs past a steered fact to the message whose calls it follows", () => {
+    expect(turnEntry(index, entryId("4-b"))).toBe("2-a")
+    expect(turnEntry(index, entryId("3-r"))).toBe("2-a")
+    expect(turnEntry(index, entryId("5-a"))).toBe("5-a")
+  })
+
+  test("turnMerged: a turn whose catch_up result merged; not another", () => {
+    expect(turnMerged(index, entryId("4-b"))).toBe(true)
+    expect(turnMerged(index, entryId("6-r"))).toBe(false)
   })
 })
 

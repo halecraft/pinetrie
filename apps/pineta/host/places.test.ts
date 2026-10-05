@@ -1,4 +1,11 @@
-import { atEntry, cardId, entryId, rootIdFor, writerId } from "@pineta/core"
+import {
+  atEntry,
+  cardId,
+  entryId,
+  PLAIN,
+  rootIdFor,
+  writerId,
+} from "@pineta/core"
 import { readPlaces, readPlacesRev } from "@pineta/reads"
 import { newPlacesDoc } from "@pineta/schema"
 import { expect, test } from "vitest"
@@ -17,7 +24,7 @@ const record = (id: string) =>
       at: atEntry(entryId("e-1")),
       lane: null,
     },
-    command: null,
+    carries: PLAIN,
     unsent: null,
   }) as const
 

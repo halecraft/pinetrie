@@ -9,6 +9,7 @@ test("a turn's title is its message's first line, else its first tool's label, e
   const doc = newRootDoc()
   const call = {
     type: "toolCall",
+    id: "c1",
     name: "bash",
     arguments: { command: "ls -la" },
   }

@@ -18,7 +18,11 @@ import {
   type AgentId,
   type AgentMessageLike,
   address,
+  CATCH_UP_TOOL,
+  CONFLICT_TOOL,
   type CommandRef,
+  type CommitId,
+  commitId,
   ERR,
   IMAGE_MIMES,
   type ImageMime,
@@ -37,7 +41,9 @@ import {
   type WriterId,
 } from "@pineta/core"
 import { type Static, Type } from "typebox"
+import { type BaseNews, behindLine, decodeBehind } from "./behind.ts"
 import { decodeWith } from "./decode.ts"
+import { decodeFact, factLine } from "./fact.ts"
 import { decodeLand, type LandMessage, landLine } from "./land.ts"
 import { decodePinned } from "./pinned.ts"
 import { type CarryOnMessage, carryOnLine, decodeCarryOn } from "./stop.ts"
@@ -243,12 +249,47 @@ export const decodeChat = (message: unknown): ChatDetails | undefined =>
   decodeWith(ChatSchema, message, ({ details }) => detailsFromStored(details))
 
 /**
+ * What a tool result of the host's tools says as a fact (ADR-0080), from its
+ * `details`, never its text: an `ask_about_conflict` the host took, or the
+ * commits a `catch_up` merged. Undefined for any other message.
+ */
+function toolResultFacts(
+  message: unknown,
+):
+  | { readonly asked: true }
+  | { readonly merged: readonly CommitId[] }
+  | undefined {
+  if (typeof message !== "object" || message === null) return undefined
+  const m = message as {
+    role?: unknown
+    toolName?: unknown
+    details?: unknown
+  }
+  if (m.role !== "toolResult") return undefined
+  const details =
+    typeof m.details === "object" && m.details !== null
+      ? (m.details as { asked?: unknown; merged?: unknown })
+      : {}
+  if (m.toolName === CONFLICT_TOOL && details.asked === true)
+    return { asked: true }
+  if (
+    m.toolName === CATCH_UP_TOOL &&
+    Array.isArray(details.merged) &&
+    details.merged.every(c => typeof c === "string" && c !== "")
+  )
+    return { merged: details.merged.map(c => commitId(c as string)) }
+  return undefined
+}
+
+/**
  * A stored message -> what the projections render. A chat becomes role `chat`
  * with its author; a land, update, stack or carry-on message becomes role
  * `land`, `update`, `stack` or `carry-on` with its one line (ADR-0033,
- * ADR-0038, ADR-0082); a cards entry
- * becomes role `pinned` with the cards it read (ADR-0048); anything else
- * passes through unchanged for `core` to judge.
+ * ADR-0038, ADR-0082), as a fact becomes role `fact` and a base's news role
+ * `behind` (ADR-0080); a cards entry becomes role `pinned` with the cards it
+ * read (ADR-0048); a host tool's result keeps its role and gains what it
+ * says as a fact (`asked`, `merged`, ADR-0080); anything else passes
+ * through unchanged for `core` to judge.
  */
 export function renderableMessage(message: unknown): AgentMessageLike {
   const land = decodeLand(message)
@@ -263,12 +304,20 @@ export function renderableMessage(message: unknown): AgentMessageLike {
     }
   const stack = decodeStack(message)
   if (stack !== undefined) return { role: "stack", content: stackLine(stack) }
+  const fact = decodeFact(message)
+  if (fact !== undefined) return { role: "fact", content: factLine(fact) }
+  const behind = decodeBehind(message)
+  if (behind !== undefined)
+    return { role: "behind", content: behindLine(behind), behind }
   const carryOn = decodeCarryOn(message)
   if (carryOn !== undefined)
     return { role: "carry-on", content: carryOnLine(carryOn) }
   // Not a message: the column draws a marker above the prompt it came with.
   const pinned = decodePinned(message)
   if (pinned !== undefined) return { role: "pinned", content: "", pinned }
+  const result = toolResultFacts(message)
+  if (result !== undefined)
+    return { ...(message as AgentMessageLike), ...result }
   const chat = decodeChat(message)
   return chat === undefined
     ? (message as AgentMessageLike)
@@ -285,6 +334,16 @@ export function renderableMessage(message: unknown): AgentMessageLike {
         ...(chat.command === undefined ? {} : { command: chat.command.name }),
         ...(chat.images === undefined ? {} : { images: chat.images }),
       }
+}
+
+/**
+ * The person behind a run (ADR-0080), from its prompt as stored: a chat's
+ * author, or a land or stack message's `by`. Null for anything else.
+ */
+export function promptAuthor(message: unknown): WriterId | null {
+  const chat = decodeChat(message)
+  if (chat !== undefined) return chat.author
+  return decodeLand(message)?.by ?? decodeStack(message)?.by ?? null
 }
 
 /**
@@ -330,6 +389,12 @@ export type ChatDecision =
    * The lane runs, or has cards queued: nothing is written, and the sender's
    * client queues its card behind them (ADR-0048).
    */
+  /**
+   * The thread's lane is idle and the agent is compelled, but its work
+   * changes no file and its base has new work (ADR-0080): catch it up, then
+   * plan the chat again.
+   */
+  | { readonly kind: "catch-up-first"; readonly lane: LaneName }
   | { readonly kind: "busy" }
   /** Another writer wrote at the slot first. Nothing is written; the sender chooses. */
   | { readonly kind: "conflict"; readonly by: WriterId | null }
@@ -390,6 +455,8 @@ export function addressChat(input: {
  *   conflicts.
  * - `queue` is the host popping a queued card: it is the queue's turn, so
  *   only a run makes the lane busy.
+ * - A run on a lane whose work changes no file, and whose base has new work,
+ *   catches the lane up first (`catch-up-first`, ADR-0080), once per send.
  */
 export function planChat(input: {
   readonly author: WriterId
@@ -440,6 +507,13 @@ export function planChat(input: {
     | { readonly unknown: string }
     | { readonly unreadable: string }
     | null
+  /**
+   * What the thread's base has for it (`planBaseNews`, ADR-0080), and whether
+   * this send has already caught it up: `pineta.base` is rewritten only at
+   * the next refresh, so it still says the base has news.
+   */
+  readonly news: BaseNews["kind"]
+  readonly caughtUp: boolean
 }): ChatDecision {
   const { lane, end, race } = input.thread
   const branch = input.mode === "branch"
@@ -501,5 +575,8 @@ export function planChat(input: {
   if (input.mode === "reply" && (race !== null || busy)) {
     return { kind: "conflict", by: race?.by ?? lane.askedBy }
   }
-  return busy ? { kind: "busy" } : { kind: "run", lane: name, details }
+  if (busy) return { kind: "busy" }
+  return input.news === "catch-up" && !input.caughtUp
+    ? { kind: "catch-up-first", lane: name }
+    : { kind: "run", lane: name, details }
 }

@@ -341,6 +341,25 @@ so it is the one behind the menu. What each does is under "Starting" below.
   as a plain message instead, and its button reads "catch up", or "catch up
   and send"; what you write is what the agent should do with the new work
   (ADR-0055).
+- **The thread hears what was done to its work** (ADR-0080). An
+  integration, a rewrite of the description, a squash and a refresh each add a line to
+  the thread: "✓ added to the project as k1a2b3c4", "✎ a new description
+  was asked for", "⇣ the stack was squashed into one revision", "↻ the
+  offer was rebuilt from this thread's work". While the agent works, the
+  line waits above the composer as a quiet row, and joins the thread when
+  the run ends. When the project has new work the thread lacks, its next
+  run, or its run in progress, begins with "↓ the project has new work: 2
+  files, 1 this thread changed too". A thread with no work of its own is
+  caught up before it runs, and shows the update's "↓ caught up" line
+  before your message.
+- **Split into a stack waits its turn** (ADR-0080): the button queues a
+  card with the split, as catching up does, sent when the thread is free;
+  the queued card says "⇶ splits the offer into a stack, with what you
+  write as its brief", its button reads "split", and while it waits the
+  strip's **split** is greyed out. The agent can ask for a split too.
+- **The agent asks about a conflict** with `ask_about_conflict`: the strip
+  then says "the agent has a question about your edits · see the thread"
+  until the offer changes.
 - **A branch from a conflicted copy is warned** (ADR-0072): when the next
   send would start a thread on its own copy cloned from a commit with
   conflicts, the line under the box says "starts from a copy with an

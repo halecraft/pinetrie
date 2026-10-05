@@ -29,4 +29,8 @@ export {
   scriptedModel,
 } from "./scripted.ts"
 export { KynetaStorage } from "./storage.ts"
-export type { ThreadLaneHandle, WriteOutcome } from "./thread-lanes.ts"
+export type {
+  BeforePrompt,
+  ThreadLaneHandle,
+  WriteOutcome,
+} from "./thread-lanes.ts"

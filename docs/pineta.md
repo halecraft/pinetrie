@@ -411,6 +411,22 @@ same. Now each integrated-offer commit the lane holds a source of is first
 joined to it, and the catch-up is clean; a conflict both sides
 made still conflicts, on that hunk alone.
 
+**ADR-0080 — commands are host-only or agent-callable, and every command on
+a thread leaves a fact in it** (built; its two `e2e:lanes` checks wait for
+a Mac). What changes only the
+thread's own copy or offer is a tool too: `catch_up`, only when the base or
+parent has new work, merging during the run when it is the batch's only call
+(S103), and `split_offer`, which queues a split card for the run's end, as
+the split button now does. An integration and the line's actions write where others
+read, and stay a person's; so does a description, whose skill needs your
+repo's history. An integration, a describe, a squash and a refresh write a fact into
+the thread through a queued card, popped at once when the thread is idle. A
+lane whose work changes files is told its base has new work, at its next
+run's start or by a steer while it runs; one whose work changes none is
+caught up before its run. A resolution ends like any run (S104):
+`ask_for_guidance`, renamed `ask_about_conflict`, works while the copy has
+conflicts, and `pineta.landing` goes.
+
 **ADR-0082 — after a Stop, Resume carries on with a new turn** (built).
 pi cannot continue a run that Stop ended, and parking it instead costs a
 wrapping provider and a parked state through the host (S105). So Resume,
@@ -824,8 +840,12 @@ context.**
   forward to it, and your `@` stays where it is (ADR-0060). Reword, squash
   or split the offer like any commit of yours before then; the host then
   leaves it alone. **split into a stack** has the agent rewrite it as reviewable
-  revisions. Set the bookmark `pineta-onto` to have offers land on another
-  commit instead, such as a branch you are not on; each integration moves it up.
+  revisions, in a run of its own: while the thread works it waits in the
+  queue, and the agent can ask for one too (ADR-0080). The thread is told
+  what you did to its offer, an integration included, and when the project
+  has new work: the agent can catch up itself (`catch_up`). Set the bookmark
+  `pineta-onto` to have offers land on another commit instead, such as a
+  branch you are not on; each integration moves it up.
   `jj git push --all` would push it: push by name.
 - **Sending your work to a thread:** the work strip's `⋯` offers **update
   from my work**: your `@`, uncommitted edits included, merged into the

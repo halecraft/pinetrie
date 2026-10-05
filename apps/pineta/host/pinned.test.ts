@@ -34,7 +34,7 @@ const pinnedCard = (id: string, order: string): CardRecord => ({
     lane: LANE,
     order,
   },
-  command: null,
+  carries: { kind: "message", command: null },
   unsent: null,
 })
 

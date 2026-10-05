@@ -270,6 +270,7 @@ describe("isWipLine, offerMoved, describeWanted", () => {
             state: "ok",
             catchUp: null,
             untraced: [],
+            work: "some",
           },
         },
         force,
@@ -318,6 +319,7 @@ describe("records", () => {
       state: "ok",
       catchUp: { tip: TIP, to: COPY, files: ["a.txt"] },
       untraced: [TIP],
+      work: "some",
     }
     const b = setRecord(BASE_RECORD, base)
     expect([b.namespace, b.key]).toEqual(["pineta.base", LANE])
@@ -402,6 +404,19 @@ describe("the update and stack messages", () => {
       skill: { hash: "h" },
     })
     expect(renderableMessage(m)).toMatchObject({ role: "stack" })
+    expect(m.content).not.toContain("What the person asked")
+  })
+  test("a split card's text is the stack's brief, under its own heading, last (ADR-0080)", () => {
+    const m = planStack({
+      skill: null,
+      bookmark: "pineta/t-1-stack",
+      details: { lane: LANE, start: [BASE], tip: TIP, by: ADA },
+      intent: "  tests apart  ",
+      timestamp: 1,
+    })
+    expect(m.content.endsWith("## What the person asked\n\ntests apart")).toBe(
+      true,
+    )
   })
 })
 
@@ -482,6 +497,7 @@ describe("the offer's policy over a gather (ADR-0038, ADR-0060)", () => {
     state: "ok",
     catchUp: null,
     untraced: [],
+    work: "some",
   }
   const gather = (over: Partial<OfferGather> = {}): OfferGather => ({
     place: at(),

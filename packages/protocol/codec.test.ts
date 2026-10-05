@@ -219,7 +219,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     {
       kind: "offer",
       lane: laneNameForThread("abc"),
-      action: "split",
+      action: "squash",
       to: null,
       seen: null,
     },

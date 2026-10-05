@@ -360,7 +360,7 @@
       .msg.chat .role { color: #e0c080; }
       .msg.assistant .role { color: #9ecbff; }
       .msg.land .role, .msg.update .role, .msg.stack .role,
-      .msg.carry-on .role { color: #c8a8e8; }
+      .msg.carry-on .role, .msg.fact .role, .msg.behind .role { color: #c8a8e8; }
       /* A message that compelled the agent: it was asked, so a reply follows. */
       .msg.asked { border-left: 2px solid #9ecbff; padding-left: .75rem; }
       /* Where a lane starts on the path: a rule with the lane's name on it. */
@@ -630,6 +630,7 @@
       .unqueue { padding: .05rem .45rem; font-size: .72rem; }
       /* Something of yours refused, said where you acted (ADR-0059). */
       .refused-move { font-size: .75rem; color: #d0a15f; margin: 0 0 1rem; }
+      .queued-fact { font-size: .75rem; color: #8b949e; margin: 0 0 .5rem; }
       .take-into-inventory { padding: .05rem .45rem; font-size: .72rem; cursor: grab; }
       /* Pinned cards (ADR-0048 step 5): the thread's direction, at the top of
          its column and outside its scrolling body; the agent reads them on

@@ -8,7 +8,12 @@ import {
   writerId,
 } from "@pineta/core"
 import type { Agent } from "@pineta/pi"
-import { encodeChat, encodePinned, planStack } from "@pineta/rules"
+import {
+  encodeBehind,
+  encodeChat,
+  encodePinned,
+  planStack,
+} from "@pineta/rules"
 import {
   readActiveRun,
   readStreams,
@@ -17,7 +22,13 @@ import {
 } from "@pineta/schema"
 import { describe, expect, test } from "vitest"
 import { basics, deferred, fakeLane, methods, record, row } from "./fakes.ts"
-import { createRuns, planRunEnd, type ReadPinned, streamInto } from "./runs.ts"
+import {
+  createRuns,
+  planRunEnd,
+  type ReadBehind,
+  type ReadPinned,
+  streamInto,
+} from "./runs.ts"
 import type { LaneWork } from "./work/index.ts"
 
 const LANE = laneNameForThread("0123456789abcdef")
@@ -41,14 +52,8 @@ describe("planRunEnd", () => {
     }
   })
 
-  test("a land prompt adds landingEnded, a stack prompt splitEnded, both before endRun", () => {
-    expect(planRunEnd("land")).toEqual([
-      "landingEnded",
-      "verdictPending",
-      "endRun",
-      "laneStopped",
-      "ended",
-    ])
+  test("a stack prompt adds splitEnded before endRun; a land prompt ends as any run (ADR-0080)", () => {
+    expect(planRunEnd("land")).toEqual(planRunEnd("chat"))
     expect(planRunEnd("stack")).toEqual([
       "splitEnded",
       "verdictPending",
@@ -56,7 +61,7 @@ describe("planRunEnd", () => {
       "laneStopped",
       "ended",
     ])
-    expect(planRunEnd(undefined)).not.toContain("landingEnded")
+    expect(planRunEnd(undefined)).not.toContain("splitEnded")
   })
 
   test("the verdict is pending before endRun, for every role (ADR-0077)", () => {
@@ -72,17 +77,15 @@ describe("planRunEnd", () => {
 
 function setUp(
   lane = fakeLane(LANE),
-  landingEnded: LaneWork["landingEnded"] = async () => {},
+  splitEnded: LaneWork["splitEnded"] = async () => null,
   readPinned: ReadPinned = async () => null,
+  readBehind: ReadBehind = async () => null,
 ) {
   const b = basics()
-  const work = record<
-    Pick<LaneWork, "beforeRun" | "runEnded" | "landingEnded" | "splitEnded">
-  >({
+  const work = record<Pick<LaneWork, "beforeRun" | "runEnded" | "splitEnded">>({
     beforeRun: () => {},
     runEnded: () => {},
-    landingEnded,
-    splitEnded: async () => null,
+    splitEnded,
   })
   const agent = record<Pick<Agent, "lane">>({ lane: () => lane.lane })
   // Whether the lane was still running when its verdict was made pending.
@@ -92,6 +95,7 @@ function setUp(
     agent: agent.port,
     work: work.port,
     readPinned,
+    readBehind,
     pending: async (l, prompt) => {
       pending.push({ prompt, running: readActiveRun(b.live, l) !== undefined })
     },
@@ -164,7 +168,7 @@ describe("a run's end", () => {
     runs.start(LANE, { kind: "prompt", message: chat, pinnedSeen: [] })
     writeEntry(
       b.root,
-      row(entryId("p-1"), null, { role: "land", content: "land" }),
+      row(entryId("p-1"), null, { role: "stack", content: "stack" }),
     )
     writeLaneTip(b.root, LANE, entryId("p-1"))
     lane.finish({ kind: "ok" })
@@ -219,8 +223,66 @@ describe("a run's pinned cards (ADR-0048)", () => {
     await ended
     expect(asked).toEqual([[LANE, seen]])
     expect(lane.calls.filter(c => c.method === "run").map(c => c.args)).toEqual(
-      [[chat, pinned]],
+      [[chat, [pinned]]],
     )
+  })
+
+  test("a chat's run is told its base's news first, before its cards entry, which stays the prompt's parent (ADR-0080)", async () => {
+    const behind = encodeBehind(
+      {
+        from: { kind: "line" },
+        to: commitId("l2"),
+        files: ["a.ts"],
+        overlap: [],
+        conflicts: [],
+      },
+      1,
+    )
+    const asked: string[] = []
+    const { lane, runs, ended } = setUp(
+      fakeLane(LANE),
+      undefined,
+      async () => pinned,
+      async l => {
+        asked.push(l)
+        return behind
+      },
+    )
+    runs.start(LANE, { kind: "prompt", message: chat, pinnedSeen: [] })
+    lane.finish({ kind: "ok" })
+    await ended
+    expect(asked).toEqual([LANE])
+    expect(lane.calls.filter(c => c.method === "run").map(c => c.args)).toEqual(
+      [[chat, [behind, pinned]]],
+    )
+  })
+
+  test("a split's run is not told its base's news: it has its own prompt", async () => {
+    const asked: string[] = []
+    const { lane, runs, ended } = setUp(
+      fakeLane(LANE),
+      undefined,
+      undefined,
+      async l => {
+        asked.push(l)
+        return null
+      },
+    )
+    const stack = planStack({
+      skill: null,
+      bookmark: "pineta-stack/x",
+      details: {
+        lane: LANE,
+        start: [],
+        tip: commitId("t"),
+        by: writerId("a@x.io"),
+      },
+      timestamp: 1,
+    })
+    runs.start(LANE, { kind: "prompt", message: stack, pinnedSeen: [] })
+    lane.finish({ kind: "ok" })
+    await ended
+    expect(asked).toEqual([])
   })
 
   test("a resume reads no pinned cards", async () => {

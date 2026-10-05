@@ -5,7 +5,8 @@
 // reads, `details` what the column shows. An update is a fact in the thread,
 // never a prompt: without it, the agent's next run would work from files it
 // no longer has. A stack message is the prompt of the run that splits an
-// offer, under the `offer-stack` skill.
+// offer, under the `offer-stack` skill, with the split card's text, if any,
+// as the person's brief (ADR-0080).
 
 import {
   type CatchUpFrom,
@@ -216,8 +217,13 @@ export const decodeStack = (message: unknown): StackDetails | undefined =>
 export const stackLine = (_d: StackDetails): string =>
   "⇶ splitting this thread's work into a stack"
 
+/** The person's text, under its own heading, as a resolution carries it; "" for none. */
+const asked = (intent: string): string =>
+  intent.trim() === "" ? "" : `\n\n## What the person asked\n\n${intent.trim()}`
+
 /**
- * The stack message: the skill's text, then where the stack starts and ends.
+ * The stack message: the skill's text, then where the stack starts and ends,
+ * then what the person asked of it, when its card had text (ADR-0080).
  * The bookmark it names is where the host reads the stack from.
  */
 export function planStack(input: {
@@ -228,6 +234,8 @@ export function planStack(input: {
   } | null
   readonly bookmark: string
   readonly details: Omit<StackDetails, "skill">
+  /** What the person asked of the split, from its card (ADR-0080); "" for nothing. */
+  readonly intent?: string
   readonly timestamp: number
 }): StackMessage {
   const { details } = input
@@ -243,7 +251,8 @@ export function planStack(input: {
       `${skill}Split this thread's work into a stack of revisions.\n\n` +
       `- Start from ${start}.\n` +
       `- The last revision must have exactly the files of \`${details.tip}\`.\n` +
-      `- When the stack is done, point the bookmark \`${input.bookmark}\` at its last revision (\`jj bookmark set ${input.bookmark} -r <last>\`).`,
+      `- When the stack is done, point the bookmark \`${input.bookmark}\` at its last revision (\`jj bookmark set ${input.bookmark} -r <last>\`).` +
+      asked(input.intent ?? ""),
     display: true,
     details: {
       ...details,

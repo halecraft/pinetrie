@@ -276,9 +276,15 @@ export function commandSendWords(
   command: NonNullable<SendPlan["command"]>,
   queue: QueuePlace,
 ): ButtonWords {
-  const verb = command.command === "continue-on-line" ? "continue" : "catch up"
+  const verb =
+    command.command === "split"
+      ? "split"
+      : command.command === "continue-on-line"
+        ? "continue"
+        : "catch up"
   return {
-    label: command.text ? `${verb} and send` : verb,
+    label:
+      command.command === "split" || !command.text ? verb : `${verb} and send`,
     title: queue.kind === "next" ? null : queueWords(queue).label,
   }
 }

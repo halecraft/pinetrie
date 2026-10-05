@@ -15,7 +15,7 @@ describe("inventoryView", () => {
     owner: ADA,
     placer: ADA,
     place: { kind: "inventory", holder: ADA },
-    command: null,
+    carries: { kind: "message", command: null },
     unsent: null,
   })
 

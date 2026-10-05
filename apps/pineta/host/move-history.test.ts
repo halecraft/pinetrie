@@ -35,7 +35,7 @@ async function setUp() {
     owner: ADA,
     placer: ADA,
     place: drafting(root),
-    command: null,
+    carries: { kind: "message", command: null },
     unsent: null,
   })
   /** The host's own write, outside any history. */

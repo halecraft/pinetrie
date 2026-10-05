@@ -5,6 +5,8 @@
 with its base, and now also with the thread it branched from), ADR-0055
 (a third card command, `catch-up-with-parent`) and ADR-0056 (a turn's paths
 are read with jj; a revision records its commit's conflicts).
+Amended by ADR-0080: the agent catches up with its parent through
+`catch_up`, refused as the button's command is.
 Amended by ADR-0083: the parent commit a lane last took is the one it
 last *caught up with* (`caughtUpWith`).
 

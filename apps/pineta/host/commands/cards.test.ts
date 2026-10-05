@@ -104,7 +104,7 @@ function setUp() {
           owner: ADA,
           placer: ADA,
           place: drafting,
-          command: null,
+          carries: { kind: "message", command: null },
           unsent: null,
           ...over,
         },
@@ -321,7 +321,7 @@ test("setCommand: the command set, its place and placer kept", async () => {
   const done = await commands.setCommand(C1, "bring-up-to-date")
   expect(done).toEqual({ outcome: { kind: "moved" }, rev: 2 })
   expect(readPlaces(b.places)[0]).toMatchObject({
-    command: "bring-up-to-date",
+    carries: { kind: "message", command: "bring-up-to-date" },
     placer: BEA,
     place: drafting,
   })

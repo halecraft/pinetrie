@@ -269,6 +269,12 @@ containers, disks and the helper.
   the queue's tail, so a snapshot cannot overlap the next turn's writes. A
   failed start or fork (`fatal`) breaks the gate, so tools fail with its
   error, until the lane is started again.
+- **A host tool may queue a merge during a run** (`catch_up`, ADR-0080):
+  the run holds no part of the queue, so the merge runs after the turn's
+  snapshot while the call waits on it (S103 item 1). The gate holds back
+  only a call that starts after: one already running would write while jj
+  checks out the merge, which is why `catch_up` must be alone in its
+  batch.
 - **The bundle is made on the lane's queue; the owner of your repo imports
   it** (`@pineta/repo`'s `importLane`, a command), which tools never wait
   on. The owner observes the import, and the moved ref marks the lane's
@@ -323,6 +329,12 @@ containers, disks and the helper.
   commit, or the bookmark when it has none, is conflicted; only then does
   `turnDone` list the files (`conflictedFilesAt`) into the record, which a
   branch's warning reads (ADR-0072).
+- **`copyFacts`** (ADR-0080) reads where the working copy sits against the
+  lane's bookmark, after a snapshot: `@`'s parents, the bookmark, and
+  whether the one parent descends from it (`isAncestor`, asked only when it
+  is not the bookmark). Every catch-up checks it before it merges
+  (`planCopyReady`, `@pineta/rules`): a split's stack as the working copy is
+  off the lane's line.
 - **`commitToBookmark`** is the one tail of every commit the host makes in
   a lane: `jj commit`, read `@-`, move the lane's bookmark. `commitTurn`,
   `mergeBase` and the mark of a move to the line all end with it.

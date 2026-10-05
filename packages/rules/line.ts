@@ -29,7 +29,6 @@ import {
   type LineDecision,
   type LineFacts,
   type LineRecord,
-  messageAt,
   nearestRevision,
   type ParentThread,
   type RevisionRecord,
@@ -112,6 +111,11 @@ const BaseRecordSchema = Type.Object({
     Type.Null(),
   ]),
   untraced: Type.Array(CommitSchema),
+  work: Type.Union([
+    Type.Literal("none"),
+    Type.Literal("some"),
+    Type.Literal("unknown"),
+  ]),
 })
 
 /** The integration line, at its one key. */
@@ -182,6 +186,7 @@ export const BASE: RecordSpec<BaseRecord, LaneName, "session"> = {
               files: r.catchUp.files,
             },
       untraced: r.untraced.map(commitId),
+      work: r.work,
     })),
 }
 
@@ -553,7 +558,8 @@ export function parentNow(input: {
   const first = firstPromptOf(index, revisions, input.lane, tip)
   let caughtUpWith = fork.commit
   for (const id of ancestry(index, tip).path) {
-    const merged = messageAt(index, id)?.merged?.find(c => parents.has(c))
+    // An update, a resolution or a `catch_up` result says what it merged.
+    const merged = index.entries[id]?.message?.merged?.find(c => parents.has(c))
     if (merged !== undefined) {
       caughtUpWith = merged
       break

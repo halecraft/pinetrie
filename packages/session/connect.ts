@@ -26,6 +26,7 @@ import { WebsocketClientTransport } from "@kyneta/websocket-transport/browser"
 import {
   type CardId,
   type CardRecord,
+  commandOf,
   type EntryId,
   type Intent,
   keyOf,
@@ -34,6 +35,7 @@ import {
   type Move,
   type MoveDirection,
   type OfferAction,
+  PLAIN,
   type Position,
   type RootId,
   type WriterId,
@@ -311,7 +313,7 @@ export type HostRequest = Exclude<
 >
 
 /** A card to create: the session makes you its owner and placer. */
-export type NewCard = Pick<CardRecord, "id" | "place" | "command" | "unsent">
+export type NewCard = Pick<CardRecord, "id" | "place" | "carries" | "unsent">
 
 /**
  * One card's undo, as its box binds it (`@kyneta/react`'s `attach`), saying
@@ -567,14 +569,16 @@ export async function connectSession(
       undo.gesture(() => {
         texts.text(card.id).text.insert(0, text)
       })
+      // Made plain: its command is set by a request of its own, after it.
+      const command = commandOf(card)
       const answer = sendMove(
         { card: card.id, from: null, to: keyOf(card.place) },
         how,
         null,
-        { ...card, owner: me, placer: me, command: null },
+        { ...card, owner: me, placer: me, carries: PLAIN },
       )
-      if (card.command !== null)
-        void send({ kind: "set-command", card: card.id, command: card.command })
+      if (command !== null)
+        void send({ kind: "set-command", card: card.id, command })
       return answer
     },
     moveCard(move, how = OFF_PAGE, queuedBy = null) {

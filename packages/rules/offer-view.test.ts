@@ -1,12 +1,10 @@
 import {
   type BaseRecord,
+  type CardCommand,
   commitId,
-  entryId,
-  type LandingRecord,
   laneNameForThread,
   type OfferRecord,
   type ThreadName,
-  writerId,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import {
@@ -20,7 +18,6 @@ import {
 import { conflictCause } from "./offer-view.ts"
 
 const LANE = laneNameForThread("1")
-const ADA = writerId("ada@x.io")
 const TIP = commitId("t1")
 const T2 = commitId("t2")
 const BASE = commitId("b0")
@@ -63,11 +60,11 @@ describe("offerView: ADR-0038's table", () => {
   const view = (
     o: OfferRecord | undefined,
     activity: "idle" | "turn" | "resolution" | "split" = "idle",
-    landing?: LandingRecord,
+    asked: number | null = null,
     catching: {
       catchUp?: CatchUpNow
       untraced?: boolean
-      catchingUp?: boolean
+      queued?: readonly CardCommand[]
       parent?: ParentNow | null
       parentRunning?: boolean
     } = {},
@@ -75,13 +72,13 @@ describe("offerView: ADR-0038's table", () => {
     offerView({
       offer: offerStatus(o),
       activity,
-      landing,
+      asked,
       base: null,
       onto: "pineta-onto",
       wipAhead: 0,
       catchUp: catching.catchUp ?? { kind: "current" },
       untraced: catching.untraced ?? false,
-      catchingUp: catching.catchingUp ?? false,
+      queued: catching.queued ?? [],
       parent: catching.parent ?? null,
       parentRunning: catching.parentRunning ?? false,
     })
@@ -190,29 +187,25 @@ describe("offerView: ADR-0038's table", () => {
     const behind = {
       catchUp: { kind: "brings", move: MOVE, files: 2 },
     } as const
-    expect(at(view(offer, "idle", undefined, behind))).toEqual([
+    expect(at(view(offer, "idle", null, behind))).toEqual([
       "ready",
       ["integrate", "split", "update"],
       ["describe"],
     ])
-    expect(at(view(undefined, "idle", undefined, behind))).toEqual([
+    expect(at(view(undefined, "idle", null, behind))).toEqual([
       "nothing",
       ["update"],
       [],
     ])
-    expect(view(undefined, "idle", undefined, behind).facts.catchUp).toEqual(
+    expect(view(undefined, "idle", null, behind).facts.catchUp).toEqual(
       behind.catchUp,
     )
     // Running, nothing to catch up with is offered at all.
-    expect(at(view(offer, "turn", undefined, behind))).toEqual([
-      "running",
-      [],
-      [],
-    ])
+    expect(at(view(offer, "turn", null, behind))).toEqual(["running", [], []])
   })
   test("catching up that would change nothing is listed, but quiet; one not yet read is not (S97)", () => {
     const quiet = (catchUp: CatchUpNow) =>
-      view(offer, "idle", undefined, { catchUp }).quiet
+      view(offer, "idle", null, { catchUp }).quiet
     expect(quiet({ kind: "current" })).toEqual(["update"])
     expect(quiet({ kind: "nothing-new" })).toEqual(["update"])
     expect(quiet({ kind: "unknown" })).toEqual([])
@@ -221,7 +214,7 @@ describe("offerView: ADR-0038's table", () => {
     const gone = offerView({
       offer: offerStatus(undefined),
       activity: "idle",
-      landing: undefined,
+      asked: null,
       base: { base: { kind: "wip", bookmark: "wip/a" }, state: "gone" },
       parent: null,
       parentRunning: false,
@@ -229,18 +222,18 @@ describe("offerView: ADR-0038's table", () => {
       wipAhead: 0,
       catchUp: { kind: "current" },
       untraced: false,
-      catchingUp: false,
+      queued: [],
     })
     expect([gone.menu, gone.quiet]).toEqual([["continue"], []])
   })
   test("an untraced thread's offer you edited can be integrated, never rebuilt (S97)", () => {
-    const edited = view({ ...offer, edited: true }, "idle", undefined, {
+    const edited = view({ ...offer, edited: true }, "idle", null, {
       untraced: true,
     })
     expect(at(edited)).toEqual(["edited", ["integrate", "update"], []])
   })
   test("an untraced thread offers nothing, and catching up beside it, never quiet (S97)", () => {
-    const untraced = view(undefined, "idle", undefined, { untraced: true })
+    const untraced = view(undefined, "idle", null, { untraced: true })
     expect([...at(untraced), untraced.quiet, untraced.facts.untraced]).toEqual([
       "nothing",
       ["update"],
@@ -250,15 +243,22 @@ describe("offerView: ADR-0038's table", () => {
     ])
   })
   test("a card bringing the thread up to date, queued on an idle lane: the offer is busy with it", () => {
-    const queued = view(offer, "idle", undefined, { catchingUp: true })
+    const queued = view(offer, "idle", null, { queued: ["bring-up-to-date"] })
     expect([queued.state, queued.buttons, queued.facts.activity]).toEqual([
       "busy",
       [],
       "catch-up",
     ])
     expect(
-      view(offer, "turn", undefined, { catchingUp: true }).facts.activity,
+      view(offer, "turn", null, { queued: ["bring-up-to-date"] }).facts
+        .activity,
     ).toBe("turn")
+  })
+  test("a split queued is not a catch-up: the offer stays ready, its split button quiet (ADR-0080)", () => {
+    const queued = view(offer, "idle", null, { queued: ["split"] })
+    expect([queued.state, queued.facts.activity]).toEqual(["ready", "idle"])
+    expect(queued.quiet).toContain("split")
+    expect(view(offer, "idle", null).quiet).not.toContain("split")
   })
   test("catchUpOf: moved from the commit a lane last caught up with in its base to the base's now, and what the host read of it there (S97)", () => {
     const moved = (...args: Parameters<typeof catchUpOf>) =>
@@ -293,6 +293,7 @@ describe("offerView: ADR-0038's table", () => {
       state: "ok" as const,
       catchUp: null,
       untraced: [],
+      work: "some",
     }
     const onWip: BaseRecord = {
       lane: LANE,
@@ -301,6 +302,7 @@ describe("offerView: ADR-0038's table", () => {
       state: "ok" as const,
       catchUp: null,
       untraced: [],
+      work: "some",
     }
     expect(moved(onLine, line(L1))).toBe(false)
     expect(moved(onLine, line(L2))).toBe(true)
@@ -350,17 +352,10 @@ describe("offerView: ADR-0038's table", () => {
       kind: "unknown",
     })
   })
-  test("a resolution that asked you counts only when newer than the offer", () => {
-    const asked: LandingRecord = {
-      id: "l",
-      lane: LANE,
-      prompt: entryId("e"),
-      state: "needs_you",
-      by: ADA,
-      at: 20,
-    }
-    expect(view(offer, "idle", asked).state).toBe("needs_you")
-    expect(view(offer, "idle", { ...asked, at: 5 }).state).toBe("ready")
+  test("an ask about a conflict counts only when newer than the offer (ADR-0080)", () => {
+    expect(view(offer, "idle", 20).state).toBe("needs_you")
+    expect(view(offer, "idle", 5).state).toBe("ready")
+    expect(view(offer, "idle", null).state).toBe("ready")
   })
 })
 
@@ -379,13 +374,13 @@ describe("a conflict that came with the copy, and the thread it branched from (A
     offerView({
       offer: offerStatus(o),
       activity: "idle",
-      landing: undefined,
+      asked: null,
       base: null,
       onto: "pineta-onto",
       wipAhead: 0,
       catchUp: { kind: "current" },
       untraced: false,
-      catchingUp: false,
+      queued: [],
       parent: p,
       parentRunning,
     })

@@ -9,6 +9,7 @@ import {
   type EntryId,
   entryId,
   laneNameForThread,
+  PLAIN,
   type PlaceKey,
   rootIdFor,
   type TraceRecord,
@@ -70,7 +71,7 @@ const card = (
   owner: ADA,
   place,
   placer,
-  command: null,
+  carries: PLAIN,
   unsent: null,
   ...over,
 })

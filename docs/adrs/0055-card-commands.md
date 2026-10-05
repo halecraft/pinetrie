@@ -16,6 +16,10 @@ your card the command to send; a card with a command says above its box
 what sending it does, and its button names the command.
 Amended by ADR-0072: a third command, `catch-up-with-parent`, merges the
 thread a thread branched from.
+Amended by ADR-0080: the rejected "tool the agent calls to pull" is taken up
+beside the card command, as `catch_up`, acting only when there is new work;
+and splitting an offer becomes a card command, `split`, which its button
+queues, as the catch-up button does.
 Amended by ADR-0083: the host *pops* a queued card, and carries out its
 command then.
 

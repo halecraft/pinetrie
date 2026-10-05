@@ -467,7 +467,8 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
     return {
       name,
       append: message => on(h => h.append(message), UNKNOWN_LANE),
-      run: (message, pinned) => on(h => h.run(message, pinned), UNKNOWN_LANE),
+      run: (message, before) => on(h => h.run(message, before), UNKNOWN_LANE),
+      steer: message => on(h => h.steer(message), UNKNOWN_LANE),
       resume: () => on(h => h.resume(), UNKNOWN_LANE),
       abort: () => on(h => h.abort(), undefined),
     }

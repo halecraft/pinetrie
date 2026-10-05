@@ -3,7 +3,8 @@
 // The one way a run starts. It announces its end and knows nothing of what
 // follows: `startHost` wires the drain and hot reload to `onEnded`, which is
 // what keeps the queue's pops and the commands out of this module. What a
-// run reads of its pinned cards is `readPinned`'s (`pinned.ts`).
+// run reads of its pinned cards is `readPinned`'s (`pinned.ts`); what it is
+// told of its base's new work, `readBehind`'s (`base-news.ts`, ADR-0080).
 
 import {
   type EntryId,
@@ -16,6 +17,7 @@ import {
 import type { Agent } from "@pineta/pi"
 import { readLatestPrompt } from "@pineta/reads"
 import {
+  type BehindMessage,
   CHAT_TYPE,
   type PinnedMessage,
   type PromptMessage,
@@ -53,6 +55,9 @@ export type ReadPinned = (
   signal: AbortSignal,
 ) => Promise<PinnedMessage | null>
 
+/** What a chat's run on `lane` is told of its base's new work first, or null (`base-news.ts`). */
+export type ReadBehind = (lane: LaneName) => Promise<BehindMessage | null>
+
 export interface Runs {
   /**
    * Start one turn on a thread's lane, streaming into the document. A
@@ -77,7 +82,6 @@ export interface Runs {
 
 /** One step of a run's end, in the order `planRunEnd` returns them. */
 export type RunEndStep =
-  | "landingEnded"
   | "splitEnded"
   | "verdictPending"
   | "endRun"
@@ -85,16 +89,16 @@ export type RunEndStep =
   | "ended"
 
 /**
- * A run's end, in order, from its prompt's role. A resolution records its
- * outcome and a split checks its stack, however they started. The run's
+ * A run's end, in order, from its prompt's role. A split checks its stack,
+ * however it started. A resolution ends as any run does: its outcome is the
+ * offer's conflicts and the agent's asks in the tree (ADR-0080, S104). The run's
  * verdict is pending before `endRun` (ADR-0077): written after, a reader
  * would see the lane stopped beside the last run's verdict. `endRun` comes
  * before `laneStopped` and `ended`: it closes the lane's streams (ADR-0044),
  * and what follows reads the lane as idle.
  */
 export function planRunEnd(role: string | undefined): readonly RunEndStep[] {
-  const outcome: readonly RunEndStep[] =
-    role === "land" ? ["landingEnded"] : role === "stack" ? ["splitEnded"] : []
+  const outcome: readonly RunEndStep[] = role === "stack" ? ["splitEnded"] : []
   return [...outcome, "verdictPending", "endRun", "laneStopped", "ended"]
 }
 
@@ -125,21 +129,19 @@ export const streamInto =
 export function createRuns(deps: {
   readonly basics: Basics
   readonly agent: Pick<Agent, "lane">
-  readonly work: Pick<
-    LaneWork,
-    "beforeRun" | "runEnded" | "landingEnded" | "splitEnded"
-  >
+  readonly work: Pick<LaneWork, "beforeRun" | "runEnded" | "splitEnded">
   readonly readPinned: ReadPinned
+  readonly readBehind: ReadBehind
   /** Write `lane`'s run's verdict as pending (`Digests.pending`). */
   readonly pending: (lane: LaneName, prompt: EntryId) => Promise<void>
 }): Runs {
-  const { basics, agent, work, readPinned } = deps
+  const { basics, agent, work, readPinned, readBehind } = deps
   const { docs, live, log } = basics
   let ended: (lane: LaneName, prompt: EntryId | null) => void = () => {}
   /**
    * A chat's run between its start and pi's, by lane. Only a chat's: a land
    * or stack run cancelled here would write no prompt, and `end` would read
-   * the lane's previous one, recording an old landing's outcome again.
+   * the lane's previous one, and could check an old split's stack again.
    */
   const waiting = new Map<LaneName, AbortController>()
 
@@ -154,9 +156,6 @@ export function createRuns(deps: {
     const cut = steps.indexOf("endRun")
     const carry = async (step: RunEndStep) => {
       switch (step) {
-        case "landingEnded":
-          if (prompt !== null) await work.landingEnded(lane, prompt.id)
-          return
         case "splitEnded":
           if (prompt !== null) await work.splitEnded(lane, prompt.id)
           return
@@ -214,7 +213,18 @@ export function createRuns(deps: {
             await handle.append(chat)
             return
           }
-          const ran = await handle.run(start.message, pinned)
+          // A chat's run is told its base's new work first (ADR-0080); a
+          // resolution or a split has a prompt of its own.
+          const behind =
+            chat === null
+              ? null
+              : await readBehind(lane).catch(error => {
+                  failed(basics, "the base's news")(error)
+                  return null
+                })
+          // The cards entry stays the prompt's parent.
+          const before = [behind, pinned].filter(m => m !== null)
+          const ran = await handle.run(start.message, before)
           if (chat !== null && settleRun(ran) === "keep") {
             // The reply was already `started`, so the author cannot be told;
             // at least their message is not lost.

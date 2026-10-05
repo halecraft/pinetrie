@@ -51,6 +51,7 @@ const BASE: BaseRecord = {
   state: "ok",
   catchUp: null,
   untraced: [],
+  work: "some",
 }
 const AT = {
   lane: LANE,

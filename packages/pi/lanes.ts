@@ -15,6 +15,7 @@ import {
 } from "@earendil-works/pi-agent-core/harness/context"
 import { NodeExecutionEnv } from "@earendil-works/pi-agent-core/harness/env/nodejs"
 import {
+  CONFLICT_TOOL,
   type EntryId,
   HOST_WORKING_COPY,
   hostPathInLane,
@@ -22,7 +23,7 @@ import {
   NO_EDITOR,
   type RuntimeProgram,
 } from "@pineta/core"
-import { PINNED_RULE } from "@pineta/rules"
+import { PINNED_RULE, type ToolAnswer } from "@pineta/rules"
 import { Type } from "typebox"
 import type { ModelSetup } from "./config.ts"
 import { buildSystemPrompt, ensureTool } from "./deep.ts"
@@ -148,10 +149,15 @@ export interface LaneHooks {
    */
   turnDone(lane: LaneName, tip: EntryId): Promise<void>
   /**
-   * `ask_for_guidance` was called. True when the lane's run is a landing,
-   * which then needs the person; false when it is not, and nothing is asked.
+   * `ask_about_conflict` was called. True when the lane's copy has a
+   * conflict to ask about, which then needs the person; false when it has
+   * none, and nothing is asked (ADR-0080).
    */
-  askedForGuidance(lane: LaneName, question: string): boolean
+  askedAboutConflict(lane: LaneName, question: string): Promise<boolean>
+  /** `catch_up` was called (ADR-0080): the host's answer. */
+  catchUp(lane: LaneName, from: "base" | "parent"): Promise<ToolAnswer>
+  /** `split_offer` was called (ADR-0080): the host's answer. */
+  askSplit(lane: LaneName): Promise<ToolAnswer>
 }
 
 type Context = Parameters<typeof withContextValue>[2]
@@ -301,25 +307,26 @@ export const systemPromptFor =
           : [PINNED_RULE, ...laneGuidelines(toolContext.lane.facts)],
     })
 
-export const GUIDANCE_TOOL = "ask_for_guidance"
-
-/** What `ask_for_guidance` answers outside a landing. */
-export const NOT_LANDING = "No landing is in progress: there is nothing to ask."
+/** What `ask_about_conflict` answers with no conflict in the lane's copy. */
+export const NO_CONFLICTS =
+  "There is no conflict in this thread's copy to ask about."
 
 /**
- * The tool a landing run can stop with (ADR-0033): calling it makes the
- * landing "needs you", whatever the files say. Every lane has it, so a lane's
- * tool list never changes between runs (S85); outside a landing it answers
- * that there is nothing to ask.
+ * The tool an agent leaves a conflict with (ADR-0033, ADR-0080): when its two
+ * sides meant different things, the agent leaves it as it is and asks, and
+ * the thread needs the person whatever the files say. Taken while the lane's
+ * copy has a conflict, in any run; its result's `details` say it asked, which
+ * is how the page reads it. Every lane has it, so a lane's tool list never
+ * changes between runs (S85).
  */
-export function guidanceTool(
-  onAsk: (lane: LaneName, question: string) => boolean,
+export function conflictTool(
+  onAsk: (lane: LaneName, question: string) => Promise<boolean>,
 ) {
   return {
-    name: GUIDANCE_TOOL,
-    label: "ask for guidance",
+    name: CONFLICT_TOOL,
+    label: "ask about a conflict",
     description:
-      "Stop and ask the person when the two sides of a merge meant different things, or when you cannot tell. Name both intents. After calling it, end your turn: the person will answer in this thread.",
+      "When the two sides of a conflict meant different things, or you cannot tell, leave that conflict as it is and ask the person. Name both intents. After calling it, end your turn: the person will answer in this thread.",
     parameters: Type.Object({
       question: Type.String({
         description: "What the person must decide, naming both intents",
@@ -334,17 +341,17 @@ export function guidanceTool(
       context: Context,
     ) {
       const lane = laneOf(context)
-      const asked = lane !== undefined && onAsk(lane, params.question)
+      const asked = lane !== undefined && (await onAsk(lane, params.question))
       return {
         content: [
           {
             type: "text" as const,
             text: asked
               ? "Asked. Stop here: the person will answer in this thread."
-              : NOT_LANDING,
+              : NO_CONFLICTS,
           },
         ],
-        details: undefined,
+        details: asked ? { asked: true } : undefined,
       }
     },
   }

@@ -4,6 +4,19 @@
 // use is not exported here: its tests import it from its module.
 
 export {
+  type CatchUpRefusal,
+  catchUpAnswer,
+  catchUpRefusal,
+  planCatchUpCall,
+  planCopyReady,
+  planSplitCall,
+  refusedAnswer,
+  SPLIT_QUEUED,
+  type SplitRefusal,
+  splitRefusal,
+  type ToolAnswer,
+} from "./agent-commands.ts"
+export {
   ARCHIVE,
   type ArchiveTeardown,
   archivedIn,
@@ -26,6 +39,17 @@ export {
   planAsk,
 } from "./banner.ts"
 export {
+  type BaseNews,
+  BEHIND_TYPE,
+  type BehindMessage,
+  behindContent,
+  behindLine,
+  decodeBehind,
+  encodeBehind,
+  planBaseNews,
+} from "./behind.ts"
+export {
+  type CarryPlan,
   cardEnd,
   cardsAt,
   decodeCard,
@@ -33,9 +57,12 @@ export {
   historyOf,
   type MoveStep,
   type MovesStep,
+  orderAfter,
   type PlaceStep,
   placeEnd,
   planCardSweep,
+  planCarry,
+  planFactCard,
   planFreshFollow,
   planHistorySweep,
   planMoveCommand,
@@ -74,6 +101,7 @@ export {
   encodeChat,
   type PromptMessage,
   planChat,
+  promptAuthor,
   renderableMessage,
   settleRun,
   withChatImages,
@@ -106,6 +134,18 @@ export {
   VERDICT_ALONE,
   VERDICT_THEN_DIGEST,
 } from "./digest.ts"
+export {
+  actionFact,
+  decodeFact,
+  decodeOfferFact,
+  encodeFact,
+  encodeOfferFact,
+  FACT_TYPE,
+  type FactMessage,
+  factContent,
+  factLine,
+  integratedFact,
+} from "./fact.ts"
 export { pastedImages, planImages } from "./images.ts"
 export {
   type ConflictShown,
@@ -113,10 +153,8 @@ export {
   type Floor,
   type FloorFound,
   LAND_TYPE,
-  LANDING,
   type LandMessage,
   type LandSkill,
-  landingRecord,
   type PromptBudget,
   planResolution,
   resolutionFloor,

@@ -134,11 +134,30 @@ changes Pineta can keep this note true. You can skip them.
   want done with it comes after, as their message.
   <!-- packages/lanes/merge.ts mergeBase -->
 - If the merge conflicts, a Pineta message asks you to resolve it. Then
-  use `ask_for_guidance` when the two sides meant different things. You
-  always have the tool, but outside such a resolution it only answers that
-  there is nothing to ask. <!-- packages/rules/land.ts LAND_TYPE -->
-  <!-- packages/pi/lanes.ts GUIDANCE_TOOL -->
-  <!-- packages/pi/lanes.ts NOT_LANDING -->
+  use `ask_about_conflict` when the two sides of a conflict meant different
+  things. You always have the tool, but it asks only while this copy has a
+  conflict; otherwise it answers that there is nothing to ask about.
+  <!-- packages/rules/land.ts LAND_TYPE -->
+  <!-- packages/core/tools.ts CONFLICT_TOOL -->
+  <!-- packages/pi/lanes.ts NO_CONFLICTS -->
+
+## This thread's base
+
+- When the thread's base (the project, or the WIP it started from) has new
+  work, a Pineta note says so, before the person's message or between your
+  tool calls: which files would change, which of them you changed too, and
+  whether your offer conflicts with it. <!-- packages/rules/behind.ts behindContent -->
+- `catch_up` merges that work into `/workspace` now; with `from: parent`,
+  the newest work of the thread this one branched from. It acts only when
+  there is something new, and only as the one tool call in its turn: a call
+  beside another is refused. A conflicted merge answers with the conflicts,
+  to resolve here. <!-- packages/rules/agent-commands.ts planCatchUpCall -->
+  <!-- packages/core/tools.ts CATCH_UP_TOOL -->
+- `split_offer` asks for this thread's offer to be split into a stack of
+  reviewable revisions. The split runs after your run, as a run of its own.
+  <!-- packages/rules/agent-commands.ts planSplitCall -->
+- Adding your work to the project is the person's: you offer it, they take
+  it. A note in the thread says when they do. <!-- packages/rules/fact.ts factContent -->
 
 ## When the lane can't do something
 

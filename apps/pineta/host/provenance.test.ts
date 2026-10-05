@@ -4,6 +4,7 @@ import {
   cardId,
   entryId,
   laneNameForThread,
+  PLAIN,
   rootIdFor,
   writerId,
 } from "@pineta/core"
@@ -27,7 +28,7 @@ test("before: a shared card's thread end in a loaded root; none for a root not l
       owner: ADA,
       placer: ADA,
       place,
-      command: null,
+      carries: PLAIN,
       unsent: null,
     },
   })

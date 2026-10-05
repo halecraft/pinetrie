@@ -19,7 +19,7 @@ const card: CardRecord = {
   owner: ADA,
   placer: ADA,
   place: { kind: "drafting", root: TEST_ROOT, at, lane: null },
-  command: null,
+  carries: { kind: "message", command: null },
   unsent: null,
 }
 

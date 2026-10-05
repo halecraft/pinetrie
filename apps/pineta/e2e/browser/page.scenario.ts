@@ -786,7 +786,7 @@ async function run(check: Checks["check"]): Promise<void> {
             at: beaEnd,
             lane: beaLane ?? null,
           },
-          command: null,
+          carries: { kind: "message", command: null },
           unsent: null,
         },
         "@agent Bea again",

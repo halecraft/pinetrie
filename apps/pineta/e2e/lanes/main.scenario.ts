@@ -8,6 +8,7 @@ import path from "node:path"
 import {
   ancestry,
   commitId,
+  conflictAskedAt,
   type EntryId,
   entryId,
   type LaneName,
@@ -20,7 +21,6 @@ import {
 import { DEFAULT_LINE, laneBase, type Runner, run } from "@pineta/lanes"
 import { scriptedModel } from "@pineta/pi"
 import {
-  readLandings,
   readLine,
   readNames,
   readOffers,
@@ -57,6 +57,7 @@ import {
   inLaneQuiet,
   jj,
   jjFails,
+  queueCommand,
   START_AGENT,
   sh,
 } from "./support.ts"
@@ -679,14 +680,26 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       { text: "resolved: both kept" },
     ])
     const intent = "keep both sides"
+    /** The newest land message on the thread's path: a resolution's prompt. */
+    const landOf = (): EntryId | null => {
+      if (two === undefined) return null
+      const index = tree()
+      return (
+        ancestry(index, laneTip(two.name)).path.find(
+          id => index.entries[id]?.message?.role === "land",
+        ) ?? null
+      )
+    }
+    const landBefore = landOf()
     if (two !== undefined)
       bringUpToDate(wu, two.name, laneTip(two.name), intent)
-    await waitFor(() => readLandings(wh.session).length > 0, 60_000)
+    await waitFor(() => {
+      const land = landOf()
+      return land !== null && land !== landBefore
+    }, 60_000)
     await idle()
-    const landing = readLandings(wh.session).at(-1)
-    const landMessage = projectTranscript(tree(), landing?.prompt ?? null).at(
-      -1,
-    )
+    const landing = landOf()
+    const landMessage = projectTranscript(tree(), landing).at(-1)
     const clean = await waitFor(
       () =>
         offerOf()?.conflicts.length === 0 &&
@@ -695,20 +708,23 @@ async function mainSection(check: Checks["check"]): Promise<void> {
     )
     // What the model read: the land message's content, not its one line.
     const stored =
-      landing === undefined
+      landing === null
         ? { present: false as const }
-        : entryMessageIn(wh, landing.prompt)
+        : entryMessageIn(wh, landing)
     const landPrompt = stored.present
       ? (stored.message as { content?: unknown }).content
       : undefined
+    // A resolution ends as any run (ADR-0080): no ask about a conflict.
+    const askedAt =
+      two === undefined ? null : conflictAskedAt(tree(), laneTip(two.name))
     check(
       "a card that brings the thread up to date runs the resolution when it conflicts, with the card's text, and the offer comes back clean",
       landMessage?.text.includes("1 file conflicts") === true &&
         typeof landPrompt === "string" &&
         landPrompt.endsWith(intent) &&
-        landing?.state === "resolved" &&
+        askedAt === null &&
         clean >= 0,
-      `${landing?.state ?? "no resolution"}`,
+      `${JSON.stringify({ landing, askedAt, clean })}`,
     )
     // The resolution moved the lane: the offer followed it in place, back to
     // a work in progress while the run went on, then described again.
@@ -916,7 +932,11 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       },
       { text: "split" },
     ])
-    const split = lane2 === undefined ? null : await wu.offer(lane2, "split")
+    // A split is a card's command, queued as the button queues it (ADR-0080).
+    const split =
+      lane2 === undefined
+        ? null
+        : queueCommand(wu, lane2, laneTip(lane2), "", "split")
     await idle()
     const stacked = await waitFor(() => offerOf()?.size === 2, 30_000)
     const squashed =
@@ -926,7 +946,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
     await wh.quiet()
     check(
       "split into a stack: the agent's stack becomes the offer, and squash makes it one again",
-      split?.kind === "started" &&
+      split !== null &&
         stacked >= 0 &&
         squashed?.kind === "offered" &&
         offerOf()?.size === 1,

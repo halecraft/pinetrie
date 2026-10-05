@@ -9,12 +9,13 @@
 
 import {
   type CommitId,
+  type CopyFacts,
   commitId,
   type EntryId,
   type LaneName,
   revisionMessage,
 } from "@pineta/core"
-import { setBookmark } from "./bookmarks.ts"
+import { bookmarkOf, setBookmark } from "./bookmarks.ts"
 import { planTurnCommit } from "./plan.ts"
 import { describeFailure, lines, type Runner } from "./run.ts"
 
@@ -146,6 +147,37 @@ export async function commitTurn(
     commit: await commitToBookmark(jj, input.lane, revisionMessage(input)),
     conflicted: atConflict === "true",
   }
+}
+
+/**
+ * Where the lane's working copy sits against its bookmark (ADR-0080), after
+ * a snapshot: `@`'s parents, the bookmark, and whether the one parent
+ * descends from it, asked only when it is not the bookmark itself.
+ */
+export async function copyFacts(
+  jj: Runner,
+  lane: LaneName,
+): Promise<CopyFacts> {
+  const at = await jj([
+    "log",
+    "--no-graph",
+    "-r",
+    "@",
+    "-T",
+    'parents.map(|c| c.commit_id()).join("\\n") ++ "\\n"',
+  ])
+  if (!at.ok) throw new Error(describeFailure("jj log", at))
+  const parents = lines(at.stdout).map(commitId)
+  const bookmark = await bookmarkOf(jj, lane)
+  const [parent] = parents
+  const descends =
+    parents.length === 1 &&
+    parent !== undefined &&
+    bookmark !== null &&
+    parent !== bookmark
+      ? await isAncestor(jj, bookmark, parent)
+      : false
+  return { parents, bookmark, descends }
 }
 
 /**

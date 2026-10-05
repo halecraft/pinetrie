@@ -2,9 +2,18 @@
 // integrate, squash, refresh, or describe again. Each is one owner command:
 // gather (`gatherOffer`, and `gatherOfferIntegration` for an integration),
 // decide (`planOfferIntegration`, `planRebuild`), translate and execute. An
-// offer integration moves one bookmark forward to the offer (ADR-0060).
+// offer integration moves one bookmark forward to the offer (ADR-0060). An
+// action carried out answers with its fact, what the thread is told it did
+// (ADR-0080).
 
-import type { ErrCode, LaneName, OfferSeen, WriterId } from "@pineta/core"
+import {
+  ERR,
+  type ErrCode,
+  type LaneName,
+  type OfferFact,
+  type OfferSeen,
+  type WriterId,
+} from "@pineta/core"
 import { readThreadName } from "@pineta/reads"
 import {
   gatherOffer,
@@ -13,6 +22,8 @@ import {
   type RepoOps,
 } from "@pineta/repo"
 import {
+  actionFact,
+  integratedFact,
   planDescribeAgain,
   planOfferIntegration,
   planRebuild,
@@ -33,25 +44,40 @@ export async function act(
   by: WriterId,
   to: string | null = null,
   seen: OfferSeen | null = null,
-): Promise<ErrCode | null> {
+): Promise<
+  | { readonly kind: "refused"; readonly code: ErrCode }
+  | { readonly kind: "done"; readonly fact: OfferFact }
+> {
   const { owner, line, basics, docs } = deps
   const done = await owner.command(ops => carry(ops))
   // After the command, so the description reads what it wrote. Tracked, and
   // logged on failure, by `requestOutside`.
   if (done.describe !== null) void describe(deps, refresh, lane, done.describe)
-  return done.code
+  return done.fact === null
+    ? { kind: "refused", code: done.code ?? ERR.REFUSED }
+    : { kind: "done", fact: done.fact }
 
-  /** The command, and whether its offer is described after it: forced, or if wanted. */
+  /**
+   * The command, whether its offer is described after it (forced, or if
+   * wanted), and its fact: null when it was refused.
+   */
   async function carry(ops: RepoOps): Promise<{
     readonly code: ErrCode | null
     readonly describe: boolean | null
+    readonly fact: OfferFact | null
   }> {
-    const code = (c: ErrCode | null) => ({ code: c, describe: null })
+    const code = (c: ErrCode) => ({ code: c, describe: null, fact: null })
     // gather
     const gathered = await gatherOffer(ops, docs.input(lane))
     if (action === "describe") {
       const refused = planDescribeAgain(gathered)
-      return refused === null ? { code: null, describe: true } : code(refused)
+      return refused === null
+        ? {
+            code: null,
+            describe: true,
+            fact: actionFact("describe", lane, by),
+          }
+        : code(refused)
     }
     if (action === "integrate") {
       const integration =
@@ -83,7 +109,11 @@ export async function act(
       basics.log(
         `[host] ${readThreadName(basics.session, lane)}: offer integrated by ${by} as ${planned.top.slice(0, 8)}`,
       )
-      return code(null)
+      return {
+        code: null,
+        describe: null,
+        fact: integratedFact({ lane, by, decision: planned, onto: line.onto }),
+      }
     }
     // squash and refresh: the offer rebuilt from the lane's tip, as one.
     const name = gathered?.name
@@ -93,6 +123,6 @@ export async function act(
     )
     if (planned.kind === "refused") return code(planned.why)
     await refresh.rebuild(ops, lane, planned)
-    return { code: null, describe: false }
+    return { code: null, describe: false, fact: actionFact(action, lane, by) }
   }
 }

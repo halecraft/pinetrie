@@ -1,6 +1,7 @@
 import {
   type AgentMessageLike,
   type BaseRecord,
+  type CardCommand,
   cardId,
   commitId,
   type EntryId,
@@ -13,6 +14,7 @@ import {
   laneNameForThread,
   type OfferRecord,
   type PinnedView,
+  PLAIN,
   type ProjectRecord,
   projectColumns,
   type RevisionRecord,
@@ -171,7 +173,6 @@ const work = (over: Partial<WorkFacts> = {}): WorkFacts => ({
   commands: [],
   lanes: new Map(),
   revisions: new Map(),
-  landings: [],
   offers: new Map(),
   names: new Map(),
   banners: new Map(),
@@ -208,6 +209,7 @@ const BASE: BaseRecord = {
     files: ["a.txt", "b.txt"],
   },
   untraced: [],
+  work: "some",
 }
 const laneView = (name: LaneName, tip: string, running = false): LaneView => ({
   name,
@@ -252,7 +254,7 @@ const facts = (
     mountedBanner: null,
     writable: true,
     nameOf: new Map([[ADA, "Ada"]]),
-    catchingUp: false,
+    queuedCommands: [],
     acting: null,
     lanes: [],
     work: work(),
@@ -699,7 +701,7 @@ describe("offerWords", () => {
     catching: {
       catchUp?: CatchUpNow
       untraced?: boolean
-      catchingUp?: boolean
+      queued?: readonly CardCommand[]
       parent?: ParentNow | null
       parentRunning?: boolean
     } = {},
@@ -709,13 +711,13 @@ describe("offerWords", () => {
       offerView({
         offer: offerStatus(o),
         activity,
-        landing: undefined,
+        asked: null,
         base,
         onto: "pineta-onto",
         wipAhead: 2,
         catchUp: catching.catchUp ?? { kind: "current" },
         untraced: catching.untraced ?? false,
-        catchingUp: catching.catchingUp ?? false,
+        queued: catching.queued ?? [],
         parent: catching.parent ?? null,
         parentRunning: catching.parentRunning ?? false,
       }),
@@ -878,9 +880,9 @@ describe("offerWords", () => {
     ])
   })
   test("a queued catch-up is the offer's activity: the strip says it is catching up", () => {
-    expect(words(offer, "idle", LINE_BASE, { catchingUp: true }).line).toBe(
-      "catching up with the project…",
-    )
+    expect(
+      words(offer, "idle", LINE_BASE, { queued: ["bring-up-to-date"] }).line,
+    ).toBe("catching up with the project…")
   })
   test("only a clean offer lands on the line: a conflicted one on the line is caught up and resolved, on a WIP added anyway to it", () => {
     const conflicted = { ...offer, conflicts: ["a.txt"] }
@@ -970,7 +972,6 @@ describe("offerWords", () => {
       sent("integrate", "pineta-onto"),
       "adding to the project…",
     ],
-    ["a split", LINE_BASE, sent("split"), "splitting into a stack…"],
     ["a squash", LINE_BASE, sent("squash"), "squashing to one…"],
     ["a describe", LINE_BASE, sent("describe"), "rewriting the description…"],
     ["a refresh", LINE_BASE, sent("refresh"), "refreshing…"],
@@ -1119,7 +1120,7 @@ test("pinnedStatus: read, changed or unread against what the agent reads, by the
     owner: ADA,
     placer: ADA,
     place: { kind: "inventory", holder: ADA } as const,
-    command: null,
+    carries: PLAIN,
     unsent: null,
   }
   const inView: PinnedView = {

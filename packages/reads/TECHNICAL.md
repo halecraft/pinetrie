@@ -35,7 +35,8 @@ functions.
 Reads the host decides from, or that more than one reader needs:
 `readRenderableEntries`, `readTreeIndex`, `readLanes` (and `readLane`, one
 of them), `readRunning`, `readLatestPrompt` (what a lane's run is: a
-run's end and `ask_for_guidance` both decide by it),
+run's end and `split_offer` decide by it), `readRunAuthor` (the person
+behind it, `promptAuthor`, ADR-0080),
 `readParticipantNames`, `readParticipants`, `readReading`, `readTyping`,
 `readAgentActivity`, `readSeats`, `readPlaces` and `readPlacesRev` (ADR-0059),
 `readArchive`, `readMarks` (ADR-0045), `readStops` and `readDigests`

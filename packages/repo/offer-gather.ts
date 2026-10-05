@@ -87,6 +87,7 @@ const baseRecord = (
     readonly state: BaseRecord["state"]
     readonly start: StartRead
     readonly catchUp: CatchUpRead | null
+    readonly work: WorkChanges
   },
 ): BaseRecord => ({
   lane,
@@ -96,6 +97,7 @@ const baseRecord = (
   catchUp: input.catchUp,
   untraced:
     input.start.kind === "untraced" ? input.start.integratedOfferCommits : [],
+  work: input.work,
 })
 
 /** A place with a target: untraced, or placed when its start is known. */
@@ -141,7 +143,11 @@ const commitOf = async (jj: Runner, bookmark: string) =>
 async function placeOf(
   jj: Runner,
   input: OfferInput,
-): Promise<{ readonly place: OfferPlace; readonly base: BaseRecord } | null> {
+): Promise<{
+  readonly place: OfferPlace
+  readonly base: BaseRecord
+  readonly work: WorkChanges
+} | null> {
   const { line, lane } = input
   const tip = await laneTipIn(jj, lane)
   if (tip === null) return null
@@ -164,9 +170,12 @@ async function placeOf(
           tip,
           known: input.known,
         })
+  // An untraced start reads nothing: its work is unknown (ADR-0067).
+  const work = await workChanges(jj, { start, tip })
   return {
     place: placeFrom({ tip, base, state, target, start }),
-    base: baseRecord(lane, { base, state, start, catchUp }),
+    base: baseRecord(lane, { base, state, start, catchUp, work }),
+    work,
   }
 }
 
@@ -235,7 +244,7 @@ export async function gatherRefresh(
     return {
       kind: "plan",
       name,
-      base: baseRecord(lane, { base, state: "ok", start, catchUp }),
+      base: baseRecord(lane, { base, state: "ok", start, catchUp, work }),
       facts: factsOf(sited({ tip, base, state: "ok", target, start }), {
         work,
         offer,
@@ -244,16 +253,8 @@ export async function gatherRefresh(
   }
   const read = await placeOf(jj, input)
   if (read === null) return { kind: "none" }
-  const { place, base } = read
+  const { place, base, work } = read
   if (place.kind === "gone") return { kind: "gone", base }
-  // An untraced start reads nothing: its work is unknown, and builds nothing.
-  const work =
-    place.kind === "placed"
-      ? await workChanges(jj, {
-          start: { kind: "known", start: place.start },
-          tip: place.tip,
-        })
-      : "unknown"
   const offer = await readOffer(jj, { name, target: place.target })
   return { kind: "plan", name, base, facts: factsOf(place, { work, offer }) }
 }

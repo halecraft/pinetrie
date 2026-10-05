@@ -20,6 +20,7 @@ const BASE: BaseRecord = {
   state: "ok",
   catchUp: null,
   untraced: [],
+  work: "some",
 }
 const OFFER: OfferRecord = {
   lane: LANE,
@@ -43,6 +44,7 @@ test("the records the host writes from your repo: only what changed, and only a 
   const agent = record<Agent>({
     writeValues: async writes => applyWrites(b, writes),
   })
+  const changed: string[] = []
   const { records } = createOfferDeps({
     owner: record<RepoOwner>({}).port,
     line: DEFAULT_LINE,
@@ -50,6 +52,7 @@ test("the records the host writes from your repo: only what changed, and only a 
     agent: () => agent.port,
     running: () => false,
     bookmarkMoved: () => {},
+    baseChanged: lane => changed.push(lane),
   })
   await records.remove(LANE)
   await records.writeBase(null)
@@ -60,6 +63,8 @@ test("the records the host writes from your repo: only what changed, and only a 
   await records.write(OFFER)
   expect(agent.calls).toHaveLength(2)
   expect(readBases(b.session).get(LANE)).toEqual(BASE)
+  // A base record that changed asks whether its thread is told (ADR-0080).
+  expect(changed).toEqual([LANE])
   // An integrated offer's record is written whatever is there.
   await records.writeIntegratedOffer({ ...OFFER, integratedAs: "kt" })
   expect(readOffers(b.session).get(LANE)?.integratedAs).toBe("kt")

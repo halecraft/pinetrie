@@ -1,24 +1,11 @@
-import {
-  commitId,
-  entryId,
-  type LandingRecord,
-  laneNameForThread,
-  writerId,
-} from "@pineta/core"
+import { commitId, laneNameForThread, writerId } from "@pineta/core"
 import { describe, expect, test } from "vitest"
-import {
-  LANDING,
-  landingRecord,
-  planResolution,
-  renderableMessage,
-  setRecord,
-} from "./index.ts"
+import { planResolution, renderableMessage } from "./index.ts"
 import {
   type ConflictFile,
   conflictSections,
   type Floor,
   LAND_TYPE,
-  landingOutcome,
   type PromptBudget,
   resolutionFloor,
 } from "./land.ts"
@@ -26,52 +13,6 @@ import {
 const LANE = laneNameForThread("1")
 const ADA = writerId("ada")
 const C1 = commitId("c1")
-
-describe("landing", () => {
-  test("LANDING round-trips, keyed by the resolution's own id", () => {
-    const landing: LandingRecord = {
-      id: "l1",
-      lane: LANE,
-      prompt: entryId("e2"),
-      state: "resolved",
-      by: ADA,
-      at: 2,
-    }
-    const g = setRecord(LANDING, landing)
-    expect([g.key, LANDING.decode(g.value, g.key)]).toEqual(["l1", landing])
-  })
-  test("landingOutcome: the agent can always ask; conflicts left are never resolved", () => {
-    expect(landingOutcome({ askedForGuidance: false, conflictsLeft: 0 })).toBe(
-      "resolved",
-    )
-    expect(landingOutcome({ askedForGuidance: true, conflictsLeft: 0 })).toBe(
-      "needs_you",
-    )
-    expect(landingOutcome({ askedForGuidance: false, conflictsLeft: 2 })).toBe(
-      "needs_you",
-    )
-  })
-  test("a resolution's record names its prompt, its landing, how it ended and who asked", () => {
-    const ada = writerId("ada@example.com")
-    expect(
-      landingRecord({
-        details: { landing: "l-1", by: ada },
-        lane: laneNameForThread("0123456789abcdef"),
-        prompt: entryId("e-7"),
-        askedForGuidance: false,
-        conflictsLeft: 1,
-        now: 5,
-      }),
-    ).toEqual({
-      id: "l-1",
-      lane: laneNameForThread("0123456789abcdef"),
-      prompt: entryId("e-7"),
-      state: "needs_you",
-      by: ada,
-      at: 5,
-    })
-  })
-})
 
 /** pi's estimate of a custom message (`packages/pi/compaction.ts`): a token per four characters. */
 const budgetOf = (tokens: number): PromptBudget => ({
@@ -163,7 +104,7 @@ describe("planResolution: the land message", () => {
       reasons,
       `${"a".repeat(size / 2)}\n<<<<<<< conflict 1 of 1\nCONFLICT\n>>>>>>> conflict 1 of 1 ends\n${"b".repeat(size / 2)}`,
     )
-  const details = { landing: "l1", lane: LANE, yours: [C1], by: ADA }
+  const details = { lane: LANE, yours: [C1], by: ADA }
   const plan = (files: ConflictFile[], tokens: number, intent = "") =>
     planResolution({
       floor: floorOf(tokens, intent),

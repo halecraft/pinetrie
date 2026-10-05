@@ -23,7 +23,7 @@ const card = (id: string, owner = "p-ada"): CardRecord => ({
     at: atEntry(entryId("e1")),
     lane: null,
   },
-  command: null,
+  carries: { kind: "message", command: null },
   unsent: null,
 })
 

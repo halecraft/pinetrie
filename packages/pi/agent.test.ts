@@ -7,6 +7,7 @@
 
 import {
   cardId,
+  commitId,
   ERR,
   entryId,
   type LaneName,
@@ -21,7 +22,9 @@ import {
   writerId,
 } from "@pineta/core"
 import {
+  BEHIND_TYPE,
   deleteRecord,
+  encodeBehind,
   encodeChat,
   encodePinned,
   LANE,
@@ -127,7 +130,7 @@ describe("createThreadLane (ADR-0057)", () => {
       0,
     )
     expect(await lane.append(message)).toEqual(unknown)
-    expect(await lane.run(message, null)).toEqual(unknown)
+    expect(await lane.run(message, [])).toEqual(unknown)
     expect(await lane.resume()).toEqual(unknown)
     await agent.close()
   })
@@ -242,7 +245,7 @@ describe("a pi session per root (ADR-0063)", () => {
           createdAt: 1,
         }),
       ])
-      expect(await first.lane(lane).run(chat(`in ${root}`), null)).toEqual({
+      expect(await first.lane(lane).run(chat(`in ${root}`), [])).toEqual({
         kind: "ok",
       })
     }
@@ -263,7 +266,7 @@ describe("a pi session per root (ADR-0063)", () => {
       tools: null,
     })
     for (const lane of lanes)
-      expect(await second.lane(lane).run(chat("again"), null)).toEqual({
+      expect(await second.lane(lane).run(chat("again"), [])).toEqual({
         kind: "ok",
       })
     expect(await second.interrupted([ONE_ROOT, OTHER])).toEqual([])
@@ -364,7 +367,7 @@ describe("pinned cards: what the model reads (ADR-0048, S92)", () => {
     ])
     const { agent, doc, lane } = await laneOver(script)
     const pinned = cardsOf(lane, "ship the sync fix")
-    expect(await agent.lane(lane).run(asked("go"), pinned)).toEqual({
+    expect(await agent.lane(lane).run(asked("go"), [pinned])).toEqual({
       kind: "ok",
     })
     await agent.close()
@@ -377,14 +380,67 @@ describe("pinned cards: what the model reads (ADR-0048, S92)", () => {
     expect(seen.at(-1)).toBe("Ada: go")
   })
 
+  test("a base's news goes in before the cards entry, in the run's commit; the model reads it first, and the next run keeps the cache (ADR-0080)", async () => {
+    const script = scriptedModel()
+    let seen: readonly string[] = []
+    script.use([
+      {
+        reply: context => {
+          seen = context
+          return "ok"
+        },
+      },
+      { text: "ok" },
+    ])
+    const { agent, doc, lane } = await laneOver(script)
+    const pad = (s: string) => `${s} ${"words ".repeat(200)}`
+    const pinned = cardsOf(lane, pad("ship the sync fix"))
+    const behind = encodeBehind(
+      {
+        from: { kind: "line" },
+        to: commitId("l2"),
+        files: ["a.ts"],
+        overlap: [],
+        conflicts: [],
+      },
+      1,
+    )
+    const handle = agent.lane(lane)
+    expect(await handle.run(asked(pad("go")), [behind, pinned])).toEqual({
+      kind: "ok",
+    })
+    await handle.run(asked(pad("again")), [])
+    await agent.close()
+    const news = rows(doc).find(r => messageOf(r)?.customType === BEHIND_TYPE)
+    const cards = rows(doc).find(r => r.parentId === news?.id)
+    const prompt = rows(doc).find(r => r.parentId === cards?.id)
+    expect(
+      [cards, prompt].map(r => messageOf(r ?? { payload: null })?.customType),
+    ).toEqual([PINNED_TYPE, "pineta.chat"])
+    expect(seen.slice(-3)).toEqual([
+      behind.content,
+      pinned.content,
+      `Ada: ${pad("go")}`,
+    ])
+    const [first, second] = rows(doc)
+      .map(r => messageOf(r))
+      .filter(m => m?.role === "assistant")
+      .map(m => m?.usage)
+    if (first === undefined || second === undefined)
+      throw new Error("two replies, each with its usage")
+    expect(second.cacheRead).toBeGreaterThanOrEqual(
+      first.cacheRead + first.cacheWrite - 1,
+    )
+  })
+
   test("an edited card keeps the cache: the request after it reads everything the request before it sent", async () => {
     const script = scriptedModel({ answer: { text: "ok" } })
     const { agent, doc, lane } = await laneOver(script)
     const pad = (s: string) => `${s} ${"words ".repeat(200)}`
     const handle = agent.lane(lane)
-    await handle.run(asked(pad("one")), cardsOf(lane, pad("card v1")))
-    await handle.run(asked(pad("two")), null)
-    await handle.run(asked(pad("three")), cardsOf(lane, pad("card v2")))
+    await handle.run(asked(pad("one")), [cardsOf(lane, pad("card v1"))])
+    await handle.run(asked(pad("two")), [])
+    await handle.run(asked(pad("three")), [cardsOf(lane, pad("card v2"))])
     await agent.close()
     const usage = rows(doc)
       .map(r => messageOf(r))
@@ -417,9 +473,9 @@ describe("pinned cards: what the model reads (ADR-0048, S92)", () => {
     const big = (s: string) => `${s} ${"words ".repeat(10_000)}`
     const handle = agent.lane(lane)
     const pinned = cardsOf(lane, "ship the sync fix")
-    await handle.run(asked(big("one")), pinned)
-    await handle.run(asked(big("two")), null)
-    await handle.run(asked("three"), null)
+    await handle.run(asked(big("one")), [pinned])
+    await handle.run(asked(big("two")), [])
+    await handle.run(asked("three"), [])
     await agent.close()
     const compaction = rows(doc).find(r => r.type === "compaction")
     expect(

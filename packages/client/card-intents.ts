@@ -152,7 +152,7 @@ export function planTakeCopyIntoInventory(
         owner: facts.me,
         placer: facts.me,
         place: { kind: "inventory", holder: facts.me },
-        command: null,
+        carries: { kind: "message", command: null },
         unsent: null,
       },
       text,

@@ -63,7 +63,7 @@ const card: CardRecord = {
   owner: ada,
   placer: ada,
   place: { kind: "drafting", root: TEST_ROOT, at, lane },
-  command: "bring-up-to-date",
+  carries: { kind: "message", command: "bring-up-to-date" },
   unsent: null,
 }
 

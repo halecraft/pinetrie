@@ -10,6 +10,56 @@ const trailers = "packages/core/trailers.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "turnEntry stops at a steered fact",
+    file: tree,
+    from: '      (toolResultOf(entry) === null && entry.message?.role !== "behind")',
+    to: "      toolResultOf(entry) === null",
+    command: unit,
+    expect: "turnEntry climbs past a steered fact",
+  },
+  {
+    name: "a catch-up's turn never merged",
+    file: tree,
+    from: "  turnTail(index, tip).some(",
+    to: "  [].some(",
+    command: unit,
+    expect: "turnMerged: a turn whose catch_up result merged",
+  },
+  {
+    name: "a merge is not what the thread knows of its base",
+    file: tree,
+    from: "        ? e.message?.merged\n",
+    to: "        ? undefined\n",
+    command: unit,
+    expect: "the newest base commit heard of or merged on the path",
+  },
+  {
+    name: "a fact is not drawn",
+    file: tree,
+    from: '  "carry-on",\n  "fact",\n',
+    to: '  "carry-on",\n',
+    command: unit,
+    expect: "a host's fact and its base's news show as their one line",
+  },
+  {
+    name: "an ask ends at a compaction",
+    file: tree,
+    from: '    "pass",\n  )\n',
+    to: "    () => null,\n  )\n",
+    command: unit,
+    expect:
+      "an ask stays a fact past a compaction, and a result that did not ask is none",
+  },
+  {
+    name: "a compaction never ends a walk",
+    file: tree,
+    from: '    if (entry.type === "compaction" && atCompaction !== "pass")',
+    to: "    if (false)",
+    command: unit,
+    expect:
+      "a compaction ends the walk with its answer, unless the read passes it",
+  },
+  {
     name: "traces seen may name none",
     file: "packages/protocol/codec.ts",
     from: "    value.length === 0 ||\n",
@@ -751,10 +801,10 @@ export const mutations: readonly Mutation[] = [
     expect: "a pinned card needs its order; its key has none",
   },
   {
-    name: "a compaction does not end the walk",
+    name: "a compaction's carried cards are not in view",
     file: tree,
-    from: '    if (entry?.type === "compaction") return entry.carried ?? null\n',
-    to: "\n",
+    from: "    e => e.carried ?? null,\n",
+    to: "    () => null,\n",
     command: unit,
     expect: "a compaction ends the walk",
   },
@@ -785,8 +835,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a carry-on message is no message",
     file: tree,
-    from: '  "stack",\n  "carry-on",\n])\n\n/**\n * One entry',
-    to: '  "stack",\n])\n\n/**\n * One entry',
+    from: '  "stack",\n  "carry-on",\n  "fact",\n',
+    to: '  "stack",\n  "fact",\n',
     command: unit,
     expect: "messageAt: the host's own messages show as their line",
   },

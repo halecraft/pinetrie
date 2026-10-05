@@ -62,18 +62,16 @@ export interface CommandDeps {
 }
 
 /**
- * Where a command runs (ADR-0065). An offer action (but a split) and a
- * `line` command act on your repo only: they go straight to its owner, and
- * hold no other command. An archive is three parts (`handleArchive`).
- * Everything else, a split among them (it reads the lane's state and starts
- * a run), is one step on the documents' keeper.
+ * Where a command runs (ADR-0065). An offer action and a `line` command act
+ * on your repo only: they go straight to its owner, and hold no other
+ * command. An archive is three parts (`handleArchive`). Everything else is
+ * one step on the documents' keeper.
  */
 export function placeOfCommand(
   intent: Intent,
 ): "documents" | "repo" | "archive" {
   switch (intent.kind) {
     case "offer":
-      return intent.action === "split" ? "documents" : "repo"
     case "line":
       return "repo"
     case "archive":

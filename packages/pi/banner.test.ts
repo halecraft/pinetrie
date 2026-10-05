@@ -125,7 +125,16 @@ describe("banners in a harness", () => {
       tools: {
         project: root,
         access: () => ({ kind: "direct", dir: root, ready: Promise.resolve() }),
-        hooks: { turnDone: async () => {}, askedForGuidance: () => false },
+        hooks: {
+          turnDone: async () => {},
+          askedAboutConflict: async () => false,
+          catchUp: async () => {
+            throw new Error("no catch_up here")
+          },
+          askSplit: async () => {
+            throw new Error("no split_offer here")
+          },
+        },
       },
       ...(asks === undefined
         ? {}
@@ -160,7 +169,7 @@ describe("banners in a harness", () => {
       { tool: BANNER_TOOL, args: { direction: "at dusk" } },
       { text: "done" },
     ])
-    await agent.lane(made.lane).run(prompt("a dusk banner, please"), null)
+    await agent.lane(made.lane).run(prompt("a dusk banner, please"), [])
     expect(asks).toEqual([
       {
         lane: made.lane,
@@ -185,7 +194,7 @@ describe("banners in a harness", () => {
     const asks: { lane: LaneName; ask: BannerAsk }[] = []
     const after = await agentOver(doc, script, asks)
     script.use([{ tool: BANNER_TOOL, args: {} }, { text: "done" }])
-    await after.lane(made.lane).run(prompt("a banner, please"), null)
+    await after.lane(made.lane).run(prompt("a banner, please"), [])
     expect(asks.map(a => a.lane)).toEqual([made.lane])
     await after.close()
   })
@@ -202,9 +211,7 @@ describe("banners in a harness", () => {
     const script = scriptedModel()
     const after = await agentOver(doc, script)
     script.use([{ tool: BANNER_TOOL, args: {} }, { text: "no banner" }])
-    const ran = await after
-      .lane(made.lane)
-      .run(prompt("a banner, please"), null)
+    const ran = await after.lane(made.lane).run(prompt("a banner, please"), [])
     expect(ran).toEqual({ kind: "ok" })
     expect(toolResults(doc).join("\n")).not.toContain(
       "A new banner is being made",

@@ -27,6 +27,7 @@ import type {
   ThreadLane,
   WorkSetting,
 } from "@pineta/core"
+import { commandOf } from "@pineta/core"
 import { type QueuedCard, writersOfClients } from "@pineta/rules"
 import { textClients } from "@pineta/schema"
 import { IN_COLUMN, newCardId, type SessionClient } from "@pineta/session"
@@ -240,7 +241,7 @@ export function CardEditor(p: {
   )
   /** The WIP a new lane of its own starts from; null for the line (ADR-0060). */
   const [base, setBase] = useState<string | null>(null)
-  const command = card?.command ?? null
+  const command = card === undefined ? null : commandOf(card)
   const plan = planSend({
     text,
     fresh: p.fresh,
@@ -305,7 +306,7 @@ export function CardEditor(p: {
             {
               id: next.state.card,
               place: p.place,
-              command: null,
+              carries: { kind: "message", command: null },
               unsent: null,
             },
             el.value,
@@ -829,6 +830,7 @@ export function QueuedCardEditor(p: {
   onTyping: () => void
 }) {
   const { card } = p
+  const command = commandOf(card)
   return (
     <BoundCardEditor
       card={card}
@@ -836,9 +838,9 @@ export function QueuedCardEditor(p: {
       heading={
         <>
           {queuedWords(card.place.by, p.n, p.reader)}
-          {card.command !== null && (
+          {command !== null && (
             <div className="card-command">
-              {commandNote(card.command, p.catchUps)}
+              {commandNote(command, p.catchUps)}
             </div>
           )}
         </>

@@ -264,8 +264,8 @@ export const mutations: readonly Mutation[] = [
     name: "a command's button never says it sends the text",
     file: "packages/client/send.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "    label: command.text ? `${verb} and send` : verb,",
-    to: "    label: verb,",
+    from: '      command.command === "split" || !command.text ? verb : `${verb} and send`,',
+    to: "      verb,",
     command: unit,
     expect: "a card with a command and text sends the text after",
   },

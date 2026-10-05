@@ -156,7 +156,9 @@ export const PROJECT: RecordSpec<ProjectRecord, typeof PROJECT_KEY, "session"> =
  * its prompts only, with neither. Only a turn's own commit carries the paths
  * it changed: a prompt's newest revision is what came before it (ADR-0056).
  * Every record with a commit carries that commit's conflicts, so a branch
- * from any of them knows its copy's (ADR-0072).
+ * from any of them knows its copy's (ADR-0072). A turn whose `catch_up`
+ * merged (ADR-0080) records the lane's newest revision, which the merge is,
+ * with no paths: a branch from it starts with the merged files.
  */
 export function planTurnRecord(input: {
   readonly entry: EntryId
@@ -175,6 +177,11 @@ export function planTurnRecord(input: {
   readonly paths: readonly string[]
   /** The files conflicted in the commit the record names: `committed`, else `newest`. */
   readonly conflicts: readonly string[]
+  /**
+   * The turn merged into the lane (`turnMerged`, ADR-0080): its `catch_up`
+   * moved the bookmark, so with no commit of its own the turn names it.
+   */
+  readonly merged: boolean
 }): RevisionRecord | null {
   const { entry, lane } = input
   if (!input.own)
@@ -183,7 +190,8 @@ export function planTurnRecord(input: {
       : null
   if (!input.isPrompt && !input.toolCalls && input.committed === null)
     return null
-  const commit = input.committed ?? (input.isPrompt ? input.newest : null)
+  const commit =
+    input.committed ?? (input.isPrompt || input.merged ? input.newest : null)
   return {
     entry,
     lane,

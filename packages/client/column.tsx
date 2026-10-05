@@ -8,6 +8,7 @@ import {
   type CardId,
   type CardRecord,
   type ColumnView,
+  commandOf,
   conflictsAt,
   type DigestRecord,
   type EntryId,
@@ -32,6 +33,7 @@ import {
 import {
   cardsAt,
   effectiveBase,
+  factLine,
   type OfferButton,
   placeEnd,
   queuedOn,
@@ -173,7 +175,7 @@ export interface ColumnProps {
   /** The streams to draw, from the same moment as `index` (`liveWork`). */
   live: LiveWork
   lanes: readonly LaneView[]
-  /** Where lanes work, the files at each entry, and landings (ADR-0032). */
+  /** Where lanes work, the files at each entry, and each lane's offer (ADR-0032). */
   work: WorkFacts
   /** The ids on this column's path, which the app has already computed. */
   path: ReadonlySet<EntryId>
@@ -459,7 +461,10 @@ export function Column(p: ColumnProps) {
     acting:
       lane.kind === "lane" ? (acting.offers.get(lane.name) ?? null) : null,
     mountedBanner,
-    catchingUp: queued.some(c => c.command !== null),
+    queuedCommands: queued.flatMap(c => {
+      const command = commandOf(c)
+      return command === null ? [] : [command]
+    }),
     index,
     asks: p.asks,
     view,
@@ -544,9 +549,10 @@ export function Column(p: ColumnProps) {
   if (pane !== null && paneShows === null) setPane(null)
   const paneId = `pane-${p.column.key}`
   const toggleReview = useStable(() => openPane({ kind: "offer" }))
-  // Catching up is a card with the command and no text, queued at once
-  // (ADR-0055, ADR-0061): the host pops it when the lane is free.
-  // An integration names its destination: the default, or the line (ADR-0060).
+  // Catching up and splitting are a card with the command and no text,
+  // queued at once (ADR-0055, ADR-0061, ADR-0080): the host pops it when
+  // the lane is free. An integration names its destination: the default,
+  // or the line (ADR-0060).
   const actOnOffer = (button: OfferButton) => {
     if (lane.kind !== "lane") return
     if (button === "integrate" || button === "integrate-into-line") {
@@ -567,20 +573,23 @@ export function Column(p: ColumnProps) {
     if (
       button !== "update" &&
       button !== "continue" &&
-      button !== "catch-up-parent"
+      button !== "catch-up-parent" &&
+      button !== "split"
     )
       return act({ kind: "offer", lane: lane.name, action: button, to: null })
     if (at.kind !== "entry") return
     const root = p.session.rootOf(at.id)
     if (root === undefined) return
     act({
-      kind: "bringUpToDate",
+      kind: "queueCommand",
       command:
         button === "continue"
           ? "continue-on-line"
           : button === "catch-up-parent"
             ? "catch-up-with-parent"
-            : "bring-up-to-date",
+            : button === "split"
+              ? "split"
+              : "bring-up-to-date",
       lane: lane.name,
       at,
       create: {
@@ -588,7 +597,7 @@ export function Column(p: ColumnProps) {
         owner: p.session.writer,
         place: { kind: "drafting", root, at, lane: lane.name },
         placer: p.session.writer,
-        command: null,
+        carries: { kind: "message", command: null },
         unsent: null,
       },
     })
@@ -975,19 +984,27 @@ export function Column(p: ColumnProps) {
               {running && <div aria-hidden className="working-line" />}
               {/* Cards queued for this thread's lane, in the order the host pops
             them: not in the tree yet, and editable by anyone until popped. */}
-              {queued.map((c, n) => (
-                <QueuedCardEditor
-                  card={c}
-                  key={c.id}
-                  n={n}
-                  onAct={act}
-                  onTyping={p.onTyping}
-                  readOnly={p.readOnly}
-                  reader={reader}
-                  session={p.session}
-                  catchUps={catchUps}
-                />
-              ))}
+              {queued.map((c, n) =>
+                c.carries.kind === "fact" ? (
+                  // The host's fact, waiting for the run's end: nobody edits
+                  // or moves it (ADR-0080).
+                  <div className="queued-fact" key={c.id}>
+                    {factLine(c.carries.fact)}
+                  </div>
+                ) : (
+                  <QueuedCardEditor
+                    card={c}
+                    key={c.id}
+                    n={n}
+                    onAct={act}
+                    onTyping={p.onTyping}
+                    readOnly={p.readOnly}
+                    reader={reader}
+                    session={p.session}
+                    catchUps={catchUps}
+                  />
+                ),
+              )}
               {refused.map(r => (
                 <div className="refused-move" key={refusalKey(r)}>
                   {refusalWords(r, reader)}

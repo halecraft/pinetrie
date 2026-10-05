@@ -1,15 +1,18 @@
 // host/commands/lane — the commands that act on one thread's lane: stop it,
-// or act on its offer (ADR-0038).
+// carry it on after a Stop (ADR-0082), or act on its offer (ADR-0038),
+// which leaves a fact in the thread (ADR-0080).
 
 import {
+  atEntry,
+  cardId,
   ERR,
   type ErrCode,
   type Intent,
   indexAsks,
-  isBusy,
   type LaneName,
   type LaneView,
   type LineAction,
+  type OfferFact,
   type RootId,
   type TreeIndex,
   type WriterId,
@@ -26,22 +29,31 @@ import {
 import {
   displayName,
   planCarryOn,
+  planFactCard,
   planStop,
   STOP,
   setRecord,
 } from "@pineta/rules"
-import type { RootDocHandle } from "@pineta/schema"
-import type { Basics } from "../basics.ts"
+import { type RootDocHandle, readLaneTip } from "@pineta/schema"
+import { type Basics, failed, type HostKeeper } from "../basics.ts"
+import { applyPlaceSteps } from "../places.ts"
+import type { Provenance } from "../provenance.ts"
 import type { Runs } from "../runs.ts"
 import type { LaneWork } from "../work/index.ts"
 
 export interface LaneDeps {
   readonly basics: Basics
   readonly agent: Pick<Agent, "lane" | "writeValues">
-  readonly work: Pick<LaneWork, "offers" | "line" | "prepareSplit">
+  readonly work: Pick<LaneWork, "offers" | "line">
   readonly start: Runs["start"]
   /** Stop a chat's run that has not reached pi yet (`Runs.cancel`). */
   readonly cancel: Runs["cancel"]
+  /** Drain a lane whose queue a card joined, unless it runs (`queueDrain`). */
+  readonly drain: (lane: LaneName) => void
+  /** The documents' keeper: a fact's card is written in a step of its own. */
+  readonly keeper: Pick<HostKeeper, "run">
+  /** Each card's history: a fact's card is the host's write. */
+  readonly provenance: Pick<Provenance, "before" | "after">
 }
 
 /** A thread's lane as its root's document has it now (`laneAt`). */
@@ -138,8 +150,8 @@ export async function handleCarryOn(
 }
 
 /**
- * An offer action (ADR-0038). A split is a run on the lane, so a busy lane
- * refuses it; every other action is the offer shell's, on your repo.
+ * An offer action (ADR-0038), the offer shell's, on your repo. A split is a
+ * card's command, not an action (ADR-0080).
  */
 export async function actOnOffer(
   deps: LaneDeps,
@@ -155,26 +167,47 @@ export async function actOnOffer(
       code: ERR.NOT_OWN_COPY,
       message: "this host has no lanes of their own",
     }
-  if (action === "split") {
-    const view = (await laneAt(deps.basics, lane))?.lane
-    if (view === undefined || isBusy(view))
-      return {
-        kind: "refused",
-        code: ERR.BUSY,
-        message: "the thread is working: split its offer when it stops",
-      }
-    const message = await work.prepareSplit(lane, by)
-    if ("refused" in message)
-      return { kind: "refused", code: ERR.REFUSED, message: message.refused }
+  const done = await offers.act(lane, action, by, to, seen)
+  if (done.kind === "refused")
     return {
-      kind: "started",
-      runId: deps.start(lane, { kind: "prompt", message, pinnedSeen: [] }),
+      kind: "refused",
+      code: done.code,
+      message: offerRefusal(done.code),
     }
-  }
-  const refused = await offers.act(lane, action, by, to, seen)
-  if (refused !== null)
-    return { kind: "refused", code: refused, message: offerRefusal(refused) }
+  // Off the command's reply: the fact is written in a keeper step of its own.
+  void deps.keeper
+    .run(() => recordFact(deps, done.fact))
+    .catch(failed(deps.basics, "an offer's fact", lane))
   return action === "integrate" ? { kind: "integrated" } : { kind: "offered" }
+}
+
+/**
+ * What a command on an offer did, queued as a card on its thread (ADR-0080)
+ * and the lane's drain asked for: an idle lane pops it at once, a running
+ * one when its run ends, in order with the cards already waiting. One step:
+ * the card is written against the places as they are, with its history.
+ */
+export async function recordFact(
+  deps: Pick<LaneDeps, "basics" | "drain" | "provenance">,
+  fact: OfferFact,
+): Promise<void> {
+  const { docs, places, newId } = deps.basics
+  const root = docs.rootOfLane(fact.lane)
+  if (root === null) return
+  const tip = readLaneTip(await docs.root(root), fact.lane)
+  if (tip === null) return
+  const before = deps.provenance.before()
+  applyPlaceSteps(places, [
+    planFactCard({
+      cards: readPlaces(places),
+      id: cardId(newId()),
+      fact,
+      root,
+      at: atEntry(tip),
+    }),
+  ])
+  await deps.provenance.after({ kind: "host" }, before)
+  deps.drain(fact.lane)
 }
 
 /** Why an offer action was refused, worded once. */

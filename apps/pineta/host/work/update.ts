@@ -1,12 +1,13 @@
 // host/work/update — a thread's base, or the thread it branched from,
 // merged into its lane, when the host pops a queued card with a command
-// (ADR-0055, ADR-0060, ADR-0072), and the resolution run's outcome when it
-// conflicts (ADR-0033). One step on the lane's queue gathers, plans and merges; then
-// `planSettle` decides what the thread gets, and `applySettle` writes it.
+// (ADR-0055, ADR-0060, ADR-0072) or its agent calls `catch_up`, and whether
+// its agent may ask about a conflict (ADR-0080). One step on the lane's
+// queue gathers, plans and merges; then `planSettle` decides what the thread
+// gets, and `applySettle` writes it.
 
 import {
   type BaseMerge,
-  type CardCommand,
+  type CatchUpCommand,
   type CommitId,
   type EntryId,
   ERR,
@@ -17,6 +18,7 @@ import {
   messageText,
   snapshotId,
   type TreeIndex,
+  toolCallsOf,
   turnEntry,
   type WriterId,
 } from "@pineta/core"
@@ -26,6 +28,7 @@ import {
   bookmarkRevset,
   commitTurn,
   conflictsIn,
+  copyFacts,
   DEFAULT_LINE,
   laneBase,
   type Merged,
@@ -37,36 +40,41 @@ import {
 } from "@pineta/lanes"
 import { type Agent, LAND_BUDGET, type ThreadLaneHandle } from "@pineta/pi"
 import {
-  readLatestPrompt,
+  readBases,
+  readLine,
   readNames,
   readRevisions,
+  readRunAuthor,
   readRunning,
   readTreeIndex,
 } from "@pineta/reads"
 import { beginFacts, type RepoOwner, readWipState } from "@pineta/repo"
 import {
+  catchUpAnswer,
   catchUpName,
-  decodeLand,
+  catchUpOf,
+  catchUpRefusal,
   encodeUpdate,
   type Floor,
-  LANDING,
   type LandMessage,
   type LandSkill,
-  landingRecord,
   mergedFrom,
   type ParentNow,
   type PromptBudget,
   parentNow,
+  planCatchUpCall,
+  planCopyReady,
   planParentUpdate,
   planResolution,
   planUpdateFrom,
+  refusedAnswer,
   resolutionFloor,
-  setRecord,
+  type ToolAnswer,
   type UpdateMessage,
   type UpdateRefusal,
 } from "@pineta/rules"
-import { readEntryMessage, readLaneTip } from "@pineta/schema"
-import { type Basics, failed, messageOf } from "../basics.ts"
+import { readLaneTip } from "@pineta/schema"
+import { type Basics, messageOf } from "../basics.ts"
 import type { Containers } from "./containers.ts"
 import { snapshotOnQueue } from "./disk.ts"
 import type { Fetches } from "./fetch.ts"
@@ -159,19 +167,31 @@ export type Prepared =
 
 const refused = (reason: string): Prepared => ({ kind: "refused", reason })
 
+/** Why a catch-up into a copy off its own line is refused (`planCopyReady`). */
+const OFF_LINE = catchUpRefusal("off-line")
+
 /**
- * Start the lane, run `update`, and stop the lane again unless a resolution
- * run is to start: that run's end stops it. A throw is a refusal saying why.
+ * What follows an update (ADR-0080): a run whatever it comes to, as after a
+ * quiet catch-up before a person's message; or the card's text, whose send
+ * may start no run, so the lane stops unless a resolution runs.
+ */
+export type UpdateFollows = "run" | "send"
+
+/**
+ * Start the lane, run `update`, and stop the lane again unless a run
+ * follows: the one `follows` names, or the resolution of a conflicted merge.
+ * That run's end stops it. A throw is a refusal saying why.
  */
 export async function withLaneStarted(
   ports: { readonly beforeRun: () => void; readonly runEnded: () => void },
+  follows: UpdateFollows,
   update: () => Promise<Prepared>,
 ): Promise<Prepared> {
   const prepared = await (async () => {
     ports.beforeRun()
     return update()
   })().catch((error: unknown) => refused(messageOf(error)))
-  if (prepared.kind !== "conflicted") ports.runEnded()
+  if (follows === "send" && prepared.kind !== "conflicted") ports.runEnded()
   return prepared
 }
 
@@ -181,8 +201,6 @@ export type SettleFacts =
   | (Extract<Merged, { readonly kind: "conflicted" }> & {
       /** What the prompt must fit, settled before the merge (`planCatchUp`). */
       readonly floor: Floor
-      /** The resolution's id. */
-      readonly landing: string
     })
 
 /**
@@ -277,7 +295,7 @@ export function planSettle(
               reasons: touching(facts.theirs, path).map(d => firstLine(d, 200)),
             },
           })),
-          details: { landing: facts.landing, lane, yours: [facts.from], by },
+          details: { lane, yours: [facts.from], by },
           timestamp: ctx.now,
         }),
         fetch: null,
@@ -325,22 +343,29 @@ export interface Updates {
    * the conflicts. Nothing new: nothing to do, but a move to the line is
    * fetched. Refused, with the lane untouched, when even the smallest
    * resolution prompt would not fit (ADR-0084). The lane is stopped after,
-   * unless a resolution runs.
+   * unless a run follows (`follows`).
    */
   prepareUpdate(
     lane: LaneName,
     by: WriterId,
     intent: string,
-    command: CardCommand,
+    command: CatchUpCommand,
+    follows: UpdateFollows,
   ): Promise<Prepared>
-  /** A resolution run ended: its outcome, from the repository. */
-  landingEnded(lane: LaneName, prompt: EntryId): Promise<void>
   /**
-   * pi's hook: the lane's agent asked for guidance. Taken only while the
-   * lane's run is a resolution, its prompt a land message; every lane has
-   * the tool (S85), so another run's call is answered that nothing is asked.
+   * pi's hook: the lane's agent called `catch_up` (ADR-0080, S103). Merged
+   * during its run, on the lane's queue, with no start or stop of the lane,
+   * and nothing appended: the tool's answer is the update. Refused unless
+   * the call is the only one in its turn and there is something new.
    */
-  askedForGuidance(lane: LaneName): boolean
+  catchUpInRun(lane: LaneName, from: "base" | "parent"): Promise<ToolAnswer>
+  /**
+   * pi's hook: the lane's agent asked about a conflict. Taken while jj finds
+   * a conflict in the lane's copy, in any run (ADR-0080, S104): read on the
+   * lane's queue, never from a revision record, which can be late. A lane
+   * that works directly has no copy to ask about.
+   */
+  askedAboutConflict(lane: LaneName): Promise<boolean>
 }
 
 export function createUpdates(deps: {
@@ -355,8 +380,6 @@ export function createUpdates(deps: {
   const { basics, setup, registry, containers } = deps
   const { docs } = basics
   const line = setup.lanes?.line ?? DEFAULT_LINE
-  /** Resolution runs whose agent called `ask_for_guidance`. */
-  const asked = new Set<LaneName>()
 
   /**
    * The update's entry recorded as a revision, the merge its commit, with a
@@ -432,7 +455,7 @@ export function createUpdates(deps: {
   const updateOnQueue = (
     lane: LaneName,
     owner: RepoOwner,
-    command: CardCommand,
+    command: CatchUpCommand,
     resolution: Parameters<typeof planCatchUp>[1],
   ) => {
     const handle = registry.handleOf(lane)
@@ -443,10 +466,13 @@ export function createUpdates(deps: {
         | {
             readonly kind: "merged"
             readonly from: BaseMerge
-            readonly merged: Merged
-            readonly floor: Floor
+            readonly facts: SettleFacts
           }
       > => {
+        // A merge lands at the lane's bookmark: a working copy off its line
+        // (a split's stack) would be left beside it (ADR-0080).
+        if (planCopyReady(await copyFacts(jj, lane)) === "off-line")
+          return refused(OFF_LINE)
         const from =
           command === "catch-up-with-parent"
             ? await parentOf(lane).then(p => planParentUpdate(p.now, p.running))
@@ -457,7 +483,12 @@ export function createUpdates(deps: {
         if (catchUp.kind === "refused") return refused(catchUp.reason)
         await commitEdits(lane, jj)
         const merged = await mergeUpdate(jj, handle.runners, lane, catchUp.plan)
-        return { kind: "merged", from, merged, floor: catchUp.floor }
+        // A conflict's prompt fits the floor settled before the merge.
+        const facts: SettleFacts =
+          merged.kind === "conflicted"
+            ? { ...merged, floor: catchUp.floor }
+            : merged
+        return { kind: "merged", from, facts }
       },
     )
 
@@ -484,16 +515,85 @@ export function createUpdates(deps: {
     }
   }
 
+  /** What a resolution's prompt must fit (ADR-0084), read before a merge. */
+  const resolutionOf = async (
+    intent: string,
+  ): Promise<Parameters<typeof planCatchUp>[1]> => ({
+    budget: LAND_BUDGET,
+    skill: await deps.agent().skill("pineta:skill:resolve-conflicts"),
+    intent,
+  })
+
   return {
-    askedForGuidance(lane) {
-      const doc = docs.docOfLane(lane)
-      if (doc === null || readLatestPrompt(doc, lane)?.role !== "land")
-        return false
-      asked.add(lane)
-      return true
+    async askedAboutConflict(lane) {
+      if (!registry.isOwn(lane)) return false
+      const jj = registry.laneJjOf(lane)
+      const conflicts = await registry
+        .handleOf(lane)
+        .queue.enqueue(() => conflictsIn(jj))
+      return conflicts.length > 0
     },
 
-    async prepareUpdate(lane, by, intent, command) {
+    async catchUpInRun(lane, from) {
+      const { owner } = setup
+      const doc = await docs.laneDoc(lane)
+      // Who the update is by: the person behind the run.
+      const by = doc === null ? null : readRunAuthor(doc, docs.session, lane)
+      if (
+        !registry.isOwn(lane) ||
+        owner === null ||
+        doc === null ||
+        by === null
+      )
+        return refusedAnswer("no-copy")
+      // gather
+      const index = readTreeIndex(doc)
+      const tip = readLaneTip(doc, lane)
+      const parent = from === "parent" ? await parentOf(lane) : null
+      // plan
+      const call = planCatchUpCall({
+        from,
+        own: true,
+        calls:
+          tip === null
+            ? 0
+            : toolCallsOf(index.entries[turnEntry(index, tip)]?.message).length,
+        base: catchUpOf(
+          readBases(docs.session).get(lane),
+          readLine(docs.session),
+        ),
+        parent: parent?.now ?? null,
+        parentRunning: parent?.running ?? false,
+      })
+      if (call.kind === "refused") return refusedAnswer(call.why)
+      // execute
+      const done = await updateOnQueue(
+        lane,
+        owner,
+        call.command,
+        await resolutionOf(""),
+      )
+      if (done.kind === "refused")
+        return refusedAnswer(
+          done.reason === OFF_LINE ? "off-line" : { reason: done.reason },
+        )
+      if (done.kind !== "merged") return catchUpAnswer({ kind: "nothing" })
+      const settle = planSettle(done.facts, {
+        lane,
+        by,
+        from: done.from,
+        index: readTreeIndex(doc),
+        now: basics.now(),
+      })
+      if (settle.fetch !== null) void deps.fetchLane(lane, settle.fetch)
+      return catchUpAnswer(
+        settle.kind === "clean"
+          ? { kind: "clean", message: settle.message, merged: settle.merge }
+          : settle,
+      )
+    },
+
+    async prepareUpdate(lane, by, intent, command, follows) {
       const { owner } = setup
       if (!registry.isOwn(lane) || owner === null)
         return refused("the lane has no copy of its own")
@@ -502,22 +602,17 @@ export function createUpdates(deps: {
           beforeRun: () => containers.beforeRun(lane),
           runEnded: () => containers.runEnded(lane),
         },
+        follows,
         async () => {
           // Read before the merge: the floor its prompt must fit needs it.
-          const skill = await deps
-            .agent()
-            .skill("pineta:skill:resolve-conflicts")
-          const done = await updateOnQueue(lane, owner, command, {
-            budget: LAND_BUDGET,
-            skill,
-            intent,
-          })
+          const done = await updateOnQueue(
+            lane,
+            owner,
+            command,
+            await resolutionOf(intent),
+          )
           if (done.kind !== "merged") return done
-          const { from, merged, floor } = done
-          const facts: SettleFacts =
-            merged.kind === "conflicted"
-              ? { ...merged, floor, landing: basics.newId() }
-              : merged
+          const { from, facts } = done
           const doc = await docs.laneDoc(lane)
           const settle = planSettle(facts, {
             lane,
@@ -536,40 +631,6 @@ export function createUpdates(deps: {
           )
         },
       )
-    },
-
-    async landingEnded(lane, prompt) {
-      const doc = await docs.laneDoc(lane)
-      const stored =
-        doc === null
-          ? { present: false as const }
-          : readEntryMessage(doc, prompt)
-      const details = stored.present ? decodeLand(stored.message) : undefined
-      const wasAsked = asked.delete(lane)
-      if (!registry.isOwn(lane) || setup.root === null || details === undefined)
-        return
-      try {
-        // The run recorded its last turn already, as every run does.
-        const jj = registry.laneJjOf(lane)
-        const left = await registry
-          .handleOf(lane)
-          .queue.enqueue(() => conflictsIn(jj))
-        await deps.agent().writeValues([
-          setRecord(
-            LANDING,
-            landingRecord({
-              details,
-              lane,
-              prompt,
-              askedForGuidance: wasAsked,
-              conflictsLeft: left.length,
-              now: basics.now(),
-            }),
-          ),
-        ])
-      } catch (error) {
-        failed(basics, "the resolution's outcome", lane)(error)
-      }
     },
   }
 }

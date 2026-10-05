@@ -103,7 +103,35 @@ describe("planTurnRecord: every prompt, and every turn with tool calls", () => {
     own: true,
     paths: ["a.txt"],
     conflicts: ["x.txt"],
+    merged: false,
   }
+  test("a turn whose catch_up merged names the bookmark it moved, with no paths; its own commit wins (ADR-0080)", () => {
+    expect(
+      planTurnRecord({
+        ...base,
+        isPrompt: false,
+        toolCalls: true,
+        committed: null,
+        merged: true,
+      }),
+    ).toEqual({
+      entry: base.entry,
+      lane: LANE,
+      commit: C1,
+      snapshot: S,
+      paths: [],
+      conflicts: ["x.txt"],
+    })
+    expect(
+      planTurnRecord({
+        ...base,
+        isPrompt: false,
+        toolCalls: true,
+        committed: C2,
+        merged: true,
+      })?.commit,
+    ).toBe(C2)
+  })
   test("a prompt always gets a record: its disk, and a commit of edits, else the newest revision", () => {
     expect(planTurnRecord({ ...base, isPrompt: true, committed: C2 })).toEqual({
       entry: base.entry,

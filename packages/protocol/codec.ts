@@ -507,6 +507,7 @@ const MOVE_REFUSALS: readonly MoveRefusal[] = [
   "not-fresh",
   "full",
   "not-yours",
+  "fact",
 ]
 const isMoveRefusal = (c: string): c is MoveRefusal =>
   (MOVE_REFUSALS as readonly string[]).includes(c)

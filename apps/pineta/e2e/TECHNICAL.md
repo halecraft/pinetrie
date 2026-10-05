@@ -108,7 +108,8 @@ They share `checks.ts` (recording a check, and stopping at one),
   card queued while a run goes is popped only when it ends, so "no run" alone
   can return between a run's end and the pop. A card a client has just
   queued may not have reached the host yet, so a step that queues waits for
-  what the pop makes (a message, a landing) before it waits for idle.
+  what the pop makes (a message, a resolution's prompt) before it waits
+  for idle.
 - **A card queued for the restart in `host/tools` is queued under a run
   that is only the document's record** (`beginRun`). Queued on an idle lane,
   the move's drain would pop it before the restart; the record is what a

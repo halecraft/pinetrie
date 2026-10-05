@@ -47,6 +47,8 @@ export interface Splits {
   prepareSplit(
     lane: LaneName,
     by: WriterId,
+    /** The split card's text: what the person asked of it (ADR-0080). */
+    intent: string,
   ): Promise<StackMessage | { readonly refused: string }>
   /** A split's run ended: its stack, checked, becomes the offer, or why not. */
   splitEnded(lane: LaneName, prompt: EntryId): Promise<string | null>
@@ -65,7 +67,7 @@ export function createSplits(deps: {
   const { basics, owner, registry, offers } = deps
   const { session, docs, log } = basics
   return {
-    async prepareSplit(lane, by) {
+    async prepareSplit(lane, by, intent) {
       if (!registry.isOwn(lane) || owner === null || offers === null)
         return { refused: "the lane has no copy of its own" }
       const span = await offers.stackSpan(lane)
@@ -77,6 +79,7 @@ export function createSplits(deps: {
         skill,
         bookmark: stackBookmark(lane),
         details: { lane, start: span.start, tip: span.tip, by },
+        intent,
         timestamp: basics.now(),
       })
     },

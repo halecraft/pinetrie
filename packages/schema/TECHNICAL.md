@@ -308,7 +308,7 @@ root and the session share one schema, `StorageDoc`, pi's storage, so
 | document | id | holds |
 |---|---|---|
 | a root's | `root:<RootId>` (`rootDocId`, core) | its entries, usage rows, pi's values and lists for its lanes, checkpoints, and the host records keyed by its entries (revision, mark, stop, digest) |
-| the session's | `pineta:session` | the records read across roots: the directory (`pineta.root`), every lane's record (`pineta.lane`, naming its root), names, offers, banners, bases, landings, the archive, seats, participants and the singletons. No entries |
+| the session's | `pineta:session` | the records read across roots: the directory (`pineta.root`), every lane's record (`pineta.lane`, naming its root), names, offers, banners, bases, the archive, seats, participants and the singletons. No entries |
 | what streams | `pineta:live` (`LiveDoc`) | streams, their text, active runs |
 
 - **Brands keep the two storage documents apart.** `RootDocHandle` and

@@ -4,6 +4,7 @@
 import type {
   CardCommand,
   CardEvent,
+  CatchUpCommand,
   CatchUpFrom,
   ParentThread,
   ThreadBase,
@@ -35,7 +36,7 @@ export interface CatchUps {
  * `catch-up-with-parent` (ADR-0072). Null for that one without a parent.
  */
 const commandFrom = (
-  command: CardCommand,
+  command: CatchUpCommand,
   { base, parent }: CatchUps,
 ): CatchUpFrom | null => {
   switch (command) {
@@ -48,23 +49,30 @@ const commandFrom = (
   }
 }
 
+/** A split's words: the button's, and above a card that carries it (ADR-0080). */
+const SPLIT = "split into a stack"
+
 const fromName = (from: CatchUpFrom | null) =>
   from === null ? "the thread this one branched from" : catchUpName(from)
 
 /** A command's name as people read it: the strip's button. */
 export const commandWords = (command: CardCommand, at: CatchUps): string =>
-  command === "continue-on-line"
-    ? "continue from the project"
-    : `catch up with ${fromName(commandFrom(command, at))}`
+  command === "split"
+    ? SPLIT
+    : command === "continue-on-line"
+      ? "continue from the project"
+      : `catch up with ${fromName(commandFrom(command, at))}`
 
 /**
  * What a card with a command does when sent, above its box, and on a queued
  * one: the command first, then the card's text as the agent's next message.
  */
 export const commandNote = (command: CardCommand, at: CatchUps): string =>
-  command === "continue-on-line"
-    ? "↓ continues from the project first, then sends what you write"
-    : `↓ catches up with ${fromName(commandFrom(command, at))} first, then sends what you write`
+  command === "split"
+    ? "⇶ splits the offer into a stack, with what you write as its brief"
+    : command === "continue-on-line"
+      ? "↓ continues from the project first, then sends what you write"
+      : `↓ catches up with ${fromName(commandFrom(command, at))} first, then sends what you write`
 
 /** A queued card's button that takes it back below the line. */
 export const UNQUEUE = "unqueue"
@@ -108,6 +116,8 @@ export function refusalWords(refusal: CardRefusal, reader: Reader): string {
       return "inventory full"
     case "not-yours":
       return "not moved: that inventory is someone else's"
+    case "fact":
+      return "not moved: it is a note the thread will read"
     case "exists":
     case "not-fresh":
       return "not moved"

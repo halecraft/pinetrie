@@ -44,6 +44,11 @@ const StoredCard = Schema.struct.json({
   seen: Schema.string(),
   /** Its command (ADR-0055). */
   command: Schema.string(),
+  /**
+   * The fact it carries (ADR-0080), as JSON; absent from a record stored
+   * before facts were, which reads as a message.
+   */
+  fact: Schema.string(),
   /** Why the host could not send it. */
   unsent: Schema.string(),
   /** Who put it where it is. */

@@ -13,7 +13,9 @@ import {
   type Position,
 } from "@pineta/core"
 import type {
+  BehindMessage,
   ChatMessage,
+  FactMessage,
   PinnedMessage,
   PromptMessage,
   UpdateMessage,
@@ -96,6 +98,9 @@ type PiResult =
   | { readonly ok: true }
   | { readonly ok: false; readonly error: { readonly _tag: string } }
 
+/** What goes into a run's commit before its prompt (`ThreadLaneHandle.run`). */
+export type BeforePrompt = BehindMessage | PinnedMessage
+
 /**
  * A thread's lane (ADR-0020). It is never moved: it advances only by its own
  * appends and runs, so its tip stays its thread's end. The host touches it only
@@ -106,17 +111,29 @@ export interface ThreadLaneHandle {
   /**
    * Append with no run, through the pi `Lane`: it plans from its own cached
    * tip, so a write that bypasses it would be dropped from its next turn (S19).
+   * A chat, or a host's fact: an update (ADR-0038), or what a command on the
+   * thread's offer did (ADR-0080).
    */
-  append(message: ChatMessage | UpdateMessage): Promise<AppendOutcome>
+  append(
+    message: ChatMessage | UpdateMessage | FactMessage,
+  ): Promise<AppendOutcome>
   /**
-   * Run one turn with `message` as the prompt itself (S19). With `pinned`,
-   * the cards entry goes in first, and pi writes both in the commit that
-   * admits the run, or neither (S92).
+   * Run one turn with `message` as the prompt itself (S19). `before` goes
+   * in first, in order: a base's news (ADR-0080) and a cards entry, which
+   * stays the prompt's parent. pi writes them all in the commit that admits
+   * the run, or none (S92).
    */
   run(
     message: PromptMessage,
-    pinned: PinnedMessage | null,
+    before: readonly BeforePrompt[],
   ): Promise<WriteOutcome>
+  /**
+   * Tell a running lane its base has new work (ADR-0080, S103 item 4): pi
+   * places the message after the tool results of the turn in flight, at its
+   * next boundary, appended, so the prompt cache holds. A steer that arrives
+   * after the run's last tool call makes one more request.
+   */
+  steer(message: BehindMessage): Promise<WriteOutcome>
   /** Resume the operation a crash interrupted, in the lane's own directory. */
   resume(): Promise<WriteOutcome>
   /**
@@ -196,10 +213,18 @@ export function threadLanes(input: {
             id: entryId(await lane.appendMessage(message, ctx)),
           })),
         ),
-      run: (message, pinned) =>
+      run: (message, before) =>
         turn(lane =>
-          lane.prompt(pinned === null ? message : [pinned, message], ctx),
+          lane.prompt(
+            before.length === 0 ? message : [...before, message],
+            ctx,
+          ),
         ),
+      steer: message =>
+        onLane<WriteOutcome>(name, async lane => {
+          const queued = await lane.steer(message, undefined, ctx)
+          return queued.ok ? OK : refusedBy(queued.error._tag)
+        }),
       // pi records a tool call the crash interrupted as interrupted, never
       // running it again; the run then continues in the lane's directory.
       resume: () => turn(lane => lane.resume(ctx)),

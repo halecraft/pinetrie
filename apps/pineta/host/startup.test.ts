@@ -74,7 +74,7 @@ test("recover resumes each interrupted lane before it settles the others, and na
         by: writerId("ada@x.io"),
         seen: "",
       },
-      command: null,
+      carries: { kind: "message", command: null },
       unsent: null,
     }),
   )
@@ -177,7 +177,7 @@ test("recover sweeps empty cards, texts no record names, and seats no text names
         at: atEntry(entryId("e-1")),
         lane: null,
       },
-      command: null,
+      carries: { kind: "message", command: null },
       unsent: null,
     })
   placesDoc.cards.set("c-full", card("c-full"))

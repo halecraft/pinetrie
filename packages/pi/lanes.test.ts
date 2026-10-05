@@ -8,6 +8,7 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import { BACKGROUND_CONTEXT } from "@earendil-works/pi-agent-core"
 import {
+  commitId,
   type EntryId,
   type LaneName,
   laneNameForThread,
@@ -16,18 +17,23 @@ import {
   THE_AGENT,
   writerId,
 } from "@pineta/core"
-import { encodeChat, PINNED_RULE } from "@pineta/rules"
+import {
+  BEHIND_TYPE,
+  encodeBehind,
+  encodeChat,
+  PINNED_RULE,
+} from "@pineta/rules"
 import { newRootDoc, readEntries, rowMessage } from "@pineta/schema"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
 import { createAgent, newId } from "./agent.ts"
 import { type LaneChannel, openChannel } from "./lane-env.ts"
 import {
-  guidanceTool,
+  conflictTool,
   type LaneAccess,
   type LaneFacts,
   laneContext,
   laneGuidelines,
-  NOT_LANDING,
+  NO_CONFLICTS,
   rememberedProgram,
   type SearchProgram,
   systemPromptFor,
@@ -102,7 +108,16 @@ test("rememberedProgram: a found path is asked once; a null is asked again", asy
 
 test("the prompt no longer tells the model to search with bash", () => {
   const { files } = assembleTools({
-    hooks: { turnDone: async () => {}, askedForGuidance: () => false },
+    hooks: {
+      turnDone: async () => {},
+      askedAboutConflict: async () => false,
+      catchUp: async () => {
+        throw new Error("no catch_up here")
+      },
+      askSplit: async () => {
+        throw new Error("no split_offer here")
+      },
+    },
     blobs: undefined,
     bannerAsks: undefined,
   })
@@ -129,9 +144,9 @@ test("every thread is told what pinned cards are, once, in a line of its own (AD
   expect(laneGuidelines(facts())).not.toContain(PINNED_RULE)
 })
 
-describe("ask_for_guidance", () => {
+describe("ask_about_conflict (ADR-0080)", () => {
   const ask = (taken: boolean) =>
-    guidanceTool(() => taken).execute(
+    conflictTool(async () => taken).execute(
       "call-1",
       { question: "which?" },
       undefined,
@@ -140,9 +155,13 @@ describe("ask_for_guidance", () => {
       laneContext(laneNameForThread("0123456789abcdef"), BACKGROUND_CONTEXT),
     )
 
-  test("in a landing, it asks; elsewhere it says there is nothing to ask", async () => {
-    expect((await ask(true)).content[0]?.text).toContain("Asked. Stop here")
-    expect((await ask(false)).content[0]?.text).toBe(NOT_LANDING)
+  test("with a conflict in the copy, it asks, and its details say so; with none, there is nothing to ask", async () => {
+    const taken = await ask(true)
+    expect(taken.content[0]?.text).toContain("Asked. Stop here")
+    expect(taken.details).toEqual({ asked: true })
+    const refused = await ask(false)
+    expect(refused.content[0]?.text).toBe(NO_CONFLICTS)
+    expect(refused.details).toBeUndefined()
   })
 })
 
@@ -284,7 +303,13 @@ describe("lanes in a harness", () => {
             await new Promise(r => setTimeout(r, 20))
             turns.push("end")
           },
-          askedForGuidance: () => false,
+          askedAboutConflict: async () => false,
+          catchUp: async () => {
+            throw new Error("no catch_up here")
+          },
+          askSplit: async () => {
+            throw new Error("no split_offer here")
+          },
         },
       },
     })
@@ -328,8 +353,8 @@ describe("lanes in a harness", () => {
       { text: "done" },
     ])
     await Promise.all([
-      agent.lane(la).run(prompt("go a"), null),
-      agent.lane(lb).run(prompt("go b"), null),
+      agent.lane(la).run(prompt("go a"), []),
+      agent.lane(lb).run(prompt("go b"), []),
     ])
     const results = texts()
       .filter(t => (t.message as { role?: string }).role === "toolResult")
@@ -350,7 +375,7 @@ describe("lanes in a harness", () => {
       { tool: "bash", args: { command: "cat marker.txt" } },
       { text: "done" },
     ])
-    const running = agent.lane(lane).run(prompt("read the marker"), null)
+    const running = agent.lane(lane).run(prompt("read the marker"), [])
     // The directory only exists once "setup" makes it.
     await new Promise(r => setTimeout(r, 100))
     const { mkdir } = await import("node:fs/promises")
@@ -394,7 +419,7 @@ describe("lanes in a harness", () => {
       },
     ])
     let told = ""
-    await agent.lane(lane).run(prompt("write, then look"), null)
+    await agent.lane(lane).run(prompt("write, then look"), [])
     const all = texts().map(t => messageText(t.message as never))
     expect(all.some(t => t.includes(`${dir}\nin the lane`))).toBe(true)
     // In <rules>: `pi-anthropic-auth` keeps it when it rebuilds the prompt (S23).
@@ -436,7 +461,7 @@ describe("lanes in a harness", () => {
       { tool: "grep", args: { pattern: "it's", glob: "*.txt" } },
       { text: "done" },
     ])
-    await agent.lane(lane).run(prompt("search"), null)
+    await agent.lane(lane).run(prompt("search"), [])
     const found =
       texts()
         .map(t => messageText(t.message as never))
@@ -465,7 +490,7 @@ describe("lanes in a harness", () => {
         },
       },
     ])
-    await agent.lane(lane).run(prompt("look"), null)
+    await agent.lane(lane).run(prompt("look"), [])
     expect(told).toContain("<rules>")
     expect(told).not.toContain("Pineta lane")
     expect(told).not.toContain("Pineta commits your changes")
@@ -481,7 +506,7 @@ describe("lanes in a harness", () => {
     const first = await setUp(new Map())
     const lane = await first.newLane(where(before))
     first.script.use([{ tool: "bash", args: { command: "sleep 2" } }])
-    void first.agent.lane(lane).run(prompt("crash"), null)
+    void first.agent.lane(lane).run(prompt("crash"), [])
     await new Promise(r => setTimeout(r, 300))
     // The next process, over the same document: a second agent.
     const wheres = new Map([[lane, where(after)]])
@@ -493,11 +518,20 @@ describe("lanes in a harness", () => {
       tools: {
         project: root,
         access: l => wheres.get(l) ?? where(root),
-        hooks: { turnDone: async () => {}, askedForGuidance: () => false },
+        hooks: {
+          turnDone: async () => {},
+          askedAboutConflict: async () => false,
+          catchUp: async () => {
+            throw new Error("no catch_up here")
+          },
+          askSplit: async () => {
+            throw new Error("no split_offer here")
+          },
+        },
       },
     })
     expect(await second.interrupted([ONE_ROOT])).toEqual([lane])
-    expect(await second.lane(lane).run(prompt("again"), null)).toMatchObject({
+    expect(await second.lane(lane).run(prompt("again"), [])).toMatchObject({
       kind: "refused",
     })
     script.use([{ tool: "bash", args: { command: "pwd" } }, { text: "done" }])
@@ -510,6 +544,124 @@ describe("lanes in a harness", () => {
     expect(results.some(r => r.trim() === after)).toBe(true)
     expect(await second.interrupted([ONE_ROOT])).toEqual([])
     await second.close()
+  })
+
+  test("a run's last turn is recorded at its newest entry, however it ends: a Stop, or a model that fails (S104)", async () => {
+    const dir = path.join(root, "endings")
+    const { mkdir } = await import("node:fs/promises")
+    await mkdir(dir)
+    const turns: string[] = []
+    const { agent, script, newLane, texts } = await setUp(new Map(), turns)
+    /** Whether the last turn recorded is the lane's newest entry. */
+    const lastIsNewest = () => {
+      const tips = turns
+        .filter(t => t.startsWith("start "))
+        .map(t => t.slice(6))
+      return tips.at(-1) === texts().at(-1)?.id
+    }
+    const until = async (f: () => boolean) => {
+      while (!f()) await new Promise(r => setTimeout(r, 10))
+    }
+    // A Stop while the model's reply is held.
+    const held = await newLane(where(dir))
+    const paused = script.pause("held")
+    const holding = agent.lane(held).run(prompt("held"), [])
+    await until(() => paused.reached)
+    await agent.lane(held).abort()
+    await holding
+    expect(lastIsNewest()).toBe(true)
+    // A Stop while a tool runs.
+    const running = await newLane(where(dir))
+    script.use([{ tool: "bash", args: { command: "sleep 5" } }])
+    const ran = agent.lane(running).run(prompt("running"), [])
+    // The call is out once its assistant message is stored.
+    await until(() =>
+      texts().some(t => {
+        const { content } = t.message as { content?: unknown }
+        return (
+          Array.isArray(content) &&
+          content.some(p => (p as { type?: string }).type === "toolCall")
+        )
+      }),
+    )
+    await new Promise(r => setTimeout(r, 100))
+    await agent.lane(running).abort()
+    await ran
+    expect(lastIsNewest()).toBe(true)
+    // A model that fails: nothing queued, no standing answer.
+    const failing = await newLane(where(dir))
+    expect(await agent.lane(failing).run(prompt("failing"), [])).toEqual({
+      kind: "ok",
+    })
+    expect(lastIsNewest()).toBe(true)
+    await agent.close()
+  })
+
+  test("a steer lands after the tool results of the turn in flight, before the next request, which keeps the cache; that request's turn is recorded from it (ADR-0080, S103)", async () => {
+    const dir = path.join(root, "steer")
+    const { mkdir } = await import("node:fs/promises")
+    await mkdir(dir)
+    const turns: string[] = []
+    const { agent, script, newLane, texts } = await setUp(new Map(), turns)
+    const lane = await newLane(where(dir))
+    script.use([
+      { tool: "bash", args: { command: "sleep 0.3" } },
+      { text: "done" },
+    ])
+    const news = encodeBehind(
+      {
+        from: { kind: "line" },
+        to: commitId("l2"),
+        files: ["a.ts"],
+        overlap: [],
+        conflicts: [],
+      },
+      1,
+    )
+    const ran = agent.lane(lane).run(prompt("steer me"), [])
+    // While its bash runs.
+    while (
+      !texts().some(t => {
+        const { content } = t.message as { content?: unknown }
+        return (
+          Array.isArray(content) &&
+          content.some(p => (p as { type?: string }).type === "toolCall")
+        )
+      })
+    )
+      await new Promise(r => setTimeout(r, 10))
+    expect(await agent.lane(lane).steer(news)).toEqual({ kind: "ok" })
+    await ran
+    await agent.close()
+    const roles = texts().map(t => {
+      const m = t.message as { role?: string; customType?: string }
+      return m.customType ?? m.role
+    })
+    expect(roles).toEqual([
+      "pineta.chat",
+      "assistant",
+      "toolResult",
+      BEHIND_TYPE,
+      "assistant",
+    ])
+    const steered = texts()[3]?.id
+    expect(turns).toContain(`start ${steered}`)
+    const usage = texts()
+      .map(
+        t =>
+          t.message as {
+            role?: string
+            usage?: { cacheRead: number; cacheWrite: number }
+          },
+      )
+      .filter(m => m.role === "assistant")
+      .map(m => m.usage)
+    const [first, second] = usage
+    if (first === undefined || second === undefined)
+      throw new Error("two replies, each with its usage")
+    expect(second.cacheRead).toBeGreaterThanOrEqual(
+      first.cacheRead + first.cacheWrite - 1,
+    )
   })
 
   test("each turn is recorded before the next request, the first at the prompt", async () => {
@@ -528,7 +680,7 @@ describe("lanes in a harness", () => {
         },
       },
     ])
-    await agent.lane(lane).run(prompt("turns"), null)
+    await agent.lane(lane).run(prompt("turns"), [])
     const ids = texts().map(t => t.id)
     const [promptId, , resultId, finalId] = ids as EntryId[]
     expect(turns).toEqual([

@@ -38,7 +38,7 @@ const drafting = (id: string, at: string, owner = ADA): CardRecord => ({
     at: atEntry(entryId(at)),
     lane: null,
   },
-  command: null,
+  carries: { kind: "message", command: null },
   unsent: null,
 })
 const fresh = (id: string, column: string): CardRecord => ({
@@ -46,7 +46,7 @@ const fresh = (id: string, column: string): CardRecord => ({
   owner: ADA,
   placer: ADA,
   place: { kind: "fresh", column, root: TEST_ROOT, at: ROOT },
-  command: null,
+  carries: { kind: "message", command: null },
   unsent: null,
 })
 /** e1's tab open, holding a branch column; a new tab; g1's tab closed. */

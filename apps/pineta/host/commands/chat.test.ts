@@ -1,5 +1,6 @@
 import {
   cardId,
+  commitId,
   ERR,
   type ErrCode,
   entryId,
@@ -15,9 +16,11 @@ import {
 } from "@pineta/core"
 import { readTreeIndex } from "@pineta/reads"
 import {
+  BASE,
   CHAT_TYPE,
   type ChatDetails,
   type ChatMessage,
+  LINE,
   PARTICIPANT,
   PROJECT,
   setRecord,
@@ -27,6 +30,7 @@ import { describe, expect, test } from "vitest"
 import {
   basics,
   methods,
+  putLane,
   putValue,
   ROOT_ID,
   record,
@@ -191,7 +195,12 @@ describe("sendChat", () => {
     reserved: null,
     base: null,
   })
-  function setUp(project: ProjectRecord | null = null) {
+  function setUp(
+    project: ProjectRecord | null = null,
+    prepareUpdate: ChatDeps["work"]["prepareUpdate"] = async () => {
+      throw new Error("no update here")
+    },
+  ) {
     const b = basics()
     writeEntry(b.root, row(E1, null))
     if (project !== null) putValue(b, setRecord(PROJECT, project))
@@ -213,6 +222,7 @@ describe("sendChat", () => {
         checkDirectory: async () => null,
         checkBegin: async () => null,
         prepareLane: async () => {},
+        prepareUpdate,
       }).port,
       blobs: record<ChatDeps["blobs"]>({
         ref: sha =>
@@ -288,6 +298,116 @@ describe("sendChat", () => {
     expect(started[0]?.details.text).toBe(
       "@agent read /mnt/host-working-copy/a.txt",
     )
+  })
+
+  describe("a lane with no work of its own is caught up before its run (ADR-0080)", () => {
+    /** A lane at E1 whose base, the line, moved to L2 bringing a file, its work `work`. */
+    const behindLane = (
+      b: ReturnType<typeof basics>,
+      work: "none" | "some",
+    ) => {
+      putLane(b, LANE, E1)
+      writeLaneTip(b.root, LANE, E1)
+      putValue(
+        b,
+        setRecord(BASE, {
+          lane: LANE,
+          base: { kind: "line" },
+          start: commitId("l1"),
+          state: "ok",
+          catchUp: { tip: commitId("t"), to: commitId("l2"), files: ["a.ts"] },
+          untraced: [],
+          work,
+        }),
+      )
+      putValue(
+        b,
+        setRecord(LINE, {
+          onto: "pineta-onto",
+          wipPrefix: "wip/",
+          publish: "main",
+          published: { commit: null, behind: 0, ahead: 0 },
+          commit: commitId("l2"),
+          heads: { current: null, proposed: "x" },
+          log: { current: null, proposed: "x" },
+          wips: [],
+          yours: {
+            behind: 0,
+            ahead: null,
+            follow: null,
+            conflicts: { commits: 0, files: [] },
+          },
+          commands: true,
+        }),
+      )
+    }
+    const ask = (): Chat => ({ ...chat("@agent go on"), lane: LANE })
+
+    test("the update first, keeping the lane up; then the chat runs after it, once", async () => {
+      const updates: unknown[][] = []
+      let b: ReturnType<typeof basics> | null = null
+      const {
+        started,
+        deps,
+        b: made,
+      } = setUp(null, async (...args) => {
+        updates.push(args)
+        if (updates.length > 1) throw new Error("caught up twice")
+        // The update's entry is the thread's end now.
+        if (b !== null) {
+          writeEntry(
+            b.root,
+            row(entryId("u-1"), E1, { role: "update", content: "u" }),
+          )
+          writeLaneTip(b.root, LANE, entryId("u-1"))
+        }
+        return { kind: "clean" }
+      })
+      b = made
+      behindLane(made, "none")
+      const out = await sendChat(deps, ALICE, "s-1", ask())
+      expect(out).toEqual({ kind: "started", runId: "r-1" })
+      expect(updates).toEqual([
+        [LANE, ALICE, "@agent go on", "bring-up-to-date", "run"],
+      ])
+      expect(started).toHaveLength(1)
+    })
+
+    test("a merge that conflicts runs the resolution, carrying the chat's text", async () => {
+      const land = { role: "custom", customType: "pineta.land" } as never
+      const prompts: unknown[] = []
+      const { deps, b } = setUp(null, async () => ({
+        kind: "conflicted",
+        message: land,
+      }))
+      const out = await sendChat(
+        {
+          ...deps,
+          start: (_lane, s) => {
+            if (s.kind === "prompt") prompts.push(s.message)
+            return runId("r-2")
+          },
+        },
+        ALICE,
+        "s-1",
+        ((): Chat => {
+          behindLane(b, "none")
+          return ask()
+        })(),
+      )
+      expect(out).toEqual({ kind: "started", runId: "r-2" })
+      expect(prompts).toEqual([land])
+    })
+
+    test("a lane with work of its own is not caught up: it is told, at its run", async () => {
+      const { started, deps, b } = setUp()
+      behindLane(b, "some")
+      expect(await sendChat(deps, ALICE, "s-1", ask())).toEqual({
+        kind: "started",
+        runId: "r-1",
+      })
+      expect(started).toHaveLength(1)
+    })
   })
 
   test("a conflict names who holds the thread, as a writer", async () => {

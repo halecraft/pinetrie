@@ -79,7 +79,7 @@ async function run(check: Checks["check"]): Promise<void> {
         {
           id,
           place: drafting(end),
-          command: null,
+          carries: { kind: "message", command: null },
           unsent: null,
         },
         text,
@@ -367,7 +367,12 @@ async function run(check: Checks["check"]): Promise<void> {
       order: "",
     } as const
     void adaLate.createCard(
-      { id: late, place: pinnedHere, command: null, unsent: null },
+      {
+        id: late,
+        place: pinnedHere,
+        carries: { kind: "message", command: null },
+        unsent: null,
+      },
       "typed just before the send",
     )
     await adaLate.chat("@agent and now", at(editEnd), { pinned: [pin, late] })
@@ -466,6 +471,7 @@ async function run(check: Checks["check"]): Promise<void> {
         by: "",
         seen: "",
         command: "",
+        fact: "",
         unsent: "",
         placer: mallory.writer,
         holder: "",
@@ -596,7 +602,7 @@ async function run(check: Checks["check"]): Promise<void> {
         {
           id,
           place: keeping,
-          command: null,
+          carries: { kind: "message", command: null },
           unsent: null,
         },
         text,
@@ -657,7 +663,7 @@ async function run(check: Checks["check"]): Promise<void> {
             {
               id: cardId(crypto.randomUUID()),
               place: mine,
-              command: null,
+              carries: { kind: "message", command: null },
               unsent: null,
             },
             `held ${slot}`,

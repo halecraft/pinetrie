@@ -286,6 +286,7 @@ describe("the thread's base in its header, and the bases a new lane may start fr
       state,
       catchUp: null,
       untraced: [],
+      work: "some",
     }) as const
   test("baseWords: a WIP while it is one, gone when gone, nothing on the line", () => {
     expect(baseWords(base("ok"))).toBe("on wip/search")

@@ -846,9 +846,10 @@ became of its files (`strip`).
   base record at all: the host has never read it. An untraced thread
   (`pineta.base`'s `untraced`) says "an earlier add of this thread can't be
   traced: catch up with the project to offer what's new", with catching up
-  beside it. `ColumnFacts.catchingUp` is a card with a command queued on
-  the lane (`offerView`'s `catch-up` activity: "catching up with the
-  project…").
+  beside it. `ColumnFacts.queuedCommands` are the commands of the cards
+  queued on the lane: a catch-up among them is `offerView`'s `catch-up`
+  activity ("catching up with the project…"); a split only quiets the
+  split button (ADR-0080).
 - **A thread's base** shows in its header only when it is not the line
   (`baseWords`): "on wip/search", or "wip/search is gone", when the menu's
   update becomes "continue from the project" and no integration is offered.
@@ -1395,22 +1396,34 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   prompt's role) comes first: while it runs, the line counts files so far
   and offers nothing. A lane that works directly says so ("edits your files
   directly"), and names other lanes running in the same directory now.
-- **Catching up is a card queued at once** (ADR-0055, ADR-0061): the button
-  is the `bringUpToDate` act, which creates a card at the thread's end with
-  the command and no text, then queues it, two effects in that order. The
+- **Catching up and splitting are a card queued at once** (ADR-0055,
+  ADR-0061, ADR-0080): the button is the `queueCommand` act, which creates a
+  card at the thread's end with the command and no text, then queues it,
+  two effects in that order. A split waits while the thread works, and a
+  queued one makes the strip's split button quiet (`offerView`'s
+  `queued`); only a catch-up makes the offer busy. The
   host handles the two in order, so the command is set before the queue's
   move starts the drain that pops the card. Your card in the composer is not
   touched. A card that carries a command anyway (one unqueued) says above its box what
   sending it does first (`commandNote`), its placeholder says its text is
   optional, and its button names the command (`commandSendWords`: "catch
-  up", "catch up and send"), its queue place in the title. The card is
+  up", "catch up and send", "split"), its queue place in the title. The card is
   then queued like any other (`planSend`, which carries the command), and
   the host carries the command out when it pops it.
-- **Land, update, stack and carry-on messages** show as one line each,
-  roles `land` ("catching up"), `update` ("caught up"), `stack` and
-  `carry-on` ("resumed"). The update's line
-  is `updateLine` (`@pineta/rules`), which names what it merged by
-  `catchUpName`.
+- **One-line messages** (`LINE_ROLES`, core) show as one line each, their
+  speaker from one table (`ROLE_LABEL`, `message.tsx`): `land` ("catching
+  up"), `update` ("caught up"), `stack`, `carry-on` ("resumed"), and the
+  host's facts, `fact` ("offer": what an integration, a squash, a refresh
+  or a description asked for did, ADR-0080) and `behind` ("the base": its
+  new work). Each line is its rule's words function (`updateLine`,
+  `factLine`, `behindLine`, `@pineta/rules`); the update's names what it
+  merged by `catchUpName`.
+- **A fact waiting for a run's end** is drawn above the line as a quiet row
+  (`.queued-fact`, worded by `factLine`), with no controls: nobody moves it
+  (ADR-0080).
+- **"Needs you" comes from the tree** (ADR-0080): the strip's `needs_you`
+  is the thread's newest `ask_about_conflict` (`conflictAskedAt`) when it is
+  newer than the offer's record.
 - **The page header counts offers open** in your repo ("work ready to add to
   the project"), as it counts mentions, and the agent's running threads;
   each row leads with the thread's name and opens its thread. Archive in a

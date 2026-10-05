@@ -35,7 +35,6 @@ import {
   entryId,
   firstLineOf,
   indexTree,
-  type LandingRecord,
   type LaneName,
   type LaneRecord,
   type LaneView,
@@ -80,7 +79,6 @@ import {
   decodeChat,
   decodePinned,
   type Home,
-  LANDING,
   LANE,
   LINE,
   LINE_KEY,
@@ -92,6 +90,7 @@ import {
   PROJECT_KEY,
   participants,
   pastedImages,
+  promptAuthor,
   queuedOn,
   REVISION,
   type RecordSpec,
@@ -110,6 +109,7 @@ import {
   type RootDocHandle,
   readActiveRun,
   readEntries,
+  readEntryMessage,
   readLaneNames,
   readLaneTip,
   readValues,
@@ -261,6 +261,28 @@ export function readLatestPrompt(
   const index = readTreeIndex(doc)
   const id = promptOf(index, readLaneTip(doc, lane))
   return id === null ? null : { id, role: index.entries[id]?.message?.role }
+}
+
+/**
+ * The person behind a lane's latest run (ADR-0080): its prompt's author, a
+ * chat's or a land or stack message's `by` (`promptAuthor`); else whoever
+ * started the lane. Null for a lane with neither.
+ */
+export function readRunAuthor(
+  doc: RootDocHandle,
+  session: SessionDocHandle,
+  lane: LaneName,
+): WriterId | null {
+  const latest = readLatestPrompt(doc, lane)
+  const stored =
+    latest === null
+      ? { present: false as const }
+      : readEntryMessage(doc, latest.id)
+  return (
+    (stored.present ? promptAuthor(stored.message) : null) ??
+    readLaneRecords(session).get(lane)?.by ??
+    null
+  )
 }
 
 /**
@@ -550,12 +572,6 @@ export const readLaneRecords = (
 export const readRevisions = (
   doc: RootDocHandle,
 ): ReadonlyMap<EntryId, RevisionRecord> => readRecords(doc, REVISION)
-
-/** Every resolution's record (`pineta.landing`), oldest first. */
-export const readLandings = (doc: SessionDocHandle): readonly LandingRecord[] =>
-  [...readRecords(doc, LANDING).values()].sort((a, b) =>
-    a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
-  )
 
 /** Each lane's offer in your repo (ADR-0038), by lane. */
 export const readOffers = (

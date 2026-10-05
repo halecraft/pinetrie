@@ -290,8 +290,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the resolution is not told what the card asked",
     file: "apps/pineta/host/work/update.ts",
-    from: "            skill,\n            intent,\n",
-    to: '            skill,\n            intent: "",\n',
+    from: "            await resolutionOf(intent),",
+    to: '            await resolutionOf(""),',
     suite: "lanes",
     scenario: "main",
     expect:

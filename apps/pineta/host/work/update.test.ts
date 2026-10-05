@@ -1,5 +1,6 @@
 import {
   type BaseMerge,
+  CATCH_UP_TOOL,
   commitId,
   entryId,
   laneNameForThread,
@@ -8,17 +9,22 @@ import {
   type ThreadName,
   writerId,
 } from "@pineta/core"
-import { planMerge } from "@pineta/lanes"
+import { createQueue, planMerge } from "@pineta/lanes"
 import { readTreeIndex } from "@pineta/reads"
+import type { RepoOwner } from "@pineta/repo"
 import {
+  BASE,
+  catchUpRefusal,
   encodeChat,
   encodeUpdate,
   type Floor,
+  LINE as LINE_RECORD,
   type PromptBudget,
+  setRecord,
 } from "@pineta/rules"
 import { newRootDoc, writeEntry, writeLaneTip } from "@pineta/schema"
 import { describe, expect, test } from "vitest"
-import { basics, record, row } from "../fakes.ts"
+import { basics, putLane, putValue, record, row } from "../fakes.ts"
 import {
   applySettle,
   createUpdates,
@@ -221,14 +227,12 @@ describe("planSettle: what a merge comes to (ADR-0060, ADR-0033)", () => {
           { description: "yours b\n", paths: ["b.txt"] },
         ],
         floor: floorFor(lineFrom, "keep both sides"),
-        landing: "l-1",
       },
       { ...ctx, index: readTreeIndex(doc) },
     )
     if (settled.kind !== "conflicted") throw new Error("not conflicted")
     expect(settled.fetch).toBeNull()
     expect(settled.message.details).toMatchObject({
-      landing: "l-1",
       lane: LANE,
       yours: [LINE],
       by: ADA,
@@ -269,7 +273,6 @@ describe("planSettle: what a merge comes to (ADR-0060, ADR-0033)", () => {
         ours: [],
         theirs: [],
         floor: floorFor(parent, ""),
-        landing: "l-2",
       },
       { ...ctx, from: parent },
     )
@@ -341,13 +344,17 @@ describe("applySettle: a settle's writes", () => {
 })
 
 describe("withLaneStarted: the lane an update starts", () => {
-  const run = async (update: () => Promise<Prepared>) => {
+  const run = async (
+    update: () => Promise<Prepared>,
+    follows: "run" | "send" = "send",
+  ) => {
     const calls: string[] = []
     const prepared = await withLaneStarted(
       {
         beforeRun: () => calls.push("start"),
         runEnded: () => calls.push("stop"),
       },
+      follows,
       async () => {
         calls.push("update")
         return update()
@@ -371,6 +378,17 @@ describe("withLaneStarted: the lane an update starts", () => {
       calls: ["start", "update"],
     })
   })
+  test("with a run to follow, the lane is never stopped, whatever the update comes to (ADR-0080)", async () => {
+    for (const prepared of [
+      { kind: "clean" },
+      { kind: "nothing" },
+      { kind: "refused", reason: "no" },
+    ] as const)
+      expect((await run(async () => prepared, "run")).calls).toEqual([
+        "start",
+        "update",
+      ])
+  })
   test("a throw is a refusal saying why, and stops the lane", async () => {
     expect(
       await run(async () => {
@@ -383,16 +401,41 @@ describe("withLaneStarted: the lane an update starts", () => {
   })
 })
 
-describe("askedForGuidance", () => {
-  /** Updates over a document whose lane's run was prompted by `role`. */
-  const updatesAt = (role: string) => {
+describe("askedAboutConflict (ADR-0080)", () => {
+  /**
+   * Updates whose lane jj answers with `conflicted` files, the lane its own
+   * or not, its run prompted by `role`.
+   */
+  const updatesWith = (
+    conflicted: readonly string[],
+    own = true,
+    role = "chat",
+  ) => {
     const b = basics()
     writeEntry(b.root, row("p-1", null, { role, content: "go" }))
     writeLaneTip(b.root, LANE, entryId("p-1"))
-    return createUpdates({
+    const asked: string[][] = []
+    const jj = async (argv: readonly string[]) => {
+      asked.push([...argv])
+      return {
+        ok: true,
+        code: 0,
+        stdout:
+          argv[0] === "file" ? conflicted.map(f => `${f}\n`).join("") : "",
+        stderr: "",
+      }
+    }
+    const updates = createUpdates({
       basics: b,
       setup: { root: null, owner: null, paths: null, lanes: null },
-      registry: record<Parameters<typeof createUpdates>[0]["registry"]>().port,
+      registry: record<Parameters<typeof createUpdates>[0]["registry"]>({
+        isOwn: () => own,
+        laneJjOf: () => jj,
+        handleOf: () =>
+          ({ queue: createQueue() }) as unknown as ReturnType<
+            Parameters<typeof createUpdates>[0]["registry"]["handleOf"]
+          >,
+      }).port,
       agent: () =>
         record<ReturnType<Parameters<typeof createUpdates>[0]["agent"]>>().port,
       containers:
@@ -400,10 +443,142 @@ describe("askedForGuidance", () => {
       fetchLane: async () => {},
       writeRevision: async () => {},
     })
+    return { updates, asked }
   }
 
-  test("a landing takes the question; any other run's call asks nothing (S85)", () => {
-    expect(updatesAt("land").askedForGuidance(LANE)).toBe(true)
-    expect(updatesAt("chat").askedForGuidance(LANE)).toBe(false)
+  test("taken while jj finds a conflict in the lane's copy, whatever started the run", async () => {
+    for (const role of ["chat", "land", "stack"])
+      expect(
+        await updatesWith(["a.txt"], true, role).updates.askedAboutConflict(
+          LANE,
+        ),
+      ).toBe(true)
+  })
+
+  test("refused with no conflict, and for a lane that works directly, which jj is never asked about", async () => {
+    expect(await updatesWith([]).updates.askedAboutConflict(LANE)).toBe(false)
+    const direct = updatesWith(["a.txt"], false)
+    expect(await direct.updates.askedAboutConflict(LANE)).toBe(false)
+    expect(direct.asked).toEqual([])
+  })
+})
+
+describe("catchUpInRun (ADR-0080)", () => {
+  /**
+   * A lane of its own whose turn is `calls` calls of `catch_up`, its base
+   * moved with files to bring, and a jj that answers `@`'s parents as
+   * `parents`, the bookmark as `b`, and nothing descending.
+   */
+  const inRun = (calls: number, parents: string) => {
+    const b = basics()
+    putLane(b, LANE, entryId("a-1"))
+    const call = (id: string) => ({
+      type: "toolCall",
+      id,
+      name: CATCH_UP_TOOL,
+      arguments: {},
+    })
+    writeEntry(
+      b.root,
+      row("p-1", null, { role: "chat", content: "go", writer: ADA }),
+    )
+    writeEntry(
+      b.root,
+      row("a-1", "p-1", {
+        role: "assistant",
+        content: Array.from({ length: calls }, (_, i) => call(`c${i}`)),
+      }),
+    )
+    writeLaneTip(b.root, LANE, entryId("a-1"))
+    putValue(
+      b,
+      setRecord(BASE, {
+        lane: LANE,
+        base: { kind: "line" },
+        start: commitId("l1"),
+        state: "ok",
+        catchUp: { tip: commitId("t"), to: commitId("l2"), files: ["a.ts"] },
+        untraced: [],
+        work: "some",
+      }),
+    )
+    putValue(
+      b,
+      setRecord(LINE_RECORD, {
+        onto: "pineta-onto",
+        wipPrefix: "wip/",
+        publish: "main",
+        published: { commit: null, behind: 0, ahead: 0 },
+        commit: commitId("l2"),
+        heads: { current: null, proposed: "x" },
+        log: { current: null, proposed: "x" },
+        wips: [],
+        yours: {
+          behind: 0,
+          ahead: null,
+          follow: null,
+          conflicts: { commits: 0, files: [] },
+        },
+        commands: true,
+      }),
+    )
+    const asked: string[] = []
+    const jj = async (argv: readonly string[]) => {
+      asked.push(argv.join(" "))
+      const out = argv.includes("@")
+        ? parents
+        : argv.some(a => a.includes("present("))
+          ? "b\n"
+          : ""
+      return { ok: true, code: 0, stdout: out, stderr: "" }
+    }
+    const updates = createUpdates({
+      basics: b,
+      setup: {
+        root: null,
+        owner: record<RepoOwner>().port,
+        paths: null,
+        lanes: null,
+      },
+      registry: record<Parameters<typeof createUpdates>[0]["registry"]>({
+        isOwn: () => true,
+        laneJjOf: () => jj,
+        handleOf: () =>
+          ({ queue: createQueue() }) as unknown as ReturnType<
+            Parameters<typeof createUpdates>[0]["registry"]["handleOf"]
+          >,
+      }).port,
+      // The skill is read before the merge, for the floor (ADR-0084).
+      agent: () =>
+        record<ReturnType<Parameters<typeof createUpdates>[0]["agent"]>>({
+          skill: async () => null,
+        }).port,
+      // Neither starts nor stops the lane: the port throws if asked.
+      containers:
+        record<Parameters<typeof createUpdates>[0]["containers"]>().port,
+      fetchLane: async () => {},
+      writeRevision: async () => {},
+    })
+    return { updates, asked }
+  }
+
+  test("a call beside another in its turn is refused before anything is queued", async () => {
+    const { updates, asked } = inRun(2, "b\n")
+    expect(await updates.catchUpInRun(LANE, "base")).toMatchObject({
+      isError: true,
+      text: catchUpRefusal("alone"),
+    })
+    expect(asked).toEqual([])
+  })
+
+  test("a copy off its own line is refused before any edit is committed or merged, and the lane is neither started nor stopped", async () => {
+    const { updates, asked } = inRun(1, "x\n")
+    expect(await updates.catchUpInRun(LANE, "base")).toMatchObject({
+      isError: true,
+      text: catchUpRefusal("off-line"),
+    })
+    expect(asked.some(a => a.startsWith("commit") || a.startsWith("new"))).toBe(
+      false,
+    )
   })
 })

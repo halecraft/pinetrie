@@ -119,13 +119,14 @@ export type ColumnAct =
       readonly command: CardCommand | null
     }
   /**
-   * The catch-up button, or continue-on-line's (ADR-0060, ADR-0061): a new
-   * card, `create`, made at the thread's end with `command` and no text,
-   * and queued on `lane` at once, so the host carries the command out when
-   * the lane is free. Your card in the composer is left as it is.
+   * A command button: catching up, continuing on the line, or splitting the
+   * offer (ADR-0060, ADR-0061, ADR-0080): a new card, `create`, made at the
+   * thread's end with `command` and no text, and queued on `lane` at once,
+   * so the host carries the command out when the lane is free. Your card in
+   * the composer is left as it is.
    */
   | {
-      readonly kind: "bringUpToDate"
+      readonly kind: "queueCommand"
       readonly create: CardRecord
       readonly command: CardCommand
       readonly lane: LaneName
@@ -568,14 +569,17 @@ function planColumn(
           intent: { kind: "set-command", card: act.card, command: act.command },
         },
       ]
-    case "bringUpToDate": {
+    case "queueCommand": {
       const queued = queueMove(act.create, act, state.cards)
       // Made, then queued: the host sets the command before the queue's
       // move, so the drain that move starts pops it with its command.
       return [
         {
           kind: "createCard",
-          card: { ...act.create, command: act.command },
+          card: {
+            ...act.create,
+            carries: { kind: "message", command: act.command },
+          },
           text: "",
           how: IN_COLUMN(key),
         },

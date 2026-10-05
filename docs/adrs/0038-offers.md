@@ -35,6 +35,11 @@ observes a move it depends on (the watched heads), not on a 2 s poll; a
 refresh is keyed upkeep, and every write to your repo is the owner's.
 Amended by ADR-0061: archiving a root withdraws its threads' offers, and a
 refresh that finds no offer and none to build removes its record.
+Amended by ADR-0080: the agent can catch up when its base has new work, and
+ask for a split, as tools; "split into a stack" queues a card, taken when
+the thread is free; a lane whose work changes no file is caught up before
+its run; a take, a description, a squash and a refresh each leave a fact in
+the thread.
 Amended by ADR-0083: in code and docs, taking an offer is *integrating*
 it, into the line or a WIP; the page still says "add".
 

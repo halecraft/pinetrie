@@ -91,6 +91,7 @@ export function createOfferDeps(input: {
   readonly agent: () => Agent
   readonly running: (lane: LaneName) => boolean
   readonly bookmarkMoved: () => void
+  readonly baseChanged: (lane: LaneName) => void
 }): OfferDeps {
   const { basics, line } = input
   const { session: doc, docs } = basics
@@ -140,10 +141,14 @@ export function createOfferDeps(input: {
       readOffers(doc).has(lane)
         ? writeValues([deleteRecord(OFFER, lane)])
         : Promise.resolve(),
-    writeBase: next =>
-      next === null
-        ? Promise.resolve()
-        : writeValues(setIfChanged(BASE, next, readBases(doc).get(next.lane))),
+    async writeBase(next) {
+      if (next === null) return
+      const writes = setIfChanged(BASE, next, readBases(doc).get(next.lane))
+      if (writes.length === 0) return
+      await writeValues(writes)
+      // A running thread whose base now has news is told (ADR-0080).
+      input.baseChanged(next.lane)
+    },
   }
   return {
     owner: input.owner,

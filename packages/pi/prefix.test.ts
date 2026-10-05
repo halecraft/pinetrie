@@ -28,7 +28,7 @@ describe("prefixChange", () => {
   test("tools, the system prompt or the thinking settings changing is a change", () => {
     const before = prefixOf(payload())
     for (const over of [
-      { tools: [{ name: "read" }, { name: "ask_for_guidance" }] },
+      { tools: [{ name: "read" }, { name: "ask_about_conflict" }] },
       { system: [{ type: "text", text: "you are, named" }] },
       { thinking: { type: "enabled" } },
     ])

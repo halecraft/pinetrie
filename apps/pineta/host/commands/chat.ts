@@ -6,8 +6,10 @@
 
 import {
   type BlobStore,
+  baseKnown,
   ERR,
   type Intent,
+  type LaneName,
   laneNameForThread,
   type PlanMode,
   type SentCard,
@@ -20,8 +22,11 @@ import type { Agent } from "@pineta/pi"
 import type { Outcome } from "@pineta/protocol/codec"
 import {
   type RootView,
+  readBases,
   readLaneRecords,
   readLanes,
+  readLine,
+  readOffers,
   readParticipantNames,
   readParticipants,
   readPlaces,
@@ -38,6 +43,7 @@ import {
   encodeChat,
   parseCommand,
   pastedImages,
+  planBaseNews,
   planChat,
   planImages,
   resolveCommand,
@@ -61,7 +67,11 @@ export interface ChatDeps {
   >
   readonly work: Pick<
     LaneWork,
-    "project" | "checkDirectory" | "checkBegin" | "prepareLane"
+    | "project"
+    | "checkDirectory"
+    | "checkBegin"
+    | "prepareLane"
+    | "prepareUpdate"
   >
   readonly blobs: Pick<BlobStore, "ref">
   /** Who wrote in a card: its other writers are a message's contributors (ADR-0048). */
@@ -103,6 +113,8 @@ export async function sendChat(
   writer: WriterId,
   sendId: string,
   chat: Chat,
+  /** This send has caught its lane up already (`catch-up-first`). */
+  caughtUp = false,
 ): Promise<Outcome> {
   const { agent, work, blobs, cards } = deps
   const { docs, session, live, newId } = deps.basics
@@ -184,10 +196,31 @@ export async function sendChat(
     }),
   )
 
+  // gather: the thread's base, for a lane with no work of its own to catch
+  // up quietly before it runs (ADR-0080)
+  const lane = thread.lane.kind === "lane" ? thread.lane.name : null
+  const bases = readBases(session)
+
   // plan: a missing image refuses the send before planChat decides the rest
   const images = planImages(shas, refs)
   if (images.kind === "refused") return images
+  const news =
+    lane === null
+      ? "nothing"
+      : planBaseNews({
+          own: bases.has(lane),
+          base: bases.get(lane),
+          line: readLine(session),
+          offer: readOffers(session).get(lane),
+          known: baseKnown(
+            index,
+            thread.end.kind === "entry" ? thread.end.id : null,
+          ),
+          told: null,
+        }).kind
   const planned = planChat({
+    news,
+    caughtUp,
     command,
     images: images.images,
     hostWorkingCopy: own ? (work.project?.root ?? null) : null,
@@ -211,6 +244,8 @@ export async function sendChat(
     contributors,
   })
 
+  if (planned.kind === "catch-up-first")
+    return catchUpFirst(deps, writer, sendId, chat, planned.lane)
   const sent = await executeChat(deps, planned, {
     view,
     index,
@@ -220,6 +255,43 @@ export async function sendChat(
     pinned: chat.pinned,
   })
   return sent
+}
+
+/**
+ * A lane with no work of its own whose base has new work, caught up before
+ * the chat runs on it (ADR-0080), as a card's catch-up is: the update, then
+ * the chat planned again, after the update's entry; or, should the merge
+ * conflict after all, the resolution run carrying the chat's text. The lane
+ * is kept started: a run follows either way.
+ */
+async function catchUpFirst(
+  deps: ChatDeps,
+  writer: WriterId,
+  sendId: string,
+  chat: Chat,
+  lane: LaneName,
+): Promise<Outcome> {
+  const prepared = await deps.work.prepareUpdate(
+    lane,
+    writer,
+    chat.text,
+    "bring-up-to-date",
+    "run",
+  )
+  if (prepared.kind === "conflicted")
+    return {
+      kind: "started",
+      runId: deps.start(lane, {
+        kind: "prompt",
+        message: prepared.message,
+        pinnedSeen: chat.pinned,
+      }),
+    }
+  if (prepared.kind === "refused")
+    deps.basics.log(
+      `[host] ${readThreadName(deps.basics.session, lane)}: not caught up before its run: ${prepared.reason}`,
+    )
+  return sendChat(deps, writer, sendId, chat, true)
 }
 
 /**
@@ -242,6 +314,9 @@ export async function executeChat(
     case "conflict":
     case "busy":
       return planned
+    case "catch-up-first":
+      // `sendChat` carries it out before it comes here.
+      return { kind: "failed", message: "a catch-up was not carried out" }
     case "appendToTree":
     case "appendToLane": {
       const appended =

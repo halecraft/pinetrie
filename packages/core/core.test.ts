@@ -428,7 +428,7 @@ describe("moves, built once (ADR-0059)", () => {
     owner: ADA,
     place,
     placer: ADA,
-    command: null,
+    carries: { kind: "message", command: null },
     unsent: null,
   })
   const drafting = card({ kind: "drafting", root: TEST_ROOT, at, lane: LANE })

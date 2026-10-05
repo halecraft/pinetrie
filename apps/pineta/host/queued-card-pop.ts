@@ -4,18 +4,33 @@
 // People queue and unqueue cards through handoffs (ADR-0059); the host pops
 // them, and only when the lane is not running, since a lane is never written
 // while it runs (S21). Popping the next queued card is where the cards
-// people still edit meet the tree.
+// people still edit meet the tree. What a popped card comes to is decided
+// first (`planCarry`): a fact appended, a catch-up then the card's text, a
+// split's run, a message sent, or nothing (ADR-0080); `carryOut` carries it
+// out.
 
 import { subscribe } from "@kyneta/schema"
 import {
   type CardId,
   type CardRecord,
   type LaneName,
+  type OfferFact,
+  PLAIN,
   parseMentions,
 } from "@pineta/core"
+import type { Agent } from "@pineta/pi"
 import type { Outcome } from "@pineta/protocol/codec"
-import { readPlaces, readRunning, readThreadName } from "@pineta/reads"
 import {
+  readParticipantNames,
+  readPlaces,
+  readRunning,
+  readThreadName,
+} from "@pineta/reads"
+import {
+  type CarryPlan,
+  displayName,
+  encodeFact,
+  planCarry,
   planNextQueuedCardPop,
   planUnsent,
   type QueuedCard,
@@ -85,9 +100,11 @@ export const chatOfPoppedQueuedCard = (popped: PoppedQueuedCard): Chat => ({
 })
 
 export interface QueuedCardPopDeps {
-  readonly basics: Pick<Basics, "session" | "live" | "places" | "log">
+  readonly basics: Pick<Basics, "session" | "live" | "places" | "log" | "now">
   readonly texts: Pick<CardPort, "hydrate" | "textNow" | "holds" | "destroy">
-  readonly work: Pick<LaneWork, "prepareUpdate">
+  /** Where a fact is appended (ADR-0080). */
+  readonly agent: Pick<Agent, "lane">
+  readonly work: Pick<LaneWork, "prepareUpdate" | "prepareSplit">
   readonly start: Runs["start"]
   /** Send a popped card's text as its queuer's message, through `sendChat`. */
   readonly send: (popped: PoppedQueuedCard) => Promise<Outcome>
@@ -139,47 +156,136 @@ export async function drain(
 }
 
 /**
- * One popped card, sent through its command. "ran": a run started, whose end
- * drains again. The pop deleted its record, so a throw while it is carried
- * out writes it back too, or the card would be lost.
+ * One popped card, carried out as `planCarry` decides. "ran": a run started,
+ * whose end drains again. The pop deleted its record, so a throw while it is
+ * carried out writes it back too, or the card would be lost.
  */
 async function carryOut(
   deps: QueuedCardPopDeps,
   lane: LaneName,
   popped: PoppedQueuedCard,
 ): Promise<"ran" | "next"> {
-  const { card } = popped
-  let sending = card
-  const hostFailed = (error: unknown) => {
-    unsent(deps, sending, `the host failed: ${messageOf(error)}`)
-    return null
-  }
-  if (card.command !== null) {
-    const prepared = await deps.work
-      .prepareUpdate(lane, card.place.by, popped.text, card.command)
-      .catch(hostFailed)
-    if (prepared === null) return "next"
-    if (prepared.kind === "refused") {
-      unsent(deps, card, prepared.reason)
+  const plan = planCarry(popped.card, popped.text)
+  switch (plan.kind) {
+    case "fact":
+      return appendFact(deps, lane, popped, plan.fact)
+    case "catch-up":
+      return catchUpThenSend(deps, lane, popped, plan)
+    case "split":
+      return splitThen(deps, lane, popped, plan.intent)
+    case "send":
+      return sendCard(deps, popped, popped.card)
+    case "discard":
+      await deps.texts.destroy(popped.card.id)
       return "next"
-    }
-    if (prepared.kind === "conflicted") {
-      await deps.texts.destroy(card.id)
-      deps.start(lane, {
-        kind: "prompt",
-        message: prepared.message,
-        pinnedSeen: [],
-      })
-      return "ran"
-    }
-    // Brought up to date: what is left is a plain message.
-    sending = { ...card, command: null }
   }
-  if (popped.text.trim() === "") {
+}
+
+/**
+ * A fact the host queued (ADR-0080), appended to the thread: the lane is
+ * idle, since the pop found it so. One that cannot be appended is logged
+ * and dropped: nobody could send it from below the line.
+ */
+async function appendFact(
+  deps: QueuedCardPopDeps,
+  lane: LaneName,
+  popped: PoppedQueuedCard,
+  fact: OfferFact,
+): Promise<"next"> {
+  const { session, log, now } = deps.basics
+  await deps.texts.destroy(popped.card.id)
+  const appended = await deps.agent
+    .lane(lane)
+    .append(
+      encodeFact(
+        fact,
+        displayName(fact.by, readParticipantNames(session).get(fact.by)),
+        now(),
+      ),
+    )
+    .catch((error: unknown) => ({ kind: "failed", message: messageOf(error) }))
+  if (appended.kind !== "appended")
+    log(
+      `[host] ${readThreadName(session, lane)}: a fact was not written: ${"message" in appended ? appended.message : appended.kind}`,
+    )
+  return "next"
+}
+
+/**
+ * A card that catches the thread up (ADR-0055): the update, then the card's
+ * text sent, or carried into the resolution run when the merge conflicts.
+ */
+async function catchUpThenSend(
+  deps: QueuedCardPopDeps,
+  lane: LaneName,
+  popped: PoppedQueuedCard,
+  plan: Extract<CarryPlan, { readonly kind: "catch-up" }>,
+): Promise<"ran" | "next"> {
+  const { card } = popped
+  const prepared = await deps.work
+    .prepareUpdate(lane, card.place.by, popped.text, plan.command, "send")
+    .catch((error: unknown) => {
+      unsent(deps, card, `the host failed: ${messageOf(error)}`)
+      return null
+    })
+  if (prepared === null) return "next"
+  if (prepared.kind === "refused") {
+    unsent(deps, card, prepared.reason)
+    return "next"
+  }
+  if (prepared.kind === "conflicted") {
+    await deps.texts.destroy(card.id)
+    deps.start(lane, {
+      kind: "prompt",
+      message: prepared.message,
+      pinnedSeen: [],
+    })
+    return "ran"
+  }
+  if (plan.after === "discard") {
     await deps.texts.destroy(card.id)
     return "next"
   }
-  const sent = await deps.send(popped).catch(hostFailed)
+  // Brought up to date: what is left is a plain message.
+  return sendCard(deps, popped, { ...card, carries: PLAIN })
+}
+
+/**
+ * A card that splits the offer (ADR-0080): the split's own run, the card's
+ * text its intent; refused, the card goes back below the line, saying why.
+ */
+async function splitThen(
+  deps: QueuedCardPopDeps,
+  lane: LaneName,
+  popped: PoppedQueuedCard,
+  intent: string,
+): Promise<"ran" | "next"> {
+  const { card } = popped
+  const message = await deps.work
+    .prepareSplit(lane, card.place.by, intent)
+    .catch((error: unknown) => ({
+      refused: `the host failed: ${messageOf(error)}`,
+    }))
+  if ("refused" in message) {
+    unsent(deps, card, message.refused)
+    return "next"
+  }
+  await deps.texts.destroy(card.id)
+  deps.start(lane, { kind: "prompt", message, pinnedSeen: [] })
+  return "ran"
+}
+
+/** A popped card's text sent as its queuer's message; `sending` is what goes back if it cannot be. */
+async function sendCard(
+  deps: QueuedCardPopDeps,
+  popped: PoppedQueuedCard,
+  sending: QueuedCard,
+): Promise<"ran" | "next"> {
+  const { card } = popped
+  const sent = await deps.send(popped).catch((error: unknown) => {
+    unsent(deps, sending, `the host failed: ${messageOf(error)}`)
+    return null
+  })
   if (sent === null) return "next"
   switch (sent.kind) {
     case "appended":

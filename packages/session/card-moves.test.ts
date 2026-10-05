@@ -44,7 +44,7 @@ const card = (over: Partial<CardRecord> = {}): CardRecord => ({
   owner: ME,
   placer: ME,
   place: drafting,
-  command: null,
+  carries: { kind: "message", command: null },
   unsent: null,
   ...over,
 })

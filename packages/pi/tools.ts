@@ -7,12 +7,19 @@ import {
   createReadTool,
   createWriteTool,
 } from "@earendil-works/pi-agent-core"
-import type { BlobStore, LaneName } from "@pineta/core"
+import {
+  type BlobStore,
+  CATCH_UP_TOOL,
+  CONFLICT_TOOL,
+  type LaneName,
+  SPLIT_TOOL,
+} from "@pineta/core"
 import type { BannerAnswer, BannerAsk } from "@pineta/rules"
 import { BANNER_TOOL, bannerTool } from "./banner.ts"
 import { readImageProcessor } from "./images.ts"
-import { GUIDANCE_TOOL, guidanceTool, type LaneHooks } from "./lanes.ts"
+import { conflictTool, type LaneHooks } from "./lanes.ts"
 import { findTool, grepTool } from "./search.ts"
+import { catchUpTool, splitTool } from "./thread-tools.ts"
 
 /**
  * Every tool the harness registers, and the names of the file tools among
@@ -21,7 +28,9 @@ import { findTool, grepTool } from "./search.ts"
  * (`toolContextOf`, in `lanes.ts`). They are also pi's `selectedTools`, and
  * naming `grep` or `find` there drops pi's rule to search with bash. `read`
  * fits an image and stores it before pi writes the result, so the session
- * keeps a reference (ADR-0051).
+ * keeps a reference (ADR-0051). Besides them, the tools the host answers:
+ * `ask_about_conflict`, `catch_up` and `split_offer` (ADR-0080), and
+ * `set_banner`.
  */
 export function assembleTools(input: {
   readonly hooks: LaneHooks
@@ -46,7 +55,9 @@ export function assembleTools(input: {
   return {
     registered: [
       ...files,
-      guidanceTool((lane, q) => input.hooks.askedForGuidance(lane, q)),
+      conflictTool((lane, q) => input.hooks.askedAboutConflict(lane, q)),
+      catchUpTool((lane, from) => input.hooks.catchUp(lane, from)),
+      splitTool(lane => input.hooks.askSplit(lane)),
       bannerTool(input.bannerAsks),
     ],
     files: files.map(t => t.name),
@@ -54,11 +65,12 @@ export function assembleTools(input: {
 }
 
 /**
- * What a lane's runs may call: the file tools, `ask_for_guidance`, and
- * `set_banner` when banners are on. One list for every run, a landing's
- * included: a list that changed between runs would change every request's
- * prefix, and Anthropic then drops the lane's earlier thinking (S85). pi
- * stores the list in a lane's configuration, and fails a run whose list
+ * What a lane's runs may call: the file tools, `ask_about_conflict`,
+ * `catch_up` and `split_offer` (ADR-0080), and `set_banner` when banners are
+ * on. One list for every run, a resolution's included, whatever kind of lane
+ * runs it: a tool that does not apply answers why. A list that changed
+ * between runs would change every request's prefix, and Anthropic then drops
+ * the lane's earlier thinking (S85). pi stores the list in a lane's configuration, and fails a run whose list
  * names a tool not registered, so `assembleTools` registers every tool
  * whatever the setting, and a lane stored with another list is given this
  * one when it is first held (`threadLanes`).
@@ -69,7 +81,9 @@ export function activeToolNames(input: {
 }): string[] {
   return [
     ...input.files,
-    GUIDANCE_TOOL,
+    CONFLICT_TOOL,
+    CATCH_UP_TOOL,
+    SPLIT_TOOL,
     ...(input.banners ? [BANNER_TOOL] : []),
   ]
 }

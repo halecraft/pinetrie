@@ -184,7 +184,7 @@ describe("planIntent", () => {
       owner: ME,
       placer: ME,
       place,
-      command: null,
+      carries: { kind: "message", command: null },
       unsent: null,
     }
     const holding = { ...NO_CARDS, cards: [held] }
@@ -409,7 +409,7 @@ describe("planIntent", () => {
       owner: ada,
       placer: ada,
       place: { kind: "drafting", root: TEST_ROOT, at: where, lane },
-      command: null,
+      carries: { kind: "message", command: null },
       unsent: null,
     }
     const here = { kind: "column", key: "col-k" } as const
@@ -508,7 +508,7 @@ describe("planIntent", () => {
       expect(
         plan(
           column({
-            kind: "bringUpToDate",
+            kind: "queueCommand",
             create: fresh,
             command: "bring-up-to-date",
             lane,
@@ -518,7 +518,10 @@ describe("planIntent", () => {
       ).toEqual([
         {
           kind: "createCard",
-          card: { ...fresh, command: "bring-up-to-date" },
+          card: {
+            ...fresh,
+            carries: { kind: "message", command: "bring-up-to-date" },
+          },
           text: "",
           how: inColumn,
         },
@@ -537,14 +540,14 @@ describe("planIntent", () => {
     })
     test("an offer's other buttons are one command each", () => {
       expect(
-        plan(column({ kind: "offer", lane, action: "split", to: null })),
-      ).toEqual([{ kind: "offer", lane, action: "split", to: null }])
+        plan(column({ kind: "offer", lane, action: "squash", to: null })),
+      ).toEqual([{ kind: "offer", lane, action: "squash", to: null }])
     })
     test("continue on the line queues its own command (ADR-0060)", () => {
       expect(
         plan(
           column({
-            kind: "bringUpToDate",
+            kind: "queueCommand",
             create: fresh,
             command: "continue-on-line",
             lane,
@@ -553,7 +556,7 @@ describe("planIntent", () => {
         )[0],
       ).toMatchObject({
         kind: "createCard",
-        card: { command: "continue-on-line" },
+        card: { carries: { kind: "message", command: "continue-on-line" } },
       })
     })
   })

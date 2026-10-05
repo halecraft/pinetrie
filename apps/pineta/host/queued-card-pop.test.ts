@@ -3,6 +3,7 @@ import {
   type CardCommand,
   type CardId,
   cardId,
+  commitId,
   ERR,
   entryId,
   laneNameForThread,
@@ -10,9 +11,10 @@ import {
   runId,
   writerId,
 } from "@pineta/core"
+import type { ThreadLaneHandle } from "@pineta/pi"
 import type { Outcome } from "@pineta/protocol/codec"
 import { readCardHistories, readPlaces, readPlacesRev } from "@pineta/reads"
-import { CARD_HISTORY, encodeCard, setRecord } from "@pineta/rules"
+import { CARD_HISTORY, encodeCard, planStack, setRecord } from "@pineta/rules"
 import { beginRun, newPlacesDoc, newPresenceDoc } from "@pineta/schema"
 import { describe, expect, test } from "vitest"
 import type { CardPort } from "./cards.ts"
@@ -57,7 +59,7 @@ const queue = (
         by: BEA,
         seen: "",
       },
-      command,
+      carries: { kind: "message", command },
       unsent: null,
     }),
   )
@@ -192,9 +194,20 @@ function setUp(
 ) {
   const b = basics()
   const events: string[] = []
+  const appended: unknown[] = []
   const sends = [...answers]
   const deps: QueuedCardPopDeps = {
     basics: b,
+    agent: record<QueuedCardPopDeps["agent"]>({
+      lane: () =>
+        record<ThreadLaneHandle>({
+          append: async message => {
+            events.push(`append ${message.customType}`)
+            appended.push(message)
+            return { kind: "appended", id: entryId("f-1") }
+          },
+        }).port,
+    }).port,
     texts: record<QueuedCardPopDeps["texts"]>({
       hydrate: async ids => {
         events.push(`hydrate ${ids.join(",")}`)
@@ -209,6 +222,18 @@ function setUp(
       prepareUpdate: async (_lane, by, intent) => {
         events.push(`update by ${by}: ${intent}`)
         return prepared
+      },
+      prepareSplit: async (lane, by, intent) => {
+        events.push(`split by ${by}: ${intent}`)
+        return intent === "refuse"
+          ? { refused: "nothing to split" }
+          : planStack({
+              skill: null,
+              bookmark: "pineta-stack/x",
+              details: { lane, start: [], tip: commitId("t"), by },
+              intent,
+              timestamp: 1,
+            })
       },
     }).port,
     start: (_lane, s) => {
@@ -228,7 +253,7 @@ function setUp(
       agent: () => ({ writeValues: async w => applyWrites(b, w) }),
     }),
   }
-  return { b, events, deps }
+  return { b, events, deps, appended }
 }
 
 describe("drain", () => {
@@ -452,7 +477,7 @@ describe("drain: bring up to date (ADR-0055)", () => {
     expect(readPlaces(b.places)).toEqual([
       expect.objectContaining({
         id: "c-1",
-        command: CMD,
+        carries: { kind: "message", command: CMD },
         unsent: "the lane has no copy of its own",
         place: {
           kind: "drafting",
@@ -469,16 +494,16 @@ describe("drain: bring up to date (ADR-0055)", () => {
     const { b, deps } = setUp({ "c-1": "x" }, [])
     const throwing: QueuedCardPopDeps = {
       ...deps,
-      work: {
+      work: record<QueuedCardPopDeps["work"]>({
         prepareUpdate: async () => {
           throw new Error("jj broke")
         },
-      },
+      }).port,
     }
     queue(b.places, "c-1", "a", CMD)
     await drain(throwing, LANE)
     expect(readPlaces(b.places)[0]).toMatchObject({
-      command: CMD,
+      carries: { kind: "message", command: CMD },
       unsent: "the host failed: jj broke",
     })
   })
@@ -492,7 +517,7 @@ describe("drain: bring up to date (ADR-0055)", () => {
     queue(b.places, "c-1", "a", CMD)
     await drain(deps, LANE)
     expect(readPlaces(b.places)[0]).toMatchObject({
-      command: null,
+      carries: { kind: "message", command: null },
       unsent: "pi refused",
     })
   })
@@ -544,5 +569,83 @@ describe("waiting for a queued card's text (behind)", () => {
     await Promise.resolve()
     await Promise.resolve()
     expect(drained).toEqual([LANE])
+  })
+})
+
+describe("drain: a fact (ADR-0080)", () => {
+  test("a queued fact is appended as the fact, its card gone, and the drain goes on", async () => {
+    const { b, events, deps, appended } = setUp({ "c-2": "next" }, [])
+    const fact = {
+      kind: "integrated",
+      lane: LANE,
+      by: ADA,
+      as: "kabcdefgh",
+      bookmark: "pineta-onto",
+      to: { kind: "line" },
+    } as const
+    b.places.cards.set(
+      "c-1",
+      encodeCard({
+        id: cardId("c-1"),
+        owner: ADA,
+        placer: ADA,
+        place: {
+          kind: "queued",
+          root: TEST_ROOT,
+          at: atEntry(E1),
+          lane: LANE,
+          order: "a",
+          by: ADA,
+          seen: "",
+        },
+        carries: { kind: "fact", fact },
+        unsent: null,
+      }),
+    )
+    queue(b.places, "c-2", "b")
+    await drain(deps, LANE)
+    expect(events).toEqual([
+      "hydrate c-1,c-2",
+      "destroy c-1",
+      "append pineta.fact",
+      "send c-2: next",
+      "destroy c-2",
+    ])
+    expect(appended).toMatchObject([{ details: fact }])
+    expect(readPlaces(b.places)).toEqual([])
+  })
+})
+
+describe("drain: a split (ADR-0080)", () => {
+  test("a split card starts the split's own run, its text the brief, and ends the drain", async () => {
+    const { b, events, deps } = setUp(
+      { "c-1": "tests apart", "c-2": "next" },
+      [],
+    )
+    queue(b.places, "c-1", "a", "split")
+    queue(b.places, "c-2", "b")
+    await drain(deps, LANE)
+    expect(events).toEqual([
+      "hydrate c-1,c-2",
+      `split by ${BEA}: tests apart`,
+      "destroy c-1",
+      "start pineta.stack",
+    ])
+    expect(readPlaces(b.places).map(c => c.id)).toEqual(["c-2"])
+  })
+
+  test("refused: back below the line with its command, saying why, and the next card is popped", async () => {
+    const { b, events, deps } = setUp({ "c-1": "refuse", "c-2": "next" }, [])
+    queue(b.places, "c-1", "a", "split")
+    queue(b.places, "c-2", "b")
+    await drain(deps, LANE)
+    expect(events).toContain("send c-2: next")
+    expect(readPlaces(b.places)).toEqual([
+      expect.objectContaining({
+        id: "c-1",
+        carries: { kind: "message", command: "split" },
+        unsent: "nothing to split",
+      }),
+    ])
   })
 })

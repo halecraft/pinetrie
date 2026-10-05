@@ -18,7 +18,9 @@ wires them.
 | `shutdown.ts` | the order a host stops in (`planShutdown`) |
 | `runs.ts` | a run from its start to its end (`createRuns`, `planRunEnd`), a Stop before pi starts (`cancel`), and the agent's `onStream` (`streamInto`) |
 | `pinned.ts` | what a run reads of its thread's pinned cards (ADR-0048 step 5): `readPinned` gathers, waits a bounded time for the sender's text (`waitFor`), and plans the cards entry |
-| `queued-card-pop.ts` | popping a lane's queued cards to send them (ADR-0048, ADR-0083): `popNextQueuedCard`, and `drain`, which sends each through its command (ADR-0055) |
+| `base-news.ts` | what a thread is told of its base's new work (ADR-0080): `atStart`, a chat's run's behind entry; `baseChanged`, a steer into a running lane, at most once per base commit (`told`); `runEnded` forgets what was steered |
+| `split-call.ts` | `split_offer` (ADR-0080): a split card queued on the thread, popped when its run ends |
+| `queued-card-pop.ts` | popping a lane's queued cards to send them (ADR-0048, ADR-0083): `popNextQueuedCard`, and `drain`, which carries each out as `planCarry` decides: a fact appended, a catch-up, a split's run, a message sent (ADR-0055, ADR-0080) |
 | `settle.ts` | what happens between runs: drains, then the compaction and sweep as upkeep (the keeper's `later`) |
 | `housekeeping.ts` | which documents a run's end compacts (`planCompaction`: its roots, the session, the places, `pineta:live`), deleting images nothing shows, and retiring histories of moves (`sweepHistories`) |
 | `docs.ts` | `HostDocuments`: every document the host holds, a root's opened as it is asked for, and `onOpened`, which replays the roots already held to a listener that joins late; `planLoads` |
@@ -113,16 +115,17 @@ wires them.
   then appends the chat, as a refused run does, and ends. `handleStop`
   cancels first and asks pi to abort only when nothing was cancelled. A
   land or stack start cannot be cancelled: it writes no prompt then, and
-  `end()` would read the lane's previous one and record an old landing's
-  outcome again. They carry no `seen`, so their window is as short as
+  `end()` would read the lane's previous one, and for a stack end an old
+  split again. They carry no `seen`, so their window is as short as
   before. A carry-on's start cannot be cancelled either, for the same
   reason: a Stop in its window reaches nothing.
 
 ## A run's end
 
 `planRunEnd(role)` returns the order, and `runs.ts` carries it out: a
-resolution's `landingEnded` or a split's `splitEnded`, then
-`verdictPending`, `endRun`, `laneStopped`, `ended`. A run touches no tools: every lane's list is the
+split's `splitEnded`, then `verdictPending`, `endRun`, `laneStopped`,
+`ended`. A resolution ends as any run does (ADR-0080, S104): what it left
+conflicted is the offer's, and whether the agent asked is the tree's. A run touches no tools: every lane's list is the
 same for every run (`packages/pi/TECHNICAL.md`, S85).
 
 - **`endRun` comes before `laneStopped` and `ended`.** It closes the lane's
@@ -383,10 +386,14 @@ rejects `shutdown()`.
   wait whose card leaves the queue, popped, unqueued or discarded, is given
   up (`givenUp`), so it neither stays subscribed nor drains; the places are
   watched only while a wait is out.
-- **A popped queued card is sent through its command.** `bring-up-to-date` runs
-  `prepareUpdate` first: clean, the update is written, then the text, if
-  any, is sent; conflicted, the resolution run carries the text; nothing
-  new, the text alone; refused, the card goes back. The text is sent through
+- **What a popped card comes to is decided first** (`planCarry`,
+  ADR-0080), then carried out (`carryOut`): a fact is appended to the
+  thread; a catch-up runs `prepareUpdate`, then sends the text; a split
+  starts the split's own run, its text the brief; a message is sent; a card
+  with no text and no command is discarded. A catch-up's `prepareUpdate`:
+  clean, the update is written, then the text, if any, is sent;
+  conflicted, the resolution run carries the text; nothing new, the text
+  alone; refused, the card goes back. The text is sent through
   `sendPoppedQueuedCard` in mode `queue`, as its queuer (`by`), with the card's other
   writers as contributors. A card with no text starts no run.
 - **A card the host could not send goes back below the line, whole**
@@ -417,6 +424,18 @@ rejects `shutdown()`.
   there, and `handleStop` writes it, then asks pi to abort, in one step. So
   the record is there when the run's end is drawn, and the first press is
   the one named.
+- **A command on an offer leaves a fact** (ADR-0080): `actOnOffer`
+  answers first, then writes the action's fact as a queued card in a keeper
+  step of its own (`recordFact`), with its history (`provenance`, cause
+  `host`, as for the split card `split_offer` queues), and asks for the
+  lane's drain. An idle
+  lane appends it at once; a running one when its run ends, in order with
+  the cards already queued. The client draws it as a quiet row, and nobody
+  moves it.
+- **A chat on a thread with no work of its own is caught up first**
+  (ADR-0080): `planChat`'s `catch-up-first` runs `prepareUpdate` with a run
+  to follow (`follows: "run"`), then sends the chat with `caughtUp`, so it
+  does not loop (`catchUpFirst`, `commands/chat.ts`).
 - **Resume is `carry-on`** (ADR-0082): `handleCarryOn` starts a run whose
   prompt is `planCarryOn`'s carry-on message, or answers its refusal. It is
   one step on the documents' keeper, as a split is, so a second press finds
@@ -536,7 +555,7 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 | `fetch.ts` | a lane's history into your repo: the bundle on the lane's queue, the import an owner command (`importLane`) |
 | `turns.ts` | pi's `turnDone`: the turn's revision, snapshot and fetch; the turn records still being written (`pendingRecords`). A lane is fetched into your repo only after a turn that commits, so a lane that never changed a file has no `tip@pineta-<lane>`, no refresh and no `pineta.base` until it catches up (a clean merge is fetched) |
 | `create.ts` | a new lane: `checkDirectory`, its record and name, its fork (`forkFacts` waits for `pendingRecords`) |
-| `update.ts` | an update (`withLaneStarted`, then one queued step, `planSettle` and `applySettle`), and a resolution's outcome, with the guidance flag pi's hook sets |
+| `update.ts` | an update (`withLaneStarted`, then one queued step, `planSettle` and `applySettle`); `catchUpInRun`, the agent's `catch_up`; `askedAboutConflict`, which asks jj for conflicts in the lane's copy |
 | `split.ts` | a split's prompt, and its end (`finishSplit`) |
 | `archive.ts` | an archive's or a restore's teardown (`planArchive`'s), off the documents' keeper |
 | `disk.ts` | the snapshot on a lane's queue, and the lockfile's hash |
@@ -544,12 +563,11 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 - **State lives where it changes.** What startup found is `Setup`'s, fixed
   after it. Each lane's handle is the registry's. Each coordination set is
   owned by the module that writes it, behind a function: `turns`' pending
-  records, `update`'s guidance flag.
+  records, `base-news`' steers told.
 - **One `turns` and one `updates`.** `index.ts` makes each once and builds
   pi's `hooks` from them, so a fork waits on the records this `turnDone`
-  adds, and `landingEnded` reads the flag this `askedForGuidance` sets. A
-  second instance would have its own set, and the fork would wait on the
-  empty one.
+  adds. A second instance would have its own set, and the fork would wait
+  on the empty one.
 - **The queues a lane's work crosses:** its own `LaneQueue` (the start, a
   fork, each turn's commit and snapshot, the bundle, the stop and trim); the
   owner of your repo, for the import (a command, queued as the bundle is
@@ -582,9 +600,21 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   the parent's newest commit is fetched by id into the lane like the line's.
   A resolution's prompt names the incoming side as that thread's work.
 - **An update stops the lane it started** (`withLaneStarted`), whatever it
-  comes to, unless a resolution runs: that run's end stops it. A split
-  reads its skill before `beforeRun`, so nothing between the lane's start
-  and its run can fail.
+  comes to, unless a run follows: a resolution, or the chat a quiet
+  catch-up goes before (`follows: "run"`). That run's end stops it.
+- **The agent's `catch_up` merges during its run** (`catchUpInRun`,
+  ADR-0080, S103): the same `updateOnQueue`, with no start or stop of the
+  lane and nothing appended: the tool's result is the update, and the
+  turn's record names the merge (`turnMerged`). It is refused unless the
+  call is its turn's only one and there is something new. Every catch-up,
+  a card's too, is refused when the lane's working copy is off its own line
+  (`planCopyReady`), since the merge lands at the lane's bookmark.
+- **`ask_about_conflict` is taken while jj finds a conflict** in the lane's
+  copy (`askedAboutConflict`, on the lane's queue), in any run: never from
+  a revision record, which can be late (S104).
+- **A split reads its skill before `beforeRun`**, so nothing between the
+  lane's start and its run can fail. It is a card's command (ADR-0080),
+  popped when the thread is free, its card's text the split's brief.
 - **A lane's `LaneQueue` breaks on a fatal failure and the host's keepers
   do not.** A failed start or fork must stop the lane's tools, which wait on
   its queue; a failed host step must not stop the steps behind it.
@@ -654,7 +684,10 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   integrated (`integratedAs`; a record from before ADR-0083 says `taken`,
   read as the same).
   Each write is skipped when it changes nothing, and the records are read
-  only for that.
+  only for that. A base record that changed is reported (`baseChanged`), so a
+  running thread whose base now has news is told (`base-news.ts`,
+  ADR-0080); the report queues a keeper step, never awaited from the owner's
+  command, which would wait on itself.
 - `refresh.ts` carries out a refresh and a rebuild, and gives the ports;
   `describe.ts` gathers by a pinned read, asks the model outside the owner,
   one request per lane at a time (`describing`), and writes in an owner

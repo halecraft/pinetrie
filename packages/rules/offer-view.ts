@@ -5,14 +5,15 @@
 // (ADR-0072). It writes no words: they are the client's (`offerWords`,
 // ADR-0040).
 
-import type {
-  BaseRecord,
-  ConflictCause,
-  LandingRecord,
-  OfferRecord,
-  OfferSeen,
-  ParentThread,
-  ThreadBase,
+import {
+  type BaseRecord,
+  type CardCommand,
+  type ConflictCause,
+  isCatchUp,
+  type OfferRecord,
+  type OfferSeen,
+  type ParentThread,
+  type ThreadBase,
 } from "@pineta/core"
 import {
   type CatchUpNow,
@@ -133,8 +134,9 @@ export function conflictCause(
 }
 
 /**
- * The offer's state and buttons. `landing` is the lane's latest resolution;
- * it asks for you only when newer than the offer. `base` is the lane's
+ * The offer's state and buttons. `asked` is when the agent last asked about
+ * a conflict on the thread's path (`conflictAskedAt`, ADR-0080); it asks for
+ * you only when newer than the offer. `base` is the lane's
  * (`pineta.base`), null before the host read it, as the line; `onto` and
  * `wipAhead` come from the line's record. An integration is offered only with a
  * destination (`offerIntegrationDestinations`).
@@ -142,7 +144,7 @@ export function conflictCause(
 export function offerView(input: {
   readonly offer: OfferStatus
   readonly activity: Exclude<OfferActivity, "catch-up">
-  readonly landing: LandingRecord | undefined
+  readonly asked: number | null
   readonly base: Pick<BaseRecord, "base" | "state"> | null
   readonly onto: string
   readonly wipAhead: number
@@ -150,16 +152,21 @@ export function offerView(input: {
   readonly catchUp: CatchUpNow
   /** Integrated-offer commits of this thread that name no source (`BaseRecord.untraced`). */
   readonly untraced: boolean
-  /** A card bringing the thread up to date is queued on its lane. */
-  readonly catchingUp: boolean
+  /**
+   * The commands of the cards queued on its lane: a catch-up makes the offer
+   * busy; a split quiets the split button (ADR-0080).
+   */
+  readonly queued: readonly CardCommand[]
   /** The thread this one branched from (`parentNow`); null for one that began at its base. */
   readonly parent: ParentNow | null
   /** That thread's agent runs: its copy moves with every turn. */
   readonly parentRunning: boolean
 }): OfferView {
-  const { offer, landing } = input
+  const { offer, asked } = input
   const activity: OfferActivity =
-    input.activity === "idle" && input.catchingUp ? "catch-up" : input.activity
+    input.activity === "idle" && input.queued.some(isCatchUp)
+      ? "catch-up"
+      : input.activity
   const notYetIntegrated =
     offer.kind === "open" || offer.kind === "held" ? offer.record : undefined
   const open = offer.kind === "open" ? offer.record : undefined
@@ -236,6 +243,8 @@ export function offerView(input: {
       ...(ahead !== null && input.parentRunning
         ? (["catch-up-parent"] as const)
         : []),
+      // A split already waits in the queue (ADR-0080).
+      ...(input.queued.includes("split") ? (["split"] as const) : []),
     ]
     // An untraced start rebuilds nothing: only your edited offer is left.
     const rebuilds = (b: OfferButton) =>
@@ -257,7 +266,7 @@ export function offerView(input: {
   if (offer.kind === "none") return view("nothing", [], ["update"])
   if (offer.kind === "integrated") return view("integrated", [], ["update"])
   const { record } = offer
-  if (landing?.state === "needs_you" && landing.at > record.at)
+  if (asked !== null && asked > record.at)
     return view("needs_you", ["integrate"], ["update"])
   if (offer.kind === "held") return view("nothing", [], ["update"])
   if (record.edited) return view("edited", ["integrate", "refresh"], ["update"])

@@ -49,6 +49,8 @@ const ROLE_LABEL: Readonly<Record<string, string>> = {
   land: "catching up",
   update: "caught up",
   "carry-on": "resumed",
+  fact: "offer",
+  behind: "the base",
 }
 
 function MessageView(p: MessageProps) {

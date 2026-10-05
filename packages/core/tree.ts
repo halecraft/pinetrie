@@ -17,6 +17,7 @@ import { type ImageRef, isImageMime, isSha256 } from "./images.ts"
 import {
   atEntry,
   type CardId,
+  type CatchUpFrom,
   type CommitId,
   type EntryId,
   type LaneName,
@@ -45,6 +46,22 @@ export interface MessagePart {
   readonly width?: number
   readonly height?: number
   readonly data?: string
+}
+
+/**
+ * What a thread is told when its base has new work (ADR-0080): a behind
+ * entry's details, decoded. `to` is the base's commit it was told of, so it
+ * is told once per commit.
+ */
+export interface BehindView {
+  readonly from: CatchUpFrom
+  readonly to: CommitId
+  /** The files catching up would change. */
+  readonly files: readonly string[]
+  /** Those of `files` this thread's work changes too. */
+  readonly overlap: readonly string[]
+  /** The files the thread's offer conflicts in with the base now. */
+  readonly conflicts: readonly string[]
 }
 
 /** One pinned card as a run read it (ADR-0048). */
@@ -96,8 +113,15 @@ export interface AgentMessageLike {
   readonly errorMessage?: string
   /** Role `pinned` only: the cards a run read (ADR-0048). */
   readonly pinned?: PinnedView
-  /** Roles `update` and `land` only: the commits merged into the lane (ADR-0072). */
+  /**
+   * Roles `update` and `land`, and a `catch_up` tool result: the commits
+   * merged into the lane (ADR-0072, ADR-0080).
+   */
   readonly merged?: readonly CommitId[]
+  /** An `ask_about_conflict` tool result the host took: the agent asked (ADR-0080). */
+  readonly asked?: true
+  /** Role `behind` only: the base's new work the thread was told of (ADR-0080). */
+  readonly behind?: BehindView
 }
 
 export interface EntryLike {
@@ -228,23 +252,11 @@ export function messageImages(
 }
 
 /**
- * The host's own messages: a land, update, stack or carry-on message
- * (ADR-0033, ADR-0038, ADR-0082). Each shows as its short line: the reader
- * decodes it into its role, with that line as its content.
- */
-const HOST_MESSAGE_ROLES: ReadonlySet<string> = new Set([
-  "land",
-  "update",
-  "stack",
-  "carry-on",
-])
-
-/**
  * One entry -> the message a reader sees, or `null` if it is not one.
  *
  * The one rule for which entries are messages, shared by every view so they
  * cannot disagree. Non-message entries, and roles other than user,
- * assistant, chat and the host's own (`HOST_MESSAGE_ROLES`), are dropped,
+ * assistant, chat and the host's own (`LINE_ROLES`), are dropped,
  * `toolResult` included: a result belongs to its call, which `projectSpine`
  * pairs it with. An assistant message carries its tool
  * calls. A `chat` message is a human's, already decoded by the reader
@@ -278,7 +290,9 @@ function renderableMessage(entry: EntryLike): TranscriptMessage | null {
         : { images: entry.message.images }),
     }
   }
-  if (role !== "user" && role !== "assistant" && !HOST_MESSAGE_ROLES.has(role))
+  // A one-line message (`LINE_ROLES`) shows as its short line: the reader
+  // decodes it into its role with that line as its content.
+  if (role !== "user" && role !== "assistant" && !LINE_ROLES.has(role))
     return null
   const message = { id: entry.id, role, text: messageText(entry.message) }
   const merged = entry.message?.merged
@@ -287,6 +301,22 @@ function renderableMessage(entry: EntryLike): TranscriptMessage | null {
   const calls = role === "assistant" ? toolCallsOf(entry.message) : []
   return calls.length === 0 ? message : { ...message, toolCalls: calls }
 }
+
+/**
+ * The host's own messages, which a column shows as one line: a resolution's
+ * prompt (`land`, ADR-0033), an update and a split's prompt (`update`,
+ * `stack`, ADR-0038), a Resume's carry-on (`carry-on`, ADR-0082), and the
+ * host's facts, what a command on the offer did (`fact`) and that the base
+ * has new work (`behind`, ADR-0080).
+ */
+export const LINE_ROLES: ReadonlySet<string> = new Set([
+  "land",
+  "update",
+  "stack",
+  "carry-on",
+  "fact",
+  "behind",
+])
 
 /** The message a reader sees at `id`, or null (`renderableMessage`). */
 export function messageAt(
@@ -311,7 +341,10 @@ function callView(id: string, name: string, args: unknown): ToolCallView {
 }
 
 /** An assistant message's tool calls, from its `toolCall` content parts. */
-function toolCallsOf(message: AgentMessageLike | undefined): ToolCallView[] {
+/** The tool calls an assistant message makes, as a reader sees them; none for any other message. */
+export function toolCallsOf(
+  message: AgentMessageLike | undefined,
+): ToolCallView[] {
   const content = message?.content
   if (!Array.isArray(content)) return []
   return content.flatMap(part =>
@@ -339,22 +372,49 @@ function toolResultOf(
 }
 
 /**
- * The entry a turn is recorded against, from the lane's tip after it: a tool
- * result belongs to the assistant message whose call it answers, which sits
- * above it with only that message's other results between, so the walk goes
- * up past results. Anything else is its own turn: a prompt, or a message that
- * called no tools.
+ * The entries a turn ends with, newest first, from the lane's tip after it:
+ * its tool results, and a host's fact steered in after them (role `behind`,
+ * ADR-0080), up to the assistant message whose calls they follow.
  */
-export function turnEntry(index: TreeIndex, tip: EntryId): EntryId {
+function turnTail(index: TreeIndex, tip: EntryId): EntryId[] {
+  const tail: EntryId[] = []
   let at = tip
   for (;;) {
     const entry = index.entries[at]
     const parent = index.parentOf(at)
-    if (entry === undefined || toolResultOf(entry) === null || parent === null)
-      return at
+    if (
+      entry === undefined ||
+      parent === null ||
+      (toolResultOf(entry) === null && entry.message?.role !== "behind")
+    )
+      return tail
+    tail.push(at)
     at = parent
   }
 }
+
+/**
+ * The entry a turn is recorded against, from the lane's tip after it: a tool
+ * result belongs to the assistant message whose call it answers, which sits
+ * above it with only that message's other results between, so the walk goes
+ * up past results, and past a steered fact after them (ADR-0080). Anything
+ * else is its own turn: a prompt, or a message that called no tools.
+ */
+export function turnEntry(index: TreeIndex, tip: EntryId): EntryId {
+  const tail = turnTail(index, tip)
+  const last = tail.at(-1)
+  return last === undefined ? tip : (index.parentOf(last) ?? tip)
+}
+
+/**
+ * Whether a turn merged into the lane: one of its results is a `catch_up`
+ * that says what it merged (ADR-0080). The merge moved the lane's bookmark,
+ * so the turn's record names it.
+ */
+export const turnMerged = (index: TreeIndex, tip: EntryId): boolean =>
+  turnTail(index, tip).some(
+    id => index.entries[id]?.message?.merged !== undefined,
+  )
 
 /**
  * The roles a run can start with: a person's message, pi's own, and a land,
@@ -392,25 +452,81 @@ export function promptOf(
 }
 
 /**
- * The pinned cards the model reads on a run from `tip`: the newest cards
- * entry on the path. A compaction ends the walk, since pi replaces
- * everything above it with its summary and its retained tail: the cards
- * that tail carries are in view, or none. pi builds a run's context by the
- * same walk; the host plans a run's cards entry from this, and the column
- * shows what changed since from it, so the two cannot disagree.
+ * The newest entry on `tip`'s path that `read` finds something in, read.
+ * A compaction ends the walk with `atCompaction`'s answer: pi replaces
+ * everything above it with its summary and its retained tail, so what the
+ * model reads stops there. A read that outlives a summary passes `pass`.
  */
-export function pinnedInView(
+export function newestOnPath<T>(
   index: TreeIndex,
   tip: EntryId | null,
-): PinnedView | null {
+  read: (entry: EntryLike) => T | undefined,
+  atCompaction: ((entry: EntryLike) => T | null) | "pass",
+): T | null {
   for (const id of ancestry(index, tip).path) {
     const entry = index.entries[id]
-    if (entry?.type === "compaction") return entry.carried ?? null
-    const pinned = entry?.message?.pinned
-    if (pinned !== undefined) return pinned
+    if (entry === undefined) continue
+    if (entry.type === "compaction" && atCompaction !== "pass")
+      return atCompaction(entry)
+    const found = read(entry)
+    if (found !== undefined) return found
   }
   return null
 }
+
+/**
+ * The pinned cards the model reads on a run from `tip`: the newest cards
+ * entry on the path, or the cards a compaction's retained tail carries.
+ * pi builds a run's context by the same walk; the host plans a run's cards
+ * entry from this, and the column shows what changed since from it, so the
+ * two cannot disagree.
+ */
+export const pinnedInView = (
+  index: TreeIndex,
+  tip: EntryId | null,
+): PinnedView | null =>
+  newestOnPath(
+    index,
+    tip,
+    e => e.message?.pinned,
+    e => e.carried ?? null,
+  )
+
+/**
+ * The base commits the thread at `tip` last heard of or merged (ADR-0080):
+ * a behind entry's `to`, or what an update, a resolution or a `catch_up`
+ * merged, the newest on the path. Null with none, or past a compaction: a
+ * fact pi summarised away is told again.
+ */
+export const baseKnown = (
+  index: TreeIndex,
+  tip: EntryId | null,
+): readonly CommitId[] | null =>
+  newestOnPath(
+    index,
+    tip,
+    e =>
+      e.message?.behind === undefined
+        ? e.message?.merged
+        : [e.message.behind.to],
+    () => null,
+  )
+
+/**
+ * When the agent last asked the person about a conflict on `tip`'s path (an
+ * `ask_about_conflict` the host took, ADR-0080), or null. An ask stays a
+ * fact after pi summarises it, so a compaction does not end the walk.
+ */
+export const conflictAskedAt = (
+  index: TreeIndex,
+  tip: EntryId | null,
+): number | null =>
+  newestOnPath(
+    index,
+    tip,
+    e => (e.message?.asked === true ? (e.timestamp ?? 0) : undefined),
+    "pass",
+  )
 
 /**
  * The tool results among `ids`' entries, by the call each answers. A result
