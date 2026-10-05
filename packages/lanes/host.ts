@@ -2,10 +2,10 @@
 // `planProjectDir`, `planRoot`, `planHost` and `planShared` (ADR-0034,
 // ADR-0035, ADR-0086).
 //
-// These are the one exception to "only `@pineta/repo` runs jj on your repo":
+// These are the one exception to "only `@pinetrie/repo` runs jj on your repo":
 // they only read it (`jjIn`, git from its root), at startup, before the owner
 // of your repo starts. Their one write is a file, your repo's exclude file
-// (`planExclude`): `prepareProjectDir` adds `.pineta/` to it, and
+// (`planExclude`): `prepareProjectDir` adds `.pinetrie/` to it, and
 // `prepareShared` the shared directories.
 //
 // Only jj can say where a jj repo is: a secondary workspace's `.jj/repo` is a
@@ -25,7 +25,7 @@ import {
 } from "node:fs/promises"
 import { homedir } from "node:os"
 import path from "node:path"
-import type { ProjectRecord } from "@pineta/core"
+import type { ProjectRecord } from "@pinetrie/core"
 import {
   type DiskPaths,
   decodeLaneConfig,
@@ -35,8 +35,9 @@ import {
   type LaneConfig,
   type Link,
   laneIgnores,
+  PROJECT_DIR,
   type ProjectDir,
-  pinetaDir,
+  pinetrieDir,
   planExclude,
   planHost,
   planProjectDir,
@@ -64,7 +65,7 @@ async function gatherRoot(dir: string): Promise<RootFacts> {
 }
 
 /**
- * The project's root from `dir`, with `.pineta/` excluded in its repo before
+ * The project's root from `dir`, with `.pinetrie/` excluded in its repo before
  * anything is written there; or why `dir` cannot be a project. Run again on
  * the same folder, it writes nothing.
  */
@@ -114,7 +115,7 @@ const exists = (p: string) =>
  */
 async function probeClone(dir: string, near: string): Promise<boolean> {
   await mkdir(dir, { recursive: true })
-  const a = path.join(near, ".pineta-clone-probe")
+  const a = path.join(near, ".pinetrie-clone-probe")
   const b = path.join(dir, ".clone-probe")
   try {
     await writeFile(a, "probe")
@@ -130,7 +131,7 @@ async function probeClone(dir: string, near: string): Promise<boolean> {
 /** Where lanes' disks and snapshots are, once `container` is known. */
 const diskPaths = (app: string, root: string): DiskPaths => ({
   volumes: path.join(app, "volumes"),
-  snapshots: pinetaDir(root).snapshots,
+  snapshots: pinetrieDir(root).snapshots,
 })
 
 /**
@@ -202,20 +203,20 @@ export async function readLaneConfig(
   return decodeLaneConfig(json, root, pnpmLock)
 }
 
-/** The user's lane config file: `$XDG_CONFIG_HOME/pineta/config.json`. */
+/** The user's lane config file: `$XDG_CONFIG_HOME/pinetrie/config.json`. */
 export const userConfigFile = (
   env: Readonly<Record<string, string | undefined>> = process.env,
 ): string =>
   path.join(
     env.XDG_CONFIG_HOME ?? path.join(homedir(), ".config"),
-    "pineta",
+    "pinetrie",
     "config.json",
   )
 
 /**
  * Gather what `planShared` needs, plan, then execute: create missing
  * directories, add unignored ones to your repo's exclude file, and write the
- * lanes' ignore file (`laneIgnores`) in `pinetaDir`'s `laneGit`. jj, not git's
+ * lanes' ignore file (`laneIgnores`) in `pinetrieDir`'s `laneGit`. jj, not git's
  * index, says what is tracked: in a colocated repo the index can lag. Ignore
  * rules are git's, and jj applies them, the global file included (S45).
  */
@@ -266,7 +267,7 @@ export async function prepareShared(
       root,
       planned.exclude.map(p => `/${p}/`),
     )
-  const ignoreDir = pinetaDir(root).laneGit
+  const ignoreDir = pinetrieDir(root).laneGit
   await mkdir(ignoreDir, { recursive: true })
   await writeFile(
     path.join(ignoreDir, IGNORE_FILE),
@@ -289,7 +290,7 @@ async function findNodeModules(root: string): Promise<string[]> {
       if (!e.isDirectory() || e.name === ".jj" || e.name === ".git") continue
       const child = path.join(rel, e.name)
       if (e.name === "node_modules") out.push(child)
-      else if (depth < 3 && e.name !== ".pineta") await walk(child, depth + 1)
+      else if (depth < 3 && e.name !== PROJECT_DIR) await walk(child, depth + 1)
     }
   }
   await walk("", 1)

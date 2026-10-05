@@ -10,7 +10,7 @@ the rest of ADR-0025 and amends ADR-0043 (no notes below messages) and
 ADR-0024 (no `editing` presence); its second part, queued cards and the
 take/unqueue race, implemented by `PLAN-2026-10-01-queued-cards`: it
 supersedes ADR-0026 (queued notes become queued cards), with ADR-0055, and
-amends ADR-0020 (nothing waits in `pineta.outbox`, which is gone). Probe 2
+amends ADR-0020 (nothing waits in `pinetrie.outbox`, which is gone). Probe 2
 is answered by S69, probes 1 and 4, for the inventory, by S75 and S76,
 and probe 5 by S92; S107 found a real model acts on the pinned cards it
 reads, a retired one included. A later step would amend ADR-0046 (a fixed line about
@@ -49,7 +49,7 @@ and "+ pin", implemented by `PLAN-2026-10-04-cards-per-place`, with "+ pin"
 in the column's header while a thread has no pinned card (2026-10-05, with
 Duane). Amended in place (2026-10-05, with Duane): who contributed to a card
 waits for Kyneta. Step 1's attribution stays until Kyneta can name the
-writers whose text still stands without Pineta unwrapping Yjs; step 6
+writers whose text still stands without pine·trie unwrapping Yjs; step 6
 goes on with traces and card history (*Who contributed*). Step 6's traces
 and card history implemented by `PLAN-2026-10-05-card-history-traces`, with
 *Other people* amended in place (2026-10-05): where history and traces
@@ -85,9 +85,9 @@ composer is the only place to put it down. It serves at least six purposes:
 
 Only the first is "the next message here". Someone who loses a paragraph once
 starts keeping a scratch file in another app, and their planning leaves
-Pineta, where no agent or collaborator can see it.
+pine·trie, where no agent or collaborator can see it.
 
-Pineta already has most of the pieces, as separate things: notes on messages
+pine·trie already has most of the pieces, as separate things: notes on messages
 and shared drafts (ADR-0025), queued notes (ADR-0026), the fold plan's private
 inventory, and the composer. Each has its own rules. What a person needs is one
 concept that lowers the cost of learning the whole system, and the relief of
@@ -180,7 +180,7 @@ who reads a card: a thought only for the team goes below the line.
   can release it. While it is held the host pops no message card from it,
   and a send there waits in it, so people can line up several cards on an
   idle thread and let them go together. The hold is the host's record
-  (`pineta.queue-hold`), so it lasts until a release, across a restart.
+  (`pinetrie.queue-hold`), so it lasts until a release, across a restart.
 - **Stop holds the queue when a message card waits in it**, so stopping a
   wrong turn does not send the next step unseen. With nothing queued, Stop
   holds nothing, or the correction sent after it would be held too. Resume
@@ -287,7 +287,7 @@ centred by default, and open while you work in them, since nothing pauses.
 - **Every card in a shared place is shown to everyone**, in full, and anyone
   can type in it. Who wrote in a card is read from its operations: each
   carries its seat's `clientID`, and the host writes a record of each seat's
-  person as it connects (`pineta.seat`), so anyone can name a card's writers
+  person as it connects (`pinetrie.seat`), so anyone can name a card's writers
   after they have left (S58). Nobody stores a contributors list. *This is
   provisional:* it reports whoever's operations the text holds, which undo
   does not change. From step 6, who contributed is a projection of the
@@ -334,8 +334,8 @@ centred by default, and open while you work in them, since nothing pauses.
   unqueued, taken, sent. That is its provenance, reached from the card and
   from a trace. Someone taking your card into their inventory is recorded there,
   not notified. *Amended in place (step 6):* a card's history and its traces
-  are host records in the session's document (`pineta.card-history`, keyed
-  by the card, and `pineta.trace`, keyed by its own id), not fields of the
+  are host records in the session's document (`pinetrie.card-history`, keyed
+  by the card, and `pinetrie.trace`, keyed by its own id), not fields of the
   places: that document grows for good (S90), and a field every event
   changes would refuse each whole undo of a move (S82). A card's history is
   deleted with the card; a trace outlives it ("Bea sent this →" leads to
@@ -352,14 +352,14 @@ centred by default, and open while you work in them, since nothing pauses.
   undoing it, removes you too (2026-10-05, with Duane).
 
   *Deferred (2026-10-05, with Duane):* the projection waits for Kyneta. Yjs
-  records who typed each character but not who deleted it, and Pineta
+  records who typed each character but not who deleted it, and pine·trie
   reaches even the first only by unwrapping Kyneta (`textClients`), so it
   has asked Kyneta for a read of the writers whose text still stands. When
   that lands, contributors become those writers, and a deletion counts for
   no one: someone who only deleted in a card is not named. Until then,
   step 1's attribution stays for the heading and a sent message's "with",
   and marks do not count cards you contributed to. Keeping a log of each
-  person's edits in Pineta, which would also credit deletions, was
+  person's edits in pine·trie, which would also credit deletions, was
   rejected as large for what it adds.
 
 *Closing a column.*
@@ -496,7 +496,7 @@ where the card becomes a message in the immutable tree.
 
 *Removed.* Notes in the tree: a note below a message (ADR-0043), origin notes,
 done / reopen / "changed since done", the notes index, and the rail's note
-squares. The `pineta.note` records and their lifecycle. Compose together as an
+squares. The `pinetrie.note` records and their lifecycle. Compose together as an
 action of its own, since every drafting card is shared. The fold plan's private
 inventory. A branch from `→` still carries a conversation about a message,
 and a pinned card can quote one.
@@ -505,7 +505,7 @@ and a pinned card can quote one.
 
 - The tab-switch bug is fixed by the first card, not by a cache: the text
   lives on its thread, in a document, and outlives any column.
-- Pineta's host gets smaller where cards are concerned: no commands, codec
+- pine·trie's host gets smaller where cards are concerned: no commands, codec
   fields or handlers for composing, drafting, cancelling or reordering. The
   host's work is the boundary, and the policy's invariants. (*Amended by
   ADR-0059: the host takes handoffs.*)
@@ -516,7 +516,7 @@ and a pinned card can quote one.
 - Every card's text is a Yjs document, never compacted while live (S24).
   Storage grows with use until Kyneta compacts live Yjs, as ADR-0026 already
   accepted for queued notes.
-- Undo comes from Kyneta, not from Pineta's code: Pineta chooses each
+- Undo comes from Kyneta, not from pine·trie's code: pine·trie chooses each
   stack's scope and wraps each gesture.
 - Cards' places need a CRDT document, not `json`: Kyneta's undo over a
   plain document is a strict one-writer stack, and a write by anyone else
@@ -541,7 +541,7 @@ and a pinned card can quote one.
      happened while you were away.
 
 *What Kyneta provides.* Asked for while this ADR was written, and now in the
-build Pineta links (`/kyneta/workspace/pineta`, bookmark `needed-by-pineta`):
+build pine·trie links (`/kyneta/workspace/pineta`, bookmark `needed-by-pinetrie`):
 "selective, durable undo across documents".
 - **`createUndoStack({ exchange, docId, key, scope })`**
   (`packages/exchange/README.md` § Undo, `TECHNICAL.md` § Undo stacks):
@@ -562,7 +562,7 @@ build Pineta links (`/kyneta/workspace/pineta`, bookmark `needed-by-pineta`):
   Cmd+Shift+Z and Ctrl+Y, typing grouped, the caret moved to what was
   undone. Without a stack, `useText` swallows Cmd+Z, as it does in a note's
   editor today.
-- Measured from Pineta's lane: one gesture writing two `NoteDoc` documents,
+- Measured from pine·trie's lane: one gesture writing two `NoteDoc` documents,
   then a write outside it at the front of the first. Undo emptied the second
   and left the first holding only the other write; redo restored both.
 - **Redo of a step of several commits to one text puts them back in reverse
@@ -595,7 +595,7 @@ and pi's system messages both lose the cache on an edit):
 3. **A spent card's document:** destroy or keep its text after a send. S28
    found a refused write unrecoverable; measure what a client still holding
    the replica sees.
-4. **Undo in Pineta's shape:** two browser tabs as two people, over the
+4. **Undo in pine·trie's shape:** two browser tabs as two people, over the
    host's exchange. One takes a card while the other types in it, and one
    moves a card the other then undoes a move of. A second tab's stack is its
    own.
@@ -607,7 +607,7 @@ and pi's system messages both lose the cache on an edit):
 
 *Still open:* whether a person-wide activity log is wanted beyond each
 card's history; how a client reaches other sessions' pages, since each
-session has its own host and store (`.pineta/pineta.db`) and a browser
+session has its own host and store (`.pinetrie/pinetrie.db`) and a browser
 reaches one host; and how a card moves between pages, since its text is a
 document on its session's host (a copy, then a delete, and an undo across
 two hosts).

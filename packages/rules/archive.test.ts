@@ -17,7 +17,7 @@ import {
   snapshotId,
   workflowStateIdFor,
   writerId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { archivedIn, planArchive, writesIn } from "./archive.ts"
 

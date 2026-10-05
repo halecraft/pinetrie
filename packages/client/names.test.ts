@@ -1,4 +1,4 @@
-import { writerId } from "@pineta/core"
+import { writerId } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { cardHeading, namesOf, speakerLabel } from "./names.ts"
 

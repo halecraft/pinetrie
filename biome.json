@@ -12,7 +12,7 @@
       "!!**/dist",
       "!!**/.pnpm-store",
       "!!sandbox",
-      "!!.pineta",
+      "!!.pinetrie",
       "!!.plans"
     ]
   },
@@ -64,7 +64,7 @@
         "!packages/core/fixtures.ts",
         "!packages/core/trailers.ts",
         "!packages/client/fixtures.ts",
-        "!apps/pineta/host/fakes.ts",
+        "!apps/pinetrie/host/fakes.ts",
         "!packages/client/layout.ts",
         "!packages/client/use-ask-bar.ts",
         "!packages/client/root-target.ts"
@@ -76,7 +76,7 @@
               "level": "error",
               "options": {
                 "paths": {
-                  "@pineta/core": {
+                  "@pinetrie/core": {
                     "importNames": ["entryId", "runId"],
                     "message": "Mint an id only where it enters: here it arrives branded from a read (packages/core/index.ts)."
                   },
@@ -93,12 +93,12 @@
     },
     {
       "includes": [
-        "apps/pineta/host/**",
+        "apps/pinetrie/host/**",
         "!**/*.test.ts",
         "!**/*.test.tsx",
         "!packages/core/fixtures.ts",
         "!packages/client/fixtures.ts",
-        "!apps/pineta/host/fakes.ts"
+        "!apps/pinetrie/host/fakes.ts"
       ],
       "linter": {
         "rules": {
@@ -107,7 +107,7 @@
               "level": "error",
               "options": {
                 "paths": {
-                  "@pineta/core": {
+                  "@pinetrie/core": {
                     "importNames": ["entryId"],
                     "message": "Mint an id only where it enters: here it arrives branded from a read (packages/core/index.ts)."
                   },

@@ -1,4 +1,4 @@
-import { writerId } from "@pineta/core"
+import { writerId } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import { entry, indexOf } from "./fixtures.ts"
 import { presenceColors, writerOrder } from "./presence.tsx"

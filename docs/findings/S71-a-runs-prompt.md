@@ -42,7 +42,7 @@ committed.
 4. **When pi accepts a run, it chains its own inbox before the prompt**
    (read: `acceptRun` in `runtime/lane.js`). Steers, follow-ups and writes
    queued in pi's inbox become entries between `fromTipId` and the prompt.
-   Pineta queues nothing there, because a lane is never written while it
+   pine·trie queues nothing there, because a lane is never written while it
    runs (S21). If it ever did, the child of `fromTipId` would not be the
    prompt, but `promptOf(tipId)` still would be, since the prompt is
    the last entry in the chain.

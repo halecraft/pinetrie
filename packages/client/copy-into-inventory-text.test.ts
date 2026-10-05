@@ -1,4 +1,4 @@
-import { entryId, type TranscriptMessage } from "@pineta/core"
+import { entryId, type TranscriptMessage } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import { copyIntoInventoryText } from "./copy-into-inventory-text.ts"
 

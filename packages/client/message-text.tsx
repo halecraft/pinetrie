@@ -1,7 +1,7 @@
 // client/message-text — a message's text drawn as markdown. What is drawn is
 // decided in markdown.ts.
 
-import type { ImageRef } from "@pineta/core"
+import type { ImageRef } from "@pinetrie/core"
 import type { Root } from "hast"
 import { type Components, toJsxRuntime } from "hast-util-to-jsx-runtime"
 import { type ReactNode, useMemo } from "react"

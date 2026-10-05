@@ -18,7 +18,7 @@ not committed.
    - With `{ authority: "self" }` registered, the first client had its 500
      entries in 32 ms, and a second client in 7 ms.
    - No `unloaded-doc-reloaded` warning reached `console.warn`.
-   - Pineta's host declares no authority today.
+   - pine·trie's host declares no authority today.
 2. **A client's `destroy` leaves the host's copy alone.** After one client
    destroyed its copy, the host still held all 500 entries. The same client's
    next `get` had them again in 17 ms.
@@ -50,7 +50,7 @@ not committed.
 
 - The host registers `{ authority: "self" }`. It is the session's only
   writer and has no upstream, so nothing it settles changes meaning: its
-  `whenHydrated` already ignores peers (`apps/pineta/host/index.ts`).
+  `whenHydrated` already ignores peers (`apps/pinetrie/host/index.ts`).
 - The client registers a `canShare` that declines a `root:` document unless
   the client holds it (`planHeldRoots`).
-- Step A, moving streams to `pineta:live`, needs no migration code.
+- Step A, moving streams to `pinetrie:live`, needs no migration code.

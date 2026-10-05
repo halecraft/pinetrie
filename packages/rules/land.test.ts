@@ -1,4 +1,4 @@
-import { commitId, laneNameForThread, writerId } from "@pineta/core"
+import { commitId, laneNameForThread, writerId } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { planResolution, renderableMessage } from "./index.ts"
 import {

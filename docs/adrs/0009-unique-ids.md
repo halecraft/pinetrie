@@ -45,7 +45,7 @@ reproduces the silent discard, so the test is not vacuous.
 **Decision: use pi's default. Do not replace it with anything weaker.**
 
 **The hazard is the injection point, not the default.** `SessionOptions.idGenerator`
-is where this can go wrong — S3 injected its own. Anything Pineta injects must
+is where this can go wrong — S3 injected its own. Anything pine·trie injects must
 clear: (i) no derivation from content, index, or position; (ii) ≥ 2⁻⁷⁰ pairwise
 cross-instance; (iii) structurally unique within a process.
 

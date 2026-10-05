@@ -66,7 +66,7 @@ and lanes exchange commits the way separate clones do.
   is a path in every lane that inherits it. Nothing is rewritten.
 - **Your working copy is mounted read-only at `/mnt/host-working-copy`.** A lane can read it
   and cannot write it, by any tool. Directories that links leave the project
-  for (Pineta's `link:` dependencies on Kyneta) are mounted read-only where
+  for (pine·trie's `link:` dependencies on Kyneta) are mounted read-only where
   the links resolve. Nothing else of the host is mounted.
 - **The lane's tools run in its container.** The host cannot read an ext4
   disk, so pi's `read`, `write`, `edit` and `bash` run in the lane: pi's own
@@ -84,8 +84,8 @@ and lanes exchange commits the way separate clones do.
   2. runs `sync`, so what the tools wrote is on the disk;
   3. is cloned, copy-on-write, into a snapshot.
 
-  The host then fetches the lane's commit into your repo as `pineta/<lane>`,
-  and the turn's `pineta.revision` record names both the commit (null when
+  The host then fetches the lane's commit into your repo as `pinetrie/<lane>`,
+  and the turn's `pinetrie.revision` record names both the commit (null when
   nothing tracked changed) and the snapshot. Every turn with tool calls gets a
   snapshot, because ignored state changes without a commit. A turn's
   snapshot runs alongside the next model request; the next tool call waits
@@ -119,7 +119,7 @@ and lanes exchange commits the way separate clones do.
   read-only and gains nothing (S43 item 4). Landing is ADR-0032's: the lane
   merges your `@-` into itself, ADR-0033 resolves, and you take the merge with
   `jj rebase -r @ -d <merge>`. A fold's file merge is a merge in the target
-  lane of commits it fetched. `bookmarks(glob:"pineta/*")` stays in your
+  lane of commits it fetched. `bookmarks(glob:"pinetrie/*")` stays in your
   repo's `immutable_heads()`.
 - **A container runs only while its lane runs.** A VM keeps the most memory
   its guest ever touched until it stops (S39 item 7), so the host stops a
@@ -134,7 +134,7 @@ and lanes exchange commits the way separate clones do.
   background (deleting a clone takes about 280 ms, S40 item 4). Restoring a
   lane clones its newest snapshot.
 - **The image is the project's.** A lane runs the project's `Containerfile`
-  if it has one, else Pineta's default image: Debian trixie, Node, git (2.41
+  if it has one, else pine·trie's default image: Debian trixie, Node, git (2.41
   or later: jj's push and fetch need it, S42 item 7), and jj. `container build`
   makes it once per change.
 - **One interface for lanes' disks and containers,** with operations: create
@@ -151,7 +151,7 @@ and lanes exchange commits the way separate clones do.
   - further read-only mounts;
   - shared directories, read-write, from the project or the person's own
     config (ADR-0035);
-  - tools that run on the host (an MCP server, an extension's tool). Pineta
+  - tools that run on the host (an MCP server, an extension's tool). pine·trie
     exposes none today; a tool that runs on the host acts outside the lane,
     with your access, so it runs in the lane unless declared.
 
@@ -189,7 +189,7 @@ and lanes exchange commits the way separate clones do.
 - **The host sees a lane's work once per turn,** when it fetches, not live.
   People see a lane's files through its revisions (`jj diff`, `jj file show`)
   or through the host, not in their own editor.
-- **Costs per turn: 250–300 ms** on Pineta's own repository (S43 item 6): a
+- **Costs per turn: 250–300 ms** on pine·trie's own repository (S43 item 6): a
   commit (84–110 ms), a `sync` (52–73 ms), a clone (5–9 ms on a fresh disk,
   up to 0.6 s on one churned for minutes, S40), and a fetch (98–131 ms). The
   clone overlaps the next model request. **Per branch:** a clone, a container start (under 1 s), and `jj new`
@@ -202,7 +202,7 @@ and lanes exchange commits the way separate clones do.
   image, read by path (S40, "Not measured"). A contract test runs the S41 soak
   in small (clones taken mid-write, then `e2fsck` and content checks) on every
   upgrade of `container`, with a deliberate bug that drops the journal.
-- **Pineta needs `container` for lanes of their own.** Other hosts, and Linux,
+- **pine·trie needs `container` for lanes of their own.** Other hosts, and Linux,
   work directly until the interface has another implementation (reflinked
   images on btrfs or XFS, S40 discussion).
 - **ADR-0032's host-side jj workspaces, `workspace/` in the repo, its
@@ -267,23 +267,23 @@ to or differs from the text above:
   and `HOST_WORKING_COPY` in core). They are named for what they hold: the
   lane's own copy, and the person's working copy on the host. The findings
   (S39–S44) measured them as `/project` and `/yours`.
-- **A project's image** is `pineta.Containerfile` at its root. It needs only
+- **A project's image** is `pinetrie.Containerfile` at its root. It needs only
   a POSIX `sh` and git 2.41 or later; the host refuses to start lanes on an
-  image without them, naming what it lacks. Pineta's default image is Debian
+  image without them, naming what it lacks. pine·trie's default image is Debian
   trixie with Node 24, git 2.47, pnpm through corepack, and jj pinned to the
   host's version.
 - **The lane runtime.** Node, with its libraries and glibc's loader, and a
-  static jj, copied out of Pineta's default image into
-  `.pineta/runtime/<image tag>/` and mounted read-only at `/pineta-runtime` in
+  static jj, copied out of pine·trie's default image into
+  `.pinetrie/runtime/<image tag>/` and mounted read-only at `/pinetrie-runtime` in
   every lane. The helper runs on that Node through that loader, so it needs
   nothing of the project's image (S44).
-- **Grants** are `pineta.json`'s `lanes` key: `ssh`, `env` (names), `mounts`
+- **Grants** are `pinetrie.json`'s `lanes` key: `ssh`, `env` (names), `mounts`
   (read-only). The same key's `install` and `installWhen` name the base
   snapshot's install command and its lockfile; a repo with `pnpm-lock.yaml`
   installs with pnpm by default.
-- **Snapshots** are files, `.pineta/snapshots/<entry id>.img`, one per
+- **Snapshots** are files, `.pinetrie/snapshots/<entry id>.img`, one per
   revision record; the base snapshot is `base.img`, with `base.json` naming
-  its commit and lockfile hash. `/.pineta/` is added to git's exclude file.
+  its commit and lockfile hash. `/.pinetrie/` is added to git's exclude file.
 - **A fetch by id** puts the commit on a branch, and every git fetch into a
   colocated repo ends with `jj --ignore-working-copy git import` (S44 items 7
   and 8). A new base disk is `git init` and `jj git init --colocate`, not
@@ -291,7 +291,7 @@ to or differs from the text above:
 - **A lane from before lane containers**, with a record and neither a disk
   nor a snapshot, is retired: its tools fail, saying so and to branch from it.
   A branch from it starts from the base snapshot at its nearest commit.
-- **Commands the host runs carry `PINETA_GIT=1`**, which a git shim that
+- **Commands the host runs carry `PINETRIE_GIT=1`**, which a git shim that
   refuses writes in a jj repo when an agent is driving lets through: fetching
   lanes' bundles into your repo is a git write.
 - **Skills** listed by path from your home directory were not readable in a

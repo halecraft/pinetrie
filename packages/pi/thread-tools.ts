@@ -9,8 +9,8 @@ import {
   type CommitId,
   type LaneName,
   SPLIT_TOOL,
-} from "@pineta/core"
-import type { ToolAnswer } from "@pineta/rules"
+} from "@pinetrie/core"
+import type { ToolAnswer } from "@pinetrie/rules"
 import { Type } from "typebox"
 import { laneOf } from "./lanes.ts"
 

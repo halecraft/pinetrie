@@ -2,7 +2,7 @@
 //
 // A card is live text in a place. Its text is its own `TextDoc`, written by
 // clients; its record is in the places document (`PlacesDoc` in
-// @pineta/schema), which only the host writes, through handoffs it applies
+// @pinetrie/schema), which only the host writes, through handoffs it applies
 // or refuses (`planMove`). This module decodes a record, and decides where a
 // card sits now, which moves and reorders the host accepts, which queued
 // card is popped next to be sent, and which are swept. Who wrote in it is `writersOfClients`
@@ -42,7 +42,7 @@ import {
   type TreeIndex,
   threadOf,
   type WriterId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { Type } from "typebox"
 import { decodeWith } from "./decode.ts"
 import { decodeOfferFact, encodeOfferFact } from "./fact.ts"
@@ -787,7 +787,7 @@ export function planHistorySweep(input: {
   })
 }
 
-/** Of an undo step, what Pineta reads: which document each part wrote, and where. */
+/** Of an undo step, what pinetrie reads: which document each part wrote, and where. */
 interface StepPart {
   readonly docId: string
   readonly footprint: readonly (readonly string[])[]

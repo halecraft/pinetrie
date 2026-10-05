@@ -8,8 +8,8 @@
 // state.
 
 import { subscribe } from "@kyneta/schema"
-import type { CardId, CardRecord } from "@pineta/core"
-import type { SessionClient } from "@pineta/session"
+import type { CardId, CardRecord } from "@pinetrie/core"
+import type { SessionClient } from "@pinetrie/session"
 import { useEffect, useState } from "react"
 import { holdsText, withFilled } from "./card-marks.ts"
 

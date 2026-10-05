@@ -1,5 +1,5 @@
 {
-  "name": "@pineta/lanes",
+  "name": "@pinetrie/lanes",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -7,6 +7,6 @@
     ".": "./index.ts"
   },
   "dependencies": {
-    "@pineta/core": "workspace:*"
+    "@pinetrie/core": "workspace:*"
   }
 }

@@ -1,4 +1,4 @@
-import { entryId, type TranscriptMessage } from "@pineta/core"
+import { entryId, type TranscriptMessage } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   describeRequest,

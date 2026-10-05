@@ -1,6 +1,6 @@
 # Architecture
 
-Pineta is a coding agent whose conversation is a tree. People branch from any
+pine·trie is a coding agent whose conversation is a tree. People branch from any
 message, work in the same tree together, and take the agent's file changes
 when they are ready. The detail is in `docs/01-architecture.md` and the ADRs
 in `docs/adrs/`.
@@ -35,4 +35,4 @@ browser ──commands (Kyneta Line)──▶ host ──▶ pi agent core
 | `reads` | document reads shared by host and client |
 | `lanes` | containers, disks, jj and git |
 | `client` | the browser UI |
-| `apps/pineta` | the host; its shell is split by responsibility (`apps/pineta/host/TECHNICAL.md`) |
+| `apps/pinetrie` | the host; its shell is split by responsibility (`apps/pinetrie/host/TECHNICAL.md`) |

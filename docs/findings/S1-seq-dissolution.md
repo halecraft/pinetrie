@@ -344,7 +344,7 @@ Its third claim — *"Entries need no `seq` at all"* — is confirmed in the sen
 
 **A new constraint for ADR-0007 (host↔client transport), and the main thing to carry forward:**
 
-> **`seq` is replica-local and MUST NOT cross a replica boundary or survive a restart.** A cursor minted on one host is meaningless on another. pi never does either today (§3.4, verified by grep), but Pineta's browser clients receive transcript events that carry `seq` from `commit.seqs[...]`. Clients must treat it as an opaque local ordering key, never as a durable identifier — entry `id` is the durable identifier.
+> **`seq` is replica-local and MUST NOT cross a replica boundary or survive a restart.** A cursor minted on one host is meaningless on another. pi never does either today (§3.4, verified by grep), but pine·trie's browser clients receive transcript events that carry `seq` from `commit.seqs[...]`. Clients must treat it as an opaque local ordering key, never as a durable identifier — entry `id` is the durable identifier.
 
 **Suggested ADR-0012 — "`seq` is a derived replica-local arrival index."** Decision: no sequencer in the shared document; stats derived too; arrival order chosen *over* causal order specifically to keep integer cursors stable; cursors are session-and-replica-scoped.
 

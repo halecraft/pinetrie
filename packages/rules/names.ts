@@ -3,7 +3,7 @@
 // a name computed at every read could collide unseen, and a changed list
 // would rename every thread.
 
-import type { LaneName, NameRecord, ThreadName } from "@pineta/core"
+import type { LaneName, NameRecord, ThreadName } from "@pinetrie/core"
 import { Type } from "typebox"
 import { decodeAt, laneKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
@@ -616,7 +616,7 @@ const NameRecordSchema = Type.Object({
 
 /** Each thread's name, `word-word`, at its lane (ADR-0039). */
 export const NAME: RecordSpec<NameRecord, LaneName, "session"> = {
-  namespace: "pineta.name",
+  namespace: "pinetrie.name",
   home: "session",
   keyOf: r => r.lane,
   encode: ({ lane, ...contents }) => contents,

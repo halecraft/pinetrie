@@ -21,15 +21,15 @@ columns belonged to it:
   colour on screen, below whichever tabs happened to be above it.
 - **The root's title showed only in its tab,** cut at 16rem, though it is
   the cue a person reads when switching context. The window's title was
-  "(n) Pineta".
-- **The header spent a row on little:** "PINETA", "messages M of N" and
+  "(n) pine·trie".
+- **The header spent a row on little:** "PINETRIE", "messages M of N" and
   "connected".
 
 **Decision.**
 
 - **The tabs are the header.** One row holds the tabs on the left, scrolling
   as before, and the session's indicators (people, activity, project,
-  inventory, you) at its right end. "PINETA", the count and "connected"
+  inventory, you) at its right end. "PINETRIE", the count and "connected"
   leave it. "syncing…" shows among the indicators only while the document
   is pending. Too narrow for both on one row (below 56rem), the indicators
   go on a row above the tabs.
@@ -47,7 +47,7 @@ columns belonged to it:
   view as you choose it. The other tabs shrink to a floor before the list
   scrolls.
 - **The window's title names the tab you are on:** "(2) Fix the sync bug ·
-  Pineta", the count left out at zero.
+  pine·trie", the count left out at zero.
 - **The message count moves to the Archive tab:** its tooltip, and a line
   in its list. Archive is the whole session's view, and the count is the
   session's.

@@ -1,5 +1,5 @@
-import { laneNameForThread, type OfferAction } from "@pineta/core"
-import type { Outcome } from "@pineta/protocol/codec"
+import { laneNameForThread, type OfferAction } from "@pinetrie/core"
+import type { Outcome } from "@pinetrie/protocol/codec"
 import { describe, expect, test } from "vitest"
 import {
   type Acting,

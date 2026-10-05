@@ -5,14 +5,14 @@
 //   L2 integration   the host's and the lanes' scenarios (`e2e`, `e2e:lanes`)
 //   L3 browser       the browser's scenarios (`e2e:browser`)
 //
-// A test above L1 is a scenario (`apps/pineta/e2e/scenario.ts`): one run
+// A test above L1 is a scenario (`apps/pinetrie/e2e/scenario.ts`): one run
 // against its own host, which holds many checks, as one `test()` holds many
 // `expect()`s. `pnpm run conformance` is pi's own Storage suite, run against
 // ours: its tests are pi's, so they count in no layer.
 
 import { globSync, readFileSync } from "node:fs"
 import path from "node:path"
-import { scenarioNames } from "../apps/pineta/e2e/scenario.ts"
+import { scenarioNames } from "../apps/pinetrie/e2e/scenario.ts"
 
 export interface LayerCounts {
   /** Static `test(`/`it(` calls in Vitest's include globs: `test.each` counts once. */
@@ -65,7 +65,7 @@ export async function countLayers(root: string): Promise<LayerCounts> {
       (readFileSync(path.join(root, f), "utf8").match(UNIT_TEST) ?? []).length,
     0,
   )
-  const e2e = path.join(root, "apps/pineta/e2e")
+  const e2e = path.join(root, "apps/pinetrie/e2e")
   return {
     unit,
     integration:

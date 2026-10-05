@@ -1,4 +1,4 @@
-import { entryId, laneNameForThread } from "@pineta/core"
+import { entryId, laneNameForThread } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import {
   newRootDoc,

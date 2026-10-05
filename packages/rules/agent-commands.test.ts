@@ -9,7 +9,7 @@ import {
   rootIdFor,
   type ThreadName,
   writerId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   catchUpAnswer,
@@ -42,7 +42,7 @@ const ADA = writerId("ada@x.io")
 const [B, C, D] = [commitId("b"), commitId("c"), commitId("d")]
 const MOVE = {
   base: { kind: "line" },
-  bookmark: "pineta-onto",
+  bookmark: "pinetrie-onto",
   from: B,
   to: C,
 } as const
@@ -155,7 +155,7 @@ describe("catchUpAnswer", () => {
       {
         lane: LANE,
         from: { kind: "line" },
-        bookmark: "pineta-onto",
+        bookmark: "pinetrie-onto",
         merged: C,
         commits: ["a change"],
         files: ["a.ts"],

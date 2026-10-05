@@ -1,5 +1,5 @@
-import { entryId, projectColumns } from "@pineta/core"
-import { newLiveDoc } from "@pineta/schema"
+import { entryId, projectColumns } from "@pinetrie/core"
+import { newLiveDoc } from "@pinetrie/schema"
 import { expect, test } from "vitest"
 import { entry, indexOf } from "./fixtures.ts"
 import { type MessageProps, sameMessageProps } from "./message-props.ts"

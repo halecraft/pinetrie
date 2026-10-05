@@ -15,7 +15,7 @@ import {
   type ThreadName,
   workflowStateIdFor,
   writerId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   BANNER,
@@ -61,7 +61,7 @@ const offer: OfferRecord = {
   yourEdits: [],
   described: true,
   edited: false,
-  bookmark: "pineta-offer/x",
+  bookmark: "pinetrie-offer/x",
   integratedAs: null,
   commits: [C],
   ledger: null,
@@ -171,7 +171,7 @@ const SAMPLES: readonly Sample[] = [
     "line",
     LINE,
     {
-      onto: "pineta-onto",
+      onto: "pinetrie-onto",
       wipPrefix: "wip/",
       publish: "main",
       published: { commit: C, behind: 1, ahead: 0 },
@@ -389,7 +389,7 @@ test("deleteRecord names the spec's namespace and the key", () => {
   expect(deleteRecord(MARK, E, TEST_ROOT)).toEqual({
     kind: "delete",
     target: { kind: "root", root: TEST_ROOT },
-    namespace: "pineta.mark",
+    namespace: "pinetrie.mark",
     key: E,
   })
 })

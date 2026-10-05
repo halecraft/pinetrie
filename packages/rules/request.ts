@@ -3,7 +3,7 @@
 // message's request (`describeRequest`, below) uses them; and a one-line
 // answer read back (`bareLine`).
 
-import { firstLine, type TranscriptMessage } from "@pineta/core"
+import { firstLine, type TranscriptMessage } from "@pinetrie/core"
 
 /**
  * One message as `speaker: text`. A chat's speaker is its author as sent;

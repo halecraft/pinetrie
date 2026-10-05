@@ -2,7 +2,7 @@
 
 Asked while planning undo of moves (ADR-0052, ADR-0059): can the host keep a
 Kyneta undo stack per seat over a places document only it writes, and so
-give moves Kyneta's undo instead of Pineta's own reverse handoffs? Measured
+give moves Kyneta's undo instead of pine·trie's own reverse handoffs? Measured
 in a lane (Node 24) against Kyneta with `undo({ whole: true })` and the
 `Undone` results (Kyneta `11365c0`). One host Exchange, no clients: a
 places document on Yjs, each card a `.json()` row of its place and placer,

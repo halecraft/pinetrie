@@ -1,0 +1,38 @@
+{
+  "name": "@pinetrie/app",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "host": "NODE_ENV=production node host/server.ts",
+    "host:react-dev": "NODE_ENV=development node host/server.ts",
+    "e2e": "node e2e/e2e.ts",
+    "e2e:live": "PINETRIE_LIVE=1 PINETRIE_SCENARIO=live node e2e/e2e.ts",
+    "e2e:browser": "node e2e/browser.ts",
+    "e2e:lanes": "node e2e/lanes.ts"
+  },
+  "dependencies": {
+    "@kyneta/exchange": "link:../../../kyneta/workspace/pineta/packages/exchange",
+    "@kyneta/schema": "link:../../../kyneta/workspace/pineta/packages/schema",
+    "@kyneta/sql-store-core": "link:../../../kyneta/workspace/pineta/packages/exchange/stores/sql-core",
+    "@kyneta/sqlite-store": "link:../../../kyneta/workspace/pineta/packages/exchange/stores/sqlite",
+    "@kyneta/websocket-transport": "link:../../../kyneta/workspace/pineta/packages/exchange/transports/websocket",
+    "@pinetrie/client": "workspace:*",
+    "@pinetrie/core": "workspace:*",
+    "@pinetrie/keeper": "workspace:*",
+    "@pinetrie/lanes": "workspace:*",
+    "@pinetrie/pi": "workspace:*",
+    "@pinetrie/protocol": "workspace:*",
+    "@pinetrie/reads": "workspace:*",
+    "@pinetrie/repo": "workspace:*",
+    "@pinetrie/rules": "workspace:*",
+    "@pinetrie/schema": "workspace:*",
+    "@pinetrie/session": "workspace:*",
+    "vite": "7.1.11",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.56.0",
+    "@types/ws": "8.18.1"
+  }
+}

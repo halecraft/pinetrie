@@ -1,4 +1,4 @@
-import { entryId, laneNameForThread, rootIdFor, writerId } from "@pineta/core"
+import { entryId, laneNameForThread, rootIdFor, writerId } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import { tree } from "./fixtures.ts"
 import {

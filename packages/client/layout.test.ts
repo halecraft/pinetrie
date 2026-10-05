@@ -5,7 +5,7 @@ import {
   laneNameForThread,
   rootIdFor,
   workflowStateIdFor,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { NEW_ROOT, tree } from "./fixtures.ts"
 import {

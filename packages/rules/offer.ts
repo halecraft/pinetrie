@@ -1,16 +1,16 @@
 // offer — what the host decides about a lane's offer in your repo (ADR-0038,
-// ADR-0060, ADR-0067), pure, over the facts `@pineta/repo` gathers.
+// ADR-0060, ADR-0067), pure, over the facts `@pinetrie/repo` gathers.
 //
-// Each decision is a value typed in `@pineta/core` (`core/offers.ts`) that
+// Each decision is a value typed in `@pinetrie/core` (`core/offers.ts`) that
 // carries the facts its steps need: what a trigger does (`planRefresh`), a
 // offer integration (`planOfferIntegration`), a split's stack or a squash rebuilt
 // (`planStackEnded`, `planRebuild`), and a commit message (`planDescribeAsk`,
-// `planDescribeSettle`). `@pineta/repo` turns each into jj steps
+// `planDescribeSettle`). `@pinetrie/repo` turns each into jj steps
 // (`offerEffects`), and the host only connects the two. What a record says
 // (`offerStatus`) and the record itself (`offerRecord`, `planYourEdits`) are
 // here too, since the host and the page read them alike. The page's view is
 // `offer-view.ts`, the review's wire `review.ts`, and the commit message's
-// format `@pineta/core`'s `trailers.ts`.
+// format `@pinetrie/core`'s `trailers.ts`.
 
 import {
   type CommitId,
@@ -37,7 +37,7 @@ import {
   type StackFacts,
   type ThreadBase,
   type ThreadName,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { Type } from "typebox"
 import { CommitSchema, decodeAt, laneKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
@@ -79,7 +79,7 @@ const OfferRecordSchema = Type.Object({
 
 /** Each lane's offer in your repo, at the lane. */
 export const OFFER: RecordSpec<OfferRecord, LaneName, "session"> = {
-  namespace: "pineta.offer",
+  namespace: "pinetrie.offer",
   home: "session",
   keyOf: r => r.lane,
   encode: ({ lane, ...contents }) => ({
@@ -266,7 +266,7 @@ export function offerIntegrationDestinations(input: {
 }
 
 /**
- * What a lane's `pineta.offer` record says, decoded once (ADR-0067): every
+ * What a lane's `pinetrie.offer` record says, decoded once (ADR-0067): every
  * reader of the page switches on this, never on the record's fields.
  * - `none`: no record;
  * - `integrated`: added to the project, as the change `as`;
@@ -381,7 +381,7 @@ const offerChanged = (offer: OfferNow, seen: OfferSeen): boolean =>
  * command: the destination asked for (`to`, else the default), which must be
  * one of the offer's destinations now (`offerIntegrationDestinations`) and at
  * or below its bottom's parent, so the move is forward; and the record marked
- * integrated. What you have of the lane is the offer's own `Pineta-Source`,
+ * integrated. What you have of the lane is the offer's own `Pinetrie-Source`,
  * which the integrated-offer commit keeps.
  * Refused, in this order: no offer, a WIP gone, nothing shown, a divergent
  * offer, other work than was shown, no such destination.

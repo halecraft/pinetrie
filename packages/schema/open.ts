@@ -2,7 +2,7 @@
 // Yjs document per person, written only by that person's tabs, so the list is
 // the same on every device of theirs. The host stores and relays it, shared
 // with its person only (host/policy.ts), and never writes it; its id and who
-// may write it are the protocol's (`personDocId`, `@pineta/protocol/writers`).
+// may write it are the protocol's (`personDocId`, `@pinetrie/protocol/writers`).
 //
 // A root maps to an order key, not a place in a list: two devices reordering
 // at once merge per root, and a list could hold a root twice.
@@ -14,7 +14,7 @@ import {
   Schema,
 } from "@kyneta/schema"
 import { yjs } from "@kyneta/yjs-schema"
-import { isRootId, type RootId } from "@pineta/core"
+import { isRootId, type RootId } from "@pinetrie/core"
 
 /** Each open root's id to its order key. A closed root has no key. */
 export const OpenDoc = yjs.bind(

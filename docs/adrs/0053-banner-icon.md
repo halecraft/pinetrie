@@ -34,7 +34,7 @@ banners to one model. And a banner came only after a run had ended.
   megapixel, with no way to ask a smaller image, and took about ten seconds
   in use.
   `banner.model` in the user config names another. pi-ai 0.87.1 does not
-  list Recraft's Flash, so Pineta describes an OpenRouter model pi-ai does
+  list Recraft's Flash, so pine·trie describes an OpenRouter model pi-ai does
   not list itself (`imageModelFor`).
 - **Only the name is sent.** The `column-banner` skill's body is the image
   model's prompt, with `{adjective}` and `{noun}` filled from the

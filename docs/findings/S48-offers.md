@@ -2,14 +2,14 @@
 
 Taking a landing today (ADR-0033, ADR-0034) rebases your `@` onto the lane's
 merge, so every turn commit the lane made becomes an ancestor of your work,
-and immutable there: `pineta/*` is in your repo's `immutable_heads()`, so
+and immutable there: `pinetrie/*` is in your repo's `immutable_heads()`, so
 you cannot squash what you took. A lane also starts from your `@-`, never
 `@`, so work you have not committed is invisible to it. The design under
 test replaces both:
 
 - each thread keeps an **offer** in your repo: one mutable commit holding
   the lane's net change, rebased onto your `@-` (or onto a bookmark,
-  `pineta-onto`, when you set one), refreshed as the thread works and as you
+  `pinetrie-onto`, when you set one), refreshed as the thread works and as you
   do, and visible in `jj log` and jjui before you take it;
 - **take** is `jj rebase -r <offer> -B @`;
 - the lane's own history stays out of your view.
@@ -17,7 +17,7 @@ test replaces both:
 These probes ask whether jj does what that needs, and where it breaks. jj
 0.44.0, throwaway repos, a lane as a separate colocated clone fetched by
 bundle as `planFetch` does. The host's commands use `--ignore-working-copy`,
-as Pineta's do; yours do not.
+as pine·trie's do; yours do not.
 
 **Answers.**
 
@@ -62,7 +62,7 @@ as Pineta's do; yours do not.
    tests against the commit it last wrote for that offer:** the same
    description; an empty `jj interdiff --from <that commit> --to <offer>`
    (interdiff compares what two commits change, ignoring their parents); and
-   the offer's parent an ancestor of the host's target (`pineta-onto`, else
+   the offer's parent an ancestor of the host's target (`pinetrie-onto`, else
    `@-`). Each catches a different edit:
    - after jj's own rebase (your reword of `@-`): all three hold, not edited;
    - after you commit on `@-`: all three hold; the offer is behind, and the
@@ -84,11 +84,11 @@ as Pineta's do; yours do not.
    bookmark at yours) left nothing divergent. It must pick its own commit by
    who made it, never by description: when your edit kept the offer's
    description, both divergent commits matched it (P11a). Run with
-   `--config operation.username=pineta-host`, every host operation says so
+   `--config operation.username=pinetrie-host`, every host operation says so
    in the evolog (`operation.user()`), which told the two apart (P11b). A
    refresh is one operation, so the window is one jj command long; the rule
    "never rewrite an offer you have edited" (answer 7) narrows it further.
-9. **`pineta-onto` does what it should.** Take puts the offer on it and
+9. **`pinetrie-onto` does what it should.** Take puts the offer on it and
    moves it up:
    - at `@-`: two offers taken in turn stacked under your edits, in the order
      taken (`-A <onto> -B @`); the second, built before the first was taken,
@@ -107,14 +107,14 @@ as Pineta's do; yours do not.
       your files had both your later edits and the lane's.
 11. **A lane's history can live in your repo as a remote bookmark, out of
     sight and immutable, with no config.** Fetched into
-    `refs/remotes/pineta-<lane>/<bookmark>` and imported, it showed as
-    `lane@pineta-t1` with no remote in your git config. jj's builtin
+    `refs/remotes/pinetrie-<lane>/<bookmark>` and imported, it showed as
+    `lane@pinetrie-t1` with no remote in your git config. jj's builtin
     `immutable_heads()` includes untracked remote bookmarks, so its commits
     were immutable with no config line, and they did not appear in your
     default `jj log`; the offer built from it did. Today's local bookmark
-    (`pineta/lane`) shows every turn in your default log, and is mutable
-    without the line Pineta adds to your config. On request:
-    `jj log -r '::remote_bookmarks(remote=glob:"pineta-*") ~ ::@'`.
+    (`pinetrie/lane`) shows every turn in your default log, and is mutable
+    without the line pine·trie adds to your config. On request:
+    `jj log -r '::remote_bookmarks(remote=glob:"pinetrie-*") ~ ::@'`.
 12. **A stack is checked by files, exactly.** A stack rebuilt in the lane
     from the fork point, one revision per file, had no file differing from
     the lane's tip (`jj diff --from <tip> --to <top> --summary` empty). A
@@ -123,34 +123,34 @@ as Pineta's do; yours do not.
     holds one file named for the current operation; it changed on a
     snapshot and on a commit, and not on a read with nothing to snapshot.
     Reading the current operation with `--ignore-working-copy` took 14 ms.
-14. **An offer cannot be named `pineta/…` while Pineta's line is in your
-    config.** With `bookmarks(glob:"pineta/*")` in `immutable_heads()`, an
-    offer at `pineta/offer/t1` could not be described or taken ("Commit … is
+14. **An offer cannot be named `pinetrie/…` while pine·trie's line is in your
+    config.** With `bookmarks(glob:"pinetrie/*")` in `immutable_heads()`, an
+    offer at `pinetrie/offer/t1` could not be described or taken ("Commit … is
     immutable"). Answer 11 removes the line; until then offers are
-    `pineta-offer/<thread>`.
+    `pinetrie-offer/<thread>`.
 
 ## What this means for the design
 
 - **Build:** empty commit at the fork point, restore the lane's tip, rebase
-  onto `pineta-onto` or `@-`, bookmark; by change id throughout;
+  onto `pinetrie-onto` or `@-`, bookmark; by change id throughout;
   `--ignore-working-copy` throughout.
 - **Refresh:** on a new operation head (answer 13), if the offer's target
   moved, and only if you have not edited the offer (answer 7's three
   tests). A divergent offer after a race is repaired by keeping yours, the
   host's commit known by its operation user (answer 8).
 - **Identity:** an offer is its change id and its bookmark; the host's
-  operations carry the user `pineta-host`. No step finds a revision by its
+  operations carry the user `pinetrie-host`. No step finds a revision by its
   description.
 - **Take:** `jj rebase -r <offer> -A <onto> -B @` when the target is an
-  ancestor of `@`, else a bookmark move; run as you; then `pineta-onto`
+  ancestor of `@`, else a bookmark move; run as you; then `pinetrie-onto`
   moves to the offer.
 - **Preview:** the offer's conflict state against your committed work
   (answer 3), plus the file-name check against your uncommitted edits
   (answer 4).
 - **Lanes from `@`:** fork at a copy of `@` with its own change id, made in
   the lane (answer 10).
-- **Lane history:** remote bookmarks under `pineta-<lane>`, which also
-  retires Pineta's line in your repo's config (answer 11), and with it the
+- **Lane history:** remote bookmarks under `pinetrie-<lane>`, which also
+  retires pine·trie's line in your repo's config (answer 11), and with it the
   naming limit of answer 14.
 - **Stacks:** accepted only when the top matches the lane's tip file for
   file (answer 12).
@@ -161,7 +161,7 @@ as Pineta's do; yours do not.
   commits on `@-`, so they appear in its default view, but no jjui was run.
 - A real race between two processes, rather than one forced with
   `--at-operation`.
-- Pineta's containers: the lane here is a directory, fetched by the same
+- pine·trie's containers: the lane here is a directory, fetched by the same
   bundle and `git fetch` steps. The jj operations in your repo are the same.
 - Repeat offers after a take ("delivered up to"), and an agent writing a
   stack.
@@ -211,15 +211,15 @@ Probes `p12.sh` to `p17.mjs`.
     as with the old config line. The copy of your `@` a root lane starts from
     is lane history, so your own `@` stays mutable.
 20. **Archiving and restoring a lane's history is two ref updates.**
-    `git update-ref -d refs/remotes/pineta-<lane>/tip` and a
+    `git update-ref -d refs/remotes/pinetrie-<lane>/tip` and a
     `jj --ignore-working-copy git import` removed the remote bookmark; the
     tip became hidden and stayed readable by id. Re-creating the ref and
     importing brought it back: nothing divergent, nothing in your default
     log.
 21. **Retiring the old layout must move each lane's history first.**
-    Deleting a local `pineta/*` bookmark leaves its commits visible: they
+    Deleting a local `pinetrie/*` bookmark leaves its commits visible: they
     appeared in your default log once the config line was gone. Pointing
-    `refs/remotes/pineta-<lane>/tip` at each bookmark's commit, importing,
+    `refs/remotes/pinetrie-<lane>/tip` at each bookmark's commit, importing,
     then deleting the local bookmarks and the line, left your default log as
     it was, and the lanes' history one `jj log` away. The line is removed by
     text, keeping anything else you wrote there (`builtin_immutable_heads() |

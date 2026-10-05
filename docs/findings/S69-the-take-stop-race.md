@@ -57,11 +57,11 @@ the host's serial executor (ADR-0026). Once clients write the cards
 document, the host taking the top queued card and someone stopping that card
 are concurrent. ADR-0048's rule is that once the take is written it wins and
 the stopper is told "already sent". This probe measured whether that holds
-over Pineta's topology, and whether a queue's order needs a list.
+over pine·trie's topology, and whether a queue's order needs a list.
 
 ## Method
 
-One disposable probe in `apps/pineta/e2e/`, not checked in, run with `node`.
+One disposable probe in `apps/pinetrie/e2e/`, not checked in, run with `node`.
 A host built as `startHost` builds its exchange: the SQLite store
 (`openStore`), `WebsocketServerTransport` behind `ws`,
 `departureTimeout: 0`, a `resolve` for the cards document and `card:` texts,

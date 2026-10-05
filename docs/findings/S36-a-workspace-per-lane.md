@@ -9,16 +9,16 @@
    `/bin/cp`: the `cp` on this machine's `PATH` is GNU's, which has no `-c`.
 3. **Symlinking `node_modules` back to your working copy would test the wrong
    code, silently.** pnpm links workspace packages relatively
-   (`packages/client/node_modules/@pineta/core -> ../../../core`), and Node
+   (`packages/client/node_modules/@pinetrie/core -> ../../../core`), and Node
    resolves a symlink to its real path before resolving from it. A workspace
    whose `packages/client/node_modules` pointed into your working copy would
    import your `packages/core`, not the agent's edited one. A clone keeps the
    relative links, so they resolve inside the workspace (measured: `realpath`
-   of `@pineta/core` from the clone is the clone's `packages/core`).
+   of `@pinetrie/core` from the clone is the clone's `packages/core`).
    `node_modules` is also written to (`.vite`, `.cache`), so a shared one
    would be shared writes.
 4. **A clone runs the workspace's own code** (measured). An export appended to
-   the workspace's `packages/core` was visible to `import("@pineta/core")`
+   the workspace's `packages/core` was visible to `import("@pinetrie/core")`
    from the workspace's `packages/client`. `LANE_PREFIX` changed to `"x-"` in
    the workspace failed 3 of its 343 tests, while your working copy passed.
    The unit suite took 2.9 s in the workspace.
@@ -149,7 +149,7 @@ snapshotted, and the previous run's end snapshotted everything).
 ## Addendum 2: before the plan
 
 Measured after ADR-0032 and ADR-0033 were written, to settle what they left
-open. jj behaviour in a throwaway repo under `/tmp`; the suites in a Pineta
+open. jj behaviour in a throwaway repo under `/tmp`; the suites in a pine·trie
 workspace under `sandbox/`.
 
 18. **pi takes each lane's directory from the run's `Context`** (measured, a
@@ -167,8 +167,8 @@ workspace under `sandbox/`.
     lane's directory. `packages/pi/agent.ts` says `LaneBusy` cannot arise,
     but after a crash it does, until something calls `resume`.
 19. **Repo-level immutability through a bookmark protects a lane's base from
-    you** (measured). With `bookmarks(glob:"pineta/*")` in the repo's
-    `immutable_heads()` and `pineta/t-1` on the lane's base `P` (your `@-`),
+    you** (measured). With `bookmarks(glob:"pinetrie/*")` in the repo's
+    `immutable_heads()` and `pinetrie/t-1` on the lane's base `P` (your `@-`),
     `jj squash` into `@-` and `jj describe -r @-` were refused ("Commit … is
     immutable"). Editing and describing `@`, and `jj new`, worked.
 20. **Landing works end to end** (measured). The lane committed a change to a
@@ -188,7 +188,7 @@ workspace under `sandbox/`.
     workspace nor a secondary one listed `workspace/…` in `jj st`; without
     the line, both did.
 23. **`jj git push --all` would push the lanes' bookmarks** (measured,
-    `--dry-run` to a local bare remote): `pineta/t-1` was listed beside
+    `--dry-run` to a local bare remote): `pinetrie/t-1` was listed beside
     `main`.
 24. **A git worktree cannot be colocated, and a subdirectory project
     initializes at git's top level** (measured). In a worktree (`.git` a file
@@ -210,10 +210,10 @@ workspace under `sandbox/`.
     All passed. e2e run at the same moment in the workspace and in your
     working copy passed in both, with no `EADDRINUSE`: the suite's host takes
     `port: 0`. The development host defaults to 7391, so two lanes each
-    starting it would collide without `PINETA_PORT=0`. The browser suite was
+    starting it would collide without `PINETRIE_PORT=0`. The browser suite was
     not run: it needs a Playwright server outside the sandbox.
 26. **A turn revision costs about a tenth of a second** (measured, the
-    Pineta workspace, 493 MB of ignored `node_modules`, 5 runs each): 84 ms
+    pine·trie workspace, 493 MB of ignored `node_modules`, 5 runs each): 84 ms
     for a snapshot and the check that nothing changed, 144 ms for a snapshot
     and `jj commit`.
 27. **`pnpm install --offline` beats cloning, where the store has the
@@ -229,8 +229,8 @@ workspace under `sandbox/`.
     Observed by accident: `jj workspace add` failed silently (its parent
     directory did not exist, and its output was discarded). Each `cd` into it
     then failed, and the commands meant for the probe ran in `sandbox/`,
-    inside Pineta's repo. There they committed your working-copy change as
-    "turn: resolve" and set a `pineta/t-1` bookmark. `jj op restore` to the
+    inside pine·trie's repo. There they committed your working-copy change as
+    "turn: resolve" and set a `pinetrie/t-1` bookmark. `jj op restore` to the
     snapshot before them undid both, with your `@` back at its commit id and
     no file changed. Also:
     - `jj … | head` exits 3 (a broken pipe), which `pipefail` reports as a

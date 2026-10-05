@@ -2,7 +2,7 @@
 // it waited on with a refusal or a failure: the work strip's offer commands
 // and the project menu's line commands both say it this way.
 
-import type { Unsuccessful } from "@pineta/session"
+import type { Unsuccessful } from "@pinetrie/session"
 
 /**
  * A refusal says that nothing was done. A failure says the host may have done

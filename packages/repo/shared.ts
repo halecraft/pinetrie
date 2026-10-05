@@ -10,7 +10,7 @@ import {
   type LineFacts,
   sourcesOf,
   untracedLanes,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import {
   describeFailure,
   INTEGRATED_OFFER_COMMIT_ROW,
@@ -19,11 +19,11 @@ import {
   parseIntegratedOfferCommits,
   type Runner,
   revsetName,
-} from "@pineta/lanes"
+} from "@pinetrie/lanes"
 import { lineFacts } from "./line.ts"
 import { INTEGRATED_OFFER_COMMITS } from "./plan.ts"
 
-/** A commit on the line carrying integrated offers' `Pineta-Source` trailers. */
+/** A commit on the line carrying integrated offers' `Pinetrie-Source` trailers. */
 export interface IntegratedOfferCommit {
   readonly commit: CommitId
   /** The lane commits it names, from every paragraph (S77 item 6). */

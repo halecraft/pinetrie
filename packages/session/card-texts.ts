@@ -10,8 +10,8 @@
 // `spentCards`, `card-copies.ts`).
 
 import { type Exchange, sync } from "@kyneta/exchange"
-import type { CardId } from "@pineta/core"
-import { cardDocId, TextDoc, type TextDocHandle } from "@pineta/schema"
+import type { CardId } from "@pinetrie/core"
+import { cardDocId, TextDoc, type TextDocHandle } from "@pinetrie/schema"
 import { hostLetGo, spentCards } from "./card-copies.ts"
 
 export interface CardTexts {

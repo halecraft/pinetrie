@@ -28,11 +28,11 @@ does it only read the repo as that operation left it?
    directory, each jj write fired `rename` events (the new head added, the
    old one removed, a `lock` file) within a millisecond, and a plain
    `jj log` with one head fired none.
-7. **Pineta's repo, 2026-10-03.** Of 2,000 operations, 5 were
-   `pineta-host`'s `reconcile divergent operations`, each about 70 ms after
+7. **pine·trie's repo, 2026-10-03.** Of 2,000 operations, 5 were
+   `pinetrie-host`'s `reconcile divergent operations`, each about 70 ms after
    an `import git refs`: the fetch's `jj git import` (`importInto`, run on
    a lane's fetch queue, not the offers' queue) ran beside an offer's
-   write. Those 471 imports are recorded as `duane`, not `pineta-host`:
+   write. Those 471 imports are recorded as `duane`, not `pinetrie-host`:
    `importInto` passes no `operation.username`.
 
 So a read pinned to an operation id is pure: it neither reconciles nor
@@ -54,7 +54,7 @@ jj --ignore-working-copy log             # reconciles; heads: 1
 
 Items 4–6 used fresh repos made the same way; item 6 ran a Node script
 with `fs.watch(".jj/repo/op_heads/heads")` beside `jj describe`, `jj log`
-and `jj new`. Item 7 read `jj op log -T 'user ++ description'` in Pineta's
+and `jj new`. Item 7 read `jj op log -T 'user ++ description'` in pine·trie's
 repo.
 
 ## Not tested

@@ -1,31 +1,31 @@
-# `@pineta/rules` — technical notes
+# `@pinetrie/rules` — technical notes
 
-Each shape Pineta stores, and every pure rule about it: the host's
+Each shape pine·trie stores, and every pure rule about it: the host's
 decisions, the prompts built from it, and what the page reads of it, one
 topic per module. A shape is a host record (a pi value, `records.ts`), a pi
 custom message (chat, land, update, stack, pinned cards), or a card's record
-in the places document. Pineta types each one here, and is its single
+in the places document. pine·trie types each one here, and is its single
 authority. Nothing here does I/O or reads the clock: the host gathers, these
 modules decide, and the host writes.
 
-The package was `@pineta/marginalia` (`packages/marginalia/`) until it was
+The package was `@pinetrie/marginalia` (`packages/marginalia/`) until it was
 renamed; the ADRs and findings use that name.
 
-Where a rule lives, as `@pineta/core` and `@pineta/repo` state it too:
+Where a rule lives, as `@pinetrie/core` and `@pinetrie/repo` state it too:
 
 > Core holds the vocabulary (ids, intents, every record's type) and the
 > reads of the tree. A format or type that `lanes` or `repo` must read,
 > write or name lives in core too, since neither can declare
-> `@pineta/rules`. What a stored shape says, and how the host changes it,
-> is `@pineta/rules`', whoever reads it. One client's own in-flight state
+> `@pinetrie/rules`. What a stored shape says, and how the host changes it,
+> is `@pinetrie/rules`', whoever reads it. One client's own in-flight state
 > (its moves, held roots, slot repair, commands out) is its session's
-> (`connectSession`, in `@pineta/client` for now). What the page draws,
-> and its words, is `@pineta/client`'s.
+> (`connectSession`, in `@pinetrie/client` for now). What the page draws,
+> and its words, is `@pinetrie/client`'s.
 
 So `planStop` is here beside `STOP`, and `agentByDefault` beside
 `addressChat`; `address`, `parseMentions` and `moveOf`, which know no
 record, are core's; the trailer format and the offer's facts and decisions
-are core's (`trailers.ts`, `offers.ts`), since `@pineta/repo` reads them.
+are core's (`trailers.ts`, `offers.ts`), since `@pinetrie/repo` reads them.
 
 ## Where things are
 
@@ -38,7 +38,7 @@ follow this list. A name only this package uses is imported from its module.
   request's budget.
 - `chat.ts`, `participant.ts`, `images.ts`, `commands.ts`: a person's
   message, who is in the session, the images a message shows, and `/`
-  commands (`pineta.commands`).
+  commands (`pinetrie.commands`).
 - `land.ts`, `update.ts`, `pinned.ts`: the resolution's prompt, the
   update and stack messages, the pinned cards a run reads.
 - `fact.ts`, `behind.ts`, `agent-commands.ts`: what a command on an offer
@@ -55,10 +55,10 @@ follow this list. A name only this package uses is imported from its module.
   it, an ask's digest, and how a thread's last run ended.
 - `names.ts`, `banner.ts`: a thread's name and its banner, each with its
   record.
-- `work.ts`: where lanes work (`pineta.lane`, `pineta.revision`,
-  `pineta.project`).
-- `line.ts`: the integration line and a thread's base (`pineta.line`,
-  `pineta.base`): where a lane begins, what catching up would do and merge,
+- `work.ts`: where lanes work (`pinetrie.lane`, `pinetrie.revision`,
+  `pinetrie.project`).
+- `line.ts`: the integration line and a thread's base (`pinetrie.line`,
+  `pinetrie.base`): where a lane begins, what catching up would do and merge,
   and the thread a lane branched from.
 - `offer.ts`, `offer-view.ts`, `review.ts`: an offer's record and the
   host's decisions about it, the page's view of it, and the review's wire.
@@ -75,7 +75,7 @@ dropped. That is what keeps a malformed lane out of the host's writes:
 `agent.lane` finds any lane pi holds (S95). A card is the exception
 (`card.ts`, below).
 
-Namespaces are stored data and name the owner, `pineta.`, following pi's own
+Namespaces are stored data and name the owner, `pinetrie.`, following pi's own
 `pi.` convention. They deliberately do not follow the package name: renaming a
 package must never require changing stored data.
 
@@ -116,7 +116,7 @@ Each host record is one `RecordSpec<R, K>`: its `namespace`, `keyOf`,
 `OFFER` in `offer.ts`). Everything else goes through the spec:
 `setRecord` and `deleteRecord` build the `ValueWrite`s the host hands
 `Agent.writeValues`; `recordsOf` decodes a namespace's values, which
-`readRecords` in `@pineta/reads` reads from the document; `setIfChanged`
+`readRecords` in `@pinetrie/reads` reads from the document; `setIfChanged`
 writes only a record that changed.
 
 - **The address holds the key; the contents never repeat it.** `encode`
@@ -145,13 +145,13 @@ writes only a record that changed.
 
 # Chat (`chat.ts`)
 
-A human message is a pi `CustomMessage`, `customType: "pineta.chat"` (ADR-0018).
+A human message is a pi `CustomMessage`, `customType: "pinetrie.chat"` (ADR-0018).
 `content` is the attributed text the model reads ("Alice: …"); `details` hold
 the author (a `WriterId`, from the transport), the display name as written, the
 text, and the `Responder` it compels. `encodeChat` and the total `decodeChat`
 are the only code that builds or reads the shape.
 
-- **Who a message is for is `address`** (`@pineta/core`, ADR-0021): `@agent`
+- **Who a message is for is `address`** (`@pinetrie/core`, ADR-0021): `@agent`
   asks the agent; a message naming only participants is for them; with no
   mention that resolves, the thread decides (`agentByDefault`: the agent where
   the thread has a lane or the column is a Start Agent column, and never by a
@@ -231,7 +231,7 @@ are the only code that builds or reads the shape.
   `skill` in the middle a skill; anything else is text, `/etc/hosts`
   included.
 - **`labelCommands`** gives each package its label: the user config's rename
-  (keyed by pi's `source`), else `pineta`, else `plugin.json`'s name, else
+  (keyed by pi's `source`), else `pinetrie`, else `plugin.json`'s name, else
   the unscoped package name, else pi's scope. Two sources with one label are
   refused together, as are two commands with one full name in one package.
 - **`expandSkill`** is pi's block, byte for byte. **`resolveCommand`** is an
@@ -240,7 +240,7 @@ are the only code that builds or reads the shape.
   (`CommandRef`: name, kind, file, hash, expansion). `attributed` reads the
   expansion, so the model reads what the command meant when it was sent. `planChat` makes a command compel
   the agent, and refuses an unknown one (`ERR.UNKNOWN_COMMAND`).
-- **`pineta.commands`** is a host-written record of every command's summary,
+- **`pinetrie.commands`** is a host-written record of every command's summary,
   for the composer's completion. `setIfChanged` is how the host writes a
   record at start only when it changed.
 
@@ -254,12 +254,12 @@ are the only code that builds or reads the shape.
   lane with cards queued for it, since no run's end will. A verdict left
   pending lost its request with the last host and is `unclassified`, unless
   its lane is resumed. What does not survive a process (runs and streams)
-  is cleared first, by `clearStreams` in `@pineta/schema`.
+  is cleared first, by `clearStreams` in `@pinetrie/schema`.
 
 # Cards (`card.ts`, ADR-0048, ADR-0059, ADR-0066)
 
 What you type is a card. Its text is a `TextDoc`, written by clients; its
-record is in the places document (`PlacesDoc` in `@pineta/schema`), which
+record is in the places document (`PlacesDoc` in `@pinetrie/schema`), which
 only the host writes. This module decodes a record, decides where a card
 sits, which moves the host accepts, which queued card is popped next, and
 which are swept.
@@ -393,7 +393,7 @@ which are swept.
 A thread's queue held: while `QUEUE_HOLD` has its lane, the host pops no
 message card from it, and a send there waits in it (`sendWaits`, core), so
 people can stage several cards on an idle thread. It is a session record,
-not `pineta:live`, so it lasts until a release, across a restart.
+not `pinetrie:live`, so it lasts until a release, across a restart.
 
 - **`planQueueHold`**: a hold is written only where there is none, so the
   first holder stays named; a release deletes it; nothing when the queue is
@@ -401,7 +401,7 @@ not `pineta:live`, so it lasts until a release, across a restart.
 - **`holdOnStop`**: a Stop holds the queue when a message card is queued
   and nobody holds it yet. With nothing queued, or only facts, it holds
   nothing: the correction sent after the Stop would be held too.
-- **`planHoldSweep`**: the holds whose lane no root holds (`pineta.lane`),
+- **`planHoldSweep`**: the holds whose lane no root holds (`pinetrie.lane`),
   or whose root is archived. Archiving is refused while cards are queued,
   so a swept hold held nothing.
 - **`isBusy` is unchanged.** A held queue with no card is not busy: it
@@ -412,8 +412,8 @@ not `pineta:live`, so it lasts until a release, across a restart.
 
 Each card's history and the traces left where someone else moved your card.
 Both are session records the host writes: `CARD_HISTORY`
-(`pineta.card-history`, keyed by the card, deleted with it) and `TRACE`
-(`pineta.trace`, keyed by its own id, since a trace outlives its card). A
+(`pinetrie.card-history`, keyed by the card, deleted with it) and `TRACE`
+(`pinetrie.trace`, keyed by its own id, since a trace outlives its card). A
 place in them is stored as core's flat key fields (`placeFields`,
 `keyOfFields`), the wire's own codec; an event whose place this build cannot
 read is dropped, not its history.
@@ -448,13 +448,13 @@ read is dropped, not its history.
 
 Who wrote in a text is in its operations: each carries its seat's Yjs
 `clientID`. Only the host knows which person a seat is, and only while it is
-connected (ADR-0037), so it writes a `pineta.seat` value per seat as the
+connected (ADR-0037), so it writes a `pinetrie.seat` value per seat as the
 seat connects (`SEAT`). It is keyed by the seat's Kyneta peer, the seat's
 identity as presence's `seatKey` has it. The `clientID` is in the
 contents: Yjs derives it from the peer, which this package cannot.
 
 - **`planSeats`**: the connected seats with no record yet. The connected seats
-  come mapped by `seatOf` (`@pineta/schema`), which needs Kyneta's
+  come mapped by `seatOf` (`@pinetrie/schema`), which needs Kyneta's
   `yjsClientId`, which this package does not import.
 - **`writersOfClients(clientIds, seats)`**: the people behind a text's `clientID`s,
   each once, in the order their seats were first seen. A card sent by one
@@ -492,7 +492,7 @@ it, and when.
   move histories retire (`planHistorySweep`).
 - **`transitionOf` says whether a move crosses the closed state's edge**:
   `within`, `close` or `reopen`. The host gathers a root's document only to
-  cross it (`apps/pineta/host/commands/board.ts`).
+  cross it (`apps/pinetrie/host/commands/board.ts`).
 - **`planWorkflowEdit`**: add (before a state, or after every open one),
   rename (trimmed; names may repeat), move, remove. The closed state is
   renamed only; a state holding a root is not removed, nor the only open
@@ -504,7 +504,7 @@ it, and when.
   fixed-width base-36, so string order is numeric order; `keyAfter`,
   `orderBetween` (null with no room), `orderKeys`.
 - **The carry-over** (`carry-over.ts`): a store with no workflow gets the
-  default one, every root a place (an old `pineta.archive` `archived`
+  default one, every root a place (an old `pinetrie.archive` `archived`
   record's root in the closed state, by who archived it, when; every other
   root in Doing, by its first writer), and the old records deleted. It keeps
   `ARCHIVE` itself, so both go together once it has run on Duane's store.
@@ -536,7 +536,7 @@ is hidden and made read-only, never removed.
   change to its states, a reservation, a move into an inventory), so a
   closed root can always be reopened. `archivedIn` finds an archived one by
   its `RootId`. One rule, applied by the host before dispatch
-  (`apps/pineta/host/commands/index.ts`); `sendChat` needs no copy, since
+  (`apps/pinetrie/host/commands/index.ts`); `sendChat` needs no copy, since
   only the `chat` command calls it. No card moves into an archived root,
   a fresh column's included (ADR-0066); a command on a card writes nowhere,
   and the pop's own gate stops a card with one.
@@ -549,7 +549,7 @@ is hidden and made read-only, never removed.
 
 # Marks (`mark.ts`, ADR-0045)
 
-A title on an entry. The record is a host-written `pineta.mark` value keyed
+A title on an entry. The record is a host-written `pinetrie.mark` value keyed
 by the entry's id, so an entry has at most one by construction. A root's mark
 titles its tab; the page offers marks only on roots, while the host accepts
 one on any entry, since the rule is the same everywhere.
@@ -564,14 +564,14 @@ one on any entry, since the rule is the same everywhere.
 - **`by` is a writer, or the agent for a title it made unasked**
   (ADR-0074). A writer id always starts `w-`, so the two never collide, and
   nothing decides by it.
-- **The title rule is `parseTitle`'s** (`@pineta/core`): trimmed, empty
+- **The title rule is `parseTitle`'s** (`@pinetrie/core`): trimmed, empty
   clears, one line of at most `MAX_TITLE`. The codec and the page both
   decide by it. The decoder checks only the shape (a non-empty title): the
   host is the session's one writer, and stores only parsed titles.
 
 # Stops (`stop.ts`, ADR-0056)
 
-Who stopped an ask's run: a host-written `pineta.stop` value keyed by the
+Who stopped an ask's run: a host-written `pinetrie.stop` value keyed by the
 ask's prompt, holding who and when. pi's entries say only that a run was
 aborted (S70), so this is the only place a stop is named. `planStop`
 decides it, and writes none when the ask has one: the first press is
@@ -582,7 +582,7 @@ abort. A stop recorded for a run that answered anyway is ignored
 
 **Carrying on** (ADR-0082). pi cannot continue a run that Stop ended
 (S105), so Resume starts a new run whose prompt is a carry-on message
-(`pineta.carry-on`, role `carry-on`), a pi `CustomMessage` in `land.ts`'s
+(`pinetrie.carry-on`, role `carry-on`), a pi `CustomMessage` in `land.ts`'s
 pattern. Its `content` tells the model who asked it to carry on, and that
 what it was writing when stopped was not kept; its `details` hold the lane,
 who resumed and their name then, for the column's line ("↻ resumed by
@@ -603,7 +603,7 @@ Ada"). It is a prompt, so its run is an ask of its own (`PROMPT_ROLES`).
 
 A model's headline and few points for a long ask's work, unless
 `{ "digests": { "enabled": false } }` is in the user config
-(`decodeDigestConfig`, ADR-0071). A host-written `pineta.digest` value keyed
+(`decodeDigestConfig`, ADR-0071). A host-written `pinetrie.digest` value keyed
 by the ask's prompt, `{ headline, points, at, final }`, replaced whole each
 time: a value, not a text, since nothing accumulates (ADR-0014). A null
 headline is a digest with nothing to draw. No agent reads it.
@@ -632,7 +632,7 @@ headline is a digest with nothing to draw. No agent reads it.
 - **`digestToWrite` is the whole write decision.** A live reply that comes
   back after the final one was written is dropped: a digest is keyed by its
   prompt, so no other ask's can land on it, as long as the host names the
-  right prompt (`apps/pineta/host/TECHNICAL.md`, "Digests"). A refused live
+  right prompt (`apps/pinetrie/host/TECHNICAL.md`, "Digests"). A refused live
   reply writes nothing, so the last good digest stays. A refused final
   reply writes an empty final digest: a live headline says what the run
   was doing, which is no longer true.
@@ -704,9 +704,9 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
 
 | record | namespace | key | written |
 |---|---|---|---|
-| a lane's setting: its own copy, or directly in a directory | `pineta.lane` | the lane | once, when the lane is created |
-| the commit and disk at an entry, and the paths its commit changed | `pineta.revision` | the entry | for every run's prompt, and every assistant message of a lane of its own that made tool calls |
-| what the host found where it runs: `lanes`, or `direct` and why | `pineta.project` | `project` | at every start |
+| a lane's setting: its own copy, or directly in a directory | `pinetrie.lane` | the lane | once, when the lane is created |
+| the commit and disk at an entry, and the paths its commit changed | `pinetrie.revision` | the entry | for every run's prompt, and every assistant message of a lane of its own that made tool calls |
+| what the host found where it runs: `lanes`, or `direct` and why | `pinetrie.project` | `project` | at every start |
 
 - **Every run's prompt has a revision record**, so the nearest record above
   any entry names its lane, its commit and its disk (`nearestRevision`, in
@@ -715,7 +715,7 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
   - A lane of its own records every turn that made tool calls, with its
     snapshot, because ignored files change without a commit. The commit is
     there only when the turn has one: made by the host, or made by the agent
-    itself and adopted (`commitTurn` in `@pineta/lanes`, S56). Otherwise a
+    itself and adopted (`commitTurn` in `@pinetrie/lanes`, S56). Otherwise a
     branch pairs the turn's disk with the commit above, and its `jj new`
     puts that commit's files back.
   - A prompt with nothing to commit records the lane's newest commit, so a
@@ -753,15 +753,15 @@ repo. Its record is `OFFER` (`offer.ts`):
 
 | record | namespace | key | written |
 |---|---|---|---|
-| a lane's offer in your repo | `pineta.offer` | the lane | when a trigger changed it, or it was integrated |
+| a lane's offer in your repo | `pinetrie.offer` | the lane | when a trigger changed it, or it was integrated |
 
 What the host decides about it is `offer.ts`'s, from the facts
-`@pineta/repo` gathers, as decisions typed in `@pineta/core`
-(`core/offers.ts`): `@pineta/repo` turns each into jj steps
+`@pinetrie/repo` gathers, as decisions typed in `@pinetrie/core`
+(`core/offers.ts`): `@pinetrie/repo` turns each into jj steps
 (`offerEffects` and the rest), and the host connects the two, deciding
 nothing itself. Where an offer starts (`startOfOffer`, `offerStart`) is
-`@pineta/repo`'s. What the page reads is `offer-view.ts`, the review's wire
-`review.ts`, the commit-message format `@pineta/core`'s `trailers.ts`
+`@pinetrie/repo`'s. What the page reads is `offer-view.ts`, the review's wire
+`review.ts`, the commit-message format `@pinetrie/core`'s `trailers.ts`
 (`withTrailers`, `withoutTrailers`, `wipDescription`, `isWipLine`), and the
 commit-message request `request.ts` (`describeRequest`).
 
@@ -828,7 +828,7 @@ commit-message request `request.ts` (`describeRequest`).
   writes it, keeping the offer's ledger (or the place's tip and start
   without one). **`planDescribeAgain`** refuses `describe` without a named
   offer.
-- **`offerStatus`** decodes a `pineta.offer` record once (ADR-0067): `none`,
+- **`offerStatus`** decodes a `pinetrie.offer` record once (ADR-0067): `none`,
   `integrated`, `held` or `open`. Every reader on the page switches on it, never
   on the record's fields: the strip, the header's activity badge and the tab's Archive
   item (`openOffers`, client), and the review read (`planOfferRead`). An
@@ -851,7 +851,7 @@ commit-message request `request.ts` (`describeRequest`).
   are made from (`OfferFacts`: files, size, conflicts, bookmark, held, the
   base as `effectiveBase` gives it, the catch-up, untraced, …). It writes
   no words: the line and the button labels are the client's (`offerWords`,
-  `@pineta/client`, ADR-0040). A resolution that asked for you counts only
+  `@pinetrie/client`, ADR-0040). A resolution that asked for you counts only
   when newer than the offer. A held offer is `nothing`, with no
   destinations. When catching up `brings`, or the thread is untraced,
   catching up moves from the menu to the buttons; when it is `current` or
@@ -875,11 +875,11 @@ commit-message request `request.ts` (`describeRequest`).
   the fork commit. A lane's commits only move forward, so the parent is
   ahead when the two differ (`parentAhead`). `planParentUpdate` merges its
   newest commit, or nothing, or refuses `no_parent` and `parent_running`.
-- **`catchUpOf`** (`line.ts`) says what catching up would do, from `pineta.base` and
+- **`catchUpOf`** (`line.ts`) says what catching up would do, from `pinetrie.base` and
   the line's record: `current` (the base has not moved since the lane last
   caught up with it, or no line is set up), `unknown` (it moved, and the
   host's `catchUp` was not read at the commit it is at now; or there is no
-  `pineta.base` at all: the host has never read the lane, as for a lane
+  `pinetrie.base` at all: the host has never read the lane, as for a lane
   whose turns never committed, so never reached your repo), `nothing-new`
   (it moved by work the lane holds, as after you integrated its own offer)
   or `brings`, with the file count and the move, the one kind that carries
@@ -904,12 +904,12 @@ commit-message request `request.ts` (`describeRequest`).
     it, `<commit>` or `<from>..<to>`; `parseOfferPath` reads them back, and
     calls anything else under `/offer/` `bad`, another version included. An
     answer is cached as immutable under its URL, so a change to the
-    templates (`REVISION_READ`, `RANGE_FILES`, `@pineta/lanes`), the schema
+    templates (`REVISION_READ`, `RANGE_FILES`, `@pinetrie/lanes`), the schema
     or `fileDiff`'s flags bumps `OFFER_WIRE`.
   - `decodeRevisionReview` is the one schema: the host decodes jj's JSON
     with it, and the page the host's answer.
   - `planOfferRead` serves only a revision in an open offer's `commits`,
-    or a range whose two commits one lane's `pineta.revision` records name
+    or a range whose two commits one lane's `pinetrie.revision` records name
     (an ask's work), each read from the record, never the request; and it
     refuses an empty path or one with a control character.
     `answerReview` and `answerDiff` settle what was read: 502 when the
@@ -919,19 +919,19 @@ commit-message request `request.ts` (`describeRequest`).
 
 | record | namespace | key | written |
 |---|---|---|---|
-| the integration line: its commit, the WIP bookmarks above it, your `@-` against it, and whether this host accepts `line` commands | `pineta.line` | `line` | when your repo's operation head moves |
-| a lane's base, as its newest `Pineta-Base` says it, whether a WIP base landed or is gone, what catching up would change and where that was read, and its untraced integrated-offer commits (S97) | `pineta.base` | the lane | when a refresh reads the lane |
+| the integration line: its commit, the WIP bookmarks above it, your `@-` against it, and whether this host accepts `line` commands | `pinetrie.line` | `line` | when your repo's operation head moves |
+| a lane's base, as its newest `Pinetrie-Base` says it, whether a WIP base landed or is gone, what catching up would change and where that was read, and its untraced integrated-offer commits (S97) | `pinetrie.base` | the lane | when a refresh reads the lane |
 
 - **`planLineRecord`** is the line's record from what the host read
   (`LineFacts`), beside what setting the line up would write to your
-  repo's config, which `@pineta/repo` words (`lineProposal`: jj's config
+  repo's config, which `@pinetrie/repo` words (`lineProposal`: jj's config
   text), and whether this host accepts `line` commands.
 - **`planLineAction`** decides a `line` command from the record read in
   its own step (`LineDecision`): refused on a host that admits others
   (`not_yours`), with no line (`no_line`), or with nothing to do
   (`refused`); setup writes exactly the heads and log the record proposed,
   the text you were shown, and follow runs only with the preview you were
-  shown. `@pineta/repo` turns it into steps (`lineSteps`).
+  shown. `@pinetrie/repo` turns it into steps (`lineSteps`).
 - **`effectiveBase`**, **`catchUpOf`**, **`parentNow`** and
   **`catchUpName`** are here too. How the page reads them is under Offers,
   "What the page reads".
@@ -941,11 +941,11 @@ commit-message request `request.ts` (`describeRequest`).
   as its owner and are refused on a host that admits others; publishing is
   anyone's. `lineRefusal` words each refusal once, for the host's answer
   and the menu's reason for a publish it does not offer.
-- **`pineta.line` and `pineta.base` are caches** (ADR-0060): the repo is
+- **`pinetrie.line` and `pinetrie.base` are caches** (ADR-0060): the repo is
   the ledger, and the host rewrites each from it. A lost one costs a read.
-  A `pineta.line` from before `publish` and `published` (ADR-0076) does not
+  A `pinetrie.line` from before `publish` and `published` (ADR-0076) does not
   decode, and is read as unknown until the host writes it again.
-  A `pineta.base` from before `catchUp` and `untraced` does not decode, and
+  A `pinetrie.base` from before `catchUp` and `untraced` does not decode, and
   is dropped (ADR-0067): the page reads catching up as unknown until the
   host writes it again. `catchUp` names the lane tip and base commit it was
   read at; the host keeps it while both stay, so it is read once per move.
@@ -954,7 +954,7 @@ commit-message request `request.ts` (`describeRequest`).
   host checks it before the lane is created, so a refused send creates
   nothing.
 - **What became of a WIP base** (`ok`, `landed` or `gone`, S77 item 2) is
-  read in `@pineta/repo` (`wipState`, `readWipState`), since the gather
+  read in `@pinetrie/repo` (`wipState`, `readWipState`), since the gather
   needs it to know where an offer sits. **`planUpdateFrom`** then says what
   bringing a thread up to date merges, from the lane's `LaneBase`: the base
   the thread follows by `effectiveBase`, the rule the
@@ -969,7 +969,7 @@ commit-message request `request.ts` (`describeRequest`).
 
 | record | namespace | key | written |
 |---|---|---|---|
-| a thread's name, `word-word` | `pineta.name` | the lane | once: when a column reserves the lane (ADR-0057), else at the host's start or before the lane's first run |
+| a thread's name, `word-word` | `pinetrie.name` | the lane | once: when a column reserves the lane (ADR-0057), else at the host's start or before the lane's first run |
 
 - **A name is two words**, from `ADJECTIVES` and `NOUNS`, 256 each,
   disjoint, lowercase, 3 to 7 letters: `amber-fox`. The unit test holds the
@@ -988,13 +988,13 @@ commit-message request `request.ts` (`describeRequest`).
 - **A name is stored, never recomputed**, so a changed word list renames
   nothing, and never changes: the offer's bookmark and older trailers name
   it. The decoder accepts only `word-word`; `ThreadName` is branded in
-  `@pineta/core`, and minted only here.
+  `@pinetrie/core`, and minted only here.
 
 # Banners (`banner.ts`, ADR-0050, ADR-0053)
 
 | record | namespace | key | written |
 |---|---|---|---|
-| a thread's column banner: the image's hash (ADR-0050, ADR-0053) | `pineta.banner` | the lane | when a banner is made or set |
+| a thread's column banner: the image's hash (ADR-0050, ADR-0053) | `pinetrie.banner` | the lane | when a banner is made or set |
 
 - **`decodeBannerConfig`** reads the user config's `banner`: null unless
   `enabled` is `true`. `model` is `provider/id`, split at its first `/`,
@@ -1011,9 +1011,9 @@ commit-message request `request.ts` (`describeRequest`).
 
 # Pinned cards (`pinned.ts`, ADR-0048 step 5, S92)
 
-A cards entry is a pi `CustomMessage`, `customType: "pineta.pinned"`,
+A cards entry is a pi `CustomMessage`, `customType: "pinetrie.pinned"`,
 `display: false`, in `update.ts`'s pattern: `content` is what the model reads,
-`details` the `PinnedView` (`@pineta/core`) Pineta reads back. `encodePinned`
+`details` the `PinnedView` (`@pinetrie/core`) pine·trie reads back. `encodePinned`
 and the total `decodePinned` are the only code that builds or reads it, and
 `renderableMessage` makes it role `pinned`, which no projection draws.
 
@@ -1023,7 +1023,7 @@ and the total `decodePinned` are the only code that builds or reads it, and
   under its owner's display name then. A card's `</card>` and
   `</pinned-cards>` are neutralised (`<\/card>`), so a card cannot close the
   block the model is told to trust.
-- **What the model reads now is `pinnedInView`** (`@pineta/core`, beside
+- **What the model reads now is `pinnedInView`** (`@pinetrie/core`, beside
   `promptOf`): the newest cards entry on the path; at a compaction, the
   cards its retained tail carries, or none, since pi replaces what is above
   it. The host plans a run's entry from it, and the column shows each card's
@@ -1044,17 +1044,17 @@ and the total `decodePinned` are the only code that builds or reads it, and
 # Updates and stacks (`update.ts`, ADR-0038)
 
 Two pi `CustomMessage`s in `land.ts`'s pattern, as is the carry-on message
-(`stop.ts`, above). An update (`pineta.update`,
+(`stop.ts`, above). An update (`pinetrie.update`,
 role `update`) is a fact in the thread, never a prompt: which of your commits
 came in and which files changed, so the agent's next run reads them again.
 The card that brought the thread up to date carries what the person wants
-done with it (ADR-0055); its text is sent after the update. A stack message (`pineta.stack`, role `stack`) is the prompt of the run that
+done with it (ADR-0055); its text is sent after the update. A stack message (`pinetrie.stack`, role `stack`) is the prompt of the run that
 splits an offer: the `offer-stack` skill, the commit the stack starts from,
 the tip it must match, and the bookmark to leave on it.
 
 # Facts, base news and agent commands (`fact.ts`, `behind.ts`, `agent-commands.ts`, ADR-0080)
 
-- **A fact is a `CustomMessage`** in `update.ts`'s pattern (`pineta.fact`,
+- **A fact is a `CustomMessage`** in `update.ts`'s pattern (`pinetrie.fact`,
   role `fact`): `content` is what the model reads, `details` the
   `OfferFact`, which the column words as one line (`factLine`). Each offer
   action has one: an integration (`integratedFact`: the change, the
@@ -1069,7 +1069,7 @@ the tip it must match, and the bookmark to leave on it.
   with its brief, a message, or a discard. A property named `then` is
   forbidden by the linter, hence `after`.
 - **`planBaseNews` is one decision** for a lane whose base has new work:
-  `tell` (a behind entry, `pineta.behind`, before the run's prompt and its
+  `tell` (a behind entry, `pinetrie.behind`, before the run's prompt and its
   cards entry, or a steer into a running lane), `catch-up` (a lane whose
   work changes no file, `BaseRecord.work`, is caught up quietly before a
   chat's run: `planChat`'s `catch-up-first`), or `nothing`. What the thread
@@ -1089,7 +1089,7 @@ the tip it must match, and the bookmark to leave on it.
 
 # The resolution's prompt (`land.ts`, ADR-0033)
 
-A land message is a pi `CustomMessage`, `customType: "pineta.land"`, like a
+A land message is a pi `CustomMessage`, `customType: "pinetrie.land"`, like a
 chat. Its `content` is what the model reads: the resolution skill, then each
 conflicted file with its markers and both sides, labelled `ours` (the lane)
 and `theirs` (what comes in), each with why it changed the file. Its `details`
@@ -1144,7 +1144,7 @@ Gotchas:
 
 # Participants (`participant.ts`)
 
-A session is its participants (ADR-0021). A `pineta.participant` value is a
+A session is its participants (ADR-0021). A `pinetrie.participant` value is a
 name, a bare string, keyed by writer id (`PARTICIPANT`, read as
 `ParticipantRecord { writer, name }`), which is `w-<email>` (ADR-0037); `displayName` gives an
 unnamed writer their email's part before the `@`, which the screen shows and

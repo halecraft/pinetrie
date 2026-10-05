@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs"
 import path from "node:path"
 import { describe, expect, test } from "vitest"
-import { stopMessage } from "../apps/pineta/e2e/checks.ts"
+import { stopMessage } from "../apps/pinetrie/e2e/checks.ts"
 import {
   choose,
   commandOf,
@@ -50,7 +50,7 @@ describe("judge: what a mutant's run proves", () => {
     const out = [
       "  PASS  one",
       `  FAIL  ${label}`,
-      "  STOP  at the check PINETA_STOP_AT names",
+      "  STOP  at the check PINETRIE_STOP_AT names",
       "file:///suite/checks.ts:55",
       "        throw new Error(stopMessage(label))",
       "        ^",
@@ -101,21 +101,21 @@ describe("failingChecks: the lines that name a failing check", () => {
 })
 
 describe("mutantEnv: a mutant names the check its suite stops at", () => {
-  test("with an expectation, PINETA_STOP_AT is set and the rest kept", () => {
+  test("with an expectation, PINETRIE_STOP_AT is set and the rest kept", () => {
     const base = { PATH: "/bin", HOME: "/root" }
     expect(mutantEnv(base, { expect: "a check" })).toEqual({
       PATH: "/bin",
       HOME: "/root",
-      PINETA_STOP_AT: "a check",
+      PINETRIE_STOP_AT: "a check",
     })
   })
-  test("a suite mutation runs only its scenario: PINETA_SCENARIO is set", () => {
+  test("a suite mutation runs only its scenario: PINETRIE_SCENARIO is set", () => {
     expect(
       mutantEnv({ PATH: "/bin" }, { expect: "a check", scenario: "boot" }),
     ).toEqual({
       PATH: "/bin",
-      PINETA_STOP_AT: "a check",
-      PINETA_SCENARIO: "boot",
+      PINETRIE_STOP_AT: "a check",
+      PINETRIE_SCENARIO: "boot",
     })
   })
   test("without either, the environment is the parent's", () => {

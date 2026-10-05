@@ -16,14 +16,14 @@ import {
   ROOT,
   THE_AGENT,
   writerId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import {
   BEHIND_TYPE,
   encodeBehind,
   encodeChat,
   PINNED_RULE,
-} from "@pineta/rules"
-import { newRootDoc, readEntries, rowMessage } from "@pineta/schema"
+} from "@pinetrie/rules"
+import { newRootDoc, readEntries, rowMessage } from "@pinetrie/schema"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
 import { createAgent, newId } from "./agent.ts"
 import { type LaneChannel, openChannel } from "./lane-env.ts"
@@ -51,8 +51,8 @@ const facts = (over: Partial<LaneFacts> = {}): LaneFacts => ({
   shared: [],
   grants: { ssh: false, env: [], mounts: [] },
   defaultImage: false,
-  install: "/pineta",
-  note: "/pineta/packages/pi/lane.md",
+  install: "/pinetrie",
+  note: "/pinetrie/packages/pi/lane.md",
   ...over,
 })
 
@@ -70,7 +70,7 @@ test("toolContextOf: a direct lane is no lane; a lane of its own carries its fac
     kind: "lane",
     facts: facts(),
     hostPaths: ["/skills"],
-    programs: "/pineta-runtime/bin",
+    programs: "/pinetrie-runtime/bin",
     gate: () => new Promise(() => {}),
   })
   expect({ dir: own.dir, lane: own.lane }).toEqual({
@@ -84,11 +84,11 @@ test("toolContextOf: a lane of its own runs the runtime's programs by path", asy
     kind: "lane",
     facts: facts(),
     hostPaths: [],
-    programs: "/pineta-runtime/bin",
+    programs: "/pinetrie-runtime/bin",
     gate: () => new Promise(() => {}),
   })
-  expect(await own.programs("rg")).toBe("/pineta-runtime/bin/rg")
-  expect(await own.programs("fd")).toBe("/pineta-runtime/bin/fd")
+  expect(await own.programs("rg")).toBe("/pinetrie-runtime/bin/rg")
+  expect(await own.programs("fd")).toBe("/pinetrie-runtime/bin/fd")
 })
 
 test("rememberedProgram: a found path is asked once; a null is asked again", async () => {
@@ -171,8 +171,8 @@ describe("laneGuidelines", () => {
   test("names the lane's directory, install and note as given", () => {
     const told = text(facts())
     expect(told).toContain("your own jj repo at /workspace")
-    expect(told).toContain("/pineta is Pineta's install, not your project")
-    expect(told).toContain("when you need it: /pineta/packages/pi/lane.md")
+    expect(told).toContain("/pinetrie is pine·trie's install, not your project")
+    expect(told).toContain("when you need it: /pinetrie/packages/pi/lane.md")
     expect(told).toContain(
       "/mnt/host-working-copy is the person's working copy",
     )
@@ -181,7 +181,7 @@ describe("laneGuidelines", () => {
   test("names no bookmark, which changes when the thread is named (S85)", () => {
     const told = text(facts())
     expect(told).toContain("your work as one commit, and never sees")
-    expect(told).not.toContain("pineta-offer")
+    expect(told).not.toContain("pinetrie-offer")
   })
 
   test("one line per shared directory, and none without", () => {
@@ -260,7 +260,7 @@ describe("laneGuidelines", () => {
 describe("lanes in a harness", () => {
   let root = ""
   beforeAll(async () => {
-    root = await realpath(await mkdtemp(path.join(tmpdir(), "pineta-lanes-")))
+    root = await realpath(await mkdtemp(path.join(tmpdir(), "pinetrie-lanes-")))
   })
   afterAll(async () => {
     await rm(root, { recursive: true, force: true })
@@ -395,7 +395,7 @@ describe("lanes in a harness", () => {
     await mkdir(dir)
     const channel: LaneChannel = openChannel([
       "env",
-      `PINETA_WORKSPACE_ROOT=${dir}`,
+      `PINETRIE_WORKSPACE_ROOT=${dir}`,
       process.execPath,
       path.join(import.meta.dirname, "lane-helper.ts"),
     ])
@@ -427,7 +427,7 @@ describe("lanes in a harness", () => {
     for (const line of laneGuidelines(facts({ dir, shared: [".plans"] })))
       expect(rules).toContain(`- ${line}`)
     expect(rules).toContain(`${dir}/.plans is shared live with the person`)
-    expect(rules).toContain("when you need it: /pineta/packages/pi/lane.md")
+    expect(rules).toContain("when you need it: /pinetrie/packages/pi/lane.md")
     channel.close()
     await channel.closed
     await agent.close()
@@ -445,7 +445,7 @@ describe("lanes in a harness", () => {
     await chmod(path.join(dir, "bin", "rg"), 0o755)
     const channel: LaneChannel = openChannel([
       "env",
-      `PINETA_WORKSPACE_ROOT=${dir}`,
+      `PINETRIE_WORKSPACE_ROOT=${dir}`,
       process.execPath,
       path.join(import.meta.dirname, "lane-helper.ts"),
     ])
@@ -492,8 +492,8 @@ describe("lanes in a harness", () => {
     ])
     await agent.lane(lane).run(prompt("look"), [])
     expect(told).toContain("<rules>")
-    expect(told).not.toContain("Pineta lane")
-    expect(told).not.toContain("Pineta commits your changes")
+    expect(told).not.toContain("pine·trie lane")
+    expect(told).not.toContain("pine·trie commits your changes")
     await agent.close()
   })
 
@@ -638,7 +638,7 @@ describe("lanes in a harness", () => {
       return m.customType ?? m.role
     })
     expect(roles).toEqual([
-      "pineta.chat",
+      "pinetrie.chat",
       "assistant",
       "toolResult",
       BEHIND_TYPE,

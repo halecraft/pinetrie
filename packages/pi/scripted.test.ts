@@ -1,7 +1,7 @@
 // The scripted model: its queue, its standing answer, and paused replies.
 
 import path from "node:path"
-import { VERDICT_ALONE, VERDICT_THEN_DIGEST } from "@pineta/rules"
+import { VERDICT_ALONE, VERDICT_THEN_DIGEST } from "@pinetrie/rules"
 import { expect, test, vi } from "vitest"
 import { setUpModel } from "./config.ts"
 import {

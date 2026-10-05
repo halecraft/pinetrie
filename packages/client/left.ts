@@ -1,8 +1,8 @@
 // client/left — where you last left a thread (ADR-0056): the furthest entry
 // you have read on its lane, on any device of yours, from your attention
-// document (ADR-0077, `@pineta/session`'s `attention-doc.ts`). Pure.
+// document (ADR-0077, `@pinetrie/session`'s `attention-doc.ts`). Pure.
 
-import { ancestry, type EntryId, type TreeIndex } from "@pineta/core"
+import { ancestry, type EntryId, type TreeIndex } from "@pinetrie/core"
 
 /**
  * The message a "since you were here" line goes before: the first of `ids`,

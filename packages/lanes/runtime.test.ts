@@ -1,6 +1,6 @@
 // The lane runtime's program list, decided without a container.
 
-import { RUNTIME_PROGRAMS } from "@pineta/core"
+import { RUNTIME_PROGRAMS } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import { EXTRACT, runtimeComplete } from "./runtime.ts"
 

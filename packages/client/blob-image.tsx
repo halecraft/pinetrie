@@ -2,7 +2,7 @@
 // markdown or a tool's result draws it. A click opens it in the column's pane
 // (ADR-0078); a Cmd- or Ctrl-click opens it in a new tab.
 
-import { blobOfUrl, blobUrl, type ImageRef } from "@pineta/core"
+import { blobOfUrl, blobUrl, type ImageRef } from "@pinetrie/core"
 import { type ComponentProps, type CSSProperties, useContext } from "react"
 import { imageClick } from "./image-click.ts"
 import { type PaneSubject, samePane } from "./pane.ts"

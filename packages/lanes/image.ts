@@ -1,9 +1,9 @@
 // lanes/image — the image a lane runs (ADR-0034, ADR-0041).
 //
-// Pineta's default image is built from `image/Containerfile`; a project's
-// own `pineta.Containerfile` at its root replaces it for the project's lanes.
+// pinetrie's default image is built from `image/Containerfile`; a project's
+// own `pinetrie.Containerfile` at its root replaces it for the project's lanes.
 // Either is built once per change of its content and build arguments: the
-// host's jj version for both, and the app's Playwright version for Pineta's
+// host's jj version for both, and the app's Playwright version for pinetrie's
 // (`planImages`). The builder holds 2 GiB while it runs (S42), so it is
 // stopped after a build.
 
@@ -19,11 +19,11 @@ const DEFAULT_CONTAINERFILE = path.join(
 )
 /**
  * A project's own image, when this file exists: its lanes then run it instead
- * of Pineta's default image, which carries the browser (ADR-0041) and
+ * of pinetrie's default image, which carries the browser (ADR-0041) and
  * python3 (ADR-0064).
  */
 export const projectContainerfile = (root: string): string =>
-  path.join(root, "pineta.Containerfile")
+  path.join(root, "pinetrie.Containerfile")
 /** The `PATH` of an image that names none. */
 const STANDARD_PATH =
   "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
@@ -72,10 +72,10 @@ export async function imagePath(tag: string): Promise<string> {
 }
 
 /**
- * The images a project's lanes need: Pineta's default, always, since the lane
+ * The images a project's lanes need: pinetrie's default, always, since the lane
  * runtime comes from it; and the project's own when it has a
- * `pineta.Containerfile`. `playwrightVersion` is the app's
- * `@playwright/test`, whose browser Pineta's image carries. Returns the tag
+ * `pinetrie.Containerfile`. `playwrightVersion` is the app's
+ * `@playwright/test`, whose browser pinetrie's image carries. Returns the tag
  * lanes run.
  */
 export async function prepareImages(
@@ -84,22 +84,22 @@ export async function prepareImages(
   log: (m: string) => void,
 ): Promise<{ readonly lane: string; readonly runtimeFrom: string }> {
   const own = projectContainerfile(root)
-  const [jjVersion, pineta, project] = await Promise.all([
+  const [jjVersion, pinetrie, project] = await Promise.all([
     hostJjVersion(),
     readFile(DEFAULT_CONTAINERFILE, "utf8"),
     readFile(own, "utf8").catch(() => null),
   ])
   const plans = planImages({
-    pineta: { file: DEFAULT_CONTAINERFILE, content: pineta },
+    pinetrie: { file: DEFAULT_CONTAINERFILE, content: pinetrie },
     project: project === null ? null : { file: own, content: project },
     jjVersion,
     playwrightVersion,
   })
-  await ensureImage(plans.pineta, log)
+  await ensureImage(plans.pinetrie, log)
   if (plans.project !== null) await ensureImage(plans.project, log)
   return {
-    lane: (plans.project ?? plans.pineta).tag,
-    runtimeFrom: plans.pineta.tag,
+    lane: (plans.project ?? plans.pinetrie).tag,
+    runtimeFrom: plans.pinetrie.tag,
   }
 }
 

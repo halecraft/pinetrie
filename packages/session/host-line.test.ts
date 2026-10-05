@@ -1,5 +1,5 @@
-import { encodeOutcome } from "@pineta/protocol/codec"
-import type { Command, Reply } from "@pineta/protocol/messages"
+import { encodeOutcome } from "@pinetrie/protocol/codec"
+import type { Command, Reply } from "@pinetrie/protocol/messages"
 import { expect, test } from "vitest"
 import { hostLine } from "./host-line.ts"
 

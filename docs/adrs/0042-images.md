@@ -18,7 +18,7 @@ checked only the invite key, which loopback does not have.
   sends it to `POST /blob`, and inserts `![name](/blob/<sha256>)` at the
   cursor. The markdown reference is the attachment: the text says where the
   image goes, and editing the text removes it.
-- **Blobs are a table beside Kyneta's.** `pineta_blobs` sits in the host's
+- **Blobs are a table beside Kyneta's.** `pinetrie_blobs` sits in the host's
   SQLite file, on the store's own connection (S47: the store owns its file):
   one file to back up, keyed by the SHA-256 of the stored bytes, so a write
   is idempotent. Each row keeps the image's type, width and height, so a

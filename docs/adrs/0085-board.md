@@ -30,7 +30,7 @@ wide, made while deciding.
 - **A horizontal bar has no top and bottom.** Tabs kept the order you opened
   them in, and long titles were cut at 32rem on the tab you are on and much
   shorter elsewhere (ADR-0081).
-- **ADR-0081 removed a header row** that held only "PINETA" and counts.
+- **ADR-0081 removed a header row** that held only "PINETRIE" and counts.
   Every row of chrome has to earn its height, and columns are tall reading
   surfaces.
 - **"Lane", "column", "track", "card" and "tab" are taken.** A board's
@@ -144,7 +144,7 @@ wide, made while deciding.
 - **A root's place on the board is a session record keyed by its
   `RootId`**: its state, its rank within the state (a field per root, as a
   queue's order is a field per card, S69), who moved it last, and when. It
-  replaces `pineta.archive`: a root is archived when its state is the
+  replaces `pinetrie.archive`: a root is archived when its state is the
   closed one, and the archive record and its readers go.
 - **Clients edit states and move roots with commands over the Line**, which
   the host's serial executor orders. A move names the state the mover saw
@@ -193,7 +193,7 @@ wide, made while deciding.
   In the footer, the board sits apart from them.
 - **▦ in the footer's left corner, below your list.** The corner belongs to
   you (profile and inventory), and the board is everyone's.
-- **Fixed states.** Not every team needs the same ones, Pineta's own team
+- **Fixed states.** Not every team needs the same ones, pine·trie's own team
   included.
 - **Several closed states** (Done, Dropped). One is enough; tags can say
   what kind of done.

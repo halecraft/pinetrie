@@ -1,6 +1,6 @@
 // A command's file as the model reads it, from its text alone.
 
-import type { CommandSource } from "@pineta/rules"
+import type { CommandSource } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import { expandCommand, skillOf, withoutFrontmatter } from "./commands.ts"
 

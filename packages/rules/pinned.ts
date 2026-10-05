@@ -1,9 +1,9 @@
 // pinned — the pinned cards a run reads (ADR-0048, S92).
 //
 // A cards entry is a pi `CustomMessage` in `update.ts`'s pattern: `content` is
-// what the model reads, `details` what Pineta reads back. The host plans one
+// what the model reads, `details` what pinetrie reads back. The host plans one
 // when a run starts and the thread's pinned cards differ from those the model
-// last read on the path (`pinnedInView`, in @pineta/core), and pi writes it
+// last read on the path (`pinnedInView`, in @pinetrie/core), and pi writes it
 // with the run's prompt, in the commit that admits the run. It restates every
 // card pinned now, and names each card unpinned since, so the newest entry is
 // all that holds.
@@ -18,11 +18,11 @@ import {
   type PinnedCardRead,
   type PinnedView,
   type WriterId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { type Static, Type } from "typebox"
 import { decodeWith } from "./decode.ts"
 
-export const PINNED_TYPE = "pineta.pinned"
+export const PINNED_TYPE = "pinetrie.pinned"
 
 /**
  * The line every agent thread's `<rules>` holds. Constant, so the system

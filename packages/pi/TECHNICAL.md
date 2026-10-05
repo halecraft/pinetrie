@@ -1,8 +1,8 @@
-# `@pineta/pi` — technical notes
+# `@pinetrie/pi` — technical notes
 
 **The pi boundary.** This is the only package that may resolve
 `@earendil-works/*`. That is enforced by module resolution, not by a scanner:
-pi is declared here and in `@pineta/conformance` (`apps/conformance`) and nowhere else, so from the
+pi is declared here and in `@pinetrie/conformance` (`apps/conformance`) and nowhere else, so from the
 app every spelling fails with `ERR_MODULE_NOT_FOUND`. See
 `docs/01-architecture.md`.
 
@@ -167,7 +167,7 @@ the alternative a second host would need: read the thread's end inside
   inside the agent's turn, as a prompt the agent answers, or after the reply
   while a queued question is never answered (S21 Q3). A message for a busy
   lane is a queued card instead (ADR-0048), which the host pops when the
-  lane is idle; see `apps/pineta/host/TECHNICAL.md`.
+  lane is idle; see `apps/pinetrie/host/TECHNICAL.md`.
 - **A host's fact enters a running lane two ways only** (ADR-0080): as a
   tool's result (`catch_up`'s update), which pi writes in the turn; or by a
   steer (`ThreadLaneHandle.steer`, pi's `Lane.steer`), which pi places after
@@ -182,7 +182,7 @@ the alternative a second host would need: read the thread's end inside
   default `convertToLlm` sends as a `user` message with its `content`.
 - The harness is created with `followUpMode: "one-at-a-time"`, so that pi's own
   queue, if ever reached, answers one message at a time rather than batching
-  (S20). Pineta's queued cards mean the host does not use it.
+  (S20). pine·trie's queued cards mean the host does not use it.
 
 `laneErrCode(tag)` maps pi's refusal tags for runs and lane creation, so none of
 pi's vocabulary passes the boundary (ADR-0003): `UnknownTarget` and `LaneBusy`
@@ -190,10 +190,10 @@ have codes of their own; anything else is `refused`. The host never writes to
 a running lane, but after a crash pi holds the interrupted operation open, and
 the lane is `LaneBusy` until resumed (below).
 
-### Streaming, in Pineta's words (ADR-0022)
+### Streaming, in pine·trie's words (ADR-0022)
 
 `createAgent` takes one `onStream(event: StreamEvent)`. `StreamEvent` is
-declared in `@pineta/core`, so pi's events never leave this package. Every pi
+declared in `@pinetrie/core`, so pi's events never leave this package. Every pi
 `HarnessEvent` carries `lane`, so concurrent threads stay apart. The mapping
 is `streamEventOf` (`stream.ts`), which drops an event on a lane that is
 not a thread's.
@@ -211,13 +211,13 @@ it (S35).
 The harness's tool events are `tool_start`, `tool_update` and `tool_end`. The
 `tool_execution_*` events in pi's types belong to its older agent loop, and the
 harness never emits them (S22). What each event does to the document is
-`planStream`'s decision, in `@pineta/schema`.
+`planStream`'s decision, in `@pinetrie/schema`.
 
 ### What the model reads: a chat's images (ADR-0042)
 
 `createAgent` passes pi's `toProviderMessages` our own: it gathers the bytes
 of every chat's `details.images` from `CreateAgentOptions.blobs`, encodes
-them, and runs `withChatImages` (`@pineta/rules`) before pi's own
+them, and runs `withChatImages` (`@pinetrie/rules`) before pi's own
 `convertToLlm`, which it must still call so every other role converts as pi
 does. It runs once per request, and reads the store each time: no cache
 (S53 item 7). pi's compaction and branch summaries call `convertToLlm`
@@ -236,7 +236,7 @@ pi's null means either undecodable or impossible to fit. After a resize,
 - **A run's prompt can come with entries before it.** `ThreadLaneHandle.run(message,
   before)` passes `lane.prompt([...before, message])`: a base's news
   (`BehindMessage`, ADR-0080) and a cards entry (`PinnedMessage`,
-  `@pineta/rules`), in that order, so the cards entry stays the prompt's
+  `@pinetrie/rules`), in that order, so the cards entry stays the prompt's
   parent. pi writes them all in the commit that admits the run, or none, so
   a refused run writes no cards entry. Only this keeps the prompt cache when a card changes: cards in the
   system prompt, or in pi's mid-conversation system messages (which pi-ai
@@ -259,7 +259,7 @@ pi's null means either undecodable or impossible to fit. After a resize,
 - **A failed hook costs only the cards.** It throws nothing on purpose: when
   `compact()` fails it returns nothing, and pi compacts on its own. The
   next run's entry restates the cards, since none is in view
-  (`pinnedInView`, `@pineta/core`).
+  (`pinnedInView`, `@pinetrie/core`).
 - **The faux provider caches per lane** (`withUsageEstimate`), and pi stores
   each reply's `usage`, so `agent.test.ts` checks that an edited card keeps
   the cache with no model key. Each part is estimated rounding up, so a
@@ -281,8 +281,8 @@ the model was given.
 
 ### Compaction, and the land message's budget (`compaction.ts`, ADR-0084)
 
-`createAgent` gives every harness `PINETA_COMPACTION`, and `LAND_BUDGET`,
-the resolution prompt's limit (`@pineta/rules`' `PromptBudget`), is derived
+`createAgent` gives every harness `PINETRIE_COMPACTION`, and `LAND_BUDGET`,
+the resolution prompt's limit (`@pinetrie/rules`' `PromptBudget`), is derived
 from it: its `keepRecentTokens`, measured with pi's `estimateTokens` of a
 custom message. pi keeps the newest messages back to `keepRecentTokens` and
 never cuts the newest, so a prompt within it is kept whole (S106).
@@ -290,7 +290,7 @@ never cuts the newest, so a prompt within it is kept whole (S106).
 - **Change the setting, and the budget moves with it.** Nothing else states
   20 000 or a ratio of characters to tokens.
 - **The `compaction` option equals pi's default today**, so removing it
-  would change nothing yet. It is passed so that the setting is Pineta's.
+  would change nothing yet. It is passed so that the setting is pine·trie's.
 - **pi-agent-core's harness compaction is not pi-coding-agent's.** The
   harness reads `options.compaction ?? DEFAULT_COMPACTION_SETTINGS`, never a
   person's `settings.json`.
@@ -301,7 +301,7 @@ never cuts the newest, so a prompt within it is kept whole (S106).
 - **`configured`:** the person's pi setup. `SettingsManager` and
   `DefaultResourceLoader` load it as pi does, and only the extensions'
   provider registrations are applied to `ModelRuntime`. Commands, tools,
-  handlers and UI hooks are pi's coding agent's, and Pineta emits none of its
+  handlers and UI hooks are pi's coding agent's, and pine·trie emits none of its
   events. A Claude subscription token works only through `pi-anthropic-auth`'s
   provider: without it, Anthropic refuses (S23).
 - **`named`:** `models.json` and `auth.json` only, for `e2e:live`'s one real
@@ -328,7 +328,7 @@ never cuts the newest, so a prompt within it is kept whole (S106).
 Loading runs every package's factory, so side effects happen (`pi-subagents`
 logs a warning). `pickModel` is the pure choice: an override's fields win over
 the settings' defaults. With tools (`CreateAgentOptions.tools`), pi-agent-core's
-`read`, `write`, `edit` and `bash`, and Pineta's `grep` and `find`, run in
+`read`, `write`, `edit` and `bash`, and pine·trie's `grep` and `find`, run in
 each lane's own directory (below).
 Settings, context files and skills load from `CreateAgentOptions.project`,
 with tools on or off (ADR-0086); with none, from the process's working
@@ -350,7 +350,7 @@ its name in the `Context` (`laneContext`): `run`, `resume`, `append` and
 where a lane works. pi's hooks see the lane's name directly. Measured in S36
 item 18, and in `lanes.test.ts` against the harness.
 
-- **`LaneAccess`** is Pineta's type, so no pi type crosses the boundary. It
+- **`LaneAccess`** is pine·trie's type, so no pi type crosses the boundary. It
   is either `direct` (a directory on the host, and a promise its tools wait
   for) or `lane` (a lane of its own: its `LaneFacts`, the host paths of the
   skills it can read, where the runtime's programs are, and a `gate()` that
@@ -358,8 +358,8 @@ item 18, and in `lanes.test.ts` against the harness.
   `LaneFacts` is everything the lane's prompt says about it: its directory,
   `/workspace`, its shared directories relative to it (ADR-0035), its offer's
   bookmark, its grants, whether it runs the default image (`defaultImage`:
-  a browser and python3), Pineta's mount and the note's path. The host builds every name in it: the rules for them are
-  in `@pineta/lanes`, which this package does not declare.
+  a browser and python3), pine·trie's mount and the note's path. The host builds every name in it: the rules for them are
+  in `@pinetrie/lanes`, which this package does not declare.
 - **The tool context** is one type, `ToolContext` in `lanes.ts`: `env`,
   `programs`, `dir`, and `lane`, which is null for a lane that works
   directly. pi builds both the tools and the system prompt from it.
@@ -396,7 +396,7 @@ item 18, and in `lanes.test.ts` against the harness.
     exit status, stdout and stderr apart, and bytes for a bundle. pi's `exec`
     gives only an exit code and capped, mixed text.
 - **The protocol** (`lane-protocol.ts`) imports nothing, since the helper
-  runs it from Pineta's install, mounted read-only at `/pineta`.
+  runs it from pine·trie's install, mounted read-only at `/pinetrie`.
   - Bytes cross as base64, read from `this[key]` in the replacer: `Buffer`'s
     own `toJSON` runs first and would hand over `{ type, data }`.
   - Errors cross as `{ name, code, message, path }` at any depth, since
@@ -417,7 +417,7 @@ item 18, and in `lanes.test.ts` against the harness.
   - pi drops a guideline equal to an earlier one, so no two lines of the
     block may be equal. A unit test checks it.
   - **The note** the block points at is `lane.md`, in this package, read in
-    the lane through Pineta's own mount (`LANE_NOTE` in `@pineta/lanes`).
+    the lane through pine·trie's own mount (`LANE_NOTE` in `@pinetrie/lanes`).
     Each fact in it names its source as `<!-- <path> <symbol> -->`, and
     `lanes.test.ts` fails when a named file or symbol is gone. A change that
     makes a line of the block or the note false must change it.
@@ -466,7 +466,7 @@ item 18, and in `lanes.test.ts` against the harness.
 - **`catch_up` and `split_offer`** (`thread-tools.ts`, ADR-0080) read their
   arguments (`parseCatchUpArgs`) and hand the call to the host
   (`LaneHooks.catchUp`, `LaneHooks.askSplit`), whose `ToolAnswer`
-  (`@pineta/rules`) becomes the result: its text, and as `details` the
+  (`@pinetrie/rules`) becomes the result: its text, and as `details` the
   commits a `catch_up` merged, which `parentNow` and the turn's record read.
   The host's answer to `catch_up` arrives while the run waits on it: the
   merge runs on the lane's queue, which no tool call holds (S103 item 1).
@@ -480,13 +480,13 @@ item 18, and in `lanes.test.ts` against the harness.
   that they are off. The tool reads its arguments (`parseBannerArgs`: an
   image that names no pasted image is refused, not ignored) and hands the
   ask to the host.
-- **Pineta's own skills** are in `skills/`, loaded after yours and the repo's
+- **pine·trie's own skills** are in `skills/`, loaded after yours and the repo's
   (`additionalSkillPaths`; pi's loader keeps the first of a name):
   `resolve-conflicts` (ADR-0033), `commit-message` and `offer-stack`
   (ADR-0038), `column-banner` (ADR-0053), whose whole body is the image
   model's prompt, and `ask-digest` (ADR-0056), whose reply has a shape the
   host reads (`digestOf`, ADR-0075): a replacement must ask for it too. So
-  one of yours or the repo's of the same name replaces Pineta's. All five are
+  one of yours or the repo's of the same name replaces pine·trie's. All five are
   `disable-model-invocation: true`: only the host asks for them.
   `Agent.skill(name)` reads the file at call time, without its frontmatter,
   and hashes it. The scripted and named model choices load no resources, so
@@ -539,18 +539,18 @@ item 18, and in `lanes.test.ts` against the harness.
     `loadPromptTemplates`, and finds its package root above it.
   - A label's sources, `.claude-plugin/plugin.json` and `package.json`, are
     read from the package root pi records (`sourceInfo.baseDir`).
-  - A skill under Pineta's own skills directory is `pineta`.
+  - A skill under pine·trie's own skills directory is `pinetrie`.
   - The model's own skill list keeps pi's precedence: one per name.
 - **`createAgent` labels them** with the user config's renames
-  (`commandRenames`) through `labelCommands` (`@pineta/rules`). `commands()` is
+  (`commandRenames`) through `labelCommands` (`@pinetrie/rules`). `commands()` is
   the list, `refusedCommands()` what clashed, and `skill(name)` takes a
   qualified name: a conflicted update asks for
-  `pineta:skill:resolve-conflicts`.
+  `pinetrie:skill:resolve-conflicts`.
 - **`expand(command, args, inLane)`** reads the file now, then runs the pure
   `expandCommand`, which hashes it. `skill(name)` reads, then runs `skillOf`.
   Both strip frontmatter with `withoutFrontmatter`, which never parses it: a
   file whose YAML broke after pi loaded it still expands.
-  - a skill becomes pi's block through `expandSkill` (`@pineta/rules`), which
+  - a skill becomes pi's block through `expandSkill` (`@pinetrie/rules`), which
     copies the format of `_expandSkillCommand` in pi-coding-agent's
     `dist/core/agent-session.js`. That method is private to pi's session, so
     the format is copied, and pinned by a golden test. Diff it on every pi
@@ -594,20 +594,20 @@ as an entry is. The replay test in `storage.test.ts` relies on this.
 ### Values
 
 `writeValues(writes)` writes the host's records (ADR-0062): the
-`ValueWrite`s that `setRecord` and `deleteRecord` (`@pineta/rules`) build, in one
+`ValueWrite`s that `setRecord` and `deleteRecord` (`@pinetrie/rules`) build, in one
 `session.mutate` commit of pi's `setValue` and `deleteValue` writes. That is
 the path `Session.setValue` takes for one write, so conformance covers the
 storage shape. A value can be written while a lane runs (S70): it does not
-go through the lane. A write to a namespace outside `pineta.` throws before
+go through the lane. A write to a namespace outside `pinetrie.` throws before
 anything is written: pi's own values (a lane's tip, a checkpoint) are never
 the host's, and type stripping does not check `HostNamespace`. This package
 imports no record namespace or encoder: what a record is lives in
-`@pineta/rules`.
+`@pinetrie/rules`.
 
 ### `seq` is derived, not stored
 
 `planArrivals` (`arrivals.ts`) assigns arrival order. Entries are ordered by
-`orderNewEntries` in `@pineta/core`, which is pure and property-tested there for
+`orderNewEntries` in `@pinetrie/core`, which is pure and property-tested there for
 permutation invariance. Its `unresolved` ids are a parent cycle and the entries
 below one: a parent outside the batch never blocks a child, whether or not it
 exists. `#reconcile` sequences the rest and throws once, naming the cycle.

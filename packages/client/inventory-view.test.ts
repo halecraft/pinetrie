@@ -1,5 +1,5 @@
-import { type CardRecord, cardId, writerId } from "@pineta/core"
-import { NO_INTENTS, type Slots, settleSlots } from "@pineta/session"
+import { type CardRecord, cardId, writerId } from "@pinetrie/core"
+import { NO_INTENTS, type Slots, settleSlots } from "@pinetrie/session"
 import { describe, expect, test } from "vitest"
 import { inventoryView } from "./inventory-view.ts"
 

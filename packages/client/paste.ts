@@ -1,7 +1,7 @@
 // client/paste — an image pasted into a composer: uploaded to the host, and
 // referred to in the text as markdown (ADR-0042).
 
-import { blobUrl, type ImageRef } from "@pineta/core"
+import { blobUrl, type ImageRef } from "@pinetrie/core"
 
 /** A selection in a text box, in UTF-16 offsets. */
 export interface Selection {

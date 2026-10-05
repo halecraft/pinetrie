@@ -19,7 +19,7 @@
 ## Why it was asked
 
 S24 found that an authoritative document compacts live on `json.bind`, and
-Pineta's session document is written only by the host. Before deciding, it had
+pine·trie's session document is written only by the host. Before deciding, it had
 to be measured whether the session document runs on the plain substrate at all:
 pi's storage semantics, streaming, persistence, the browser; and what the plain
 substrate keeps in memory.
@@ -73,7 +73,7 @@ document with 5,000 edits to a 50 KB tail-kept text:
 4. **ADRs to revise:** ADR-0008 (Loro history as infrastructure), ADR-0016
    (racing lazily created containers: moot with one writer, harmless to keep),
    and the environment gate's Loro floor, which the host no longer needs.
-   Existing `.pineta/pineta.db` stores are Loro and cannot be opened: start a new
+   Existing `.pinetrie/pinetrie.db` stores are Loro and cannot be opened: start a new
    file.
 
 ## Method

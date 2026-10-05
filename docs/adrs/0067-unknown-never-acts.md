@@ -4,13 +4,13 @@
 `PLAN-2026-10-03-offer-certainty`. Amends ADR-0038 (an offer is built only
 from work known to change a file, from a known start; the page reads one
 status per offer), ADR-0060 (a take that names no source makes its lane's
-start untraced; `pineta.base` records what catching up would change) and
+start untraced; `pinetrie.base` records what catching up would change) and
 ADR-0065 (every named lane whose root is not archived is still refreshed
 on a full observation, which this makes safe).
 Amended by ADR-0083: a take above the base is an *integrated-offer
 commit*.
 
-**Context.** On Pineta's own repo the page contradicted itself: vernal-pine's
+**Context.** On pine·trie's own repo the page contradicted itself: vernal-pine's
 strip said "nothing to add yet" while its tab warned that archiving drops
 its work, and the header counted 14 threads with work to add (S97). Six of
 the offers were empty, and six more replayed work you had taken days
@@ -20,7 +20,7 @@ page could not tell, read as one it could:
 - jj refused to diff a range with a gap, after a catch-up merged a take;
   `changesNoFile` read the refusal as "the lane has work", and the host built
   an empty offer.
-- Takes made before offers carried `Pineta-Source` name no source;
+- Takes made before offers carried `Pinetrie-Source` name no source;
   `takenRevset` read their absence as "nothing taken", so the start stayed
   at the thread's old base.
 - The page decided "open" in four places from a record's raw fields, and
@@ -42,12 +42,12 @@ page could not tell, read as one it could:
    take whose paragraph names a thread and a lane but no source
    (`untracedLanes`) is untraced. Catching up past it, which puts it under
    the lane's base, is what clears it.
-4. **A cached fact names what it was read at.** `pineta.base`'s `catchUp`
+4. **A cached fact names what it was read at.** `pinetrie.base`'s `catchUp`
    carries the lane tip and the base commit its files were read at; a reader
    whose base has moved since reads it as unknown. The host keeps it while
    both stay, so it is read once per move.
 5. **A stored record that fails to decode is dropped**, and its reader treats
-   the fact as unknown until the host writes it again. A `pineta.base`
+   the fact as unknown until the host writes it again. A `pinetrie.base`
    written before `catchUp` and `untraced` is such a record.
 6. **The page decodes each record into one status that every reader
    shares.** `offerStatus` says `none`, `taken`, `held` or `open`; the strip,
@@ -58,7 +58,7 @@ page could not tell, read as one it could:
 **Consequences.**
 
 - An empty offer is no longer built after a catch-up merged a take, and one
-  built before is withdrawn. A thread taken before `Pineta-Source` existed
+  built before is withdrawn. A thread taken before `Pinetrie-Source` existed
   gets no offer until it catches up, and its strip says so.
 - An offer whose line already holds its work (S89) is still kept, as
   `held`, with its bookmark shown, and no take, review or count.
@@ -70,16 +70,16 @@ page could not tell, read as one it could:
   move of its tip or base.
 - Only a lane's own untraced takes are found. One of a lane it forked from
   is not.
-- `apps/pineta/host/offers/refresh.test.ts` refreshes each history S97 found
+- `apps/pinetrie/host/offers/refresh.test.ts` refreshes each history S97 found
   until a round writes nothing.
 
 **Alternatives rejected.**
 
 - **Refresh only lanes with an offer bookmark or an open record**, as the
   poll before ADR-0065 did. It hid the stale offers without removing their
-  cause, and would leave idle lanes' `pineta.base` behind the line.
-- **Recover an untraced take's source from its `Pineta-Entry`** through
-  `pineta.revision`. The entry's revision may have no commit, the host would
+  cause, and would leave idle lanes' `pinetrie.base` behind the line.
+- **Recover an untraced take's source from its `Pinetrie-Entry`** through
+  `pinetrie.revision`. The entry's revision may have no commit, the host would
   decide from the document, not the repo, and catching up clears the state
   anyway.
 - **Never write an offer record with no files.** The page could not tell

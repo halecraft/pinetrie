@@ -5,8 +5,8 @@
 // stand. `nextActing` decides, and `sendActing` is the one shell around it,
 // over the session's store.
 
-import type { LaneName, LineAction, OfferAction } from "@pineta/core"
-import type { Outcome } from "@pineta/protocol/codec"
+import type { LaneName, LineAction, OfferAction } from "@pinetrie/core"
+import type { Outcome } from "@pinetrie/protocol/codec"
 import type { SnapshotStore } from "./store.ts"
 
 /** A command's answer the page says (`outcomeWords`): refused, or failed. */

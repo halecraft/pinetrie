@@ -3,7 +3,7 @@
 **Status:** Answered. Led to ADR-0067. Served
 `PLAN-2026-10-03-offer-certainty`.
 
-**Question.** On 2026-10-03, on Pineta's own repo, the page contradicted
+**Question.** On 2026-10-03, on pine·trie's own repo, the page contradicted
 itself about vernal-pine. Its tab's ⋯ warned that archiving drops "work not
 added to the project", while its strip said "nothing to add yet". The
 header's ⇣ counted 14 threads with work to add, and fewer had any. Where do
@@ -18,7 +18,7 @@ reads below ran in, outside the workspace.
 **Answers.**
 
 1. **Some offers were empty, and the page counted them anyway.** 6 of 15
-   `pineta-offer/*` bookmarks were empty commits. `offerView` read a record
+   `pinetrie-offer/*` bookmarks were empty commits. `offerView` read a record
    with no files as `nothing`. `openOffers`, which the ⇣ count and the tab's
    Archive list read, and `recordedSpan` checked only `taken === null`.
 2. **"jj refused" read as "the lane has work".** vernal-pine's offer was
@@ -30,11 +30,11 @@ reads below ran in, outside the workspace.
    host built an offer, as the diff from the start to the tip:
    `jj diff --from bd47a088 --to 2dfcfc03` lists nothing. Every refresh then
    planned `none`, so the empty offer stayed.
-3. **Takes from before `Pineta-Source` existed are invisible to the start.**
-   90 commits on the line carry `Pineta-Thread`, `Pineta-Lane` and
-   `Pineta-Entry` but no `Pineta-Source`: takes from before offers carried
+3. **Takes from before `Pinetrie-Source` existed are invisible to the start.**
+   90 commits on the line carry `Pinetrie-Thread`, `Pinetrie-Lane` and
+   `Pinetrie-Entry` but no `Pinetrie-Source`: takes from before offers carried
    their ledger, the newest from 2026-10-02. `takenRevset` reads only
-   `Pineta-Source`, so for six threads (loyal-plover, jade-elk, spry-flint,
+   `Pinetrie-Source`, so for six threads (loyal-plover, jade-elk, spry-flint,
    copper-newt, minty-poplar and cozy-mallard) the start stayed at the
    thread's old base, and each offer replayed what you had already taken
    onto today's line: 12 to 74 files, up to +13,668 lines, every one
@@ -60,7 +60,7 @@ reads below ran in, outside the workspace.
   catches up past it.
 - The page reads one decoded `OfferStatus` for an offer; a record the line
   already holds is `held`, and nothing counts or warns about it.
-- `pineta.base` records what catching up would change, read at a lane tip
+- `pinetrie.base` records what catching up would change, read at a lane tip
   and a base commit, so catch-up says whether it would change anything.
-- `apps/pineta/host/offers/refresh.test.ts` refreshes each history above as
+- `apps/pinetrie/host/offers/refresh.test.ts` refreshes each history above as
   the host does, until a round writes nothing.

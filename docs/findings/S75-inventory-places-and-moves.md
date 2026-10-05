@@ -2,7 +2,7 @@
 
 Measured in a lane (Linux, Node 24), for ADR-0048's step 4, the inventory.
 It answers the ADR's probe 1 (places as a CRDT) and the rest of probe 4
-(undo in Pineta's shape, for moves). The probe is kept under
+(undo in pine·trie's shape, for moves). The probe is kept under
 `.plans/s75-probe/` with its output, and was not committed.
 
 **Superseded in part by S76.** Answers 2, 3, 10 and 11 showed that a
@@ -89,7 +89,7 @@ filtered to the cards document while other live cards have steps there").
 
 ## Method
 
-One disposable probe in `apps/pineta/e2e/`, run with `node`, built as S69's
+One disposable probe in `apps/pinetrie/e2e/`, run with `node`, built as S69's
 was: a host whose exchange is built as `startHost` builds it (the SQLite
 store, `WebsocketServerTransport` behind `ws`, `departureTimeout: 0`, a
 `resolve` for the cards document, `card:` texts and `inventory:` documents,

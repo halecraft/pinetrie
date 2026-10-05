@@ -73,5 +73,5 @@ written.
   versions after edits.
 - `sandbox/s55-live-handover/s55-store.ts`: `write` runs a host on a store
   file and shuts it down mid-reply; `read`, with the new row, opens it.
-- Each was copied into `apps/pineta/e2e/` (or `packages/client/`) to resolve
+- Each was copied into `apps/pinetrie/e2e/` (or `packages/client/`) to resolve
   the workspace's packages, and deleted afterwards.

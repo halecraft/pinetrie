@@ -1,7 +1,7 @@
 // repo/offer-steps — what a decision about an offer runs on your repo, and
 // what the host does after (ADR-0038, ADR-0060).
 //
-// `@pineta/rules` decides (`planRefresh`, `planOfferIntegration`, `planStackEnded`,
+// `@pinetrie/rules` decides (`planRefresh`, `planOfferIntegration`, `planStackEnded`,
 // `planRebuild`, `planDescribeSettle`); these turn each decision into
 // `RepoStep`s, pure. Every decision carries the facts its steps need, so
 // each kind has exactly one translation, and none that runs nothing because
@@ -20,7 +20,7 @@ import {
   type Rebuild,
   type RefreshDecision,
   type ThreadName,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import {
   planAbandonOffer,
   planDescribe,
@@ -35,7 +35,7 @@ import type { RepoStep } from "./step.ts"
 export interface OfferAt {
   readonly lane: LaneName
   readonly name: ThreadName
-  /** The lane's tip entry, for `Pineta-Entry`. */
+  /** The lane's tip entry, for `Pinetrie-Entry`. */
   readonly entry: string
 }
 
@@ -43,7 +43,7 @@ export interface OfferAt {
 export interface BuildAt extends OfferAt {
   /** The line an offer carries until an agent describes it (`wipDescription`). */
   readonly wip: string
-  /** `pineta-offer-<uuid>`, fresh for each build: the host makes it. */
+  /** `pinetrie-offer-<uuid>`, fresh for each build: the host makes it. */
   readonly nonce: string
 }
 

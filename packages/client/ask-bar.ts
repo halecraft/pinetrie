@@ -1,7 +1,7 @@
 // client/ask-bar — which ask the work at the top of a column belongs to
 // (ADR-0056). Pure: `use-ask-bar.ts` measures, this decides.
 
-import type { EntryId } from "@pineta/core"
+import type { EntryId } from "@pinetrie/core"
 
 /** An ask's work as drawn: its box, from the top of the column's view. */
 export interface WorkBox {

@@ -4,7 +4,7 @@
 // `DefaultResourceLoader` over `~/.pi/agent`, then the extensions' provider
 // registrations applied to a `ModelRuntime`. Only providers: an extension's
 // tools, commands, handlers and UI hooks belong to pi's coding agent, and
-// Pineta emits none of its events. A Claude subscription token, for one, works
+// pinetrie emits none of its events. A Claude subscription token, for one, works
 // only through the provider `pi-anthropic-auth` registers.
 
 import { homedir } from "node:os"
@@ -17,8 +17,8 @@ import {
   type ImagesModels,
 } from "@earendil-works/pi-ai"
 import { openrouterImagesProvider } from "@earendil-works/pi-ai/providers/openrouter-images"
-import type { GatheredCommand } from "@pineta/rules"
-import { gatherCommands, pinetaCommands } from "./commands.ts"
+import type { GatheredCommand } from "@pinetrie/rules"
+import { gatherCommands, pinetrieCommands } from "./commands.ts"
 import {
   type buildSystemPrompt,
   DefaultResourceLoader,
@@ -162,7 +162,7 @@ export async function setUpModel(
      */
     readonly agentDir?: string
     /**
-     * Pineta's own skills. pi keeps one skill per name for the model, and
+     * pinetrie's own skills. pi keeps one skill per name for the model, and
      * these come after yours and the repo's; as commands, each is reachable
      * under its own package (ADR-0036).
      */
@@ -192,12 +192,12 @@ export async function setUpModel(
     }
     return { settingsManager, loader, resources }
   }
-  // Loading nothing of pi's still leaves Pineta's own skills as commands.
+  // Loading nothing of pi's still leaves pinetrie's own skills as commands.
   const none = {
     contextFiles: [],
     skills: [],
     commands:
-      where.skillsDir === undefined ? [] : pinetaCommands(where.skillsDir),
+      where.skillsDir === undefined ? [] : pinetrieCommands(where.skillsDir),
   }
   switch (choice.kind) {
     case "scripted": {
@@ -253,7 +253,7 @@ export async function setUpModel(
       )
       if (picked === undefined)
         throw new Error(
-          "no model: set defaultProvider and defaultModel in pi's settings, or PINETA_PROVIDER and PINETA_MODEL",
+          "no model: set defaultProvider and defaultModel in pi's settings, or PINETRIE_PROVIDER and PINETRIE_MODEL",
         )
       const model = found(models, picked)
       return {

@@ -7,12 +7,16 @@
 // package never changes what a name already meant. Everything here is pure:
 // the host gathers what pi loaded, and reads the file a command names.
 
-import type { CommandKind, CommandSummary, CommandsRecord } from "@pineta/core"
+import type {
+  CommandKind,
+  CommandSummary,
+  CommandsRecord,
+} from "@pinetrie/core"
 import { Type } from "typebox"
 import { decodeAt, fixedKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
-/** The one `pineta.commands` value's key: what the host's pi loaded. */
+/** The one `pinetrie.commands` value's key: what the host's pi loaded. */
 export const COMMANDS_KEY = "commands"
 
 const CommandSummarySchema = Type.Object({
@@ -32,7 +36,7 @@ export const COMMANDS: RecordSpec<
   typeof COMMANDS_KEY,
   "session"
 > = {
-  namespace: "pineta.commands",
+  namespace: "pinetrie.commands",
   home: "session",
   keyOf: () => COMMANDS_KEY,
   encode: r => ({ commands: r.commands.map(c => ({ ...c })) }),
@@ -61,8 +65,8 @@ export interface GatheredCommand {
   readonly source: string
   /** What its label may come from, most preferred first. */
   readonly names: {
-    /** Pineta's own skills. */
-    readonly pineta: boolean
+    /** pinetrie's own skills. */
+    readonly pinetrie: boolean
     /** `.claude-plugin/plugin.json`'s `name`, as Claude names the plugin. */
     readonly plugin: string | null
     /** `package.json`'s `name`, scope included. */
@@ -90,7 +94,7 @@ function labelOf(
 ): string {
   const renamed = renames[c.source]
   if (renamed !== undefined) return renamed
-  if (c.names.pineta) return "pineta"
+  if (c.names.pinetrie) return "pinetrie"
   if (c.names.plugin !== null && c.names.plugin !== "") return c.names.plugin
   if (c.names.packageName !== null && c.names.packageName !== "")
     return unscoped(c.names.packageName)
@@ -107,7 +111,7 @@ export const qualified = (
 /**
  * Every command under its package's label, and what is refused.
  * - A label is the user config's rename (keyed by pi's `source`), else
- *   `pineta` for Pineta's own, else `plugin.json`'s name, else the package
+ *   `pinetrie` for pinetrie's own, else `plugin.json`'s name, else the package
  *   name without its scope, else pi's scope.
  * - Two sources with one label are refused together: a person renames one,
  *   rather than load order choosing.

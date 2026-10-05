@@ -14,12 +14,12 @@ import {
   isWorkflowStateId,
   type RootId,
   type WorkflowStateId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import type { Intent } from "./intent.ts"
 import { gapAt } from "./reorder.ts"
 
-/** The drag data type a root travels under, Pineta's own; never a card's. */
-export const ROOT_MIME = "application/x-pineta-root"
+/** The drag data type a root travels under, pinetrie's own; never a card's. */
+export const ROOT_MIME = "application/x-pinetrie-root"
 
 /** A root being dragged: which, the state it is in, and where from. */
 export interface RootDrag {

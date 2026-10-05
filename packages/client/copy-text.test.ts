@@ -1,5 +1,5 @@
-import type { ToolCallView, TranscriptMessage } from "@pineta/core"
-import { entryId } from "@pineta/core"
+import type { ToolCallView, TranscriptMessage } from "@pinetrie/core"
+import { entryId } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import { copyText } from "./copy-text.ts"
 

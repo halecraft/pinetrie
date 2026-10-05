@@ -5,7 +5,7 @@ import {
   rootIdFor,
   type WriterId,
   writerId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   type Inbox,

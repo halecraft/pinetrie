@@ -10,7 +10,7 @@ ADR-0063: a session is a document per root, a session document of its
 records, and one of what is streaming; it is still the boundary of who is in
 it.
 
-**Context.** ADR-0018 stored a default at an entry (`pineta.thread`): below a
+**Context.** ADR-0018 stored a default at an entry (`pinetrie.thread`): below a
 *working session* entry the agent answers every message, below a
 *conversation* entry only `@agent`. It was changed by an action on a message
 ("from here, …"), beside another action, "branch from here". Both asked a
@@ -81,7 +81,7 @@ The actions differ in cost, and in how far they can be undone:
 **Consequences.** The stored thread rules, the `thread` command,
 `setThreadDefault`, `effectiveDefault`, `readThreadRules`, `rulesAlong`,
 `ROOT_DEFAULT`, the "from here, …" action and the separate "branch from here"
-are gone; `pineta.thread` values already in a session are no longer read. The
+are gone; `pinetrie.thread` values already in a session are no longer read. The
 host decides a message's addressee from its mentions, the thread's lane, and,
 for a Start Agent column's first message, the column's default, which the send
 carries. Someone working alone clicks Start Agent once per thread. In agent

@@ -7,7 +7,7 @@ const checks = [
   "exec",
   "vitest",
   "run",
-  "apps/pineta/e2e/checks.test.ts",
+  "apps/pinetrie/e2e/checks.test.ts",
 ]
 const proofs = [
   "pnpm",
@@ -23,7 +23,7 @@ const scenarios = [
   "exec",
   "vitest",
   "run",
-  "apps/pineta/e2e/scenario.test.ts",
+  "apps/pinetrie/e2e/scenario.test.ts",
 ]
 
 export const mutations: readonly Mutation[] = [
@@ -37,7 +37,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "every failing check stops the suite",
-    file: "apps/pineta/e2e/checks.ts",
+    file: "apps/pinetrie/e2e/checks.ts",
     from: "): boolean => !passed && stopAt !== undefined && label === stopAt",
     to: "): boolean => !passed && stopAt !== undefined",
     command: checks,
@@ -45,7 +45,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a stop is not recorded as a failure",
-    file: "apps/pineta/e2e/checks.ts",
+    file: "apps/pinetrie/e2e/checks.ts",
     from: "      ;(pass ? passed : failed).push(label)",
     to: "      if (!stopsHere(pass, label, stopAt)) (pass ? passed : failed).push(label)",
     command: checks,
@@ -54,10 +54,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "mutate names no check",
     file: "scripts/mutate.ts",
-    from: "    ...(m.expect === undefined ? {} : { PINETA_STOP_AT: m.expect }),\n",
+    from: "    ...(m.expect === undefined ? {} : { PINETRIE_STOP_AT: m.expect }),\n",
     to: "",
     command: unit,
-    expect: "with an expectation, PINETA_STOP_AT is set",
+    expect: "with an expectation, PINETRIE_STOP_AT is set",
   },
   {
     name: "a stop reads as a load failure",
@@ -84,16 +84,16 @@ export const mutations: readonly Mutation[] = [
     expect: "a filter that names nothing is refused",
   },
   {
-    name: "mutantEnv drops PINETA_SCENARIO",
+    name: "mutantEnv drops PINETRIE_SCENARIO",
     file: "scripts/mutate.ts",
-    from: "    ...(m.scenario === undefined ? {} : { PINETA_SCENARIO: m.scenario }),\n",
+    from: "    ...(m.scenario === undefined ? {} : { PINETRIE_SCENARIO: m.scenario }),\n",
     to: "",
     command: unit,
     expect: "a suite mutation runs only its scenario",
   },
   {
-    name: "chooseScenarios ignores PINETA_SCENARIO",
-    file: "apps/pineta/e2e/scenario.ts",
+    name: "chooseScenarios ignores PINETRIE_SCENARIO",
+    file: "apps/pinetrie/e2e/scenario.ts",
     from: "  if (asked.length === 0) return [...all].sort()",
     to: "  if (true) return [...all].sort()",
     command: scenarios,
@@ -101,7 +101,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "planSuite runs a scenario whose needs gave a reason",
-    file: "apps/pineta/e2e/scenario.ts",
+    file: "apps/pinetrie/e2e/scenario.ts",
     from: "      return why === null ? { name, run: true } : { name, run: false, why }",
     to: "      return { name, run: true }",
     command: scenarios,

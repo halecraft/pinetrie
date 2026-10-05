@@ -1,8 +1,8 @@
 // client/message-props — what a message is drawn from, and how each of its
 // props is compared: `React.memo`'s rule for `Message` (`sameProps`), kept pure.
 
-import type { BranchSummary, SpineNode, WriterId } from "@pineta/core"
-import type { LiveDocHandle } from "@pineta/schema"
+import type { BranchSummary, SpineNode, WriterId } from "@pinetrie/core"
+import type { LiveDocHandle } from "@pinetrie/schema"
 import type { LaneJoin, PinnedMarker } from "./column-view.ts"
 import type { MessageAct, MessageTools } from "./message-tools.ts"
 import { type PropRule, sameProps } from "./same-props.ts"

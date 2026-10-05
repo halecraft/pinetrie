@@ -1,8 +1,8 @@
-// lanes/runtime — Pineta's lane runtime: Node, and static programs for any
+// lanes/runtime — pinetrie's lane runtime: Node, and static programs for any
 // image (S44, ADR-0064).
 //
-// The helper is Pineta's, so it must run on any project's image, with or
-// without Node, on musl as well as glibc. After building Pineta's default
+// The helper is pinetrie's, so it must run on any project's image, with or
+// without Node, on musl as well as glibc. After building pinetrie's default
 // image, the host copies out of it:
 // - `node/`: the `node` binary, the shared libraries `ldd` lists for it
 //   (`node/lib/`), and glibc's dynamic loader. The helper is started through
@@ -11,12 +11,12 @@
 // - `bin/`: each of core's `RUNTIME_PROGRAMS`, a static musl build that runs
 //   on any Linux. Debian's own builds of rg and fd link glibc, so the default
 //   image downloads release builds instead.
-// Every lane mounts it read-only at `/pineta-runtime`. Only `bin/` goes on a
-// lane's `PATH`: Pineta's `node` cannot start without its loader.
+// Every lane mounts it read-only at `/pinetrie-runtime`. Only `bin/` goes on a
+// lane's `PATH`: pinetrie's `node` cannot start without its loader.
 
 import { mkdir, readdir, rename, rm } from "node:fs/promises"
 import path from "node:path"
-import { RUNTIME_PROGRAMS } from "@pineta/core"
+import { RUNTIME_PROGRAMS } from "@pinetrie/core"
 import { RUNTIME_MOUNT } from "./plan.ts"
 import { describeFailure, run } from "./run.ts"
 
@@ -53,7 +53,7 @@ export const runtimeComplete = (binEntries: readonly string[]): boolean =>
   RUNTIME_PROGRAMS.every(p => binEntries.includes(p))
 
 /**
- * The runtime for `image` under `dir` (`.pineta/runtime/`), copied out of it
+ * The runtime for `image` under `dir` (`.pinetrie/runtime/`), copied out of it
  * unless one with every program is there. Its directory is named by the
  * image's tag, so a rebuilt image gets a new runtime, and those of earlier
  * tags are removed. Returns the directory.

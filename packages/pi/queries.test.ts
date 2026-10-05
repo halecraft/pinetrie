@@ -1,5 +1,5 @@
 // The rules of pi's reads, over stored rows (`queries.ts`).
-import type { StoredEntryRow } from "@pineta/schema"
+import type { StoredEntryRow } from "@pinetrie/schema"
 import { describe, expect, test } from "vitest"
 import {
   boundsAfter,

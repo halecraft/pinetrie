@@ -9,9 +9,9 @@
 // starts is not added here. An item holding an unsent card of yours carries a
 // pip (ADR-0048, `cardMarks`), and before its label, its status (ADR-0077).
 
-import { MAX_TITLE, type TreeIndex, type WriterId } from "@pineta/core"
-import { ROOT_BUSY_REASON } from "@pineta/rules"
-import type { SessionClient } from "@pineta/session"
+import { MAX_TITLE, type TreeIndex, type WriterId } from "@pinetrie/core"
+import { ROOT_BUSY_REASON } from "@pinetrie/rules"
+import type { SessionClient } from "@pinetrie/session"
 import {
   type KeyboardEvent,
   useEffect,

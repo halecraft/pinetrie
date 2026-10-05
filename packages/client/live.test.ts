@@ -3,8 +3,8 @@ import {
   entryId,
   type LaneName,
   laneNameForThread,
-} from "@pineta/core"
-import type { StreamRecord } from "@pineta/schema"
+} from "@pinetrie/core"
+import type { StreamRecord } from "@pinetrie/schema"
 import { describe, expect, test } from "vitest"
 import { callStreams, liveWork } from "./live.ts"
 

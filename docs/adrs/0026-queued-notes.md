@@ -11,7 +11,7 @@ top card someone types in. A thread's own hold, which anyone sets and
 releases, is step 7's too. Was: amends ADR-0020 (the outbox) and ADR-0025 (the lifecycle, and
 how done is enforced). Evidence: S20, S21, S26, S28.
 
-**Context.** A message waiting for a busy lane sits in `pineta.outbox` as a
+**Context.** A message waiting for a busy lane sits in `pinetrie.outbox` as a
 frozen copy of its text. It cannot be cancelled or changed, and someone who
 wants a waiting instruction to take something into account can only send
 another message, whose place relative to that instruction depends on timing.
@@ -25,7 +25,7 @@ That calls for a queue whose items can be edited while they wait.
   becomes a note in state `queued`, with its lane and its sender. This holds for
   plain and compelled messages alike, whether sent from a composer or as a
   draft. Its text is the note's Yjs document, which anyone can edit while it
-  waits, with edits attributed as in ADR-0025. `pineta.outbox` is removed. A
+  waits, with edits attributed as in ADR-0025. `pinetrie.outbox` is removed. A
   message sent to an idle thread is written at once, as today, and is not a
   note. A queued note is not a draft, so a lane may have many queued notes, and
   "one draft per thread end" still holds.
@@ -86,7 +86,7 @@ condition as a field on a queued note, checked by a run in the lane that ends
 with a structured verdict, with both runs in the tree; and Stop pausing an
 unattended queue rather than letting it drain.
 
-**Alternatives rejected.** Cancel as removal from `pineta.outbox` (the text
+**Alternatives rejected.** Cancel as removal from `pinetrie.outbox` (the text
 stays frozen at send, and it would be replaced at once). Two lists, one for
 ordering and one for a plan of steps (the order between them would have to be
 chosen, while editing a step is the direct way to inform it). Returning a

@@ -7,7 +7,7 @@
 // earlier can win over a further one written on another device (S101).
 // `attention-doc.ts` carries it out. Pure.
 
-import type { EntryId, LaneName } from "@pineta/core"
+import type { EntryId, LaneName } from "@pinetrie/core"
 
 /** The least time between two writes of one lane's mark. */
 export const READ_EVERY = 5_000

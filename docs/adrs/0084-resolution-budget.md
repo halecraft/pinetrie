@@ -13,7 +13,7 @@ bounded only the reasons, in characters, a unit pi does not count in.
 
 **Decision.**
 - **The budget is pi's.** `packages/pi` passes its compaction settings to
-  every harness (`PINETA_COMPACTION`), and the land message's budget is
+  every harness (`PINETRIE_COMPACTION`), and the land message's budget is
   their `keepRecentTokens`, measured with pi's `estimateTokens`
   (`LAND_BUDGET`). A message within it is kept whole when pi compacts.
 - **The whole message is measured.** `planResolution` measures each message

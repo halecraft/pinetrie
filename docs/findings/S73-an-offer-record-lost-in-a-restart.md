@@ -5,10 +5,10 @@ An offer (ADR-0038) stopped following its lane for twenty minutes, said
 11 files that its column never named. This finding records why
 (`PLAN-2026-10-01-offer-lost-write`).
 
-Observed in Pineta's own repo on 2026-10-01, on `pineta-offer/zany-camel`
+Observed in pine·trie's own repo on 2026-10-01, on `pinetrie-offer/zany-camel`
 (change `vupnvkys`), with jj 0.44.0. Read with `jj op log`, `jj evolog`,
 `jj interdiff`, all `--ignore-working-copy`, and from the session store's
-`pineta.offer` and `pineta.have` values.
+`pinetrie.offer` and `pinetrie.have` values.
 
 **What the repos held.**
 
@@ -16,7 +16,7 @@ Observed in Pineta's own repo on 2026-10-01, on `pineta-offer/zany-camel`
 |---|---|
 | 22:44:32 | you take mpxwowul, which changes host code |
 | 22:44:35 | the host rebases the offer onto your new `@-`: `8de22478`, its content from the lane's `0f8bf517` |
-| 22:44:38 | the host follows the lane to `1938535f`: three operations, all by `pineta-host`, giving `7e570256` |
+| 22:44:38 | the host follows the lane to `1938535f`: three operations, all by `pinetrie-host`, giving `7e570256` |
 | 22:44:45 | a new host process starts |
 | 22:44 to 22:59 | the lane makes about 40 more commits; the offer is not refreshed again |
 | 23:03:53 | you take the offer; the have it delivers is `0f8bf517` |
@@ -46,7 +46,7 @@ Observed in Pineta's own repo on 2026-10-01, on `pineta-offer/zany-camel`
 2. **The host's own rewrite read as your edit.** Every later trigger
    compared the offer with the stale `wrote`. `jj interdiff` was not empty,
    so `planRefresh` answered `leave`, and the host never touched the offer
-   again. The evolog shows only `pineta-host` operations between `8de22478`
+   again. The evolog shows only `pinetrie-host` operations between `8de22478`
    and `7e570256`.
 3. **The column hid the conflict.** `offerView` decides `edited` before
    `conflicts`, and `offerWords` worded the edited state without them. The
@@ -59,7 +59,7 @@ Observed in Pineta's own repo on 2026-10-01, on `pineta-offer/zany-camel`
 **A probe: the evolog says who made each version.** With jj 0.44.0,
 `jj evolog -r <commit> --no-graph -T` accepts `commit.commit_id()`,
 `commit.change_id()`, `operation.user()` (printed as
-`pineta-host@<hostname>` for the host's operations) and `predecessors`
+`pinetrie-host@<hostname>` for the host's operations) and `predecessors`
 (a list of commits). Following the predecessor with the same change id
 walks back from the offer's commit to the one the host last recorded:
-from `7e570256` it reaches `8de22478` in three steps, each by `pineta-host`.
+from `7e570256` it reaches `8de22478` in three steps, each by `pinetrie-host`.

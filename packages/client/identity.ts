@@ -10,8 +10,8 @@
 // follows the session's name for you: `reconcileName` decides which way a
 // difference goes.
 
-import { handleOf, normalizeEmail, normalizeName } from "@pineta/core"
-import type { Outcome } from "@pineta/protocol/codec"
+import { handleOf, normalizeEmail, normalizeName } from "@pinetrie/core"
+import type { Outcome } from "@pinetrie/protocol/codec"
 import { Type } from "typebox"
 import { Value } from "typebox/value"
 import { failedWords } from "./send.ts"
@@ -23,7 +23,7 @@ export interface Identity {
 }
 
 /** Where the identity is kept, in the device's `localStorage`. */
-export const IDENTITY_KEY = "pineta-identity"
+export const IDENTITY_KEY = "pinetrie-identity"
 
 /** The form's input -> an identity, or which field is not usable. */
 export function parseIdentity(

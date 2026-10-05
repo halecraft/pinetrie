@@ -8,7 +8,7 @@ import {
   ROOT,
   runId,
   writerId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { expect, test } from "vitest"
 import { IN_COLUMN, pendingOf } from "./card-moves.ts"
 import { planChatRequest, startsRoot } from "./chat.ts"

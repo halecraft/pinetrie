@@ -4,7 +4,7 @@
 // by that person's tabs, so it is the same on every device of theirs. The host
 // stores and relays it, shared with its person only (host/policy.ts), and
 // never writes it; its id and who may write it are the protocol's
-// (`personDocId`, `@pineta/protocol/writers`).
+// (`personDocId`, `@pinetrie/protocol/writers`).
 //
 // It is a document of its own, not a part of the inventory's: read marks are
 // written whenever a column reaches its thread's end, slots only when a card
@@ -17,7 +17,12 @@ import {
   Schema,
 } from "@kyneta/schema"
 import { yjs } from "@kyneta/yjs-schema"
-import { type EntryId, entryId, isLaneName, type LaneName } from "@pineta/core"
+import {
+  type EntryId,
+  entryId,
+  isLaneName,
+  type LaneName,
+} from "@pinetrie/core"
 
 export const AttentionDoc = yjs.bind(
   Schema.struct({

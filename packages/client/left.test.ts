@@ -1,4 +1,4 @@
-import { entryId } from "@pineta/core"
+import { entryId } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import { tree } from "./fixtures.ts"
 import { leftLine } from "./left.ts"

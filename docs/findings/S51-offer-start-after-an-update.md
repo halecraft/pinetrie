@@ -4,9 +4,9 @@ A thread's offer (ADR-0038) came out conflicted in your repo, though the
 thread's lane was clean and so was your `@`. This finding records why, and
 the rule that fixes it (`PLAN-2026-09-29-offer-start`).
 
-Observed in Pineta's own repo, on the offer `pineta-offer/stoic-raven`, with
+Observed in pine·trie's own repo, on the offer `pinetrie-offer/stoic-raven`, with
 jj 0.44.0. The commands were read-only, from a lane, against the repo mounted
-at `/mnt/host-working-copy`: `jj log -r 'conflicts() | bookmarks(glob:"pineta-offer/*")'`,
+at `/mnt/host-working-copy`: `jj log -r 'conflicts() | bookmarks(glob:"pinetrie-offer/*")'`,
 `jj resolve --list -r <offer>`, and `jj evolog -r <offer>`.
 
 **What the repos held.**
@@ -16,7 +16,7 @@ at `/mnt/host-working-copy`: `jj log -r 'conflicts() | bookmarks(glob:"pineta-of
 - The offer, `wqrzvlzs`, conflicted in four files: `packages/client/TECHNICAL.md`,
   `packages/lanes/TECHNICAL.md`, `packages/lanes/lanes.test.ts` and
   `scripts/mutations/marginalia.ts`.
-- The lane had three copies of your `@` recorded as `pineta.have`:
+- The lane had three copies of your `@` recorded as `pinetrie.have`:
 
   | copy | made | what it held |
   |---|---|---|
@@ -67,7 +67,7 @@ at `/mnt/host-working-copy`: `jj log -r 'conflicts() | bookmarks(glob:"pineta-of
    `startHaves`: a have holding the tip is kept alone, and the start is the
    tip. `packages/lanes/lanes.test.ts` reproduces it with real jj.
 
-**Not covered here.** Another thread's offer, `pineta-offer/silver-vine`,
+**Not covered here.** Another thread's offer, `pinetrie-offer/silver-vine`,
 also conflicted. Its only start was the lane's first copy, since it had never
 been updated, and its conflicts were with your later commits in files both
 sides changed. That is the conflict "update from my work" exists to resolve.

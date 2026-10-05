@@ -3,7 +3,7 @@
 //
 // The root you are on shows one root: its rail and its columns. Your list is
 // the roots you have open, in your order: it is your own document, the same
-// on every device (`openList`, `@pineta/session`), and comes in here as a
+// on every device (`openList`, `@pinetrie/session`), and comes in here as a
 // fact, so the layout draws it but never stores it. The layout keeps a
 // column list per root you have opened, and new tabs: each one fresh column
 // at the root that becomes a root of your list once its first message is
@@ -27,7 +27,7 @@ import {
   rootOf,
   type TreeIndex,
   type WorkflowStateId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { type Static, Type } from "typebox"
 import { Value } from "typebox/value"
 import {

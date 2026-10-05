@@ -1,5 +1,5 @@
 {
-  "name": "@pineta/conformance",
+  "name": "@pinetrie/conformance",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -8,6 +8,6 @@
   },
   "dependencies": {
     "@earendil-works/pi-agent-core": "0.87.1",
-    "@pineta/pi": "workspace:*"
+    "@pinetrie/pi": "workspace:*"
   }
 }

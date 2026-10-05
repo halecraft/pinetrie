@@ -5,14 +5,17 @@ import {
   createQueue,
   HELPER,
   LANE_NOTE,
-  PINETA_INSTALL,
-  PINETA_MOUNT,
+  PINETRIE_INSTALL,
+  PINETRIE_MOUNT,
 } from "./index.ts"
 
-test("every Pineta file a lane is pointed at exists", () => {
+test("every pinetrie file a lane is pointed at exists", () => {
   for (const inLane of [HELPER, LANE_NOTE]) {
-    expect(inLane.startsWith(`${PINETA_MOUNT}/`)).toBe(true)
-    const onHost = path.join(PINETA_INSTALL, inLane.slice(PINETA_MOUNT.length))
+    expect(inLane.startsWith(`${PINETRIE_MOUNT}/`)).toBe(true)
+    const onHost = path.join(
+      PINETRIE_INSTALL,
+      inLane.slice(PINETRIE_MOUNT.length),
+    )
     expect(statSync(onHost, { throwIfNoEntry: false })?.isFile(), onHost).toBe(
       true,
     )

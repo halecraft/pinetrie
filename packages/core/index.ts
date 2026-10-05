@@ -10,11 +10,11 @@
 //
 // Nothing in this file may import pi, Kyneta, or a Node builtin.
 //
-// What belongs here, as `@pineta/rules` and `@pineta/repo` state it too: core holds the vocabulary (ids, intents, every record's type)
+// What belongs here, as `@pinetrie/rules` and `@pinetrie/repo` state it too: core holds the vocabulary (ids, intents, every record's type)
 // and the reads of the tree. A format or type that `lanes` or `repo` must
 // read, write or name lives in core too, since neither can declare
-// `@pineta/rules`. What a stored shape says, and how the host changes it, is
-// `@pineta/rules`', whoever reads it.
+// `@pinetrie/rules`. What a stored shape says, and how the host changes it, is
+// `@pinetrie/rules`', whoever reads it.
 
 import type { Sha256 } from "./images.ts"
 import type { OfferLedger, OfferSeen, WorkChanges } from "./offers.ts"
@@ -106,7 +106,7 @@ export const laneNameForThread = (id: string): LaneName =>
 
 /**
  * Whether text names a thread's lane: the check wherever a lane name is read,
- * in the codec, the schema's readers, `@pineta/rules`' decoders and the pi adapter.
+ * in the codec, the schema's readers, `@pinetrie/rules`' decoders and the pi adapter.
  */
 export const isLaneName = (s: string): s is LaneName =>
   s.startsWith(LANE_PREFIX) && s.length > LANE_PREFIX.length
@@ -210,7 +210,7 @@ declare const runIdBrand: unique symbol
  * runtime. Positions take an entry id; `activeRuns` holds run ids. Passing
  * one where the other belongs would otherwise compile, run, and fail
  * silently. Mint them only where they enter: the protocol codec, the reads,
- * the schema's readers, `@pineta/rules`' decoders, the pi adapter, the client's
+ * the schema's readers, `@pinetrie/rules`' decoders, the pi adapter, the client's
  * stored forms, and the host's id generator. `biome.json` refuses an
  * `entryId` import in core, the client and the host, and a `runId` import in
  * core and the client (S95).
@@ -365,7 +365,7 @@ export const refused = (code: ErrCode, message: string): Refusal => ({
 })
 
 /** A namespace of the host's own records. pi's are `pi.`, and never the host's to write. */
-export type HostNamespace = `pineta.${string}`
+export type HostNamespace = `pinetrie.${string}`
 
 /**
  * Which document a host record is written to (ADR-0063): the session's, or a
@@ -380,7 +380,7 @@ export const SESSION_TARGET: Target = { kind: "session" }
 /**
  * One write to a pi value at its address, in its document, as the host
  * decides it and pi's session carries it out (ADR-0062). Built by
- * `setRecord` and `deleteRecord` (`@pineta/rules`), which take the target from
+ * `setRecord` and `deleteRecord` (`@pinetrie/rules`), which take the target from
  * the record's home.
  */
 export type ValueWrite =
@@ -423,7 +423,7 @@ export type PlanMode = ChatMode | "queue"
  * A command whose SHAPE is already known to be valid. The protocol codec
  * produces it; it owns every shape rule, so this type cannot express a
  * malformed command. What it then does is decided by `planChat` and the
- * other planners in `@pineta/rules`, over what the host gathers.
+ * other planners in `@pinetrie/rules`, over what the host gathers.
  */
 export type Intent =
   /** A human message; `mentions` are parsed from `text` once, at the codec. */
@@ -596,7 +596,7 @@ export interface WorkflowState {
 }
 
 /**
- * The session's workflow: a host-written `pineta.workflow` singleton. The
+ * The session's workflow: a host-written `pinetrie.workflow` singleton. The
  * open states in board order, then the one closed state, which is always
  * there and always last: a root in it is archived (ADR-0029).
  */
@@ -625,7 +625,7 @@ export const WORKFLOW_ACTIONS: readonly WorkflowAction[] = [
 ]
 
 /**
- * A root's place on the board: a host-written `pineta.board` value keyed by
+ * A root's place on the board: a host-written `pinetrie.board` value keyed by
  * its `RootId`. A root has one, written as it starts and as it moves.
  */
 export interface BoardPlace {
@@ -653,7 +653,7 @@ export interface ArchivedRoot {
 
 /**
  * A root as your list, the board, the inbox and the activity menu see it,
- * without its document: a host-written `pineta.root` value in the session,
+ * without its document: a host-written `pinetrie.root` value in the session,
  * keyed by the root's id, refreshed whenever the root's document changes.
  */
 export interface RootRecord {
@@ -691,7 +691,7 @@ export interface RootRecord {
 // --- marks (ADR-0045) --------------------------------------------------------
 
 /**
- * A title on an entry: a host-written `pineta.mark` value keyed by the
+ * A title on an entry: a host-written `pinetrie.mark` value keyed by the
  * entry's id, so an entry has at most one. A root's mark titles its tab.
  */
 export interface MarkRecord {
@@ -706,7 +706,7 @@ export interface MarkRecord {
 // --- stops (ADR-0056) --------------------------------------------------------
 
 /**
- * Who stopped an ask's run: a host-written `pineta.stop` value keyed by the
+ * Who stopped an ask's run: a host-written `pinetrie.stop` value keyed by the
  * ask's prompt. pi's entries say a run was aborted, never by whom (S70).
  */
 export interface StopRecord {
@@ -718,7 +718,7 @@ export interface StopRecord {
 
 /**
  * A thread's queue held (ADR-0048 step 7): a host-written
- * `pineta.queue-hold` value in the session, keyed by the lane. While it is
+ * `pinetrie.queue-hold` value in the session, keyed by the lane. While it is
  * there no message card is popped, only facts, until someone releases it.
  */
 export interface QueueHold {
@@ -731,7 +731,7 @@ export interface QueueHold {
 /** What a digest says (ADR-0075). */
 export interface DigestBody {
   /**
-   * One line of at most `HEADLINE_WORDS` words (`@pineta/rules`'
+   * One line of at most `HEADLINE_WORDS` words (`@pinetrie/rules`'
    * `digest.ts`); null when the model found
    * nothing the reader does not see already.
    */
@@ -822,10 +822,16 @@ export const NO_EDITOR = {
 } as const
 
 /**
+ * The product's name as a person reads it: lowercase, with a middle dot so it
+ * reads as "pine". Code names say `pinetrie`.
+ */
+export const PRODUCT_NAME = "pine·trie"
+
+/**
  * The user every host operation on your repo carries, so the evolog says which
  * commits the host made, and a race is repaired in your favour (S48 item 8).
  */
-export const HOST_OPERATOR = "pineta-host"
+export const HOST_OPERATOR = "pinetrie-host"
 
 /**
  * Where a thread's lane starts and is brought up to date from (ADR-0060):
@@ -856,18 +862,18 @@ export interface CopyFacts {
 /** What a catch-up merges from: the thread's base, or the thread it branched from. */
 export type CatchUpFrom = ThreadBase | ParentThread
 
-/** A lane's base, read from its history (`@pineta/lanes`' `laneBase`, ADR-0060). */
+/** A lane's base, read from its history (`@pinetrie/lanes`' `laneBase`, ADR-0060). */
 export interface LaneBase {
   readonly base: ThreadBase
   /**
    * Where the lane's own work begins: the line commit its base names, or the
-   * WIP's copy; for a lane with no `Pineta-Base`, the newest line commit in
+   * WIP's copy; for a lane with no `Pinetrie-Base`, the newest line commit in
    * its history.
    */
   readonly start: CommitId
   /**
    * The commit of yours the lane holds whole since its base: the one its
-   * `Pineta-Base` names (the WIP's, for a WIP, never the copy); for a lane
+   * `Pinetrie-Base` names (the WIP's, for a WIP, never the copy); for a lane
    * with none, `start`.
    */
   readonly source: CommitId
@@ -890,7 +896,7 @@ export const HOST_WORKING_COPY = "/mnt/host-working-copy"
 /**
  * The programs the lane runtime carries into every lane of its own, on its
  * `PATH` whatever the image (ADR-0064). Each must be a static build in
- * Pineta's default image, which the runtime is copied out of.
+ * pinetrie's default image, which the runtime is copied out of.
  */
 export const RUNTIME_PROGRAMS = ["jj", "rg", "fd", "sd"] as const
 export type RuntimeProgram = (typeof RUNTIME_PROGRAMS)[number]
@@ -942,7 +948,7 @@ export interface CommandsRecord {
 declare const snapshotIdBrand: unique symbol
 /**
  * A lane disk snapshot's id: the entry id of the revision record it belongs
- * to, or `"base"`. Its file is `.pineta/snapshots/<id>.img`. One snapshot
+ * to, or `"base"`. Its file is `.pinetrie/snapshots/<id>.img`. One snapshot
  * per record, so a turn retried after a crash writes the same file.
  */
 export type SnapshotId = string & { readonly [snapshotIdBrand]: true }
@@ -956,7 +962,7 @@ export type WorkSetting =
   | { readonly kind: "direct"; readonly dir: string }
 
 /**
- * A lane's record: a host-written `pineta.lane` value keyed by the lane's
+ * A lane's record: a host-written `pinetrie.lane` value keyed by the lane's
  * name, written once, when the lane is created. The setting never changes:
  * a lane's files would stop matching its conversation (ADR-0032).
  */
@@ -971,7 +977,7 @@ export interface LaneRecord {
 }
 
 /**
- * The files at an entry: a host-written `pineta.revision` value keyed by the
+ * The files at an entry: a host-written `pinetrie.revision` value keyed by the
  * entry's id (ADR-0032, ADR-0034). Every run's prompt has one, and so does
  * every assistant message of a lane of its own that made tool calls. So the
  * nearest record above any entry names its lane, its commit and its disk
@@ -997,10 +1003,10 @@ export interface RevisionRecord {
 }
 
 /**
- * What the host found where it runs: a host-written `pineta.project` value,
+ * What the host found where it runs: a host-written `pinetrie.project` value,
  * rewritten at every start. With `direct`, no lane can have its own copy, and
  * `reason` says why (no repo, or no usable `container`). With `lanes`, a new
- * root lane gets `rootDefault` (`PINETA_LANES=0` makes it `direct`), and any
+ * root lane gets `rootDefault` (`PINETRIE_LANES=0` makes it `direct`), and any
  * lane may choose either.
  */
 export type ProjectRecord =
@@ -1013,9 +1019,9 @@ export type ProjectRecord =
 
 /**
  * A lane's offer: one revision, or a stack, in your repo, holding the lane's
- * work you do not have yet (ADR-0038). A host-written `pineta.offer` value
+ * work you do not have yet (ADR-0038). A host-written `pinetrie.offer` value
  * keyed by lane: the page's cache, written from the repo after each of the
- * host's steps (`offerRecord`, `@pineta/rules`). The host never decides from it: it reads the
+ * host's steps (`offerRecord`, `@pinetrie/rules`). The host never decides from it: it reads the
  * offer from your repo (`OfferInRepo`), so a record lost or stale changes
  * nothing. What integrating it would bring, each revision's description,
  * files and diffs, is not stored: the page reads it by commit when it asks
@@ -1169,11 +1175,11 @@ export type BaseMerge =
 declare const threadNameBrand: unique symbol
 /**
  * A thread's name as people say it: two words, `amber-fox` (ADR-0039). Minted
- * by `@pineta/rules`' naming and its decoder; stored, never recomputed.
+ * by `@pinetrie/rules`' naming and its decoder; stored, never recomputed.
  */
 export type ThreadName = string & { readonly [threadNameBrand]: true }
 
-/** A lane's name: a host-written `pineta.name` value keyed by the lane (ADR-0039). */
+/** A lane's name: a host-written `pinetrie.name` value keyed by the lane (ADR-0039). */
 export interface NameRecord {
   readonly lane: LaneName
   readonly name: ThreadName
@@ -1181,7 +1187,7 @@ export interface NameRecord {
 }
 
 /**
- * The image behind a thread's column header: a host-written `pineta.banner`
+ * The image behind a thread's column header: a host-written `pinetrie.banner`
  * value keyed by the lane. The image is a blob (ADR-0042); a replaced one is
  * no longer referenced, and the blob sweep deletes it.
  */
@@ -1193,7 +1199,7 @@ export interface BannerRecord {
 
 /**
  * The integration line in your repo, as the host last read it (ADR-0060): a
- * host-written `pineta.line` value, a cache the page reads. The repo is the
+ * host-written `pinetrie.line` value, a cache the page reads. The repo is the
  * truth; the host rewrites this whenever your repo's operation head moves.
  */
 export interface LineRecord {
@@ -1267,8 +1273,8 @@ export interface LineRecord {
 
 /**
  * A thread's base as its lane's history says it (ADR-0060): a host-written
- * `pineta.base` value keyed by lane, a cache the page reads. `start` is the
- * commit the lane's newest `Pineta-Base` trailer names, or the line commit it
+ * `pinetrie.base` value keyed by lane, a cache the page reads. `start` is the
+ * commit the lane's newest `Pinetrie-Base` trailer names, or the line commit it
  * forked from when it has none.
  */
 export interface BaseRecord {
@@ -1832,7 +1838,7 @@ export interface CardEvent {
 }
 
 /**
- * A card's history: a host-written `pineta.card-history` value in the
+ * A card's history: a host-written `pinetrie.card-history` value in the
  * session, keyed by the card, and deleted with it.
  */
 export interface CardHistoryRecord {
@@ -1843,7 +1849,7 @@ export interface CardHistoryRecord {
 
 /**
  * What stays where your card was when someone else moved it, while you were
- * not looking (ADR-0048, *Other people*): a host-written `pineta.trace`
+ * not looking (ADR-0048, *Other people*): a host-written `pinetrie.trace`
  * value in the session, keyed by its own id, since it outlives its card.
  * Drawn only for its placer, and deleted once they have seen it.
  */
@@ -1864,7 +1870,7 @@ export interface TraceRecord {
 /**
  * A seat the host has seen: its Kyneta peer, the Yjs `clientID` its
  * operations carry, and the person it is (ADR-0037). A host-written
- * `pineta.seat` value keyed by the peer, so anyone can name who wrote in a
+ * `pinetrie.seat` value keyed by the peer, so anyone can name who wrote in a
  * text after the seat has gone.
  */
 export interface SeatRecord {
@@ -2006,9 +2012,9 @@ export function normalizeName(name: string): string | undefined {
 // --- streams ----------------------------------------------------------------
 
 /**
- * What a running turn streams, in Pineta's own words (ADR-0003: no pi type
+ * What a running turn streams, in pinetrie's own words (ADR-0003: no pi type
  * crosses). `packages/pi` maps pi's harness events onto it; `planStream` in
- * `@pineta/schema` decides what each does to the document. There is no end
+ * `@pinetrie/schema` decides what each does to the document. There is no end
  * event: a stream stays until the entry that replaces it is written.
  */
 export type StreamEvent =

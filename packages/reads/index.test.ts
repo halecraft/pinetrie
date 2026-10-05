@@ -7,8 +7,8 @@ import {
   rootIdFor,
   runId,
   writerId,
-} from "@pineta/core"
-import { encodePinned } from "@pineta/rules"
+} from "@pinetrie/core"
+import { encodePinned } from "@pinetrie/rules"
 import {
   beginRun,
   newLiveDoc,
@@ -16,7 +16,7 @@ import {
   type StoredEntryRow,
   writeEntry,
   writeLaneTip,
-} from "@pineta/schema"
+} from "@pinetrie/schema"
 import { expect, test } from "vitest"
 import { readLanes, readTreeIndex } from "./index.ts"
 

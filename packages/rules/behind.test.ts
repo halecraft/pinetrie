@@ -5,7 +5,7 @@ import {
   type LineRecord,
   laneNameForThread,
   type OfferRecord,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   behindContent,
@@ -20,7 +20,7 @@ const LANE = laneNameForThread("1")
 const [L1, L2] = [commitId("l1"), commitId("l2")]
 
 const line = (commit = L2): LineRecord => ({
-  onto: "pineta-onto",
+  onto: "pinetrie-onto",
   wipPrefix: "wip/",
   publish: "main",
   published: { commit: null, behind: 0, ahead: 0 },

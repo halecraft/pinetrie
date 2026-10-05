@@ -21,7 +21,7 @@
    `sessionStorage` into a duplicated tab, and `resolveLease` returns a cached id
    before looking at the lease. Kyneta's `packages/exchange/TECHNICAL.md` (§ The
    substrate's own copy of the invariant) says two peers sharing an id lose
-   operations. In Pineta the writer id is derived from the peer id, so the
+   operations. In pine·trie the writer id is derived from the peer id, so the
    duplicate is also the same writer, with the same presence keys.
 4. **A crash leaves the lease held** (reasoned from the code, not measured).
    No `pagehide` fires, so `localStorage[key:held]` keeps a dead tab's token.
@@ -37,7 +37,7 @@
    in 0 of 50 had them when `connectSession` returned. Kyneta's `docStatus` is
    `"populated"` as soon as any data arrives, and `useDocReady` is
    `docStatus !== "pending"`, so neither is the signal that everything has.
-7. **Pineta's open columns take the same shape without the lease**
+7. **pine·trie's open columns take the same shape without the lease**
    (ADR-0027): a tab slot for reloads, a device slot for new tabs. Columns need
    no uniqueness, since a duplicated layout is what Duplicate Tab means.
 
@@ -60,9 +60,9 @@ the document has fully arrived, so that moment was measured too.
 
 ## Consequences
 
-- Pineta keeps open columns per tab through `packages/client/tab-state.ts`,
+- pine·trie keeps open columns per tab through `packages/client/tab-state.ts`,
   and drops missing anchors once, after `whenSettled` (ADR-0027).
-- Until Kyneta is fixed, a duplicated Pineta tab is the same writer as its
+- Until Kyneta is fixed, a duplicated pine·trie tab is the same writer as its
   original: the same name, presence keys shared between the two tabs, and
   document operations at risk. `packages/client/TECHNICAL.md` § Who a tab is
   says so.
@@ -119,7 +119,7 @@ tab = new Map(tab)
 const duplicate = persistentPeerId("k")
 ```
 
-The settling probe, run from `apps/pineta/e2e/` for its dependencies:
+The settling probe, run from `apps/pinetrie/e2e/` for its dependencies:
 
 ```ts
 const host = await startHost({
@@ -149,7 +149,7 @@ pipeline was disposed. Not examined; it doesn't affect the counts.
 Answers 3 to 5 are moot. Kyneta v4 removed `persistentPeerId`: every Runtime
 issues itself a peer id, a *seat*, from its store or fresh per session, so no
 two live replicas share one, a duplicated tab included. The caller names only
-a *principal*. In Pineta a principal is a person's email, asked once per
+a *principal*. In pine·trie a principal is a person's email, asked once per
 browser and kept in `localStorage`, so a duplicated tab, a reload, a second
 tab and a second device are the same person on different seats. Answer 6
 stands: `whenSettled` is still the signal that the document has arrived.

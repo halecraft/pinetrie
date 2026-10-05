@@ -1,8 +1,8 @@
 // digest — a model's headline and few points for a long ask's work
 // (ADR-0056, ADR-0075), unless the user config turns digests off. The record
-// is a host-written `pineta.digest` value keyed by the ask's prompt; no agent
+// is a host-written `pinetrie.digest` value keyed by the ask's prompt; no agent
 // reads it, so it puts no tokens in any context. The host carries the plan
-// out (`apps/pineta/host/digests.ts`).
+// out (`apps/pinetrie/host/digests.ts`).
 
 import {
   type AskIndex,
@@ -13,7 +13,7 @@ import {
   lastWord,
   projectTranscript,
   type TreeIndex,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { Type } from "typebox"
 import { recordOf } from "./config.ts"
 import { decodeAt, entryKey } from "./decode.ts"
@@ -36,7 +36,7 @@ const DigestSchema = Type.Object({
 
 /** Each ask's digest, at its prompt's entry id. */
 export const DIGEST: RecordSpec<DigestRecord, EntryId, "root"> = {
-  namespace: "pineta.digest",
+  namespace: "pinetrie.digest",
   home: "root",
   keyOf: r => r.prompt,
   encode: ({ prompt, ...contents }) => contents,

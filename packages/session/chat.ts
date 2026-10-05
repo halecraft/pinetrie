@@ -14,8 +14,8 @@ import {
   type SentCard,
   type WorkflowStateId,
   type WorkSetting,
-} from "@pineta/core"
-import type { Outcome } from "@pineta/protocol/codec"
+} from "@pinetrie/core"
+import type { Outcome } from "@pinetrie/protocol/codec"
 import { IN_COLUMN, type Pending, pendingOf } from "./card-moves.ts"
 
 /** How a chat is sent: its mode, its column's lane, and its send id. */

@@ -1,6 +1,6 @@
 // review — the review's wire (ADR-0047, ADR-0056): its URLs, what a request
 // may read, and how it is answered, here since the host and the page both
-// import it. The reads are `@pineta/repo`'s (`revisionRead`, `fileDiff`).
+// import it. The reads are `@pinetrie/repo`'s (`revisionRead`, `fileDiff`).
 
 import {
   type DiffSpan,
@@ -10,7 +10,7 @@ import {
   type RevisionRecord,
   type RevisionReview,
   spanKey,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { Type } from "typebox"
 import { decodeWith } from "./decode.ts"
 import { offerStatus } from "./offer.ts"
@@ -43,8 +43,8 @@ export const decodeRevisionReview = (
 ): RevisionReview | undefined => decodeWith(RevisionReviewSchema, value, r => r)
 
 /**
- * The version of what `/offer/` answers: `REVISION_READ` (`@pineta/lanes`)
- * and the range read (`@pineta/repo`), `decodeRevisionReview`, `fileDiff`'s
+ * The version of what `/offer/` answers: `REVISION_READ` (`@pinetrie/lanes`)
+ * and the range read (`@pinetrie/repo`), `decodeRevisionReview`, `fileDiff`'s
  * flags, and the URLs' spans. Every answer is cached as immutable under a URL holding it,
  * so a change to any of them bumps it, or pages keep the old shape.
  */

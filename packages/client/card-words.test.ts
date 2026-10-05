@@ -8,8 +8,8 @@ import {
   rootIdFor,
   type ThreadName,
   writerId,
-} from "@pineta/core"
-import type { CardRefusal } from "@pineta/session"
+} from "@pinetrie/core"
+import type { CardRefusal } from "@pinetrie/session"
 import { describe, expect, test } from "vitest"
 import {
   cardStatus,

@@ -7,7 +7,7 @@ import {
   type OfferRecord,
   type RevisionRecord,
   writerId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   answerDiff,
@@ -36,7 +36,7 @@ const offer: OfferRecord = {
   yourEdits: [],
   described: true,
   edited: false,
-  bookmark: "pineta-offer/t-1",
+  bookmark: "pinetrie-offer/t-1",
   integratedAs: null,
   commits: [commitId("w1")],
   ledger: null,

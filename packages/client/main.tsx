@@ -3,8 +3,8 @@
 // are, the connection and the mount. `App` (`app.tsx`) is given them.
 
 import { ExchangeProvider } from "@kyneta/react"
-import { SESSION_DOC_ID } from "@pineta/protocol/messages"
-import { connectSession, newRootId } from "@pineta/session"
+import { SESSION_DOC_ID } from "@pinetrie/protocol/messages"
+import { connectSession, newRootId } from "@pinetrie/session"
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 import { App, type AppStores } from "./app.tsx"
@@ -21,7 +21,7 @@ const stores: AppStores = {
    * layout's version tells an older one apart.
    */
   layout: tabState({
-    key: `pineta-columns:${SESSION_DOC_ID}`,
+    key: `pinetrie-columns:${SESSION_DOC_ID}`,
     codec: {
       encode: encodeLayout,
       decode: raw => decodeLayout(raw, newRootId),

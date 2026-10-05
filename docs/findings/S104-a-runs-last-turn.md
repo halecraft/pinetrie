@@ -1,11 +1,11 @@
 # S104 — A run's last turn is recorded however the run ends, except when the host closes under it, which the next host's resume records
 
 **Status:** Answered. Led to ADR-0080 (a resolution run ends like any
-run: no `pineta.landing`).
+run: no `pinetrie.landing`).
 
 **Question.** ADR-0033's outcome of a resolution is read once, at the end
 of a run whose prompt is a land message (`landingEnded`,
-`apps/pineta/host/work/update.ts`): the conflicts jj finds left in the
+`apps/pinetrie/host/work/update.ts`): the conflicts jj finds left in the
 lane, and whether the agent called `ask_for_guidance`. ADR-0080 would read
 the same facts for any run instead. Two things must hold first:
 
@@ -45,7 +45,7 @@ direct lane, recording every `turnDone(lane, tip)`.
      lane before anything waiting for it (`recover`). The resumed run records the
      interrupted tool result's turn, then its own.
    - **`landingEnded` does no better there.** After `HarnessClosed`, the
-     run's end runs against closed queues (`apps/pineta/host/TECHNICAL.md`,
+     run's end runs against closed queues (`apps/pinetrie/host/TECHNICAL.md`,
      Shutdown), so its `conflictsIn` and its record are lost too.
 
 2. **A turn with no record is read through the nearest one above it**
@@ -75,7 +75,7 @@ direct lane, recording every `turnDone(lane, tip)`.
 - The strip's "needs you" is read from the tree: the thread's newest ask
   about a conflict, newer than the offer.
 - Conflicts left are the offer's.
-- `landingEnded`, the `asked` set and `pineta.landing` go.
+- `landingEnded`, the `asked` set and `pinetrie.landing` go.
 
 **What was not run.** Nothing here ran in a container or against jj; the
 lane worked directly. Case 2 is read from source.

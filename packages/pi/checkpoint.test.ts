@@ -6,7 +6,7 @@ import {
   StorageBackedSession,
   value,
 } from "@earendil-works/pi-agent-core"
-import { newRootDoc } from "@pineta/schema"
+import { newRootDoc } from "@pinetrie/schema"
 import { describe, expect, test } from "vitest"
 import {
   CHECKPOINT_NAMESPACE,

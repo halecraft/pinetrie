@@ -11,7 +11,7 @@ import {
   THE_AGENT,
   type ThreadLane,
   type TranscriptMessage,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import type { Prefill } from "./columns.ts"
 
 /** The mention that asks the agent, as a composer starts with it. */

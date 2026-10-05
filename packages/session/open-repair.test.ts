@@ -1,6 +1,6 @@
-import { rootIdFor } from "@pineta/core"
-import { orderKeys } from "@pineta/rules"
-import { newOpenDoc, orderOpen, readOpenKeys } from "@pineta/schema"
+import { rootIdFor } from "@pinetrie/core"
+import { orderKeys } from "@pinetrie/rules"
+import { newOpenDoc, orderOpen, readOpenKeys } from "@pinetrie/schema"
 import { expect, test } from "vitest"
 import { placeInList, planOpenRepair } from "./open-repair.ts"
 

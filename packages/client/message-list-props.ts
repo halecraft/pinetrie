@@ -12,8 +12,8 @@ import type {
   ThreadLane,
   TreeIndex,
   WriterId,
-} from "@pineta/core"
-import type { LiveDocHandle } from "@pineta/schema"
+} from "@pinetrie/core"
+import type { LiveDocHandle } from "@pinetrie/schema"
 import type { FoldMemory } from "./ask-fold.ts"
 import type { Density } from "./ask-words.ts"
 import type { LaneJoin } from "./column-view.ts"

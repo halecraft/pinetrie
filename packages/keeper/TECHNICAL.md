@@ -1,8 +1,8 @@
-# `@pineta/keeper`: technical notes
+# `@pinetrie/keeper`: technical notes
 
 One primitive for a resource that needs exclusive access: one step at a
 time, in an order the caller can reason about. The host has one for its
-documents (`apps/pineta/host/index.ts`), and one each for its names and its
+documents (`apps/pinetrie/host/index.ts`), and one each for its names and its
 lane work. It declares nothing (`workspace.test.ts`).
 
 ## `run`, `once` and `later`
@@ -42,7 +42,7 @@ current.
 
 - **A failed step never stops the steps behind it.** `onError` hears each
   failure once, and the step's own callers still get the rejection. This is
-  the opposite of `@pineta/lanes`' `createQueue`, whose fatal failure breaks it
+  the opposite of `@pinetrie/lanes`' `createQueue`, whose fatal failure breaks it
   until `reset`, as a lane's disk needs.
 - **Every promise it returns is already handled,** so voiding `run`, `once`
   or `later` is safe. Awaiting one inside an async function whose own promise

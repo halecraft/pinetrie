@@ -2,15 +2,15 @@
 // sessions over the session's document and that root's (ADR-0063). Every
 // lane is in it unless its record names another.
 
-import { type LaneName, type RootId, rootIdFor } from "@pineta/core"
-import { LANE, recordsOf } from "@pineta/rules"
+import { type LaneName, type RootId, rootIdFor } from "@pinetrie/core"
+import { LANE, recordsOf } from "@pinetrie/rules"
 import {
   newRootDoc,
   newSessionDoc,
   type RootDocHandle,
   readValues,
   type SessionDocHandle,
-} from "@pineta/schema"
+} from "@pinetrie/schema"
 import type { AgentDocuments } from "./agent.ts"
 
 /** The root a test's lanes and entries are in. */

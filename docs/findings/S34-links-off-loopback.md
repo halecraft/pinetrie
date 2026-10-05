@@ -12,7 +12,7 @@
 3. **So off loopback, a link someone can open must carry the key.** The page
    cannot read it: the cookie is `HttpOnly`. The host already builds its
    invite links, key included, one per network address (`invites` in
-   `apps/pineta/host/index.ts`); a page given those can make a link that works.
+   `apps/pinetrie/host/index.ts`); a page given those can make a link that works.
 4. **The page's own address is not a link to share.** A page opened on the
    host machine as `127.0.0.1` would copy a link nobody else can open; the
    host's invite links name its network addresses.
@@ -41,8 +41,8 @@ that carries it after the first visit has rules of its own.
 
 ## Method
 
-`sandbox/s34-links/probe.ts`, copied into `apps/pineta/e2e/` to run (the
-workspace resolves `@pineta/*` only from a package that declares them) and
+`sandbox/s34-links/probe.ts`, copied into `apps/pinetrie/e2e/` to run (the
+workspace resolves `@pinetrie/*` only from a package that declares them) and
 deleted afterwards. It starts a host on `0.0.0.0`, so it has a key; serves a
 page on `localhost` (another site than `127.0.0.1`) holding a key-less link;
 and drives Chromium through the Playwright server at `localhost:3100`: the

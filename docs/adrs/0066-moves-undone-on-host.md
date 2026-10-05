@@ -10,9 +10,9 @@ move; a keep is one command) and ADR-0063 (a new tab's `RootId` is minted as
 it opens; a fresh place carries a `Spot`; `places` is Yjs, not `json`).
 Supersedes `PLAN-2026-10-03-history-at-send`.
 
-**Context.** Moves you can undo (ADR-0048 step 4) were built as Pineta's own
+**Context.** Moves you can undo (ADR-0048 step 4) were built as pine·trie's own
 history in each browser tab: an undo sent the reverse handoff (ADR-0059),
-planned by the page. To be sound that needed more of Pineta's own code: a
+planned by the page. To be sound that needed more of pine·trie's own code: a
 version check per card, so an undo could not reverse someone else's later
 move; a batch command, so a keep over several cards was one step; recording
 at send, so an undo right after a move worked. The history was lost on a
@@ -81,17 +81,17 @@ own runtime made, and only the host writes `places`. Probed:
   undo is refused.
 - `places` costs about 25 bytes a move, kept: 250 KB over 10,000 moves.
 - Duane's store was carried over once, on 2026-10-03, by startup code
-  (`carryPlacesOver`) that read the old `json` `pineta:places` into the new
-  `pineta:card-places` and destroyed it, deleted once it had run. A store
+  (`carryPlacesOver`) that read the old `json` `pinetrie:places` into the new
+  `pinetrie:card-places` and destroyed it, deleted once it had run. A store
   from before this ADR keeps its old places unread, and its cards' texts are
   swept at its first start; to keep them, restore that code from the
   revision before its deletion.
 
 **Alternatives rejected.**
 
-- **Pineta's own history in the page, recorded at send**
+- **pine·trie's own history in the page, recorded at send**
   (`PLAN-2026-10-03-history-at-send`), with a version id per card and a batch
-  command. Every rule of undo would stay Pineta's to get right: reverses,
+  command. Every rule of undo would stay pine·trie's to get right: reverses,
   redo clearing, atomic groups.
 - **A stack per browser tab.** Lost on reload, and your other tabs could not
   undo in a root you share between them.

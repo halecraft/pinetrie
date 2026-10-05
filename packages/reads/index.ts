@@ -4,13 +4,13 @@
 // Each read takes the documents it reads (ADR-0063): a root's (`RootDocHandle`:
 // its entries, pi's values for its lanes, the records keyed by its entries),
 // the session's (`SessionDocHandle`: the records read across roots), or
-// `pineta:live`. A read of several takes a `RootView`.
+// `pinetrie:live`. A read of several takes a `RootView`.
 //
 // The composer promises "send" or "queue" from the same facts the host then
 // decides from. If the two read those facts separately, the promise holds only
 // while two copies stay in step, which is the drift this project keeps
 // meeting. So both read here. `packages/client/projection.ts` gathers these
-// for the page; a stream's text is `readStreams`, in `@pineta/schema`.
+// for the page; a stream's text is `readStreams`, in `@pinetrie/schema`.
 //
 // Pure reads of a document handle: no subscription and no pi. The only caches
 // are keyed by objects Kyneta keeps while their content is unchanged, so a hit
@@ -70,7 +70,7 @@ import {
   type WriterId,
   workFor,
   writersOf,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import {
   archivedOf,
   BANNER,
@@ -109,7 +109,7 @@ import {
   VERDICT,
   WORKFLOW,
   WORKFLOW_KEY,
-} from "@pineta/rules"
+} from "@pinetrie/rules"
 import {
   type LiveDocHandle,
   type PlacesDocHandle,
@@ -126,7 +126,7 @@ import {
   type SessionDocHandle,
   type StoredEntryRow,
   writerOfKey,
-} from "@pineta/schema"
+} from "@pinetrie/schema"
 
 /**
  * Each stored row's entry, decoded once. Kyneta returns the same frozen row
@@ -242,14 +242,14 @@ export function readHeld<K, V>(
   return new Map(docs.flatMap(doc => [...read(doc)]))
 }
 
-/** Whether a lane is running now: `pineta:live` records its active run. */
+/** Whether a lane is running now: `pinetrie:live` records its active run. */
 export const readRunning = (live: LiveDocHandle, lane: LaneName): boolean =>
   readActiveRun(live, lane) !== undefined
 
 /**
  * A root's documents, for a read of several (ADR-0063): the root's own, for
  * its lanes and their tips; the session's, for the lanes' records; and
- * `pineta:live`, for which of them run.
+ * `pinetrie:live`, for which of them run.
  */
 export interface RootView {
   readonly root: RootId
@@ -361,7 +361,7 @@ export const readRecords = <R, K extends string, H extends Home>(
   spec: RecordSpec<R, K, H>,
 ): ReadonlyMap<K, R> => recordsOf(spec, readValues(doc, spec.namespace))
 
-/** Every root's directory record (`pineta.root`, ADR-0063), by its id. */
+/** Every root's directory record (`pinetrie.root`, ADR-0063), by its id. */
 export const readRoots = (
   doc: SessionDocHandle,
 ): ReadonlyMap<RootId, RootRecord> => readRecords(doc, ROOT)
@@ -401,7 +401,7 @@ const sameMap = <K, V>(a: ReadonlyMap<K, V>, b: ReadonlyMap<K, V>): boolean =>
   a.size === b.size && [...a].every(([k, v]) => b.has(k) && b.get(k) === v)
 
 /**
- * Each writer's display name (`pineta.participant`). The same map while the
+ * Each writer's display name (`pinetrie.participant`). The same map while the
  * names are the same: every message compares it by identity, and the
  * session's other records, the directory's among them, change far more often
  * (ADR-0063).
@@ -522,7 +522,7 @@ const sameHolds = (
   })
 
 /**
- * Each held queue (`pineta.queue-hold`, ADR-0048 step 7), by lane. The same
+ * Each held queue (`pinetrie.queue-hold`, ADR-0048 step 7), by lane. The same
  * map while the holds are, since every session write wakes it.
  */
 export const readQueueHolds = keptWhileSame(
@@ -531,7 +531,7 @@ export const readQueueHolds = keptWhileSame(
   sameHolds,
 )
 
-/** Every seat the host has seen (`pineta.seat`), first seen first. */
+/** Every seat the host has seen (`pinetrie.seat`), first seen first. */
 export const readSeats = (doc: SessionDocHandle): readonly SeatRecord[] =>
   [...readRecords(doc, SEAT).values()].sort((a, b) => a.at - b.at)
 
@@ -564,11 +564,11 @@ export function readPlaces(places: PlacesDocHandle): readonly CardRecord[] {
 /** The places document's `rev`: raised with every write (ADR-0059). */
 export const readPlacesRev = (places: PlacesDocHandle): number => places.rev()
 
-/** The session's workflow (`pineta.workflow`, ADR-0085), or null before a host wrote it. */
+/** The session's workflow (`pinetrie.workflow`, ADR-0085), or null before a host wrote it. */
 export const readWorkflow = (doc: SessionDocHandle): Workflow | null =>
   readRecords(doc, WORKFLOW).get(WORKFLOW_KEY) ?? null
 
-/** Each root's place on the board (`pineta.board`, ADR-0085), by its id. */
+/** Each root's place on the board (`pinetrie.board`, ADR-0085), by its id. */
 export const readBoardPlaces = (
   doc: SessionDocHandle,
 ): ReadonlyMap<RootId, BoardPlace> => readRecords(doc, BOARD)
@@ -594,28 +594,28 @@ export const readArchived = keptWhileSame(
     }),
 )
 
-/** Every entry's mark (`pineta.mark`, ADR-0045), keyed by entry: a root's titles its tab. */
+/** Every entry's mark (`pinetrie.mark`, ADR-0045), keyed by entry: a root's titles its tab. */
 export const readMarks = (
   doc: RootDocHandle,
 ): ReadonlyMap<EntryId, MarkRecord> => readRecords(doc, MARK)
 
-/** Each ask's digest (`pineta.digest`, ADR-0056), by its prompt. */
+/** Each ask's digest (`pinetrie.digest`, ADR-0056), by its prompt. */
 export const readDigests = (
   doc: RootDocHandle,
 ): ReadonlyMap<EntryId, DigestRecord> => readRecords(doc, DIGEST)
 
-/** Who stopped each ask (`pineta.stop`, ADR-0056), by its prompt. */
+/** Who stopped each ask (`pinetrie.stop`, ADR-0056), by its prompt. */
 export const readStops = (
   doc: RootDocHandle,
 ): ReadonlyMap<EntryId, StopRecord> => readRecords(doc, STOP)
 
-/** Each thread's last run's verdict (`pineta.verdict`, ADR-0077), by lane. */
-/** Every card's history (`pineta.card-history`, ADR-0048 step 6), by card. */
+/** Each thread's last run's verdict (`pinetrie.verdict`, ADR-0077), by lane. */
+/** Every card's history (`pinetrie.card-history`, ADR-0048 step 6), by card. */
 export const readCardHistories = (
   doc: SessionDocHandle,
 ): ReadonlyMap<CardId, CardHistoryRecord> => readRecords(doc, CARD_HISTORY)
 
-/** Every trace (`pineta.trace`, ADR-0048), by id. */
+/** Every trace (`pinetrie.trace`, ADR-0048), by id. */
 export const readTraces = (
   doc: SessionDocHandle,
 ): ReadonlyMap<string, TraceRecord> => readRecords(doc, TRACE)
@@ -626,12 +626,12 @@ export const readVerdicts = (
 
 // ── where lanes work (ADR-0032, ADR-0033) ─────────────────────────────────
 
-/** Every lane's record (`pineta.lane`): where it works, by lane. */
+/** Every lane's record (`pinetrie.lane`): where it works, by lane. */
 export const readLaneRecords = (
   doc: SessionDocHandle,
 ): ReadonlyMap<LaneName, LaneRecord> => readRecords(doc, LANE)
 
-/** Every revision record (`pineta.revision`), by the entry it is at. */
+/** Every revision record (`pinetrie.revision`), by the entry it is at. */
 export const readRevisions = (
   doc: RootDocHandle,
 ): ReadonlyMap<EntryId, RevisionRecord> => readRecords(doc, REVISION)
@@ -650,13 +650,13 @@ export const readBases = (
   doc: SessionDocHandle,
 ): ReadonlyMap<LaneName, BaseRecord> => readRecords(doc, BASE)
 
-/** Each lane's name (`pineta.name`, ADR-0039), by lane. */
+/** Each lane's name (`pinetrie.name`, ADR-0039), by lane. */
 export const readNames = (
   doc: SessionDocHandle,
 ): ReadonlyMap<LaneName, ThreadName> =>
   new Map([...readRecords(doc, NAME).values()].map(r => [r.lane, r.name]))
 
-/** Each thread's banner (`pineta.banner`), by lane. */
+/** Each thread's banner (`pinetrie.banner`), by lane. */
 export const readBanners = (
   doc: SessionDocHandle,
 ): ReadonlyMap<LaneName, BannerRecord> => readRecords(doc, BANNER)
@@ -668,7 +668,7 @@ export const readBanners = (
 export const readThreadName = (doc: SessionDocHandle, lane: LaneName): string =>
   readNames(doc).get(lane) ?? lane.slice(-8)
 
-/** What the host found where it runs (`pineta.project`); null with no tools. */
+/** What the host found where it runs (`pinetrie.project`); null with no tools. */
 export const readProject = (doc: SessionDocHandle): ProjectRecord | null =>
   readRecords(doc, PROJECT).get(PROJECT_KEY) ?? null
 
@@ -783,7 +783,7 @@ export const readReferencedBlobs = (
  * message and that message's first line, its title, its messages, newest
  * entry and writers (`summarizeRoots`), each thread's writers on its path
  * (ADR-0077), its chats that name someone, and every image it shows. What
- * the host writes as `pineta.root`.
+ * the host writes as `pinetrie.root`.
  */
 export function readRootRecord(root: RootId, doc: RootDocHandle): RootRecord {
   const index = readTreeIndex(doc)

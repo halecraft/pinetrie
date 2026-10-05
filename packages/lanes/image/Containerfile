@@ -1,4 +1,4 @@
-# Pineta's default lane image (ADR-0034, ADR-0041, ADR-0064): the tools every
+# pinetrie's default lane image (ADR-0034, ADR-0041, ADR-0064): the tools every
 # lane can count on.
 # - Debian trixie and Node 24.
 # - git 2.47: jj needs 2.41 or later (S42 item 7).
@@ -8,9 +8,9 @@
 #   The lane runtime copies them out of this image, so every lane has them
 #   whatever its image (`runtime.ts`). Debian's own rg and fd link glibc, and
 #   would not run on a musl image.
-# - Chromium's headless shell and its libraries, at the build Pineta's
+# - Chromium's headless shell and its libraries, at the build pinetrie's
 #   Playwright drives (`PLAYWRIGHT_VERSION`).
-# A project's own `pineta.Containerfile` replaces it. The lane runtime is
+# A project's own `pinetrie.Containerfile` replaces it. The lane runtime is
 # copied out of this image (`runtime.ts`).
 FROM docker.io/library/node:24-trixie-slim
 ARG JJ_VERSION

@@ -2,7 +2,7 @@
 //
 // Kyneta text records edits, not values, so a text that grows costs what was
 // added, not a new copy each time (S22: a live tool stream as whole values
-// appended 4.35 MB; as edits, 96 KB). Every stream Pineta writes, a reply's
+// appended 4.35 MB; as edits, 96 KB). Every stream pinetrie writes, a reply's
 // deltas and a tool's output, goes through here.
 
 /** One edit: at `at`, remove `remove` characters, then insert `insert`. */

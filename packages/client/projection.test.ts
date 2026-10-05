@@ -1,11 +1,11 @@
-import { cardId } from "@pineta/core"
-import { CARD_HISTORY, setRecord } from "@pineta/rules"
+import { cardId } from "@pinetrie/core"
+import { CARD_HISTORY, setRecord } from "@pinetrie/rules"
 import {
   newLiveDoc,
   newRootDoc,
   newSessionDoc,
   physicalKey,
-} from "@pineta/schema"
+} from "@pinetrie/schema"
 import { expect, test } from "vitest"
 import { readSessionFacts } from "./projection.ts"
 

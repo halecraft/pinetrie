@@ -12,19 +12,19 @@ import {
   type Sha256,
   THE_AGENT,
   writerId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import {
   type BannerAnswer,
   type BannerAsk,
   DEFAULT_BANNER,
   encodeChat,
-} from "@pineta/rules"
+} from "@pinetrie/rules"
 import {
   newRootDoc,
   type RootDocHandle,
   readEntries,
   rowMessage,
-} from "@pineta/schema"
+} from "@pinetrie/schema"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
 import { createAgent, newId } from "./agent.ts"
 import {
@@ -94,7 +94,9 @@ test("drawnOf: a model's image is fitted as an upload is; bytes that are not one
 describe("banners in a harness", () => {
   let root = ""
   beforeAll(async () => {
-    root = await realpath(await mkdtemp(path.join(tmpdir(), "pineta-banner-")))
+    root = await realpath(
+      await mkdtemp(path.join(tmpdir(), "pinetrie-banner-")),
+    )
   })
   afterAll(async () => {
     await rm(root, { recursive: true, force: true })

@@ -1,8 +1,8 @@
 // client/perform — carry out the effects `planIntent` decided (`intent.ts`).
 // The shell: one port call per effect, and nothing decided here.
 
-import type { CardId, EntryId } from "@pineta/core"
-import type { AttentionStore, SessionClient } from "@pineta/session"
+import type { CardId, EntryId } from "@pinetrie/core"
+import type { AttentionStore, SessionClient } from "@pinetrie/session"
 import { afterKeep } from "./card-intents.ts"
 import type { Identity } from "./identity.ts"
 import { afterRootMove, type Effect, type Intent } from "./intent.ts"

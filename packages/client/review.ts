@@ -8,7 +8,7 @@ import {
   type RevisionReview,
   spanKey,
   withoutTrailers,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import type { ReviewTarget } from "./column-view.ts"
 
 /** A fetch's state. */

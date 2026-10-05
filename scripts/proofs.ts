@@ -2,7 +2,7 @@
 // as a rule between the suites' checks and their mutations. Pure: the
 // labels and mutations come in, and what breaks the rule comes out.
 //
-// Every check label in a scenario (`apps/pineta/e2e/<suite>/<name>.scenario.ts`)
+// Every check label in a scenario (`apps/pinetrie/e2e/<suite>/<name>.scenario.ts`)
 // is the `expect` of a suite mutation that names that scenario, and every
 // suite mutation's `expect` is a label in the scenario it names.
 

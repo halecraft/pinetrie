@@ -13,8 +13,9 @@ import type {
   Verdict,
   VerdictRecord,
   WriterId,
-} from "@pineta/core"
-import type { Attention } from "@pineta/schema"
+} from "@pinetrie/core"
+import { PRODUCT_NAME } from "@pinetrie/core"
+import type { Attention } from "@pinetrie/schema"
 import type { OpenOffer } from "./app-view.ts"
 
 /** Lowest first: `highest` and every comparison read this order. */
@@ -293,7 +294,7 @@ export const LEVEL_CLASS: Readonly<Record<Level, string>> = {
 }
 
 /** Why the agent's end could not be told, in words. */
-const UNCLASSIFIED_WORDS = "the run ended; Pineta could not tell what it needs"
+const UNCLASSIFIED_WORDS = `the run ended; ${PRODUCT_NAME} could not tell what it needs`
 
 /** A raised item's reason: a mark's title, a header row's line. */
 export function attentionWords(

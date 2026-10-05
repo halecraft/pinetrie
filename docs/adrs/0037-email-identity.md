@@ -3,10 +3,10 @@
 **Status:** Accepted. Implemented by `PLAN-2026-09-28-kyneta-v4`. Evidence:
 S29, S47. Amends ADR-0024 (presence keys per seat), ADR-0025 (authorship by
 seat), ADR-0027 and ADR-0030 (your other tabs are you). Amended by ADR-0048:
-the host writes a record of each seat's person (`pineta.seat`) as it
+the host writes a record of each seat's person (`pinetrie.seat`) as it
 connects, so a text's writers can be named after they leave.
 
-**Context.** Pineta chose each client's Kyneta peer id and made its writer
+**Context.** pine·trie chose each client's Kyneta peer id and made its writer
 from it: a browser tab took one from Kyneta's `persistentPeerId`, a Node
 client made one up. Kyneta v4 takes that choice away. A CRDT replica may
 write under an id only if no other live replica writes under it and it
@@ -20,7 +20,7 @@ the host's address, note authorship and presence keys.
 **Decision.**
 - **A principal is a person, and a person is their email.** A browser asks
   for email and name on its first visit (`identity-form.tsx`) and keeps both
-  per device (`localStorage`, `pineta-identity`). The email, normalized
+  per device (`localStorage`, `pinetrie-identity`). The email, normalized
   (`normalizeEmail`), is the principal; the writer is `w-<email>`
   (`writerOfPrincipal`). A reload, a second tab and a second device with the
   same email are one person, each tab its own seat.
@@ -35,7 +35,7 @@ the host's address, note authorship and presence keys.
 - **The host identifies the sender by transport, as before**: the principal
   of the seat a command's Line comes from. A principal that is not an email
   names nobody, and its every command is refused (`invalid_identity`).
-- **The host is found by its principal,** `pineta-host`, which is not an
+- **The host is found by its principal,** `pinetrie-host`, which is not an
   email, so no person can claim it. A client addresses its Line to the seat
   `whenPeer` finds.
 - **Presence is per seat, shown per person.** Every key starts

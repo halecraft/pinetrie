@@ -18,7 +18,7 @@ import {
   commitId,
   type LaneBase,
   laneNameForThread,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { snapshotExists } from "./disk.ts"
 import { executeOrThrow } from "./execute.ts"
 import { laneHandle, type OpenLink, removeLane } from "./lane.ts"
@@ -116,7 +116,7 @@ export async function refreshBase<C>(input: {
 }
 
 /**
- * A lane's base, from the newest `Pineta-Base` in the history of `tip`, a
+ * A lane's base, from the newest `Pinetrie-Base` in the history of `tip`, a
  * revset: the lane's tip in your repo, or its bookmark in its own repo. A
  * lane with none (one from before the line) is on the line, from the newest
  * line commit in its history; null when there is none. In the lane's own

@@ -1,13 +1,13 @@
 // lanes/disk — snapshots and their upkeep (ADR-0034, S40, S41).
 //
 // A snapshot is a copy-on-write clone of a lane's `volume.img`, a file under
-// `.pineta/snapshots/`. Writing a clone into a volume `container` created is
+// `.pinetrie/snapshots/`. Writing a clone into a volume `container` created is
 // not an API of `container` 1.4.1: a volume is its `entity.json` and an image
 // read by path (S40). The contract test in `e2e:lanes` guards it on every
 // upgrade.
 
 import { rm, stat } from "node:fs/promises"
-import type { SnapshotId } from "@pineta/core"
+import type { SnapshotId } from "@pinetrie/core"
 import { type DiskPaths, snapshotFile } from "./plan.ts"
 import { describeFailure, run } from "./run.ts"
 

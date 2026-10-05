@@ -4,7 +4,7 @@
 Evidence: S19, S20, S21. Amended by ADR-0021 (the lane is also the thread's
 mode), and by ADR-0048 (step 3) with ADR-0055: what waits for a busy lane is
 a queued card, written by clients and taken by the host; nothing waits in
-`pineta.outbox`, which is gone. (ADR-0026 said a note, and was never built.)
+`pinetrie.outbox`, which is gone. (ADR-0026 said a note, and was never built.)
 
 **Context.** ADR-0011 gave every writer a lane, so two writers never contend for
 a tip; ADR-0018 then ran every model turn on one agent lane that travelled to
@@ -35,7 +35,7 @@ already attributes.
   executor makes that parent right when it is written; S21 Q2's read inside
   `session.mutate` is what a second host would need.
 - **A running lane is never written** (S21 Q3). Every message for a busy thread
-  (running, or with messages already waiting) waits in `pineta.outbox`, in send
+  (running, or with messages already waiting) waits in `pinetrie.outbox`, in send
   order, and is drained when the lane is idle: a plain message appended, a
   compelled one run to completion before the next.
 - **A race is another writer's compelled message** below what the sender saw.
@@ -47,7 +47,7 @@ already attributes.
 **Consequences.** `navigate`, `prompt` and `branch` commands, per-writer turn
 state, `laneNameForWriter` and `planAttach` are gone. Threads run concurrently,
 each one message at a time. The host and the client read the facts behind every
-decision through one package (`@pineta/reads`), so the composer's promise and
+decision through one package (`@pinetrie/reads`), so the composer's promise and
 the host's decision cannot drift apart.
 
 **Alternatives rejected.** A lane for every thread, conversation included (two

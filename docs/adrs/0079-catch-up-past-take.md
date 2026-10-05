@@ -10,12 +10,12 @@ commit*; the code joins those.
 **Context.** A thread catches up by merging the line's commit into its lane
 (ADR-0060), and jj chooses the merge's base from history. A take puts a
 copy of the lane's work on the line, not the lane's commit. Its message
-names the commit it copies (`Pineta-Source`). So the base was the take's
-`Pineta-Start`, from before the lane's work, and both sides of the merge
+names the commit it copies (`Pinetrie-Source`). So the base was the take's
+`Pinetrie-Start`, from before the lane's work, and both sides of the merge
 made that work's changes. Wherever the line edited them after the take, the
 merge conflicted: "this thread's text, the line's text", where the line's
 was the thread's own text, edited. The same happened to a branch holding
-its parent's taken work: a thread in Pineta's own repo conflicted on 27
+its parent's taken work: a thread in pine·trie's own repo conflicted on 27
 files after the line took grand-banjo's work and renamed a package over it
 (S102). A resolution run was then started for conflicts no one made. The
 update's list of what came in named the take, the lane's own work, as new.
@@ -33,7 +33,7 @@ update's list of what came in named the take, the lane's own work, as new.
   base then holds the earlier ones. Joined alone, it conflicted where the
   line edited the first take's lines between them.
 - **The update stays one commit:** a merge of the lane, the last join and
-  the line's commit, carrying `Pineta-Base` as before. A join carries no
+  the line's commit, carrying `Pinetrie-Base` as before. A join carries no
   trailer.
 - **A join that conflicts is abandoned.** That is a take of an offer you
   edited where the lane wrote. Its take is merged as before.
@@ -49,7 +49,7 @@ The decision is `planJoins` (`packages/lanes/plan.ts`), and `mergeBase`
   edits on the line to that work. A conflict both sides really made still
   conflicts, now on that hunk alone.
 - A lane's history holds a join commit for each take it caught up past.
-  Your repo sees them in the lane's history (`tip@pineta-<lane>`).
+  Your repo sees them in the lane's history (`tip@pinetrie-<lane>`).
 - Every catch-up reads the takes above the lane: one `jj log`, and a second
   only when it finds one.
 - A WIP thread catches up by merging a fresh copy of its WIP, which holds

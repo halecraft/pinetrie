@@ -9,7 +9,7 @@
 // `editorState` decides each step and names what the component must do;
 // `card-editor.tsx` does it. Pure.
 
-import type { CardId, CardRecord } from "@pineta/core"
+import type { CardId, CardRecord } from "@pinetrie/core"
 import type { Pending, Prefill } from "./columns.ts"
 import { sendable } from "./send.ts"
 

@@ -1,6 +1,6 @@
 // pi/scripted — a model whose replies a suite writes in advance.
 //
-// pi-ai's faux provider, behind Pineta's own shapes so no pi type crosses
+// pi-ai's faux provider, behind pinetrie's own shapes so no pi type crosses
 // (ADR-0003). Suites script tool calls with it, so a tool run is repeatable
 // and spends nothing (S22). A suite can also give a standing reply for any
 // request with nothing queued (`answer`), and pause the reply to a prompt, so
@@ -22,7 +22,7 @@ import {
   type Provider,
   type TranscriptContext,
 } from "@earendil-works/pi-ai"
-import { VERDICT_ALONE, VERDICT_THEN_DIGEST } from "@pineta/rules"
+import { VERDICT_ALONE, VERDICT_THEN_DIGEST } from "@pinetrie/rules"
 
 /**
  * One scripted reply: text; text made from the context the model was given,

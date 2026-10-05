@@ -15,7 +15,7 @@ import {
   rootOfDocId,
   type WriterId,
   writerOfPrincipal,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import {
   HOST_PRINCIPAL,
   LIVE_DOC_ID,
@@ -85,7 +85,7 @@ export function holdsPersonDoc(
 /**
  * Whether the peer whose principal is `principal` may write `docId`;
  * undefined leaves it to the other policies. The session, the places and
- * `pineta:live` are the host's (`isHostDoc`); a person's document is that
+ * `pinetrie:live` are the host's (`isHostDoc`); a person's document is that
  * person's, relayed by the host. Pure.
  */
 export function mayWrite(
@@ -100,6 +100,6 @@ export function mayWrite(
 
 /** `mayWrite` as a Kyneta policy, for the host and every client to register. */
 export const writersPolicy: Policy = {
-  name: "pineta.writers",
+  name: "pinetrie.writers",
   canWrite: (docId, peer) => mayWrite(docId, peer.principal),
 }

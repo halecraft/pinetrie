@@ -177,7 +177,7 @@ That is a cross-leg consequence requiring simultaneous knowledge of both branche
 
 **Keeps the prompt**, as the brief above asks ("Throw away… keep the prompt"). Kept verbatim at `out/*.foldprompt.txt`; the rule list is in `fold.mjs` `buildFoldPrompt()`. The rules earning their keep: *do not restate*, *name contradictions plainly*, *say irrelevant in one line*, *cite concrete numbers*.
 
-**Incidental pi finding.** `get_last_assistant_text` returned `{"data":{}}` on every call despite `docs/rpc.md` documenting `{"text": "..."}`. Reading `message_end` events is the reliable path. Minor, but relevant if the Pineta host ever uses that RPC command.
+**Incidental pi finding.** `get_last_assistant_text` returned `{"data":{}}` on every call despite `docs/rpc.md` documenting `{"text": "..."}`. Reading `message_end` events is the reliable path. Minor, but relevant if the pine·trie host ever uses that RPC command.
 
 ---
 

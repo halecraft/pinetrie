@@ -50,7 +50,7 @@ order away.
 
 Two things do merge, and should stay CRDTs: a card's text, which people type
 in together, and your inventory's layout, which only your own devices
-arrange and which should work offline. Later Pineta may want offline moves,
+arrange and which should work offline. Later pine·trie may want offline moves,
 peers talking directly, and several hosts (one per project). Whatever is
 chosen now should not have to be undone for those.
 
@@ -79,7 +79,7 @@ a person's inventory.
   each other's repairs forever. The client's code holds no writable
   reference to it. (*Since Kyneta's `canWrite`, every peer declares who may
   write `places`, the session and each inventory (`writersPolicy`,
-  `@pineta/protocol/writers`), so a client's write throws before it is
+  `@pinetrie/protocol/writers`), so a client's write throws before it is
   made, and a writer whose offer is refused is told and stops writing.*)
 
 *Handoffs.* A move from one place to another, within the host's places or
@@ -216,13 +216,13 @@ message is a creation into your inventory, and undoing it removes it.
   or hold a Line message back until the documents it depends on catch up,
   `rev` can give way to it.
 - A conflict is settled by arrival, not by `clientID`, and its loser is told.
-- Kyneta's undo covers texts and inventories. A handoff's undo is Pineta's
+- Kyneta's undo covers texts and inventories. A handoff's undo is pine·trie's
   own, which is sound because a place is one value and the reverse is
   refused when that value changed.
 - Kyneta's `destroy` kept every destroyed document in memory, and nothing
   unloaded a document while keeping it stored (S76). Kyneta now does both:
   a destroyed document's replica is disposed, and `unload` takes a stored
-  document out of memory. Pineta does not unload yet, so a tab's and the
+  document out of memory. pine·trie does not unload yet, so a tab's and the
   host's memory still grow with the cards they have opened.
 - Stored cards are not carried over: no code reads the old cards document,
   and the startup sweep removes the texts no record names. The only stored

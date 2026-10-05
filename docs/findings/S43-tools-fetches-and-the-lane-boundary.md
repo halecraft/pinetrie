@@ -40,7 +40,7 @@ in full, and what a lane can reach on the host.
    written there.** `jj git clone` 58 ms (a throwaway repo), fetch 7 ms; a
    write to `/yours` failed ("Read-only file system"), and the repo gained no
    lock files.
-5. **Your `@-` has to be fetched by id.** `jj git clone` of Pineta's real
+5. **Your `@-` has to be fetched by id.** `jj git clone` of pine·trie's real
    repository (read-only, 104 MB of loose objects) took 1.2 s but checked out
    nothing: it fetches bookmarks and checks out the remote's default branch,
    and a colocated repo's git `HEAD` is detached, with `@-` on no bookmark.
@@ -74,7 +74,7 @@ in full, and what a lane can reach on the host.
      listening on all interfaces may prompt.
 
 8. **A bundle must exclude what the host already has.** On a clone of
-   Pineta's real repository, `git bundle create` of `main` whole took 253 ms
+   pine·trie's real repository, `git bundle create` of `main` whole took 253 ms
    and 1.1 MB; of `main ^main~1` (one commit), 29 ms and 8 KB. A bundle per
    turn that names only the lane's bookmark would grow with the repository's
    history. (Measured while checking `PLAN-2026-09-28-lane-containers`.)
@@ -98,7 +98,7 @@ in full, and what a lane can reach on the host.
   parallel); here they ran one at a time.
 - `jj git fetch` from a bundle file by jj itself rather than `git fetch`.
 - Clone time against image fragmentation, isolated.
-- MCP servers or extension tools, which Pineta does not expose today.
+- MCP servers or extension tools, which pine·trie does not expose today.
 
 ## Method
 
@@ -107,5 +107,5 @@ in full, and what a lane can reach on the host.
 side), `remote-env.ts` (the host side), `run-remote.ts <container>` (pi's
 harness and tools through it). Containers from `s42-lane:2` with `--init`, on
 journaled volumes; pi-agent-core from this workspace mounted read-only at
-`/pineta`. Fetches into a throwaway host repo; Pineta's real repository was
+`/pinetrie`. Fetches into a throwaway host repo; pine·trie's real repository was
 mounted read-only only. Everything created was removed after.

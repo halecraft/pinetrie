@@ -106,21 +106,21 @@ Five contracts. Fix these and everything else proceeds in parallel.
 
 ```
 apps/         things you RUN; nothing imports them
-  pineta/        @pineta/app          the host (server) and its e2e suites
-  conformance/   @pineta/conformance  pi's own Storage suite vs our adapter
+  pinetrie/        @pinetrie/app          the host (server) and its e2e suites
+  conformance/   @pinetrie/conformance  pi's own Storage suite vs our adapter
 
 packages/     libraries; their boundaries are enforced by resolution
-  core/          @pineta/core         declares NOTHING; pure decisions and types
-  schema/        @pineta/schema       Kyneta only; the document shape (TECHNICAL.md)
-  pi/            @pineta/pi           THE pi boundary (TECHNICAL.md)
-  protocol/      @pineta/protocol     the wire contract and its codec
-  rules/         @pineta/rules        each stored shape and the pure rules about it (TECHNICAL.md)
-  reads/         @pineta/reads        document reads shared by the host and the client
-  lanes/         @pineta/lanes        a lane's container and disk, and jj and git in it (TECHNICAL.md)
-  keeper/        @pineta/keeper       declares NOTHING; one step at a time on a resource (TECHNICAL.md)
-  repo/          @pineta/repo         your repo: reads, steps, the owner; offers, the line, lanes' refs (TECHNICAL.md)
-  session/       @pineta/session      one client's connection to a host; no React (TECHNICAL.md)
-  client/        @pineta/client       browser UI; owns its Vite build
+  core/          @pinetrie/core         declares NOTHING; pure decisions and types
+  schema/        @pinetrie/schema       Kyneta only; the document shape (TECHNICAL.md)
+  pi/            @pinetrie/pi           THE pi boundary (TECHNICAL.md)
+  protocol/      @pinetrie/protocol     the wire contract and its codec
+  rules/         @pinetrie/rules        each stored shape and the pure rules about it (TECHNICAL.md)
+  reads/         @pinetrie/reads        document reads shared by the host and the client
+  lanes/         @pinetrie/lanes        a lane's container and disk, and jj and git in it (TECHNICAL.md)
+  keeper/        @pinetrie/keeper       declares NOTHING; one step at a time on a resource (TECHNICAL.md)
+  repo/          @pinetrie/repo         your repo: reads, steps, the owner; offers, the line, lanes' refs (TECHNICAL.md)
+  session/       @pinetrie/session      one client's connection to a host; no React (TECHNICAL.md)
+  client/        @pinetrie/client       browser UI; owns its Vite build
 
 (root)        a bare workspace: development tooling only, no dependencies
 ```
@@ -128,10 +128,10 @@ packages/     libraries; their boundaries are enforced by resolution
 Unit tests sit beside the code they test. `workspace.test.ts` at the root is
 the one exception: it checks the manifests.
 
-The host's shell, `apps/pineta/host/`, is split by responsibility: runs, the
+The host's shell, `apps/pinetrie/host/`, is split by responsibility: runs, the
 popping queued cards, settling, startup, each command, HTTP. Each module takes its
 dependencies as a parameter, and `index.ts` alone wires them. Its order rules
-(a run's end, startup) are in `apps/pineta/host/TECHNICAL.md`.
+(a run's end, startup) are in `apps/pinetrie/host/TECHNICAL.md`.
 
 ### The pi rule is correct-by-construction, not checked
 
@@ -144,7 +144,7 @@ spelling fails at resolution:
 | `import("@earendil-works/pi-agent-core")` | `ERR_MODULE_NOT_FOUND` |
 | `` import(`@earendil-works/pi-agent-core`) `` | `ERR_MODULE_NOT_FOUND` |
 | `createRequire(...)("@earendil-works/pi-agent-core")` | `MODULE_NOT_FOUND` |
-| `import("@pineta/pi")` | ✅ resolves |
+| `import("@pinetrie/pi")` | ✅ resolves |
 
 This replaced a syntax scan that **all three of those spellings evaded**. A
 scanner reads syntax and a specifier can be spelled unboundedly many ways;
@@ -199,11 +199,11 @@ a writer, identified by the transport's `LineSender.peer` and recorded in every
 message it sends; writers own no lanes. A lane belongs to a thread: created
 where agent work is first wanted there, never moved, never written while it
 runs (ADR-0020). Threads run concurrently. Decisions are pure (`planChat`,
-`planArchive` and the rest in `@pineta/rules`, over facts read by `@pineta/reads`);
+`planArchive` and the rest in `@pinetrie/rules`, over facts read by `@pinetrie/reads`);
 the host gathers, plans and executes each command in one serial step. A
 decision that acts on your repo (an offer, the line) is a value typed in
-`@pineta/core`, decided by `@pineta/rules` from facts `@pineta/repo`
-reads, and carried out by `@pineta/repo`'s steps: the two packages never
+`@pinetrie/core`, decided by `@pinetrie/rules` from facts `@pinetrie/repo`
+reads, and carried out by `@pinetrie/repo`'s steps: the two packages never
 import each other, and the host only connects them.
 
 Wire sentinels live only in `packages/protocol/codec.ts`. The wire is total, so `""`
@@ -258,17 +258,17 @@ branches from the op log. Our mapping is exact. (ADR-0008)
 ### Documents (ADR-0063)
 
 ```
-pineta:session   StorageDoc, no entries   session-wide host records:
-                                          the directory of roots (pineta.root),
-                                          every lane's record (pineta.lane),
+pinetrie:session   StorageDoc, no entries   session-wide host records:
+                                          the directory of roots (pinetrie.root),
+                                          every lane's record (pinetrie.lane),
                                           the board, names, offers, banners
 root:<RootId>    StorageDoc, one a root   that root's pi storage (entries,
                                           values, lists) and the records keyed
                                           by its entries (revision, mark, stop)
-pineta:live      LiveDoc                  streams and active runs: compacted
+pinetrie:live      LiveDoc                  streams and active runs: compacted
                                           at every run's end, needed by no
                                           restarted host
-pineta:card-places
+pinetrie:card-places
                  PlacesDoc, Yjs           where every card is (ADR-0059),
                                           Yjs so the host undoes moves
                                           (ADR-0066)
@@ -318,14 +318,14 @@ no entries.
   > pointer. `pi.op.*` is keyed by `operationId` and presumptively uncontended
   > (assumed, not verified).
 - **lists** — grow-only list + tombstones. Carries `pi.pending.assistant_frame`.
-- **pending assistant text** — in `pineta:live` since ADR-0063; durable **`Schema.text()`**, written with
+- **pending assistant text** — in `pinetrie:live` since ADR-0063; durable **`Schema.text()`**, written with
   `insert(at, delta)` and cleared on commit (ADR-0014). Ships only the inserted
   characters. **Do not use `Schema.string()` for anything that accumulates** —
   it is a whole-value LWW register, so appending to it is O(n²) **on every
   substrate**, durable included (measured: 144 582 B vs 18 131 B for the same
   stream).
 - **images** — not in the document at all (ADR-0042). Their bytes are rows
-  of `pineta_blobs` in the host's SQLite file, keyed by SHA-256; a chat holds
+  of `pinetrie_blobs` in the host's SQLite file, keyed by SHA-256; a chat holds
   `ImageRef`s in `details.images`, and the model is given the bytes when its
   context is built. A tool's image is stored by `read` before pi writes the
   result, whose entry holds a reference that `KynetaStorage` rejoins with the
@@ -431,6 +431,6 @@ a "landed" signal for the tree UI.
 | ~~`seq` collides across replicas~~ | **RESOLVED (S1 → ADR-0013).** `seq` is now a derived replica-local **arrival** index; the shared counter is gone. All three defects cleared (0 collisions, no regression, 0 skipped), conformance 21/21, property 1000/1000 vs control 0/300. Cold index rebuild 57 ms @ n=10 000; incremental reconcile O(δ), 0 ms. **New constraint:** `seq` must never cross a replica boundary or survive a restart — see ADR-0013 and ADR-0007 |
 | ~~Harness assumes a private world~~ | **Resolved by S3 + ADR-0011.** The harness caches (`Lane`, not `StorageBackedSession`) and assumes monotonic local growth, but does not crash or corrupt — and lane-per-writer avoids every tip-level failure. **T5 answered: the admission mutex CAN be per-replica.** Multi-writer stays a *storage* project. Caveat: the drive/inference loop was stubbed, not exercised |
 | ~~Fold output is mush~~ | **Retired.** S5 — not observed across four scenarios plus ablation |
-| ~~`@kyneta/schema` writes are O(n²)~~ | **RESOLVED (S14).** Fixed upstream in `da978ec` (2026-09-19): `step` = copy ∘ core, `stepInPlace` = core, `applyChange` uses the dual. **Requires `loro-crdt >= 1.13.4`.** Pineta shape n=10 000: entries **38 444 → 93 ms**, lists **12 731 → 92 ms**; linear to **n=50 000** (626 ms / 739 ms). **Residual: none — S13 closed.** Remaining exposure is *distribution*, not design: published 3.0.0 is stale **and** declares `loro-crdt >= 1.8.0`, so a consumer can install a supported-looking combination that is 17× slow |
+| ~~`@kyneta/schema` writes are O(n²)~~ | **RESOLVED (S14).** Fixed upstream in `da978ec` (2026-09-19): `step` = copy ∘ core, `stepInPlace` = core, `applyChange` uses the dual. **Requires `loro-crdt >= 1.13.4`.** pine·trie shape n=10 000: entries **38 444 → 93 ms**, lists **12 731 → 92 ms**; linear to **n=50 000** (626 ms / 739 ms). **Residual: none — S13 closed.** Remaining exposure is *distribution*, not design: published 3.0.0 is stale **and** declares `loro-crdt >= 1.8.0`, so a consumer can install a supported-looking combination that is 17× slow |
 | Loro `fork_at` immaturity | Not on the critical path; we do not build the tree on version history |
 | ~~List cursors `{seq}` break under CRDT semantics~~ | **Retired.** S2/T7's prediction did not hold — S1 keeps `ListReadOptions` unchanged with no Loro `Cursor` |

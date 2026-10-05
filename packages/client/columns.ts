@@ -14,7 +14,7 @@ import {
   type TreeIndex,
   type WorkflowStateId,
   type WorkSetting,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import type { Density } from "./ask-words.ts"
 
 /**

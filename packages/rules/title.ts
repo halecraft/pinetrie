@@ -1,7 +1,7 @@
 // title — a model's few words for a root, written as the root's mark
 // (ADR-0045, ADR-0074): unasked when the root's first lane starts, or when a
 // person asks for one (Auto-update title). The host carries the plan out
-// (`apps/pineta/host/titles.ts`).
+// (`apps/pinetrie/host/titles.ts`).
 
 import {
   type AgentId,
@@ -20,7 +20,7 @@ import {
   THE_AGENT,
   type TreeIndex,
   type WriterId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { type ModelRef, modelRef, recordOf } from "./config.ts"
 import {
   bareLine,

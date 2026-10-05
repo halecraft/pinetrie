@@ -1,7 +1,7 @@
 // client/markdown — message text as the tree `MessageText` draws
 // (docs/findings/S27-markdown-rendering.md).
 
-import { blobOfUrl, type ImageRef, type Sha256 } from "@pineta/core"
+import { blobOfUrl, type ImageRef, type Sha256 } from "@pinetrie/core"
 import type { Element, ElementContent, Root, RootContent } from "hast"
 import remarkGfm from "remark-gfm"
 import remarkParse from "remark-parse"

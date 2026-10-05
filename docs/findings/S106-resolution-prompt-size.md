@@ -2,7 +2,7 @@
 
 **Status:** Answered. Led to ADR-0084, implemented by
 `PLAN-2026-10-05-resolution-budget`: `resolutionFloor` and `planResolution`
-(`packages/rules/land.ts`), `planCatchUp` (`apps/pineta/host/work/update.ts`)
+(`packages/rules/land.ts`), `planCatchUp` (`apps/pinetrie/host/work/update.ts`)
 and `LAND_BUDGET` (`packages/pi/compaction.ts`).
 
 **Question.** The thread helpful-grove caught up with the project and
@@ -39,7 +39,7 @@ read its jj history, then stopped; the thread was read from the host's store.
    no operation after the merge.
 4. **pi cannot compact such a prompt** (read from `@earendil-works/pi-agent-core`,
    `dist/harness/compaction/compaction.js` and `dist/harness/runtime/harness.js`):
-   - Pineta's lanes run on pi-agent-core's harness, and `createAgentHarness`
+   - pine·trie's lanes run on pi-agent-core's harness, and `createAgentHarness`
      was given no `compaction` option, so every lane ran with
      `DEFAULT_COMPACTION_SETTINGS`: `reserveTokens` 16 384,
      `keepRecentTokens` 20 000. A person's pi `settings.json` does not reach
@@ -60,7 +60,7 @@ read its jj history, then stopped; the thread was read from the host's store.
    and builds no new prompt. The 1 MB message stays at the thread's tip, and
    every run on that branch sends it again.
 6. **How much of the conflict each way of showing it costs.** The 38 files
-   of `pineta-offer/helpful-grove`, read with `jj file show`:
+   of `pinetrie-offer/helpful-grove`, read with `jj file show`:
 
    | shown | characters |
    |---|---|
@@ -69,8 +69,8 @@ read its jj history, then stopped; the thread was read from the host's store.
    | names | 1 132 |
 
    Two sections are whole files: a conflict "including 1 deletion" wraps the
-   surviving side whole (`apps/pineta/host/take.ts`, 14 613;
-   `apps/pineta/host/take.test.ts`, 19 773). Under 20 000 tokens, this
+   surviving side whole (`apps/pinetrie/host/take.ts`, 14 613;
+   `apps/pinetrie/host/take.test.ts`, 19 773). Under 20 000 tokens, this
    conflict shows its files by name.
 
 **Recovering a thread already stuck.** ADR-0084 bounds new prompts; it does

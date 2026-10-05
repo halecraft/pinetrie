@@ -41,7 +41,7 @@ what it seemed to.
 - **One row of tools:** note, edit (or new tab), `→`.
 
 **Consequences.** Nothing links one message to another semantically until fold
-defines what it needs. Stored `pineta.reference` values are ignored, with no
+defines what it needs. Stored `pinetrie.reference` values are ignored, with no
 migration. A message can have two notes below it: one about it, and its changed
 origin. The notes index and the Archive's counts still count every note record,
 while the tree's markers (the rail's squares, closed branches' counts) count

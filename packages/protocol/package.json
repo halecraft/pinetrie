@@ -1,5 +1,5 @@
 {
-  "name": "@pineta/protocol",
+  "name": "@pinetrie/protocol",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -12,6 +12,6 @@
   "dependencies": {
     "@kyneta/exchange": "link:../../../kyneta/workspace/pineta/packages/exchange",
     "@kyneta/schema": "link:../../../kyneta/workspace/pineta/packages/schema",
-    "@pineta/core": "workspace:*"
+    "@pinetrie/core": "workspace:*"
   }
 }

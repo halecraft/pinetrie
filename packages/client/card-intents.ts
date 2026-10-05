@@ -27,8 +27,8 @@ import {
   sameKey,
   type TraceRecord,
   type WriterId,
-} from "@pineta/core"
-import type { Outcome } from "@pineta/protocol/codec"
+} from "@pinetrie/core"
+import type { Outcome } from "@pinetrie/protocol/codec"
 import {
   AT_INVENTORY,
   atColumn,
@@ -38,7 +38,7 @@ import {
   type MoveAnswer,
   type MoveHow,
   type Slots,
-} from "@pineta/session"
+} from "@pinetrie/session"
 import {
   type CardFacts,
   type Effect,

@@ -1,4 +1,4 @@
-import { type WorkStats, writerId } from "@pineta/core"
+import { type WorkStats, writerId } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   askWords,

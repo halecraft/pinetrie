@@ -27,7 +27,7 @@ if (target === "memory") {
     return { storage, async [Symbol.asyncDispose]() {} }
   }
 } else {
-  const { KynetaStorage } = await import("@pineta/pi")
+  const { KynetaStorage } = await import("@pinetrie/pi")
   factory = async () => {
     const storage = new KynetaStorage()
     return { storage, async [Symbol.asyncDispose]() {} }

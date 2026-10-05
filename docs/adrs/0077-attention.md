@@ -57,7 +57,7 @@ needed him:
   are on or off. Until the reply comes, the verdict is **pending** and the
   tab keeps its working ring: the agent's side is not finished. A request
   that fails, or a pending verdict a starting host finds, becomes **needs
-  you**, "the run ended; Pineta could not tell what it needs". A missed
+  you**, "the run ended; pine·trie could not tell what it needs". A missed
   question stalls work silently; a false alarm costs a click.
 - **A thread has followers: everyone who has written a message on its
   path.** You follow a thread by writing in it. A run's prompt is a message
@@ -79,7 +79,7 @@ needed him:
   project and anyone may take it; it raises a tab and counts in the badge
   only for the thread's followers. A verdict is shown only to the thread's
   followers.
-- **One verdict per lane**, a session record (`pineta.verdict`, keyed by
+- **One verdict per lane**, a session record (`pinetrie.verdict`, keyed by
   lane): the run's prompt, its last entry, and **what happened**, never a
   level: pending, what the model said (with its reason), failed (with the
   error), stopped (by whom), or unclassified. Who it asks something of,
@@ -168,7 +168,7 @@ needed him:
 - Reading a thread does not clear its offer; adding the work does.
 - A thread whose followers have all gone leaves its offer listed and
   counted by no one.
-- `pineta-left:<session>` and `pineta-inbox:<session>` go, with their
+- `pinetrie-left:<session>` and `pinetrie-inbox:<session>` go, with their
   codecs. Nothing stored on a device is carried over: `since` starts
   everyone with nothing unread.
 - The "since you were here" line now moves when you read on another device.
@@ -204,7 +204,7 @@ needed him:
 - **Addressees stored on each verdict.** A fact about the thread copied
   into each event; an offer would need its own copy, or borrow the latest
   verdict's, with a fallback when there is none.
-- **A record of its own for who wrote on a thread** (`pineta.writers`,
+- **A record of its own for who wrote on a thread** (`pinetrie.writers`,
   keyed by lane). It would need writing wherever a person's message lands,
   wherever a lane is made, and at startup; the directory already does all
   three for the root's record.

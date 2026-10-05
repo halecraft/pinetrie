@@ -14,7 +14,7 @@ import {
   type OfferSeen,
   type ParentThread,
   type ThreadBase,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import {
   type CatchUpNow,
   effectiveBase,
@@ -58,7 +58,7 @@ export type OfferActivity =
 /**
  * One state of a lane's offer, what can be done in it (ADR-0038's table), and
  * the facts its words are made from. The words are the client's
- * (`offerWords`, `@pineta/client`).
+ * (`offerWords`, `@pinetrie/client`).
  */
 export interface OfferView {
   readonly state:
@@ -137,7 +137,7 @@ export function conflictCause(
  * The offer's state and buttons. `asked` is when the agent last asked about
  * a conflict on the thread's path (`conflictAskedAt`, ADR-0080); it asks for
  * you only when newer than the offer. `base` is the lane's
- * (`pineta.base`), null before the host read it, as the line; `onto` and
+ * (`pinetrie.base`), null before the host read it, as the line; `onto` and
  * `wipAhead` come from the line's record. An integration is offered only with a
  * destination (`offerIntegrationDestinations`).
  */

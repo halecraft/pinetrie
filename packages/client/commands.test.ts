@@ -1,4 +1,4 @@
-import type { CommandSummary } from "@pineta/core"
+import type { CommandSummary } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import { matchCommands } from "./commands.ts"
 

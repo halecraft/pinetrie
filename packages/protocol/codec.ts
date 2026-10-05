@@ -6,7 +6,7 @@
 // encodes them back on the way out, so no `""`, no `?? ""` and no `.trim()` of
 // an id reaches decision logic.
 //
-// It owns every SHAPE rule. `planCommand` in @pineta/core owns only state
+// It owns every SHAPE rule. `planCommand` in @pinetrie/core owns only state
 // policy (ready, busy). Keeping all shape rules here means the order in which
 // a malformed command is refused is decided in exactly one function.
 
@@ -60,7 +60,7 @@ import {
   type WorkflowStateId,
   type WorkSetting,
   type WriterId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { type Command, command, type Reply, reply } from "./messages.ts"
 
 /** What a reply means. `reply()` flattens it for the wire. */

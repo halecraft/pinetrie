@@ -17,11 +17,11 @@ import {
   Schema,
 } from "@kyneta/schema"
 import { yjs } from "@kyneta/yjs-schema"
-import { type CardId, cardId } from "@pineta/core"
+import { type CardId, cardId } from "@pinetrie/core"
 
 /**
  * A card's record as flat strings, "" for none, decoded in
- * `@pineta/rules` (`decodeCard`). One leaf (`.json()`), since the host
+ * `@pinetrie/rules` (`decodeCard`). One leaf (`.json()`), since the host
  * always writes a record whole.
  */
 const StoredCard = Schema.struct.json({

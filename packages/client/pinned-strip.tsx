@@ -7,8 +7,8 @@
 // in the column's header until the strip has a card (`newPinAt`), and in the
 // strip after; the box it opens is drawn last in the strip.
 
-import type { CardId, CardRecord, PinnedView } from "@pineta/core"
-import type { SessionClient } from "@pineta/session"
+import type { CardId, CardRecord, PinnedView } from "@pinetrie/core"
+import type { SessionClient } from "@pinetrie/session"
 import type { ReactElement } from "react"
 import type { ReadOnly } from "./app-view.ts"
 import { PinnedCardEditor } from "./card-editor.tsx"

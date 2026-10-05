@@ -40,7 +40,7 @@ now have.
     the document's lanes, archived ones included. One step does it, at the
     host's start and whenever it creates a lane, one at a time, before the
     lane's first run.
-  - **The name is stored**, as a host-written `pineta.name` value keyed by
+  - **The name is stored**, as a host-written `pinetrie.name` value keyed by
     the lane: the map from a name to its UUID, and never recomputed, so a
     change to the word lists renames nothing.
   - **It is fixed.** A rename would move a bookmark and leave older
@@ -50,14 +50,14 @@ now have.
   in <dir> · shared". The lane's newest commit is no longer shown there. The
   page header's offers menu and the host's log lines name threads by it.
 - **Everything you type in jj uses it; the machinery keeps the UUID.** The
-  offer's bookmark is `pineta-offer/<name>`. A lane's container, volume and
-  remote (`pineta-<lane>`) keep the lane's id: you never type them.
+  offer's bookmark is `pinetrie-offer/<name>`. A lane's container, volume and
+  remote (`pinetrie-<lane>`) keep the lane's id: you never type them.
 - **An offer is a work in progress until its thread's run ends.** Until an
   agent describes it, its line is `WIP (<name>): <first line>`, where the
   first line is the thread's own first message: the first prompt its lane
   ran, not its root's. The agent's commit message replaces it when the run
-  ends, as ADR-0038 decides, and carries the trailer `Pineta-Thread: <name>`
-  beside `Pineta-Lane` and `Pineta-Entry`.
+  ends, as ADR-0038 decides, and carries the trailer `Pinetrie-Thread: <name>`
+  beside `Pinetrie-Lane` and `Pinetrie-Entry`.
 - **An offer follows its lane in place.** When the lane moves under an
   unedited single offer, the host rebases the offer back onto where it
   starts, restores the lane's new tip into it, and rebases it onto the
@@ -83,15 +83,15 @@ now have.
 
 **Consequences.**
 - In jjui and `jj log`, a working thread is one commit,
-  `pineta-offer/amber-fox`, whose diff grows, with an evolog of its updates.
-- Your op log gains three `pineta-host` operations per lane commit, not six.
+  `pinetrie-offer/amber-fox`, whose diff grows, with an evolog of its updates.
+- Your op log gains three `pinetrie-host` operations per lane commit, not six.
 - A taken commit names its thread twice: by name, for you, and by lane, for
   the machinery.
 - Taking a parent thread's offer shrinks its branches' offers to their own
   work; taking a branch's withdraws its parent's, when it held all of it.
-- An offer built before this keeps its `pineta-offer/<lane>` bookmark until
+- An offer built before this keeps its `pinetrie-offer/<lane>` bookmark until
   it is taken or abandoned: nothing renames it.
-- A new document table, `pineta.name`, written only by the host.
+- A new document table, `pinetrie.name`, written only by the host.
 
 **Alternatives rejected.**
 - The lane id's last characters (`a17a15f3`): stable and unique, but not

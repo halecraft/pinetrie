@@ -6,8 +6,8 @@
 // tip. A tool's stream is drawn by its call's row, which stops drawing it once
 // the row has a result.
 
-import type { AgentRun, ToolCallView } from "@pineta/core"
-import { isCurrentReply, type StreamRecord } from "@pineta/schema"
+import type { AgentRun, ToolCallView } from "@pinetrie/core"
+import { isCurrentReply, type StreamRecord } from "@pinetrie/schema"
 
 export interface LiveWork {
   /** Each running lane's current reply: at most one per lane. */

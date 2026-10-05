@@ -6,7 +6,7 @@
 // the board's included. What holding them opens and lets go is
 // `planHold` (`root-hold.ts`).
 
-import type { EntryId, RootId, RootRecord } from "@pineta/core"
+import type { EntryId, RootId, RootRecord } from "@pinetrie/core"
 import type { Layout } from "./layout.ts"
 
 /** Each root's root entry, by its id, from the directory; a root with no message has none. */

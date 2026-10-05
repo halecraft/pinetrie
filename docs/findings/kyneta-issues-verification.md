@@ -104,7 +104,7 @@ A doc-comment pointing this out would likely have saved us the measurement: the 
 
 ## Reproduction
 
-All probes are in `<pineta>/sandbox/s4-transport/`, wired to the local workspace by symlink (`relink.sh`; note `npm install` deletes the symlinks):
+All probes are in `<pinetrie>/sandbox/s4-transport/`, wired to the local workspace by symlink (`relink.sh`; note `npm install` deletes the symlinks):
 
 ```bash
 node smoke.mjs              # sanity: stepInPlace present, loro-crdt 1.16.1

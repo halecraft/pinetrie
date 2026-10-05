@@ -1,4 +1,4 @@
-import { entryId, laneNameForThread } from "@pineta/core"
+import { entryId, laneNameForThread } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { NO_READS, READ_EVERY, readStep } from "./read-marks.ts"
 

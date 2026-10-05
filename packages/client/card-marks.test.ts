@@ -10,7 +10,7 @@ import {
   rootIdFor,
   type TreeIndex,
   writerId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { cardMarks, holdsText, ownCards, withFilled } from "./card-marks.ts"
 import { entry, indexOf } from "./fixtures.ts"

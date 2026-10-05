@@ -26,11 +26,11 @@ importers:
       '@earendil-works/pi-agent-core':
         specifier: 0.87.1
         version: 0.87.1(ws@8.21.3)
-      '@pineta/pi':
+      '@pinetrie/pi':
         specifier: workspace:*
         version: link:../../packages/pi
 
-  apps/pineta:
+  apps/pinetrie:
     dependencies:
       '@kyneta/exchange':
         specifier: link:../../../kyneta/workspace/pineta/packages/exchange
@@ -47,37 +47,37 @@ importers:
       '@kyneta/websocket-transport':
         specifier: link:../../../kyneta/workspace/pineta/packages/exchange/transports/websocket
         version: link:../../../kyneta/workspace/pineta/packages/exchange/transports/websocket
-      '@pineta/client':
+      '@pinetrie/client':
         specifier: workspace:*
         version: link:../../packages/client
-      '@pineta/core':
+      '@pinetrie/core':
         specifier: workspace:*
         version: link:../../packages/core
-      '@pineta/keeper':
+      '@pinetrie/keeper':
         specifier: workspace:*
         version: link:../../packages/keeper
-      '@pineta/lanes':
+      '@pinetrie/lanes':
         specifier: workspace:*
         version: link:../../packages/lanes
-      '@pineta/pi':
+      '@pinetrie/pi':
         specifier: workspace:*
         version: link:../../packages/pi
-      '@pineta/protocol':
+      '@pinetrie/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
-      '@pineta/reads':
+      '@pinetrie/reads':
         specifier: workspace:*
         version: link:../../packages/reads
-      '@pineta/repo':
+      '@pinetrie/repo':
         specifier: workspace:*
         version: link:../../packages/repo
-      '@pineta/rules':
+      '@pinetrie/rules':
         specifier: workspace:*
         version: link:../../packages/rules
-      '@pineta/schema':
+      '@pinetrie/schema':
         specifier: workspace:*
         version: link:../../packages/schema
-      '@pineta/session':
+      '@pinetrie/session':
         specifier: workspace:*
         version: link:../../packages/session
       vite:
@@ -111,22 +111,22 @@ importers:
       '@kyneta/schema':
         specifier: link:../../../kyneta/workspace/pineta/packages/schema
         version: link:../../../kyneta/workspace/pineta/packages/schema
-      '@pineta/core':
+      '@pinetrie/core':
         specifier: workspace:*
         version: link:../core
-      '@pineta/protocol':
+      '@pinetrie/protocol':
         specifier: workspace:*
         version: link:../protocol
-      '@pineta/reads':
+      '@pinetrie/reads':
         specifier: workspace:*
         version: link:../reads
-      '@pineta/rules':
+      '@pinetrie/rules':
         specifier: workspace:*
         version: link:../rules
-      '@pineta/schema':
+      '@pinetrie/schema':
         specifier: workspace:*
         version: link:../schema
-      '@pineta/session':
+      '@pinetrie/session':
         specifier: workspace:*
         version: link:../session
       hast-util-to-jsx-runtime:
@@ -179,7 +179,7 @@ importers:
 
   packages/lanes:
     dependencies:
-      '@pineta/core':
+      '@pinetrie/core':
         specifier: workspace:*
         version: link:../core
 
@@ -197,13 +197,13 @@ importers:
       '@kyneta/schema':
         specifier: link:../../../kyneta/workspace/pineta/packages/schema
         version: link:../../../kyneta/workspace/pineta/packages/schema
-      '@pineta/core':
+      '@pinetrie/core':
         specifier: workspace:*
         version: link:../core
-      '@pineta/rules':
+      '@pinetrie/rules':
         specifier: workspace:*
         version: link:../rules
-      '@pineta/schema':
+      '@pinetrie/schema':
         specifier: workspace:*
         version: link:../schema
       typebox:
@@ -218,37 +218,37 @@ importers:
       '@kyneta/schema':
         specifier: link:../../../kyneta/workspace/pineta/packages/schema
         version: link:../../../kyneta/workspace/pineta/packages/schema
-      '@pineta/core':
+      '@pinetrie/core':
         specifier: workspace:*
         version: link:../core
 
   packages/reads:
     dependencies:
-      '@pineta/core':
+      '@pinetrie/core':
         specifier: workspace:*
         version: link:../core
-      '@pineta/rules':
+      '@pinetrie/rules':
         specifier: workspace:*
         version: link:../rules
-      '@pineta/schema':
+      '@pinetrie/schema':
         specifier: workspace:*
         version: link:../schema
 
   packages/repo:
     dependencies:
-      '@pineta/core':
+      '@pinetrie/core':
         specifier: workspace:*
         version: link:../core
-      '@pineta/keeper':
+      '@pinetrie/keeper':
         specifier: workspace:*
         version: link:../keeper
-      '@pineta/lanes':
+      '@pinetrie/lanes':
         specifier: workspace:*
         version: link:../lanes
 
   packages/rules:
     dependencies:
-      '@pineta/core':
+      '@pinetrie/core':
         specifier: workspace:*
         version: link:../core
       mdast-util-from-markdown:
@@ -272,7 +272,7 @@ importers:
       '@kyneta/yjs-schema':
         specifier: link:../../../kyneta/workspace/pineta/packages/schema/backends/yjs
         version: link:../../../kyneta/workspace/pineta/packages/schema/backends/yjs
-      '@pineta/core':
+      '@pinetrie/core':
         specifier: workspace:*
         version: link:../core
 
@@ -296,19 +296,19 @@ importers:
       '@kyneta/websocket-transport':
         specifier: link:../../../kyneta/workspace/pineta/packages/exchange/transports/websocket
         version: link:../../../kyneta/workspace/pineta/packages/exchange/transports/websocket
-      '@pineta/core':
+      '@pinetrie/core':
         specifier: workspace:*
         version: link:../core
-      '@pineta/protocol':
+      '@pinetrie/protocol':
         specifier: workspace:*
         version: link:../protocol
-      '@pineta/reads':
+      '@pinetrie/reads':
         specifier: workspace:*
         version: link:../reads
-      '@pineta/rules':
+      '@pinetrie/rules':
         specifier: workspace:*
         version: link:../rules
-      '@pineta/schema':
+      '@pinetrie/schema':
         specifier: workspace:*
         version: link:../schema
 

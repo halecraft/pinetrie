@@ -1,4 +1,4 @@
-import { ERR } from "@pineta/core"
+import { ERR } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   identityCodec,

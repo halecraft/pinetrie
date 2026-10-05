@@ -49,7 +49,7 @@ how contributors can be told apart without the host watching every card.
 
 ## Method
 
-One disposable probe in `apps/pineta/e2e/`, not checked in, run with `node`.
+One disposable probe in `apps/pinetrie/e2e/`, not checked in, run with `node`.
 A minimal host built as `startHost` builds its exchange: the SQLite store
 (`openStore`), a `WebsocketServerTransport` behind `node:http` and `ws`,
 `departureTimeout: 0`, a write policy, and a `resolve` for `cards`, `card:`
@@ -58,7 +58,7 @@ and `undo:`. Two Node clients (Ada and Bea), each an `Exchange` over
 was `yjs.bind` of a record of flat string structs; each card's text was a
 `{ text: Schema.text() }` Yjs document. `clientID`s were read with `unwrap`
 from `store.clients`. Undo used `createUndoStack` from the Kyneta build
-Pineta links (`needed-by-pineta`, with "selective, durable undo across
+pine·trie links (`needed-by-pinetrie`, with "selective, durable undo across
 documents"). The host was restarted over the same file to see what stayed
 stored.
 
@@ -102,7 +102,7 @@ stored.
 5. **A spent card's undo steps are wasted.** Ask Kyneta: a document its
    authority has dismissed should count as not standing, so the stack skips
    its steps, as it skips a step nothing of which still stands. Kyneta now
-   skips a step whose document is not held; Pineta destroys each client's
+   skips a step whose document is not held; pine·trie destroys each client's
    copy when the host lets go of it (S64).
 6. **The sender's text and the host's copy agree** at the moment of a send
    from one client, since one client's writes arrive in order. The chat

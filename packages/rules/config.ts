@@ -1,4 +1,4 @@
-// config — reading the user config (`~/.config/pineta/config.json`): the
+// config — reading the user config (`~/.config/pinetrie/config.json`): the
 // helpers its settings' decoders share (`decodeBannerConfig`,
 // `decodeDigestConfig`, `decodeTitleConfig`). Each decoder is total: a
 // missing or malformed setting takes its default.

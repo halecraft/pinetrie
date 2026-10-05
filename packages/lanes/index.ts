@@ -1,5 +1,5 @@
 // lanes — a lane's Linux container and its disk, and jj and git in it
-// (ADR-0032, ADR-0033, ADR-0034). Your repo is `@pineta/repo`'s, which builds
+// (ADR-0032, ADR-0033, ADR-0034). Your repo is `@pinetrie/repo`'s, which builds
 // on this package: what a lane also runs, through a runner it is given, is
 // here.
 

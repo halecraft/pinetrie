@@ -2,14 +2,20 @@
 // fingerprint read at one operation (`fingerprintRead`, `parseFingerprint`),
 // and what moved between two (`planObserve`). Pure; the owner reads and acts.
 
-import type { ThreadName } from "@pineta/core"
+import type { ThreadName } from "@pinetrie/core"
 import {
   type CommitId,
   commitId,
   isLaneName,
   type LaneName,
-} from "@pineta/core"
-import { type LineConfig, offerBookmark, revsetName } from "@pineta/lanes"
+} from "@pinetrie/core"
+import {
+  LANE_REMOTE_PREFIX,
+  type LineConfig,
+  OFFER_BOOKMARKS,
+  OFFER_PREFIX,
+  revsetName,
+} from "@pinetrie/lanes"
 
 /**
  * What an outside change can move: the line, the WIPs, the publish bookmark,
@@ -40,13 +46,10 @@ export interface Moved {
   readonly offers: ReadonlySet<ThreadName>
 }
 
-const OFFER_PREFIX = offerBookmark("" as ThreadName)
-const LANE_REMOTE = "pineta-"
-
-/** A lane's remote in your repo is `pineta-<lane>` (`laneTipName`). */
+/** A lane's remote in your repo is `pinetrie-<lane>` (`laneTipName`). */
 const laneOfRemote = (remote: string): LaneName | null => {
-  const lane = remote.slice(LANE_REMOTE.length)
-  return remote.startsWith(LANE_REMOTE) && isLaneName(lane) ? lane : null
+  const lane = remote.slice(LANE_REMOTE_PREFIX.length)
+  return remote.startsWith(LANE_REMOTE_PREFIX) && isLaneName(lane) ? lane : null
 }
 
 /** Whether a local bookmark is one an offer or the line's record depends on. */
@@ -67,8 +70,8 @@ export function fingerprintRead(line: LineConfig): readonly string[] {
     `present(${revsetName(line.onto)})`,
     `bookmarks(glob:${revsetName(`${line.wipPrefix}*`)})`,
     `present(${revsetName(line.publish)})`,
-    `bookmarks(glob:${revsetName(`${OFFER_PREFIX}*`)})`,
-    `remote_bookmarks(remote=glob:${revsetName(`${LANE_REMOTE}*`)})`,
+    OFFER_BOOKMARKS,
+    `remote_bookmarks(remote=glob:${revsetName(`${LANE_REMOTE_PREFIX}*`)})`,
     "@",
   ].join(" | ")
   return [

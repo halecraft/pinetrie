@@ -37,7 +37,7 @@ parked lane cannot be stopped for good.
 2. **A Stop during a tool needs the tool stopped apart from pi** (measured).
    A tool cannot defer. The probe's tool watched the park signal and threw
    "Command stopped". pi recorded that as the call's result, as an error,
-   and the next request was parked. In Pineta that means aborting the lane's
+   and the next request was parked. In pine·trie that means aborting the lane's
    running calls (`lane-env.ts`, `{ abort }`) without `lane.abort`.
 
 3. **While parked, the lane is open** (measured).
@@ -65,7 +65,7 @@ parked lane cannot be stopped for good.
    parked turn: two user messages in a row, as after today's Stop.
 
 6. **A restart keeps the parked run** (measured).
-   - A new harness over the same storage lists it in `open`. Pineta's
+   - A new harness over the same storage lists it in `open`. pine·trie's
      `Agent.interrupted()` would list it too, so `planStartup` would resume
      it on its own unless parked runs are told apart from crashed ones.
    - A new provider has no memory of the handle, so `fetchDeferred` must
@@ -82,14 +82,14 @@ parked lane cannot be stopped for good.
      Whether `ModelRuntime`'s models are mutable is not checked.
    - **No pi-ai provider implements deferral today** (`fetchDeferred` appears
      only in faux and the lazy wrapper). The mechanism is pi's, but every
-     deferral here would be Pineta's own.
-   - **Pineta would treat a parked run as ended.** `thread-lanes.ts`'s `turn`
+     deferral here would be pine·trie's own.
+   - **pine·trie would treat a parked run as ended.** `thread-lanes.ts`'s `turn`
      treats any `ok` result as ended: it records the turn and the host ends
      the run (verdict, queued cards, the lane's container stopped).
      `SuspendedRun` would have to be an outcome of its own.
 
 **Decision.** Parking is feasible and gives a true resume: no new message,
-one run, the same request re-sent. Its cost lands in Pineta:
+one run, the same request re-sent. Its cost lands in pine·trie:
 - a wrapping provider;
 - a per-call tool stop that does not go through pi's abort;
 - a "parked" outcome through the host, its startup and asks (ADR-0056);

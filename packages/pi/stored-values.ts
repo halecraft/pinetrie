@@ -4,7 +4,7 @@
 // entry with its message's images as references (ADR-0051). Every other value
 // is stored as it is. Pure; `KynetaStorage` gathers the lookups.
 
-import type { StoredValueRecord } from "@pineta/schema"
+import type { StoredValueRecord } from "@pinetrie/schema"
 import {
   CHECKPOINT_NAMESPACE,
   sealCheckpoint,

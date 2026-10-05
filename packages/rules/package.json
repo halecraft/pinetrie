@@ -1,5 +1,5 @@
 {
-  "name": "@pineta/rules",
+  "name": "@pinetrie/rules",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -7,7 +7,7 @@
     ".": "./index.ts"
   },
   "dependencies": {
-    "@pineta/core": "workspace:*",
+    "@pinetrie/core": "workspace:*",
     "mdast-util-from-markdown": "2.0.3",
     "mdast-util-gfm": "3.1.0",
     "micromark-extension-gfm": "3.0.0",

@@ -2,7 +2,7 @@
 // (ADR-0078), with no prop through the memoised list and messages: a context
 // change redraws only the components that read it.
 
-import type { EntryId } from "@pineta/core"
+import type { EntryId } from "@pinetrie/core"
 import { createContext } from "react"
 import type { PaneSubject } from "./pane.ts"
 

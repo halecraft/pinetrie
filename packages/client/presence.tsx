@@ -5,8 +5,8 @@
 // get colours far from each other and from the tracks; the rest, a hue from
 // their writer id.
 
-import { type TreeIndex, type WriterId, writersOf } from "@pineta/core"
-import { displayName } from "@pineta/rules"
+import { type TreeIndex, type WriterId, writersOf } from "@pinetrie/core"
+import { displayName } from "@pinetrie/rules"
 
 /**
  * The first people's colours: magenta, white and yellow, far apart, and apart

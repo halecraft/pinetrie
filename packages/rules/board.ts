@@ -25,7 +25,7 @@ import {
   type WorkflowStateId,
   type WriterId,
   workflowStateIdFor,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { Type } from "typebox"
 import { decodeAt, fixedKey, rootKey } from "./decode.ts"
 import { keyAfter, orderBetween, orderKeys } from "./order.ts"
@@ -49,7 +49,7 @@ const stateOf = (s: { id: string; name: string }): WorkflowState | undefined =>
 
 /** The session's workflow: one value, at `WORKFLOW_KEY`. */
 export const WORKFLOW: RecordSpec<Workflow, typeof WORKFLOW_KEY, "session"> = {
-  namespace: "pineta.workflow",
+  namespace: "pinetrie.workflow",
   home: "session",
   keyOf: () => WORKFLOW_KEY,
   encode: w => ({
@@ -75,7 +75,7 @@ const PlaceSchema = Type.Object({
 
 /** Each root's place on the board, at its `RootId`. */
 export const BOARD: RecordSpec<BoardPlace, RootId, "session"> = {
-  namespace: "pineta.board",
+  namespace: "pinetrie.board",
   home: "session",
   keyOf: p => p.root,
   encode: ({ root, ...contents }) => contents,

@@ -7,7 +7,7 @@ import {
   rootIdFor,
   snapshotId,
   writerId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   forkPoint,
@@ -49,7 +49,7 @@ describe("records: one spec each, total decoders", () => {
   test("each record round-trips, keyed as its reader expects", () => {
     const l = setRecord(LANE_RECORD, lane)
     expect([l.namespace, l.key, LANE_RECORD.decode(l.value, l.key)]).toEqual([
-      "pineta.lane",
+      "pinetrie.lane",
       LANE,
       lane,
     ])
@@ -211,7 +211,7 @@ describe("forkPoint: a snapshot to clone, and what to start on", () => {
   const S = snapshotId("e")
   const begin = {
     kind: "line",
-    onto: "pineta-onto",
+    onto: "pinetrie-onto",
     commit: commitId("l1"),
   } as const
   test("from a turn: its snapshot and the commit above", () => {

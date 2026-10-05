@@ -13,8 +13,8 @@ import {
   CONFLICT_TOOL,
   type LaneName,
   SPLIT_TOOL,
-} from "@pineta/core"
-import type { BannerAnswer, BannerAsk } from "@pineta/rules"
+} from "@pinetrie/core"
+import type { BannerAnswer, BannerAsk } from "@pinetrie/rules"
 import { BANNER_TOOL, bannerTool } from "./banner.ts"
 import { readImageProcessor } from "./images.ts"
 import { conflictTool, type LaneHooks } from "./lanes.ts"

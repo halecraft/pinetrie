@@ -1,7 +1,7 @@
 // Mutations for the host and the interface, checked by the host, live and
 // browser suites. Each runs one scenario (`suite`, `scenario`) to the check
 // it expects: seconds for a host scenario, a minute or two for a browser one.
-// The browser suite needs Chromium's headless shell (apps/pineta/e2e/browser.ts).
+// The browser suite needs Chromium's headless shell (apps/pinetrie/e2e/browser.ts).
 // Run: pnpm mutate scripts/mutations/app.ts [name-substring]
 import type { Mutation } from "../mutate.ts"
 
@@ -9,7 +9,7 @@ export const mutations: readonly Mutation[] = [
   {
     // Needs `container`: run on the Mac.
     name: "a catch-up's turn names no commit",
-    file: "apps/pineta/host/work/turns.ts",
+    file: "apps/pinetrie/host/work/turns.ts",
     from: "        const merged = turnMerged(index, tip)",
     to: "        const merged = false && turnMerged(index, tip)",
     suite: "lanes",
@@ -20,7 +20,7 @@ export const mutations: readonly Mutation[] = [
   {
     // Needs `container`: run on the Mac.
     name: "an offer integration's fact is never written",
-    file: "apps/pineta/host/commands/lane.ts",
+    file: "apps/pinetrie/host/commands/lane.ts",
     from: "    .run(() => recordFact(deps, done.fact))",
     to: "    .run(async () => {})",
     suite: "lanes",
@@ -30,7 +30,7 @@ export const mutations: readonly Mutation[] = [
   // ── card history and traces (ADR-0048 step 6) ──
   {
     name: "the host reads no presence for traces",
-    file: "apps/pineta/host/provenance.ts",
+    file: "apps/pinetrie/host/provenance.ts",
     from: "        reading: readReading(deps.presence),",
     to: "        reading: [],",
     suite: "host",
@@ -50,7 +50,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the dispatcher drops traces seen",
-    file: "apps/pineta/host/commands/index.ts",
+    file: "apps/pinetrie/host/commands/index.ts",
     from: "        return cardCommands.tracesSeen(writer, intent.traces)",
     to: '        return settled({ kind: "seen" })',
     suite: "host",
@@ -100,8 +100,8 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the live prompt asks for another token",
-    file: "apps/pineta/e2e/host/live.scenario.ts",
-    from: 'const PROMPT = "Say exactly: PINETA-OK"',
+    file: "apps/pinetrie/e2e/host/live.scenario.ts",
+    from: 'const PROMPT = "Say exactly: PINETRIE-OK"',
     to: 'const PROMPT = "Say exactly: SOMETHING-ELSE"',
     suite: "live",
     scenario: "live",
@@ -195,7 +195,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the host does not wait for its stored session",
-    file: "apps/pineta/host/index.ts",
+    file: "apps/pinetrie/host/index.ts",
     from: "  await whenHydrated(session)",
     to: "  void whenHydrated(session)",
     suite: "host",
@@ -205,47 +205,47 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the host binds every interface by default",
-    file: "apps/pineta/host/admission.ts",
+    file: "apps/pinetrie/host/admission.ts",
     from: 'export const DEFAULT_BIND = "127.0.0.1"',
     to: 'export const DEFAULT_BIND = "0.0.0.0"',
-    command: ["pnpm", "exec", "vitest", "run", "apps/pineta/host"],
+    command: ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host"],
     expect: "the default bind is loopback",
   },
   {
     name: "admits ignores the key",
-    file: "apps/pineta/host/admission.ts",
+    file: "apps/pinetrie/host/admission.ts",
     from: "  if (key === null) return isLoopbackHost(request.host) ? ADMIT : REFUSE",
     to: '  if (key !== "") return ADMIT',
-    command: ["pnpm", "exec", "vitest", "run", "apps/pineta/host"],
+    command: ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host"],
     expect: "a wrong, empty or missing key is refused",
   },
   {
     name: "admits ignores Origin",
-    file: "apps/pineta/host/admission.ts",
+    file: "apps/pinetrie/host/admission.ts",
     from: "  if (request.origin !== undefined && !sameHost(request.origin, request.host))",
     to: '  if (request.origin === "" && !sameHost(request.origin, request.host))',
-    command: ["pnpm", "exec", "vitest", "run", "apps/pineta/host"],
+    command: ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host"],
     expect: "an Origin naming another host is refused",
   },
   {
     name: "admits ignores Host on loopback",
-    file: "apps/pineta/host/admission.ts",
+    file: "apps/pinetrie/host/admission.ts",
     from: "  if (key === null) return isLoopbackHost(request.host) ? ADMIT : REFUSE",
     to: "  if (key === null) return ADMIT",
-    command: ["pnpm", "exec", "vitest", "run", "apps/pineta/host"],
+    command: ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host"],
     expect: "a Host that is not this machine's name is refused",
   },
   {
     name: "the invite redirect keeps the key",
-    file: "apps/pineta/host/admission.ts",
+    file: "apps/pinetrie/host/admission.ts",
     from: '    url.searchParams.delete("key")',
     to: '    url.searchParams.has("key")',
-    command: ["pnpm", "exec", "vitest", "run", "apps/pineta/host"],
+    command: ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host"],
     expect: "sent to the URL without it",
   },
   {
     name: "the http handler skips admission",
-    file: "apps/pineta/host/http.ts",
+    file: "apps/pinetrie/host/http.ts",
     from: '      case "refuse":\n        res.writeHead(403).end()\n        return',
     to: '      case "refuse":\n        vite.middlewares(req, res)\n        return',
     suite: "host",
@@ -254,7 +254,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the websocket upgrade skips admission",
-    file: "apps/pineta/host/http.ts",
+    file: "apps/pinetrie/host/http.ts",
     from: '      case "refuse":\n        socket.end("HTTP/1.1 403 Forbidden\\r\\n\\r\\n")\n        return\n      case "exchange":',
     to: '      case "refuse":\n      case "exchange":',
     suite: "host",
@@ -283,7 +283,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a run's end does not compact",
-    file: "apps/pineta/host/index.ts",
+    file: "apps/pinetrie/host/index.ts",
     from: "    void settle([lane])",
     to: "    void keeper.run(() => drain(lane))",
     suite: "host",
@@ -292,7 +292,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "startup does not compact",
-    file: "apps/pineta/host/index.ts",
+    file: "apps/pinetrie/host/index.ts",
     from: "    settle,\n    cards: cardPort,\n    provenance,\n    ensureNames: names.ensure,\n    carryOver,\n  })",
     to: "    settle: lanes =>\n      keeper.run(async () => {\n        for (const l of lanes) await drain(l)\n      }),\n    cards: cardPort,\n    provenance,\n    ensureNames: names.ensure,\n    carryOver,\n  })",
     suite: "host",
@@ -310,7 +310,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the browser suite runs against production React",
-    file: "apps/pineta/e2e/browser.ts",
+    file: "apps/pinetrie/e2e/browser.ts",
     from: 'await runSuite("e2e:browser", path.join(import.meta.dirname, "browser"))',
     to: 'process.env.NODE_ENV = "production"\nawait runSuite("e2e:browser", path.join(import.meta.dirname, "browser"))',
     suite: "browser",
@@ -405,7 +405,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the startup sweep deletes nothing",
-    file: "apps/pineta/host/index.ts",
+    file: "apps/pinetrie/host/index.ts",
     from: "    await store.delete(id)",
     to: "    void id",
     suite: "host",
@@ -555,7 +555,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the host neither stores nor relays your list",
-    file: "apps/pineta/host/index.ts",
+    file: "apps/pinetrie/host/index.ts",
     from: '        case "open":\n          return Interpret(OpenDoc)\n',
     to: "",
     suite: "browser",
@@ -1015,7 +1015,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the host serves before it has recovered",
-    file: "apps/pineta/host/index.ts",
+    file: "apps/pinetrie/host/index.ts",
     from: "  await recover({",
     to: "  void recover({",
     suite: "host",
@@ -1025,7 +1025,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a new thread's banner waits for its run's end",
-    file: "apps/pineta/host/index.ts",
+    file: "apps/pinetrie/host/index.ts",
     from: '    onNamed: lane => {\n      banners?.due(lane).catch(failed(basics, "banner"))\n',
     to: "    onNamed: lane => {\n",
     suite: "host",
@@ -1035,7 +1035,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the agent is never given set_banner",
-    file: "apps/pineta/host/index.ts",
+    file: "apps/pinetrie/host/index.ts",
     from: "      : { banners: { config: bannerConfig, request: banners.request } }),",
     to: "      : {}),",
     suite: "host",
@@ -1094,7 +1094,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the host resolves no card a client creates",
-    file: "apps/pineta/host/index.ts",
+    file: "apps/pinetrie/host/index.ts",
     from: '        case "text":\n          return Interpret(TextDoc)',
     to: '        case "text":\n          return undefined',
     suite: "host",
@@ -1104,7 +1104,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the host writes no seat records",
-    file: "apps/pineta/host/seats.ts",
+    file: "apps/pinetrie/host/seats.ts",
     from: "      await agent.writeValues(seats.map(seat => setRecord(SEAT, seat)))",
     to: "      void seats",
     suite: "host",
@@ -1172,7 +1172,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the dispatcher answers a move on the board without moving",
-    file: "apps/pineta/host/commands/index.ts",
+    file: "apps/pinetrie/host/commands/index.ts",
     from: "        return settled(await handleRootMove(deps, writer, intent))",
     to: '        return settled({ kind: "moved-root" })',
     suite: "host",
@@ -1182,7 +1182,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a started root is never placed",
-    file: "apps/pineta/host/commands/index.ts",
+    file: "apps/pinetrie/host/commands/index.ts",
     from: '        if (intent.at.kind === "root" && spendsCard(sent))',
     to: '        if (intent.at.kind === "root" && spendsCard(sent) && false)',
     suite: "host",
@@ -1192,7 +1192,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a root moved out of Done keeps its place there",
-    file: "apps/pineta/host/commands/board.ts",
+    file: "apps/pinetrie/host/commands/board.ts",
     from: "  // execute\n  await deps.agent.writeValues(writes)\n",
     to: '  // execute\n  if (moved.transition === "close") await deps.agent.writeValues(writes)\n',
     suite: "host",
@@ -1202,7 +1202,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the dispatcher answers mark without titling",
-    file: "apps/pineta/host/commands/index.ts",
+    file: "apps/pinetrie/host/commands/index.ts",
     from: "        return settled(await handleMark(deps, writer, intent))",
     to: '        return settled({ kind: "marked" })',
     suite: "host",
@@ -1239,7 +1239,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the agent writes into another document",
-    file: "apps/pineta/host/index.ts",
+    file: "apps/pinetrie/host/index.ts",
     from: "    documents: docs,\n    replicaId: newId(),",
     to: "    documents: { ...docs, root: async () => newRootDoc() },\n    replicaId: newId(),",
     suite: "host",
@@ -1248,7 +1248,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the agent's streams reach no document",
-    file: "apps/pineta/host/index.ts",
+    file: "apps/pinetrie/host/index.ts",
     from: "    onStream: streamInto(basics),",
     to: "    onStream: () => {},",
     suite: "host",
@@ -1257,7 +1257,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the commands record lists none",
-    file: "apps/pineta/host/startup.ts",
+    file: "apps/pinetrie/host/startup.ts",
     from: "      commands: agent.commands().map(c => ({",
     to: "      commands: agent.commands().filter(() => false).map(c => ({",
     suite: "host",
@@ -1286,7 +1286,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a direct lane works in the project",
-    file: "apps/pineta/host/work/containers.ts",
+    file: "apps/pinetrie/host/work/containers.ts",
     from: "          dir: record.work.dir,",
     to: "          dir: setup.project?.root ?? record.work.dir,",
     suite: "host",
@@ -1296,7 +1296,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "an upload answers another hash",
-    file: "apps/pineta/host/http.ts",
+    file: "apps/pinetrie/host/http.ts",
     from: "      send(res, uploaded(blobs.put(prepared.image)))",
     to: '      send(res, uploaded({ ...blobs.put(prepared.image), sha256: "0" }))',
     suite: "host",
@@ -1324,7 +1324,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "images are kept in memory, not the store's file",
-    file: "apps/pineta/host/store.ts",
+    file: "apps/pinetrie/host/store.ts",
     from: "  return { store, blobs: sqliteBlobs(db) }",
     to: '  return { store, blobs: sqliteBlobs(new DatabaseSync(":memory:")) }',
     suite: "host",
@@ -1334,7 +1334,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the agent is given no tools",
-    file: "apps/pineta/host/index.ts",
+    file: "apps/pinetrie/host/index.ts",
     from: "    tools:\n      toolsIn === null\n        ? null",
     to: "    tools:\n      true\n        ? null",
     suite: "host",
@@ -1382,7 +1382,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a stop is recorded under no one who pressed it",
-    file: "apps/pineta/host/commands/index.ts",
+    file: "apps/pinetrie/host/commands/index.ts",
     from: "        return settled(await handleStop(deps, intent.lane, writer))",
     to: "        return settled(await handleStop(deps, intent.lane, intent.lane as never))",
     suite: "host",
@@ -1391,7 +1391,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "Resume stops the thread instead",
-    file: "apps/pineta/host/commands/index.ts",
+    file: "apps/pinetrie/host/commands/index.ts",
     from: "        return settled(await handleCarryOn(deps, intent.lane, writer))",
     to: "        return settled(await handleStop(deps, intent.lane, writer))",
     suite: "host",
@@ -1440,7 +1440,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a popped queued card is sent as the card's owner, not who queued it",
-    file: "apps/pineta/host/index.ts",
+    file: "apps/pinetrie/host/index.ts",
     from: "            popped.card.place.by,\n            newId(),",
     to: "            popped.card.owner,\n            newId(),",
     suite: "host",
@@ -1450,7 +1450,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a queue move asks for no drain",
-    file: "apps/pineta/host/index.ts",
+    file: "apps/pinetrie/host/index.ts",
     from: "    drain: lane => queueDrain(lane),\n    histories,",
     to: "    drain: () => {},\n    histories,",
     suite: "host",
@@ -1547,7 +1547,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the drain waits behind a move that came after the queue",
-    file: "apps/pineta/host/index.ts",
+    file: "apps/pinetrie/host/index.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "    void keeper.once(`drain:${lane}`, () => drain(lane))",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
@@ -1570,7 +1570,7 @@ export const mutations: readonly Mutation[] = [
   // ── your inventory (ADR-0048 step 4) ──
   {
     name: "every inventory is shared with every peer",
-    file: "apps/pineta/host/policy.ts",
+    file: "apps/pinetrie/host/policy.ts",
     from: "      : (routeLine(docId, peer) ?? holdsPersonDoc(docId, peer.principal)),",
     to: "      : (routeLine(docId, peer) ??\n        (holdsPersonDoc(docId, peer.principal) === undefined ? undefined : true)),",
     suite: "host",
@@ -1646,7 +1646,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the host neither stores nor relays an inventory",
-    file: "apps/pineta/host/index.ts",
+    file: "apps/pinetrie/host/index.ts",
     from: "          return Interpret(InventoryDoc)",
     to: "          return undefined",
     suite: "browser",
@@ -1684,7 +1684,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a starting host retires every history of moves",
-    file: "apps/pineta/host/housekeeping.ts",
+    file: "apps/pinetrie/host/housekeeping.ts",
     from: "    roots: readRoots(session),",
     to: "    roots: new Map(),",
     suite: "host",
@@ -1703,7 +1703,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "an archived root's harness outlives its document",
-    file: "apps/pineta/host/index.ts",
+    file: "apps/pinetrie/host/index.ts",
     from: "      await created?.release(root)\n",
     to: "",
     suite: "browser",
@@ -1713,7 +1713,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a host leaves Vite open as it stops",
-    file: "apps/pineta/host/http.ts",
+    file: "apps/pinetrie/host/http.ts",
     from: "      await vite.close()\n",
     to: "",
     suite: "browser",
@@ -1722,7 +1722,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the host never titles a root unasked",
-    file: "apps/pineta/host/index.ts",
+    file: "apps/pinetrie/host/index.ts",
     from: "    enabled: titleConfig.enabled,",
     to: "    enabled: false,",
     suite: "host",
@@ -1751,7 +1751,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "startHost runs read no pinned cards",
-    file: "apps/pineta/host/index.ts",
+    file: "apps/pinetrie/host/index.ts",
     from: "    readPinned,\n    readBehind: baseNews.atStart,\n",
     to: "    readPinned: async () => null,\n    readBehind: baseNews.atStart,\n",
     suite: "host",
@@ -1761,7 +1761,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a run does not wait for its pinned cards' text",
-    file: "apps/pineta/host/pinned.ts",
+    file: "apps/pinetrie/host/pinned.ts",
     from: "      seen.filter(s => ids.has(s.id)),",
     to: "      [],",
     suite: "host",
@@ -1811,7 +1811,7 @@ export const mutations: readonly Mutation[] = [
   // ── queue control (ADR-0048 step 7) ──
   {
     name: "the drain is never woken once typing stops",
-    file: "apps/pineta/host/index.ts",
+    file: "apps/pinetrie/host/index.ts",
     from: "    wait(card, signal => untilNotTyped(presence, card.id, signal))",
     to: "    wait(card, () => new Promise<void>(() => {}))",
     suite: "host",
@@ -1821,7 +1821,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a starting host sweeps every hold",
-    file: "apps/pineta/host/housekeeping.ts",
+    file: "apps/pinetrie/host/housekeeping.ts",
     from: "    rootOf: lane => lanes.get(lane)?.root ?? null,",
     to: "    rootOf: () => null,",
     suite: "host",

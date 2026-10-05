@@ -10,7 +10,7 @@ mandatory).
 Amended by ADR-0080: a resolution ends like any run. `ask_for_guidance` is
 renamed `ask_about_conflict`, and is accepted while jj finds conflicts in
 the lane's copy; the strip's "needs you" is read from the thread's newest
-ask, conflicts left are the offer's, and `pineta.landing` goes (S104).
+ask, conflicts left are the offer's, and `pinetrie.landing` goes (S104).
 **Amended by ADR-0084:** a resolution's prompt fits what pi keeps
 when it compacts; over it, the hunks give way to conflict sections, then
 names, then a count, before the reasons do.
@@ -18,7 +18,7 @@ names, then a count, before the reasons do.
 **Context.** A fold of files and a landing are jj merges in a lane's
 workspace (ADR-0032). jj records conflicts rather than failing, so a merge
 always completes and may leave conflicts on disk (S36 item 11). A merge tool
-sees only text. Pineta also knows why each side changed a line: a conflicting
+sees only text. pine·trie also knows why each side changed a line: a conflicting
 hunk traces through turn revisions to the messages that produced it. ADR-0010
 showed that a fold without labelled sides is confidently wrong. Merges also
 conflict without touching the same lines: both sides can merge cleanly and
@@ -44,10 +44,10 @@ still break each other. How cautious to be varies by person and by repo.
   is never dropped. Under a budget, the messages are compacted first, never
   the hunks. (*Amended by ADR-0084:* the hunks give way first, to conflict
   sections, names or a count, since the agent can read them in its lane.)
-- **The policy is a skill, `resolve-conflicts`.** Pineta ships a `SKILL.md`
+- **The policy is a skill, `resolve-conflicts`.** pine·trie ships a `SKILL.md`
   and loads it as an extra skill path. pi loads your skills, then the repo's
   (`.pi/skills`), then extra paths, and the first of a name wins. So a
-  `resolve-conflicts` of yours or the repo's replaces Pineta's with no
+  `resolve-conflicts` of yours or the repo's replaces pine·trie's with no
   configuration. Its frontmatter sets `disable-model-invocation: true`, so the
   agent never picks it from its list, and only the host invokes it. The skill
   says:
@@ -60,13 +60,13 @@ still break each other. How cautious to be varies by person and by repo.
 
   It is read from your working copy, never from the lane's, so a branch cannot
   change the rules that judge its own merge.
-- **The prompt is Pineta's message, not the skill's text.** The column shows a
+- **The prompt is pine·trie's message, not the skill's text.** The column shows a
   short resolution message ("3 conflicts merging 'aside' into this thread")
   whose details record the skill's path and a hash of its content. The model
   sees the skill's content and the conflict material. pi's `lane.skill` is not
   used: it would write the whole skill into the tree as a `user` message.
 - **The agent can always stop; it can never claim a success the repository
-  contradicts.** A resolution run may call a Pineta tool, `ask_for_guidance`,
+  contradicts.** A resolution run may call a pine·trie tool, `ask_for_guidance`,
   with its question, to end as "needs you" whatever the files say. The skill
   tells it to leave a conflict it should ask about unresolved rather than
   pick a side. When the run ends, the host decides:
@@ -87,7 +87,7 @@ still break each other. How cautious to be varies by person and by repo.
 - Changing the skill changes the policy without changing code. Someone whose
   skill says "always resolve" gets that: the skill is theirs. It cannot remove
   the labels, the destination's side, or the host's check of the outcome.
-- `setUpModel` loads Pineta's skill directory as an extra path, and the
+- `setUpModel` loads pine·trie's skill directory as an extra path, and the
   harness never needs the skill in its `resources`.
 - Fold's synthesis can later become a skill, `fold`, in the same way.
 
@@ -95,7 +95,7 @@ still break each other. How cautious to be varies by person and by repo.
 - jj's merge tools or an external merge tool (they see text, not intent).
 - Resolving in your working copy (ADR-0032: agents never write there).
 - Trusting the agent's report of success (the repository can check it).
-- A policy written into Pineta (it cannot differ by person or by repo).
+- A policy written into pine·trie (it cannot differ by person or by repo).
 - The policy in `AGENTS.md` (always in context, and not replaceable as one
   unit).
 - pi's `lane.skill` (it writes the whole skill into the tree).

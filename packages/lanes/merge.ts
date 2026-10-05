@@ -17,7 +17,7 @@ import {
   type LaneName,
   sourcesOf,
   trailerRevset,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { executeOrThrow, type Runners } from "./execute.ts"
 import {
   bookmarkName,
@@ -185,7 +185,7 @@ export async function mergeBase(
 /**
  * An empty commit on the lane's bookmark, described `message`: a thread
  * moved to the line when the line has nothing the lane lacks still needs its
- * newest `Pineta-Base` to say so (ADR-0060). Returns it.
+ * newest `Pinetrie-Base` to say so (ADR-0060). Returns it.
  */
 async function markBase(
   jj: Runner,
@@ -197,7 +197,7 @@ async function markBase(
 
 /**
  * A lane's base as its history says it (ADR-0060): the newest commit in
- * `::rev` whose message carries `Pineta-Base`, read with `jj` (the lane's,
+ * `::rev` whose message carries `Pinetrie-Base`, read with `jj` (the lane's,
  * or your repo's on the lane's tip). Its value names the bookmark and the
  * commit it pointed at; null for a lane with none, one from before the line.
  */

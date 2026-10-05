@@ -10,7 +10,7 @@ import {
   physicalKey,
   type StoredEntryRow,
   type StoredValueRecord,
-} from "@pineta/schema"
+} from "@pinetrie/schema"
 import type { Arrival, Batch } from "./arrivals.ts"
 import { inlineImages, type RefOf } from "./stored-images.ts"
 import { toStoredRow } from "./stored-row.ts"

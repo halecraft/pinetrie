@@ -1,7 +1,7 @@
 // client/line-view — the integration line in the footer (ADR-0060), "the
 // project" (ADR-0061), and publishing it (ADR-0076): what the host last read
 // of it, decided as a value (`lineView`) and worded in one function
-// (`lineWords`). Which actions may run is `@pineta/rules`' `lineActionState`,
+// (`lineWords`). Which actions may run is `@pinetrie/rules`' `lineActionState`,
 // the rule the host decides commands by.
 
 import {
@@ -9,13 +9,13 @@ import {
   type LineAction,
   type LineRecord,
   type ProjectRecord,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import {
   type LineActionState,
   lineActionState,
   lineRefusal,
-} from "@pineta/rules"
-import type { LineActing } from "@pineta/session"
+} from "@pinetrie/rules"
+import type { LineActing } from "@pinetrie/session"
 import { count } from "./counts.ts"
 import type { Intent } from "./intent.ts"
 import { outcomeWords } from "./outcome-words.ts"
@@ -147,7 +147,7 @@ const named = (files: readonly string[]): string =>
  * setup writes does not reach it (S77 item 8, `docs/the-jujutsu-repo.md`).
  */
 const JJUI_NOTE =
-  'jjui with a revset of its own: add | bookmarks(glob:"pineta-offer/*") to it'
+  'jjui with a revset of its own: add | bookmarks(glob:"pinetrie-offer/*") to it'
 
 const commits = (n: number) => count(n, "commit", "commits")
 
@@ -320,7 +320,7 @@ export function resolveIntent(
     kind: "newTab",
     asksAgent: true,
     prefill: {
-      text: `/pineta:skill:resolve-conflicts My files were updated from the project (${facts.onto}) and conflict${facts.conflicts.files.length === 0 ? "" : ` in ${facts.conflicts.files.join(", ")}`}. Resolve them in my working copy.`,
+      text: `/pinetrie:skill:resolve-conflicts My files were updated from the project (${facts.onto}) and conflict${facts.conflicts.files.length === 0 ? "" : ` in ${facts.conflicts.files.join(", ")}`}. Resolve them in my working copy.`,
       blank: false,
       work: { kind: "direct", dir: project.root },
     },

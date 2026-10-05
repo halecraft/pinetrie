@@ -1,7 +1,7 @@
 // participant — who is in a session, and what each is called.
 //
 // A session is its participants (ADR-0021). A name is a label, never an
-// identity: a `pineta.participant` value is a name, keyed by writer id.
+// identity: a `pinetrie.participant` value is a name, keyed by writer id.
 // Everyone who has written is a participant, named or not, so everyone shown
 // on screen can be mentioned.
 
@@ -9,7 +9,7 @@ import {
   emailLocalPart,
   type ParticipantRecord,
   type WriterId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { Type } from "typebox"
 import { decodeAt, writerKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
@@ -19,7 +19,7 @@ import type { RecordSpec } from "./records.ts"
  * Total: contents that are not a string are malformed.
  */
 export const PARTICIPANT: RecordSpec<ParticipantRecord, WriterId, "session"> = {
-  namespace: "pineta.participant",
+  namespace: "pinetrie.participant",
   home: "session",
   keyOf: r => r.writer,
   encode: r => r.name,

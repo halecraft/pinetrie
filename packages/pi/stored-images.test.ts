@@ -8,8 +8,8 @@ import {
   pendingEntry,
   setValue,
 } from "@earendil-works/pi-agent-core"
-import type { BlobStore, ImageRef, Sha256, StoredImage } from "@pineta/core"
-import { newRootDoc } from "@pineta/schema"
+import type { BlobStore, ImageRef, Sha256, StoredImage } from "@pinetrie/core"
+import { newRootDoc } from "@pinetrie/schema"
 import { describe, expect, test } from "vitest"
 import { sha256Of } from "./images.ts"
 import { KynetaStorage } from "./storage.ts"

@@ -10,8 +10,8 @@ import type {
   Position,
   SeatRecord,
   ThreadLane,
-} from "@pineta/core"
-import type { SessionClient } from "@pineta/session"
+} from "@pinetrie/core"
+import type { SessionClient } from "@pinetrie/session"
 import type { ReadOnly } from "./app-view.ts"
 import { CardEditor, type Where } from "./card-editor.tsx"
 import type { EditorState } from "./card-state.ts"

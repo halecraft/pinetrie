@@ -6,8 +6,8 @@
 // that person is NOW, with the name they sent it under when it differs, so a
 // message sent before someone named themselves does not read as a stranger's.
 
-import type { WriterId } from "@pineta/core"
-import { displayName } from "@pineta/rules"
+import type { WriterId } from "@pinetrie/core"
+import { displayName } from "@pinetrie/rules"
 
 /**
  * A message written together names its sender, then the others who wrote it

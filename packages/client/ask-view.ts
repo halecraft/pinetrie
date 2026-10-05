@@ -21,7 +21,7 @@ import {
   type StopRecord,
   type TreeIndex,
   type WriterId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { outcomeWords, workWords } from "./ask-words.ts"
 
 /** A column's messages as drawn: one on its own, or an ask's work together. */

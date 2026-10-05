@@ -19,7 +19,7 @@ import {
   THE_AGENT,
   workflowStateIdFor,
   writerId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { test } from "vitest"
 import {
   decodeCommand,

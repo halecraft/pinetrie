@@ -3,7 +3,7 @@ import {
   laneNameForThread,
   type Sha256,
   type ThreadName,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   BANNER,
@@ -124,7 +124,7 @@ describe("bannerPrompt", () => {
 
 test("a banner record round-trips, keyed by lane", () => {
   const e = setRecord(BANNER, banner)
-  expect([e.namespace, e.key]).toEqual(["pineta.banner", LANE])
+  expect([e.namespace, e.key]).toEqual(["pinetrie.banner", LANE])
   expect(BANNER.decode(structuredClone(e.value), LANE)).toEqual(banner)
   expect(BANNER.decode({ sha: "nope", at: 1 }, LANE)).toBeUndefined()
   // Written when a banner had a crop: still shown.

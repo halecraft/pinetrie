@@ -22,38 +22,44 @@ import {
   shellWord,
   type ThreadName,
   WORKSPACE_ROOT,
-} from "@pineta/core"
+} from "@pinetrie/core"
 
-/** Pineta's own install, read-only: the helper's code and pi's. */
-export const PINETA_MOUNT = "/pineta"
+/** pinetrie's own install, read-only: the helper's code and pi's. */
+export const PINETRIE_MOUNT = "/pinetrie"
 /**
- * Pineta's lane runtime, read-only: Node and its libraries (S44), and in
+ * pinetrie's lane runtime, read-only: Node and its libraries (S44), and in
  * `bin/` the static programs core's `RUNTIME_PROGRAMS` lists.
  */
-export const RUNTIME_MOUNT = "/pineta-runtime"
+export const RUNTIME_MOUNT = "/pinetrie-runtime"
 /** The runtime's programs, as a lane sees them: on its `PATH`, last. */
 export const RUNTIME_BIN = `${RUNTIME_MOUNT}/bin`
 /** The lane's own jj config, on its disk so that forks inherit it (S42 item 4). */
-export const LANE_CONFIG_DIR = `${WORKSPACE_ROOT}/.pineta-lane`
+export const LANE_CONFIG_DIR = `${WORKSPACE_ROOT}/.pinetrie-lane`
 export const LANE_JJ_CONFIG = `${LANE_CONFIG_DIR}/jj.toml`
 /** The branch a commit fetched by id is put on, so jj sees it (S44 item 7). */
-export const FETCHED_REF = "refs/heads/pineta/fetched"
+export const FETCHED_REF = "refs/heads/pinetrie/fetched"
+/** The directory the host keeps in a project's root (`pinetrieDir`). */
+export const PROJECT_DIR = ".pinetrie"
 /** A new volume's size. The image is sparse: only written blocks take space. */
 const DISK_SIZE = "64G"
 
 /** The bookmark that holds a lane's newest revision, in the lane's own repo. */
-export const bookmarkName = (lane: LaneName): string => `pineta/${lane}`
+export const bookmarkName = (lane: LaneName): string => `pinetrie/${lane}`
+
+/** A revset string literal, so a bookmark name is never parsed as a revset. */
+export const revsetName = (name: string): string => JSON.stringify(name)
 
 /** The revset of one bookmark, its name quoted so it is never parsed as a revset. */
 export const bookmarkRevset = (name: string): string =>
   `bookmarks(exact:${revsetName(name)})`
 
 /**
- * A lane's history in your repo: a remote bookmark, `tip@pineta-<lane>`,
+ * A lane's history in your repo: a remote bookmark, `tip@pinetrie-<lane>`,
  * which jj keeps out of your default log and immutable with its builtin
  * config, ancestors included (S48 items 11 and 19). No git remote is added.
  */
-const laneRemote = (lane: LaneName): string => `pineta-${lane}`
+export const LANE_REMOTE_PREFIX = "pinetrie-"
+const laneRemote = (lane: LaneName): string => `${LANE_REMOTE_PREFIX}${lane}`
 /** Where git keeps a lane's history in your repo: `laneTipName`'s ref. */
 export const laneTipRef = (lane: LaneName): string =>
   `refs/remotes/${laneRemote(lane)}/tip`
@@ -63,7 +69,8 @@ export const laneTipName = (lane: LaneName): string => `tip@${laneRemote(lane)}`
  * A split's stack (ADR-0038): the bookmark its run leaves in the lane's own
  * repo, and the remote bookmark it arrives as in yours.
  */
-export const stackBookmark = (lane: LaneName): string => `pineta/${lane}-stack`
+export const stackBookmark = (lane: LaneName): string =>
+  `pinetrie/${lane}-stack`
 /** Where git keeps a split's stack in your repo: `laneStackName`'s ref. */
 export const laneStackRef = (lane: LaneName): string =>
   `refs/remotes/${laneRemote(lane)}/stack`
@@ -71,16 +78,19 @@ export const laneStackName = (lane: LaneName): string =>
   `stack@${laneRemote(lane)}`
 
 /**
- * A lane's offer in your repo (ADR-0038). Not under `pineta/`, whose
+ * A lane's offer in your repo (ADR-0038). Not under `pinetrie/`, whose
  * bookmarks were immutable before ADR-0038 (S48 item 14).
  */
+export const OFFER_PREFIX = "pinetrie-offer/"
 export const offerBookmark = (name: ThreadName): string =>
-  `pineta-offer/${name}`
+  `${OFFER_PREFIX}${name}`
+/** Every offer's bookmark, as a revset. */
+export const OFFER_BOOKMARKS = `bookmarks(glob:${revsetName(`${OFFER_PREFIX}*`)})`
 
 /** The container and the volume of a lane share one name. */
-export const laneContainer = (lane: LaneName): string => `pineta-${lane}`
+export const laneContainer = (lane: LaneName): string => `pinetrie-${lane}`
 
-/** What a project lets cross a lane's boundary (ADR-0034), from `pineta.json`. */
+/** What a project lets cross a lane's boundary (ADR-0034), from `pinetrie.json`. */
 export interface LaneGrants {
   readonly ssh: boolean
   /** Environment variable names passed from the host. */
@@ -123,15 +133,15 @@ export interface LaneSpec {
 /**
  * Every mount a lane gets, in one list:
  * - your working copy, read-only at `/mnt/host-working-copy`;
- * - Pineta's own install at `/pineta` and its runtime at `/pineta-runtime`,
- *   and the directory of the lane's ignore file at `/pineta-git`, read-only;
+ * - pinetrie's own install at `/pinetrie` and its runtime at `/pinetrie-runtime`,
+ *   and the directory of the lane's ignore file at `/pinetrie-git`, read-only;
  * - links' and grants' mounts, read-only where they say;
  * - shared directories, read-write at their place in `/workspace` (ADR-0035);
  * - granted host paths, read-only at `/mnt/host` and their path (ADR-0036).
  */
 export function planMounts(parts: {
   readonly hostWorkingCopy: string
-  readonly pineta: string
+  readonly pinetrie: string
   readonly runtime: string
   readonly ignoreDir: string
   readonly links: readonly Mount[]
@@ -146,7 +156,7 @@ export function planMounts(parts: {
   })
   return [
     at(parts.hostWorkingCopy, HOST_WORKING_COPY),
-    at(parts.pineta, PINETA_MOUNT),
+    at(parts.pinetrie, PINETRIE_MOUNT),
     at(parts.runtime, RUNTIME_MOUNT),
     at(parts.ignoreDir, IGNORE_MOUNT),
     ...parts.links,
@@ -230,11 +240,11 @@ export interface SharedDir {
 }
 
 /** Where every lane sees its ignore file's directory. */
-export const IGNORE_MOUNT = "/pineta-git"
+export const IGNORE_MOUNT = "/pinetrie-git"
 /** The ignore file's name, in `ignoreDir` on the host and `IGNORE_MOUNT` in a lane. */
 export const IGNORE_FILE = "ignore"
 /** The label a container's spec hash is kept under. */
-export const SPEC_LABEL = "pineta.spec"
+export const SPEC_LABEL = "pinetrie.spec"
 
 const setEnv = (name: string, value: string): string[] => [
   "-e",
@@ -314,11 +324,11 @@ function runArgs(
 }
 
 /**
- * The lane's ignore file: what no repo in a lane may track. Pineta's own
+ * The lane's ignore file: what no repo in a lane may track. pinetrie's own
  * config, the file system's own directory, and each shared directory.
  */
 export const laneIgnores = (shared: readonly string[]): string =>
-  ["/.pineta-lane/", "/lost+found/", ...shared.map(p => `/${p}/`)]
+  ["/.pinetrie-lane/", "/lost+found/", ...shared.map(p => `/${p}/`)]
     .map(l => `${l}\n`)
     .join("")
 
@@ -327,7 +337,7 @@ const isRecord = (v: unknown): v is Readonly<Record<string, unknown>> =>
 const strings = (v: unknown): string[] =>
   Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []
 
-/** A `lanes` key: the project's `pineta.json`, or the user's config. */
+/** A `lanes` key: the project's `pinetrie.json`, or the user's config. */
 export interface LaneConfig {
   readonly grants: LaneGrants
   /** How the base snapshot installs; null with nothing to install. */
@@ -417,7 +427,7 @@ export interface LineConfig {
 }
 
 export const DEFAULT_LINE: LineConfig = {
-  onto: "pineta-onto",
+  onto: "pinetrie-onto",
   wipPrefix: "wip/",
   publish: "main",
 }
@@ -473,17 +483,14 @@ export function lineConfig(
   }
 }
 
-/** A revset string literal, so a bookmark name is never parsed as a revset. */
-export const revsetName = (name: string): string => JSON.stringify(name)
-
-/** Where a shared directory may never be: repos, Pineta's own, dependencies. */
-const NEVER_SHARED = [".git", ".jj", ".pineta", "node_modules"]
+/** Where a shared directory may never be: repos, pinetrie's own, dependencies. */
+const NEVER_SHARED = [".git", ".jj", PROJECT_DIR, "node_modules"]
 
 /**
  * Which shared directories apply, and what to do for them on the host. The
  * user's entries come first, then the project's, normalized and without
  * duplicates. Refused: absolute paths, paths that leave the project, those
- * in `.git`, `.jj`, `.pineta` or `node_modules`, and those holding files jj
+ * in `.git`, `.jj`, `.pinetrie` or `node_modules`, and those holding files jj
  * tracks. A missing directory is created; one your repo does not already
  * ignore is added to its exclude file.
  */
@@ -546,16 +553,16 @@ export function sharedCandidates(entries: {
   return { candidates, refused }
 }
 
-/** The line in your repo's exclude file that keeps `pinetaDir` out of it. */
-export const EXCLUDE_LINE = "/.pineta/"
+/** The line in your repo's exclude file that keeps `pinetrieDir` out of it. */
+export const EXCLUDE_LINE = `/${PROJECT_DIR}/`
 
 /**
- * What the host keeps in a project, all under `.pineta/` at its root, which
+ * What the host keeps in a project, all under `.pinetrie/` at its root, which
  * `EXCLUDE_LINE` keeps out of the project's repo (ADR-0086).
  */
-export function pinetaDir(root: string): {
+export function pinetrieDir(root: string): {
   readonly dir: string
-  /** The session's SQLite file, unless `PINETA_STORE` names another. */
+  /** The session's SQLite file, unless `PINETRIE_STORE` names another. */
   readonly store: string
   /** Snapshots of lanes' disks (`DiskPaths.snapshots`). */
   readonly snapshots: string
@@ -564,10 +571,10 @@ export function pinetaDir(root: string): {
   /** The lanes' ignore file's directory (`laneIgnores`). */
   readonly laneGit: string
 } {
-  const dir = path.join(root, ".pineta")
+  const dir = path.join(root, PROJECT_DIR)
   return {
     dir,
-    store: path.join(dir, "pineta.db"),
+    store: path.join(dir, "pinetrie.db"),
     snapshots: path.join(dir, "snapshots"),
     runtime: path.join(dir, "runtime"),
     laneGit: path.join(dir, "lane-git"),
@@ -599,7 +606,7 @@ export interface Link {
  * For each relative target outside the root, the directory beside the
  * project's that holds it is mounted where it resolves from `/workspace`: the
  * whole directory, since a linked package resolves its own dependencies
- * through the `node_modules` of its repo. Pineta's `link:` dependencies on
+ * through the `node_modules` of its repo. pinetrie's `link:` dependencies on
  * Kyneta resolve this way (S39 item 5).
  */
 export function planLinks(root: string, links: readonly Link[]): Mount[] {
@@ -684,7 +691,7 @@ export function fetchById(
 export interface DiskPaths {
   /** `container`'s volumes directory. */
   readonly volumes: string
-  /** The project's `.pineta/snapshots/`. */
+  /** The project's `.pinetrie/snapshots/`. */
   readonly snapshots: string
 }
 
@@ -776,7 +783,7 @@ export interface MergePlan {
   readonly steps: readonly LaneStep[]
   /** The commit to merge, or the copy the steps leave as `@-`. */
   readonly source: CommitId | "copy"
-  /** The line's names the base (`Pineta-Base`); a WIP's copy names its own; a parent's none (ADR-0072). */
+  /** The line's names the base (`Pinetrie-Base`); a WIP's copy names its own; a parent's none (ADR-0072). */
   readonly message: string
   /** With nothing to merge, a commit still names the line (`BaseMerge`). */
   readonly mark: boolean
@@ -790,7 +797,7 @@ export interface MergePlan {
 /**
  * An update's steps (ADR-0060). A WIP's copy fetches only the WIP's commit:
  * the copy's parent is the lane's own. The thread it branched from is merged
- * as the line's commit is, with no `Pineta-Base`: it is no base, and what
+ * as the line's commit is, with no `Pinetrie-Base`: it is no base, and what
  * the lane holds of it is its history (ADR-0072).
  */
 export function planMerge(from: BaseMerge): MergePlan {
@@ -963,8 +970,8 @@ export const planFork = (input: {
 /**
  * A git bundle of `bookmark` in the lane, written to the host file `to`,
  * excluding what your repo already has: a bundle naming only the bookmark
- * carries the whole history, 1.1 MB against 8 KB for one commit on Pineta's
- * repo (S43 item 8). Your repo imports it with `@pineta/repo`'s `planImport`.
+ * carries the whole history, 1.1 MB against 8 KB for one commit on pinetrie's
+ * repo (S43 item 8). Your repo imports it with `@pinetrie/repo`'s `planImport`.
  */
 export const planBundle = (input: {
   readonly bookmark: string
@@ -1091,7 +1098,7 @@ export interface HostFacts {
   readonly installed: boolean
   readonly running: boolean
   readonly kernel: boolean
-  /** A clone of a small file into `.pineta/snapshots/` shared its blocks. */
+  /** A clone of a small file into `.pinetrie/snapshots/` shared its blocks. */
   readonly clones: boolean
 }
 
@@ -1107,7 +1114,7 @@ export function planHost(f: HostFacts): ProjectRecord {
       : !f.kernel
         ? "`container` has no kernel: `container system kernel set --recommended`"
         : !f.clones
-          ? `${root}/.pineta/snapshots cannot clone copy-on-write: it must be on the same APFS volume as \`container\`'s data`
+          ? `${root}/.pinetrie/snapshots cannot clone copy-on-write: it must be on the same APFS volume as \`container\`'s data`
           : null
   return reason === null
     ? { kind: "lanes", root, rootDefault: "own" }
@@ -1132,7 +1139,7 @@ export type ProjectDirRefusal =
   | { readonly kind: "missing"; readonly dir: string }
   /** Your home directory or `/`. */
   | { readonly kind: "unsafe"; readonly root: string }
-  /** A jj repo with no git directory beside it to exclude `.pineta/` in (S108). */
+  /** A jj repo with no git directory beside it to exclude `.pinetrie/` in (S108). */
   | { readonly kind: "unexcludable"; readonly root: string }
 
 /** A project's root and the repo there, or why the folder cannot be one. */
@@ -1170,7 +1177,7 @@ export function projectDirWords(r: ProjectDirRefusal): string {
     case "unsafe":
       return `${r.root} is your home directory or the file system's root`
     case "unexcludable":
-      return `${r.root} has no git directory beside its jj repo to exclude .pineta/ in: \`jj git init --colocate\` makes one, or PINETA_STORE can name a store elsewhere`
+      return `${r.root} has no git directory beside its jj repo to exclude .pinetrie/ in: \`jj git init --colocate\` makes one, or PINETRIE_STORE can name a store elsewhere`
   }
 }
 
@@ -1196,7 +1203,7 @@ export function planRoot(d: ProjectDir, dir: string): HostFacts["root"] {
 
 /**
  * Your repo's exclude file with each of `lines` in it, appended in order, or
- * null when they are all there already. `/.pineta/` holds what `pinetaDir`
+ * null when they are all there already. `/.pinetrie/` holds what `pinetrieDir`
  * lays out; shared directories are added as `/<path>/`.
  */
 export function planExclude(
@@ -1283,22 +1290,22 @@ export interface Containerfile {
 }
 
 /**
- * The images a project's lanes need (ADR-0034, ADR-0041). Pineta's is built
+ * The images a project's lanes need (ADR-0034, ADR-0041). pinetrie's is built
  * with the host's jj version and the app's Playwright version, so its jj and
  * its browser match what drives them. A project's own image gets the jj
  * version only. Each is tagged by a hash of its Containerfile and build
  * arguments, so a change of either builds it again.
  */
 export function planImages(input: {
-  readonly pineta: Containerfile
-  /** The project's `pineta.Containerfile`, or null when it has none. */
+  readonly pinetrie: Containerfile
+  /** The project's `pinetrie.Containerfile`, or null when it has none. */
   readonly project: Containerfile | null
   readonly jjVersion: string
   readonly playwrightVersion: string
-}): { readonly pineta: ImagePlan; readonly project: ImagePlan | null } {
+}): { readonly pinetrie: ImagePlan; readonly project: ImagePlan | null } {
   const jj = `JJ_VERSION=${input.jjVersion}`
   return {
-    pineta: imagePlan(input.pineta, [
+    pinetrie: imagePlan(input.pinetrie, [
       jj,
       `PLAYWRIGHT_VERSION=${input.playwrightVersion}`,
     ]),
@@ -1316,5 +1323,5 @@ function imagePlan(
     .update(buildArgs.join("\0"))
     .digest("hex")
     .slice(0, 12)
-  return { file: containerfile.file, tag: `pineta-lane:${hash}`, buildArgs }
+  return { file: containerfile.file, tag: `pinetrie-lane:${hash}`, buildArgs }
 }

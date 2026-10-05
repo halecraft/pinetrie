@@ -57,7 +57,7 @@ failures would have been indistinguishable from a broken probe.
 
 A new schema reads a document written by the old one, with absent fields taking
 schema defaults. The hash difference bites at **Exchange negotiation between
-peers on different builds**, not at local read. Pineta ships host and client
+peers on different builds**, not at local read. pine·trie ships host and client
 together, so this is upgrade coordination.
 
 ### P2 / P2b — changefeed granularity is unaffected

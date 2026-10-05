@@ -21,9 +21,9 @@
 import { type FSWatcher, watch } from "node:fs"
 import { readdir, readFile, stat } from "node:fs/promises"
 import path from "node:path"
-import type { LaneName } from "@pineta/core"
-import { createKeeper, type SlowStep } from "@pineta/keeper"
-import type { LineConfig, Runner } from "@pineta/lanes"
+import type { LaneName } from "@pinetrie/core"
+import { createKeeper, type SlowStep } from "@pinetrie/keeper"
+import type { LineConfig, Runner } from "@pinetrie/lanes"
 import {
   type Fingerprint,
   fingerprintRead,
@@ -38,7 +38,7 @@ import type { RepoStep } from "./step.ts"
 
 /** jj and git on your repo, as the owner hands them to a step. */
 export interface RepoOps {
-  /** jj as the host: `--ignore-working-copy`, `operation.username=pineta-host`. */
+  /** jj as the host: `--ignore-working-copy`, `operation.username=pinetrie-host`. */
   readonly jj: Runner
   /** jj as you, for a step that moves your files or lands your work. */
   readonly jjAsYou: Runner

@@ -10,10 +10,10 @@ import type {
   CardId,
   SeatRecord,
   WriterId,
-} from "@pineta/core"
-import { movedBackBy, writersOfClients } from "@pineta/rules"
-import { textClients } from "@pineta/schema"
-import type { SessionClient } from "@pineta/session"
+} from "@pinetrie/core"
+import { movedBackBy, writersOfClients } from "@pinetrie/rules"
+import { textClients } from "@pinetrie/schema"
+import type { SessionClient } from "@pinetrie/session"
 import { createContext, useContext } from "react"
 import {
   HISTORY,

@@ -4,14 +4,14 @@ import {
   type RootRecord,
   rootIdFor,
   writerId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { expect, test } from "vitest"
 import { BOARD, WORKFLOW } from "./board.ts"
 import { ARCHIVE, carryOverWrites, planCarryOver } from "./carry-over.ts"
 import { recordsOf } from "./records.ts"
 
 const ADA = writerId("ada@x.io")
-const HOST = writerId("host@pineta")
+const HOST = writerId("host@pinetrie")
 const R = (n: number) =>
   rootIdFor(`01a0ffd2-0000-7000-8000-${String(n).padStart(12, "0")}`)
 const rootAt = (

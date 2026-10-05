@@ -9,7 +9,7 @@ earlier message, a file range, an image region, a URL, another branch.
 **Decision.** A discriminated union of reference kinds, stored in a dedicated
 namespace rather than as fields on entries.
 
-**Realised by ADR-0017:** the dedicated namespace is pi's `pineta.reference`
+**Realised by ADR-0017:** the dedicated namespace is pi's `pinetrie.reference`
 value namespace.
 
 **Consequences.** Backlinks are queryable in both directions for free. Two

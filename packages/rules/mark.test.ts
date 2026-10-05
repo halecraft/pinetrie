@@ -5,7 +5,7 @@ import {
   indexTree,
   type MarkRecord,
   writerId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { MARK, planMark } from "./mark.ts"
 import { recordsOf } from "./records.ts"

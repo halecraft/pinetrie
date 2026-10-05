@@ -1,5 +1,5 @@
 {
-  "name": "@pineta/pi",
+  "name": "@pinetrie/pi",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -11,9 +11,9 @@
     "@earendil-works/pi-ai": "0.87.1",
     "@earendil-works/pi-coding-agent": "0.87.1",
     "@kyneta/schema": "link:../../../kyneta/workspace/pineta/packages/schema",
-    "@pineta/core": "workspace:*",
-    "@pineta/rules": "workspace:*",
-    "@pineta/schema": "workspace:*",
+    "@pinetrie/core": "workspace:*",
+    "@pinetrie/rules": "workspace:*",
+    "@pinetrie/schema": "workspace:*",
     "typebox": "1.3.27"
   }
 }

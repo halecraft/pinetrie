@@ -7,7 +7,7 @@ import {
   type TranscriptMessage,
   type WorkStats,
   type WriterId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import type { AskView } from "./ask-view.ts"
 import { listOf, plural } from "./counts.ts"
 

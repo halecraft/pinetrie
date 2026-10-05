@@ -127,15 +127,15 @@ non-Kyneta client.
 
 ```
   PASS  live turn completed and replicated (143ms)
-  model said: "PINETA-OK"
+  model said: "PINETRIE-OK"
   PASS  model output contains the requested token
   PASS  live turn streamed 13 updates through Schema.text()
 
 --- final client view ---
   user      "hello"
   assistant "Hello, how can I help you?"
-  user      "Say exactly: PINETA-OK"
-  assistant "PINETA-OK"
+  user      "Say exactly: PINETRIE-OK"
+  assistant "PINETRIE-OK"
 
 === e2e: pass=20 fail=0 ===
 ```
@@ -158,14 +158,14 @@ The host runs the same sanity gate at startup and refuses to start on a stale bu
 Four turns in a real browser, rendering live:
 
 ```
-Pineta — walking skeleton
+pine·trie — walking skeleton
 status connected · lane w-01a0c688-1a27-7476-88e9-b6b862196f4b · entries 6
-  user       PINETA-OK
-  assistant  Walking-skeleton harness ready for the PINETA scenario.
+  user       PINETRIE-OK
+  assistant  Walking-skeleton harness ready for the PINETRIE scenario.
   user       Hi
   assistant  Hello!
   user       What can you do?
-  assistant  I respond to the PINETA walking-skeleton command with predefined status updates.
+  assistant  I respond to the PINETRIE walking-skeleton command with predefined status updates.
 ```
 
 Six entries across four turns — so streaming, commit, replication and the
@@ -178,7 +178,7 @@ The lane name again carries writer identity (ADR-0011).
 ### 3.7 Browser — AUTOMATED ✅ `e2e/browser.mjs`
 
 ```
-=== Pineta — real browser against a real host ===
+=== pine·trie — real browser against a real host ===
   playwright server : ws://localhost:3100/
   browser           : 141.0.7390.37
   host              : http://localhost:49790/
@@ -235,7 +235,7 @@ e2e because it never loads the bundle:
    > package is the smoking gun; it was explained away as a display artifact.
 2. **`EADDRINUSE` gave a bare stack trace.** A stale host holding port 7391 is
    the most likely startup failure and said nothing about recovery. It now
-   fails with find/stop/alternate-port instructions; `PINETA_PORT=0` takes any
+   fails with find/stop/alternate-port instructions; `PINETRIE_PORT=0` takes any
    free port.
 
 ---
@@ -283,7 +283,7 @@ Three residual-unknown entries are now closed:
 ## 6. Verified vs assumed
 
 **Verified by execution:** the boundary checker's full output; 11/11 core tests;
-16/16 offline e2e; 20/20 live e2e including the model emitting `PINETA-OK`;
+16/16 offline e2e; 20/20 live e2e including the model emitting `PINETRIE-OK`;
 HTTP 200 for page, bundle and wasm; the host's startup sanity gate;
 `stepInPlace` present and loro-crdt 1.16.3 ≥ the 1.13.4 floor.
 

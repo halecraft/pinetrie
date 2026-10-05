@@ -52,7 +52,7 @@ instead of month three, and gives a demo target that keeps the project legible.
 
 Roughly in dependency order, each independently shippable:
 
-1. ~~**Tree read**~~ — **done.** `projectSpine` in `@pineta/core`; the client
+1. ~~**Tree read**~~ — **done.** `projectSpine` in `@pinetrie/core`; the client
    renders a linear spine with branches hanging off it, dimmed and labelled
    "not in your context". Two findings: step 1 is not demonstrable without
    branched data, so the e2e fixture writes a fork as a foreign write (S3);
@@ -85,7 +85,7 @@ Roughly in dependency order, each independently shippable:
    records a lane on creation, which is what lets the document tell "no lane"
    from "a lane at the root".)
 4. ~~**References**~~ — **done, then withdrawn** (ADR-0043). Stored as pi
-   values in `pineta.reference` (ADR-0017); backlinks derived; attached where
+   values in `pinetrie.reference` (ADR-0017); backlinks derived; attached where
    the author is reading. Nothing read them, so they were removed. The v1 demo
    runs in a real browser, minus presence.
 5. **Humans in the tree** — reframed from "multi-writer composer" (ADR-0018).
@@ -247,7 +247,7 @@ output is a proposal, not a workaround — which changes how it is built.
 3. ~~**Land `fixB-reader.patch`**~~ — **done, superseded** by `da978ec`, which
    covers more cases (set-op, tree, middle inserts, deletes) and needs no
    `undefined` guard.
-4. **Pin `loro-crdt >= 1.13.4` in Pineta.** Every existing sandbox uses `1.10.8`.
+4. **Pin `loro-crdt >= 1.13.4` in pine·trie.** Every existing sandbox uses `1.10.8`.
 5. **Decide the lane-naming scheme** (ADR-0011). Coordination-free and
    mechanically enforced; a collision is silent data loss.
 6. **⚠️ Tell the Kyneta team that `kyneta-ephemeral-wire-cost.md` is WRONG.**
@@ -277,7 +277,7 @@ output is a proposal, not a workaround — which changes how it is built.
 8. **Exercise `@kyneta/react` + `@kyneta/devtools`** against the landed fix.
    S11 flagged object-identity assumptions as the main risk of in-place
    mutation; `da978ec` mutates *more* aggressively than S11's patch did, so the
-   risk **grew**. Nothing in Pineta's suites touches those packages.
+   risk **grew**. Nothing in pine·trie's suites touches those packages.
 
 ## S17 — typed entries (resolved)
 
@@ -305,12 +305,12 @@ one that forces a coordinated upgrade if pi moves it.
    See `README.md` § Where documents live.
 2. ~~**Repo layout**~~ **Settled.** A pnpm workspace with `packages/core`,
    `packages/schema`, `packages/pi`, `packages/protocol` and `packages/client`,
-   with `apps/pineta` and `apps/conformance` for what is run. Superseding the
+   with `apps/pinetrie` and `apps/conformance` for what is run. Superseding the
    earlier arrangement of
    `client/`, `protocol/`, `e2e/` stay in the root app. The pi boundary is
    enforced by module resolution rather than by the scanner — see
    `01-architecture.md`.
 3. **Language/runtime for the host** — Node assumed (pi is Node). Bun is viable
    and Kyneta has `internal/bun-server`.
-4. **Does Pineta vendor Kyneta or depend on published `@kyneta/*`?** Published
+4. **Does pine·trie vendor Kyneta or depend on published `@kyneta/*`?** Published
    is 3.0.0; local source is at `~/halecraft/kyneta`.

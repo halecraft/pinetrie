@@ -2,7 +2,7 @@
 
 Agents in lanes kept trying to reach the Playwright server on the Mac at
 `:3100`, which `e2e:browser` connected to because pi-jail's Seatbelt denied
-Chromium `mach-register` (WS1). Pineta applies no sandbox of its own. This
+Chromium `mach-register` (WS1). pine·trie applies no sandbox of its own. This
 probe asks whether a lane can run its own Chromium, what the host's server
 gives a lane, and why the browser suite failed in a lane.
 
@@ -38,7 +38,7 @@ gives a lane, and why the browser suite failed in a lane.
    `file:///etc/hosts` and
    `file:///System/Library/CoreServices/SystemVersion.plist`. Only harmless
    targets were tried. By the same route a lane could read
-   `~/.pi/agent/auth.json`, or open a Pineta host bound to the Mac's
+   `~/.pi/agent/auth.json`, or open a pine·trie host bound to the Mac's
    loopback, which admits loopback with no key. ADR-0034 counts neither as
    reachable.
 6. **pi-ai's faux provider drops concurrent requests to a factory that
@@ -55,7 +55,7 @@ gives a lane, and why the browser suite failed in a lane.
 - A lane can carry its own browser, so no gate needs a browser server on the
   host, and the host's server should not run while lanes are up (item 5).
 - The browser suite and `e2e` need no real model: what they check is
-  Pineta's, and a scripted model can hold a run open for as long as a check
+  pine·trie's, and a scripted model can hold a run open for as long as a check
   needs (item 6).
 - A scripted provider queues one response per request, never a response that
   queues itself again.
@@ -76,4 +76,4 @@ Browsers installed with `PLAYWRIGHT_BROWSERS_PATH=/tmp/pw-browsers`; a
 `playwright run-server` on the lane's `127.0.0.1:3200`; the Mac's server at
 the gateway, `192.168.64.1:3100`. `browser.ts` was patched to pass
 `exposeNetwork` for one run and put back. The probes were scripts under
-`apps/pineta/e2e/` and `packages/pi/`, deleted after each run.
+`apps/pinetrie/e2e/` and `packages/pi/`, deleted after each run.

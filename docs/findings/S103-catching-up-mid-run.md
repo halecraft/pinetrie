@@ -4,7 +4,7 @@
 running thread that its base moved).
 
 **Question.** ADR-0080 gives the agent a `catch_up` tool. Today a catch-up
-runs only between runs (`prepareUpdate`, `apps/pineta/host/work/update.ts`),
+runs only between runs (`prepareUpdate`, `apps/pinetrie/host/work/update.ts`),
 and "a running lane is never written" (`packages/pi/TECHNICAL.md`). During a
 run:
 
@@ -17,7 +17,7 @@ run:
    steering message, and what does that do to the prompt cache?
 
 **Kill criterion.** A merge during a run that can lose the agent's edits, or
-leave a branch without the merged files, with no fix inside Pineta's own
+leave a branch without the merged files, with no fix inside pine·trie's own
 code: then the tool waits for the run's end, as a queued card does.
 
 **Throw away.** `.plans/s103-probe/` (`probe.sh`, `results.txt`): a jj
@@ -28,10 +28,10 @@ script in throwaway repos. jj 0.44.0.
 1. **No deadlock: a run does not hold the lane's queue** (read). The queue
    (`createQueue`, `packages/lanes/lane.ts`) is a chain of promises. A
    run's tool calls wait on it only when they start: the lane's `gate()`
-   (`apps/pineta/host/work/containers.ts`) awaits `queue.idle()`, then
+   (`apps/pinetrie/host/work/containers.ts`) awaits `queue.idle()`, then
    hands over the channel (`laneEnv`, `packages/pi/lane-env.ts`). A turn's
    commit and snapshot are tasks on it (`turnDone`,
-   `apps/pineta/host/work/turns.ts`). A host tool such as `catch_up` makes
+   `apps/pinetrie/host/work/turns.ts`). A host tool such as `catch_up` makes
    no `env` call, so it can enqueue `updateOnQueue` and await it, after
    the previous turn's snapshot. Two hazards:
    - **A call already running is not held.** pi runs a batch's calls in
@@ -78,7 +78,7 @@ script in throwaway repos. jj 0.44.0.
      the commit the nearest record above names) records the bookmark. A
      later turn commits on the merge as usual (case D: `next turn < merge <
      L`).
-   - **The merge's message carries `Pineta-Base`** (`planMerge`), so the
+   - **The merge's message carries `Pinetrie-Base`** (`planMerge`), so the
      lane's base is read from its history as after any catch-up
      (`newestBase`). A catch-up with the parent is read differently:
      `parentNow` (`packages/rules/line.ts`) finds what the lane took from

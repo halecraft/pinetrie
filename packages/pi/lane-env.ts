@@ -190,7 +190,7 @@ export function laneEnv(
   }) as unknown as ExecutionEnv
 }
 
-/** How a lane command ended; the shape `@pineta/lanes` reads as `Ran`. */
+/** How a lane command ended; the shape `@pinetrie/lanes` reads as `Ran`. */
 export interface LaneRan<Out = string> {
   readonly ok: boolean
   readonly code: number

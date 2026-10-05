@@ -7,7 +7,7 @@ export type RepoStep =
   | {
       readonly tool: "jj"
       /**
-       * `host`: `--ignore-working-copy` and `operation.username=pineta-host`,
+       * `host`: `--ignore-working-copy` and `operation.username=pinetrie-host`,
        * so it never snapshots your files and the evolog says the host made
        * what it made (S48 items 1 and 8). `you`: as you, for a step that is
        * your act or moves your files (`planLand`, `planFollow`).

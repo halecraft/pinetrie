@@ -6,7 +6,7 @@ a lane reaches on the host).
 
 **Context.** Agents in lanes run the gates, and two of them could not pass
 there. `e2e:browser` drove Chromium through a `playwright run-server` on the
-Mac, a workaround for pi-jail's Seatbelt, which Pineta no longer runs under.
+Mac, a workaround for pi-jail's Seatbelt, which pine·trie no longer runs under.
 From a lane, that server is reachable only at the gateway, and the Mac's
 browser then opens the Mac's loopback, not the lane's, so the page under
 test is out of reach. The same server lets a lane read the Mac's files and
@@ -18,7 +18,7 @@ that need a run in progress raced the model's speed, and the model costs
 money and time. The scripted sections raced too, on long scripted replies.
 
 **Decision.**
-- **The default lane image is Pineta's set of known good tools:** Node 24,
+- **The default lane image is pine·trie's set of known good tools:** Node 24,
   pnpm, git, jj, and now Chromium's headless shell with its libraries, in
   `PLAYWRIGHT_BROWSERS_PATH=/ms-playwright`. The browser is the build of the
   `@playwright/test` the app declares: the host resolves its version and
@@ -42,13 +42,13 @@ money and time. The scripted sections raced too, on long scripted replies.
 - A project on another Playwright version installs its own browser in its
   lane; the libraries are already there. That download does not survive the
   container's recreation.
-- A project with its own `pineta.Containerfile` has no browser unless it
+- A project with its own `pinetrie.Containerfile` has no browser unless it
   installs one.
 - On the Mac, the headless shell is installed once:
-  `pnpm --filter @pineta/app exec playwright install chromium-headless-shell`.
+  `pnpm --filter @pinetrie/app exec playwright install chromium-headless-shell`.
 - Nobody runs a Playwright server, so the route to the host it opened is
   closed.
-- `@playwright/test` is declared once, by `apps/pineta`.
+- `@playwright/test` is declared once, by `apps/pinetrie`.
 
 **Alternatives rejected.**
 - The Mac's server with `exposeNetwork: "<loopback>"`: it reaches the page
@@ -57,7 +57,7 @@ money and time. The scripted sections raced too, on long scripted replies.
 - `mcr.microsoft.com/playwright` as the base: Ubuntu, all three browsers,
   and a different base from the one the lane runtime is copied out of.
 - Debian's `chromium` with `executablePath`: Playwright guarantees only its
-  own builds, and the version would drift from Pineta's Playwright.
+  own builds, and the version would drift from pine·trie's Playwright.
 - Browsers in a shared directory (ADR-0035): read-write, so one lane could
   replace a binary another runs; the libraries would still need the image.
 - A model key granted to lanes: sharing secrets with lanes is its own

@@ -70,7 +70,7 @@ questions remained before building on it:
 - A fork, at any visible turn: clone the disk snapshot recorded at that turn,
   then re-register it before any jj command runs there. The fork's tracked
   files, ignored state and caches are the turn's; its jj workspace is its own.
-- Pineta never runs `jj workspace update-stale` in a lane: in a clone it is
+- pine·trie never runs `jj workspace update-stale` in a lane: in a clone it is
   the one command that reaches the parent.
 - Re-registering checks the fork's revision out in full in a scratch
   directory (cost grows with the repo's size), and the fork's first `jj st`
@@ -83,7 +83,7 @@ questions remained before building on it:
 - Re-registering in a large repository; a sparse scratch checkout
   (`--sparse-patterns empty`) might avoid writing its files.
 - `data=journal` or `writeback` modes; cloning with the host cache off.
-- Pineta's own repository, the host's `turnDone` and the landing flow on
+- pine·trie's own repository, the host's `turnDone` and the landing flow on
   this layout.
 
 ## Method

@@ -37,7 +37,7 @@ needs so it can go on.
 
 ## Result
 
-Through Pineta's host (`startHost`, SQLite store, scripted model) and
+Through pine·trie's host (`startHost`, SQLite store, scripted model) and
 `connectSession` clients over WebSocket. Two runs, identical.
 
 **A. A refused write, then recovery by dropping the replica** (Ada opens a
@@ -128,7 +128,7 @@ tick of 1 s.)
 
 ## Method
 
-Two disposable probes in `apps/pineta/e2e/`, not checked in, run twice with
+Two disposable probes in `apps/pinetrie/e2e/`, not checked in, run twice with
 `node`. The first used a real host, clients, a refusal via mark done, then
 `exchange.destroy` and `exchange.get`, and a subscription to the host's
 presence document. The second inspected a fresh replica's

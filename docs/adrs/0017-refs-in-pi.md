@@ -1,4 +1,4 @@
-# ADR-0017 — References are pi values in a Pineta namespace
+# ADR-0017 — References are pi values in a pine·trie namespace
 
 **Status:** Superseded by ADR-0043 (references are withdrawn). Accepted. Realises ADR-0006. Roadmap step 4.
 
@@ -10,7 +10,7 @@ Checked in pi's source: namespaces are open (only empty or NUL is rejected);
 every write, values included; and only custom entries can enter a model's
 context, through a registered `entryProjectors[customType]`.
 
-**Decision.** A reference is a pi **value** in `pineta.reference`, keyed by its
+**Decision.** A reference is a pi **value** in `pinetrie.reference`, keyed by its
 own id, written only through `Agent.addReference`.
 
 - **Values, not custom entries.** A custom entry has a `parentId`, so it would
@@ -18,7 +18,7 @@ own id, written only through `Agent.addReference`.
   the author's lane tip. Values stay out of the causal graph and out of every
   model's context.
 - **One schema, TypeBox, in `packages/marginalia`** (named `packages/references`
-  when this was decided). Pineta owns the reference
+  when this was decided). pine·trie owns the reference
   shape, so this schema is the single authority, not a mirror of pi's. It is
   the TypeBox version pi pins, so one copy is installed. Decoding is total: a
   malformed value is dropped, never thrown.
@@ -38,12 +38,12 @@ own id, written only through `Agent.addReference`.
   unchanged.
 
 **Consequences.** References travel in pi's JSONL. A pi extension can reach
-them once Pineta supplies an API through the embedder-provided `toolContext`;
+them once pine·trie supplies an API through the embedder-provided `toolContext`;
 that is added with the first extension that needs it. TypeBox ships to the
 browser: +42 kB raw, +12 kB gzipped. Proven: two writers citing one entry
 concurrently both survive, and keying by target id instead loses one.
 
-**Alternatives rejected.** A Pineta-owned document field (invisible to pi); pi
+**Alternatives rejected.** A pine·trie-owned document field (invisible to pi); pi
 custom entries (causal graph, lane tip); a stored backlink list (S18); Zod
 (TypeBox matches pi's tool parameters). Deferred: routing the namespace to a
 typed Kyneta row inside `KynetaStorage`, the ADR-0015 pattern, until references

@@ -5,7 +5,7 @@ import {
   merge,
   unwrap,
 } from "@kyneta/schema"
-import { cardId, writerId } from "@pineta/core"
+import { cardId, writerId } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import { cardDocId, cardIdOfDoc } from "./places.ts"
 import { seatOf, TextDoc, textClients, textHolds, textVersion } from "./text.ts"
@@ -16,7 +16,7 @@ test("seatOf: each seat's person, by the clientID its document carries (ADR-0037
   const seats = [
     { peerId: "0f3c9a2b7d1e4f60a8b9c0d1e2f3a4b5", principal: "Ada@X.io" },
     { peerId: "9e8d7c6b5a4f3e2d1c0b9a8f7e6d5c4b", principal: "bea@x.io" },
-    { peerId: "a1b2c3d4e5f60718293a4b5c6d7e8f90", principal: "pineta-host" },
+    { peerId: "a1b2c3d4e5f60718293a4b5c6d7e8f90", principal: "pinetrie-host" },
   ]
   const authors = new Map(
     seats.flatMap(s => {

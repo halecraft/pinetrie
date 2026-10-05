@@ -39,12 +39,12 @@ Measured in a lane (Linux, 5 cores, Node 24, Chromium's headless shell, no
 3. **A suite mutant pays every wait before its check** (source,
    `scripts/mutate.ts`). Mutants run one at a time, since each edits the
    working copy in place. A suite mutant reruns its suite from the start
-   until its expected check fails (`PINETA_STOP_AT`). From the checks'
+   until its expected check fails (`PINETRIE_STOP_AT`). From the checks'
    times in a run, the 14 `e2e` mutants averaged 28 s; 7 of them came after
    both slow restarts. Of the 94 browser mutants, 72 expect a check in the
    first 55 s (mean 15 s), and 19 a check after the container section.
 4. **A unit mutant costs 1 to 4 s** (measured), mostly Vitest starting:
-   `packages/core` 0.8 s, `packages/client` 2.0 s, `apps/pineta/host` 3.8 s.
+   `packages/core` 0.8 s, `packages/client` 2.0 s, `apps/pinetrie/host` 3.8 s.
    There are about 430.
 5. **The three dead waits are gone** (measured, after the plan).
    `slowToLoad` delays only the first `currentMeta` of one named document,
@@ -71,11 +71,11 @@ something.
 - `slowToLoad` logging each `currentMeta` and `loadAll` with its document
   and caller, around the restart, `quiet()` and `shutdown()`.
 - For each suite mutation in `scripts/mutations/app.ts`, the time its
-  `expect` check printed in a timed run: the time `PINETA_STOP_AT` stops it.
+  `expect` check printed in a timed run: the time `PINETRIE_STOP_AT` stops it.
 
 ## Still open
 
-Listed in `docs/pineta.md`, "Open, non-blocking": the image clean-up delay
+Listed in `docs/pinetrie.md`, "Open, non-blocking": the image clean-up delay
 and presence expiry as host options; `e2e` and `e2e:browser` in sections, as
 `e2e:lanes` already is; the browser tools section's container-free checks on
 a host without containers; mutants in parallel, each in its own copy of the

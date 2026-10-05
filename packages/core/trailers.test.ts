@@ -31,12 +31,12 @@ test("trailerValues reads a trailer from every paragraph, as a squash leaves two
   const squashed = [
     "integrated one",
     "",
-    "Pineta-Source: aaaa",
+    "Pinetrie-Source: aaaa",
     "",
     "integrated two",
     "",
-    "Pineta-Lane: t-2",
-    "Pineta-Source: bbbb",
+    "Pinetrie-Lane: t-2",
+    "Pinetrie-Source: bbbb",
     "",
   ].join("\n")
   expect(trailerValues(squashed, TRAILERS.source)).toEqual(["aaaa", "bbbb"])
@@ -45,35 +45,35 @@ test("trailerValues reads a trailer from every paragraph, as a squash leaves two
 
 test("offerLedger reads the newest paragraph that names a source; none without one (ADR-0060)", () => {
   const one =
-    "offer: x\n\nPineta-Source: aaaa\nPineta-Start: s1\nPineta-Start: s2\n"
+    "offer: x\n\nPinetrie-Source: aaaa\nPinetrie-Start: s1\nPinetrie-Start: s2\n"
   expect(offerLedger(one)).toEqual({
     source: commitId("aaaa"),
     start: [commitId("s1"), commitId("s2")],
   })
-  const squashed = `${one}\nPineta-Source: bbbb\nPineta-Start: s3\n`
+  const squashed = `${one}\nPinetrie-Source: bbbb\nPinetrie-Start: s3\n`
   expect(offerLedger(squashed)).toEqual({
     source: commitId("bbbb"),
     start: [commitId("s3")],
   })
   expect(offerLedger("offer: yours, rewritten\n")).toBeNull()
-  expect(offerLedger("offer: x\n\nPineta-Source: aaaa\n")).toBeNull()
+  expect(offerLedger("offer: x\n\nPinetrie-Source: aaaa\n")).toBeNull()
 })
 
 test("untracedLanes: an integrated offer's paragraph naming a thread and a lane but no source; never a turn's, nor a traced integrated offer's (S97)", () => {
-  const old = `feat: x\n\nPineta-Thread: amber-fox\nPineta-Lane: ${LANE}\nPineta-Entry: e\n`
+  const old = `feat: x\n\nPinetrie-Thread: amber-fox\nPinetrie-Lane: ${LANE}\nPinetrie-Entry: e\n`
   expect(untracedLanes(old)).toEqual([LANE])
   expect(
     untracedLanes(
-      `${old}\nPineta-Thread: amber-fox\nPineta-Lane: ${LANE}\nPineta-Source: aaaa\n`,
+      `${old}\nPinetrie-Thread: amber-fox\nPinetrie-Lane: ${LANE}\nPinetrie-Source: aaaa\n`,
     ),
   ).toEqual([LANE])
   expect(
     untracedLanes(
-      `feat: x\n\nPineta-Thread: amber-fox\nPineta-Lane: ${LANE}\nPineta-Source: aaaa\n`,
+      `feat: x\n\nPinetrie-Thread: amber-fox\nPinetrie-Lane: ${LANE}\nPinetrie-Source: aaaa\n`,
     ),
   ).toEqual([])
   expect(
-    untracedLanes(`turn\n\nPineta-Lane: ${LANE}\nPineta-Entry: e\n`),
+    untracedLanes(`turn\n\nPinetrie-Lane: ${LANE}\nPinetrie-Entry: e\n`),
   ).toEqual([])
 })
 
@@ -108,13 +108,13 @@ describe("what is written reads back", () => {
     expect(entryOfMessage(message)).toBe("e-1")
     expect(entryOfMessage("your commit")).toBeNull()
   })
-  test("baseMessage and baseOf round-trip a Pineta-Base, the newest of them; a malformed one reads as none", () => {
+  test("baseMessage and baseOf round-trip a Pinetrie-Base, the newest of them; a malformed one reads as none", () => {
     const m = baseMessage("copy of wip/a@b", {
       bookmark: "wip/a@b",
       commit: C1,
     })
-    expect(m).toBe("copy of wip/a@b\n\nPineta-Base: wip/a@b@c1\n")
-    expect(baseOf("x\n\nPineta-Base: nope\n")).toBeNull()
+    expect(m).toBe("copy of wip/a@b\n\nPinetrie-Base: wip/a@b@c1\n")
+    expect(baseOf("x\n\nPinetrie-Base: nope\n")).toBeNull()
     expect(baseOf(m)).toEqual({ bookmark: "wip/a@b", commit: C1 })
     const later = baseMessage("update", { bookmark: "onto", commit: C1 })
     expect(baseOf(`${m}\n${later}`)).toEqual({ bookmark: "onto", commit: C1 })
@@ -143,15 +143,15 @@ describe("what is written reads back", () => {
     const yours = "feat: x\n\nSigned-off-by: Ada <ada@x.io>"
     expect(withoutTrailers(withTrailers(yours, at))).toBe(yours)
     expect(
-      withoutTrailers(`feat: x\n\nSigned-off-by: Ada\nPineta-Entry: e1`),
-    ).toBe("feat: x\n\nSigned-off-by: Ada\nPineta-Entry: e1")
-    expect(withoutTrailers("Pineta-Entry: e1")).toBe("Pineta-Entry: e1")
+      withoutTrailers(`feat: x\n\nSigned-off-by: Ada\nPinetrie-Entry: e1`),
+    ).toBe("feat: x\n\nSigned-off-by: Ada\nPinetrie-Entry: e1")
+    expect(withoutTrailers("Pinetrie-Entry: e1")).toBe("Pinetrie-Entry: e1")
   })
   test("withTrailers and the WIP line", () => {
     expect(
       withTrailers("feat: x\n", { lane: LANE, name: NAME, entry: "e9" }),
     ).toBe(
-      `feat: x\n\nPineta-Thread: amber-fox\nPineta-Lane: ${LANE}\nPineta-Entry: e9\n`,
+      `feat: x\n\nPinetrie-Thread: amber-fox\nPinetrie-Lane: ${LANE}\nPinetrie-Entry: e9\n`,
     )
     expect(wipDescription(NAME, "add the offer line\nmore")).toBe(
       "WIP (amber-fox): add the offer line",
@@ -193,17 +193,19 @@ describe("withLedger (ADR-0060)", () => {
 
 test("trailerRevset names what hasTrailer matches", () => {
   expect(trailerRevset(["base"])).toBe(
-    'description(regex:"(?m)^Pineta-Base: ")',
+    'description(regex:"(?m)^Pinetrie-Base: ")',
   )
   expect(trailerRevset(["source", "thread"])).toBe(
-    'description(regex:"(?m)^(Pineta-Source|Pineta-Thread): ")',
+    'description(regex:"(?m)^(Pinetrie-Source|Pinetrie-Thread): ")',
   )
   expect(trailerRevset(["thread"], NAME)).toBe(
-    'description(regex:"(?m)^Pineta-Thread: amber-fox$")',
+    'description(regex:"(?m)^Pinetrie-Thread: amber-fox$")',
   )
-  expect(hasTrailer(`x\n\nPineta-Thread: ${NAME}\n`, "thread", NAME)).toBe(true)
-  expect(hasTrailer(`x\n\nPineta-Thread: ${NAME}-2\n`, "thread", NAME)).toBe(
+  expect(hasTrailer(`x\n\nPinetrie-Thread: ${NAME}\n`, "thread", NAME)).toBe(
+    true,
+  )
+  expect(hasTrailer(`x\n\nPinetrie-Thread: ${NAME}-2\n`, "thread", NAME)).toBe(
     false,
   )
-  expect(hasTrailer(`Pineta-Lane: ${NAME}\n`, "thread", NAME)).toBe(false)
+  expect(hasTrailer(`Pinetrie-Lane: ${NAME}\n`, "thread", NAME)).toBe(false)
 })

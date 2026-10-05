@@ -49,7 +49,7 @@ space and a quote.
 ## Method
 
 A repo from `jj git init`, one commit `base`, then one commit changing the
-files above, with a description holding a body and a `Pineta-Entry` trailer.
+files above, with a description holding a body and a `Pinetrie-Entry` trailer.
 Each answer is one command against that commit's id, run with
 `--ignore-working-copy`, as the host's reads are (`hostOps`).
 

@@ -9,7 +9,7 @@ which owns its width, head, Escape and focus, and covers a narrow screen.
 **Context.** The work strip counts an offer's files ("2 files ready",
 "conflicts with your edits in 1 file"), and its line could not be opened.
 The host already records every path, conflict and file you are editing, and
-the page only counted them. Nothing in Pineta showed the offer's commit
+the page only counted them. Nothing in pine·trie showed the offer's commit
 message, which an agent writes (ADR-0038), or its diffs: ADR-0038's preview
 was `jj log` and jjui. A collaborator on an invite link has neither, and can
 press **take**. "touches files you're editing" does not say which, and that

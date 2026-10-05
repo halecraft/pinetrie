@@ -1,4 +1,4 @@
-// Mutations for @pineta/reads' own unit tests. Run: pnpm mutate scripts/mutations/reads.ts
+// Mutations for @pinetrie/reads' own unit tests. Run: pnpm mutate scripts/mutations/reads.ts
 import type { Mutation } from "../mutate.ts"
 
 const unit = ["pnpm", "exec", "vitest", "run", "packages/reads"]

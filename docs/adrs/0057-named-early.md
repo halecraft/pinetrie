@@ -27,7 +27,7 @@ Two facts make an earlier name cheap:
 - A lane id needs no coordination. It is a uuidv7 behind the `t-` prefix
   (ADR-0016), so any writer can make one, and pi's `harness.lane` takes the
   name it is given.
-- Nothing about `pineta.name` or `pineta.banner` needs the lane to exist.
+- Nothing about `pinetrie.name` or `pinetrie.banner` needs the lane to exist.
   Both are keyed by the lane id, and `planNames` takes only lane ids and
   their order.
 
@@ -35,7 +35,7 @@ Two facts make an earlier name cheap:
 
 - **A thread is named when its column first wants an agent, and created when
   it is first asked.** Its identity (lane id, name, icon) comes before its
-  lane. A thread that is named but not yet started is a `pineta.name` record
+  lane. A thread that is named but not yet started is a `pinetrie.name` record
   whose lane pi does not hold. This adds no table and no state field.
 - **The client makes the lane id.** A column makes one
   (`laneNameForThread` over a uuidv7) the first time its composer's next
@@ -101,7 +101,7 @@ Two facts make an earlier name cheap:
   A reply whose thread already has a lane, because someone else created it
   meanwhile, goes to that lane, as `planChat` decides today. The column then
   shows that lane's name, and its own reservation is left unused.
-- `pineta.name` holds records with no lane. Every reader today looks a name
+- `pinetrie.name` holds records with no lane. Every reader today looks a name
   up by its lane (`readNames(doc).get(lane)`), so these records go unseen. A
   reader that lists threads must start from pi's lanes, not from the names.
 - A new agent's column open in two browser tabs of one device shows one

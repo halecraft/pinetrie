@@ -6,7 +6,7 @@ one costs no request. Amended by ADR-0077: a short ask's end costs a request
 again, for its verdict alone.
 
 **Context.** ADR-0056 made each ask's digest opt-in: only
-`{ "digests": { "enabled": true } }` in `~/.config/pineta/config.json` turned
+`{ "digests": { "enabled": true } }` in `~/.config/pinetrie/config.json` turned
 it on. A person who never edits that file never sees a summary, and does not
 know they exist. A digest costs a model request per ask (fewer while no one
 reads the running thread), on the model commit messages use, and puts no

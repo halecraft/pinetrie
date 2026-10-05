@@ -9,7 +9,7 @@ import {
   THE_AGENT,
   type ThreadLane,
   writerId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   type ComposerMode,
@@ -496,9 +496,9 @@ describe("where a new lane works: the chip and its menu", () => {
     ])
     expect(whereChoices(lanes, [], { kind: "own" })[0]?.disabled).toBe(false)
     expect(
-      whereChoices(lanes, [], { kind: "own" }, "pineta-onto")[0]?.title,
+      whereChoices(lanes, [], { kind: "own" }, "pinetrie-onto")[0]?.title,
     ).toBe(
-      "a lane of its own, cloned from pineta-onto; its work comes back as pineta-offer/<thread>",
+      "a lane of its own, cloned from pinetrie-onto; its work comes back as pinetrie-offer/<thread>",
     )
   })
 })

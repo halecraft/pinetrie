@@ -39,7 +39,7 @@ import {
   THE_AGENT,
   type ThreadLane,
   type WriterId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { type Static, Type } from "typebox"
 import { type BaseNews, behindLine, decodeBehind } from "./behind.ts"
 import { decodeWith } from "./decode.ts"
@@ -56,7 +56,7 @@ import {
 } from "./update.ts"
 import { showHostWorkingCopy } from "./work.ts"
 
-export const CHAT_TYPE = "pineta.chat"
+export const CHAT_TYPE = "pinetrie.chat"
 
 const ResponderSchema = Type.Union([
   Type.Object({ kind: Type.Literal("none") }),
@@ -509,7 +509,7 @@ export function planChat(input: {
     | null
   /**
    * What the thread's base has for it (`planBaseNews`, ADR-0080), and whether
-   * this send has already caught it up: `pineta.base` is rewritten only at
+   * this send has already caught it up: `pinetrie.base` is rewritten only at
    * the next refresh, so it still says the base has news.
    */
   readonly news: BaseNews["kind"]

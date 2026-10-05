@@ -1,4 +1,4 @@
-import { commitId, type LineRecord, laneNameForThread } from "@pineta/core"
+import { commitId, type LineRecord, laneNameForThread } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { baseWords } from "./column-view.ts"
 import {
@@ -11,7 +11,7 @@ import {
 import { baseChoices } from "./send.ts"
 
 const record = (over: Partial<LineRecord> = {}): LineRecord => ({
-  onto: "pineta-onto",
+  onto: "pinetrie-onto",
   wipPrefix: "wip/",
   publish: "main",
   published: { commit: commitId("m0"), behind: 0, ahead: 0 },
@@ -58,13 +58,13 @@ describe("lineView and lineWords (ADR-0060)", () => {
     ])
     expect(project?.notes[1]).toContain("builtin_immutable_heads() | …")
     expect(project?.notes[2]).toContain("builtin_log() | …")
-    expect(project?.notes[3]).toContain('bookmarks(glob:"pineta-offer/*")')
+    expect(project?.notes[3]).toContain('bookmarks(glob:"pinetrie-offer/*")')
   })
   test("a host that admits others, before setup: not set up yet, the jj instructions in its title", () => {
     const words = lineWords(lineView(record({ commit: null, commands: false })))
     expect(words.trigger).toBe("◆ project")
     expect(words.label).toContain(
-      "create pineta-onto with jj on the host's machine",
+      "create pinetrie-onto with jj on the host's machine",
     )
     expect(words.sections).toEqual([
       {
@@ -98,7 +98,7 @@ describe("lineView and lineWords (ADR-0060)", () => {
       {
         action: "land",
         label: "add my work to the project (2 commits)",
-        title: "moves pineta-onto forward to your @-",
+        title: "moves pinetrie-onto forward to your @-",
       },
     ])
     expect(words?.notes).toEqual(["your files have everything in the project"])
@@ -106,7 +106,7 @@ describe("lineView and lineWords (ADR-0060)", () => {
   test("the trigger counts what is not yet on main, never your files being behind; its bookmark only in the label", () => {
     const quiet = lineWords(lineView(record({ yours: yours({ behind: 3 }) })))
     expect(quiet.trigger).toBe("◆ project")
-    expect(quiet.label).toContain("pineta-onto")
+    expect(quiet.label).toContain("pinetrie-onto")
     const unpublished = lineWords(
       lineView(
         record({ published: { commit: commitId("m0"), behind: 2, ahead: 0 } }),
@@ -138,7 +138,7 @@ describe("publishing the project (ADR-0076)", () => {
         {
           action: "publish",
           label: "publish to main (2 commits)",
-          title: "moves main forward to pineta-onto",
+          title: "moves main forward to pinetrie-onto",
         },
       ])
     }
@@ -184,7 +184,7 @@ describe("update my files, and resolving what conflicts (ADR-0061)", () => {
         action: "follow",
         label: "update my files",
         title:
-          "changes 116 files · your work stays on top · jj diff --from 'fork_point(@ | pineta-onto)' --to pineta-onto",
+          "changes 116 files · your work stays on top · jj diff --from 'fork_point(@ | pinetrie-onto)' --to pinetrie-onto",
       },
     ])
   })
@@ -192,7 +192,7 @@ describe("update my files, and resolving what conflicts (ADR-0061)", () => {
     const words = section(record({ yours: yours({}) }), "yours")
     expect(words?.actions).toEqual([])
     expect(words?.notes).toEqual([
-      "2 new commits in the project since you last updated: rebase onto pineta-onto in jj",
+      "2 new commits in the project since you last updated: rebase onto pinetrie-onto in jj",
     ])
   })
   test("conflicts in your files: said first, and resolved with the agent", () => {
@@ -232,7 +232,7 @@ describe("update my files, and resolving what conflicts (ADR-0061)", () => {
       kind: "newTab",
       asksAgent: true,
       prefill: {
-        text: "/pineta:skill:resolve-conflicts My files were updated from the project (pineta-onto) and conflict in g.txt. Resolve them in my working copy.",
+        text: "/pinetrie:skill:resolve-conflicts My files were updated from the project (pinetrie-onto) and conflict in g.txt. Resolve them in my working copy.",
         blank: false,
         work: { kind: "direct", dir: "/work" },
       },
@@ -311,7 +311,7 @@ describe("the thread's base in its header, and the bases a new lane may start fr
         true,
       ],
     ])
-    expect(baseChoices(line, null)[0]?.title).toBe("pineta-onto at c1")
+    expect(baseChoices(line, null)[0]?.title).toBe("pinetrie-onto at c1")
     expect(baseChoices(record(), null)).toEqual([])
     expect(baseChoices(record({ commit: null }), null)).toEqual([])
     expect(baseChoices(null, null)).toEqual([])

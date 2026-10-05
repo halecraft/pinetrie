@@ -12,14 +12,14 @@ the old tip and the chat entry drops out of the path without an error.
 ## Why it was asked
 
 Humans in the tree (`PLAN-2026-09-26-humans-in-the-tree`) stores each human
-message as a `pineta.chat` custom entry on its author's lane, appended by the
+message as a `pinetrie.chat` custom entry on its author's lane, appended by the
 host with no model run. The host holds one pi `Lane` object per writer for the
 life of the process, and S3 warned that a `Lane` is single-writer state that
 caches. The question was whether a tip moved outside that object is seen by it.
 
 ## Result
 
-Each trial runs one turn on a fresh lane, appends a `pineta.chat` entry by one
+Each trial runs one turn on a fresh lane, appends a `pinetrie.chat` entry by one
 path, prompts the SAME `Lane` object again, and reads the new user message's
 `parentId`. The stack is the real one: `KynetaStorage` over a Kyneta document,
 `StorageBackedSession`, `createAgentHarness`, a live model. Two runs, identical.
@@ -27,7 +27,7 @@ path, prompts the SAME `Lane` object again, and reads the new user message's
 | append path | entry stored at the old tip | `lane.getTipId()` after the append | next turn's parent |
 |---|---|---|---|
 | `session.mutate`: `insertEntry` + `setValue(branchTip(lane))` | yes | **the old tip** | **the old tip** (chat entry lost) |
-| `lane.appendCustomEntry("pineta.chat", data)` | yes | the chat entry | **the chat entry** |
+| `lane.appendCustomEntry("pinetrie.chat", data)` | yes | the chat entry | **the chat entry** |
 | control: no append | — | the old tip | the old tip |
 
 The control shows the check tells the cases apart: the parent is only ever the
@@ -84,7 +84,7 @@ pi has a built-in `CustomMessage` (`role: "custom"`, `customType`, `content`,
 `toProviderMessages` (`convertToLlm`) sends it to the model as a `user` message
 with the same `content`, and `prompt` accepts any `AgentMessage` except a pending
 assistant message. So a chat message is a `CustomMessage` with
-`customType: "pineta.chat"`, `content` the attributed text the model sees
+`customType: "pinetrie.chat"`, `content` the attributed text the model sees
 ("Alice: …"), and `details` the structured author and text.
 
 Probe: Alice's chat is appended with `lane.appendMessage`; an agent lane is

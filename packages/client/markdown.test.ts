@@ -1,4 +1,4 @@
-import type { Sha256 } from "@pineta/core"
+import type { Sha256 } from "@pinetrie/core"
 import type { Element, ElementContent, Root } from "hast"
 import { describe, expect, test } from "vitest"
 import { messageTree, safeUrl, tableAt, tableHeads } from "./markdown.ts"

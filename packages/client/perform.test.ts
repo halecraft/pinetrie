@@ -6,9 +6,9 @@ import {
   laneNameForThread,
   workflowStateIdFor,
   writerId,
-} from "@pineta/core"
-import type { Outcome } from "@pineta/protocol/codec"
-import type { MoveAnswer, MoveHow } from "@pineta/session"
+} from "@pinetrie/core"
+import type { Outcome } from "@pinetrie/protocol/codec"
+import type { MoveAnswer, MoveHow } from "@pinetrie/session"
 import { expect, test, vi } from "vitest"
 import { TEST_ROOT } from "./fixtures.ts"
 import type { Effect } from "./intent.ts"

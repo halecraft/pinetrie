@@ -10,7 +10,7 @@ import {
   setValue,
   value,
 } from "@earendil-works/pi-agent-core"
-import { physicalKey } from "@pineta/schema"
+import { physicalKey } from "@pinetrie/schema"
 import { expect, test } from "vitest"
 import { CHECKPOINT_NAMESPACE } from "./checkpoint.ts"
 import { planCommit } from "./commit.ts"

@@ -1,5 +1,10 @@
-import { laneNameForThread, NOBODY, type Sha256, writerId } from "@pineta/core"
-import { encodeChat } from "@pineta/rules"
+import {
+  laneNameForThread,
+  NOBODY,
+  type Sha256,
+  writerId,
+} from "@pinetrie/core"
+import { encodeChat } from "@pinetrie/rules"
 import { expect, test } from "vitest"
 import { planSweep, referencedBlobs } from "./index.ts"
 

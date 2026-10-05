@@ -1,4 +1,4 @@
-# `@pineta/schema` — technical notes
+# `@pinetrie/schema` — technical notes
 
 The Kyneta document shape. Imports Kyneta only, never pi. That pi-free property
 is what let spikes S7, S8 and S12 test convergence with no harness in the
@@ -18,8 +18,8 @@ plus one sealed `payload`.
 | `fromId` | the merge node (ADR-0004), needed by fold (ADR-0010) |
 | `payload` | **not** typed: pi's variant data, sealed |
 
-Everything Pineta reasons about is a column. Everything pi owns is in
-`payload`. We type what we traverse. Two readers lift what Pineta reads out
+Everything pine·trie reasons about is a column. Everything pi owns is in
+`payload`. We type what we traverse. Two readers lift what pine·trie reads out
 of it, and nothing else looks inside: `rowMessage` (a message entry's
 message) and `rowRetainedTail` (a compaction's retained tail, where pi's
 compaction hook carries the pinned cards, ADR-0048).
@@ -75,10 +75,10 @@ names `seq` in `NEVER_IN_PAYLOAD` for exactly this reason. A unit test caught
 this during implementation; it is not hypothetical.
 
 **`usageRows`, `values` and `lists` are still `Schema.any()`.** They are pi's
-bookkeeping for its `Storage` port, not Pineta's domain model, and nothing of
+bookkeeping for its `Storage` port, not pine·trie's domain model, and nothing of
 ours traverses them. The asymmetry with `entries` is deliberate.
 
-## `pineta:live`: what is streaming now (ADR-0063)
+## `pinetrie:live`: what is streaming now (ADR-0063)
 
 `LiveDoc` holds `streams`, `streamText` and `activeRuns`, apart from pi's
 storage. No restarted host needs them (`clearStreams`), and they churn with
@@ -117,7 +117,7 @@ one text per run. Keys are fresh uuidv7s (ADR-0016), written only by the host.
   drawing the first in the change that adds its entry (ADR-0044). Per run, one
   stream would have shown the first message's committed text again.
 - A tool stream opens with the tool. Its output arrives as whole snapshots of
-  a tail-kept view and is written with `tailEdit` (`@pineta/core`).
+  a tail-kept view and is written with `tailEdit` (`@pinetrie/core`).
 - **Nothing happens when a message or a tool ends.** A stream stays until its
   entry is written, so a reader never sees neither. `closeStreams` is the one
   way a stream is deleted, and each caller knows the entry is written:
@@ -143,13 +143,13 @@ one text per run. Keys are fresh uuidv7s (ADR-0016), written only by the host.
 - `checkpointText` holds pi's tool-output checkpoints' text, keyed by
   `physicalKey`, written by `KynetaStorage` (`packages/pi/TECHNICAL.md`).
 
-This package depends on `@pineta/core` (for `tailEdit` and `StreamEvent`), which
+This package depends on `@pinetrie/core` (for `tailEdit` and `StreamEvent`), which
 the dependency direction `core → schema → pi → app` allows. It still imports no
 pi.
 
 ## Presence (`presence.ts`, ADR-0024)
 
-`pineta:presence` is a Kyneta `ephemeral` document: never stored, last writer
+`pinetrie:presence` is a Kyneta `ephemeral` document: never stored, last writer
 wins per field. Its records are flat, and every key starts with its seat's
 `seatKey`, `${writer}:${seat}` (ADR-0037): `reading` is keyed
 `readingKey(seatKey, columnKey)` (every column of the tab a person is on
@@ -185,7 +185,7 @@ document.
 - **`seatOf(peerId, principal)` is the one place a seat becomes a person**:
   its `clientID` (Kyneta's `yjsClientId`) and its writer, or null for a
   principal that is not an email, the host's among them. The host's seat
-  records (`pineta.seat`) come from it, and every text's writers from those.
+  records (`pinetrie.seat`) come from it, and every text's writers from those.
 - **`textClients(doc)`** is every `clientID` that wrote in a text, deletions
   included, from its Yjs store. Kyneta writes a structural seed under
   `clientID` 0 before anyone types, which is nobody's and left out (S58).
@@ -210,12 +210,12 @@ document.
 `PlacesDoc` holds every card's record, keyed by card id: `yjs.bind` of a
 record of flat string rows (`owner`, `kind`, `root`, `at`, `lane`,
 `column`, `order`, `by`, `seen`, `command`, `unsent`, `placer`,
-`holder`, "" for none), decoded in `@pineta/rules` (`decodeCard`),
-and `rev`. Its id is `pineta:card-places` (`PLACES_DOC_ID`). Only the host
-writes it, through `applyPlaceSteps` (`apps/pineta/host/places.ts`).
+`holder`, "" for none), decoded in `@pinetrie/rules` (`decodeCard`),
+and `rev`. Its id is `pinetrie:card-places` (`PLACES_DOC_ID`). Only the host
+writes it, through `applyPlaceSteps` (`apps/pinetrie/host/places.ts`).
 
 A card's history and its traces are not here (ADR-0048 step 6): they are
-session records (`pineta.card-history`, `pineta.trace`). This document
+session records (`pinetrie.card-history`, `pinetrie.trace`). This document
 grows for good with each write (S90), and a field every event changed
 would refuse each whole undo of a move (S82).
 
@@ -233,7 +233,7 @@ would refuse each whole undo of a move (S82).
 - **A pinned row carries `order`**, as a queued one does, and no `by` or
   `seen`: `kind`, `at` and `lane` are a drafting row's. No new field.
 - **A client cannot write it.** Every peer registers `writersPolicy`
-  (`@pineta/protocol/writers`), Kyneta's `canWrite`, so a client's write
+  (`@pinetrie/protocol/writers`), Kyneta's `canWrite`, so a client's write
   throws before it is made, and the host refuses the same operations from
   any sender. Made anyway, a write would leave the writer's copy forked for
   good (S28, S76). The client keeps the document private: the page reads
@@ -250,8 +250,8 @@ would refuse each whole undo of a move (S82).
 - **Its storage is compacted after each run** (`planCompaction`); nothing
   in memory is trimmed (S90).
 - **`newPlacesDoc()`** is one with no Exchange, for tests.
-- **A store from before ADR-0059 holds a `pineta:cards` document**, and one
-  from before ADR-0066 a `json` `pineta:places` document, that no code
+- **A store from before ADR-0059 holds a `pinetrie:cards` document**, and one
+  from before ADR-0066 a `json` `pinetrie:places` document, that no code
   opens; delete them by hand. The startup sweep removes the texts no record
   names.
 - **`holder`** is whose inventory holds a card (`CardPlace` `inventory`);
@@ -262,12 +262,12 @@ would refuse each whole undo of a move (S82).
 
 A person has one document of each kind in `PERSON_DOC_KINDS`, at
 `<kind>:<writer>` (`personDocId`, `ownerOfPersonDoc` in
-`@pineta/protocol/writers`): each a Yjs document written only by that
+`@pinetrie/protocol/writers`): each a Yjs document written only by that
 person's tabs.
 
 - **The host stores and relays them, and never writes them.** Its policy
   shares each only with peers whose principal is its writer
-  (`holdsPersonDoc`, `apps/pineta/host/policy.ts`), and `resolveDoc` names
+  (`holdsPersonDoc`, `apps/pinetrie/host/policy.ts`), and `resolveDoc` names
   its kind so the host interprets it with its schema.
 - **Who may write one is the protocol's** (`mayWrite`): its person, and the
   host, which relays it between that person's tabs. `ownerOfPersonDoc`
@@ -309,15 +309,15 @@ hold a root twice.
 
 ## A document per root (ADR-0063)
 
-A session is a document per root, the session's own, and `pineta:live`. The
+A session is a document per root, the session's own, and `pinetrie:live`. The
 root and the session share one schema, `StorageDoc`, pi's storage, so
 `KynetaStorage` and pi's `setValue` serve both unchanged.
 
 | document | id | holds |
 |---|---|---|
 | a root's | `root:<RootId>` (`rootDocId`, core) | its entries, usage rows, pi's values and lists for its lanes, checkpoints, and the host records keyed by its entries (revision, mark, stop, digest) |
-| the session's | `pineta:session` | the records read across roots: the directory (`pineta.root`), every lane's record (`pineta.lane`, naming its root), names, offers, banners, bases, the board (`pineta.workflow`, `pineta.board`), seats, participants and the singletons. No entries |
-| what streams | `pineta:live` (`LiveDoc`) | streams, their text, active runs |
+| the session's | `pinetrie:session` | the records read across roots: the directory (`pinetrie.root`), every lane's record (`pinetrie.lane`, naming its root), names, offers, banners, bases, the board (`pinetrie.workflow`, `pinetrie.board`), seats, participants and the singletons. No entries |
+| what streams | `pinetrie:live` (`LiveDoc`) | streams, their text, active runs |
 
 - **Brands keep the two storage documents apart.** `RootDocHandle` and
   `SessionDocHandle` are `StorageDocHandle` with a phantom brand, so a read
@@ -329,28 +329,28 @@ root and the session share one schema, `StorageDoc`, pi's storage, so
   Agent creates a lane at the root before pi writes the first entry. The
   directory record maps one to the other.
 - **Every document is compacted alone.** A run's end compacts the roots its
-  lanes ran in, the session, `pineta:live` and the places
-  (`planCompaction`, `apps/pineta/host/housekeeping.ts`). The largest root
+  lanes ran in, the session, `pinetrie:live` and the places
+  (`planCompaction`, `apps/pinetrie/host/housekeeping.ts`). The largest root
   in the session that motivated this took 182 ms (S84).
 
 ## Persistence
 
 The host keeps the session in a Kyneta exchange store: `@kyneta/sqlite-store`
-over `node:sqlite`, `.pineta/pineta.db` by default. It holds every document the
+over `node:sqlite`, `.pinetrie/pinetrie.db` by default. It holds every document the
 host serves, one append-only record stream per document: each root's
-`StorageDoc`, which is also pi's storage, the session's, `pineta:live`, each
+`StorageDoc`, which is also pi's storage, the session's, `pinetrie:live`, each
 live card's text, the places document, each person's history of moves per
 root (`moves:<writer>:<RootId>`, ADR-0066), and each connected client's
 command Line. A tab's undo stack is never stored here: the host rejects it
 (`resolveDoc`). It is not a pi session file.
 
-- **The store owns its file** (S47, `apps/pineta/host/store.ts`): exclusive
+- **The store owns its file** (S47, `apps/pinetrie/host/store.ts`): exclusive
   locking mode, taken when it opens, so a second process is refused, and so
   is any reader. Read a running host's store through the `Store`, as the e2e
   suite does. Kyneta's SQLite store issues the same seat on every open, so
   the host keeps its peer id across restarts.
 - **Images are beside the documents, not in them** (ADR-0042). The same file
-  holds `pineta_blobs` (`apps/pineta/host/blobs.ts`), on the store's own
+  holds `pinetrie_blobs` (`apps/pinetrie/host/blobs.ts`), on the store's own
   connection, since the store holds the file's lock: one row per image,
   keyed by its SHA-256, with its type, size, bytes and when it was last
   stored. A chat holds only references, so compaction never rewrites an
@@ -371,7 +371,7 @@ restore it from the revision before its deletion (ADR-0063).
 `StorageDoc` is `json.bind`: plain JSON, serialized writes, one writer (the
 host). No replica writes it, so it needs no CRDT merging, and the browser loads
 no Loro and no wasm. Its in-memory op log grows with every edit until
-compacted (S25), so the host compacts it between runs (`apps/pineta/host/settle.ts`:
+compacted (S25), so the host compacts it between runs (`apps/pinetrie/host/settle.ts`:
 after a run ends, and at startup), each root's alone (ADR-0063): the store's
 records become the document as it stands, and the log is trimmed. What is lost is the history of edits to transient
 state: streams and cleared values. The tree is explicit and
@@ -405,7 +405,7 @@ value as pi does, for tests and fixtures; in the host, only pi writes it.
 ## Lane names, tips and runs are branded here
 
 The lane and run functions take and give `LaneName`, `EntryId` and `RunId`
-(`@pineta/core`), so `endRun(doc, lane, run)` cannot take its two ids
+(`@pinetrie/core`), so `endRun(doc, lane, run)` cannot take its two ids
 swapped. The readers mint them: `readLaneTip` an `EntryId`, `readActiveRun` a
 `RunId`, and `readStoredLanes` the lane names.
 
@@ -443,6 +443,6 @@ an identity, never parsed: readers use each stored value's own `namespace` and
 `packages/pi` and by point lookups here. `valuePrefix` is the one other
 function that depends on the format: the NUL ends the namespace, so a key
 prefix within one namespace is a physical-key prefix (`scanValues`). The
-record itself is `StoredValueRecord`, defined here because it is Pineta's
+record itself is `StoredValueRecord`, defined here because it is pine·trie's
 format, not pi's: `KynetaStorage` writes it with a `wid` per write, and
 `writeLaneTip` writes one without.

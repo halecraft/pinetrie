@@ -20,7 +20,7 @@ import {
   type ThreadName,
   type ValueWrite,
   writerId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import {
   BEHIND_TYPE,
   deleteRecord,
@@ -33,7 +33,7 @@ import {
   PINNED_TYPE,
   recordsOf,
   setRecord,
-} from "@pineta/rules"
+} from "@pinetrie/rules"
 import {
   newRootDoc,
   newSessionDoc,
@@ -44,7 +44,7 @@ import {
   rowMessage,
   rowRetainedTail,
   type SessionDocHandle,
-} from "@pineta/schema"
+} from "@pinetrie/schema"
 import { describe, expect, test } from "vitest"
 import { createAgent, newId } from "./agent.ts"
 import { ONE_ROOT, oneRoot } from "./one-root.ts"
@@ -156,15 +156,15 @@ describe("writeValues (ADR-0062)", () => {
       setRecord(MARK, mark, ONE_ROOT),
       setRecord(NAME, { lane, name: "amber-fox" as ThreadName, at: 1 }),
     ])
-    expect(readValues(doc, "pineta.mark")).toEqual([
+    expect(readValues(doc, "pinetrie.mark")).toEqual([
       { key: entry, value: { title: "Plans", by: writerId("ada"), at: 1 } },
     ])
-    expect(readValues(session, "pineta.mark")).toEqual([])
-    expect(readValues(session, "pineta.name")).toHaveLength(1)
-    expect(readValues(doc, "pineta.name")).toEqual([])
+    expect(readValues(session, "pinetrie.mark")).toEqual([])
+    expect(readValues(session, "pinetrie.name")).toHaveLength(1)
+    expect(readValues(doc, "pinetrie.name")).toEqual([])
     await agent.writeValues([deleteRecord(MARK, entry, ONE_ROOT)])
-    expect(readValues(doc, "pineta.mark")).toEqual([])
-    expect(readValues(session, "pineta.name")).toHaveLength(1)
+    expect(readValues(doc, "pinetrie.mark")).toEqual([])
+    expect(readValues(session, "pinetrie.name")).toHaveLength(1)
     await agent.close()
   })
 
@@ -180,7 +180,7 @@ describe("writeValues (ADR-0062)", () => {
     await expect(
       agent.writeValues([setRecord(MARK, mark, ONE_ROOT), theirs]),
     ).rejects.toThrow("not the host's")
-    expect(readValues(doc, "pineta.mark")).toEqual([])
+    expect(readValues(doc, "pinetrie.mark")).toEqual([])
     expect(readLaneNames(doc)).toEqual([])
     await agent.close()
   })
@@ -374,7 +374,7 @@ describe("pinned cards: what the model reads (ADR-0048, S92)", () => {
     const cards = rows(doc).find(r => messageOf(r)?.customType === PINNED_TYPE)
     const prompt = rows(doc).find(r => r.parentId === cards?.id)
     expect(messageOf(prompt ?? { payload: null })?.customType).toBe(
-      "pineta.chat",
+      "pinetrie.chat",
     )
     expect(seen.at(-2)).toBe(pinned.content)
     expect(seen.at(-1)).toBe("Ada: go")
@@ -416,7 +416,7 @@ describe("pinned cards: what the model reads (ADR-0048, S92)", () => {
     const prompt = rows(doc).find(r => r.parentId === cards?.id)
     expect(
       [cards, prompt].map(r => messageOf(r ?? { payload: null })?.customType),
-    ).toEqual([PINNED_TYPE, "pineta.chat"])
+    ).toEqual([PINNED_TYPE, "pinetrie.chat"])
     expect(seen.slice(-3)).toEqual([
       behind.content,
       pinned.content,

@@ -6,7 +6,7 @@ text, directly; the host writes pi's tree, and a card only to spend it.
 Amended by ADR-0059: the host writes cards' places again (`places`, `json`),
 through handoffs clients ask for; clients write cards' texts and their own
 inventories. Amended by ADR-0063: the session is a `json` document per root,
-a session document and `pineta:live`, each compacted alone.
+a session document and `pinetrie:live`, each compacted alone.
 
 **Context.** The session document was on Loro, a CRDT: every replica could write
 it and merge. None does. The host alone writes the session document (pi's

@@ -1,4 +1,4 @@
-import { parseNewLane } from "@pineta/core"
+import { parseNewLane } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import { newLaneName } from "./ids.ts"
 

@@ -6,9 +6,9 @@
 // holds is opened again from its place alone, in its root's tab: its key,
 // its root and its branch point are in the place (`openFresh`).
 
-import type { PlaceKey } from "@pineta/core"
-import { placeEnd } from "@pineta/rules"
-import { type ActedAt, AT_INVENTORY } from "@pineta/session"
+import type { PlaceKey } from "@pinetrie/core"
+import { placeEnd } from "@pinetrie/rules"
+import { type ActedAt, AT_INVENTORY } from "@pinetrie/session"
 import { type Effect, type IntentState, planOpenAt, show } from "./intent.ts"
 import { columnsOf, hereOfColumn, planOpen } from "./layout.ts"
 

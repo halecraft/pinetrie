@@ -5,7 +5,7 @@
 // it by any part. Typing `/plan` offers `/duane:skill:plan` and
 // `/pi-pstack:skill:plan` alike.
 
-import type { CommandSummary } from "@pineta/core"
+import type { CommandSummary } from "@pinetrie/core"
 
 /**
  * The commands matching what is typed, while the text's first word is a

@@ -5,7 +5,7 @@ though the branch had changed only 7. This finding records why, and the rule
 that fixes it (`PLAN-2026-10-02-offer-start-beside`). It extends S51
 (`docs/findings/S51-offer-start-after-an-update.md`).
 
-Observed in Pineta's own repo, on the offer `pineta-offer/bronze-river`
+Observed in pine·trie's own repo, on the offer `pinetrie-offer/bronze-river`
 (`dfbad45f`), with jj 0.44.0. The commands were read-only, from a lane,
 against the repo mounted at `/mnt/host-working-copy`: `jj log`, `jj diff
 --name-only`, `jj resolve --list` and `jj evolog`, all with
@@ -19,7 +19,7 @@ against the repo mounted at `/mnt/host-working-copy`: `jj log`, `jj diff
 | 19:54 | bronze-river branches from woolly-flint at `25094563` |
 | 20:28 | woolly-flint: "update from my work" (copy `2011b96c`, merged as `44f6752e`) |
 | 20:42, 20:47 | woolly-flint's offers taken: its tip `efe50198` delivered |
-| after | `pineta-offer/bronze-river` conflicts in 23 of its 26 files |
+| after | `pinetrie-offer/bronze-river` conflicts in 23 of its 26 files |
 
 - bronze-river's tip was `db5dd95c`. The newest copy of your `@` in its
   history is `058662e9`, woolly-flint's own, made when woolly-flint forked.
@@ -72,7 +72,7 @@ against the repo mounted at `/mnt/host-working-copy`: `jj log`, `jj diff
 
 **A probe: a delivered commit can be hidden.** In
 `packages/lanes/lanes.test.ts` the parent and the branch are two lines of one
-lane. Fetching the branch's line moves `tip@pineta-<lane>` sideways, and
+lane. Fetching the branch's line moves `tip@pinetrie-<lane>` sideways, and
 `jj git import` abandons the parent's tip, the delivered commit. With jj
 0.44.0, a hidden commit still resolves by its id, in `present()`, `::x` and
 `x::`, so the start is the same. On the host each lane has its own remote

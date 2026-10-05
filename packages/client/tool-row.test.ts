@@ -1,4 +1,4 @@
-import { type ImageRef, isSha256, type ToolResultView } from "@pineta/core"
+import { type ImageRef, isSha256, type ToolResultView } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import {
   CALL_MARK,

@@ -2,7 +2,7 @@
 // each column of the root you are on reads (ADR-0024, ADR-0029), and when you
 // are typing, and in which card. PURE: `App` gathers and writes.
 
-import type { CardId } from "@pineta/core"
+import type { CardId } from "@pinetrie/core"
 
 /** Each reported column's key, and the thread end it shows (null: none yet). */
 export type Reported = ReadonlyMap<string, string | null>

@@ -2,8 +2,8 @@
 // It reads the reader's choice for its own ask (`FoldMemory`), so opening or
 // closing one redraws it alone, as a tool row does (ADR-0049).
 
-import type { EntryId, Segment } from "@pineta/core"
-import { pointsText } from "@pineta/rules"
+import type { EntryId, Segment } from "@pinetrie/core"
+import { pointsText } from "@pinetrie/rules"
 import {
   Fragment,
   type ReactNode,

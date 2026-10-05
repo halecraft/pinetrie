@@ -2,7 +2,7 @@
 // your profile: one rule (`normalizeName`, through `identity.ts`) and one
 // wording for both.
 
-import { MAX_NAME_LENGTH } from "@pineta/core"
+import { MAX_NAME_LENGTH } from "@pinetrie/core"
 import { nameHint } from "./identity.ts"
 
 /** Why `normalizeName` refuses a name, in the client's words. */

@@ -1,13 +1,13 @@
 // line — the integration line and a thread's base on it (ADR-0060,
 // ADR-0061, ADR-0072, ADR-0076): the line's and each lane's base's records
-// (`pineta.line`, `pineta.base`), the line's record from what the host read
+// (`pinetrie.line`, `pinetrie.base`), the line's record from what the host read
 // (`planLineRecord`), whether a `line` command may run (`lineActionState`)
 // and why not (`lineRefusal`), the command (`planLineAction`), where a new
 // lane begins (`planBegin`), the base a thread follows (`effectiveBase`),
 // what catching up with it would do (`catchUpOf`) and merge
 // (`planUpdateFrom`), and the thread a lane branched from (`parentNow`,
 // `planParentUpdate`).
-// A `line` command's steps are `@pineta/repo`'s (`lineSteps`).
+// A `line` command's steps are `@pinetrie/repo`'s (`lineSteps`).
 
 import {
   ancestry,
@@ -35,12 +35,12 @@ import {
   type ThreadBase,
   type ThreadName,
   type TreeIndex,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { Type } from "typebox"
 import { CommitSchema, decodeAt, fixedKey, laneKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
-/** The one `pineta.line` value's key: a host follows one line. */
+/** The one `pinetrie.line` value's key: a host follows one line. */
 export const LINE_KEY = "line"
 
 const LineRecordSchema = Type.Object({
@@ -120,7 +120,7 @@ const BaseRecordSchema = Type.Object({
 
 /** The integration line, at its one key. */
 export const LINE: RecordSpec<LineRecord, typeof LINE_KEY, "session"> = {
-  namespace: "pineta.line",
+  namespace: "pinetrie.line",
   home: "session",
   keyOf: () => LINE_KEY,
   encode: r => ({
@@ -159,7 +159,7 @@ export const LINE: RecordSpec<LineRecord, typeof LINE_KEY, "session"> = {
 
 /** Each lane's base, as its history says it, at the lane. */
 export const BASE: RecordSpec<BaseRecord, LaneName, "session"> = {
-  namespace: "pineta.base",
+  namespace: "pinetrie.base",
   home: "session",
   keyOf: r => r.lane,
   encode: ({ lane, ...contents }) => ({
@@ -346,14 +346,14 @@ interface BaseMove {
   readonly base: ThreadBase
   /** The base's bookmark: the line's, or the WIP's. */
   readonly bookmark: string
-  /** The commit the lane's newest `Pineta-Base` names, and the base's now. */
+  /** The commit the lane's newest `Pinetrie-Base` names, and the base's now. */
   readonly from: CommitId
   readonly to: CommitId
 }
 
 /**
  * How a thread's base has moved on since its lane last forked from it or
- * caught up (ADR-0060), or null: the commit its newest `Pineta-Base` names
+ * caught up (ADR-0060), or null: the commit its newest `Pinetrie-Base` names
  * (`start`) against where the base is now, the line's `commit` or the WIP's.
  * Never for a WIP gone, which only "continue on the line" moves. Commits
  * only: whether catching up would change a file is `catchUpOf`'s, which
@@ -380,7 +380,7 @@ function baseMoved(
  * - `current`: its base has not moved since the lane last caught up with
  *   it, or there is no line to catch up with;
  * - `unknown`: it moved, and the host has not yet read what that changes;
- *   or the host has never read the lane at all (no `pineta.base`): a lane
+ *   or the host has never read the lane at all (no `pinetrie.base`): a lane
  *   whose turns changed no file never reached your repo;
  * - `nothing-new`: it moved, but by work the lane already holds, as after
  *   you integrated its own offer: catching up changes no file;
@@ -480,7 +480,7 @@ export function planUpdateFrom(input: {
   readonly onto: string
   /** The lane's base, from its own history; null for a lane with none, on the line. */
   readonly base: LaneBase | null
-  /** `wipState` of a WIP base (`@pineta/repo`); "ok" for the line. */
+  /** `wipState` of a WIP base (`@pinetrie/repo`); "ok" for the line. */
   readonly state: BaseRecord["state"]
   /** "continue on the line": the thread moves to the line, whatever its base. */
   readonly toLine: boolean

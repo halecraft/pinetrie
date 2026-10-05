@@ -4,9 +4,9 @@
 // The host's places document says whose inventory a card is in; this says
 // where in the grid it sits. Only your own tabs arrange it, and they may do
 // so at once, so it merges; each tab then repairs it from the host's record
-// (`planSlots` in @pineta/client). The host stores and relays it, shared with
+// (`planSlots` in @pinetrie/client). The host stores and relays it, shared with
 // its person only (host/policy.ts), and never writes it; its id and who may
-// write it are the protocol's (`@pineta/protocol/writers`).
+// write it are the protocol's (`@pinetrie/protocol/writers`).
 
 import {
   type BoundSchema,
@@ -15,7 +15,7 @@ import {
   Schema,
 } from "@kyneta/schema"
 import { yjs } from "@kyneta/yjs-schema"
-import { type CardId, cardId } from "@pineta/core"
+import { type CardId, cardId } from "@pinetrie/core"
 
 /** Slot index ("0"–"17", reading order) to card id. An empty slot has no key. */
 export const InventoryDoc = yjs.bind(

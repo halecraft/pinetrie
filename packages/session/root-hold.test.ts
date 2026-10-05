@@ -1,4 +1,4 @@
-import { type RootId, rootIdFor } from "@pineta/core"
+import { type RootId, rootIdFor } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { planHold } from "./root-hold.ts"
 

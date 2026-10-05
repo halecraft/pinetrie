@@ -35,7 +35,7 @@ anyone measuring it.
 ## Method
 
 `sandbox/s31-line-kinds/run.sh`, from the repo root: it copies
-`probe.ts` into `apps/pineta/e2e/` (the workspace resolves `@pineta/*` only
+`probe.ts` into `apps/pinetrie/e2e/` (the workspace resolves `@pinetrie/*` only
 from a package that declares them), runs it against a fresh sqlite store with
 the current kinds, adds `"archive"` to `COMMAND_KINDS` and `"archived"` to
 `OUTCOME_KINDS` in `packages/protocol/messages.ts`, runs it again on the same

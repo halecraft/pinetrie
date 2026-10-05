@@ -5,7 +5,7 @@ import {
   indexAsks,
   indexTree,
   rootIdFor,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   DIGEST_EVERY,

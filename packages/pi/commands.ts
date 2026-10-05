@@ -9,13 +9,13 @@
 
 import { readFile, stat } from "node:fs/promises"
 import path from "node:path"
-import { type CommandRef, hostPathInLane } from "@pineta/core"
+import { type CommandRef, hostPathInLane } from "@pinetrie/core"
 import {
   type CommandSource,
   expandSkill,
   type GatheredCommand,
   resolveCommand,
-} from "@pineta/rules"
+} from "@pinetrie/rules"
 import {
   type DefaultResourceLoader,
   loadPromptTemplates,
@@ -66,12 +66,12 @@ interface Origin {
 async function namesOf(
   file: string,
   origin: Origin,
-  pinetaSkills: string,
+  pinetrieSkills: string,
 ): Promise<GatheredCommand["names"]> {
   const root = origin.root
   return {
-    pineta:
-      pinetaSkills !== "" && file.startsWith(`${pinetaSkills}${path.sep}`),
+    pinetrie:
+      pinetrieSkills !== "" && file.startsWith(`${pinetrieSkills}${path.sep}`),
     plugin:
       root === null
         ? null
@@ -125,24 +125,25 @@ function loserTemplate(d: Diagnostic, cwd: string, agentDir: string) {
 }
 
 /**
- * Pineta's own skills alone, as commands: what a scripted or named model has
- * when it loads nothing of pi's, so `pineta:skill:resolve-conflicts` is a
+ * pinetrie's own skills alone, as commands: what a scripted or named model has
+ * when it loads nothing of pi's, so `pinetrie:skill:resolve-conflicts` is a
  * command whatever the model.
  */
-export function pinetaCommands(pinetaSkills: string): GatheredCommand[] {
-  return loadSkillsFromDir({ dir: pinetaSkills, source: "pineta" }).skills.map(
-    s => ({
-      kind: "skill",
-      name: s.name,
-      description: s.description,
-      argumentHint: null,
-      file: s.filePath,
-      dir: s.baseDir,
-      root: pinetaSkills,
-      source: "pineta",
-      names: { pineta: true, plugin: null, packageName: null, scope: "user" },
-    }),
-  )
+export function pinetrieCommands(pinetrieSkills: string): GatheredCommand[] {
+  return loadSkillsFromDir({
+    dir: pinetrieSkills,
+    source: "pinetrie",
+  }).skills.map(s => ({
+    kind: "skill",
+    name: s.name,
+    description: s.description,
+    argumentHint: null,
+    file: s.filePath,
+    dir: s.baseDir,
+    root: pinetrieSkills,
+    source: "pinetrie",
+    names: { pinetrie: true, plugin: null, packageName: null, scope: "user" },
+  }))
 }
 
 /**
@@ -154,7 +155,7 @@ export function pinetaCommands(pinetaSkills: string): GatheredCommand[] {
 export async function gatherCommands(
   loader: Loader,
   where: { readonly cwd: string; readonly agentDir: string },
-  pinetaSkills: string,
+  pinetrieSkills: string,
 ): Promise<GatheredCommand[]> {
   const skills = loader.getSkills()
   const prompts = loader.getPrompts()
@@ -192,7 +193,7 @@ export async function gatherCommands(
       dir: s.baseDir,
       root: origin.root ?? s.baseDir,
       source: origin.source,
-      names: await namesOf(s.filePath, origin, pinetaSkills),
+      names: await namesOf(s.filePath, origin, pinetrieSkills),
     })
   }
   const template = async (t: Template, lost: boolean) => {
@@ -207,7 +208,7 @@ export async function gatherCommands(
       dir,
       root: origin.root ?? dir,
       source: origin.source,
-      names: await namesOf(t.filePath, origin, pinetaSkills),
+      names: await namesOf(t.filePath, origin, pinetrieSkills),
     })
   }
   for (const s of skills.skills) await skill(s, false)
@@ -278,7 +279,7 @@ export interface CommandFiles {
     readonly reason: string
   }[]
   /**
-   * A skill by its qualified name, e.g. `pineta:skill:resolve-conflicts`,
+   * A skill by its qualified name, e.g. `pinetrie:skill:resolve-conflicts`,
    * read now. Null if no command has that name, or its file is unreadable.
    */
   skill(name: string): Promise<ReturnType<typeof skillOf> | null>

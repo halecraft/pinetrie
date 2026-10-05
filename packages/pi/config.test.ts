@@ -2,7 +2,7 @@
 // settings list two packages that each have a skill named `hello`.
 
 import path from "node:path"
-import { labelCommands } from "@pineta/rules"
+import { labelCommands } from "@pinetrie/rules"
 import { expect, test } from "vitest"
 import { imageModelFor, setUpModel, titleModelOf } from "./config.ts"
 import { scriptedModel } from "./scripted.ts"
@@ -31,7 +31,7 @@ test("every skill and template pi loaded, the ones it dropped for their names in
   )
 })
 
-test("a scripted model given no agent directory loads nothing of pi's, and still has Pineta's own skills as commands", async () => {
+test("a scripted model given no agent directory loads nothing of pi's, and still has pinetrie's own skills as commands", async () => {
   const setup = await setUpModel(
     { kind: "scripted", script: scriptedModel() },
     {
@@ -45,12 +45,12 @@ test("a scripted model given no agent directory loads nothing of pi's, and still
       .commands.map(c => c.name)
       .sort(),
   ).toEqual([
-    "pineta:skill:ask-digest",
-    "pineta:skill:column-banner",
-    "pineta:skill:commit-message",
-    "pineta:skill:offer-stack",
-    "pineta:skill:resolve-conflicts",
-    "pineta:skill:tab-title",
+    "pinetrie:skill:ask-digest",
+    "pinetrie:skill:column-banner",
+    "pinetrie:skill:commit-message",
+    "pinetrie:skill:offer-stack",
+    "pinetrie:skill:resolve-conflicts",
+    "pinetrie:skill:tab-title",
   ])
 })
 

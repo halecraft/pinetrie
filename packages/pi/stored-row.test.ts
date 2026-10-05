@@ -10,7 +10,7 @@
 // either copy yields the same entry. Only the disjointness case sees that, so
 // it comes first.
 
-import { findSeqKeys } from "@pineta/core"
+import { findSeqKeys } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   type EntryWithoutSeq,

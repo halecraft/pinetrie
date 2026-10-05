@@ -15,7 +15,7 @@ import {
   rootOf,
   type TreeIndex,
   type WriterId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 
 export interface PersonHere {
   readonly writer: WriterId

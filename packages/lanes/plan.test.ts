@@ -6,7 +6,7 @@ import {
   shellWord,
   snapshotId,
   type ThreadName,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   DEFAULT_LINE,
@@ -51,13 +51,13 @@ const LANE = laneNameForThread("1")
 const C1 = commitId("c1")
 const C2 = commitId("c2")
 const HOME = "/Users/ada"
-const paths = { volumes: "/v", snapshots: "/p/.pineta/snapshots" }
+const paths = { volumes: "/v", snapshots: "/p/.pinetrie/snapshots" }
 
 const parts = {
   hostWorkingCopy: "/p",
-  pineta: "/opt/pineta",
-  runtime: "/p/.pineta/runtime/abc",
-  ignoreDir: "/p/.pineta/lane-git",
+  pinetrie: "/opt/pinetrie",
+  runtime: "/p/.pinetrie/runtime/abc",
+  ignoreDir: "/p/.pinetrie/lane-git",
   links: [{ source: "/k", target: "/k", readonly: true }],
   grants: [],
   shared: [],
@@ -66,12 +66,12 @@ const parts = {
 
 const spec: LaneSpec = {
   lane: LANE,
-  volume: "pineta-t-1",
-  image: "pineta-lane:abc",
+  volume: "pinetrie-t-1",
+  image: "pinetrie-lane:abc",
   imagePath: "/usr/local/bin:/usr/bin:/bin",
   mounts: planMounts(parts),
   grants: { ssh: false, env: [] },
-  identity: { name: "agent", email: "agent@pineta" },
+  identity: { name: "agent", email: "agent@pinetrie" },
   memory: "2G",
 }
 
@@ -80,16 +80,20 @@ const valuesOf = (argv: readonly string[], flag: string) =>
   argv.flatMap((a, i) => (a === flag ? [argv[i + 1] ?? ""] : []))
 
 describe("planMounts: every host path a lane sees, in one list", () => {
-  test("your working copy, Pineta's own and the ignore file's directory, read-only", () => {
+  test("your working copy, pinetrie's own and the ignore file's directory, read-only", () => {
     expect(planMounts(parts)).toEqual([
       { source: "/p", target: "/mnt/host-working-copy", readonly: true },
-      { source: "/opt/pineta", target: "/pineta", readonly: true },
+      { source: "/opt/pinetrie", target: "/pinetrie", readonly: true },
       {
-        source: "/p/.pineta/runtime/abc",
-        target: "/pineta-runtime",
+        source: "/p/.pinetrie/runtime/abc",
+        target: "/pinetrie-runtime",
         readonly: true,
       },
-      { source: "/p/.pineta/lane-git", target: "/pineta-git", readonly: true },
+      {
+        source: "/p/.pinetrie/lane-git",
+        target: "/pinetrie-git",
+        readonly: true,
+      },
       { source: "/k", target: "/k", readonly: true },
     ])
   })
@@ -181,7 +185,7 @@ describe("planRun: a lane's container", () => {
       "-d",
       "--init",
     ])
-    expect(valuesOf(argv, "-v")).toEqual(["pineta-t-1:/workspace"])
+    expect(valuesOf(argv, "-v")).toEqual(["pinetrie-t-1:/workspace"])
     expect(valuesOf(argv, "--mount")).toEqual(
       spec.mounts.map(m => mountArgs(m)[1]),
     )
@@ -191,11 +195,11 @@ describe("planRun: a lane's container", () => {
       expect.arrayContaining([
         "GIT_CONFIG_COUNT=1",
         "GIT_CONFIG_KEY_0=core.excludesFile",
-        "GIT_CONFIG_VALUE_0=/pineta-git/ignore",
+        "GIT_CONFIG_VALUE_0=/pinetrie-git/ignore",
       ]),
     )
     expect(laneIgnores([".plans", "notes/shared"])).toBe(
-      "/.pineta-lane/\n/lost+found/\n/.plans/\n/notes/shared/\n",
+      "/.pinetrie-lane/\n/lost+found/\n/.plans/\n/notes/shared/\n",
     )
   })
   test("the spec label: stable, and changed by a mount or the image", () => {
@@ -210,7 +214,9 @@ describe("planRun: a lane's container", () => {
         {},
       ),
     ).not.toBe(hash)
-    expect(specHashOf({ ...spec, image: "pineta-lane:def" }, {})).not.toBe(hash)
+    expect(specHashOf({ ...spec, image: "pinetrie-lane:def" }, {})).not.toBe(
+      hash,
+    )
   })
   test("never your home directory, and no variable no grant names", () => {
     expect(argv.join(" ")).not.toContain(HOME)
@@ -233,15 +239,15 @@ describe("planRun: a lane's container", () => {
     expect(env).toEqual(
       expect.arrayContaining([
         "JJ_USER=agent",
-        "JJ_EMAIL=agent@pineta",
-        "JJ_CONFIG=/workspace/.pineta-lane/jj.toml",
+        "JJ_EMAIL=agent@pinetrie",
+        "JJ_CONFIG=/workspace/.pinetrie-lane/jj.toml",
         "JJ_EDITOR=false",
-        "PATH=/usr/local/bin:/usr/bin:/bin:/pineta-runtime/bin",
+        "PATH=/usr/local/bin:/usr/bin:/bin:/pinetrie-runtime/bin",
       ]),
     )
     expect(argv.slice(-4)).toEqual([
       "/workspace",
-      "pineta-lane:abc",
+      "pinetrie-lane:abc",
       "sleep",
       "infinity",
     ])
@@ -272,7 +278,7 @@ describe("lineConfig: the project's names win, and a bad one falls back", () => 
     expect(r.refused[0]).toContain("has space")
   })
   test("isBookmarkName: git's rules", () => {
-    for (const ok of ["pineta-onto", "wip/x", "a.b"])
+    for (const ok of ["pinetrie-onto", "wip/x", "a.b"])
       expect(isBookmarkName(ok)).toBe(true)
     for (const bad of ["", "a b", "a..b", "-a", "a/", "a.lock", "a@b", "a:b"])
       expect(isBookmarkName(bad)).toBe(false)
@@ -367,7 +373,7 @@ describe("planShared: which shared directories apply, and what the host does for
     expect(planned.create).toEqual(["notes", "shared/data"])
     expect(planned.exclude).toEqual(["notes", "shared/data"])
   })
-  test("refused, with a reason: absolute, leaving the project, in a repo's or Pineta's own, tracked", () => {
+  test("refused, with a reason: absolute, leaving the project, in a repo's or pinetrie's own, tracked", () => {
     const planned = planShared({
       ...facts,
       user: [
@@ -376,7 +382,7 @@ describe("planShared: which shared directories apply, and what the host does for
         ".",
         ".jj/plans",
         ".git",
-        ".pineta/x",
+        ".pinetrie/x",
         "node_modules/y",
         "docs",
       ],
@@ -390,7 +396,7 @@ describe("planShared: which shared directories apply, and what the host does for
       ".: it leaves the project",
       ".jj/plans: it is inside .jj",
       ".git: it is inside .git",
-      ".pineta/x: it is inside .pineta",
+      ".pinetrie/x: it is inside .pinetrie",
       "node_modules/y: it is inside node_modules",
       "docs: it holds files jj tracks",
     ])
@@ -399,7 +405,7 @@ describe("planShared: which shared directories apply, and what the host does for
 
 test("planLinks: the directory beside the project that a link leaves for, mounted where it resolves", () => {
   expect(
-    planLinks("/w/pineta", [
+    planLinks("/w/pinetrie", [
       { path: "node_modules/@k/a", target: "../../../kyneta/packages/a" },
       {
         path: "packages/x/node_modules/@k/a",
@@ -432,17 +438,17 @@ test("planForkSetup: a base with several parents is committed once, so the bookm
   ).toEqual([
     "lane: jj new c1 c2",
     `lane: jj commit -m base: ${LANE}`,
-    `lane: jj bookmark set --allow-backwards pineta/${LANE} -r @-`,
+    `lane: jj bookmark set --allow-backwards pinetrie/${LANE} -r @-`,
   ])
 })
 
 test("planForkSetup: on the line, an empty commit naming it; its id read for the config (ADR-0060)", () => {
   const steps = argvs(
-    planForkSetup(LANE, { kind: "line", onto: "pineta-onto", commit: C1 }),
+    planForkSetup(LANE, { kind: "line", onto: "pinetrie-onto", commit: C1 }),
   )
   expect(steps.slice(1, 3)).toEqual([
     "lane: jj new c1",
-    `lane: jj commit -m ${baseMessage("base: pineta-onto", { bookmark: "pineta-onto", commit: C1 })}`,
+    `lane: jj commit -m ${baseMessage("base: pinetrie-onto", { bookmark: "pinetrie-onto", commit: C1 })}`,
   ])
   expect(steps.at(-1)).toContain(
     "jj --ignore-working-copy log --no-graph -r @-",
@@ -504,7 +510,7 @@ describe("planJoins: the integrated-offer commits a lane holds, joined before it
       new Set([S1]),
     )
     expect(join?.message).toBe("join: t1 holds s1")
-    expect(join?.message).not.toMatch(/^Pineta-/m)
+    expect(join?.message).not.toMatch(/^Pinetrie-/m)
   })
 })
 
@@ -513,12 +519,17 @@ describe("planMerge: an update's steps (ADR-0060)", () => {
   const COPY = commitId("copy1")
   test("the line's merge names its base, and lists what came in since the lane", () => {
     expect(
-      planMerge({ kind: "line", onto: "pineta-onto", commit: C1, mark: true }),
+      planMerge({
+        kind: "line",
+        onto: "pinetrie-onto",
+        commit: C1,
+        mark: true,
+      }),
     ).toEqual({
       steps: [fetchById([C1])],
       source: C1,
-      message: baseMessage("update: pineta-onto", {
-        bookmark: "pineta-onto",
+      message: baseMessage("update: pinetrie-onto", {
+        bookmark: "pinetrie-onto",
         commit: C1,
       }),
       mark: true,
@@ -546,7 +557,7 @@ describe("planMerge: an update's steps (ADR-0060)", () => {
       came: { from: C2, to: W },
     })
   })
-  test("the thread it branched from is merged as a commit, named, with no Pineta-Base (ADR-0072)", () => {
+  test("the thread it branched from is merged as a commit, named, with no Pinetrie-Base (ADR-0072)", () => {
     expect(
       planMerge({
         kind: "parent",
@@ -588,14 +599,14 @@ test("planFork: the clone, the container, then jj new before anything else, then
     env: {},
   })
   expect(argvs(steps)).toEqual([
-    "host: container volume create --opt journal=ordered --opt size=64G pineta-t-1",
-    "host: /bin/cp -c /p/.pineta/snapshots/e1.img /v/pineta-t-1/volume.img.tmp",
-    "host: /bin/mv -f /v/pineta-t-1/volume.img.tmp /v/pineta-t-1/volume.img",
+    "host: container volume create --opt journal=ordered --opt size=64G pinetrie-t-1",
+    "host: /bin/cp -c /p/.pinetrie/snapshots/e1.img /v/pinetrie-t-1/volume.img.tmp",
+    "host: /bin/mv -f /v/pinetrie-t-1/volume.img.tmp /v/pinetrie-t-1/volume.img",
     `host: container ${planRun(spec, {}).join(" ")}`,
     `lane: ${fetchById([C1]).argv.join(" ")}`,
     "lane: jj new c1",
-    `lane: jj bookmark set --allow-backwards pineta/${LANE} -r @-`,
-    `lane: sh -c mkdir -p /workspace/.pineta-lane && printf ${shellWord(forkConfig("%s", ["%s" as never]))} /workspace c1 > /workspace/.pineta-lane/jj.toml`,
+    `lane: jj bookmark set --allow-backwards pinetrie/${LANE} -r @-`,
+    `lane: sh -c mkdir -p /workspace/.pinetrie-lane && printf ${shellWord(forkConfig("%s", ["%s" as never]))} /workspace c1 > /workspace/.pinetrie-lane/jj.toml`,
   ])
 })
 
@@ -603,7 +614,7 @@ test("planDisk: a new volume, or one cloned from a snapshot; then the container"
   const disk = (from: typeof BASE_SNAPSHOT | null) =>
     argvs(planDisk({ paths, spec, env: {}, from }))
   expect(disk(null)).toEqual([
-    "host: container volume create --opt journal=ordered --opt size=64G pineta-t-1",
+    "host: container volume create --opt journal=ordered --opt size=64G pinetrie-t-1",
     `host: container ${planRun(spec, {}).join(" ")}`,
   ])
   expect(disk(BASE_SNAPSHOT)[1]).toContain("/snapshots/base.img ")
@@ -612,21 +623,32 @@ test("planDisk: a new volume, or one cloned from a snapshot; then the container"
 test("planSnapshot: sync comes before the clone", () => {
   expect(
     argvs(
-      planSnapshot({ volume: "pineta-t-1", snapshot: snapshotId("e2"), paths }),
+      planSnapshot({
+        volume: "pinetrie-t-1",
+        snapshot: snapshotId("e2"),
+        paths,
+      }),
     ),
   ).toEqual([
     "lane: sync",
-    "host: /bin/cp -c /v/pineta-t-1/volume.img /p/.pineta/snapshots/e2.img.tmp",
-    "host: /bin/mv -f /p/.pineta/snapshots/e2.img.tmp /p/.pineta/snapshots/e2.img",
+    "host: /bin/cp -c /v/pinetrie-t-1/volume.img /p/.pinetrie/snapshots/e2.img.tmp",
+    "host: /bin/mv -f /p/.pinetrie/snapshots/e2.img.tmp /p/.pinetrie/snapshots/e2.img",
   ])
 })
 
 test("planBundle: the lane's bookmark, excluding what your repo has", () => {
   expect(
-    planBundle({ bookmark: `pineta/${LANE}`, have: [C1], to: "/tmp/b" }),
+    planBundle({ bookmark: `pinetrie/${LANE}`, have: [C1], to: "/tmp/b" }),
   ).toEqual({
     in: "lane",
-    argv: ["git", "bundle", "create", "-", `refs/heads/pineta/${LANE}`, "^c1"],
+    argv: [
+      "git",
+      "bundle",
+      "create",
+      "-",
+      `refs/heads/pinetrie/${LANE}`,
+      "^c1",
+    ],
     stdoutTo: "/tmp/b",
   })
 })
@@ -780,14 +802,14 @@ describe("the host: its root, then container, in order", () => {
     })
   })
   test("planExclude: adds each missing line once, on a line of its own", () => {
-    expect(planExclude("", ["/.pineta/"])).toBe("/.pineta/\n")
-    expect(planExclude("# x", ["/.pineta/", "/.plans/"])).toBe(
-      "# x\n/.pineta/\n/.plans/\n",
+    expect(planExclude("", ["/.pinetrie/"])).toBe("/.pinetrie/\n")
+    expect(planExclude("# x", ["/.pinetrie/", "/.plans/"])).toBe(
+      "# x\n/.pinetrie/\n/.plans/\n",
     )
-    expect(planExclude("a\n/.pineta/\n", ["/.pineta/", "/.plans/"])).toBe(
-      "a\n/.pineta/\n/.plans/\n",
+    expect(planExclude("a\n/.pinetrie/\n", ["/.pinetrie/", "/.plans/"])).toBe(
+      "a\n/.pinetrie/\n/.plans/\n",
     )
-    expect(planExclude("a\n/.pineta/\n", ["/.pineta/"])).toBeNull()
+    expect(planExclude("a\n/.pinetrie/\n", ["/.pinetrie/"])).toBeNull()
   })
   test("planContainer: create, recreate from another spec, start, or nothing", () => {
     const decide = (
@@ -815,20 +837,20 @@ describe("the host: its root, then container, in order", () => {
   })
 })
 
-test("planImages: Pineta's image is pinned to the app's Playwright, a project's is not", () => {
+test("planImages: pinetrie's image is pinned to the app's Playwright, a project's is not", () => {
   const input = {
-    pineta: { file: "/pineta/Containerfile", content: "FROM node" },
-    project: { file: "/p/pineta.Containerfile", content: "FROM alpine" },
+    pinetrie: { file: "/pinetrie/Containerfile", content: "FROM node" },
+    project: { file: "/p/pinetrie.Containerfile", content: "FROM alpine" },
     jjVersion: "0.44.0",
     playwrightVersion: "1.56.0",
   }
   const plans = planImages(input)
   const bumped = planImages({ ...input, playwrightVersion: "1.57.0" })
-  expect(plans.pineta.buildArgs).toEqual([
+  expect(plans.pinetrie.buildArgs).toEqual([
     "JJ_VERSION=0.44.0",
     "PLAYWRIGHT_VERSION=1.56.0",
   ])
-  expect(bumped.pineta.tag).not.toBe(plans.pineta.tag)
+  expect(bumped.pinetrie.tag).not.toBe(plans.pinetrie.tag)
   expect(plans.project?.buildArgs).toEqual(["JJ_VERSION=0.44.0"])
   expect(bumped.project?.tag).toBe(plans.project?.tag)
   expect(planImages({ ...input, project: null }).project).toBeNull()

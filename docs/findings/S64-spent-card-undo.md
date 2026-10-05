@@ -2,7 +2,7 @@
 
 **Answers.**
 1. **Redo of a step of several commits to one text is fixed** in the Kyneta
-   build Pineta links (`needed-by-pineta`, "a step of several commits to one
+   build pine·trie links (`needed-by-pinetrie`, "a step of several commits to one
    text undoes and redoes in order"). Typing `more` after `Go` a key at a
    time, then undo and redo, gives `Gomore` (S58's addendum measured
    `Goerom`). A word backspaced a key at a time and undone comes back as it
@@ -41,7 +41,7 @@
    the peer, from the session first (`sync/peer-departed`). So "the host left
    this document while still connected" means the host destroyed it.
 6. **The two arrive in either order.** The host deletes the record, then
-   destroys the document (`CardPort.spend`, `apps/pineta/host/cards.ts`). Over
+   destroys the document (`CardPort.spend`, `apps/pinetrie/host/cards.ts`). Over
    the real host, though, a client heard the host leave the card's document
    while the record was still there: the `dismiss` is sent at once, and the
    record's delete with the next sync of the cards document. (Measured by
@@ -53,7 +53,7 @@
 
 ## Method
 
-Disposable probes in `apps/pineta/e2e/`, not checked in, run with `node`.
+Disposable probes in `apps/pinetrie/e2e/`, not checked in, run with `node`.
 They used three `Exchange`s over Kyneta's in-process transport
 (`@kyneta/bridge-transport`, imported from the Kyneta build by path): a host
 with the `resolve` `startHost` uses (`cards` → `CardsDoc`, `card:` →
@@ -80,7 +80,7 @@ connection with `exchange.peers`.
 
 ## What was not measured
 
-- Pineta's real topology, except the order of answer 6: a hub, with every
+- pine·trie's real topology, except the order of answer 6: a hub, with every
   client connected only to the host over websockets. The in-process
   transport here meshed all three peers.
 - An abrupt disconnect. Here the host shut down cleanly; a drop is
@@ -156,7 +156,7 @@ measured:
 - `undo({ docs })` and `redo({ docs })` never take a step from under a newer
   step it overlaps, so either can be `false` while the card has steps.
 
-The same disposable probe, in Pineta's shape:
+The same disposable probe, in pine·trie's shape:
 
 | step | returns | after |
 |---|---|---|
@@ -166,7 +166,7 @@ The same disposable probe, in Pineta's shape:
 | undo `b`, under newer steps on `a` and `c` | `true` | `b` gone |
 
 **Creating a card no longer clears another card's redo**, and the redo that
-wrote into a gone card's text (addendum 2) cannot happen. In Pineta a newer
+wrote into a gone card's text (addendum 2) cannot happen. In pine·trie a newer
 step on a card's record or text is only ever that card's own, from its own
 box, so its Cmd+Z is never refused. The e2e suite's check 2b now creates a
 card between the undo past a card's creation and the redo.

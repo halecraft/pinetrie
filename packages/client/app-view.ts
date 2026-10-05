@@ -19,8 +19,8 @@ import {
   type TreeIndex,
   type Workflow,
   type WriterId,
-} from "@pineta/core"
-import { displayName, offerStatus } from "@pineta/rules"
+} from "@pinetrie/core"
+import { displayName, offerStatus } from "@pinetrie/rules"
 import type { Column } from "./columns.ts"
 import type { Intent } from "./intent.ts"
 import type { Here } from "./layout.ts"

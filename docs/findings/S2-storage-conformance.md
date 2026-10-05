@@ -283,7 +283,7 @@ underneath) or renegotiate the contract.
 
 **NEW — a roadmap risk that did not previously exist.** §3.4 is a Kyneta-side
 finding, in `@kyneta/schema` core, independent of substrate and of pi. Current
-behaviour rules out large single-container writes. In Pineta's shape a session's
+behaviour rules out large single-container writes. In pine·trie's shape a session's
 entry record and `pi.pending.assistant_frame` lists are exactly the containers
 that grow without bound. Mitigating facts: the realistic streaming shape (1 000
 separate single-append commits = 247ms ≈ 0.25ms/commit) is fine today, and the

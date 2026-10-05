@@ -36,11 +36,11 @@ clones do.
    config, off the disk.
 5. **Concurrent pushes into the host repo over virtiofs were sound.** Lanes
    A, B and C took 15 turns each at once, each turn a commit and a push of
-   `pineta/<lane>` to the host repo mounted at `/host` (3 s in all): every
+   `pinetrie/<lane>` to the host repo mounted at `/host` (3 s in all): every
    bookmark on the host was its lane's latest commit, the host held all 45
    turns, nothing was divergent, and `git fsck` was clean.
 6. **Landing and folding are ordinary jj.** The host merged `main` with
-   `pineta/lane-c` and had lane C's tracked files; its ignored state stayed
+   `pinetrie/lane-c` and had lane C's tracked files; its ignored state stayed
    in the lane. Lane B fetched the others' bookmarks (same change ids) and
    merged lane A's tip: a content conflict in the file both edited, as
    ADR-0033's resolution expects.
@@ -55,7 +55,7 @@ clones do.
   lane it forks from, by cloning the disk). No jj workspaces, no shared jj
   state between VMs, and no re-registering: a fork is a disk clone and `jj
   new T`.
-- A turn: snapshot and commit, push `pineta/<lane>` to your repo, clone the
+- A turn: snapshot and commit, push `pinetrie/<lane>` to your repo, clone the
   disk. The host sees a lane's work at each push, once per turn, not live.
 - A fork's lane config marks everything at or above its fork point immutable.
 - Landing, folding and resolving conflicts run on commits in any repo that
@@ -69,14 +69,14 @@ clones do.
   another machine.
 - Your working copy as the push target while you use it; here the host repo
   was a throwaway with no one editing it.
-- Pineta's host code moved onto this layout (`turnDone`, landing, ADR-0033).
+- pine·trie's host code moved onto this layout (`turnDone`, landing, ADR-0033).
 
 ## Method
 
 `sandbox/s42/` in lane `t-01a0e616-…`'s workspace (ignored): `img/` (the
 `Containerfile`: `node:24-trixie-slim`, git, jj 0.44.0), `lib.sh` (`plane`
 starts a lane with its disk at `/r/workspace/lane` and the host repo at
-`/host`; `pturn` commits, sets and pushes `pineta/<lane>`; `snap` clones a
+`/host`; `pturn` commits, sets and pushes `pinetrie/<lane>`; `snap` clones a
 disk; `immutable` writes the fork's config). A throwaway colocated host repo
 with a `base` commit and `main`. Image `s42-lane:2` remains; the containers,
 volumes, clones and repo were removed.

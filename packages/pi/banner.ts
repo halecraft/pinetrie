@@ -10,8 +10,8 @@ import {
   type LaneName,
   type Sha256,
   type StoredImage,
-} from "@pineta/core"
-import type { BannerAnswer, BannerAsk, BannerConfig } from "@pineta/rules"
+} from "@pinetrie/core"
+import type { BannerAnswer, BannerAsk, BannerConfig } from "@pinetrie/rules"
 import { Type } from "typebox"
 import type { ImagesSetup } from "./config.ts"
 import { prepareImage } from "./images.ts"
@@ -73,7 +73,7 @@ export function bannerAnswerText(answer: BannerAnswer): string {
       return answer.reason === "not_stored"
         ? "That image is not stored: ask the person to paste it again."
         : answer.reason === "off"
-          ? "Banners are off: the person turns them on in ~/.config/pineta/config.json."
+          ? "Banners are off: the person turns them on in ~/.config/pinetrie/config.json."
           : "This call has no thread to set a banner on."
   }
 }

@@ -17,13 +17,13 @@ import {
   type LaneName,
   type ThreadName,
   type WriterId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { type Static, Type } from "typebox"
 import { CommitSchema, decodeWith } from "./decode.ts"
 import { catchUpName } from "./line.ts"
 
-const UPDATE_TYPE = "pineta.update"
-const STACK_TYPE = "pineta.stack"
+const UPDATE_TYPE = "pinetrie.update"
+const STACK_TYPE = "pinetrie.stack"
 
 const UpdateDetailsSchema = Type.Object({
   lane: Type.String({ minLength: 1 }),

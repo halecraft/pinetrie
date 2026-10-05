@@ -1,9 +1,9 @@
 // roots — the directory of roots (ADR-0063): what your list, the board, the
 // inbox and the activity menu read of a root without opening its document.
 //
-// The record is a host-written `pineta.root` value in the session, keyed by
+// The record is a host-written `pinetrie.root` value in the session, keyed by
 // the root's id. The host refreshes it whenever the root's document changes
-// (`readRootRecord`, in `@pineta/reads`), so it lags a running turn by one
+// (`readRootRecord`, in `@pinetrie/reads`), so it lags a running turn by one
 // step of the host's queue.
 
 import {
@@ -15,7 +15,7 @@ import {
   type RootRecord,
   type Sha256,
   type WriterId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { Type } from "typebox"
 import { decodeAt, rootKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
@@ -53,7 +53,7 @@ const threadsOf = (
 
 /** Each root's directory record, at its id. */
 export const ROOT: RecordSpec<RootRecord, RootId, "session"> = {
-  namespace: "pineta.root",
+  namespace: "pinetrie.root",
   home: "session",
   keyOf: r => r.root,
   encode: ({ root, ...contents }) => contents,

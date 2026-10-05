@@ -35,7 +35,7 @@ import {
   type ThreadName,
   type TreeIndex,
   type WriterId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import {
   type CatchUpNow,
   carryOnState,
@@ -54,8 +54,8 @@ import {
   pinnedDiff,
   pinnedReads,
   type QueuedCard,
-} from "@pineta/rules"
-import type { OfferActing } from "@pineta/session"
+} from "@pinetrie/rules"
+import type { OfferActing } from "@pinetrie/session"
 import { type ControlWords, commandWords } from "./card-words.ts"
 import type { Column } from "./columns.ts"
 import { ago, count } from "./counts.ts"

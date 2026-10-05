@@ -5,7 +5,7 @@ import {
   type RootRecord,
   rootIdFor,
   writerId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   CHAT_LABEL,

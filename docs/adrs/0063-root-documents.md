@@ -13,7 +13,7 @@ Amended by ADR-0085: the archive record goes; a root is archived while its
 board place, keyed by its `RootId`, is in the closed state, and the Archive
 tab's search over labels is the closed state's.
 
-**Context.** The session was one Kyneta document, `pineta:session`: pi's
+**Context.** The session was one Kyneta document, `pinetrie:session`: pi's
 storage for every root ever started, the host's records, and what is
 streaming now. Kyneta's plain substrate stores and sends a document as one
 string, `exportEntirety()`. By 2026-10-03 it was 124 M characters, 4.3× under
@@ -25,7 +25,7 @@ V8's string limit of 2^29−24 (S84).
   all of it.
 
 In Kyneta the document is the unit of storage, compaction, sync and memory.
-Pineta's root is already the unit people work in: a tab (ADR-0029), a tree no
+pine·trie's root is already the unit people work in: a tab (ADR-0029), a tree no
 lane leaves (S30).
 
 **Decision.**
@@ -34,12 +34,12 @@ lane leaves (S30).
   - `root:<RootId>`, one per root (`StorageDoc`): that root's pi storage
     (entries, usage rows, pi's values and lists, checkpoints) and the host
     records keyed by its entries (revision, mark, stop, digest).
-  - `pineta:session` (`StorageDoc` with no entries): the session-wide
+  - `pinetrie:session` (`StorageDoc` with no entries): the session-wide
     records. These are the directory of roots (`ROOT`), every lane's record
     (`LANE`, naming its root), the other lane-keyed records (name, offer,
     banner, base, landing), the archive and the singletons. The header and
     the tab bar read them across roots, and they are small.
-  - `pineta:live` (`LiveDoc`): streams, their text and active runs. It is
+  - `pinetrie:live` (`LiveDoc`): streams, their text and active runs. It is
     needed by no restarted host, and compacted at every run's end.
 - **A root's id is a `RootId`, minted by its tab**, as a column mints its
   lane's id (ADR-0057). It is not the root entry's id: Start Agent creates
@@ -74,7 +74,7 @@ lane leaves (S30).
   session's schema (S86). Kyneta asks `canShare` as `get` opens a document,
   so a root is allowed before it is opened, or it is never asked for.
 - **A run's end compacts what changed**: the roots its lanes ran in, the
-  session, `pineta:live` and the places.
+  session, `pinetrie:live` and the places.
 
 **Consequences.**
 

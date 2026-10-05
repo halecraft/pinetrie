@@ -15,12 +15,12 @@ import {
   type StreamEvent,
   type TextEdit,
   tailEdit,
-} from "@pineta/core"
+} from "@pinetrie/core"
 
 /**
  * One entry as it sits in the document (ADR-0015).
  *
- * Six typed columns plus one sealed leaf. The columns are exactly what Pineta
+ * Six typed columns plus one sealed leaf. The columns are exactly what pinetrie
  * itself reasons about: the tree edge, plus the fields `projectTranscript`,
  * `orderNewEntries` and fold read. Everything pi-specific stays in `payload`,
  * except a message's image bytes: an image part there refers to the host's
@@ -62,7 +62,7 @@ const StoredEntryRowSchema = Schema.struct.json({
  *     the whole of what is needed, and a retried write lands on the same key
  *     where a list would duplicate it.
  *   - `usageRows`, `values` and `lists` stay `Schema.any()`. They are pi's
- *     bookkeeping for its `Storage` port, not Pineta's domain model, and
+ *     bookkeeping for its `Storage` port, not pinetrie's domain model, and
  *     nothing of ours traverses them. The asymmetry with `entries` is
  *     deliberate: we type what we reason about.
  *

@@ -100,14 +100,14 @@ into `node_modules/@kyneta/`, and the reason `relink.sh` exists with its
 "`npm install` deletes the symlinks" warning. Under pnpm this becomes ordinary
 dependency declaration and **`relink.sh` can be deleted.**
 
-Even better: since Pineta now lives beside Kyneta, a pnpm workspace could
+Even better: since pine·trie now lives beside Kyneta, a pnpm workspace could
 include both — though that couples the repos, so I would *not* do it by default.
 
 ### D3 — Vite ✅ recommend
 
 **DONE.** Was: esbuild one-shot bundle + a hand-rolled static file server in
-`apps/pineta/host/index.ts` with a manual MIME map, plus a manual wasm copy step. All three
-are deleted; `apps/pineta/host/http.ts` runs Vite in middleware mode on the shared
+`apps/pinetrie/host/index.ts` with a manual MIME map, plus a manual wasm copy step. All three
+are deleted; `apps/pinetrie/host/http.ts` runs Vite in middleware mode on the shared
 `node:http` server. Bundle fell 771 kB → 305 kB (Vite tree-shakes).
 
 Vite gives us HMR, kills the MIME map, and — importantly — kills the
@@ -202,7 +202,7 @@ The requirements:
   the jail blocks `container`'s XPC services and writes to its volumes under
   `~/Library/Application Support/com.apple.container/`.
 - **The project on the same APFS volume as `container`'s data**, so a
-  snapshot under `.pineta/snapshots/` is a copy-on-write clone.
+  snapshot under `.pinetrie/snapshots/` is a copy-on-write clone.
 - **Memory**: about 1.2 GiB per running lane (S40); a stopped lane takes
   none. `container build` runs a builder VM of 2 GiB, which the host stops
   after each build.
@@ -261,7 +261,7 @@ rediscovered:
 ```
 
 `"."` is the **session's** cwd — which is why writes were confined to
-`~/tmp` before the repo move and work in `~/halecraft/pineta` after it, and why
+`~/tmp` before the repo move and work in `~/halecraft/pinetrie` after it, and why
 `~/halecraft/kyneta` is read-only from here (desirable anyway).
 
 Three consequences, all now handled:

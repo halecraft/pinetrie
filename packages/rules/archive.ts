@@ -24,7 +24,7 @@ import {
   rootWork,
   type SnapshotId,
   type TreeIndex,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { planRetention } from "./work.ts"
 
 /** Into the closed state, or out of it: `transitionOf`'s crossings. */

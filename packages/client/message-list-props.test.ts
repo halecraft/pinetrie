@@ -1,5 +1,5 @@
-import type { ColumnView, EntryId, LaneName } from "@pineta/core"
-import { entryId } from "@pineta/core"
+import type { ColumnView, EntryId, LaneName } from "@pinetrie/core"
+import { entryId } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import { foldMemory } from "./ask-fold.ts"
 import type { LaneJoin } from "./column-view.ts"

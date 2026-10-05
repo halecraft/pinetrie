@@ -21,7 +21,7 @@ source taken at or below the commit the lane's base names is superseded by
 it, so an offer after a catch-up starts there alone.
 **Amended by ADR-0067:** a take above the lane's base that names no source
 makes its start untraced, and nothing is offered until it catches up past
-it; `pineta.base` records what catching up would change, and where it was
+it; `pinetrie.base` records what catching up would change, and where it was
 read.
 Amended by ADR-0079: a catch-up first joins each take the lane holds to
 its source, so the lane's work is not merged twice.
@@ -34,12 +34,12 @@ leaves on the line an *integrated-offer commit*; the record's `taken` is
 
 **Context.**
 
-Pineta shares one repo with you. You rewrite it freely, in jj and jjui:
-squash, amend, reword, rebase. Pineta has worked out what you meant from
+pine·trie shares one repo with you. You rewrite it freely, in jj and jjui:
+squash, amend, reword, rebase. pine·trie has worked out what you meant from
 the repo's state, compared against records it keeps elsewhere, and each
 way that failed was patched as it was found:
 
-- **What you already have** (ADR-0038's `pineta.have` records): commits a
+- **What you already have** (ADR-0038's `pinetrie.have` records): commits a
   take delivered and copies of your `@`, kept by commit id in the session
   document. A rewrite of yours breaks the link. The rules for which haves
   count grew case by case: the newest copy supersedes older haves (S51), a
@@ -53,13 +53,13 @@ way that failed was patched as it was found:
   rewrite in place moved it sideways, the working copy went stale, and
   every lane failed to start (S74).
 - **A take moves your `@`.** It is `jj rebase -r <offer> -A @- -B @`, run as
-  you, because it updates your files. Using jjui beside Pineta, you cannot
+  you, because it updates your files. Using jjui beside pine·trie, you cannot
   tell what a take will do to the work you have open, and fear "messing
   something up".
 
 Your work is also already made immutable, implicitly and unannounced. A
 lane's history reaches your repo as untracked remote bookmarks
-(`tip@pineta-<lane>`), which jj's builtin `immutable_heads()` includes (S48
+(`tip@pinetrie-<lane>`), which jj's builtin `immutable_heads()` includes (S48
 item 11). Once a lane forks from or is brought up to date with a commit of
 yours, that commit is an ancestor of the lane's tip, and immutable. On
 2026-10-02, `nmsuztkr`, a fix still being finished, became immutable when
@@ -77,16 +77,16 @@ is by commit id, which every rewrite of yours changes.
 
 **Decision.**
 
-- **An integration line.** One bookmark, `pineta-onto` by default, is the
+- **An integration line.** One bookmark, `pinetrie-onto` by default, is the
   line where finished work lands: threads' work, by a take, and yours, by
   "land my work". It only moves forward. The name is configurable:
-  `offers.onto` in the user config (`$XDG_CONFIG_HOME/pineta/config.json`)
-  or the project's `pineta.json`; the project's value wins, since the
+  `offers.onto` in the user config (`$XDG_CONFIG_HOME/pinetrie/config.json`)
+  or the project's `pinetrie.json`; the project's value wins, since the
   bookmark belongs to the repo. A repo without the bookmark is set up once:
   the host proposes your `@-` and creates the bookmark only when you agree.
 - **The line is immutable, and so are offers that sit on it.** The host
   extends your repo's `immutable_heads()` with
-  `present(<onto>) | (bookmarks(glob:"pineta-offer/*") & children(present(<onto>)))`
+  `present(<onto>) | (bookmarks(glob:"pinetrie-offer/*") & children(present(<onto>)))`
   (without `present()`, a repo with no line fails every jj command, S77),
   joined to
   the definition you already have, and shows you the result before writing
@@ -124,13 +124,13 @@ is by commit id, which every rewrite of yours changes.
   *Context*). The host makes the copy in the new lane, as it makes a copy of
   your `@` today (`planYourCopy`): one commit on the line commit under the
   WIP, holding the WIP's files, its message written by the host with
-  `Pineta-Base: <bookmark>@<commit>`. The copy's parent is already
+  `Pinetrie-Base: <bookmark>@<commit>`. The copy's parent is already
   final, so the lane freezes nothing of yours. The copy lives only in the
   lane's history. Its offer is the lane's work since the copy, placed on the
   WIP bookmark's current target: after you rewrite the WIP, it follows the
   bookmark, and conflicts only where you changed what the lane changed.
 - **The lane's history says its base.** Every commit the host makes in a
-  lane to start it or bring it up to date carries `Pineta-Base:
+  lane to start it or bring it up to date carries `Pinetrie-Base:
   <bookmark>@<commit>`: the bookmark is the line or a WIP, the commit what
   it pointed at then. A fork from the line is an empty commit on the line
   commit with that trailer; a WIP fork is the copy; an update is the merge
@@ -141,7 +141,7 @@ is by commit id, which every rewrite of yours changes.
   fact: the header, the take destinations and the update button all come
   from it.
 - **"Bring up to date" is always with the thread's base**, named on its
-  button: "bring up to date with pineta-onto", or "with wip/search". A line
+  button: "bring up to date with pinetrie-onto", or "with wip/search". A line
   thread merges the line's current commit into its lane, with no copy: the
   line is final. A WIP thread merges a fresh copy of the WIP. A WIP thread
   is never brought up to date with the line: its offer is its lane's work
@@ -149,21 +149,21 @@ is by commit id, which every rewrite of yours changes.
   WIP with the thread's. To bring a WIP thread level with the line, you
   rebase the WIP onto the line (it is yours), then bring the thread up to
   date with the WIP. The app says when that is due, as a fact ("wip/search
-  is 3 takes behind pineta-onto").
+  is 3 takes behind pinetrie-onto").
 - **A WIP that lands hands its threads to the line.** When the WIP's
   bookmark points into `::<onto>` (moved there by landing, or by a squash
   into the line, which keeps the bookmark and drops the WIP's change, S77),
-  or, with the bookmark gone, the commit a thread's `Pineta-Base` names or
+  or, with the bookmark gone, the commit a thread's `Pinetrie-Base` names or
   its change id is in `::<onto>`, the WIP's work is on the line: the
   thread's base becomes the line, its header loses the WIP, and its next
   update is with the line. A WIP that is gone
   without landing (its bookmark deleted, renamed, or its commits abandoned)
   stops its threads' updates and WIP takes, and the header says so;
-  "continue on pineta-onto", in the "…" menu, moves such a thread to the
-  line, by an update like any other: its merge says `Pineta-Base:
+  "continue on pinetrie-onto", in the "…" menu, moves such a thread to the
+  line, by an update like any other: its merge says `Pinetrie-Base:
   <onto>@…`, so the thread is on the line from then on. Its offer then
   carries the gone WIP's content with the thread's work, since that is now
-  the only place it exists. Pineta does not decide this for you: the
+  the only place it exists. pine·trie does not decide this for you: the
   bookmark may be about to come back.
 - **A take moves one bookmark forward to the offer. It never rebases, and
   never moves your `@`.** Its destinations are the bookmarks below the offer
@@ -183,8 +183,8 @@ is by commit id, which every rewrite of yours changes.
   resolved in its thread first (ADR-0033), or taken into a WIP, which is
   mutable: there you fix it yourself. The take re-checks this in its own
   step, as it does the destination.
-- **Each take button names its destination**: "take onto pineta-onto"; for a
-  WIP, "take into wip/search", with "land on pineta-onto, with your 2
+- **Each take button names its destination**: "take onto pinetrie-onto"; for a
+  WIP, "take into wip/search", with "land on pinetrie-onto, with your 2
   commits beneath it" in its menu. A conflicting offer has no line among
   its destinations: a thread on a WIP shows "take anyway into wip/search",
   and a thread on the line shows "Resolve in the thread". The words come
@@ -196,26 +196,26 @@ is by commit id, which every rewrite of yours changes.
 - **The repo is the ledger.** What the host needs to resume is in the repo,
   as trailers on commits it makes, never on yours:
   - an offer carries the lane tip it was built from and where it starts
-    (`Pineta-Source`, `Pineta-Start`), beside `Pineta-Thread`,
-    `Pineta-Lane` and `Pineta-Entry`;
-  - a taken offer keeps them: `Pineta-Source` names the lane commit you now
+    (`Pinetrie-Source`, `Pinetrie-Start`), beside `Pinetrie-Thread`,
+    `Pinetrie-Lane` and `Pinetrie-Entry`;
+  - a taken offer keeps them: `Pinetrie-Source` names the lane commit you now
     have. Trailers survive rebase, and a squash, accepting jj's prefilled
     message, keeps both messages, so they follow what you do to taken work.
-    Pineta reads its trailers from every paragraph of a message, by regex:
+    pine·trie reads its trailers from every paragraph of a message, by regex:
     jj's `trailers` reads only the last, and a squash leaves two (S77). A
     squash that keeps one message drops the other's trailers, and that work
     is offered again: the consequence of an explicit edit.
 
   Your own commits need nothing: they are found by ancestry. What a lane's
   offer starts from is then one revset over the repo: the lane's newest
-  `Pineta-Base` commit, and the lane commits that `Pineta-Source` trailers
+  `Pinetrie-Base` commit, and the lane commits that `Pinetrie-Source` trailers
   in `::<onto>` and `::<the WIP>` name, except those below the commit the
-  `Pineta-Base` names: the lane merged that commit, so it holds them
-  already (S81). `pineta.have` records go. The
-  `pineta.offer` record becomes a cache for the page, rebuilt from the repo
+  `Pinetrie-Base` names: the lane merged that commit, so it holds them
+  already (S81). `pinetrie.have` records go. The
+  `pinetrie.offer` record becomes a cache for the page, rebuilt from the repo
   on every trigger; a lost write costs nothing.
 - **Authorship comes from jj's operation log.** Every host operation carries
-  `operation.username=pineta-host`, and a take no longer runs as you, so
+  `operation.username=pinetrie-host`, and a take no longer runs as you, so
   every operation of yours is yours. "Did you change this offer?" is a walk
   of the offer's evolog to the host's last version (S73), never a diff
   against a remembered commit alone.
@@ -236,7 +236,7 @@ work on the immutable line.
 
 **Consequences.**
 
-- Pineta never touches your files or your `@`. A take is a bookmark move,
+- pine·trie never touches your files or your `@`. A take is a bookmark move,
   as the host; landing your work is a bookmark move, as you.
 - Taken work is final on the line: it is changed by commits on top, or with
   `--ignore-immutable` on purpose. What is immutable is then decided by you
@@ -254,21 +254,21 @@ work on the immutable line.
 - A thread has one base for its life, chosen once and rarely: the line by
   default. "Bring up to date" has one meaning, named on its button, and a
   WIP thread's header says which WIP.
-- Copies of your `@` in lanes go, and with them `pineta.have`. S51's rule
+- Copies of your `@` in lanes go, and with them `pinetrie.have`. S51's rule
   stays, carried by the base instead of a copy: a catch-up merges a commit
   that holds what was taken below it (S81). The one copy left is a WIP's,
   whose offer needs no record of what you have: it is the lane's work since
   the copy. The start rules shrink to ancestry plus trailers.
 - Trailers appear in taken commits' messages. Correctness is chosen over a
-  quieter log. Stripping them by hand changes what Pineta believes, which is
+  quieter log. Stripping them by hand changes what pine·trie believes, which is
   explicit intent.
 - Your repo config gains the immutable heads above, shown before it is
-  written. ADR-0038 had removed Pineta's line from `immutable_heads()` once
+  written. ADR-0038 had removed pine·trie's line from `immutable_heads()` once
   lane history became untracked remote bookmarks, immutable with no config
   (S48 item 11). This line protects something else: the integration line
   and the offers on it.
-- Migration: existing open offers are rebuilt on the line; `pineta.have`
-  records are read once to write `Pineta-Source` where a taken commit lacks
+- Migration: existing open offers are rebuilt on the line; `pinetrie.have`
+  records are read once to write `Pinetrie-Source` where a taken commit lacks
   one, then deleted.
 
 **As built.** Where the build departs from the text above:
@@ -282,8 +282,8 @@ work on the immutable line.
 - **A WIP thread's update copies onto the lane's previous copy**, not the
   line commit under the WIP, so conflicts the lane already resolved do not
   come back.
-- **No migration of `pineta.have`:** stored values are deleted at
-  startup. A lane with no `Pineta-Base` is on the line, and starts at the
+- **No migration of `pinetrie.have`:** stored values are deleted at
+  startup. A lane with no `Pinetrie-Base` is on the line, and starts at the
   newest line commit in its history.
 - **Setup also writes `revsets.log`**, adding the offers: an immutable
   head is out of jj's default log, so jj and jjui would not show an offer on
@@ -297,7 +297,7 @@ work on the immutable line.
 
 **Alternatives rejected.**
 
-- **A jj workspace of Pineta's own, to take into.** Workspaces share the
+- **A jj workspace of pine·trie's own, to take into.** Workspaces share the
   operation log, the commits and the bookmarks; they separate only `@`. It
   would not separate ownership, and it adds a checked-out commit that goes
   stale whenever you rewrite what it sits on (S74, in your own repo). The
@@ -306,7 +306,7 @@ work on the immutable line.
 - **Offers immutable while they sit on your `@-`.** Every ancestor of an
   immutable head is immutable: your own work under an offer would freeze.
 - **Takes that move your `@`** (ADR-0038). The take ran as you and changed
-  your files; with jjui beside Pineta, you cannot tell in advance what it
+  your files; with jjui beside pine·trie, you cannot tell in advance what it
   does to the work you have open.
 - **A thread on a WIP forks from the WIP's own commits.** The lane's tip,
   immutable in your repo, would make them immutable: the WIP would freeze as
@@ -325,7 +325,7 @@ work on the immutable line.
   the jj steps it describes can be lost after they land (S73). The document
   stays a cache.
 - **Trailers on your own commits.** Not needed: your commits are the
-  commits, found by ancestry. Pineta writes trailers only on commits it
+  commits, found by ancestry. pine·trie writes trailers only on commits it
   makes.
 - **Bringing a WIP thread up to date with the line.** The lane's work since
   its copy would then hold the line's new changes, and its offer would carry

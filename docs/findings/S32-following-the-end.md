@@ -48,8 +48,8 @@ the height it is measured against (6).
 
 ## Method
 
-`sandbox/s32-following-the-end/probe.ts`, copied into `apps/pineta/e2e/` to
-run (the workspace resolves `@pineta/*` only from a package that declares
+`sandbox/s32-following-the-end/probe.ts`, copied into `apps/pinetrie/e2e/` to
+run (the workspace resolves `@pinetrie/*` only from a package that declares
 them) and deleted afterwards. It drives Chromium through the Playwright
 server.
 - For 1, it uses the app on a scripted host.

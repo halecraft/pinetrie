@@ -1,9 +1,9 @@
 // verdict — how a thread's last run ended, for the people who follow it
-// (ADR-0077). The record is a host-written `pineta.verdict` value in the
+// (ADR-0077). The record is a host-written `pinetrie.verdict` value in the
 // session, keyed by lane, so the activity menu and the board read it across
 // roots. It holds what happened; what that asks of each person is decided
 // on their client. The host carries the plan out
-// (`apps/pineta/host/digests.ts`): one request at a run's end, for the
+// (`apps/pinetrie/host/digests.ts`): one request at a run's end, for the
 // verdict and the final digest together.
 
 import {
@@ -19,7 +19,7 @@ import {
   type Verdict,
   type VerdictRecord,
   type WriterId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { Type } from "typebox"
 import { decodeAt, laneKey } from "./decode.ts"
 import {
@@ -59,7 +59,7 @@ const VerdictSchema = Type.Object({
 
 /** Each thread's last run's verdict, at its lane. */
 export const VERDICT: RecordSpec<VerdictRecord, LaneName, "session"> = {
-  namespace: "pineta.verdict",
+  namespace: "pinetrie.verdict",
   home: "session",
   keyOf: r => r.lane,
   encode: ({ lane, ...contents }) => contents,

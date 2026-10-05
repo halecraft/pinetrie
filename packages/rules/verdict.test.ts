@@ -6,7 +6,7 @@ import {
   rootIdFor,
   type VerdictRecord,
   writerId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import type { AskLines, DigestPlan } from "./digest.ts"
 import {

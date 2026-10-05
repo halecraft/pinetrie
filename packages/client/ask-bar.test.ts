@@ -1,4 +1,4 @@
-import { entryId } from "@pineta/core"
+import { entryId } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import { askAtTop, sameAtTop } from "./ask-bar.ts"
 

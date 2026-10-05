@@ -1,6 +1,6 @@
 ---
 name: tab-title
-description: How Pineta titles a thread's tab from what was said in it. Pineta asks for it; the agent does not choose it.
+description: How pine·trie titles a thread's tab from what was said in it. pine·trie asks for it; the agent does not choose it.
 disable-model-invocation: true
 ---
 

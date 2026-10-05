@@ -10,7 +10,7 @@ import {
   type Workflow,
   workflowStateIdFor,
   writerId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   type AppViewInput,

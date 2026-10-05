@@ -35,14 +35,14 @@ lane writes there, or how the lane's jj treats it.
 
    So the line must be in place before any jj command runs with the mount
    present: at every container start, since an existing disk or an older
-   fork lacks the line for a newly shared directory. Pineta's base setup
+   fork lacks the line for a newly shared directory. pine·trie's base setup
    writes its exclude after `jj git init`, which is too late for a shared
    directory.
 5. **A snapshot holds none of the shared files.** A clone of the volume taken
    with the mount in place, read with `debugfs`, has `/.plans` as an empty
    directory, the mount point, and the lane's own files beside it. Started
    again without the mount, the volume shows the same empty directory.
-6. **A container's labels read back.** `container run --label pineta.spec=<hash>`
+6. **A container's labels read back.** `container run --label pinetrie.spec=<hash>`
    appears in `container inspect` under `configuration.labels`. The host can
    therefore tell a container created from an older spec (other mounts,
    grants or variables) and recreate it; the disk is a separate volume.
@@ -53,7 +53,7 @@ lane writes there, or how the lane's jj treats it.
    - with no ignore at all, both git and jj tracked `.plans/p.md`, as in
      item 4;
    - with `GIT_CONFIG_COUNT=1`, `GIT_CONFIG_KEY_0=core.excludesFile` and
-     `GIT_CONFIG_VALUE_0=/pineta-ignore/ignore` set on the container, and a
+     `GIT_CONFIG_VALUE_0=/pinetrie-ignore/ignore` set on the container, and a
      read-only directory holding that file, neither tracked it; `t.txt` was
      tracked as usual;
    - a read-only directory mounted at `$HOME/.config/git/` did the same;
@@ -74,7 +74,7 @@ lane writes there, or how the lane's jj treats it.
   is needed.
 - What a lane writes there is yours on the host, editable by you and your
   tools.
-- The host generates one ignore file for a lane, listing `/.pineta-lane/`,
+- The host generates one ignore file for a lane, listing `/.pinetrie-lane/`,
   `/lost+found/` and each shared directory. It mounts that file's directory
   read-only and names the file with `core.excludesFile` through
   `GIT_CONFIG_COUNT`, `GIT_CONFIG_KEY_0` and `GIT_CONFIG_VALUE_0` (item 7).
@@ -98,7 +98,7 @@ lane writes there, or how the lane's jj treats it.
 
 `sandbox/s45/probe.sh`, `sandbox/s45/exclude.sh` and `sandbox/s45/ignore.sh`,
 from the repo root,
-outside the sandbox. The probes used containers from Pineta's default lane
-image (`pineta-lane:efb706bfa489`) on journaled 4 GiB volumes, with
+outside the sandbox. The probes used containers from pine·trie's default lane
+image (`pinetrie-lane:efb706bfa489`) on journaled 4 GiB volumes, with
 `sandbox/s45/shared` as the host directory, and read snapshots with
-`pineta-fsck:1`. Everything they made was removed.
+`pinetrie-fsck:1`. Everything they made was removed.

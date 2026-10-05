@@ -2,7 +2,7 @@
 
 Measured in a lane (Linux, Node 24, jj 0.44.0, pi 0.87.1), for
 `PLAN-2026-10-02-asks`. The run probes drove a real host, `startHost` with a
-`ScriptedModel` and tools in a throwaway project, as `apps/pineta/e2e/e2e.ts`
+`ScriptedModel` and tools in a throwaway project, as `apps/pinetrie/e2e/e2e.ts`
 section 5 does; they were disposable scripts beside the suites and are kept
 under `sandbox/s70-asks/`.
 
@@ -45,7 +45,7 @@ under `sandbox/s70-asks/`.
      template and the counts from the section in the same place.
    - A commit is readable by id after it is abandoned, so a lane's
      revisions stay readable after a take or a split. A lane's history is in
-     your repo as `tip@pineta-<lane>` (`packages/lanes/TECHNICAL.md`, "Moving
+     your repo as `tip@pinetrie-<lane>` (`packages/lanes/TECHNICAL.md`, "Moving
      commits").
 
 4. **A turn's changed paths, with git** (measured on a scratch colocated

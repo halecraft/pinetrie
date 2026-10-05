@@ -8,8 +8,8 @@ import {
   type RailRow,
   railLandmarks,
   type WorkStats,
-} from "@pineta/core"
-import { digestText } from "@pineta/rules"
+} from "@pinetrie/core"
+import { digestText } from "@pinetrie/rules"
 
 /**
  * The messages this view draws on their own, never inside a stretch: thread

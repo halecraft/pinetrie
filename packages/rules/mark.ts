@@ -1,6 +1,6 @@
 // mark — a title on an entry (ADR-0045). A root's mark titles its tab.
 //
-// The record is a host-written `pineta.mark` value keyed by the entry's id.
+// The record is a host-written `pinetrie.mark` value keyed by the entry's id.
 // The last write wins, since nobody types a title together (ADR-0023), and
 // clearing a title deletes its record.
 
@@ -13,7 +13,7 @@ import {
   refused,
   type TreeIndex,
   type WriterId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { Type } from "typebox"
 import { decodeAt, entryKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
@@ -28,7 +28,7 @@ const MarkSchema = Type.Object({
 
 /** Each entry's mark, at the entry's id. */
 export const MARK: RecordSpec<MarkRecord, EntryId, "root"> = {
-  namespace: "pineta.mark",
+  namespace: "pinetrie.mark",
   home: "root",
   keyOf: r => r.entry,
   encode: ({ entry, ...contents }) => contents,

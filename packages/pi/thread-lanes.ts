@@ -1,6 +1,6 @@
 // pi/thread-lanes — each thread's pi lane (ADR-0020) in one root's document,
 // held while that root's harness is (`Agent.release` closes it), behind
-// handles that speak only Pineta's types. A lane is never moved, and its tip
+// handles that speak only pinetrie's types. A lane is never moved, and its tip
 // is never read here: readers use the document.
 
 import { BACKGROUND_CONTEXT } from "@earendil-works/pi-agent-core"
@@ -11,7 +11,7 @@ import {
   entryId,
   type LaneName,
   type Position,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import type {
   BehindMessage,
   ChatMessage,
@@ -19,12 +19,12 @@ import type {
   PinnedMessage,
   PromptMessage,
   UpdateMessage,
-} from "@pineta/rules"
+} from "@pinetrie/rules"
 import {
   hasLaneRecord,
   type RootDocHandle,
   readLaneNames,
-} from "@pineta/schema"
+} from "@pinetrie/schema"
 import type { createAgentHarness } from "./deep.ts"
 import { laneContext } from "./lanes.ts"
 import { toolsChanged } from "./tools.ts"

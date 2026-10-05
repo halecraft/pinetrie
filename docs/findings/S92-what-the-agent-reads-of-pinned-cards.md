@@ -78,10 +78,10 @@ starts with. Every design ran the same script:
 
 5. **pi's own compaction can drop a cards entry from the context.** pi
    compacts by default (`DEFAULT_COMPACTION_SETTINGS`: on, keeping the last
-   20,000 tokens), and Pineta does not configure it. With the window forced
+   20,000 tokens), and pine·trie does not configure it. With the window forced
    down to 30 tokens, entries before the cut, card v1 and v2 among them,
    reached the model only through the summary. A cards entry inside the kept
-   window stayed. Pineta's tree does not track pi's compaction entries yet.
+   window stayed. pine·trie's tree does not track pi's compaction entries yet.
 
 **Consequences for step 5.**
 
@@ -98,7 +98,7 @@ starts with. Every design ran the same script:
    conversation thread, whose first run sees none on its path.
 3. **After a pi compaction on the path, the next run writes every card
    again.** The comparison reads only entries after the compaction's first
-   kept entry. Pineta's tree index must learn pi's compaction entry for
+   kept entry. pine·trie's tree index must learn pi's compaction entry for
    that.
 4. **The fixed line goes in `<rules>` (`promptGuidelines`) for every thread
    with an agent**, not only lanes of their own. ADR-0046's block is in the
@@ -151,7 +151,7 @@ tried three ways, plus a hook that fails:
    tree records it.
 8. **A failing hook costs only the cards.** pi reports the error and
    compacts on its own. The next run's entry has to restate the cards then.
-9. **Pineta's reads already pass over a compaction.** `readTreeIndex` and
+9. **pine·trie's reads already pass over a compaction.** `readTreeIndex` and
    `projectTranscript` showed every message on the path, those summarised
    included. The compaction entry has no message, so it is not drawn.
 
@@ -174,7 +174,7 @@ tried three ways, plus a hook that fails:
 
 ## Addendum: the same, through pi's faux provider
 
-pi's faux provider, behind Pineta's `ScriptedModel`, keeps its own prompt
+pi's faux provider, behind pine·trie's `ScriptedModel`, keeps its own prompt
 cache. It is keyed by the session and lane pi passes as `sessionId`, and
 reads the characters a request shares with the lane's previous request
 (`withUsageEstimate`, `providers/faux.js`). pi stores the result in each

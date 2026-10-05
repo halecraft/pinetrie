@@ -24,7 +24,7 @@ Amended by ADR-0083: the host *pops* a queued card, and carries out its
 command then.
 
 **Context.** ADR-0048 makes queued messages queued cards, and removes
-`pineta.outbox`. The outbox holds two kinds of thing: messages, and "Update
+`pinetrie.outbox`. The outbox holds two kinds of thing: messages, and "Update
 from my work" (ADR-0038), parked when the thread's agent is running and
 taken in order with the messages. So you can queue "run the tests", click
 the button, and queue "check that yours still fits", and they happen in
@@ -33,7 +33,7 @@ that order.
 
 The button has more problems:
 - **Its wording assumes a laptop.** "My work" is your working copy only
-  because the host runs beside it. On a hosted Pineta the work comes from
+  because the host runs beside it. On a hosted pine·trie the work comes from
   the project's repository, and "my" or "Ada's" is wrong.
 - **What it brings in is said after, by a prefill.** A clean update fills
   your composer with "I've merged my latest work… check that yours still
@@ -97,7 +97,7 @@ context first and choose what to do with it last. Vim has this shape:
 
 **Consequences.**
 
-- `pineta.outbox` goes with nothing in its place: everything that waits
+- `pinetrie.outbox` goes with nothing in its place: everything that waits
   for a thread is a queued card. An update waits in order with the
   messages, can be unqueued or edited while it waits, and follows the
   take/unqueue rule (S69).
@@ -117,7 +117,7 @@ context first and choose what to do with it last. Vim has this shape:
 
 **Alternatives rejected.**
 
-- **`/pineta:pull` typed in the text**, expanded or carried out by the
+- **`/pinetrie:pull` typed in the text**, expanded or carried out by the
   host. It puts the command first, gives the text a syntax to learn, and
   makes one command something the host carries out rather than expands.
 - **`:` lines at the top of a card, run in order like a shell script.**

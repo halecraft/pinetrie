@@ -1,4 +1,9 @@
-import { cardId, entryId, type LaneView, laneNameForThread } from "@pineta/core"
+import {
+  cardId,
+  entryId,
+  type LaneView,
+  laneNameForThread,
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { type Column, columnsReducer } from "./columns.ts"
 import { tree } from "./fixtures.ts"

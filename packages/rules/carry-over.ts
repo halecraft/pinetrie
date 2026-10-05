@@ -1,6 +1,6 @@
 // carry-over — a store from before the board, carried over once (ADR-0085).
 //
-// Before the board, a root was archived by a `pineta.archive` record keyed
+// Before the board, a root was archived by a `pinetrie.archive` record keyed
 // by its root entry. A starting host with no workflow writes the default one,
 // puts each root with an `archived` record in the closed state and every
 // other root in Doing, and deletes the old records. Delete this module, its
@@ -15,7 +15,7 @@ import type {
   ValueWrite,
   Workflow,
   WriterId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { Type } from "typebox"
 import { BOARD, defaultWorkflow, WORKFLOW } from "./board.ts"
 import { decodeAt, entryKey } from "./decode.ts"
@@ -38,7 +38,7 @@ const ArchiveSchema = Type.Object({
 
 /** Each root's archive record before the board, at the root's entry id. */
 export const ARCHIVE: RecordSpec<OldArchiveRecord, EntryId, "session"> = {
-  namespace: "pineta.archive",
+  namespace: "pinetrie.archive",
   home: "session",
   keyOf: r => r.root,
   encode: ({ root, ...contents }) => contents,

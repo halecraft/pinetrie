@@ -20,7 +20,7 @@ plain-JS substrate shows the same curve, so it is **`@kyneta/schema` core**).
 construction.
 
 **Why this is top priority.** It is *first-party code you own and can fix*, and
-it sits directly under Pineta's two unbounded containers — the session entry
+it sits directly under pine·trie's two unbounded containers — the session entry
 record and `pi.pending.assistant_frame`. Every later design decision about
 document granularity depends on whether this is a bug or a law.
 
@@ -30,13 +30,13 @@ separate single-append commits took 247ms (≈0.25ms/commit). Reads are also che
 long sessions, not on interactive use.
 
 **Kill criterion.** If it is inherent to the schema algebra rather than an
-implementation defect, Pineta needs per-entry document granularity — a
+implementation defect, pine·trie needs per-entry document granularity — a
 document-shape change, so it must be known **before** the production adapter is
 built on the current shape. (Supersedes part of S10.)
 
 ## 1. VERDICT
 
-**DEFECT, not inherent — and there are two independent defects, both fixed.** Cause A is a redundant deep clone that **is already fixed in Kyneta's `main` source but is still present in the published 3.0.0 dist**; cause B is `step`'s pure-arrow container rebuild, fixed here with an in-place fast path that passes Kyneta's own 2062-test suite unchanged. On the real Pineta shape at n=10 000, list append goes **13 106 ms → 185 ms (71×)** and entry writes **41 270 ms → 1 904 ms (22×)**. **The kill criterion is not met: Pineta does not need per-entry document granularity on account of write throughput.**
+**DEFECT, not inherent — and there are two independent defects, both fixed.** Cause A is a redundant deep clone that **is already fixed in Kyneta's `main` source but is still present in the published 3.0.0 dist**; cause B is `step`'s pure-arrow container rebuild, fixed here with an in-place fast path that passes Kyneta's own 2062-test suite unchanged. On the real pine·trie shape at n=10 000, list append goes **13 106 ms → 185 ms (71×)** and entry writes **41 270 ms → 1 904 ms (22×)**. **The kill criterion is not met: pine·trie does not need per-entry document granularity on account of write throughput.**
 
 ---
 
@@ -64,7 +64,7 @@ Node v24.19.0.
 | `probe-ops.mjs` | dumps the actual change instructions a `push` / `set` emits |
 | `bench.mjs`, `bench-loro.mjs` | before/after curves, plain + Loro substrates |
 | `bench-shapes.mjs` | `record(any)` vs `record(struct.json)` vs `record(struct)` |
-| `bench-pineta.mjs` | the real shape from `01-architecture.md`, to n=10 000 |
+| `bench-pinetrie.mjs` | the real shape from `01-architecture.md`, to n=10 000 |
 | `patchB.py`, `apply-patches.sh`, `restore-pristine.sh` | toggle the fixes in `node_modules` |
 | `fixB-reader.patch` | **the deliverable** — unified diff against Kyneta source |
 | `srctest/` | copy of `packages/schema/src` + vitest, to run Kyneta's own suite |
@@ -78,7 +78,7 @@ npm install --no-audit --no-fund
 
 ./restore-pristine.sh && node bench-loro.mjs before      # baseline
 ./apply-patches.sh    && node bench-loro.mjs after       # both fixes
-node bench-pineta.mjs patched
+node bench-pinetrie.mjs patched
 
 node --cpu-prof --cpu-prof-dir=prof  prof-target.mjs 4000 && node analyze.mjs prof
 node --cpu-prof --cpu-prof-dir=prof3 prof-map.mjs    4000 && node analyze.mjs prof3
@@ -379,7 +379,7 @@ TRIAL 0 FAILED (seed=42): entry t0-collide-1 parent t0-collide-2 !== t0-collide-
 
 **Not verified: `tsc --noEmit`.** It OOM'd (4 GB heap) on my ad-hoc tsconfig — the schema type algebra is deeply recursive and I did not reproduce the package's real build config. vitest transpiles without typechecking, so the two `as` casts in the patch are **type-unverified**. This should be checked in Kyneta's own build before the patch is accepted.
 
-### 3.8 The real Pineta shape
+### 3.8 The real pine·trie shape
 
 `Schema.record(Schema.struct.json({id,parentId,type,text}))` for entries plus `Schema.record(Schema.list(Schema.any()))` for `pi.pending.assistant_frame`, on the Loro substrate:
 
@@ -422,7 +422,7 @@ Raw `loro-crdt` map-set is linear (`raw loro map set x4000 → 7ms`), so this is
 
 ## 4. Consequences
 
-**Kill criterion NOT met.** The quadratic cost is two implementation defects, not a property of the schema algebra. **Pineta does not need per-entry document granularity for write-throughput reasons**, and the production adapter can be built on the shape S7 settled (`Schema.record(Schema.struct.json({...}))`). Note this only discharges the *write-throughput* half of the granularity question — S10's snapshot-size and sync-payload concerns are untouched.
+**Kill criterion NOT met.** The quadratic cost is two implementation defects, not a property of the schema algebra. **pine·trie does not need per-entry document granularity for write-throughput reasons**, and the production adapter can be built on the shape S7 settled (`Schema.record(Schema.struct.json({...}))`). Note this only discharges the *write-throughput* half of the granularity question — S10's snapshot-size and sync-payload concerns are untouched.
 
 **`01-architecture.md` § Risks — the row `**@kyneta/schema writes are O(n²)**` should be downgraded**, with the caveat that it is only fixed once the packages are republished. Suggested replacement: *"Fixed. Cause A already on `main` (a5e2c8f) but unpublished; cause B has a candidate patch (S11). Residual: Loro map-write path ~x3.5 per doubling, unexplained."*
 
@@ -434,7 +434,7 @@ Raw `loro-crdt` map-set is linear (`raw loro map set x4000 → 7ms`), so this is
 
 **Spawns S12 (suggested):** root-cause the residual x3.5 superlinearity in the Loro backend's map-write path (§3.9). Size S–M, not urgent.
 
-**Feeds the roadmap's fitness functions.** `04-roadmap.md` already calls for a write-throughput budget. Concrete numbers now exist: on the Pineta shape, **10 000 entry writes ≤ ~2 s and 10 000 list appends ≤ ~0.25 s** on the patched build. Pin the budget just above these so a regression (e.g. an unpatched republish) trips it.
+**Feeds the roadmap's fitness functions.** `04-roadmap.md` already calls for a write-throughput budget. Concrete numbers now exist: on the pine·trie shape, **10 000 entry writes ≤ ~2 s and 10 000 list appends ≤ ~0.25 s** on the patched build. Pin the budget just above these so a regression (e.g. an unpatched republish) trips it.
 
 ---
 
@@ -467,7 +467,7 @@ Raw `loro-crdt` map-set is linear (`raw loro map set x4000 → 7ms`), so this is
 - That in-place mutation is safe for *all* consumers — argued from the documented liveness invariant and the ordering of `invert` before `applyChange`, and supported by three test suites, but not proven by audit (residual #3).
 - That the profiler's collapse of callees into `prepare` (§3.2) is V8 inlining. I worked around it rather than confirming the cause; the conclusion rests on code reading plus the bisection in §3.4/§3.5, not on that profile.
 - That republishing is sufficient for cause A — I verified the *source* is fixed, but did not build the packages from source and re-measure. The patched-dist measurements are a proxy for that.
-- That `x2.0` per doubling constitutes linearity over the measured range (1k–8k). Confirmed to 10 000 on the Pineta shape for lists (x1.84), not beyond.
+- That `x2.0` per doubling constitutes linearity over the measured range (1k–8k). Confirmed to 10 000 on the pine·trie shape for lists (x1.84), not beyond.
 
 ## Review
 
@@ -491,7 +491,7 @@ Raw `loro-crdt` map-set is linear (`raw loro map set x4000 → 7ms`), so this is
 > actionable: *"the published `@kyneta/schema@3.0.0` dist predates `a5e2c8f` …
 > Republishing is most of the win for anyone installing from npm."*
 
-**Kill criterion not met: Pineta does not
+**Kill criterion not met: pine·trie does not
 need per-entry document granularity for write-throughput reasons.** The shape S7
 settled stands.
 
@@ -513,7 +513,7 @@ settled stands.
   convergence property **400 trials with entry counts byte-identical** to S7's
   published figures; negative control still fails.
 - **Measured (re-verified independently):** n=8000 list `7793 → 142 ms`,
-  record `18976 → 1205 ms`. Pineta shape at n=10 000: entries
+  record `18976 → 1205 ms`. pine·trie shape at n=10 000: entries
   `41 270 → 1 904 ms` (22×), pending list `13 106 → 185 ms` (71×). S2's slowest
   conformance case dropped `12 198 → 267 ms`.
 - **Methodological note worth keeping:** the first CPU profile was *misleading* —

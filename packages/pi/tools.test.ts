@@ -1,6 +1,6 @@
 // Which tools a lane's runs may call, decided without a harness.
 
-import { CATCH_UP_TOOL, CONFLICT_TOOL, SPLIT_TOOL } from "@pineta/core"
+import { CATCH_UP_TOOL, CONFLICT_TOOL, SPLIT_TOOL } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { BANNER_TOOL } from "./banner.ts"
 import { parseCatchUpArgs } from "./thread-tools.ts"

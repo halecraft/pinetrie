@@ -1,14 +1,14 @@
 # S77 — what jj does under an integration line
 
-ADR-0060 (proposed) puts takes on an immutable bookmark, `pineta-onto`,
-starts threads from a `wip/` bookmark through a copy, and keeps Pineta's
+ADR-0060 (proposed) puts takes on an immutable bookmark, `pinetrie-onto`,
+starts threads from a `wip/` bookmark through a copy, and keeps pine·trie's
 ledger in trailers on the commits it makes. This finding measures the jj
 behaviours it relies on (`PLAN-2026-10-02-integration-line-probes`).
 
 Measured with jj 0.44.0, the version lanes run too: `prepareImages`
 (`packages/lanes/image.ts`) builds the lane image with the host's jj. Every
 probe ran in a fresh repo under `/tmp`, with `JJ_CONFIG` pointing at an empty
-file, so no user alias changed a result. Item 3's cost was read on Pineta's
+file, so no user alias changed a result. Item 3's cost was read on pine·trie's
 own repo, with the extension given by `--config-file` and nothing written.
 
 **1. `jj bookmark move` moves a bookmark forward only.** Without
@@ -38,8 +38,8 @@ have to be looked up in `::line`.
 **3. The extended `immutable_heads()`.** With
 
 ```
-builtin_immutable_heads() | present(pineta-onto)
-  | (bookmarks(glob:"pineta-offer/*") & children(present(pineta-onto)))
+builtin_immutable_heads() | present(pinetrie-onto)
+  | (bookmarks(glob:"pinetrie-offer/*") & children(present(pinetrie-onto)))
 ```
 
 the line and an offer whose parent is the line are immutable. A WIP above
@@ -47,15 +47,15 @@ the line, and an offer on the WIP, are mutable: `jj describe` of the WIP
 succeeds and rebases the offer above it. `jj describe` of the line's offer
 fails: `Error: Commit … is immutable`.
 
-- **`present()` is required.** Without it, a repo with no `pineta-onto`
-  fails every jj command: `Revision 'pineta-onto' doesn't exist`, from
+- **`present()` is required.** Without it, a repo with no `pinetrie-onto`
+  fails every jj command: `Revision 'pinetrie-onto' doesn't exist`, from
   `jj log` included.
-- **Cost:** `jj log -r 'mutable()' -T ''` on Pineta's repo (873 commits)
+- **Cost:** `jj log -r 'mutable()' -T ''` on pine·trie's repo (873 commits)
   took 0.01 to 0.02 s with or without the extension.
 
 **4. A lane's repo after its fetched ref moves sideways.** A lane with
-`B` fetched to `refs/heads/pineta/fetched/0`, `jj new B`, a turn on top,
-and its bookmark `pineta/lane` on `B`; then `C`, which does not descend
+`B` fetched to `refs/heads/pinetrie/fetched/0`, `jj new B`, a turn on top,
+and its bookmark `pinetrie/lane` on `B`; then `C`, which does not descend
 from `B`, fetched to the same ref and imported with
 `--ignore-working-copy`. Nothing was abandoned or rebased, the working copy
 was not stale, and `jj new C` succeeded. The same repo without the lane's
@@ -81,35 +81,35 @@ restored, rebased onto `wip/x`):
 - A squash of two described commits makes jj ask for the message, prefilled
   with both. Accepted as it is, it holds two trailer paragraphs, one after
   the other. jj's `trailers` template reads only the last paragraph: it saw
-  `Pineta-Lane=t-2,Pineta-Source=bbbb`, not the first commit's. A revset
+  `Pinetrie-Lane=t-2,Pinetrie-Source=bbbb`, not the first commit's. A revset
   over the whole description finds both:
-  `description(regex:"(?m)^Pineta-Source: aaaa$")`.
+  `description(regex:"(?m)^Pinetrie-Source: aaaa$")`.
 - `jj squash -u` keeps the destination's message only, so the source's
   trailers are gone.
 
 **7. The host's rewrite of an immutable offer.** `jj describe
---ignore-immutable`, as `pineta-host`, rewrote the line's offer, and the
-offer's evolog names `pineta-host@…`. Moving `pineta-onto` forward to the
+--ignore-immutable`, as `pinetrie-host`, rewrote the line's offer, and the
+offer's evolog names `pinetrie-host@…`. Moving `pinetrie-onto` forward to the
 offer, as a take would, succeeded with the bookmark immutable: a bookmark
 move rewrites no commit. Rebasing the WIP onto the moved line succeeded, and
 the WIP stayed mutable.
 
 **8. jj's default log hides an immutable offer** (measured after the
-build, with `e2e:lanes`). A repo with `pineta-onto`, an offer on it, and
+build, with `e2e:lanes`). A repo with `pinetrie-onto`, an offer on it, and
 your `@` beside: with the offers in `immutable_heads()`, `jj log` showed
 your work and the line, and not the offer; with only the line there, it
 showed all three. `builtin_log()` is `present(@) | ancestors(immutable_heads().., 2) | trunk()`,
 and an immutable head is not in `immutable_heads()..`. jjui, which uses the
 same default revset, hides it too. So setting up the line also adds the
 offers to the repo's `revsets.log` (`logRevset`): `builtin_log() |
-bookmarks(glob:"pineta-offer/*")`, shown before it is written, as the
+bookmarks(glob:"pinetrie-offer/*")`, shown before it is written, as the
 immutable heads are.
 
 jjui's own `[revisions] revset` replaces `revsets.log` for jjui (seen with
 jjui 0.10.9, whose config set `present(@) | ancestors(immutable_heads().., 2)
 | ancestors(@, 5) | present(trunk())`): `jj log` showed an offer on the
 line, and jjui did not. The setup cannot reach that file; the line menu says
-to add `bookmarks(glob:"pineta-offer/*")` to it, and
+to add `bookmarks(glob:"pinetrie-offer/*")` to it, and
 `docs/the-jujutsu-repo.md` shows how.
 
 **What follows for ADR-0060.**
@@ -117,10 +117,10 @@ to add `bookmarks(glob:"pineta-offer/*")` to it, and
 - The extension to `immutable_heads()` wraps the line in `present()`.
 - "Landed" is the WIP bookmark's target in `::<onto>`. The copy's commit or
   change id is read only when the bookmark is gone.
-- Pineta reads its trailers from every paragraph of a message, by regex,
+- pine·trie reads its trailers from every paragraph of a message, by regex,
   never with jj's `trailers`, which sees only the last.
 - A squash that keeps one message (`-u`, or a message you write) drops the
-  other commit's trailers. Pineta then believes you do not have that work,
+  other commit's trailers. pine·trie then believes you do not have that work,
   and offers it again: the consequence of an explicit edit, as the ADR
   says.
 - Lanes need no S74 recovery: their bookmark keeps what they forked from

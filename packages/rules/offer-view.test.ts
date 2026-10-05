@@ -5,7 +5,7 @@ import {
   laneNameForThread,
   type OfferRecord,
   type ThreadName,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   type CatchUpNow,
@@ -33,7 +33,7 @@ const offer: OfferRecord = {
   yourEdits: [],
   described: true,
   edited: false,
-  bookmark: "pineta-offer/t-1",
+  bookmark: "pinetrie-offer/t-1",
   integratedAs: null,
   commits: [commitId("w1")],
   ledger: null,
@@ -53,7 +53,7 @@ test("offerSeen: what an offer integration was shown is the record's ledger and 
 describe("offerView: ADR-0038's table", () => {
   const MOVE = {
     base: { kind: "line" },
-    bookmark: "pineta-onto",
+    bookmark: "pinetrie-onto",
     from: commitId("l1"),
     to: commitId("l2"),
   } as const
@@ -74,7 +74,7 @@ describe("offerView: ADR-0038's table", () => {
       activity,
       asked,
       base: null,
-      onto: "pineta-onto",
+      onto: "pinetrie-onto",
       wipAhead: 0,
       catchUp: catching.catchUp ?? { kind: "current" },
       untraced: catching.untraced ?? false,
@@ -141,11 +141,11 @@ describe("offerView: ADR-0038's table", () => {
       size: 2,
       conflicts: 0,
       touchesYourEdits: false,
-      bookmark: "pineta-offer/t-1",
+      bookmark: "pinetrie-offer/t-1",
       held: false,
       integratedAs: null,
       base: { kind: "line" },
-      onto: "pineta-onto",
+      onto: "pinetrie-onto",
       catchUp: { kind: "current" },
       untraced: false,
       conflictCause: "work",
@@ -169,7 +169,7 @@ describe("offerView: ADR-0038's table", () => {
     const held = view({ ...offer, files: [] })
     expect([held.facts.held, held.facts.bookmark, held.destinations]).toEqual([
       true,
-      "pineta-offer/t-1",
+      "pinetrie-offer/t-1",
       [],
     ])
   })
@@ -218,7 +218,7 @@ describe("offerView: ADR-0038's table", () => {
       base: { base: { kind: "wip", bookmark: "wip/a" }, state: "gone" },
       parent: null,
       parentRunning: false,
-      onto: "pineta-onto",
+      onto: "pinetrie-onto",
       wipAhead: 0,
       catchUp: { kind: "current" },
       untraced: false,
@@ -270,7 +270,7 @@ describe("offerView: ADR-0038's table", () => {
       commit: typeof L1 | null,
       wips = [] as { bookmark: string; commit: typeof L1 }[],
     ) => ({
-      onto: "pineta-onto",
+      onto: "pinetrie-onto",
       wipPrefix: "wip/",
       publish: "main",
       published: { commit: null, behind: 0, ahead: 0 },
@@ -339,7 +339,7 @@ describe("offerView: ADR-0038's table", () => {
     // Only what brings files says the move: the header's ↓ names it.
     const move = {
       base: { kind: "line" },
-      bookmark: "pineta-onto",
+      bookmark: "pinetrie-onto",
       from: L1,
       to: L2,
     }
@@ -376,7 +376,7 @@ describe("a conflict that came with the copy, and the thread it branched from (A
       activity: "idle",
       asked: null,
       base: null,
-      onto: "pineta-onto",
+      onto: "pinetrie-onto",
       wipAhead: 0,
       catchUp: { kind: "current" },
       untraced: false,

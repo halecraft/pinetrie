@@ -1,6 +1,6 @@
 ---
 name: offer-stack
-description: How Pineta's agent splits a thread's offer into a stack of reviewable revisions. Pineta runs it; the agent does not choose it.
+description: How pine·trie's agent splits a thread's offer into a stack of reviewable revisions. pine·trie runs it; the agent does not choose it.
 disable-model-invocation: true
 ---
 
@@ -15,4 +15,4 @@ The person asked for this thread's work as a series of revisions they can review
 - Describe each revision as a commit message, in the repository's own style: a subject under 72 characters, and a body only when the reason is not obvious.
 - When the stack is done, point the bookmark the prompt names at its last revision, and end your turn with a list of the revisions and what each does.
 
-Pineta checks the stack against the tip itself; a stack that differs is refused.
+pine·trie checks the stack against the tip itself; a stack that differs is refused.

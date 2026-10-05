@@ -5,7 +5,7 @@
 // (ADR-0023); a card's record is in the places document (`places.ts`). Kyneta gives each peer's
 // Yjs `clientID` from its seat (`yjsClientId`), so the operations in a text
 // say which seat wrote them, and the seat's principal says who that is
-// (ADR-0037). The host writes that down once per seat (`pineta.seat`), so
+// (ADR-0037). The host writes that down once per seat (`pinetrie.seat`), so
 // anyone can name a text's writers after they have gone.
 //
 // A text's document is never compacted: Kyneta cannot compact a live Yjs
@@ -19,7 +19,7 @@ import {
   version,
 } from "@kyneta/schema"
 import { YjsVersion, yjs, yjsClientId } from "@kyneta/yjs-schema"
-import { type WriterId, writerOfPrincipal } from "@pineta/core"
+import { type WriterId, writerOfPrincipal } from "@pinetrie/core"
 
 export const TextDoc = yjs.bind(Schema.struct({ text: Schema.text() }))
 
@@ -30,7 +30,7 @@ export type TextDocHandle =
 /**
  * A seat's peer, its Yjs `clientID` and the person behind it, or null for a
  * seat whose principal is no email: the host's among them. The one place a seat becomes
- * a person; the host's seat records (`pineta.seat`) come from it, and a
+ * a person; the host's seat records (`pinetrie.seat`) come from it, and a
  * card's writers from those.
  */
 export const seatOf = (

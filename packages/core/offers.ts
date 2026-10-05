@@ -1,11 +1,11 @@
 // core/offers — an offer and the integration line in your repo: the facts
-// `@pineta/repo` reads, and the decisions it carries out (ADR-0038,
+// `@pinetrie/repo` reads, and the decisions it carries out (ADR-0038,
 // ADR-0060).
 //
 // A format or type that lanes or repo must read, write or name lives in core
-// too, since neither can declare @pineta/rules. This file holds the
+// too, since neither can declare @pinetrie/rules. This file holds the
 // facts `repo` reads of an offer and the decisions it carries out:
-// `@pineta/rules` decides from the one and returns the other, and neither package
+// `@pinetrie/rules` decides from the one and returns the other, and neither package
 // imports the other.
 
 import type {
@@ -20,8 +20,8 @@ import type {
 
 /**
  * What a revision's evolog says since the host's newest version of it
- * (`readOffer` in `@pineta/repo` reads it, `revisionEdited` in
- * `@pineta/rules` decides from it): whether the walk back reached a
+ * (`readOffer` in `@pinetrie/repo` reads it, `revisionEdited` in
+ * `@pinetrie/rules` decides from it): whether the walk back reached a
  * version the host made, and whether a version an operation not the host's
  * made on the way changed it. Read from the repo, never from a record the
  * host kept, which can be lost after its jj steps landed (S73).
@@ -41,9 +41,9 @@ export interface OfferRevision {
 
 /** An offer's ledger, as its top's message carries it (`offerLedger`). */
 export interface OfferLedger {
-  /** The lane tip it holds (`Pineta-Source`). */
+  /** The lane tip it holds (`Pinetrie-Source`). */
   readonly source: CommitId
-  /** Where it starts (`Pineta-Start`). */
+  /** Where it starts (`Pinetrie-Start`). */
   readonly start: readonly CommitId[]
 }
 
@@ -58,9 +58,9 @@ export interface OfferSeen {
 }
 
 /**
- * An offer as your repo holds it now (`readOffer` in `@pineta/repo`): all
+ * An offer as your repo holds it now (`readOffer` in `@pinetrie/repo`): all
  * the host decides an offer from. Facts only; what they mean is decided in
- * `@pineta/rules` (`planRefresh`, `offerEdited`, `offerMoved`) and
+ * `@pinetrie/rules` (`planRefresh`, `offerEdited`, `offerMoved`) and
  * `isWipLine` (`trailers.ts`). A divergent offer is only its change ids: the repair needs
  * nothing more, and every other read would name one of two commits.
  */
@@ -122,7 +122,7 @@ export const changesOf = (offer: OfferInRepo): readonly string[] =>
 /** An offer as your repo holds it, not divergent. */
 export type OfferNow = Extract<OfferInRepo, { readonly kind: "offer" }>
 
-// ── where an offer sits (the gathers in `@pineta/repo`) ───────────────────
+// ── where an offer sits (the gathers in `@pinetrie/repo`) ───────────────────
 
 /** A place an offer can be built on: a target, and a known start. */
 export interface Placed {
@@ -130,7 +130,7 @@ export interface Placed {
   /** The lane's tip in your repo. */
   readonly tip: CommitId
   readonly base: LaneBase
-  /** A WIP base's state (`wipState`, `@pineta/repo`); "ok" for the line. */
+  /** A WIP base's state (`wipState`, `@pinetrie/repo`); "ok" for the line. */
   readonly state: "ok" | "landed"
   /** Where the offer sits: the line's commit, or the WIP bookmark's. */
   readonly target: CommitId
@@ -206,7 +206,7 @@ export interface StackFacts {
   readonly differing: readonly string[]
 }
 
-// ── what `@pineta/rules` decides, and `@pineta/repo` carries out ──────────
+// ── what `@pinetrie/rules` decides, and `@pinetrie/repo` carries out ──────────
 
 /**
  * An offer built anew at `place` from `sources`, after abandoning `changes`:
@@ -282,7 +282,7 @@ export interface DescribeDecision {
 
 /**
  * What the host reads of the line, each time it looks (`lineFacts` in
- * `@pineta/repo`): its commit, the WIPs above it and your work against it,
+ * `@pinetrie/repo`): its commit, the WIPs above it and your work against it,
  * as its record holds them, and your repo's `immutable_heads()` and
  * `revsets.log` as jj resolves them (null for jj's own).
  */

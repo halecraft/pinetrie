@@ -4,8 +4,8 @@
 // while its diff is in view. `review.ts` decides what it shows; `useFetched`
 // reads. The pane's frame (`pane.tsx`) gives it its width, Escape and focus.
 
-import type { RevisionReview } from "@pineta/core"
-import { decodeRevisionReview, diffUrl, reviewUrl } from "@pineta/rules"
+import type { RevisionReview } from "@pinetrie/core"
+import { decodeRevisionReview, diffUrl, reviewUrl } from "@pinetrie/rules"
 import { memo, useEffect, useRef, useState } from "react"
 import type { ReviewTarget } from "./column-view.ts"
 import { PaneHead } from "./pane-head.tsx"

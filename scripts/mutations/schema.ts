@@ -1,4 +1,4 @@
-// Mutations for @pineta/schema's streams. Run: pnpm mutate scripts/mutations/schema.ts
+// Mutations for @pinetrie/schema's streams. Run: pnpm mutate scripts/mutations/schema.ts
 import type { Mutation } from "../mutate.ts"
 
 const unit = ["pnpm", "exec", "vitest", "run", "packages/schema"]

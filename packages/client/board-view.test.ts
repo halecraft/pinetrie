@@ -10,8 +10,8 @@ import {
   type WriterId,
   workflowStateIdFor,
   writerId,
-} from "@pineta/core"
-import { orderKeys } from "@pineta/rules"
+} from "@pinetrie/core"
+import { orderKeys } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import type { Status } from "./attention.ts"
 import {

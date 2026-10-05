@@ -1,4 +1,4 @@
-import { movesDocId, rootDocId, rootIdFor, writerId } from "@pineta/core"
+import { movesDocId, rootDocId, rootIdFor, writerId } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import {
   HOST_PRINCIPAL,

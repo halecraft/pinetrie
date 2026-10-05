@@ -7,7 +7,7 @@ import {
   rootIdFor,
   type TraceRecord,
   writerId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { expect, test } from "vitest"
 import { keptTraces, seenBatches, traceGroups, tracesAt } from "./traces.ts"
 

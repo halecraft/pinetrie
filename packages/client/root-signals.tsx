@@ -5,8 +5,8 @@
 // reading in it. Each reads presence itself, so a presence write redraws it
 // and not the list or the board (S59).
 
-import type { EntryId, TreeIndex, WriterId } from "@pineta/core"
-import type { SessionClient } from "@pineta/session"
+import type { EntryId, TreeIndex, WriterId } from "@pinetrie/core"
+import type { SessionClient } from "@pinetrie/session"
 import { useMemo, useState } from "react"
 import {
   attentionWords,

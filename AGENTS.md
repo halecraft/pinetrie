@@ -1,7 +1,7 @@
-# Working on Pineta
+# Working on pine·trie
 
-Pineta is a collaborative agentic harness: pi's agent core over a Kyneta CRDT
-document, where the conversation is a tree. Start with `docs/pineta.md` (the
+pine·trie is a collaborative agentic harness: pi's agent core over a Kyneta CRDT
+document, where the conversation is a tree. Start with `docs/pinetrie.md` (the
 handoff) and `docs/README.md` (the map of the docs). Decisions and their
 reasons are the ADRs, one file each in `docs/adrs/`. Each package has a
 `TECHNICAL.md` with its gotchas: read the one nearest the code you change.
@@ -20,6 +20,10 @@ reasons are the ADRs, one file each in `docs/adrs/`. Each package has a
 
 ## House rules
 
+- The name: `pine·trie` wherever a person reads it (prose, UI, what the agent
+  is told), lowercase even at a sentence's start, from `PRODUCT_NAME` in code;
+  `pinetrie` in code names (`@pinetrie/core`, `PINETRIE_PORT`); `Pinetrie-`
+  only in git trailers (`Pinetrie-Base`), after `Signed-off-by`.
 - No backwards compatibility: delete old code rather than keeping it beside new.
 - No non-null assertions (`!`).
 - Functional core, imperative shell: gather, then plan (pure, returning values),
@@ -40,7 +44,7 @@ reasons are the ADRs, one file each in `docs/adrs/`. Each package has a
 |---|---|
 | unit, conformance, e2e | `pnpm run verify` |
 | with a real model | `pnpm run e2e:live` (the `live` scenario alone; needs a model key) |
-| in a real browser | `pnpm run e2e:browser` (without `container`, its offer and review checks report SKIP; on the Mac, `pnpm --filter @pineta/app exec playwright install chromium-headless-shell` once) |
+| in a real browser | `pnpm run e2e:browser` (without `container`, its offer and review checks report SKIP; on the Mac, `pnpm --filter @pinetrie/app exec playwright install chromium-headless-shell` once) |
 | lanes of their own, in containers | `pnpm run e2e:lanes` (needs Apple's `container` running, outside the sandbox; without it every scenario reports SKIP) |
 | deliberate bugs | `pnpm mutate scripts/mutations/<list>.ts [name]` |
 
@@ -53,10 +57,10 @@ against minutes. `pnpm mutate <list> <name> --against <command>` runs a
 mutant against another command and lists the checks that catch it: use it to
 find a unit test that already proves a rule before writing one.
 
-Each suite is a set of scenarios, one per file (`apps/pineta/e2e/TECHNICAL.md`),
-and `PINETA_SCENARIO=a,b` runs some. A suite mutation names its `suite`,
+Each suite is a set of scenarios, one per file (`apps/pinetrie/e2e/TECHNICAL.md`),
+and `PINETRIE_SCENARIO=a,b` runs some. A suite mutation names its `suite`,
 `scenario` and check, and runs only that scenario until the check it expects
-fails (`PINETA_STOP_AT`, set by `pnpm mutate`), so one whose check comes late
+fails (`PINETRIE_STOP_AT`, set by `pnpm mutate`), so one whose check comes late
 in a long scenario still takes a minute or two. Every suite check is a
 mutation's `expect` (`scripts/proofs.ts`); one no mutation proves yet is in
 `scripts/unproven.ts`, which only shrinks. The suites keep to a budget: the

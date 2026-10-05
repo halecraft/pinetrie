@@ -5,7 +5,7 @@
 // board's strip, what needs you and the project (docs/06-interface.md,
 // ADR-0085). The rail draws the root's tree; each column is one path, read on
 // its own scroll; the board opens over them. What is drawn is a read of the
-// document, through `@pineta/reads` and `projection.ts`. Your list is your
+// document, through `@pinetrie/reads` and `projection.ts`. Your list is your
 // own document, on every device (`openList`). Which root you are on, each
 // root's columns and whether the board is open are this window's own view
 // state: a reducer (`layout.ts`), kept in this browser tab's storage and
@@ -33,21 +33,21 @@ import {
   type RootId,
   rootWork,
   type WorkflowStateId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import {
   participantsIn,
   readHeldIndex,
   readParticipantNames,
   readRoots,
-} from "@pineta/reads"
-import { boardOf } from "@pineta/rules"
+} from "@pinetrie/reads"
+import { boardOf } from "@pinetrie/rules"
 import {
   heldBy,
   intentsOf,
   newRootId,
   type SessionClient,
   settleSlots,
-} from "@pineta/session"
+} from "@pinetrie/session"
 import {
   useCallback,
   useEffect,

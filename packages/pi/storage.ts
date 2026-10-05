@@ -35,7 +35,7 @@ import {
   value,
 } from "@earendil-works/pi-agent-core"
 import { batch, subscribe } from "@kyneta/schema"
-import { type BlobStore, type ImageRef, tailEdit } from "@pineta/core"
+import { type BlobStore, type ImageRef, tailEdit } from "@pinetrie/core"
 import {
   applyTextEdits,
   newStorageDoc,
@@ -43,7 +43,7 @@ import {
   type StorageDocHandle,
   type StoredValueRecord,
   valuePrefix,
-} from "@pineta/schema"
+} from "@pinetrie/schema"
 import { ArrivalIndex, type Observed, planArrivals } from "./arrivals.ts"
 import {
   type CommittedWrite,

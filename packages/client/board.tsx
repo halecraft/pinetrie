@@ -11,8 +11,8 @@
 // is a count, a search over labels and its most recent roots. What it shows
 // is `boardView`'s.
 
-import type { EntryId, WriterId } from "@pineta/core"
-import { ROOT_BUSY_REASON } from "@pineta/rules"
+import type { EntryId, WriterId } from "@pinetrie/core"
+import { ROOT_BUSY_REASON } from "@pinetrie/rules"
 import { useEffect, useRef, useState } from "react"
 import { LEVEL_CLASS, LEVEL_WORDS, type Level } from "./attention.ts"
 import {

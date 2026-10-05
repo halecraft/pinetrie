@@ -1,8 +1,8 @@
-// core/trailers — the commit-message format: every trailer Pineta writes into
+// core/trailers — the commit-message format: every trailer pinetrie writes into
 // a commit, and its readers.
 //
 // A format or type that lanes or repo must read, write or name lives in core
-// too, since neither can declare @pineta/rules. This file holds the
+// too, since neither can declare @pinetrie/rules. This file holds the
 // trailers: what a turn's revision, a lane's base, an offer and its ledger
 // carry, written and read here alone, so `trailers.test.ts` reads back every
 // message it writes. A revset that finds commits by a trailer is
@@ -27,12 +27,12 @@ import { firstLine } from "./tree.ts"
  * an offer names the lane tip it holds and where it starts.
  */
 export const TRAILERS = {
-  thread: "Pineta-Thread",
-  lane: "Pineta-Lane",
-  entry: "Pineta-Entry",
-  base: "Pineta-Base",
-  source: "Pineta-Source",
-  start: "Pineta-Start",
+  thread: "Pinetrie-Thread",
+  lane: "Pinetrie-Lane",
+  entry: "Pinetrie-Entry",
+  base: "Pinetrie-Base",
+  source: "Pinetrie-Source",
+  start: "Pinetrie-Start",
 } as const
 
 /** A trailer, by its name in `TRAILERS`. */
@@ -125,7 +125,7 @@ export const baseMessage = (
   base: { readonly bookmark: string; readonly commit: CommitId },
 ): string => `${title}\n\n${TRAILERS.base}: ${base.bookmark}@${base.commit}\n`
 
-/** `<bookmark>@<commit>`, a `Pineta-Base` value, read back; null if malformed. */
+/** `<bookmark>@<commit>`, a `Pinetrie-Base` value, read back; null if malformed. */
 function parseBase(
   value: string,
 ): { readonly bookmark: string; readonly commit: CommitId } | null {
@@ -134,7 +134,7 @@ function parseBase(
   return { bookmark: value.slice(0, at), commit: commitId(value.slice(at + 1)) }
 }
 
-/** The newest `Pineta-Base` a message carries, parsed; null for none, or a malformed one. */
+/** The newest `Pinetrie-Base` a message carries, parsed; null for none, or a malformed one. */
 export function baseOf(
   message: string,
 ): { readonly bookmark: string; readonly commit: CommitId } | null {
@@ -169,7 +169,7 @@ export const withTrailers = (
 
 /**
  * A message with the offer's ledger (ADR-0060): the lane commit it holds
- * (`Pineta-Source`) and where it starts (`Pineta-Start`, one per commit).
+ * (`Pinetrie-Source`) and where it starts (`Pinetrie-Start`, one per commit).
  * Added to the host's trailer paragraph when the message ends in one, else
  * as a paragraph of its own. Integrated, the offer keeps them: they say what you
  * have of the lane, wherever its commit goes.
@@ -214,7 +214,7 @@ export function withoutTrailers(message: string): string {
 
 /**
  * An offer's ledger as its message carries it (ADR-0060): the lane tip it
- * holds (`Pineta-Source`) and where it starts (`Pineta-Start`), from the
+ * holds (`Pinetrie-Source`) and where it starts (`Pinetrie-Start`), from the
  * last paragraph that names a source, so a message holding an older ledger
  * above it reads as the newest. Null when no paragraph names one, as after
  * you rewrote the message without them.
@@ -234,7 +234,7 @@ export function offerLedger(message: string): OfferLedger | null {
 // ── an integrated-offer commit on the line (ADR-0060, S97) ────────────────
 
 /**
- * Every `Pineta-Source` an integrated-offer commit's message names, from
+ * Every `Pinetrie-Source` an integrated-offer commit's message names, from
  * every paragraph, once each: a squash of two integrated offers keeps both
  * ledgers (S77 item 6).
  */
@@ -243,11 +243,11 @@ export const sourcesOf = (message: string): CommitId[] =>
 
 /**
  * The lanes a message's integrated offers name with no source (S97): each
- * paragraph carrying `Pineta-Thread` and `Pineta-Lane` but no
- * `Pineta-Source`, as the offers integrated before offers carried their
+ * paragraph carrying `Pinetrie-Thread` and `Pinetrie-Lane` but no
+ * `Pinetrie-Source`, as the offers integrated before offers carried their
  * ledger did. What such an integration brought cannot be placed in its
  * lane's history. A turn's commit carries no
- * `Pineta-Thread`, so it is never one.
+ * `Pinetrie-Thread`, so it is never one.
  */
 export function untracedLanes(message: string): LaneName[] {
   return message

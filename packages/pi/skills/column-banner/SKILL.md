@@ -1,6 +1,6 @@
 ---
 name: column-banner
-description: The prompt Pineta sends the image model for a thread's banner, the icon in its column header. Its whole body is the prompt; {adjective} and {noun} are filled from the thread's two-word name. Pineta uses it; the agent does not choose it.
+description: The prompt pine·trie sends the image model for a thread's banner, the icon in its column header. Its whole body is the prompt; {adjective} and {noun} are filled from the thread's two-word name. pine·trie uses it; the agent does not choose it.
 disable-model-invocation: true
 ---
 

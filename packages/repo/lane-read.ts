@@ -22,7 +22,7 @@ import {
   type ThreadName,
   trailerRevset,
   type WorkChanges,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import {
   bookmarkRevset,
   commitsOf,
@@ -34,7 +34,7 @@ import {
   offerBookmark,
   type Runner,
   revsetName,
-} from "@pineta/lanes"
+} from "@pinetrie/lanes"
 import {
   offerFiles,
   readCatchUp,
@@ -56,7 +56,7 @@ export interface LaneRow {
   readonly bookmark: boolean
   /** Under the offer's bookmark and not under the line: where its revisions are. */
   readonly region: boolean
-  /** The newest commit of the lane's carrying a `Pineta-Base` trailer. */
+  /** The newest commit of the lane's carrying a `Pinetrie-Base` trailer. */
   readonly base: boolean
   /** The newest line commit in the lane's history. */
   readonly line: boolean

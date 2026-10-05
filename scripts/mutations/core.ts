@@ -1,4 +1,4 @@
-// Mutations for @pineta/core. Run: pnpm mutate scripts/mutations/core.ts
+// Mutations for @pinetrie/core. Run: pnpm mutate scripts/mutations/core.ts
 import type { Mutation } from "../mutate.ts"
 
 const unit = ["pnpm", "exec", "vitest", "run", "packages/core"]
@@ -573,12 +573,12 @@ export const mutations: readonly Mutation[] = [
     expect: "a turn that changed only ignored files",
   },
   {
-    name: "PINETA_LANES=0 is ignored",
+    name: "PINETRIE_LANES=0 is ignored",
     file: "packages/core/work.ts",
     from: '  return project.rootDefault === "own"',
     to: "  return true",
     command: unit,
-    expect: "PINETA_LANES=0 changes a root lane's default",
+    expect: "PINETRIE_LANES=0 changes a root lane's default",
   },
   {
     name: "an email may hold a colon",

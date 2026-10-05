@@ -29,7 +29,7 @@ reverted. The store probe read a copy of a working store's SQLite file.
      purpose.
 
 2. **Biome can keep minting at the edges** (measured). `style/noRestrictedImports`
-   with `paths: { "@pineta/core": { importNames: ["entryId", …] } }`, scoped
+   with `paths: { "@pinetrie/core": { importNames: ["entryId", …] } }`, scoped
    by `overrides[].includes`, flagged exactly the files that imported a
    named minter, and no others: it reads parsed imports, not source text.
    `!` globs in `includes` exclude files, and two overrides may restrict

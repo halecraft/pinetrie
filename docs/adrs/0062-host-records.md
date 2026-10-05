@@ -5,7 +5,7 @@
 imports pi) and ADR-0016 (a value's physical key is an identity, never
 parsed).
 
-**Context.** The host keeps its own records as pi values under `pineta.`
+**Context.** The host keeps its own records as pi values under `pinetrie.`
 namespaces: a root's archive state, an entry's mark, a lane's offer, the
 integration line, and 12 more. They are written through pi's session,
 because `KynetaStorage` owns the write tokens and arrival order (ADR-0013).
@@ -18,14 +18,14 @@ Each record was defined in three places with nothing tying them together:
   `removeOffer`, and the legacy `removeHeld` and `removeHave`);
 - its read key, a `…Records` function that keyed decoded values by a field.
 
-So `packages/pi` imported Pineta's record list, though it only passes the
+So `packages/pi` imported pine·trie's record list, though it only passes the
 writes on, and every new record grew `Agent`. Host tests asserted which
 method was called, not what was written.
 
 A pi value has an address, `(namespace, key)`, and contents. The address
 decides which value a write replaces and a delete removes. Ten records
 repeated the address key inside their contents (`MarkRecord.entry`); three
-stored contents only (`pineta.stop`, `pineta.digest`, `pineta.participant`)
+stored contents only (`pinetrie.stop`, `pinetrie.digest`, `pinetrie.participant`)
 and their readers cast the address key; three (line, project, commands)
 have one fixed key. A seat was addressed by its Yjs
 `clientId` as text, a number Yjs derives from the seat's Kyneta peer.
@@ -35,24 +35,24 @@ have one fixed key. A seat was addressed by its Yjs
 - **One `RecordSpec<R, K>` per record**, in marginalia (`records.ts`):
   `namespace`, `keyOf(record)`, `encode(record)`, `decode(contents, key)`.
   `setRecord`, `deleteRecord`, `recordsOf` and `setIfChanged` all go
-  through it, and `@pineta/reads` derives each named reader from it
+  through it, and `@pinetrie/reads` derives each named reader from it
   (`readRecords(doc, spec)`).
 - **The address holds the key, and the contents never repeat it.** `encode`
   leaves the key out. `decode` checks the address (`isLaneName` for a
   lane, non-empty for an entry) and puts the key back, so the in-memory
   record is whole. A write and a read cannot disagree on a key.
-- **The host builds `ValueWrite`s** (`@pineta/core`: `set` or `delete` at
-  a `HostNamespace`, `pineta.${string}`) with `setRecord` and `deleteRecord`.
+- **The host builds `ValueWrite`s** (`@pinetrie/core`: `set` or `delete` at
+  a `HostNamespace`, `pinetrie.${string}`) with `setRecord` and `deleteRecord`.
 - **pi carries them**: `Agent.writeValues(writes)` writes them in one
   session commit, and throws, writing nothing, for a namespace outside
-  `pineta.`. `packages/pi` imports no namespace and no record encoder.
+  `pinetrie.`. `packages/pi` imports no namespace and no record encoder.
 - **A seat is addressed by its `peerId`**, the seat's identity as presence
   has it (`seatKey`). Its `clientId` stays in the contents: a text's
   operations carry it, and marginalia cannot derive it from the peer.
 - **Whether a record changed ignores key order** (`setIfChanged`): a
   decoder may build fields in another order than the code that made the
   new record.
-- **The cleanup of `pineta.outbox` and `pineta.have`**, values left by
+- **The cleanup of `pinetrie.outbox` and `pinetrie.have`**, values left by
   hosts before queued cards and before ADR-0060, is deleted.
 
 **Consequences.**

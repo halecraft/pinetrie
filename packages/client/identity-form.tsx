@@ -28,7 +28,7 @@ function IdentityForm({ onDone }: { onDone: (identity: Identity) => void }) {
         else setProblem(parsed.problem)
       }}
     >
-      <h1>pineta</h1>
+      <h1>pinetrie</h1>
       <label>
         email:{" "}
         <input

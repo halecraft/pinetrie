@@ -14,15 +14,15 @@ import {
   type ThreadLane,
   type WorkSetting,
   type WriterId,
-} from "@pineta/core"
-import type { Outcome } from "@pineta/protocol/codec"
+} from "@pinetrie/core"
+import type { Outcome } from "@pinetrie/protocol/codec"
 import {
   addressChat,
   agentByDefault,
   displayName,
   parseCommand,
-} from "@pineta/rules"
-import type { ChatHow } from "@pineta/session"
+} from "@pinetrie/rules"
+import type { ChatHow } from "@pinetrie/session"
 import type { Prefill } from "./columns.ts"
 
 /** What every send from one column carries, whichever card it is sent from. */
@@ -168,7 +168,7 @@ export interface SendPlan {
 
 /**
  * What a composer's next send does, decided as the host will decide it: who
- * the message is for is `addressChat`, which `@pineta/rules`' `planChat`
+ * the message is for is `addressChat`, which `@pinetrie/rules`' `planChat`
  * runs too, over the thread `threadOf` gives (ADR-0021).
  *
  * - A fresh column sends `branch`. Elsewhere, a send to a busy lane, plain or
@@ -435,7 +435,7 @@ export function whereChoices(
           ? project.reason
           : onto === null
             ? undefined
-            : `a lane of its own, cloned from ${onto}; its work comes back as pineta-offer/<thread>`,
+            : `a lane of its own, cloned from ${onto}; its work comes back as pinetrie-offer/<thread>`,
     },
     {
       key: "yours",

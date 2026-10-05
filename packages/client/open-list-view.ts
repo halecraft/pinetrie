@@ -10,7 +10,8 @@ import type {
   ThreadName,
   Workflow,
   WorkflowStateId,
-} from "@pineta/core"
+} from "@pinetrie/core"
+import { PRODUCT_NAME } from "@pinetrie/core"
 import type { Moments, Status } from "./attention.ts"
 import type { CardMarks } from "./card-marks.ts"
 import type { Intent } from "./intent.ts"
@@ -257,7 +258,7 @@ export const listKey = (item: ItemView): string =>
  * anything is chosen.
  */
 export const pageTitle = (count: number, here: ItemView | null): string => {
-  const place = here === null ? "Pineta" : `${here.label} · Pineta`
+  const place = here === null ? PRODUCT_NAME : `${here.label} · ${PRODUCT_NAME}`
   return count === 0 ? place : `(${count}) ${place}`
 }
 

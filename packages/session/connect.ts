@@ -41,24 +41,24 @@ import {
   type RootId,
   type WriterId,
   writerOfPrincipal,
-} from "@pineta/core"
-import type { Outcome } from "@pineta/protocol/codec"
-import { Control } from "@pineta/protocol/line"
+} from "@pinetrie/core"
+import type { Outcome } from "@pinetrie/protocol/codec"
+import { Control } from "@pinetrie/protocol/line"
 import {
   HOST_PRINCIPAL,
   LIVE_DOC_ID,
   PLACES_DOC_ID,
   SESSION_DOC_ID,
-} from "@pineta/protocol/messages"
-import { personDocId, writersPolicy } from "@pineta/protocol/writers"
+} from "@pinetrie/protocol/messages"
+import { personDocId, writersPolicy } from "@pinetrie/protocol/writers"
 import {
   readArchived,
   readOffers,
   readPlaces,
   readPlacesRev,
   readRoots,
-} from "@pineta/reads"
-import { offerSeen } from "@pineta/rules"
+} from "@pinetrie/reads"
+import { offerSeen } from "@pinetrie/rules"
 import {
   asSessionDoc,
   cardDocId,
@@ -75,7 +75,7 @@ import {
   StorageDoc,
   type TextDocHandle,
   textVersion,
-} from "@pineta/schema"
+} from "@pinetrie/schema"
 import { type ActingState, NO_ACTING, sendActing } from "./acting.ts"
 import {
   type AttentionStore,

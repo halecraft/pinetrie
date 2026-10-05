@@ -21,12 +21,12 @@ lane: its mounts, grants and image were fixed when the container was made.
   items 1 and 5). What a lane writes there is yours on the host, visible at
   once (S45 items 2 and 3).
 - **Two levels, merged:** the person's lane config,
-  `$XDG_CONFIG_HOME/pineta/config.json` (only its `lanes.shared`), for
+  `$XDG_CONFIG_HOME/pinetrie/config.json` (only its `lanes.shared`), for
   habits that follow them into every project; and the project's
-  `pineta.json`, for directories everyone on it needs. The person's come
+  `pinetrie.json`, for directories everyone on it needs. The person's come
   first.
 - **Refused, with the reason logged:** absolute paths; paths that leave the
-  project; anything in `.git`, `.jj`, `.pineta` or `node_modules`; a path
+  project; anything in `.git`, `.jj`, `.pinetrie` or `node_modules`; a path
   holding files jj tracks. The rest still apply. A missing directory is
   created.
 - **No repo tracks a shared directory.**

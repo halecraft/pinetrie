@@ -1,4 +1,4 @@
-// Mutations for @pineta/session. Run: pnpm mutate scripts/mutations/session.ts
+// Mutations for @pinetrie/session. Run: pnpm mutate scripts/mutations/session.ts
 import type { Mutation } from "../mutate.ts"
 
 const unit = ["pnpm", "exec", "vitest", "run", "packages/session"]
@@ -7,8 +7,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the session declares React",
     file: "packages/session/package.json",
-    from: '    "@pineta/schema": "workspace:*"\n',
-    to: '    "@pineta/schema": "workspace:*",\n    "react": "19.2.0"\n',
+    from: '    "@pinetrie/schema": "workspace:*"\n',
+    to: '    "@pinetrie/schema": "workspace:*",\n    "react": "19.2.0"\n',
     command: ["pnpm", "exec", "vitest", "run", "workspace.test.ts"],
     expect: "session declares only Kyneta's exchange and WebSocket transport",
   },

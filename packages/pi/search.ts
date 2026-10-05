@@ -15,7 +15,7 @@ import {
   formatSize,
   type ShellOutputView,
 } from "@earendil-works/pi-agent-core"
-import { shellWord } from "@pineta/core"
+import { shellWord } from "@pinetrie/core"
 import { Type } from "typebox"
 import type { SearchProgram, ToolContext } from "./lanes.ts"
 

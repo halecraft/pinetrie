@@ -19,8 +19,8 @@ import {
   rootOf,
   type TreeIndex,
   type WriterId,
-} from "@pineta/core"
-import { cardEnd } from "@pineta/rules"
+} from "@pinetrie/core"
+import { cardEnd } from "@pinetrie/rules"
 import { needsCard } from "./card-state.ts"
 import { hereOfColumn, type Layout, unlisted } from "./layout.ts"
 import { AGENT_PREFILL } from "./message-tools.ts"

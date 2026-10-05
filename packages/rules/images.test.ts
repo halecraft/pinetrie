@@ -1,4 +1,4 @@
-import { ERR, type ImageRef, type Sha256 } from "@pineta/core"
+import { ERR, type ImageRef, type Sha256 } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import { imageSources, pastedImages, planImages } from "./images.ts"
 

@@ -3,7 +3,7 @@
 //
 // While a lane's queue is held, the host pops no message card from it, only
 // facts (`planNextQueuedCardPop`, `card.ts`), and a send there waits in it
-// (`sendWaits`, @pineta/core). So people can line up several cards on an idle thread and
+// (`sendWaits`, @pinetrie/core). So people can line up several cards on an idle thread and
 // let them go together. The hold is a session record, so it outlasts a
 // restart: a queue staged overnight must not drain when the host starts.
 
@@ -13,7 +13,7 @@ import type {
   RootId,
   ValueWrite,
   WriterId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { Type } from "typebox"
 import type { QueuedCard } from "./card.ts"
 import { decodeAt, laneKey } from "./decode.ts"
@@ -26,7 +26,7 @@ const QueueHoldSchema = Type.Object({
 
 /** Each held queue, at its lane. */
 export const QUEUE_HOLD: RecordSpec<QueueHold, LaneName, "session"> = {
-  namespace: "pineta.queue-hold",
+  namespace: "pinetrie.queue-hold",
   home: "session",
   keyOf: r => r.lane,
   encode: ({ lane, ...contents }) => contents,

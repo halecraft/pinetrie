@@ -10,7 +10,7 @@
 > is now `StoredEntryRow`, a typed Kyneta row. See
 > `S17-typed-entries.md`.
 
-**Date:** 2026-09-24 · **Repo:** `~/halecraft/pineta` (working copy, not committed)
+**Date:** 2026-09-24 · **Repo:** `~/halecraft/pinetrie` (working copy, not committed)
 **Node:** v24.19.0 (native type stripping — no `tsx`, no build step)
 **TypeScript:** 5.9.3, `strict` + `noUncheckedIndexedAccess` + `verbatimModuleSyntax`
 
@@ -73,7 +73,7 @@ built client/app.bundle.js                       # 771463 bytes
 
 esbuild took the `.ts` entry point with no config change.
 
-**`e2e:live` (real model):** `pass=20 fail=0`, model emitted `PINETA-OK`.
+**`e2e:live` (real model):** `pass=20 fail=0`, model emitted `PINETRIE-OK`.
 
 **`e2e:browser` — a Playwright server WAS listening on 3100, so I ran it:**
 

@@ -14,7 +14,7 @@ import {
   parseMentions,
   type RootRecord,
   type WriterId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 
 /** A message that mentions you. */
 export interface InboxItem {
@@ -56,7 +56,7 @@ export function mentionsOf(input: {
 
 /** What you have seen: every mention at or before `since`, and `seen` after it. */
 export interface Inbox {
-  /** An entry id, or `EARLIEST` (`@pineta/session`'s `startOf`). */
+  /** An entry id, or `EARLIEST` (`@pinetrie/session`'s `startOf`). */
   readonly since: string
   readonly seen: readonly string[]
 }

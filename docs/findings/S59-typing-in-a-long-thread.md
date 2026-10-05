@@ -26,7 +26,7 @@ session of 8,206 entries.
 
 ## Method
 
-A disposable probe in `apps/pineta/e2e/`, not checked in: `startHost` with an
+A disposable probe in `apps/pinetrie/e2e/`, not checked in: `startHost` with an
 in-memory store; about 8,000 entries written directly (`writeEntry`): 40 roots
 of about 160 messages each, and one conversation of 1,500 messages
 (`encodeChat` for people's, assistant text for the rest), under a root the
@@ -90,7 +90,7 @@ React's own measure of each `Column` render took 55–72 ms.
   and a `console.createTask` for owner stacks
   (`react-jsx-dev-runtime.development.js`, up to 10,000 per reset). That is
   about 35 µs per `<Message>`, whether or not the message then redraws. The
-  host always serves Vite's development build (`apps/pineta/host/http.ts`), so
+  host always serves Vite's development build (`apps/pinetrie/host/http.ts`), so
   this is the cost a person feels. Skipping the list when a column's messages
   are unchanged removes it.
 
@@ -145,7 +145,7 @@ PLAN-2026-09-30-presence-renders. `App` reads no presence: each field is
 read by the small part that shows it (`packages/client/use-presence.ts`).
 A column's message list is memoised (`MessageList`). `pnpm run host`
 serves production React, and `pnpm run host:react-dev` development React
-(`docs/pineta.md`).
+(`docs/pinetrie.md`).
 
 ## What was not measured
 

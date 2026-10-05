@@ -9,7 +9,7 @@ import {
   type MessagePart,
   type Sha256,
   storedImage,
-} from "@pineta/core"
+} from "@pinetrie/core"
 
 /** A blob's bytes, as the rejoin reads them. */
 export type BlobOf = (

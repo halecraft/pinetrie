@@ -23,7 +23,7 @@
 // (`releasedTip`): an ask whose run ended after it stays open under the
 // reader until they come back down (ADR-0056).
 
-import type { EntryId } from "@pineta/core"
+import type { EntryId } from "@pinetrie/core"
 
 /** What a scroller reports: read from the element, nothing else. */
 export interface Metrics {

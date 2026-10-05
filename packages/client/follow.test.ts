@@ -1,4 +1,4 @@
-import { entryId } from "@pineta/core"
+import { entryId } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   behind,

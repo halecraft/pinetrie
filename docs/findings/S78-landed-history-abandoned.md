@@ -7,13 +7,13 @@ had landed (`wyymlxnv`, `yvmprzss`, `mwzqvmwq`) were no longer ancestors of
 had been rebased onto `nmsuztkr` without them.
 
 **What the operation log held.** Read with `jj op log` and `jj op show`,
-all `--ignore-working-copy`, in Pineta's own repo, jj 0.44.0.
+all `--ignore-working-copy`, in pine·trie's own repo, jj 0.44.0.
 
 | time | operation | effect |
 |---|---|---|
 | 10:45:22 | snapshot working copy | the last state with the history whole |
-| 10:48:04 | `jj git import` (args `-R … --ignore-working-copy git import`, as the user) | `tip@pineta-t-01a0faee…` (cozy-mallard) went from a commit to absent; 151 revisions removed; `mkwnuzpx`, `ltywxrpq` and `@` rewritten |
-| 10:48:20 | `jj git import` | `tip@pineta-t-01a0faee…` back at the same commit, with two new lanes' tips (`…fd6e`, a branch of it at the same commit, and `…fd37`); the 150 revisions back, but the rewritten commits not restored |
+| 10:48:04 | `jj git import` (args `-R … --ignore-working-copy git import`, as the user) | `tip@pinetrie-t-01a0faee…` (cozy-mallard) went from a commit to absent; 151 revisions removed; `mkwnuzpx`, `ltywxrpq` and `@` rewritten |
+| 10:48:20 | `jj git import` | `tip@pinetrie-t-01a0faee…` back at the same commit, with two new lanes' tips (`…fd6e`, a branch of it at the same commit, and `…fd37`); the 150 revisions back, but the rewritten commits not restored |
 
 **Answers.**
 

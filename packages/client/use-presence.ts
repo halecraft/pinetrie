@@ -11,9 +11,9 @@ import {
   type TreeIndex,
   type WriterId,
   whoIsAt,
-} from "@pineta/core"
-import { readReading, readReadingRoots, readTyping } from "@pineta/reads"
-import type { PresenceDocHandle } from "@pineta/schema"
+} from "@pinetrie/core"
+import { readReading, readReadingRoots, readTyping } from "@pinetrie/reads"
+import type { PresenceDocHandle } from "@pinetrie/schema"
 import { useMemo } from "react"
 
 /** Others reading each thread end, you left out (`readingAt`). */

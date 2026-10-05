@@ -5,8 +5,8 @@ seat on every open, which is sound only if no other connection writes the
 file. Kyneta's own adapters (`fromBetterSqlite3`, `fromBunSqlite`) take
 ownership in a private `own()`: `PRAGMA busy_timeout`, `PRAGMA locking_mode =
 EXCLUSIVE`, then `BEGIN EXCLUSIVE; COMMIT`, and read a refusal as
-`code === "SQLITE_BUSY"`. Pineta wraps Node's built-in `node:sqlite` by hand
-(`apps/pineta/host/store.ts`), so it copies that step, and nothing had
+`code === "SQLITE_BUSY"`. pine·trie wraps Node's built-in `node:sqlite` by hand
+(`apps/pinetrie/host/store.ts`), so it copies that step, and nothing had
 measured it on Node. Node 24.
 
 **Answers.**

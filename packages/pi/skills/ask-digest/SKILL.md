@@ -1,6 +1,6 @@
 ---
 name: ask-digest
-description: How Pineta summarizes an ask's work in a thread for the people reading it, and says at a run's end what it needs from them. Pineta asks for it; the agent does not choose it.
+description: How pine·trie summarizes an ask's work in a thread for the people reading it, and says at a run's end what it needs from them. pine·trie asks for it; the agent does not choose it.
 disable-model-invocation: true
 ---
 
@@ -21,7 +21,7 @@ A headline of 12 words or fewer
 - The headline says what came of the work, or what it is doing now if it is unfinished. No "The agent", and no full stop.
 - Then up to four points, each a line starting with `- `: a change, a finding, a decision, a failure or a risk that the last message does not already give. Leave them out when there are none.
 - Put file names, commands and errors in backticks.
-- Never restate the ask, narrate step by step, count steps, or name how Pineta works (lanes, sessions, summaries).
+- Never restate the ask, narrate step by step, count steps, or name how pine·trie works (lanes, sessions, summaries).
 - Never claim what the messages do not show. If the work is unfinished, say what it is doing now, not that it is done.
 
 If the last message already says what the work came to, or the work was routine, reply exactly:

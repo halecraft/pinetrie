@@ -15,7 +15,7 @@ Reproduced with jj 0.44.0 and git, in throwaway repos (now a test in
 `packages/lanes/lanes.test.ts`):
 
 1. A base made as `planBaseRefresh` makes one: `git init`, `jj git init
-   --colocate`, `git fetch <yours> +B:refs/heads/pineta/fetched/0`,
+   --colocate`, `git fetch <yours> +B:refs/heads/pinetrie/fetched/0`,
    `jj --ignore-working-copy git import`, `jj new B`.
 2. Your `@-` rewritten: commit C, which does not descend from B. The same
    fetch moves the ref from B to C, sideways.

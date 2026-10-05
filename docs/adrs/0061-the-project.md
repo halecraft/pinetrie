@@ -2,7 +2,7 @@
 
 **Status:** Accepted (Duane, 2026-10-03). Evidence: S80. Implemented by
 `PLAN-2026-10-03-jj-ux`. Amends ADR-0060 (its
-words; and "Pineta never touches your files or your `@`", for one act you
+words; and "pine·trie never touches your files or your `@`", for one act you
 ask for), ADR-0055 ("bring up to date" is "catch up", its button acts at once,
 and how a card with a command says so), ADR-0032 (where the composer says where an agent
 works), ADR-0029 and ADR-0038 (archiving a root withdraws its threads'
@@ -19,7 +19,7 @@ activity menu's "Ready to add", counted on its badge.
 - The chip beside the send button said "on a copy", which read as part of
   the button: "on a copy · send to agent".
 - Its menu listed where the agent works and where its copy starts in one
-  list, with no mark on either choice; "starts from pineta-onto" read as a
+  list, with no mark on either choice; "starts from pinetrie-onto" read as a
   caption.
 - "Bring up to date" seemed to do nothing: it gave your card a command and
   focused the box, and the button still said "queue up next".
@@ -28,7 +28,7 @@ activity menu's "Ready to add", counted on its badge.
   an archived thread's lane history, deleted from the repo, left its offer
   and record for good.
 
-And `pineta-onto` means nothing to someone who does not use jj; to someone
+And `pinetrie-onto` means nothing to someone who does not use jj; to someone
 who does, it says nothing about what to do next.
 
 **Decision.**
@@ -38,7 +38,7 @@ who does, it says nothing about what to do next.
   files**. A thread works on **its own copy**. A WIP is **your unfinished
   work**, named by its bookmark. Words name places only so, through one
   function (`baseName`, `packages/marginalia/work.ts`); the jj names (the
-  bookmark, short commit ids, `pineta-offer/<thread>`) go in titles, in the
+  bookmark, short commit ids, `pinetrie-offer/<thread>`) go in titles, in the
   project's setup, and on the offer's copy button, which is there to find
   it in jj.
 - **The verbs move work between the places.** "Add to the project" (a take
@@ -46,7 +46,7 @@ who does, it says nothing about what to do next.
   project" (bringing a thread up to date), "add my work to the project"
   (land my work), and "update my files" (below).
 - **A thread knows when its base has moved on**, from records the page has:
-  the commit its newest `Pineta-Base` names against the line's commit or the
+  the commit its newest `Pinetrie-Base` names against the line's commit or the
   WIP's (`baseMoved`). Then the offer's strip says "the project has new
   work", catching up stands beside the offer instead of in its menu, and
   the column's header shows ↓, titled with the bookmark and both commits.
@@ -101,7 +101,7 @@ who does, it says nothing about what to do next.
   planned from still has one.
 - **"Resolve with the agent" opens a new agent tab** working in your files
   (its box's `Prefill` carries the work setting), its box holding
-  `/pineta:skill:resolve-conflicts` and the conflicted files, for you to
+  `/pinetrie:skill:resolve-conflicts` and the conflicted files, for you to
   send. The
   agent reads the conflicts from your working copy itself: the skill has a
   section for your own files, where `ask_for_guidance` is not available
@@ -115,7 +115,7 @@ who does, it says nothing about what to do next.
 
 - Someone who never uses jj can follow work from a thread to the project,
   and, once "update my files" is built, into their files.
-- Pineta touches your `@` in one act, which you ask for after a preview.
+- pine·trie touches your `@` in one act, which you ask for after a preview.
   ADR-0060's reason against a take moving `@`, that you cannot tell what it
   does to the work you have open, is met by the preview; a take still never
   moves it.
@@ -127,7 +127,7 @@ who does, it says nothing about what to do next.
 
 **Alternatives rejected.**
 
-- **Keep the jj names in the words.** `pineta-onto` is a configured
+- **Keep the jj names in the words.** `pinetrie-onto` is a configured
   bookmark: it tells a person neither what it is for nor what to do.
 - **"Update my files" as part of a take.** ADR-0060 removed that for good
   reason: a take you press for a thread's work would change your files too.

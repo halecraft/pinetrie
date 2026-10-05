@@ -1,4 +1,4 @@
-import { entryId, rootIdFor, workflowStateIdFor } from "@pineta/core"
+import { entryId, rootIdFor, workflowStateIdFor } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   encodeRootDrag,

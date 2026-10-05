@@ -75,7 +75,7 @@ reimplementing in TypeScript what the schema algebra derives.
 
    What this costs is bounded, and probe P1c measured it: a **new schema reads
    old data locally**, filling absent fields with defaults. The hash matters at
-   *Exchange negotiation* between peers on different Pineta builds. Pineta ships
+   *Exchange negotiation* between peers on different pine·trie builds. pine·trie ships
    host and client together, so that is an upgrade-coordination concern, not a
    runtime one.
 
@@ -111,7 +111,7 @@ Five sub-decisions, each evidence-backed:
   coordinated upgrade — every time pi adds an entry type. `type` as an
   unconstrained string means **a new pi `EntryType` requires no schema change at
   all.** Minimal surface, maximal tolerance.
-- **Type exactly what Pineta reasons about.** `id`, `parentId`, `type` and
+- **Type exactly what pine·trie reasons about.** `id`, `parentId`, `type` and
   `fromId` are the fields our own traversals read — `projectTranscript`,
   `orderNewEntries`, the planned `projectSpine`, and fold. Everything else is
   displayed, not reasoned over.

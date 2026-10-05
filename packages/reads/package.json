@@ -1,5 +1,5 @@
 {
-  "name": "@pineta/reads",
+  "name": "@pinetrie/reads",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -7,8 +7,8 @@
     ".": "./index.ts"
   },
   "dependencies": {
-    "@pineta/core": "workspace:*",
-    "@pineta/rules": "workspace:*",
-    "@pineta/schema": "workspace:*"
+    "@pinetrie/core": "workspace:*",
+    "@pinetrie/rules": "workspace:*",
+    "@pinetrie/schema": "workspace:*"
   }
 }

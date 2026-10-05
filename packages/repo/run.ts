@@ -11,14 +11,14 @@
 // Only the owner (`owner.ts`) and this package's tests use these: the package
 // exports none of them.
 
-import { HOST_OPERATOR, NO_EDITOR } from "@pineta/core"
+import { HOST_OPERATOR, NO_EDITOR } from "@pinetrie/core"
 import {
   describeFailure,
   JJ_FLAGS,
   type Ran,
   type Runner,
   run,
-} from "@pineta/lanes"
+} from "@pinetrie/lanes"
 import type { RepoStep } from "./step.ts"
 
 /** Who runs a command on your repo: jj as the host, as you, or pinned to an operation; or git. */

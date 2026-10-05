@@ -13,11 +13,11 @@ nothing showed who else was there. The composer's "seen by" was removed because,
 without presence, any list was a guess. Notes will need "who is editing this".
 
 **Decision.**
-- **Presence is a Kyneta `ephemeral` document** (`pineta:presence`): never
+- **Presence is a Kyneta `ephemeral` document** (`pinetrie:presence`): never
   stored, last writer wins per field, and every field decays to `null` without a
   fresh write. Leaving needs no message: a person's entries go quiet and decay,
   which is also what a crashed tab does.
-- **Thread-level, and per open column.** Pineta has no focused column: every
+- **Thread-level, and per open column.** pine·trie has no focused column: every
   open column reports the end of the thread it follows (`reading`, keyed
   `${writer}:${seat}:${columnKey}` since ADR-0037), refreshed every 10 s while
   the page is visible and deleted when the column closes. `typing` and
@@ -44,4 +44,4 @@ presence with a short decay.
 **Alternatives rejected.** Presence in the session document (stored and
 compacted for data that lasts seconds, and clients cannot write the session).
 Heartbeats with explicit leave messages (the leave is what a crash never sends).
-Initials on the rail's dots (no room). A focused column (Pineta has none).
+Initials on the rail's dots (no room). A focused column (pine·trie has none).

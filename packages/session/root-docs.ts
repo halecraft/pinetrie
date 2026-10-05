@@ -14,9 +14,9 @@ import {
   type RootId,
   rootDocId,
   rootOfDocId,
-} from "@pineta/core"
-import type { Outcome } from "@pineta/protocol/codec"
-import { asRootDoc, type RootDocHandle, StorageDoc } from "@pineta/schema"
+} from "@pinetrie/core"
+import type { Outcome } from "@pinetrie/protocol/codec"
+import { asRootDoc, type RootDocHandle, StorageDoc } from "@pinetrie/schema"
 import { newRootId } from "./ids.ts"
 import { planHold } from "./root-hold.ts"
 import { type Readable, readable, snapshotStore } from "./store.ts"
@@ -53,7 +53,7 @@ export function rootDocs(exchange: Exchange): RootDocs {
   // not yet wanted then is never asked for.
   let wanted: ReadonlySet<RootId> = new Set()
   exchange.register({
-    name: "pineta.roots",
+    name: "pinetrie.roots",
     canShare: (docId: string) => {
       const root = rootOfDocId(docId)
       return root === undefined ? undefined : wanted.has(root)

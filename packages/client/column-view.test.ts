@@ -24,14 +24,14 @@ import {
   type ThreadName,
   type TreeIndex,
   writerId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import {
   type CatchUpNow,
   offerStatus,
   offerView,
   type ParentNow,
-} from "@pineta/rules"
-import type { OfferActing } from "@pineta/session"
+} from "@pinetrie/rules"
+import type { OfferActing } from "@pinetrie/session"
 import { describe, expect, test } from "vitest"
 import {
   behindMark,
@@ -185,7 +185,7 @@ const work = (over: Partial<WorkFacts> = {}): WorkFacts => ({
 })
 /** The line, one commit past the lane's base: `base` read what catching up brings. */
 const LINE = {
-  onto: "pineta-onto",
+  onto: "pinetrie-onto",
   wipPrefix: "wip/",
   publish: "main",
   published: { commit: null, behind: 0, ahead: 0 },
@@ -539,7 +539,7 @@ describe("columnView: the work strip", () => {
     expect(shows.strip.words.menu.find(b => b.button === "update")).toEqual({
       button: "update",
       label: "catch up with the project",
-      title: "merges pineta-onto into this thread's copy",
+      title: "merges pinetrie-onto into this thread's copy",
     })
     expect(shows.behind).toBeNull()
   })
@@ -581,7 +581,7 @@ describe("columnView: the work strip", () => {
       yourEdits: ["a.txt"],
       described: true,
       edited: false,
-      bookmark: "pineta-offer/copper-owl",
+      bookmark: "pinetrie-offer/copper-owl",
       integratedAs: null,
       commits: [commitId("c1")],
       ledger: null,
@@ -691,7 +691,7 @@ describe("offerWords", () => {
     yourEdits: [],
     described: true,
     edited: false,
-    bookmark: "pineta-offer/amber-fox",
+    bookmark: "pinetrie-offer/amber-fox",
     integratedAs: null,
     commits: [commitId("w")],
     ledger: null,
@@ -717,7 +717,7 @@ describe("offerWords", () => {
         activity,
         asked: null,
         base,
-        onto: "pineta-onto",
+        onto: "pinetrie-onto",
         wipAhead: 2,
         catchUp: catching.catchUp ?? { kind: "current" },
         untraced: catching.untraced ?? false,
@@ -783,7 +783,7 @@ describe("offerWords", () => {
   ] as const)("%s", (_, o, activity, line) => {
     const w = words(o, activity)
     expect(w.line).toBe(line)
-    expect(w.line).not.toMatch(/`|pineta-offer/)
+    expect(w.line).not.toMatch(/`|pinetrie-offer/)
   })
   test("the labels follow the state, and name where an integration adds the work", () => {
     const labels = (
@@ -810,7 +810,7 @@ describe("offerWords", () => {
   })
   const MOVE = {
     base: { kind: "line" },
-    bookmark: "pineta-onto",
+    bookmark: "pinetrie-onto",
     from: commitId("a"),
     to: commitId("b"),
   } as const
@@ -819,13 +819,13 @@ describe("offerWords", () => {
       catchUp: { kind: "unknown" },
     })
     expect(w.buttons[0]?.title).toBe(
-      "moves pineta-onto forward to pineta-offer/amber-fox",
+      "moves pinetrie-onto forward to pinetrie-offer/amber-fox",
     )
     expect(w.menu.find(b => b.button === "update")?.title).toBe(
-      "merges pineta-onto into this thread's copy",
+      "merges pinetrie-onto into this thread's copy",
     )
     expect(words(offer, "idle", WIP_BASE).buttons[0]?.title).toBe(
-      "moves wip/search forward to pineta-offer/amber-fox",
+      "moves wip/search forward to pinetrie-offer/amber-fox",
     )
   })
   const brings = { catchUp: { kind: "brings", move: MOVE, files: 3 } } as const
@@ -835,7 +835,7 @@ describe("offerWords", () => {
     expect(behind.buttons.find(b => b.button === "update")).toEqual({
       button: "update",
       label: "catch up with the project",
-      title: "merges pineta-onto into this thread's copy · changes 3 files",
+      title: "merges pinetrie-onto into this thread's copy · changes 3 files",
     })
     expect(words(undefined, "idle", LINE_BASE, brings).line).toBe(
       "the project has new work since this thread started",
@@ -865,7 +865,7 @@ describe("offerWords", () => {
     expect(update({ kind: "unknown" })).toEqual({
       button: "update",
       label: "catch up with the project",
-      title: "merges pineta-onto into this thread's copy",
+      title: "merges pinetrie-onto into this thread's copy",
     })
     // Nothing new is no "new work" either.
     expect(
@@ -973,7 +973,7 @@ describe("offerWords", () => {
     [
       "an integration from a WIP into the line",
       WIP_BASE,
-      sent("integrate", "pineta-onto"),
+      sent("integrate", "pinetrie-onto"),
       "adding to the project…",
     ],
     ["a squash", LINE_BASE, sent("squash"), "squashing to one…"],
@@ -1009,7 +1009,7 @@ describe("behindMark: the header's mark for a base that moved on", () => {
     expect(behindMark(BASE, LINE)).toEqual({
       mark: "↓",
       title:
-        "the project has new work since this thread started, in 2 files · pineta-onto: aaaaaaaa → bbbbbbbb",
+        "the project has new work since this thread started, in 2 files · pinetrie-onto: aaaaaaaa → bbbbbbbb",
     })
   })
   test("a thread's details say it in full (ADR-0073)", () => {

@@ -19,7 +19,7 @@ import {
   type ThreadLane,
   type WriterId,
   writerId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { detailsFromStored } from "./chat.ts"
 import {
@@ -439,7 +439,7 @@ test("withChatImages: a chat's text, then its images in order; a missing one nam
 
 test("decodeChat is total: a malformed or foreign message is not a chat", () => {
   assert.equal(
-    decodeChat({ role: "custom", customType: "pineta.chat" }),
+    decodeChat({ role: "custom", customType: "pinetrie.chat" }),
     undefined,
   )
   assert.equal(decodeChat({ role: "user", content: "hi" }), undefined)
@@ -594,7 +594,7 @@ describe("promptAuthor (ADR-0080)", () => {
       promptAuthor(
         planStack({
           skill: null,
-          bookmark: "pineta-stack/x",
+          bookmark: "pinetrie-stack/x",
           details: {
             lane: laneNameForThread("1"),
             start: [],

@@ -3,9 +3,9 @@
 // what the reader asks as a `MessageAct`.
 
 import { useSelector } from "@kyneta/react"
-import type { ToolCallView, TranscriptMessage } from "@pineta/core"
-import { type LiveDocHandle, readStreamText } from "@pineta/schema"
-import { newCardId } from "@pineta/session"
+import type { ToolCallView, TranscriptMessage } from "@pinetrie/core"
+import { type LiveDocHandle, readStreamText } from "@pinetrie/schema"
+import { newCardId } from "@pinetrie/session"
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
 import { StoredImage } from "./blob-image.tsx"
 import {

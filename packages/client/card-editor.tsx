@@ -26,11 +26,11 @@ import type {
   SeatRecord,
   ThreadLane,
   WorkSetting,
-} from "@pineta/core"
-import { commandOf } from "@pineta/core"
-import { type QueuedCard, writersOfClients } from "@pineta/rules"
-import { textClients } from "@pineta/schema"
-import { IN_COLUMN, newCardId, type SessionClient } from "@pineta/session"
+} from "@pinetrie/core"
+import { commandOf } from "@pinetrie/core"
+import { type QueuedCard, writersOfClients } from "@pinetrie/rules"
+import { textClients } from "@pinetrie/schema"
+import { IN_COLUMN, newCardId, type SessionClient } from "@pinetrie/session"
 import { type ReactNode, useEffect, useRef, useState } from "react"
 import type { ReadOnly } from "./app-view.ts"
 import { CardHistory, MovedBack } from "./card-history.tsx"
@@ -735,7 +735,7 @@ export function CardEditor(p: {
   )
 }
 
-/** Start a card's drag: its id, under Pineta's own type (`put-target.ts`). */
+/** Start a card's drag: its id, under pinetrie's own type (`put-target.ts`). */
 export const dragCard = (
   e: { readonly dataTransfer: DataTransfer | null },
   card: CardId,

@@ -1,4 +1,4 @@
-import type { ImageRef, Sha256 } from "@pineta/core"
+import type { ImageRef, Sha256 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { imageMarkdown, insertAt, pastedFiles } from "./paste.ts"
 

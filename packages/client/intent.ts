@@ -28,8 +28,8 @@ import {
   type WorkflowEdit,
   type WorkflowStateId,
   type WriterId,
-} from "@pineta/core"
-import type { Outcome } from "@pineta/protocol/codec"
+} from "@pinetrie/core"
+import type { Outcome } from "@pinetrie/protocol/codec"
 import {
   type ActedAt,
   type CardRefusal,
@@ -38,7 +38,7 @@ import {
   type MoveHow,
   type SlotMove,
   type Slots,
-} from "@pineta/session"
+} from "@pinetrie/session"
 import type { Density } from "./ask-words.ts"
 import type { Raised } from "./attention.ts"
 import {

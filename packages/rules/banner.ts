@@ -1,6 +1,6 @@
 // banner — the image in a thread's column header: whether a thread gets one,
 // what the image model is asked, the setting that turns it on, and its
-// record (`pineta.banner`). The host carries the plan out.
+// record (`pinetrie.banner`). The host carries the plan out.
 
 import {
   type BannerRecord,
@@ -8,7 +8,7 @@ import {
   type LaneName,
   type Sha256,
   type ThreadName,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { Type } from "typebox"
 import { type ModelRef, modelRef, recordOf } from "./config.ts"
 import { decodeAt, laneKey } from "./decode.ts"
@@ -21,7 +21,7 @@ const BannerRecordSchema = Type.Object({
 
 /** Each thread's column banner, the image's hash, at its lane. */
 export const BANNER: RecordSpec<BannerRecord, LaneName, "session"> = {
-  namespace: "pineta.banner",
+  namespace: "pinetrie.banner",
   home: "session",
   keyOf: r => r.lane,
   encode: ({ lane, ...contents }) => contents,

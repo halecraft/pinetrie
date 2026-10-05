@@ -10,7 +10,7 @@ import {
   laneNameForThread,
   type RevisionRecord,
   type ThreadName,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   lineActionState,
@@ -37,11 +37,11 @@ describe("the line (ADR-0060)", () => {
       conflicts: { commits: 0, files: [] },
     },
   } as const
-  const proposed = { heads: "trunk() | present(pineta-onto)", log: "logged" }
+  const proposed = { heads: "trunk() | present(pinetrie-onto)", log: "logged" }
   const record = (over: Partial<LineRecord> = {}): LineRecord => ({
     ...planLineRecord({
       facts,
-      line: { onto: "pineta-onto", wipPrefix: "wip/", publish: "main" },
+      line: { onto: "pinetrie-onto", wipPrefix: "wip/", publish: "main" },
       proposed,
       commands: true,
     }),
@@ -58,12 +58,12 @@ describe("the line (ADR-0060)", () => {
       record().wipPrefix,
       record().publish,
       record().commands,
-    ]).toEqual(["pineta-onto", "wip/", "main", true])
+    ]).toEqual(["pinetrie-onto", "wip/", "main", true])
   })
   test("setup writes the bookmark at your @- and exactly the proposed heads and log", () => {
     expect(planLineAction("setup", record())).toEqual({
       kind: "setup",
-      onto: "pineta-onto",
+      onto: "pinetrie-onto",
       heads: proposed.heads,
       log: "logged",
     })
@@ -100,7 +100,7 @@ describe("the line (ADR-0060)", () => {
     expect(planLineAction("land", set(0)).kind).toBe("refused")
     expect(planLineAction("land", set(2))).toEqual({
       kind: "land",
-      onto: "pineta-onto",
+      onto: "pinetrie-onto",
     })
   })
   test("follow: only with a line and a preview, the one you were shown; a conflict in it refuses nothing", () => {
@@ -125,7 +125,7 @@ describe("the line (ADR-0060)", () => {
     })
     expect(planLineAction("follow", set(preview))).toEqual({
       kind: "follow",
-      onto: "pineta-onto",
+      onto: "pinetrie-onto",
     })
     expect(
       planLineAction("follow", { ...set(preview), commands: false }),
@@ -143,7 +143,7 @@ describe("the line (ADR-0060)", () => {
             "publish",
             at({ commit: main, behind: 2, ahead: 0 }, commands),
           ),
-        ).toEqual({ kind: "publish", onto: "pineta-onto", publish: "main" })
+        ).toEqual({ kind: "publish", onto: "pinetrie-onto", publish: "main" })
     })
     test("refused with no line, no bookmark, nothing unpublished, or commits the line lacks", () => {
       const code = (r: LineRecord) => {
@@ -190,11 +190,11 @@ describe("planBegin: the line, or a WIP's copy (ADR-0060)", () => {
   const begin = (
     base: string | null,
     facts: Parameters<typeof planBegin>[0]["facts"],
-  ) => planBegin({ base, onto: "pineta-onto", wipPrefix: "wip/", facts })
+  ) => planBegin({ base, onto: "pinetrie-onto", wipPrefix: "wip/", facts })
   test("the line's commit by default", () => {
     expect(begin(null, { line: L, wip: null })).toEqual({
       kind: "line",
-      onto: "pineta-onto",
+      onto: "pinetrie-onto",
       commit: L,
     })
   })
@@ -334,7 +334,7 @@ describe("planUpdateFrom: always the base the thread follows (ADR-0060)", () => 
   const now = { commit: commitId("w2"), under: commitId("l0") }
   const from = (over: Partial<Parameters<typeof planUpdateFrom>[0]> = {}) =>
     planUpdateFrom({
-      onto: "pineta-onto",
+      onto: "pinetrie-onto",
       base: wipBase,
       state: "ok",
       toLine: false,
@@ -344,7 +344,7 @@ describe("planUpdateFrom: always the base the thread follows (ADR-0060)", () => 
     })
   const line = (mark: boolean) => ({
     kind: "line",
-    onto: "pineta-onto",
+    onto: "pinetrie-onto",
     commit: L,
     mark,
   })

@@ -27,7 +27,7 @@ The roadmap's "shared composition" was the same want, started earlier.
   (a draft) or folded (`PLAN-2026-09-27-fold`).
 - **Where each part lives (ADR-0023).** The text is a Yjs document per note
   (`note:<id>`), the one place people type together. The record (state, what it
-  is the text of, contributors) is a host-written `pineta.note` session value.
+  is the text of, contributors) is a host-written `pinetrie.note` session value.
   Who is editing now is presence (ADR-0024).
 - **The lifecycle: draft, open, done.** A draft is sent through the one send
   path, so a busy lane queues it and a raced reply is a conflict that keeps the
@@ -55,7 +55,7 @@ recorded as an upstream item. A write the host refused stays in that client's
 replica, and that client's later edits to the note build on it, so they do not
 reach the host either, even after the note is reopened (measured; S26 addendum
 2). The screen never offers a done note for editing, so only a client writing
-directly can do this. Pineta computes a seat's `clientID` with Kyneta's own
+directly can do this. pine·trie computes a seat's `clientID` with Kyneta's own
 `yjsClientId`; a test pins it to a real document. Yjs adds about 36 kB
 gzipped to the page.
 

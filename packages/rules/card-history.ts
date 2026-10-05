@@ -7,7 +7,7 @@
 //
 // `planProvenance` decides both from the cards before and after a write, so
 // an undo, whose revert Kyneta writes, is read like any other change. The
-// host gathers and writes (`apps/pineta/host/provenance.ts`). Pure.
+// host gathers and writes (`apps/pinetrie/host/provenance.ts`). Pure.
 
 import {
   type CardEvent,
@@ -26,7 +26,7 @@ import {
   sameKey,
   type TraceRecord,
   type WriterId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { Type } from "typebox"
 import { decodeAt, textKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
@@ -90,7 +90,7 @@ const keyOrNull = (f: PlaceFields | null): PlaceKey | null | undefined =>
  * cannot read is dropped, not the history.
  */
 export const CARD_HISTORY: RecordSpec<CardHistoryRecord, CardId, "session"> = {
-  namespace: "pineta.card-history",
+  namespace: "pinetrie.card-history",
   home: "session",
   keyOf: r => r.card,
   encode: ({ events }) => ({
@@ -115,7 +115,7 @@ export const CARD_HISTORY: RecordSpec<CardHistoryRecord, CardId, "session"> = {
 
 /** Each trace, at its own id. */
 export const TRACE: RecordSpec<TraceRecord, string, "session"> = {
-  namespace: "pineta.trace",
+  namespace: "pinetrie.trace",
   home: "session",
   keyOf: r => r.id,
   encode: ({ id, ...t }) => ({

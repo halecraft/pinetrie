@@ -13,7 +13,7 @@ import {
   rootIdFor,
   type StopRecord,
   writerId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import type { QueuedCard } from "./card.ts"
 import { renderableMessage } from "./chat.ts"

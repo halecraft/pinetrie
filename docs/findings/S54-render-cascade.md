@@ -68,7 +68,7 @@ browser suite counts renders from the same timeline entries answer 1 found
   measures what is reachable from the root with and without edges named
   `mDetail`. Firefox's snapshots hold no string contents, so the owner was
   found by the objects' property names.
-- Answer 2: `sandbox/s-render/renders.ts`, copied into `apps/pineta/` to run.
+- Answer 2: `sandbox/s-render/renders.ts`, copied into `apps/pinetrie/` to run.
   It starts a host with `scriptedModel({ tokensPerSecond: 60 })`, drives
   Chromium's headless shell, and reads
   `performance.getEntriesByType("measure")` whose

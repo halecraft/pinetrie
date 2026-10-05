@@ -2,14 +2,14 @@
 // carries its id. Runs in a browser and in Node alike: it is given the
 // Line's two ends, and touches nothing else.
 
-import type { Intent } from "@pineta/core"
+import type { Intent } from "@pinetrie/core"
 import {
   decodeReply,
   encodeIntent,
   type Outcome,
   revOfReply,
-} from "@pineta/protocol/codec"
-import type { Command, Reply } from "@pineta/protocol/messages"
+} from "@pinetrie/protocol/codec"
+import type { Command, Reply } from "@pinetrie/protocol/messages"
 
 /** The host's answer: its outcome, and the places document's `rev` it carried. */
 export interface Answered {

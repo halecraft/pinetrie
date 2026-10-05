@@ -16,7 +16,7 @@ and what decides when the agent answers.
   is a run, and only an agent can be one. Every human message records who it
   compels (`Responder`): usually nobody.
 - **A human message is a pi `CustomMessage`** (`role: "custom"`,
-  `customType: "pineta.chat"`). `content` is what the model reads, with the
+  `customType: "pinetrie.chat"`). `content` is what the model reads, with the
   speaker ("Alice: …"), copied at write time; `details` holds the author lane,
   display name, text and responder. pi's default conversion sends it to the
   model as a `user` message, so there is no projector.
@@ -28,7 +28,7 @@ and what decides when the agent answers.
   the next turn's path, silently (S19).
 - **Threads carry a default.** A *working session* compels the agent on every
   message; a *conversation* compels nobody, so `@agent` does. Set at an entry
-  as a `pineta.thread` value and inherited below it; the session's root is a
+  as a `pinetrie.thread` value and inherited below it; the session's root is a
   working session. `@name` notifies a person and never compels. *Superseded by
   ADR-0021:* the default is derived from whether the thread has a lane, nothing
   is stored, and a message naming only people does not compel the agent.

@@ -22,9 +22,9 @@ failure is *silent data loss*.
 
 ## 1. VERDICT
 
-**PASS — the kill criterion is not met. pi's default `IdGenerator` is safe for Pineta, and it is safe for a *structural* reason, not a statistical one: it is not stock UUIDv7 but a 41-bit strictly-incrementing counter, so two ids from one module instance can never collide at all (probability exactly 0, not 2⁻⁷⁴).** Cross-instance safety rests on a 40-bit CSPRNG seed plus 33 freshly-random bits per id = 2⁻⁷³ pairwise, within one bit of stock v7. 41 assertions, zero failures.
+**PASS — the kill criterion is not met. pi's default `IdGenerator` is safe for pine·trie, and it is safe for a *structural* reason, not a statistical one: it is not stock UUIDv7 but a 41-bit strictly-incrementing counter, so two ids from one module instance can never collide at all (probability exactly 0, not 2⁻⁷⁴).** Cross-instance safety rests on a 40-bit CSPRNG seed plus 33 freshly-random bits per id = 2⁻⁷³ pairwise, within one bit of stock v7. 41 assertions, zero failures.
 
-**The one boundary worth recording:** cross-instance safety degrades at ~10⁴ concurrent instances × 10⁶ ids each (expected collisions 5.3×10⁻³). That is far outside Pineta's plausible scale, and v1 is a single host process (ADR-0001/0007) where the probability is exactly zero.
+**The one boundary worth recording:** cross-instance safety degrades at ~10⁴ concurrent instances × 10⁶ ids each (expected collisions 5.3×10⁻³). That is far outside pine·trie's plausible scale, and v1 is a single host process (ADR-0001/0007) where the probability is exactly zero.
 
 ---
 
@@ -294,7 +294,7 @@ Comparison with stock RFC 9562 UUIDv7 method 1 (48-bit ts + 74 random bits):
 | stock v7 | 2⁻⁷⁴ (**not zero**) | 2⁻⁷⁴ |
 | **pi's** | **0** (counter) | 2⁻⁷³ |
 
-pi trades one bit of cross-process entropy for *absolute* intra-process uniqueness. For Pineta that is the right trade, because v1 is one host process.
+pi trades one bit of cross-process entropy for *absolute* intra-process uniqueness. For pine·trie that is the right trade, because v1 is one host process.
 
 **Exhaustion headroom:** worst-case seed 2⁴⁰−1 against `MAX_SEQUENCE` 2⁴¹−1 leaves a guaranteed 2⁴⁰ ≈ 1.1×10¹² ids — 35 years at 1,000 ids/sec — and it **throws** rather than wrapping. Fail-loud, not silent reuse.
 
@@ -335,13 +335,13 @@ Per S13's lesson, the control exercises the **same** configuration as the subjec
 
 ## 4. Consequences for the plan
 
-**Kill criterion NOT met. S9 resolves PASS.** No collision path was found. Pineta should **use pi's default generator** and must not replace it with anything weaker.
+**Kill criterion NOT met. S9 resolves PASS.** No collision path was found. pine·trie should **use pi's default generator** and must not replace it with anything weaker.
 
 **ADR-0009 (entry id uniqueness) — upheld and now enforced by a verified mechanism.** The ADR says ids "MUST be unique and coordination-free." pi's default satisfies both: coordination-free (pure CSPRNG, zero network/PID/hostname input) and unique (structurally within a process, 2⁻⁷³ across). The ADR's note that pi's generator is "currently unverified (spike S9)" can be struck.
 
 **ADR-0001/0007 (single host) is what makes this a non-issue for v1.** Within one host process every `Session` shares one counter (§3.3 b), so entry-id collision probability in v1 is **exactly zero**, not merely small.
 
-**New hazard to record — the injection point, not the default.** `SessionOptions.idGenerator` is the danger, not `uuidv7`. S3 injected its own peer-tagged generator; anything Pineta injects must clear the bar established here: (i) no derivation from content, index, or position; (ii) ≥2⁻⁷⁰ pairwise cross-instance; (iii) strictly-increasing or otherwise structurally-unique within a process. Recommend adding to `04-roadmap.md`'s fitness functions: **assert that the configured `idGenerator` is pi's default unless a replacement has passed this bar.**
+**New hazard to record — the injection point, not the default.** `SessionOptions.idGenerator` is the danger, not `uuidv7`. S3 injected its own peer-tagged generator; anything pine·trie injects must clear the bar established here: (i) no derivation from content, index, or position; (ii) ≥2⁻⁷⁰ pairwise cross-instance; (iii) strictly-increasing or otherwise structurally-unique within a process. Recommend adding to `04-roadmap.md`'s fitness functions: **assert that the configured `idGenerator` is pi's default unless a replacement has passed this bar.**
 
 **Feeds `01-architecture.md`.** The line "Entry IDs are UUIDv7 — globally unique, time-sortable, coordination-free" is correct but understates it; suggest "UUIDv7-*shaped*: a 41-bit monotonic counter (seeded once per module instance from 40 CSPRNG bits) plus 33 fresh random bits — intra-process uniqueness is structural."
 

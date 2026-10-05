@@ -2,7 +2,7 @@
 // documents to open and which to let go (ADR-0063, S86). Pure; `root-docs.ts`
 // carries it out.
 
-import type { RootId } from "@pineta/core"
+import type { RootId } from "@pinetrie/core"
 
 /** What holding changes: the roots to open, and those to let go. */
 export interface HoldPlan {

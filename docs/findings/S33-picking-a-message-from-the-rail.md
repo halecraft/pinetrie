@@ -50,7 +50,7 @@ both cases.
 
 ## Method
 
-`sandbox/s33-picking-from-the-rail/probe.ts`, copied into `apps/pineta/e2e/`
+`sandbox/s33-picking-from-the-rail/probe.ts`, copied into `apps/pinetrie/e2e/`
 to run and deleted afterwards. It drives Chromium through the Playwright
 server against a scripted host with tools. It writes a thread of 32 messages
 (a person's, 30 steps that each call `read`, and a reply), then picks from the

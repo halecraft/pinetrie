@@ -3,7 +3,7 @@
 // before the move; once the card is drawn somewhere else, that element
 // animates from the old box to its own (Web Animations).
 
-import type { CardId } from "@pineta/core"
+import type { CardId } from "@pinetrie/core"
 import { useStable } from "./use-stable.ts"
 
 /** How long a flight lasts, and how long a take into a closed inventory keeps it open. */

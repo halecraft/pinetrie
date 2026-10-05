@@ -39,7 +39,7 @@ about 5 s while typing, twice, and on load, in a session of 9,177 entries.
   process's main thread). Busy stretches were found from `threadCPUDelta`;
   the cycle collector's own `CC` and `CCSlice` markers gave its counts.
 - The heap: a disposable probe started a host on a copy of Duane's store
-  (`.pineta/pineta.db`), opened its longest open thread in headless
+  (`.pinetrie/pinetrie.db`), opened its longest open thread in headless
   Chromium with production React, and used CDP's sampling heap profiler
   (`HeapProfiler.startSampling`), once over the load (live objects after
   `collectGarbage`), and once over one entry arriving, counting objects
@@ -52,5 +52,5 @@ about 5 s while typing, twice, and on load, in a session of 9,177 entries.
 
 - Firefox with its developer tools closed. The profile was recorded from
   them, and an open toolbox can keep more of the page alive.
-- How many of the 22.5 million objects are Kyneta's, Pineta's or React's:
+- How many of the 22.5 million objects are Kyneta's, pine·trie's or React's:
   only bytes were measured, in Chromium.

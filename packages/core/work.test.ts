@@ -313,7 +313,7 @@ describe("workFor: the choice, then the lane above, then the project's default",
       kind: "own",
     })
   })
-  test("PINETA_LANES=0 changes a root lane's default, never what may be chosen", () => {
+  test("PINETRIE_LANES=0 changes a root lane's default, never what may be chosen", () => {
     const directByDefault = { ...lanesProject, rootDefault: "direct" as const }
     expect(
       workFor({ choice: null, above: null, lanes, project: directByDefault }),

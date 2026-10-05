@@ -1,9 +1,9 @@
 // client/projection — what `App` draws from, read from the session's
-// documents in one moment: the session's, `pineta:live`, and the roots this
+// documents in one moment: the session's, `pinetrie:live`, and the roots this
 // tab holds (ADR-0063), read as one tree.
 //
 // The facts the host also decides from (the tree, rules, names, references)
-// are read by `@pineta/reads`, shared with the host, so a composer cannot
+// are read by `@pinetrie/reads`, shared with the host, so a composer cannot
 // promise what the host will not do. This only gathers them. Lanes are read
 // with the cards (`session.cards`), read on their own, by `readHeldLanes` in
 // `App`. Which streams are drawn is `liveWork` (`live.ts`), over the stream
@@ -33,7 +33,7 @@ import {
   type TreeIndex,
   type VerdictRecord,
   type Workflow,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import {
   readAgentActivity,
   readArchived,
@@ -60,13 +60,13 @@ import {
   readTraces,
   readVerdicts,
   readWorkflow,
-} from "@pineta/reads"
+} from "@pinetrie/reads"
 import {
   type LiveDocHandle,
   type RootDocHandle,
   readStreamRecords,
   type SessionDocHandle,
-} from "@pineta/schema"
+} from "@pinetrie/schema"
 import type { WorkFacts } from "./column-view.ts"
 import { type LiveWork, liveWork } from "./live.ts"
 import { sameData } from "./same-props.ts"

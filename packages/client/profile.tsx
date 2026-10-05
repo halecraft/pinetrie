@@ -6,8 +6,8 @@
 // Escape or a click elsewhere; saving on blur would race the popover
 // unmounting the field.
 
-import type { WriterId } from "@pineta/core"
-import type { Outcome } from "@pineta/protocol/codec"
+import type { WriterId } from "@pinetrie/core"
+import type { Outcome } from "@pinetrie/protocol/codec"
 import { useState } from "react"
 import { planRename, renameProblem } from "./identity.ts"
 import { NAME_PROBLEM, NameInput, type NameProblem } from "./name-input.tsx"

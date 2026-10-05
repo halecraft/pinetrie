@@ -11,7 +11,7 @@ step of the shutdown hangs, and why does the second signal leave an orphan?
 hang lies outside the host (pnpm, the terminal), and the host needs no
 change.
 
-**Throw away.** The probes: a host started from `apps/pineta/host/server.ts`
+**Throw away.** The probes: a host started from `apps/pinetrie/host/server.ts`
 with a throwaway store, a headless Chromium page opened through
 `@playwright/test`, and logging patched into `shutdown()` and
 `RunningHttp.close()`, all reverted.
@@ -19,11 +19,11 @@ with a throwaway store, a headless Chromium page opened through
 **Answers.**
 
 1. **With no client, SIGINT stops the host at once.** The host was started
-   with `PINETA_PROVIDER=anthropic PINETA_MODEL=claude-sonnet-4-5
-   PINETA_STORE=<tmp>`: no model request is made unless a run starts.
+   with `PINETRIE_PROVIDER=anthropic PINETRIE_MODEL=claude-sonnet-4-5
+   PINETRIE_STORE=<tmp>`: no model request is made unless a run starts.
 2. **With one page open, the `server` step never ends.** Every step up to
    `server` finished within 6 ms of the signal. `server` is
-   `RunningHttp.close()` (`apps/pineta/host/http.ts`), which ended with
+   `RunningHttp.close()` (`apps/pinetrie/host/http.ts`), which ended with
    `httpServer.close(cb)`. Node calls `cb` only once every open socket has
    ended. One connection stayed open, and it was not the exchange's:
    `wss.clients.size` was 0, since `exchange.shutdown()` had closed the

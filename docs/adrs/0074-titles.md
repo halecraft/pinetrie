@@ -29,7 +29,7 @@ written.
   beside the run, not at the run's end. A root that began as a chat is
   titled when the agent is first asked there. Its mark is written `by` the
   agent.
-- **The title is a mark** (`pineta.mark`, ADR-0045), so it names the root
+- **The title is a mark** (`pinetrie.mark`, ADR-0045), so it names the root
   everywhere a title does and Rename edits it. The run writes the root's
   first entry, so a title that comes back first waits for it, at most
   30 seconds.

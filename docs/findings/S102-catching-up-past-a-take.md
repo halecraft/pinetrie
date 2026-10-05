@@ -8,8 +8,8 @@ past a take of the lane's work (S102)" in `packages/repo/repo.test.ts`.
 **Question.** A thread caught up with the line and conflicted on lines it
 had not touched since the line last saw them. The thread had merged its
 parent thread grand-banjo's lane (ADR-0072). The line then took
-grand-banjo's offer as a copy, and renamed `@pineta/marginalia` to
-`@pineta/rules` on top of it. Every conflict read "this thread: grand-banjo's
+grand-banjo's offer as a copy, and renamed `@pinetrie/marginalia` to
+`@pinetrie/rules` on top of it. Every conflict read "this thread: grand-banjo's
 text; the line: the same text, renamed". Why does this happen, does it
 happen when a lane's own offer is taken, and what merge avoids it?
 
@@ -25,16 +25,16 @@ is no bug to fix.
    twice.** The update was one merge of the lane's tip with the line's
    commit (`planMerge`'s `line` case, `mergeUpdate`), as jj chooses its
    base: `heads(::tip & ::line)`. A take is a copy on the line, not the
-   lane's commit (ADR-0060), so that base is the take's `Pineta-Start`.
+   lane's commit (ADR-0060), so that base is the take's `Pinetrie-Start`.
    Both sides then make the lane's changes. Where they agree, jj merges
    them. Where the line edited them after the take, they conflict. In
-   Pineta's own repo: the lane held grand-banjo's tip `7a27fddb`; the take
-   `pyolxksm` names `Pineta-Source: 7a27fddb`; the base was `mlzklntq`,
-   its `Pineta-Start`. 27 files conflicted, and each conflict differed only
+   pine·trie's own repo: the lane held grand-banjo's tip `7a27fddb`; the take
+   `pyolxksm` names `Pinetrie-Source: 7a27fddb`; the base was `mlzklntq`,
+   its `Pinetrie-Start`. 27 files conflicted, and each conflict differed only
    by the rename.
 2. **A lane's own take does it too.** The scratch repo: a base `B`; the
    lane's commit `S` changing lines 3 and 6; the line moving elsewhere, then
-   a take `C` copying `S`'s files and naming `Pineta-Source: S`; then `R`,
+   a take `C` copying `S`'s files and naming `Pinetrie-Source: S`; then `R`,
    on the line, rewriting line 3. The lane's tip, `S` or a later commit of
    the lane, merged with `R` in one step: **conflicted** in every case,
    own take or parent's.
@@ -55,7 +55,7 @@ is no bug to fix.
    | own take, lane edited elsewhere | conflict | clean | clean |
    | own take, lane re-edited its own taken line | conflict | conflict | clean |
    | parent's take, held by a catch-up merge | conflict | clean | clean |
-   | Pineta's repo (two steps, take then line) | conflict | clean, the project's tree byte for byte | not run |
+   | pine·trie's repo (two steps, take then line) | conflict | clean, the project's tree byte for byte | not run |
 
 5. **A real conflict stays, and reads better.** When the lane rewrote line
    3 too, as the line did, every strategy conflicted, as it should. The
@@ -75,7 +75,7 @@ is no bug to fix.
    then `P2` with its take and that first join, then the octopus with the
    line: clean, and the tree wanted.
 8. **Finding the takes, from the lane.** The takes the lane lacks are
-   `(::<line> ~ ::<tip>) & description(regex:"(?m)^Pineta-Source: ")`
+   `(::<line> ~ ::<tip>) & description(regex:"(?m)^Pinetrie-Source: ")`
    (`trailerRevset(["source"])`, `packages/core/trailers.ts`). One is held
    when a source its message names (`sourcesOf`) is in
    `::<tip>`, read with `present()` since a source may never have been

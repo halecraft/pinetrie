@@ -34,7 +34,7 @@ what people write to it.
 3. **Timestamps cannot stand in for identity.** pi's faux replies share one
    timestamp: three different assistant messages had the same millisecond, and
    matching the retained tail by role and timestamp attributed B's reply to A.
-4. **Compaction breaks the rule unless Pineta compacts.**
+4. **Compaction breaks the rule unless pine·trie compacts.**
    - The compaction entry is the compacting lane's, and its `retainedTail`
      holds copies. Inherited messages kept in the tail then read as the lane's
      own, and arrived at the model unrewritten.
@@ -134,12 +134,12 @@ before B branches).
 Items 7–10: a jj workspace at `default@` (`962465c4`), `sandbox/s38-ws`, set up
 with the host's own `setUpWorkspace`, then forgotten.
 - `sandbox/ownership.ts`: `createAgent` with the scripted model; `turnDone`
-  mirrors `apps/pineta/host/work.ts` for a lane working directly; ground truth
+  mirrors `apps/pinetrie/host/work.ts` for a lane working directly; ground truth
   from which operation added each entry.
-- `apps/pineta/s38-live.ts`: a copy of `.pineta/pineta.db`, opened as the host
+- `apps/pinetrie/s38-live.ts`: a copy of `.pinetrie/pinetrie.db`, opened as the host
   opens it (copy deleted after).
-- `apps/pineta/s38-restart.ts crash|resume`: two processes over one SQLite
+- `apps/pinetrie/s38-restart.ts crash|resume`: two processes over one SQLite
   store.
-- `apps/pineta/s38-model.ts <model> a|b`: pi's harness with Anthropic models by
+- `apps/pinetrie/s38-model.ts <model> a|b`: pi's harness with Anthropic models by
   name; `NATURAL=1` for a task that does not instruct the thinking, `THINK` for
   the level.

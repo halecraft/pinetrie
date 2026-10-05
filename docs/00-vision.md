@@ -121,13 +121,13 @@ In a normal chat tool these are identical: if a message exists, the model sees
 it. There is no way to have something exist without it costing tokens and
 steering the next reply.
 
-Pineta's purpose is to let them differ, and to let you control what moves
+pine·trie's purpose is to let them differ, and to let you control what moves
 between them. An Aside is an entry in `E` but not in `T` — real, shared,
 durable, costing the trunk nothing. A fold is the deliberate act of moving part
 of `E` into `T`.
 
 **A transcript forces "exists" and "is in context" to be the same thing;
-Pineta separates them.**
+pine·trie separates them.**
 
 Everything else serves that. The CRDT makes `E` shared across people and
 devices. `parentId` defines which subset counts as `T`. ADR-0010's three-way

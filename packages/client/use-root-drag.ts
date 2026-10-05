@@ -9,7 +9,7 @@
 // carries `data-root-dragging`, which dims it. Both are written to the DOM,
 // never to React state, as a column's drag is (`use-column-drag.ts`).
 
-import type { WorkflowStateId } from "@pineta/core"
+import type { WorkflowStateId } from "@pinetrie/core"
 import { type DragEvent as ReactDragEvent, useEffect } from "react"
 import type { Intent } from "./intent.ts"
 import {

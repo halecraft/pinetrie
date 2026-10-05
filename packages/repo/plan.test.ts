@@ -1,5 +1,5 @@
-import { commitId, laneNameForThread, type ThreadName } from "@pineta/core"
-import { DEFAULT_LINE } from "@pineta/lanes"
+import { commitId, laneNameForThread, type ThreadName } from "@pinetrie/core"
+import { DEFAULT_LINE } from "@pinetrie/lanes"
 import { describe, expect, test } from "vitest"
 import { type LaneRow, planLaneRead } from "./lane-read.ts"
 import { wipState } from "./line.ts"
@@ -41,10 +41,10 @@ const argvs = (steps: readonly RepoStep[]) =>
 describe("logRevset: the offers added to your log (S77 item 8)", () => {
   test("added to jj's default when the repo defines none, and idempotent", () => {
     const once = logRevset(null)
-    expect(once).toBe('builtin_log() | bookmarks(glob:"pineta-offer/*")')
+    expect(once).toBe('builtin_log() | bookmarks(glob:"pinetrie-offer/*")')
     expect(logRevset(once)).toBe(once)
     expect(logRevset("@ | trunk()")).toBe(
-      '@ | trunk() | bookmarks(glob:"pineta-offer/*")',
+      '@ | trunk() | bookmarks(glob:"pinetrie-offer/*")',
     )
   })
 })
@@ -52,7 +52,7 @@ describe("logRevset: the offers added to your log (S77 item 8)", () => {
 describe("immutableHeads: the line and its offers added to yours", () => {
   test("added to jj's builtin when the repo defines none, with present()", () => {
     expect(immutableHeads(DEFAULT_LINE, null)).toBe(
-      'builtin_immutable_heads() | present("pineta-onto") | (bookmarks(glob:"pineta-offer/*") & children(present("pineta-onto")))',
+      'builtin_immutable_heads() | present("pinetrie-onto") | (bookmarks(glob:"pinetrie-offer/*") & children(present("pinetrie-onto")))',
     )
   })
   test("joined to your own definition, and idempotent", () => {
@@ -80,13 +80,13 @@ describe("offers (ADR-0038)", () => {
   })
   test("integratedOfferCommitsRevset: integrated sources above the commit the base holds, never a WIP's copy (S81)", () => {
     const integrated =
-      'description(regex:"(?m)^(Pineta-Source|Pineta-Thread): ")'
+      'description(regex:"(?m)^(Pinetrie-Source|Pinetrie-Thread): ")'
     expect(
       integratedOfferCommitsRevset({
         line: DEFAULT_LINE,
         base: { base: { kind: "line" }, start: C1, source: C1 },
       }),
-    ).toBe(`(::(present("pineta-onto")) ~ ::present(c1)) & ${integrated}`)
+    ).toBe(`(::(present("pinetrie-onto")) ~ ::present(c1)) & ${integrated}`)
     // A WIP lane starts at its copy, which holds no integrated-offer commit: what it
     // holds is the WIP's commit the copy was made from.
     expect(
@@ -99,7 +99,7 @@ describe("offers (ADR-0038)", () => {
         },
       }),
     ).toBe(
-      `(::(present("pineta-onto") | present("wip/a")) ~ ::present(c2)) & ${integrated}`,
+      `(::(present("pinetrie-onto") | present("wip/a")) ~ ::present(c2)) & ${integrated}`,
     )
   })
   test("planOffer: a commit per source, by nonce; rebased, bookmarked, then described", () => {
@@ -127,7 +127,7 @@ describe("offers (ADR-0038)", () => {
         "bookmark",
         "set",
         "--allow-backwards",
-        "pineta-offer/amber-fox",
+        "pinetrie-offer/amber-fox",
         "-r",
         n(1),
       ),
@@ -159,14 +159,14 @@ describe("offers (ADR-0038)", () => {
     expect(
       argvs(
         planOfferIntegrationSteps({
-          bookmark: "pineta-offer/amber-fox",
+          bookmark: "pinetrie-offer/amber-fox",
           top: "t",
-          destination: "pineta-onto",
+          destination: "pinetrie-onto",
         }),
       ),
     ).toEqual([
-      op("bookmark", "move", "pineta-onto", "--to", "t"),
-      op("bookmark", "delete", "pineta-offer/amber-fox"),
+      op("bookmark", "move", "pinetrie-onto", "--to", "t"),
+      op("bookmark", "delete", "pinetrie-offer/amber-fox"),
     ])
   })
   test("laneRefSteps: update or delete, then one import", () => {
@@ -178,8 +178,8 @@ describe("offers (ADR-0038)", () => {
         ]),
       ),
     ).toEqual([
-      `git update-ref refs/remotes/pineta-${LANE}/tip c1`,
-      `git update-ref -d refs/remotes/pineta-${LANE}/tip`,
+      `git update-ref refs/remotes/pinetrie-${LANE}/tip c1`,
+      `git update-ref -d refs/remotes/pinetrie-${LANE}/tip`,
       op("git", "import"),
     ])
     expect(laneRefSteps([])).toEqual([])
@@ -188,7 +188,7 @@ describe("offers (ADR-0038)", () => {
     expect(
       argvs(planImport({ lane: LANE, bundle: "/tmp/b.bundle", stack: false })),
     ).toEqual([
-      `git fetch -q /tmp/b.bundle +refs/heads/pineta/${LANE}:refs/remotes/pineta-${LANE}/tip`,
+      `git fetch -q /tmp/b.bundle +refs/heads/pinetrie/${LANE}:refs/remotes/pinetrie-${LANE}/tip`,
       op("git", "import"),
     ])
     expect(
@@ -196,25 +196,25 @@ describe("offers (ADR-0038)", () => {
         planImport({ lane: LANE, bundle: "/tmp/b.bundle", stack: true }),
       )[0],
     ).toBe(
-      `git fetch -q /tmp/b.bundle +refs/heads/pineta/${LANE}-stack:refs/remotes/pineta-${LANE}/stack`,
+      `git fetch -q /tmp/b.bundle +refs/heads/pinetrie/${LANE}-stack:refs/remotes/pinetrie-${LANE}/stack`,
     )
   })
   test("the line's setup is the host's bookmark and your config; a land and a follow are yours; a publish the host's (ADR-0060, ADR-0061, ADR-0076)", () => {
     expect(
-      argvs(planLineSetup({ onto: "pineta-onto", heads: "H", log: "L" })),
+      argvs(planLineSetup({ onto: "pinetrie-onto", heads: "H", log: "L" })),
     ).toEqual([
-      op("bookmark", "create", "pineta-onto", "-r", "@-"),
+      op("bookmark", "create", "pinetrie-onto", "-r", "@-"),
       'jj as you: config set --repo revset-aliases."immutable_heads()" H',
       "jj as you: config set --repo revsets.log L",
     ])
-    expect(argvs(planLand({ onto: "pineta-onto" }))).toEqual([
-      "jj as you: bookmark move pineta-onto --to @-",
+    expect(argvs(planLand({ onto: "pinetrie-onto" }))).toEqual([
+      "jj as you: bookmark move pinetrie-onto --to @-",
     ])
     expect(
-      argvs(planPublish({ onto: "pineta-onto", publish: "main" })),
-    ).toEqual([op("bookmark", "move", "main", "--to", '"pineta-onto"')])
-    expect(argvs(planFollow({ onto: "pineta-onto" }))).toEqual([
-      'jj as you: rebase -b @ -d "pineta-onto"',
+      argvs(planPublish({ onto: "pinetrie-onto", publish: "main" })),
+    ).toEqual([op("bookmark", "move", "main", "--to", '"pinetrie-onto"')])
+    expect(argvs(planFollow({ onto: "pinetrie-onto" }))).toEqual([
+      'jj as you: rebase -b @ -d "pinetrie-onto"',
     ])
   })
 })
@@ -231,7 +231,7 @@ describe("walkToHost", () => {
         )
         .join("\n"),
     )
-  const HOST = "pineta-host@mac"
+  const HOST = "pinetrie-host@mac"
   const id = commitId
   test("a revision the host made last: reached at once, none of yours", () => {
     const entries = evolog(["c2", HOST, "c1"], ["c1", "you@mac", ""])
@@ -260,8 +260,8 @@ describe("walkToHost", () => {
     const entries = parseEvolog(
       [
         "c2\tkchange\tyou@mac\tcx:kother,c1:kchange",
-        "cx\tkother\tpineta-host@mac\t",
-        "c1\tkchange\tpineta-host@mac\t",
+        "cx\tkother\tpinetrie-host@mac\t",
+        "c1\tkchange\tpinetrie-host@mac\t",
       ].join("\n"),
     )
     expect(walkToHost(entries, id("c2"))).toEqual({
@@ -284,7 +284,7 @@ describe("the runner factory: what each runner adds to a command on your repo", 
           "--color=never",
           "--ignore-working-copy",
           "--config",
-          "operation.username=pineta-host",
+          "operation.username=pinetrie-host",
           "log",
         ],
         cwd: "/y",
@@ -332,11 +332,11 @@ describe("planObserve: what moved between two fingerprints", () => {
     at: at === null ? null : commitId(at),
   })
   const base = {
-    "pineta-onto": "c1",
+    "pinetrie-onto": "c1",
     "wip/a": "c2",
     main: "c0",
-    "pineta-offer/amber-fox": "c3",
-    [`tip@pineta-${LANE}`]: "c4",
+    "pinetrie-offer/amber-fox": "c3",
+    [`tip@pinetrie-${LANE}`]: "c4",
   }
   const none = {
     all: false,
@@ -349,7 +349,7 @@ describe("planObserve: what moved between two fingerprints", () => {
     ["nothing moved", fp(base), none],
     [
       "the line moved",
-      fp({ ...base, "pineta-onto": "c9" }),
+      fp({ ...base, "pinetrie-onto": "c9" }),
       { ...none, all: true },
     ],
     ["a WIP moved", fp({ ...base, "wip/a": "c9" }), { ...none, all: true }],
@@ -362,26 +362,26 @@ describe("planObserve: what moved between two fingerprints", () => {
     ],
     [
       "a lane's ref moved",
-      fp({ ...base, [`tip@pineta-${LANE}`]: "c9" }),
+      fp({ ...base, [`tip@pinetrie-${LANE}`]: "c9" }),
       { ...none, lanes: new Set([LANE]) },
     ],
     [
       "a lane's stack appeared",
-      fp({ ...base, [`stack@pineta-${LANE_B}`]: "c9" }),
+      fp({ ...base, [`stack@pinetrie-${LANE_B}`]: "c9" }),
       { ...none, lanes: new Set([LANE_B]) },
     ],
     [
       "an offer moved",
-      fp({ ...base, "pineta-offer/amber-fox": "c9" }),
+      fp({ ...base, "pinetrie-offer/amber-fox": "c9" }),
       { ...none, offers: new Set(["amber-fox"]) },
     ],
     [
       "an offer went",
       fp({
-        "pineta-onto": "c1",
+        "pinetrie-onto": "c1",
         "wip/a": "c2",
         main: "c0",
-        [`tip@pineta-${LANE}`]: "c4",
+        [`tip@pinetrie-${LANE}`]: "c4",
       }),
       { ...none, offers: new Set(["amber-fox"]) },
     ],
@@ -393,15 +393,15 @@ describe("planObserve: what moved between two fingerprints", () => {
   })
   test("a bookmark of yours outside the line, the WIPs, the publish bookmark, the offers and the lanes' remotes is not read", () => {
     const stdout = [
-      "c1\t\tpineta-onto,main,feature\tmain@origin,pineta-onto@git",
-      `c4\t@\t\ttip@pineta-${LANE}`,
+      "c1\t\tpinetrie-onto,main,feature\tmain@origin,pinetrie-onto@git",
+      `c4\t@\t\ttip@pinetrie-${LANE}`,
     ].join("\n")
     const read = parseFingerprint("op", stdout, DEFAULT_LINE)
     expect(read.bookmarks).toEqual(
       new Map([
-        ["pineta-onto", "c1"],
+        ["pinetrie-onto", "c1"],
         ["main", "c1"],
-        [`tip@pineta-${LANE}`, "c4"],
+        [`tip@pinetrie-${LANE}`, "c4"],
       ]),
     )
     expect(read.at).toBe("c4")
@@ -409,10 +409,10 @@ describe("planObserve: what moved between two fingerprints", () => {
   test("a conflicted bookmark is all its targets", () => {
     const read = parseFingerprint(
       "op",
-      "c2\t\tpineta-onto\t\nc1\t\tpineta-onto\t",
+      "c2\t\tpinetrie-onto\t\nc1\t\tpinetrie-onto\t",
       DEFAULT_LINE,
     )
-    expect(read.bookmarks.get("pineta-onto")).toBe("c1,c2")
+    expect(read.bookmarks.get("pinetrie-onto")).toBe("c1,c2")
   })
 })
 
@@ -438,14 +438,14 @@ describe("planLaneRead: what one lane's rows say", () => {
   const tip = row("a1", { tip: true, parents: [commitId("b1")] })
   const based = row("b1", {
     base: true,
-    description: `start\n\nPineta-Base: pineta-onto@c0\n`,
+    description: `start\n\nPinetrie-Base: pinetrie-onto@c0\n`,
   })
   const offerRow = row("f1", {
     bookmark: true,
     region: true,
     parents: [commitId("c0")],
     files: ["a.txt"],
-    description: `WIP\n\nPineta-Thread: ${NAME}\nPineta-Source: a1\nPineta-Start: c0\n`,
+    description: `WIP\n\nPinetrie-Thread: ${NAME}\nPinetrie-Source: a1\nPinetrie-Start: c0\n`,
   })
   const read = (
     rows: LaneRow[],
@@ -459,7 +459,7 @@ describe("planLaneRead: what one lane's rows say", () => {
         sources: t.sources.map(commitId),
       })),
     })
-  test("its base from the newest Pineta-Base, its start that commit, and its offer", () => {
+  test("its base from the newest Pinetrie-Base, its start that commit, and its offer", () => {
     expect(read([tip, based, offerRow])).toMatchObject({
       kind: "line",
       tip: "a1",
@@ -476,7 +476,7 @@ describe("planLaneRead: what one lane's rows say", () => {
   })
   test("a base on a WIP is read the separate way", () => {
     expect(
-      read([tip, { ...based, description: "s\n\nPineta-Base: wip/x@c9\n" }]),
+      read([tip, { ...based, description: "s\n\nPinetrie-Base: wip/x@c9\n" }]),
     ).toEqual({ kind: "wip" })
   })
   test("an integrated source above the base makes the start a read; one under it does not", () => {

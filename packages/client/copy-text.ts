@@ -1,6 +1,6 @@
 // client/copy-text — what a message's copy puts on the clipboard, as markdown.
 
-import type { ToolCallView, TranscriptMessage } from "@pineta/core"
+import type { ToolCallView, TranscriptMessage } from "@pinetrie/core"
 
 /**
  * A message as markdown: its text as stored, then each tool call it made, in

@@ -1,9 +1,9 @@
 // session/open-repair — what your list's document should say (ADR-0085).
 // Pure: `open-list.ts` writes what these decide.
 
-import type { RootId } from "@pineta/core"
-import { keyAfter, orderBetween, orderKeys } from "@pineta/rules"
-import { orderOpen } from "@pineta/schema"
+import type { RootId } from "@pinetrie/core"
+import { keyAfter, orderBetween, orderKeys } from "@pinetrie/rules"
+import { orderOpen } from "@pinetrie/schema"
 
 /** Keys to set, by root, and roots to delete: one batch to your document. */
 export interface OpenWrites {

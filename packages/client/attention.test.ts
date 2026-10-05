@@ -6,8 +6,8 @@ import {
   type Verdict,
   type VerdictRecord,
   writerId,
-} from "@pineta/core"
-import type { Attention } from "@pineta/schema"
+} from "@pinetrie/core"
+import type { Attention } from "@pinetrie/schema"
 import { describe, expect, test } from "vitest"
 import type { OpenOffer } from "./app-view.ts"
 import {
@@ -295,7 +295,7 @@ test("attentionWords: each reason, as a value worded once", () => {
     "the run failed: rate limited",
   )
   expect(of({ kind: "unclassified" })).toBe(
-    "the run ended; Pineta could not tell what it needs",
+    "the run ended; pine·trie could not tell what it needs",
   )
   expect(attentionWords({ kind: "offer", source: null }, nameOf)).toBe(
     "work ready to add to the project",

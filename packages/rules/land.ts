@@ -19,12 +19,12 @@ import {
   isLaneName,
   type LaneName,
   type WriterId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { type Static, Type } from "typebox"
 import { CommitSchema, decodeWith } from "./decode.ts"
 import { leftOut } from "./request.ts"
 
-export const LAND_TYPE = "pineta.land"
+export const LAND_TYPE = "pinetrie.land"
 
 const LandDetailsSchema = Type.Object({
   lane: Type.String({ minLength: 1 }),

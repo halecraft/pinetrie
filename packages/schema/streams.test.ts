@@ -5,7 +5,7 @@ import {
   laneNameForThread,
   runId,
   type StreamEvent,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   applyStreamOps,

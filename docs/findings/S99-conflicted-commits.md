@@ -26,7 +26,7 @@ somewhere else.
    README, and the real changes.
 2. **The 2084 is that tree, deleted.** From the conflicted merge to the
    resolution, git listed 2084 paths: 3 × 694 = 2082 under `.jjconflict-*`,
-   `JJ-CONFLICT-README`, and `docs/pineta.md`, the one file resolved.
+   `JJ-CONFLICT-README`, and `docs/pinetrie.md`, the one file resolved.
    `changedPaths` (`packages/lanes/revisions.ts`) read a turn's paths with
    `git diff`, so the turn's revision record held all of them, and the
    ask's file count (`workStats`) was their number.
@@ -57,7 +57,7 @@ somewhere else.
    from the side merged in (`heldAlike`, `mergeUpdate`), and the merge is
    clean.
 6. **Then the offer is empty.** The merge puts the parent's taken source,
-   and any newer `Pineta-Base` of the parent's, in the branch's history, so
+   and any newer `Pinetrie-Base` of the parent's, in the branch's history, so
    the offer's start (`offerStart`) moves above them, and the branch's work
    from there changes no file. `PLAN-2026-10-04-catch-up-parent` adds that
    catch-up (ADR-0072), and an offer now says when every file it conflicts

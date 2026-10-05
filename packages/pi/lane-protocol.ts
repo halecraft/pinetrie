@@ -2,7 +2,7 @@
 // (ADR-0034, S43, S44).
 //
 // One JSON line per message, over one `container exec -i` stream. It imports
-// nothing: the helper runs it from Pineta's read-only install, on whatever
+// nothing: the helper runs it from pinetrie's read-only install, on whatever
 // Node the lane runtime brings, with its types stripped.
 //
 // Values cross with three things JSON cannot carry:
@@ -80,8 +80,8 @@ export interface RunResult {
   readonly stderr: string
 }
 
-const BYTES = "$pineta.bytes"
-const ERROR = "$pineta.error"
+const BYTES = "$pinetrie.bytes"
+const ERROR = "$pinetrie.error"
 
 interface WireError {
   readonly name: string

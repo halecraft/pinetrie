@@ -7,7 +7,7 @@ import {
   PLAIN,
   type WriterId,
   writerId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { renderableMessage } from "./chat.ts"
 import {
@@ -57,7 +57,7 @@ describe("the cards entry", () => {
     const ok = JSON.parse(
       JSON.stringify(encodePinned(view([read("p-1", "a")]), nameOf, 7)),
     )
-    expect(decodePinned({ ...ok, customType: "pineta.chat" })).toBeUndefined()
+    expect(decodePinned({ ...ok, customType: "pinetrie.chat" })).toBeUndefined()
     expect(
       decodePinned({ ...ok, details: { ...ok.details, lane: "main" } }),
     ).toBeUndefined()
@@ -65,7 +65,7 @@ describe("the cards entry", () => {
       decodePinned({ ...ok, details: { ...ok.details, cards: [{ id: "x" }] } }),
     ).toBeUndefined()
     expect(decodePinned(null)).toBeUndefined()
-    expect(PINNED_TYPE).toBe("pineta.pinned")
+    expect(PINNED_TYPE).toBe("pinetrie.pinned")
   })
 
   test("what the model reads: every card by its owner's name, then what no longer applies", () => {

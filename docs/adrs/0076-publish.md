@@ -20,7 +20,7 @@ project's mark counts unpublished commits, not your files being behind).
 - ↓ on its trigger meant "your files are behind"; on a column's header it
   means "the thread's base has new work" (ADR-0061, ADR-0073).
 
-And "your files" means nothing on a host a team shares (`PINETA_BIND`,
+And "your files" means nothing on a host a team shares (`PINETRIE_BIND`,
 ADR-0022): `LineRecord.commands` is false there, so the menu showed the
 host machine's `@`, which no reader has, and offered nothing.
 
@@ -42,7 +42,7 @@ reached `main`, the branch everyone else builds from.
   Publishing is refused, saying why, with no line, no bookmark, nothing
   unpublished, or `ahead > 0` ("main has 2 commits the project doesn't:
   bring them into the project first").
-- **One rule decides what may run** (`lineActionState`, `@pineta/rules`): the
+- **One rule decides what may run** (`lineActionState`, `@pinetrie/rules`): the
   host's `planLineAction` and the page's `lineView` both read it, and
   `lineRefusal` words its refusals for both.
 - **The menu has two sections.** *The project*, on every host: how many
@@ -57,7 +57,7 @@ reached `main`, the branch everyone else builds from.
   not their paths.
 - **The trigger counts unpublished commits**: "◆ project · 2 unpublished".
   Your files being behind no longer marks it, so ↓ keeps one meaning.
-- **A move of the publish bookmark outside Pineta refreshes the line's
+- **A move of the publish bookmark outside pine·trie refreshes the line's
   record alone** (`Moved.line`): no offer depends on it.
 
 **Consequences.**
@@ -65,7 +65,7 @@ reached `main`, the branch everyone else builds from.
 - A record written before this decodes as unknown until the host writes it
   again (ADR-0067, rule 5): the project menu is empty for a moment after an
   upgrade.
-- With `main` moved outside Pineta, the project cannot be published until
+- With `main` moved outside pine·trie, the project cannot be published until
   main's commits are brought into the line, by hand for now.
 - The line's facts read three more jj processes per operation (the
   bookmark's commit and its two counts).

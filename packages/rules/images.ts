@@ -12,7 +12,7 @@ import {
   type Refusal,
   refused,
   type Sha256,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { fromMarkdown } from "mdast-util-from-markdown"
 import { gfmFromMarkdown } from "mdast-util-gfm"
 import { gfm } from "micromark-extension-gfm"

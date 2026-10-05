@@ -260,7 +260,7 @@ export function messageImages(
  * `toolResult` included: a result belongs to its call, which `projectSpine`
  * pairs it with. An assistant message carries its tool
  * calls. A `chat` message is a human's, already decoded by the reader
- * (`readRenderableEntries` in `@pineta/reads`); core only admits the role, so it
+ * (`readRenderableEntries` in `@pinetrie/reads`); core only admits the role, so it
  * needs no schema library.
  */
 function renderableMessage(entry: EntryLike): TranscriptMessage | null {

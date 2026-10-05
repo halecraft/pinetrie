@@ -10,7 +10,7 @@ import {
   commitId,
   type LaneBase,
   type LineFacts,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import {
   commitsOf,
   conflictedFilesAt,
@@ -18,7 +18,7 @@ import {
   lines,
   type Runner,
   revsetName,
-} from "@pineta/lanes"
+} from "@pinetrie/lanes"
 import { changeOf } from "./offer.ts"
 
 /** What `planFollow`'s rebase would do to your files (S80): `LineRecord`'s shape. */
@@ -227,7 +227,7 @@ async function wipFacts(
  * A WIP base's state (ADR-0060): landed when its bookmark points into the
  * line (moved there, or squashed into the line, which keeps the bookmark and
  * drops the WIP's change, S77 item 2), or, with the bookmark gone, when the
- * commit the lane's `Pineta-Base` names, or its change, is on the line.
+ * commit the lane's `Pinetrie-Base` names, or its change, is on the line.
  * Gone when the bookmark is gone and the WIP did not land; else ok. No
  * facts, a base on the line, is ok. Pure.
  */
@@ -237,7 +237,7 @@ export function wipState(
     readonly bookmark: CommitId | null
     /** The bookmark's commit is in the line's history. */
     readonly bookmarkInLine: boolean
-    /** The commit `Pineta-Base` names, or its change, is in the line's history. */
+    /** The commit `Pinetrie-Base` names, or its change, is in the line's history. */
     readonly sourceInLine: boolean
   } | null,
 ): BaseRecord["state"] {

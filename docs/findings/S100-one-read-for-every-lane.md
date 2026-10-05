@@ -1,7 +1,7 @@
 # S100 — Can one parameterized read give every offer its facts, a lane on a WIP's included?
 
 **Status:** Open. Opened from `PLAN-2026-10-04-offers-one-home`, which
-puts every offer read behind one entry point in `@pineta/repo`, and
+puts every offer read behind one entry point in `@pinetrie/repo`, and
 leaves what is read unchanged. Serves the plan that would replace the
 separate reads.
 
@@ -38,11 +38,11 @@ For that read to replace the separate ones, it has to cover:
    shared facts (`packages/repo/shared.ts`) collect only those in
    `::<onto>`. A take onto the WIP would be missed, and the start would be
    wrong (S81).
-3. **"Under the base".** On the line, the commit carrying `Pineta-Base`
+3. **"Under the base".** On the line, the commit carrying `Pinetrie-Base`
    descends from the base's source, so the read's `::<based>` flag stands
    for `takenRevset`'s `~ ::present(<source>)`. On a WIP, that commit is the
    WIP's copy, which does not descend from the source (the WIP's commit),
-   and the source is known only after the `Pineta-Base` row is parsed.
+   and the source is known only after the `Pinetrie-Base` row is parsed.
 4. **The WIP's state** (`wipState`: ok, landed or gone). This needs the
    bookmark's commit and whether it is on the line. For a gone WIP, it
    needs whether its source, or the source's change, is on the line

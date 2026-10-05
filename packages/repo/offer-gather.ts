@@ -25,7 +25,7 @@ import type {
   StartRead,
   ThreadName,
   WorkChanges,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import {
   commitsOf,
   type LineConfig,
@@ -34,7 +34,7 @@ import {
   type Runner,
   revsetName,
   titlesOf,
-} from "@pineta/lanes"
+} from "@pinetrie/lanes"
 import { gatherLane } from "./lane-read.ts"
 import { readWipState } from "./line.ts"
 import {
@@ -136,7 +136,7 @@ const commitOf = async (jj: Runner, bookmark: string) =>
 
 /**
  * Where a lane's offer sits and starts, and its base record, by the separate
- * reads: its base from the lane's newest `Pineta-Base`, its target the line's
+ * reads: its base from the lane's newest `Pinetrie-Base`, its target the line's
  * commit or the WIP's, its start `startOfOffer`. Null before the lane has a
  * tip here, or a line commit in its history.
  */

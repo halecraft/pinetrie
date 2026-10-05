@@ -1,4 +1,4 @@
-# `@pineta/reads` — technical notes
+# `@pinetrie/reads` — technical notes
 
 What the session document says, read once, by the host and the client alike.
 
@@ -11,7 +11,7 @@ What the session document says, read once, by the host and the client alike.
 - **The session's reads take its `SessionDocHandle`**: every record read
   across roots (`readLaneRecords`, `readNames`, `readOffers`, `readWorkflow`,
   `readBoardPlaces`, `readArchived`,
-  `readRoots`, the singletons…), `readRunningLanes` with `pineta:live`, and
+  `readRoots`, the singletons…), `readRunningLanes` with `pinetrie:live`, and
   `readReferencedBlobs`, which takes each root's images from its directory
   record, so no root is opened to sweep.
 - **A read of several takes a `RootView`** (`{ root, doc, session, live }`):
@@ -50,18 +50,18 @@ at an entry would work, and the commit and snapshot it would start from: the
 composer shows it, and the host creates the lane by it, and decides by it
 whether a sent message's paths are stored under `/mnt/host-working-copy`. The board's items are a
 client-only read, in `packages/client/board-view.ts`. Live streams are read with `readStreams` in
-`@pineta/schema`; an entry count stays in `packages/client/projection.ts`.
+`@pinetrie/schema`; an entry count stays in `packages/client/projection.ts`.
 
 ## Where entry ids are branded
 
 A stored row's id is a plain `string` (Kyneta's `Schema.string()` carries no
-brand), and `renderableEntry` is the first Pineta code to see one: it mints
+brand), and `renderableEntry` is the first pine·trie code to see one: it mints
 the entry's `id` and `parentId` as `EntryId`s, and everything read from the
 index after that carries the brand (S95). Presence's `reading` and `typing`
 values are thread ends, written by clients: `presenceField` mints them too.
 Lane names, lane tips and run ids are branded one layer down, by
-`@pineta/schema`'s readers (`readLaneNames`, `readLaneTip`, `readActiveRun`),
-and each record's ids by its decoder in `@pineta/rules`. `entryId` is
+`@pinetrie/schema`'s readers (`readLaneNames`, `readLaneTip`, `readActiveRun`),
+and each record's ids by its decoder in `@pinetrie/rules`. `entryId` is
 the identity at run time, so the frozen entries and the index's cache are
 unchanged by it.
 
@@ -73,7 +73,7 @@ through its card port). `planSweep` decides which
 stored images to delete from it.
 
 **Each record reader is `readRecords(doc, SPEC)`** (ADR-0062): the
-record's values decoded by its spec in `@pineta/rules` and keyed by their address.
+record's values decoded by its spec in `@pinetrie/rules` and keyed by their address.
 A reader keeps its own name and return type, and shapes the map only where
 its readers want something else: `readSeats` and `readLandings` sort,
 `readNames` and `readParticipantNames` give the name alone, and the
@@ -141,7 +141,7 @@ Kyneta has let go.
   `threadOf`'s race reads the first two, a fresh column the third.
 - **A compaction entry carries the pinned cards its retained tail holds**
   (`carried`, ADR-0048 step 5): the tail's newest cards entry, read from the
-  row's payload (`rowRetainedTail`, `@pineta/schema`). pi stores the tail on
+  row's payload (`rowRetainedTail`, `@pinetrie/schema`). pi stores the tail on
   the compaction itself, and the model reads it after the summary, so
   `pinnedInView` stops there.
 - **`readPlaces` keeps an unchanged card the same object.** Kyneta gives an

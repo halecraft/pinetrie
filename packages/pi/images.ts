@@ -8,7 +8,7 @@ import {
   isImageMime,
   type Sha256,
   type StoredImage,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import {
   detectSupportedImageMimeType,
   formatDimensionNote,

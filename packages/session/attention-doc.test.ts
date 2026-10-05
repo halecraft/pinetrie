@@ -4,7 +4,7 @@ import {
   laneNameForThread,
   type RootRecord,
   writerId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { expect, test } from "vitest"
 import { attentionStore, EARLIEST, startOf } from "./attention-doc.ts"
 

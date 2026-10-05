@@ -16,12 +16,12 @@ import {
   type OfferIntegrationDecision,
   type ThreadName,
   type WriterId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { type Static, Type } from "typebox"
 import { decodeWith } from "./decode.ts"
 import { catchUpName } from "./line.ts"
 
-export const FACT_TYPE = "pineta.fact"
+export const FACT_TYPE = "pinetrie.fact"
 
 const CatchUpFromSchema = Type.Union([
   Type.Object({ kind: Type.Literal("line") }),

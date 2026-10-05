@@ -1,4 +1,4 @@
-// Mutations for @pineta/repo: your repo, as the host reads and writes it.
+// Mutations for @pinetrie/repo: your repo, as the host reads and writes it.
 // Run: pnpm mutate scripts/mutations/repo.ts
 // The plans' checks are unit tests, in seconds; the real-jj checks in
 // `repo.test.ts` take a few seconds each. The suite mutations run one
@@ -12,7 +12,7 @@ const offersRefresh = [
   "exec",
   "vitest",
   "run",
-  "apps/pineta/host/offers/refresh.test.ts",
+  "apps/pinetrie/host/offers/refresh.test.ts",
 ]
 
 export const mutations: readonly Mutation[] = [

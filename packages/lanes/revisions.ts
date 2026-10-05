@@ -14,7 +14,7 @@ import {
   type EntryId,
   type LaneName,
   revisionMessage,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { bookmarkOf, setBookmark } from "./bookmarks.ts"
 import { planTurnCommit } from "./plan.ts"
 import { describeFailure, lines, type Runner } from "./run.ts"
@@ -40,7 +40,7 @@ export async function commitsOf(
 /**
  * An integrated-offer commit on the line as `INTEGRATED_OFFER_COMMIT_ROW`
  * prints it: its commit, and its message whole. Your repo reads the
- * integrated-offer commits on the line with it (`@pineta/repo`), and a lane
+ * integrated-offer commits on the line with it (`@pinetrie/repo`), and a lane
  * those it lacks before it catches up (`integratedOfferCommitsAbove`).
  */
 export interface IntegratedOfferCommitRow {
@@ -255,8 +255,8 @@ export async function conflictedFilesAt(
 
 /**
  * A revision's description and per-file stats, printed as the JSON of
- * `RevisionReview` (`@pineta/core`): `json()` quotes every string (S57). A
- * change to it bumps `OFFER_WIRE` (`@pineta/rules`).
+ * `RevisionReview` (`@pinetrie/core`): `json()` quotes every string (S57). A
+ * change to it bumps `OFFER_WIRE` (`@pinetrie/rules`).
  */
 export const REVISION_READ =
   '"{\\"description\\":" ++ json(description) ++ ",\\"files\\":[" ++ ' +

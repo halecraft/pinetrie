@@ -1,4 +1,4 @@
-import { laneNameForThread, rootIdFor, writerId } from "@pineta/core"
+import { laneNameForThread, rootIdFor, writerId } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import type { QueuedCard } from "./card.ts"
 import {

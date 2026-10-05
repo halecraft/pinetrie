@@ -7,7 +7,7 @@
 // following column that grew for a row does not shrink when the call ends
 // (S35).
 
-import type { ImageRef, ToolResultView } from "@pineta/core"
+import type { ImageRef, ToolResultView } from "@pinetrie/core"
 
 /** How long a call's output streams before its row opens. */
 export const REVEAL_MS = 500

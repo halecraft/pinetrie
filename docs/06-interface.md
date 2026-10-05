@@ -19,7 +19,7 @@ This document fixes the design before any code. It draws E and T directly.
 1. **Draw the tree.** Every branch that exists is visible somewhere, in the
    shape it has. Hiding branches behind a counter is what a transcript does.
 2. **A branch sits beside its parent.** Slack's thread panel gets this right for
-   one level. Pineta needs it at any depth.
+   one level. pine·trie needs it at any depth.
 3. **No thread is special.** The data has no "main thread"; the interface should
    not invent one. Whatever you put first is what reads as the trunk. Roots
    are peers too: you open the ones you work in, in your list (ADR-0030,
@@ -139,7 +139,7 @@ While the page syncs, "syncing…" leads its right end.
   you (a run that ended asking something, failing, or that no one could
   tell; work ready to add) plus the mentions you have not seen; the page's
   title carries the same count, before the root you are on: "(2) Fix the
-  sync bug · Pineta". While the agent works, a steady count of its threads
+  sync bug · pine·trie". While the agent works, a steady count of its threads
   stands beside the ✦, never in the badge. Its sections, each shown only
   with rows: **Needs you** (each thread's reason, in amber), **Ready to
   add** (every thread with an open offer, those you follow marked and
@@ -340,12 +340,12 @@ tab's; with nothing in your list and nothing you are on, it opens by itself.
   menu, greyed out, and says why: "already caught up with the project", or,
   when the project moved only by this thread's own work you added, "the
   project's new work is this thread's own: catching up changes no file"
-  (ADR-0067). A thread whose base Pineta has not read yet (one whose agent
+  (ADR-0067). A thread whose base pine·trie has not read yet (one whose agent
   never changed a file, so its work never reached your repo) keeps it in
   the menu, enabled, and claims nothing. An offer whose work the project already has says "nothing to
   add: the project already has this thread's work": the header does not
   count it, and archiving its thread warns of nothing. A thread whose
-  earlier add was made before Pineta recorded what an add brought says "an
+  earlier add was made before pine·trie recorded what an add brought says "an
   earlier add of this thread can't be traced: catch up with the project to
   offer what's new", with catching up beside it. Every catch-up button does
   it at once
@@ -441,7 +441,7 @@ the tree.
   Coming back, a dashed line, "since you were here", marks the first
   message after it. It takes no room.
 - **A summary, unless digests are off** (`{ "digests": { "enabled": false } }` in
-  `~/.config/pineta/config.json`, ADR-0071): a model's two or three sentences on an
+  `~/.config/pinetrie/config.json`, ADR-0071): a model's two or three sentences on an
   ask's work, under its digest line, set apart from the agent's words. It is
   refreshed at most once a minute while someone reads the running thread,
   written once more when its run ends, and read by no agent.
@@ -823,7 +823,7 @@ board's records (ADR-0085); a card's text is its own document (ADR-0048).
   the part after its fork point is the suffix below the column to its left.
 - **The rail** is the tree itself, from `parentId`, drawn in id order, which is
   creation order (uuidv7).
-- **A thread's mode** is its lane; **names** are `pineta.participant` values.
+- **A thread's mode** is its lane; **names** are `pinetrie.participant` values.
 - **A root** is a root of the tree index (an orphan counts as one). **Your
   list** is your own document (`open:<you>`, ADR-0085), each root's id to an
   order key, written only by your tabs: the roots in it that are not
@@ -835,8 +835,8 @@ board's records (ADR-0085); a card's text is its own document (ADR-0048).
   yours: an entry id (`mentionsSince`), at or before which every mention is
   seen, and the ids of later ones you have seen.
 - **The board** is two host-written records (ADR-0085): the workflow
-  (`pineta.workflow`, the open states in order and the closed one) and each
-  root's place (`pineta.board`, by its id: its state, its rank there, who
+  (`pinetrie.workflow`, the open states in order and the closed one) and each
+  root's place (`pinetrie.board`, by its id: its state, its rank there, who
   moved it and when). A root in the closed state is archived; the host
   refuses commands that would write in it (ADR-0029).
 - **Which root you are on, each root's columns, new tabs and whether the

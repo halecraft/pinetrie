@@ -28,7 +28,7 @@ import {
   threadOf,
   type WriterId,
   workFor,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import {
   cardsAt,
   effectiveBase,
@@ -37,19 +37,19 @@ import {
   placeEnd,
   queuedOn,
   yourCard,
-} from "@pineta/rules"
+} from "@pinetrie/rules"
 import {
   type LiveDocHandle,
   readStreamText,
   type StreamRecord,
-} from "@pineta/schema"
-import type { AttentionStore } from "@pineta/session"
+} from "@pinetrie/schema"
+import type { AttentionStore } from "@pinetrie/session"
 import {
   drawnPlace,
   newCardId,
   newLaneName,
   type SessionClient,
-} from "@pineta/session"
+} from "@pinetrie/session"
 import {
   useCallback,
   useEffect,

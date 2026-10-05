@@ -11,7 +11,7 @@ before numbers for the one-owner work (ADR-0065); the after numbers come
 when that work is done.
 
 **Answer.** Yes to each. jj 0.44.0, `container` 1.4.1. The project was an
-APFS clone of Pineta's own repo, so jj ran with this repo's real history:
+APFS clone of pine·trie's own repo, so jj ran with this repo's real history:
 a jj process took 18 ms at the median and 20 ms at p90. It ran with a
 fresh session and the scripted model.
 
@@ -82,7 +82,7 @@ None of this contradicts problems 2–6. It shows problem 10 at 18
 processes, not about 10. Phase 7's target of at most 3 stands.
 
 **Aside.** The base snapshot's scratch lane has a fixed name,
-`pineta-t-base-scratch` (`BASE_LANE`, `packages/lanes/base.ts`), and
+`pinetrie-t-base-scratch` (`BASE_LANE`, `packages/lanes/base.ts`), and
 `container` names are global to the Mac. Two hosts on one Mac, even over
 different repos, would share that container and volume. Not tested.
 
@@ -126,22 +126,22 @@ Runs 2 and 3 again, with you and without:
 - **Your `@` moving costs one shared read** (the `shared` key: 26 steps,
   15 processes each, in the run with you), and no lane's refresh.
 
-The probe's hooks were in `@pineta/keeper` (each step's wait and run, its
-key, and each call merged into a queued step) and `@pineta/lanes`'
+The probe's hooks were in `@pinetrie/keeper` (each step's wait and run, its
+key, and each call merged into a queued step) and `@pinetrie/lanes`'
 `run.ts`, and removed afterwards.
 
 ## Method
 
 A disposable probe, not committed:
 
-- Temporary hooks in `apps/pineta/host/queue.ts` (each step's queue time,
+- Temporary hooks in `apps/pinetrie/host/queue.ts` (each step's queue time,
   start, end and caller, from its stack), `packages/lanes/run.ts` (each
   process, attributed to the step running it through an
   `AsyncLocalStorage` that `Serial.run` entered), `offers/watch.ts` (each
   tick, and whether a read was still out) and `offers/index.ts` (each
   refresh's outcome). The hooks were active only when the probe set
   `globalThis.__s89`, and were removed afterwards.
-- A driver that cloned the repo with `cp -cR`, leaving out `.pineta`,
+- A driver that cloned the repo with `cp -cR`, leaving out `.pinetrie`,
   `node_modules` and `sandbox`, into a sibling directory. The project's
   `node_modules` link to `../../../kyneta`, so the clone had to sit beside
   the repo.
@@ -168,5 +168,5 @@ queued and not yet started.
   page drops the answer to an offer command (`perform.ts`), which this
   probe did not look at.
 - Divergent operation heads made by the fetch's import racing an
-  offer's write. S87 item 7 counted them in Pineta's own repo. The clone
+  offer's write. S87 item 7 counted them in pine·trie's own repo. The clone
   was deleted before its op log was read.

@@ -1,4 +1,4 @@
-import { laneNameForThread, type ThreadName } from "@pineta/core"
+import { laneNameForThread, type ThreadName } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { NAME, planNames, planReserve, recordsOf, setRecord } from "./index.ts"
 import { ADJECTIVES, NOUNS, threadNameFor } from "./names.ts"
@@ -96,7 +96,7 @@ describe("planReserve (ADR-0057)", () => {
 
 test("a name record round-trips by lane; a malformed name is dropped", () => {
   const e = setRecord(NAME, { lane: A, name: "amber-fox" as ThreadName, at: 1 })
-  expect([e.namespace, e.key]).toEqual(["pineta.name", A])
+  expect([e.namespace, e.key]).toEqual(["pinetrie.name", A])
   expect(recordsOf(NAME, [e]).get(A)?.name).toBe("amber-fox")
   expect(
     recordsOf(NAME, [{ key: B, value: { name: "Amber Fox", at: 1 } }]).size,

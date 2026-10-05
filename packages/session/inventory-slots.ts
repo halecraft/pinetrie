@@ -10,9 +10,9 @@
 
 import type { Exchange } from "@kyneta/exchange"
 import { batch } from "@kyneta/schema"
-import type { CardId, WriterId } from "@pineta/core"
-import { personDocId } from "@pineta/protocol/writers"
-import { InventoryDoc, readSlots } from "@pineta/schema"
+import type { CardId, WriterId } from "@pinetrie/core"
+import { personDocId } from "@pinetrie/protocol/writers"
+import { InventoryDoc, readSlots } from "@pinetrie/schema"
 import {
   type HeldSince,
   type Intents,

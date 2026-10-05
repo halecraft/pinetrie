@@ -11,17 +11,18 @@ import {
   DEFAULT_COMPACTION_SETTINGS,
   estimateTokens,
 } from "@earendil-works/pi-agent-core"
-import { LAND_TYPE, type PromptBudget } from "@pineta/rules"
+import { LAND_TYPE, type PromptBudget } from "@pinetrie/rules"
 
 /**
  * The settings `createAgent` gives every harness. pi's defaults today: the
  * harness reads no person's `settings.json`, so these are all it uses.
  */
-export const PINETA_COMPACTION: CompactionSettings = DEFAULT_COMPACTION_SETTINGS
+export const PINETRIE_COMPACTION: CompactionSettings =
+  DEFAULT_COMPACTION_SETTINGS
 
 /** A land message's limit: what pi keeps whole when it compacts, by pi's own estimate. */
 export const LAND_BUDGET: PromptBudget = {
-  tokens: PINETA_COMPACTION.keepRecentTokens,
+  tokens: PINETRIE_COMPACTION.keepRecentTokens,
   estimate: content =>
     estimateTokens({
       role: "custom",

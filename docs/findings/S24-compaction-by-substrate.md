@@ -26,16 +26,16 @@
 
 ## Why it was asked
 
-Pineta's store only grows: every tool run adds its output, twice (S22), and
+pine·trie's store only grows: every tool run adds its output, twice (S22), and
 nothing reclaimed it. Kyneta's store fix (S22 addendum) reworked `compact`.
-The question widened to which substrate each kind of Pineta document should
+The question widened to which substrate each kind of pine·trie document should
 use. An authoritative document, written by the server alone, could compact
 freely. A collaborative one needs a CRDT, and compaction then trades something
 away.
 
 ## Result
 
-A workload like a Pineta tool run, on each of Kyneta's `json`, `loro` and `yjs`
+A workload like a pine·trie tool run, on each of Kyneta's `json`, `loro` and `yjs`
 targets:
 - a text written as tail edits (120 snapshots of a 50 KB tail-kept view), then
   deleted;
@@ -72,16 +72,16 @@ the pure-Loro result, was not understood, and is set aside.
 
 1. **An authoritative document belongs on `json.bind`.** It is written by one
    writer, compacts live, and a reconnecting client simply receives the whole
-   document. Pineta's session document is written only by the host: clients
+   document. pine·trie's session document is written only by the host: clients
    send commands (ADR-0007, ADR-0018). It fits, and it would drop Loro, and its
    wasm, from the browser.
 2. **A collaborative document belongs on Yjs.** It compacts without refusing
-   late peers, and needs no wasm. Pineta's first one is shared composition
+   late peers, and needs no wasm. pine·trie's first one is shared composition
    (drafts written by tabs). Live compaction needs Kyneta support first.
 3. **Loro's compaction is a choice between no gain and refusing late peers.**
-   Nothing Pineta plans needs Loro's history (time travel, versions).
+   Nothing pine·trie plans needs Loro's history (time travel, versions).
 4. **Open questions for moving the session document to `json.bind`:**
-   - pi's storage conformance and Pineta's suites on the plain substrate;
+   - pi's storage conformance and pine·trie's suites on the plain substrate;
    - whether the plain substrate's in-memory op log is trimmed, or grows until
      compaction;
    - what triggers compaction, and what a whole-document resend costs a
@@ -94,5 +94,5 @@ the pure-Loro result, was not understood, and is set aside.
 Disposable probes, not checked in: one through Kyneta (`Exchange`, in-memory
 stores, the bridge transport, each binding target), and one each in pure Loro
 and pure Yjs for the late-peer cases. Each ran at least twice with the same
-results. Kyneta's own tests for its store change could not be run from Pineta's
+results. Kyneta's own tests for its store change could not be run from pine·trie's
 sandbox.

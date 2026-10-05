@@ -1,7 +1,7 @@
 // pi/agent — the pi stack over the session's documents, a pi session and a
 // harness per document (ADR-0063), and the facade the host sees. Only this
 // package may import pi (ADR-0003, enforced by module resolution):
-// everything pi-shaped is converted to Pineta's shapes here or in the
+// everything pi-shaped is converted to pinetrie's shapes here or in the
 // modules `createAgent` wires, so the host never sees a pi type.
 
 import path from "node:path"
@@ -28,7 +28,7 @@ import {
   type StreamEvent,
   type Target,
   type ValueWrite,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import {
   type BannerAnswer,
   type BannerAsk,
@@ -38,17 +38,17 @@ import {
   labelCommands,
   type ModelRef,
   withChatImages,
-} from "@pineta/rules"
+} from "@pinetrie/rules"
 import {
   asRootDoc,
   type RootDocHandle,
   readLaneTip,
   type SessionDocHandle,
   type StorageDocHandle,
-} from "@pineta/schema"
+} from "@pinetrie/schema"
 import { type Banners, banners } from "./banner.ts"
 import { type CommandFiles, commandFiles } from "./commands.ts"
-import { PINETA_COMPACTION } from "./compaction.ts"
+import { PINETRIE_COMPACTION } from "./compaction.ts"
 import {
   complete,
   DEFAULT_AGENT_DIR,
@@ -114,7 +114,7 @@ const toPiWrite = (w: ValueWrite) =>
 export const newId = (): string => uuidv7()
 
 /**
- * Pineta's own skills, loaded after yours and the repo's: `resolve-conflicts`,
+ * pinetrie's own skills, loaded after yours and the repo's: `resolve-conflicts`,
  * `commit-message`, `offer-stack`, `column-banner`, `ask-digest` and
  * `tab-title`.
  */
@@ -156,7 +156,7 @@ export interface CreateAgentOptions {
     readonly access: (lane: LaneName) => LaneAccess
     readonly hooks: LaneHooks
   } | null
-  /** What a running turn writes, in Pineta's own words, per lane. */
+  /** What a running turn writes, in pinetrie's own words, per lane. */
   readonly onStream?: (event: StreamEvent) => void
   /**
    * A lane's request starts otherwise than its last one did: its earlier
@@ -346,7 +346,7 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
     })
     const session = new StorageBackedSession(
       {
-        id: `pineta-${replicaId}-${id}`,
+        id: `pinetrie-${replicaId}-${id}`,
         createdAt: Date.now(),
         storageVersion: 1,
       },
@@ -365,10 +365,10 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
         systemPrompt,
         toProviderMessages: messages =>
           providerMessages(messages, options.blobs ?? NO_BLOBS),
-        // Pineta's queued cards mean pi's own queue is never used; should it
+        // pinetrie's queued cards mean pi's own queue is never used; should it
         // be, it answers one message at a time rather than batching (S20).
         followUpMode: "one-at-a-time",
-        compaction: PINETA_COMPACTION,
+        compaction: PINETRIE_COMPACTION,
       },
       CTX,
     )
@@ -529,7 +529,7 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
 
     async writeValues(writes) {
       if (writes.length === 0) return
-      const foreign = writes.find(w => !w.namespace.startsWith("pineta."))
+      const foreign = writes.find(w => !w.namespace.startsWith("pinetrie."))
       if (foreign !== undefined)
         throw new Error(
           `writeValues: ${foreign.namespace} is not the host's to write`,

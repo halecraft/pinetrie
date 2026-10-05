@@ -1,4 +1,4 @@
-import { cardId } from "@pineta/core"
+import { cardId } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   type KeyFocus,

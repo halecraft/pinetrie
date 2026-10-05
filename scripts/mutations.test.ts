@@ -1,7 +1,7 @@
 import { readdirSync, readFileSync } from "node:fs"
 import path from "node:path"
 import { describe, expect, test } from "vitest"
-import { SCENARIO_SUFFIX } from "../apps/pineta/e2e/scenario.ts"
+import { SCENARIO_SUFFIX } from "../apps/pinetrie/e2e/scenario.ts"
 import { type Mutation, SUITES } from "./mutate.ts"
 import { callsCheck, labelsIn, proofGaps } from "./proofs.ts"
 import { UNPROVEN } from "./unproven.ts"
@@ -40,7 +40,7 @@ describe("mutation lists", async () => {
 })
 
 describe("every suite check is proven, and every suite mutation names one", async () => {
-  const e2e = path.join(root, "apps/pineta/e2e")
+  const e2e = path.join(root, "apps/pinetrie/e2e")
   const labels = new Map<string, readonly string[]>()
   let nonLiteral = 0
   const stray: string[] = []

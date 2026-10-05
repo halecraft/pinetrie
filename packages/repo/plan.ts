@@ -16,16 +16,17 @@ import {
   type OfferSource,
   type ThreadName,
   trailerRevset,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import {
   bookmarkName,
   type LineConfig,
   laneStackRef,
   laneTipRef,
+  OFFER_BOOKMARKS,
   offerBookmark,
   revsetName,
   stackBookmark,
-} from "@pineta/lanes"
+} from "@pinetrie/lanes"
 import { git, host, type RepoStep, you } from "./step.ts"
 
 /**
@@ -40,7 +41,7 @@ export function immutableHeads(
   current: string | null,
 ): string {
   const onto = `present(${revsetName(line.onto)})`
-  const added = `${onto} | (bookmarks(glob:${revsetName("pineta-offer/*")}) & children(${onto}))`
+  const added = `${onto} | (${OFFER_BOOKMARKS} & children(${onto}))`
   const base = (current ?? "builtin_immutable_heads()").trim()
   return base.endsWith(added) ? base : `${base} | ${added}`
 }
@@ -52,7 +53,7 @@ export function immutableHeads(
  * not show it (S77 item 8). Given its own output, it returns it.
  */
 export function logRevset(current: string | null): string {
-  const added = `bookmarks(glob:${revsetName("pineta-offer/*")})`
+  const added = OFFER_BOOKMARKS
   const base = (current ?? "builtin_log()").trim()
   return base.endsWith(added) ? base : `${base} | ${added}`
 }
@@ -149,11 +150,11 @@ export function lineSteps(
 
 /**
  * `jj git import` into your repo, as the host. A jj command with
- * `--ignore-working-copy` imports no git refs, so every ref Pineta writes is
+ * `--ignore-working-copy` imports no git refs, so every ref pinetrie writes is
  * imported at once. With the flag, the import leaves your working copy
  * unsnapshotted: 12-47 ms, where a plain `jj git import` snapshots it too
  * (about 100 ms, S44 item 8). As the host, so the operation is
- * `pineta-host`'s (S87 item 7).
+ * `pinetrie-host`'s (S87 item 7).
  */
 const IMPORT: RepoStep = host("git", "import")
 
@@ -210,7 +211,7 @@ export const INTEGRATED_OFFER_COMMITS = trailerRevset(["source", "thread"])
  * Where an offer starts, as a revset (ADR-0060): the newest ancestors of the
  * lane's tip you already have. That is the commit the lane's base names
  * (`start`: the line's commit, or the WIP's copy), and every lane commit a
- * integrated offer's `Pineta-Source` names above what the base holds
+ * integrated offer's `Pinetrie-Source` names above what the base holds
  * (`integratedOfferCommitsRevset`), with their history: a parent lane's work
  * integrated after this lane forked, or a branch of this lane integrated
  * whole. Each source is
@@ -228,8 +229,8 @@ export function offerStart(input: {
 }
 
 /**
- * The integrated-offer commits `offerStart` reads, by their `Pineta-Source`
- * or `Pineta-Thread` trailers: an integrated offer's sources, or none for an
+ * The integrated-offer commits `offerStart` reads, by their `Pinetrie-Source`
+ * or `Pinetrie-Thread` trailers: an integrated offer's sources, or none for an
  * offer integrated before offers carried them (`untracedLanes`, S97). Those in `::<onto>`, and in `::<wip>` for a
  * lane on a WIP, but not in the history of the base's `source` (S81). The lane merged that commit, so it holds
  * what was integrated below it. An offer keeps the diff from the merge of its

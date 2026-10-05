@@ -2,13 +2,13 @@
 // ADR-0059). Pure: `settleSlots`, the one slot rule the repair writes too,
 // each slot with its card.
 
-import type { CardId, CardRecord } from "@pineta/core"
+import type { CardId, CardRecord } from "@pinetrie/core"
 import {
   type Intents,
   SLOT_INDICES,
   type Slots,
   settleSlots,
-} from "@pineta/session"
+} from "@pinetrie/session"
 
 export interface SlotView {
   readonly index: number

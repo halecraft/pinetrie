@@ -1816,8 +1816,8 @@ export const mutations: readonly Mutation[] = [
     name: "the window's title names no root",
     file: "packages/client/open-list-view.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: '  const place = here === null ? "Pineta" : `${here.label} · Pineta`',
-    to: '  const place = "Pineta"',
+    from: "  const place = here === null ? PRODUCT_NAME : `${here.label} · ${PRODUCT_NAME}`",
+    to: "  const place = PRODUCT_NAME",
     command: unit,
     expect: "0 needing you, on a root",
   },
@@ -2191,8 +2191,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a client view mints an entry id",
     file: "packages/client/open-list-view.ts",
-    from: 'import type {\n  EntryId,\n  LaneName,\n  MarkRecord,\n  RootId,\n  ThreadName,\n  Workflow,\n  WorkflowStateId,\n} from "@pineta/core"',
-    to: 'import {\n  type EntryId,\n  entryId,\n  type LaneName,\n  type MarkRecord,\n  type RootId,\n  type ThreadName,\n  type Workflow,\n  type WorkflowStateId,\n} from "@pineta/core"',
+    from: 'import type {\n  EntryId,\n  LaneName,\n  MarkRecord,\n  RootId,\n  ThreadName,\n  Workflow,\n  WorkflowStateId,\n} from "@pinetrie/core"',
+    to: 'import {\n  type EntryId,\n  entryId,\n  type LaneName,\n  type MarkRecord,\n  type RootId,\n  type ThreadName,\n  type Workflow,\n  type WorkflowStateId,\n} from "@pinetrie/core"',
     command: [
       "pnpm",
       "exec",

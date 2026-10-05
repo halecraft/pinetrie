@@ -9,15 +9,15 @@ import type {
   ParentThread,
   ThreadBase,
   WriterId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import {
   catchUpName,
   displayName,
   type PinnedStatus,
   type Verb,
   verbOf,
-} from "@pineta/rules"
-import type { CardRefusal } from "@pineta/session"
+} from "@pinetrie/rules"
+import type { CardRefusal } from "@pinetrie/session"
 import type { PinnedMarker } from "./column-view.ts"
 import { lineWords, type Reader } from "./send.ts"
 import type { TraceGroup } from "./traces.ts"

@@ -1,4 +1,4 @@
-// Mutations for @pineta/rules. Run: pnpm mutate scripts/mutations/rules.ts
+// Mutations for @pinetrie/rules. Run: pnpm mutate scripts/mutations/rules.ts
 import type { Mutation } from "../mutate.ts"
 
 const unit = ["pnpm", "exec", "vitest", "run", "packages/rules"]
@@ -317,7 +317,7 @@ export const mutations: readonly Mutation[] = [
     name: "the line is named by its bookmark",
     file: "packages/rules/line.ts",
     from: '  from.kind === "line"\n    ? "the project"',
-    to: '  from.kind === "line"\n    ? "pineta-onto"',
+    to: '  from.kind === "line"\n    ? "pinetrie-onto"',
     command: unit,
     expect:
       "an update round-trips, shows one line, and tells the model what changed",

@@ -15,7 +15,7 @@ Decision).
 Amended by ADR-0085: the `archive` command is gone; `move-root` and
 `workflow` change the workspace people share in its place.
 
-**Context.** Pineta has grown commands the host carries out, each started
+**Context.** pine·trie has grown commands the host carries out, each started
 by a button and nothing else (`packages/core/index.ts`):
 
 | command | what it changes |
@@ -29,11 +29,11 @@ by a button and nothing else (`packages/core/index.ts`):
 Two gaps showed (Duane, 2026-10-05):
 
 - **A take leaves nothing in the thread.** It moves a bookmark in your
-  repo and marks the lane's one `pineta.offer` record taken. The strip says
+  repo and marks the lane's one `pinetrie.offer` record taken. The strip says
   "added as …" until the next offer is built over that record, or a
   refresh forgets it (ADR-0061). The thread's timeline never shows it, and
   the agent never learns its work was added. A catch-up, by contrast,
-  writes a `pineta.update` entry (ADR-0038).
+  writes a `pinetrie.update` entry (ADR-0038).
 - **The agent cannot see or do what the buttons do.** Whether the thread's
   base has new work is a value the page has (`catchUpOf`,
   `packages/rules/line.ts`): ↓ on the column's header, "the project has
@@ -91,7 +91,7 @@ Two gaps showed (Duane, 2026-10-05):
   - The merge runs on the lane's queue (`updateOnQueue`), after the
     previous turn's snapshot, without `withLaneStarted`, whose end stops the
     container (S103 item 1). Its result is the tool's result, in place of
-    the `pineta.update` entry, with the merged commits in its `details`,
+    the `pinetrie.update` entry, with the merged commits in its `details`,
     which `parentNow` reads as it reads an update's `merged`.
   - **The turn records the merge** (S103 item 3): a turn whose `catch_up`
     result says it merged records the lane's bookmark, so a branch from it
@@ -119,7 +119,7 @@ Two gaps showed (Duane, 2026-10-05):
   (`packages/client/TECHNICAL.md`, "Words come from values").
   - A take: "added to the project as `<change>`", with the bookmark it
     moved. A describe, squash or refresh likewise; a catch-up and a split
-    already have theirs (`pineta.update` or the tool's result, the stack's
+    already have theirs (`pinetrie.update` or the tool's result, the stack's
     prompt).
   - **A fact is always a queued card** with no text, which starts no run,
     taken in order with the other cards (ADR-0048, ADR-0055). An idle
@@ -144,7 +144,7 @@ Two gaps showed (Duane, 2026-10-05):
   without asking: it has nothing to lose, and nothing to conflict. When
   its base `brings` and its offer's `WorkChanges` is `none` (never
   `unknown`, ADR-0067), the host runs `bring-up-to-date` first; its
-  `pineta.update` entry is the fact, and it costs no model run.
+  `pinetrie.update` entry is the fact, and it costs no model run.
 - **A resolution ends like any run** (S104). ADR-0033's rule stands: the
   agent can always stop by asking, and can never claim a success the
   repository contradicts. Only where the facts are read changes:
@@ -163,7 +163,7 @@ Two gaps showed (Duane, 2026-10-05):
     ask about a conflict, when it is newer than the offer's record.
   - **Conflicts left are the offer's**, built from the lane's tip when the
     run ends (ADR-0072's `conflictCause` reads them there).
-  - `landingEnded`, the host's `asked` set, the `pineta.landing` record and
+  - `landingEnded`, the host's `asked` set, the `pinetrie.landing` record and
     `planRunEnd`'s step for a land message go. A land message stays the
     prompt of a catch-up a card started.
 
@@ -183,7 +183,7 @@ Two gaps showed (Duane, 2026-10-05):
   list when it is first held (`threadLanes`), and loses its earlier
   thinking once (S85).
 - A lane caught up before its run starts from newer files than the person
-  last saw it on. Its `pineta.update` entry, before their message, says so.
+  last saw it on. Its `pinetrie.update` entry, before their message, says so.
 - An agent that asks for a split waits for its run to end before the stack
   is built, and the split costs a run of its own, as the button's does.
 - A person can ask for a split while the thread works; it waits in the
@@ -222,7 +222,7 @@ it left open:
   An instruction is not a boundary; host-only is enforced by there being
   no tool.
 - **A `describe_offer` tool** taking the agent's message (Duane,
-  2026-10-05). The `commit-message` skill is Pineta's, not the agent's to
+  2026-10-05). The `commit-message` skill is pine·trie's, not the agent's to
   choose (`disable-model-invocation`), and is given what a lane's agent
   cannot see: your repo's recent descriptions, to follow its conventions.
   During a run the offer is still the last run's, so the message would
@@ -237,7 +237,7 @@ it left open:
   says nothing the agent can act on.
 - **Keeping the name `ask_for_guidance`.** It reads as a tool for any
   question, while the host accepts it only over a conflict.
-- **Keeping `pineta.landing`, written at any run's end.** Its two facts
+- **Keeping `pinetrie.landing`, written at any run's end.** Its two facts
   are already in the offer and the tree; a record would be a third copy
   to keep in step.
 - **Gating `ask_about_conflict` on the newest revision record's

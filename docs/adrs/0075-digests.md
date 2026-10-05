@@ -17,7 +17,7 @@ paragraph under the ask's fold line. In use:
   whole, and markdown (`` `core/index.ts` ``) showed its backticks.
 - The most useful sentence sat apart from the fold line, which said only
   counts ("30 steps · 30 tool calls · 12 files").
-- Words for Pineta's machinery ("session lane") reached the reader.
+- Words for pine·trie's machinery ("session lane") reached the reader.
 
 **Decision.**
 - **Only a long ask has a digest.** A long ask is one whose run holds
@@ -42,8 +42,8 @@ paragraph under the ask's fold line. In use:
   agent's last message under a heading of its own, which is never cut. The
   skill asks for what lies between them: changes, findings, decisions,
   failures and risks. It forbids restating the ask, narrating steps, and
-  naming Pineta's machinery.
-- **`pineta.digest` holds `{ headline, points, at, final }`;** a null
+  naming pine·trie's machinery.
+- **`pinetrie.digest` holds `{ headline, points, at, final }`;** a null
   headline is a digest with nothing to draw. A record written before this
   ADR, `{ text, at, final }`, does not decode and is dropped.
 - **In story, the headline leads the fold line,** before the counts, and

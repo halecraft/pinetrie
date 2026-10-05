@@ -1,4 +1,4 @@
-import { cardId } from "@pineta/core"
+import { cardId } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import { cardKeyAct } from "./card-keys.ts"
 

@@ -25,9 +25,9 @@ import type {
   PlaceKey,
   Reorder,
   WriterId,
-} from "@pineta/core"
-import type { Outcome } from "@pineta/protocol/codec"
-import { planReorder } from "@pineta/rules"
+} from "@pinetrie/core"
+import type { Outcome } from "@pinetrie/protocol/codec"
+import { planReorder } from "@pinetrie/rules"
 import type { Intents } from "./inventory.ts"
 
 /**

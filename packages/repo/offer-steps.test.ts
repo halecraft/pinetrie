@@ -6,7 +6,7 @@ import {
   type Placed,
   type RefreshDecision,
   type ThreadName,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   describeEffects,
@@ -32,7 +32,7 @@ const TARGET = commitId("44444444")
 const NOT_YOURS = { reached: true, yoursChanged: false }
 const OFFER: OfferNow = {
   kind: "offer",
-  bookmark: `pineta-offer/${NAME}`,
+  bookmark: `pinetrie-offer/${NAME}`,
   revisions: [
     { commit: commitId("55555555"), change: "kxyz", since: NOT_YOURS },
   ],
@@ -189,7 +189,7 @@ test("offerIntegrationEffects and describeEffects: the integration's bookmark mo
     yourEdits: [],
     described: false,
     edited: false,
-    bookmark: `pineta-offer/${NAME}`,
+    bookmark: `pinetrie-offer/${NAME}`,
     integratedAs: "ktop",
     commits: [],
     ledger: null,
@@ -200,7 +200,7 @@ test("offerIntegrationEffects and describeEffects: the integration's bookmark mo
       kind: "integrate",
       name: NAME,
       bookmark: integrated.bookmark,
-      destination: "pineta-onto",
+      destination: "pinetrie-onto",
       top: "ktop",
       integrated,
     }),
@@ -208,7 +208,7 @@ test("offerIntegrationEffects and describeEffects: the integration's bookmark mo
     steps: planOfferIntegrationSteps({
       bookmark: integrated.bookmark,
       top: "ktop",
-      destination: "pineta-onto",
+      destination: "pinetrie-onto",
     }),
     after: { kind: "integrated", record: integrated },
     built: false,

@@ -2,7 +2,7 @@
 
 After each assistant message whose tools changed tracked files, the host
 commits the lane's working copy (`commitTurn`, ADR-0032) and moves the lane's
-bookmark, `pineta/<lane>`, to the commit. The offer is fetched from that
+bookmark, `pinetrie/<lane>`, to the commit. The offer is fetched from that
 bookmark (ADR-0038), and a branch at a message runs `jj new` on the nearest
 recorded commit, on a clone of that message's disk (ADR-0034). This probe asks
 what happens when the agent commits itself, with `jj commit` or `git commit`,
@@ -31,7 +31,7 @@ makes itself is the turn's revision", one case for jj and one for git.
    ignored files"). The fork's `jj new B` on the cloned disk removed `b.txt`.
    Nothing reported an error.
 
-**Consequences.** Telling the agent to leave commits to Pineta (ADR-0046) is
+**Consequences.** Telling the agent to leave commits to pine·trie (ADR-0046) is
 not enough, since an agent may still commit from habit or because a person
 asks. The host adopts the agent's commit as the turn's revision when it
 descends from the lane's bookmark (`planTurnCommit`, ADR-0032 as amended).

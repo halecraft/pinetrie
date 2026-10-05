@@ -19,7 +19,7 @@ import {
   SESSION_TARGET,
   type Target,
   type ValueWrite,
-} from "@pineta/core"
+} from "@pinetrie/core"
 
 /** Which document a record lives in (ADR-0063). */
 export type Home = "session" | "root"

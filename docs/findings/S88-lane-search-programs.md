@@ -6,7 +6,7 @@
 through the lane runtime (S44), and gives the agent `grep` and `find` tools
 that run them. pi's prompt already told every lane to "use bash for file
 operations like ls, rg, find", and no lane had `rg`. This records the probes
-the plan rests on, run in a lane on Debian trixie (aarch64), against Pineta's
+the plan rests on, run in a lane on Debian trixie (aarch64), against pine·trie's
 own repo at `/workspace`.
 
 **Answers.**

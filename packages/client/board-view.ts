@@ -15,8 +15,8 @@ import type {
   WorkflowState,
   WorkflowStateId,
   WriterId,
-} from "@pineta/core"
-import { boardOf } from "@pineta/rules"
+} from "@pinetrie/core"
+import { boardOf } from "@pinetrie/rules"
 import { type Level, markOf, type Status } from "./attention.ts"
 import type { Intent } from "./intent.ts"
 import { NO_TEXT } from "./root-label.ts"

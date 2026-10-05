@@ -22,9 +22,10 @@ import {
   isWithin,
   type LaneName,
   NO_EDITOR,
+  PRODUCT_NAME,
   type RuntimeProgram,
-} from "@pineta/core"
-import { PINNED_RULE, type ToolAnswer } from "@pineta/rules"
+} from "@pinetrie/core"
+import { PINNED_RULE, type ToolAnswer } from "@pinetrie/rules"
 import { Type } from "typebox"
 import type { ModelSetup } from "./config.ts"
 import { buildSystemPrompt, ensureTool } from "./deep.ts"
@@ -59,7 +60,7 @@ export type LaneAccess =
 
 /**
  * What a lane of its own is told about itself (ADR-0046). The host builds
- * every name in it: `PINETA_MOUNT` and `LANE_NOTE` are in `@pineta/lanes`,
+ * every name in it: `PINETRIE_MOUNT` and `LANE_NOTE` are in `@pinetrie/lanes`,
  * which this package does not declare. Nothing here changes while the lane
  * lives: a change would alter every request's prefix, and Anthropic then
  * drops the lane's earlier thinking (S85).
@@ -72,7 +73,7 @@ export interface LaneFacts {
    * relative to `dir` (ADR-0035).
    */
   readonly shared: readonly string[]
-  /** What `pineta.json` lets into the lane (ADR-0034). */
+  /** What `pinetrie.json` lets into the lane (ADR-0034). */
   readonly grants: {
     readonly ssh: boolean
     /** Names of environment variables passed in. */
@@ -81,12 +82,12 @@ export interface LaneFacts {
     readonly mounts: readonly string[]
   }
   /**
-   * The lane runs Pineta's default image, which carries Chromium's headless
+   * The lane runs pinetrie's default image, which carries Chromium's headless
    * shell (ADR-0041) and python3 (ADR-0064). A project's own image may carry
    * neither.
    */
   readonly defaultImage: boolean
-  /** Pineta's install, mounted read-only in the lane. */
+  /** pinetrie's install, mounted read-only in the lane. */
   readonly install: string
   /** The lane note's path in the lane. */
   readonly note: string
@@ -122,11 +123,11 @@ export function laneGuidelines(facts: LaneFacts): string[] {
       : [`read-only files at ${grants.mounts.join(", ")}`]),
   ]
   return [
-    `You work in a Pineta lane: a Linux container where you are root, in your own jj repo at ${dir}.`,
-    "Pineta commits your changes after each message, so you need not commit. Don't rewrite earlier revisions. Your work so far: `jj log -r 'immutable_heads()..'`.",
+    `You work in a ${PRODUCT_NAME} lane: a Linux container where you are root, in your own jj repo at ${dir}.`,
+    `${PRODUCT_NAME} commits your changes after each message, so you need not commit. Don't rewrite earlier revisions. Your work so far: \`jj log -r 'immutable_heads()..'\`.`,
     "The person gets your work as one commit, and never sees your files live.",
     `Only ${dir} lasts. Background processes end with each run, and nothing outside ${dir} reaches a branch.`,
-    `${HOST_WORKING_COPY} is the person's working copy, read-only. ${facts.install} is Pineta's install, not your project.`,
+    `${HOST_WORKING_COPY} is the person's working copy, read-only. ${facts.install} is ${PRODUCT_NAME}'s install, not your project.`,
     ...facts.shared.map(
       p =>
         `${dir}/${p} is shared live with the person and other threads, never committed.`,
@@ -163,7 +164,7 @@ export interface LaneHooks {
 
 type Context = Parameters<typeof withContextValue>[2]
 
-const LANE = createContextKey<LaneName>("pineta.lane")
+const LANE = createContextKey<LaneName>("pinetrie.lane")
 
 /** `base` with the lane named: pass it to every call that drives the lane. */
 export const laneContext = (lane: LaneName, base: Context): Context =>

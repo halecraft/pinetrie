@@ -9,7 +9,7 @@
 // move are Cmd or Ctrl with Z (Shift+Z, or Ctrl+Y, to redo), only outside a
 // text box, where they are the box's own text undo (ADR-0052).
 
-import { type CardId, INVENTORY_COLUMNS, INVENTORY_SLOTS } from "@pineta/core"
+import { type CardId, INVENTORY_COLUMNS, INVENTORY_SLOTS } from "@pinetrie/core"
 import type { Intent } from "./intent.ts"
 
 /** The part of a `KeyboardEvent` read here. */

@@ -4,7 +4,7 @@ import {
   type OfferRecord,
   type ThreadName,
   writerId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   actionFact,
@@ -25,7 +25,7 @@ const INTEGRATED: OfferFact = {
   lane: LANE,
   by: ADA,
   as: "kabcdefghij",
-  bookmark: "pineta-onto",
+  bookmark: "pinetrie-onto",
   to: { kind: "line" },
 }
 const FACTS: readonly OfferFact[] = [
@@ -51,7 +51,7 @@ describe("a fact (ADR-0080)", () => {
       decodeOfferFact(JSON.stringify({ ...INTEGRATED, lane: "main" })),
     ).toBeUndefined()
     expect(
-      decodeFact({ role: "custom", customType: "pineta.fact" }),
+      decodeFact({ role: "custom", customType: "pinetrie.fact" }),
     ).toBeUndefined()
   })
 
@@ -67,7 +67,7 @@ describe("a fact (ADR-0080)", () => {
 
   test("the model reads who did it, and an integration's change and bookmark", () => {
     expect(factContent(INTEGRATED, "Ada")).toContain(
-      "Ada added this thread's work to the project, as the change kabcdefghij: pineta-onto moved forward to it.",
+      "Ada added this thread's work to the project, as the change kabcdefghij: pinetrie-onto moved forward to it.",
     )
     expect(factContent(FACTS[4] as OfferFact, "Ada")).toMatch(/^Ada rebuilt/)
   })
@@ -83,20 +83,20 @@ describe("a fact (ADR-0080)", () => {
     const decision = {
       kind: "integrate",
       name: "amber-fox" as ThreadName,
-      bookmark: "pineta-offer/amber-fox",
-      destination: "pineta-onto",
+      bookmark: "pinetrie-offer/amber-fox",
+      destination: "pinetrie-onto",
       top: "kabcdefghij",
       integrated: {} as OfferRecord,
     } as const
     expect(
-      integratedFact({ lane: LANE, by: ADA, decision, onto: "pineta-onto" }),
+      integratedFact({ lane: LANE, by: ADA, decision, onto: "pinetrie-onto" }),
     ).toEqual(INTEGRATED)
     expect(
       integratedFact({
         lane: LANE,
         by: ADA,
         decision: { ...decision, destination: "wip/search" },
-        onto: "pineta-onto",
+        onto: "pinetrie-onto",
       }),
     ).toMatchObject({ to: { kind: "wip", bookmark: "wip/search" } })
     expect(actionFact("squash", LANE, ADA)).toEqual(FACTS[3])

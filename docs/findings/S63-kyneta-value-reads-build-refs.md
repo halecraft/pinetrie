@@ -1,7 +1,7 @@
 # S63 — a value read in Kyneta builds a ref for every node it reads
 
 A brief for Kyneta, from S62's pauses. Measured against the Kyneta checkout
-Pineta links (`kqrrxzqs` 6c381fdc, "fix(exchange)!: an undo never creates a
+pine·trie links (`kqrrxzqs` 6c381fdc, "fix(exchange)!: an undo never creates a
 document", plus a working copy on top), in Node 24.
 
 **Answers.**
@@ -20,11 +20,11 @@ document", plus a working copy on top), in Node 24.
    through `navigable.at(key)` "to respect caching/addressing identity", and
    a product's (`withReadable`, `interpreters/with-readable.ts`) through each
    field's getter. Each step creates the child's ref, and caching keeps it.
-   The sampling profile of the same read in Pineta's client attributes the
+   The sampling profile of the same read in pine·trie's client attributes the
    retained memory to `wireChangefeed`, `onRefCreated`, the tracking
    `scalar`, `interpretImpl`, `attachIsPopulated` and `createNodeChangefeed`,
    with the frozen values themselves (`frozenClone`) a small part.
-3. **In Pineta's session this is most of the page's memory** (measured). A
+3. **In pine·trie's session this is most of the page's memory** (measured). A
    Node client of a copy of Duane's store (9,445 entries, 47 MiB as JSON)
    held 99 MiB once synced, and 411 MiB after one `doc.entries()` and one
    `doc.values()`. A sampling profile put 317 MiB of that under the read.
@@ -35,14 +35,14 @@ document", plus a working copy on top), in Node 24.
    took 452 ms, against 74 ms for single-`any` rows. After one more row,
    a read took 36 ms and retained 429 KiB more.
 
-## What Pineta would want
+## What pine·trie would want
 
 A value read (`ref()`) that gives a frozen snapshot of the store at that path
 without creating, caching or wiring refs for the nodes below it, reporting
 one dependency for the path it read. Refs would then exist only for what a
 program navigates to. Whatever change-delivery or identity guarantee the
 current route through `at(key)` gives, the snapshot's values would still have
-to keep their identity while unchanged (S54, answer 4), which Pineta's reads
+to keep their identity while unchanged (S54, answer 4), which pine·trie's reads
 rely on.
 
 ## Repro
@@ -113,6 +113,6 @@ The object counts came from the same program at 2,000 rows, with
 ## Not tested
 
 - A read inside a reactive scope against one outside: the Node client
-  measured the plain read, and Pineta's page reads under `useSelector`.
+  measured the plain read, and pine·trie's page reads under `useSelector`.
 - Loro- or Yjs-bound documents: only `json.bind`.
 - Whether a ref, once built, is ever released.

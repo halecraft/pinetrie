@@ -38,7 +38,7 @@ import {
   THE_AGENT,
   writerId,
   writerOfPrincipal,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
@@ -66,7 +66,7 @@ describe("who a principal is (ADR-0037)", () => {
   })
 
   test("the host's principal names no writer", () => {
-    expect(writerOfPrincipal("pineta-host")).toBeUndefined()
+    expect(writerOfPrincipal("pinetrie-host")).toBeUndefined()
     expect(writerOfPrincipal(undefined)).toBeUndefined()
     expect(writerOfPrincipal("Ada@X.io")).toBe(writerId("ada@x.io"))
   })

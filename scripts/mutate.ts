@@ -14,10 +14,10 @@
 //     some other check is ELSEWHERE, because the intended check did not fire.
 //   - A run that times out is KILLED (hung): a guard against spinning, removed,
 //     makes the suite hang, and a hang is a failure.
-//   - With `expect`, a suite stops at that check (`PINETA_STOP_AT`,
-//     `apps/pineta/e2e/checks.ts`): nothing after it changes the verdict.
-//   - A suite mutation runs only its scenario (`PINETA_SCENARIO`,
-//     `apps/pineta/e2e/scenario.ts`), with its suite's command (`SUITES`).
+//   - With `expect`, a suite stops at that check (`PINETRIE_STOP_AT`,
+//     `apps/pinetrie/e2e/checks.ts`): nothing after it changes the verdict.
+//   - A suite mutation runs only its scenario (`PINETRIE_SCENARIO`,
+//     `apps/pinetrie/e2e/scenario.ts`), with its suite's command (`SUITES`).
 //
 // Usage: node scripts/mutate.ts <mutations.ts> [name-substring]
 // Exits with the number of mutations that were not KILLED.
@@ -71,15 +71,15 @@ export type Mutation = CommandMutation | SuiteMutation
 export const SUITES: Readonly<
   Record<Suite, { readonly command: readonly string[]; readonly dir: string }>
 > = {
-  host: { command: ["pnpm", "run", "e2e"], dir: "apps/pineta/e2e/host" },
-  live: { command: ["pnpm", "run", "e2e:live"], dir: "apps/pineta/e2e/host" },
+  host: { command: ["pnpm", "run", "e2e"], dir: "apps/pinetrie/e2e/host" },
+  live: { command: ["pnpm", "run", "e2e:live"], dir: "apps/pinetrie/e2e/host" },
   browser: {
     command: ["pnpm", "run", "e2e:browser"],
-    dir: "apps/pineta/e2e/browser",
+    dir: "apps/pinetrie/e2e/browser",
   },
   lanes: {
     command: ["pnpm", "run", "e2e:lanes"],
-    dir: "apps/pineta/e2e/lanes",
+    dir: "apps/pinetrie/e2e/lanes",
   },
 }
 
@@ -141,8 +141,8 @@ export function mutantEnv(
   if (m.expect === undefined && m.scenario === undefined) return base
   return {
     ...base,
-    ...(m.expect === undefined ? {} : { PINETA_STOP_AT: m.expect }),
-    ...(m.scenario === undefined ? {} : { PINETA_SCENARIO: m.scenario }),
+    ...(m.expect === undefined ? {} : { PINETRIE_STOP_AT: m.expect }),
+    ...(m.scenario === undefined ? {} : { PINETRIE_SCENARIO: m.scenario }),
   }
 }
 

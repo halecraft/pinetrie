@@ -48,19 +48,19 @@ const gathered = (
   file: `/x/${over.name}/SKILL.md`,
   dir: `/x/${over.name}`,
   root: "/x",
-  names: { pineta: false, plugin: null, packageName: null, scope: "user" },
+  names: { pinetrie: false, plugin: null, packageName: null, scope: "user" },
   ...over,
 })
 
 describe("labelCommands: each package's label, and clashes refused", () => {
-  test("plugin.json's name, else the unscoped package name, else pi's scope, else pineta", () => {
+  test("plugin.json's name, else the unscoped package name, else pi's scope, else pinetrie", () => {
     const { commands, refused } = labelCommands(
       [
         gathered({
           name: "plan",
           source: "/d",
           names: {
-            pineta: false,
+            pinetrie: false,
             plugin: "duane",
             packageName: "@duane/skills",
             scope: "user",
@@ -70,7 +70,7 @@ describe("labelCommands: each package's label, and clashes refused", () => {
           name: "plan",
           source: "/p",
           names: {
-            pineta: false,
+            pinetrie: false,
             plugin: null,
             packageName: "@zenspc/pi-pstack",
             scope: "user",
@@ -81,7 +81,7 @@ describe("labelCommands: each package's label, and clashes refused", () => {
           kind: "prompt",
           source: "/d",
           names: {
-            pineta: false,
+            pinetrie: false,
             plugin: "duane",
             packageName: "@duane/skills",
             scope: "user",
@@ -90,9 +90,9 @@ describe("labelCommands: each package's label, and clashes refused", () => {
         gathered({ name: "loose", source: "user" }),
         gathered({
           name: "resolve-conflicts",
-          source: "/pineta",
+          source: "/pinetrie",
           names: {
-            pineta: true,
+            pinetrie: true,
             plugin: null,
             packageName: null,
             scope: "user",
@@ -107,7 +107,7 @@ describe("labelCommands: each package's label, and clashes refused", () => {
       "pi-pstack:skill:plan",
       "duane:comments",
       "user:skill:loose",
-      "pineta:skill:resolve-conflicts",
+      "pinetrie:skill:resolve-conflicts",
     ])
   })
   test("a rename, keyed by pi's source, wins", () => {
@@ -117,7 +117,7 @@ describe("labelCommands: each package's label, and clashes refused", () => {
           name: "plan",
           source: "/p",
           names: {
-            pineta: false,
+            pinetrie: false,
             plugin: null,
             packageName: "@zenspc/pi-pstack",
             scope: "user",
@@ -130,7 +130,7 @@ describe("labelCommands: each package's label, and clashes refused", () => {
   })
   test("two sources with one label are refused together, both named", () => {
     const names = {
-      pineta: false,
+      pinetrie: false,
       plugin: "same",
       packageName: null,
       scope: "user",

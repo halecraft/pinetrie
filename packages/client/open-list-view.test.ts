@@ -9,7 +9,7 @@ import {
   type Workflow,
   workflowStateIdFor,
   writerId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import type { Item, Status } from "./attention.ts"
 import type { CardMarks } from "./card-marks.ts"
@@ -320,11 +320,11 @@ test("selected is the item you are on, and each item has its own key", () => {
 describe("pageTitle", () => {
   const [r1, , , t] = items()
   test.each([
-    [0, "nothing", null, "Pineta"],
-    [3, "nothing", null, "(3) Pineta"],
-    [0, "a root", r1, "Tab names · Pineta"],
-    [3, "a root", r1, "(3) Tab names · Pineta"],
-    [0, "a new tab", t, "new agent · Pineta"],
+    [0, "nothing", null, "pine·trie"],
+    [3, "nothing", null, "(3) pine·trie"],
+    [0, "a root", r1, "Tab names · pine·trie"],
+    [3, "a root", r1, "(3) Tab names · pine·trie"],
+    [0, "a new tab", t, "new agent · pine·trie"],
   ])("%i needing you, on %s", (count, _, here, words) => {
     expect(pageTitle(count, here ?? null)).toBe(words)
   })

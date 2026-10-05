@@ -11,9 +11,9 @@ import {
   type StoredImage,
   THE_AGENT,
   writerId,
-} from "@pineta/core"
-import { encodeChat } from "@pineta/rules"
-import { newRootDoc } from "@pineta/schema"
+} from "@pinetrie/core"
+import { encodeChat } from "@pinetrie/rules"
+import { newRootDoc } from "@pinetrie/schema"
 import { expect, test } from "vitest"
 import { createAgent, newId } from "./agent.ts"
 import { prepareImage, readImageProcessor, sha256Of } from "./images.ts"

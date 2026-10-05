@@ -1,7 +1,7 @@
 // pi/lane-helper — the guest side of a lane's channel (ADR-0034, S43, S44).
 //
 // The host starts this once per running lane, as
-// `container exec -i <lane> <runtime loader> … node /pineta/packages/pi/lane-helper.ts`,
+// `container exec -i <lane> <runtime loader> … node /pinetrie/packages/pi/lane-helper.ts`,
 // and speaks `lane-protocol.ts` over its stdin and stdout. It serves:
 // - pi's own `NodeExecutionEnv`, so pi's tools run in the lane unchanged;
 // - `run` requests, the host's own jj and git, by `execFile` with no shell.
@@ -20,7 +20,7 @@ import {
   withAbortSignal,
 } from "@earendil-works/pi-agent-core/harness/context"
 import { NodeExecutionEnv } from "@earendil-works/pi-agent-core/harness/env/nodejs"
-import { WORKSPACE_ROOT } from "@pineta/core"
+import { WORKSPACE_ROOT } from "@pinetrie/core"
 import {
   decode,
   encode,
@@ -30,7 +30,7 @@ import {
   type RunResult,
 } from "./lane-protocol.ts"
 
-const cwd = process.env.PINETA_WORKSPACE_ROOT ?? WORKSPACE_ROOT
+const cwd = process.env.PINETRIE_WORKSPACE_ROOT ?? WORKSPACE_ROOT
 const env = new NodeExecutionEnv({ cwd })
 const running = new Map<number, AbortController>()
 

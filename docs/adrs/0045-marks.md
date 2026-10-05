@@ -24,7 +24,7 @@ a boundary already, so its mark only names it. That difference belongs to the
 reads that derive membership, not to the record.
 
 **Decision.**
-- **A mark is a title on an entry.** It is a host-written `pineta.mark` value
+- **A mark is a title on an entry.** It is a host-written `pinetrie.mark` value
   keyed by the entry's id: `{ entry, title, by, at }`. The key makes it one
   per entry.
 - **One command, `mark`, sets or clears it.** It names the entry and a title.

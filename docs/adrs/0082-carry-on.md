@@ -23,7 +23,7 @@ aborted" (S70).
 **Decision.**
 - **Resume starts a new run with a host-written message**, as a split's
   stack message does (ADR-0038). It is a pi custom message,
-  `pineta.carry-on`, holding the lane and who resumed. The model reads
+  `pinetrie.carry-on`, holding the lane and who resumed. The model reads
   that the person asked it to carry on from where it was stopped, and that
   what it was writing then was not kept. A column shows "↻ resumed by
   <name>".

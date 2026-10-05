@@ -10,7 +10,7 @@
 // save winning, and hears other tabs' saves and clears through the `storage`
 // event.
 //
-// Generic: it knows nothing of Pineta. A value's stored form is its codec's.
+// Generic: it knows nothing of pinetrie. A value's stored form is its codec's.
 
 /** The part of `Storage` used here. */
 export interface StorageLike {

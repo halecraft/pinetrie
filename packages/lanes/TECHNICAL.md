@@ -1,12 +1,12 @@
-# `@pineta/lanes`: technical notes
+# `@pinetrie/lanes`: technical notes
 
 This package covers a lane's Linux container and its disk, and jj and git in
-it (ADR-0032 to ADR-0034). Your repo is `@pineta/repo`'s
+it (ADR-0032 to ADR-0034). Your repo is `@pinetrie/repo`'s
 (`packages/repo/TECHNICAL.md`), which builds on this package: what a lane
 also runs, through a `Runner` it is given, is here (`laneBase`,
 `REVISION_READ`, `commitsOf`), and so are the names both sides use
 (`bookmarkName`, `laneTipName`, `offerBookmark`, `DEFAULT_LINE`). This
-package never imports `@pineta/repo`. It declares only `@pineta/core`
+package never imports `@pinetrie/repo`. It declares only `@pinetrie/core`
 (`workspace.test.ts`), and the client may not depend on it. It never imports
 pi (ADR-0003): the channel into a lane is `packages/pi`'s, and the host hands
 it in as an `OpenLink`.
@@ -29,15 +29,15 @@ containers, disks and the helper.
   joins.
 - `host.ts`: startup facts, lane configs and shared directories. Its reads
   of your repo (`jjIn`, git from its root) are the one exception to "only
-  `@pineta/repo` runs jj on your repo": they only read, at startup, before
+  `@pinetrie/repo` runs jj on your repo": they only read, at startup, before
   the owner of your repo starts. Its one write there is a file, the exclude
-  file. `prepareProjectDir` adds `/.pineta/` to it, once from `server.ts`
+  file. `prepareProjectDir` adds `/.pinetrie/` to it, once from `server.ts`
   before the store opens and again in `prepareHost`, which then writes
   nothing (ADR-0086); `prepareShared` adds shared directories.
 - `planProjectDir` (`plan.ts`) decides a project's root from `RootFacts`,
   or refuses the folder (`ProjectDirRefusal`, worded by `projectDirWords`);
-  `planRoot` only maps its result for `planHost`. `pinetaDir` is the layout
-  of `.pineta/`: the store, snapshots, the runtime and `lane-git`.
+  `planRoot` only maps its result for `planHost`. `pinetrieDir` is the layout
+  of `.pinetrie/`: the store, snapshots, the runtime and `lane-git`.
 - `image.ts`, `runtime.ts`: the image and the lane runtime. `image.ts`
   gathers what `planImages` needs and builds what it plans.
 - `disk.ts`: snapshots, deletion, trim. `lane.ts`: the container, the queue,
@@ -80,7 +80,7 @@ containers, disks and the helper.
   files restored. Never the WIP's own commits: the lane's tip, a remote
   bookmark and immutable in your repo, would make them immutable too (S48
   item 11), and your WIP would freeze. Either commit carries
-  `Pineta-Base: <bookmark>@<commit>` (`baseMessage`), the lane's ledger of
+  `Pinetrie-Base: <bookmark>@<commit>` (`baseMessage`), the lane's ledger of
   its base. The base disk is the line's, so a WIP whose lockfile differs
   from the line's installs (`installIfLockMoved`).
 - **The base snapshot is the line's commit** (`refreshBase`), and
@@ -89,10 +89,10 @@ containers, disks and the helper.
 - **`jj new` runs first in a fork** (`planForkSetup`). A clone carries its
   parent's working-copy change. Without `jj new`, the fork's first turn reuses
   that change's id, and your repo sees a divergent change (S42 item 2).
-  `repo.test.ts` (`@pineta/repo`) forks a lane's repo and checks that your repo has no
+  `repo.test.ts` (`@pinetrie/repo`) forks a lane's repo and checks that your repo has no
   `divergent()`. Its mutation drops `jj new`.
 - **Inherited history is immutable in the fork.** Its config is a file on its
-  own disk (`JJ_CONFIG=/workspace/.pineta-lane/jj.toml`), so forks of forks
+  own disk (`JJ_CONFIG=/workspace/.pinetrie-lane/jj.toml`), so forks of forks
   inherit it. It sets `immutable_heads()` to
   `builtin_immutable_heads() | <fork commit>` (`forkConfig`). A parent's fork
   point is an ancestor of its child's, so nothing needs reading from the lane.
@@ -112,7 +112,7 @@ containers, disks and the helper.
 
 - **By commit id, into a lane**: `fetchById` fetches from `/mnt/host-working-copy` only when
   the disk lacks the commit, and puts the commit on a branch
-  (`refs/heads/pineta/fetched/<i>`). jj imports only branches, remote branches
+  (`refs/heads/pinetrie/fetched/<i>`). jj imports only branches, remote branches
   and tags, so it does not see a commit fetched with no ref (S44 item 7).
   When your `@-` was rewritten, that branch moves sideways, and the import
   (`--ignore-working-copy`) abandons the commit it named and rebases its
@@ -123,20 +123,20 @@ containers, disks and the helper.
   wanted commit the disk already holds, so naming one of the lane's own is
   harmless, though a caller names only what the lane may lack (S83).
 - **By bundle, into your repo** (`planBundle` here, `planImport` in
-  `@pineta/repo`): `git bundle create -` in the lane, written to a host file
+  `@pinetrie/repo`): `git bundle create -` in the lane, written to a host file
   through the channel as bytes, then, in your repo, `git fetch <file>
-  +refs/heads/pineta/<lane>:refs/remotes/pineta-<lane>/tip`.
+  +refs/heads/pinetrie/<lane>:refs/remotes/pinetrie-<lane>/tip`.
   The bundle excludes what your repo has (`^<have>`). A bundle of the whole
-  history is 1.1 MB and 253 ms on Pineta's repo, against 8 KB and 29 ms for
+  history is 1.1 MB and 253 ms on pine·trie's repo, against 8 KB and 29 ms for
   one commit (S43 item 8).
-- **In your repo a lane's history is a remote bookmark**, `tip@pineta-<lane>`
+- **In your repo a lane's history is a remote bookmark**, `tip@pinetrie-<lane>`
   (ADR-0038). jj imports a ref under `refs/remotes/` with no git remote
   configured, keeps its commits out of your default log, and treats them,
   and their ancestors, as immutable with its builtin config (S48 items 11 and
-  19). `laneRefSteps` (`@pineta/repo`) is the one writer of the ref besides
+  19). `laneRefSteps` (`@pinetrie/repo`) is the one writer of the ref besides
   the fetch: archiving deletes it, restoring writes it back. In the lane's
-  own repo the bookmark stays a local `pineta/<lane>`; `laneTipIn`
-  (`@pineta/repo`) reads the one in yours, `bookmarkOf` the lane's.
+  own repo the bookmark stays a local `pinetrie/<lane>`; `laneTipIn`
+  (`@pinetrie/repo`) reads the one in yours, `bookmarkOf` the lane's.
 - **Every fetch into a colocated repo ends with
   `jj --ignore-working-copy git import`**, in your repo as the host
   (`planImport`). A jj command run with
@@ -147,7 +147,7 @@ containers, disks and the helper.
   fetch by id. `jj git clone` refuses a directory that is not empty, and a
   fresh volume holds `lost+found` (S44 item 6). A clone would also fetch every
   bookmark and check out nothing (S43 item 5).
-- **`PINETA_GIT=1`** is set on every host command `run` starts. A git shim
+- **`PINETRIE_GIT=1`** is set on every host command `run` starts. A git shim
   that refuses git writes in a jj repo when an agent is driving lets it
   through. The agent's own commands run through pi's environment, never
   through `run`, so they never carry it.
@@ -159,14 +159,14 @@ containers, disks and the helper.
   `container exec -i <lane> …`, and a call takes 0.3–1 ms. A `container exec`
   per call would take 50–70 ms (S39, S43).
 - **The helper runs on the lane runtime** (`runtimeNode`):
-  `/pineta-runtime/node/ld-linux-aarch64.so.1 --library-path … node …`. The
-  runtime is copied out of Pineta's default image into
-  `.pineta/runtime/<image tag>/`: Node, the libraries `ldd` lists for it,
+  `/pinetrie-runtime/node/ld-linux-aarch64.so.1 --library-path … node …`. The
+  runtime is copied out of pine·trie's default image into
+  `.pinetrie/runtime/<image tag>/`: Node, the libraries `ldd` lists for it,
   glibc's loader, and in `bin/` static builds of core's `RUNTIME_PROGRAMS`
   (jj, rg, fd, sd). So the helper runs on any image, musl or glibc, with or
   without Node (S44), and every lane has those programs (ADR-0064). Only
   `bin/` (`RUNTIME_BIN`) goes on a lane's `PATH`, after the image's own;
-  Pineta's Node needs its loader.
+  pine·trie's Node needs its loader.
 - **The runtime's programs are static release builds**, pinned by `ARG`
   defaults in the default Containerfile (S88). Debian's rg and fd link glibc,
   and would not run on a musl image. `EXTRACT` copies each program in the
@@ -177,7 +177,7 @@ containers, disks and the helper.
   to `sh -c`) and git 2.41 or later. Git launches its own helper programs, so
   it cannot be carried in from outside the image. `checkImage` refuses an
   image without them, naming what it lacks.
-- **Pineta's default image carries python3**, and **Chromium's headless
+- **pine·trie's default image carries python3**, and **Chromium's headless
   shell** and its libraries, in `PLAYWRIGHT_BROWSERS_PATH=/ms-playwright`
   (ADR-0041). Its
   build is pinned by `PLAYWRIGHT_VERSION`: `prepareImages` takes it from the
@@ -193,7 +193,7 @@ containers, disks and the helper.
 ## Containers
 
 - **A container is disposable; the disk is the lane.** Each lane's container
-  is labelled `pineta.spec=<hash>` (`SPEC_LABEL`), a hash of its
+  is labelled `pinetrie.spec=<hash>` (`SPEC_LABEL`), a hash of its
   `container run` arguments. `planContainer` decides at each start:
   - missing: create it;
   - its label differs, or it has none: recreate it on the same volume;
@@ -224,18 +224,18 @@ containers, disks and the helper.
   there arrives on the host owned by you. Changes are visible at once
   between the host and every lane (S45 items 2 and 3).
 - **Two levels, merged:** the user's lane config
-  (`$XDG_CONFIG_HOME/pineta/config.json`, only its `lanes.shared`), then the
-  project's `pineta.json`. `planShared` refuses:
+  (`$XDG_CONFIG_HOME/pinetrie/config.json`, only its `lanes.shared`), then the
+  project's `pinetrie.json`. `planShared` refuses:
   - absolute paths, and paths that leave the project;
-  - anything in `.git`, `.jj`, `.pineta` or `node_modules`;
+  - anything in `.git`, `.jj`, `.pinetrie` or `node_modules`;
   - a path holding files jj tracks. Checked with `jj file list`, not git's
     index, which can lag in a colocated repo.
 
   Each refusal is logged with its reason, and the rest still apply.
 - **No repo may track a shared directory.**
-  - **In a lane,** the host writes `.pineta/lane-git/ignore` (`laneIgnores`:
-    `/.pineta-lane/`, `/lost+found/`, each shared directory). It mounts its
-    directory read-only at `/pineta-git`, and names the file as git's
+  - **In a lane,** the host writes `.pinetrie/lane-git/ignore` (`laneIgnores`:
+    `/.pinetrie-lane/`, `/lost+found/`, each shared directory). It mounts its
+    directory read-only at `/pinetrie-git`, and names the file as git's
     `core.excludesFile` through `GIT_CONFIG_COUNT`, `GIT_CONFIG_KEY_0` and
     `GIT_CONFIG_VALUE_0`. jj reads it too (S45 item 7), so every repo in the
     lane ignores those paths from the container's first moment: the base,
@@ -245,13 +245,13 @@ containers, disks and the helper.
     command that ran first tracks the files, and adding the line later does
     not untrack them (S45 item 4).
   - **In your repo,** a shared directory nothing already ignores is added to
-    `.git/info/exclude`, as `/.pineta/` is. `git check-ignore` decides, so
+    `.git/info/exclude`, as `/.pinetrie/` is. `git check-ignore` decides, so
     your global git ignore counts.
 
 ## Mounts, and granted host paths (ADR-0036)
 
 - **Every mount is one `Mount { source, target, readonly }`**, in one list
-  from `planMounts`: your working copy, Pineta's install and runtime, the
+  from `planMounts`: your working copy, pine·trie's install and runtime, the
   ignore file's directory, links, grants, shared directories and granted
   host paths. `planRun` renders each with `mountArgs`, and does not know what
   a mount is for.
@@ -283,14 +283,14 @@ containers, disks and the helper.
   checks out the merge, which is why `catch_up` must be alone in its
   batch.
 - **The bundle is made on the lane's queue; the owner of your repo imports
-  it** (`@pineta/repo`'s `importLane`, a command), which tools never wait
+  it** (`@pinetrie/repo`'s `importLane`, a command), which tools never wait
   on. The owner observes the import, and the moved ref marks the lane's
   offer for a refresh (`host/offers/`).
 
 ## Running jj and git (`run.ts`)
 
 - **Every jj command takes `-R <root>`**: `laneJj(runner)` with `-R
-  /workspace` in a lane, and `@pineta/repo`'s runners on your repo. A jj
+  /workspace` in a lane, and `@pinetrie/repo`'s runners on your repo. A jj
   command run from the wrong directory acts on whatever repo surrounds it
   (S36 item 28). `jjIn` alone runs from a directory: to ask where a repo is,
   and for the startup reads above.
@@ -300,8 +300,8 @@ containers, disks and the helper.
 - **One bookmark in a revset is `bookmarkRevset(name)`**: `bookmarks(exact:…)`
   with the name quoted (`revsetName`), so a name is never parsed as a
   revset.
-- **The host's trailers** (`Pineta-Thread`, `Pineta-Lane`, `Pineta-Entry`,
-  `Pineta-Base` and an offer's ledger) are written and read in one file,
+- **The host's trailers** (`Pinetrie-Thread`, `Pinetrie-Lane`, `Pinetrie-Entry`,
+  `Pinetrie-Base` and an offer's ledger) are written and read in one file,
   core's `trailers.ts`: a turn's message (`revisionMessage`,
   `entryOfMessage`), a base's (`baseMessage`, `parseBase`, `baseOf`), an
   offer's, and the revset that finds commits by one (`trailerRevset`, here
@@ -319,7 +319,7 @@ containers, disks and the helper.
 - **`commitTurn`** snapshots, reads `@`'s `empty` and its parents in one
   `jj log`, and decides with `planTurnCommit`:
   - `@` has changes: `jj commit` with the title and two trailers,
-    `Pineta-Entry` and `Pineta-Lane`, then the lane's bookmark moves there;
+    `Pinetrie-Entry` and `Pinetrie-Lane`, then the lane's bookmark moves there;
   - `@` is empty and its one parent descends from the bookmark: the agent
     committed in the turn, with jj or git, and that commit is the turn's
     revision. The bookmark moves to it, untouched, without trailers (S56).
@@ -340,7 +340,7 @@ containers, disks and the helper.
   lane's bookmark, after a snapshot: `@`'s parents, the bookmark, and
   whether the one parent descends from it (`isAncestor`, asked only when it
   is not the bookmark). Every catch-up checks it before it merges
-  (`planCopyReady`, `@pineta/rules`): a split's stack as the working copy is
+  (`planCopyReady`, `@pinetrie/rules`): a split's stack as the working copy is
   off the lane's line.
 - **`commitToBookmark`** is the one tail of every commit the host makes in
   a lane: `jj commit`, read `@-`, move the lane's bookmark. `commitTurn`,
@@ -362,7 +362,7 @@ containers, disks and the helper.
   lane's previous copy, so conflicts the lane already resolved do not come
   back. Or the newest commit of the thread it branched from (`planMerge`'s
   `parent`, ADR-0072), merged as the line's commit is but with no
-  `Pineta-Base`: ancestry says what the lane holds of it. The line's merge carries `Pineta-Base`, a WIP's copy its own, and
+  `Pinetrie-Base`: ancestry says what the lane holds of it. The line's merge carries `Pinetrie-Base`, a WIP's copy its own, and
   `newestBase` reads the newest one in a lane's history: its base, and
   where its offers start. `laneBase` reads it in the lane's own repo too
   (`bookmarkRevset`), where a lane with none is null: that repo has no
@@ -370,8 +370,8 @@ containers, disks and the helper.
 - **An integrated-offer commit the lane holds is joined to its source
   first** (`planJoins`, `mergeBase`, S102, ADR-0079). An integrated-offer
   commit is a copy of a lane's work on the line, naming the commit it
-  copies (`Pineta-Source`). Merged as history says, its base is that
-  commit's `Pineta-Start`, from before that work, so the work came in
+  copies (`Pinetrie-Source`). Merged as history says, its base is that
+  commit's `Pinetrie-Start`, from before that work, so the work came in
   twice: any edit the line made to it since conflicted. So a join, a commit
   merging the source with the integrated-offer commit (the same changes,
   so clean), goes first, and the update merges the lane, the last join and
@@ -418,27 +418,27 @@ containers, disks and the helper.
 
 ## Tests
 
-- **`plan.test.ts`**: the planners. Your repo's are `@pineta/repo`'s.
+- **`plan.test.ts`**: the planners. Your repo's are `@pinetrie/repo`'s.
 - **`lane.test.ts`**: the queue, and that each file a lane is pointed at
-  inside Pineta's mount (`HELPER`, `LANE_NOTE`) exists in the install.
+  inside pine·trie's mount (`HELPER`, `LANE_NOTE`) exists in the install.
 - **`runtime.test.ts`**: `runtimeComplete`, and that `EXTRACT` copies every
   program in `RUNTIME_PROGRAMS`.
 - **`lanes.test.ts`**: the executor, the trailers' round trip, and
   `changedPaths` against git. A lane's whole life against jj and git, in
   throwaway repos, is `packages/repo/repo.test.ts`: every such test fetches
-  into your repo, so it needs `@pineta/repo`, which this package may not
+  into your repo, so it needs `@pinetrie/repo`, which this package may not
   import.
-- **`e2e:lanes`** (`apps/pineta/e2e/lanes.ts`): the same in real containers,
+- **`e2e:lanes`** (`apps/pinetrie/e2e/lanes.ts`): the same in real containers,
   with a repo in a fork's `/tmp` for the config's scope, an agent's own
   `jj commit` reaching its offer and a branch, and the contract
   test. The `main` section alone takes about 2.5 minutes on the Mac. Its `images` section also runs
   the runtime's rg, fd and sd and the `grep` and `find` tools on Alpine, and
-  launches Chromium, through Pineta's Playwright, and python3 on the default
+  launches Chromium, through pine·trie's Playwright, and python3 on the default
   image. Its `commands` section
   reads skill files at `/mnt/host`, and checks what a real lane's prompt
   tells it about itself and that the note it names is there (ADR-0046). It
-  has five scenarios (`apps/pineta/e2e/lanes/`), `main`, `images`,
-  `shared`, `commands` and `contract`, and `PINETA_SCENARIO` picks some.
+  has five scenarios (`apps/pinetrie/e2e/lanes/`), `main`, `images`,
+  `shared`, `commands` and `contract`, and `PINETRIE_SCENARIO` picks some.
   Without `container`, each reports SKIP with the host's own reason.
   Its hosts pass their own `userConfig`, so the person's own lane config
   never applies. Each
@@ -450,10 +450,10 @@ containers, disks and the helper.
   the runtime's rg.
   `planContainer`'s and `planStartFrom`'s rules are unit mutations. These
   are all that `e2e:lanes` proves by mutation: the host's lane work and offers
-  are proven by unit tests (`apps/pineta/host/TECHNICAL.md`).
+  are proven by unit tests (`apps/pinetrie/host/TECHNICAL.md`).
 - **The contract test takes about 7 s:**
   - its volume is 4 GiB, since `e2fsck -f` walks every block group however
     little a volume holds;
   - its writer runs only while the clones are taken;
-  - the clones are checked four at a time, in `pineta-fsck:1`, an Alpine
+  - the clones are checked four at a time, in `pinetrie-fsck:1`, an Alpine
     image with `e2fsprogs` that it builds once and keeps.

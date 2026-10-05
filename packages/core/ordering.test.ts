@@ -1,7 +1,7 @@
 // ADR-0013's safety claim, stated as tests. The derivation is pure so that
 // these properties need no substrate to express.
 
-import { orderNewEntries } from "@pineta/core"
+import { orderNewEntries } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 
 /** A tree as `id -> parentId`. `null` is a root. */

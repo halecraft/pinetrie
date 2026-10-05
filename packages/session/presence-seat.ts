@@ -7,18 +7,18 @@
 
 import type { Exchange } from "@kyneta/exchange"
 import { batch } from "@kyneta/schema"
-import type { CardId, WriterId } from "@pineta/core"
-import { PRESENCE_DOC_ID } from "@pineta/protocol/messages"
+import type { CardId, WriterId } from "@pinetrie/core"
+import { PRESENCE_DOC_ID } from "@pinetrie/protocol/messages"
 import {
   type PresenceDecay,
   type PresenceDocHandle,
   presenceDoc,
   readingKey,
   seatKey,
-} from "@pineta/schema"
+} from "@pinetrie/schema"
 
 export interface PresenceSeat {
-  /** Who is here: read it through `@pineta/reads`; write it only here. */
+  /** Who is here: read it through `@pinetrie/reads`; write it only here. */
   readonly handle: PresenceDocHandle
   /**
    * This seat's column `columnKey` follows the thread ending at `end`, in

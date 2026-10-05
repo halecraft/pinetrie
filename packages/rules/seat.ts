@@ -3,11 +3,11 @@
 // A text's operations carry their seat's Yjs `clientID`, which says who wrote
 // them only to a peer that knows the seat's principal. A client's only peer is
 // the host, and the host forgets a seat once it leaves. So the host writes a
-// `pineta.seat` value per seat when it connects, keyed by its peer, and
+// `pinetrie.seat` value per seat when it connects, keyed by its peer, and
 // anyone derives a text's writers from its `clientID`s (`writersOfClients`)
 // whenever they need them. Nobody stores a contributors list.
 
-import type { SeatRecord, WriterId } from "@pineta/core"
+import type { SeatRecord, WriterId } from "@pinetrie/core"
 import { Type } from "typebox"
 import { decodeAt, textKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
@@ -22,10 +22,10 @@ const SeatSchema = Type.Object({
  * Each seat, at its Kyneta peer id: the seat's identity, as presence's
  * `seatKey` has it. The `clientID` is in the contents, since a text's
  * operations carry it and Yjs derives it from the peer (`seatOf`, in
- * `@pineta/schema`), which this package cannot.
+ * `@pinetrie/schema`), which this package cannot.
  */
 export const SEAT: RecordSpec<SeatRecord, string, "session"> = {
-  namespace: "pineta.seat",
+  namespace: "pinetrie.seat",
   home: "session",
   keyOf: s => s.peer,
   encode: ({ peer, ...contents }) => contents,
@@ -40,7 +40,7 @@ export const SEAT: RecordSpec<SeatRecord, string, "session"> = {
 
 /**
  * The connected seats with no record yet, to write. `connected` is each seat
- * as `seatOf` (`@pineta/schema`) gives it: a seat that is nobody is not in it.
+ * as `seatOf` (`@pinetrie/schema`) gives it: a seat that is nobody is not in it.
  */
 export function planSeats(
   connected: readonly {

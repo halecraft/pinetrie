@@ -59,7 +59,7 @@ test("core declares nothing", () => {
 
 test("the protocol declares only Kyneta and core", () => {
   const extra = deps(read("packages/protocol")).filter(
-    d => !d.startsWith("@kyneta/") && d !== "@pineta/core",
+    d => !d.startsWith("@kyneta/") && d !== "@pinetrie/core",
   )
   assert.deepEqual(extra, [])
 })
@@ -69,7 +69,7 @@ test("rules declares only TypeBox, core, and the markdown parser the client's re
   // the parser under the client's remark-parse and remark-gfm, at the same
   // versions, so both read one tree and the bundle holds one copy (ADR-0042).
   assert.deepEqual(deps(read("packages/rules")).sort(), [
-    "@pineta/core",
+    "@pinetrie/core",
     "mdast-util-from-markdown",
     "mdast-util-gfm",
     "micromark-extension-gfm",
@@ -80,9 +80,9 @@ test("rules declares only TypeBox, core, and the markdown parser the client's re
 test("reads declares only core, schema and rules: no pi, no transport", () => {
   // The host and the client decide from these reads, so they must run in both.
   assert.deepEqual(deps(read("packages/reads")).sort(), [
-    "@pineta/core",
-    "@pineta/rules",
-    "@pineta/schema",
+    "@pinetrie/core",
+    "@pinetrie/rules",
+    "@pinetrie/schema",
   ])
 })
 
@@ -96,23 +96,23 @@ test("session declares only Kyneta's exchange and WebSocket transport, core, pro
     "@kyneta/schema",
     "@kyneta/transport",
     "@kyneta/websocket-transport",
-    "@pineta/core",
-    "@pineta/protocol",
-    "@pineta/reads",
-    "@pineta/rules",
-    "@pineta/schema",
+    "@pinetrie/core",
+    "@pinetrie/protocol",
+    "@pinetrie/reads",
+    "@pinetrie/rules",
+    "@pinetrie/schema",
   ])
 })
 
 test("lanes declares only core: it runs container, jj and git, never pi or the document", () => {
-  assert.deepEqual(deps(read("packages/lanes")), ["@pineta/core"])
+  assert.deepEqual(deps(read("packages/lanes")), ["@pinetrie/core"])
 })
 
 test("repo declares only core, keeper and lanes: it runs jj and git on your repo, never pi or the document", () => {
   assert.deepEqual(deps(read("packages/repo")).sort(), [
-    "@pineta/core",
-    "@pineta/keeper",
-    "@pineta/lanes",
+    "@pinetrie/core",
+    "@pinetrie/keeper",
+    "@pinetrie/lanes",
   ])
 })
 
@@ -125,10 +125,10 @@ test("the client declares no server package and no app", () => {
   for (const forbidden of [
     "ws",
     "vite",
-    "@pineta/app",
-    "@pineta/pi",
-    "@pineta/lanes",
-    "@pineta/repo",
+    "@pinetrie/app",
+    "@pinetrie/pi",
+    "@pinetrie/lanes",
+    "@pinetrie/repo",
   ]) {
     assert.ok(
       !client.includes(forbidden),

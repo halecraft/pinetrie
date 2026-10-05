@@ -1,11 +1,11 @@
-import type { ThreadName } from "@pineta/core"
+import type { ThreadName } from "@pinetrie/core"
 import {
   commitId,
   laneNameForThread,
   type ReviewFile,
   type RevisionReview,
   withTrailers,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import type { ReviewTarget } from "./column-view.ts"
 import { diffLines, type Loaded, reviewView, sectionState } from "./review.ts"

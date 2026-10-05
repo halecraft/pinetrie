@@ -1,6 +1,6 @@
 // startup — what a starting host does with the lanes it finds, pure.
 
-import type { CardRecord, LaneName, VerdictRecord } from "@pineta/core"
+import type { CardRecord, LaneName, VerdictRecord } from "@pinetrie/core"
 import { queuedOn } from "./card.ts"
 
 /**
@@ -11,7 +11,7 @@ import { queuedOn } from "./card.ts"
  * request with the last host, and is `unclassified`, unless its lane is
  * resumed, whose run's end writes another (ADR-0077). What does not survive
  * a process (runs, streams) is cleared first, by `clearStreams` in
- * `@pineta/schema`.
+ * `@pinetrie/schema`.
  */
 export function planStartup(input: {
   readonly cards: readonly CardRecord[]

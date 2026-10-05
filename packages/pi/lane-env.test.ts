@@ -29,10 +29,10 @@ let channel: LaneChannel
 const ready = () => Promise.resolve(channel)
 
 beforeAll(async () => {
-  dir = await realpath(await mkdtemp(path.join(tmpdir(), "pineta-lane-env-")))
+  dir = await realpath(await mkdtemp(path.join(tmpdir(), "pinetrie-lane-env-")))
   channel = openChannel([
     "env",
-    `PINETA_WORKSPACE_ROOT=${dir}`,
+    `PINETRIE_WORKSPACE_ROOT=${dir}`,
     process.execPath,
     HELPER,
   ])

@@ -6,9 +6,9 @@
 
 import type { Exchange } from "@kyneta/exchange"
 import { batch } from "@kyneta/schema"
-import type { EntryId, LaneName, RootRecord, WriterId } from "@pineta/core"
-import { personDocId } from "@pineta/protocol/writers"
-import { type Attention, AttentionDoc, readAttention } from "@pineta/schema"
+import type { EntryId, LaneName, RootRecord, WriterId } from "@pinetrie/core"
+import { personDocId } from "@pinetrie/protocol/writers"
+import { type Attention, AttentionDoc, readAttention } from "@pinetrie/schema"
 import { personDoc } from "./person-doc.ts"
 import { NO_READS, type ReadMemory, readStep } from "./read-marks.ts"
 import type { Readable } from "./store.ts"
@@ -30,7 +30,7 @@ export function startOf(roots: Iterable<RootRecord>): string {
 
 /**
  * The mentions you have seen, as the page's inbox decides them
- * (`@pineta/client`'s `inbox.ts`): every one at or before `since`, and
+ * (`@pinetrie/client`'s `inbox.ts`): every one at or before `since`, and
  * `seen` above it.
  */
 export interface SeenMentions {

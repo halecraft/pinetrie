@@ -1,4 +1,4 @@
-// Decoding for every shape Pineta stores inside pi.
+// Decoding for every shape pinetrie stores inside pi.
 //
 // Stored values are `Schema.any()` in the document and may come from any
 // replica, so decoding is total: a malformed value is dropped, never thrown.
@@ -12,7 +12,7 @@ import {
   type LaneName,
   type RootId,
   type WriterId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { type Static, type TSchema, Type } from "typebox"
 import { Value } from "typebox/value"
 

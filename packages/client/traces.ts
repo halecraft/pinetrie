@@ -3,9 +3,9 @@
 // else moved it while you were away; the host leaves it (`planProvenance`)
 // and deletes it once you have seen it (`traces-seen`). Pure.
 
-import type { EntryId, PlaceKey, TraceRecord, WriterId } from "@pineta/core"
-import { MAX_TRACES_SEEN } from "@pineta/protocol/codec"
-import { type Verb, verbOf } from "@pineta/rules"
+import type { EntryId, PlaceKey, TraceRecord, WriterId } from "@pinetrie/core"
+import { MAX_TRACES_SEEN } from "@pinetrie/protocol/codec"
+import { type Verb, verbOf } from "@pinetrie/rules"
 
 /** Traces at one spot by one person, doing one thing: one line. */
 export interface TraceGroup {

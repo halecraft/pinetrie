@@ -1,4 +1,4 @@
-import { type SeatRecord, writerId } from "@pineta/core"
+import { type SeatRecord, writerId } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import { recordsOf, setRecord } from "./records.ts"
 import { planSeatSweep, planSeats, SEAT, writersOfClients } from "./seat.ts"

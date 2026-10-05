@@ -24,8 +24,8 @@ three of them acts in the domain:
    the opposite direction from 2;
 5. plain English: an id already in use (`lane_taken`), "takes focus".
 
-`planTake` was defined twice: in `@pineta/rules` for 3, and in
-`@pineta/client` for 1. `Taken` was two types, one for 3 and one for 2. Senses 1
+`planTake` was defined twice: in `@pinetrie/rules` for 3, and in
+`@pinetrie/client` for 1. `Taken` was two types, one for 3 and one for 2. Senses 1
 and 3 act on the same card and race each other (S75 item 5, "the host's
 take ∥ Ada's take of a queued card"). The page had already said "add" for 2
 since ADR-0061, so code and page disagreed. A one-word replacement such as
@@ -54,13 +54,13 @@ since ADR-0061, so code and page disagreed. A one-word replacement such as
   `IntegratedOfferCommit`, `integratedOfferCommitsRevset`,
   `INTEGRATED_OFFER_COMMIT_ROW`, `IntegratedOfferCommitAbove`.
 - **Pop the next queued card**, to send it. The page says "sent". In code:
-  `apps/pineta/host/queued-card-pop.ts`, `popNextQueuedCard`,
+  `apps/pinetrie/host/queued-card-pop.ts`, `popNextQueuedCard`,
   `PoppedQueuedCard`, `planNextQueuedCardPop`, `sendPoppedQueuedCard`.
 - **Catch up with the base.** The parent commit a lane last caught up with
   is `caughtUpWith`.
 - **An id in use**: `lane_id_in_use`, `root_id_in_use`.
 - Plain English stays ("takes focus", "takes a `CallableRef`").
-- **Offer records written before this keep reading.** `pineta.offer` stored
+- **Offer records written before this keep reading.** `pinetrie.offer` stored
   the integration's change id as `taken`. The decoder reads it as
   `integratedAs` when a record has no `integratedAs` of its own, and the
   encoder writes only `integratedAs`. Once every host has rewritten its

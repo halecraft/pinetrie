@@ -8,7 +8,7 @@ import {
 } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { entryId, laneNameForThread } from "@pineta/core"
+import { entryId, laneNameForThread } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   bookmarkOf,
@@ -27,7 +27,7 @@ import {
 } from "./index.ts"
 
 // What a lane runs against jj itself, in throwaway repos, with your repo in
-// it, is `@pineta/repo`'s `repo.test.ts`: every such test fetches into your
+// it, is `@pinetrie/repo`'s `repo.test.ts`: every such test fetches into your
 // repo.
 
 const _LANE = laneNameForThread("1")
@@ -62,7 +62,7 @@ describe("execute", () => {
 
 test("changedPaths: a path with a space and an accent comes back as it is named (S70), and a conflicted commit's paths are its files (S99)", async () => {
   const dir = await realpath(
-    await mkdtemp(path.join(tmpdir(), "pineta-paths-")),
+    await mkdtemp(path.join(tmpdir(), "pinetrie-paths-")),
   )
   try {
     const env = {
@@ -110,7 +110,9 @@ test("changedPaths: a path with a space and an accent comes back as it is named 
 })
 
 test("copyFacts (S103, ADR-0080): the copy on its bookmark, on the merge whose turn commits nothing of its own, on the agent's own commit, and on a split's stack", async () => {
-  const dir = await realpath(await mkdtemp(path.join(tmpdir(), "pineta-copy-")))
+  const dir = await realpath(
+    await mkdtemp(path.join(tmpdir(), "pinetrie-copy-")),
+  )
   try {
     const env = {
       ...process.env,
@@ -181,8 +183,10 @@ test("copyFacts (S103, ADR-0080): the copy on its bookmark, on the merge whose t
   }
 })
 
-test("prepareProjectDir (ADR-0086, S108): a repo's root with .pineta/ excluded once; a non-colocated repo refused; a plain folder untouched", async () => {
-  const dir = await realpath(await mkdtemp(path.join(tmpdir(), "pineta-dir-")))
+test("prepareProjectDir (ADR-0086, S108): a repo's root with .pinetrie/ excluded once; a non-colocated repo refused; a plain folder untouched", async () => {
+  const dir = await realpath(
+    await mkdtemp(path.join(tmpdir(), "pinetrie-dir-")),
+  )
   try {
     const env = {
       ...process.env,
@@ -197,7 +201,7 @@ test("prepareProjectDir (ADR-0086, S108): a repo's root with .pineta/ excluded o
     const found = { kind: "found", root: colocated, repo: "jj" }
     expect(await prepareProjectDir(path.join(colocated, "sub"))).toEqual(found)
     expect(await prepareProjectDir(colocated)).toEqual(found)
-    expect(await readFile(exclude, "utf8")).toBe(`${before}/.pineta/\n`)
+    expect(await readFile(exclude, "utf8")).toBe(`${before}/.pinetrie/\n`)
 
     const apart = path.join(dir, "apart")
     await run("jj", ["git", "init", "--no-colocate", apart], { env })

@@ -1,6 +1,6 @@
 ---
 name: hello
-description: Say hello, as a test of commands in Pineta.
+description: Say hello, as a test of commands in pine·trie.
 disable-model-invocation: true
 ---
 

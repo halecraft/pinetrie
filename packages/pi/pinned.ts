@@ -12,7 +12,7 @@ import type {
   CompactionPreparation,
   CompactResult,
 } from "@earendil-works/pi-agent-core"
-import { decodePinned } from "@pineta/rules"
+import { decodePinned } from "@pinetrie/rules"
 
 const isCards = (m: AgentMessage): boolean => decodePinned(m) !== undefined
 

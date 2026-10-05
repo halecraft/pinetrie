@@ -1,4 +1,4 @@
-// Mutations for @pineta/keeper. Run: pnpm mutate scripts/mutations/keeper.ts
+// Mutations for @pinetrie/keeper. Run: pnpm mutate scripts/mutations/keeper.ts
 import type { Mutation } from "../mutate.ts"
 
 const unit = ["pnpm", "exec", "vitest", "run", "packages/keeper"]

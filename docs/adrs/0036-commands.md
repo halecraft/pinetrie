@@ -6,10 +6,10 @@ S46. Amends ADR-0034: skill files are a grant every lane of its own gets.
 named last and is not typed (`bring-up-to-date` first). Typed commands stay
 as decided here.
 
-**Context.** Pineta loads your pi configuration (ADR-0022, S23), and pi's
+**Context.** pine·trie loads your pi configuration (ADR-0022, S23), and pi's
 loader finds your skills and prompt templates: yours, the project's, and
 those of every pi package your settings list. In pi's terminal, `/skill:plan`
-expands a skill into a `<skill …>` block and `/review` a template. Pineta
+expands a skill into a `<skill …>` block and `/review` a template. pine·trie
 drives pi's harness, not pi's session, so nothing expanded a command: it
 reached the model as typed. pi keeps one skill or template per name, so a
 second package's `plan` was unreachable. And under ADR-0034 a lane could read
@@ -24,8 +24,8 @@ mounted.
   a command by any part: typing `/plan` offers every command named `plan`.
 - **A package's label** is its `.claude-plugin/plugin.json` `name`, as Claude
   names plugins; else its `package.json` name without the scope; else pi's
-  scope (`user`, `project`) for a loose skill or template; `pineta` for
-  Pineta's own. The user config's `commands.names` renames one, keyed by pi's
+  scope (`user`, `project`) for a loose skill or template; `pinetrie` for
+  pine·trie's own. The user config's `commands.names` renames one, keyed by pi's
   `source`. Two packages with one label are refused, both named, until one is
   renamed: a person decides, never load order.
 - **Every command pi loaded is reachable,** those its collision handling
@@ -44,7 +44,7 @@ mounted.
   directory, never one that is or holds your home directory, `/` or pi's
   agent directory (`auth.json`). A skill that cannot be mounted still
   expands, and is logged as not readable in lanes.
-- **Lane paths only where Pineta writes them:** the skill list in a lane's
+- **Lane paths only where pine·trie writes them:** the skill list in a lane's
   system prompt, and an expanded skill's header. Skills refer to their own
   files by relative path and to other skills by name (pi's `docs/skills.md`),
   so nothing in their text is translated.
@@ -52,7 +52,7 @@ mounted.
   handles the separators `container` gives `--mount` and `-v` (S46 item 4).
 
 **Consequences.**
-- Your skills and prompts work in Pineta as in pi, with the package in front,
+- Your skills and prompts work in pine·trie as in pi, with the package in front,
   and are found by typing.
 - A branch that works directly, from a thread of its own, inherits command
   messages whose headers name `/mnt/host/…` paths. That is the same exposure

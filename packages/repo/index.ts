@@ -1,7 +1,7 @@
 // repo — your repo, as the host reads and writes it (ADR-0038, ADR-0060,
 // ADR-0065): the offers, the integration line, and lanes' refs in it, all
 // through one owner (`startRepoOwner`). What a lane also runs, through a
-// runner it is given, stays in `@pineta/lanes`. The runners on your repo are
+// runner it is given, stays in `@pinetrie/lanes`. The runners on your repo are
 // the owner's alone: this package exports none. Only what other packages
 // use is exported: every read of an offer goes through a gather
 // (`offer-gather.ts`), which picks the read path, so the separate reads and

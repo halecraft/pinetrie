@@ -1,7 +1,7 @@
 // session/card-copies — when this client's copy of a card's text goes (S64).
 // Pure; `card-texts.ts` carries it out.
 
-import type { CardId } from "@pineta/core"
+import type { CardId } from "@pinetrie/core"
 
 /**
  * Whether the host let go of a card's document: it left the document while

@@ -1,7 +1,7 @@
 // client/use-ask-bar — the shell of `ask-bar.ts`: measure each ask's work
 // and message against the top of a column's view, on scroll and resize.
 
-import { type EntryId, entryId } from "@pineta/core"
+import { type EntryId, entryId } from "@pinetrie/core"
 import { type RefObject, useEffect, useRef, useState } from "react"
 import { type AtTop, askAtTop, sameAtTop, type WorkBox } from "./ask-bar.ts"
 

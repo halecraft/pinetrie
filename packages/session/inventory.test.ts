@@ -1,4 +1,4 @@
-import { cardId, writerId } from "@pineta/core"
+import { cardId, writerId } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   firstEmpty,

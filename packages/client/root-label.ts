@@ -10,7 +10,7 @@ import {
   type RootId,
   type RootRecord,
   type RootSummary,
-} from "@pineta/core"
+} from "@pinetrie/core"
 
 export { NO_TEXT }
 

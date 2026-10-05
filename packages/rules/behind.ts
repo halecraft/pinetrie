@@ -18,12 +18,12 @@ import {
   type LineRecord,
   type OfferRecord,
   type ThreadName,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { type Static, Type } from "typebox"
 import { CommitSchema, decodeWith } from "./decode.ts"
 import { catchUpName, catchUpOf } from "./line.ts"
 
-export const BEHIND_TYPE = "pineta.behind"
+export const BEHIND_TYPE = "pinetrie.behind"
 
 /** How many files the model is told of by name, before "and N more". */
 const NAMED_FILES = 20

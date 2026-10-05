@@ -5,9 +5,9 @@ import {
   entryId,
   rootIdFor,
   writerId,
-} from "@pineta/core"
-import { encodeCard } from "@pineta/rules"
-import { newPlacesDoc } from "@pineta/schema"
+} from "@pinetrie/core"
+import { encodeCard } from "@pinetrie/rules"
+import { newPlacesDoc } from "@pinetrie/schema"
 import { expect, test } from "vitest"
 import { readPlaces, readPlacesRev } from "./index.ts"
 

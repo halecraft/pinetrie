@@ -9,7 +9,7 @@ export type Dock = "left" | "centre" | "right"
 export const DOCKS: readonly Dock[] = ["left", "centre", "right"]
 
 /** The key the dock is kept under in `localStorage`. */
-export const DOCK_KEY = "pineta-inventory-dock"
+export const DOCK_KEY = "pinetrie-inventory-dock"
 
 /** The third of a `width`-wide screen that `x` falls in. */
 export function snapTo(x: number, width: number): Dock {

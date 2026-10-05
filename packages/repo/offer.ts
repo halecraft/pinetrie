@@ -7,8 +7,8 @@
 // revision's commits the host made (`hostCommitIn`, from `evologOf`). The
 // gathers in `offer-gather.ts` call them, or read a lane on the line in one
 // `jj log` instead (`lane-read.ts`). What the facts mean is decided in
-// `@pineta/rules`' `offer.ts`, and its decisions become steps in
-// `offer-steps.ts`. A lane's base is read by `@pineta/lanes`' `laneBase`,
+// `@pinetrie/rules`' `offer.ts`, and its decisions become steps in
+// `offer-steps.ts`. A lane's base is read by `@pinetrie/lanes`' `laneBase`,
 // since a lane reads it too.
 
 import {
@@ -29,7 +29,7 @@ import {
   trailerRevset,
   untracedLanes,
   type WorkChanges,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import {
   bookmarkRevset,
   commitsOf,
@@ -43,7 +43,7 @@ import {
   parseIntegratedOfferCommits,
   REVISION_READ,
   type Runner,
-} from "@pineta/lanes"
+} from "@pinetrie/lanes"
 import {
   EVOLOG_ENTRY,
   type EvologEntry,
@@ -91,7 +91,7 @@ export async function laneTipIn(
 
 /**
  * What the integrated-offer commits `integratedOfferCommitsRevset` finds say
- * for `lane`: the lane commits they name in `Pineta-Source` trailers, what
+ * for `lane`: the lane commits they name in `Pinetrie-Source` trailers, what
  * you have of lanes that the lane's base does not already hold, read from
  * every paragraph of each message (S77 item 6); and the integrated-offer
  * commits of `lane` that name none (`untracedLanes`, S97).

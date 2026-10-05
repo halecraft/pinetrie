@@ -17,7 +17,7 @@ import {
   type ThreadName,
   type WorkChanges,
   writerId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   BASE as BASE_RECORD,
@@ -58,7 +58,7 @@ const offer: OfferRecord = {
   yourEdits: [],
   described: true,
   edited: false,
-  bookmark: "pineta-offer/t-1",
+  bookmark: "pinetrie-offer/t-1",
   integratedAs: null,
   commits: [commitId("w1")],
   ledger: null,
@@ -72,7 +72,7 @@ describe("planRefresh", () => {
     o: Partial<Extract<OfferInRepo, { kind: "offer" }>> = {},
   ): OfferInRepo => ({
     kind: "offer",
-    bookmark: `pineta-offer/t-1`,
+    bookmark: `pinetrie-offer/t-1`,
     revisions: [rev()],
     chained: true,
     ledger: { source: TIP, start: [BASE] },
@@ -225,7 +225,7 @@ describe("isWipLine, offerMoved, describeWanted", () => {
   const NAME = "t-1" as ThreadName
   const one = {
     kind: "offer" as const,
-    bookmark: "pineta-offer/t-1",
+    bookmark: "pinetrie-offer/t-1",
     revisions: [
       {
         commit: TIP,
@@ -289,11 +289,11 @@ describe("isWipLine, offerMoved, describeWanted", () => {
 describe("records", () => {
   test("an offer, the line and a base round-trip (ADR-0060)", () => {
     const o = setRecord(OFFER, offer)
-    expect([o.namespace, o.key]).toEqual(["pineta.offer", LANE])
+    expect([o.namespace, o.key]).toEqual(["pinetrie.offer", LANE])
     expect(OFFER.decode(structuredClone(o.value), LANE)).toEqual(offer)
     expect(OFFER.decode({ ...offer, size: 0 }, LANE)).toBeUndefined()
     const line = {
-      onto: "pineta-onto",
+      onto: "pinetrie-onto",
       wipPrefix: "wip/",
       publish: "main",
       published: { commit: null, behind: 0, ahead: 0 },
@@ -310,7 +310,7 @@ describe("records", () => {
       commands: true,
     }
     const l = setRecord(LINE, line)
-    expect([l.namespace, l.key]).toEqual(["pineta.line", "line"])
+    expect([l.namespace, l.key]).toEqual(["pinetrie.line", "line"])
     expect(LINE.decode(structuredClone(l.value), "line")).toEqual(line)
     const base: BaseRecord = {
       lane: LANE,
@@ -322,7 +322,7 @@ describe("records", () => {
       work: "some",
     }
     const b = setRecord(BASE_RECORD, base)
-    expect([b.namespace, b.key]).toEqual(["pineta.base", LANE])
+    expect([b.namespace, b.key]).toEqual(["pinetrie.base", LANE])
     expect(BASE_RECORD.decode(structuredClone(b.value), LANE)).toEqual(base)
     // One stored before what catching up changes was read: dropped, so the
     // page reads it as unknown until the host writes it again (ADR-0067).
@@ -343,7 +343,7 @@ describe("the update and stack messages", () => {
   const details = {
     lane: LANE,
     from: { kind: "line" as const },
-    bookmark: "pineta-onto",
+    bookmark: "pinetrie-onto",
     merged: COPY,
     commits: ["feat: yours"],
     files: ["a.txt", "c.txt"],
@@ -358,7 +358,7 @@ describe("the update and stack messages", () => {
       content: "↓ caught up with the project: 2 files changed",
       merged: [COPY],
     })
-    expect(m.content).toContain("pineta-onto was merged into this thread")
+    expect(m.content).toContain("pinetrie-onto was merged into this thread")
     const wip = {
       ...details,
       from: { kind: "wip" as const, bookmark: "wip/a" },
@@ -392,13 +392,13 @@ describe("the update and stack messages", () => {
   test("a stack message names where it starts and ends, and the bookmark to set", () => {
     const m = planStack({
       skill: { path: "/s", content: "Split well.", hash: "h" },
-      bookmark: "pineta/t-1-stack",
+      bookmark: "pinetrie/t-1-stack",
       details: { lane: LANE, start: [BASE], tip: TIP, by: ADA },
       timestamp: 1,
     })
     expect(m.content).toContain("`b0`")
     expect(m.content).toContain("`t1`")
-    expect(m.content).toContain("jj bookmark set pineta/t-1-stack")
+    expect(m.content).toContain("jj bookmark set pinetrie/t-1-stack")
     expect(decodeStack(structuredClone(m))).toMatchObject({
       tip: TIP,
       skill: { hash: "h" },
@@ -409,7 +409,7 @@ describe("the update and stack messages", () => {
   test("a split card's text is the stack's brief, under its own heading, last (ADR-0080)", () => {
     const m = planStack({
       skill: null,
-      bookmark: "pineta/t-1-stack",
+      bookmark: "pinetrie/t-1-stack",
       details: { lane: LANE, start: [BASE], tip: TIP, by: ADA },
       intent: "  tests apart  ",
       timestamp: 1,
@@ -429,18 +429,18 @@ describe("offerIntegrationDestinations (ADR-0060)", () => {
     offerIntegrationDestinations({
       base: line,
       state: "ok",
-      onto: "pineta-onto",
+      onto: "pinetrie-onto",
       conflicted: false,
       wipAhead: 2,
       ...over,
     }).map(d => [d.bookmark, d.bringsAlong, d.final])
   test("a line thread: the line, final", () => {
-    expect(of()).toEqual([["pineta-onto", 0, true]])
+    expect(of()).toEqual([["pinetrie-onto", 0, true]])
   })
   test("a WIP thread: its WIP first, then the line with the WIP's commits", () => {
     expect(of({ base: wip })).toEqual([
       ["wip/x", 0, false],
-      ["pineta-onto", 2, true],
+      ["pinetrie-onto", 2, true],
     ])
   })
   test("a conflicted offer never lands on the line: only into a WIP", () => {
@@ -449,7 +449,7 @@ describe("offerIntegrationDestinations (ADR-0060)", () => {
   })
   test("a landed WIP is the line's; a gone one has none", () => {
     expect(of({ base: wip, state: "landed" })).toEqual([
-      ["pineta-onto", 0, true],
+      ["pinetrie-onto", 0, true],
     ])
     expect(of({ base: wip, state: "gone" })).toEqual([])
   })
@@ -478,7 +478,7 @@ describe("the offer's policy over a gather (ADR-0038, ADR-0060)", () => {
   /** An offer as your repo holds it: one revision, the host's, on its WIP line. */
   const read = (over: Partial<OfferNow> = {}): OfferNow => ({
     kind: "offer",
-    bookmark: `pineta-offer/${NAME}`,
+    bookmark: `pinetrie-offer/${NAME}`,
     revisions: [{ commit: NOW_COMMIT, change: "kxyz", since: NOT_YOURS }],
     chained: true,
     ledger: { source: TIP, start: [START] },
@@ -528,7 +528,7 @@ describe("the offer's policy over a gather (ADR-0038, ADR-0060)", () => {
         yourEdits: ["a.txt"],
         described: false,
         edited: false,
-        bookmark: "pineta-offer/amber-fox",
+        bookmark: "pinetrie-offer/amber-fox",
         integratedAs: null,
         commits: [NOW_COMMIT],
         ledger: { source: TIP, start: [START] },
@@ -608,7 +608,7 @@ describe("the offer's policy over a gather (ADR-0038, ADR-0060)", () => {
     } as const
     /** What the page drew: this offer's ledger, not conflicting. */
     const SHOWN = { ledger: o.ledger, conflicted: false }
-    const BOTH = new Set(["wip/x", "pineta-onto"])
+    const BOTH = new Set(["wip/x", "pinetrie-onto"])
     const integrate = (
       over: {
         readonly to?: string | null
@@ -630,7 +630,7 @@ describe("the offer's policy over a gather (ADR-0038, ADR-0060)", () => {
         seen: over.seen === undefined ? SHOWN : over.seen,
         integration: { wipAhead: 2, below: over.below ?? BOTH },
         editing: new Set(),
-        onto: "pineta-onto",
+        onto: "pinetrie-onto",
         to: over.to ?? null,
         now: 9,
       })
@@ -653,7 +653,7 @@ describe("the offer's policy over a gather (ADR-0038, ADR-0060)", () => {
         top: "ktop",
         integrated: { ...record, integratedAs: "ktop", at: 9 },
       })
-      expect(outcome(integrate({ to: "pineta-onto" }))).toBe("pineta-onto")
+      expect(outcome(integrate({ to: "pinetrie-onto" }))).toBe("pinetrie-onto")
     })
     test("refused in order: no offer, a WIP gone, nothing shown, divergent, other work, no such destination", () => {
       expect(outcome(integrate({ gathered: null }))).toBe(ERR.NO_OFFER)
@@ -682,7 +682,7 @@ describe("the offer's policy over a gather (ADR-0038, ADR-0060)", () => {
         outcome(integrate({ offer: { kind: "divergent", changes: ["k"] } })),
       ).toBe(ERR.NO_OFFER)
       expect(outcome(integrate({ to: "main" }))).toBe(ERR.BAD_DESTINATION)
-      expect(outcome(integrate({ below: new Set(["pineta-onto"]) }))).toBe(
+      expect(outcome(integrate({ below: new Set(["pinetrie-onto"]) }))).toBe(
         ERR.BAD_DESTINATION,
       )
     })
@@ -694,7 +694,7 @@ describe("the offer's policy over a gather (ADR-0038, ADR-0060)", () => {
       )
       expect(
         outcome(
-          integrate({ offer: conflicted, seen: shown, to: "pineta-onto" }),
+          integrate({ offer: conflicted, seen: shown, to: "pinetrie-onto" }),
         ),
       ).toBe(ERR.BAD_DESTINATION)
       const untraced = gather({
@@ -707,7 +707,7 @@ describe("the offer's policy over a gather (ADR-0038, ADR-0060)", () => {
         },
         offer: o,
       })
-      expect(outcome(integrate({ gathered: untraced }))).toBe("pineta-onto")
+      expect(outcome(integrate({ gathered: untraced }))).toBe("pinetrie-onto")
     })
     test.each([
       [

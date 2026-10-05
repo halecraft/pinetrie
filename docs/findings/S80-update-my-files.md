@@ -1,7 +1,7 @@
 # S80 — "update my files": which rebase, a preview, and conflicts
 
 `PLAN-2026-10-03-jj-ux`, task 6, asks for an action that brings the
-project's work (the integration line, `pineta-onto`) into your own work: a
+project's work (the integration line, `pinetrie-onto`) into your own work: a
 rebase of your commits onto the line, run only when you ask, after a
 preview. Probed on a disposable colocated repo, jj 0.44.0, git 2.47. The
 script is below; every answer is from its output.
@@ -63,18 +63,18 @@ cd /tmp && rm -rf s79 && mkdir s79 && cd s79
 jj git init --colocate
 cid() { jj log -r "$1" --no-graph -T 'change_id.short()'; }
 printf 'a\nb\nc\n' > f.txt; echo base > g.txt
-jj commit -m L0; L0=$(cid @-); jj bookmark create pineta-onto -r $L0
+jj commit -m L0; L0=$(cid @-); jj bookmark create pinetrie-onto -r $L0
 echo yours > g.txt; jj describe -m Y1; Y1=$(cid @)
 jj new $Y1 -m sibling; echo s > s.txt
 jj new $Y1; echo h > h.txt; AT=$(cid @)
 jj new $L0 -m L1; printf 'a\nB\nc\n' > f.txt; echo line > g.txt; L1=$(cid @)
-jj bookmark move pineta-onto --to $L1
+jj bookmark move pinetrie-onto --to $L1
 jj edit $AT
-jj log -r 'roots(pineta-onto..@)::'      # Y1, sibling, @
-jj log -r 'pineta-onto..@'               # Y1, @
-B=$(jj log -r 'fork_point(pineta-onto | @)' --no-graph -T commit_id)
-O=$(jj log -r pineta-onto --no-graph -T commit_id)
+jj log -r 'roots(pinetrie-onto..@)::'      # Y1, sibling, @
+jj log -r 'pinetrie-onto..@'               # Y1, @
+B=$(jj log -r 'fork_point(pinetrie-onto | @)' --no-graph -T commit_id)
+O=$(jj log -r pinetrie-onto --no-graph -T commit_id)
 A=$(jj log -r @ --no-graph -T commit_id)
 git merge-tree --write-tree --name-only --merge-base=$B $O $A   # g.txt, exit 1
-jj rebase -b @ -d pineta-onto            # Y1, sibling, @ conflicted; markers in g.txt
+jj rebase -b @ -d pinetrie-onto            # Y1, sibling, @ conflicted; markers in g.txt
 ```

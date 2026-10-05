@@ -5,7 +5,7 @@ import {
   parseMentions,
   type ThreadLane,
   type TranscriptMessage,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   branchPrefill,

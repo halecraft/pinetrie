@@ -39,7 +39,7 @@ there is no way to put one aside, or to take it back.
   in creation order (id order, S9). Which tab you are looking at is yours.
   A root someone else starts appears as a tab and does not take you there.
 - **Archiving hides a root for everyone, and deletes nothing.** The record is
-  a host-written `pineta.archive` value keyed by the root's entry id: its
+  a host-written `pinetrie.archive` value keyed by the root's entry id: its
   state (`archived` or `restored`), who changed it and when. Clients archive
   and restore with a command over the Line. Anyone can do either. Entries are
   immutable (ADR-0004), so archiving touches no entry.

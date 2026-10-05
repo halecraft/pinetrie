@@ -1,6 +1,6 @@
 // pi's harness events as `StreamEvent`s, mapped without a harness.
 
-import { laneNameForThread } from "@pineta/core"
+import { laneNameForThread } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import { type StreamSource, streamEventOf } from "./stream.ts"
 

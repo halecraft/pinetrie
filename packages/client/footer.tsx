@@ -17,8 +17,8 @@ import {
   type ProjectRecord,
   type TreeIndex,
   type WriterId,
-} from "@pineta/core"
-import type { SessionClient } from "@pineta/session"
+} from "@pinetrie/core"
+import type { SessionClient } from "@pinetrie/session"
 import { type ReactNode, useState, useSyncExternalStore } from "react"
 import {
   type ActivitySection,

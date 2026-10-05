@@ -27,7 +27,7 @@ import {
   type ThreadName,
   trailerRevset,
   WORKSPACE_ROOT,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import {
   bookmarkName,
   bookmarkOf,
@@ -67,7 +67,7 @@ import {
   run,
   stackBookmark,
   type TouchedRevision,
-} from "@pineta/lanes"
+} from "@pinetrie/lanes"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
 import { gatherLane } from "./lane-read.ts"
 import { lineFacts } from "./line.ts"
@@ -190,7 +190,7 @@ const fetchLane = async (
 
 /**
  * A lane's steps, run on the host: `/mnt/host-working-copy` and `/workspace` are directories
- * here. Only a mount at the start of a word moves: `refs/heads/pineta/fetched`
+ * here. Only a mount at the start of a word moves: `refs/heads/pinetrie/fetched`
  * is a ref, not a path.
  */
 const onHost = (steps: readonly LaneStep[], dirs: Record<string, string>) =>
@@ -231,7 +231,7 @@ describe("a lane's repo, with jj", () => {
     "GIT_CONFIG_VALUE_0",
   ] as const
   beforeAll(async () => {
-    top = await realpath(await mkdtemp(path.join(tmpdir(), "pineta-lanes-")))
+    top = await realpath(await mkdtemp(path.join(tmpdir(), "pinetrie-lanes-")))
     process.env.JJ_USER = "Probe"
     process.env.JJ_EMAIL = "probe@example.com"
     const ignore = path.join(top, "lane-git", "ignore")
@@ -344,8 +344,8 @@ describe("a lane's repo, with jj", () => {
     expect(
       (await yoursOps(["op", "log", "--no-graph", "-n", "1", "-T", "user"]))
         .stdout,
-    ).toMatch(/^pineta-host@/)
-    expect(await commitsOf(yoursJj, 'bookmarks(glob:"pineta/*")')).toEqual([])
+    ).toMatch(/^pinetrie-host@/)
+    expect(await commitsOf(yoursJj, 'bookmarks(glob:"pinetrie/*")')).toEqual([])
     expect(await defaultLog(yoursJj)).not.toContain("edit line two")
     expect((await yoursJj(["describe", "-r", r1, "-m", "rewritten"])).ok).toBe(
       false,
@@ -504,7 +504,7 @@ describe("a lane's repo, with jj", () => {
     )
     const [rootCopy] = await commitsOf(
       rootJj,
-      `bookmarks(exact:"pineta/${ROOT}")`,
+      `bookmarks(exact:"pinetrie/${ROOT}")`,
     )
     // Its fork point is immutable in the lane.
     expect(
@@ -651,7 +651,7 @@ describe("a lane's repo, with jj", () => {
       planForkSetup(LANE, { kind: "commits", commits: [base] }),
       runners,
     )
-    // A lane from before the line has no `Pineta-Base`; its own repo has no
+    // A lane from before the line has no `Pinetrie-Base`; its own repo has no
     // line bookmark to find a start on.
     expect(await baseOfLane()).toBeNull()
 
@@ -800,7 +800,7 @@ describe("a lane's repo, with jj", () => {
     // agent's commit, so the merge keeps b.txt.
     await edit(yoursDir, "yours.txt", "yours\n")
     await yoursJj(["commit", "-m", "you add a file"])
-    await yoursJj(["bookmark", "move", "pineta-onto", "--to", "@-"])
+    await yoursJj(["bookmark", "move", "pinetrie-onto", "--to", "@-"])
     const line = await lineNow()
     await inLane([fetchById([line])])
     const { ours, merge } = await mergeBase(laneJj, LANE, line, "update")
@@ -917,7 +917,7 @@ describe("a lane's repo, with jj", () => {
       "-m",
       "feat: as I want it",
     ])
-    const facts = await readOffer(ops, { name: NAME, target: "pineta-onto" })
+    const facts = await readOffer(ops, { name: NAME, target: "pinetrie-onto" })
     const [now] = facts?.kind === "offer" ? facts.revisions : []
     if (now === undefined) throw new Error("no commit")
     expect(now.commit).not.toBe(w)
@@ -1105,7 +1105,7 @@ describe("a lane's repo, with jj", () => {
       const tip = await laneTipIn(ops, LANE)
       if (tip === null) throw new Error("no tip")
       const built = await build([
-        { commit: tip, description: `WIP\n\nPineta-Source: ${tip}\n` },
+        { commit: tip, description: `WIP\n\nPinetrie-Source: ${tip}\n` },
       ])
       const [commit] = built.commits
       if (commit === undefined) throw new Error("no offer")
@@ -1207,7 +1207,7 @@ describe("a lane's repo, with jj", () => {
     const one = await build([
       {
         commit: t1,
-        description: `offer: lane\n\nPineta-Source: ${t1}\nPineta-Start: ${base[0]}\n`,
+        description: `offer: lane\n\nPinetrie-Source: ${t1}\nPinetrie-Start: ${base[0]}\n`,
       },
     ])
     const [c1] = one.changes
@@ -1265,7 +1265,7 @@ describe("a lane's repo, with jj", () => {
     expect(await sinceNow()).toEqual([{ reached: true, yoursChanged: true }])
     await executeRepo(
       yoursDir,
-      planDescribe(c1, `offer: lane\n\nPineta-Source: ${t1}\n`),
+      planDescribe(c1, `offer: lane\n\nPinetrie-Source: ${t1}\n`),
     )
 
     // A race: your edit and a host rewrite from the same operation make it
@@ -1293,7 +1293,7 @@ describe("a lane's repo, with jj", () => {
       "-r",
       c1,
       "-m",
-      `offer: lane\n\nPineta-Source: ${t1}\n\nhost`,
+      `offer: lane\n\nPinetrie-Source: ${t1}\n\nhost`,
     ])
     // Divergent: the batched read says so too.
     await agrees()
@@ -1317,7 +1317,7 @@ describe("a lane's repo, with jj", () => {
       "-m",
       // As the host writes it: so the next offer's revisions are told
       // from this one, integrated, by its base, not its trailer.
-      `offer: lane\n\nPineta-Thread: ${NAME}\nPineta-Source: ${t1}\n`,
+      `offer: lane\n\nPinetrie-Thread: ${NAME}\nPinetrie-Source: ${t1}\n`,
     ])
 
     // Integrate: the line moved forward to the offer, as the host; your @ and
@@ -1341,7 +1341,7 @@ describe("a lane's repo, with jj", () => {
     await yoursJj(["commit", "-m", "yours: a.txt"])
     await yoursJj(["bookmark", "move", line.onto, "--to", "@-"])
 
-    // The next turn: its offer starts at what the integrated-offer commit's Pineta-Source names,
+    // The next turn: its offer starts at what the integrated-offer commit's Pinetrie-Source names,
     // and holds only what came after; it does not bring a.txt back.
     await edit(laneDir, "b.txt", "b\n")
     const t2 = await turnOn(laneJj, { ...TURN, entry: entryId("e-2") })
@@ -1378,7 +1378,7 @@ describe("a lane's repo, with jj", () => {
         start: await knownStart(ops, { tip: t3, base: b3, line }),
         tip: t3,
         target: await lineNow(),
-        description: `WIP\n\nPineta-Source: ${t3}\n`,
+        description: `WIP\n\nPinetrie-Source: ${t3}\n`,
       }),
     )
     const [followed] = await commitsOf(ops, `change_id(${nc})`)
@@ -1402,14 +1402,14 @@ describe("a lane's repo, with jj", () => {
       "bookmark",
       "set",
       "--allow-backwards",
-      `pineta/${LANE}`,
+      `pinetrie/${LANE}`,
       "-r",
       s2,
     ])
     await fetch([t2])
     // Each revision names its thread, as the host writes it: found by that,
     // above the integrated offer and your commit under it, which are on the line.
-    const ours = `Pineta-Thread: ${NAME}\nPineta-Source: ${t2}`
+    const ours = `Pinetrie-Thread: ${NAME}\nPinetrie-Source: ${t2}`
     const stack = await build([
       { commit: s1, description: `s1: d.txt\n\n${ours}\n` },
       { commit: s2, description: `s2: e.txt\n\n${ours}\n` },
@@ -1607,7 +1607,7 @@ describe("a lane's repo, with jj", () => {
         sources: [
           {
             commit: before.tip,
-            description: `WIP\n\nPineta-Thread: ${BRANCH}\nPineta-Source: ${before.tip}\nPineta-Start: ${merge}\n`,
+            description: `WIP\n\nPinetrie-Thread: ${BRANCH}\nPinetrie-Source: ${before.tip}\nPinetrie-Start: ${merge}\n`,
           },
         ],
         target: await rig.lineNow(),
@@ -1687,7 +1687,7 @@ describe("a lane's repo, with jj", () => {
     await integrate(await offer(base))
     await edit(yoursDir, "mine.txt", "mine\n")
     await yoursJj(["commit", "-m", "mine on the line"])
-    await yoursJj(["bookmark", "move", "pineta-onto", "--to", "@-"])
+    await yoursJj(["bookmark", "move", "pinetrie-onto", "--to", "@-"])
     const before = await commitsOf(ops, "::@-")
     await executeRepo(yoursDir, laneRefSteps([{ lane: LANE, commit: null }]))
     expect(await commitsOf(ops, "::@-")).toEqual(before)
@@ -1800,7 +1800,7 @@ describe("a lane's repo, with jj", () => {
     })
     // The host's move, with --ignore-working-copy, still reaches git.
     expect(await gitMain()).toBe(before.commit)
-    // main moved sideways, outside Pineta: its own commit, which the line lacks.
+    // main moved sideways, outside pinetrie: its own commit, which the line lacks.
     await yoursJj(["new", "main", "-m", "hotfix"])
     await edit(yoursDir, "h.txt", "h\n")
     await yoursJj(["bookmark", "move", "main", "--to", "@"])
@@ -1833,7 +1833,7 @@ describe("a lane's repo, with jj", () => {
     await build([
       {
         commit: tip,
-        description: `WIP\n\nPineta-Thread: ${NAME}\nPineta-Source: ${tip}\n${start.map(c => `Pineta-Start: ${c}`).join("\n")}\n`,
+        description: `WIP\n\nPinetrie-Thread: ${NAME}\nPinetrie-Source: ${tip}\n${start.map(c => `Pinetrie-Start: ${c}`).join("\n")}\n`,
       },
     ])
     const op = (await ops(["op", "log", "--no-graph", "-n", "1", "-T", "id"]))
@@ -1929,7 +1929,7 @@ describe("a lane's repo, with jj", () => {
       await build([
         {
           commit: tip,
-          description: `WIP\n\nPineta-Thread: ${NAME}\nPineta-Source: ${tip}\n${start.map(c => `Pineta-Start: ${c}`).join("\n")}\n`,
+          description: `WIP\n\nPinetrie-Thread: ${NAME}\nPinetrie-Source: ${tip}\n${start.map(c => `Pinetrie-Start: ${c}`).join("\n")}\n`,
         },
       ])
     ).changes
@@ -1975,7 +1975,7 @@ describe("a lane's repo, with jj", () => {
     const built = await build([
       {
         commit: t1,
-        description: `feat: a\n\nPineta-Thread: ${NAME}\nPineta-Lane: ${LANE}\n`,
+        description: `feat: a\n\nPinetrie-Thread: ${NAME}\nPinetrie-Lane: ${LANE}\n`,
       },
     ])
     await integrate({ built })
@@ -2184,7 +2184,7 @@ describe("a lane's repo, with jj", () => {
       if (top === undefined) throw new Error("no offer")
       await rig.yoursJj(["new", top])
       await rig.edit(rig.yoursDir, "doc.txt", doc({ 1: "edited by you" }))
-      // The offer keeps its message, and so its `Pineta-Source`.
+      // The offer keeps its message, and so its `Pinetrie-Source`.
       await rig.yoursJj([
         "squash",
         "--ignore-immutable",

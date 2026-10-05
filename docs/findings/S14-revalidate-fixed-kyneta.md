@@ -195,7 +195,7 @@ Identical across every combination.
 
 ## 4. B — PERFORMANCE
 
-### 4.1 The Pineta shape to n=10 000
+### 4.1 The pine·trie shape to n=10 000
 
 `Schema.record(Schema.struct.json({id,parentId,type,text}))` for entries, `Schema.record(Schema.list(Schema.any()))` for pending frames.
 
@@ -375,7 +375,7 @@ So the pure arrow now preserves `undefined`, `stepInPlace` mutates in place and 
 
 **Nothing regresses.** Every ADR that rested on S2/S3/S5/S7/S8/S11 stands. ADR-0009 (id uniqueness) and ADR-0011 (lane-per-writer) are re-confirmed with identical trial counts on the supported floor.
 
-**`01-architecture.md` § Risks — the `@kyneta/schema` writes row should be rewritten.** It currently reads *"Blocked on a republish, not on design. Residual: Loro map-write path still ~×3.5 per doubling, in wasm, unexplained → S13."* Both halves are now stale. Suggested: *"Fixed upstream in `da978ec` (2026-09-19): `step` = copy ∘ core, `stepInPlace` = core, `applyChange` uses the dual. Requires loro-crdt ≥1.13.4. Pineta shape n=10 000: entries 38 444 → 93 ms, lists 12 731 → 92 ms. Linear to n=50 000. Residual: none — S13 closed, the ×3.5 was loro-crdt's subscriber-gated O(keys²) event build."*
+**`01-architecture.md` § Risks — the `@kyneta/schema` writes row should be rewritten.** It currently reads *"Blocked on a republish, not on design. Residual: Loro map-write path still ~×3.5 per doubling, in wasm, unexplained → S13."* Both halves are now stale. Suggested: *"Fixed upstream in `da978ec` (2026-09-19): `step` = copy ∘ core, `stepInPlace` = core, `applyChange` uses the dual. Requires loro-crdt ≥1.13.4. pine·trie shape n=10 000: entries 38 444 → 93 ms, lists 12 731 → 92 ms. Linear to n=50 000. Residual: none — S13 closed, the ×3.5 was loro-crdt's subscriber-gated O(keys²) event build."*
 
 **S13 moves to Resolved** with a CONFIRMED verdict, evidenced in raw loro-crdt (§4.3). It was never a Kyneta binding issue.
 
@@ -403,9 +403,9 @@ whereas the working copy declares `>=1.13.4`. A republish that ships the code fi
 
 1. **The loro mechanism was verified as a black box only.** I confirmed subscriber-gated superlinearity and that the version bump removes it. I did **not** read loro's source, and did **not** re-bisect 1.13.3 → 1.13.4; I tested 1.10.8 and 1.16.1, both safely on their respective sides of the claimed boundary.
 2. **git `HEAD` does not contain `da978ec`** (§2). The working copy does, and the dist is built from it, but I did not resolve the jj/git divergence. If someone rebuilds from git `HEAD` rather than the working copy they may not get the fix.
-3. **Kyneta's own 2062-test suite was not re-run.** S11 ran it against its patch; I did not re-run it against the landed fix. That is the Kyneta team's CI, not Pineta's, but it means "the landed fix passes Kyneta's tests" is assumed here, not verified.
+3. **Kyneta's own 2062-test suite was not re-run.** S11 ran it against its patch; I did not re-run it against the landed fix. That is the Kyneta team's CI, not pine·trie's, but it means "the landed fix passes Kyneta's tests" is assumed here, not verified.
 4. **`tsc --noEmit` still not run** — inherited from S11 residual #2. The landed code is different code, so S11's caveat does not transfer either way.
-5. **`@kyneta/react` and `@kyneta/devtools` still unexercised.** S11 residual #3 flagged object-identity assumptions as the main risk of in-place mutation. The landed fix mutates in place *more* aggressively than S11's patch (set-op and tree too), so this risk is *larger* now, not smaller. Nothing in Pineta's suites touches those packages.
+5. **`@kyneta/react` and `@kyneta/devtools` still unexercised.** S11 residual #3 flagged object-identity assumptions as the main risk of in-place mutation. The landed fix mutates in place *more* aggressively than S11's patch (set-op and tree too), so this risk is *larger* now, not smaller. Nothing in pine·trie's suites touches those packages.
 6. **S5 was not re-run.** It is an LLM-quality spike with no Kyneta dependency; re-running would cost tokens and could not regress from a version bump. Deliberately skipped, not overlooked.
 7. **The S3 drive/inference loop is still stubbed** — S3 residual #1 carries over untouched.
 8. **Single-writer, in-memory, no persistence, no transport.** Same envelope as every prior spike: no `@kyneta/exchange`, no Line, no store backend.
@@ -450,7 +450,7 @@ factorial was incomplete without it and that S13 could not otherwise be answered
   1000/1000; S3 step1 12/12, step7 10/10. **Every entry total byte-identical to
   published figures** — behaviour unperturbed, not merely "still passing." Both
   negative controls still fail as designed.
-- **Performance, Pineta shape n=10 000:** entries **38 444 → 93 ms (413×)**,
+- **Performance, pine·trie shape n=10 000:** entries **38 444 → 93 ms (413×)**,
   lists **12 731 → 92 ms (138×)**. Linear to **n=50 000**. Independently
   re-verified at n=8 000: entries `26 234 → 75 ms`, ×4.54 → ×1.75.
 - **The factorial is the interesting part.** Lists need only the Kyneta fix

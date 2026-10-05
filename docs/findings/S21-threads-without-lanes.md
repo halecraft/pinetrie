@@ -79,7 +79,7 @@ input, and where it lands depends on the turn boundary it meets.
    taken. That one ordered outbox replaces both `followUp` (S20) and appending
    during a run, whose outcome depends on timing.
 3. **The outbox is shared state.** Every window must see who is waiting, so the
-   held messages belong in the document as Pineta values, keyed by message id
+   held messages belong in the document as pine·trie values, keyed by message id
    (ADR-0016), read in id order.
 
 ## Method

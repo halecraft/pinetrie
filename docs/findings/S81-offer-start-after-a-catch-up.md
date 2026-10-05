@@ -7,7 +7,7 @@ It is S51 item 3 (`docs/findings/S51-offer-start-after-an-update.md`)
 again: ADR-0060 removed the copies of your `@` that carried S51's rule, and
 with them the rule, though a catch-up with the line needs it too.
 
-Observed in Pineta's own repo, on the offer `pineta-offer/ideal-lily`, with
+Observed in pine·trie's own repo, on the offer `pinetrie-offer/ideal-lily`, with
 jj 0.44.0. The commands were read-only, on the host: `jj log`, `jj resolve
 --list -r`, `jj evolog -r`, `jj op show`, and `jj diff --stat`.
 
@@ -15,15 +15,15 @@ jj 0.44.0. The commands were read-only, on the host: `jj log`, `jj resolve
 
 | commit | what it is | conflicted |
 |---|---|---|
-| `0b195282` | ideal-lily's earlier offer, taken: `Pineta-Source: e5621018` | no |
+| `0b195282` | ideal-lily's earlier offer, taken: `Pinetrie-Source: e5621018` | no |
 | `c625202c` | the line, above `0b195282`, changing some of its lines | no |
-| `vvskrpyl` 69a77da1 | the lane's catch-up: a merge of `c625202c` and `e5621018`, `Pineta-Base: pineta-onto@c625202c` | 4 files |
+| `vvskrpyl` 69a77da1 | the lane's catch-up: a merge of `c625202c` and `e5621018`, `Pinetrie-Base: pinetrie-onto@c625202c` | 4 files |
 | `rxknzpos` 707a483c | the lane's tip, after its agent resolved the merge | no |
-| `puznttyw` 21b86a0e | the offer, `Pineta-Start: c625202c` and `e5621018` | the same 4 files |
+| `puznttyw` 21b86a0e | the offer, `Pinetrie-Start: c625202c` and `e5621018` | the same 4 files |
 
 - `jj diff --from c625202c --to 707a483c` is empty: the lane kept the
   line's text everywhere, so it held nothing the line lacked.
-- The offer's evolog, every operation `pineta-host`'s: a new commit on
+- The offer's evolog, every operation `pinetrie-host`'s: a new commit on
   `c625202c` and `e5621018` (conflicted, as their merge is); `restore --from
   707a483c` (clean); `rebase -s … -o c625202c` (conflicted); two describes.
 
@@ -45,7 +45,7 @@ jj 0.44.0. The commands were read-only, on the host: `jj log`, `jj resolve
    whole. A source whose taken commit is in `::c625202c` is in the lane's
    tip already, in the form the line has it. The rule: the taken sources are
    read only from commits outside `::<the base's source>`, the commit the
-   lane's `Pineta-Base` names (`takenRevset`, `packages/lanes/plan.ts`).
+   lane's `Pinetrie-Base` names (`takenRevset`, `packages/lanes/plan.ts`).
    Here that drops `e5621018`, the start is `c625202c`, and the lane's work
    changes no file, so the offer is withdrawn.
 5. **For a WIP, the base's source is the WIP's commit, not the copy.** A

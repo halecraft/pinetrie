@@ -1,6 +1,6 @@
 # S85 — earlier thinking is dropped when a lane's tools or prompt change
 
-Measured on a copy of the person's `.pineta/pineta.db` (2026-10-03), against
+Measured on a copy of the person's `.pinetrie/pinetrie.db` (2026-10-03), against
 pi-ai 0.87.1's `api/anthropic-messages.js` and pi-agent-core 0.87.1's harness.
 The probes ran in a lane, read only the stored session, and were not committed.
 ADR-0063's change acts on it: a lane's tools and prompt stay the same across
@@ -49,7 +49,7 @@ its runs.
    follow a naming of the lane. The rest line up in time with landed changes
    to `packages/pi` and `AGENTS.md`, which a restarted host reads afresh
    (`setUpModel` loads context files and skills once per process). That last
-   cause is particular to developing Pineta in Pineta.
+   cause is particular to developing pine·trie in pine·trie.
 6. **The prompt cache is otherwise healthy:** 2.88 G tokens read against 119 M
    written, over the session.
 

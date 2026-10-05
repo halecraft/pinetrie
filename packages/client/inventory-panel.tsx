@@ -5,14 +5,14 @@
 // drop here is an intent, planned like any other.
 
 import { subscribe } from "@kyneta/schema"
-import type { CardId, CardRecord, WriterId } from "@pineta/core"
-import { displayName } from "@pineta/rules"
+import type { CardId, CardRecord, WriterId } from "@pinetrie/core"
+import { displayName } from "@pinetrie/rules"
 import type {
   CardRefusal,
   Intents,
   SessionClient,
   Slots,
-} from "@pineta/session"
+} from "@pinetrie/session"
 import { useEffect, useRef, useState } from "react"
 import { BoundCardEditor, dragCard } from "./card-editor.tsx"
 import {

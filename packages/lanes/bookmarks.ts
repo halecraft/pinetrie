@@ -1,12 +1,12 @@
-// lanes/bookmarks — `pineta/<lane>`, in a lane's own repo.
+// lanes/bookmarks — `pinetrie/<lane>`, in a lane's own repo.
 //
 // The bookmark moves with every revision (`commitTurn`, `mergeBase`). In your
 // repo a lane's history is not a bookmark of yours but a remote bookmark,
-// `tip@pineta-<lane>` (`@pineta/repo`'s `laneTipIn` and `laneRefSteps`),
+// `tip@pinetrie-<lane>` (`@pinetrie/repo`'s `laneTipIn` and `laneRefSteps`),
 // which jj keeps out of your default log and immutable (ADR-0038, S48 item
 // 11).
 
-import { type CommitId, commitId, type LaneName } from "@pineta/core"
+import { type CommitId, commitId, type LaneName } from "@pinetrie/core"
 import { bookmarkName, bookmarkRevset } from "./plan.ts"
 import { describeFailure, lines, type Runner } from "./run.ts"
 

@@ -8,7 +8,7 @@ from the thread's name alone, as the thread is named, with no crop.
 things: a colour stripe, a two-word name (ADR-0039), avatars. Threads are
 hard to tell apart at a glance. pi-ai 0.87.1 has an image API
 (`createImagesModels`, `openrouterImagesProvider`) with about sixty
-OpenRouter image models, and Pineta already stores pasted images by content
+OpenRouter image models, and pine·trie already stores pasted images by content
 (ADR-0042).
 
 S60 found:
@@ -23,11 +23,11 @@ S60 found:
 
 **Decision.**
 
-- **A thread owns its banner:** a host-written `pineta.banner` value keyed by
+- **A thread owns its banner:** a host-written `pinetrie.banner` value keyed by
   its lane (`{ lane, sha, focus, at }`, marginalia `work.ts`). The image is a
   blob. A branch is its own thread, so it gets its own.
 - **Off unless the user config enables it:**
-  `{ "banner": { "enabled": true } }` in `~/.config/pineta/config.json`, with
+  `{ "banner": { "enabled": true } }` in `~/.config/pinetrie/config.json`, with
   an optional `model` (`provider/id`) and `aspectRatio`. Disabled, nothing is
   made and the agent has no tool; banners already stored are still drawn.
   Enabled with no key for the model's provider: nothing is made, and the host
@@ -40,7 +40,7 @@ S60 found:
   message) writes a brief from the `column-banner` skill: the thread's name,
   its own messages from its first prompt, and what came before it in the room
   left (`bannerRequest`). The image model draws the brief.
-- **The skill is the person's to edit.** Pineta's `column-banner` is
+- **The skill is the person's to edit.** pine·trie's `column-banner` is
   `disable-model-invocation: true`. A user's or repo's skill of that name
   replaces it, and it is read at every banner.
 - **The model never draws text.** The header lays the name over the image, as

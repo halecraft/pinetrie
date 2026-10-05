@@ -27,7 +27,7 @@ import {
   type StopRecord,
   type TreeIndex,
   type WriterId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { Type } from "typebox"
 import type { QueuedCard } from "./card.ts"
 import { decodeAt, decodeWith, entryKey } from "./decode.ts"
@@ -41,7 +41,7 @@ const StopSchema = Type.Object({
 
 /** Each ask's stop, at its prompt's entry id. */
 export const STOP: RecordSpec<StopRecord, EntryId, "root"> = {
-  namespace: "pineta.stop",
+  namespace: "pinetrie.stop",
   home: "root",
   keyOf: r => r.prompt,
   encode: ({ prompt, ...contents }) => contents,
@@ -97,7 +97,7 @@ export function planStop(
 
 // ── carrying on (ADR-0082) ───────────────────────────────────────────────
 
-const CARRY_ON_TYPE = "pineta.carry-on"
+const CARRY_ON_TYPE = "pinetrie.carry-on"
 
 const CarryOnSchema = Type.Object({
   role: Type.Literal("custom"),

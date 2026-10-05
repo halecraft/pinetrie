@@ -7,7 +7,7 @@ and ADR-0034 (a lane's fetch is imported by the owner).
 **Amended by ADR-0067:** whether a lane's work changes any file is `none`,
 `some` or `unknown`, and an untraced start or an unknown answer builds no
 offer, so refreshing every named lane on a full observation wakes none from
-before `Pineta-Source`; a lane whose base moved runs two more jj processes,
+before `Pinetrie-Source`; a lane whose base moved runs two more jj processes,
 once per move.
 Amended by ADR-0083: a take is an *offer integration*; it names what it
 was shown.
@@ -17,7 +17,7 @@ archived lane has no base to follow, and its ref, its offer bookmark or an
 open record still marks it.
 
 **Context.** A take ("add to the project") sometimes took 30–60 s, and the
-page showed nothing meanwhile. S89 measured it on a clone of Pineta's repo:
+page showed nothing meanwhile. S89 measured it on a clone of pine·trie's repo:
 a take waited 13–18 s behind 52–59 refreshes on the offers' one queue, and
 another person's chat waited as long, since the take held the host's one
 queue too. Every trigger queued a whole refresh; nothing merged duplicates
@@ -36,13 +36,13 @@ merges divergent heads and names the result; the heads are file names that
 and not on a read.
 
 **Decision.**
-- **One owner writes your repo** (`@pineta/repo`'s `startRepoOwner`). It
+- **One owner writes your repo** (`@pinetrie/repo`'s `startRepoOwner`). It
   is the only thing that knows the head: writes run on it, everything else
   reads at the head it last saw. The package exports no runner on your repo;
   a step gets `RepoOps`, a read `RepoReads`. `lanes` keeps what a lane also
   runs; startup's reads (`prepareHost`, `prepareShared`) are the one
   documented exception.
-- **Commands first, upkeep keyed** (`@pineta/keeper`). A take, a `line`
+- **Commands first, upkeep keyed** (`@pinetrie/keeper`). A take, a `line`
   command, a split's span and end, an archive's ref moves and a fetch's
   import are commands; a lane's refresh, the line's record, an observation
   and the shared rewrite are upkeep, at most one queued per key, started
@@ -77,6 +77,6 @@ and not on a read.
 answered in 0.44 s and the other person's chat in 0.01 s; a refresh that
 wrote nothing runs 3 jj processes, against 18; the host's own jj
 processes fell from about 8,400 to 3,200 over the run. The host makes no
-divergent heads, and every operation it makes is `pineta-host`'s. A page
+divergent heads, and every operation it makes is `pinetrie-host`'s. A page
 whose record lags the repo gets `offer_changed` rather than taking work
 nobody reviewed. A lane on a WIP still reads its base the separate way.

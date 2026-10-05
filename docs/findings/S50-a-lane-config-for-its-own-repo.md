@@ -1,6 +1,6 @@
 # S50 — a lane's jj config, for its own repo only
 
-A lane's container sets `JJ_CONFIG=/workspace/.pineta-lane/jj.toml`, which
+A lane's container sets `JJ_CONFIG=/workspace/.pinetrie-lane/jj.toml`, which
 makes the fork's inherited history immutable (S42 item 4, ADR-0034). The
 variable reaches every jj command in the container, not only the lane's repo.
 In a lane, `pnpm run verify` failed: 3 tests in `packages/lanes/lanes.test.ts`

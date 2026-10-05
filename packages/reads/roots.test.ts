@@ -8,8 +8,8 @@ import {
   rootIdFor,
   type Sha256,
   writerId,
-} from "@pineta/core"
-import { encodeChat, MARK, setRecord } from "@pineta/rules"
+} from "@pinetrie/core"
+import { encodeChat, MARK, setRecord } from "@pinetrie/rules"
 import {
   newRootDoc,
   newSessionDoc,
@@ -18,7 +18,7 @@ import {
   type StoredEntryRow,
   writeEntry,
   writeLaneTip,
-} from "@pineta/schema"
+} from "@pinetrie/schema"
 import { describe, expect, test } from "vitest"
 import {
   readHeldIndex,
@@ -144,8 +144,8 @@ describe("readRootRecord", () => {
 
 test("readReferencedBlobs: every root's images from its record, without its document", () => {
   const session = newSessionDoc()
-  session.values.set(physicalKey("pineta.root", ROOT), {
-    namespace: "pineta.root",
+  session.values.set(physicalKey("pinetrie.root", ROOT), {
+    namespace: "pinetrie.root",
     key: ROOT,
     value: {
       ...readRootRecord(ROOT, newRootDoc()),
@@ -170,8 +170,8 @@ test("readHeldIndex: several roots read as one tree, kept while none changes", (
 test("readParticipants: a writer only in a root not held still counts, from its record", () => {
   const session = newSessionDoc()
   const bea = writerId("bea@x.io")
-  session.values.set(physicalKey("pineta.root", ROOT), {
-    namespace: "pineta.root",
+  session.values.set(physicalKey("pinetrie.root", ROOT), {
+    namespace: "pinetrie.root",
     key: ROOT,
     value: {
       ...readRootRecord(ROOT, newRootDoc()),
@@ -187,16 +187,16 @@ test("readParticipants: a writer only in a root not held still counts, from its 
 test("readParticipantNames keeps its map while the names are the same, whatever else the session writes", () => {
   const session = newSessionDoc()
   const name = (writer: string, n: string) =>
-    session.values.set(physicalKey("pineta.participant", writer), {
-      namespace: "pineta.participant",
+    session.values.set(physicalKey("pinetrie.participant", writer), {
+      namespace: "pinetrie.participant",
       key: writer,
       value: n,
     })
   name(ADA, "Ada")
   const first = readParticipantNames(session)
   expect(first.get(ADA)).toBe("Ada")
-  session.values.set(physicalKey("pineta.root", ROOT), {
-    namespace: "pineta.root",
+  session.values.set(physicalKey("pinetrie.root", ROOT), {
+    namespace: "pinetrie.root",
     key: ROOT,
     value: { ...readRootRecord(ROOT, newRootDoc()), root: undefined },
   })

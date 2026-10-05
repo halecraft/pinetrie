@@ -5,7 +5,7 @@ import {
   ROOT,
   rootIdFor,
   writerId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { composerPlace } from "./column-view.ts"
 import {

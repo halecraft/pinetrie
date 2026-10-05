@@ -8,7 +8,7 @@ import {
   laneNameForThread,
   type RootId,
   rootIdFor,
-} from "@pineta/core"
+} from "@pinetrie/core"
 
 /** A uuidv7: 48 bits of milliseconds, the version, the variant, randomness. */
 export function newUuidv7(): string {

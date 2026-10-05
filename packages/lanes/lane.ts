@@ -18,7 +18,7 @@
 
 import path from "node:path"
 import type { Runners } from "./execute.ts"
-import { PINETA_MOUNT, SPEC_LABEL } from "./plan.ts"
+import { PINETRIE_MOUNT, SPEC_LABEL } from "./plan.ts"
 import {
   type BytesRunner,
   describeFailure,
@@ -28,14 +28,14 @@ import {
 } from "./run.ts"
 import { runtimeNode } from "./runtime.ts"
 
-/** Pineta's own install on the host, mounted read-only at `/pineta` in every lane. */
-export const PINETA_INSTALL = path.resolve(import.meta.dirname, "../..")
+/** pinetrie's own install on the host, mounted read-only at `/pinetrie` in every lane. */
+export const PINETRIE_INSTALL = path.resolve(import.meta.dirname, "../..")
 
 /** The helper's own path, inside every lane. */
-export const HELPER = `${PINETA_MOUNT}/packages/pi/lane-helper.ts`
+export const HELPER = `${PINETRIE_MOUNT}/packages/pi/lane-helper.ts`
 
 /** The note a lane's agent is pointed at, inside every lane (ADR-0046). */
-export const LANE_NOTE = `${PINETA_MOUNT}/packages/pi/lane.md`
+export const LANE_NOTE = `${PINETRIE_MOUNT}/packages/pi/lane.md`
 
 /** The command that opens a lane's channel: the helper on the runtime's Node. */
 export const helperCommand = (container: string): readonly string[] => [

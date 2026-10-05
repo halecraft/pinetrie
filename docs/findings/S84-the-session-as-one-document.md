@@ -1,6 +1,6 @@
 # S84 — the session as one document: what compaction rewrites, and why
 
-Measured on a copy of the person's `.pineta/pineta.db` (2026-10-03, mid-run),
+Measured on a copy of the person's `.pinetrie/pinetrie.db` (2026-10-03, mid-run),
 read with `node:sqlite` in a lane. Kyneta read at
 `kyneta/workspace/pineta`. Disposable probes, not committed. ADR-0063 acts on
 it: a root is a document, and what is streaming is another.
@@ -8,7 +8,7 @@ it: a root is a document, and what is streaming is another.
 **Answers.**
 
 1. **Kyneta stores a document as a log of small deltas. The one large row comes
-   from Pineta's compaction.** Since the last compaction, `pineta:session` had
+   from pine·trie's compaction.** Since the last compaction, `pinetrie:session` had
    gained 1,438 delta records, 1.7 MB in all, beside one entirety record of
    124.3 M characters. Each write appends `exportSince(confirmed)`
    (`Runtime.#prepareWrite`). Only `compact()` replaces the log with
@@ -56,11 +56,11 @@ Each choice was sound for what was known when it was made:
 - **Compaction runs at every run end and at startup** (`host/settle.ts`,
   `host/housekeeping.ts`). Both are fixed triggers, with no size threshold.
 
-## What Kyneta offers that Pineta does not use
+## What Kyneta offers that pine·trie does not use
 
 In Kyneta the document is the unit of storage, compaction, sync and memory:
 
-- **Many documents.** Pineta already uses one per card and per inventory. The
+- **Many documents.** pine·trie already uses one per card and per inventory. The
   session could be one per root, plus one for transient state.
 - **`unload`** takes a stored document out of memory and loads it again on
   `get` (exchange `TECHNICAL.md`, "Suspend, unload, destroy"). An archived
@@ -74,11 +74,11 @@ In Kyneta the document is the unit of storage, compaction, sync and memory:
 
 - **Every value has an owner a root can be found from.** Most are keyed by
   lane: `pi.branch.tip`, `pi.lane.config`, `pi.lane.state` (81 each),
-  `pineta.lane`, `.name`, `.offer`, `.banner`, `.base`. Some are keyed by
-  entry: `pineta.revision` (10,746), `.landing`, `.mark`, `.stop`. `pineta.archive`
+  `pinetrie.lane`, `.name`, `.offer`, `.banner`, `.base`. Some are keyed by
+  entry: `pinetrie.revision` (10,746), `.landing`, `.mark`, `.stop`. `pinetrie.archive`
   is keyed by root. `pi.result`, `pi.op.meta` and `pi.op.state` name a lane in
   their value. Usage rows name their `entryId`. Five are session-wide, one
-  record each or close to it: `pineta.project`, `.commands`, `.participant`,
+  record each or close to it: `pinetrie.project`, `.commands`, `.participant`,
   `.seat` and `.line`.
 - **Each new entry rebuilds the whole tree index.** `readTreeIndex`
   (`packages/reads`) is memoized on the `entries` snapshot. The host's
@@ -125,17 +125,17 @@ SQLite store.
 5. **Streams and active runs need a stored `json` document.** Kyneta has one
    transient tier, `ephemeral` (`Durability`, `schema/src/substrate.ts`), and
    its laws exclude `positional-ot`, so it cannot hold a `Schema.text()`. A
-   small `pineta:now` on `json`, compacted at every run end, holds only what is
+   small `pinetrie:now` on `json`, compacted at every run end, holds only what is
    streaming. The live handover (ADR-0044) needs the tip and the entry in one
    change. Both stay in the root's document.
 
 ## Open
 
-- **Session-wide values.** `pineta.seat`, `.participant` and the rest are
+- **Session-wide values.** `pinetrie.seat`, `.participant` and the rest are
   written through pi's `session.setValue` today. The session document could
   be a pi session with no entries, or be written through `packages/schema`.
 - **Atomicity.** A pi commit is one batch on one document. Anything that now
   writes a root and the session-wide document together, like a root's
   archive record and the root itself, becomes two changes.
 - **Migration.** The routing in addendum item 2 is a dry run of a one-off
-  script that splits `pineta:session` into per-root documents.
+  script that splits `pinetrie:session` into per-root documents.

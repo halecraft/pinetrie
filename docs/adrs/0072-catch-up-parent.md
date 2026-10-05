@@ -27,7 +27,7 @@ conflicted jj commit as every side's whole tree under `.jjconflict-*`
   lane whose commit is nearest above its first prompt (`forkParent`, the
   commit `forkPoint` clones). The parent's newest commit, fetched from your
   repo, is merged into the thread's copy like the line's commit, with no
-  `Pineta-Base`: it is no base. A conflict starts the usual resolution run
+  `Pinetrie-Base`: it is no base. A conflict starts the usual resolution run
   (ADR-0033). Offers still go to the project or a WIP; the parent's work
   reaches the project by the parent's own offer.
 - **Whether the parent is ahead is read from the document**, not your repo
@@ -74,9 +74,9 @@ conflicted jj commit as every side's whole tree under `.jjconflict-*`
 - *Catch up with the project instead*: it settles a `start` conflict only
   once the parent's resolution was taken.
 - *Read the parent from your repo on each refresh*, stored in
-  `pineta.base`, with a parent's move refreshing its children: jj processes
+  `pinetrie.base`, with a parent's move refreshing its children: jj processes
   on every refresh, against ADR-0065's budget, for what the document says.
-- *A `Pineta-Parent` trailer* on the merge: the update and land messages
+- *A `Pinetrie-Parent` trailer* on the merge: the update and land messages
   record what was merged, and ancestry says the rest.
 - *Filter `.jjconflict-*` out of git's paths*: it depends on jj's storage
   format.

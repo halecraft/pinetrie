@@ -14,7 +14,7 @@ import {
   pinnedOf,
   sameKey,
   type WriterId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 
 export type PutTarget =
   /** Below the line at a column's end, or a fresh column's card. */
@@ -24,8 +24,8 @@ export type PutTarget =
   /** A slot of your inventory. */
   | { readonly kind: "inventory"; readonly slot: number }
 
-/** The drag data type a card's id travels under, Pineta's own. */
-export const CARD_MIME = "application/x-pineta-card"
+/** The drag data type a card's id travels under, pinetrie's own. */
+export const CARD_MIME = "application/x-pinetrie-card"
 
 /** The attribute a column's drop zone carries: its key. */
 const PUT_COLUMN = "data-put-column"

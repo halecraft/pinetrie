@@ -1,5 +1,5 @@
-import { writerId } from "@pineta/core"
-import { newPresenceDoc, readingKey, seatKey } from "@pineta/schema"
+import { writerId } from "@pinetrie/core"
+import { newPresenceDoc, readingKey, seatKey } from "@pinetrie/schema"
 import { expect, test } from "vitest"
 import {
   readReading,

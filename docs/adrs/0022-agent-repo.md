@@ -9,8 +9,8 @@ ADR-0044: a stream no longer closes when its message or tool ends. Amended by
 ADR-0086: the repo the host runs from is the default project; `pnpm host
 <folder>` names another.
 
-**Context.** To use Pineta to build Pineta, its agent needs pi's editing
-abilities: read, write, edit, and run commands. Pineta is shared, streamed and
+**Context.** To use pine·trie to build pine·trie, its agent needs pi's editing
+abilities: read, write, edit, and run commands. pine·trie is shared, streamed and
 now persisted, so those abilities must be safe to expose, visible while they
 work, and cheap to store. The agent's model should be the person's own, which
 for a Claude subscription works only through a pi extension (S23).
@@ -19,14 +19,14 @@ for a Claude subscription works only through a pi extension (S23).
 - **The agent works in the repo it runs from.** pi-agent-core's `read`,
   `write`, `edit` and `bash` run in the repo root through `NodeExecutionEnv`.
   The development host gives them by default, since an agent without them
-  cannot do the work it is asked for; `PINETA_TOOLS=0` turns them off. A host
+  cannot do the work it is asked for; `PINETRIE_TOOLS=0` turns them off. A host
   started from code (`startHost`) has none unless given a directory, so no
   suite runs commands by accident. There is no second
   checkout: Node loads the host's code once, jj keeps the agent's edits in a
   reviewable change, and hot reload is off, so the agent's edits to the client
   never reach an open page mid-run.
 - **Loopback by default; an invite key anywhere else.** The host binds to
-  `127.0.0.1` unless `PINETA_BIND` says otherwise. Off loopback, nothing gets
+  `127.0.0.1` unless `PINETRIE_BIND` says otherwise. Off loopback, nothing gets
   in without the key: no page, no file, no WebSocket. The key comes as an
   invite link (`?key=`), which sets an `HttpOnly` cookie and redirects to the
   page without it. Hot reload runs on loopback only, because Vite's socket
@@ -43,8 +43,8 @@ for a Claude subscription works only through a pi extension (S23).
     host's user. The host says so at startup.
 - **Models come from the person's pi setup.** pi's own `SettingsManager` and
   `DefaultResourceLoader` load the person's packages, and only the extensions'
-  provider registrations are applied to Pineta's `ModelRuntime`. The settings'
-  default model is used unless `PINETA_PROVIDER`/`PINETA_MODEL` override it.
+  provider registrations are applied to pine·trie's `ModelRuntime`. The settings'
+  default model is used unless `PINETRIE_PROVIDER`/`PINETRIE_MODEL` override it.
   The system prompt is pi's `buildSystemPrompt`, with the repo's `AGENTS.md`
   and the person's skills. Suites never use this: they name their model, or
   script one.
@@ -59,7 +59,7 @@ for a Claude subscription works only through a pi extension (S23).
 - **A stop control** ends a thread's running turn (`lane.abort`); messages
   waiting for the lane are then taken as usual.
 - **The session persists** in a Kyneta SQLite store over `node:sqlite`
-  (`.pineta/pineta.db` by default). A starting host clears every stream and run,
+  (`.pinetrie/pinetrie.db` by default). A starting host clears every stream and run,
   then drains held messages. A later change to the document's root schema
   cannot open an existing store: migrate it, or start a new file.
 
@@ -70,7 +70,7 @@ for a Claude subscription works only through a pi extension (S23).
   key (`operationId`/`invocationId`); that is an upstream request.
 - Kyneta's store repeated bytes when a commit landed while another was being
   written (S22 addendum: 133 KB of 345 KB in one run). Fixed in Kyneta and
-  verified from Pineta; until `compact()` works on a live Loro substrate, every
+  verified from pine·trie; until `compact()` works on a live Loro substrate, every
   tool run still grows the store for good.
 - Two threads running tools at once share the repo and can collide. Accepted
   until a workspace per lane (ADR-0019). A sandbox for `bash` is a later step.

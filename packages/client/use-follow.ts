@@ -1,7 +1,7 @@
 // client/use-follow — the shell of `follow.ts`: read the scroller, decide,
 // scroll.
 
-import type { EntryId } from "@pineta/core"
+import type { EntryId } from "@pinetrie/core"
 import {
   type RefObject,
   useCallback,
@@ -17,7 +17,7 @@ import {
 } from "./follow.ts"
 
 /** The DOM event `alignOnOpen` and `useReveal` dispatch on a column body they have placed. */
-export const PLACED = "pineta:placed"
+export const PLACED = "pinetrie:placed"
 
 export interface Follow {
   /** Released, and content has arrived below since, or it was mounted behind. */

@@ -20,7 +20,7 @@ measured mounts at deep paths the image lacks, or unusual paths.
    `container run` fails with "unknown directive". The same path works with
    `-v <source>:<target>:ro`, whose separator is a colon instead, so `-v`
    cannot take a path with a colon. A path with both can be mounted neither
-   way. The same limit applies to every mount Pineta makes today, your
+   way. The same limit applies to every mount pine·trie makes today, your
    working copy's included.
 5. **A skill's own script runs from the mount.** `bash .../comments/scripts/register-scan`
    ran in the lane and reported the same hit as on the host. Writes to the
@@ -43,6 +43,6 @@ measured mounts at deep paths the image lacks, or unusual paths.
 ## Method
 
 `sandbox/s46/probe.sh`, from the repo root, outside the sandbox. It used
-Pineta's default lane image (`pineta-lane:efb706bfa489`), your `@duane/skills`
+pine·trie's default lane image (`pinetrie-lane:efb706bfa489`), your `@duane/skills`
 package as a source, and temporary directories under `sandbox/s46/` with a
 space and a comma in their names. Everything made was removed.

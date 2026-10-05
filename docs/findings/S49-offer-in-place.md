@@ -6,7 +6,7 @@ restore the lane tip's files into it, rebase it onto the target, set the
 bookmark, describe it. That is six operations in your repo, and a new change
 id, after every commit the lane makes, which is after every tool call. In
 use (2026-09-29), one thread working for ten minutes rebuilt its offer every
-20 to 30 seconds: your `jj op log` filled with `pineta-host` operations, and
+20 to 30 seconds: your `jj op log` filled with `pinetrie-host` operations, and
 jjui showed a different commit each time, under the placeholder line.
 
 This probe asks whether the offer can be updated in place instead, keeping

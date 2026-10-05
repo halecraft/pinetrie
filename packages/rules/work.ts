@@ -1,6 +1,6 @@
 // work — where lanes work (ADR-0032 to ADR-0034): each lane's setting
-// (`pineta.lane`), the commit and disk at each entry (`pineta.revision`), and
-// what the host found where it runs (`pineta.project`). What a turn records
+// (`pinetrie.lane`), the commit and disk at each entry (`pinetrie.revision`), and
+// what the host found where it runs (`pinetrie.project`). What a turn records
 // (`planTurnRecord`), where a fork starts (`forkPoint`), which snapshots go
 // (`planRetention`) and how a message names your working copy in a lane
 // (`showHostWorkingCopy`) are pure, over what the host gathers.
@@ -22,7 +22,7 @@ import {
   type SnapshotId,
   snapshotId,
   type WriterId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { Type } from "typebox"
 import {
   CommitSchema,
@@ -34,7 +34,7 @@ import {
 import type { ForkBegin } from "./line.ts"
 import type { RecordSpec } from "./records.ts"
 
-/** The one `pineta.project` value's key: a host has one project. */
+/** The one `pinetrie.project` value's key: a host has one project. */
 export const PROJECT_KEY = "project"
 
 const WorkSettingSchema = Type.Union([
@@ -83,7 +83,7 @@ const ProjectRecordSchema = Type.Union([
  * (ADR-0063), and its setting, its own copy or a directory, or null for none.
  */
 export const LANE: RecordSpec<LaneRecord, LaneName, "session"> = {
-  namespace: "pineta.lane",
+  namespace: "pinetrie.lane",
   home: "session",
   keyOf: r => r.lane,
   encode: ({ lane, ...contents }) => contents,
@@ -103,7 +103,7 @@ export const LANE: RecordSpec<LaneRecord, LaneName, "session"> = {
 
 /** The commit and disk at an entry, and its turn's paths and conflicts, at the entry. */
 export const REVISION: RecordSpec<RevisionRecord, EntryId, "root"> = {
-  namespace: "pineta.revision",
+  namespace: "pinetrie.revision",
   home: "root",
   keyOf: r => r.entry,
   encode: ({ entry, ...contents }) => ({
@@ -132,7 +132,7 @@ export const REVISION: RecordSpec<RevisionRecord, EntryId, "root"> = {
 /** What the host found where it runs, at its one key. */
 export const PROJECT: RecordSpec<ProjectRecord, typeof PROJECT_KEY, "session"> =
   {
-    namespace: "pineta.project",
+    namespace: "pinetrie.project",
     home: "session",
     keyOf: () => PROJECT_KEY,
     encode: r => ({ ...r }),

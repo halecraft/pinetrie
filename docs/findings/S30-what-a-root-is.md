@@ -6,7 +6,7 @@
    at `ROOT`; Start Agent creates the thread's lane at `ROOT` and runs the chat
    as its prompt. Either way, the chat is the entry with no parent, and
    `indexTree` reports it among `roots`. Three threads gave three roots, each
-   a `pineta.chat` message.
+   a `pinetrie.chat` message.
 2. **pi writes nothing above it** (read from pi's source). Creating a lane
    writes only the `pi.branch.tip` value, with no entry. `model_change` and
    `thinking_level_change` appear only in pi-agent-core's legacy v3 JSONL
@@ -44,8 +44,8 @@ child of its chat. Two lanes, each with its tip at its reply. No orphans.
 
 ## Method
 
-`sandbox/s30-roots/probe.ts`, copied into `apps/pineta/e2e/` to run (the
-workspace resolves `@pineta/*` only from a package that declares them) and
+`sandbox/s30-roots/probe.ts`, copied into `apps/pinetrie/e2e/` to run (the
+workspace resolves `@pinetrie/*` only from a package that declares them) and
 deleted afterwards. It starts a host with a scripted model, sends Start Agent,
 Start Chat and Start Agent at `ROOT` from one client, waits for the runs, then
 prints `readTreeIndex(host.doc)`'s roots with each tree below them.

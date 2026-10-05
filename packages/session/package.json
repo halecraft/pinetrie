@@ -1,5 +1,5 @@
 {
-  "name": "@pineta/session",
+  "name": "@pinetrie/session",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -14,10 +14,10 @@
     "@kyneta/schema": "link:../../../kyneta/workspace/pineta/packages/schema",
     "@kyneta/transport": "link:../../../kyneta/workspace/pineta/packages/transport",
     "@kyneta/websocket-transport": "link:../../../kyneta/workspace/pineta/packages/exchange/transports/websocket",
-    "@pineta/core": "workspace:*",
-    "@pineta/protocol": "workspace:*",
-    "@pineta/reads": "workspace:*",
-    "@pineta/rules": "workspace:*",
-    "@pineta/schema": "workspace:*"
+    "@pinetrie/core": "workspace:*",
+    "@pinetrie/protocol": "workspace:*",
+    "@pinetrie/reads": "workspace:*",
+    "@pinetrie/rules": "workspace:*",
+    "@pinetrie/schema": "workspace:*"
   }
 }

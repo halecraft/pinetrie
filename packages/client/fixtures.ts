@@ -9,7 +9,7 @@ import {
   indexTree,
   rootIdFor,
   type TreeIndex,
-} from "@pineta/core"
+} from "@pinetrie/core"
 
 /** One entry: a message when `message` is given, else of `more.type`. */
 export const entry = (

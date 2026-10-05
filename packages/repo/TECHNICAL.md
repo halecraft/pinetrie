@@ -1,27 +1,27 @@
-# `@pineta/repo`: technical notes
+# `@pinetrie/repo`: technical notes
 
 This package is your repo as the host reads and writes it: the offers, the
 integration line, and lanes' refs in it (ADR-0038, ADR-0060, ADR-0061), all
-through one owner (ADR-0065). It declares `@pineta/core`, `@pineta/keeper`
-and `@pineta/lanes` (`workspace.test.ts`); `lanes` never imports it. What a
+through one owner (ADR-0065). It declares `@pinetrie/core`, `@pinetrie/keeper`
+and `@pinetrie/lanes` (`workspace.test.ts`); `lanes` never imports it. What a
 lane also runs, through a `Runner` it is given, stays in `lanes`
 (`laneBase`, `REVISION_READ`, `commitsOf`), and this package calls it. The
 client may not depend on it.
 
 What an offer or a `line` command means is decided in
-`@pineta/rules`, which this package cannot declare: it returns
-each decision as a value typed in `@pineta/core` (`core/offers.ts`), this
+`@pinetrie/rules`, which this package cannot declare: it returns
+each decision as a value typed in `@pinetrie/core` (`core/offers.ts`), this
 package reads the facts it is made from and turns it into steps, and the
 host connects the two. The rule all three packages keep:
 
 > Core holds the vocabulary (ids, intents, every record's type) and the
 > reads of the tree. A format or type that lanes or repo must read, write
-> or name lives in core too, since neither can declare @pineta/rules.
+> or name lives in core too, since neither can declare @pinetrie/rules.
 > What a stored shape says, and how the host changes it, is
-> @pineta/rules', whoever reads it. One client's own in-flight state
+> @pinetrie/rules', whoever reads it. One client's own in-flight state
 > (its moves, held roots, slot repair, commands out) is its session's
-> (connectSession, in @pineta/client for now). What the page draws, and
-> its words, is @pineta/client's.
+> (connectSession, in @pinetrie/client for now). What the page draws, and
+> its words, is @pinetrie/client's.
 
 `index.ts` names its exports: only what other packages use. The separate
 reads, the one-read path and the step planners stay inside, so the host
@@ -38,7 +38,7 @@ translates to.
   (`lineProposal`, `lineSteps`), an offer's build, follow, refresh, repair
   and integration, lanes' refs (`laneRefSteps`), a bundle's import
   (`planImport`), where an offer starts (`offerStart`, `integratedOfferCommitsRevset`), the
-  integrated-offer commits' revset (`INTEGRATED_OFFER_COMMITS`, read with `@pineta/lanes`' `INTEGRATED_OFFER_COMMIT_ROW` and
+  integrated-offer commits' revset (`INTEGRATED_OFFER_COMMITS`, read with `@pinetrie/lanes`' `INTEGRATED_OFFER_COMMIT_ROW` and
   `parseIntegratedOfferCommits`), and the evolog walk
   (`walkToHost`).
 - `run.ts`: the runner factory, private to the package.
@@ -68,7 +68,7 @@ everything else reads at the head it last saw.**
 - **Commands first, upkeep keyed.** `command` is a step someone waits on;
   `later(key)` is upkeep (`refresh:<lane>`, `line`, `observe`, `shared`), at
   most one queued per key, started only when no command waits
-  (`@pineta/keeper`). A command waits for at most the one step running.
+  (`@pinetrie/keeper`). A command waits for at most the one step running.
 - **Only the owner runs a `RepoStep`** (`RepoOps.execute`). The package
   exports no runner: a step gets `RepoOps` (`jj` as the host, `jjAsYou`,
   `git`, `execute`), a read gets `RepoReads`.
@@ -88,7 +88,7 @@ everything else reads at the head it last saw.**
   (S87 item 4). The same id ends it. Else one `jj log`, pinned to that id,
   reads the fingerprint: the line's bookmark, the WIP bookmarks, the
   publish bookmark (`main`, ADR-0076), the offers' bookmarks, the lanes'
-  `pineta-*` remote bookmarks, each with its commit (a conflicted one with
+  `pinetrie-*` remote bookmarks, each with its commit (a conflicted one with
   all its targets), and `@`'s commit. A bookmark of yours outside those is
   not read, so moving it moves nothing. The publish bookmark moving is
   `Moved.line`, not `all`: no offer depends on it, so it refreshes the
@@ -101,7 +101,7 @@ everything else reads at the head it last saw.**
   observation. `.jj/repo` is a file naming the repo in a secondary
   workspace (`headsDir`). `close()` stops both and refuses every step.
 - **`importLane`** is `planImport` as a command: the host's operation
-  (`pineta-host`, S87 item 7), in the order the bundles were made.
+  (`pinetrie-host`, S87 item 7), in the order the bundles were made.
 
 ## Shared facts and one read per lane (`shared.ts`, `lane-read.ts`)
 
@@ -110,11 +110,11 @@ operation is read once and kept until the head moves.**
 
 - **A lane with no ref in your repo is `"none"`** to `gatherLane` and
   `gatherRefresh`: one that never committed was never fetched. No
-  `pineta.base` is written for it, and the page reads catching up as
-  `unknown` (`catchUpOf`, `@pineta/rules`), never as caught up.
+  `pinetrie.base` is written for it, and the page reads catching up as
+  `unknown` (`catchUpOf`, `@pinetrie/rules`), never as caught up.
 - **`SharedFacts`**, per operation (`RepoOps.shared()`): the line's facts
   (`lineFacts`, for the line's record), the integrated-offer commits on the
-  line (`INTEGRATED_OFFER_COMMITS`: a `Pineta-Source` or `Pineta-Thread`
+  line (`INTEGRATED_OFFER_COMMITS`: a `Pinetrie-Source` or `Pinetrie-Thread`
   trailer), split into those naming sources (`integratedOfferCommits`) and
   those that name none for some lane (`untraced`,
   `untracedLanes`, S97), and the files `@` changes (`editing`). The owner keeps one set, keyed by the head as it
@@ -122,10 +122,10 @@ operation is read once and kept until the head moves.**
   other (an outside write, two heads) is observed first. A write in the same
   step observes, so a read after it reads a fresh set.
 - **`yourEdits` is `files ∩ editing`**, decided in `offerRecord`
-  (`@pineta/rules`): no lane reads `@`. `@` alone moving rewrites every open
+  (`@pinetrie/rules`): no lane reads `@`. `@` alone moving rewrites every open
   record's from one shared read (`planYourEdits`).
 - **A lane on the line is read in one `jj log`** (`laneRead`): its tip, the
-  newest commit carrying `Pineta-Base`, the newest line commit in its
+  newest commit carrying `Pinetrie-Base`, the newest line commit in its
   history, the offer's region (`::<bookmark> ~ ::<line>`), and the
   integrated-offer commits and this lane's untraced ones not under its base; each row with
   its parents, its flags (`contained_in` each revset: tip, bookmark, region,
@@ -149,7 +149,7 @@ operation is read once and kept until the head moves.**
   again on every observation, without end (S89).
 - **What catching up would change** (`readCatchUp`) is read only once the
   base has moved from the lane's base start, and kept (`known`: the page's
-  `pineta.base`, as a memo) while the lane's tip and the base's commit stay.
+  `pinetrie.base`, as a memo) while the lane's tip and the base's commit stay.
 - **The budget:** an unchanged offer's refresh runs at most 3 jj processes
   (`repo.test.ts` counts 3: the read, the evolog, and `workChanges`); S89
   measured 18 before. A lane whose base moved runs two more, once per move.
@@ -170,7 +170,7 @@ operation is read once and kept until the head moves.**
 - **One runner factory** (`runnerFor`, through `repoCommand`, pure and
   tested as a table) adds what each runner needs: `-R <root>` and jj's
   `--no-pager --color=never` to every jj; as the host,
-  `--ignore-working-copy` and `operation.username=pineta-host`, from the
+  `--ignore-working-copy` and `operation.username=pinetrie-host`, from the
   repo's root, so paths jj prints are the repo's; pinned, `--at-op <id>`
   and `--ignore-working-copy`; as you, nothing more, from the host's own
   directory; git from the repo's root.
@@ -187,20 +187,20 @@ operation is read once and kept until the head moves.**
 ## Offers in your repo (`offer.ts`, `offer-gather.ts`, `offer-steps.ts`, `plan.ts`, ADR-0038, ADR-0039)
 
 - **The host runs no jj on an offer.** Each of its offer steps is a gather
-  here, a decision in `@pineta/rules`, a translation here (`offerEffects` and
+  here, a decision in `@pinetrie/rules`, a translation here (`offerEffects` and
   the rest), then the steps on the owner. A decision carries the facts its
   steps need (a `Placed`, the offer, its changes), so each kind has one
   translation and none that runs nothing because a case cannot occur.
 
-- **An offer's bookmark is `pineta-offer/<name>`**, the thread's two-word
+- **An offer's bookmark is `pinetrie-offer/<name>`**, the thread's two-word
   name (`offerBookmark`). Every step finds the offer by it: one built under
   another name is not found, and a new one is built.
 
 - **Every host command on your repo carries `--ignore-working-copy` and
-  `--config operation.username=pineta-host`** (`as: "host"`, `RepoOps.jj`): it
+  `--config operation.username=pinetrie-host`** (`as: "host"`, `RepoOps.jj`): it
   never snapshots your working copy, and the evolog says which commits the
   host made (S48 items 1 and 8). The import of a lane's bundle is the host's
-  too (`planImport`), so it is `pineta-host`'s in your op log (S87 item 7),
+  too (`planImport`), so it is `pinetrie-host`'s in your op log (S87 item 7),
   and so is publishing (`planPublish`, ADR-0076), which changes no file and
   is anyone's command.
   Updating your files (`planFollow`: `jj rebase -b @ -d <onto>`) is one
@@ -227,10 +227,10 @@ operation is read once and kept until the head moves.**
   rebased onto the target. A stack's sources are the agent's revisions.
 - **Where an offer starts is read from the repo** (`startOfOffer`,
   `offerStart`, ADR-0060): `heads(::tip & (<base start> | ::(<sources>)))`.
-  The base start is the commit the lane's newest `Pineta-Base` names
+  The base start is the commit the lane's newest `Pinetrie-Base` names
   (`laneBase`); for a lane with none, from before the line, the newest line
   commit in the tip's history. The sources are the lane commits that
-  integrated offers' `Pineta-Source` trailers name, in `::<onto>` and in `::<wip>`
+  integrated offers' `Pinetrie-Source` trailers name, in `::<onto>` and in `::<wip>`
   for a lane on a WIP, minus `::present(<base source>)` (`integratedOfferCommitsRevset`,
   read by `integratedOfferCommitFacts` with the lane's untraced ones), each `present()`: one never fetched here names
   nothing you have. A squash of two integrated offers keeps both trailer
@@ -238,7 +238,7 @@ operation is read once and kept until the head moves.**
   reads only the last (S77 item 6).
 - **A source integrated below the base's source is not part of the start**
   (S81). `LaneBase.source` is the commit of yours the lane merged whole:
-  the one its `Pineta-Base` names (the WIP's commit, never the copy, which
+  the one its `Pinetrie-Base` names (the WIP's commit, never the copy, which
   descends from no integrated-offer commit), else `start`. An offer keeps the diff from
   its start's merge to the tip, so a start the target holds as another
   commit is subtracted from the target. An integrated-offer commit and a
@@ -247,8 +247,8 @@ operation is read once and kept until the head moves.**
   resolve. `present()` around the base's source keeps a commit lost to
   `jj util gc` from failing every refresh; it then excludes nothing.
 - **Every revision of an offer carries the host's trailers and its ledger**
-  (`offerMessage`, core's `trailers.ts`): `Pineta-Thread`, `Pineta-Lane`,
-  `Pineta-Entry`, then `Pineta-Source: <tip>` and `Pineta-Start`, in one
+  (`offerMessage`, core's `trailers.ts`): `Pinetrie-Thread`, `Pinetrie-Lane`,
+  `Pinetrie-Entry`, then `Pinetrie-Source: <tip>` and `Pinetrie-Start`, in one
   paragraph, on its WIP line and kept through a description. The source is
   the lane tip the whole offer holds, a stack's revisions included:
   integrated, it says you have that tip.
@@ -276,7 +276,7 @@ operation is read once and kept until the head moves.**
   (`StartRead`), since no start can leave out what it brought: nothing is
   offered until the lane catches up past it, which puts it under the base.
   A turn's commit names no thread, so it is never one. Only the lane's own
-  integrated-offer commits are matched, by `Pineta-Lane`: an untraced one of
+  integrated-offer commits are matched, by `Pinetrie-Lane`: an untraced one of
   a lane it forked from is not found.
 - **An untraced place leaves a gap** (`untouched`, ADR-0067): on a lane
   whose start is untraced, a divergent offer is not repaired and an offer
@@ -317,9 +317,9 @@ operation is read once and kept until the head moves.**
   ADR-0060): nothing the host remembers is needed, so a lost record costs
   nothing. Its revisions (`offerRevisions`) are what is under the bookmark,
   not already under the target, and carries the thread's trailer:
-  `(::<bookmark> ~ ::<target>) & (description(regex:"(?m)^Pineta-Thread:
+  `(::<bookmark> ~ ::<target>) & (description(regex:"(?m)^Pinetrie-Thread:
   <name>$") | <bookmark>)`. A conflicted offer's `startConflicts` are the
-  files conflicted at each commit its `Pineta-Start` names
+  files conflicted at each commit its `Pinetrie-Start` names
   (`startConflictsOf`, shared with `gatherLane`); a start your repo lacks
   names none. An integrated offer below carries the same trailer, but
   is under the target; your commits carry none. The bookmark's own commit
@@ -327,7 +327,7 @@ operation is read once and kept until the head moves.**
   commits, reads as divergent, with only the change ids. Every read after
   the first names commits (S48 item 2). It returns facts, and the bookmark it
   found them under; `planRefresh`, `offerEdited` and `offerMoved`
-  (`@pineta/rules`) decide what they mean.
+  (`@pinetrie/rules`) decide what they mean.
 - **Every revision's evolog is read, back to the host's newest version**
   (`evologOf`, one `jj evolog -T EVOLOG_ENTRY`; `walkToHost`, pure),
   through each version's predecessor of the same change. Each version an
@@ -377,7 +377,7 @@ operation is read once and kept until the head moves.**
 - **`repo.test.ts`**: a lane's whole life against jj and git, in throwaway
   repos on the host, with no container: the lane's steps from `lanes`, its
   bundle fetched into your repo (`planBundle`, then `planImport`, whose
-  operation is `pineta-host`'s), and every read and plan here. It covers the
+  operation is `pinetrie-host`'s), and every read and plan here. It covers the
   base, a turn, an update with a conflict, forks from a turn and from a copy
   of your `@`, checked for divergence and immutability, and a repo beside a
   fork that the fork's config leaves alone; a commit the agent makes itself,
@@ -404,7 +404,7 @@ operation is read once and kept until the head moves.**
   source, so that commit is joined to it and the update is clean.
 - **`offer-steps.test.ts`**: each decision's steps, as the planners make
   them, and that each `after` carries the decision's place.
-- **`apps/pineta/host/offers/refresh.test.ts`** runs the host's own refresh
+- **`apps/pinetrie/host/offers/refresh.test.ts`** runs the host's own refresh
   (`createRefresh`, a real owner) on the histories S97 found, until a round
   writes nothing: it lives with the host, since this package may not import
   `planRefresh` (`workspace.test.ts`).

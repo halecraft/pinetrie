@@ -23,12 +23,12 @@
      and the model sees *"The following is a summary of a branch that this
      conversation came back from: …"*. That wording is pi's, written for
      returning from a branch;
-   - **a Pineta chat message** run as the prompt (S19's path), whose details keep
+   - **a pine·trie chat message** run as the prompt (S19's path), whose details keep
      the source's `fromId`. The model sees the fold text, and replies.
 5. **pi already computes a common ancestor and writes merge summaries.**
    `collectEntriesForBranchSummary` finds the deepest common ancestor of two
    tips; `generateBranchSummary` summarizes entries with custom instructions. pi
-   writes a `branch_summary` entry only while navigating a lane, which Pineta
+   writes a `branch_summary` entry only while navigating a lane, which pine·trie
    never does (ADR-0020).
 6. **A model can use a note's changes as hunks.** With a live model, told a
    note's changed paragraphs (each with the paragraph before it), it named what
@@ -62,7 +62,7 @@ clients over the bridge transport (in which every peer reaches every other).
 | route | stored as | the model sees | run |
 |---|---|---|---|
 | `lane.appendMessage(branchSummary)` | a message entry; `message.fromId` set, the entry's `fromId` column null | pi's "summary of a branch that this conversation came back from" | none |
-| a `pineta.chat` message as the prompt | a message entry; `details.fold.fromId` | the fold text | yes, the agent replies |
+| a `pinetrie.chat` message as the prompt | a message entry; `details.fold.fromId` | the fold text | yes, the agent replies |
 
 **Probe C (live model, `cerebras/qwen-3.8-27b`).** A lane took a note's first
 version, then was folded its second, where one paragraph reversed a decision.
@@ -91,7 +91,7 @@ version, then was folded its second, where one paragraph reversed a decision.
    fold lands as a chat message the agent runs on. Which is the plan's decision;
    pi's wording for the summary message is written for a different situation.
 4. **pi's common ancestor is not enough on its own.** It follows parent edges
-   only. After one fold, the next must also follow `fromId` edges (Pineta's set
+   only. After one fold, the next must also follow `fromId` edges (pine·trie's set
    difference), so repeated folds take only what is new.
 5. **Hunks are worth sending**, with the paragraph around each change; a small
    note can be sent whole.
@@ -114,7 +114,7 @@ transport cannot say who edited stands; it is simply the wrong layer.
 
 ## Addendum 2: a refused write to a note
 
-Measured through Pineta's host, once notes were built (`PLAN-2026-09-27-notes`):
+Measured through pine·trie's host, once notes were built (`PLAN-2026-09-27-notes`):
 a client writes to a note that is done, which the host's policy refuses; the
 note is reopened; the same client writes again.
 

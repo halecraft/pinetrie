@@ -15,7 +15,7 @@ import {
   type Position,
   type RootId,
   type WriterId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { type PlaceStep, queuedOn } from "./card.ts"
 import type { LandMessage } from "./land.ts"
 import { type CatchUpNow, type ParentNow, parentAhead } from "./line.ts"

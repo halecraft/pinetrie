@@ -1,11 +1,11 @@
-# `@pineta/client` — technical notes
+# `@pinetrie/client` — technical notes
 
 The browser interface: your list of roots down the left, the root you are on
 as a rail beside a strip of columns, and the board in the footer
 (`docs/06-interface.md`, ADR-0085). Its connection to the host is
-`@pineta/session` (`packages/session/TECHNICAL.md`), which declares no React:
+`@pinetrie/session` (`packages/session/TECHNICAL.md`), which declares no React:
 this package draws and words, and decides what the page asks the session for. Everything drawn is a read of the session
-document through `@pineta/reads` and `projection.ts`, and of your own
+document through `@pinetrie/reads` and `projection.ts`, and of your own
 documents through the session; the only state kept here is the layout
 (which root you are on, each root's columns, new tabs, whether the board is
 open), kept per browser tab. What is typed is a card (ADR-0048): a document of its own,
@@ -49,7 +49,7 @@ written by this client, and kept on its thread.
 
 ## Reads go through one index
 
-`readTreeIndex(doc)` (`@pineta/reads`) builds `indexTree` once per change of
+`readTreeIndex(doc)` (`@pinetrie/reads`) builds `indexTree` once per change of
 the document's entries, and returns the same index until one changes. The
 columns, the rail and the agent's path all read that one index
 (`packages/core/tree.ts`). `App` reads it through `readSessionFacts`
@@ -65,7 +65,7 @@ lanes and the archive together.
 as an `EntryId`, and every lane as a `LaneName` (`packages/reads/TECHNICAL.md`),
 so the client never mints one but where an id comes back in from elsewhere:
 its stored form (`layout.ts`'s `decodeLayout`), your attention document
-(`readAttention`, in `@pineta/schema`), and ids read back from the page (`use-ask-bar.ts`, from `data-ask-of`; `root-target.ts`, from a root's drag and its drop marks).
+(`readAttention`, in `@pinetrie/schema`), and ids read back from the page (`use-ask-bar.ts`, from `data-ask-of`; `root-target.ts`, from a root's drag and its drop marks).
 `biome.json` refuses an `entryId` or `runId` import anywhere else in the
 client; tests build entries and trees through `fixtures.ts`, which mints.
 
@@ -158,7 +158,7 @@ about 55 ms (S59).
   `startHost` serves with `NODE_ENV` unset, as `pnpm run host:react-dev`
   does (`pnpm run host` serves production React): React measures every
   render whose props changed on its "Components ⚛" track, with the changed
-  props' diff (`componentRenders` in `apps/pineta/e2e/browser.ts`). A
+  props' diff (`componentRenders` in `apps/pinetrie/e2e/browser.ts`). A
   production build records none, and every count would pass, so the suite
   stops at its start unless the page has recorded some. A render whose props
   are the same (a state change, a `useSelector` write) is not recorded. An
@@ -169,7 +169,7 @@ about 55 ms (S59).
 ## Views decide, intents act
 
 The page works as the host's shell does: gather, plan purely, then carry
-the plan out (`apps/pineta/host/TECHNICAL.md`). A rule kept in a component
+the plan out (`apps/pinetrie/host/TECHNICAL.md`). A rule kept in a component
 can only be proven in a browser, minutes per check; a rule in a pure
 function is proven by a unit test in a second.
 
@@ -219,7 +219,7 @@ The stored layout is `{ active, roots, newTabs, board }`, and
 `layoutReducer` is pure. `active` is a `Here`: a root (by its root entry: a
 thread started at the root is rooted at its first message, S30), a new tab,
 or nothing. Your list is not the layout's: it is your own document
-(`openList`, `@pineta/session`), keyed by `RootId`, which `App` maps to root
+(`openList`, `@pinetrie/session`), keyed by `RootId`, which `App` maps to root
 entries through the directory and passes in as `LayoutFacts.list`.
 `summarizeRoots` and `rootWork` (`packages/core/roots.ts`) give the roots
 and each item's signals.
@@ -325,7 +325,7 @@ and each item's signals.
 
 ## The board (`board-view.ts`, `board.tsx`, ADR-0085)
 
-- **What the board shows is `boardView`'s**, over `boardOf` (`@pineta/rules`):
+- **What the board shows is `boardView`'s**, over `boardOf` (`@pinetrie/rules`):
   the strip (each state's name, count, roots and `markOf`), each open state
   as a column of items, and the closed state's `closedRows`. An item's
   `moves` are its `⋯`'s Move to ▸, one per other state, with the busy reason
@@ -471,7 +471,7 @@ pending.
 - **The project menu** (`line-view.ts`, ADR-0076): `lineView` decides two
   sections, the project's (setting it up, publishing it, on every host) and
   your files' (null on a host that admits others), each offering what
-  `@pineta/rules`' `lineActionState` allows, the rule the host decides by;
+  `@pinetrie/rules`' `lineActionState` allows, the rule the host decides by;
   `lineWords` words them, a publish it does not offer with `lineRefusal`.
   Notes name no files but those that would conflict; how many files
   updating changes is the action's title. The trigger counts unpublished
@@ -566,16 +566,16 @@ pending.
 
 `tabState` keeps a value under one key in two slots: the tab's
 (`sessionStorage`), read first, which survives a reload; and the device's
-(`localStorage`), which a new tab starts from. It knows nothing of Pineta; a
+(`localStorage`), which a new tab starts from. It knows nothing of pine·trie; a
 value's stored form is its codec's. The layout is its one use, under the key
-`pineta-columns:<session>`, which predates root tabs.
+`pinetrie-columns:<session>`, which predates root tabs.
 
 The stores are built in `main.tsx`, the one module that touches
 `sessionStorage`, `localStorage` and `window` as it loads, and `App` is
 given them (`AppStores`).
 
 `deviceState` keeps a value in the device's slot only, shared by the device's
-tabs: where the inventory is docked, and who you are (`pineta-identity`,
+tabs: where the inventory is docked, and who you are (`pinetrie-identity`,
 below), which `reconcileName`'s `store` also saves, with the same email, so
 it reloads no tab. What you have dealt with is not here but in your
 attention document, on every device of yours (ADR-0077), which merges; here
@@ -829,11 +829,11 @@ became of its files (`strip`).
   With no revisions at all (a host without a project), every asked message
   falls back, and the whole path reads as the column's lane.
 - **What a catch-up merges is worded by `catchUpName` alone**
-  (`@pineta/rules`, ADR-0061, ADR-0072): the line is "the project", a
+  (`@pinetrie/rules`, ADR-0061, ADR-0072): the line is "the project", a
   WIP its bookmark, the thread a thread branched from its name. The words
   take core's `CatchUpFrom`, never a bookmark string, and the line's
   bookmark goes only in titles: `offerWords`' button titles ("moves
-  pineta-onto forward to pineta-offer/amber-fox"), `behindMark`'s,
+  pinetrie-onto forward to pinetrie-offer/amber-fox"), `behindMark`'s,
   `baseChoices`'. A card's command is worded from `CatchUps` (the thread's
   base and its parent), which `Column` keeps as one object while it says
   the same, since the composer is memoised.
@@ -857,7 +857,7 @@ became of its files (`strip`).
   whether it conflicted). The host refuses the integration `offer_changed` when the
   offer now brings other work.
 - **Your offer and line commands are tracked per tab** (`acting.ts`,
-  `@pineta/session`): `SessionClient.offer` and `.line` mark the command
+  `@pinetrie/session`): `SessionClient.offer` and `.line` mark the command
   `sent` at once and record the answer when it comes. A refusal or failure
   stays until your next command on that lane (or the line); an answer that
   carried it out (`integrated`, `offered`, a split's `started`, `line-moved`)
@@ -870,7 +870,7 @@ became of its files (`strip`).
   `sent` or `said`). An integration in flight names its destination by
   `catchUpName`; a refusal or failure is `outcomeWords`, shared with the
   project menu.
-- **`offerView` (`@pineta/rules`) decides an offer; `offerWords`
+- **`offerView` (`@pinetrie/rules`) decides an offer; `offerWords`
   words it**: its line and each button's label and title, by state. An
   offer that conflicts says so even when it is `edited` (S73), and its
   integrate button reads "add anyway" whatever the state, as it does when a
@@ -883,8 +883,8 @@ became of its files (`strip`).
   `workStrip` hands `offerView` the record decoded (`offerStatus`): a `held`
   offer says "nothing to add: the project already has this thread's work",
   and has no review.
-- **What catching up would do** (`catchUpOf`, from `pineta.base`'s `start`
-  and `catchUp` against `pineta.line`'s commits, S97): when it `brings`
+- **What catching up would do** (`catchUpOf`, from `pinetrie.base`'s `start`
+  and `catchUp` against `pinetrie.line`'s commits, S97): when it `brings`
   files, the strip's line adds "· the project has new work", or is that
   alone with nothing to add, catching up moves from the `⋯` menu to the
   buttons, its title counts the files, and the header shows `behindMark`'s
@@ -895,7 +895,7 @@ became of its files (`strip`).
   `column.tsx` disables it. Until the host has read the move (`unknown`), it
   stays in the menu, enabled, and claims nothing. So does a lane with no
   base record at all: the host has never read it. An untraced thread
-  (`pineta.base`'s `untraced`) says "an earlier add of this thread can't be
+  (`pinetrie.base`'s `untraced`) says "an earlier add of this thread can't be
   traced: catch up with the project to offer what's new", with catching up
   beside it. `ColumnFacts.queuedCommands` are the commands of the cards
   queued on the lane: a catch-up among them is `offerView`'s `catch-up`
@@ -956,7 +956,7 @@ became of its files (`strip`).
   - **Toggling dispatches no `PLACED`**, unlike density: it changes the
     view's height, not the content's, and `useFollow` follows that.
 - **The banner (ADR-0050, ADR-0053) is the thread's at the column's end**
-  (`banner`): the lane's `pineta.banner`, none for a conversation. It takes
+  (`banner`): the lane's `pinetrie.banner`, none for a conversation. It takes
   the star's place before the name (`ThreadMark`): a fixed 1.5rem square,
   the head row's height, holding the star, with the image laid over it
   absolutely, so its arrival moves nothing. The star stays in the text
@@ -977,7 +977,7 @@ became of its files (`strip`).
 - **The thread to come is named before the send** (ADR-0057). `headLane` is
   the lane the header names and draws the banner of: the thread's, or the
   column's reserved one while `createsLane`. `columnView` decides the
-  `reserve` step: `mint` a lane id (`newLaneName`, `@pineta/session`) for a column
+  `reserve` step: `mint` a lane id (`newLaneName`, `@pinetrie/session`) for a column
   with none, `ask` the host to name it, else `none`. `Column` carries it out
   in an effect keyed on the step. Asking again (a remount, StrictMode) is
   harmless: the host does nothing for an id it has named.
@@ -1001,7 +1001,7 @@ change of wording then touches the words function, its one test, and
   `describe("offerWords")` and `describe("sendButton")` are) pins the words.
 - **Suites compare with the words function**, never a literal: the browser
   suite builds its labels from `recipientWords`, `queueWords` and `UPLOADING`
-  (`@pineta/client/send`), as it does tool labels from `toolLabel`. A check
+  (`@pinetrie/client/send`), as it does tool labels from `toolLabel`. A check
   that is about the words themselves (a run's tooltip, a refusal's reason)
   keeps its literal.
 - **Docs quote labels in `docs/06-interface.md` only.** An ADR states the rule
@@ -1224,7 +1224,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   the thread (the column's bound lane, or its end), over `readLanes` and
   `readParticipants`, the reads the host decides from. `planSend` (`send.ts`)
   decides the rest: who the message is for is `addressChat`
-  (`@pineta/rules`), the function `planChat` runs on the host, so the
+  (`@pinetrie/rules`), the function `planChat` runs on the host, so the
   button cannot promise a reply the host will not start. `SendPlan.to` is
   `addressChat`'s `Address`, unchanged. A fresh column sends `branch`; a
   send to a busy lane (`isBusy`), plain or asking the agent, and a card
@@ -1331,7 +1331,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
 - **Completion** (`commands.ts`, `matchCommands`): while the text is a `/`
   and a first word, the commands whose name has every typed part in some
   part of it are offered. Those whose own name starts with what was typed
-  come first. The list is `pineta.commands`, read with `readCommands`.
+  come first. The list is `pinetrie.commands`, read with `readCommands`.
 - **Keys:** arrows move, Tab or Enter chooses (inserting the full name and a
   space), Escape hides the list for that text. Enter sends only when the
   list is closed.
@@ -1407,7 +1407,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   stop (`carryOnState`, ADR-0082), sending `carry-on`. `columnView` decides
   it (`run`) and `runWords` words it. It is the column's, not a card's, and
   never shows read-only. The host records who stopped under the ask
-  (`pineta.stop`, ADR-0056). The button is `.stop` or `.resume`: the
+  (`pinetrie.stop`, ADR-0056). The button is `.stop` or `.resume`: the
   browser suite reads `.stop` as "the lane runs" (`page.ts`), and a
   carry-on message's row is `.msg.carry-on`.
 - **What the agent is doing shows in three places, none taking layout**
@@ -1488,7 +1488,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   host's facts, `fact` ("offer": what an integration, a squash, a refresh
   or a description asked for did, ADR-0080) and `behind` ("the base": its
   new work). Each line is its rule's words function (`updateLine`,
-  `factLine`, `behindLine`, `@pineta/rules`); the update's names what it
+  `factLine`, `behindLine`, `@pinetrie/rules`); the update's names what it
   merged by `catchUpName`.
 - **A fact waiting for a run's end** is drawn above the line as a quiet row
   (`.queued-fact`, worded by `factLine`), with no controls: nobody moves it
@@ -1541,7 +1541,7 @@ heads a range, which has no description.
   the review's width, Escape, focus and coming into view, and `PaneHead`
   its head and close; `ReviewPane` draws the list and the diffs inside
   `.review`, which fills `.pane`.
-- **Every URL names its commits** (`reviewUrl`, `diffUrl`, `@pineta/rules`),
+- **Every URL names its commits** (`reviewUrl`, `diffUrl`, `@pinetrie/rules`),
   and the answer is immutable, so the browser's HTTP cache is the only
   cache and `useFetched` has no refetch rule. The record's `commits` is what
   changes; the page never keys on its `at`, which every trigger rewrites.
@@ -1612,7 +1612,7 @@ offer's review, an ask's, a table from a message, or a stored image.
 
 `messageTree` (`markdown.ts`) turns a message's text into the tree
 `MessageText` draws: remark-parse, remark-gfm and remark-rehype, as
-react-markdown runs them, then Pineta's own pass over the tree. Owning the
+react-markdown runs them, then pine·trie's own pass over the tree. Owning the
 pipeline keeps the tree a pure function, testable without a DOM.
 
 - **Nothing in it is HTML.** Raw HTML becomes text. A link or image URL keeps
@@ -1662,7 +1662,7 @@ pipeline keeps the tree a pure function, testable without a DOM.
 - **A root's avatars in your list** are `readersByRoot(peopleHere(…))` (`here.ts`): the
   header's people turned around, each tab's `Readers` taking its root's.
 - **`core/presence.ts` decides everything shown**, from one field's read
-  (`readReading` and `readTyping` in `@pineta/reads`) and the
+  (`readReading` and `readTyping` in `@pinetrie/reads`) and the
   tree: rings (`readingAt`), a header's avatars (`seenBy`, others whose
   thread end lies on one path with this column's), and who is typing
   (`whoIsAt`). Each leaves you out, and shows a person once however
@@ -1680,10 +1680,10 @@ pipeline keeps the tree a pure function, testable without a DOM.
   colour, class `initial`. `Avatar` is an `Initial` with class `avatar`,
   which means a person shown here (Gotchas).
 
-## The session (`@pineta/session`)
+## The session (`@pinetrie/session`)
 
 The page's one connection to a host is `SessionClient`, from
-`@pineta/session`; its parts, and the order they are made in, are in
+`@pinetrie/session`; its parts, and the order they are made in, are in
 `packages/session/TECHNICAL.md`. `main.tsx` connects and hands its
 `exchange` to `ExchangeProvider`, so React renders from the same connection.
 
@@ -1795,7 +1795,7 @@ stays in view; the strip scrolls past 30vh.
   comparison the host plans a run's entry from, so the strip and the run
   agree on what the agent read. A card with no text yet has none.
 - **"+ pin" opens a box at the strip's end** that makes a pinned card. It
-  is a `CardEditor` whose `place` is pinned (`drawnPlace(pinnedOf(…))`, `@pineta/session`):
+  is a `CardEditor` whose `place` is pinned (`drawnPlace(pinnedOf(…))`, `@pinetrie/session`):
   the composer's create-on-first-keystroke rule, and the same element goes
   on editing the card, so nothing typed between the create and the binding
   is lost, which a hand-over to a `PinnedCardEditor` would. It never sends:
@@ -1810,7 +1810,7 @@ stays in view; the strip scrolls past 30vh.
   that always took room moved where a column shown again puts its reader.
 - **A send carries the pinned cards' versions.** `Column` puts the strip's
   card ids in `how.pinned`, and the session sends each with its version as
-  this client has it (`versionOf`, `@pineta/session`); the run waits for
+  this client has it (`versionOf`, `@pinetrie/session`); the run waits for
   them.
 - **The marker above a run's prompt** is `pinnedMarkers(index, nodes)`,
   computed in `MessageList` from the index: a node whose parent is a cards
@@ -1904,7 +1904,7 @@ state, never stored.
   inventory, and your inventory document which slot holds each. The session
   keeps the slots and repairs them (`packages/session/TECHNICAL.md`, "Your
   inventory's slots").
-- **`settleSlots` is the one slot rule** (`@pineta/session`): the panel
+- **`settleSlots` is the one slot rule** (`@pinetrie/session`): the panel
   draws it (`inventoryView`, `inventory-view.ts`), the session's repair
   writes towards it, and a take into the inventory lands by the same
   `firstEmpty`. `App` computes it once, with the takes into the inventory in
@@ -1981,17 +1981,17 @@ state, never stored.
 - **`:text-is` matches the smallest element holding the text**, which in
   markdown is the paragraph, not `.text`. The suite finds a plain message by
   `.text > p:only-child:text-is(…)`.
-- **Waiting on a selector** is in `apps/pineta/e2e/TECHNICAL.md`: a wait
+- **Waiting on a selector** is in `apps/pinetrie/e2e/TECHNICAL.md`: a wait
   for an element CSS hides never ends early.
 
 ## Who you are (ADR-0037)
 
 A person is their email: the principal every Exchange of theirs names, and so
 their writer, `w-<email>`. Kyneta issues each tab its own peer id, a seat, so
-the email is the only thing Pineta chooses.
+the email is the only thing pine·trie chooses.
 
 - **Asked once per browser, before anything connects.** `main.tsx` reads
-  `pineta-identity` (a `deviceState`, `identity.ts`), or draws the form
+  `pinetrie-identity` (a `deviceState`, `identity.ts`), or draws the form
   (`identity-form.tsx`: **email:** and **name:**) and waits for it. The form's
   rule is `parseIdentity`, over the host's own `normalizeEmail` and
   `normalizeName`, so it accepts exactly what the host would; the browser's
@@ -2022,10 +2022,10 @@ the email is the only thing Pineta chooses.
 - **Not you? Sign in as someone else**, in the profile, clears the stored
   identity and reloads. Every tab subscribes to it, and reloads when another
   clears it or stores another email, so no tab goes on as the old person.
-- **Presence is per seat** (`presence-seat.ts`, `@pineta/session`), so
+- **Presence is per seat** (`presence-seat.ts`, `@pinetrie/session`), so
   your tabs never overwrite or clear each other's; `core/presence.ts` shows
   each person once, and never you.
-- **The host is found by principal** (`@pineta/session`): its seat is
+- **The host is found by principal** (`@pinetrie/session`): its seat is
   Kyneta's to issue.
 
 ## Names

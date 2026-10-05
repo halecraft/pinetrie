@@ -1,4 +1,4 @@
-// Mutations for @pineta/lanes. Run: pnpm mutate scripts/mutations/lanes.ts
+// Mutations for @pinetrie/lanes. Run: pnpm mutate scripts/mutations/lanes.ts
 // The planners' checks are unit tests, in seconds. The suite mutations run one
 // `e2e:lanes` scenario, which needs `container`: on the Mac.
 import type { Mutation } from "../mutate.ts"
@@ -149,8 +149,8 @@ export const mutations: readonly Mutation[] = [
     name: "the lane's ignore file leaves out the shared directories",
     file: plan,
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: '  ["/.pineta-lane/", "/lost+found/", ...shared.map(p => `/${p}/`)]',
-    to: '  ["/.pineta-lane/", "/lost+found/"]',
+    from: '  ["/.pinetrie-lane/", "/lost+found/", ...shared.map(p => `/${p}/`)]',
+    to: '  ["/.pinetrie-lane/", "/lost+found/"]',
     command: unit,
     expect: "every repo in the lane ignores what the ignore file lists",
   },
@@ -199,23 +199,23 @@ export const mutations: readonly Mutation[] = [
     expect: "planForkSetup: a WIP's copy on the line commit under it",
   },
   {
-    name: "the image ignores Pineta's Playwright version",
+    name: "the image ignores pinetrie's Playwright version",
     file: plan,
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "      `PLAYWRIGHT_VERSION=${input.playwrightVersion}`,",
     to: "",
     command: unit,
-    expect: "planImages: Pineta's image is pinned to the app's Playwright",
+    expect: "planImages: pinetrie's image is pinned to the app's Playwright",
   },
   {
-    name: "the image's browser is not the one Pineta's Playwright drives",
+    name: "the image's browser is not the one pinetrie's Playwright drives",
     file: plan,
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "      `PLAYWRIGHT_VERSION=${input.playwrightVersion}`,",
     to: '      "PLAYWRIGHT_VERSION=1.55.0",',
     suite: "lanes",
     scenario: "images",
-    expect: "on the default image, Pineta's Playwright launches Chromium",
+    expect: "on the default image, pinetrie's Playwright launches Chromium",
   },
   {
     name: "an agent's own commit is not adopted",
@@ -254,19 +254,19 @@ export const mutations: readonly Mutation[] = [
     name: "the lane note is not where the prompt says",
     file: "packages/lanes/lane.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "export const LANE_NOTE = `${PINETA_MOUNT}/packages/pi/lane.md`",
+    from: "export const LANE_NOTE = `${PINETRIE_MOUNT}/packages/pi/lane.md`",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
-    to: "export const LANE_NOTE = `${PINETA_MOUNT}/packages/pi/lane-notes.md`",
+    to: "export const LANE_NOTE = `${PINETRIE_MOUNT}/packages/pi/lane-notes.md`",
     command: unit,
-    expect: "every Pineta file a lane is pointed at exists",
+    expect: "every pinetrie file a lane is pointed at exists",
   },
   {
     name: "the lane note is not where the prompt says, in a real lane",
     file: "packages/lanes/lane.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "export const LANE_NOTE = `${PINETA_MOUNT}/packages/pi/lane.md`",
+    from: "export const LANE_NOTE = `${PINETRIE_MOUNT}/packages/pi/lane.md`",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
-    to: "export const LANE_NOTE = `${PINETA_MOUNT}/packages/pi/lane-notes.md`",
+    to: "export const LANE_NOTE = `${PINETRIE_MOUNT}/packages/pi/lane-notes.md`",
     suite: "lanes",
     scenario: "commands",
     expect: "the note the prompt names is a file in the lane",
@@ -289,7 +289,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the resolution is not told what the card asked",
-    file: "apps/pineta/host/work/update.ts",
+    file: "apps/pinetrie/host/work/update.ts",
     from: "            await resolutionOf(intent),",
     to: '            await resolutionOf(""),',
     suite: "lanes",
@@ -299,7 +299,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a clean update refuses the card's text",
-    file: "apps/pineta/host/work/update.ts",
+    file: "apps/pinetrie/host/work/update.ts",
     from: '    case "clean":\n      return { kind: "clean" }',
     to: '    case "clean":\n      return { kind: "refused", reason: "clean" }',
     suite: "lanes",
@@ -349,7 +349,7 @@ export const mutations: readonly Mutation[] = [
     suite: "lanes",
     scenario: "images",
     expect:
-      "on Alpine, Pineta's rg, fd and sd run, and grep and find find the files",
+      "on Alpine, pinetrie's rg, fd and sd run, and grep and find find the files",
   },
   {
     name: "the default image has no python3",
@@ -380,12 +380,12 @@ export const mutations: readonly Mutation[] = [
       "planProjectDir: jj's root, else git's, else the folder; never missing, your home directory or /",
   },
   {
-    name: "a project's repo is not told to ignore .pineta/",
+    name: "a project's repo is not told to ignore .pinetrie/",
     file: "packages/lanes/host.ts",
     from: "  return (await excludeInYours(planned.root, [EXCLUDE_LINE]))\n",
     to: "  return true\n",
     command: unit,
     expect:
-      "prepareProjectDir (ADR-0086, S108): a repo's root with .pineta/ excluded once; a non-colocated repo refused; a plain folder untouched",
+      "prepareProjectDir (ADR-0086, S108): a repo's root with .pinetrie/ excluded once; a non-colocated repo refused; a plain folder untouched",
   },
 ]

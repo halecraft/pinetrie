@@ -107,4 +107,4 @@ fast to see without a recording.
   the agent's column every animation frame (messages, last tool status,
   `.streaming`, `.tool.live`, `.open-branch`, content height, `scrollTop`).
   `S35_THROTTLE=20` slows the CPU through CDP. Both are copied into
-  `apps/pineta/e2e/` to run, and deleted afterwards.
+  `apps/pinetrie/e2e/` to run, and deleted afterwards.

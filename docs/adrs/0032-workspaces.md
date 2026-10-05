@@ -94,7 +94,7 @@ fold does (S36 items 11 and 12).
   ▾", and its menu says what each choice means ("on a copy · you take its
   changes", "in your working copy · edits your files"). A new lane inherits the setting, and
   the directory, from the lane above its fork point. A root lane takes the
-  host's default: own copy, unless `PINETA_WORKSPACES=0` or the project could
+  host's default: own copy, unless `PINETRIE_WORKSPACES=0` or the project could
   not be initialized. The setting never changes on an existing lane, since
   the files and the conversation would then disagree (the reason lanes never
   move, ADR-0020): to work differently, branch and choose again. So it is
@@ -123,7 +123,7 @@ fold does (S36 items 11 and 12).
   tool calls finish, the host snapshots the lane's workspace. If anything
   changed, the host commits it (`jj commit`), described with the message's
   first line, with the entry id and lane as trailers. It records the commit id
-  against the message's entry in a host-written `pineta.revision` value, keyed
+  against the message's entry in a host-written `pinetrie.revision` value, keyed
   by the entry's id. A message whose calls changed nothing gets no revision; a
   branch from it starts from the nearest one above. A run's prompt always gets
   a record: changes made in the lane's directory between runs are committed
@@ -137,9 +137,9 @@ fold does (S36 items 11 and 12).
   line, such as a split's stack, or a merge, is not adopted
   (`planTurnCommit`).
 - **Revisions a lane builds on are immutable.** The host keeps a local
-  bookmark per lane, `pineta/<lane>`, at its newest revision (the only place
+  bookmark per lane, `pinetrie/<lane>`, at its newest revision (the only place
   that revision is stored), and extends
-  `immutable_heads()` in the repo's config with `bookmarks(glob:"pineta/*")`.
+  `immutable_heads()` in the repo's config with `bookmarks(glob:"pinetrie/*")`.
   jj treats every ancestor of an immutable head as immutable. So no agent,
   and not you without `--ignore-immutable`, can rewrite a revision a lane
   builds on, including the `@-` a lane started from. Workspace-level config
@@ -238,7 +238,7 @@ fold does (S36 items 11 and 12).
   read-only workspace is not needed. The vision's third merge problem, effect
   merge, becomes a jj merge and ADR-0033.
 - **`jj log` holds every lane's revisions**, one per file-changing message,
-  under `pineta/<lane>` bookmarks. `jj git push --all` would push those
+  under `pinetrie/<lane>` bookmarks. `jj git push --all` would push those
   bookmarks too (S36 item 23); push by name.
 - **A turn revision costs about a tenth of a second** per message: 84 ms when
   nothing changed, 144 ms with a commit (S36 item 26).
@@ -254,11 +254,11 @@ fold does (S36 items 11 and 12).
 - **Lanes can run the test suites at once:** the whole `verify` gate passed
   in a workspace, and e2e ran in a workspace and in your working copy at the
   same moment without a port collision, since its host takes `port: 0` (S36
-  item 25). A lane starting the development host needs `PINETA_PORT=0`, or
+  item 25). A lane starting the development host needs `PINETRIE_PORT=0`, or
   it collides on 7391.
 - **Taking a landing changes the host's own files.** Host code needs a restart
   to take effect, as today.
-- **Pineta's own `link:` dependencies on Kyneta** are relative, so they need
+- **pine·trie's own `link:` dependencies on Kyneta** are relative, so they need
   the re-pointing step. That step handles any repo's links that leave it.
 - **A host started from one of its own lanes' workspaces finds the right repo
   and workspace,** because jj answers, not a directory check.

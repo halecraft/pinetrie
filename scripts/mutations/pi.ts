@@ -1,4 +1,4 @@
-// Mutations for @pineta/pi. Run: pnpm mutate scripts/mutations/pi.ts
+// Mutations for @pinetrie/pi. Run: pnpm mutate scripts/mutations/pi.ts
 import type { Mutation } from "../mutate.ts"
 
 const unit = ["pnpm", "exec", "vitest", "run", "packages/pi"]
@@ -15,7 +15,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the land budget is a number of its own",
     file: "packages/pi/compaction.ts",
-    from: "  tokens: PINETA_COMPACTION.keepRecentTokens,",
+    from: "  tokens: PINETRIE_COMPACTION.keepRecentTokens,",
     to: "  tokens: 60_000,",
     command: unit,
     expect: "one source: the budget is the harness's keepRecentTokens",
@@ -140,7 +140,7 @@ export const mutations: readonly Mutation[] = [
     name: "a direct lane is told it is in a container",
     file: "packages/pi/lanes.ts",
     from: "      dir: access.dir,\n      lane: null,",
-    to: '      dir: access.dir,\n      lane: { hostPaths: [], facts: { dir: access.dir, shared: [], grants: { ssh: false, env: [], mounts: [] }, defaultImage: false, install: "/pineta", note: "" } },',
+    to: '      dir: access.dir,\n      lane: { hostPaths: [], facts: { dir: access.dir, shared: [], grants: { ssh: false, env: [], mounts: [] }, defaultImage: false, install: "/pinetrie", note: "" } },',
     command: unit,
     expect: "a lane that works directly is told nothing of a lane",
   },
@@ -156,8 +156,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the note names a symbol that is gone",
     file: "packages/pi/lane.md",
-    from: "<!-- apps/pineta/host/work/containers.ts runEnded -->",
-    to: "<!-- apps/pineta/host/work/containers.ts runEnd -->",
+    from: "<!-- apps/pinetrie/host/work/containers.ts runEnded -->",
+    to: "<!-- apps/pinetrie/host/work/containers.ts runEnd -->",
     command: unit,
     expect: "every source lane.md names",
   },
@@ -613,7 +613,7 @@ export const mutations: readonly Mutation[] = [
     name: "the cards go at the end of each request",
     file: "packages/pi/agent.ts",
     from: "  return convertToLlm(withChatImages(messages, found))",
-    to: '  const cards = (m: AgentMessage) => (m as { customType?: string }).customType === "pineta.pinned"\n  return convertToLlm(withChatImages([...messages.filter(m => !cards(m)), ...messages.filter(cards)], found))',
+    to: '  const cards = (m: AgentMessage) => (m as { customType?: string }).customType === "pinetrie.pinned"\n  return convertToLlm(withChatImages([...messages.filter(m => !cards(m)), ...messages.filter(cards)], found))',
     command: unit,
     expect: "an edited card keeps the cache",
   },

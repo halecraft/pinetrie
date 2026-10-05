@@ -21,7 +21,7 @@ import {
   rootIdFor,
   type TreeIndex,
   writerId,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   cardEnd,
@@ -98,7 +98,7 @@ const INTEGRATED: OfferFact = {
   lane: LANE,
   by: ADA,
   as: "kabcdefg",
-  bookmark: "pineta-onto",
+  bookmark: "pinetrie-onto",
   to: { kind: "line" },
 }
 

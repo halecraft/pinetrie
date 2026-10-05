@@ -1,9 +1,9 @@
-// pi/stream — pi's harness events as Pineta's `StreamEvent`s (ADR-0022).
+// pi/stream — pi's harness events as pinetrie's `StreamEvent`s (ADR-0022).
 // Nothing else of pi's events leaves this package. Which events are mapped,
 // and why the end events are not, is in `TECHNICAL.md`, "Streaming".
 
 import type { HarnessEvent } from "@earendil-works/pi-agent-core"
-import { isLaneName, type StreamEvent } from "@pineta/core"
+import { isLaneName, type StreamEvent } from "@pinetrie/core"
 
 /** The harness events a stream is made of. */
 export const STREAM_SOURCES = [

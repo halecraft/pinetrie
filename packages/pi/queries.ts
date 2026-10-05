@@ -7,7 +7,7 @@ import type {
   EntryStructure,
   StorageBranchScan,
 } from "@earendil-works/pi-agent-core"
-import type { StoredEntryRow } from "@pineta/schema"
+import type { StoredEntryRow } from "@pinetrie/schema"
 import type { Bounds } from "./arrivals.ts"
 import { rowCustomType } from "./stored-row.ts"
 

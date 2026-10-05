@@ -2,7 +2,7 @@
 // rejoined (ADR-0015). Pure.
 
 import type { Entry } from "@earendil-works/pi-agent-core"
-import type { StoredEntryRow } from "@pineta/schema"
+import type { StoredEntryRow } from "@pinetrie/schema"
 import {
   type BlobOf,
   type RefOf,
@@ -127,7 +127,7 @@ export function fromStoredRow(
 
 /**
  * A row's `customType`, which lives in `payload`: it is pi's variant data,
- * not one of the columns Pineta reasons about.
+ * not one of the columns pinetrie reasons about.
  */
 export function rowCustomType(row: StoredEntryRow): string | undefined {
   const customType = (row.payload as { customType?: unknown } | null)

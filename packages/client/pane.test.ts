@@ -8,7 +8,7 @@ import {
   type RevisionRecord,
   type Sha256,
   type SpineNode,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import type { ReviewTarget } from "./column-view.ts"
 import { entry, indexOf } from "./fixtures.ts"

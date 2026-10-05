@@ -18,14 +18,14 @@
 //   `JJ_EDITOR=false` (`NO_EDITOR`): a command that wants one fails at once
 //   (S36 item 21). A lane's container sets the same variables.
 //
-// Every host command here runs with `PINETA_GIT=1`. A git shim that refuses
-// git writes in a jj repo when an agent is driving lets Pineta's own calls
+// Every host command here runs with `PINETRIE_GIT=1`. A git shim that refuses
+// git writes in a jj repo when an agent is driving lets pinetrie's own calls
 // through by it: the host must fetch lanes' bundles into your repo. The
 // agent's own commands run through pi's environment, never through `run`,
 // so they never carry it.
 
 import { execFile } from "node:child_process"
-import { NO_EDITOR, WORKSPACE_ROOT } from "@pineta/core"
+import { NO_EDITOR, WORKSPACE_ROOT } from "@pinetrie/core"
 
 export interface Ran<Out = string> {
   readonly ok: boolean
@@ -59,7 +59,7 @@ function exec<Out>(
       args,
       {
         ...(options.cwd === undefined ? {} : { cwd: options.cwd }),
-        env: { ...process.env, ...options.env, PINETA_GIT: "1" },
+        env: { ...process.env, ...options.env, PINETRIE_GIT: "1" },
         maxBuffer: 256 * 1024 * 1024,
         encoding,
       },
@@ -111,7 +111,7 @@ export const laneJj =
 
 /**
  * jj from `dir`, with no `-R`: for asking where a repo is, and for the
- * startup reads of your repo before `@pineta/repo`'s runners exist.
+ * startup reads of your repo before `@pinetrie/repo`'s runners exist.
  */
 export const jjIn = (dir: string, args: readonly string[]): Promise<Ran> =>
   run("jj", [...JJ_FLAGS, ...args], { cwd: dir, env: NO_EDITOR })

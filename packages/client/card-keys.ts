@@ -7,7 +7,7 @@
 // caret to its paragraph's start or end; those boxes lose that, and the
 // composer and drafting cards keep it.
 
-import type { CardId } from "@pineta/core"
+import type { CardId } from "@pinetrie/core"
 import type { ColumnAct } from "./intent.ts"
 import type { KeyLike } from "./inventory-keys.ts"
 

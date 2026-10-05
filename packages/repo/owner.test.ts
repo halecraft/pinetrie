@@ -1,8 +1,8 @@
 import { mkdtemp, readdir, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { NO_EDITOR } from "@pineta/core"
-import { DEFAULT_LINE, run } from "@pineta/lanes"
+import { NO_EDITOR } from "@pinetrie/core"
+import { DEFAULT_LINE, run } from "@pinetrie/lanes"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
 import type { Moved } from "./observe.ts"
 import { headsDir, type RepoOwner, startRepoOwner } from "./owner.ts"
@@ -11,7 +11,7 @@ import { host } from "./step.ts"
 
 let top = ""
 beforeAll(async () => {
-  top = await realpath(await mkdtemp(path.join(tmpdir(), "pineta-owner-")))
+  top = await realpath(await mkdtemp(path.join(tmpdir(), "pinetrie-owner-")))
   process.env.JJ_USER = "Probe"
   process.env.JJ_EMAIL = "probe@example.com"
 })
@@ -145,7 +145,7 @@ describe("the owner of your repo", () => {
     expect(observed()).toBe(before)
     await owner.command(ops =>
       ops.execute([
-        host("bookmark", "create", "pineta-offer/amber-fox", "-r", "@-"),
+        host("bookmark", "create", "pinetrie-offer/amber-fox", "-r", "@-"),
       ]),
     )
     await owner.idle()
@@ -162,7 +162,7 @@ describe("the owner of your repo", () => {
         "log",
         "--no-graph",
         "-r",
-        "pineta-offer/amber-fox",
+        "pinetrie-offer/amber-fox",
         "-T",
         "commit_id",
       ]),
@@ -177,10 +177,17 @@ describe("the owner of your repo", () => {
     await owner.idle()
     const seen = await owner.command(async ops => {
       await ops.execute([
-        host("bookmark", "create", "pineta-offer/x", "-r", "@-"),
+        host("bookmark", "create", "pinetrie-offer/x", "-r", "@-"),
       ])
       return owner.read(r =>
-        r.jj(["log", "--no-graph", "-r", "pineta-offer/x", "-T", "commit_id"]),
+        r.jj([
+          "log",
+          "--no-graph",
+          "-r",
+          "pinetrie-offer/x",
+          "-T",
+          "commit_id",
+        ]),
       )
     })
     expect(seen.ok).toBe(true)

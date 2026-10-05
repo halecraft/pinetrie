@@ -12,8 +12,8 @@ import {
   value,
 } from "@earendil-works/pi-agent-core"
 import { exportSince, merge, version } from "@kyneta/schema"
-import { entryId, laneNameForThread } from "@pineta/core"
-import { newRootDoc, writeLaneTip } from "@pineta/schema"
+import { entryId, laneNameForThread } from "@pinetrie/core"
+import { newRootDoc, writeLaneTip } from "@pinetrie/schema"
 import { expect, test } from "vitest"
 import { emptyUsage } from "./deep.ts"
 import { KynetaStorage } from "./storage.ts"

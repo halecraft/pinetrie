@@ -2,7 +2,7 @@
 // in your attention document, on every device of yours (ADR-0030,
 // ADR-0077). The decisions are `inbox.ts`'s.
 
-import type { AttentionStore } from "@pineta/session"
+import type { AttentionStore } from "@pinetrie/session"
 import { useCallback, useEffect, useMemo, useSyncExternalStore } from "react"
 import {
   type Inbox,

@@ -1,4 +1,4 @@
-import { type CardId, cardId } from "@pineta/core"
+import { type CardId, cardId } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { hostLetGo, spentCards } from "./card-copies.ts"
 

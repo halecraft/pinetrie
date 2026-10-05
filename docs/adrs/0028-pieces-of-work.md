@@ -50,7 +50,7 @@ boundary, and collaborators need to see the same one.
   another; the host checks no position, and the record's name stays optional.
 - **A label with no name is computed when drawn,** from the description's
   first line, else the opening words of the marked message. Nothing is stored.
-- **The record is a host-written `pineta.work` value, keyed by its own id,** as
+- **The record is a host-written `pinetrie.work` value, keyed by its own id,** as
   a note's is (ADR-0025). It holds the marked message, the name if any, its
   state (`marked` or `unmarked`), who marked it, and when. Clients mark,
   rename and unmark with commands over the Line, and the host writes the

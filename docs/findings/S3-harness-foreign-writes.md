@@ -31,7 +31,7 @@ storage — a materially larger project.
 **KILL CRITERION MET — but the mitigation is a design change, not a harness patch.**
 The harness **caches** (confirmed) and **assumes monotonic local growth** (confirmed); it does **not** corrupt or crash. A *shared* lane across replicas is unusable. However, **one lane per writer fully avoids every tip-level failure** (10/10 assertions), because lanes are keyed by name, each owns its own `branchTip` register, and `harness.lane()` re-reads storage at acquisition. `seq` remains broken under either shape and is now empirically S1's problem, not a theoretical one.
 
-**Net: multi-writer Pineta stays a STORAGE project, on the condition that writers never share a lane.**
+**Net: multi-writer pine·trie stays a STORAGE project, on the condition that writers never share a lane.**
 
 ---
 
@@ -228,7 +228,7 @@ Both peers acquire their own lane branching at the shared trunk tip via `harness
     seq= 19 id=18eab6 parent=55578b message "B-3"
 ```
 
-That is **exactly the branched conversation tree Pineta wants**, produced by two concurrent partitioned writers with zero coordination.
+That is **exactly the branched conversation tree pine·trie wants**, produced by two concurrent partitioned writers with zero coordination.
 
 Cross-lane reads work without restart:
 
@@ -296,7 +296,7 @@ So:
 
 ## 6. Consequences for the plan
 
-**S3 resolved — kill criterion met on 2 of 3 counts** (caches ✅, monotonic growth ✅, corrupts ❌). Read strictly, that says "harness changes needed." Read precisely, step 7 shows the harness already supplies the primitives (P3, P4) and the required change is **a Pineta design rule, not a pi patch**.
+**S3 resolved — kill criterion met on 2 of 3 counts** (caches ✅, monotonic growth ✅, corrupts ❌). Read strictly, that says "harness changes needed." Read precisely, step 7 shows the harness already supplies the primitives (P3, P4) and the required change is **a pine·trie design rule, not a pi patch**.
 
 **ADR-0001 (embed `pi-agent-core`) — HOLDS, with a new constraint.** The calculus does not change: no fork is required. Add the constraint below.
 
@@ -346,7 +346,7 @@ Concurrent writers MUST each own a distinct lane name. A shared lane produces st
   It does **not** crash or corrupt. `StorageBackedSession` does *not* cache —
   **`Lane` does** (`lane.js:128-131`, `getTipId` ignores its context param).
 - **Mitigation proven:** lane-per-writer → 10/10, re-verified, zero orphans,
-  producing exactly the branched tree Pineta wants from two partitioned writers
+  producing exactly the branched tree pine·trie wants from two partitioned writers
   with zero coordination.
 - **T5 answered: yes, the mutex can be per-replica.** The question was aimed at
   the wrong object — no probe produced a `Storage`-contract violation. The real
@@ -354,5 +354,5 @@ Concurrent writers MUST each own a distinct lane name. A shared lane produces st
 - **Itemised 10 exclusive-ownership assumptions (A1–A10) with file:line
   evidence**, plus 5 escape hatches (P1–P5) — notably `MutationLine` is
   *injectable*, so a distributed barrier is possible without forking.
-- **Net: multi-writer Pineta stays a STORAGE project**, conditional on ADR-0011.
+- **Net: multi-writer pine·trie stays a STORAGE project**, conditional on ADR-0011.
 - Model layer was **stubbed**; the drive/inference loop is untested (residual #1).

@@ -4,27 +4,27 @@
 // sides agree on; binding it to a transport happens in protocol/line.ts.
 
 /** Line topic for the command channel (ADR-0007: commands over a Line). */
-export const CONTROL_TOPIC = "pineta.control"
+export const CONTROL_TOPIC = "pinetrie.control"
 
 /** Document ids replicated host -> client (ADR-0007: state over documents). */
-export const SESSION_DOC_ID = "pineta:session"
+export const SESSION_DOC_ID = "pinetrie:session"
 /** Who is here, and what each person reads and types: ephemeral, never stored (ADR-0024). */
-export const PRESENCE_DOC_ID = "pineta:presence"
+export const PRESENCE_DOC_ID = "pinetrie:presence"
 /**
  * Where every card is (ADR-0059): written only by the host, through handoffs.
  * Yjs (ADR-0066), under a new id so a store's `json` places never meet the
  * new schema under one id.
  */
-export const PLACES_DOC_ID = "pineta:card-places"
+export const PLACES_DOC_ID = "pinetrie:card-places"
 /** What is streaming now (ADR-0063): written only by the host, and compacted at every run's end. */
-export const LIVE_DOC_ID = "pineta:live"
+export const LIVE_DOC_ID = "pinetrie:live"
 
 /**
  * The host's principal. Kyneta issues each peer its id (its seat), so a client
  * finds the host's seat by this name (`whenPeer`) and addresses its Line
  * there. It is not an email, so no person can claim it (`writerOfPrincipal`).
  */
-export const HOST_PRINCIPAL = "pineta-host"
+export const HOST_PRINCIPAL = "pinetrie-host"
 
 /**
  * The verbs. `line.ts` spreads this into a constrained schema literal, so this
@@ -33,7 +33,7 @@ export const HOST_PRINCIPAL = "pineta-host"
  *
  *   - `chat` is a human message. `parentId` is where its sender was reading,
  *     or the branch point (`""`: the root, where only a `branch` may start);
- *     `mode` says how it joins the tree (`CHAT_MODES` in @pineta/core); `lane`
+ *     `mode` says how it joins the tree (`CHAT_MODES` in @pinetrie/core); `lane`
  *     names the thread's lane when the sender's column is bound to one;
  *     `asksAgent` marks a Start Agent column; `cardId` names the card its text
  *     was sent from, which the host spends once it is sent (ADR-0048), and

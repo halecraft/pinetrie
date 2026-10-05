@@ -3,7 +3,7 @@
 //
 // A step runs after every step queued before it, whether they failed or not:
 // one must never stop the ones behind it. That is why this is not
-// `@pineta/lanes`' `createQueue`, which a fatal failure breaks until `reset`,
+// `@pinetrie/lanes`' `createQueue`, which a fatal failure breaks until `reset`,
 // as a lane's disk needs.
 //
 // Steps are of two kinds. `run` and `once` are steps someone waits on, in the

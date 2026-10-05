@@ -12,8 +12,8 @@ import {
   type RootRecord,
   type VerdictRecord,
   type WriterId,
-} from "@pineta/core"
-import type { AttentionStore } from "@pineta/session"
+} from "@pinetrie/core"
+import type { AttentionStore } from "@pinetrie/session"
 import {
   useEffect,
   useMemo,

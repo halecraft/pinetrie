@@ -7,8 +7,8 @@ import {
   indexAsks,
   rootIdFor,
   writerId,
-} from "@pineta/core"
-import type { Outcome } from "@pineta/protocol/codec"
+} from "@pinetrie/core"
+import type { Outcome } from "@pinetrie/protocol/codec"
 import { describe, expect, test } from "vitest"
 import { afterKeep } from "./card-intents.ts"
 import { NEW_ROOT, tree } from "./fixtures.ts"

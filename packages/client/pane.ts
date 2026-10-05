@@ -11,7 +11,7 @@ import {
   type Sha256,
   type SpineNode,
   type TreeIndex,
-} from "@pineta/core"
+} from "@pinetrie/core"
 import type { Element, Root } from "hast"
 import type { ReviewTarget } from "./column-view.ts"
 import { imageLookup, messageTree, tableAt, tableHeads } from "./markdown.ts"

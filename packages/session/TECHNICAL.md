@@ -1,10 +1,10 @@
-# `@pineta/session`: technical notes
+# `@pinetrie/session`: technical notes
 
 One client's connection to a host: the documents it syncs and the requests
 it sends, deciding nothing about what the page draws. `connectSession`
 (`connect.ts`) opens a Kyneta `Exchange` over a WebSocket, finds the host's
-seat, and returns a `SessionClient`. The page (`@pineta/client`'s
-`main.tsx`) and the e2e suites (`join` in `apps/pineta/e2e/harness.ts`) use
+seat, and returns a `SessionClient`. The page (`@pinetrie/client`'s
+`main.tsx`) and the e2e suites (`join` in `apps/pinetrie/e2e/harness.ts`) use
 the same code.
 
 **It runs unchanged in a browser and in Node, and declares no React**
@@ -18,23 +18,23 @@ Where a rule lives, as `packages/rules/TECHNICAL.md` and
 > Core holds the vocabulary (ids, intents, every record's type) and the
 > reads of the tree. A format or type that `lanes` or `repo` must read,
 > write or name lives in core too, since neither can declare
-> `@pineta/rules`. What a stored shape says, and how the host changes it,
-> is `@pineta/rules`', whoever reads it. One client's own in-flight state
+> `@pinetrie/rules`. What a stored shape says, and how the host changes it,
+> is `@pinetrie/rules`', whoever reads it. One client's own in-flight state
 > (its moves, held roots, slot repair, commands out) is
-> `@pineta/session`'s. What the page draws, and its words, is
-> `@pineta/client`'s.
+> `@pinetrie/session`'s. What the page draws, and its words, is
+> `@pinetrie/client`'s.
 
 So `answerOf`, `withPending`, `settleSlots` and `nextActing` are here, while
 the host's command rules (`planChat`, `planMove`, `planStop`) are
-`@pineta/rules`'. This package's `answerOf` (a move's answer) shares its
-name with `@pineta/rules`' banner rule; `index.ts` does not export it.
+`@pinetrie/rules`'. This package's `answerOf` (a move's answer) shares its
+name with `@pinetrie/rules`' banner rule; `index.ts` does not export it.
 
 `index.ts` lists every name another package imports; a name only this
 package and its tests use is not exported there.
 
 ## "Session" means two things
 
-`@pineta/session` is this client's connection. `SessionClient.session` is
+`@pinetrie/session` is this client's connection. `SessionClient.session` is
 the session document (ADR-0063), the records every root shares. The names
 are the code's own (`connectSession`, `SessionClient`).
 
@@ -46,7 +46,7 @@ it.
 
 | part | owns | decides with |
 |---|---|---|
-| `rootDocs` (`root-docs.ts`) | the roots held, the `pineta.roots` policy | `planHold` (`root-hold.ts`) |
+| `rootDocs` (`root-docs.ts`) | the roots held, the `pinetrie.roots` policy | `planHold` (`root-hold.ts`) |
 | `cardTexts` (`card-texts.ts`) | each card's text, and the copies to destroy | `hostLetGo`, `spentCards` (`card-copies.ts`) |
 | one `snapshotStore<LocalState>` | the host's records, this tab's moves, the cards drawn | `localStep` (`card-moves.ts`) |
 | `inventorySlots` (`inventory-slots.ts`) | your inventory's slots, the repair's alarm | `repairStep`, `takeIntoInventoryWrites`, `swapWrites` (`inventory.ts`) |
@@ -91,7 +91,7 @@ it.
 
 - **`SessionClient.holdRoots` opens what is new and `destroy`s what is
   not**, which leaves the host's copy (S86). Which roots the page asks for
-  is the page's (`planHeldRoots`, `@pineta/client`). A root this client
+  is the page's (`planHeldRoots`, `@pinetrie/client`). A root this client
   starts is held from its first send until the page asks for it, and after
   that only while the page does. `planHold` (pure) decides what opens and
   goes; `rootDocs` carries it out.
@@ -114,7 +114,7 @@ so a refusal added to the plan must move the minting after it.
 
 The page reads the cards' records as `session.cards`, a snapshot store; it
 never holds the places document itself. `connectSession` registers
-`writersPolicy` (`@pineta/protocol/writers`), so a write to the places, the
+`writersPolicy` (`@pinetrie/protocol/writers`), so a write to the places, the
 session or someone else's inventory throws before it is made.
 
 - **Every move is a request to the host**: creating a card (its text in one
@@ -185,7 +185,7 @@ session or someone else's inventory throws before it is made.
   session opens it and repairs it on every change (`repairStep`:
   `steadiness`, then `planSlots`).
 - **`settleSlots` is the one slot rule**: the page's panel draws it
-  (`inventoryView`, `@pineta/client`), the repair writes towards it, and a
+  (`inventoryView`, `@pinetrie/client`), the repair writes towards it, and a
   take into the inventory lands by the same `firstEmpty`: the selected slot if empty, else the
   first empty.
 - **The repair waits for a card to be steady** (`steadiness`, S79): it
