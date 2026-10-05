@@ -184,6 +184,38 @@ describe("idle, close and slow steps", () => {
     await keeper.once("k", async () => {
       t += 20
     })
-    expect(slow).toEqual([{ key: "k", waited: 0, ran: 20 }])
+    // Queued together, the second waits for the first's 20.
+    const first = keeper.run(async () => {
+      t += 20
+    })
+    const second = keeper.once("k", async () => {})
+    await Promise.all([first, second])
+    expect(slow).toEqual([
+      { key: "k", waited: 0, ran: 20 },
+      { key: null, waited: 0, ran: 20 },
+      { key: "k", waited: 20, ran: 0 },
+    ])
+  })
+
+  test("an upkeep step that only waited is not reported; one that ran long is", async () => {
+    let t = 0
+    const slow: unknown[] = []
+    const keeper = createKeeper<"k" | "j">({
+      now: () => t,
+      slowMs: 10,
+      onSlow: s => slow.push(s),
+    })
+    const held = keeper.run(async () => {
+      t += 20
+    })
+    const waited = keeper.later("k", async () => {})
+    const ran = keeper.later("j", async () => {
+      t += 20
+    })
+    await Promise.all([held, waited, ran])
+    expect(slow).toEqual([
+      { key: null, waited: 0, ran: 20 },
+      { key: "j", waited: 20, ran: 20 },
+    ])
   })
 })

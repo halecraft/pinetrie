@@ -2,7 +2,7 @@
 // it reports a failure.
 
 import type { LaneName, RootId } from "@pineta/core"
-import { type Keeper, KeeperClosed } from "@pineta/keeper"
+import { type Keeper, KeeperClosed, type SlowStep } from "@pineta/keeper"
 import { readThreadName } from "@pineta/reads"
 import type {
   LiveDocHandle,
@@ -58,4 +58,18 @@ export function failed(
         : `[host] ${readThreadName(basics.session, lane)}: ${what} failed: ${messageOf(error)}`,
     )
   }
+}
+
+/**
+ * An `onSlow` handler that logs `[host] <where>: a step (<key>) waited <n> ms
+ * and ran <n> ms`, with no `<where>: ` for the documents' keeper.
+ */
+export function slow(
+  basics: Pick<Basics, "log">,
+  where?: string,
+): (step: SlowStep) => void {
+  return s =>
+    basics.log(
+      `[host] ${where === undefined ? "" : `${where}: `}a step${s.key === null ? "" : ` (${s.key})`} waited ${Math.round(s.waited)} ms and ran ${Math.round(s.ran)} ms`,
+    )
 }

@@ -59,13 +59,19 @@ import {
 } from "@pineta/schema"
 import { DEFAULT_BIND, isLoopback, newKey } from "./admission.ts"
 import { createBanners } from "./banners.ts"
-import { type Basics, failed, type HostKeeper, type HostKey } from "./basics.ts"
+import {
+  type Basics,
+  failed,
+  type HostKeeper,
+  type HostKey,
+  slow,
+} from "./basics.ts"
 import { memoryBlobs } from "./blobs.ts"
 import { startCards } from "./cards.ts"
 import { createCommands } from "./commands/index.ts"
 import { startControl } from "./control.ts"
 import { createDigests } from "./digests.ts"
-import { createDirectory, type Directory } from "./directory.ts"
+import { startDirectory } from "./directory.ts"
 import {
   type HostDocuments,
   hostDocuments,
@@ -282,9 +288,6 @@ export async function startHost({
   await whenHydrated(live)
   // Each person's history of moves, per root (ADR-0066).
   const histories = createMoveHistories(exchange)
-  // Each root's document as it is first opened is followed by the directory,
-  // made below with the documents' keeper; this is the one late read of it.
-  let directory: Directory | undefined
   // The agent, made below, holds a harness over each root it has used.
   let created: Agent | undefined
   const docs = hostDocuments({
@@ -292,7 +295,6 @@ export async function startHost({
     session,
     live,
     places,
-    opened: (root, doc) => directory?.watch(root, doc),
     releasing: async root => {
       await created?.release(root)
       await histories.unloadRoot(root)
@@ -310,8 +312,10 @@ export async function startHost({
 
   // --- where lanes work (ADR-0032, ADR-0034) --------------------------------
   // Lane work is made before the agent, which is made with lane work's
-  // `access` and `hooks`, so lane work reads the agent lazily. This is the
-  // one lazy read: every module made after the agent is given the agent.
+  // `access` and `hooks`, so lane work reads the agent lazily, as do
+  // banners, digests, titles and names, made before it too. Every module
+  // made after the agent is given the agent. One made before it must not
+  // write as it is made: `theAgent()` throws until then.
   const theAgent = (): Agent => {
     if (created === undefined) throw new Error("the agent is not created yet")
     return created
@@ -324,12 +328,8 @@ export async function startHost({
     .catch(() => null)
   const keeper: HostKeeper = createKeeper<HostKey>({
     onError: failed(basics, "step"),
-    onSlow: s =>
-      log(
-        `[host] a step${s.key === null ? "" : ` (${s.key})`} waited ${Math.round(s.waited)} ms and ran ${Math.round(s.ran)} ms`,
-      ),
+    onSlow: slow(basics),
   })
-  directory = createDirectory({ basics, keeper, agent: theAgent })
   // The roots that are not archived, opened before anything reads one: every
   // lane that could be running is in one of them (`planLoads`).
   const directoryNow = readRoots(session)
@@ -423,6 +423,9 @@ export async function startHost({
     titleModel: titleConfig.model,
   })
   created = agent
+  // The directory writes through the agent, so it starts here; it follows
+  // the roots opened above as well as those opened later (`onOpened`).
+  startDirectory({ basics, keeper, agent })
   if (titleConfig.model !== null && !agent.titleModelFound)
     log(
       `[host] titles name ${titleConfig.model.provider}/${titleConfig.model.model}, which pi does not have: titles use the run's model`,

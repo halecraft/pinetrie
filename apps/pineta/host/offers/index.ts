@@ -163,9 +163,11 @@ export function startOffers(input: {
       })
       .catch(failed(basics, "reading what you are editing"))
   owner.onMoved(moved => {
+    const names = readNames(basics.session)
     const planned = planMarks({
       moved,
-      names: readNames(basics.session),
+      names,
+      archived: new Set([...names.keys()].filter(l => deps.docs.archived(l))),
       open: [...readOffers(basics.session).values()]
         .filter(o => isNotYetIntegrated(offerStatus(o)))
         .map(o => o.lane),

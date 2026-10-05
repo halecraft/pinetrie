@@ -8,8 +8,11 @@ import type { Moved } from "@pineta/repo"
 /**
  * What a move the owner observed marks for a refresh (ADR-0065): the line's
  * record, and each lane whose offer it may change. Everything, the line, a
- * WIP or the first observation (`all`), marks every named lane and every
- * open record. The publish bookmark (`line`) marks the line's record alone.
+ * WIP or the first observation (`all`), marks every named lane whose root is
+ * not archived, and every open record. An archived lane's refresh only
+ * withdraws an offer it still has, and what still holds one, its ref, its
+ * offer bookmark or an open record, marks it anyway. The publish bookmark
+ * (`line`) marks the line's record alone.
  * `@` alone (`yours`) marks no lane: it changes only each
  * record's `yourEdits` and the line's preview, which one shared read
  * rewrites (`shared`). A lane's ref marks that lane, and an offer bookmark
@@ -18,6 +21,8 @@ import type { Moved } from "@pineta/repo"
 export function planMarks(input: {
   readonly moved: Moved
   readonly names: ReadonlyMap<LaneName, ThreadName>
+  /** The named lanes whose root is archived. */
+  readonly archived: ReadonlySet<LaneName>
   /** Lanes with an open offer record: how an offer you abandoned is built again. */
   readonly open: readonly LaneName[]
 }): {
@@ -30,7 +35,12 @@ export function planMarks(input: {
   const every = moved.all
   const byName = new Map([...input.names].map(([lane, name]) => [name, lane]))
   const lanes = new Set<LaneName>([
-    ...(every ? [...input.names.keys(), ...input.open] : []),
+    ...(every
+      ? [
+          ...[...input.names.keys()].filter(l => !input.archived.has(l)),
+          ...input.open,
+        ]
+      : []),
     ...moved.lanes,
     ...[...moved.offers].flatMap(name => {
       const lane = byName.get(name)

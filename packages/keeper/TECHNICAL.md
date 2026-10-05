@@ -54,8 +54,11 @@ current.
 - **`idle` settles when nothing is queued, running or tracked**, including
   what is added while it waits. `track(work)` holds `idle` for work that is not
   a step: a request outside the keeper, say.
-- **`onSlow`** hears each step that waited or ran past `slowMs` (1 s by
-  default), with its key. The host logs it.
+- **`onSlow`** hears each step that ran past `slowMs` (1 s by default), and
+  each `run` or `once` step that waited past it, with its key. A `later`
+  step's wait is not reported: upkeep waits behind commands and other
+  upkeep by design, so a burst of it (a refresh per lane, queued at once)
+  would report every step behind the first second. The host logs it.
 
 ## Tests
 

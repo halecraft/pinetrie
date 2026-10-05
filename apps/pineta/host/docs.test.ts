@@ -1,6 +1,14 @@
-import { entryId, type RootRecord, rootIdFor, writerId } from "@pineta/core"
+import { createInMemoryStore, Exchange } from "@kyneta/exchange"
+import {
+  entryId,
+  type RootId,
+  type RootRecord,
+  rootIdFor,
+  writerId,
+} from "@pineta/core"
+import { newLiveDoc, newPlacesDoc, newSessionDoc } from "@pineta/schema"
 import { expect, test } from "vitest"
-import { openedWords, planLoads } from "./docs.ts"
+import { hostDocuments, openedWords, planLoads } from "./docs.ts"
 
 const record = (n: string, entry: string | null): RootRecord => ({
   root: rootIdFor(n),
@@ -46,4 +54,25 @@ test("openedWords: how many roots a starting host opened, and how many it left a
   expect(openedWords(5, 5)).toBe("opened 5 of 5 roots")
   expect(openedWords(1, 1)).toBe("opened 1 of 1 root")
   expect(openedWords(0, 0)).toBe("opened 0 of 0 roots")
+})
+
+test("onOpened hears every root already held, then each root as it is opened, once", async () => {
+  const docs = hostDocuments({
+    exchange: new Exchange({
+      principal: "pineta-host",
+      store: createInMemoryStore(),
+    }),
+    session: newSessionDoc(),
+    live: newLiveDoc(),
+    places: newPlacesDoc(),
+  })
+  const a = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
+  const b = rootIdFor("01a0ffd2-0000-7000-8000-00000000000b")
+  await docs.root(a)
+  const heard: RootId[] = []
+  docs.onOpened(root => heard.push(root))
+  expect(heard).toEqual([a])
+  await docs.root(b)
+  await docs.root(a)
+  expect(heard).toEqual([a, b])
 })

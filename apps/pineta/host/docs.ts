@@ -45,6 +45,12 @@ export interface HostDocuments {
   unload(root: RootId): Promise<void>
   /** The roots whose documents are held now. */
   loaded(): readonly RootId[]
+  /**
+   * Call `listener` for every root held now, then for each root as it is
+   * opened (a root unloaded and opened again is heard again). A root still
+   * loading when it joins is heard once, as it finishes.
+   */
+  onOpened(listener: (root: RootId, doc: RootDocHandle) => void): void
 }
 
 /**
@@ -76,8 +82,6 @@ export function hostDocuments(input: {
   readonly session: SessionDocHandle
   readonly live: LiveDocHandle
   readonly places: PlacesDocHandle
-  /** Called once for each root's document, as it is first opened. */
-  readonly opened?: (root: RootId, doc: RootDocHandle) => void
   /**
    * Called as a root's document is about to go: whatever holds it lets go,
    * so nothing writes to a closed document.
@@ -87,6 +91,7 @@ export function hostDocuments(input: {
   const { exchange, session, live, places } = input
   const held = new Map<RootId, RootDocHandle>()
   const loading = new Map<RootId, Promise<RootDocHandle>>()
+  const listeners: ((root: RootId, doc: RootDocHandle) => void)[] = []
 
   return {
     session,
@@ -102,7 +107,7 @@ export function hostDocuments(input: {
       const ready = exchange.whenHydrated(id).then(() => {
         loading.delete(root)
         held.set(root, doc)
-        input.opened?.(root, doc)
+        for (const listener of listeners) listener(root, doc)
         return doc
       })
       loading.set(root, ready)
@@ -132,5 +137,9 @@ export function hostDocuments(input: {
       exchange.unload(rootDocId(root))
     },
     loaded: () => [...held.keys()],
+    onOpened(listener) {
+      for (const [root, doc] of held) listener(root, doc)
+      listeners.push(listener)
+    },
   }
 }

@@ -11,6 +11,10 @@ before `Pineta-Source`; a lane whose base moved runs two more jj processes,
 once per move.
 Amended by ADR-0083: a take is an *offer integration*; it names what it
 was shown.
+Amended by `PLAN-2026-10-05-quiet-startup`: a full observation refreshes
+every named lane whose root is not archived, and every open record. An
+archived lane has no base to follow, and its ref, its offer bookmark or an
+open record still marks it.
 
 **Context.** A take ("add to the project") sometimes took 30–60 s, and the
 page showed nothing meanwhile. S89 measured it on a clone of Pineta's repo:

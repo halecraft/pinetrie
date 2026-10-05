@@ -58,7 +58,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a root's new entry leaves its record behind",
     file: "apps/pineta/host/directory.ts",
-    from: "      subscribe(doc.entries, changed)\n",
+    from: "    subscribe(doc.entries, changed)\n",
     to: "",
     command: unit,
     expect:
@@ -74,6 +74,24 @@ export const mutations: readonly Mutation[] = [
       "a compaction queued while refreshes and drains wait runs after all of them",
   },
   {
+    name: "a root is not refreshed as it is watched",
+    file: "apps/pineta/host/directory.ts",
+    from: "    changed()\n  }\n",
+    to: "  }\n",
+    command: unit,
+    expect:
+      "the roots held when the directory starts are refreshed, and an unchanged record is not written again (ADR-0077)",
+  },
+  {
+    name: "a late listener misses the roots already held",
+    file: "apps/pineta/host/docs.ts",
+    from: "      for (const [root, doc] of held) listener(root, doc)\n",
+    to: "",
+    command: unit,
+    expect:
+      "onOpened hears every root already held, then each root as it is opened, once",
+  },
+  {
     name: "a root's refreshes are not merged",
     file: "apps/pineta/host/directory.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
@@ -86,8 +104,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a root's record is rewritten unchanged",
     file: "apps/pineta/host/directory.ts",
-    from: "    if (writes.length > 0) await deps.agent().writeValues(writes)",
-    to: "    await deps.agent().writeValues(setIfChanged(ROOT, record, undefined))",
+    from: "    if (writes.length > 0) await deps.agent.writeValues(writes)",
+    to: "    await deps.agent.writeValues(setIfChanged(ROOT, record, undefined))",
     command: unit,
     expect: "a change the record does not show writes nothing",
   },
@@ -1103,11 +1121,29 @@ export const mutations: readonly Mutation[] = [
   {
     name: "everything moving marks only the open records",
     file: "apps/pineta/host/offers/marks.ts",
-    from: "    ...(every ? [...input.names.keys(), ...input.open] : []),",
-    to: "    ...(every ? [...input.open] : []),",
+    from: "          ...[...input.names.keys()].filter(l => !input.archived.has(l)),\n",
+    to: "",
     command: unit,
     expect:
-      "everything moved marks the line, every named lane and every open record",
+      "everything moved marks the line, every named lane not archived and every open record",
+  },
+  {
+    name: "everything moving marks archived lanes",
+    file: "apps/pineta/host/offers/marks.ts",
+    from: "          ...[...input.names.keys()].filter(l => !input.archived.has(l)),\n",
+    to: "          ...input.names.keys(),\n",
+    command: unit,
+    expect:
+      "everything moved marks the line, every named lane not archived and every open record",
+  },
+  {
+    name: "an archived lane's offer bookmark marks nothing",
+    file: "apps/pineta/host/offers/marks.ts",
+    from: "      return lane === undefined ? [] : [lane]",
+    to: "      return lane === undefined || input.archived.has(lane) ? [] : [lane]",
+    command: unit,
+    expect:
+      "an archived lane is still marked by its ref, its offer bookmark or an open record",
   },
   {
     name: "the lane's base record is never written",

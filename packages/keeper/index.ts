@@ -19,7 +19,10 @@ export class KeeperClosed extends Error {
   }
 }
 
-/** A step that waited or ran longer than `slowMs`. */
+/**
+ * A step that ran longer than `slowMs`, or a `run` or `once` step that waited
+ * longer. An upkeep step's wait is not counted: waiting is what upkeep does.
+ */
 export interface SlowStep {
   /** Its `once` or `later` key; null for a `run` step. */
   readonly key: string | null
@@ -66,7 +69,7 @@ export function createKeeper<K extends string = never>(
   options: {
     /** Hears each failed step once; its callers still get the rejection. */
     readonly onError?: (error: unknown) => void
-    /** Called for a step that waited or ran longer than `slowMs`. */
+    /** Called for each `SlowStep`. */
     readonly onSlow?: (step: SlowStep) => void
     readonly slowMs?: number
     readonly now?: () => number
@@ -104,6 +107,7 @@ export function createKeeper<K extends string = never>(
     scheduled = true
     queueMicrotask(() => {
       scheduled = false
+      const isUpkeep = waiting.length === 0
       const next = waiting.shift() ?? upkeep.shift()
       if (next === undefined) return notify()
       if (next.key !== null) {
@@ -115,7 +119,7 @@ export function createKeeper<K extends string = never>(
       const finish = () => {
         const ran = now() - started
         const waited = started - next.queued
-        if (waited > slowMs || ran > slowMs)
+        if (ran > slowMs || (!isUpkeep && waited > slowMs))
           options.onSlow?.({ key: next.key, waited, ran })
         running = false
         schedule()

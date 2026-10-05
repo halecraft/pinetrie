@@ -5,8 +5,8 @@
 from work known to change a file, from a known start; the page reads one
 status per offer), ADR-0060 (a take that names no source makes its lane's
 start untraced; `pineta.base` records what catching up would change) and
-ADR-0065 (every named lane is still refreshed on a full observation, which
-this makes safe).
+ADR-0065 (every named lane whose root is not archived is still refreshed
+on a full observation, which this makes safe).
 Amended by ADR-0083: a take above the base is an *integrated-offer
 commit*.
 

@@ -73,8 +73,25 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a step that ran long is not reported",
     file,
-    from: "        if (waited > slowMs || ran > slowMs)",
-    to: "        if (waited > slowMs)",
+    from: "        if (ran > slowMs || (!isUpkeep && waited > slowMs))",
+    to: "        if (!isUpkeep && waited > slowMs)",
+    command: unit,
+    expect: "a step that waited or ran past slowMs is reported",
+  },
+  {
+    name: "upkeep that waited is reported as slow",
+    file,
+    from: "        if (ran > slowMs || (!isUpkeep && waited > slowMs))",
+    to: "        if (ran > slowMs || waited > slowMs)",
+    command: unit,
+    expect:
+      "an upkeep step that only waited is not reported; one that ran long is",
+  },
+  {
+    name: "a command that waited is not reported",
+    file,
+    from: "        if (ran > slowMs || (!isUpkeep && waited > slowMs))",
+    to: "        if (ran > slowMs)",
     command: unit,
     expect: "a step that waited or ran past slowMs is reported",
   },

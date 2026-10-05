@@ -21,8 +21,8 @@ wires them.
 | `queued-card-pop.ts` | popping a lane's queued cards to send them (ADR-0048, ADR-0083): `popNextQueuedCard`, and `drain`, which sends each through its command (ADR-0055) |
 | `settle.ts` | what happens between runs: drains, then the compaction and sweep as upkeep (the keeper's `later`) |
 | `housekeeping.ts` | which documents a run's end compacts (`planCompaction`: its roots, the session, the places, `pineta:live`), deleting images nothing shows, and retiring histories of moves (`sweepHistories`) |
-| `docs.ts` | `HostDocuments`: every document the host holds, a root's opened as it is asked for; `planLoads` |
-| `directory.ts` | each root's directory record, refreshed as its document changes |
+| `docs.ts` | `HostDocuments`: every document the host holds, a root's opened as it is asked for, and `onOpened`, which replays the roots already held to a listener that joins late; `planLoads` |
+| `directory.ts` | each root's directory record, refreshed as its document changes: `startDirectory`, started with the agent |
 | `cards.ts` | the card port (ADR-0048), about texts only: who wrote in a card, destroying one, loading and reading texts for the queue's pops and a run's pinned cards, waiting until a text holds a version (`whenHolds`, which an `AbortSignal` gives up), and the texts of given cards gathered for the sweeps; where the shell opens card documents |
 | `seats.ts` | each connected seat's person, written once as a `pineta.seat` record (started after `recover`), and unloading the histories of moves of a person with no seat left |
 | `startup.ts` | `recover`: what a starting host does before it takes a command |
@@ -68,7 +68,9 @@ wires them.
   waits.
 - **A failed step never stops the steps behind it,** and is logged
   (`[host] step failed: …`); its caller still gets the rejection. A step
-  that waited or ran over a second is logged too (`onSlow`).
+  that ran over a second is logged too (`onSlow`), and so is a command or a
+  drain that waited over one; upkeep's wait is not, since waiting is what
+  upkeep does.
 - **One seat's commands run in the order sent, by a chain, not by timing**
   (`control.ts`). Each is queued on the keeper only once the one before it
   has replied, so what that one queued is ahead of it: a queue's drain runs
@@ -168,7 +170,11 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
 - **The directory follows each root's document** (`directory.ts`): a change
   to its entries or values queues one refresh, the keeper's `once`
   (`root:<id>`), absorbed by one already queued, which writes
-  `readRootRecord` with `setIfChanged`. A settle's compaction is `later`, so
+  `readRootRecord` with `setIfChanged`. It starts once the agent exists,
+  since a refresh writes through it, and follows every root through
+  `onOpened`: the roots `startHost` opened before it, then each opened
+  later. It refreshes each as it starts to follow it, so a record stored
+  before a field was added (ADR-0077) is rewritten at startup. A settle's compaction is `later`, so
   it runs after every refresh queued before it starts, and the records it
   compacts are current. A write after a compaction only lands in the next
   one's log.
@@ -203,8 +209,15 @@ any refresh they queued.
 - **The agent, lane work and banners are made in a cycle.** Lane work and
   banners are made first and read the agent lazily (`theAgent()`), because
   the agent is made with lane work's `access` and `hooks` and banners'
-  `request`. Those are the only lazy reads: every module made after the
+  `request`. Digests, titles and names are made before it too, and read it
+  the same way. Those are the only lazy reads: every module made after the
   agent is given the agent. The documents' keeper is made before them, for banners.
+- **A module made before the agent writes nothing as it is made.**
+  `theAgent()` throws until the agent exists, and the documents' keeper runs
+  a step at once. A directory that refreshed each root as `startHost`
+  opened it, before the agent, failed on every stale record; so the
+  directory starts after the agent, and `onOpened` replays the roots opened
+  before it.
 
 ## Shutdown
 
@@ -587,7 +600,8 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   before its refresh starts refreshes once.
 - **What marks a lane** (`planMarks`, `marks.ts`, pure, from the owner's `onMoved`): a
   move of the line or a WIP, or the first observation (`all`), marks the
-  line's record, every named lane and every open record; your `@` alone
+  line's record, every named lane whose root is not archived, and every
+  open record; your `@` alone
   (`yours`, jjui and your editor) marks no lane: one `later("shared")` step
   rewrites each open record's `yourEdits` (its files that `@` changes,
   `planYourEdits`) and
@@ -600,7 +614,11 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   is built again. A bookmark of yours that no offer depends on moves
   nothing. Every named lane, not only those with an offer, so each lane's
   `pineta.base` follows the line, and with it what catching up would
-  change. That is safe because an untraced start, or what jj cannot say,
+  change. Not an archived root's lanes: they have no base to follow
+  (`gatherRefresh` gives them none), and their refresh only withdraws an
+  offer. What could still hold one marks such a lane anyway: its ref or its
+  offer bookmark (the first observation reports every bookmark as moved),
+  or an open record. That is safe because an untraced start, or what jj cannot say,
   builds nothing (ADR-0067): a thread integrated before offers carried
   `Pineta-Source` is not offered again (S97).
 - **Reads are pinned and never queued:** a page's review or diff

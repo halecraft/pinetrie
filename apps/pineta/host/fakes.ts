@@ -175,11 +175,13 @@ export function fakeDocuments(input: {
   const { session, live, places, roots } = input
   const rootOfLane = (lane: LaneName): RootId =>
     readLaneRecords(session).get(lane)?.root ?? ROOT_ID
+  const listeners: ((root: RootId, doc: RootDocHandle) => void)[] = []
   const open = (root: RootId): RootDocHandle => {
     const known = roots.get(root)
     if (known !== undefined) return known
     const made = newRootDoc()
     roots.set(root, made)
+    for (const listener of listeners) listener(root, made)
     return made
   }
   return {
@@ -203,6 +205,10 @@ export function fakeDocuments(input: {
       roots.delete(root)
     },
     loaded: () => [...roots.keys()],
+    onOpened(listener) {
+      for (const [root, doc] of roots) listener(root, doc)
+      listeners.push(listener)
+    },
   }
 }
 

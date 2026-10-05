@@ -40,7 +40,7 @@ import {
 } from "@pineta/lanes"
 import type { Agent } from "@pineta/pi"
 import { type RepoOwner, startRepoOwner } from "@pineta/repo"
-import { type Basics, failed, messageOf } from "../basics.ts"
+import { type Basics, failed, messageOf, slow } from "../basics.ts"
 import { lockHashAt } from "./disk.ts"
 import { openLink } from "./registry.ts"
 
@@ -166,10 +166,7 @@ export async function startSetup(input: {
           root,
           line: lanes?.line ?? DEFAULT_LINE,
           onError: failed(basics, "your repo"),
-          onSlow: s =>
-            log(
-              `[host] your repo: a step${s.key === null ? "" : ` (${s.key})`} waited ${Math.round(s.waited)} ms and ran ${Math.round(s.ran)} ms`,
-            ),
+          onSlow: slow(basics, "your repo"),
         })
   // Read at startup, as `prepareImages` reads it, so a lane's prompt says
   // what its image has before the images are ready.

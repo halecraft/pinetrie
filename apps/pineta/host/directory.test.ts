@@ -6,7 +6,7 @@ import { encodeChat } from "@pineta/rules"
 import { writeEntry } from "@pineta/schema"
 import { expect, test } from "vitest"
 import type { HostKey } from "./basics.ts"
-import { createDirectory } from "./directory.ts"
+import { startDirectory } from "./directory.ts"
 import {
   applyWrites,
   basics,
@@ -36,21 +36,19 @@ function setUp() {
   const agent = record<Pick<Agent, "writeValues">>({
     writeValues: async writes => applyWrites(b, writes),
   })
-  const directory = createDirectory({
-    basics: b,
-    keeper,
-    agent: () => agent.port,
-  })
-  directory.watch(ROOT_ID, b.root)
-  return { b, keeper, agent, directory }
+  startDirectory({ basics: b, keeper, agent: agent.port })
+  return { b, keeper, agent }
 }
 
 test("a root's record follows its document: a new entry refreshes it, once per burst (ADR-0063)", async () => {
   const { b, keeper, agent } = setUp()
+  // The refresh as the directory starts is over before the root changes.
+  await keeper.idle()
+  const before = writesOf(agent.calls).length
   writeEntry(b.root, row("e1", null, chat("plan the rail")))
   writeEntry(b.root, row("e2", "e1", chat("and the tabs")))
   await keeper.idle()
-  expect(writesOf(agent.calls)).toHaveLength(1)
+  expect(writesOf(agent.calls)).toHaveLength(before + 1)
   expect(readRoots(b.session).get(ROOT_ID)).toMatchObject({
     entry: "e1",
     firstLine: "plan the rail",
@@ -84,6 +82,8 @@ test("a compaction queued while refreshes and drains wait runs after all of them
     },
     sweep: async () => {},
   })
+  // The refresh as the directory starts would absorb the change below.
+  await keeper.idle()
   const gate = deferred<void>()
   void keeper.run(() => gate.promise)
   void settle([lane])
@@ -100,7 +100,7 @@ test("five changes to one root before its refresh starts read and write it once"
     writeValues: async writes => applyWrites(b, writes),
   })
   let reads = 0
-  const directory = createDirectory({
+  startDirectory({
     basics: {
       ...b,
       docs: {
@@ -112,9 +112,11 @@ test("five changes to one root before its refresh starts read and write it once"
       },
     },
     keeper,
-    agent: () => agent.port,
+    agent: agent.port,
   })
-  directory.watch(ROOT_ID, b.root)
+  await keeper.idle()
+  reads = 0
+  const written = writesOf(agent.calls).length
   const gate = deferred<void>()
   void keeper.run(() => gate.promise)
   for (let i = 1; i <= 5; i += 1)
@@ -125,27 +127,23 @@ test("five changes to one root before its refresh starts read and write it once"
   gate.resolve()
   await keeper.idle()
   expect(reads).toBe(1)
-  expect(writesOf(agent.calls)).toHaveLength(1)
+  expect(writesOf(agent.calls)).toHaveLength(written + 1)
 })
 
-test("a root is refreshed as it is watched, with no change to it, and an unchanged record is not written again (ADR-0077)", async () => {
+test("the roots held when the directory starts are refreshed, and an unchanged record is not written again (ADR-0077)", async () => {
   const b = basics()
   const keeper = createKeeper<HostKey>()
   const agent = record<Pick<Agent, "writeValues">>({
     writeValues: async writes => applyWrites(b, writes),
   })
   writeEntry(b.root, row("e1", null, chat("plan")))
-  const open = () =>
-    createDirectory({ basics: b, keeper, agent: () => agent.port }).watch(
-      ROOT_ID,
-      b.root,
-    )
-  open()
+  const start = () => startDirectory({ basics: b, keeper, agent: agent.port })
+  start()
   await keeper.idle()
   expect(readRoots(b.session).get(ROOT_ID)).toMatchObject({ entry: "e1" })
   const written = agent.calls.length
-  // A host started again opens the same root.
-  open()
+  // A host started again holds the same root.
+  start()
   await keeper.idle()
   expect(agent.calls.length).toBe(written)
 })
