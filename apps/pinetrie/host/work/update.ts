@@ -12,6 +12,7 @@ import {
   type EntryId,
   ERR,
   entryOfMessage,
+  errorText,
   firstLine,
   indexTree,
   type LaneName,
@@ -74,7 +75,7 @@ import {
   type UpdateRefusal,
 } from "@pinetrie/rules"
 import { readLaneTip } from "@pinetrie/schema"
-import { type Basics, messageOf } from "../basics.ts"
+import type { Basics } from "../basics.ts"
 import type { Containers } from "./containers.ts"
 import { snapshotOnQueue } from "./disk.ts"
 import type { Fetches } from "./fetch.ts"
@@ -190,7 +191,7 @@ export async function withLaneStarted(
   const prepared = await (async () => {
     ports.beforeRun()
     return update()
-  })().catch((error: unknown) => refused(messageOf(error)))
+  })().catch((error: unknown) => refused(errorText(error)))
   if (follows === "send" && prepared.kind !== "conflicted") ports.runEnded()
   return prepared
 }

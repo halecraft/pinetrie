@@ -354,9 +354,9 @@ export const mutations: readonly Mutation[] = [
     name: "a failure's log loses its thread",
     file: "apps/pinetrie/host/basics.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "        : `[host] ${readThreadName(basics.session, lane)}: ${what} failed: ${messageOf(error)}`,",
+    from: "        : `[host] ${readThreadName(basics.session, lane)}: ${what} failed: ${errorText(error)}`,",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    to: "        : `[host] ${what} failed: ${messageOf(error)}`,",
+    to: "        : `[host] ${what} failed: ${errorText(error)}`,",
     command: unit,
     expect: "failed logs the host's line",
   },
@@ -674,7 +674,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a throwing command gets no reply",
     file: "apps/pinetrie/host/commands/index.ts",
-    from: '        return settled({ kind: "failed", message: messageOf(error) })',
+    from: '        return settled({ kind: "failed", message: errorText(error) })',
     to: "        throw error",
     command: unit,
     expect: "a command that throws is answered failed",
@@ -1200,7 +1200,7 @@ export const mutations: readonly Mutation[] = [
     from: "  const archived = total - opened\n",
     to: "  const archived = 0\n",
     command: unit,
-    expect: "openedWords: how many roots a starting host opened",
+    expect: "rootsOpenedWords: how many roots a starting host opened",
   },
   {
     name: "your @ moving marks every lane",

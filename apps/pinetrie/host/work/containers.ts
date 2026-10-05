@@ -1,7 +1,12 @@
 // host/work/containers — each lane's container: started before a run,
 // stopped and trimmed after it (ADR-0034), and where its tools run.
 
-import { type LaneName, type SnapshotId, WORKSPACE_ROOT } from "@pinetrie/core"
+import {
+  errorText,
+  type LaneName,
+  type SnapshotId,
+  WORKSPACE_ROOT,
+} from "@pinetrie/core"
 import type { Keeper } from "@pinetrie/keeper"
 import {
   containerFacts,
@@ -22,7 +27,7 @@ import {
 } from "@pinetrie/lanes"
 import type { LaneAccess } from "@pinetrie/pi"
 import { readRevisions, readThreadName } from "@pinetrie/reads"
-import { type Basics, failed, messageOf } from "../basics.ts"
+import { type Basics, failed } from "../basics.ts"
 import type { Offers } from "../offers/index.ts"
 import type { LaneRegistry } from "./registry.ts"
 import type { Setup } from "./setup.ts"
@@ -167,7 +172,7 @@ export function createContainers(deps: {
           .enqueue(() => startContainer(lane), { fatal: true })
           .catch(error =>
             log(
-              `[host] ${readThreadName(session, lane)} cannot start: ${messageOf(error)}`,
+              `[host] ${readThreadName(session, lane)} cannot start: ${errorText(error)}`,
             ),
           ),
       )

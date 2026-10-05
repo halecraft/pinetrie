@@ -14,7 +14,9 @@
 // and the reads of the tree. A format or type that `lanes` or `repo` must
 // read, write or name lives in core too, since neither can declare
 // `@pinetrie/rules`. What a stored shape says, and how the host changes it, is
-// `@pinetrie/rules`', whoever reads it.
+// `@pinetrie/rules`', whoever reads it. Core also holds the few pure helpers
+// several packages share (`paths.ts`, `errorText`), since every package that
+// uses one already depends on core.
 
 import type { Sha256 } from "./images.ts"
 import type { OfferLedger, OfferSeen, WorkChanges } from "./offers.ts"
@@ -2135,6 +2137,7 @@ export function orderNewEntries(
 
 export * from "./asks.ts"
 export * from "./edits.ts"
+export * from "./errors.ts"
 export * from "./images.ts"
 export * from "./offers.ts"
 export * from "./paths.ts"

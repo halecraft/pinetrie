@@ -3,7 +3,13 @@
 // (`placeOfCommand`, ADR-0065): a step on the documents' keeper, straight
 // through to the owner of your repo, or a board move's three parts.
 
-import { ERR, type Intent, type RootId, type WriterId } from "@pinetrie/core"
+import {
+  ERR,
+  errorText,
+  type Intent,
+  type RootId,
+  type WriterId,
+} from "@pinetrie/core"
 import type { Agent } from "@pinetrie/pi"
 import {
   decodeCommand,
@@ -26,7 +32,7 @@ import {
   setRecord,
   writesIn,
 } from "@pinetrie/rules"
-import { type Basics, failed, type HostKeeper, messageOf } from "../basics.ts"
+import { type Basics, failed, type HostKeeper } from "../basics.ts"
 import type { ControlSender } from "../control.ts"
 import type { Names } from "../names.ts"
 import type { Titles } from "../titles.ts"
@@ -126,7 +132,7 @@ export function createCommands(deps: CommandDeps): Commands {
       (error: unknown): Settled => {
         const kind = typeof wire.kind === "string" ? wire.kind : "malformed"
         failed(deps.basics, `a ${kind} command`)(error)
-        return settled({ kind: "failed", message: messageOf(error) })
+        return settled({ kind: "failed", message: errorText(error) })
       },
     )
     // Sent here alone, after the catch: a send that throws gets no second reply.

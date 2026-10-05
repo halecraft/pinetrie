@@ -6,6 +6,7 @@
 
 import {
   blobOfUrl,
+  errorText,
   isSha256,
   type LaneName,
   type Sha256,
@@ -209,7 +210,7 @@ export function banners(
         if (image?.type !== "image") return failed("the reply held no image")
         return await drawnOf(image.data)
       } catch (error) {
-        return failed(error instanceof Error ? error.message : String(error))
+        return failed(errorText(error))
       }
     },
   }

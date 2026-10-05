@@ -1,7 +1,7 @@
 // client/paste — an image pasted into a composer: uploaded to the host, and
 // referred to in the text as markdown (ADR-0042).
 
-import { blobUrl, type ImageRef } from "@pinetrie/core"
+import { blobUrl, errorText, type ImageRef } from "@pinetrie/core"
 
 /** A selection in a text box, in UTF-16 offsets. */
 export interface Selection {
@@ -68,7 +68,7 @@ export async function uploadImage(file: Blob): Promise<Upload> {
   } catch (error) {
     return {
       ok: false,
-      reason: error instanceof Error ? error.message : String(error),
+      reason: errorText(error),
     }
   }
 }

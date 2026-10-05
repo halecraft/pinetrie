@@ -20,7 +20,7 @@ import {
   withAbortSignal,
 } from "@earendil-works/pi-agent-core/harness/context"
 import { NodeExecutionEnv } from "@earendil-works/pi-agent-core/harness/env/nodejs"
-import { WORKSPACE_ROOT } from "@pinetrie/core"
+import { errorText, WORKSPACE_ROOT } from "@pinetrie/core"
 import {
   decode,
   encode,
@@ -102,7 +102,7 @@ async function answer(request: Exclude<LaneRequest, { abort: number }>) {
   } catch (error) {
     send({
       id: request.id,
-      thrown: error instanceof Error ? error.message : String(error),
+      thrown: errorText(error),
     })
   } finally {
     running.delete(request.id)

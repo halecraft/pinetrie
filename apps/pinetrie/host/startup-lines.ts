@@ -1,6 +1,8 @@
 // host/startup-lines — the words of the lines a starting host logs about what
 // it serves and what it read: the project, the store, the user config (and a
 // project's broken `pinetrie.json`), the model, and where to open the host.
+// A line about the session's state stays beside what computes it, such as
+// `rootsOpenedWords` in `docs.ts`.
 
 import type { ConfigRead } from "@pinetrie/lanes"
 import type { FieldSource, ModelOrigin } from "@pinetrie/pi"

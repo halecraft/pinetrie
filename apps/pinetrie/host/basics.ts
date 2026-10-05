@@ -1,7 +1,7 @@
 // host/basics — what nearly every module of the host's shell takes, and how
 // it reports a failure.
 
-import type { LaneName, RootId } from "@pinetrie/core"
+import { errorText, type LaneName, type RootId } from "@pinetrie/core"
 import { type Keeper, KeeperClosed, type SlowStep } from "@pinetrie/keeper"
 import { readThreadName } from "@pinetrie/reads"
 import type {
@@ -37,12 +37,9 @@ export type HostKey = `drain:${LaneName}` | `root:${RootId}` | "compact"
 /** The documents' keeper: every command, drain and write of the host's. */
 export type HostKeeper = Keeper<HostKey>
 
-export const messageOf = (error: unknown): string =>
-  error instanceof Error ? error.message : String(error)
-
 /**
- * A `.catch` handler that logs `[host] <thread>: <what> failed: <message>`,
- * or `[host] <what> failed: <message>` with no lane. A step a closed
+ * A `.catch` handler that logs `[host] <thread>: <what> failed: <error>`,
+ * or `[host] <what> failed: <error>` with no lane. A step a closed
  * keeper refused is not logged: shutdown refuses them on purpose.
  */
 export function failed(
@@ -54,8 +51,8 @@ export function failed(
     if (error instanceof KeeperClosed) return
     basics.log(
       lane === undefined
-        ? `[host] ${what} failed: ${messageOf(error)}`
-        : `[host] ${readThreadName(basics.session, lane)}: ${what} failed: ${messageOf(error)}`,
+        ? `[host] ${what} failed: ${errorText(error)}`
+        : `[host] ${readThreadName(basics.session, lane)}: ${what} failed: ${errorText(error)}`,
     )
   }
 }

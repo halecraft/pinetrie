@@ -25,7 +25,7 @@ import {
 } from "node:fs/promises"
 import { homedir } from "node:os"
 import path from "node:path"
-import type { ProjectRecord } from "@pinetrie/core"
+import { errorText, type ProjectRecord } from "@pinetrie/core"
 import {
   type ConfigRead,
   type DiskPaths,
@@ -198,20 +198,17 @@ export async function readConfigFile(file: string): Promise<ConfigRead> {
   } catch (error) {
     return isMissing(error)
       ? { kind: "missing" }
-      : { kind: "broken", reason: messageOf(error) }
+      : { kind: "broken", reason: errorText(error) }
   }
   try {
     return { kind: "read", json: JSON.parse(text) as unknown }
   } catch (error) {
-    return { kind: "broken", reason: messageOf(error) }
+    return { kind: "broken", reason: errorText(error) }
   }
 }
 
 const isMissing = (error: unknown): boolean =>
   error instanceof Error && "code" in error && error.code === "ENOENT"
-
-const messageOf = (error: unknown): string =>
-  error instanceof Error ? error.message : String(error)
 
 /** The user's lane config file: `$XDG_CONFIG_HOME/pinetrie/config.json`. */
 export const userConfigFile = (

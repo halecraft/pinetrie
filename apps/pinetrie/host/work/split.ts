@@ -1,7 +1,13 @@
 // host/work/split — an offer split into a stack by a run on its lane
 // (ADR-0038): the run's prompt, and what its end does.
 
-import type { CommitId, EntryId, LaneName, WriterId } from "@pinetrie/core"
+import {
+  type CommitId,
+  type EntryId,
+  errorText,
+  type LaneName,
+  type WriterId,
+} from "@pinetrie/core"
 import {
   bookmarkOf,
   commitsOf,
@@ -13,7 +19,7 @@ import { readThreadName } from "@pinetrie/reads"
 import type { RepoOwner } from "@pinetrie/repo"
 import { decodeStack, planStack, type StackMessage } from "@pinetrie/rules"
 import { readEntryMessage } from "@pinetrie/schema"
-import { type Basics, messageOf } from "../basics.ts"
+import type { Basics } from "../basics.ts"
 import type { Offers } from "../offers/index.ts"
 import type { Containers } from "./containers.ts"
 import type { Fetches } from "./fetch.ts"
@@ -126,7 +132,7 @@ export function createSplits(deps: {
           )
         return refused
       } catch (error) {
-        return messageOf(error)
+        return errorText(error)
       }
     },
   }

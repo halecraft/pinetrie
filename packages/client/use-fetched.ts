@@ -2,6 +2,7 @@
 // (ADR-0047): a review's URL names a commit, so the URL is the whole cache
 // key, and the browser's HTTP cache answers one seen before.
 
+import { errorText } from "@pinetrie/core"
 import { useEffect, useRef, useState } from "react"
 import type { Loaded } from "./review.ts"
 
@@ -56,7 +57,7 @@ export function useFetched<T>(
           settle({
             kind: "failed",
             status: 0,
-            reason: error instanceof Error ? error.message : String(error),
+            reason: errorText(error),
           }),
         )
       return [controller]

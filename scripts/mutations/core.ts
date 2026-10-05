@@ -883,4 +883,12 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "isBusy: running, or with cards queued",
   },
+  {
+    name: "a thrown Error is worded as a string",
+    file: "packages/core/errors.ts",
+    from: "  error instanceof Error ? error.message : String(error)",
+    to: "  false ? error.message : String(error)",
+    command: unit,
+    expect: "errorText reads an Error's message",
+  },
 ]

@@ -14,6 +14,7 @@ import { subscribe } from "@kyneta/schema"
 import {
   type CardId,
   type CardRecord,
+  errorText,
   type LaneName,
   type OfferFact,
   PLAIN,
@@ -40,7 +41,7 @@ import {
   queuedOn,
 } from "@pinetrie/rules"
 import type { PlacesDocHandle, PresenceDocHandle } from "@pinetrie/schema"
-import { type Basics, messageOf } from "./basics.ts"
+import type { Basics } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
 import type { Chat } from "./commands/chat.ts"
 import { applyPlaceSteps } from "./places.ts"
@@ -53,6 +54,9 @@ export interface PoppedQueuedCard {
   readonly card: QueuedCard
   readonly text: string
 }
+
+/** A card the host could not send, in the words its writer reads. */
+const hostFailedWords = (why: string): string => `the host failed: ${why}`
 
 /**
  * What a pop found: nothing to pop, a held queue, a top card someone is
@@ -225,7 +229,7 @@ async function appendFact(
         now(),
       ),
     )
-    .catch((error: unknown) => ({ kind: "failed", message: messageOf(error) }))
+    .catch((error: unknown) => ({ kind: "failed", message: errorText(error) }))
   if (appended.kind !== "appended")
     log(
       `[host] ${readThreadName(session, lane)}: a fact was not written: ${"message" in appended ? appended.message : appended.kind}`,
@@ -247,7 +251,7 @@ async function catchUpThenSend(
   const prepared = await deps.work
     .prepareUpdate(lane, card.place.by, popped.text, plan.command, "send")
     .catch((error: unknown) => {
-      unsent(deps, card, `the host failed: ${messageOf(error)}`)
+      unsent(deps, card, hostFailedWords(errorText(error)))
       return null
     })
   if (prepared === null) return "next"
@@ -286,7 +290,7 @@ async function splitThen(
   const message = await deps.work
     .prepareSplit(lane, card.place.by, intent)
     .catch((error: unknown) => ({
-      refused: `the host failed: ${messageOf(error)}`,
+      refused: hostFailedWords(errorText(error)),
     }))
   if ("refused" in message) {
     unsent(deps, card, message.refused)
@@ -305,7 +309,7 @@ async function sendCard(
 ): Promise<"ran" | "next"> {
   const { card } = popped
   const sent = await deps.send(popped).catch((error: unknown) => {
-    unsent(deps, sending, `the host failed: ${messageOf(error)}`)
+    unsent(deps, sending, hostFailedWords(errorText(error)))
     return null
   })
   if (sent === null) return "next"
@@ -325,7 +329,7 @@ async function sendCard(
       unsent(deps, sending, "two threads end here: send it from one of them")
       return "next"
     case "failed":
-      unsent(deps, sending, `the host failed: ${sent.message}`)
+      unsent(deps, sending, hostFailedWords(sent.message))
       return "next"
     default:
       unsent(deps, sending, `not sent: ${sent.kind}`)

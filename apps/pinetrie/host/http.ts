@@ -10,13 +10,12 @@ import {
   type WebsocketServerTransport,
   wrapNodeWebsocket,
 } from "@kyneta/websocket-transport/server"
-import type { BlobStore, Sha256 } from "@pinetrie/core"
+import { type BlobStore, errorText, type Sha256 } from "@pinetrie/core"
 import { prepareImage } from "@pinetrie/pi"
 import type { OfferAsk } from "@pinetrie/rules"
 import { createServer as createViteServer } from "vite"
 import { WebSocketServer } from "ws"
 import { KEY_COOKIE, planInvites, requestFacts, urlHost } from "./admission.ts"
-import { messageOf } from "./basics.ts"
 import { MAX_UPLOAD_BYTES, planUploadHeaders } from "./blobs.ts"
 import type { HotReload } from "./hot-reload.ts"
 import {
@@ -176,7 +175,7 @@ export async function startHttp(input: {
       send(res, uploaded(blobs.put(prepared.image)))
     } catch (error) {
       // The store closes with the host: an upload can outlive it.
-      send(res, uploadRefusal(503, messageOf(error)))
+      send(res, uploadRefusal(503, errorText(error)))
     }
   }
 

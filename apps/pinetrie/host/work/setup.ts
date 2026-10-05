@@ -6,7 +6,12 @@ import { stat } from "node:fs/promises"
 import { createRequire } from "node:module"
 import { homedir } from "node:os"
 import path from "node:path"
-import { type LaneName, PRODUCT_NAME, type ProjectRecord } from "@pinetrie/core"
+import {
+  errorText,
+  type LaneName,
+  PRODUCT_NAME,
+  type ProjectRecord,
+} from "@pinetrie/core"
 import { createKeeper, type Keeper } from "@pinetrie/keeper"
 import {
   BASE_LANE,
@@ -41,7 +46,7 @@ import {
 } from "@pinetrie/lanes"
 import type { Agent } from "@pinetrie/pi"
 import { type RepoOwner, startRepoOwner } from "@pinetrie/repo"
-import { type Basics, failed, messageOf, slow } from "../basics.ts"
+import { type Basics, failed, slow } from "../basics.ts"
 import { brokenConfigLine } from "../startup-lines.ts"
 import { lockHashAt } from "./disk.ts"
 import { openLink } from "./registry.ts"
@@ -258,7 +263,7 @@ export async function startSetup(input: {
       ? null
       : keeper.track(prepare(root, paths, refreshBaseNow, log))
   ready?.catch(error =>
-    log(`[host] lanes of their own cannot start: ${messageOf(error)}`),
+    log(`[host] lanes of their own cannot start: ${errorText(error)}`),
   )
 
   /** The base snapshot's refreshes, one at a time. */

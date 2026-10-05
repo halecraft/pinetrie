@@ -4,7 +4,7 @@
 import { mkdtempSync, writeFileSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { messageOf } from "../../host/basics.ts"
+import { errorText } from "@pinetrie/core"
 import type { Checks } from "../checks.ts"
 import {
   SUITE_CONFIG,
@@ -143,7 +143,7 @@ async function run(check: Checks["check"]): Promise<void> {
             end.outcome = "stopped"
           },
           (e: unknown) => {
-            end.outcome = `failed: ${messageOf(e)}`
+            end.outcome = `failed: ${errorText(e)}`
           },
         )
         const took = await waitFor(() => end.outcome !== null, 10_000)

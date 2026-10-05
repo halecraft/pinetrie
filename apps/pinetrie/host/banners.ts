@@ -2,7 +2,13 @@
 // again at a run's end if that failed, or set when the person asks through
 // `set_banner`. `bannerDue` and `planAsk` decide; this carries them out.
 
-import type { BlobStore, LaneName, Sha256, StoredImage } from "@pinetrie/core"
+import {
+  type BlobStore,
+  errorText,
+  type LaneName,
+  type Sha256,
+  type StoredImage,
+} from "@pinetrie/core"
 import type { Keeper } from "@pinetrie/keeper"
 import type { Agent } from "@pinetrie/pi"
 import { readBanners, readNames } from "@pinetrie/reads"
@@ -67,8 +73,7 @@ export function createBanners(deps: {
         if (!bannerStillWanted(asked, readBanners(doc).get(lane))) return
         await write(lane, blobs.put(image).sha256)
       },
-      failed: error =>
-        failedFor(lane)(error instanceof Error ? error.message : String(error)),
+      failed: error => failedFor(lane)(errorText(error)),
     })
 
   /** The image to write, or null: no name yet, no key, no skill, or every draw failed. */

@@ -3,7 +3,7 @@
 
 import { IDENTITY_KEY, identityCodec } from "@pinetrie/client/identity"
 import { recipientWords } from "@pinetrie/client/send"
-import { NOBODY, THE_AGENT } from "@pinetrie/core"
+import { errorText, NOBODY, THE_AGENT } from "@pinetrie/core"
 import type { Browser } from "@playwright/test"
 import { chromium, type Page } from "@playwright/test"
 
@@ -221,7 +221,7 @@ export async function launchBrowser(): Promise<Browser> {
   try {
     return await chromium.launch()
   } catch (error: unknown) {
-    const detail = error instanceof Error ? error.message : String(error)
+    const detail = errorText(error)
     throw new Error(
       `could not launch Chromium: ${detail.split("\n")[0]}. Install it once: pnpm --filter @pinetrie/app exec playwright install chromium-headless-shell`,
     )

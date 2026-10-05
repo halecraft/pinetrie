@@ -87,8 +87,8 @@ import { startDirectory } from "./directory.ts"
 import {
   type HostDocuments,
   hostDocuments,
-  openedWords,
   planLoads,
+  rootsOpenedWords,
 } from "./docs.ts"
 import { hotReload as holdHotReload } from "./hot-reload.ts"
 import {
@@ -379,7 +379,9 @@ export async function startHost({
         ),
   )
   for (const root of roots) await docs.root(root)
-  log(`[host] ${openedWords(roots.length, directoryNow.size)}`)
+  log(
+    `[host] ${rootsOpenedWords({ opened: roots.length, total: directoryNow.size })}`,
+  )
   // Each thread's column banner, when the user config turns banners on. Made
   // before the agent, whose `set_banner` asks it, so it reads the agent
   // lazily, as lane work does.
