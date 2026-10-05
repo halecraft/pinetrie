@@ -7,7 +7,10 @@ trigger goes; its threads are the menu's "Ready to add"). Amended by
 ADR-0076: the project's trigger counts unpublished commits, and no longer
 marks your files being behind. Amended by ADR-0077: the badge counts
 verdicts that need you, offers of threads you follow and unseen mentions;
-the menu gains "Needs you" and "Worth a read".
+the menu gains "Needs you" and "Worth a read". Amended by ADR-0091: the
+activity menu goes; its personal sections are your inbox, beside your
+avatar, which is always drawn, and running work is a count on the board's
+strip.
 
 **Context.** Using the header alone, with the agent working most of the time,
 Duane found its right end noisy and unclear:

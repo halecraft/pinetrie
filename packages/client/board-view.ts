@@ -2,9 +2,11 @@
 // PURE: `Board` and `BoardStrip` (`board.tsx`) draw it.
 //
 // The board is everyone's: every root with a message, in its workflow state.
-// Its strip, in the footer, says each state's name, count and highest mark;
-// opened, each open state is a column of items, and the closed state is a
-// count, a search over labels and its most recent roots.
+// Its strip, in the footer, says each state's name, count and highest mark,
+// and how many of its roots the agent works in and have work ready to
+// accept (ADR-0091); opened, each open state is a column of items, each ⇡
+// when a thread of it has work ready, and the closed state is a count, a
+// search over labels and its most recent roots.
 
 import type {
   BoardPlace,
@@ -18,6 +20,7 @@ import type {
 } from "@pinetrie/core"
 import { boardOf } from "@pinetrie/rules"
 import { type Level, markOf, type Status } from "./attention.ts"
+import { count } from "./counts.ts"
 import type { Intent } from "./intent.ts"
 import { NO_TEXT } from "./root-label.ts"
 import { stepsIn } from "./root-target.ts"
@@ -31,6 +34,8 @@ export interface BoardItem {
   readonly status: Status | null
   /** An unsent card of yours is in it (`CardMarks.roots`). */
   readonly card: boolean
+  /** Its threads with work ready to accept (`offeredByRoot`): ⇡, for everyone (ADR-0091). */
+  readonly ready: readonly string[]
   /** Everyone who wrote a chat in it, in order of first message. */
   readonly writers: readonly WriterId[]
   /** The state it is in: what its drag carries. */
@@ -59,6 +64,10 @@ export interface BoardColumnView {
   readonly items: readonly BoardItem[]
   /** Its highest mark (`markOf`). */
   readonly mark: Level | null
+  /** Its items whose agent works (`Status` working, a pending verdict among them). */
+  readonly working: number
+  /** Its items with work ready to accept. */
+  readonly ready: number
   /** ＋ here: a new root that lands in this state. */
   readonly add: { readonly agent: Intent; readonly conversation: Intent }
   /** One place left or right among the open states; null at an end. */
@@ -82,6 +91,9 @@ export interface StripState {
   readonly name: string
   readonly count: number
   readonly mark: Level | null
+  /** Its column's `working` and `ready`; 0 for the closed state. */
+  readonly working: number
+  readonly ready: number
   /** Its roots: the strip's avatars are the people reading in them. */
   readonly roots: readonly EntryId[]
   readonly closed: boolean
@@ -109,11 +121,13 @@ export interface BoardViewInput {
   readonly status: ReadonlyMap<EntryId, Status>
   /** Roots holding an unsent card of yours (`CardMarks.roots`). */
   readonly cardRoots: ReadonlySet<EntryId>
+  /** Each root's threads with an open offer (`offeredByRoot`). */
+  readonly ready: ReadonlyMap<EntryId, readonly string[]>
   /** The closed state's search, and whether it keeps only roots you wrote in. */
   readonly query: string
   readonly mine: boolean
   readonly me: WriterId
-  /** The agent's work in each root (`rootWork`): a root it works in is not closed. */
+  /** The agent's work in each root, held or not (`workAnywhere`): a root it works in is not closed. */
   readonly work: ReadonlyMap<string, "running" | "waiting">
 }
 
@@ -149,6 +163,7 @@ export function boardView(input: BoardViewInput): BoardView {
       label: input.labels.get(entry) ?? NO_TEXT,
       status: input.status.get(entry) ?? null,
       card: input.cardRoots.has(entry),
+      ready: input.ready.get(entry) ?? [],
       writers: summaries.get(entry)?.writers ?? [],
       state,
       show: { kind: "show", here: { kind: "root", root: entry } },
@@ -200,6 +215,8 @@ export function boardView(input: BoardViewInput): BoardView {
         input.status,
         items.map(t => t.entry),
       ),
+      working: items.filter(t => t.status?.kind === "working").length,
+      ready: items.filter(t => t.ready.length > 0).length,
       add: {
         agent: { kind: "newTab", asksAgent: true, state: state.id },
         conversation: { kind: "newTab", asksAgent: false, state: state.id },
@@ -234,6 +251,8 @@ export function boardView(input: BoardViewInput): BoardView {
         name: c.state.name,
         count: c.items.length,
         mark: c.mark,
+        working: c.working,
+        ready: c.ready,
         roots: c.items.map(t => t.entry),
         closed: false,
       })),
@@ -242,6 +261,8 @@ export function boardView(input: BoardViewInput): BoardView {
         name: closed.state.name,
         count: closed.count,
         mark: null,
+        working: 0,
+        ready: 0,
         roots: [],
         closed: true,
       },
@@ -311,6 +332,17 @@ export const nameStateIntent = (
   },
 })
 
+/** A strip state's counts, as its titles say them (ADR-0091). */
+export const stripWords = (
+  state: Pick<StripState, "working" | "ready">,
+): { readonly working: string; readonly ready: string } => ({
+  working: `the agent is working in ${count(state.working, "root", "roots")}`,
+  ready: `${count(state.ready, "root", "roots")} with work ready to accept`,
+})
+
+/** A board item's ⇡: the threads it names. */
+export const readyWords = (threads: readonly string[]): string =>
+  `ready to accept: ${threads.join(", ")}`
+
 /** What the closed state's count says. */
-export const closedWords = (count: number): string =>
-  count === 1 ? "1 root" : `${count} roots`
+export const closedWords = (n: number): string => count(n, "root", "roots")

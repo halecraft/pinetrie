@@ -8,10 +8,7 @@
 // list's avatars are the same people turned around, by root.
 
 import {
-  type AgentRun,
   type EntryId,
-  type LaneName,
-  type RootId,
   rootOf,
   type TreeIndex,
   type WriterId,
@@ -58,43 +55,9 @@ export function peopleHere(
     .map(([writer, ts]) => ({ writer, threads: ts }))
 }
 
-/** A lane the agent is replying on, for the header: its root, and where to open it. */
-export interface RunHere {
-  readonly lane: LaneName
-  /** Its root entry. */
-  readonly root: EntryId
-  /** Its tip, in a root this tab holds; else its root entry. */
-  readonly end: EntryId
-}
-
-/**
- * Every lane the agent is replying on, in any root (ADR-0063): each held
- * lane's run (`activity`), at its tip, then each other lane `running`
- * names, at its root's entry (`rootEntriesOf`). A lane whose root has no
- * entry yet is left out.
- */
-export function runsHere(input: {
-  readonly activity: readonly AgentRun[]
-  readonly running: readonly {
-    readonly lane: LaneName
-    readonly root: RootId
-  }[]
-  readonly rootEntries: ReadonlyMap<RootId, EntryId>
-  readonly index: TreeIndex
-}): readonly RunHere[] {
-  const out: RunHere[] = []
-  for (const { lane, tip } of input.activity) {
-    const root = rootOf(input.index, tip)
-    if (root !== null) out.push({ lane, root, end: tip })
-  }
-  const held = new Set(out.map(r => r.lane))
-  for (const { lane, root } of input.running) {
-    const entry = input.rootEntries.get(root)
-    if (!held.has(lane) && entry !== undefined)
-      out.push({ lane, root: entry, end: entry })
-  }
-  return out
-}
+/** A reader's menu's heading: where they are, or that they have left. */
+export const readerHeading = (name: string, gone: boolean): string =>
+  gone ? `${name} has left` : `${name} is in`
 
 /**
  * The people reading in `roots`, each with only their threads there: a board

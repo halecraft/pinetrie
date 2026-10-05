@@ -20,6 +20,7 @@ import {
   type OpenMenus,
   peopleHere,
   peopleIn,
+  readerHeading,
   readersByRoot,
   toggleOpenMenu,
   withOpenMenus,
@@ -163,9 +164,7 @@ export function ReaderMenus(
           sections={[
             {
               key: "threads",
-              heading: gone
-                ? `${nameFor(p.nameOf, person.writer)} has left`
-                : `${nameFor(p.nameOf, person.writer)} is in`,
+              heading: readerHeading(nameFor(p.nameOf, person.writer), gone),
               items: person.threads.map(t => p.thread(t.end, t.root)),
             },
           ]}

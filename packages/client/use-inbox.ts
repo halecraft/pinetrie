@@ -13,14 +13,15 @@ import {
   seenNow,
 } from "./inbox.ts"
 
-export interface InboxView {
+/** Which of your mentions you have seen, and marking them seen. */
+export interface InboxSeen {
   readonly unseen: number
   readonly isUnseen: (id: string) => boolean
   readonly markSeen: (id: string) => void
   readonly markAllSeen: () => void
 }
 
-const NOTHING_YET: InboxView = {
+const NOTHING_YET: InboxSeen = {
   unseen: 0,
   isUnseen: () => false,
   markSeen: () => {},
@@ -36,7 +37,7 @@ export function useInbox({
   readonly items: readonly InboxItem[]
   /** The tab you are on: its columns' paths. */
   readonly shown: ReadonlySet<string>
-}): InboxView {
+}): InboxSeen {
   const stored = useSyncExternalStore(
     attention.attention.subscribe,
     attention.attention.current,

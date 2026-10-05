@@ -13,6 +13,8 @@ its verdict) and ADR-0075 (the final digest request carries the verdict).
 Builds on ADR-0076, in flight.
 Amended by ADR-0085: your open roots are a third person document (`open:`),
 and ▦ carries the mark the Archive tab did.
+Amended by ADR-0091: an open offer is marked on the board for everyone,
+and listed and counted in your inbox for its followers.
 
 **Context.** With several agents at work, Duane could not tell which tab
 needed him:

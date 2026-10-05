@@ -799,17 +799,18 @@
       #strip:has(.fork-dot[data-color="pending"]:hover) .column-head[data-color="pending"] {
         outline: 2px solid var(--track); outline-offset: 2px; }
       /* The footer (ADR-0085): one row of chrome, split where your list's edge
-         is. Its own cell, at the list's width, is yours: you and your
-         inventory. Then everyone's: the board's strip, what needs you
-         (ADR-0069), the publish button (ADR-0090), and "syncing…" while
-         pending. Nothing here
+         is. Its own cell, at the list's width, is yours: you, your inbox
+         (ADR-0091) and your inventory. Then everyone's: the board's strip,
+         with where the agent works and what is ready to accept, "syncing…"
+         while pending, and the publish button (ADR-0090). Nothing here
          animates: your list, the column and the rail show where the agent
          works. */
       #bottom { grid-column: 1 / 3; grid-row: 2; display: flex; align-items: center;
         gap: 1rem; min-height: 42px; padding-right: .6rem; background: var(--chrome);
         --surface: var(--chrome); box-shadow: inset 0 1px 0 var(--edge); font-size: .8rem; }
       .footer-you { flex: 0 0 var(--side); align-self: stretch; display: flex; align-items: center;
-        gap: .5rem; padding: 0 .6rem; box-shadow: inset -1px 0 0 var(--edge); }
+        gap: .25rem; padding: 0 .4rem; box-shadow: inset -1px 0 0 var(--edge); }
+      .footer-you .inventory-toggle { margin-left: auto; padding: .15rem .45rem; white-space: nowrap; }
       .footer-right { margin-left: auto; display: flex; align-items: center; gap: .75rem; }
       .sync-note { font-size: .75rem; color: #6f7784; }
       /* The board's strip: ▦, then each state's name, count, readers and mark. */
@@ -821,9 +822,14 @@
       .board-toggle[aria-expanded="true"] { background: var(--page); }
       .board-toggle .glyph { color: #8b949e; }
       .strip-count { color: #e6e6e6; font-weight: 600; }
-      .reader-trigger, .activity-trigger, .me-trigger { display: inline-flex; align-items: center; gap: .3rem;
+      /* A state's roots the agent works in, and with work ready to accept
+         (ADR-0091): facts, muted, never a badge, never moving. ⇡ is blue on
+         a board item, apart from the amber that asks something of you. */
+      .strip-working, .strip-ready { font-size: .75rem; color: #8b93a1; }
+      .root-ready { flex: 0 0 auto; color: #8ab4f8; font-size: .8rem; line-height: 1; }
+      .reader-trigger, .inbox-trigger, .me-trigger { display: inline-flex; align-items: center; gap: .3rem;
         padding: .1rem .3rem; background: none; color: #ddd; border-radius: 999px; }
-      .reader-trigger .initial, .activity-trigger .initial, .me-trigger .initial { width: 22px; height: 22px;
+      .reader-trigger .initial, .me-trigger .initial { width: 22px; height: 22px;
         line-height: 22px; font-size: 12px; }
       /* The board, open (ADR-0085): over the columns, from the footer's edge,
          moving none of them. A column per open state, a column to add one,
@@ -875,11 +881,15 @@
       .closed-search { padding: .3rem .5rem; background: var(--page); color: #ddd;
         border: 1px solid var(--edge); border-radius: 4px; font: inherit; }
       .closed-mine { color: #8b949e; font-size: .75rem; }
-      .activity-trigger .agent-mark { background: #3a3f48; color: #aab4c3; }
-      .activity-trigger:has(.activity-working) .agent-mark { background: #9ecbff; color: #111; }
-      .activity-working { font-size: .75rem; color: #aab4c3; }
-      .activity-badge { min-width: 1.1rem; padding: 0 .3rem; border-radius: 999px; background: #e0c080;
+      /* Your inbox (ADR-0091): the page's one badge, amber; quiet at zero. */
+      .inbox-trigger { color: #8b93a1; white-space: nowrap; }
+      .inbox-trigger:has(.inbox-badge) { color: #ddd; }
+      .inbox-badge { min-width: 1.1rem; padding: 0 .3rem; border-radius: 999px; background: #e0c080;
         color: #111; font-size: .72rem; font-weight: 600; text-align: center; }
+      /* At 11.5rem the corner holds you, your inbox with a two-digit badge and
+         your inventory only this tightly (ADR-0091). */
+      .footer-you .me-trigger { padding: .1rem 0; }
+      .footer-you .inbox-trigger { gap: .2rem; padding: .1rem .15rem; }
       /* The publish button (ADR-0090): a title that leads with a refusal
          marks it, so you hover before you click. */
       .publish-button { padding: .15rem .6rem; font-size: .8rem; background: none; color: #ddd;

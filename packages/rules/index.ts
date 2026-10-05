@@ -214,7 +214,13 @@ export {
   type UpdateRefusal,
 } from "./line.ts"
 export { MARK, planMark } from "./mark.ts"
-export { NAME, planNames, planReserve, type ReservePlan } from "./names.ts"
+export {
+  NAME,
+  planNames,
+  planReserve,
+  type ReservePlan,
+  threadNameOf,
+} from "./names.ts"
 export {
   isNotYetIntegrated,
   OFFER,

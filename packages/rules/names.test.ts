@@ -1,6 +1,13 @@
 import { laneNameForThread, type ThreadName } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
-import { NAME, planNames, planReserve, recordsOf, setRecord } from "./index.ts"
+import {
+  NAME,
+  planNames,
+  planReserve,
+  recordsOf,
+  setRecord,
+  threadNameOf,
+} from "./index.ts"
 import { ADJECTIVES, NOUNS, threadNameFor } from "./names.ts"
 
 const lane = (id: string) => laneNameForThread(id)
@@ -37,6 +44,12 @@ describe("threadNameFor", () => {
     const all = new Set(NOUNS.map(n => `${adjective}-${n}`))
     expect(threadNameFor(A, all).split("-")[0]).not.toBe(adjective)
   })
+})
+
+test("threadNameOf: a lane's name, else its id's last eight characters", () => {
+  const named = new Map([[A, "amber-fox" as ThreadName]])
+  expect(threadNameOf(named, A)).toBe("amber-fox")
+  expect(threadNameOf(named, B)).toBe(B.slice(-8))
 })
 
 describe("planNames", () => {

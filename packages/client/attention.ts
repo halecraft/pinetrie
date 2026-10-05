@@ -164,13 +164,6 @@ export function attentionOf(input: AttentionInput): readonly Item[] {
   return items
 }
 
-/**
- * What needs you: the activity menu's badge, with unseen mentions, and the page's
- * title. An offer of a thread you follow is one of them, once.
- */
-export const needsYouCount = (items: readonly Item[]): number =>
-  items.filter(i => i.level === "needsYou").length
-
 /** A root's status: what its mark draws, in your list and on the board. */
 export type Status =
   | { readonly kind: "working" }
@@ -193,19 +186,19 @@ export const markOf = (
   )
 
 /**
- * Each root's status: working while a lane of it is busy or its verdict is
- * pending (the agent's side is not finished), else its highest item. A
- * root with neither has none.
+ * Each root's status: working while the agent works there or its verdict is
+ * pending (the agent's side is not finished); else its highest item. A root
+ * with neither has none.
  */
 export function rootStatus(input: {
   readonly items: readonly Item[]
-  /** Roots whose agent works (`rootWork`, or any lane in `busy`). */
-  readonly working: ReadonlySet<EntryId>
+  /** Roots where the agent works, held or not (`workAnywhere`). */
+  readonly work: ReadonlyMap<EntryId, unknown>
   readonly verdicts: ReadonlyMap<LaneName, VerdictRecord>
   readonly laneRoots: ReadonlyMap<LaneName, EntryId>
 }): ReadonlyMap<EntryId, Status> {
   const out = new Map<EntryId, Status>()
-  for (const root of input.working) out.set(root, { kind: "working" })
+  for (const root of input.work.keys()) out.set(root, { kind: "working" })
   for (const v of input.verdicts.values()) {
     const root = input.laneRoots.get(v.lane)
     if (root !== undefined && v.verdict.kind === "pending")
@@ -287,7 +280,7 @@ export const LEVEL_WORDS: Readonly<Record<Level, string>> = {
   worthARead: "worth a read",
 }
 
-/** Each level's class, on a root's mark and an activity row: what the styles key on. */
+/** Each level's class, on a root's mark and an inbox row: what the styles key on. */
 export const LEVEL_CLASS: Readonly<Record<Level, string>> = {
   needsYou: "needs-you",
   worthARead: "worth-a-read",
@@ -296,7 +289,7 @@ export const LEVEL_CLASS: Readonly<Record<Level, string>> = {
 /** Why the agent's end could not be told, in words. */
 const UNCLASSIFIED_WORDS = `the run ended; ${PRODUCT_NAME} could not tell what it needs`
 
-/** A raised item's reason: a mark's title, a header row's line. */
+/** A raised item's reason: a mark's title, an inbox row's line. */
 export function attentionWords(
   raised: Raised,
   nameOf: (writer: WriterId) => string,

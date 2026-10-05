@@ -40,12 +40,14 @@ import type { Scenario } from "../scenario.ts"
 
 import {
   asPerson,
+  boardSel,
   chooseFromMenu,
   col,
   componentRenders,
   launchBrowser,
   msg,
   OWN_MENU,
+  openBoard,
   openFromBoard,
   PANE_VIEWPORT,
   railCount,
@@ -1650,10 +1652,11 @@ async function run(
           await aligner.close()
         }
 
-        // ── the agent's work, in the header (ADR-0030) ──────────────────────
+        // ── the agent's work, on the board (ADR-0091) ───────────────────────
         // Another writer starts agent work at the root: no tab opens, the
-        // header's activity counts its thread, choosing the thread
-        // opens it, and that root cannot be archived until the agent is done.
+        // strip counts it, the board rings its root though this tab does not
+        // hold it, choosing the item opens it, and that root cannot be
+        // archived until the agent is done.
         await tp
           .$eval('#open-list [aria-current="true"]', n =>
             n.getAttribute("data-root"),
@@ -1666,13 +1669,11 @@ async function run(
             mode: "branch",
           })
           const newRoot = treeOf(toolHost).roots.at(-1) ?? ""
-          await appears("#bottom .activity .activity-working")
-
-          await chooseFromMenu(
-            tp,
-            "#bottom .activity .activity-trigger",
-            ".here-thread",
-          )
+          await appears("#bottom .strip-working")
+          await openBoard(tp)
+          const ringed = `#board ${boardSel(newRoot)}:has(.root-status.working) .board-open`
+          await appears(ringed)
+          await tp.click(ringed)
           await appears(
             `#open-list .open-root[data-root="${newRoot}"][aria-current="true"]`,
           )

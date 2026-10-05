@@ -21,7 +21,9 @@ import {
   clickClosesBoard,
   closedRows,
   nameStateIntent,
+  readyWords,
   removeWords,
+  stripWords,
 } from "./board-view.ts"
 
 const ADA = writerId("ada@x.io")
@@ -88,6 +90,7 @@ const input = (over: Partial<BoardViewInput> = {}): BoardViewInput => ({
   ]),
   status: new Map(),
   cardRoots: new Set(),
+  ready: new Map(),
   query: "",
   mine: false,
   me: ADA,
@@ -139,6 +142,42 @@ describe("boardView", () => {
     const view = boardView(input({ status }))
     expect(view.open.map(c => c.mark)).toEqual([null, "needsYou"])
     expect(view.strip.map(s => s.mark)).toEqual([null, "needsYou", null])
+  })
+
+  test("an item's ⇡ names its threads with work ready; a column counts its items working (a pending verdict is working, `rootStatus`), and its items ready, not threads; the strip copies them, the closed state 0 (ADR-0091)", () => {
+    const status = new Map<EntryId, Status>([
+      [E(1), { kind: "working" }],
+      [E(3), { kind: "working" }],
+      [E(4), { kind: "working" }],
+    ])
+    const ready = new Map([
+      [E(1), ["amber-fox", "cozy-mallard"]],
+      [E(4), ["quiet-owl"]],
+    ])
+    const view = boardView(input({ status, ready }))
+    expect(view.open[1]?.items.map(t => t.ready)).toEqual([
+      [],
+      ["amber-fox", "cozy-mallard"],
+    ])
+    expect(view.open.map(c => [c.working, c.ready])).toEqual([
+      [1, 0],
+      [1, 1],
+    ])
+    expect(view.strip.map(s => [s.working, s.ready])).toEqual([
+      [1, 0],
+      [1, 1],
+      [0, 0],
+    ])
+  })
+
+  test("stripWords and readyWords: what the strip's counts and an item's ⇡ say", () => {
+    expect(stripWords({ working: 1, ready: 2 })).toEqual({
+      working: "the agent is working in 1 root",
+      ready: "2 roots with work ready to accept",
+    })
+    expect(readyWords(["amber-fox", "cozy-mallard"])).toBe(
+      "ready to accept: amber-fox, cozy-mallard",
+    )
   })
 
   test("an item's ⋯ moves it to every other state; into the closed state, refused while its agent works", () => {

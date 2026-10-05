@@ -14,6 +14,10 @@ ADR-0088 (proposed): your list folds to icons, and the footer's corner to
 your avatar, which answers this ADR's deferred narrow screens. Evidence:
 screenshots of the client restyled into this layout, at 1440 and 860 pixels
 wide, made while deciding.
+Amended by ADR-0091: under your list, your inbox sits between your avatar
+and your inventory; the activity menu goes, and each state on the strip
+counts its roots where the agent works and those with work ready to
+accept.
 
 **Context.**
 

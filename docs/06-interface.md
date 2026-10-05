@@ -46,7 +46,7 @@ This document fixes the design before any code. It draws E and T directly.
 │              ││      ││ │ send to agent…  send │││ │ reply in thread…  │ │
 │              ││      ││ └──────────────────────┘││ └───────────────────┘ │
 ├──────────────┤└──────┘└────────────────────────┘└───────────────────────┘
-│ (A) inventory│ ▦ Board · Backlog 3 · Doing 3 (B)(C) · Done 41    ✦2  publish
+│(A) Inbox 2 ▣│ ▦ Board · Backlog 3 · Doing 3 ◌2 ⇡1 (B)(C) · Done 41  publish
 └──────────────┴──────────────────────────────────────────────────────────────
 ```
 
@@ -68,7 +68,7 @@ beside it (ADR-0081, turned sideways).
   the bottom; drag an item to reorder. **×** closes a root for you and
   writes nothing shared; opening it again brings its columns back. A root
   you start joins your list; a root someone else starts does not, and
-  reaches you through the board, a mention, or the activity menu.
+  reaches you through the board or your inbox.
 - **An item's label** is the root's title, else its first message's first
   line, wrapped to two lines before it is cut; a root only people have
   written in, untitled, is **Chat**. When the agent is first asked in a root
@@ -78,7 +78,7 @@ beside it (ADR-0081, turned sideways).
   brings back the first line. **Auto-update title**, beside it, asks the
   model again from what was said in the thread, and replaces the title for
   everyone. A title is a mark on the root (ADR-0045), and names the root
-  wherever it is shown: your list, the board, the activity menu, the inbox.
+  wherever it is shown: your list, the board, your inbox.
 - **An item shows what happens in its root while you are elsewhere**
   (ADR-0077), before its label: a still blue ring while the agent works
   there or is finishing its summary, which needs nothing from you; a filled
@@ -128,13 +128,15 @@ beside it (ADR-0081, turned sideways).
     icon.
   - **＋** stands over its ▾.
 
-### The footer: you, the board, and what needs you (ADR-0069, ADR-0077, ADR-0085)
+### The footer: you, your inbox, and the board (ADR-0077, ADR-0085, ADR-0091)
 
 One row along the bottom. Its own cell, under your list and as wide, is
-yours: your avatar and your inventory. While your list is folded, the cell
-holds only your avatar, and your inventory's toggle is in your profile. To
-the right is everyone's, from live data only: the board's strip, then what
-needs you and publish.
+yours: your avatar, your inbox and your inventory. While your list is
+folded, the cell holds only your avatar, your inventory's toggle is in your
+profile, and your inbox stands just past the cell's edge. To the right is
+everyone's, from live data only: the board's strip, then publish. Your
+inbox carries the page's only badge: one place asks you for something, the
+other reports.
 While the page syncs, "syncing…" leads its right end.
 
 - **You:** your avatar opens your profile (ADR-0037): your name, and the
@@ -143,32 +145,41 @@ While the page syncs, "syncing…" leads its right end.
   again. A rename is sent on Enter or **save**, and Escape or a click
   elsewhere discards it. A name no mention could reach is refused before it
   is sent.
-- **Your inventory** (below), beside you, or in your profile while your list
-  is folded.
+- **Your inbox** (ADR-0030, ADR-0077, ADR-0091), beside you: one menu of
+  what needs you, its trigger **Inbox**, drawn even with nothing in it. Its
+  amber badge counts what the threads you follow need from you (a run that
+  ended asking something, failing, or that no one could tell; work ready to
+  accept) plus the mentions you have not seen; the page's title carries the
+  same count, before the root you are on: "(2) Fix the sync bug · pine·trie".
+  Its sections, each shown only with rows: **Needs you** (each thread's
+  reason, in amber), **Ready to accept** (threads you follow with an open
+  offer), **Worth a read** (listed, not counted) and **Mentions of you**.
+  It lists exactly what it counts. Each thread's row opens it; under each,
+  **not needed** clears it on every device of yours, until the next run's
+  end or new work. You follow a thread once you have written on it; threads
+  you do not follow raise nothing for you.
+- **Mentions of you**: the messages that mention you, newest first, each
+  with who, the thread, and the start of the message. A row opens that
+  thread in your list, with a column on the message, archived or not. The
+  badge counts the mentions you have not seen. One is seen when you open it
+  from the inbox, when it is drawn in a column of the root you are on, or
+  when you **mark all seen**. A seen mention stays in the inbox; a filter
+  shows only the unseen.
+- **The inbox is yours**, the same on every device of yours (ADR-0077). You
+  start from your first load, with no backlog.
+- **Your inventory** (below), beside your inbox, or in your profile while
+  your list is folded.
 - **The board's strip**: ▦ **Board**, then each workflow state's name and
-  count, avatars of the people reading in its roots, and an amber dot when a
-  root there needs you. ▦ carries the highest mark of the roots not in your
-  list, and a dot in your colour when one of them holds something you typed;
-  its title is the session's message count, "2 in the threads this tab has
-  loaded, of 4 in the session": the messages in the roots this browser tab
-  holds, of every root's.
-- **Activity** (ADR-0069, ADR-0077): one menu of what needs you, its
-  trigger a ✦. Its amber badge counts what the threads you follow need from
-  you (a run that ended asking something, failing, or that no one could
-  tell; work ready to accept) plus the mentions you have not seen; the page's
-  title carries the same count, before the root you are on: "(2) Fix the
-  sync bug · pine·trie". While the agent works, a steady count of its threads
-  stands beside the ✦, never in the badge. Its sections, each shown only
-  with rows: **Needs you** (each thread's reason, in amber), **Ready to
-  add** (every thread with an open offer, those you follow marked and
-  counted), **Worth a read** (listed, not counted), **Mentions of you**
-  (the inbox, below; shown once anyone has mentioned you) and **The agent
-  is working in** (its threads in every root). Each row opens its thread;
-  under each of yours, **not needed** clears it on every device of yours,
-  until the next run's end or new work. You follow a thread once you have
-  written on it; threads you do not follow raise nothing for you. With
-  nothing in it, the menu is not shown. Nothing in the footer animates:
-  your list, the column and the rail show where the agent works.
+  count, avatars of the people reading in its roots, an amber dot when a
+  root there needs you, and, only when there are any, **◌n**, its roots the
+  agent works in, and **⇡n**, its roots with work ready to accept (ADR-0091).
+  Those two are facts for everyone: never a badge, never moving. ▦ carries
+  the highest mark of the roots not in your list, and a dot in your colour
+  when one of them holds something you typed; its title is the session's
+  message count, "2 in the threads this tab has loaded, of 4 in the
+  session": the messages in the roots this browser tab holds, of every
+  root's. Nothing in the footer animates: your list, the column, the rail
+  and the board show where the agent works.
 - **Publish** (ADR-0060, ADR-0076, ADR-0090): one button, no menu. The
   integration line is **accepted work**, where finished work goes; its
   bookmark (`offers.onto`) is in titles only. Before the line exists, the
@@ -203,18 +214,10 @@ While the page syncs, "syncing…" leads its right end.
   holding the `resolve-conflicts` skill and the files, for you to send.
 - **A menu you opened stays open until you close it.** The footer's and the
   board's avatars and counts come from live data, but when what one stands
-  for goes while its menu is open (a person leaves, the agent finishes, the
-  last offer is integrated), the menu says so ("The agent has finished") and
-  its trigger stays until you close it (principle 6).
-- **The inbox**, activity's mentions: the messages that mention you, newest
-  first, each with who, the thread, and the start of the message. A row
-  opens that thread in your list, with a column on the message, archived or
-  not. The badge counts the mentions you have not seen. One is seen when you
-  open it from the inbox, when it is drawn in a column of the root you are
-  on, or when you **mark all seen**. A seen mention stays in the inbox; a
-  filter shows only the unseen.
-- **The inbox is yours**, the same on every device of yours (ADR-0077). You
-  start from your first load, with no backlog.
+  for goes while its menu is open (a person leaves the root, the last thing
+  in a section of your inbox is dealt with), the menu says so ("Bea has
+  left", "Nothing left to accept.") and its trigger stays until you close it
+  (principle 6). Escape closes a menu open on the board, and then the board.
 - **Nothing opens a root by itself.** A mention is a notification: you
   choose to open it.
 
@@ -228,7 +231,10 @@ tab's; with nothing in your list and nothing you are on, it opens by itself.
 - **Every root is in one workflow state.** Each open state is a column of
   the board, in order; the closed state is last. A new session has
   **Backlog**, **Doing** and **Done**.
-- **A board item** shows its root's label, its status (as in your list), a
+- **A board item** shows its root's label, its status (as in your list,
+  with the agent's ring in any root, opened in this browser tab or not), a
+  blue **⇡** for everyone when a thread of it has work ready to accept (its
+  title names the threads; the thread's followers have it in their inbox), a
   dot in your colour when it holds something you typed, who wrote in it,
   and the others reading there: each reader's avatar is a menu of the
   threads they read there, a row of which opens that thread in your list.
@@ -882,10 +888,10 @@ board's records (ADR-0085); a card's text is its own document (ADR-0048).
   per root gives unread marks on your list's items, a "3 new" count on ▦, and a
   "what's happening" panel listing roots by activity. It can reuse the
   inbox's storage and its rule for "seen".
-- **The inbox, grown:** **done** to take a handled mention off it; other kinds
-  of item, such as the agent finishing what you asked; one inbox per person
-  across devices, once a person has an identity; browser or system
-  notifications, which need permission.
+- **The inbox, grown:** **done** to take a handled mention off it; browser or
+  system notifications, which need permission. (How runs end, work ready,
+  and one inbox per person on every device came with ADR-0077 and
+  ADR-0091.)
 - **The review, grown** (ADR-0047): side-by-side diffs; a review of one turn,
   its revision record's commit, through the same URLs; "ask about this" on a
   hunk, which puts its path, line and quoted lines into the column's

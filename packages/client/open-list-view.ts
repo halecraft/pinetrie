@@ -16,6 +16,7 @@ import type {
   WorkflowStateId,
 } from "@pinetrie/core"
 import { blobUrl, PRODUCT_NAME, rootOf } from "@pinetrie/core"
+import { threadNameOf } from "@pinetrie/rules"
 import type { Moments, Status } from "./attention.ts"
 import type { CardMarks } from "./card-marks.ts"
 import type { Intent } from "./intent.ts"
@@ -41,7 +42,7 @@ export type ItemMenuItem =
       readonly name: string
       readonly closes: boolean
       readonly busy: "running" | "waiting" | null
-      readonly drops: readonly ThreadName[]
+      readonly drops: readonly string[]
       readonly intent: Intent
     }
 
@@ -114,10 +115,10 @@ export interface OpenListViewInput {
   readonly marks: ReadonlyMap<EntryId, MarkRecord>
   /** Roots in the closed state, by root entry. */
   readonly archived: ReadonlySet<EntryId>
-  /** The agent's work in each root (`rootWork`). */
+  /** The agent's work in each root, held or not (`workAnywhere`). */
   readonly work: ReadonlyMap<string, "running" | "waiting">
   /** The threads with an open offer, by root (`offeredByRoot`). */
-  readonly offered: ReadonlyMap<EntryId, readonly ThreadName[]>
+  readonly offered: ReadonlyMap<EntryId, readonly string[]>
   readonly unsent: CardMarks
   /** Each root's status (`rootStatus`, ADR-0077). */
   readonly status: ReadonlyMap<EntryId, Status>
@@ -292,8 +293,8 @@ export const listKey = (item: ItemView): string =>
   item.kind === "new" ? `new:${item.key}` : `root:${item.root}`
 
 /**
- * The window's title: what needs you (`needsYouCount` plus unseen
- * mentions), then the root you are on. `here` is null on nothing, and before
+ * The window's title: what needs you (`inboxCount`, your inbox's badge),
+ * then the root you are on. `here` is null on nothing, and before
  * anything is chosen.
  */
 export const pageTitle = (count: number, here: ItemView | null): string => {
@@ -302,24 +303,23 @@ export const pageTitle = (count: number, here: ItemView | null): string => {
 }
 
 /**
- * The threads with an open offer, by their root: what archiving that root
- * withdraws. `offers` are the open offers (`appView`'s).
+ * The threads with an open offer, by their root, each as people read it
+ * (`threadNameOf`), named or not: what archiving that root withdraws, and
+ * what a board item's ⇡ names (ADR-0091). `offers` are the open offers
+ * (`appView`'s).
  */
 export function offeredByRoot(
   offers: readonly { readonly lane: LaneName; readonly root: EntryId }[],
   names: ReadonlyMap<LaneName, ThreadName>,
-): ReadonlyMap<EntryId, readonly ThreadName[]> {
-  const byRoot = new Map<EntryId, ThreadName[]>()
-  for (const { lane, root } of offers) {
-    const name = names.get(lane)
-    if (name === undefined) continue
-    byRoot.set(root, [...(byRoot.get(root) ?? []), name])
-  }
+): ReadonlyMap<EntryId, readonly string[]> {
+  const byRoot = new Map<EntryId, string[]>()
+  for (const { lane, root } of offers)
+    byRoot.set(root, [...(byRoot.get(root) ?? []), threadNameOf(names, lane)])
   return byRoot
 }
 
 /** What archiving a root does to its threads' offers, beside its item. */
-export const dropsWords = (drops: readonly ThreadName[]): string | null =>
+export const dropsWords = (drops: readonly string[]): string | null =>
   drops.length === 0 ? null : `work not accepted goes: ${drops.join(", ")}`
 
 /** What a root's rename field sends, once planned (`planTitle`). */

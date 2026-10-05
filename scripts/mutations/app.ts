@@ -530,17 +530,17 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "page",
     expect:
-      "an activity menu open when the agent finishes stays open and says so, and the trigger leaves once you close it",
+      "a reader's menu open when they leave stays open and says so, and their avatar leaves once you close it",
   },
   {
-    name: "the header's agent mark pulses again",
+    name: "the strip's working count pulses",
     file: "packages/client/index.html",
-    from: "      .activity-trigger:has(.activity-working) .agent-mark { background: #9ecbff; color: #111; }",
-    to: "      .activity-trigger:has(.activity-working) .agent-mark { background: #9ecbff; color: #111; animation: pulse 1s ease-in-out infinite; }",
+    from: "      .strip-working, .strip-ready { font-size: .75rem; color: #8b93a1; }",
+    to: "      .strip-working, .strip-ready { font-size: .75rem; color: #8b93a1; animation: pulse 1s ease-in-out infinite; }",
     suite: "browser",
     scenario: "page",
     expect:
-      "the footer's activity and the thread's item are still while the agent works",
+      "the strip's working count and the thread's item are still while the agent works",
   },
   // ── the board and your list (ADR-0085) ──
   {
@@ -601,7 +601,17 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "page",
     expect:
-      "the footer's activity and the thread's item are still while the agent works",
+      "the strip's working count and the thread's item are still while the agent works",
+  },
+  {
+    name: "Escape closes the board under a menu open on it",
+    file: "packages/client/board.tsx",
+    from: '      if (e.key === "Escape" && self.current?.querySelector(".open") == null)',
+    to: '      if (e.key === "Escape")',
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "a reader's menu open when they leave stays open and says so, and their avatar leaves once you close it",
   },
   {
     name: "Escape leaves a popover open once its focused item has gone",
@@ -611,7 +621,7 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "page",
     expect:
-      "an activity menu open when the agent finishes stays open and says so, and the trigger leaves once you close it",
+      "a reader's menu open when they leave stays open and says so, and their avatar leaves once you close it",
   },
   {
     name: "a capsule ignores where it is clicked",
@@ -634,14 +644,14 @@ export const mutations: readonly Mutation[] = [
       "a long loop is one hollow capsule on the rail, as long as its size has digits, its label counting the failed call",
   },
   {
-    name: "the activity badge never hears of unseen mentions",
-    file: "packages/client/footer.tsx",
-    from: "    unseen: inbox.unseen,",
-    to: "    unseen: 0,",
+    name: "the inbox badge never hears of unseen mentions",
+    file: "packages/client/app.tsx",
+    from: "  const needsYou = inboxCount(attention.items, inbox.unseen)",
+    to: "  const needsYou = inboxCount(attention.items, 0)",
     suite: "browser",
     scenario: "page",
     expect:
-      "a mention counts on the activity badge, and choosing it opens its thread with the message drawn",
+      "a mention counts on the inbox badge, and choosing it opens its thread with the message drawn",
   },
   {
     name: "seen mentions are never written to your attention document",

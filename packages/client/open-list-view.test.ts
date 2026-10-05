@@ -197,7 +197,7 @@ describe("openListView", () => {
     expect(dropsWords([])).toBe(null)
   })
 
-  test("offeredByRoot: each open offer's named thread, under its root", () => {
+  test("offeredByRoot: each open offer's thread, under its root; one the host has not named yet by its id's end", () => {
     const lane = (n: string) => n as LaneName
     const names = new Map([
       [lane("l1"), "amber-fox" as ThreadName],
@@ -212,7 +212,12 @@ describe("openListView", () => {
         ],
         names,
       ),
-    ).toEqual(new Map([[entryId("r1"), ["amber-fox", "cozy-mallard"]]]))
+    ).toEqual(
+      new Map([
+        [entryId("r1"), ["amber-fox", "cozy-mallard"]],
+        [entryId("r2"), ["l3"]],
+      ]),
+    )
   })
 
   test("a pip on each item holding a card of yours", () => {

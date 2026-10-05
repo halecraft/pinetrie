@@ -1,6 +1,6 @@
 // verdict — how a thread's last run ended, for the people who follow it
 // (ADR-0077). The record is a host-written `pinetrie.verdict` value in the
-// session, keyed by lane, so the activity menu and the board read it across
+// session, keyed by lane, so your inbox and the board read it across
 // roots. It holds what happened; what that asks of each person is decided
 // on their client. The host carries the plan out
 // (`apps/pinetrie/host/digests.ts`): one request at a run's end, for the

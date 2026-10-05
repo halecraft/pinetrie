@@ -106,6 +106,7 @@ import {
   SEAT,
   STOP,
   TRACE,
+  threadNameOf,
   VERDICT,
   WORKFLOW,
   WORKFLOW_KEY,
@@ -661,12 +662,9 @@ export const readBanners = (
   doc: SessionDocHandle,
 ): ReadonlyMap<LaneName, BannerRecord> => readRecords(doc, BANNER)
 
-/**
- * A lane as people read it: its name, or, before the host has named it, the
- * last eight characters of its id.
- */
+/** A lane as people read it (`threadNameOf`). */
 export const readThreadName = (doc: SessionDocHandle, lane: LaneName): string =>
-  readNames(doc).get(lane) ?? lane.slice(-8)
+  threadNameOf(readNames(doc), lane)
 
 /** What the host found where it runs (`pinetrie.project`); null with no tools. */
 export const readProject = (doc: SessionDocHandle): ProjectRecord | null =>

@@ -562,6 +562,16 @@ export function threadNameFor(
 }
 
 /**
+ * A lane as people read it: its name, or, before the host has named it, the
+ * last eight characters of its id. The one rule for a thread named in a
+ * sentence or a mark, on the host and the page.
+ */
+export const threadNameOf = (
+  names: ReadonlyMap<LaneName, ThreadName>,
+  lane: LaneName,
+): string => names.get(lane) ?? lane.slice(-8)
+
+/**
  * A name for each lane that has none, oldest lane first, each avoiding the
  * names stored and those planned before it. What the host writes at start,
  * when it creates a lane, and when a column reserves one (`planReserve`).

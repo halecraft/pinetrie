@@ -1,12 +1,14 @@
 // client/board — the board (ADR-0085): everyone's roots, each in its
 // workflow state. Its strip sits in the footer and says each state's name,
-// count, the people reading in its roots, and its highest mark; ▦ opens the
-// board over the columns, moving none of them, and ▦, Escape or a click
-// outside it closes it.
+// count, the people reading in its roots, its highest mark, and how many of
+// its roots the agent works in and have work ready to accept (ADR-0091),
+// counts that ask nothing of you; ▦ opens the board over the columns, moving
+// none of them, and ▦, Escape or a click outside it closes it.
 //
 // Opened, each open state is a column: drag an item to another column, or
 // within one, or use its ⋯'s Move to ▸, to move it for everyone. To the
-// closed state it is archived (ADR-0029). Selecting an item opens it in your
+// closed state it is archived (ADR-0029). An item with a thread whose work
+// is ready to accept carries ⇡, for everyone. Selecting an item opens it in your
 // list; dragged onto your list, it opens there. A state's name is edited in
 // place, its ⋯ moves or removes it, and ＋ state adds one. The closed state
 // is a count, a search over labels and its most recent roots. What it shows
@@ -23,7 +25,9 @@ import {
   clickClosesBoard,
   closedWords,
   nameStateIntent,
+  readyWords,
   type StripState,
+  stripWords,
 } from "./board-view.ts"
 import type { Intent } from "./intent.ts"
 import { Menu, type MenuItem } from "./menu.tsx"
@@ -43,7 +47,10 @@ import { startRootDrag } from "./use-root-drag.ts"
 const elsewhereWords = (level: Level): string =>
   `a thread not in your list: ${LEVEL_WORDS[level]}`
 
-/** The strip: ▦, then each state's name, count, readers and mark. */
+/**
+ * The strip: ▦, then each state's name, count, readers and mark, and its
+ * roots the agent works in (◌) and with work ready to accept (⇡), ADR-0091.
+ */
 export function BoardStrip({
   view,
   open,
@@ -109,6 +116,7 @@ function StripStateButton({
   onOpen: () => void
   readers: ReadersProps
 }) {
+  const words = stripWords(state)
   return (
     <button
       className="strip-state"
@@ -127,6 +135,16 @@ function StripStateButton({
           role="img"
           title={LEVEL_WORDS[state.mark]}
         />
+      )}
+      {state.working > 0 && (
+        <span className="strip-working" title={words.working}>
+          ◌{state.working}
+        </span>
+      )}
+      {state.ready > 0 && (
+        <span className="strip-ready" title={words.ready}>
+          ⇡{state.ready}
+        </span>
       )}
     </button>
   )
@@ -157,13 +175,15 @@ export function Board({
   pip: React.ReactNode
 }) {
   // Escape closes the board, as ▦ does, and so does a click outside it
-  // (`clickClosesBoard`). Both ends of a click are read in the capture
-  // phase, before what was clicked can take itself out of the page.
+  // (`clickClosesBoard`). A menu open on the board takes the first Escape
+  // (`Popover`), and the board the next. Both ends of a click are read in the
+  // capture phase, before what was clicked can take itself out of the page.
   const self = useRef<HTMLElement>(null)
   useEffect(() => {
     const close = () => onIntent({ kind: "board", open: false })
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") close()
+      if (e.key === "Escape" && self.current?.querySelector(".open") == null)
+        close()
     }
     const side = (at: EventTarget | null): BoardSide =>
       !(at instanceof Element)
@@ -394,6 +414,16 @@ function ItemCard({
           status={item.status}
         />
         <span className="board-label">{item.label}</span>
+        {item.ready.length > 0 && (
+          <span
+            aria-label={readyWords(item.ready)}
+            className="root-ready"
+            role="img"
+            title={readyWords(item.ready)}
+          >
+            ⇡
+          </span>
+        )}
         {item.card && pip}
       </button>
       <span className="board-meta">

@@ -761,6 +761,14 @@ export const mutations: readonly Mutation[] = [
     expect: "names only the unnamed",
   },
   {
+    name: "a thread the host has not named reads as its whole lane id",
+    file: "packages/rules/names.ts",
+    from: "): string => names.get(lane) ?? lane.slice(-8)",
+    to: "): string => names.get(lane) ?? lane",
+    command: unit,
+    expect: "threadNameOf: a lane's name, else its id's last eight characters",
+  },
+  {
     name: "an offer ignores a moved start",
     file: "packages/rules/offer.ts",
     from: "  ledger.source !== now.tip ||\n  !sameStart(ledger.start, now.start)",

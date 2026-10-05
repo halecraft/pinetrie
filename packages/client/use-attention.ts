@@ -59,7 +59,7 @@ export function useAttention(input: {
   readonly lanes: readonly LaneView[]
   readonly laneRoots: ReadonlyMap<LaneName, EntryId>
   readonly archived: ReadonlySet<EntryId>
-  /** Roots whose agent works (`rootWork`). */
+  /** Roots whose agent works, held or not (`workAnywhere`). */
   readonly work: ReadonlyMap<EntryId, unknown>
   readonly layout: Pick<Layout, "open">
   /** The session has settled: before, a change is data arriving, not news. */
@@ -107,7 +107,7 @@ export function useAttention(input: {
     () =>
       rootStatus({
         items,
-        working: new Set(input.work.keys()),
+        work: input.work,
         verdicts: input.verdicts,
         laneRoots: input.laneRoots,
       }),

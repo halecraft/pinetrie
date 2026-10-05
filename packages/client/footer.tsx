@@ -1,42 +1,32 @@
 // client/footer — the page's one row of chrome, along its bottom (ADR-0085).
 // It splits where your list's edge does: below your list, what is yours (you,
-// whose avatar opens your profile, `profile.tsx`, and your inventory, which
-// moves into your profile while your list is folded, ADR-0088); to the
-// right, what is everyone's: the board's strip (`board.tsx`), then one menu
-// of what needs you (`activity.ts`, ADR-0069, ADR-0077), the publish button
-// (ADR-0090), and "syncing…" while the document is pending. The
-// agent comes from live data (the running lanes), the inbox from the tree
-// and your attention document. Nothing here opens a root until you choose,
-// and nothing closes a menu you opened: a trigger whose live data has gone
-// stays until you close its menu (`Popover`'s `gone`).
+// whose avatar opens your profile, `profile.tsx`; your inbox, `inbox-view.ts`,
+// ADR-0091; and your inventory, which moves into your profile while your
+// list is folded, ADR-0088, when the inbox stands just past the corner); to
+// the right, what is everyone's: the board's strip (`board.tsx`), which
+// counts where the agent works and what is ready to accept, then "syncing…"
+// while the document is pending and the publish button (ADR-0090). The inbox
+// carries the page's only badge. Nothing here opens a root until you choose,
+// and nothing closes a menu you opened: an open menu keeps a section whose
+// rows have gone, and says so.
 
 import {
   type EntryId,
   firstLine,
+  type LaneName,
   type LineRecord,
   messageText,
   type ProjectRecord,
+  type ThreadName,
   type TreeIndex,
   type WriterId,
 } from "@pinetrie/core"
+import { threadNameOf } from "@pinetrie/rules"
 import type { LineActing, SessionClient } from "@pinetrie/session"
 import { type ReactNode, useState, useSyncExternalStore } from "react"
-import {
-  type ActivitySection,
-  type ActivityView,
-  activityView,
-  activityWords,
-} from "./activity.ts"
-import type { OpenOffer } from "./app-view.ts"
-import {
-  attentionWords,
-  type Item,
-  LEVEL_CLASS,
-  type Level,
-} from "./attention.ts"
-import { AGENT_MARK } from "./column-view.ts"
-import type { RunHere } from "./here.ts"
+import { attentionWords, type Item, LEVEL_CLASS } from "./attention.ts"
 import type { InboxItem } from "./inbox.ts"
+import { type InboxSection, inboxView, inboxWords } from "./inbox-view.ts"
 import type { Intent } from "./intent.ts"
 import {
   InventoryToggle,
@@ -52,7 +42,7 @@ import {
   resolveIntent,
 } from "./publish-view.ts"
 import { Toast } from "./toast.tsx"
-import type { InboxView } from "./use-inbox.ts"
+import type { InboxSeen } from "./use-inbox.ts"
 
 /**
  * A thread as a menu row: its lane's name when it has one, its root's label,
@@ -84,22 +74,24 @@ export function threadRow(input: {
   })
 }
 
+/** A thread's menu row, as `threadRow` builds it. */
+export type ThreadRow = ReturnType<typeof threadRow>
+
 export function Footer({
   syncing,
   strip,
   session,
-  runs,
-  index,
+  thread,
   labelOf,
   nameOf,
   colorOf,
+  names,
+  count,
+  attention,
   mentions,
   inbox,
-  offers,
-  attention,
   line,
   project,
-  names,
   onOpen,
   onIntent,
   inventory,
@@ -111,38 +103,123 @@ export function Footer({
   /** The board's strip (`BoardStrip`): everyone's, after what is yours. */
   strip: ReactNode
   session: SessionClient
-  /** The agent's running lanes, in any root (`runsHere`). */
-  runs: readonly RunHere[]
-  index: TreeIndex
+  /** A thread's row, which opens it (`threadRow`, made once by `App`). */
+  thread: ThreadRow
   labelOf: (root: EntryId) => string
   nameOf: ReadonlyMap<WriterId, string>
   colorOf: (writer: WriterId) => string
-  mentions: readonly InboxItem[]
-  inbox: InboxView
-  /** Threads with an offer open in your repo, at their lane's tip (ADR-0038). */
-  offers: readonly OpenOffer[]
+  /** Each lane's name: a thread's row leads with it (ADR-0039). */
+  names: ReadonlyMap<LaneName, ThreadName>
+  /** What needs you (`inboxCount`): the inbox's badge, as the window's title has it. */
+  count: number
   /** What the threads you follow raise for you (`attentionOf`, ADR-0077). */
   attention: readonly Item[]
+  mentions: readonly InboxItem[]
+  inbox: InboxSeen
   /** The integration line (ADR-0060), as the host last read it. */
   line: LineRecord | null
   /** Where the host runs: "resolve with the agent" works in its root. */
   project: ProjectRecord | null
-  /** Each lane's name: a thread's row leads with it (ADR-0039). */
-  names: ReadonlyMap<string, string>
   /** Open an entry in your list (`planOpen`). */
   onOpen: (id: EntryId, root: EntryId) => void
-  /** Where the publish toast's "resolve with the agent" goes. */
+  /** Where "not needed" and the publish toast's "resolve with the agent" go. */
   onIntent: (intent: Intent) => void
   /** Your inventory's toggle: whether its panel is open, and its cards. */
   inventory: InventoryToggleProps
   me: Me
   /**
    * Your list is folded to icons (ADR-0088): the corner, as narrow, holds
-   * only your avatar, and the inventory's toggle is in your profile.
+   * only your avatar, the inventory's toggle is in your profile, and your
+   * inbox stands just past the corner.
    */
   folded: boolean
 }) {
-  const thread = threadRow({ index, labelOf, onOpen })
+  const yours = (
+    <InboxMenu
+      attention={attention}
+      count={count}
+      inbox={inbox}
+      labelOf={labelOf}
+      mentions={mentions}
+      nameOf={nameOf}
+      names={names}
+      onIntent={onIntent}
+      onOpen={onOpen}
+      thread={thread}
+    />
+  )
+  return (
+    <footer id="bottom">
+      <div className="footer-you">
+        {folded ? (
+          <Profile
+            {...me}
+            colorOf={colorOf}
+            inventory={inventory}
+            nameOf={nameOf}
+          />
+        ) : (
+          <>
+            <Profile {...me} colorOf={colorOf} nameOf={nameOf} />
+            {yours}
+            <InventoryToggle {...inventory} />
+          </>
+        )}
+      </div>
+      {folded && yours}
+      {strip}
+      <div className="footer-right">
+        {syncing && <span className="sync-note">syncing…</span>}
+        <PublishButton
+          line={line}
+          onIntent={onIntent}
+          project={project}
+          session={session}
+        />
+      </div>
+    </footer>
+  )
+}
+
+/**
+ * Your inbox (ADR-0091): what the threads you follow raise for you, then
+ * mentions of you, in one menu. Its badge counts what needs you; nothing
+ * here animates, and it is drawn even with nothing in it. What goes in
+ * which section is `inboxView`'s; this draws it.
+ */
+function InboxMenu({
+  attention,
+  count,
+  mentions,
+  inbox,
+  thread,
+  names,
+  labelOf,
+  nameOf,
+  onOpen,
+  onIntent,
+}: {
+  attention: readonly Item[]
+  count: number
+  mentions: readonly InboxItem[]
+  inbox: InboxSeen
+  thread: ThreadRow
+  names: ReadonlyMap<LaneName, ThreadName>
+  labelOf: (root: EntryId) => string
+  nameOf: ReadonlyMap<WriterId, string>
+  onOpen: (id: EntryId, root: EntryId) => void
+  onIntent: (intent: Intent) => void
+}) {
+  const [onlyUnseen, setOnlyUnseen] = useState(false)
+  const [kept, setKept] = useState<readonly InboxSection[]>([])
+  const view = inboxView({
+    items: attention,
+    badge: count,
+    mentions: mentions.length,
+    unseen: inbox.unseen,
+    kept,
+  })
+  const words = inboxWords(view)
   /** A raised item's rows: its thread, with its reason, and "not needed". */
   const raised = (item: Item): MenuItem[] => [
     {
@@ -150,7 +227,7 @@ export function Footer({
         `${item.lane}:${item.raised.kind}`,
         item.end,
         item.root,
-        names.get(item.lane),
+        threadNameOf(names, item.lane),
         attentionWords(item.raised, w => nameFor(nameOf, w)),
       ),
       className: `here-thread raised ${LEVEL_CLASS[item.level]}`,
@@ -173,113 +250,6 @@ export function Footer({
           },
         ]),
   ]
-  const verdicts = (level: Level): MenuItem[] =>
-    attention.flatMap(i =>
-      i.raised.kind === "verdict" && i.level === level ? raised(i) : [],
-    )
-  const yourOffers = new Map(
-    attention.flatMap(i => (i.raised.kind === "offer" ? [[i.lane, i]] : [])),
-  )
-  const verdictsAt = (level: Level) =>
-    attention.filter(i => i.raised.kind === "verdict" && i.level === level)
-      .length
-  const counts = {
-    needsYou: verdictsAt("needsYou"),
-    ready: offers.length,
-    readyYours: yourOffers.size,
-    worthARead: verdictsAt("worthARead"),
-  }
-  return (
-    <footer id="bottom">
-      <div className="footer-you">
-        {folded ? (
-          <Profile
-            {...me}
-            colorOf={colorOf}
-            inventory={inventory}
-            nameOf={nameOf}
-          />
-        ) : (
-          <>
-            <Profile {...me} colorOf={colorOf} nameOf={nameOf} />
-            <InventoryToggle {...inventory} />
-          </>
-        )}
-      </div>
-      {strip}
-      <div className="footer-right">
-        {syncing && <span className="sync-note">syncing…</span>}
-        <ActivityMenu
-          inbox={inbox}
-          labelOf={labelOf}
-          mentions={mentions}
-          nameOf={nameOf}
-          counts={counts}
-          needsYou={verdicts("needsYou")}
-          offers={offers.flatMap(o => {
-            const yours = yourOffers.get(o.lane)
-            return yours === undefined
-              ? [thread(o.lane, o.end, o.root, names.get(o.lane))]
-              : raised(yours)
-          })}
-          worthARead={verdicts("worthARead")}
-          onOpen={onOpen}
-          runs={runs.map(r => thread(r.lane, r.end, r.root, names.get(r.lane)))}
-        />
-        <PublishButton
-          line={line}
-          onIntent={onIntent}
-          project={project}
-          session={session}
-        />
-      </div>
-    </footer>
-  )
-}
-
-/**
- * What needs you, in one menu (ADR-0069): threads with work ready to add,
- * mentions of you, and where the agent works. The badge counts the first two;
- * the agent's runs are a steady count beside it. Nothing here animates.
- */
-function ActivityMenu({
-  counts,
-  needsYou,
-  offers,
-  worthARead,
-  runs,
-  mentions,
-  inbox,
-  labelOf,
-  nameOf,
-  onOpen,
-}: {
-  /** What each section counts: its threads, not its rows. */
-  counts: Pick<ActivityView, "needsYou" | "ready" | "readyYours" | "worthARead">
-  /** Rows of the verdicts that need you, each with its "not needed". */
-  needsYou: readonly MenuItem[]
-  /** A row per thread with an open offer; one you follow with its "not needed". */
-  offers: readonly MenuItem[]
-  /** Rows of the verdicts worth a read. */
-  worthARead: readonly MenuItem[]
-  /** A row per lane the agent works on. */
-  runs: readonly MenuItem[]
-  mentions: readonly InboxItem[]
-  inbox: InboxView
-  labelOf: (root: EntryId) => string
-  nameOf: ReadonlyMap<WriterId, string>
-  onOpen: (id: EntryId, root: EntryId) => void
-}) {
-  const [onlyUnseen, setOnlyUnseen] = useState(false)
-  const [kept, setKept] = useState<readonly ActivitySection[]>([])
-  const view = activityView({
-    ...counts,
-    mentions: mentions.length,
-    unseen: inbox.unseen,
-    working: runs.length,
-    kept,
-  })
-  const words = activityWords(view)
   const listed = onlyUnseen
     ? mentions.filter(m => inbox.isUnseen(m.id))
     : mentions
@@ -317,24 +287,22 @@ function ActivityMenu({
       onOpen(m.id, m.root)
     },
   }))
-  const items: Record<ActivitySection, readonly MenuItem[]> = {
-    needsYou,
-    ready: offers,
-    worthARead,
-    mentions: mentions.length === 0 ? [] : [...controls, ...rows],
-    working: runs,
-  }
+  const items = (s: InboxSection): readonly MenuItem[] =>
+    s === "mentions"
+      ? mentions.length === 0
+        ? []
+        : [...controls, ...rows]
+      : view.items[s].flatMap(raised)
   return (
     <Menu
-      className="activity"
-      gone={view.gone}
+      className="inbox"
       // The first section only names the menu; each later one is a group.
       sections={[
-        { key: "activity", heading: words.heading, items: [] },
+        { key: "inbox", heading: words.heading, items: [] },
         ...view.sections.map(s => ({
           key: s,
           heading: words.sections[s],
-          items: items[s],
+          items: items(s),
         })),
       ]}
       label={words.label}
@@ -342,18 +310,15 @@ function ActivityMenu({
       title={words.label}
       trigger={
         <>
-          <span className="initial agent-mark">{AGENT_MARK}</span>
-          {view.working > 0 && (
-            <span className="activity-working">{view.working}</span>
-          )}
+          {words.trigger}
           {view.badge > 0 && (
-            <span className="activity-badge" data-needs-you={view.badge}>
+            <span className="inbox-badge" data-needs-you={view.badge}>
               {view.badge}
             </span>
           )}
         </>
       }
-      triggerClassName="activity-trigger"
+      triggerClassName="inbox-trigger"
     />
   )
 }

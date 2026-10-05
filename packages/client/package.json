@@ -8,6 +8,7 @@
     "./send": "./send.ts",
     "./column-view": "./column-view.ts",
     "./copy": "./copy.ts",
+    "./here": "./here.ts",
     "./package.json": "./package.json"
   },
   "scripts": {

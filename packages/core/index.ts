@@ -651,7 +651,7 @@ export interface ArchivedRoot {
 // --- the directory of roots (ADR-0063) --------------------------------------
 
 /**
- * A root as your list, the board, the inbox and the activity menu see it,
+ * A root as your list, the board and your inbox see it,
  * without its document: a host-written `pinetrie.root` value in the session,
  * keyed by the root's id, refreshed whenever the root's document changes.
  */

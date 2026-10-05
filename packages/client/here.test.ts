@@ -1,10 +1,10 @@
-import { entryId, laneNameForThread, rootIdFor, writerId } from "@pinetrie/core"
+import { entryId, writerId } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import { tree } from "./fixtures.ts"
 import {
   peopleHere,
+  readerHeading,
   readersByRoot,
-  runsHere,
   toggleOpenMenu,
   withOpenMenus,
 } from "./here.ts"
@@ -102,25 +102,7 @@ test("toggleOpenMenu records an opening and forgets a closing, the same map when
   expect([...toggleOpenMenu(opened, BEA, 1, false)]).toEqual([])
 })
 
-test("runsHere: each held run at its tip, then each other running lane at its root's entry (ADR-0063)", () => {
-  const held = laneNameForThread("held")
-  const far = laneNameForThread("far")
-  const fresh = laneNameForThread("fresh")
-  const farRoot = rootIdFor("far")
-  const freshRoot = rootIdFor("fresh")
-  expect(
-    runsHere({
-      activity: [{ lane: held, tip: entryId("2-a") }],
-      running: [
-        { lane: held, root: rootIdFor("r1") },
-        { lane: far, root: farRoot },
-        { lane: fresh, root: freshRoot },
-      ],
-      rootEntries: new Map([[farRoot, entryId("8-r9")]]),
-      index,
-    }),
-  ).toEqual([
-    { lane: held, root: "1-r1", end: "2-a" },
-    { lane: far, root: "8-r9", end: "8-r9" },
-  ])
+test("readerHeading: where a reader is, or that they have left", () => {
+  expect(readerHeading("Bea", false)).toBe("Bea is in")
+  expect(readerHeading("Bea", true)).toBe("Bea has left")
 })

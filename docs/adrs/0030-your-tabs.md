@@ -12,6 +12,8 @@ per device. Amended by ADR-0081: the header holds your tabs, and the
 message count moved to the Archive tab.
 Amended by ADR-0085: your tabs are your list, kept per person; the header's
 people go, and who is where shows on your list's items and the board's.
+Amended by ADR-0091: your inbox sits beside your avatar, and holds what
+the threads you follow raise as well as your mentions.
 
 **Context.** ADR-0029 gave everyone the same tab bar, every root not archived,
 and rejected tabs each person opens and closes: a collaborator's new root would

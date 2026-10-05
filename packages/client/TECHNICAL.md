@@ -23,7 +23,7 @@ written by this client, and kept on its thread.
 - **Every cross-root fact comes from the directory** (`readRoots`): your
   list's labels and summaries (`summariesOf`, `firstLinesOf`, `labelsOf`), the
   board's items, `prune`'s known roots, the inbox's mentions, ▦'s count (`messageCount`: the held roots' messages, of every root's), the participants (`participantsIn`), the
-  roots of the activity menu's runs and offers (`runsHere`, `laneRootsOf`), and the
+  roots of running lanes and of offers (`workAnywhere`, `laneRootsOf`), and the
   root of a card drafted in a root not held (`cardMarks`'s `rootEntries`).
   The board's closed state searches labels: a search of every message would
   hold every root.
@@ -206,7 +206,7 @@ function is proven by a unit test in a second.
   own `useMemo`s, and their results come in. One tree rebuilt each render
   would give every memoised child new props (S54, S59). `appView` gives the
   workspace (`connecting`, `archive`, a root's or a new tab's columns as
-  `ColumnSlot`s), the read-only words, and the activity menu's open offers. A slot
+  `ColumnSlot`s), the read-only words, and the open offers your inbox and the board read. A slot
   is new each render; `Column` is not memoised, so this costs nothing, and
   a slot must never reach a memoised component by identity.
 - **`main.tsx` boots the page:** it builds the device's stores, asks who you
@@ -230,7 +230,7 @@ and each item's signals.
   out of your document; the screen you are on does not lose it.
 - **Who writes your list.** `show` of a root ensures it in your document
   (`intent.ts`'s `show`, a `list` effect), so every way of opening goes
-  through it: the board, the activity menu, the inbox, `openAt`. A root you
+  through it: the board, your inbox, `openAt`. A root you
   start joins it in the session, as its send is answered (`startsRoot`). ×
   is a `list` close and a `closeRoot`, which moves you on only if you were
   on it: `afterClosing`'s choice, your list's next item below, else above,
@@ -263,8 +263,9 @@ and each item's signals.
   `.open-root` (or `.open-new`) button, ⋯ and ×; the selected wrap carries
   `data-selected`, set from `ItemView.selected`, and is filled with
   `--page`, the list `--chrome`. The footer (`footer.tsx`) holds
-  `.footer-you` (your profile and inventory), the board's strip
-  (`BoardStrip`), then `.footer-right` (activity, project, sync note).
+  `.footer-you` (your profile, inbox and inventory; folded, your profile
+  alone, the inbox just past it), the board's strip (`BoardStrip`), then
+  `.footer-right` (sync note, publish).
 - **Your list folds to icons** (ADR-0088). The width is a value
   (`ListWidth`, `list-width.ts`): your choice in this tab, else icons on a
   small window (`shownWidth`, `useSmallWindow`). Folding is an intent,
@@ -459,7 +460,7 @@ with ANY column to its left, so a shared stretch of paths is drawn once, in the
 leftmost column that shows it. Anything looking for a message on screen (the
 rail's scroll-to, the alignment) must search every column.
 
-## Who is here, and your inbox (ADR-0030, ADR-0085)
+## Who is here, and your inbox (ADR-0030, ADR-0085, ADR-0091)
 
 The footer (`footer.tsx`, `#bottom`) is you, then the rest of the session,
 from live data; nothing in it opens a root until you choose. Its right end
@@ -476,18 +477,32 @@ pending.
   (`ReaderMenus`); your list's items and the strip's states show avatars
   only (`Readers`).
 - **You** are first in the footer, under your list: your profile
-  (`profile.tsx`, below, under Who you are), then your inventory.
-- **The agent:** `runsHere` is its running lanes in every root: a held
-  lane's run at its tip (`activity`), any other at its root entry, from the
-  lane's record (`running`) and the directory.
-- **Activity** (`activity.ts`, pure, ADR-0069): the agent's runs, the open
-  offers and your mentions, in one menu (`ActivityMenu`). `activityView`
-  decides the badge (offers plus unseen mentions, never runs), which
-  sections show, and whether the trigger is drawn; `activityWords` words
-  them. `kept` is the sections shown when the menu opened, set through
-  `onToggle`, so an open menu keeps a section whose rows have gone and says
-  so. Its first section has a heading and no items: it names the menu, and
-  its empty `.menu-section` is hidden, with no rule under it.
+  (`profile.tsx`, below, under Who you are), your inbox, then your
+  inventory. While your list is folded the corner holds your profile alone,
+  and the inbox is drawn just past it, before the strip.
+- **Your inbox** (`inbox-view.ts`, pure, ADR-0091): what the threads you
+  follow raise (`attentionOf`'s items) and your mentions, in one menu
+  (`InboxMenu`). `inboxView` groups the items into sections (a verdict
+  under its level, an offer under ready), so the inbox lists exactly what
+  it counts; `inboxWords` words them. Its badge is `inboxCount`, given:
+  `App` computes it once and the window's title shows the same number.
+  `InboxMenu` only turns each section's items into rows (`threadRow`, made
+  once by `App` and shared with the board) and "not needed". `kept` is the
+  sections shown when the menu opened, set through `onToggle`, so an open
+  menu keeps a section whose rows have gone and says so. The trigger is
+  always drawn, quiet at zero. Its first section has a heading and no
+  items: it names the menu, and its empty `.menu-section` is hidden, with
+  no rule under it.
+- **Where the agent works, and what is ready, is the board's** (ADR-0091):
+  `workAnywhere` (`app-view.ts`) is the agent's work in every root: the held
+  lanes' (`rootWork`) and every lane running in the session (`running`, by
+  its root entry). `App` builds it once, and your list, the board and
+  `rootStatus` all read it, so a root rung on the board also refuses Move to
+  Done there. `rootStatus` rings a root while the agent works there or its
+  verdict is pending; `boardView` folds each column's items into `working` and `ready`
+  counts beside `mark`, and an item's `ready` is its root's threads with an
+  open offer (`offeredByRoot`, each named by `threadNameOf`, so one the host
+  has not named yet still counts). Nothing lists the runs.
 - **The publish button and its toast** (`publish-view.ts`, `toast.tsx`,
   ADR-0090): `publishView` decides the one button: `absent` with no record,
   or before setup on a host that admits others; `setup`, before setup on the
@@ -535,13 +550,15 @@ pending.
   and a menu's list does.
 - **A trigger from live data is `gone`, not unmounted.** Unmounting a
   `Popover` takes its open box with it, so a change in the session would
-  close a menu you opened. The footer keeps its activity menu
-  mounted with `gone` when there is nothing to list (no trigger drawn unless
-  open), and keeps a person who leaves while their menu is open
-  (`withOpenMenus`, told by `onToggle`) until you close it.
+  close a menu you opened. A board item keeps a person who leaves while
+  their menu is open (`withOpenMenus`, told by `onToggle`), `gone`, until
+  you close it; the menu's heading says so (`readerHeading`). Escape closes
+  that menu first: the board leaves Escape alone while a menu in it is open
+  (`.open`), since both listen on the document and the board's listener,
+  added first, hears it first.
 - **`Menu`** (`menu.tsx`) is a `Popover` whose box is a `role="menu"` list,
-  in sections (`MenuSection`): a board item's readers, activity and
-  project, your list's items' `⋯`, ＋'s menu and the composer's where line.
+  in sections (`MenuSection`): a board item's readers, your inbox, publish's
+  setup, your list's items' `⋯`, ＋'s menu and the composer's where line.
   The first section's heading is drawn above the list, not in it, since a
   menu holds only menu items, and names it (`aria-labelledby`); each later
   section is a `<fieldset>` (role `group`, which Biome asks for as the
@@ -553,8 +570,8 @@ pending.
   both kinds.
 - **`.initial` is the circle; `.avatar` is a person shown here.** The browser
   suite counts people by `.avatar`, and proves you are never among them by
-  it. So your profile's trigger (`.me`), the agent's mark (`.agent-mark`)
-  and the "+n" of `Avatars` (`.more`) are `.initial` and never `.avatar`.
+  it. So your profile's trigger (`.me`) and the "+n" of `Avatars`
+  (`.more`) are `.initial` and never `.avatar`.
   The circle's shape is `.initial`'s rule; `.avatar` has none. Your list's
   items and the board's hold readers' avatars too, so `.avatar` anywhere matches them,
   who never include you either.
@@ -570,8 +587,9 @@ pending.
 - **`levelOf` turns a verdict, a fact, into a level for you**: a stop is
   done for whoever stopped it. `LEVELS` orders the levels once; `highest`
   reads it.
-- **`rootStatus`** is each tab's mark: working while a lane of its root is
-  busy or its verdict pending, else its highest item. `markOf` folds it
+- **`rootStatus`** is each root's mark: working while the agent works there
+  (`workAnywhere`, held by this tab or not) or its verdict is pending, else
+  its highest item. `markOf` folds it
   over several roots: `unlisted` (`layout.ts`) gives ▦'s, as it gives
   `cardMarks.elsewhere`.
 - **Motion is a change you saw, never a state.** `arrivals` compares two
@@ -582,9 +600,9 @@ pending.
   (`moving`), and the ✓'s fade ends at no width. So the end of a motion
   redraws nothing. A timer that dropped arrivals redrew `App` while you
   typed, which the browser suite's render check caught.
-- **One count** (`needsYouCount` plus unseen mentions) is the badge's and
-  the window title's. `pageTitle` (`tabs-view.ts`) puts it before the
-  selected tab's label.
+- **One count** (`inboxCount`: the items that need you plus unseen mentions),
+  computed once in `App`, is the inbox's badge and the window title's.
+  `pageTitle` (`open-list-view.ts`) puts it before the selected root's label.
 - **Words:** `attentionWords` words each item's reason, `LEVEL_WORDS` and
   `LEVEL_CLASS` a level's name and class. Selectors: `.root-status`
   (`.working`, `.needs-you`, `.worth-a-read`, `.done`, `data-arrived`),
@@ -1542,11 +1560,11 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
 - **"Needs you" comes from the tree** (ADR-0080): the strip's `needs_you`
   is the thread's newest `ask_about_conflict` (`conflictAskedAt`) when it is
   newer than the offer's record.
-- **The footer's activity menu counts offers open** in your repo ("work ready to
-  accept"), as it counts mentions, and the agent's running threads;
-  each row leads with the thread's name and opens its thread. Move to Done
+- **Open offers in your repo** ("work ready to accept") are your inbox's
+  rows for the threads you follow, each leading with the thread's name and
+  opening it, and a board item's ⇡ for everyone (ADR-0091). Move to Done
   in an item's `⋯` names the threads whose offers it withdraws (`offeredByRoot`,
-  `dropsWords`). Both read `openOffers`, which keeps only `offerStatus`'s
+  `dropsWords`). All read `openOffers`, which keeps only `offerStatus`'s
   `open` (ADR-0067): one the line already holds (`held`) has nothing to
   add, so it is neither counted nor named, as the strip says.
 - **Selectors in the browser suite:** a column's offer is `.work.offer`, with
@@ -2162,7 +2180,7 @@ shown by their email's part before the `@`. Each rendered chat carries its
   resize or a scroll of an element holding the trigger, since a fixed box
   would drift from its trigger. Not on any scroll outside the box: a column
   following its end scrolls whenever an entry arrives, which closed every
-  open menu (the activity menu among them) without the person doing anything.
+  open menu without the person doing anything.
 - **Playwright clicks what a person cannot see.** It scrolls a clipped element
   into view before clicking, so a check that a popup can be clicked does not
   show it is visible. Check what `elementFromPoint` finds at its centre: the
@@ -2184,12 +2202,16 @@ shown by their email's part before the `@`. Each rendered chat carries its
   the inventory toggle is `#profile .inventory-toggle`. The board is `#board`: a `.board-column[data-state]`
   per open state and `.board-closed` for the closed one, each item a
   `.board-item[data-root][data-entry]` with `.board-open`, `.board-label`,
-  `.reader-trigger` per reader and `.item-menu`; `.closed-search`,
+  `.reader-trigger` per reader (its menu `.reader`, `.open` while open),
+  `.root-ready` when a thread has work ready, and `.item-menu`; `.closed-search`,
   `.add-state`, `.state-name`. The footer is `#bottom`: ▦ is
   `.board-toggle`, whose `data-messages` is the session's message count
   (the browser suite's `countIsHosts` waits on it), each state
-  `.strip-state[data-state]`; `connected` (`page.ts`) waits for
-  `#open-list .add-agent` with no `.sync-note`. Menu rows are `.here-thread`
+  `.strip-state[data-state]`, with `.strip-working` and `.strip-ready`
+  when nonzero; `connected` (`page.ts`) waits for
+  `#open-list .add-agent` with no `.sync-note`. Your inbox is `.inbox`,
+  its trigger `.inbox-trigger` and badge `.inbox-badge[data-needs-you]`.
+  Menu rows are `.here-thread`
   and `.inbox-row`, each with `data-entry`. You are
   `#bottom .me-trigger` (its `title` your name), opening `#profile`, with
   `input[name="name"]`, `.name-handle`, `.name-problem[data-problem]`,

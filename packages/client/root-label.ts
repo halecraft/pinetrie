@@ -80,8 +80,8 @@ export const CHAT_LABEL = "Chat"
 /**
  * Every root's label, by its root entry: its title; else, for a root no lane
  * works in (only people have written there), `CHAT_LABEL`; else its first
- * line. `App` builds it once per change, and your list, the board, the
- * activity menu and the inbox look labels up in it.
+ * line. `App` builds it once per change, and your list, the board and your
+ * inbox look labels up in it.
  */
 export function labelsOf(
   directory: ReadonlyMap<RootId, RootRecord>,

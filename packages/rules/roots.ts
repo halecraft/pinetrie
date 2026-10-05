@@ -1,5 +1,5 @@
-// roots — the directory of roots (ADR-0063): what your list, the board, the
-// inbox and the activity menu read of a root without opening its document.
+// roots — the directory of roots (ADR-0063): what your list, the board and
+// your inbox read of a root without opening its document.
 //
 // The record is a host-written `pinetrie.root` value in the session, keyed by
 // the root's id. The host refreshes it whenever the root's document changes

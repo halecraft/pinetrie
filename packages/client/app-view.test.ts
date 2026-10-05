@@ -17,6 +17,7 @@ import {
   appView,
   hereRail,
   readOnlyWords,
+  workAnywhere,
 } from "./app-view.ts"
 import type { Column } from "./columns.ts"
 import { tree } from "./fixtures.ts"
@@ -158,4 +159,29 @@ test("a tab's rail draws its own root's tree only", () => {
   ])
   expect(hereRail(index, { kind: "new", key: "t" })).toEqual([])
   expect(hereRail(index, null)).toEqual([])
+})
+
+test("workAnywhere: the held roots' work, and each lane running in a root this tab does not hold, by its root entry, running winning; a root with no entry yet is left out (ADR-0091)", () => {
+  const held = rootIdFor("01a0ffd2-0000-7000-8000-000000000001")
+  const unheld = rootIdFor("01a0ffd2-0000-7000-8000-000000000002")
+  const unknown = rootIdFor("01a0ffd2-0000-7000-8000-000000000003")
+  expect(
+    workAnywhere({
+      held: new Map([[entryId("r1"), "waiting"]]),
+      running: [
+        { lane: laneNameForThread("a"), root: held },
+        { lane: laneNameForThread("b"), root: unheld },
+        { lane: laneNameForThread("c"), root: unknown },
+      ],
+      rootEntries: new Map([
+        [held, entryId("r1")],
+        [unheld, entryId("r2")],
+      ]),
+    }),
+  ).toEqual(
+    new Map([
+      [entryId("r1"), "running"],
+      [entryId("r2"), "running"],
+    ]),
+  )
 })

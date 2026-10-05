@@ -359,7 +359,8 @@ threads ready to add to the project, mentions of you (only once someone has
 mentioned you) and where the agent works. Its badge counts open offers and
 unseen mentions; running work is a steady count beside it, and nothing in
 the header animates. The project stays apart, marked with what is not yet
-on main (ADR-0076); your inventory and you sit at the far right.
+on main (ADR-0076); your inventory and you sit at the far right. ADR-0091
+replaced the menu with your inbox, by your avatar, and counts on the board.
 
 **ADR-0072 — a thread catches up with the thread it branched from** (built).
 A branch cloned from a conflicted copy kept that conflict in its offer, even
@@ -514,6 +515,17 @@ first step or undone after a failure (`jj op revert`, S111); elsewhere it
 moves `main` alone. A refusal is a toast. The line is "accepted work" on the
 page, an offer's button is **accept**, and threads and your files both
 **catch up**; `land` and `follow` are gone from the code.
+
+**ADR-0091 — your inbox sits by your avatar** (built). The activity menu
+sat on everyone's side of the footer while its badge counted only what is
+yours. Now your inbox, under your list between your avatar and your
+inventory, holds how the threads you follow ended, their work ready to
+accept, what is worth a read and your mentions, and carries the page's only
+badge, always drawn. Everyone's facts went to the board: each state on the
+strip counts its roots the agent works in (◌) and with work ready (⇡), an
+item with an open offer carries ⇡, and a root's ring reads lanes running
+in any root, not only those this tab holds.
+
 **ADR-0019 — a lane is a line of work, not a unit of parallelism.** A person's
 lane is a *conversation lane* and never touches disk. A *work lane* carries
 agent work and will own a jj workspace, so creating one is deliberate, and fold

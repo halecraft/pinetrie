@@ -20,7 +20,6 @@ import {
   highest,
   levelOf,
   markOf,
-  needsYouCount,
   rootStatus,
   type Status,
 } from "./attention.ts"
@@ -198,35 +197,27 @@ describe("rootStatus", () => {
     [A, R1],
     [B, R2],
   ])
+  const facts = { work: new Map(), verdicts: new Map(), laneRoots }
   test("working wins, and a pending verdict is working; else the highest item", () => {
     const items = attentionOf(input({ offers: [offer(A, "c-1")] }))
     const status = rootStatus({
+      ...facts,
       items,
-      working: new Set([R2]),
-      verdicts: new Map(),
-      laneRoots,
+      work: new Map([[R2, "running"]]),
     })
     expect(status.get(R1)?.kind).toBe("needsYou")
     expect(status.get(R2)).toEqual({ kind: "working" })
     expect(
       rootStatus({
+        ...facts,
         items,
-        working: new Set(),
         verdicts: new Map([[A, verdict(A, { kind: "pending" })]]),
-        laneRoots,
       }).get(R1),
     ).toEqual({ kind: "working" })
   })
 
   test("a root with nothing raised and nothing working has no status", () => {
-    expect(
-      rootStatus({
-        items: [],
-        working: new Set(),
-        verdicts: new Map(),
-        laneRoots,
-      }).size,
-    ).toBe(0)
+    expect(rootStatus({ ...facts, items: [] }).size).toBe(0)
   })
 })
 
@@ -300,24 +291,6 @@ test("attentionWords: each reason, as a value worded once", () => {
   expect(attentionWords({ kind: "offer", source: null }, nameOf)).toBe(
     "work ready to accept",
   )
-})
-
-test("needsYouCount: what needs you, an offer of a thread you follow among it, once; never what is worth a read", () => {
-  const items = attentionOf(
-    input({
-      verdicts: new Map([
-        [A, verdict(A, said("needsYou"))],
-        [B, verdict(B, said("worthARead"))],
-      ]),
-      writers: new Map([
-        [A, [ADA]],
-        [B, [ADA]],
-      ]),
-      offers: [offer(A, "c-1")],
-    }),
-  )
-  expect(items).toHaveLength(3)
-  expect(needsYouCount(items)).toBe(2)
 })
 
 test("markOf: the highest level among the roots it covers; working raises nothing", () => {

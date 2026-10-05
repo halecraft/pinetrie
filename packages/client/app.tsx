@@ -59,9 +59,8 @@ import {
   useSyncExternalStore,
 } from "react"
 import { placement } from "./align.ts"
-import { appView, hereRail, laneRootsOf } from "./app-view.ts"
+import { appView, hereRail, laneRootsOf, workAnywhere } from "./app-view.ts"
 import { foldMemory } from "./ask-fold.ts"
-import { needsYouCount } from "./attention.ts"
 import { Board, BoardStrip } from "./board.tsx"
 import { boardView } from "./board-view.ts"
 import { CardHistories } from "./card-history.tsx"
@@ -72,9 +71,9 @@ import { type Column as ColumnSpec, isAnchored } from "./columns.ts"
 import type { SeenEnd } from "./follow.ts"
 import { Footer, threadRow } from "./footer.tsx"
 import { planHeldRoots, rootEntriesOf } from "./held-roots.ts"
-import { runsHere } from "./here.ts"
 import { type Identity, reconcileName } from "./identity.ts"
 import { mentionsOf } from "./inbox.ts"
+import { inboxCount } from "./inbox-view.ts"
 import {
   claimFocus,
   type Effect,
@@ -364,8 +363,8 @@ export function App({
     () => messageCount(directory, new Set(roots.keys())),
     [directory, roots],
   )
-  // The agent's runs and each lane's root, in every root, held or not
-  // (ADR-0063): what the header lists.
+  // Each root's root entry, held or not (ADR-0063): where a lane running in
+  // a root this tab does not hold rings it, and where its offer's ⇡ goes.
   const rootEntries = useMemo(() => rootEntriesOf(directory), [directory])
   const rootIds = useMemo(
     () => new Map([...rootEntries].map(([id, entry]) => [entry, id] as const)),
@@ -413,15 +412,16 @@ export function App({
     }
     return out
   }, [board, rootEntries])
-  const runs = useMemo(
-    () => runsHere({ activity, running, rootEntries, index }),
-    [activity, running, rootEntries, index],
-  )
   const laneRoots = useMemo(
     () => laneRootsOf(workFacts.lanes, rootEntries),
     [workFacts.lanes, rootEntries],
   )
-  const work = useMemo(() => rootWork(index, lanes), [index, lanes])
+  // The agent's work in every root, held or not: one map for your list,
+  // the board and each root's ring (ADR-0091).
+  const work = useMemo(
+    () => workAnywhere({ held: rootWork(index, lanes), running, rootEntries }),
+    [index, lanes, running, rootEntries],
+  )
   // A root with no message has no summary, so it has no label in `labels`.
   const labelOf = (root: EntryId): string => labels.get(root) ?? NO_TEXT
 
@@ -680,8 +680,8 @@ export function App({
     items: mentions,
     shown,
   })
-  // What needs you, and where (ADR-0077): each root's status, the activity
-  // menu's rows, and the page's title.
+  // What needs you, and where (ADR-0077): each root's status, your inbox's
+  // rows, and its count, which the page's title shows too (ADR-0091).
   const attention = useAttention({
     me: session.writer,
     attention: session.attention,
@@ -696,7 +696,7 @@ export function App({
     layout,
     settled,
   })
-  const needsYou = needsYouCount(attention.items) + inbox.unseen
+  const needsYou = inboxCount(attention.items, inbox.unseen)
   const sprites = useMemo(
     () => rootSprites(index, lanes, workFacts.banners),
     [index, lanes, workFacts.banners],
@@ -737,6 +737,7 @@ export function App({
             labels,
             status: attention.status,
             cardRoots: unsent.roots,
+            ready: offered,
             query: boardQuery,
             mine: boardMine,
             me: session.writer,
@@ -750,6 +751,7 @@ export function App({
       labels,
       attention.status,
       unsent.roots,
+      offered,
       boardQuery,
       boardMine,
       session.writer,
@@ -1262,17 +1264,17 @@ export function App({
           />
         }
         colorOf={colorOf}
-        inbox={inbox}
-        index={index}
+        thread={thread}
         labelOf={labelOf}
-        mentions={mentions}
         nameOf={nameOf}
         names={workFacts.names}
+        count={needsYou}
+        attention={attention.items}
+        mentions={mentions}
+        inbox={inbox}
         line={workFacts.line}
         project={workFacts.project}
         onIntent={onIntent}
-        offers={view.offers}
-        attention={attention.items}
         me={{
           writer: session.writer,
           email: session.principal,
@@ -1281,7 +1283,6 @@ export function App({
         }}
         onOpen={openIn}
         session={session}
-        runs={runs}
         inventory={{
           open: inventoryOpen,
           count: held.length,

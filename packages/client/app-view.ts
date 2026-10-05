@@ -97,7 +97,32 @@ export const laneRootsOf = (
   )
 
 /**
- * An open offer (`offerStatus`), for the header and the tab's Archive item:
+ * The agent's work in each root, held by this tab or not: the held lanes'
+ * (`rootWork`), and every lane running in the session, by its root's entry
+ * (ADR-0063, ADR-0091); running wins over waiting, and a root with no entry
+ * yet is left out. What rings a root, in your list and on the board, and
+ * what refuses its move to the closed state.
+ */
+export function workAnywhere(input: {
+  /** The held roots' work (`rootWork`). */
+  readonly held: ReadonlyMap<EntryId, "running" | "waiting">
+  /** Lanes running in any root (`readRunningLanes`). */
+  readonly running: readonly {
+    readonly lane: LaneName
+    readonly root: RootId
+  }[]
+  readonly rootEntries: ReadonlyMap<RootId, EntryId>
+}): ReadonlyMap<EntryId, "running" | "waiting"> {
+  const work = new Map(input.held)
+  for (const { root } of input.running) {
+    const entry = input.rootEntries.get(root)
+    if (entry !== undefined) work.set(entry, "running")
+  }
+  return work
+}
+
+/**
+ * An open offer (`offerStatus`), for your inbox and the board's ⇡ (ADR-0091):
  * its lane, its root entry, and where it opens: its lane's tip, or its root
  * entry in a root this tab does not hold.
  */
@@ -114,7 +139,7 @@ export interface OpenOffer {
 
 export function appView(input: AppViewInput): {
   readonly workspace: Workspace
-  /** Open offers whose lane has a tip, for the header. */
+  /** Open offers whose lane has a tip, for your inbox and the board. */
   readonly offers: readonly OpenOffer[]
 } {
   return { workspace: workspaceOf(input), offers: openOffers(input) }
