@@ -49,7 +49,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "your home directory is mounted into lanes",
     file: "packages/lanes/plan.ts",
-    from: "        : contains(root, input.home)",
+    from: "        : isWithin(input.home, root)",
     to: "        : false",
     command: vitest("packages/lanes"),
     expect: "never your home directory, / or pi's agent directory",

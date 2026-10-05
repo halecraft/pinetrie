@@ -76,7 +76,7 @@ async function run(
       const script = scriptedModel({ tokensPerSecond: 400 })
       const askHost = await startSuiteHost({
         model: { kind: "scripted", script },
-        tools: { project: work },
+        project: { dir: work, tools: true },
         containers: false,
         log: () => {},
       })
@@ -369,7 +369,7 @@ async function run(
       const script = scriptedModel({ tokensPerSecond: 60 })
       const toolHost = await startSuiteHost({
         model: { kind: "scripted", script },
-        tools: { project: work },
+        project: { dir: work, tools: true },
         // A fixture pi directory, for commands (ADR-0036).
         agentDir: path.join(
           import.meta.dirname,

@@ -30,7 +30,14 @@ containers, disks and the helper.
 - `host.ts`: startup facts, lane configs and shared directories. Its reads
   of your repo (`jjIn`, git from its root) are the one exception to "only
   `@pineta/repo` runs jj on your repo": they only read, at startup, before
-  anything else runs. Its one write there is a file, `.git/info/exclude`.
+  the owner of your repo starts. Its one write there is a file, the exclude
+  file. `prepareProjectDir` adds `/.pineta/` to it, once from `server.ts`
+  before the store opens and again in `prepareHost`, which then writes
+  nothing (ADR-0086); `prepareShared` adds shared directories.
+- `planProjectDir` (`plan.ts`) decides a project's root from `RootFacts`,
+  or refuses the folder (`ProjectDirRefusal`, worded by `projectDirWords`);
+  `planRoot` only maps its result for `planHost`. `pinetaDir` is the layout
+  of `.pineta/`: the store, snapshots, the runtime and `lane-git`.
 - `image.ts`, `runtime.ts`: the image and the lane runtime. `image.ts`
   gathers what `planImages` needs and builds what it plans.
 - `disk.ts`: snapshots, deletion, trim. `lane.ts`: the container, the queue,

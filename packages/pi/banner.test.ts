@@ -122,8 +122,8 @@ describe("banners in a harness", () => {
       documents: oneRoot(doc),
       replicaId: "test",
       model: { kind: "scripted", script },
+      project: root,
       tools: {
-        project: root,
         access: () => ({ kind: "direct", dir: root, ready: Promise.resolve() }),
         hooks: {
           turnDone: async () => {},

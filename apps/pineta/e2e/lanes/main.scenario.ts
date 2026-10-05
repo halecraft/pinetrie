@@ -81,7 +81,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
   const logs: string[] = []
   const wh = await startSuiteHost({
     model: { kind: "scripted", script },
-    tools: { project },
+    project: { dir: project, tools: true },
     log: m => {
       logs.push(m)
       if (process.env.PINETA_E2E_LOG === "1") console.log(m)

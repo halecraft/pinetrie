@@ -1486,4 +1486,50 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a carry-on the rule refuses is answered with its refusal",
   },
+  // ── hot reload holds only what a direct lane edits ──
+  {
+    name: "hot reload holds every update while any direct lane runs",
+    file: "apps/pineta/host/hot-reload.ts",
+    from: "        if (!isHeld(file, dirs())) return undefined\n",
+    to: "        if (dirs().length === 0) return undefined\n",
+    command: unit,
+    expect:
+      "a lane working directly in another project holds none of the client's updates",
+  },
+  {
+    name: "hot reload reloads while a held file's lane still runs",
+    file: "apps/pineta/host/hot-reload.ts",
+    from: "      if ([...held].some(file => isHeld(file, now))) return\n",
+    to: "",
+    command: unit,
+    expect:
+      "a lane working directly in Pineta holds the client's updates until its run ends, then reloads once",
+  },
+  // ── the command line (ADR-0086) ──
+  {
+    name: "a relative folder is read from the working directory",
+    file: "apps/pineta/host/invocation.ts",
+    from: "    folder: folder === undefined ? pinetaRoot : path.resolve(base, folder),",
+    to: "    folder: folder === undefined ? pinetaRoot : path.resolve(folder),",
+    command: unit,
+    expect:
+      "no folder serves Pineta's repo; one folder is read from the base, never the working directory",
+  },
+  {
+    name: "a flag is taken for a folder",
+    file: "apps/pineta/host/invocation.ts",
+    from: '  const flag = args.find(a => a.startsWith("-"))',
+    to: "  const flag = undefined as string | undefined",
+    command: unit,
+    expect: "a flag, or a second folder, is refused",
+  },
+  {
+    name: "PINETA_STORE is ignored",
+    file: "apps/pineta/host/invocation.ts",
+    from: "  return env.PINETA_STORE ?? pinetaDir(root).store",
+    to: "  return pinetaDir(root).store",
+    command: unit,
+    expect:
+      "the store is PINETA_STORE when set, else .pineta/pineta.db in the project's root",
+  },
 ]

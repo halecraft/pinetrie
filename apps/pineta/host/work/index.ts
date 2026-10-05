@@ -68,7 +68,7 @@ export type LaneWork = Pick<
  */
 export async function startLaneWork(input: {
   readonly basics: Basics
-  /** The directory the host runs from, or null with no tools. */
+  /** The project's folder, whose root `prepareHost` finds; null with no tools. */
   readonly dir: string | null
   /** `PINETA_LANES=0`: a new root lane works directly by default. */
   readonly defaultDirect: boolean
@@ -127,7 +127,6 @@ export async function startLaneWork(input: {
     registry,
     keeper,
     offers,
-    dir: input.dir,
   })
   const { fetchLane } = createFetches({
     basics,

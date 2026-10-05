@@ -36,6 +36,7 @@ import {
   planLinks,
   planMerge,
   planMounts,
+  planProjectDir,
   planRoot,
   planRun,
   planShared,
@@ -716,16 +717,64 @@ describe("the host: its root, then container, in order", () => {
       planHost({ root: { direct: "/p", reason: "no jj" }, ...ok }),
     ).toEqual({ kind: "direct", root: "/p", reason: "no jj" })
   })
-  test("planRoot: jj's root; never your home directory or /; a git repo without jj works directly", () => {
-    const facts = { dir: "/p/sub", jjRoot: "/p", gitTop: null, home: HOME }
-    expect(planRoot(facts)).toEqual({ ok: "/p" })
-    expect(planRoot({ ...facts, jjRoot: HOME })).toMatchObject({
-      direct: "/p/sub",
+  test("planProjectDir: jj's root, else git's, else the folder; never missing, your home directory or /", () => {
+    const facts = {
+      dir: "/p/sub",
+      isDirectory: true,
+      jjRoot: "/p",
+      gitTop: null,
+      home: HOME,
+    }
+    expect(planProjectDir(facts)).toEqual({
+      kind: "found",
+      root: "/p",
+      repo: "jj",
     })
-    expect(planRoot({ ...facts, jjRoot: null, gitTop: "/" })).toMatchObject({
-      direct: "/p/sub",
+    expect(planProjectDir({ ...facts, jjRoot: null, gitTop: "/p" })).toEqual({
+      kind: "found",
+      root: "/p",
+      repo: "git",
     })
-    expect(planRoot({ ...facts, jjRoot: null, gitTop: "/p" })).toMatchObject({
+    expect(planProjectDir({ ...facts, jjRoot: null })).toEqual({
+      kind: "found",
+      root: "/p/sub",
+      repo: null,
+    })
+    expect(planProjectDir({ ...facts, isDirectory: false })).toEqual({
+      kind: "refused",
+      refusal: { kind: "missing", dir: "/p/sub" },
+    })
+    expect(planProjectDir({ ...facts, jjRoot: HOME })).toEqual({
+      kind: "refused",
+      refusal: { kind: "unsafe", root: HOME },
+    })
+    expect(planProjectDir({ ...facts, jjRoot: null, gitTop: "/" })).toEqual({
+      kind: "refused",
+      refusal: { kind: "unsafe", root: "/" },
+    })
+  })
+  test("planRoot: a jj repo's root; a refused folder works directly where it is, and a repo without jj at its root", () => {
+    expect(
+      planRoot({ kind: "found", root: "/p", repo: "jj" }, "/p/sub"),
+    ).toEqual({ ok: "/p" })
+    expect(
+      planRoot(
+        { kind: "refused", refusal: { kind: "unsafe", root: HOME } },
+        "/p/sub",
+      ),
+    ).toEqual({
+      direct: "/p/sub",
+      reason: expect.stringContaining("your home directory"),
+    })
+    expect(
+      planRoot(
+        { kind: "refused", refusal: { kind: "unexcludable", root: "/p" } },
+        "/p/sub",
+      ),
+    ).toEqual({ direct: "/p", reason: expect.stringContaining("--colocate") })
+    expect(
+      planRoot({ kind: "found", root: "/p", repo: "git" }, "/p/sub"),
+    ).toMatchObject({
       direct: "/p",
       reason: expect.stringContaining("no jj repo"),
     })

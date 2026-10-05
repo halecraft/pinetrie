@@ -330,7 +330,9 @@ logs a warning). `pickModel` is the pure choice: an override's fields win over
 the settings' defaults. With tools (`CreateAgentOptions.tools`), pi-agent-core's
 `read`, `write`, `edit` and `bash`, and Pineta's `grep` and `find`, run in
 each lane's own directory (below).
-Settings, context files and skills load from `tools.project`. The system prompt
+Settings, context files and skills load from `CreateAgentOptions.project`,
+with tools on or off (ADR-0086); with none, from the process's working
+directory. The system prompt
 is pi's `buildSystemPrompt`, with the loader's context files (the repo's
 `AGENTS.md`) and skills: the section layout `pi-anthropic-auth` shapes. Its
 `cwd` is the lane's directory.

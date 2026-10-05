@@ -10,6 +10,7 @@ wires them.
 
 | module | owns |
 |---|---|
+| `server.ts`, `invocation.ts` | `pnpm host [folder]` (ADR-0086): `planInvocation` (the folder), `storeFile` (the session's file), `refusalText` (a refusal's words); `server.ts` carries them out |
 | `index.ts` | `startHost`: the store, the Exchange (with its `resolve` for the documents clients create, `resolveDoc`), the documents, lane work and the agent, then the wiring below |
 | `basics.ts` | `Basics` (the session, `pineta:live`, the documents, the places, log, ids, clock) and how a failure is logged (`messageOf`, `failed`) |
 | `places.ts` | `applyPlaceSteps`: the one writer of the places document (ADR-0059), which writes its records in one batch, in an undo step when given one, then raises its `rev` in a batch of its own (`raiseRev`) |
@@ -33,7 +34,7 @@ wires them.
 | `http.ts` | the HTTP server: admission, Vite, the websocket, blobs, offer reads, invites |
 | `responses.ts` | every answer the host writes itself, as a pure `HttpAnswer` |
 | `routes.ts` | what a request or an upgrade gets, pure: admission first (`planRequest`, `planUpgrade`), then which requests are the host's (`route`) |
-| `hot-reload.ts` | Vite's hot updates, held while a direct lane in the project runs |
+| `hot-reload.ts` | Vite's hot updates: one to a file inside a running direct lane's directory is held until a run's end (`isHeld`); the project does not come into it |
 | `admission.ts`, `policy.ts`, `lines.ts`, `blobs.ts`, `store.ts` | the invite key and links, the write policy, departed seats, the image store, the SQLite store |
 | `work/` | lane containers and disks (§ Lane work) |
 | `offers/` | each lane's offer in your repo, on the owner of your repo (§ Offers); the line's record and commands are `work/line.ts`'s |
@@ -131,8 +132,8 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
 - **`endRun` comes before `laneStopped` and `ended`.** It closes the lane's
   streams (ADR-0044: a stream stays open past its message's end) and clears
   its active run. `laneStopped` is lane work's `runEnded`: the container
-  stops, and the offer is refreshed. `ended` runs hot reload, whose pause
-  reads which lanes run, and drains the lane; a drain that ran before
+  stops, and the offer is refreshed. `ended` runs hot reload, which reads
+  which lanes run, and drains the lane; a drain that ran before
   `endRun` could start the next run with the last one's reply still open.
 - **The verdict is pending before `endRun`** (ADR-0077, `Digests.pending`):
   written after, a page would see the lane stopped beside the last run's
@@ -205,6 +206,16 @@ too), and last `settle` for the lanes with cards queued:
 its compaction is `later`, so it runs after every write above, and after
 any refresh they queued.
 
+- **The project folder is prepared before `startHost`** (`server.ts`):
+  `prepareProjectDir` (`@pineta/lanes`) finds its root and adds `/.pineta/`
+  to its repo's exclude file, so the store, opened first in `startHost`, is
+  never taken into your `@` (S108). A suite skips this: it gives its own
+  store, and `prepareHost` runs `prepareProjectDir` again for lanes, which
+  writes nothing the second time.
+- **The project is apart from tools** (`StartHostOptions.project`). pi's
+  settings and `AGENTS.md` load from it with tools off too; lane work starts
+  with a directory only with tools on, so `Setup.project` is null without
+  them, and nothing asks a lane's access then.
 - **Commands are taken only after `recover`.** `Control.listen` is made
   earlier, and `startControl` registers `onReceive` after `recover`. Earlier,
   a new message could run before an interrupted lane resumed, and jump a
@@ -728,8 +739,8 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 ## Testing the shell
 
 - **Test a decision as a value** where the shell has one: `planRunEnd`,
-  `planInvites`, `draftSent`, the responses, `planSettle`, and `planStartup`
-  (`@pineta/rules`).
+  `planInvites`, `draftSent`, the responses, `planSettle`, `planInvocation`,
+  `storeFile`, `isHeld`, and `planStartup` (`@pineta/rules`).
 - **Otherwise, drive a module with `record<T>()`** for exactly the port it
   takes, and a real `newSessionDoc()`. A method the test did not give throws,
   naming itself, so a module that touches an undeclared port fails at once.

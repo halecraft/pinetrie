@@ -54,8 +54,6 @@ export function createContainers(deps: {
   /** Work nobody awaits: `quiet` waits for it. */
   readonly keeper: Keeper
   readonly offers: Offers | null
-  /** The directory the host runs from, or null with no tools. */
-  readonly dir: string | null
 }): Containers {
   const { basics, setup, registry, keeper, offers } = deps
   const { session, docs, log } = basics
@@ -124,13 +122,17 @@ export function createContainers(deps: {
           ready: Promise.resolve(),
         }
       // A lane with no record, or a lane of its own where containers are
-      // unavailable, works in the project.
-      if (record === undefined || !registry.isOwn(lane))
+      // unavailable, works in the project. Only an agent with tools asks,
+      // and lane work has a project then.
+      if (record === undefined || !registry.isOwn(lane)) {
+        if (setup.project === null)
+          throw new Error("lane work has no project: the agent has no tools")
         return {
           kind: "direct",
-          dir: setup.project?.root ?? deps.dir ?? process.cwd(),
+          dir: setup.project.root,
           ready: Promise.resolve(),
         }
+      }
       const handle = registry.handleOf(lane)
       const grants = setup.lanes?.config.grants ?? NO_GRANTS
       return {

@@ -1,9 +1,12 @@
 // lanes/host — what the host finds at startup, gathered, then planned by
-// `planRoot`, `planHost` and `planShared` (ADR-0034, ADR-0035).
+// `planProjectDir`, `planRoot`, `planHost` and `planShared` (ADR-0034,
+// ADR-0035, ADR-0086).
 //
 // These are the one exception to "only `@pineta/repo` runs jj on your repo":
-// they only read it (`jjIn`, git from its root), at startup, before anything
-// else runs. Their one write is a file, `.git/info/exclude` (`planExclude`).
+// they only read it (`jjIn`, git from its root), at startup, before the owner
+// of your repo starts. Their one write is a file, your repo's exclude file
+// (`planExclude`): `prepareProjectDir` adds `.pineta/` to it, and
+// `prepareShared` the shared directories.
 //
 // Only jj can say where a jj repo is: a secondary workspace's `.jj/repo` is a
 // file, and from a jj workspace nested in another repo, git names the outer
@@ -26,14 +29,17 @@ import type { ProjectRecord } from "@pineta/core"
 import {
   type DiskPaths,
   decodeLaneConfig,
+  EXCLUDE_LINE,
   type HostFacts,
   IGNORE_FILE,
   type LaneConfig,
   type Link,
-  laneIgnoreDir,
   laneIgnores,
+  type ProjectDir,
+  pinetaDir,
   planExclude,
   planHost,
+  planProjectDir,
   planRoot,
   planShared,
   type RootFacts,
@@ -42,18 +48,35 @@ import {
 } from "./plan.ts"
 import { jjIn, lines, run } from "./run.ts"
 
-/** Gather what jj, then git, say from `dir`. */
+/** Gather whether `dir` is a directory, then what jj, then git, say from it. */
 async function gatherRoot(dir: string): Promise<RootFacts> {
+  const none = { dir, jjRoot: null, gitTop: null, home: homedir() }
+  const found = await stat(dir).catch(() => null)
+  if (found?.isDirectory() !== true) return { ...none, isDirectory: false }
   const root = await jjIn(dir, ["workspace", "root", "--ignore-working-copy"])
-  if (root.ok)
-    return { dir, jjRoot: root.stdout.trim(), gitTop: null, home: homedir() }
+  if (root.ok) return { ...none, isDirectory: true, jjRoot: root.stdout.trim() }
   const top = await run("git", ["rev-parse", "--show-toplevel"], { cwd: dir })
   return {
-    dir,
-    jjRoot: null,
+    ...none,
+    isDirectory: true,
     gitTop: top.ok ? top.stdout.trim() : null,
-    home: homedir(),
   }
+}
+
+/**
+ * The project's root from `dir`, with `.pineta/` excluded in its repo before
+ * anything is written there; or why `dir` cannot be a project. Run again on
+ * the same folder, it writes nothing.
+ */
+export async function prepareProjectDir(dir: string): Promise<ProjectDir> {
+  const planned = planProjectDir(await gatherRoot(dir))
+  if (planned.kind === "refused" || planned.repo === null) return planned
+  return (await excludeInYours(planned.root, [EXCLUDE_LINE]))
+    ? planned
+    : {
+        kind: "refused",
+        refusal: { kind: "unexcludable", root: planned.root },
+      }
 }
 
 /** `container`'s own directory, from its status; null when it is not running. */
@@ -107,7 +130,7 @@ async function probeClone(dir: string, near: string): Promise<boolean> {
 /** Where lanes' disks and snapshots are, once `container` is known. */
 const diskPaths = (app: string, root: string): DiskPaths => ({
   volumes: path.join(app, "volumes"),
-  snapshots: path.join(root, ".pineta", "snapshots"),
+  snapshots: pinetaDir(root).snapshots,
 })
 
 /**
@@ -118,7 +141,7 @@ export async function prepareHost(dir: string): Promise<{
   readonly project: ProjectRecord
   readonly paths: DiskPaths | null
 }> {
-  const root = planRoot(await gatherRoot(dir))
+  const root = planRoot(await prepareProjectDir(dir), dir)
   const installed = (await run("container", ["--version"])).ok
   const app = installed ? await appRoot() : null
   const facts: HostFacts = {
@@ -142,37 +165,29 @@ export async function prepareHost(dir: string): Promise<{
   }
   const project = planHost(facts)
   if (project.kind === "direct" || app === null) return { project, paths: null }
-  // Snapshots and the runtime live under `.pineta/`: no tracked file changes.
-  const excluded = await excludeInYours(project.root, ["/.pineta/"])
-  if (excluded !== null)
-    return {
-      project: { kind: "direct", root: project.root, reason: excluded },
-      paths: null,
-    }
   return { project, paths: diskPaths(app, project.root) }
 }
 
 /**
  * Add `lines` to your repo's exclude file, found with
  * `git rev-parse --git-path info/exclude`, so what they name changes no
- * tracked file. Returns why it could not, or null.
+ * tracked file. False when the repo has no git directory beside it (S108).
  */
 async function excludeInYours(
   root: string,
   lines: readonly string[],
-): Promise<string | null> {
+): Promise<boolean> {
   const where = await run("git", ["rev-parse", "--git-path", "info/exclude"], {
     cwd: root,
   })
-  if (!where.ok)
-    return "the repo has no git directory beside it to exclude .pineta/ in"
+  if (!where.ok) return false
   const file = path.resolve(root, where.stdout.trim())
   const next = planExclude(await readFile(file, "utf8").catch(() => ""), lines)
   if (next !== null) {
     await mkdir(path.dirname(file), { recursive: true })
     await writeFile(file, next)
   }
-  return null
+  return true
 }
 
 /** A lane config file, read and decoded; an empty one when missing or malformed. */
@@ -200,7 +215,7 @@ export const userConfigFile = (
 /**
  * Gather what `planShared` needs, plan, then execute: create missing
  * directories, add unignored ones to your repo's exclude file, and write the
- * lanes' ignore file (`laneIgnores`) in `laneIgnoreDir`. jj, not git's
+ * lanes' ignore file (`laneIgnores`) in `pinetaDir`'s `laneGit`. jj, not git's
  * index, says what is tracked: in a colocated repo the index can lag. Ignore
  * rules are git's, and jj applies them, the global file included (S45).
  */
@@ -251,7 +266,7 @@ export async function prepareShared(
       root,
       planned.exclude.map(p => `/${p}/`),
     )
-  const ignoreDir = laneIgnoreDir(root)
+  const ignoreDir = pinetaDir(root).laneGit
   await mkdir(ignoreDir, { recursive: true })
   await writeFile(
     path.join(ignoreDir, IGNORE_FILE),

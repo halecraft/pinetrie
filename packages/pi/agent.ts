@@ -142,12 +142,16 @@ export interface CreateAgentOptions {
   readonly replicaId: string
   readonly model: ModelChoice
   /**
-   * The agent's tools, and where each lane uses them; null for no tools.
-   * Tools run as the host's user, so they are on only when asked for.
+   * The project: where pi's settings, `AGENTS.md` and skills load from, with
+   * tools on or off, and where a call that names no lane works. Absent, the
+   * process's working directory: an agent with no project, as in a suite.
+   */
+  readonly project?: string
+  /**
+   * How each lane uses the agent's tools; null for no tools. Tools run as
+   * the host's user, so they are on only when asked for.
    */
   readonly tools: {
-    /** The project: where pi's settings, `AGENTS.md` and skills load from. */
-    readonly project: string
     /** How a lane's tools reach its files: its container, or a directory (ADR-0034). */
     readonly access: (lane: LaneName) => LaneAccess
     readonly hooks: LaneHooks
@@ -285,7 +289,7 @@ export interface Agent extends CommandFiles, Banners {
 export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
   const { documents, replicaId, tools } = options
 
-  const project = tools?.project ?? process.cwd()
+  const project = options.project ?? process.cwd()
   const setup = await setUpModel(options.model, {
     cwd: project,
     skillsDir: SKILLS_DIR,

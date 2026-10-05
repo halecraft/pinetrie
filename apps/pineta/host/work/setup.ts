@@ -21,12 +21,12 @@ import {
   jjIn,
   type LaneSpec,
   laneContainer,
-  laneIgnoreDir,
   lineConfig,
   type Mount,
   NO_GRANTS,
   normalShared,
   PINETA_INSTALL,
+  pinetaDir,
   planHostMounts,
   planLinks,
   planMounts,
@@ -109,7 +109,7 @@ export interface Setup {
 
 export async function startSetup(input: {
   readonly basics: Basics
-  /** The directory the host runs from, or null with no tools. */
+  /** The project's folder, whose root `prepareHost` finds; null with no tools. */
   readonly dir: string | null
   /** `PINETA_LANES=0`: a new root lane works directly by default. */
   readonly defaultDirect: boolean
@@ -205,7 +205,7 @@ export async function startSetup(input: {
         hostWorkingCopy: root,
         pineta: PINETA_INSTALL,
         runtime: r.runtime,
-        ignoreDir: laneIgnoreDir(root),
+        ignoreDir: pinetaDir(root).laneGit,
         links: r.links,
         grants: grants.mounts,
         shared: base ? [] : (lanes?.shared ?? []),
@@ -336,10 +336,7 @@ async function prepare(
   const images = await prepareImages(at, playwrightVersion(), log)
   const refused = await checkImage(images.lane)
   if (refused !== null) throw new Error(refused)
-  const runtime = await ensureRuntime(
-    path.join(at, ".pineta", "runtime"),
-    images.runtimeFrom,
-  )
+  const runtime = await ensureRuntime(pinetaDir(at).runtime, images.runtimeFrom)
   // Your jj config, not your repo: asked from its root, as startup asks.
   const config = async (key: string, fallback: string) => {
     const ran = await jjIn(at, ["config", "get", key])

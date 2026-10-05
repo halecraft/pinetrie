@@ -79,7 +79,7 @@ import {
   openedWords,
   planLoads,
 } from "./docs.ts"
-import { hotReload as pauseHotReload } from "./hot-reload.ts"
+import { hotReload as holdHotReload } from "./hot-reload.ts"
 import { compactAfter, sweepBlobs, sweepHistories } from "./housekeeping.ts"
 import { startHttp } from "./http.ts"
 import { lineDocPrefix } from "./lines.ts"
@@ -118,10 +118,12 @@ export interface StartHostOptions {
   /** No default: a suite that forgot one must not spend the person's models. */
   readonly model: ModelChoice
   /**
-   * The agent's tools, and the project they work in: each lane in its own
-   * container, on its own disk (ADR-0034). Absent or null, the agent has none.
+   * The project (ADR-0086): where pi's settings and `AGENTS.md` load from,
+   * and, with `tools`, where the agent reads, writes and runs commands, each
+   * lane in its own container, on its own disk (ADR-0034). Absent or null:
+   * no project, and no tools.
    */
-  readonly tools?: { readonly project: string } | null
+  readonly project?: { readonly dir: string; readonly tools: boolean } | null
   /**
    * Whether a new root lane gets its own copy by default. False makes every
    * new root lane work directly in the project (`PINETA_LANES=0`).
@@ -205,7 +207,7 @@ export async function startHost({
   bind = DEFAULT_BIND,
   key: givenKey,
   model,
-  tools = null,
+  project = null,
   lanes = true,
   containers = true,
   userConfig = userConfigFile(),
@@ -217,6 +219,7 @@ export async function startHost({
   log = console.log,
 }: StartHostOptions): Promise<RunningHost> {
   const key = isLoopback(bind) ? null : (givenKey ?? newKey())
+  const toolsIn = project?.tools === true ? project.dir : null
 
   // --- transport + exchange ------------------------------------------------
   const serverTransport = new WebsocketServerTransport()
@@ -383,13 +386,16 @@ export async function startHost({
     basics,
     baseNews,
     ensureNames: names.ensure,
-    dir: tools?.project ?? null,
+    dir: toolsIn,
     defaultDirect: !lanes,
     containers,
     userConfig: { file: userConfig, json: userJson },
     agent: theAgent,
     lineCommands: key === null,
   })
+
+  // Lane work's root when it has one; the folder as given without tools.
+  const projectRoot = work.project?.root ?? project?.dir ?? null
 
   // --- pi stack ------------------------------------------------------------
   const commandRenames = decodeCommandRenames(userJson)
@@ -400,11 +406,11 @@ export async function startHost({
     commandRenames,
     blobs,
     ...(agentDir === undefined ? {} : { agentDir }),
+    ...(projectRoot === null ? {} : { project: projectRoot }),
     tools:
-      tools === null
+      toolsIn === null
         ? null
         : {
-            project: work.project?.root ?? tools.project,
             access: work.access,
             hooks: {
               ...work.hooks,
@@ -445,15 +451,11 @@ export async function startHost({
     )
 
   log(
-    `[host] agent ready — model ${agent.modelLabel}; tools ${tools === null ? "off" : `on, in ${work.project?.root ?? tools.project}`}`,
+    `[host] agent ready — model ${agent.modelLabel}; tools ${toolsIn === null ? "off" : `on, in ${projectRoot}`}`,
   )
 
   // --- the shell -----------------------------------------------------------
-  const hotReload = pauseHotReload({
-    session,
-    live,
-    project: () => work.project,
-  })
+  const hotReload = holdHotReload({ session, live })
   // Commands are received only from `startControl`, after `recover`.
   const listener = Control.listen(exchange)
   const cardPort = startCards({ exchange, store, session })
@@ -587,7 +589,7 @@ export async function startHost({
     port,
     bind,
     key,
-    tools: tools !== null,
+    tools: toolsIn !== null,
     serverTransport,
     hotReload,
     blobs,

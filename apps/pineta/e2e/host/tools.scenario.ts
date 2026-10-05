@@ -69,7 +69,7 @@ async function run(check: Checks["check"]): Promise<void> {
     const open = (log: (m: string) => void, store: Store = stored) =>
       startSuiteHost({
         model: { kind: "scripted", script },
-        tools: { project: work },
+        project: { dir: work, tools: true },
         // `verify` runs anywhere: lanes of their own are `e2e:lanes`'s.
         containers: false,
         store,

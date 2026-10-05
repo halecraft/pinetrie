@@ -45,7 +45,7 @@ async function run(check: Checks["check"]): Promise<void> {
     const GRACE_MS = 1_000
     const bh = await startSuiteHost({
       model: { kind: "scripted", script },
-      tools: { project },
+      project: { dir: project, tools: true },
       containers: false,
       userConfig,
       blobGraceMs: GRACE_MS,

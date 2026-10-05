@@ -37,7 +37,7 @@ async function run(check: Checks["check"]): Promise<void> {
     const script = scriptedModel()
     const dh = await startSuiteHost({
       model: { kind: "scripted", script },
-      tools: { project },
+      project: { dir: project, tools: true },
       containers: false,
       log: () => {},
     })

@@ -1,53 +1,68 @@
-// host/hot-reload — Vite's hot updates, held while a lane works directly in
-// the working copy this host serves.
+// host/hot-reload — Vite's hot updates, held while a lane working directly
+// in a directory edits a file in it.
 //
 // Agents edit their own disks, so the page's code changes only by your hand,
 // and hot reload stays on (ADR-0034). A lane working directly in your working
-// copy edits the client this host serves, mid-run: while one runs, updates
-// are held, and its end reloads the page once (ADR-0022's reason).
+// copy may edit the client this host serves, mid-run: an update to a file
+// inside a running direct lane's directory is held, and the run's end
+// reloads the page once (ADR-0022's reason). Whether the project is Pineta
+// does not come into it: Vite reports only the files it serves, so a lane
+// working in another project holds nothing.
 
-import path from "node:path"
-import type { ProjectRecord } from "@pineta/core"
+import { realpathSync } from "node:fs"
+import { isWithin } from "@pineta/core"
 import { readLaneRecords, readRunning } from "@pineta/reads"
 import type { LiveDocHandle, SessionDocHandle } from "@pineta/schema"
 
-export type HotReload = ReturnType<typeof pausedWhile>
+export type HotReload = ReturnType<typeof hotReload>
 
-/** Hot reload, paused while a direct lane inside the project runs. */
-export function hotReload(input: {
-  readonly session: SessionDocHandle
-  readonly live: LiveDocHandle
-  readonly project: () => ProjectRecord | null
-}): HotReload {
-  return pausedWhile(() => {
-    const project = input.project()
-    if (project === null) return false
-    return [...readLaneRecords(input.session).values()].some(r => {
-      const w = readRunning(input.live, r.lane) ? r.work : null
-      return w?.kind === "direct" && isWithin(w.dir, project.root)
-    })
-  })
+/**
+ * Whether an update to `file` waits: it is inside a directory a running
+ * direct lane works in. Both are real paths, as Vite reports `file`.
+ */
+export function isHeld(file: string, directDirs: readonly string[]): boolean {
+  return directDirs.some(dir => isWithin(file, dir))
 }
 
-/** Whether `dir` is `root` or inside it. */
-const isWithin = (dir: string, root: string): boolean => {
-  const rel = path.relative(root, dir)
-  return rel === "" || (!rel.startsWith("..") && !path.isAbsolute(rel))
+/** The real path of each running direct lane's directory. */
+function runningDirectDirs(
+  session: SessionDocHandle,
+  live: LiveDocHandle,
+): string[] {
+  return [...readLaneRecords(session).values()].flatMap(r =>
+    r.work?.kind === "direct" && readRunning(live, r.lane)
+      ? [realPath(r.work.dir)]
+      : [],
+  )
+}
+
+/** A missing directory holds no file Vite could report: its path will do. */
+const realPath = (dir: string): string => {
+  try {
+    return realpathSync(dir)
+  } catch {
+    return dir
+  }
 }
 
 /**
- * A Vite plugin that holds hot updates while `paused()` says so, and a hook
- * that reloads the page once when the pause ends: a run's end is the moment.
+ * A Vite plugin that holds each hot update `isHeld` says waits, and a hook
+ * that reloads the page once at a run's end, when none of the held files
+ * waits any longer.
  */
-function pausedWhile(paused: () => boolean) {
-  let held = false
+export function hotReload(input: {
+  readonly session: SessionDocHandle
+  readonly live: LiveDocHandle
+}) {
+  const dirs = () => runningDirectDirs(input.session, input.live)
+  const held = new Set<string>()
   let reload = () => {}
   return {
     plugin: {
-      name: "pineta:paused-while-direct",
-      handleHotUpdate() {
-        if (!paused()) return undefined
-        held = true
+      name: "pineta:held-while-direct",
+      handleHotUpdate({ file }: { readonly file: string }) {
+        if (!isHeld(file, dirs())) return undefined
+        held.add(file)
         return []
       },
     },
@@ -55,10 +70,11 @@ function pausedWhile(paused: () => boolean) {
       reload = fullReload
     },
     runEnded() {
-      if (held && !paused()) {
-        held = false
-        reload()
-      }
+      if (held.size === 0) return
+      const now = dirs()
+      if ([...held].some(file => isHeld(file, now))) return
+      held.clear()
+      reload()
     },
   }
 }

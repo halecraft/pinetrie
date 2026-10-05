@@ -290,8 +290,8 @@ describe("lanes in a harness", () => {
       documents: oneRoot(doc),
       replicaId: "test",
       model: { kind: "scripted", script },
+      project: root,
       tools: {
-        project: root,
         access: lane => {
           const where = wheres.get(lane)
           if (where === undefined) throw new Error(`no access for ${lane}`)
@@ -515,8 +515,8 @@ describe("lanes in a harness", () => {
       documents: oneRoot(first.doc),
       replicaId: "after",
       model: { kind: "scripted", script },
+      project: root,
       tools: {
-        project: root,
         access: l => wheres.get(l) ?? where(root),
         hooks: {
           turnDone: async () => {},

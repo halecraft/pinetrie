@@ -14,6 +14,7 @@ import {
   type ForkStart,
   HOST_WORKING_COPY,
   hostPathInLane,
+  isWithin,
   type LaneName,
   NO_EDITOR,
   type ProjectRecord,
@@ -198,18 +199,15 @@ export function planHostMounts(input: {
     readonly reason: string
   }[]
 } {
-  const contains = (outer: string, inner: string) =>
-    inner === outer ||
-    inner.startsWith(outer.endsWith("/") ? outer : `${outer}/`)
   const refused: { path: string; reason: string }[] = []
   const allowed: string[] = []
   for (const root of new Set(input.roots.map(r => path.resolve(r)))) {
     const reason =
       root === "/"
         ? "it is the file system's root"
-        : contains(root, input.home)
+        : isWithin(input.home, root)
           ? "it is, or holds, your home directory"
-          : contains(root, input.agentDir)
+          : isWithin(input.agentDir, root)
             ? "it is, or holds, pi's agent directory"
             : root.includes(",") && root.includes(":")
               ? "it has both a comma and a colon, which container cannot mount"
@@ -218,7 +216,7 @@ export function planHostMounts(input: {
     else refused.push({ path: root, reason })
   }
   const mounts = allowed
-    .filter(r => !allowed.some(o => o !== r && contains(o, r)))
+    .filter(r => !allowed.some(o => o !== r && isWithin(r, o)))
     .sort()
   return { mounts, refused }
 }
@@ -548,9 +546,33 @@ export function sharedCandidates(entries: {
   return { candidates, refused }
 }
 
-/** Where the host keeps a project's lane ignore file (`laneIgnores`). */
-export const laneIgnoreDir = (root: string): string =>
-  path.join(root, ".pineta", "lane-git")
+/** The line in your repo's exclude file that keeps `pinetaDir` out of it. */
+export const EXCLUDE_LINE = "/.pineta/"
+
+/**
+ * What the host keeps in a project, all under `.pineta/` at its root, which
+ * `EXCLUDE_LINE` keeps out of the project's repo (ADR-0086).
+ */
+export function pinetaDir(root: string): {
+  readonly dir: string
+  /** The session's SQLite file, unless `PINETA_STORE` names another. */
+  readonly store: string
+  /** Snapshots of lanes' disks (`DiskPaths.snapshots`). */
+  readonly snapshots: string
+  /** The lane runtime, one directory per image tag. */
+  readonly runtime: string
+  /** The lanes' ignore file's directory (`laneIgnores`). */
+  readonly laneGit: string
+} {
+  const dir = path.join(root, ".pineta")
+  return {
+    dir,
+    store: path.join(dir, "pineta.db"),
+    snapshots: path.join(dir, "snapshots"),
+    runtime: path.join(dir, "runtime"),
+    laneGit: path.join(dir, "lane-git"),
+  }
+}
 
 /** A shared path as relative, normalized, with no trailing slash. */
 export const normalShared = (given: string): string =>
@@ -1092,9 +1114,11 @@ export function planHost(f: HostFacts): ProjectRecord {
     : { kind: "direct", root, reason }
 }
 
-/** What jj and git say about where the host runs. */
+/** What the file system, jj and git say about a project's folder. */
 export interface RootFacts {
   readonly dir: string
+  /** Whether `dir` is a directory; jj and git are asked only when it is. */
+  readonly isDirectory: boolean
   /** The jj workspace root jj names from `dir`, or null. */
   readonly jjRoot: string | null
   /** git's top level from `dir`, asked only when jj names nothing. */
@@ -1102,34 +1126,78 @@ export interface RootFacts {
   readonly home: string
 }
 
+/** Why a folder cannot be a project (`projectDirWords` words it). */
+export type ProjectDirRefusal =
+  /** Missing, or not a directory. */
+  | { readonly kind: "missing"; readonly dir: string }
+  /** Your home directory or `/`. */
+  | { readonly kind: "unsafe"; readonly root: string }
+  /** A jj repo with no git directory beside it to exclude `.pineta/` in (S108). */
+  | { readonly kind: "unexcludable"; readonly root: string }
+
+/** A project's root and the repo there, or why the folder cannot be one. */
+export type ProjectDir =
+  | {
+      readonly kind: "found"
+      readonly root: string
+      readonly repo: "jj" | "git" | null
+    }
+  | { readonly kind: "refused"; readonly refusal: ProjectDirRefusal }
+
 /**
- * The project's root: jj's, else git's. Never your home directory or `/`: a
- * home directory that is a dotfiles repo is what git names for any project
- * below it with no repo of its own. With no jj repo, lanes work directly: a
- * lane's commits need jj on both sides.
+ * The project's root: jj's, else git's, else the folder. Never your home
+ * directory or `/`: a home directory that is a dotfiles repo is what git
+ * names for any project below it with no repo of its own.
  */
-export function planRoot(f: RootFacts): HostFacts["root"] {
-  const target = f.jjRoot ?? f.gitTop ?? f.dir
-  const unsafe =
-    path.resolve(target) === path.resolve(f.home) ||
-    path.resolve(target) === path.parse(target).root
-  if (unsafe)
+export function planProjectDir(f: RootFacts): ProjectDir {
+  if (!f.isDirectory)
+    return { kind: "refused", refusal: { kind: "missing", dir: f.dir } }
+  const root = f.jjRoot ?? f.gitTop ?? f.dir
+  if (
+    path.resolve(root) === path.resolve(f.home) ||
+    path.resolve(root) === path.parse(root).root
+  )
+    return { kind: "refused", refusal: { kind: "unsafe", root } }
+  const repo = f.jjRoot !== null ? "jj" : f.gitTop !== null ? "git" : null
+  return { kind: "found", root, repo }
+}
+
+/** A refusal's words, for the log, `ProjectRecord.reason` and the command line. */
+export function projectDirWords(r: ProjectDirRefusal): string {
+  switch (r.kind) {
+    case "missing":
+      return `${r.dir} is not a directory`
+    case "unsafe":
+      return `${r.root} is your home directory or the file system's root`
+    case "unexcludable":
+      return `${r.root} has no git directory beside its jj repo to exclude .pineta/ in: \`jj git init --colocate\` makes one, or PINETA_STORE can name a store elsewhere`
+  }
+}
+
+/**
+ * Where lanes work, from what `planProjectDir` found in `dir`. A folder
+ * refused works directly where it is, or at its root when only the exclude
+ * failed. With no jj repo, lanes work directly: a lane's commits need jj on
+ * both sides.
+ */
+export function planRoot(d: ProjectDir, dir: string): HostFacts["root"] {
+  if (d.kind === "refused")
     return {
-      direct: f.dir,
-      reason: `${target} is your home directory or the file system's root`,
+      direct: d.refusal.kind === "unexcludable" ? d.refusal.root : dir,
+      reason: projectDirWords(d.refusal),
     }
-  if (f.jjRoot === null)
+  if (d.repo !== "jj")
     return {
-      direct: target,
-      reason: `${target} has no jj repo: \`jj git init --colocate\` gives its lanes their own copies`,
+      direct: d.root,
+      reason: `${d.root} has no jj repo: \`jj git init --colocate\` gives its lanes their own copies`,
     }
-  return { ok: f.jjRoot }
+  return { ok: d.root }
 }
 
 /**
  * Your repo's exclude file with each of `lines` in it, appended in order, or
- * null when they are all there already. `/.pineta/` holds snapshots and the
- * runtime; shared directories are added as `/<path>/`.
+ * null when they are all there already. `/.pineta/` holds what `pinetaDir`
+ * lays out; shared directories are added as `/<path>/`.
  */
 export function planExclude(
   current: string,

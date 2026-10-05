@@ -173,7 +173,7 @@ export async function sectionHost(input: {
   const script = scriptedModel()
   const host = await startSuiteHost({
     model: { kind: "scripted", script },
-    tools: { project: dir },
+    project: { dir: dir, tools: true },
     ...(input.store === undefined ? {} : { store: input.store }),
     ...(input.userConfig === undefined ? {} : { userConfig: input.userConfig }),
     ...(input.agentDir === undefined ? {} : { agentDir: input.agentDir }),

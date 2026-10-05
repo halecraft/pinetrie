@@ -1293,7 +1293,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the agent is given no tools",
     file: "apps/pineta/host/index.ts",
-    from: "    tools:\n      tools === null\n        ? null",
+    from: "    tools:\n      toolsIn === null\n        ? null",
     to: "    tools:\n      true\n        ? null",
     suite: "host",
     scenario: "tools",

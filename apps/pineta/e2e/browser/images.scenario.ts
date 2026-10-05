@@ -306,7 +306,7 @@ async function run(check: Checks["check"]): Promise<void> {
       const script = scriptedModel()
       const imageHost = await startSuiteHost({
         model: { kind: "scripted", script },
-        tools: { project: work },
+        project: { dir: work, tools: true },
         containers: false,
         log: () => {},
       })

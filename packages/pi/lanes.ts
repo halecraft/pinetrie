@@ -19,6 +19,7 @@ import {
   type EntryId,
   HOST_WORKING_COPY,
   hostPathInLane,
+  isWithin,
   type LaneName,
   NO_EDITOR,
   type RuntimeProgram,
@@ -268,8 +269,7 @@ function skillsInLane<S extends { filePath: string; baseDir: string }>(
   skills: readonly S[] | undefined,
   hostPaths: readonly string[],
 ): S[] {
-  const mounted = (p: string) =>
-    hostPaths.some(r => p === r || p.startsWith(`${r}/`))
+  const mounted = (p: string) => hostPaths.some(r => isWithin(p, r))
   return (skills ?? [])
     .filter(s => mounted(s.filePath))
     .map(s => ({

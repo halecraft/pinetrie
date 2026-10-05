@@ -1,4 +1,11 @@
-import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises"
+import {
+  mkdir,
+  mkdtemp,
+  readFile,
+  realpath,
+  rm,
+  writeFile,
+} from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { entryId, laneNameForThread } from "@pineta/core"
@@ -13,6 +20,7 @@ import {
   copyFacts,
   execute,
   type LaneStep,
+  prepareProjectDir,
   type Ran,
   type Runner,
   run,
@@ -167,6 +175,47 @@ test("copyFacts (S103, ADR-0080): the copy on its bookmark, on the merge whose t
       parents: [stack],
       bookmark: merge,
       descends: false,
+    })
+  } finally {
+    await rm(dir, { recursive: true, force: true })
+  }
+})
+
+test("prepareProjectDir (ADR-0086, S108): a repo's root with .pineta/ excluded once; a non-colocated repo refused; a plain folder untouched", async () => {
+  const dir = await realpath(await mkdtemp(path.join(tmpdir(), "pineta-dir-")))
+  try {
+    const env = {
+      ...process.env,
+      JJ_USER: "Probe",
+      JJ_EMAIL: "probe@example.com",
+    }
+    const colocated = path.join(dir, "colocated")
+    await run("jj", ["git", "init", "--colocate", colocated], { env })
+    await mkdir(path.join(colocated, "sub"))
+    const exclude = path.join(colocated, ".git", "info", "exclude")
+    const before = await readFile(exclude, "utf8").catch(() => "")
+    const found = { kind: "found", root: colocated, repo: "jj" }
+    expect(await prepareProjectDir(path.join(colocated, "sub"))).toEqual(found)
+    expect(await prepareProjectDir(colocated)).toEqual(found)
+    expect(await readFile(exclude, "utf8")).toBe(`${before}/.pineta/\n`)
+
+    const apart = path.join(dir, "apart")
+    await run("jj", ["git", "init", "--no-colocate", apart], { env })
+    expect(await prepareProjectDir(apart)).toEqual({
+      kind: "refused",
+      refusal: { kind: "unexcludable", root: apart },
+    })
+
+    const plain = path.join(dir, "plain")
+    await mkdir(plain)
+    expect(await prepareProjectDir(plain)).toEqual({
+      kind: "found",
+      root: plain,
+      repo: null,
+    })
+    expect(await prepareProjectDir(path.join(dir, "missing"))).toEqual({
+      kind: "refused",
+      refusal: { kind: "missing", dir: path.join(dir, "missing") },
     })
   } finally {
     await rm(dir, { recursive: true, force: true })

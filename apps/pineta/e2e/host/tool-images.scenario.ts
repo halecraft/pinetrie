@@ -43,7 +43,7 @@ async function run(check: Checks["check"]): Promise<void> {
     const start = () =>
       startSuiteHost({
         model: { kind: "scripted", script },
-        tools: { project: work },
+        project: { dir: work, tools: true },
         containers: false,
         store: opened.store,
         blobs: opened.blobs,

@@ -256,7 +256,7 @@ in the repo, with hot reload off (`PINETA_TOOLS=0` turns tools off). The host bi
 admits only the invite key. Models come from the person's pi setup (only the
 extensions' providers are applied). Replies and tool output are one kind of
 stream, written as text edits; pi's checkpoints are stored the same way. Stop
-ends a thread's turn. The session persists in `.pineta/pineta.db`.
+ends a thread's turn. The session persists in the project's `.pineta/pineta.db`.
 
 **ADR-0060 — integrated offers stack on an integration line; the repo is the
 ledger** (built). Integrating an offer moves one bookmark forward to it,
@@ -455,6 +455,14 @@ The files show whole, by their conflict sections, by name or as a count,
 whichever fits with each side's newest reason, and `jj resolve --list` is
 the list of what is left. A catch-up whose smallest prompt cannot fit is
 refused before it merges.
+
+**ADR-0086 — the host serves the project its command line names** (built).
+`pnpm host [folder]` serves that folder's root, Pineta's own repo without
+one; a relative folder is read from Pineta's root, since pnpm does not pass
+on the shell's directory (S108). Each project keeps its session in its own
+`.pineta/pineta.db`, and the host adds `/.pineta/` to the repo's exclude
+file first, or refuses to start. The project is a host option apart from
+tools, so pi loads the project's settings with tools off too.
 **ADR-0019 — a lane is a line of work, not a unit of parallelism.** A person's
 lane is a *conversation lane* and never touches disk. A *work lane* carries
 agent work and will own a jj workspace, so creating one is deliberate, and fold
@@ -783,10 +791,16 @@ context.**
 
 ---
 
-### Running Pineta on itself
+### Running Pineta
 
-- `pnpm run host` starts the development host: loopback, your pi settings'
-  model, the session in `.pineta/pineta.db`. The agent has its tools, and each
+- `pnpm run host` starts the development host on Pineta's own repo:
+  loopback, your pi settings' model, the session in `.pineta/pineta.db`.
+  `pnpm run host <folder>` serves another project instead, at that folder's
+  jj or git root (ADR-0086). A relative folder is read from Pineta's root,
+  not the shell's directory. Each project keeps its own session in its
+  root's `.pineta/`, which the host adds to the repo's exclude file before
+  writing there; a jj repo with no git directory beside it is refused. The
+  agent has its tools, and each
   thread's agent works in its own Linux container (ADR-0034), on a disk
   cloned from the turn it branched at: a root thread's starts from your
   committed work (`@-`), with dependencies installed, so commit what it should
@@ -858,7 +872,8 @@ context.**
 - **Working directly:** the send button's `▾` sets a new thread to work in
   your working copy, or any directory, with no container, as you. A branch
   inherits its thread's setting. `PINETA_LANES=0` makes it the default. Such
-  a thread shares its directory, and hot reload waits while one runs in yours.
+  a thread shares its directory, and while one runs, hot reload holds an update
+  to a file inside it.
 - **Summaries of asks** (ADR-0056, on by default since ADR-0071, shaped by
   ADR-0075): a model, the one commit messages use, writes each long ask's
   work a headline and a few points while someone reads the running thread,
@@ -878,7 +893,7 @@ context.**
   the key. Everyone with the link gets in, and with tools on, can run commands
   on this machine as you. Use a trusted network or a tunnel.
 - `PINETA_PROVIDER` / `PINETA_MODEL` override the model. A root schema change
-  cannot open an existing store: move `.pineta/pineta.db` aside.
+  cannot open an existing store: move the project's `.pineta/pineta.db` aside.
 
 ## 7. Working agreements
 

@@ -840,4 +840,14 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "messageAt: the host's own messages show as their line",
   },
+  // ── paths compared as strings ──
+  {
+    name: "isWithin takes a sibling with the same prefix",
+    file: "packages/core/paths.ts",
+    from: '    inner.startsWith(outer.endsWith("/") ? outer : ',
+    to: "    inner.startsWith(true ? outer : ",
+    command: unit,
+    expect:
+      "isWithin: the path itself and what is under it, never a sibling with the same prefix",
+  },
 ]

@@ -360,4 +360,32 @@ export const mutations: readonly Mutation[] = [
     scenario: "images",
     expect: "the default image has python3",
   },
+  // ── a project's folder (ADR-0086) ──
+  {
+    name: "a home directory can be a project",
+    file: "packages/lanes/plan.ts",
+    from: "    path.resolve(root) === path.resolve(f.home) ||\n",
+    to: "    false ||\n",
+    command: unit,
+    expect:
+      "planProjectDir: jj's root, else git's, else the folder; never missing, your home directory or /",
+  },
+  {
+    name: "a missing folder can be a project",
+    file: "packages/lanes/plan.ts",
+    from: "  if (!f.isDirectory)\n",
+    to: "  if (false)\n",
+    command: unit,
+    expect:
+      "planProjectDir: jj's root, else git's, else the folder; never missing, your home directory or /",
+  },
+  {
+    name: "a project's repo is not told to ignore .pineta/",
+    file: "packages/lanes/host.ts",
+    from: "  return (await excludeInYours(planned.root, [EXCLUDE_LINE]))\n",
+    to: "  return true\n",
+    command: unit,
+    expect:
+      "prepareProjectDir (ADR-0086, S108): a repo's root with .pineta/ excluded once; a non-colocated repo refused; a plain folder untouched",
+  },
 ]

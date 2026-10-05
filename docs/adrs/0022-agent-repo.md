@@ -5,7 +5,9 @@
 the session is compacted, on `json.bind`. Amended by ADR-0032: the agent's
 tools run in its lane's workspace, never in the repo the host runs from. Amended
 by ADR-0042: admission also checks where a request comes from. Amended by
-ADR-0044: a stream no longer closes when its message or tool ends.
+ADR-0044: a stream no longer closes when its message or tool ends. Amended by
+ADR-0086: the repo the host runs from is the default project; `pnpm host
+<folder>` names another.
 
 **Context.** To use Pineta to build Pineta, its agent needs pi's editing
 abilities: read, write, edit, and run commands. Pineta is shared, streamed and
