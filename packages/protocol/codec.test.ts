@@ -434,6 +434,8 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
     { kind: "line-moved" },
     { kind: "queued" },
     { kind: "moved" },
+    { kind: "held" },
+    { kind: "released" },
     {
       kind: "undone",
       cards: [

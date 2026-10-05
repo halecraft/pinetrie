@@ -170,7 +170,7 @@ test("a stop with a message card queued holds the queue in the same write as its
   expect(methods(handle.calls)).toEqual(["abort"])
 })
 
-test("a hold is written once, its release deleted and the lane drained; an unknown lane is refused (ADR-0048 step 7)", async () => {
+test("a hold is written once, its release deleted and the lane drained, each answered with how the queue is now; an unknown lane is refused (ADR-0048 step 7)", async () => {
   const { b, lane } = running()
   const writes: unknown[] = []
   const drained: string[] = []
@@ -185,17 +185,17 @@ test("a hold is written once, its release deleted and the lane drained; an unkno
     drain: (l: LaneName) => void drained.push(l),
   }
   expect(await handleQueueHold(deps, lane, true, ada)).toEqual({
-    kind: "moved",
+    kind: "held",
   })
   expect(await handleQueueHold(deps, lane, true, bea)).toEqual({
-    kind: "nothing",
+    kind: "held",
   })
   expect(writes).toEqual([
     [setRecord(QUEUE_HOLD, { lane, by: ada, at: 1_000 })],
   ])
   expect(drained).toEqual([])
   expect(await handleQueueHold(deps, lane, false, bea)).toEqual({
-    kind: "moved",
+    kind: "released",
   })
   expect(writes.at(-1)).toEqual([deleteRecord(QUEUE_HOLD, lane)])
   expect(drained).toEqual([lane])

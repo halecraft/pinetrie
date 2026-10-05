@@ -138,6 +138,15 @@ export const mutations: readonly Mutation[] = [
     expect: "a queued fact is appended as the fact",
   },
   {
+    name: "a queue hold answers the opposite of what it did",
+    file: "apps/pinetrie/host/commands/lane.ts",
+    from: '  return { kind: held ? "held" : "released" }',
+    to: '  return { kind: held ? "released" : "held" }',
+    command: unit,
+    expect:
+      "a hold is written once, its release deleted and the lane drained, each answered with how the queue is now",
+  },
+  {
     name: "a fact's card waits for a drain nobody asks for",
     file: "apps/pinetrie/host/commands/lane.ts",
     from: "  deps.drain(fact.lane)\n",

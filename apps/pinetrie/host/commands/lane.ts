@@ -136,8 +136,9 @@ export async function handleStop(
 }
 
 /**
- * Hold a thread's queue, or release it (ADR-0048 step 7). A release asks
- * for the lane's drain: nothing else would pop what waited.
+ * Hold a thread's queue, or release it (ADR-0048 step 7), answering how the
+ * queue is now: `held` or `released`, though it was already so. A release
+ * asks for the lane's drain: nothing else would pop what waited.
  */
 export async function handleQueueHold(
   deps: Pick<LaneDeps, "basics" | "drain"> & {
@@ -166,7 +167,7 @@ export async function handleQueueHold(
   // execute
   if (writes.length > 0) await deps.agent.writeValues(writes)
   if (!held) deps.drain(lane)
-  return writes.length === 0 ? { kind: "nothing" } : { kind: "moved" }
+  return { kind: held ? "held" : "released" }
 }
 
 /**

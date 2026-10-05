@@ -74,8 +74,12 @@ export type Outcome =
   | { readonly kind: "busy" }
   /** The lane was busy, so the host queued the chat's card behind the others (ADR-0059). */
   | { readonly kind: "queued" }
-  /** A move or a command on a card was carried out (ADR-0059). */
+  /** A move of cards, or a command on a card, was carried out (ADR-0059). */
   | { readonly kind: "moved" }
+  /** A thread's queue is held now, whoever held it first (ADR-0048 step 7). */
+  | { readonly kind: "held" }
+  /** A thread's queue is released now (ADR-0048 step 7). */
+  | { readonly kind: "released" }
   /** An undo or redo of moves moved these cards, each to the place it is now (ADR-0066). */
   | { readonly kind: "undone"; readonly cards: readonly MovedCard[] }
   /** An undo or redo found nothing to do. */
@@ -809,6 +813,10 @@ function outcomeToWire(id: string, outcome: Outcome): Reply {
       return reply({ id, outcome: "queued" })
     case "moved":
       return reply({ id, outcome: "moved" })
+    case "held":
+      return reply({ id, outcome: "held" })
+    case "released":
+      return reply({ id, outcome: "released" })
     case "undone":
       return reply({
         id,
@@ -877,6 +885,10 @@ export function decodeReply(wire: Reply): Outcome {
       return { kind: "queued" }
     case "moved":
       return { kind: "moved" }
+    case "held":
+      return { kind: "held" }
+    case "released":
+      return { kind: "released" }
     case "undone":
       return { kind: "undone", cards: decodeMovedCards(wire.cards) }
     case "nothing":

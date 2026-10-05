@@ -208,6 +208,8 @@ export const OUTCOME_KINDS = [
   "seen",
   "line-moved",
   "moved",
+  "held",
+  "released",
   "queued",
   "unmoved",
   "undone",

@@ -478,8 +478,8 @@ rejects `shutdown()`.
   write (`holdOnStop`, ADR-0048 step 7), so the run's end, a drain on the
   same keeper, pops nothing.
 - **`queue-hold` holds or releases a thread's queue** (`handleQueueHold`,
-  `planQueueHold`): it answers `moved` when it wrote, `nothing` when the
-  queue was already so. A release asks for the lane's drain: nothing else
+  `planQueueHold`): it answers how the queue is now, `held` or `released`,
+  whether it wrote or the queue was already so. A release asks for the lane's drain: nothing else
   would pop what waited.
 - **`reorder` and `unqueue-all` are moves of their own** (`commands/cards.ts`).
   A reorder is written in the sender's history of its place's root
