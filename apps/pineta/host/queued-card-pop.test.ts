@@ -14,21 +14,29 @@ import {
 import type { ThreadLaneHandle } from "@pineta/pi"
 import type { Outcome } from "@pineta/protocol/codec"
 import { readCardHistories, readPlaces, readPlacesRev } from "@pineta/reads"
-import { CARD_HISTORY, encodeCard, planStack, setRecord } from "@pineta/rules"
-import { beginRun, newPlacesDoc, newPresenceDoc } from "@pineta/schema"
+import {
+  CARD_HISTORY,
+  deleteRecord,
+  encodeCard,
+  planStack,
+  QUEUE_HOLD,
+  setRecord,
+} from "@pineta/rules"
+import { beginRun, newPlacesDoc, newPresenceDoc, seatKey } from "@pineta/schema"
 import { describe, expect, test } from "vitest"
 import type { CardPort } from "./cards.ts"
 import { applyWrites, basics, putValue, record } from "./fakes.ts"
 import { createProvenance } from "./provenance.ts"
 import {
   chatOfPoppedQueuedCard,
-  createBehind,
+  createWaits,
   drain,
   givenUp,
   type NextQueuedCardPop,
   type PoppedQueuedCard,
   popNextQueuedCard,
   type QueuedCardPopDeps,
+  untilNotTyped,
 } from "./queued-card-pop.ts"
 
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
@@ -72,6 +80,8 @@ const held = (
   textNow: textOf,
   holds: id => !behind.includes(id),
 })
+/** An idle lane, its queue not held, nobody typing. */
+const IDLE = { running: false, held: false, typing: new Set<CardId>() }
 const poppedOf = (top: NextQueuedCardPop): PoppedQueuedCard | null =>
   top.kind === "popped" ? top.popped : null
 
@@ -84,7 +94,7 @@ describe("popNextQueuedCard", () => {
       popNextQueuedCard(
         cards,
         LANE,
-        false,
+        IDLE,
         held(id => `text of ${id}`),
       ),
     )
@@ -99,7 +109,7 @@ describe("popNextQueuedCard", () => {
     popNextQueuedCard(
       cards,
       LANE,
-      false,
+      IDLE,
       held(() => "x"),
     )
     expect(readPlacesRev(cards)).toBe(1)
@@ -112,7 +122,7 @@ describe("popNextQueuedCard", () => {
       popNextQueuedCard(
         cards,
         LANE,
-        true,
+        { ...IDLE, running: true },
         held(() => "x"),
       ),
     ).toEqual({
@@ -123,7 +133,7 @@ describe("popNextQueuedCard", () => {
       popNextQueuedCard(
         newPlacesDoc(),
         LANE,
-        false,
+        IDLE,
         held(() => "x"),
       ),
     ).toEqual({
@@ -140,7 +150,7 @@ describe("popNextQueuedCard", () => {
       popNextQueuedCard(
         cards,
         LANE,
-        false,
+        IDLE,
         held(() => "x"),
       ).kind,
     ).toBe("idle")
@@ -153,7 +163,7 @@ describe("popNextQueuedCard", () => {
     const top = popNextQueuedCard(
       cards,
       LANE,
-      false,
+      IDLE,
       held(() => "x", ["c-1"]),
     )
     expect(top.kind === "behind" ? top.card.id : top.kind).toBe("c-1")
@@ -168,7 +178,7 @@ test("chatOfPoppedQueuedCard: the queuer's message, in the queue's mode, from th
     popNextQueuedCard(
       cards,
       LANE,
-      false,
+      IDLE,
       held(() => "@agent go"),
     ),
   )
@@ -193,6 +203,7 @@ function setUp(
   behind: readonly string[] = [],
 ) {
   const b = basics()
+  const presence = newPresenceDoc()
   const events: string[] = []
   const appended: unknown[] = []
   const sends = [...answers]
@@ -244,19 +255,39 @@ function setUp(
       events.push(`send ${popped.card.id}: ${popped.text}`)
       return sends.shift() ?? { kind: "appended", id: entryId("e-9") }
     },
+    presence,
     behind: card => {
       events.push(`behind ${card.id}`)
     },
+    typing: card => {
+      events.push(`typing ${card.id}`)
+    },
     provenance: createProvenance({
       basics: b,
-      presence: newPresenceDoc(),
+      presence,
       agent: () => ({ writeValues: async w => applyWrites(b, w) }),
     }),
   }
-  return { b, events, deps, appended }
+  return { b, events, deps, appended, presence }
 }
 
 describe("drain", () => {
+  test("a held queue pops no message; a card someone types in on top waits for them, and the cards behind it wait too (ADR-0048 step 7)", async () => {
+    const { b, events, deps, presence } = setUp({ "c-1": "a", "c-2": "b" }, [])
+    queue(b.places, "c-1", "a")
+    queue(b.places, "c-2", "b")
+    applyWrites(b, [setRecord(QUEUE_HOLD, { lane: LANE, by: ADA, at: 1 })])
+    await drain(deps, LANE)
+    expect(events).toEqual(["hydrate c-1,c-2"])
+    expect(readPlaces(b.places)).toHaveLength(2)
+    applyWrites(b, [deleteRecord(QUEUE_HOLD, LANE)])
+    presence.typingIn.set(seatKey(BEA, "s1"), "c-1")
+    events.length = 0
+    await drain(deps, LANE)
+    expect(events).toEqual(["hydrate c-1,c-2", "typing c-1"])
+    expect(readPlaces(b.places)).toHaveLength(2)
+  })
+
   test("a top card whose text is behind stops the drain and asks to be drained again; the cards behind it wait", async () => {
     const { b, events, deps } = setUp(
       { "c-1": "first", "c-2": "second" },
@@ -523,7 +554,7 @@ describe("drain: bring up to date (ADR-0055)", () => {
   })
 })
 
-describe("waiting for a queued card's text (behind)", () => {
+describe("the drain's waits for its top card", () => {
   const queuedCard = (places: ReturnType<typeof newPlacesDoc>, id: string) => {
     const card = readPlaces(places).find(c => c.id === id)
     if (card?.place.kind !== "queued") throw new Error("not queued")
@@ -538,7 +569,7 @@ describe("waiting for a queued card's text (behind)", () => {
     )
   })
 
-  test("a card that leaves the queue gives its wait up, and drains nothing; one whose text arrives drains its lane", async () => {
+  test("a card that leaves the queue gives its wait up, and drains nothing; one whose wait ends drains its lane", async () => {
     const places = newPlacesDoc()
     queue(places, "c-1", "a")
     queue(places, "c-2", "b")
@@ -546,19 +577,17 @@ describe("waiting for a queued card's text (behind)", () => {
       string,
       { arrive: () => void; signal?: AbortSignal }
     >()
-    const texts: Pick<CardPort, "whenHolds"> = {
-      whenHolds: (id, _seen, signal) =>
-        new Promise(resolve => {
-          waits.set(id, { arrive: resolve, signal })
-          signal?.addEventListener("abort", () => resolve())
-        }),
-    }
+    const until = (id: string) => (signal: AbortSignal) =>
+      new Promise<void>(resolve => {
+        waits.set(id, { arrive: resolve, signal })
+        signal.addEventListener("abort", () => resolve())
+      })
     const drained: string[] = []
-    const behind = createBehind({ places, texts, drain: l => drained.push(l) })
-    behind(queuedCard(places, "c-1"))
-    behind(queuedCard(places, "c-2"))
+    const wait = createWaits({ places, drain: l => drained.push(l) })
+    wait(queuedCard(places, "c-1"), until("c-1"))
+    wait(queuedCard(places, "c-2"), until("c-2"))
     // Asked twice, a card is waited for once.
-    behind(queuedCard(places, "c-1"))
+    wait(queuedCard(places, "c-1"), until("c-1-again"))
     expect([...waits.keys()]).toEqual(["c-1", "c-2"])
     // c-1 leaves the queue: its wait is given up.
     places.cards.delete("c-1")
@@ -569,6 +598,24 @@ describe("waiting for a queued card's text (behind)", () => {
     await Promise.resolve()
     await Promise.resolve()
     expect(drained).toEqual([LANE])
+  })
+
+  test("untilNotTyped: resolves once the typing in the card is gone, or at once when there is none", async () => {
+    const presence = newPresenceDoc()
+    const seat = seatKey(BEA, "s1")
+    presence.typingIn.set(seat, "c-1")
+    let done = false
+    void untilNotTyped(
+      presence,
+      cardId("c-1"),
+      new AbortController().signal,
+    ).then(() => {
+      done = true
+    })
+    presence.typingIn.set(seat, "c-2")
+    await Promise.resolve()
+    expect(done).toBe(true)
+    await untilNotTyped(presence, cardId("c-9"), new AbortController().signal)
   })
 })
 

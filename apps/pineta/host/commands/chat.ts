@@ -30,6 +30,7 @@ import {
   readParticipantNames,
   readParticipants,
   readPlaces,
+  readQueueHolds,
   readRoots,
   readThreadName,
   readTreeIndex,
@@ -145,7 +146,12 @@ export async function sendChat(
   // plan (pure)
   const thread = threadOf(
     index,
-    readLanes(view, index, readPlaces(deps.basics.places)),
+    readLanes(
+      view,
+      index,
+      readPlaces(deps.basics.places),
+      readQueueHolds(session),
+    ),
     {
       at: chat.at,
       mode: chat.mode,

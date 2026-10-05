@@ -153,7 +153,13 @@ export function writesIn(
     // work out. A carry-on writes its message there.
     case "offer":
     case "carry-on":
+    // A queue's hold, and its cards unqueued, are its lane's root's.
+    case "queue-hold":
+    case "unqueue-all":
       return only(rootOfLane(intent.lane))
+    // A reorder stays in the place it names.
+    case "reorder":
+      return [intent.reorder.at.root]
     case "mark":
     case "retitle":
     case "undo-move":

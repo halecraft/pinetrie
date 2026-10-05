@@ -1,13 +1,22 @@
 import {
   atEntry,
+  cardId,
   entryId,
+  type LaneName,
   laneNameForThread,
   runId,
   writerId,
 } from "@pineta/core"
 import type { Agent } from "@pineta/pi"
 import { readCardHistories, readPlaces } from "@pineta/reads"
-import { PARTICIPANT, STOP, setRecord } from "@pineta/rules"
+import {
+  deleteRecord,
+  encodeCard,
+  PARTICIPANT,
+  QUEUE_HOLD,
+  STOP,
+  setRecord,
+} from "@pineta/rules"
 import {
   beginRun,
   newPresenceDoc,
@@ -28,7 +37,12 @@ import {
 } from "../fakes.ts"
 import { createProvenance } from "../provenance.ts"
 import type { RunStart } from "../runs.ts"
-import { handleCarryOn, handleStop, recordFact } from "./lane.ts"
+import {
+  handleCarryOn,
+  handleQueueHold,
+  handleStop,
+  recordFact,
+} from "./lane.ts"
 
 const ada = writerId("ada@example.com")
 const bea = writerId("bea@example.com")
@@ -112,6 +126,82 @@ test("a stop while a chat's run waits for its pinned cards cancels it there, and
   expect(cancelled).toEqual([lane])
   expect(methods(agent.calls)).toEqual(["writeValues"])
   expect(methods(handle.calls)).toEqual([])
+})
+
+test("a stop with a message card queued holds the queue in the same write as its stop record, before the abort (ADR-0048 step 7)", async () => {
+  const { b, lane, handle, agent } = running()
+  b.places.cards.set(
+    "c-1",
+    encodeCard({
+      id: cardId("c-1"),
+      owner: bea,
+      placer: bea,
+      place: {
+        kind: "queued",
+        root: ROOT_ID,
+        at: atEntry(entryId("e-2")),
+        lane,
+        order: "a",
+        by: bea,
+        seen: "",
+      },
+      carries: { kind: "message", command: null },
+      unsent: null,
+    }),
+  )
+  await handleStop(
+    { basics: b, agent: agent.port, cancel: () => false },
+    lane,
+    ada,
+  )
+  expect(agent.calls[0]).toEqual({
+    method: "writeValues",
+    args: [
+      [
+        setRecord(
+          STOP,
+          { prompt: entryId("e-1"), by: ada, at: 1_000 },
+          ROOT_ID,
+        ),
+        setRecord(QUEUE_HOLD, { lane, by: ada, at: 1_000 }),
+      ],
+    ],
+  })
+  expect(methods(handle.calls)).toEqual(["abort"])
+})
+
+test("a hold is written once, its release deleted and the lane drained; an unknown lane is refused (ADR-0048 step 7)", async () => {
+  const { b, lane } = running()
+  const writes: unknown[] = []
+  const drained: string[] = []
+  const deps = {
+    basics: b,
+    agent: {
+      writeValues: async (w: Parameters<Agent["writeValues"]>[0]) => {
+        writes.push(w)
+        applyWrites(b, w)
+      },
+    },
+    drain: (l: LaneName) => void drained.push(l),
+  }
+  expect(await handleQueueHold(deps, lane, true, ada)).toEqual({
+    kind: "moved",
+  })
+  expect(await handleQueueHold(deps, lane, true, bea)).toEqual({
+    kind: "nothing",
+  })
+  expect(writes).toEqual([
+    [setRecord(QUEUE_HOLD, { lane, by: ada, at: 1_000 })],
+  ])
+  expect(drained).toEqual([])
+  expect(await handleQueueHold(deps, lane, false, bea)).toEqual({
+    kind: "moved",
+  })
+  expect(writes.at(-1)).toEqual([deleteRecord(QUEUE_HOLD, lane)])
+  expect(drained).toEqual([lane])
+  expect(
+    (await handleQueueHold(deps, laneNameForThread("ffff"), true, ada)).kind,
+  ).toBe("refused")
 })
 
 test("an offer's fact is queued as a card at the thread's end, after the cards there, and the lane's drain asked for (ADR-0080)", async () => {

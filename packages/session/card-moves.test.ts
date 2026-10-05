@@ -166,6 +166,31 @@ describe("the tab's moves (ADR-0059)", () => {
     })
   })
 
+  test("a reorder is drawn where the host would put it, its queuer kept, until the copy reaches its rev (ADR-0048 step 7)", () => {
+    const key = (n: number) => n.toString(36).padStart(10, "0")
+    const q = (id: string, n: number) =>
+      card({
+        id: cardId(id),
+        place: { ...queuedKey, order: key(n), by: BEA },
+        placer: BEA,
+      })
+    const records = [q("c-a", 100), q("c-b", 200), q("c-c", 300)]
+    const reorder = {
+      card: cardId("c-c"),
+      at: queuedKey,
+      after: cardId("c-a"),
+      before: cardId("c-b"),
+    }
+    const s = run([
+      sent({ ...sentAs, id: "r-1", kind: "reorder", reorder }),
+      accepted("r-1", 4),
+    ])
+    const drawn = withPending(records, s, ME).find(c => c.id === "c-c")
+    expect(drawn?.place).toEqual({ ...queuedKey, order: key(150), by: BEA })
+    expect(drawn?.placer).toBe(BEA)
+    expect(withPending(records, movesStep(s, changed(4)), ME)).toBe(records)
+  })
+
   test("the host left: nothing stays drawn", () => {
     const s = run([sent(queueIt), { kind: "hostLeft" }])
     expect(s.pending).toEqual([])

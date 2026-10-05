@@ -34,16 +34,16 @@ functions.
 ## What belongs here
 
 Reads the host decides from, or that more than one reader needs:
-`readRenderableEntries`, `readTreeIndex`, `readLanes` (and `readLane`, one
-of them), `readRunning`, `readLatestPrompt` (what a lane's run is: a
+`readRenderableEntries`, `readTreeIndex`, `readLanes`, `readRunning`, `readLatestPrompt` (what a lane's run is: a
 run's end and `split_offer` decide by it), `readRunAuthor` (the person
 behind it, `promptAuthor`, ADR-0080),
 `readParticipantNames`, `readParticipants`, `readReading`, `readTyping`,
-`readAgentActivity`, `readSeats`, `readPlaces` and `readPlacesRev` (ADR-0059),
-`readWorkflow`, `readBoardPlaces` and `readArchived` (the board, ADR-0085:
-the roots in the closed state, derived and kept while the same, since every
-write to the session's values wakes it), `readMarks` (ADR-0045), `readStops`
-and `readDigests` (ADR-0056), and
+`readTypingIn` and `readQueueHolds` (ADR-0048 step 7), `readAgentActivity`,
+`readSeats`, `readPlaces` and `readPlacesRev` (ADR-0059), `readWorkflow`,
+`readBoardPlaces` and `readArchived` (the board, ADR-0085: the roots in the
+closed state, derived and kept while the same, since every write to the
+session's values wakes it), `readMarks` (ADR-0045), `readStops` and
+`readDigests` (ADR-0056), and
 where lanes work (ADR-0032, ADR-0034): `readLaneRecords`, `readRevisions`, `readLandings`,
 `readProject` (`lanes`, or `direct` and why). `workAt` is where a lane created
 at an entry would work, and the commit and snapshot it would start from: the
@@ -111,6 +111,14 @@ Kyneta has let go.
   queued now waits behind it, so it is who the queue button names. It is null exactly when `waiting` is 0. It
   differs from `askedBy` while a run goes: `askedBy` is who the agent
   answers, `lastWaiting` who is last in line.
+- **`readLanes`' `heldBy`** is who holds the lane's queue (ADR-0048 step
+  7), from the holds its caller passes (`readQueueHolds`, the session's): a
+  root document does not hold them, and every caller already has the
+  session. `readQueueHolds` keeps its map while the holds are the same,
+  since every session write wakes it.
+- **`readTypingIn`** is the set of cards someone types in now, from any
+  seat; it keeps its set while the cards are the same. The host's drain
+  reads it, and pops none of them.
 - **A presence read gives one entry per key** (`readReading`, `readTyping`), as
   `[writer, value]` pairs: a person here from two seats
   appears twice (ADR-0037), and `core/presence.ts` shows them once. Each

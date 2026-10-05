@@ -1,7 +1,12 @@
 import { writerId } from "@pineta/core"
 import { newPresenceDoc, readingKey, seatKey } from "@pineta/schema"
 import { expect, test } from "vitest"
-import { readReading, readReadingRoots, readTyping } from "./index.ts"
+import {
+  readReading,
+  readReadingRoots,
+  readTyping,
+  readTypingIn,
+} from "./index.ts"
 
 test("each presence read names each seat's person, a person with two seats twice (ADR-0037)", () => {
   const ada = writerId("ada@x.io")
@@ -55,4 +60,17 @@ test("each followed end's root, as its column reported it; the same map while un
   expect(readReadingRoots(doc)).toBe(first)
   doc.readingRoot.set(readingKey(ada, "c1"), "r9")
   expect([...readReadingRoots(doc)]).toEqual([["e1", "r9"]])
+})
+
+test("the cards someone is typing in, from any seat, without decayed ones; the same set while unchanged (ADR-0048 step 7)", () => {
+  const ada = writerId("ada@x.io")
+  const doc = newPresenceDoc()
+  doc.typingIn.set(seatKey(ada, "s1"), "c-1")
+  doc.typingIn.set(seatKey(ada, "s2"), null)
+  const first = readTypingIn(doc)
+  expect([...first]).toEqual(["c-1"])
+  doc.typingIn.set(seatKey(ada, "s1"), "c-1")
+  expect(readTypingIn(doc)).toBe(first)
+  doc.typingIn.set(seatKey(ada, "s1"), null)
+  expect([...readTypingIn(doc)]).toEqual([])
 })

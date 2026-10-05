@@ -27,6 +27,7 @@ import {
   readLanes,
   readParticipantNames,
   readPlaces,
+  readQueueHolds,
   readRevisions,
   readRoots,
   readTreeIndex,
@@ -163,7 +164,12 @@ async function planCrossing(
     crossing,
     root: entry,
     index,
-    lanes: readLanes({ doc, live }, index, readPlaces(places)),
+    lanes: readLanes(
+      { doc, live },
+      index,
+      readPlaces(places),
+      readQueueHolds(session),
+    ),
     own,
     revisions: readRevisions(doc),
   })

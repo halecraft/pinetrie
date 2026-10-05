@@ -1,6 +1,7 @@
-// host/commands/cards — the commands that move cards (ADR-0059): a move, an
-// undo of moves (ADR-0066), a card's command, a busy chat's card queued, a
-// sent card spent, and traces seen (ADR-0048 step 6).
+// host/commands/cards — the commands that move cards (ADR-0059): a move, a
+// reorder and unqueue all (ADR-0048 step 7), an undo of moves (ADR-0066), a
+// card's command, a busy chat's card queued, a sent card spent, and traces
+// seen (ADR-0048 step 6).
 //
 // Each runs inside one step of the documents' keeper, as every command does, so
 // it is ordered with a queued card's pop and with every other move: gather the places,
@@ -21,6 +22,7 @@ import {
   type Move,
   type MoveDirection,
   moveOf,
+  type Reorder,
   type RootId,
   type SentCard,
   threadOf,
@@ -31,6 +33,7 @@ import { PLACES_DOC_ID } from "@pineta/protocol/messages"
 import {
   readLanes,
   readPlaces,
+  readQueueHolds,
   readRunning,
   readTreeIndex,
 } from "@pineta/reads"
@@ -42,7 +45,9 @@ import {
   type PlaceStep,
   planFreshFollow,
   planMoveCommand,
+  planReorder,
   planSetCommand,
+  planUnqueueAll,
   undoAnswer,
 } from "@pineta/rules"
 import type { Basics } from "../basics.ts"
@@ -67,7 +72,7 @@ export const settled = (
 ): Settled => ({ outcome, rev })
 
 export interface CardCommandDeps {
-  readonly basics: Pick<Basics, "docs" | "live" | "places">
+  readonly basics: Pick<Basics, "docs" | "live" | "places" | "session">
   readonly cards: Pick<CardPort, "destroy">
   /** Queue a drain of the lane on the documents' keeper, not awaited. */
   readonly drain: (lane: LaneName) => void
@@ -77,7 +82,7 @@ export interface CardCommandDeps {
 }
 
 export function createCardCommands(deps: CardCommandDeps) {
-  const { docs, live, places } = deps.basics
+  const { docs, live, places, session } = deps.basics
   const running = (lane: LaneName) => readRunning(deps.basics.live, lane)
 
   /** A refused move: where the card is now and who put it there. */
@@ -138,7 +143,9 @@ export function createCardCommands(deps: CardCommandDeps) {
     const { lane, reserved } = sent.chat
     const held =
       reserved !== null &&
-      readLanes({ doc, live }, index, cards).some(l => l.name === reserved)
+      readLanes({ doc, live }, index, cards, readQueueHolds(session)).some(
+        l => l.name === reserved,
+      )
     return {
       message: at,
       steps: planFreshFollow(
@@ -151,26 +158,57 @@ export function createCardCommands(deps: CardCommandDeps) {
     }
   }
 
+  /**
+   * Handoffs, whole or refused: applied when every card is where its
+   * sender saw it. Recorded as one step of the sender's history of moves
+   * in the root `historyOf` names, when it names one (ADR-0066).
+   */
+  async function move(
+    writer: WriterId,
+    moves: readonly Move[],
+  ): Promise<Settled> {
+    // gather: the history's stack, loaded before the places are read
+    const root = historyOf(moves, readPlaces(places))
+    const gesture =
+      root === null ? undefined : await deps.histories.gestureOf(writer, root)
+    // plan
+    const { step, drain } = planMoveCommand(
+      readPlaces(places),
+      moves,
+      writer,
+      running,
+    )
+    // execute
+    return carry(step, drain, { kind: "move", by: writer }, gesture)
+  }
+
   return {
+    move,
+
     /**
-     * Handoffs, whole or refused: applied when every card is where its
-     * sender saw it. Recorded as one step of the sender's history of moves
-     * in the root `historyOf` names, when it names one (ADR-0066).
+     * A queued or pinned card moved among its neighbours (ADR-0048 step 7),
+     * as one step of the sender's history of moves in its root, so the
+     * page can undo it. It changes no lane's turn, so it drains nothing.
      */
-    async move(writer: WriterId, moves: readonly Move[]): Promise<Settled> {
+    async reorder(writer: WriterId, reorder: Reorder): Promise<Settled> {
       // gather: the history's stack, loaded before the places are read
-      const root = historyOf(moves, readPlaces(places))
-      const gesture =
-        root === null ? undefined : await deps.histories.gestureOf(writer, root)
+      const gesture = await deps.histories.gestureOf(writer, reorder.at.root)
       // plan
-      const { step, drain } = planMoveCommand(
-        readPlaces(places),
-        moves,
-        writer,
-        running,
-      )
+      const step = planReorder(readPlaces(places), reorder)
       // execute
-      return carry(step, drain, { kind: "move", by: writer }, gesture)
+      return carry(step, [], { kind: "move", by: writer }, gesture)
+    },
+
+    /**
+     * Every message card queued on `lane` back below the line, as the queue
+     * is now (`planUnqueueAll`): one move, so one undo queues them again.
+     * `nothing` when none is queued.
+     */
+    unqueueAll(writer: WriterId, lane: LaneName): Promise<Settled> {
+      const moves = planUnqueueAll(readPlaces(places), lane)
+      return moves.length === 0
+        ? Promise.resolve(settled({ kind: "nothing" }))
+        : move(writer, moves)
     },
 
     /**
@@ -245,12 +283,16 @@ export function createCardCommands(deps: CardCommandDeps) {
       const doc = await docs.root(chat.root)
       const index = readTreeIndex(doc)
       const cards = readPlaces(places)
-      const thread = threadOf(index, readLanes({ doc, live }, index, cards), {
-        at: chat.at,
-        mode: chat.mode,
-        lane: chat.lane,
-        me: writer,
-      })
+      const thread = threadOf(
+        index,
+        readLanes({ doc, live }, index, cards, readQueueHolds(session)),
+        {
+          at: chat.at,
+          mode: chat.mode,
+          lane: chat.lane,
+          me: writer,
+        },
+      )
       const now = cards.find(c => c.id === chat.card.id)
       if (
         thread.kind !== "thread" ||

@@ -1,5 +1,7 @@
 import {
   type AgentMessageLike,
+  atEntry,
+  cardId,
   type EntryId,
   type EntryLike,
   ERR,
@@ -8,10 +10,12 @@ import {
   indexTree,
   type LaneView,
   laneNameForThread,
+  rootIdFor,
   type StopRecord,
   writerId,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
+import type { QueuedCard } from "./card.ts"
 import { renderableMessage } from "./chat.ts"
 import { carryOnState, decodeCarryOn, planCarryOn, planStop } from "./stop.ts"
 
@@ -37,10 +41,16 @@ describe("planStop", () => {
     waiting: 0,
     askedBy: null,
     lastWaiting: null,
+    heldBy: null,
   })
-  const facts = (stops: ReadonlyMap<EntryId, StopRecord> = new Map()) => ({
+  const facts = (
+    stops: ReadonlyMap<EntryId, StopRecord> = new Map(),
+    queue: readonly QueuedCard[] = [],
+  ) => ({
     index: i,
     stops,
+    queue,
+    holds: new Map(),
     by: ada,
     now: 7,
   })
@@ -48,6 +58,30 @@ describe("planStop", () => {
     expect(planStop(lane(true), facts())).toEqual({
       kind: "abort",
       record: { prompt: "1-p", by: ada, at: 7 },
+      hold: null,
+    })
+  })
+  test("with a message card queued, a stop holds the queue, so the run's end sends nothing (ADR-0048 step 7)", () => {
+    const name = laneNameForThread("s")
+    const queued: QueuedCard = {
+      id: cardId("c-1"),
+      owner: ada,
+      placer: ada,
+      place: {
+        kind: "queued",
+        root: rootIdFor("01a0ffd2-0000-7000-8000-00000000000a"),
+        at: atEntry(entryId("2-a")),
+        lane: name,
+        order: "a",
+        by: ada,
+        seen: "",
+      },
+      carries: { kind: "message", command: null },
+      unsent: null,
+    }
+    expect(planStop(lane(true), facts(new Map(), [queued]))).toMatchObject({
+      kind: "abort",
+      hold: { lane: name, by: ada, at: 7 },
     })
   })
   test("the first stop recorded is kept: a second press records nothing", () => {
@@ -57,6 +91,7 @@ describe("planStop", () => {
     expect(planStop(lane(true), facts(first))).toEqual({
       kind: "abort",
       record: null,
+      hold: null,
     })
   })
   test("an idle lane is already stopped", () => {
@@ -88,6 +123,7 @@ describe("carrying on (ADR-0082)", () => {
         waiting: 0,
         askedBy: null,
         lastWaiting: null,
+        heldBy: null,
         ...lane,
       },
       facts: { index, asks: indexAsks(index) },
@@ -135,6 +171,20 @@ describe("carrying on (ADR-0082)", () => {
     expect(state(over([ask, aborted], { waiting: 1 }))).toEqual(
       refusedWith(ERR.BUSY),
     )
+  })
+  test("held cards wait for a release, not for this turn: the lane may carry on (ADR-0048 step 7)", () => {
+    expect(
+      state(over([ask, aborted], { waiting: 1, heldBy: writerId("bea") })),
+    ).toEqual({ kind: "ok" })
+    expect(
+      state(
+        over([ask, aborted], {
+          running: true,
+          waiting: 1,
+          heldBy: writerId("bea"),
+        }),
+      ),
+    ).toEqual(refusedWith(ERR.BUSY))
   })
   test("an answered ask, or a message after the stop, refuses", () => {
     const answered = { ...aborted, stopReason: "stop" }

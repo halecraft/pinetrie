@@ -1,6 +1,7 @@
 // host/commands/lane — the commands that act on one thread's lane: stop it,
-// carry it on after a Stop (ADR-0082), or act on its offer (ADR-0038),
-// which leaves a fact in the thread (ADR-0080).
+// carry it on after a Stop (ADR-0082), hold or release its queue (ADR-0048
+// step 7), or act on its offer (ADR-0038), which leaves a fact in the thread
+// (ADR-0080).
 
 import {
   atEntry,
@@ -23,6 +24,7 @@ import {
   readLanes,
   readParticipantNames,
   readPlaces,
+  readQueueHolds,
   readStops,
   readTreeIndex,
 } from "@pineta/reads"
@@ -30,7 +32,10 @@ import {
   displayName,
   planCarryOn,
   planFactCard,
+  planQueueHold,
   planStop,
+  QUEUE_HOLD,
+  queuedOn,
   STOP,
   setRecord,
 } from "@pineta/rules"
@@ -69,26 +74,30 @@ interface LaneHere {
  * for a lane no root holds.
  */
 async function laneAt(
-  basics: Pick<Basics, "docs" | "live" | "places">,
+  basics: Pick<Basics, "docs" | "live" | "places" | "session">,
   lane: LaneName,
 ): Promise<LaneHere | null> {
-  const { docs, live, places } = basics
+  const { docs, live, places, session } = basics
   const root = docs.rootOfLane(lane)
   if (root === null) return null
   const doc = await docs.root(root)
   const index = readTreeIndex(doc)
-  const view = readLanes({ doc, live }, index, readPlaces(places)).find(
-    l => l.name === lane,
-  )
+  const view = readLanes(
+    { doc, live },
+    index,
+    readPlaces(places),
+    readQueueHolds(session),
+  ).find(l => l.name === lane)
   return view === undefined ? null : { root, doc, index, lane: view }
 }
 
 /**
- * Stop a thread's turn, recording who stopped its ask first (ADR-0056): the
- * record is written before the run is stopped, so it is there when the
- * run's end is drawn. A chat's run still waiting for its pinned cards' text
- * has not reached pi, whose abort would reach nothing: it is cancelled
- * instead. The run's end then drains the lane, as any run's does.
+ * Stop a thread's turn, recording who stopped its ask first (ADR-0056), and
+ * holding its queue when a message card waits there (ADR-0048 step 7):
+ * both are written before the run is stopped, so they are there when the
+ * run's end is drawn and drains the lane, which then pops nothing. A chat's
+ * run still waiting for its pinned cards' text has not reached pi, whose
+ * abort would reach nothing: it is cancelled instead.
  */
 export async function handleStop(
   deps: Pick<LaneDeps, "basics" | "agent" | "cancel">,
@@ -104,18 +113,60 @@ export async function handleStop(
       message: "no such lane to stop",
     }
   const { root, doc, index } = here
+  const { places, session } = deps.basics
   const planned = planStop(here.lane, {
     index,
     stops: readStops(doc),
+    queue: queuedOn(readPlaces(places), lane),
+    holds: readQueueHolds(session),
     by,
     now: deps.basics.now(),
   })
   if (planned.kind === "abort") {
-    if (planned.record !== null)
-      await agent.writeValues([setRecord(STOP, planned.record, root)])
+    const writes = [
+      ...(planned.record === null
+        ? []
+        : [setRecord(STOP, planned.record, root)]),
+      ...(planned.hold === null ? [] : [setRecord(QUEUE_HOLD, planned.hold)]),
+    ]
+    if (writes.length > 0) await agent.writeValues(writes)
     if (!deps.cancel(lane)) await agent.lane(lane).abort()
   }
   return { kind: "stopped" }
+}
+
+/**
+ * Hold a thread's queue, or release it (ADR-0048 step 7). A release asks
+ * for the lane's drain: nothing else would pop what waited.
+ */
+export async function handleQueueHold(
+  deps: Pick<LaneDeps, "basics" | "drain"> & {
+    readonly agent: Pick<Agent, "writeValues">
+  },
+  lane: LaneName,
+  held: boolean,
+  by: WriterId,
+): Promise<Outcome> {
+  // gather
+  const here = await laneAt(deps.basics, lane)
+  if (here === null)
+    return {
+      kind: "refused",
+      code: ERR.UNKNOWN_TARGET,
+      message: "no such thread's queue",
+    }
+  // plan
+  const writes = planQueueHold({
+    holds: readQueueHolds(deps.basics.session),
+    lane,
+    by,
+    now: deps.basics.now(),
+    held,
+  })
+  // execute
+  if (writes.length > 0) await deps.agent.writeValues(writes)
+  if (!held) deps.drain(lane)
+  return writes.length === 0 ? { kind: "nothing" } : { kind: "moved" }
 }
 
 /**

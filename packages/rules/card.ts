@@ -4,8 +4,8 @@
 // clients; its record is in the places document (`PlacesDoc` in
 // @pineta/schema), which only the host writes, through handoffs it applies
 // or refuses (`planMove`). This module decodes a record, and decides where a
-// card sits now, which moves the host accepts, which queued card is popped
-// next to be sent, and which are swept. Who wrote in it is `writersOfClients`
+// card sits now, which moves and reorders the host accepts, which queued
+// card is popped next to be sent, and which are swept. Who wrote in it is `writersOfClients`
 // (`seat.ts`).
 
 import {
@@ -19,6 +19,7 @@ import {
   type CardRecord,
   type CatchUpCommand,
   cardId,
+  draftingOf,
   type EntryId,
   INVENTORY_SLOTS,
   keyOf,
@@ -26,6 +27,7 @@ import {
   type LaneView,
   type Move,
   type MoveRefusal,
+  moveOf,
   movesOfDocId,
   type OfferFact,
   PLAIN,
@@ -33,6 +35,7 @@ import {
   type Position,
   placeFields,
   placeOfFields,
+  type Reorder,
   type RootId,
   type RootRecord,
   sameKey,
@@ -43,7 +46,7 @@ import {
 import { Type } from "typebox"
 import { decodeWith } from "./decode.ts"
 import { decodeOfferFact, encodeOfferFact } from "./fact.ts"
-import { orderAfter } from "./order.ts"
+import { orderAfter, orderBetween, respace } from "./order.ts"
 
 /**
  * A card as the places document stores it: flat strings, "" for none. The
@@ -272,21 +275,54 @@ export function queuedOn(
     .sort(byOrder)
 }
 
-/** What an idle lane's queue gives up next. */
+/** What a lane's queue gives up next. */
 type NextQueuedCardPopStep =
+  /** It runs, or nothing is queued. */
   | { readonly kind: "idle" }
+  /** Its queue is held, and its top card is a message (ADR-0048 step 7). */
+  | { readonly kind: "held" }
+  /** Someone is typing in its top card: it waits until they stop. */
+  | { readonly kind: "typing"; readonly card: QueuedCard }
   | { readonly kind: "pop"; readonly card: QueuedCard }
 
-/** The next queued card to pop for a lane: none while it runs, else its top one. Pure. */
+/**
+ * The next queued card to pop for a lane: none while it runs; else its top
+ * card, unless the queue is held or someone is typing in that card. A fact
+ * on top is popped whatever the hold or the typing: it is nobody's
+ * instruction, and starts no run. Pure.
+ */
 export function planNextQueuedCardPop(
   cards: readonly CardRecord[],
   lane: LaneName,
-  running: boolean,
+  facts: {
+    readonly running: boolean
+    readonly held: boolean
+    /** The cards someone is typing in now (`typingIn`). */
+    readonly typing: ReadonlySet<CardId>
+  },
 ): NextQueuedCardPopStep {
-  if (running) return { kind: "idle" }
+  if (facts.running) return { kind: "idle" }
   const top = queuedOn(cards, lane)[0]
-  return top === undefined ? { kind: "idle" } : { kind: "pop", card: top }
+  if (top === undefined) return { kind: "idle" }
+  if (top.carries.kind === "fact") return { kind: "pop", card: top }
+  if (facts.held) return { kind: "held" }
+  if (facts.typing.has(top.id)) return { kind: "typing", card: top }
+  return { kind: "pop", card: top }
 }
+
+/**
+ * Unqueue all (ADR-0048 step 7): every message card queued on the lane
+ * back below the line where it was queued, in queue order. A fact stays:
+ * nobody moves it. Planned by the host from the queue as it is, so a card
+ * popped since the click is not in it. Pure.
+ */
+export const planUnqueueAll = (
+  cards: readonly CardRecord[],
+  lane: LaneName,
+): readonly Move[] =>
+  queuedOn(cards, lane)
+    .filter(c => c.carries.kind === "message")
+    .map(c => moveOf(c, draftingOf(c.place)))
 
 /**
  * A popped card the host could not send, written back: drafting where it
@@ -442,9 +478,10 @@ function refuseInto(
 
 /**
  * A handoff: a compare-and-set on where the card is. The host accepts a move
- * only if the card is still where its sender saw it; a reorder does not count
- * as moving it (`sameKey`). Every accepted move names its sender as the
- * card's placer. Pure.
+ * only if the card is still where its sender saw it; someone else's reorder
+ * since does not count as moving it (`sameKey`). A move to where the card is
+ * already is refused `moved`: `planReorder` changes a place in line. Every
+ * accepted move names its sender as the card's placer. Pure.
  *
  * - No `from`: the card is created, its sender its owner, with no command.
  * - A card carrying a fact is the host's (ADR-0080): every move of it is
@@ -486,6 +523,10 @@ export function planMove(
   if (now.carries.kind === "fact") return { kind: "refused", code: "fact", now }
   if (!sameKey(keyOf(now.place), move.from))
     return { kind: "refused", code: "moved", now }
+  // A move to where the card is would requeue it last, under its sender's
+  // name: a card changes its place in line by a reorder (`planReorder`).
+  if (move.to !== null && sameKey(move.from, move.to))
+    return { kind: "refused", code: "moved", now }
   if (!ownsPlace(move.from, sender))
     return { kind: "refused", code: "not-yours", now }
   if (move.to === null)
@@ -502,6 +543,101 @@ export function planMove(
       placer: sender,
       unsent: move.to.kind === "queued" ? null : now.unsent,
     },
+  }
+}
+
+// ── reorders (ADR-0048 step 7) ─────────────────────────────────────────────
+
+/**
+ * The cards a reorder of `card` moves among, without it, in order: its
+ * lane's queue, or every pinned card in the session, since pinned keys are
+ * the session's (`placeAt`).
+ */
+const siblingsOf = (
+  cards: readonly CardRecord[],
+  card: CardRecord,
+): readonly CardRecord[] =>
+  (card.place.kind === "queued"
+    ? queuedOn(cards, card.place.lane)
+    : cards.filter(isPinned).sort(byOrder)
+  ).filter(c => c.id !== card.id)
+
+/** `card` with order `order`, everything else as it is. */
+const withOrder = (card: CardRecord, order: string): CardRecord =>
+  card.place.kind === "queued" || card.place.kind === "pinned"
+    ? { ...card, place: { ...card.place, order } }
+    : card
+
+/**
+ * A reorder: a queued or pinned card moved among its neighbours, as its
+ * sender saw them (ADR-0048, *Physics* 5). Only its order changes: its
+ * placer, its queuer, its text's version and why it was not sent stay, so
+ * nobody's trace or history changes with it. Refused:
+ * - `gone`: no card;
+ * - `fact`: a fact, or a queued card that would pass one, since a fact says
+ *   what already happened;
+ * - `moved`: the card is no longer where its sender saw it;
+ * - `order-changed`: it names no neighbour, a neighbour is no longer among
+ *   its siblings, or, in a queue, the two are no longer next to each other.
+ *   A thread's pinned cards are found through the tree, which this does not
+ *   read, so other threads' may sit between two pinned neighbours.
+ *
+ * With no room between the neighbours, the crowded siblings around it are
+ * given new keys in the same step (`respace`). Pure.
+ */
+export function planReorder(
+  cards: readonly CardRecord[],
+  reorder: Reorder,
+): MovesStep | MoveStep {
+  const now = cards.find(c => c.id === reorder.card)
+  if (now === undefined) return { kind: "refused", code: "gone", now: null }
+  if (now.carries.kind === "fact") return { kind: "refused", code: "fact", now }
+  if (!sameKey(keyOf(now.place), reorder.at))
+    return { kind: "refused", code: "moved", now }
+  const changed: MoveStep = { kind: "refused", code: "order-changed", now }
+  const siblings = siblingsOf(cards, now)
+  const find = (id: CardId | null): number | null | undefined => {
+    if (id === null) return null
+    const i = siblings.findIndex(c => c.id === id)
+    return i < 0 ? undefined : i
+  }
+  const after = find(reorder.after)
+  const before = find(reorder.before)
+  if (after === undefined || before === undefined) return changed
+  if (after === null && before === null) return changed
+  // Where it goes among its siblings: just before `before`, else just after
+  // `after`.
+  const index = before ?? (after === null ? 0 : after + 1)
+  if (after !== null && before !== null && after >= before) return changed
+  if (now.place.kind === "queued") {
+    if (siblings[index - 1]?.id !== (reorder.after ?? undefined)) return changed
+    if (siblings[index]?.id !== (reorder.before ?? undefined)) return changed
+    // The cards it passes, from where it was to where it goes.
+    const was = siblings.findIndex(c => byOrder(now, c) < 0)
+    const from = was < 0 ? siblings.length : was
+    const passed =
+      index < from ? siblings.slice(index, from) : siblings.slice(from, index)
+    if (passed.some(c => c.carries.kind === "fact"))
+      return { kind: "refused", code: "fact", now }
+  }
+  const bound = (i: number | null): string | null => {
+    const c = i === null ? undefined : siblings[i]
+    return c === undefined ? null : orderOf(c)
+  }
+  const order = orderBetween(bound(after), bound(before))
+  if (order !== null) return { kind: "write", record: withOrder(now, order) }
+  const made = respace(siblings.map(orderOf), index)
+  return {
+    kind: "steps",
+    steps: [
+      { kind: "write", record: withOrder(now, made.inserted) },
+      ...[...made.changed].flatMap(([i, key]): PlaceStep[] => {
+        const sibling = siblings[i]
+        return sibling === undefined
+          ? []
+          : [{ kind: "write", record: withOrder(sibling, key) }]
+      }),
+    ],
   }
 }
 

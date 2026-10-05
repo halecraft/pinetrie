@@ -21,6 +21,7 @@ import {
   moveOf,
   type OfferAction,
   type Position,
+  type Reorder,
   type RootId,
   type TraceRecord,
   type TreeIndex,
@@ -54,6 +55,7 @@ import {
   planUndoMove,
   planUnpin,
   queueMove,
+  reorderOf,
 } from "./card-intents.ts"
 import type { Pending, Prefill, ReaderAction } from "./columns.ts"
 import type { Identity, NameStep } from "./identity.ts"
@@ -112,6 +114,24 @@ export type ColumnAct =
       readonly lane: LaneName
       readonly by: WriterId
     }
+  /**
+   * Move a queued or pinned card one place up (-1) or down (1) among
+   * `among`, its list as drawn, by id (ADR-0048 step 7).
+   */
+  | {
+      readonly kind: "reorder"
+      readonly card: CardId
+      readonly among: readonly CardId[]
+      readonly step: -1 | 1
+    }
+  /** Hold the thread's queue, or release it (ADR-0048 step 7). */
+  | {
+      readonly kind: "holdQueue"
+      readonly lane: LaneName
+      readonly held: boolean
+    }
+  /** Take every message card queued on the thread back below the line. */
+  | { readonly kind: "unqueueAll"; readonly lane: LaneName }
   /** Set a card's command, or clear it with null (ADR-0055). */
   | {
       readonly kind: "setCommand"
@@ -267,6 +287,12 @@ export type Effect =
       readonly queuedBy: WriterId | null
       /** Whether the card animates to where it lands (`ports.fly`). */
       readonly fly: boolean
+    }
+  /** A reorder (ADR-0048 step 7), drawn at once, as a move is. */
+  | {
+      readonly kind: "reorderCard"
+      readonly reorder: Reorder
+      readonly how: MoveHow
     }
   /** Swap two slots of your inventory, as one step of this tab's swaps. */
   | { readonly kind: "swapSlots"; readonly a: number; readonly b: number }
@@ -644,6 +670,28 @@ function planColumn(
       const move = moveOf(now, draftingOf(now.place))
       return [moveCard(move, IN_COLUMN(key), false, act.by)]
     }
+    case "reorder": {
+      const now = cardOf(state.cards, act.card)
+      const among = act.among.flatMap(id => {
+        const c = cardOf(state.cards, id)
+        return c === undefined ? [] : [c]
+      })
+      const reorder = now === undefined ? null : reorderOf(now, among, act.step)
+      return reorder === null
+        ? []
+        : [{ kind: "reorderCard", reorder, how: IN_COLUMN(key) }]
+    }
+    case "holdQueue":
+      return [
+        {
+          kind: "request",
+          intent: { kind: "queue-hold", lane: act.lane, held: act.held },
+        },
+      ]
+    case "unqueueAll":
+      return [
+        { kind: "request", intent: { kind: "unqueue-all", lane: act.lane } },
+      ]
     case "pin":
       return planPin(act.card, key, state)
     case "unpin":

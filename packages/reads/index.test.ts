@@ -122,7 +122,7 @@ test("readLanes: a lane's queued cards are what waits; askedBy is who queued the
     queued("c-1", "a", "ada@x.io"),
     drafting,
   ]
-  const found = readLanes(view, readTreeIndex(doc), cards).find(
+  const found = readLanes(view, readTreeIndex(doc), cards, new Map()).find(
     l => l.name === lane,
   )
   expect(found).toMatchObject({
@@ -130,12 +130,21 @@ test("readLanes: a lane's queued cards are what waits; askedBy is who queued the
     waiting: 2,
     askedBy: writerId("ada@x.io"),
     lastWaiting: writerId("bea@x.io"),
+    heldBy: null,
   })
-  expect(readLanes(view, readTreeIndex(doc), [])[0]).toMatchObject({
+  expect(readLanes(view, readTreeIndex(doc), [], new Map())[0]).toMatchObject({
     waiting: 0,
     askedBy: null,
     lastWaiting: null,
+    heldBy: null,
   })
+  // A held queue names who holds it (ADR-0048 step 7).
+  const holds = new Map([[lane, { lane, by: writerId("cy@x.io"), at: 1 }]])
+  expect(readLanes(view, readTreeIndex(doc), [], holds)[0]?.heldBy).toBe(
+    writerId("cy@x.io"),
+  )
   beginRun(live, lane, runId("r-1"))
-  expect(readLanes(view, readTreeIndex(doc), cards)[0]?.running).toBe(true)
+  expect(
+    readLanes(view, readTreeIndex(doc), cards, new Map())[0]?.running,
+  ).toBe(true)
 })

@@ -43,6 +43,10 @@ export const HOST_PRINCIPAL = "pineta-host"
  *   - `stop` ends the running turn of the thread whose lane is `lane`.
  *   - `carry-on` starts a new turn on that thread after a stop, its prompt
  *     the host's carry-on message (ADR-0082).
+ *   - `queue-hold` holds that thread's queue (`mode` `hold`) or releases
+ *     it (`release`), ADR-0048 step 7.
+ *   - `unqueue-all` takes every message card queued on that thread back
+ *     below the line.
  *   - `move-root` moves the root `root` on the board (ADR-0085): `text` is
  *     JSON `{ from, to, before }`, the state its sender saw it in, the state
  *     it goes to, and the root it goes before there, or null for the end.
@@ -65,6 +69,10 @@ export const HOST_PRINCIPAL = "pineta-host"
  *     each card, where its sender saw it and where it goes, each an encoded
  *     key or null: no `from` creates the card, and no `to` removes it.
  *     The list is accepted whole or refused (a keep's several cards).
+ *   - `reorder` moves the card `cardId` among its neighbours in its queue
+ *     or among the pinned cards: `moves` is `{ at, after, before }`, the
+ *     key of where it is and the cards it goes after and before, `""` for
+ *     none (ADR-0048 step 7).
  *   - `undo-move` undoes (`mode` `undo`) or redoes (`redo`) the sender's
  *     newest move in the root `root` (ADR-0066).
  *   - `set-command` sets the card `cardId`'s command to `mode`, or
@@ -84,6 +92,9 @@ export const COMMAND_KINDS = [
   "offer",
   "reserve",
   "move",
+  "reorder",
+  "queue-hold",
+  "unqueue-all",
   "set-command",
   "line",
   "undo-move",
@@ -138,7 +149,7 @@ export interface Command {
    * purpose.
    */
   readonly targetId: string
-  /** `chat`: the card its text was sent from, or `""` (ADR-0048); `move`, `set-command`: the card. */
+  /** `chat`: the card its text was sent from, or `""` (ADR-0048); `set-command`, `reorder`: the card. */
   readonly cardId: string
   /**
    * `chat`: the card's text version as the sender had it (S96), or `""`.
@@ -148,7 +159,8 @@ export interface Command {
   readonly seen: string
   /**
    * `move`: a JSON list of `{ card, from, to }`, each place a key's flat
-   * fields or null (`encodeMoves`); `""` otherwise.
+   * fields or null (`encodeMoves`); `reorder`: `{ at, after, before }`
+   * (`encodeReorder`); `""` otherwise.
    */
   readonly moves: string
   /**

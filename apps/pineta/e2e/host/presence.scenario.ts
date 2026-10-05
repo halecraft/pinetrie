@@ -38,7 +38,7 @@ async function run(check: Checks["check"]): Promise<void> {
     const bea = await joinHere("bea")
     ada.setReading("c1", "e-one", null)
     ada.setReading("c2", "e-two", null)
-    ada.setTyping("e-two")
+    ada.setTyping("e-two", null)
     const seen = await waitFor(
       () => readReading(bea.presence).length === 2,
       5_000,

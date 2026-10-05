@@ -219,8 +219,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a creation's take into the inventory is no intent",
     file: "packages/session/card-moves.ts",
-    from: '  p.kind === "create" ? p.draft.id : p.move.card',
-    to: '  p.kind === "create" ? ("" as CardId) : p.move.card',
+    from: '  p.kind === "create"\n    ? p.draft.id\n',
+    to: '  p.kind === "create"\n    ? ("" as CardId)\n',
     command: unit,
     expect: "each take into the inventory in flight's slot, a creation's too",
   },
@@ -374,6 +374,14 @@ export const mutations: readonly Mutation[] = [
     to: "    if (newest === null) since = since",
     command: unit,
     expect: "a person starts at the directory's newest entry",
+  },
+  {
+    name: "a pending reorder is drawn nowhere",
+    file: "packages/session/card-moves.ts",
+    from: '      for (const w of steps)\n        if (w.kind === "write") cards.set(w.record.id, w.record)\n',
+    to: "",
+    command: unit,
+    expect: "a reorder is drawn where the host would put it",
   },
   // ── your list (ADR-0085) ──
   {

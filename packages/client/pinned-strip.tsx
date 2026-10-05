@@ -7,7 +7,7 @@
 // in the column's header until the strip has a card (`newPinAt`), and in the
 // strip after; the box it opens is drawn last in the strip.
 
-import type { CardRecord, PinnedView } from "@pineta/core"
+import type { CardId, CardRecord, PinnedView } from "@pineta/core"
 import type { SessionClient } from "@pineta/session"
 import type { ReactElement } from "react"
 import type { ReadOnly } from "./app-view.ts"
@@ -35,7 +35,7 @@ export function PinnedStrip(p: {
   reader: Reader
   readOnly: ReadOnly | null
   onAct: (act: ColumnAct) => void
-  onTyping: () => void
+  onTyping: (card: CardId | null) => void
 }) {
   const empty = p.cards.length === 0 && p.box === null
   if (empty && p.putKey === null) return null
@@ -50,6 +50,7 @@ export function PinnedStrip(p: {
       {empty && <span className="pinned-empty">{PINNED_EMPTY}</span>}
       {p.cards.map(c => (
         <PinnedCardEditor
+          among={p.cards}
           card={c}
           inView={p.inView}
           key={c.id}

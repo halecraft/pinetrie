@@ -21,16 +21,16 @@ wires them.
 | `pinned.ts` | what a run reads of its thread's pinned cards (ADR-0048 step 5): `readPinned` gathers, waits a bounded time for the sender's text (`waitFor`), and plans the cards entry |
 | `base-news.ts` | what a thread is told of its base's new work (ADR-0080): `atStart`, a chat's run's behind entry; `baseChanged`, a steer into a running lane, at most once per base commit (`told`); `runEnded` forgets what was steered |
 | `split-call.ts` | `split_offer` (ADR-0080): a split card queued on the thread, popped when its run ends |
-| `queued-card-pop.ts` | popping a lane's queued cards to send them (ADR-0048, ADR-0083): `popNextQueuedCard`, and `drain`, which carries each out as `planCarry` decides: a fact appended, a catch-up, a split's run, a message sent (ADR-0055, ADR-0080) |
+| `queued-card-pop.ts` | popping a lane's queued cards to send them (ADR-0048, ADR-0083): `popNextQueuedCard`, and `drain`, which carries each out as `planCarry` decides: a fact appended, a catch-up, a split's run, a message sent (ADR-0055, ADR-0080); and `createWaits`, the drain's waits for its top card's text or for someone's typing in it to stop (ADR-0048 step 7) |
 | `settle.ts` | what happens between runs: drains, then the compaction and sweep as upkeep (the keeper's `later`) |
-| `housekeeping.ts` | which documents a run's end compacts (`planCompaction`: its roots, the session, the places, `pineta:live`), deleting images nothing shows, and retiring histories of moves (`sweepHistories`) |
+| `housekeeping.ts` | which documents a run's end compacts (`planCompaction`: its roots, the session, the places, `pineta:live`), deleting images nothing shows, retiring histories of moves (`sweepHistories`), and deleting holds on queues nobody can use (`sweepHolds`, ADR-0048 step 7) |
 | `docs.ts` | `HostDocuments`: every document the host holds, a root's opened as it is asked for, and `onOpened`, which replays the roots already held to a listener that joins late; `planLoads` |
 | `directory.ts` | each root's directory record, refreshed as its document changes: `startDirectory`, started with the agent |
 | `cards.ts` | the card port (ADR-0048), about texts only: who wrote in a card, destroying one, loading and reading texts for the queue's pops and a run's pinned cards, waiting until a text holds a version (`whenHolds`, which an `AbortSignal` gives up), and the texts of given cards gathered for the sweeps; where the shell opens card documents |
 | `seats.ts` | each connected seat's person, written once as a `pineta.seat` record (started after `recover`), and unloading the histories of moves of a person with no seat left |
 | `startup.ts` | `recover`: what a starting host does before it takes a command |
 | `control.ts` | the command Line of each client seat, and who its writer is |
-| `commands/` | one module per command: `chat`, `board` (a move on the board, a change to its states: ADR-0085), `mark`, `lane` (stop, carry on, offer: each finds its lane through `laneAt`), `cards` (a move, an undo of moves, a command, a busy chat's card queued, a sent card spent: ADR-0059, ADR-0066); `index.ts` decodes, decides where it runs (`placeOfCommand`), checks the archive, routes, and sends a popped queued card behind the same check (`sendPoppedQueuedCard`) |
+| `commands/` | one module per command: `chat`, `board` (a move on the board, a change to its states: ADR-0085), `mark`, `lane` (stop, carry on, hold or release a queue, offer: each finds its lane through `laneAt`), `cards` (a move, a reorder, unqueue all, an undo of moves, a command, a busy chat's card queued, a sent card spent: ADR-0059, ADR-0066); `index.ts` decodes, decides where it runs (`placeOfCommand`), checks the archive, routes, and sends a popped queued card behind the same check (`sendPoppedQueuedCard`) |
 | `http.ts` | the HTTP server: admission, Vite, the websocket, blobs, offer reads, invites |
 | `responses.ts` | every answer the host writes itself, as a pure `HttpAnswer` |
 | `routes.ts` | what a request or an upgrade gets, pure: admission first (`planRequest`, `planUpgrade`), then which requests are the host's (`route`) |
@@ -193,7 +193,9 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
 ## Startup
 
 After `recover`, `sweepHistories` retires the histories of moves no one will undo again (§
-Moves' history).
+Moves' history), and `sweepHolds` deletes the holds on queues whose lane no
+root holds or whose root is archived (ADR-0048 step 7). Both run again after
+each run's end, in `settle`'s sweep.
 
 `recover` runs, in order: `clearStreams` (no stream survives a process), the
 carry-over's writes from before the board, if `planCarryOver` planned any
@@ -409,7 +411,7 @@ rejects `shutdown()`.
   order between documents, so a card's record can arrive before its text.
   The record carries the text's version (`seen`); a top card the host's
   copy does not yet hold is `behind`, and stays on top, and the host drains
-  the lane again once it holds it (`createBehind`, one wait per card). A
+  the lane again once it holds it (`createWaits`, below). A
   wait whose card leaves the queue, popped, unqueued or discarded, is given
   up (`givenUp`), so it neither stays subscribed nor drains; the places are
   watched only while a wait is out.
@@ -429,12 +431,25 @@ rejects `shutdown()`.
   is kept. After a clean update its command is cleared: it was carried out.
   An update or a send that throws writes the card back the same way, saying
   the host failed: the pop has deleted its record, so nothing else would.
-- **Three things drain a lane:** a run's end (`settle`), startup
-  (`recover`), and a move that leaves a card queued on it while it is not
-  running (`queueDrain` in `index.ts`). All three are the keeper's `once`
+- **Five things drain a lane:** a run's end (`settle`), startup
+  (`recover`), a move that leaves a card queued on it while it is not
+  running (`queueDrain` in `index.ts`), a release of its queue, and the end
+  of a wait for its top card (below). All are the keeper's `once`
   (`drain:<lane>`): queued once until its step starts, the same step for
-  all three; a move while it runs queues one more, which finds what the
-  running one missed, or nothing. `runs.start` marks a lane
+  all; a move while it runs queues one more, which finds what the running
+  one missed, or nothing.
+- **A held queue pops no message card** (ADR-0048 step 7): the drain reads
+  the hold (`readQueueHolds`) and who is typing in which card
+  (`readTypingIn`, presence) in the synchronous span of the pop. `held`
+  ends the drain; a release drains again. A fact on top is popped anyway.
+  Startup drains every lane with queued cards, and a held one stops at
+  `held`. Presence is empty when a host starts, so a card someone was
+  typing in as it restarted can be popped: ADR-0048 accepts that.
+- **The drain waits for its top card** (`createWaits`, one wait per card):
+  for its text as its queuer had it (`behind`, S96), or for the typing in it
+  to stop (`typing`, `untilNotTyped`, which watches presence; a decay
+  reaches the host's subscribers, S28). A wait is given up when its card
+  leaves the queue (`givenUp`), and its end drains the lane again. `runs.start` marks a lane
   running at once (`beginRun`), so a drain behind a started run pops
   nothing.
 - **`executeChat` still checks a new lane's directory and asks pi for the
@@ -450,7 +465,19 @@ rejects `shutdown()`.
   (`@pineta/rules`) gives the `pineta.stop` record for the running ask's prompt, unless one is
   there, and `handleStop` writes it, then asks pi to abort, in one step. So
   the record is there when the run's end is drawn, and the first press is
-  the one named.
+  the one named. With a message card queued it holds the queue in the same
+  write (`holdOnStop`, ADR-0048 step 7), so the run's end, a drain on the
+  same keeper, pops nothing.
+- **`queue-hold` holds or releases a thread's queue** (`handleQueueHold`,
+  `planQueueHold`): it answers `moved` when it wrote, `nothing` when the
+  queue was already so. A release asks for the lane's drain: nothing else
+  would pop what waited.
+- **`reorder` and `unqueue-all` are moves of their own** (`commands/cards.ts`).
+  A reorder is written in the sender's history of its place's root
+  (`planReorder`), through `carry`, and drains nothing. Unqueue all plans
+  its moves from the queue as it is (`planUnqueueAll`) and hands them to
+  `move`, so it is one step one undo reverses; with nothing queued it
+  answers `nothing`.
 - **A command on an offer leaves a fact** (ADR-0080): `actOnOffer`
   answers first, then writes the action's fact as a queued card in a keeper
   step of its own (`recordFact`), with its history (`provenance`, cause

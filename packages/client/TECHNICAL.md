@@ -1261,6 +1261,29 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   sent".
 - **A card the host could not send** carries `unsent` until it is queued
   again; its editor's status says it (`cardStatus`).
+- **The queue's controls** (ADR-0048 step 7) are the column's, beside Stop
+  and Resume: `columnView`'s `queue` (`QueueControls`) for a writable column
+  whose thread has a lane, worded by `queueControlWords`: "hold queue", or
+  "queue held by Bea" and "release"; and "unqueue all" while a message card
+  waits (`ColumnFacts.queuedMessages`). Each is a `ColumnAct` (`holdQueue`,
+  `unqueueAll`) that `planIntent` turns into one `request`. A send to a held
+  idle lane queues (`planSend` reads core's `sendWaits`), and its button's
+  title says the queue is held (`HELD_QUEUE_TITLE`).
+- **A queued or pinned card moves one place** with its ↑ and ↓
+  (`ReorderButtons`) or Alt+↑/↓ in its box (`card-keys.ts`, `cardKeyAct`).
+  Both are the `reorder` act, carrying the card's list as drawn, by id;
+  `planIntent` finds the new neighbours with `reorderOf` (`card-intents.ts`),
+  which gives nothing at an edge or past a fact, and the session tracks the
+  reorder as a move (`reorderCard`). Only those two editors take Alt+↑/↓:
+  on a Mac it is Option+↑/↓, a textarea's move to its paragraph's start or
+  end, which the composer and drafting cards keep. A queued card's editor
+  is keyed by its card, so a reorder moves the element, and its box keeps
+  focus and caret. There is no drop target for a reorder: put could not
+  reach it (`put-target.test.ts`).
+- **Each keystroke says which card it is in** (`onTyping(card)`, through
+  every editor to `App`): presence `typingIn`, which the host reads to pop
+  no card someone types in. `typingDue` writes at most once a second, and
+  at once in another card.
 
 ## Pasting an image (`paste.ts`, ADR-0042)
 
@@ -1774,6 +1797,10 @@ stays in view; the strip scrolls past 30vh.
   only when what the entry replaced was read by its own lane: a branch's
   first run retires its parent's cards, and its column draws nothing for
   that. A null marker draws nothing.
+- **Selectors for the browser suite (queue control, ADR-0048 step 7):**
+  `.queue-controls` (with `data-held`, who holds it), its `.hold-queue`,
+  `.release-queue` and `.unqueue-all`; a queued or pinned card's
+  `.reorder-up` and `.reorder-down`.
 - **Selectors for the browser suite:** `.pinned-strip`, its
   `textarea[data-card]`, a drafting card's `.pin`, a pinned card's `.unpin`,
   `.pinned-status[data-status]`, and `details.pinned-read` just before its

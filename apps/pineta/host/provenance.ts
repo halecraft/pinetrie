@@ -20,6 +20,7 @@ import {
   readCardHistories,
   readLanes,
   readPlaces,
+  readQueueHolds,
   readReading,
   readTraces,
   readTreeIndex,
@@ -120,7 +121,12 @@ export function createProvenance(deps: ProvenanceDeps): Provenance {
           if (held === null) roots.set(root, null)
           else {
             const index = readTreeIndex(held.doc)
-            const lanes = readLanes({ doc: held.doc, live }, index, cards)
+            const lanes = readLanes(
+              { doc: held.doc, live },
+              index,
+              cards,
+              readQueueHolds(session),
+            )
             roots.set(root, { index, lanes })
           }
         }

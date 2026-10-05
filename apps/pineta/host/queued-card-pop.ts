@@ -3,7 +3,8 @@
 //
 // People queue and unqueue cards through handoffs (ADR-0059); the host pops
 // them, and only when the lane is not running, since a lane is never written
-// while it runs (S21). Popping the next queued card is where the cards
+// while it runs (S21), its queue is not held, and nobody is typing in the
+// top card (ADR-0048 step 7). Popping the next queued card is where the cards
 // people still edit meet the tree. What a popped card comes to is decided
 // first (`planCarry`): a fact appended, a catch-up then the card's text, a
 // split's run, a message sent, or nothing (ADR-0080); `carryOut` carries it
@@ -23,8 +24,10 @@ import type { Outcome } from "@pineta/protocol/codec"
 import {
   readParticipantNames,
   readPlaces,
+  readQueueHolds,
   readRunning,
   readThreadName,
+  readTypingIn,
 } from "@pineta/reads"
 import {
   type CarryPlan,
@@ -36,7 +39,7 @@ import {
   type QueuedCard,
   queuedOn,
 } from "@pineta/rules"
-import type { PlacesDocHandle } from "@pineta/schema"
+import type { PlacesDocHandle, PresenceDocHandle } from "@pineta/schema"
 import { type Basics, messageOf } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
 import type { Chat } from "./commands/chat.ts"
@@ -51,9 +54,14 @@ export interface PoppedQueuedCard {
   readonly text: string
 }
 
-/** What a pop found: nothing to pop, a top card whose text is behind, or a card popped. */
+/**
+ * What a pop found: nothing to pop, a held queue, a top card someone is
+ * typing in, a top card whose text is behind, or a card popped.
+ */
 export type NextQueuedCardPop =
   | { readonly kind: "idle" }
+  | { readonly kind: "held" }
+  | { readonly kind: "typing"; readonly card: QueuedCard }
   | { readonly kind: "behind"; readonly card: QueuedCard }
   | { readonly kind: "popped"; readonly popped: PoppedQueuedCard }
 
@@ -62,7 +70,8 @@ export type NextQueuedCardPop =
  * text, and remove its record. Synchronous: an unqueue is a step on the same
  * keeper as the drain, so it runs before the pop or after it, never
  * between, and one after it is refused as gone. Idle when the lane runs or
- * nothing is queued. A card whose text the host does not yet hold as its
+ * nothing is queued; `held` and `typing` as `planNextQueuedCardPop` says
+ * (ADR-0048 step 7). A card whose text the host does not yet hold as its
  * queuer had it is `behind`, and stays: Kyneta keeps no order between
  * documents, so its record can arrive before its text (S96). `texts` must
  * answer from texts already loaded.
@@ -70,11 +79,11 @@ export type NextQueuedCardPop =
 export function popNextQueuedCard(
   places: PlacesDocHandle,
   lane: LaneName,
-  running: boolean,
+  facts: Parameters<typeof planNextQueuedCardPop>[2],
   texts: Pick<CardPort, "textNow" | "holds">,
 ): NextQueuedCardPop {
-  const step = planNextQueuedCardPop(readPlaces(places), lane, running)
-  if (step.kind === "idle") return { kind: "idle" }
+  const step = planNextQueuedCardPop(readPlaces(places), lane, facts)
+  if (step.kind !== "pop") return step
   const { card } = step
   if (!texts.holds(card.id, card.place.seen)) return { kind: "behind", card }
   const text = texts.textNow(card.id)
@@ -102,6 +111,8 @@ export const chatOfPoppedQueuedCard = (popped: PoppedQueuedCard): Chat => ({
 
 export interface QueuedCardPopDeps {
   readonly basics: Pick<Basics, "session" | "live" | "places" | "log" | "now">
+  /** Who is typing in which card (`typingIn`): the pop waits for them. */
+  readonly presence: PresenceDocHandle
   readonly texts: Pick<CardPort, "hydrate" | "textNow" | "holds" | "destroy">
   /** Where a fact is appended (ADR-0080). */
   readonly agent: Pick<Agent, "lane">
@@ -111,6 +122,8 @@ export interface QueuedCardPopDeps {
   readonly send: (popped: PoppedQueuedCard) => Promise<Outcome>
   /** The top card's text is behind: drain the lane again once the host holds it. */
   readonly behind: (card: QueuedCard) => void
+  /** Someone is typing in the top card: drain the lane again once they stop. */
+  readonly typing: (card: QueuedCard) => void
   /** Each card's history (ADR-0048 step 6). */
   readonly provenance: Pick<Provenance, "before" | "after">
 }
@@ -120,8 +133,10 @@ export interface QueuedCardPopDeps {
  * left. Each card's text is loaded before the pop, so the pop reads it
  * whole. A popped card is spent once its message is written or running;
  * one that could not be sent goes back below the line, saying why
- * (`planUnsent`, S69 answer 5). A run's end, startup and a move that queues
- * a card on an idle lane each drain again.
+ * (`planUnsent`, S69 answer 5). A held queue ends the drain; a top card
+ * whose text is behind, or that someone types in, ends it with a wait that
+ * drains again. A run's end, startup, a move that queues a card on an idle
+ * lane, and a release each drain again.
  */
 export async function drain(
   deps: QueuedCardPopDeps,
@@ -143,12 +158,18 @@ export async function drain(
     const top = popNextQueuedCard(
       places,
       lane,
-      readRunning(deps.basics.live, lane),
+      {
+        running: readRunning(deps.basics.live, lane),
+        held: readQueueHolds(deps.basics.session).has(lane),
+        typing: readTypingIn(deps.presence),
+      },
       deps.texts,
     )
-    if (top.kind === "idle") return
+    // Nothing to pop, or a held queue: its release drains it again.
+    if (top.kind === "idle" || top.kind === "held") return
     // The queue waits for its top card: those behind it keep their turn.
     if (top.kind === "behind") return deps.behind(top.card)
+    if (top.kind === "typing") return deps.typing(top.card)
     const done = await carryOut(deps, lane, top.popped)
     // Popped, written back or below the line again: the host's own write.
     await deps.provenance.after({ kind: "host" }, before)
@@ -342,16 +363,17 @@ export const givenUp = (
 }
 
 /**
- * The drain's `behind`: wait once per card for its text as its queuer had
- * it, then drain its lane again. A wait is given up when its card leaves
- * the queue (`givenUp`), so no subscription outlives a card the pop will
- * never reach. The places are watched only while a wait is out.
+ * The drain's waits for its top card (ADR-0048 step 7, S96): once per card,
+ * until `until` resolves, then drain its lane again. A wait is given up
+ * when its card leaves the queue (`givenUp`), so no subscription outlives a
+ * card the pop will never reach. The places are watched only while a wait
+ * is out. A card already awaited is not awaited twice: the drain that
+ * follows the first wait asks again if it must.
  */
-export function createBehind(deps: {
+export function createWaits(deps: {
   readonly places: PlacesDocHandle
-  readonly texts: Pick<CardPort, "whenHolds">
   readonly drain: (lane: LaneName) => void
-}): (card: QueuedCard) => void {
+}): (card: QueuedCard, until: (signal: AbortSignal) => Promise<void>) => void {
   const awaiting = new Map<CardId, AbortController>()
   let unwatch: (() => void) | null = null
   const watch = () => {
@@ -360,20 +382,41 @@ export function createBehind(deps: {
         awaiting.get(id)?.abort()
     })
   }
-  return card => {
+  return (card, until) => {
     if (awaiting.has(card.id)) return
     const stop = new AbortController()
     awaiting.set(card.id, stop)
     watch()
-    void deps.texts
-      .whenHolds(card.id, card.place.seen, stop.signal)
-      .then(() => {
-        awaiting.delete(card.id)
-        if (awaiting.size === 0) {
-          unwatch?.()
-          unwatch = null
-        }
-        if (!stop.signal.aborted) deps.drain(card.place.lane)
-      })
+    void until(stop.signal).then(() => {
+      awaiting.delete(card.id)
+      if (awaiting.size === 0) {
+        unwatch?.()
+        unwatch = null
+      }
+      if (!stop.signal.aborted) deps.drain(card.place.lane)
+    })
   }
+}
+
+/**
+ * Resolves once nobody is typing in `card` (`readTypingIn`), as soon as
+ * their presence decays (S28), or when `signal` gives the wait up.
+ */
+export function untilNotTyped(
+  presence: PresenceDocHandle,
+  card: CardId,
+  signal: AbortSignal,
+): Promise<void> {
+  return new Promise(resolve => {
+    const done = () => {
+      unsubscribe()
+      signal.removeEventListener("abort", done)
+      resolve()
+    }
+    const unsubscribe = subscribe(presence, () => {
+      if (!readTypingIn(presence).has(card)) done()
+    })
+    signal.addEventListener("abort", done)
+    if (signal.aborted || !readTypingIn(presence).has(card)) done()
+  })
 }

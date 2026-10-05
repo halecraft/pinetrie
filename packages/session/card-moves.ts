@@ -9,7 +9,8 @@
 // the card since. Dropped at the answer alone, the card would jump back for
 // a moment; dropped when the card looks moved, a move overtaken before the
 // copy caught up (popped from its queue, or moved back) would never show, and would be drawn
-// for good. A send is a move of its card too: out of the composer.
+// for good. A send is a move of its card too: out of the composer. So is a
+// reorder (ADR-0048 step 7), drawn as the host's own rule would write it.
 //
 // The history of moves is the host's (ADR-0066), not kept here. The slot a
 // take into the inventory chose is an intent until the take is answered
@@ -22,9 +23,11 @@ import type {
   Move,
   MoveRefusal,
   PlaceKey,
+  Reorder,
   WriterId,
 } from "@pineta/core"
 import type { Outcome } from "@pineta/protocol/codec"
+import { planReorder } from "@pineta/rules"
 import type { Intents } from "./inventory.ts"
 
 /**
@@ -84,10 +87,14 @@ interface Sent {
   readonly actedAt: ActedAt
 }
 
-/** A move this tab sent: a creation draws its record, any other its target. */
+/**
+ * A move this tab sent: a creation draws its record, a move its target, a
+ * reorder what the host would write for it (`planReorder`).
+ */
 export type Pending =
   | (Sent & { readonly kind: "create"; readonly draft: CardRecord })
   | (Sent & { readonly kind: "move"; readonly move: Move })
+  | (Sent & { readonly kind: "reorder"; readonly reorder: Reorder })
 
 /**
  * Something of yours refused, kept to be worded where you acted: a move or
@@ -214,7 +221,11 @@ export function movesStep(state: MovesState, event: MovesEvent): MovesState {
 
 /** The card a pending move moves. */
 export const cardOfPending = (p: Pending): CardId =>
-  p.kind === "create" ? p.draft.id : p.move.card
+  p.kind === "create"
+    ? p.draft.id
+    : p.kind === "reorder"
+      ? p.reorder.card
+      : p.move.card
 
 /** A move sent as `id`, unanswered; with `draft`, a creation drawn as that record. */
 export function pendingOf(
@@ -242,6 +253,7 @@ export function slotOnAccept(
   p: Pending,
   answer: MoveAnswer,
 ): { readonly card: CardId; readonly slot: number } | null {
+  if (p.kind === "reorder") return null
   const into = p.kind === "create" ? p.draft.place : p.move.to
   return answer.kind === "accepted" &&
     into?.kind === "inventory" &&
@@ -300,6 +312,16 @@ export function withPending(
   for (const p of shown) {
     if (p.kind === "create") {
       if (!cards.has(p.draft.id)) cards.set(p.draft.id, p.draft)
+      continue
+    }
+    if (p.kind === "reorder") {
+      // Drawn as the host would write it, over what is drawn so far: a
+      // reorder it would refuse is drawn as nothing.
+      const step = planReorder([...cards.values()], p.reorder)
+      const steps =
+        step.kind === "steps" ? step.steps : step.kind === "write" ? [step] : []
+      for (const w of steps)
+        if (w.kind === "write") cards.set(w.record.id, w.record)
       continue
     }
     const now = cards.get(p.move.card)

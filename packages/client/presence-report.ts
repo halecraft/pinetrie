@@ -1,6 +1,8 @@
 // client/presence-report — what this page writes about you: which thread end
 // each column of the root you are on reads (ADR-0024, ADR-0029), and when you
-// are typing. PURE: `App` gathers and writes.
+// are typing, and in which card. PURE: `App` gathers and writes.
+
+import type { CardId } from "@pineta/core"
 
 /** Each reported column's key, and the thread end it shows (null: none yet). */
 export type Reported = ReadonlyMap<string, string | null>
@@ -29,6 +31,19 @@ export function planReading(
 /** How often typing is written, at most. */
 export const TYPING_EVERY_MS = 1_000
 
-/** Whether typing at `now` is written, the last write having been at `last`. */
-export const typingDue = (last: number, now: number): boolean =>
-  now - last >= TYPING_EVERY_MS
+/** The last typing written: when, and in which card (null: none yet). */
+export interface TypedLast {
+  readonly at: number
+  readonly card: CardId | null
+}
+
+/**
+ * Whether typing at `now` in `card` is written: a second after the last
+ * write, or at once in another card, since the host pops no card someone
+ * is typing in (ADR-0048 step 7).
+ */
+export const typingDue = (
+  last: TypedLast,
+  now: number,
+  card: CardId | null,
+): boolean => card !== last.card || now - last.at >= TYPING_EVERY_MS

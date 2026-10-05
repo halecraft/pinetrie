@@ -27,7 +27,6 @@ import {
   IMAGE_MIMES,
   type ImageMime,
   type ImageRef,
-  isBusy,
   type LaneName,
   type Mention,
   type PlanMode,
@@ -36,6 +35,7 @@ import {
   type Responder,
   refused,
   type Sha256,
+  sendWaits,
   THE_AGENT,
   type ThreadLane,
   type WriterId,
@@ -566,7 +566,7 @@ export function planChat(input: {
   }
 
   const name: LaneName = lane.name
-  const busy = input.mode === "queue" ? lane.running : isBusy(lane)
+  const busy = input.mode === "queue" ? lane.running : sendWaits(lane)
   if (!compelled) {
     return busy
       ? { kind: "busy" }

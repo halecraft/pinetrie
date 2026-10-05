@@ -531,6 +531,55 @@ describe("planIntent", () => {
         plan(unqueue, at(onRoot("1-r1"), undefined, withCard(drafting))),
       ).toEqual([])
     })
+    test("a reorder moves the card one place among the list as drawn, said in the column; at an edge, or past a fact, nothing (ADR-0048 step 7)", () => {
+      const q = (id: string, order: string) =>
+        ({
+          ...fresh,
+          id: cardId(id),
+          place: { ...queuedPlace, order },
+        }) satisfies CardRecord
+      const [a, b] = [q("c-a", "a"), q("c-b", "b")]
+      const fact = {
+        ...q("c-f", "c"),
+        carries: {
+          kind: "fact",
+          fact: { kind: "described", lane, by: ada },
+        },
+      } satisfies CardRecord
+      const state = at(onRoot("1-r1"), undefined, {
+        ...NO_CARDS,
+        cards: [a, b, fact],
+      })
+      const among = [a.id, b.id, fact.id]
+      expect(
+        plan(column({ kind: "reorder", card: b.id, among, step: -1 }), state),
+      ).toEqual([
+        {
+          kind: "reorderCard",
+          reorder: {
+            card: b.id,
+            at: { kind: "queued", root: TEST_ROOT, at: where, lane, seen: "v" },
+            after: null,
+            before: a.id,
+          },
+          how: inColumn,
+        },
+      ])
+      expect(
+        plan(column({ kind: "reorder", card: a.id, among, step: -1 }), state),
+      ).toEqual([])
+      expect(
+        plan(column({ kind: "reorder", card: b.id, among, step: 1 }), state),
+      ).toEqual([])
+    })
+    test("hold, release and unqueue all are one request each", () => {
+      expect(plan(column({ kind: "holdQueue", lane, held: true }))).toEqual([
+        { kind: "request", intent: { kind: "queue-hold", lane, held: true } },
+      ])
+      expect(plan(column({ kind: "unqueueAll", lane }))).toEqual([
+        { kind: "request", intent: { kind: "unqueue-all", lane } },
+      ])
+    })
     test("a command is one write", () => {
       expect(
         plan(column({ kind: "setCommand", card: c, command: null })),

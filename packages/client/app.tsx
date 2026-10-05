@@ -96,7 +96,7 @@ import { OpenList } from "./open-list.tsx"
 import { offeredByRoot, openListView, pageTitle } from "./open-list-view.ts"
 import { type AppPorts, perform } from "./perform.ts"
 import { nameFor, presenceColors, writerOrder } from "./presence.tsx"
-import { planReading, typingDue } from "./presence-report.ts"
+import { planReading, type TypedLast, typingDue } from "./presence-report.ts"
 import { type HeldView, readHeldLanes, readSessionFacts } from "./projection.ts"
 import {
   CARD_MIME,
@@ -600,12 +600,12 @@ export function App({
       document.removeEventListener("visibilitychange", refresh)
     }
   }, [session])
-  const lastTyped = useRef(0)
-  const typing = (end: string | null) => {
+  const lastTyped = useRef<TypedLast>({ at: 0, card: null })
+  const typing = (end: string | null, card: CardId | null) => {
     const now = Date.now()
-    if (end === null || !typingDue(lastTyped.current, now)) return
-    lastTyped.current = now
-    session.setTyping(end)
+    if (end === null || !typingDue(lastTyped.current, now, card)) return
+    lastTyped.current = { at: now, card }
+    session.setTyping(end, card)
   }
   const colors = useMemo(() => branchColors(rail, views), [rail, views])
   const paths = useMemo(
@@ -1185,7 +1185,7 @@ export function App({
                     forks={colors.forks}
                     key={slot.key}
                     onIntent={onIntent}
-                    onTyping={() => typing(columnView.tipId)}
+                    onTyping={card => typing(columnView.tipId, card)}
                     path={paths[slot.position] ?? new Set()}
                     position={slot.position}
                     readOnly={

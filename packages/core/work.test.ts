@@ -20,6 +20,7 @@ import {
   type RevisionRecord,
   ROOT,
   rootIdFor,
+  sendWaits,
   snapshotId,
   turnEntry,
   workFor,
@@ -367,10 +368,17 @@ test("isBusy: running, or with cards queued", () => {
     waiting: 0,
     askedBy: null,
     lastWaiting: null,
+    heldBy: null,
   }
   expect(isBusy(view)).toBe(false)
   expect(isBusy({ ...view, running: true })).toBe(true)
   expect(isBusy({ ...view, waiting: 1 })).toBe(true)
+  // A held queue is not busy: nothing waits, and the agent is idle.
+  expect(isBusy({ ...view, heldBy: writerId("ada") })).toBe(false)
+  // But a send there waits in it (ADR-0048 step 7).
+  expect(sendWaits({ ...view, heldBy: writerId("ada") })).toBe(true)
+  expect(sendWaits(view)).toBe(false)
+  expect(sendWaits({ ...view, waiting: 1 })).toBe(true)
 })
 
 test("firstLine: the first non-empty line, cut with an ellipsis only when longer", () => {

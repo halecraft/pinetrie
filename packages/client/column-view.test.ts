@@ -1,5 +1,6 @@
 import {
   type AgentMessageLike,
+  atEntry,
   type BaseRecord,
   type CardCommand,
   cardId,
@@ -44,6 +45,7 @@ import {
   pinnedMarker,
   pinnedMarkers,
   pinnedStatus,
+  queueControlWords,
   runWords,
   startedWords,
   tokensOf,
@@ -59,6 +61,7 @@ const C = laneNameForThread("c")
 const AMBER = "amber-fox" as ThreadName
 const COPPER = "copper-owl" as ThreadName
 const ADA = writerId("ada@x.io")
+const BEA = writerId("bea@x.io")
 
 type Line = readonly [
   id: string,
@@ -218,6 +221,7 @@ const laneView = (name: LaneName, tip: string, running = false): LaneView => ({
   waiting: 0,
   askedBy: null,
   lastWaiting: null,
+  heldBy: null,
 })
 const onLane = (view: LaneView): ThreadLane => ({ kind: "lane", ...view })
 const record = (lane: LaneName, work: LaneRecord["work"]): LaneRecord => ({
@@ -254,7 +258,7 @@ const facts = (
     mountedBanner: null,
     writable: true,
     nameOf: new Map([[ADA, "Ada"]]),
-    queuedCommands: [],
+    queued: [],
     acting: null,
     lanes: [],
     work: work(),
@@ -1146,6 +1150,68 @@ test.each([
   expect(newPinAt(facts)).toBe(want)
 })
 
+describe("columnView: the queue's controls (ADR-0048 step 7)", () => {
+  const controls = (over: Partial<ColumnFacts>) =>
+    columnView(facts(0, over)).queue
+  test("a writable thread with a lane: hold, and unqueue all while a message card waits", () => {
+    expect(controls({ lane: onLane(laneView(A, "6")) })).toEqual({
+      lane: A,
+      heldBy: null,
+      unqueueAll: false,
+    })
+    expect(
+      controls({
+        lane: onLane({ ...laneView(A, "6"), heldBy: BEA }),
+        queued: [
+          {
+            id: cardId("c-1"),
+            owner: ADA,
+            placer: ADA,
+            place: {
+              kind: "queued",
+              root: TEST_ROOT,
+              at: atEntry(entryId("6")),
+              lane: A,
+              order: "a",
+              by: ADA,
+              seen: "",
+            },
+            carries: { kind: "message", command: null },
+            unsent: null,
+          },
+        ],
+      }),
+    ).toEqual({ lane: A, heldBy: BEA, unqueueAll: true })
+  })
+  test("none read-only, nor with no lane", () => {
+    expect(controls({ lane: { kind: "none" } })).toBeNull()
+    expect(
+      controls({ lane: onLane(laneView(A, "6")), writable: false }),
+    ).toBeNull()
+  })
+  test("words: hold, or who holds it and release; unqueue all only when offered", () => {
+    const reader = { me: ADA, nameOf: new Map([[BEA, "Bea"]]) }
+    const free = queueControlWords(
+      { lane: A, heldBy: null, unqueueAll: false },
+      reader,
+    )
+    expect(free.held).toBeNull()
+    expect(free.hold.label).toBe("hold queue")
+    expect(free.unqueueAll).toBeNull()
+    const held = queueControlWords(
+      { lane: A, heldBy: BEA, unqueueAll: true },
+      reader,
+    )
+    expect(held.held).toBe("queue held by Bea")
+    expect(held.hold.label).toBe("release")
+    expect(held.unqueueAll?.label).toBe("unqueue all")
+    expect(
+      queueControlWords({ lane: A, heldBy: ADA, unqueueAll: false }, reader)
+        .held,
+    ).toBe("queue held by you")
+  })
+})
+
 describe("columnView: the run button (ADR-0082)", () => {
   /** A thread of a prompt and its reply, `tail` after; its lane's tip the last. */
   const thread = (
@@ -1180,6 +1246,10 @@ describe("columnView: the run button (ADR-0082)", () => {
   test("nothing once a message follows the stop, a card waits, or the ask answered", () => {
     expect(thread(stopped, [{ role: "chat", content: "to Bea" }])).toBeNull()
     expect(thread(stopped, [], { waiting: 1 })).toBeNull()
+    // A held queue waits for a release: Resume shows beside it.
+    expect(thread(stopped, [], { waiting: 1, heldBy: ADA })).toEqual({
+      kind: "carry-on",
+    })
     expect(thread({ ...stopped, stopReason: "stop" })).toBeNull()
   })
   test("an update after the stop leaves Resume", () => {

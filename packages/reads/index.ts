@@ -30,6 +30,7 @@ import {
   type CardId,
   type CardRecord,
   type CommandSummary,
+  cardId,
   type DigestRecord,
   type EntryId,
   type EntryLike,
@@ -51,6 +52,7 @@ import {
   type ProjectRecord,
   parseMentions,
   promptOf,
+  type QueueHold,
   type RevisionRecord,
   type RootId,
   type RootRecord,
@@ -94,6 +96,7 @@ import {
   participants,
   pastedImages,
   promptAuthor,
+  QUEUE_HOLD,
   queuedOn,
   REVISION,
   type RecordSpec,
@@ -303,14 +306,16 @@ function askerOf(index: TreeIndex, tip: EntryId | null): WriterId | undefined {
 /**
  * Every thread lane: its tip, whether it runs, how many cards are queued for
  * it (ADR-0048), who holds it (for a conflict's "by"): the writer of the ask
- * it is answering (`askerOf`), or who queued its first card; and who queued
- * its last card, whom a card queued now follows. `cards` is every card's
- * record (`readPlaces`).
+ * it is answering (`askerOf`), or who queued its first card; who queued
+ * its last card, whom a card queued now follows; and who holds its queue
+ * (ADR-0048 step 7). `cards` is every card's record (`readPlaces`), `holds`
+ * the session's held queues (`readQueueHolds`).
  */
 export function readLanes(
   view: Pick<RootView, "doc" | "live">,
   index: TreeIndex,
   cards: readonly CardRecord[],
+  holds: ReadonlyMap<LaneName, QueueHold>,
 ): readonly LaneView[] {
   const { doc, live } = view
   return readLaneNames(doc).map(name => {
@@ -325,17 +330,10 @@ export function readLanes(
       waiting: queue.length,
       askedBy: asking ?? null,
       lastWaiting: queue.at(-1)?.place.by ?? null,
+      heldBy: holds.get(name)?.by ?? null,
     }
   })
 }
-
-/** One lane's view, or undefined for a lane the root does not hold. */
-export const readLane = (
-  view: Pick<RootView, "doc" | "live">,
-  lane: LaneName,
-  cards: readonly CardRecord[],
-): LaneView | undefined =>
-  readLanes(view, readTreeIndex(view.doc), cards).find(l => l.name === lane)
 
 /** Every lane the agent is replying on, in this root. */
 export function readAgentActivity(
@@ -497,6 +495,41 @@ export const readReadingRoots = keptWhileSame(
 
 /** One entry per seat typing: its writer, and the thread end. */
 export const readTyping = presenceField(doc => doc.typing())
+
+/**
+ * The cards someone is typing in now (`typingIn`), from any seat: the host
+ * pops none of them (ADR-0048 step 7). Kept while the same cards.
+ */
+export const readTypingIn = keptWhileSame(
+  (doc: PresenceDocHandle): ReadonlySet<CardId> =>
+    new Set(
+      Object.values(doc.typingIn()).flatMap(card =>
+        card === null ? [] : [cardId(card)],
+      ),
+    ),
+  (a, b) => a.size === b.size && [...a].every(c => b.has(c)),
+)
+
+/** Whether two holds say the same: who, and since when. */
+const sameHolds = (
+  a: ReadonlyMap<LaneName, QueueHold>,
+  b: ReadonlyMap<LaneName, QueueHold>,
+): boolean =>
+  a.size === b.size &&
+  [...a].every(([lane, h]) => {
+    const o = b.get(lane)
+    return o !== undefined && o.by === h.by && o.at === h.at
+  })
+
+/**
+ * Each held queue (`pineta.queue-hold`, ADR-0048 step 7), by lane. The same
+ * map while the holds are, since every session write wakes it.
+ */
+export const readQueueHolds = keptWhileSame(
+  (doc: SessionDocHandle): ReadonlyMap<LaneName, QueueHold> =>
+    readRecords(doc, QUEUE_HOLD),
+  sameHolds,
+)
 
 /** Every seat the host has seen (`pineta.seat`), first seen first. */
 export const readSeats = (doc: SessionDocHandle): readonly SeatRecord[] =>

@@ -6,7 +6,10 @@
 /**
  * Order keys are fixed-width base-36 integers, so string order is numeric
  * order. The first starts in the middle, and each next one a step on, which
- * leaves room before and between for reordering.
+ * leaves room before and between for reordering. A key between two
+ * neighbours is their midpoint, so about twenty inserts into one gap use it
+ * up; then the caller renumbers (`orderKeys`, or `respace` for only the
+ * crowded keys).
  */
 const ORDER_WIDTH = 10
 const ORDER_MAX = 36 ** ORDER_WIDTH - 1
@@ -64,3 +67,47 @@ const mid = (low: number, high: number): string | null => {
 /** `n` keys in order, a step apart from the start: a list renumbered. */
 export const orderKeys = (n: number): readonly string[] =>
   Array.from({ length: n }, (_, i) => orderKey(ORDER_START + i * ORDER_STEP))
+
+/**
+ * Room for a key at `index` of `orders` (ascending) where `orderBetween`
+ * found none: the fewest keys around `index` given new ones, spread evenly
+ * between the nearest keys outside them. The window widens one key each
+ * side until every key in it, and the new one, fits at least two apart.
+ * Returns the keys that change, by index, and the new key. Pure.
+ */
+export function respace(
+  orders: readonly string[],
+  index: number,
+): {
+  readonly changed: ReadonlyMap<number, string>
+  readonly inserted: string
+} {
+  const at = (i: number): number => {
+    const n = numberOf(orders[i] ?? "")
+    return Number.isFinite(n) ? n : 0
+  }
+  let from = index
+  let to = index
+  for (;;) {
+    const lo = from > 0 ? at(from - 1) : -1
+    const hi = to < orders.length ? at(to) : ORDER_MAX + 1
+    const count = to - from + 1
+    const step = Math.floor((hi - lo) / (count + 1))
+    const whole = from === 0 && to === orders.length
+    if (step >= 2 || whole) {
+      const changed = new Map<number, string>()
+      let inserted = ""
+      for (let k = 0; k < count; k++) {
+        const key = orderKey(lo + (k + 1) * step)
+        if (from + k === index) inserted = key
+        else {
+          const i = from + k - (from + k > index ? 1 : 0)
+          if (orders[i] !== key) changed.set(i, key)
+        }
+      }
+      return { changed, inserted }
+    }
+    if (from > 0) from--
+    if (to < orders.length) to++
+  }
+}

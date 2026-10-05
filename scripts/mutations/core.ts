@@ -850,4 +850,12 @@ export const mutations: readonly Mutation[] = [
     expect:
       "isWithin: the path itself and what is under it, never a sibling with the same prefix",
   },
+  {
+    name: "sendWaits ignores the hold",
+    file: tree,
+    from: "  isBusy(lane) || lane.heldBy !== null",
+    to: "  isBusy(lane)",
+    command: unit,
+    expect: "isBusy: running, or with cards queued",
+  },
 ]

@@ -214,6 +214,7 @@ describe("layoutReducer", () => {
         waiting: 0,
         askedBy: null,
         lastWaiting: null,
+        heldBy: null,
       },
     ]
     const synced = resolve(reserved, written, new Set(), lanes)
@@ -377,6 +378,7 @@ describe("layoutReducer", () => {
       waiting: 0,
       askedBy: null,
       lastWaiting: null,
+      heldBy: null,
     })
     const bound = resolve(withColumn(at(initialLayout())), index, new Set(), [
       lane("4-c"),

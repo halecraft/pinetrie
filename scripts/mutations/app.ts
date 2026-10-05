@@ -1590,8 +1590,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a client cannot read a full inventory",
     file: "packages/protocol/codec.ts",
-    from: '  "full",\n  "not-yours",\n  "fact",\n]',
-    to: '  "not-yours",\n  "fact",\n]',
+    from: '  "full",\n  "not-yours",\n  "fact",\n  "order-changed",\n]',
+    to: '  "not-yours",\n  "fact",\n  "order-changed",\n]',
     suite: "host",
     scenario: "cards",
     expect: "the nineteenth card is refused: the inventory is full",
@@ -1807,5 +1807,46 @@ export const mutations: readonly Mutation[] = [
     scenario: "page",
     expect:
       "after a run, the marker of the pinned cards it read is drawn above its prompt",
+  },
+  // ── queue control (ADR-0048 step 7) ──
+  {
+    name: "the drain is never woken once typing stops",
+    file: "apps/pineta/host/index.ts",
+    from: "    wait(card, signal => untilNotTyped(presence, card.id, signal))",
+    to: "    wait(card, () => new Promise<void>(() => {}))",
+    suite: "host",
+    scenario: "cards",
+    expect:
+      "the top queued card waits while someone types in it, and is popped once their typing decays",
+  },
+  {
+    name: "a starting host sweeps every hold",
+    file: "apps/pineta/host/housekeeping.ts",
+    from: "    rootOf: lane => lanes.get(lane)?.root ?? null,",
+    to: "    rootOf: () => null,",
+    suite: "host",
+    scenario: "cards",
+    expect:
+      "a held queue keeps a card sent to its idle thread queued across a restart, and a release pops it",
+  },
+  {
+    name: "a queued card's box is keyed by its place in line",
+    file: "packages/client/column.tsx",
+    from: "                    among={queued}\n                    card={c}\n                    key={c.id}\n",
+    to: "                    among={queued}\n                    card={c}\n                    key={n}\n",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "Alt+↑ in a queued card moves it up the queue, and its box keeps the focus and the caret",
+  },
+  {
+    name: "unqueue all does nothing on the page",
+    file: "packages/client/column.tsx",
+    from: '          onClick={() => p.onAct({ kind: "unqueueAll", lane })}',
+    to: "          onClick={() => {}}",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "hold queue holds the thread's queue, and unqueue all puts every queued card below the line",
   },
 ]

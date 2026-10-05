@@ -326,6 +326,38 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     { kind: "set-command", card: cardId("c-7"), command: "bring-up-to-date" },
     { kind: "set-command", card: cardId("c-7"), command: null },
     { kind: "traces-seen", traces: ["t-1", "t-2"] },
+    { kind: "queue-hold", lane: laneNameForThread("abc"), held: true },
+    { kind: "queue-hold", lane: laneNameForThread("abc"), held: false },
+    { kind: "unqueue-all", lane: laneNameForThread("abc") },
+    {
+      kind: "reorder",
+      reorder: {
+        card: cardId("c-7"),
+        at: {
+          kind: "queued",
+          root: TEST_ROOT,
+          at: atEntry(entryId("e-1")),
+          lane: laneNameForThread("abc"),
+          seen: "v1",
+        },
+        after: cardId("c-6"),
+        before: null,
+      },
+    },
+    {
+      kind: "reorder",
+      reorder: {
+        card: cardId("c-7"),
+        at: {
+          kind: "pinned",
+          root: TEST_ROOT,
+          at: atEntry(entryId("e-1")),
+          lane: null,
+        },
+        after: null,
+        before: cardId("c-8"),
+      },
+    },
   ] as const
   for (const intent of intents) {
     assert.deepEqual(decodeCommand(encodeIntent("c-1", intent)), intent)
@@ -420,6 +452,7 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
       by: writerId("bea@example.com"),
     },
     { kind: "unmoved", code: "gone", place: null, by: null },
+    { kind: "unmoved", code: "order-changed", place: null, by: null },
     {
       kind: "unmoved",
       code: "not-yours",
@@ -522,8 +555,47 @@ test("decodeReply: an unrecognised code stays inside the ErrCode set", () => {
   assert.equal(out.kind === "refused" ? out.code : "", ERR.UNKNOWN_KIND)
 })
 
+test("decode: a malformed reorder or queue hold is refused (ADR-0048 step 7)", () => {
+  const queued = {
+    kind: "queued",
+    root: TEST_ROOT,
+    at: "e-1",
+    lane: laneNameForThread("abc"),
+    seen: "",
+  }
+  const reorder = (cardId: string, moves: unknown) =>
+    decodeCommand({ kind: "reorder", cardId, moves: JSON.stringify(moves) })
+      .kind
+  assert.equal(
+    reorder("c-1", { at: queued, after: "c-2", before: "" }),
+    "reorder",
+  )
+  assert.equal(reorder("", { at: queued, after: "c-2" }), "refused")
+  assert.equal(reorder("c-1", { at: queued }), "refused")
+  assert.equal(reorder("c-1", { at: queued, after: "c-1" }), "refused")
+  assert.equal(
+    reorder("c-1", { at: queued, after: "c-2", before: "c-2" }),
+    "refused",
+  )
+  assert.equal(
+    reorder("c-1", {
+      at: { kind: "drafting", root: TEST_ROOT, at: "e-1", lane: "" },
+      after: "c-2",
+    }),
+    "refused",
+  )
+  assert.equal(
+    decodeCommand({
+      kind: "queue-hold",
+      lane: laneNameForThread("abc"),
+      mode: "pause",
+    }).kind,
+    "refused",
+  )
+})
+
 test("decode: stop and carry-on must name a thread's lane", () => {
-  for (const kind of ["stop", "carry-on"])
+  for (const kind of ["stop", "carry-on", "unqueue-all", "queue-hold"])
     assert.equal(
       refusalCode(decodeCommand({ kind, lane: "w-someone" })),
       ERR.UNKNOWN_TARGET,

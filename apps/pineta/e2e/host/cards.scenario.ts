@@ -7,7 +7,14 @@ import { type CardId, cardId, entryId, type LaneName, ROOT } from "@pineta/core"
 import { scriptedModel } from "@pineta/pi"
 import { PLACES_DOC_ID } from "@pineta/protocol/messages"
 import { personDocId } from "@pineta/protocol/writers"
-import { readPlaces, readReading, readSeats, readTraces } from "@pineta/reads"
+import {
+  readPlaces,
+  readQueueHolds,
+  readReading,
+  readSeats,
+  readTraces,
+  readTypingIn,
+} from "@pineta/reads"
 import { yourCard } from "@pineta/rules"
 import { cardDocId, InventoryDoc, PlacesDoc } from "@pineta/schema"
 import type { SessionClient } from "@pineta/session"
@@ -288,6 +295,36 @@ async function run(check: Checks["check"]): Promise<void> {
       told >= 0 && sent7 && onHost(c7) === undefined,
       `${told}; sent ${sent7}`,
     )
+
+    // 4d. The top queued card waits while someone types in it (ADR-0048
+    // step 7): Ada types in her card as she queues it on the idle thread.
+    // The host hears her typing through presence, waits, and pops it once
+    // her typing decays.
+    const typeEnd = tipOf()
+    const c8 = newCard(ada, typeEnd, "@Bea wait for me")
+    await waitFor(() => ch.cardText(c8) === "@Bea wait for me", 5_000)
+    ada.setTyping(typeEnd ?? "", c8)
+    await waitFor(() => readTypingIn(ch.presence).has(c8), 5_000)
+    void queueCard(ada, c8, { lane, at: at(typeEnd) })
+    await waitFor(() => onHost(c8)?.place.kind === "queued", 5_000)
+    await ch.quiet()
+    const waited = onHost(c8)?.place.kind === "queued"
+    const sent8 = await waitFor(
+      () =>
+        onHost(c8) === undefined &&
+        Object.values(treeOf(ch).entries).some(
+          e =>
+            e.message?.role === "chat" &&
+            e.message.content === "@Bea wait for me",
+        ),
+      10_000,
+    )
+    check(
+      "the top queued card waits while someone types in it, and is popped once their typing decays",
+      waited && sent8 >= 0,
+      `waited ${waited}; popped after ${sent8} ms`,
+    )
+    await ch.quiet()
 
     // 4e. Pinned cards (ADR-0048 step 5, S92): a card pinned at the thread's
     // end is read by the agent's next run, in a cards entry pi writes with
@@ -725,6 +762,15 @@ async function run(check: Checks["check"]): Promise<void> {
         readSeats(ch.session).some(s => s.writer === zed.writer),
       5_000,
     )
+    // A held queue (ADR-0048 step 7): Bea holds it, and her send to the idle
+    // thread waits in it, across the restart.
+    await bea.request({ kind: "queue-hold", lane, held: true })
+    const c9 = newCard(bea, tipOf(), "@Ada after the restart")
+    await waitFor(() => ch.cardText(c9) === "@Ada after the restart", 5_000)
+    const heldSend = await bea.chat("@Ada after the restart", at(tipOf()), {
+      card: c9,
+    })
+    await ch.quiet()
     await Promise.all([bea.close(), zed.close()])
     await ch.shutdown()
     // The empty card's text loads late, so a host that served before its
@@ -754,6 +800,25 @@ async function run(check: Checks["check"]): Promise<void> {
     await adaAgain.close()
     const eve = await join(ch, "eve", "cards")
     await ch.quiet()
+    const heldAcross =
+      onHost(c9)?.place.kind === "queued" &&
+      readQueueHolds(ch.session).has(lane)
+    await eve.request({ kind: "queue-hold", lane, held: false })
+    const released = await waitFor(
+      () =>
+        onHost(c9) === undefined &&
+        Object.values(treeOf(ch).entries).some(
+          e =>
+            e.message?.role === "chat" &&
+            e.message.content === "@Ada after the restart",
+        ),
+      5_000,
+    )
+    check(
+      "a held queue keeps a card sent to its idle thread queued across a restart, and a release pops it",
+      heldSend.kind === "queued" && heldAcross && released >= 0,
+      `${heldSend.kind}; held ${heldAcross}; popped after ${released} ms`,
+    )
     await waitFor(
       () => eve.cardText(keep).text() === "kept across a restart",
       5_000,

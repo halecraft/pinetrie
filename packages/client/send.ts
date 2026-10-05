@@ -7,10 +7,10 @@ import {
   type Address,
   type CardCommand,
   type ChatMode,
-  isBusy,
   type LineRecord,
   type ProjectRecord,
   parseMentions,
+  sendWaits,
   type ThreadLane,
   type WorkSetting,
   type WriterId,
@@ -152,6 +152,8 @@ export interface SendPlan {
   readonly to: Address
   /** Where a queued send would wait: the button's in `queue` mode, and a conflict's. */
   readonly queue: QueuePlace
+  /** The thread's queue is held: a queued send waits for a release (ADR-0048 step 7). */
+  readonly held: boolean
   /**
    * The card's command (ADR-0055), and whether it has text to send after
    * it: the button then names the command.
@@ -201,13 +203,14 @@ export function planSend(input: {
   })
   const compelled = to.compels.kind === "agent"
   const queued =
-    lane.kind === "lane" && (isBusy(lane) || input.command !== null)
+    lane.kind === "lane" && (sendWaits(lane) || input.command !== null)
   const mode: ComposerMode = fresh ? "branch" : queued ? "queue" : "reply"
   return {
     mode,
     createsLane: compelled && (fresh || lane.kind === "none"),
     to,
     queue: queuePlace(lane, input.reader),
+    held: lane.kind === "lane" && lane.heldBy !== null,
     agentByDefault: agentByDefault(how),
     command:
       input.command === null
@@ -233,6 +236,10 @@ export interface SendButton extends ButtonWords {
   readonly disabled: boolean
 }
 
+/** The queue button's title while the thread's queue is held. */
+export const HELD_QUEUE_TITLE =
+  "the queue is held: sent once someone releases it"
+
 /** The button's label while an image uploads: a send then would lack its markdown. */
 export const UPLOADING = "uploading image…"
 
@@ -246,7 +253,9 @@ export function sendButton(plan: SendPlan, busy: EditorBusy): SendButton {
     : plan.command !== null
       ? commandSendWords(plan.command, plan.queue)
       : plan.mode === "queue"
-        ? queueWords(plan.queue)
+        ? plan.held
+          ? { ...queueWords(plan.queue), title: HELD_QUEUE_TITLE }
+          : queueWords(plan.queue)
         : recipientWords(plan.to)
   return { ...words, disabled: busy.uploading || busy.sending }
 }

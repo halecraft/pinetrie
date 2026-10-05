@@ -192,7 +192,11 @@ cards entry pi writes with the run's prompt when they changed, carried
 across pi's compaction (S92); and step 6's card history and traces: every
 card's moves in a session record the host writes in the step that moved
 it, and a trace where your card was when someone else moved it while you
-were away, deleted once seen (who contributed waits for Kyneta). A send
+were away, deleted once seen (who contributed waits for Kyneta); and step
+7's queue control: a thread's queue held until someone releases it, which
+Stop does when a message card waits, unqueue all, queued and pinned cards
+reordered with Alt+↑/↓ or their ↑ and ↓, and the next card held while
+someone types in it (presence `typingIn`). A send
 to a busy thread queues your
 card above the line, in the host's step that found the lane busy, where
 anyone can edit it or unqueue it until the host pops it; the pop and an
@@ -222,7 +226,8 @@ card at the thread's end. Typed `/` commands stay as ADR-0036 has them.
 
 **ADR-0026 — everything queued is a note, superseded by ADR-0048 and
 ADR-0055.** Queued notes were never built; a queued message is a queued card.
-The hold while someone types in a queued card waits for ADR-0048's step 7.
+The hold while someone types in a queued card is ADR-0048's step 7: presence
+`typingIn`, lapsing 3 s after the last keystroke, with no release.
 
 **ADR-0029 — a tab per root, an archive shared by everyone.** A column's
 context is its path to its root, so the screen splits there: a root tab has

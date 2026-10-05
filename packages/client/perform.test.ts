@@ -28,6 +28,7 @@ const ports = () => {
       createCard: vi.fn(async () => accepted),
       moveCard: vi.fn(async (): Promise<MoveAnswer> => accepted),
       moveCards: vi.fn(async (): Promise<MoveAnswer> => accepted),
+      reorderCard: vi.fn(async (): Promise<MoveAnswer> => accepted),
       undoMoves: vi.fn(async (): Promise<Outcome> => ({ kind: "nothing" })),
       swapSlots: vi.fn(),
       undoSwap: vi.fn(async () => {}),

@@ -12,6 +12,7 @@ const lane = (tip: string | null, name = L): LaneView => ({
   waiting: 0,
   askedBy: null,
   lastWaiting: null,
+  heldBy: null,
 })
 const sync = (
   s: readonly Column[],

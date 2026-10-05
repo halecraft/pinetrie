@@ -588,7 +588,8 @@ The rail is E; the column is T. Seeing both at once is the product.
   place, and a column at its end does not get shorter while the agent works
   (ADR-0044).
   **Stop** ends the turn, and records who pressed it under the ask
-  (ADR-0056); cards queued are then sent. Once it has stopped, **Resume**
+  (ADR-0056); cards queued are then held, until someone presses
+  **release** (ADR-0048 step 7). Once it has stopped, **Resume**
   takes its place: it starts a new turn with a message from the host,
   "↻ resumed by <name>" (ADR-0082), until anything else is written at the
   thread's end.
@@ -670,6 +671,21 @@ The rail is E; the column is T. Seeing both at once is the product.
   before you unqueued it". A move someone else made first is undone on your
   screen, saying "not moved: Bea moved it first". A card the host could not
   send is back below the line saying "not sent: …" until it is queued again.
+- **The queue has its own controls** (ADR-0048 step 7), beside Stop and
+  Resume on any thread with an agent: **hold queue**, and once held "queue
+  held by Bea" and **release**; and **unqueue all** while a card waits.
+  While the queue is held nothing in it is sent, and a send there waits in
+  it, so you can line up several steps on a quiet thread and let them go
+  together. Notes the thread will read (a fact, ADR-0080) still go. Unqueue
+  all puts every queued card below the line at once, and the undo key
+  outside a box puts them back.
+- **↑ and ↓ on a queued card, or Alt+↑ and Alt+↓ in its box, move it one
+  place in line**; the box keeps its caret. A card never passes a note the
+  thread will read. A move the queue overtook says "not moved: the cards
+  around it changed first".
+- **A card someone is typing in waits.** The host does not send the next
+  queued card while someone types in it, and sends it a few seconds after
+  they stop.
 - **Cmd+Z in a box undoes only that box's card**, never anything in another
   column or tab (ADR-0052). After you undo past a card's first keystroke,
   the box is empty but keeps its card, and Cmd+Shift+Z there brings the text
@@ -704,6 +720,8 @@ The rail is E; the column is T. Seeing both at once is the product.
   thread has none, at the end of the strip once it has one. The box it
   opens pins what you type from the first keystroke; Enter is a new line,
   and Escape or clicking away closes it.
+- **↑ and ↓ on a pinned card, or Alt+↑ and Alt+↓ in its box, move it among
+  the thread's pinned cards**: the agent reads them in that order.
 - **Anyone here can edit a pinned card**, as a queued one. Each is headed
   "pinned by Bea", and shows its size, "~120 tokens", since a long one costs
   that on every run, and how it stands: "read by the agent", "changed since

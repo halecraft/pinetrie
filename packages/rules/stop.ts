@@ -21,6 +21,7 @@ import {
   type LaneName,
   type LaneView,
   promptOf,
+  type QueueHold,
   type Refusal,
   refused,
   type StopRecord,
@@ -28,7 +29,9 @@ import {
   type WriterId,
 } from "@pineta/core"
 import { Type } from "typebox"
+import type { QueuedCard } from "./card.ts"
 import { decodeAt, decodeWith, entryKey } from "./decode.ts"
+import { holdOnStop } from "./queue-hold.ts"
 import type { RecordSpec } from "./records.ts"
 
 const StopSchema = Type.Object({
@@ -56,20 +59,26 @@ type StopPlan =
       readonly kind: "abort"
       /** Who stopped the ask; null when it is recorded already. */
       readonly record: StopRecord | null
+      /** The hold it leaves on the queue (`holdOnStop`); null for none. */
+      readonly hold: QueueHold | null
     }
   | { readonly kind: "idle" }
 
 /**
  * What stopping a thread's lane does: abort its running turn, recording who
  * stopped its ask (ADR-0056), unless someone's stop is recorded already, so
- * the first press is the one named; nothing when it is idle (stopping is
- * idempotent). Pure.
+ * the first press is the one named; and hold its queue when a message card
+ * waits there, so the run's end does not send the next one (ADR-0048 step
+ * 7). Nothing when it is idle (stopping is idempotent). Pure.
  */
 export function planStop(
   lane: LaneView,
   facts: {
     readonly index: TreeIndex
     readonly stops: ReadonlyMap<EntryId, StopRecord>
+    /** The lane's queue, in order. */
+    readonly queue: readonly QueuedCard[]
+    readonly holds: ReadonlyMap<LaneName, QueueHold>
     readonly by: WriterId
     readonly now: number
   },
@@ -82,6 +91,7 @@ export function planStop(
       prompt === null || facts.stops.has(prompt)
         ? null
         : { prompt, by: facts.by, at: facts.now },
+    hold: holdOnStop({ ...facts, lane: lane.name }),
   }
 }
 
@@ -140,8 +150,8 @@ const OK: CarryOnState = { kind: "ok" }
 const refusedFor = (code: ErrCode): CarryOnState => ({ kind: "refused", code })
 
 /**
- * Whether `lane` may carry on: it is idle, and the ask at its tip ended
- * stopped. A message written after the stop is the tip's ask, with no work,
+ * Whether `lane` may carry on: it is not running, has no cards waiting
+ * unless its queue is held, and the ask at its tip ended stopped. A message written after the stop is the tip's ask, with no work,
  * so it refuses; an update is no ask, so it does not. Pure.
  */
 export function carryOnState(
@@ -149,7 +159,9 @@ export function carryOnState(
   facts: { readonly index: TreeIndex; readonly asks: AskIndex },
 ): CarryOnState {
   if (lane.tip === null) return refusedFor(ERR.UNKNOWN_TARGET)
-  if (isBusy(lane)) return refusedFor(ERR.BUSY)
+  // A held queue waits for a release, not for this turn (ADR-0048 step 7).
+  if (lane.running || (isBusy(lane) && lane.heldBy === null))
+    return refusedFor(ERR.BUSY)
   const prompt = promptOf(facts.index, lane.tip)
   if (prompt === null) return refusedFor(ERR.REFUSED)
   const outcome = askOutcome(facts.index, facts.asks, prompt, {

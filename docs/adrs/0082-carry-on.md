@@ -3,7 +3,10 @@
 **Status:** Accepted. Evidence: S70 (`docs/findings/S70-asks.md`) and S105
 (`docs/findings/S105-parking-a-stopped-run.md`). Implementation:
 `PLAN-2026-10-05-resume-after-stop`. Amends ADR-0056: a carry-on message
-starts an ask, and names who resumed.
+starts an ask, and names who resumed. Amended by ADR-0048 (step 7,
+`PLAN-2026-10-05-queue-control`): a held queue does not hide Resume. Its
+cards wait for a release, not for this turn; cards queued and not held
+still do.
 
 **Context.** Stop ends a thread's turn and records who pressed it
 (ADR-0056). To go on, someone had to write a message to the agent, even

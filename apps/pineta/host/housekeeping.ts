@@ -1,6 +1,7 @@
 // host/housekeeping — what the host does between runs besides draining:
 // compact the session (ADR-0023), delete images nothing shows (ADR-0042),
-// and retire histories of moves no one will undo again (ADR-0066).
+// retire histories of moves no one will undo again (ADR-0066), and delete
+// holds on queues nobody can use (ADR-0048 step 7).
 
 import type { Exchange, Store } from "@kyneta/exchange"
 import {
@@ -9,6 +10,7 @@ import {
   type RootId,
   rootDocId,
 } from "@pineta/core"
+import type { Agent } from "@pineta/pi"
 import {
   LIVE_DOC_ID,
   PLACES_DOC_ID,
@@ -17,11 +19,18 @@ import {
 import {
   planSweep,
   readArchived,
+  readLaneRecords,
   readPlaces,
+  readQueueHolds,
   readReferencedBlobs,
   readRoots,
 } from "@pineta/reads"
-import { planHistorySweep } from "@pineta/rules"
+import {
+  deleteRecord,
+  planHistorySweep,
+  planHoldSweep,
+  QUEUE_HOLD,
+} from "@pineta/rules"
 import type { Basics } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
 import type { MoveHistories } from "./move-history.ts"
@@ -115,4 +124,32 @@ export async function sweepHistories(input: {
   if (retired.length === 0) return
   await input.histories.retire(retired)
   log(`[host] retired ${retired.length} history(ies) of moves`)
+}
+
+/**
+ * Delete the holds on queues nobody can use (ADR-0048 step 7): gather the
+ * holds, each lane's root and the roots in the closed state (ADR-0085), plan (`planHoldSweep`), then
+ * delete them in one write. Archiving is refused while cards are queued, so
+ * a hold swept holds nothing.
+ */
+export async function sweepHolds(input: {
+  readonly basics: Pick<Basics, "session" | "log">
+  readonly agent: Pick<Agent, "writeValues">
+}): Promise<void> {
+  const { session, log } = input.basics
+  // gather
+  const lanes = readLaneRecords(session)
+  const archived = readArchived(session)
+  // plan
+  const swept = planHoldSweep({
+    holds: readQueueHolds(session),
+    rootOf: lane => lanes.get(lane)?.root ?? null,
+    archived: root => archived.has(root),
+  })
+  // execute
+  if (swept.length === 0) return
+  await input.agent.writeValues(
+    swept.map(lane => deleteRecord(QUEUE_HOLD, lane)),
+  )
+  log(`[host] swept ${swept.length} hold(s) on queues nobody can use`)
 }

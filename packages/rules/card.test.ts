@@ -40,7 +40,9 @@ import {
   planMoveCommand,
   planMoves,
   planNextQueuedCardPop,
+  planReorder,
   planSetCommand,
+  planUnqueueAll,
   planUnsent,
   type QueuedCard,
   queuedOn,
@@ -224,6 +226,7 @@ const laneAt = (tip: string): LaneView[] => [
     waiting: 0,
     askedBy: null,
     lastWaiting: null,
+    heldBy: null,
   },
 ]
 
@@ -395,17 +398,83 @@ describe("the queue", () => {
     expect(first < second && second < third).toBe(true)
   })
 
+  const idle = { running: false, held: false, typing: new Set<CardId>() }
+
   test("planNextQueuedCardPop: nothing while the lane runs; else its top queued card", () => {
     const cards = [queued("c-2", "b"), queued("c-1", "a")]
-    expect(planNextQueuedCardPop(cards, LANE, true)).toEqual({ kind: "idle" })
-    expect(planNextQueuedCardPop(cards, LANE, false)).toEqual({
+    expect(
+      planNextQueuedCardPop(cards, LANE, { ...idle, running: true }),
+    ).toEqual({ kind: "idle" })
+    expect(planNextQueuedCardPop(cards, LANE, idle)).toEqual({
       kind: "pop",
       card: cards[1],
     })
-    expect(planNextQueuedCardPop(cards, laneNameForThread("y"), false)).toEqual(
-      {
-        kind: "idle",
-      },
+    expect(planNextQueuedCardPop(cards, laneNameForThread("y"), idle)).toEqual({
+      kind: "idle",
+    })
+  })
+
+  test("planNextQueuedCardPop: a held queue pops no message, nor a card someone types in; a fact on top goes whatever (ADR-0048 step 7)", () => {
+    const top = queued("c-1", "a")
+    const cards = [top, queued("c-2", "b")]
+    expect(planNextQueuedCardPop(cards, LANE, { ...idle, held: true })).toEqual(
+      { kind: "held" },
+    )
+    expect(
+      planNextQueuedCardPop(cards, LANE, {
+        ...idle,
+        typing: new Set([top.id]),
+      }),
+    ).toEqual({ kind: "typing", card: top })
+    // Typing in the second card does not hold the first.
+    expect(
+      planNextQueuedCardPop(cards, LANE, {
+        ...idle,
+        typing: new Set([cardId("c-2")]),
+      }),
+    ).toEqual({ kind: "pop", card: top })
+    const fact: QueuedCard = {
+      ...queued("c-0", "0"),
+      carries: { kind: "fact", fact: INTEGRATED },
+    }
+    expect(
+      planNextQueuedCardPop([fact, ...cards], LANE, {
+        running: false,
+        held: true,
+        typing: new Set([fact.id]),
+      }),
+    ).toEqual({ kind: "pop", card: fact })
+    expect(
+      planNextQueuedCardPop([fact, ...cards], LANE, {
+        ...idle,
+        running: true,
+      }),
+    ).toEqual({ kind: "idle" })
+  })
+
+  test("planUnqueueAll: every message card queued on the lane, back where it was queued, in order; a fact and another lane's stay", () => {
+    const fact: QueuedCard = {
+      ...queued("c-0", "0"),
+      carries: { kind: "fact", fact: INTEGRATED },
+    }
+    const cards = [
+      queued("c-2", "b"),
+      fact,
+      queued("c-1", "a"),
+      queued("c-3", "c", laneNameForThread("y")),
+    ]
+    expect(planUnqueueAll(cards, LANE)).toEqual(
+      ["c-1", "c-2"].map(id => ({
+        card: cardId(id),
+        from: {
+          kind: "queued",
+          root: TEST_ROOT,
+          at: atEntry(E2),
+          lane: LANE,
+          seen: "",
+        },
+        to: { kind: "drafting", root: TEST_ROOT, at: atEntry(E2), lane: LANE },
+      })),
     )
   })
 
@@ -505,6 +574,13 @@ describe("handoffs (ADR-0059)", () => {
       kind: "write",
       record: { ...q, place: drafting, placer: BEA },
     })
+  })
+
+  test("a move to where the card is is refused: a card changes its place in line by a reorder", () => {
+    const q = { ...queued("c-1", "a"), placer: ADA }
+    expect(
+      planMove([q], { card: C1, from: queuedKey, to: queuedKey }, BEA),
+    ).toEqual({ kind: "refused", code: "moved", now: q })
   })
 
   test("an unqueue keeps the command and why it was not sent", () => {
@@ -831,6 +907,173 @@ test("planCardSweep: a card with a command stays, whatever its text", () => {
       cardOfDoc: d => cardId(d.slice(5)),
     }),
   ).toEqual({ records: [], docs: [] })
+})
+
+describe("planReorder (ADR-0048 step 7)", () => {
+  const key = (n: number) => n.toString(36).padStart(10, "0")
+  const queuedAt = {
+    kind: "queued",
+    root: TEST_ROOT,
+    at: atEntry(E2),
+    lane: LANE,
+    seen: "",
+  } as const
+  const q = (id: string, n: number): QueuedCard => ({
+    ...queued(id, key(n)),
+    placer: ADA,
+    unsent: "not sent: x",
+  })
+  const orderIn = (step: ReturnType<typeof planReorder>, id: string) =>
+    step.kind === "write" && step.record.id === id
+      ? (step.record.place as { order: string }).order
+      : null
+
+  test("up and down: only the order changes, between the neighbours its sender saw; placer, queuer, version and why kept", () => {
+    const [a, b, c] = [q("c-a", 100), q("c-b", 200), q("c-c", 300)]
+    const up = planReorder([a, b, c], {
+      card: c.id,
+      at: queuedAt,
+      after: a.id,
+      before: b.id,
+    })
+    expect(up).toEqual({
+      kind: "write",
+      record: { ...c, place: { ...c.place, order: key(150) } },
+    })
+    const down = planReorder([a, b, c], {
+      card: a.id,
+      at: queuedAt,
+      after: c.id,
+      before: null,
+    })
+    const order = orderIn(down, "c-a")
+    expect(order !== null && order > key(300)).toBe(true)
+    const first = planReorder([a, b, c], {
+      card: b.id,
+      at: queuedAt,
+      after: null,
+      before: a.id,
+    })
+    const top = orderIn(first, "c-b")
+    expect(top !== null && top < key(100)).toBe(true)
+  })
+
+  test("refused: gone, a fact, moved, and neighbours no longer next to each other or out of order", () => {
+    const [a, b, c] = [q("c-a", 100), q("c-b", 200), q("c-c", 300)]
+    const at = queuedAt
+    expect(
+      planReorder([a, b], { card: c.id, at, after: null, before: a.id }),
+    ).toEqual({ kind: "refused", code: "gone", now: null })
+    const fact: QueuedCard = {
+      ...q("c-f", 150),
+      carries: { kind: "fact", fact: INTEGRATED },
+    }
+    expect(
+      planReorder([a, fact], { card: fact.id, at, after: null, before: a.id }),
+    ).toMatchObject({ kind: "refused", code: "fact" })
+    const drafted = card({
+      id: c.id,
+      place: { kind: "drafting", root: TEST_ROOT, at: atEntry(E2), lane: LANE },
+    })
+    expect(
+      planReorder([a, drafted], { card: c.id, at, after: null, before: a.id }),
+    ).toEqual({ kind: "refused", code: "moved", now: drafted })
+    // b sits between a and c now: the sender saw them next to each other.
+    expect(
+      planReorder([a, b, c, q("c-d", 400)], {
+        card: "c-d" as CardId,
+        at,
+        after: a.id,
+        before: c.id,
+      }),
+    ).toMatchObject({ kind: "refused", code: "order-changed" })
+    expect(
+      planReorder([a, b, c], { card: c.id, at, after: b.id, before: a.id }),
+    ).toMatchObject({ kind: "refused", code: "order-changed" })
+    expect(
+      planReorder([a, c], { card: c.id, at, after: null, before: b.id }),
+    ).toMatchObject({ kind: "refused", code: "order-changed" })
+    expect(
+      planReorder([a, c], { card: c.id, at, after: null, before: null }),
+    ).toMatchObject({ kind: "refused", code: "order-changed" })
+  })
+
+  test("a queued card never passes a fact, up or down", () => {
+    const [a, c] = [q("c-a", 100), q("c-c", 300)]
+    const fact: QueuedCard = {
+      ...q("c-f", 200),
+      carries: { kind: "fact", fact: INTEGRATED },
+    }
+    expect(
+      planReorder([a, fact, c], {
+        card: c.id,
+        at: queuedAt,
+        after: null,
+        before: a.id,
+      }),
+    ).toMatchObject({ kind: "refused", code: "fact" })
+    expect(
+      planReorder([a, fact, c], {
+        card: a.id,
+        at: queuedAt,
+        after: c.id,
+        before: null,
+      }),
+    ).toMatchObject({ kind: "refused", code: "fact" })
+  })
+
+  test("with no room, only the crowded siblings are written, and every card keeps its order", () => {
+    const cards = [
+      q("c-a", 1000),
+      q("c-b", 1001),
+      q("c-c", 1002),
+      q("c-d", 9000),
+    ]
+    const step = planReorder(cards, {
+      card: cardId("c-d"),
+      at: queuedAt,
+      after: cardId("c-a"),
+      before: cardId("c-b"),
+    })
+    expect(step.kind).toBe("steps")
+    const written = step.kind === "steps" ? step.steps : []
+    const now = new Map(
+      cards.map(c => [c.id, (c.place as { order: string }).order] as const),
+    )
+    for (const w of written)
+      if (w.kind === "write")
+        now.set(w.record.id, (w.record.place as { order: string }).order)
+    const ids = [...now].sort((x, y) => (x[1] < y[1] ? -1 : 1)).map(e => e[0])
+    expect(ids).toEqual(["c-a", "c-d", "c-b", "c-c"])
+    expect(
+      written.every(w => w.kind === "write" && w.record.placer === ADA),
+    ).toBe(true)
+  })
+
+  test("pinned cards: neighbours among every pinned card, other threads' between them allowed", () => {
+    const pinnedAt = {
+      kind: "pinned",
+      root: TEST_ROOT,
+      at: atEntry(E2),
+      lane: null,
+    } as const
+    const [a, other, b, c] = [
+      pinned("p-a", key(100)),
+      pinned("p-o", key(200), F1),
+      pinned("p-b", key(300)),
+      pinned("p-c", key(400)),
+    ]
+    const step = planReorder([a, other, b, c], {
+      card: c.id,
+      at: pinnedAt,
+      after: a.id,
+      before: b.id,
+    })
+    expect(step).toEqual({
+      kind: "write",
+      record: { ...c, place: { ...c.place, order: key(200) } },
+    })
+  })
 })
 
 describe("storage", () => {

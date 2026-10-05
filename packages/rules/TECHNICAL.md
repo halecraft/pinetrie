@@ -44,11 +44,12 @@ follow this list. A name only this package uses is imported from its module.
 - `fact.ts`, `behind.ts`, `agent-commands.ts`: what a command on an offer
   did, as a fact in the thread; the base's new work, told or caught up; the
   agent's `catch_up` and `split_offer` (ADR-0080).
-- `card.ts`, `seat.ts`, `startup.ts`: cards and their moves, who wrote in a
-  text, what a starting host resumes.
+- `card.ts`, `queue-hold.ts`, `seat.ts`, `startup.ts`: cards and their
+  moves, a held queue, who wrote in a text, what a starting host resumes.
 - `board.ts`, `archive.ts`, `carry-over.ts`, `order.ts`: the board's
   workflow states and each root's place, what crossing the closed state's
-  edge does, a store from before the board carried over, and order keys.
+  edge does, a store from before the board carried over, and order keys
+  (a queue's, the pinned cards' and the board's).
 - `roots.ts`, `mark.ts`, `title.ts`, `stop.ts`, `digest.ts`, `verdict.ts`:
   the directory of roots, titles, who stopped a run and carrying on after
   it, an ask's digest, and how a thread's last run ended.
@@ -104,6 +105,8 @@ cannot reach the wrong document and needs no guard at run time.
 - **`WORKFLOW` and `BOARD`** (`board.ts`, ADR-0085): the session's workflow
   states, a singleton, and each root's place on the board, keyed by its
   `RootId`.
+- **`QUEUE_HOLD`** (`queue-hold.ts`, ADR-0048 step 7): a thread's queue
+  held, keyed by lane, in the session: who held it and when.
 - **The archive gate** reads the roots a command writes in (`writesIn`) and
   looks each up among the archived (`archivedIn`, over `archivedOf`): a
   command carries its roots, so no root's document is opened to check.
@@ -168,7 +171,7 @@ are the only code that builds or reads the shape.
 - **`planChat` decides what a message does** (ADR-0020), over the thread
   `threadOf` gives, and names exactly where to write:
 
-  | a message… | no lane | idle lane | busy lane (running, or cards queued) |
+  | a message… | no lane | idle lane | busy lane (running, cards queued, or its queue held: `sendWaits`) |
   |---|---|---|---|
   | plain | `appendToTree` at the end | `appendToLane` | `busy` |
   | compelled `reply`, not raced | `createAndRun` at the end | `run` | `conflict` |
@@ -292,8 +295,32 @@ which are swept.
   owner; no `to` removes it, and only a fresh column's card, or one in the
   sender's own inventory, can be removed. Queueing puts it after the lane's
   last card, queued by the sender, and clears why it was not sent before;
-  below the line, or into an inventory, it keeps both. Refusals: `gone` (no
-  record), `moved`, `exists`, `not-fresh`, `full`, `not-yours`.
+  below the line, or into an inventory, it keeps both. A move to where the
+  card already is is refused `moved`: it would queue the card last under its
+  sender's name, and a card changes its place in line by a reorder.
+  Refusals: `gone` (no record), `moved`, `exists`, `not-fresh`, `full`,
+  `not-yours`.
+- **A reorder is a card's action in place, not a move** (`planReorder`,
+  ADR-0048 step 7). It names the card, its place's key, and the two cards
+  it goes between as its sender saw them; the host checks them against the
+  places alone, since a thread's pinned cards are found through the tree,
+  which a handoff does not read. Its siblings are the lane's queue, or every
+  pinned card in the session (pinned keys are the session's). Only `order`
+  changes: `placer`, `by`, `seen` and `unsent` stay, so it changes nobody's
+  trace and adds no history event. Refused `gone`; `fact` for a fact's card,
+  or a queued card whose new place passes a fact (a fact says what already
+  happened); `moved` when the card's key changed; `order-changed` when it
+  names no neighbour, a neighbour is no longer a sibling, the two are out of
+  order, or, in a queue, no longer next to each other (other threads' pinned
+  cards may sit between two pinned neighbours). With no room between the
+  neighbours, `respace` (`order.ts`) gives new keys to the fewest siblings
+  around the gap, in the same step, so a whole undo is refused only when one
+  of those few changed since. The session draws a pending reorder by running
+  `planReorder` over what it draws.
+- **`planUnqueueAll`**: every message card queued on a lane, back to
+  `draftingOf` its place, in queue order; a fact stays. The host plans it
+  from the queue as it is when the command arrives, and carries it out as
+  one move, so one undo queues them again.
 - **An inventory is its holder's alone** (`ownsPlace`): a move into or out
   of someone else's is refused `not-yours`, checked on both ends, and a
   move into yours `full` once it holds `INVENTORY_SLOTS` cards, the card
@@ -345,15 +372,41 @@ which are swept.
   thread's: a thread is found through the tree, which a handoff does not
   read, and an order only has to grow within a thread.
 - **The queue is fields, not a list** (S69): `queuedOn(cards, lane)` sorts
-  a lane's queued cards by `order`, then id. `orderAfter` keys are
-  fixed-width base-36 integers, started mid-range and stepped, so string
-  order is numeric order and there is room before and between. Only the
-  host assigns them now (`planMove`). `planNextQueuedCardPop` pops nothing
-  while the lane runs, else its top card. `planUnsent` is the step a
-  refused pop writes back: drafting where it was queued, saying why, never queued.
+  a lane's queued cards by `order`, then id. Order keys (`order.ts`) are
+  fixed-width base-36 integers, started mid-range and stepped
+  (`orderAfter`), so string order is numeric order and there is room before
+  and between; `orderBetween` is a step from one open end or the midpoint,
+  null when none fits. Only the host assigns them (`planMove`,
+  `planReorder`). `planNextQueuedCardPop` answers `idle` while the lane runs
+  or nothing is queued; `held` when its queue is held and its top card is a
+  message; `typing` when someone types in its top card (presence
+  `typingIn`); else `pop`. A fact on top is popped whatever the hold or the
+  typing: it is nobody's instruction, and starts no run. `planUnsent` is the
+  step a refused pop writes back: drafting where it was queued, saying why,
+  never queued.
 - **`planCardSweep`**: records whose text is empty and that carry no
   command, and stored `card:` documents with no record, a spent or empty
   card's among them.
+
+# Queue holds (`queue-hold.ts`, ADR-0048 step 7)
+
+A thread's queue held: while `QUEUE_HOLD` has its lane, the host pops no
+message card from it, and a send there waits in it (`sendWaits`, core), so
+people can stage several cards on an idle thread. It is a session record,
+not `pineta:live`, so it lasts until a release, across a restart.
+
+- **`planQueueHold`**: a hold is written only where there is none, so the
+  first holder stays named; a release deletes it; nothing when the queue is
+  already so.
+- **`holdOnStop`**: a Stop holds the queue when a message card is queued
+  and nobody holds it yet. With nothing queued, or only facts, it holds
+  nothing: the correction sent after the Stop would be held too.
+- **`planHoldSweep`**: the holds whose lane no root holds (`pineta.lane`),
+  or whose root is archived. Archiving is refused while cards are queued,
+  so a swept hold held nothing.
+- **`isBusy` is unchanged.** A held queue with no card is not busy: it
+  neither blocks archiving nor marks a tab. Only a send's decision reads the
+  hold (`sendWaits`, in `planChat` and the client's `planSend`).
 
 # Card history and traces (`card-history.ts`, ADR-0048 step 6)
 
@@ -477,7 +530,8 @@ is hidden and made read-only, never removed.
   the root's revision records, so no part decides anything when it runs.
 - **The gate keys on the roots a command writes in** (ADR-0063). `writesIn`
   names them for every intent (a chat's root, a mark's, an undo of moves',
-  an offer's lane's, each root a move's cards go to), or none for one that
+  an offer's lane's, a queue hold's and an unqueue all's lane's, a
+  reorder's place's, each root a move's cards go to), or none for one that
   writes in no root (a new root, a name, a stop, a move on the board or a
   change to its states, a reservation, a move into an inventory), so a
   closed root can always be reopened. `archivedIn` finds an archived one by
@@ -521,7 +575,9 @@ Who stopped an ask's run: a host-written `pineta.stop` value keyed by the
 ask's prompt, holding who and when. pi's entries say only that a run was
 aborted (S70), so this is the only place a stop is named. `planStop`
 decides it, and writes none when the ask has one: the first press is
-the one named. A stop recorded for a run that answered anyway is ignored
+the one named. It also gives the hold the Stop leaves on the queue
+(`holdOnStop`, ADR-0048 step 7), written in the same write, before the
+abort. A stop recorded for a run that answered anyway is ignored
 (`askOutcome`).
 
 **Carrying on** (ADR-0082). pi cannot continue a run that Stop ended
@@ -533,8 +589,9 @@ who resumed and their name then, for the column's line ("↻ resumed by
 Ada"). It is a prompt, so its run is an ask of its own (`PROMPT_ROLES`).
 
 - **`carryOnState` is the one rule**, read by the host's `planCarryOn` and
-  the column's run button: the lane is idle (`isBusy`), and the ask at its
-  tip ended stopped (`askOutcome`). A message written after the stop is
+  the column's run button: the lane does not run and has no cards waiting,
+  unless its queue is held (ADR-0048 step 7: held cards wait for a release,
+  not this turn), and the ask at its tip ended stopped (`askOutcome`). A message written after the stop is
   the tip's ask, with no work, so it refuses; an update is no ask, so it
   does not. It refuses with `UNKNOWN_TARGET` (no tip), `BUSY` or
   `REFUSED`.

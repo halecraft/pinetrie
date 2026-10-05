@@ -49,6 +49,7 @@ import {
   decodeDigestConfig,
   decodeTitleConfig,
   planCarryOver,
+  type QueuedCard,
 } from "@pineta/rules"
 import {
   AttentionDoc,
@@ -91,7 +92,12 @@ import {
   planLoads,
 } from "./docs.ts"
 import { hotReload as holdHotReload } from "./hot-reload.ts"
-import { compactAfter, sweepBlobs, sweepHistories } from "./housekeeping.ts"
+import {
+  compactAfter,
+  sweepBlobs,
+  sweepHistories,
+  sweepHolds,
+} from "./housekeeping.ts"
 import { startHttp } from "./http.ts"
 import { lineDocPrefix } from "./lines.ts"
 import { createMoveHistories } from "./move-history.ts"
@@ -101,8 +107,9 @@ import { hostPolicy, resolveDoc } from "./policy.ts"
 import { createProvenance } from "./provenance.ts"
 import {
   chatOfPoppedQueuedCard,
-  createBehind,
+  createWaits,
   drain as drainQueue,
+  untilNotTyped,
 } from "./queued-card-pop.ts"
 import { createRuns, streamInto } from "./runs.ts"
 import { startSeats } from "./seats.ts"
@@ -516,11 +523,13 @@ export async function startHost({
     provenance,
     keeper,
   })
-  const behind = createBehind({
-    places,
-    texts: cardPort,
-    drain: lane => queueDrain(lane),
-  })
+  // The drain's waits for its top card: its text (S96), or someone's
+  // typing in it to stop (ADR-0048 step 7).
+  const wait = createWaits({ places, drain: lane => queueDrain(lane) })
+  const behind = (card: QueuedCard) =>
+    wait(card, signal => cardPort.whenHolds(card.id, card.place.seen, signal))
+  const typing = (card: QueuedCard) =>
+    wait(card, signal => untilNotTyped(presence, card.id, signal))
   const drain = (lane: LaneName) =>
     drainQueue(
       {
@@ -535,7 +544,9 @@ export async function startHost({
             newId(),
             chatOfPoppedQueuedCard(popped),
           ),
+        presence,
         behind,
+        typing,
         provenance,
       },
       lane,
@@ -554,6 +565,7 @@ export async function startHost({
         texts: cardPort.texts,
       })
       await sweepHistories({ basics, store, histories, startup: false })
+      await sweepHolds({ basics, agent })
       await provenance.sweep()
     },
   })
@@ -611,6 +623,7 @@ export async function startHost({
     carryOver,
   })
   await sweepHistories({ basics, store, histories, startup: true })
+  await sweepHolds({ basics, agent })
   const seats = startSeats({ exchange, basics, keeper, agent, histories })
   const control = startControl({
     exchange,

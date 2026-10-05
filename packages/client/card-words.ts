@@ -87,14 +87,39 @@ const who = (by: WriterId, reader: Reader): string =>
 export const queuedWords = (by: WriterId, n: number, reader: Reader): string =>
   `queued by ${who(by, reader)} · ${lineWords(n)}`
 
+/** A control's words: its label, its title and its class. */
+export interface ControlWords {
+  readonly label: string
+  readonly title: string
+  readonly className: string
+}
+
+/**
+ * A queued or pinned card's ↑ or ↓ (ADR-0048 step 7): it moves one place,
+ * as Alt+↑ or Alt+↓ in its box does.
+ */
+export const reorderWords = (step: -1 | 1): ControlWords =>
+  step === -1
+    ? {
+        label: "↑",
+        title: "move up one place (Alt+↑)",
+        className: "reorder-up",
+      }
+    : {
+        label: "↓",
+        title: "move down one place (Alt+↓)",
+        className: "reorder-down",
+      }
+
 /** A card the host could not send, until it is queued again. */
 export const unsentWords = (reason: string): string => `not sent: ${reason}`
 
 /**
- * Something of yours refused (ADR-0059): a move or an undo the host
- * refused, or an undone swap whose slots changed. Gone from the queue, the
- * host had popped the card first (S69), so it was sent as its queuer's
- * message; moved, someone else moved it first.
+ * Something of yours refused (ADR-0059): a move, a reorder or an undo the
+ * host refused, or an undone swap whose slots changed. Gone from the queue,
+ * the host had popped the card first (S69), so it was sent as its queuer's
+ * message; moved, someone else moved it first; order changed, the cards a
+ * reorder named moved first.
  */
 export function refusalWords(refusal: CardRefusal, reader: Reader): string {
   if (refusal.code === "slots-changed")
@@ -116,8 +141,11 @@ export function refusalWords(refusal: CardRefusal, reader: Reader): string {
       return "inventory full"
     case "not-yours":
       return "not moved: that inventory is someone else's"
+    // A fact's card, or a reorder that would pass one: either stays put.
     case "fact":
-      return "not moved: it is a note the thread will read"
+      return "not moved: a note the thread will read keeps its place"
+    case "order-changed":
+      return "not moved: the cards around it changed first"
     case "exists":
     case "not-fresh":
       return "not moved"

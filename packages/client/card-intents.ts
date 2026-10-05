@@ -22,6 +22,7 @@ import {
   type Position,
   pinnedOf,
   queueRoot,
+  type Reorder,
   type RootId,
   sameKey,
   type TraceRecord,
@@ -69,6 +70,33 @@ export function queueMove(
   return root === undefined
     ? null
     : moveOf(card, { kind: "queued", root, at: to.at, lane: to.lane, seen: "" })
+}
+
+/**
+ * A queued or pinned card moved one place up (`step` -1) or down (1) in
+ * `among`, its list as drawn (ADR-0048 step 7): the reorder naming its new
+ * neighbours. Null at an edge, for a card in neither kind of place, or when
+ * the card it would pass is a fact, which keeps its place. Pure.
+ */
+export function reorderOf(
+  card: CardRecord,
+  among: readonly CardRecord[],
+  step: -1 | 1,
+): Reorder | null {
+  const at = keyOf(card.place)
+  if (at.kind !== "queued" && at.kind !== "pinned") return null
+  const from = among.findIndex(c => c.id === card.id)
+  const to = from + step
+  const passed = among[to]
+  if (from < 0 || passed === undefined || passed.carries.kind === "fact")
+    return null
+  const rest = among.filter(c => c.id !== card.id)
+  return {
+    card: card.id,
+    at,
+    after: rest[to - 1]?.id ?? null,
+    before: rest[to]?.id ?? null,
+  }
 }
 
 const slotOf = (slots: Slots, card: CardId): number | null => {

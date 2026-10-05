@@ -1,3 +1,4 @@
+import { cardId } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import { planReading, TYPING_EVERY_MS, typingDue } from "./presence-report.ts"
 
@@ -30,7 +31,10 @@ describe("planReading", () => {
   })
 })
 
-test("typing is written at most once a second", () => {
-  expect(typingDue(0, TYPING_EVERY_MS - 1)).toBe(false)
-  expect(typingDue(0, TYPING_EVERY_MS)).toBe(true)
+test("typing is written at most once a second, and at once in another card (ADR-0048 step 7)", () => {
+  const last = { at: 0, card: cardId("c-1") }
+  expect(typingDue(last, TYPING_EVERY_MS - 1, cardId("c-1"))).toBe(false)
+  expect(typingDue(last, TYPING_EVERY_MS, cardId("c-1"))).toBe(true)
+  expect(typingDue(last, 1, cardId("c-2"))).toBe(true)
+  expect(typingDue(last, 1, null)).toBe(true)
 })

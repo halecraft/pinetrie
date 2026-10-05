@@ -154,8 +154,10 @@ wins per field. Its records are flat, and every key starts with its seat's
 `seatKey`, `${writer}:${seat}` (ADR-0037): `reading` is keyed
 `readingKey(seatKey, columnKey)` (every column of the tab a person is on
 reports its thread's end), and so is `readingRoot` (the root entry of that
-thread, ADR-0063, for a window that does not hold the root); `typing` and
-`editing` are keyed by `seatKey`. A person on
+thread, ADR-0063, for a window that does not hold the root); `typing` (a
+thread end) and `typingIn` (the card typed in: the host pops no queued card
+while someone types in it, ADR-0048 step 7) are keyed by `seatKey`, and
+decay after `typingMs`. A person on
 two tabs is two seats, so one tab never overwrites or clears another's.
 `writerOfKey` takes the writer from before the first colon: a writer holds
 none (`normalizeEmail`), a seat is hex, and a column key holds none. The

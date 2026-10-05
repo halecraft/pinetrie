@@ -32,6 +32,7 @@ import {
   OFFER,
   PARTICIPANT,
   PROJECT,
+  QUEUE_HOLD,
   REVISION,
   type RecordSpec,
   ROOT,
@@ -214,6 +215,7 @@ const SAMPLES: readonly Sample[] = [
     { lane: L, sha: "a".repeat(64) as Sha256, at: 1 },
     "lane",
   ),
+  sample("queue hold", QUEUE_HOLD, { lane: L, by: ADA, at: 1 }, "lane"),
   sample(
     "project",
     PROJECT,
@@ -361,6 +363,7 @@ test("each record lives where it is read (ADR-0063): across roots in the session
     base: "session",
     name: "session",
     banner: "session",
+    "queue hold": "session",
     project: "session",
     commands: "session",
     root: "session",

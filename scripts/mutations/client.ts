@@ -963,7 +963,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a lane with cards queued is not busy",
     file: send,
-    from: '    lane.kind === "lane" && (isBusy(lane) || input.command !== null)',
+    from: '    lane.kind === "lane" && (sendWaits(lane) || input.command !== null)',
     to: '    lane.kind === "lane" && (lane.running || input.command !== null)',
     command: unit,
     expect: "a busy lane queues the next card",
@@ -971,8 +971,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a card with a command is sent at once on an idle lane",
     file: send,
-    from: '    lane.kind === "lane" && (isBusy(lane) || input.command !== null)',
-    to: '    lane.kind === "lane" && isBusy(lane)',
+    from: '    lane.kind === "lane" && (sendWaits(lane) || input.command !== null)',
+    to: '    lane.kind === "lane" && sendWaits(lane)',
     command: unit,
     expect: "a card with a command is queued, even on an idle lane",
   },
@@ -2778,6 +2778,48 @@ export const mutations: readonly Mutation[] = [
     to: '  if (lane.kind !== "lane") return null\n  if (lane.running)',
     command: unit,
     expect: "read-only, no button at all",
+  },
+  // ── queue control (ADR-0048 step 7) ──
+  {
+    name: "a reorder passes a fact on the page",
+    file: "packages/client/card-intents.ts",
+    from: '  if (from < 0 || passed === undefined || passed.carries.kind === "fact")',
+    to: "  if (from < 0 || passed === undefined)",
+    command: unit,
+    expect: "a reorder moves the card one place among the list as drawn",
+  },
+  {
+    name: "Alt+Shift+↑ reorders",
+    file: "packages/client/card-keys.ts",
+    from: "    event.metaKey ||\n    event.shiftKey\n",
+    to: "    event.metaKey\n",
+    command: unit,
+    expect: "Alt+↑ and Alt+↓ move the card one place",
+  },
+  {
+    name: "typing in another card waits for the second",
+    file: "packages/client/presence-report.ts",
+    from: "): boolean => card !== last.card || now - last.at >= TYPING_EVERY_MS",
+    to: "): boolean => now - last.at >= TYPING_EVERY_MS",
+    command: unit,
+    expect:
+      "typing is written at most once a second, and at once in another card",
+  },
+  {
+    name: "a held queue is not said on the queue button",
+    file: send,
+    from: '    held: lane.kind === "lane" && lane.heldBy !== null,',
+    to: "    held: false,",
+    command: unit,
+    expect: "an idle lane whose queue is held queues too",
+  },
+  {
+    name: "a queue's controls offer unqueue all with nothing queued",
+    file: "packages/client/column-view.ts",
+    from: '    unqueueAll: f.queued.some(c => c.carries.kind === "message"),',
+    to: "    unqueueAll: true,",
+    command: unit,
+    expect: "a writable thread with a lane: hold, and unqueue all",
   },
   // ── your list and the board (ADR-0085) ──
   {

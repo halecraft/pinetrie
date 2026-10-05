@@ -8,7 +8,6 @@ import {
   type CardId,
   type CardRecord,
   type ColumnView,
-  commandOf,
   conflictsAt,
   type DigestRecord,
   type EntryId,
@@ -88,6 +87,8 @@ import {
   headLane,
   identityWords,
   newPinAt,
+  type QueueControls,
+  queueControlWords,
   type ReserveStep,
   type RunButton,
   runWords,
@@ -123,7 +124,7 @@ import { type ComposerPlacesStore, dropProps } from "./put-target.ts"
 import { colorSlot, trackStyle } from "./rail.tsx"
 import { keyMove } from "./reorder.ts"
 import type { ScreenMemory } from "./screen-memory.ts"
-import type { ColumnHow } from "./send.ts"
+import type { ColumnHow, Reader } from "./send.ts"
 import type { RowMemory } from "./tool-row.ts"
 import { keptTraces, seenBatches, traceGroups, tracesAt } from "./traces.ts"
 import { useAskBar } from "./use-ask-bar.ts"
@@ -159,8 +160,8 @@ export interface ColumnProps {
   participants: readonly string[]
   /** Each person's colour (`presenceColors`). */
   colorOf: (writer: WriterId) => string
-  /** This window is typing in this column's composer. */
-  onTyping: () => void
+  /** This window is typing in this column, in the card its box shows. */
+  onTyping: (card: CardId | null) => void
   /** Every card's record (ADR-0048). */
   cards: readonly CardRecord[]
   /** Every seat the host has seen: who wrote in a card. */
@@ -456,10 +457,7 @@ export function Column(p: ColumnProps) {
     acting:
       lane.kind === "lane" ? (acting.offers.get(lane.name) ?? null) : null,
     mountedBanner,
-    queuedCommands: queued.flatMap(c => {
-      const command = commandOf(c)
-      return command === null ? [] : [command]
-    }),
+    queued,
     index,
     asks: p.asks,
     view,
@@ -988,6 +986,7 @@ export function Column(p: ColumnProps) {
                   </div>
                 ) : (
                   <QueuedCardEditor
+                    among={queued}
                     card={c}
                     key={c.id}
                     n={n}
@@ -1102,6 +1101,13 @@ export function Column(p: ColumnProps) {
               session={p.session}
             />
           )}
+          {shows.queue !== null && (
+            <QueueControlsView
+              controls={shows.queue}
+              onAct={act}
+              reader={reader}
+            />
+          )}
           <Composer
             card={mine}
             place={place}
@@ -1180,6 +1186,45 @@ function RunButtonView(p: {
     >
       {words.label}
     </button>
+  )
+}
+
+/**
+ * A thread's queue controls (ADR-0048 step 7): hold it or release it, and
+ * unqueue all. Each is a column act; the host decides it again.
+ */
+function QueueControlsView(p: {
+  controls: QueueControls
+  reader: Reader
+  onAct: (act: ColumnAct) => void
+}) {
+  const { lane, heldBy } = p.controls
+  const words = queueControlWords(p.controls, p.reader)
+  const { unqueueAll } = words
+  return (
+    <div className="queue-controls" data-held={heldBy ?? undefined}>
+      {words.held !== null && <span className="queue-held">{words.held}</span>}
+      <button
+        className={words.hold.className}
+        onClick={() =>
+          p.onAct({ kind: "holdQueue", lane, held: heldBy === null })
+        }
+        title={words.hold.title}
+        type="button"
+      >
+        {words.hold.label}
+      </button>
+      {unqueueAll !== null && (
+        <button
+          className={unqueueAll.className}
+          onClick={() => p.onAct({ kind: "unqueueAll", lane })}
+          title={unqueueAll.title}
+          type="button"
+        >
+          {unqueueAll.label}
+        </button>
+      )}
+    </div>
   )
 }
 

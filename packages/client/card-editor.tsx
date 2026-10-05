@@ -34,6 +34,8 @@ import { IN_COLUMN, newCardId, type SessionClient } from "@pineta/session"
 import { type ReactNode, useEffect, useRef, useState } from "react"
 import type { ReadOnly } from "./app-view.ts"
 import { CardHistory, MovedBack } from "./card-history.tsx"
+import { reorderOf } from "./card-intents.ts"
+import { cardKeyAct } from "./card-keys.ts"
 import {
   type EditorEvent,
   type EditorState,
@@ -57,6 +59,7 @@ import {
   pinnedStatusWords,
   pinnedWords,
   queuedWords,
+  reorderWords,
   sizeWords,
   TAKE_INTO_INVENTORY,
   TAKE_INTO_INVENTORY_TITLE,
@@ -191,8 +194,11 @@ export function CardEditor(p: {
   onSend: () => string | undefined
   /** After a conflict: open a branch at `at`, which sends the card's text. */
   onBranchInstead: (pending: Pending) => void
-  /** Called on each keystroke; presence is written at most once a second. */
-  onTyping: () => void
+  /**
+   * Called on each keystroke, with the card the box then shows; presence is
+   * written at most once a second.
+   */
+  onTyping: (card: CardId | null) => void
   /** Told whether the next send would create a lane, each time that changes. */
   onCreatesLane: ((createsLane: boolean) => void) | undefined
   /**
@@ -594,9 +600,9 @@ export function CardEditor(p: {
           const value = e.currentTarget.value
           setText(value)
           setPicked(0)
-          p.onTyping()
           if (free(current.current) && p.place !== undefined)
             step({ kind: "input", text: value, card: newCardId() })
+          p.onTyping(shownBy(current.current))
         }}
         onPaste={e => {
           const files = pastedFiles(e.clipboardData)
@@ -773,15 +779,26 @@ export function BoundCardEditor(p: {
   readOnly: boolean
   /** The box's least height, in lines. */
   rows: number
-  onTyping: () => void
+  /** Called on each keystroke in its box, with its card. */
+  onTyping: (card: CardId) => void
   /** Its buttons. */
   children: ReactNode
   /** `data-queued`: a queued card's, which the browser suite reads. */
   queued: CardId | null
   /** Told the card's text each time it changes. */
   onText?: (text: string) => void
+  /**
+   * A queued or pinned card's list as drawn, which its ↑, ↓ and Alt+↑/↓
+   * move it in (ADR-0048 step 7); null for a card with no place in line.
+   */
+  reorder: {
+    readonly among: readonly CardRecord[]
+    readonly onAct: (act: ColumnAct) => void
+  } | null
 }) {
   const { session, card } = p
+  // A read-only box moves nothing.
+  const reorder = p.readOnly ? null : p.reorder
   const box = useRef<HTMLTextAreaElement>(null)
   const [text, setText] = useState("")
   // Of fixed identity, so a new `onText` each render never binds the box again.
@@ -802,12 +819,37 @@ export function BoundCardEditor(p: {
         autoComplete="off"
         className="input"
         data-card={card.id}
-        onInput={p.onTyping}
+        onInput={() => p.onTyping(card.id)}
+        onKeyDown={e => {
+          if (reorder === null) return
+          const act = cardKeyAct(
+            {
+              key: e.key,
+              altKey: e.altKey,
+              ctrlKey: e.ctrlKey,
+              metaKey: e.metaKey,
+              shiftKey: e.shiftKey,
+              isComposing: e.nativeEvent.isComposing,
+            },
+            card.id,
+            reorder.among.map(c => c.id),
+          )
+          if (act === null) return
+          e.preventDefault()
+          reorder.onAct(act)
+        }}
         readOnly={p.readOnly}
         ref={box}
         rows={Math.min(8, Math.max(p.rows, text.split("\n").length))}
       />
       <div className="compose-row">
+        {reorder !== null && (
+          <ReorderButtons
+            among={reorder.among}
+            card={card}
+            onAct={reorder.onAct}
+          />
+        )}
         {p.children}
         <CardHistory card={card.id} />
       </div>
@@ -816,10 +858,43 @@ export function BoundCardEditor(p: {
 }
 
 /**
+ * A queued or pinned card's ↑ and ↓ (ADR-0048 step 7): the same reorder as
+ * Alt+↑ and Alt+↓ in its box, each off where `reorderOf` finds none.
+ */
+function ReorderButtons(p: {
+  card: CardRecord
+  among: readonly CardRecord[]
+  onAct: (act: ColumnAct) => void
+}) {
+  const among = p.among.map(c => c.id)
+  return (
+    <>
+      {([-1, 1] as const).map(step => {
+        const words = reorderWords(step)
+        return (
+          <button
+            className={words.className}
+            disabled={reorderOf(p.card, p.among, step) === null}
+            key={step}
+            onClick={() =>
+              p.onAct({ kind: "reorder", card: p.card.id, among, step })
+            }
+            title={words.title}
+            type="button"
+          >
+            {words.label}
+          </button>
+        )
+      })}
+    </>
+  )
+}
+
+/**
  * A queued card above the line (ADR-0048): its text, which anyone here may
  * edit until the host pops it, who queued it and its place in line, its
- * command, a button that unqueues it, and one that takes it into your
- * inventory.
+ * command, ↑ and ↓ that move it in line (as Alt+↑/↓ in its box do), a
+ * button that unqueues it, and one that takes it into your inventory.
  */
 export function QueuedCardEditor(p: {
   session: SessionClient
@@ -830,8 +905,10 @@ export function QueuedCardEditor(p: {
   readOnly: ReadOnly | null
   /** What its command catches up with: the thread's base, or the thread it branched from. */
   catchUps: CatchUps
+  /** Its lane's queue as drawn, facts included: what a reorder moves it among. */
+  among: readonly CardRecord[]
   onAct: (act: ColumnAct) => void
-  onTyping: () => void
+  onTyping: (card: CardId) => void
 }) {
   const { card } = p
   const command = commandOf(card)
@@ -852,6 +929,7 @@ export function QueuedCardEditor(p: {
       onTyping={p.onTyping}
       queued={card.id}
       readOnly={p.readOnly !== null}
+      reorder={{ among: p.among, onAct: p.onAct }}
       rows={1}
       session={p.session}
     >
@@ -886,18 +964,21 @@ export function QueuedCardEditor(p: {
 /**
  * A pinned card at the top of its column (ADR-0048): its text, which anyone
  * here may edit, who pinned it, its size, how it stands against what the
- * agent last read (`inView`), a button that unpins it, and one that takes
- * it into your inventory. It has no send: Enter is a new line.
+ * agent last read (`inView`), ↑ and ↓ that move it among the thread's
+ * pinned cards (as Alt+↑/↓ in its box do), a button that unpins it, and one
+ * that takes it into your inventory. It has no send: Enter is a new line.
  */
 export function PinnedCardEditor(p: {
   session: SessionClient
   card: CardRecord
   /** What the agent reads of the thread's pinned cards now (`pinnedInView`). */
   inView: PinnedView | null
+  /** The thread's pinned cards as drawn: what a reorder moves it among. */
+  among: readonly CardRecord[]
   reader: Reader
   readOnly: ReadOnly | null
   onAct: (act: ColumnAct) => void
-  onTyping: () => void
+  onTyping: (card: CardId) => void
 }) {
   const { card } = p
   const [text, setText] = useState("")
@@ -911,6 +992,7 @@ export function PinnedCardEditor(p: {
       onTyping={p.onTyping}
       queued={null}
       readOnly={p.readOnly !== null}
+      reorder={{ among: p.among, onAct: p.onAct }}
       rows={1}
       session={p.session}
     >

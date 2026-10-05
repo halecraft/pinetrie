@@ -916,8 +916,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a stop is recorded after the abort",
     file: "apps/pineta/host/commands/lane.ts",
-    from: "    if (planned.record !== null)\n      await agent.writeValues([setRecord(STOP, planned.record, root)])\n    if (!deps.cancel(lane)) await agent.lane(lane).abort()\n",
-    to: "    if (!deps.cancel(lane)) await agent.lane(lane).abort()\n    if (planned.record !== null)\n      await agent.writeValues([setRecord(STOP, planned.record, root)])\n",
+    from: "    if (writes.length > 0) await agent.writeValues(writes)\n    if (!deps.cancel(lane)) await agent.lane(lane).abort()\n",
+    to: "    if (!deps.cancel(lane)) await agent.lane(lane).abort()\n    if (writes.length > 0) await agent.writeValues(writes)\n",
     command: unit,
     expect: "records who stopped its ask, then aborts",
   },
@@ -1163,8 +1163,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a move is recorded in no history",
     file: "apps/pineta/host/commands/cards.ts",
-    from: '      return carry(step, drain, { kind: "move", by: writer }, gesture)',
-    to: '      return carry(step, drain, { kind: "move", by: writer })',
+    from: '    return carry(step, drain, { kind: "move", by: writer }, gesture)',
+    to: '    return carry(step, drain, { kind: "move", by: writer })',
     command: unit,
     expect:
       "a take into the inventory is one step of the taker's history in the root it left; a creation is in none",
@@ -1451,8 +1451,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a wait given up drains its lane anyway",
     file: "apps/pineta/host/queued-card-pop.ts",
-    from: "        if (!stop.signal.aborted) deps.drain(card.place.lane)",
-    to: "        deps.drain(card.place.lane)",
+    from: "      if (!stop.signal.aborted) deps.drain(card.place.lane)",
+    to: "      deps.drain(card.place.lane)",
     command: unit,
     expect: "a card that leaves the queue gives its wait up",
   },
@@ -1534,5 +1534,46 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "the store is PINETA_STORE when set, else .pineta/pineta.db in the project's root",
+  },
+  // ── queue control (ADR-0048 step 7) ──
+  {
+    name: "a held queue is popped",
+    file: "apps/pineta/host/queued-card-pop.ts",
+    from: "        held: readQueueHolds(deps.basics.session).has(lane),",
+    to: "        held: false,",
+    command: unit,
+    expect: "a held queue pops no message",
+  },
+  {
+    name: "a stop holds nothing",
+    file: "apps/pineta/host/commands/lane.ts",
+    from: "      ...(planned.hold === null ? [] : [setRecord(QUEUE_HOLD, planned.hold)]),",
+    to: "",
+    command: unit,
+    expect: "a stop with a message card queued holds the queue",
+  },
+  {
+    name: "a release drains nothing",
+    file: "apps/pineta/host/commands/lane.ts",
+    from: "  if (!held) deps.drain(lane)",
+    to: "",
+    command: unit,
+    expect: "a hold is written once, its release deleted and the lane drained",
+  },
+  {
+    name: "a reorder is recorded in no history",
+    file: "apps/pineta/host/commands/cards.ts",
+    from: '      return carry(step, [], { kind: "move", by: writer }, gesture)',
+    to: '      return carry(step, [], { kind: "move", by: writer })',
+    command: unit,
+    expect: "a reorder writes only the card's order",
+  },
+  {
+    name: "untilNotTyped waits for a card nobody types in",
+    file: "apps/pineta/host/queued-card-pop.ts",
+    from: "    if (signal.aborted || !readTypingIn(presence).has(card)) done()",
+    to: "    if (signal.aborted) done()",
+    command: unit,
+    expect: "untilNotTyped",
   },
 ]

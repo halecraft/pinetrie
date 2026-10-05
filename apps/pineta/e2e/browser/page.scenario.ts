@@ -24,6 +24,7 @@ import {
   readNames,
   readParticipantNames,
   readPlaces,
+  readQueueHolds,
   readReading,
   readRoots,
   readTyping,
@@ -902,6 +903,99 @@ async function run(check: Checks["check"]): Promise<void> {
         "with your own message last in line, it says it will queue after yours",
         await queueButton(queueWords({ kind: "afterYours", ahead: 2 })),
         `"${await label(0)}"`,
+      )
+      // ── the queue's own controls (ADR-0048 step 7) ────────────────────────
+      // Alt+↑ in your queued card moves it above Bea's; its box keeps the
+      // focus and the caret, though the list was drawn again.
+      const yourBox = `${col(0)} .card-editor.queued textarea[data-card="${yours?.id ?? ""}"]`
+      await page.focus(yourBox)
+      await page.$eval(yourBox, el => {
+        ;(el as HTMLTextAreaElement).setSelectionRange(5, 5)
+      })
+      await page.keyboard.press("Alt+ArrowUp")
+      const firstNow = () =>
+        readPlaces(host.places)
+          .filter(c => c.place.kind === "queued")
+          .sort((a, b) =>
+            (a.place as { order: string }).order <
+            (b.place as { order: string }).order
+              ? -1
+              : 1,
+          )[0]?.id
+      const reordered = await waitFor(() => firstNow() === yours?.id, 15_000)
+      const focusKept = await page
+        .waitForFunction(
+          ([c, id]) => {
+            const first = document.querySelector(`${c} .card-editor.queued`)
+            const a = document.activeElement as HTMLTextAreaElement | null
+            return (
+              first?.getAttribute("data-queued") === id &&
+              a?.getAttribute("data-card") === id &&
+              a.selectionStart === 5
+            )
+          },
+          [col(0), yours?.id ?? ""] as const,
+          { timeout: 15_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        )
+      check(
+        "Alt+↑ in a queued card moves it up the queue, and its box keeps the focus and the caret",
+        reordered >= 0 && focusKept,
+        `${reordered} ms; ${focusKept}`,
+      )
+      // Hold, then unqueue all: both cards go below the line, the queue held.
+      // The undo key puts them back, and a release lets them go when Bea's
+      // turn ends.
+      await page.click(`${col(0)} .queue-controls .hold-queue`)
+      await waitFor(
+        () =>
+          beaLane !== undefined && readQueueHolds(host.session).has(beaLane),
+        15_000,
+      )
+      await page.click(`${col(0)} .queue-controls .unqueue-all`)
+      const unqueued = await waitFor(
+        () =>
+          [again, yours?.id].every(
+            id =>
+              readPlaces(host.places).find(c => c.id === id)?.place.kind ===
+              "drafting",
+          ),
+        15_000,
+      )
+      const releaseShown = await page
+        .waitForSelector(`${col(0)} .queue-controls .release-queue`, {
+          timeout: 15_000,
+        })
+        .then(
+          () => true,
+          () => false,
+        )
+      check(
+        "hold queue holds the thread's queue, and unqueue all puts every queued card below the line",
+        unqueued >= 0 && releaseShown,
+        `${unqueued} ms; release shown ${releaseShown}`,
+      )
+      await page.evaluate(() =>
+        (document.activeElement as HTMLElement | null)?.blur(),
+      )
+      await page.keyboard.press("ControlOrMeta+z")
+      await waitFor(
+        () =>
+          [again, yours?.id].every(
+            id =>
+              readPlaces(host.places).find(c => c.id === id)?.place.kind ===
+              "queued",
+          ),
+        15_000,
+      )
+      await page.click(`${col(0)} .queue-controls .release-queue`)
+      await waitFor(
+        () =>
+          beaLane !== undefined && !readQueueHolds(host.session).has(beaLane),
+        15_000,
       )
       beasTurn.resume()
       await waitFor(() => idleNow(host))

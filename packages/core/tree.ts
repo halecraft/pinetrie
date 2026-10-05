@@ -1264,6 +1264,8 @@ export interface LaneView {
    * it. Null when nothing waits.
    */
   readonly lastWaiting: WriterId | null
+  /** Who holds its queue (ADR-0048 step 7); null when it is not held. */
+  readonly heldBy: WriterId | null
 }
 
 export type ThreadLane =
@@ -1271,11 +1273,21 @@ export type ThreadLane =
   | ({ readonly kind: "lane" } & LaneView)
 
 /**
- * A lane is busy while it runs or has cards queued: a new message then
- * waits behind them, or it would jump the queue (ADR-0020, ADR-0048).
+ * A lane is busy while it runs or has cards queued: the agent works there,
+ * or will. A root with a busy lane is not archived (`rootWork`), and a
+ * stopped thread does not carry on behind cards waiting (ADR-0020,
+ * ADR-0048).
  */
 export const isBusy = (lane: LaneView): boolean =>
   lane.running || lane.waiting > 0
+
+/**
+ * Whether a new message to the lane waits in its queue: it is busy, or its
+ * queue is held, so the message would jump the queue or skip the hold
+ * (ADR-0048 step 7).
+ */
+export const sendWaits = (lane: LaneView): boolean =>
+  isBusy(lane) || lane.heldBy !== null
 
 /** Which thread a send continues, as the host and the composer both decide it. */
 export type ThreadOf =

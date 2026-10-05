@@ -36,6 +36,7 @@ import {
   readLanes,
   readLine,
   readPlaces,
+  readQueueHolds,
   readRoots,
   readWorkflow,
 } from "@pineta/reads"
@@ -321,8 +322,9 @@ export const lanesOf = (
   index: TreeIndex,
   cards: readonly CardRecord[],
 ): readonly LaneView[] => {
-  const { roots, live } = held(x)
-  return roots.flatMap(doc => readLanes({ doc, live }, index, cards))
+  const { roots, live, session } = held(x)
+  const holds = readQueueHolds(session)
+  return roots.flatMap(doc => readLanes({ doc, live }, index, cards, holds))
 }
 
 /** Every lane name pi holds, in the roots `x` holds. */

@@ -15,6 +15,7 @@ import {
   readLanes,
   readParticipantNames,
   readPlaces,
+  readQueueHolds,
   readTreeIndex,
 } from "@pineta/reads"
 import {
@@ -66,7 +67,12 @@ export function createPinned(deps: {
     if (doc === null || tip === null) return null
     const index = readTreeIndex(doc)
     const records = readPlaces(places)
-    const lanes = readLanes({ doc, live }, index, records)
+    const lanes = readLanes(
+      { doc, live },
+      index,
+      records,
+      readQueueHolds(session),
+    )
     return { index, tip, pinned: cardsAt("pinned", tip, records, lanes, index) }
   }
 

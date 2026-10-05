@@ -22,6 +22,7 @@ const agentWork: ThreadLane = {
   waiting: 0,
   askedBy: null,
   lastWaiting: null,
+  heldBy: null,
 }
 const conversation: ThreadLane = { kind: "none" }
 

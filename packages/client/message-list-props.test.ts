@@ -19,6 +19,7 @@ const lane = (running = false): MessageListProps["lane"] => ({
   waiting: 0,
   askedBy: null,
   lastWaiting: null,
+  heldBy: null,
 })
 const joins = (): ReadonlyMap<EntryId, LaneJoin> =>
   new Map([[entryId("e1"), { name: undefined, from: null }]])

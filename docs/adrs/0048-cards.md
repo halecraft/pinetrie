@@ -57,6 +57,11 @@ live, an unpin treated as an unqueue, "on your screen" as an open column,
 a trace seen as deleted by the host, and the 30-day sweep.
 Amended by ADR-0083: a person *takes a card into the inventory*, and the
 host *pops the next queued card* to send it; "take" alone names neither.
+Step 7, queue control, implemented by `PLAN-2026-10-05-queue-control`, with
+*The column, read as time*, *Physics* and *Input* amended in place
+(2026-10-05, with Duane): a held queue, Stop holding it, unqueue all,
+reordering queued and pinned cards, and the wait while someone types in the
+next card; it amends ADR-0056 and ADR-0082, and builds ADR-0026's hold.
 
 **Context.**
 
@@ -170,6 +175,33 @@ who reads a card: a thought only for the team goes below the line.
 - **The usual case looks as it does today.** The composer is the one drafting
   card; a second appears only when someone asks for one.
 
+*Queue control* (*amended in place, step 7, 2026-10-05, with Duane*):
+- **Staging is a held queue.** Anyone can hold a thread's queue, and anyone
+  can release it. While it is held the host pops no message card from it,
+  and a send there waits in it, so people can line up several cards on an
+  idle thread and let them go together. The hold is the host's record
+  (`pineta.queue-hold`), so it lasts until a release, across a restart.
+- **Stop holds the queue when a message card waits in it**, so stopping a
+  wrong turn does not send the next step unseen. With nothing queued, Stop
+  holds nothing, or the correction sent after it would be held too. Resume
+  shows beside a held queue: its cards wait for a release, not for the turn.
+- **A held queue still lets facts go** (ADR-0080): a fact is nobody's
+  instruction and starts no run.
+- **The next card waits while someone types in it.** Each keystroke in a
+  card says so in presence (`typingIn`), and it lapses 3 s after the last;
+  the host pops no top card someone is typing in, and pops it once the
+  typing lapses. There is nothing to release. A host that has just started
+  has heard no typing, so a card being typed in as it starts can go.
+- **Unqueue all** takes every message card queued on the thread back below
+  the line, as the queue is when the host gets it, in one step one undo
+  reverses. It does not release a hold.
+- **Reordering** moves a queued card up or down its queue, or a pinned card
+  among its thread's pinned cards. It changes only the card's order: who
+  queued it and who placed it stay, so it leaves no trace and no history
+  event. A queued card never passes a fact, since a fact says what already
+  happened. A reorder names the two cards it goes between, as its sender
+  saw them, and is refused when they have changed.
+
 *Physics.*
 
 1. A card is always somewhere, and only a person moves it, except the agent
@@ -184,7 +216,10 @@ who reads a card: a thought only for the team goes below the line.
 4. **Taking from the past copies.** Taking a message, or a selection in one,
    makes a new card with its text. The message loses nothing.
 5. **In place, a card has its own actions:** send (Enter, as today), queue,
-   unqueue, reorder (Alt+↑/↓). These are what a card does, not where it goes.
+   unqueue, reorder (Alt+↑/↓, or the card's ↑ and ↓). These are what a card
+   does, not where it goes. *Amended in place, step 7:* Alt+↑/↓ is taken
+   only in queued and pinned cards' boxes, which lose a Mac's Option+↑/↓
+   caret move; the composer and drafting cards keep it.
 6. A card looks and edits the same in every place.
 7. Every move can be undone, except send: the tree is immutable, so a sent
    card is spent.
@@ -206,7 +241,9 @@ fidelity by construction.
   *Deferred (step 4) to the key system's redesign:* Cmd+C and Cmd+X belong
   to text.
 - A test holds the fidelity: every place a drag can drop on is reachable by
-  put, and every place put reaches accepts a drop.
+  put, and every place put reaches accepts a drop. *Amended in place, step
+  7:* so reordering has no drop target; it is the keys and the card's ↑ and
+  ↓, until the key system's redesign.
 
 *The inventory* is a game's inventory: a panel floating over the columns,
 centred by default, and open while you work in them, since nothing pauses.
@@ -497,7 +534,7 @@ and a pinned card can quote one.
   6. traces and card history, and who contributed, projected from it (for
      marks, a card's heading and a sent message's "with"; traces and history
      built, who contributed waits for Kyneta, *Who contributed*);
-  7. queue control: staging, reordering, unqueues;
+  7. queue control: staging, reordering, unqueues (built: *Queue control*);
   8. later: reminders (inventory cards that light up when due and reach your `@`
      inbox, separate from the queue), conditions on queued cards (ADR-0026),
      the agent suggesting next steps as drafting cards, and a summary of what

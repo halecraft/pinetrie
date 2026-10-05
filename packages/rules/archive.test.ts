@@ -55,6 +55,7 @@ const lane = (tip: string, over: Partial<LaneView> = {}): LaneView => ({
   waiting: 0,
   askedBy: null,
   lastWaiting: null,
+  heldBy: null,
   ...over,
 })
 
@@ -221,6 +222,35 @@ describe("writesIn: the root a command writes in (ADR-0063)", () => {
       "a carry-on: its lane's root",
       { kind: "carry-on", lane: LANE_X },
       [OTHER_ROOT],
+    ],
+    [
+      "a queue's hold: its lane's root",
+      { kind: "queue-hold", lane: LANE_X, held: true },
+      [OTHER_ROOT],
+    ],
+    [
+      "unqueue all: its lane's root",
+      { kind: "unqueue-all", lane: LANE_X },
+      [OTHER_ROOT],
+    ],
+    [
+      "a reorder: the root of the place it names",
+      {
+        kind: "reorder",
+        reorder: {
+          card: cardId("c-1"),
+          at: {
+            kind: "queued",
+            root: TEST_ROOT,
+            at: atEntry(entryId("a")),
+            lane: LANE_X,
+            seen: "",
+          },
+          after: null,
+          before: cardId("c-2"),
+        },
+      },
+      [TEST_ROOT],
     ],
     ["a reservation", { kind: "reserve", lane: laneNameForThread("x") }, []],
     [

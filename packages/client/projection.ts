@@ -52,6 +52,7 @@ import {
   readNames,
   readOffers,
   readProject,
+  readQueueHolds,
   readRevisions,
   readRunningLanes,
   readSeats,
@@ -195,12 +196,17 @@ function readFacts(view: HeldView): SessionFacts {
   }
 }
 
-/** Every lane in the roots this tab holds, with its queue from the cards. */
+/**
+ * Every lane in the roots this tab holds, with its queue from the cards and
+ * who holds it from the session (ADR-0048 step 7).
+ */
 export const readHeldLanes = (
   view: HeldView,
   index: TreeIndex,
   cards: readonly CardRecord[],
-): readonly LaneView[] =>
-  view.roots.flatMap(root =>
-    readLanes({ doc: root, live: view.live }, index, cards),
+): readonly LaneView[] => {
+  const holds = readQueueHolds(view.session)
+  return view.roots.flatMap(root =>
+    readLanes({ doc: root, live: view.live }, index, cards, holds),
   )
+}

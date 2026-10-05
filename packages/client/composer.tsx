@@ -2,6 +2,7 @@
 // (ADR-0048), and who else is typing here.
 
 import type {
+  CardId,
   CardPlace,
   CardRecord,
   CommandSummary,
@@ -48,7 +49,7 @@ export function Composer(p: {
   where: Where
   /** The thread end whose typists it names; null names none. */
   typingAt: EntryId | null
-  onTyping: () => void
+  onTyping: (card: CardId | null) => void
   onSend: () => string | undefined
   onBranchInstead: (pending: Pending) => void
   onCreatesLane: (createsLane: boolean) => void

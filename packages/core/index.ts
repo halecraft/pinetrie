@@ -483,6 +483,17 @@ export type Intent =
   /** Start a new turn on a thread whose last ask was stopped (ADR-0082). */
   | { readonly kind: "carry-on"; readonly lane: LaneName }
   /**
+   * Hold a thread's queue, or release it (ADR-0048 step 7): while it is
+   * held, no message card queued there is popped.
+   */
+  | {
+      readonly kind: "queue-hold"
+      readonly lane: LaneName
+      readonly held: boolean
+    }
+  /** Take every message card queued on a thread back below the line. */
+  | { readonly kind: "unqueue-all"; readonly lane: LaneName }
+  /**
    * Move a root on the board (ADR-0085): from the state its sender saw it in,
    * to `to`, before `before` there, or at its end. Into the closed state it
    * archives the root, and out of it restores the root.
@@ -526,6 +537,11 @@ export type Intent =
    * history of the sender's moves (`historyOf`, ADR-0066).
    */
   | { readonly kind: "move"; readonly moves: readonly Move[] }
+  /**
+   * Move a queued or pinned card among its neighbours (ADR-0048 step 7),
+   * recorded in its root's history of the sender's moves (ADR-0066).
+   */
+  | { readonly kind: "reorder"; readonly reorder: Reorder }
   /** Undo or redo the sender's newest move in `root` (ADR-0066). */
   | {
       readonly kind: "undo-move"
@@ -697,6 +713,18 @@ export interface StopRecord {
   readonly prompt: EntryId
   readonly by: WriterId
   /** When Stop was pressed, in ms since the epoch. */
+  readonly at: number
+}
+
+/**
+ * A thread's queue held (ADR-0048 step 7): a host-written
+ * `pineta.queue-hold` value in the session, keyed by the lane. While it is
+ * there no message card is popped, only facts, until someone releases it.
+ */
+export interface QueueHold {
+  readonly lane: LaneName
+  readonly by: WriterId
+  /** When it was held, in ms since the epoch. */
   readonly at: number
 }
 
@@ -1499,6 +1527,21 @@ export interface Move {
   readonly to: PlaceKey | null
 }
 
+/**
+ * A card's new place among its neighbours, as its sender saw them (ADR-0048
+ * step 7): what a card does in its place, not a move between places. It
+ * stays in the same queue, or among the same pinned cards.
+ */
+export interface Reorder {
+  readonly card: CardId
+  /** Where the card is: a queue, or a thread's pinned cards. */
+  readonly at: Extract<PlaceKey, { readonly kind: "queued" | "pinned" }>
+  /** The card it goes after, null for the first. */
+  readonly after: CardId | null
+  /** The card it goes before, null for the last. */
+  readonly before: CardId | null
+}
+
 /** `card`'s move from where it is now to `to`; `to` null removes it. */
 export const moveOf = (card: CardRecord, to: PlaceKey | null): Move => ({
   card: card.id,
@@ -1561,6 +1604,11 @@ export type MoveRefusal =
   | "not-yours"
   /** A card carrying a fact: the host's, on its way into the thread (ADR-0080). */
   | "fact"
+  /**
+   * A reorder whose neighbours are not where its sender saw them: one gone,
+   * in another place, or the two out of order.
+   */
+  | "order-changed"
 
 /**
  * A place as flat strings, "" for none: how the places document stores it,

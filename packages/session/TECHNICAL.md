@@ -140,6 +140,12 @@ session or someone else's inventory throws before it is made.
   what the host did with it, spent or queued. Without it, the composer's
   `yourCard` finds the card still drafting at the thread's end between the
   reply and the change, and takes it back.
+- **A reorder is tracked as a move is** (`reorderCard`, ADR-0048 step 7):
+  a pending `reorder` is drawn by running core's rules' `planReorder` over
+  what is drawn, so the card sits where the host will put it, its queuer and
+  placer kept, until the copy reaches the reply's `rev`. A refused one draws
+  nothing, and its refusal is kept where you acted. It is not a
+  `HostRequest`, so the page cannot send one untracked.
 - **Several cards move as one** (`moveCards`, a keep): never none. A keep
   with no card left is the page's to settle (`planKeep` closes the column),
   so the session's moves always name a card.
@@ -257,7 +263,10 @@ no offer command: it is a card's command, queued (ADR-0080).
 
 Presence is per seat (`seatKey(writer, exchange.peerId)`), so your tabs
 never overwrite or clear each other's. Write it only through `setReading`,
-`clearReading` and `setTyping`.
+`clearReading` and `setTyping`. `setTyping(end, card)` writes the thread
+end (`typing`, the composer's "typing…") and the card typed in (`typingIn`,
+which the host reads to pop no card someone types in, ADR-0048 step 7) in
+one batch; `dispose` clears both.
 
 ## Tests
 

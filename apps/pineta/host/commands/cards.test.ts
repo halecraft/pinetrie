@@ -1,5 +1,6 @@
 import {
   atEntry,
+  type CardId,
   type CardRecord,
   cardId,
   entryId,
@@ -47,6 +48,8 @@ const drafting = {
 } as const
 /** Texts the host holds whole. */
 const held = { textNow: () => "x", holds: () => true }
+/** An idle lane, its queue not held, nobody typing. */
+const idle = { running: false, held: false, typing: new Set<CardId>() }
 const queuedKey = {
   kind: "queued",
   root: TEST_ROOT,
@@ -146,7 +149,7 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
     const { b, commands, put } = setUp()
     put()
     await commands.move(BEA, [{ card: C1, from: drafting, to: queuedKey }])
-    const top = popNextQueuedCard(b.places, LANE, false, held)
+    const top = popNextQueuedCard(b.places, LANE, idle, held)
     expect(top.kind === "popped" ? top.popped.card.id : top.kind).toBe(C1)
     const done = await commands.move(ADA, [
       {
@@ -166,7 +169,7 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
     put()
     await commands.move(BEA, [{ card: C1, from: drafting, to: queuedKey }])
     await commands.move(ADA, [{ card: C1, from: queuedKey, to: drafting }])
-    expect(popNextQueuedCard(b.places, LANE, false, held).kind).toBe("idle")
+    expect(popNextQueuedCard(b.places, LANE, idle, held).kind).toBe("idle")
   })
 
   test("a move someone else made first: answered moved, naming them", async () => {
@@ -274,6 +277,81 @@ describe("moves' history (ADR-0066)", () => {
       outcome: { kind: "nothing" },
       rev: null,
     })
+  })
+})
+
+describe("reorders and unqueue all (ADR-0048 step 7)", () => {
+  const queuedAt = (order: string) => ({ ...queuedKey, order, by: BEA })
+
+  test("a reorder writes only the card's order, in the sender's history of its root, with the rev; it drains nothing", async () => {
+    const { b, commands, put, recorded, drains } = setUp()
+    put({ place: queuedAt("0000000100"), placer: BEA })
+    applyPlaceSteps(b.places, [
+      {
+        kind: "write",
+        record: {
+          id: cardId("c-2"),
+          owner: ADA,
+          placer: ADA,
+          place: queuedAt("0000000300"),
+          carries: { kind: "message", command: null },
+          unsent: null,
+        },
+      },
+    ])
+    const done = await commands.reorder(ADA, {
+      card: cardId("c-2"),
+      at: queuedKey,
+      after: null,
+      before: C1,
+    })
+    expect(done).toEqual({
+      outcome: { kind: "moved" },
+      rev: readPlacesRev(b.places),
+    })
+    expect(recorded).toEqual([[ADA, TEST_ROOT]])
+    expect(drains).toEqual([])
+    const order = readPlaces(b.places).map(c => c.id)
+    const queue = readPlaces(b.places)
+      .filter(c => c.place.kind === "queued")
+      .sort((x, y) =>
+        (x.place as { order: string }).order <
+        (y.place as { order: string }).order
+          ? -1
+          : 1,
+      )
+      .map(c => c.id)
+    expect(order).toHaveLength(2)
+    expect(queue).toEqual(["c-2", C1])
+  })
+
+  test("unqueue all: every queued card below the line in one step of the sender's history; with none queued, nothing", async () => {
+    const { b, commands, put, recorded } = setUp()
+    expect(await commands.unqueueAll(ADA, LANE)).toEqual({
+      outcome: { kind: "nothing" },
+      rev: null,
+    })
+    put({ place: queuedAt("a") })
+    applyPlaceSteps(b.places, [
+      {
+        kind: "write",
+        record: {
+          id: cardId("c-2"),
+          owner: BEA,
+          placer: BEA,
+          place: queuedAt("b"),
+          carries: { kind: "message", command: null },
+          unsent: null,
+        },
+      },
+    ])
+    const done = await commands.unqueueAll(ADA, LANE)
+    expect(done.outcome).toEqual({ kind: "moved" })
+    expect(readPlaces(b.places).map(c => c.place.kind)).toEqual([
+      "drafting",
+      "drafting",
+    ])
+    expect(recorded).toEqual([[ADA, TEST_ROOT]])
   })
 })
 

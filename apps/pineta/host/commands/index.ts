@@ -42,6 +42,7 @@ import {
   actOnLine,
   actOnOffer,
   handleCarryOn,
+  handleQueueHold,
   handleStop,
   type LaneDeps,
 } from "./lane.ts"
@@ -193,6 +194,14 @@ export function createCommands(deps: CommandDeps): Commands {
       }
       case "move":
         return cardCommands.move(writer, intent.moves)
+      case "reorder":
+        return cardCommands.reorder(writer, intent.reorder)
+      case "unqueue-all":
+        return cardCommands.unqueueAll(writer, intent.lane)
+      case "queue-hold":
+        return settled(
+          await handleQueueHold(deps, intent.lane, intent.held, writer),
+        )
       case "undo-move":
         return cardCommands.undoMove(writer, intent.root, intent.direction)
       case "set-command":

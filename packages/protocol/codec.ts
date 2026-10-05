@@ -48,6 +48,7 @@ import {
   parseTitle,
   placeFields,
   type Refusal,
+  type Reorder,
   ROOT,
   type RootId,
   type RunId,
@@ -162,11 +163,26 @@ export function decodeCommand(
         )
       : { kind: "name", name }
   }
-  if (kind === "stop" || kind === "carry-on") {
+  if (kind === "stop" || kind === "carry-on" || kind === "unqueue-all") {
     const lane = text(wire?.lane)
     return isLaneName(lane)
       ? { kind, lane }
       : refused(ERR.UNKNOWN_TARGET, `not a thread's lane: ${lane}`)
+  }
+  if (kind === "queue-hold") {
+    const lane = text(wire?.lane)
+    if (!isLaneName(lane))
+      return refused(ERR.UNKNOWN_TARGET, `not a thread's lane: ${lane}`)
+    const mode = text(wire?.mode)
+    return mode === "hold" || mode === "release"
+      ? { kind, lane, held: mode === "hold" }
+      : refused(ERR.UNKNOWN_KIND, `unknown queue hold: ${mode}`)
+  }
+  if (kind === "reorder") {
+    const reorder = decodeReorder(text(wire?.cardId), text(wire?.moves))
+    return typeof reorder === "string"
+      ? refused(ERR.UNKNOWN_TARGET, reorder)
+      : { kind, reorder }
   }
   if (kind === "chat") {
     const body = text(wire?.text)
@@ -513,6 +529,46 @@ export function decodeMoves(s: string): readonly Move[] | string {
   return moves
 }
 
+/** A reorder's place and neighbours -> the wire: `{ at, after, before }`. */
+export const encodeReorder = (r: Reorder): string =>
+  JSON.stringify({
+    at: keyToJson(r.at),
+    after: r.after ?? "",
+    before: r.before ?? "",
+  })
+
+/**
+ * The wire -> a reorder, or why it is malformed: no card, a place that is
+ * not a queue's or the pinned cards', no neighbour, or a neighbour that is
+ * the card itself or both of them.
+ */
+export function decodeReorder(card: string, s: string): Reorder | string {
+  if (card === "") return "a reorder must name its card"
+  const value = parsed(s)
+  if (typeof value !== "object" || value === null || Array.isArray(value))
+    return "a reorder must name its place"
+  const v = value as Record<string, unknown>
+  const at = keyFromJson(v.at ?? null)
+  if (
+    at === null ||
+    at === undefined ||
+    (at.kind !== "queued" && at.kind !== "pinned")
+  )
+    return "a reorder stays in a queue or among the pinned cards"
+  const neighbour = (k: unknown): string =>
+    typeof k === "string" ? k.trim() : ""
+  const [after, before] = [neighbour(v.after), neighbour(v.before)]
+  if (after === "" && before === "") return "a reorder must name a neighbour"
+  if (after === card || before === card || after === before)
+    return "a reorder's neighbours are two other cards"
+  return {
+    card: cardId(card),
+    at,
+    after: after === "" ? null : cardId(after),
+    before: before === "" ? null : cardId(before),
+  }
+}
+
 /** Cards an undo moved -> the wire: a JSON list of `{ card, place }`. */
 const encodeMovedCards = (cards: readonly MovedCard[]): string =>
   JSON.stringify(cards.map(c => ({ card: c.card, place: keyToJson(c.place) })))
@@ -542,6 +598,7 @@ const MOVE_REFUSALS: readonly MoveRefusal[] = [
   "full",
   "not-yours",
   "fact",
+  "order-changed",
 ]
 const isMoveRefusal = (c: string): c is MoveRefusal =>
   (MOVE_REFUSALS as readonly string[]).includes(c)
@@ -620,7 +677,22 @@ export function encodeIntent(id: string, intent: Intent): Command {
       return command({ id, kind: "name", text: intent.name })
     case "stop":
     case "carry-on":
+    case "unqueue-all":
       return command({ id, kind: intent.kind, lane: intent.lane })
+    case "queue-hold":
+      return command({
+        id,
+        kind: "queue-hold",
+        lane: intent.lane,
+        mode: intent.held ? "hold" : "release",
+      })
+    case "reorder":
+      return command({
+        id,
+        kind: "reorder",
+        cardId: intent.reorder.card,
+        moves: encodeReorder(intent.reorder),
+      })
     case "move-root":
       return command({
         id,

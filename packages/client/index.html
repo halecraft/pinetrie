@@ -566,6 +566,13 @@
         font-size: .75rem; background: none; border: 1px solid #f28b82;
         color: #f28b82; }
       .resume { border-color: #8ab4f8; color: #8ab4f8; }
+      /* A thread's queue (ADR-0048 step 7): quiet until it is held. */
+      .queue-controls { display: flex; gap: .5rem; align-items: center;
+        margin: 0 .75rem .35rem; font-size: .72rem; color: #8b949e; }
+      .queue-controls button { padding: .05rem .45rem; font-size: .72rem;
+        background: none; border: 1px solid #3a3f47; color: #8b949e; }
+      .queue-controls[data-held] .queue-held { color: #e8c07a; }
+      .queue-controls[data-held] .release-queue { border-color: #e8c07a; color: #e8c07a; }
       /* Someone else asked first: the sender chooses to wait or to branch. */
       .conflict { font-size: .8rem; color: #d0a15f; margin-bottom: .35rem; }
       .conflict button { padding: .1rem .5rem; font-size: .75rem; }
@@ -609,7 +616,7 @@
          and editable by anyone until the host takes it (ADR-0048). */
       .card-editor.queued { margin: 0 0 1rem; padding-left: .5rem; border-left: 2px dashed #777; }
       .card-editor.queued .compose-row { justify-content: flex-start; }
-      .unqueue { padding: .05rem .45rem; font-size: .72rem; }
+      .unqueue, .reorder-up, .reorder-down { padding: .05rem .45rem; font-size: .72rem; }
       /* Something of yours refused, said where you acted (ADR-0059). */
       .refused-move { font-size: .75rem; color: #d0a15f; margin: 0 0 1rem; }
       .queued-fact { font-size: .75rem; color: #8b949e; margin: 0 0 .5rem; }

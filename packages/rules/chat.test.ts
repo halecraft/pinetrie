@@ -69,6 +69,7 @@ const lane = (
   waiting: 0,
   askedBy: null,
   lastWaiting: null,
+  heldBy: null,
   ...over,
 })
 const NONE: ThreadLane = { kind: "none" }
@@ -220,6 +221,11 @@ describe("planChat: plain messages never conflict", () => {
       kind: "busy",
     })
   })
+  test("an idle lane whose queue is held: busy, so the message waits in the queue (ADR-0048 step 7)", () => {
+    expect(plan({ mentions: TO_BO, lane: lane({ heldBy: BO }) })).toEqual({
+      kind: "busy",
+    })
+  })
   test("another writer's compelled message below: still appended, never a conflict", () => {
     expect(kind(plan({ race: { by: BO } }))).toBe("appendToTree")
     expect(
@@ -308,6 +314,10 @@ describe("planChat: a compelled message", () => {
     expect(
       plan({ mentions: ASK, mode: "queue", lane: lane({ running: true }) }),
     ).toEqual({ kind: "busy" })
+    // The pop already passed the hold: a held queue does not stop it.
+    expect(
+      kind(plan({ mentions: ASK, mode: "queue", lane: lane({ heldBy: BO }) })),
+    ).toBe("run")
     expect(kind(plan({ mentions: ASK, mode: "queue", race: { by: BO } }))).toBe(
       "createAndRun",
     )

@@ -185,6 +185,7 @@ export function InventoryPanel(p: {
               onTyping={() => {}}
               queued={null}
               readOnly={false}
+              reorder={null}
               rows={4}
               session={p.session}
             >

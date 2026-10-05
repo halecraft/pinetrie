@@ -7,7 +7,7 @@
 
 import type { Exchange } from "@kyneta/exchange"
 import { batch } from "@kyneta/schema"
-import type { WriterId } from "@pineta/core"
+import type { CardId, WriterId } from "@pineta/core"
 import { PRESENCE_DOC_ID } from "@pineta/protocol/messages"
 import {
   type PresenceDecay,
@@ -27,8 +27,12 @@ export interface PresenceSeat {
   setReading(columnKey: string, end: string, root: string | null): void
   /** The column closed: its entry is deleted, not left to decay. */
   clearReading(columnKey: string): void
-  /** This seat is typing in the composer at `end`. Silence decays it. */
-  setTyping(end: string): void
+  /**
+   * This seat is typing at `end`, in `card` when it is one already: the host
+   * pops no card someone is typing in (ADR-0048 step 7). Silence decays
+   * both.
+   */
+  setTyping(end: string, card: CardId | null): void
   /** This seat's typing goes with it; another seat of the same person keeps its own. */
   dispose(): void
 }
@@ -57,12 +61,21 @@ export function presenceSeat(
           d.readingRoot.delete(key)
         })
     },
-    setTyping(end) {
-      batch(presence, d => d.typing.set(mine, end))
+    setTyping(end, card) {
+      batch(presence, d => {
+        d.typing.set(mine, end)
+        d.typingIn.set(mine, card)
+      })
     },
     dispose() {
-      if (presence.typing()[mine] !== undefined)
-        batch(presence, d => d.typing.delete(mine))
+      if (
+        presence.typing()[mine] !== undefined ||
+        presence.typingIn()[mine] !== undefined
+      )
+        batch(presence, d => {
+          d.typing.delete(mine)
+          d.typingIn.delete(mine)
+        })
     },
   }
 }

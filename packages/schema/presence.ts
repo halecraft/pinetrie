@@ -14,7 +14,7 @@
 // devices, each its own seat (ADR-0037), so every key starts with the seat's
 // `seatKey`, `${writer}:${seat}`: one tab never overwrites or clears
 // another's. `reading` adds the column, `${seatKey}:${columnKey}`, since every
-// open column is being read; `typing` and `editing` are keyed by `seatKey`.
+// open column is being read; `typing` and `typingIn` are keyed by `seatKey`.
 // The writer must be in the key: a browser sees only the host among its
 // peers, so it cannot look another tab's person up from its seat.
 
@@ -50,6 +50,12 @@ export const presenceSchema = (d: PresenceDecay) =>
     readingRoot: Schema.record(Schema.string().nullable().decay(d.presenceMs)),
     /** Keyed by writer: the thread end whose composer they are typing in. */
     typing: Schema.record(Schema.string().nullable().decay(d.typingMs)),
+    /**
+     * Keyed as `typing`: the card they are typing in. The host pops no card
+     * someone is typing in (ADR-0048 step 7), and drains again once this
+     * decays.
+     */
+    typingIn: Schema.record(Schema.string().nullable().decay(d.typingMs)),
   })
 
 export const presenceDoc = (d: PresenceDecay = PRESENCE_DECAY) =>

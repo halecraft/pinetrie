@@ -15,6 +15,7 @@ import {
   type ComposerMode,
   failedWords,
   forkWords,
+  HELD_QUEUE_TITLE,
   lineWords,
   placeholderWords,
   planSend,
@@ -49,6 +50,7 @@ const lane = (
   waiting: 0,
   askedBy: null,
   lastWaiting: null,
+  heldBy: null,
   ...over,
 })
 
@@ -184,6 +186,7 @@ describe("planSend: what the send does, as the host will decide (ADR-0021)", () 
       createsLane: false,
       to: { compels: NOBODY, people: [] },
       queue: { kind: "next" },
+      held: false,
       agentByDefault: false,
       command: null,
     })
@@ -226,6 +229,12 @@ describe("planSend: what the send does, as the host will decide (ADR-0021)", () 
       to: { compels: NOBODY, people: ["Ada"] },
     })
   })
+  test("an idle lane whose queue is held queues too, and says it is held (ADR-0048 step 7)", () => {
+    expect(plan("hi", { lane: lane({ heldBy: BEA }) })).toMatchObject({
+      mode: "queue",
+      held: true,
+    })
+  })
   test("a card with a command is queued, even on an idle lane; with no lane it is not (ADR-0055)", () => {
     expect(
       plan("check it", { lane: lane(), command: "bring-up-to-date" }).mode,
@@ -255,6 +264,7 @@ describe("sendButton: the plan in words, and whether it can be pressed", () => {
     createsLane: false,
     to,
     queue: { kind: "after", name: "Bea", ahead: 3 },
+    held: false,
     agentByDefault: false,
     command: null,
   })
@@ -289,6 +299,14 @@ describe("sendButton: the plan in words, and whether it can be pressed", () => {
       IDLE,
       "queue after Bea",
       "3 waiting ahead",
+      false,
+    ],
+    [
+      "queued while the queue is held: the title says it waits for a release",
+      { ...sent(AGENT, "queue"), held: true },
+      IDLE,
+      "queue after Bea",
+      HELD_QUEUE_TITLE,
       false,
     ],
     [

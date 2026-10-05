@@ -84,7 +84,9 @@ export {
   planHistorySweep,
   planMoveCommand,
   planNextQueuedCardPop,
+  planReorder,
   planSetCommand,
+  planUnqueueAll,
   planUnsent,
   type QueuedCard,
   queuedOn,
@@ -242,6 +244,11 @@ export {
   pinnedReads,
   planPinnedRead,
 } from "./pinned.ts"
+export {
+  planHoldSweep,
+  planQueueHold,
+  QUEUE_HOLD,
+} from "./queue-hold.ts"
 export {
   deleteRecord,
   type Home,

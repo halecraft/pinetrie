@@ -37,6 +37,7 @@ import {
   type OfferAction,
   PLAIN,
   type Position,
+  type Reorder,
   type RootId,
   type WriterId,
   writerOfPrincipal,
@@ -194,8 +195,11 @@ export interface SessionClient {
   setReading(columnKey: string, end: string, root: string | null): void
   /** The column closed: its entry is deleted, not left to decay. */
   clearReading(columnKey: string): void
-  /** This window is typing in the composer at `end`. Silence decays it. */
-  setTyping(end: string): void
+  /**
+   * This window is typing at `end`, in `card` when it is one already (the
+   * host pops no card someone types in). Silence decays it.
+   */
+  setTyping(end: string, card: CardId | null): void
   /**
    * A human message. `at` is where the sender is reading, or the branch point
    * (only a `branch` starts at the root). It runs the agent only if the agent
@@ -238,6 +242,12 @@ export interface SessionClient {
     how?: MoveHow,
     queuedBy?: WriterId | null,
   ): Promise<MoveAnswer>
+  /**
+   * Ask the host to move a queued or pinned card among its neighbours, as
+   * the page saw them (ADR-0048 step 7), drawn there at once. Resolves with
+   * the host's answer; a refusal is kept where you acted.
+   */
+  reorderCard(reorder: Reorder, how?: MoveHow): Promise<MoveAnswer>
   /**
    * Hand several cards at once, as one move the host accepts or refuses
    * whole (a keep, ADR-0066), each with the slot it takes.
@@ -314,14 +324,23 @@ export interface SessionClient {
 
 /**
  * What the host is asked for that is neither tracked nor needs a root found:
- * a chat and a move are tracked in `moves`, an undo of moves waits for this
- * tab's copy of the places, an offer action and a line action are tracked
- * in `acting`, and a mark and a retitle need their entry's root (`inRootOf`).
+ * a chat, a move and a reorder are tracked in `moves`, an undo of moves
+ * waits for this tab's copy of the places, an offer action and a line
+ * action are tracked in `acting`, and a mark and a retitle need their
+ * entry's root (`inRootOf`).
  */
 export type HostRequest = Exclude<
   Intent,
   {
-    kind: "chat" | "move" | "undo-move" | "mark" | "retitle" | "offer" | "line"
+    kind:
+      | "chat"
+      | "move"
+      | "reorder"
+      | "undo-move"
+      | "mark"
+      | "retitle"
+      | "offer"
+      | "line"
   }
 >
 
@@ -606,6 +625,19 @@ export async function connectSession(
     },
     moveCard(move, how = OFF_PAGE, queuedBy = null) {
       return sendMove(move, how, queuedBy, null)
+    },
+    reorderCard(reorder, how = OFF_PAGE) {
+      const pending: Pending = {
+        id: crypto.randomUUID(),
+        answer: { state: "sent" },
+        slot: null,
+        actedAt: how.actedAt,
+        kind: "reorder",
+        reorder,
+      }
+      return tracked({ kind: "reorder", reorder }, [pending], null).then(
+        r => r.answer,
+      )
     },
     moveCards(moves, actedAt) {
       const id = crypto.randomUUID()

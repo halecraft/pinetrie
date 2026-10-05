@@ -638,6 +638,7 @@ describe("threads: where a message lands, and whether it raced", () => {
     waiting: 0,
     askedBy: null,
     lastWaiting: null,
+    heldBy: null,
   })
   const send = (
     at: Position,
