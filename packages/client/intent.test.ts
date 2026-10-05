@@ -401,6 +401,7 @@ describe("planIntent", () => {
         askOf: new Map([[entryId("4-c"), entryId("2-a")]]),
         work: new Map([[entryId("2-a"), [entryId("4-c")]]]),
         last: new Map([[entryId("2-a"), entryId("4-c")]]),
+        steered: new Map(),
       }
       const effects = plan(
         { kind: "openAt", entry: entryId("4-c") },

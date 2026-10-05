@@ -107,6 +107,15 @@ export const mutations: readonly Mutation[] = [
     expect: "lastEndedAsk: the column's last ask, passing over the one running",
   },
   {
+    name: "a base's news steered into a run splits its ask's row in two",
+    file: "packages/client/ask-view.ts",
+    from: '    const ask = s.kind === "fold" ? s.ask : runOf(asks, s.id)\n',
+    to: '    const ask = s.kind === "fold" ? s.ask : asks.askOf.get(s.id)\n',
+    command: unit,
+    expect:
+      "columnRows: a base's news steered into a run is drawn in its ask's row",
+  },
+  {
     name: "outline hides the last ended ask's last word",
     file: "packages/client/ask-view.ts",
     from: "    outlineHides: input.lastEnded === ask ? null : lastWord(index, asks, ask),",

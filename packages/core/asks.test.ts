@@ -19,6 +19,7 @@ import {
   projectRail,
   type RevisionRecord,
   railLandmarks,
+  runOf,
   type Segment,
   segmentPath,
   startsRun,
@@ -71,6 +72,25 @@ describe("indexAsks", () => {
   test("is kept per index", () => {
     expect(indexAsks(index)).toBe(asks)
   })
+})
+
+test("a base's news steered in between a run's entries is steered into it; one after the run or before a prompt is not", () => {
+  const behind = (to: string): Message => ({ role: "behind", content: to })
+  const index = build([
+    entry("1-b", null, behind("before the prompt")),
+    entry("2-p", "1-b", chat()),
+    entry("3-a", "2-p", calls("c1")),
+    entry("4-r", "3-a", result("c1")),
+    entry("5-b", "4-r", behind("mid-run")),
+    entry("6-a", "5-b", said("done")),
+    entry("7-b", "6-a", behind("after the run")),
+  ])
+  const asks = indexAsks(index)
+  expect([...asks.steered]).toEqual([["5-b", "2-p"]])
+  expect(runOf(asks, entryId("5-b"))).toBe("2-p")
+  expect(runOf(asks, entryId("4-r"))).toBe("2-p")
+  expect(runOf(asks, entryId("7-b"))).toBeUndefined()
+  expect(asks.askOf.has(entryId("5-b"))).toBe(false)
 })
 
 test("a carry-on message starts an ask of its own; the stopped ask before it stays stopped", () => {
@@ -344,6 +364,39 @@ describe("compactRail and asks", () => {
       "14",
     ])
     expect(items[3]).toMatchObject({ kind: "stretch", ask: "05" })
+  })
+  test("a long ask with a base's news steered in is one capsule, counted as its fold", () => {
+    const rows: EntryLike[] = [entry("01", null, chat("the long one"))]
+    let parent = "01"
+    for (const id of ["02", "03", "04", "05", "06"]) {
+      rows.push(
+        entry(
+          id,
+          parent,
+          id === "04" ? { role: "behind", content: "↓" } : said(id),
+        ),
+      )
+      parent = id
+    }
+    rows.push(entry("07", parent, chat("next")))
+    const index = build(rows)
+    const asks = indexAsks(index)
+    const items = compactRail(
+      index,
+      projectRail(index, entryId("01")),
+      new Set(),
+      { asks, revisions: new Map() },
+    )
+    expect(
+      items.map(it => (it.kind === "dot" ? it.ids[0] : [...it.ids])),
+    ).toEqual(["01", ["02", "03", "04", "05", "06"], "07"])
+    expect(items[1]).toMatchObject({
+      kind: "stretch",
+      ask: "01",
+      stats: { people: 0, agent: 4 },
+    })
+    const stats = items[1]?.kind === "stretch" ? items[1].stats : null
+    expect(stats).toEqual(askStats(index, asks, entryId("01"), new Map()))
   })
   test("short exchanges still merge across their asks", () => {
     const rows: EntryLike[] = [entry("00", null, chat())]

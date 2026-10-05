@@ -16,6 +16,7 @@ import {
   lastWord,
   messageAt,
   type RevisionRecord,
+  runOf,
   type Segment,
   type StopRecord,
   type TreeIndex,
@@ -29,17 +30,16 @@ export type ColumnRow =
   | {
       readonly kind: "ask"
       readonly ask: EntryId
-      /** Its segments on this path, in order: folds, landmarks, its last word. */
+      /**
+       * Its segments on this path, in order: folds, landmarks, its last word,
+       * and any message steered in among them.
+       */
       readonly parts: readonly [Segment, ...Segment[]]
     }
 
-const askOfSegment = (s: Segment, asks: AskIndex): EntryId | undefined =>
-  s.kind === "fold" ? s.ask : asks.askOf.get(s.id)
-
 /**
- * `segments` grouped: a run of segments that one ask's run wrote is one row,
- * its prompt and everything else a row each. A run holds nothing anyone else
- * wrote (S21), so an ask's work is one stretch of the path.
+ * `segments` grouped: an ask's work is one row, a message steered into its
+ * run included (`runOf`), and its prompt and everything else a row each.
  */
 export function columnRows(
   segments: readonly Segment[],
@@ -47,7 +47,7 @@ export function columnRows(
 ): readonly ColumnRow[] {
   const rows: ColumnRow[] = []
   for (const s of segments) {
-    const ask = askOfSegment(s, asks)
+    const ask = s.kind === "fold" ? s.ask : runOf(asks, s.id)
     if (ask === undefined) {
       if (s.kind === "entry") rows.push({ kind: "message", id: s.id })
       continue

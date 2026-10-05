@@ -70,6 +70,39 @@ test("columnRows: an ask's work is one row, its prompt and what follows rows of 
   })
 })
 
+test("columnRows: a base's news steered into a run is drawn in its ask's row", () => {
+  const steered = indexOf([
+    entry("1-p", null, chat),
+    entry("2-a", "1-p", said("looking")),
+    entry("3-a", "2-a", said("still looking")),
+    entry("4-b", "3-a", { role: "behind", content: "↓ new work" }),
+    entry("5-a", "4-b", said("more")),
+    entry("6-a", "5-a", said("done")),
+    entry("7-q", "6-a", chat),
+    entry("8-b", "7-q", { role: "behind", content: "↓ newer work" }),
+  ])
+  const ids = ["1-p", "2-a", "3-a", "4-b", "5-a", "6-a", "7-q", "8-b"]
+  const a = indexAsks(steered)
+  const rows = columnRows(
+    segmentPath(steered, a, ids.map(entryId), new Set()),
+    a,
+  )
+  expect(rows.map(r => (r.kind === "message" ? r.id : r.ask))).toEqual([
+    "1-p",
+    "1-p",
+    "7-q",
+    "8-b",
+  ])
+  expect(rows[1]).toMatchObject({
+    parts: [
+      { kind: "fold", ids: ["2-a", "3-a"], first: true },
+      { kind: "entry", id: "4-b" },
+      { kind: "fold", ids: ["5-a"], first: false },
+      { kind: "entry", id: "6-a" },
+    ],
+  })
+})
+
 test("lastEndedAsk: the column's last ask, passing over the one running", () => {
   const ask = (id: string): ColumnRow => ({
     kind: "ask",

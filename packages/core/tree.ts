@@ -12,7 +12,7 @@
 // A tool's result is its own entry, but it belongs to its call: `projectSpine`
 // pairs it with the call on the same path, and it is never a message itself.
 
-import { type AskIndex, isLongAsk } from "./asks.ts"
+import { type AskIndex, isLongAsk, runOf } from "./asks.ts"
 import { type ImageRef, isImageMime, isSha256 } from "./images.ts"
 import {
   atEntry,
@@ -1051,7 +1051,8 @@ export interface RailAsks {
  * A row is uneventful when it is not one of `railLandmarks`, and not the
  * prompt of a long ask (`isLongAsk`, ADR-0056). A stretch never crosses a
  * long ask's edge, so a long ask is a dot and a capsule of its own, while
- * short exchanges still merge.
+ * short exchanges still merge. A message steered into a run is in its
+ * ask's capsule (`runOf`).
  * So a stretch holds no structure, and the compacted rail has every branch
  * the full one has.
  * An uneventful row's only child is the next row in depth-first order, so a
@@ -1072,7 +1073,7 @@ export function compactRail(
     !landmarks.has(r.id) && !long.has(r.id)
   /** The long ask a row works for, or null: a stretch keeps to one. */
   const longAsk = (id: EntryId | undefined): EntryId | null => {
-    const prompt = id === undefined ? undefined : asks.askOf.get(id)
+    const prompt = id === undefined ? undefined : runOf(asks, id)
     return prompt !== undefined && long.has(prompt) ? prompt : null
   }
 
@@ -1116,7 +1117,13 @@ export function compactRail(
         span,
         ids,
         ...edge(first),
-        stats: workStats(index, ids, rows[end]?.id, revisions),
+        // A message steered in is no message of the work, as in `askStats`.
+        stats: workStats(
+          index,
+          ids.filter(id => !asks.steered.has(id)),
+          rows[end]?.id,
+          revisions,
+        ),
         ask: longAsk(first.id),
       })
     }

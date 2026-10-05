@@ -3,7 +3,8 @@
 //
 // A run's entries are the agent's messages and their tool results below its
 // prompt (`startsRun`), up to the next prompt. A lane is never written while
-// it runs (S21), so nothing a person wrote sits inside a run.
+// it runs (S21), so nothing a person wrote sits inside a run: only the
+// host's news is steered in (`steered`, ADR-0080).
 //
 // The column folds each ask's work (`segmentPath`), and the rail compacts the
 // same stretches (`compactRail`): both draw `railLandmarks` apart, so a fold
@@ -39,7 +40,17 @@ export interface AskIndex {
   readonly work: ReadonlyMap<EntryId, readonly EntryId[]>
   /** A run's prompt -> its newest entry, a tool result included. */
   readonly last: ReadonlyMap<EntryId, EntryId>
+  /**
+   * An entry no run wrote, steered in between a run's entries (a base's
+   * news, ADR-0080) -> the run's prompt. The column draws it in the ask's
+   * work and the rail in its capsule, so neither splits the ask in two.
+   */
+  readonly steered: ReadonlyMap<EntryId, EntryId>
 }
+
+/** The ask whose work `id` is drawn in: one its run wrote, or steered into it. */
+export const runOf = (asks: AskIndex, id: EntryId): EntryId | undefined =>
+  asks.askOf.get(id) ?? asks.steered.get(id)
 
 /** How an ask's run ended, or that it has not. */
 export type AskOutcome =
@@ -102,6 +113,7 @@ export function indexAsks(index: TreeIndex): AskIndex {
   const askOf = new Map<EntryId, EntryId>()
   const work = new Map<EntryId, EntryId[]>()
   const last = new Map<EntryId, EntryId>()
+  const steered = new Map<EntryId, EntryId>()
   // Ids are uuidv7, so sorted ids are creation order (S9).
   const entries = Object.values(index.entries).sort((a, b) =>
     a.id < b.id ? -1 : a.id > b.id ? 1 : 0,
@@ -113,11 +125,20 @@ export function indexAsks(index: TreeIndex): AskIndex {
     const prompt = parent === null ? null : resolve(parent)
     if (prompt === null) continue
     askOf.set(id, prompt)
+    // What sits between this entry and the run's entry or prompt above it
+    // was steered in. An older entry is in `askOf` already, and `resolve`
+    // found no prompt nearer than `prompt`.
+    for (
+      let at: EntryId | null = parent;
+      at !== null && at !== prompt && !askOf.has(at);
+      at = index.parentOf(at)
+    )
+      steered.set(at, prompt)
     last.set(prompt, id)
     if (entry.message?.role === "assistant")
       work.set(prompt, [...(work.get(prompt) ?? []), id])
   }
-  const asks: AskIndex = { askOf, work, last }
+  const asks: AskIndex = { askOf, work, last, steered }
   known.set(index, asks)
   return asks
 }

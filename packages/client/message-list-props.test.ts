@@ -33,7 +33,12 @@ const shared = {
   nameOf: new Map(),
   live: {} as MessageListProps["live"],
   onAct: () => {},
-  asks: { askOf: new Map(), work: new Map(), last: new Map() },
+  asks: {
+    askOf: new Map(),
+    work: new Map(),
+    last: new Map(),
+    steered: new Map(),
+  },
   stops: new Map(),
   revisions: new Map(),
   folds: foldMemory(),

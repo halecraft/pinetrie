@@ -697,6 +697,12 @@ the columns read one. `segmentPath` (core) decides what a column folds;
   reads its own key with `useSyncExternalStore`, so opening one redraws it
   alone and `MessageList` gets no new prop. Its messages are drawn only
   while open: a closed fold creates none of their elements (S59).
+- **An ask is one row, even with a message steered into its run.** A
+  base's news (ADR-0080) is written mid-run, and no run wrote it, so it is
+  in no `askOf`. `indexAsks` (core) records it in `steered`, and `runOf`
+  reads both: `columnRows` draws it in the ask's row and `compactRail` in
+  its capsule. Read apart, it split the ask in two, and outline drew its
+  line and digest twice.
 - **Nothing is written when a run ends.** `foldOpen` reads
   `endedWhileAway`: the run's last entry is past `releasedTip`, the
   column's tip when its reader left its end (`follow.ts`). Following, there

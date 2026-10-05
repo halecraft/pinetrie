@@ -10,6 +10,31 @@ const trailers = "packages/core/trailers.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "nothing is steered into a run",
+    file: asks,
+    from: "      steered.set(at, prompt)\n",
+    to: "      void at\n",
+    command: unit,
+    expect:
+      "a base's news steered in between a run's entries is steered into it",
+  },
+  {
+    name: "the rail splits a long ask's capsule at a base's news",
+    file: tree,
+    from: "    const prompt = id === undefined ? undefined : runOf(asks, id)\n",
+    to: "    const prompt = id === undefined ? undefined : asks.askOf.get(id)\n",
+    command: unit,
+    expect: "a long ask with a base's news steered in is one capsule",
+  },
+  {
+    name: "a capsule counts a base's news as a person's message",
+    file: tree,
+    from: "          ids.filter(id => !asks.steered.has(id)),\n",
+    to: "          ids,\n",
+    command: unit,
+    expect: "a long ask with a base's news steered in is one capsule",
+  },
+  {
     name: "turnEntry stops at a steered fact",
     file: tree,
     from: '      (toolResultOf(entry) === null && entry.message?.role !== "behind")',
