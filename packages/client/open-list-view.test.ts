@@ -132,8 +132,8 @@ describe("openListView", () => {
     const menus = items({ archived: new Set([entryId("r1")]) }).map(kinds)
     expect(menus).toEqual([
       [],
-      ["rename", "retitle", "up", "down", "moveTo", "moveTo"],
-      ["rename", "retitle", "up", "moveTo", "moveTo"],
+      ["rename", "retitle", "moveTo", "moveTo"],
+      ["rename", "retitle", "moveTo", "moveTo"],
       null,
     ])
   })
@@ -144,25 +144,6 @@ describe("openListView", () => {
       kind: "retitle",
       intent: { kind: "retitle", root: entryId("r1") },
     })
-  })
-
-  test("Move up and Move down move it one place in your list; the ends offer neither", () => {
-    const [r1, r2] = items()
-    expect(kinds(r1)).not.toContain("up")
-    const moves =
-      r2?.kind === "root"
-        ? r2.menu.filter(i => i.kind === "up" || i.kind === "down")
-        : []
-    expect(moves).toEqual([
-      {
-        kind: "up",
-        intent: { kind: "moveInList", root: "r2", before: "r1" },
-      },
-      {
-        kind: "down",
-        intent: { kind: "moveInList", root: "r2", before: null },
-      },
-    ])
   })
 
   test("Move to ▸ offers every state but its own, each a move on the board for everyone", () => {

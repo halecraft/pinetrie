@@ -17,7 +17,6 @@ import type { CardMarks } from "./card-marks.ts"
 import type { Intent } from "./intent.ts"
 import { type Here, type Layout, listOf, sameHere } from "./layout.ts"
 import { NO_TEXT } from "./root-label.ts"
-import { stepsIn } from "./root-target.ts"
 
 /** What a root's ⋯ in your list offers. */
 export type ItemMenuItem =
@@ -26,8 +25,6 @@ export type ItemMenuItem =
   | { readonly kind: "notNeeded"; readonly intent: Intent }
   /** Ask a model for a title from the root's messages (ADR-0074). */
   | { readonly kind: "retitle"; readonly intent: Intent }
-  /** Up or down your list: the keyboard's way to reorder it. */
-  | { readonly kind: "up" | "down"; readonly intent: Intent }
   /**
    * Move the root on the board to another workflow state (ADR-0085). Into
    * the closed state it is archived: refused while its agent works there
@@ -115,8 +112,7 @@ export interface OpenListViewInput {
 
 export function openListView(input: OpenListViewInput): OpenListView {
   const all = listOf(input.layout)
-  const roots = input.layout.open
-  const items = all.map(here => itemView(here, roots, input))
+  const items = all.map(here => itemView(here, input))
   return {
     items,
     selected: items.find(t => t.selected) ?? null,
@@ -127,11 +123,7 @@ export function openListView(input: OpenListViewInput): OpenListView {
   }
 }
 
-function itemView(
-  here: Here,
-  roots: readonly EntryId[],
-  input: OpenListViewInput,
-): ItemView {
+function itemView(here: Here, input: OpenListViewInput): ItemView {
   const common = {
     selected: sameHere(here, input.active),
     show: { kind: "show", here } as const,
@@ -167,7 +159,7 @@ function itemView(
         arrived: input.arrivals.arrived.get(root) ?? null,
         done: input.arrivals.done.get(root) ?? null,
         archived,
-        menu: archived ? [] : menuOf(root, roots, status, input),
+        menu: archived ? [] : menuOf(root, status, input),
         pip: input.unsent.roots.has(root),
       }
     }
@@ -176,11 +168,9 @@ function itemView(
 
 function menuOf(
   root: EntryId,
-  roots: readonly EntryId[],
   status: Status | null,
   input: OpenListViewInput,
 ): readonly ItemMenuItem[] {
-  const steps = stepsIn(roots, root)
   return [
     ...(status === null || status.kind === "working"
       ? []
@@ -196,22 +186,6 @@ function menuOf(
         ]),
     { kind: "rename" },
     { kind: "retitle", intent: { kind: "retitle", root } },
-    ...(steps.up === null
-      ? []
-      : [
-          {
-            kind: "up",
-            intent: { kind: "moveInList", root, before: steps.up.before },
-          } as const,
-        ]),
-    ...(steps.down === null
-      ? []
-      : [
-          {
-            kind: "down",
-            intent: { kind: "moveInList", root, before: steps.down.before },
-          } as const,
-        ]),
     ...movesOf(root, input),
   ]
 }

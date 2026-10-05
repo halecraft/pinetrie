@@ -3,9 +3,10 @@
 //
 // A root is dragged from the board or from your list. A drop names a target
 // by the attributes the drop code marks it with (`rootDropProps`), and
-// `planRootDrop` turns it into the intent a keyboard move sends: a board
-// item's Move to ▸, and Move up and Move down (`stepsIn`) on both. Where in
-// a group of places (`rootGroupProps`) the pointer lands is `landingIn`'s.
+// `planRootDrop` turns it into an intent: on the board, the one a board
+// item's Move to ▸, Move up or Move down (`stepsIn`) sends; on your list, a
+// `moveInList`. Where in a group of places (`rootGroupProps`) the pointer
+// lands is `landingIn`'s.
 
 import {
   type EntryId,

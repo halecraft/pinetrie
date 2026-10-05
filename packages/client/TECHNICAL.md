@@ -251,8 +251,8 @@ and each item's signals.
   `renameKey` what Enter and Escape do.
 - **What your list shows and offers is `openListView`'s**
   (`open-list-view.ts`), over `listOf`'s order: each item's label, pip,
-  `⋯` items (Not needed, Rename, Auto-update title, Move up, Move down,
-  Move to ▸ each other state) and the intents they send. `OpenList`
+  `⋯` items (Not needed, Rename, Auto-update title, Move to ▸ each other
+  state) and the intents they send. `OpenList`
   (`open-list.tsx`) draws it; each item's `Readers` read presence
   themselves (S59, `root-signals.tsx`). `selected` is the item you are on,
   decided there once: `App` titles the window from it (`pageTitle`) and
@@ -2102,7 +2102,7 @@ shown by their email's part before the `@`. Each rendered chat carries its
   `#open-list .open-root[data-root="…"]`, the one you are on has
   `aria-current="true"` and its wrap `data-selected`, its × is the
   `.open-close` after it, its `⋯` (`.open-menu`) holds `.rename-root`,
-  `.retitle-root`, `.move-up`, `.move-down` and `.move-to` (`.closes` for
+  `.retitle-root` and `.move-to` (`.closes` for
   the closed state), a root being renamed is `.open-title-input`, new tabs
   are `.open-new`, and ＋'s buttons are `.add-agent`, `.add-menu` and
   `.add-conversation`. The board is `#board`: a `.board-column[data-state]`

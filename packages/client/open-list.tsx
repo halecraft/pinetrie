@@ -2,10 +2,10 @@
 // in your order, then new tabs, then ＋ (ADR-0030, ADR-0085).
 //
 // Your list is yours, on every device: × closes a root for you and writes
-// nothing shared. Drag an item, or its ⋯'s Move up and Move down, to
-// reorder; a root dragged here from the board opens there. In its ⋯, Rename
-// titles a root for everyone (ADR-0045), and Move to ▸ moves it on the board
-// for everyone: to the closed state, it is archived. A root someone else
+// nothing shared. Drag an item to reorder; a root dragged here from the
+// board opens there. In its ⋯, Rename titles a root for everyone (ADR-0045),
+// and Move to ▸ moves it on the board for everyone: to the closed state, it
+// is archived. A root someone else
 // starts is not added here. An item holding an unsent card of yours carries a
 // pip (ADR-0048, `cardMarks`), and before its label, its status (ADR-0077).
 
@@ -243,15 +243,6 @@ function menuItem(
         className: "retitle-root",
         title: "title this thread from what was said in it, for everyone",
         label: "Auto-update title",
-        onChoose: () => onIntent(item.intent),
-      }
-    case "up":
-    case "down":
-      return {
-        key: item.kind,
-        className: `move-${item.kind}`,
-        title: `move it ${item.kind} your list`,
-        label: item.kind === "up" ? "Move up" : "Move down",
         onChoose: () => onIntent(item.intent),
       }
     case "moveTo": {

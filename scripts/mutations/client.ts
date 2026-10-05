@@ -1807,8 +1807,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a root's ⋯ shows only on the root you are on",
     file: "packages/client/open-list-view.ts",
-    from: "        menu: archived ? [] : menuOf(root, roots, status, input),",
-    to: "        menu: archived || !common.selected ? [] : menuOf(root, roots, status, input),",
+    from: "        menu: archived ? [] : menuOf(root, status, input),",
+    to: "        menu: archived || !common.selected ? [] : menuOf(root, status, input),",
     command: unit,
     expect: "every root not archived offers ⋯",
   },

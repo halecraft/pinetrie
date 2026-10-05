@@ -65,11 +65,10 @@ beside it (ADR-0081, turned sideways).
   Every column there shares the root.
 - **Your list is yours, on every device of yours**: your own document, which
   only your tabs write. Top to bottom is your order. Opening a root adds it at
-  the bottom; drag an item, or its `⋯`'s **Move up** and **Move down**, to
-  reorder. **×** closes a root for you and writes nothing shared; opening it
-  again brings its columns back. A root you start joins your list; a root
-  someone else starts does not, and reaches you through the board, a
-  mention, or the activity menu.
+  the bottom; drag an item to reorder. **×** closes a root for you and
+  writes nothing shared; opening it again brings its columns back. A root
+  you start joins your list; a root someone else starts does not, and
+  reaches you through the board, a mention, or the activity menu.
 - **An item's label** is the root's title, else its first message's first
   line, wrapped to two lines before it is cut; a root only people have
   written in, untitled, is **Chat**. When the agent is first asked in a root

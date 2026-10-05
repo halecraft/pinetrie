@@ -48,7 +48,7 @@ describe("a root's drop lands where a key could move it", () => {
       before: null,
       closes: true,
     })
-    // Move up, as `openListView` offers it.
+    // Before another in your list.
     expect(
       planRootDrop(drag, { kind: "list", before: entryId("2-r") }, DONE, null),
     ).toEqual({ kind: "moveInList", root: "1-r", before: "2-r" })
