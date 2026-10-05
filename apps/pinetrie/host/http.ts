@@ -68,6 +68,10 @@ export async function startHttp(input: {
   })
 
   const httpServer = http.createServer()
+  // Vite's HMR listener sits on this stand-in, which never binds, so an
+  // upgrade reaches it only through the `"vite"` route below, admitted.
+  // Without one, Vite opens port 24678 and its client connects there (S112).
+  const viteUpgrades = http.createServer()
 
   // Vite serves the client: index.html, module transforms, wasm, HMR. One
   // node:http server is shared, so there is a single port and a single origin.
@@ -82,9 +86,10 @@ export async function startHttp(input: {
     plugins: [hotReload.plugin],
     server: {
       middlewareMode: true,
-      // Vite attaches its own upgrade listener, ahead of the one below, so its
-      // socket would bypass admission: hot reload runs on loopback only.
-      hmr: key === null ? { server: httpServer } : false,
+      hmr: { server: viteUpgrades },
+      // Admission decides which `Host` gets in (admission.ts): off loopback,
+      // any name with the key, such as a tunnel's.
+      allowedHosts: true,
     },
   })
   hotReload.attach(() => vite.ws.send({ type: "full-reload" }))
@@ -179,11 +184,8 @@ export async function startHttp(input: {
     }
   }
 
-  // ROUTE the upgrade. `noServer` + an explicit /ws test is what lets our sync
-  // socket and Vite's HMR socket share a port: anything that is not /ws falls
-  // through to Vite's own upgrade listener (attached via hmr.server above).
-  // Handling every upgrade here — which is what this did before Vite — would
-  // swallow HMR silently.
+  // ROUTE the upgrade: the Exchange's socket is `/ws`, and any other admitted
+  // upgrade goes on to Vite's HMR listener, on `viteUpgrades`.
   httpServer.on("upgrade", (req, socket, head) => {
     switch (planUpgrade(requestFacts(req), key)) {
       case "refuse":
@@ -195,8 +197,9 @@ export async function startHttp(input: {
         )
         return
       case "vite":
-        // Vite's own listener answers, on loopback, where hot reload is on.
-        // After `vite.close()` none does, so `close()` stops accepting first.
+        // After `vite.close()` nothing answers, so `close()` stops accepting
+        // first.
+        viteUpgrades.emit("upgrade", req, socket, head)
         return
     }
   })

@@ -602,6 +602,13 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 
 - **Admission comes first**, for a request and for an upgrade. Nothing
   reaches Vite, the blobs, an offer's reads or the Exchange without it.
+- **Vite's HMR socket shares the host's port, behind admission.** Vite's
+  listener sits on `viteUpgrades`, a server that never binds, and `http.ts`
+  passes it each admitted upgrade that is not `/ws`. `hmr: false` does not
+  stop `/@vite/client` from connecting, and without `hmr.server` Vite
+  listens on port 24678. Behind a tunnel that socket hangs, and Firefox,
+  which opens one WebSocket to a host at a time, held `/ws` behind it (S112).
+  Vite's own host check is off (`allowedHosts: true`): admission decides.
 - **Every answer the host writes itself is a `responses.ts` value**, written
   by one `send`. A blob, a review and a diff are cached for a year
   (`IMMUTABLE`: each is named by what it holds); a refusal is never stored.

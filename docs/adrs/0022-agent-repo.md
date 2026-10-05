@@ -30,7 +30,8 @@ for a Claude subscription works only through a pi extension (S23).
   in without the key: no page, no file, no WebSocket. The key comes as an
   invite link (`?key=`), which sets an `HttpOnly` cookie and redirects to the
   page without it. Hot reload runs on loopback only, because Vite's socket
-  would bypass admission. *Since ADR-0042, a request whose `Origin` names
+  would bypass admission. *Since S112, Vite's socket is admitted like the
+  rest, and hot reload runs off loopback too.* *Since ADR-0042, a request whose `Origin` names
   another host is refused, key or no key, and a loopback host refuses a
   `Host` that is not a loopback name: without a key, any page in the
   person's browser could otherwise open the WebSocket.* Two limits:

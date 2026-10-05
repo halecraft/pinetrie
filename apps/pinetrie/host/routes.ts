@@ -54,8 +54,8 @@ export function planRequest(
 }
 
 /**
- * An upgrade: refused, the Exchange's websocket (`/ws`), or left to Vite's own
- * upgrade listener. A WebSocket is exempt from the same-origin policy, so the
+ * An upgrade: refused, the Exchange's websocket (`/ws`), or handed to Vite's
+ * HMR listener. A WebSocket is exempt from the same-origin policy, so the
  * `Origin` check in `admits` is what keeps another page off the socket.
  */
 export function planUpgrade(

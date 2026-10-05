@@ -262,6 +262,15 @@ export const mutations: readonly Mutation[] = [
     expect: "without the key: no page, no source file, no websocket",
   },
   {
+    name: "Vite's HMR socket gets a port of its own",
+    file: "apps/pinetrie/host/http.ts",
+    from: "      hmr: { server: viteUpgrades },",
+    to: "      hmr: true,",
+    suite: "host",
+    scenario: "admission",
+    expect: "with the key, Vite's HMR socket opens on the host's port",
+  },
+  {
     name: "an opened tool row shows its cut label and the whole one",
     file: "packages/client/index.html",
     from: "      .tool[open] > summary:has(.tool-label-whole) .tool-label { display: none; }",

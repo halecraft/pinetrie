@@ -1,6 +1,7 @@
 // e2e/host/admission — off loopback, without the invite key, the HTTP server
-// and the websocket upgrade both refuse. What admission decides is `routes.ts`'
-// and `admission.ts`', unit-tested; this proves the server carries it out.
+// and the websocket upgrade both refuse; with it, Vite's HMR socket opens on
+// the host's own port. What admission decides is `routes.ts`' and
+// `admission.ts`', unit-tested; this proves the server carries it out.
 
 import { scriptedModel } from "@pinetrie/pi"
 import type { Checks } from "../checks.ts"
@@ -35,6 +36,28 @@ async function run(check: Checks["check"]): Promise<void> {
         (await status(open.httpUrl)) === 403 &&
           (await status(`${open.httpUrl}app.tsx`)) === 403 &&
           wsRefused,
+      )
+      // A socket nothing answers neither opens nor fails: the timeout is
+      // that outcome.
+      const hmrOpens = await new Promise<boolean>(resolve => {
+        const ws = new WebSocket(
+          `${open.httpUrl.replace("http", "ws")}?key=k3y`,
+          "vite-hmr",
+        )
+        const timer = setTimeout(() => resolve(false), 5000)
+        ws.onopen = () => {
+          clearTimeout(timer)
+          ws.close()
+          resolve(true)
+        }
+        ws.onerror = () => {
+          clearTimeout(timer)
+          resolve(false)
+        }
+      })
+      check(
+        "with the key, Vite's HMR socket opens on the host's port",
+        hmrOpens,
       )
     },
   )
