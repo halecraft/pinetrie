@@ -283,6 +283,20 @@ export function removeWords(roots: number, openStates: number): string | null {
   return null
 }
 
+/** Where a press or a click lands, as the open board sees it. */
+export type BoardSide = "board" | "strip" | "elsewhere"
+
+/**
+ * Whether a click closes the open board: one pressed and released outside
+ * it and its strip, whose buttons act for themselves. A press in the board let go
+ * outside (a selection dragged out) keeps it open, and a drag from your list
+ * ends in no click, so it can drop on the board.
+ */
+export const clickClosesBoard = (
+  press: BoardSide | null,
+  release: BoardSide,
+): boolean => press === "elsewhere" && release === "elsewhere"
+
 /** A state renamed, or a new one added: the board's name field sends this. */
 export const nameStateIntent = (
   state: WorkflowStateId | null,

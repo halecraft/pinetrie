@@ -204,8 +204,8 @@ While the page syncs, "syncing…" leads its right end.
 ### The board: where everyone's work stands (ADR-0085)
 
 ▦, or a state in the strip, opens the board over the columns, from the
-footer's edge: it moves none of them. ▦ again, or Escape, closes it, and so
-does choosing something to work in. Whether it is open is this browser
+footer's edge: it moves none of them. ▦ again, Escape, or a click outside
+it and its strip closes it, and so does choosing something to work in. Whether it is open is this browser
 tab's; with nothing in your list and nothing you are on, it opens by itself.
 
 - **Every root is in one workflow state.** Each open state is a column of

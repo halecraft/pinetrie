@@ -1573,6 +1573,15 @@ export const mutations: readonly Mutation[] = [
     expect: "an item holds your card exactly when its root does",
   },
   {
+    name: "a selection dragged out of the board closes it",
+    file: "packages/client/board-view.ts",
+    from: ': boolean => press === "elsewhere" && release === "elsewhere"',
+    to: ': boolean => press !== null && release === "elsewhere"',
+    command: unit,
+    expect:
+      "clickClosesBoard: a click pressed and let go outside the board and its strip closes it",
+  },
+  {
     name: "a modified click opens the image in the pane too",
     file: "packages/client/image-click.ts",
     from: '  return e.metaKey || e.ctrlKey ? "tab" : "pane"',

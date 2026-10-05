@@ -1,7 +1,8 @@
 // client/board — the board (ADR-0085): everyone's roots, each in its
 // workflow state. Its strip sits in the footer and says each state's name,
 // count, the people reading in its roots, and its highest mark; ▦ opens the
-// board over the columns, moving none of them, and ▦ or Escape closes it.
+// board over the columns, moving none of them, and ▦, Escape or a click
+// outside it closes it.
 //
 // Opened, each open state is a column: drag an item to another column, or
 // within one, or use its ⋯'s Move to ▸, to move it for everyone. To the
@@ -17,7 +18,9 @@ import { useEffect, useRef, useState } from "react"
 import { LEVEL_CLASS, LEVEL_WORDS, type Level } from "./attention.ts"
 import {
   type BoardItem,
+  type BoardSide,
   type BoardView,
+  clickClosesBoard,
   closedWords,
   nameStateIntent,
   type StripState,
@@ -153,13 +156,39 @@ export function Board({
   thread: (end: EntryId, root: EntryId) => MenuItem
   pip: React.ReactNode
 }) {
-  // Escape closes the board, as ▦ does.
+  // Escape closes the board, as ▦ does, and so does a click outside it
+  // (`clickClosesBoard`). Both ends of a click are read in the capture
+  // phase, before what was clicked can take itself out of the page.
+  const self = useRef<HTMLElement>(null)
   useEffect(() => {
+    const close = () => onIntent({ kind: "board", open: false })
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onIntent({ kind: "board", open: false })
+      if (e.key === "Escape") close()
+    }
+    const side = (at: EventTarget | null): BoardSide =>
+      !(at instanceof Element)
+        ? "elsewhere"
+        : self.current?.contains(at)
+          ? "board"
+          : at.closest(".board-strip") !== null
+            ? "strip"
+            : "elsewhere"
+    let press: BoardSide | null = null
+    const onPress = (e: PointerEvent) => {
+      press = side(e.target)
+    }
+    const onClick = (e: MouseEvent) => {
+      if (clickClosesBoard(press, side(e.target))) close()
+      press = null
     }
     document.addEventListener("keydown", onKey)
-    return () => document.removeEventListener("keydown", onKey)
+    document.addEventListener("pointerdown", onPress, true)
+    document.addEventListener("click", onClick, true)
+    return () => {
+      document.removeEventListener("keydown", onKey)
+      document.removeEventListener("pointerdown", onPress, true)
+      document.removeEventListener("click", onClick, true)
+    }
   }, [onIntent])
   const [adding, setAdding] = useState(false)
   // An open column's item is a place to drop before; a closed row is not,
@@ -180,7 +209,7 @@ export function Board({
     />
   )
   return (
-    <section aria-label="board" className="board" id="board">
+    <section aria-label="board" className="board" id="board" ref={self}>
       {view.open.map(column => (
         <div
           className="board-column"

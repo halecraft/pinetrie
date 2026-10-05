@@ -273,6 +273,11 @@ and each item's signals.
   `active` back to null.
 - **Choosing a root or a new tab closes the board** (`show`, `newTab`): it
   lay over what you chose.
+- **A click outside the board closes it** only when it was pressed outside
+  too (`clickClosesBoard`): a selection dragged out of the board keeps it,
+  and a drag from your list fires no click, so it can still drop there. The
+  strip counts as the board's own, so its buttons act alone: ▦ toggles, and
+  a state's button keeps the board open rather than closing and reopening it.
 - **Moving a root on the board** is a `moveRoot` effect: the host's
   `move-root`, and, into the closed state, the effects that close it for you
   (`moved`), which `afterRootMove` runs only once the host answers

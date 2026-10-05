@@ -296,7 +296,7 @@ async function run(check: Checks["check"]): Promise<void> {
         )
       }
       // The board opens over the columns, from the footer's edge, and moves
-      // none of them (ADR-0085).
+      // none of them (ADR-0085). A click on a column above it closes it.
       {
         const rects = () =>
           page.$$eval(".column", cs =>
@@ -321,17 +321,28 @@ async function run(check: Checks["check"]): Promise<void> {
             return c !== undefined && r.top < c.bottom && r.bottom > c.top
           })
           .catch(() => false)
-        await page.click("#bottom .board-toggle")
-        await page
-          .waitForSelector("#board", { state: "detached", timeout: 15_000 })
+        const above = await page
+          .$eval(`${col(0)} .column-head`, h => {
+            const r = h.getBoundingClientRect()
+            return { x: r.left + 4, y: r.bottom + 4 }
+          })
           .catch(() => null)
+        if (above !== null) await page.mouse.click(above.x, above.y)
+        const closed = await page
+          .waitForSelector("#board", { state: "detached", timeout: 5_000 })
+          .then(
+            () => true,
+            () => false,
+          )
+        if (!closed) await page.click("#bottom .board-toggle")
         check(
-          "the board opens over the columns and moves none of them",
+          "the board opens over the columns, moves none of them, and a click outside closes it",
           board &&
             over &&
+            closed &&
             before.length > 0 &&
             during.join("|") === before.join("|"),
-          `${before.join("|")} → ${during.join("|")}`,
+          `${before.join("|")} → ${during.join("|")}; closed: ${closed}`,
         )
       }
       // Its thread is named before anything is typed (ADR-0057).

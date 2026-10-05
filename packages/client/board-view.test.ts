@@ -18,6 +18,7 @@ import {
   type BoardViewInput,
   boardView,
   CLOSED_RECENT,
+  clickClosesBoard,
   closedRows,
   nameStateIntent,
   removeWords,
@@ -196,6 +197,16 @@ describe("boardView", () => {
     expect(removeWords(0, 2)).toBeNull()
     expect(removeWords(3, 2)).toBe("holds 3 roots: move them first")
   })
+})
+
+test("clickClosesBoard: a click pressed and let go outside the board and its strip closes it", () => {
+  expect(clickClosesBoard("elsewhere", "elsewhere")).toBe(true)
+  expect(clickClosesBoard("board", "board")).toBe(false)
+  expect(clickClosesBoard("strip", "strip")).toBe(false)
+  // A selection begun in the board and let go outside it.
+  expect(clickClosesBoard("board", "elsewhere")).toBe(false)
+  expect(clickClosesBoard("elsewhere", "board")).toBe(false)
+  expect(clickClosesBoard(null, "elsewhere")).toBe(false)
 })
 
 describe("closedRows", () => {

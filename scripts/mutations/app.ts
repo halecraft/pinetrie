@@ -541,7 +541,18 @@ export const mutations: readonly Mutation[] = [
     to: "      #board { position: relative; order: -1; z-index: 3; left: 0; right: 0; bottom: 0; max-height: 70%;",
     suite: "browser",
     scenario: "page",
-    expect: "the board opens over the columns and moves none of them",
+    expect:
+      "the board opens over the columns, moves none of them, and a click outside closes it",
+  },
+  {
+    name: "a click outside the board leaves it open",
+    file: "packages/client/board.tsx",
+    from: "      if (clickClosesBoard(press, side(e.target))) close()",
+    to: "      if (clickClosesBoard(press, side(e.target)) && false) close()",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "the board opens over the columns, moves none of them, and a click outside closes it",
   },
   {
     name: "a root's drag lands nowhere",
