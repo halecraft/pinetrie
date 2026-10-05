@@ -2,8 +2,8 @@
 // It splits where your list's edge does: below your list, what is yours (you,
 // whose avatar opens your profile, `profile.tsx`, and your inventory); to the
 // right, what is everyone's: the board's strip (`board.tsx`), then one menu
-// of what needs you (`activity.ts`, ADR-0069, ADR-0077), the project
-// (ADR-0060, ADR-0061), and "syncing…" while the document is pending. The
+// of what needs you (`activity.ts`, ADR-0069, ADR-0077), the publish button
+// (ADR-0090), and "syncing…" while the document is pending. The
 // agent comes from live data (the running lanes), the inbox from the tree
 // and your attention document. Nothing here opens a root until you choose,
 // and nothing closes a menu you opened: a trigger whose live data has gone
@@ -18,7 +18,7 @@ import {
   type TreeIndex,
   type WriterId,
 } from "@pinetrie/core"
-import type { SessionClient } from "@pinetrie/session"
+import type { LineActing, SessionClient } from "@pinetrie/session"
 import { type ReactNode, useState, useSyncExternalStore } from "react"
 import {
   type ActivitySection,
@@ -38,16 +38,16 @@ import { AGENT_MARK } from "./column-view.ts"
 import type { RunHere } from "./here.ts"
 import type { InboxItem } from "./inbox.ts"
 import type { Intent } from "./intent.ts"
-import {
-  type LineSection,
-  lineNote,
-  lineView,
-  lineWords,
-  resolveIntent,
-} from "./line-view.ts"
 import { Menu, type MenuItem } from "./menu.tsx"
 import { nameFor } from "./presence.tsx"
 import { type Me, Profile } from "./profile.tsx"
+import {
+  publishToast,
+  publishView,
+  publishWords,
+  resolveIntent,
+} from "./publish-view.ts"
+import { Toast } from "./toast.tsx"
 import type { InboxView } from "./use-inbox.ts"
 
 /**
@@ -126,7 +126,7 @@ export function Footer({
   names: ReadonlyMap<string, string>
   /** Open an entry in your list (`planOpen`). */
   onOpen: (id: EntryId, root: EntryId) => void
-  /** Where the project menu's "resolve with the agent" goes. */
+  /** Where the publish toast's "resolve with the agent" goes. */
   onIntent: (intent: Intent) => void
   /** Your inventory's toggle: whether its panel is open, and its cards. */
   inventory: {
@@ -217,7 +217,7 @@ export function Footer({
           onOpen={onOpen}
           runs={runs.map(r => thread(r.lane, r.end, r.root, names.get(r.lane)))}
         />
-        <LineMenu
+        <PublishButton
           line={line}
           onIntent={onIntent}
           project={project}
@@ -350,12 +350,12 @@ function ActivityMenu({
 }
 
 /**
- * The project, the integration line (ADR-0060, ADR-0061): setting it up and
- * publishing it, on every host (ADR-0076); then, on this machine's host,
- * where your files stand against it, and moving work between them. Absent on
- * a host with no lanes of their own.
+ * The publish button (ADR-0090): set up before the line exists, on the host's
+ * own machine; then publish, only while there is something to publish. A
+ * refusal or failure of your last command here is a toast until you dismiss
+ * it or send another.
  */
-function LineMenu({
+function PublishButton({
   line,
   project,
   session,
@@ -366,48 +366,72 @@ function LineMenu({
   session: Pick<SessionClient, "line" | "acting">
   onIntent: (intent: Intent) => void
 }) {
-  const view = lineView(line)
-  const words = lineWords(view)
-  const resolve = resolveIntent(project, view.facts)
   // Your last command here, kept by the session until your next.
   const acting = useSyncExternalStore(
     session.acting.subscribe,
     session.acting.current,
   ).line
-  const said = lineNote(acting)
+  const [dismissed, setDismissed] = useState<LineActing | null>(null)
+  const view = publishView(line)
+  const said = acting === dismissed ? null : publishToast(acting)
+  const resolve = said?.resolve === true ? resolveIntent(project, line) : null
+  const toast =
+    said === null ? null : (
+      <Toast
+        action={
+          resolve === null
+            ? null
+            : {
+                label: "resolve with the agent",
+                onChoose: () => onIntent(resolve),
+              }
+        }
+        onDismiss={() => setDismissed(acting)}
+        text={said.text}
+      />
+    )
+  if (view.kind === "absent" || view.kind === "hidden") return toast
+  const words = publishWords(view, acting)
   const waiting = acting?.kind === "sent"
-  const items = (section: LineSection): MenuItem[] =>
-    section.actions.flatMap(({ action, label, title }): MenuItem[] => {
-      const item = (onChoose: () => void): MenuItem[] => [
-        {
-          key: action,
-          className: "line-action",
-          data: { action },
-          label,
-          ...(title === undefined ? {} : { title }),
-          disabled: waiting,
-          onChoose,
-        },
-      ]
-      if (action !== "resolve") return item(() => void session.line(action))
-      return resolve === null ? [] : item(() => onIntent(resolve))
-    })
   return (
-    <Menu
-      className={`line line-${view.state}`}
-      gone={view.state === "absent"}
-      // What your last command here said leads the menu, above every section.
-      sections={words.sections.map((section, i) => ({
-        key: section.key,
-        heading: section.heading,
-        notes:
-          i === 0 && said !== null ? [said, ...section.notes] : section.notes,
-        items: items(section),
-      }))}
-      label={words.label}
-      title={words.label}
-      trigger={<span className="line-mark">{words.trigger}</span>}
-      triggerClassName="line-trigger"
-    />
+    <>
+      {words.kind === "publish" ? (
+        <button
+          className="publish-button"
+          data-refused={words.refused || undefined}
+          disabled={waiting}
+          onClick={() => void session.line("publish")}
+          title={words.title}
+          type="button"
+        >
+          {words.label}
+        </button>
+      ) : (
+        <Menu
+          className="publish-setup"
+          label={words.title}
+          sections={[
+            {
+              key: "setup",
+              heading: words.heading,
+              notes: words.notes,
+              items: [
+                {
+                  key: "setup",
+                  className: "setup-action",
+                  label: "set up",
+                  disabled: waiting,
+                  onChoose: () => void session.line("setup"),
+                },
+              ],
+            },
+          ]}
+          title={words.title}
+          trigger={words.label}
+          triggerClassName="publish-button"
+        />
+      )}
+      {toast}
+    </>
   )
 }

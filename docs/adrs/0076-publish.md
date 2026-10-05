@@ -5,6 +5,9 @@
 host moves: the publish bookmark, forward only, never your `@`), ADR-0061
 (the project menu's two sections, and its words) and ADR-0069 (the
 project's mark counts unpublished commits, not your files being behind).
+Amended by ADR-0090: the menu goes, for one publish button; on the host's
+own machine a publish also catches your files up and integrates your
+commits; a refusal is a toast.
 
 **Context.** The header's **◆ project** menu (ADR-0061) had grown confusing
 (Duane, 2026-10-04):

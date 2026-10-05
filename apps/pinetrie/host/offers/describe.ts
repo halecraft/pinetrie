@@ -80,8 +80,8 @@ export function describe(
           },
           settle: text =>
             owner.command(async ops => {
-              // The offer followed its lane, or you edited it, while the
-              // model wrote: the message describes what it held then.
+              // The offer was rebuilt from its lane, or you edited it, while
+              // the model wrote: the message describes what it held then.
               const planned = planDescribeSettle({
                 gathered: await gatherOffer(ops, docs.input(lane)),
                 asked: gathered.commit,

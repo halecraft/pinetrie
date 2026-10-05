@@ -33,5 +33,12 @@ export {
   type RepoReads,
   startRepoOwner,
 } from "./owner.ts"
-export { laneRefSteps, lineProposal, lineSteps } from "./plan.ts"
+export {
+  laneRefSteps,
+  lineProposal,
+  planCatchUpUndo,
+  planLineSetup,
+  planPublishCatchUp,
+  planPublishMove,
+} from "./plan.ts"
 export type { RepoStep } from "./step.ts"

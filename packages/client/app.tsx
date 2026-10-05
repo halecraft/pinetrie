@@ -2,7 +2,7 @@
 //
 // The screen is your list down the left, the root you are on beside it, a
 // rail beside a strip of columns, and the footer along the bottom: you, the
-// board's strip, what needs you and the project (docs/06-interface.md,
+// board's strip, what needs you and publish (docs/06-interface.md,
 // ADR-0085). The rail draws the root's tree; each column is one path, read on
 // its own scroll; the board opens over them. What is drawn is a read of the
 // document, through `@pinetrie/reads` and `projection.ts`. Your list is your

@@ -100,7 +100,6 @@ async function settles(dir: string, lane: LaneName, name: ThreadName) {
       basics: b,
       agent: () => agent.port,
       running: () => false,
-      bookmarkMoved: () => {},
       baseChanged: () => {},
     })
     const refresh = createRefresh(deps)

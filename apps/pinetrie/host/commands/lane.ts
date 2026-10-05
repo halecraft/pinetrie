@@ -274,8 +274,8 @@ export function offerRefusal(code: ErrCode): string {
 }
 
 /**
- * A `line` command: set up the integration line, land your work (ADR-0060),
- * update your files from it (ADR-0061), or publish it (ADR-0076).
+ * A `line` command: set up the integration line (ADR-0060), or publish it
+ * (ADR-0076, ADR-0090).
  */
 export async function actOnLine(
   deps: Pick<LaneDeps, "work">,

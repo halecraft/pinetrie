@@ -6,6 +6,7 @@ import {
   entryId,
   indexTree,
   type LaneBase,
+  LINE_ACTIONS,
   type LineRecord,
   laneNameForThread,
   type RevisionRecord,
@@ -15,12 +16,17 @@ import { describe, expect, test } from "vitest"
 import {
   lineActionState,
   lineRefusal,
+  movedOnLine,
+  nothingToPublish,
   parentNow,
   planBegin,
   planLineAction,
   planLineRecord,
   planParentUpdate,
+  planPublishFinish,
   planUpdateFrom,
+  publishUndone,
+  publishWork,
 } from "./index.ts"
 
 describe("the line (ADR-0060)", () => {
@@ -32,8 +38,8 @@ describe("the line (ADR-0060)", () => {
     published: { commit: null, behind: 0, ahead: 0 },
     yours: {
       behind: 0,
-      ahead: null,
-      follow: null,
+      ahead: 0,
+      catchUp: null,
       conflicts: { commits: 0, files: [] },
     },
   } as const
@@ -68,12 +74,8 @@ describe("the line (ADR-0060)", () => {
       log: "logged",
     })
   })
-  test("a host that admits others refuses both; a set line refuses setup", () => {
+  test("a host that admits others refuses setup; a set line refuses it", () => {
     expect(planLineAction("setup", record({ commands: false }))).toEqual({
-      kind: "refused",
-      code: ERR.NOT_YOURS,
-    })
-    expect(planLineAction("land", record({ commands: false }))).toEqual({
       kind: "refused",
       code: ERR.NOT_YOURS,
     })
@@ -81,106 +83,233 @@ describe("the line (ADR-0060)", () => {
       planLineAction("setup", record({ commit: commitId("c1") })).kind,
     ).toBe("refused")
   })
-  test("land: only with a line, and your work above it", () => {
-    expect(planLineAction("land", record())).toEqual({
-      kind: "refused",
-      code: ERR.NO_LINE,
-    })
-    const set = (ahead: number | null) =>
-      record({
-        commit: commitId("c1"),
-        yours: {
-          behind: 0,
-          ahead,
-          follow: null,
-          conflicts: { commits: 0, files: [] },
-        },
-      })
-    expect(planLineAction("land", set(null)).kind).toBe("refused")
-    expect(planLineAction("land", set(0)).kind).toBe("refused")
-    expect(planLineAction("land", set(2))).toEqual({
-      kind: "land",
-      onto: "pinetrie-onto",
-    })
-  })
-  test("follow: only with a line and a preview, the one you were shown; a conflict in it refuses nothing", () => {
-    const preview = { changes: 1, conflicts: ["a.txt"], heads: 0 }
-    const set = (follow: typeof preview | null) =>
-      record({
-        commit: commitId("c1"),
-        yours: {
-          behind: 2,
-          ahead: 1,
-          follow,
-          conflicts: { commits: 0, files: [] },
-        },
-      })
-    expect(planLineAction("follow", record())).toEqual({
-      kind: "refused",
-      code: ERR.NO_LINE,
-    })
-    expect(planLineAction("follow", set(null))).toEqual({
-      kind: "refused",
-      code: ERR.REFUSED,
-    })
-    expect(planLineAction("follow", set(preview))).toEqual({
-      kind: "follow",
-      onto: "pinetrie-onto",
-    })
-    expect(
-      planLineAction("follow", { ...set(preview), commands: false }),
-    ).toEqual({ kind: "refused", code: ERR.NOT_YOURS })
+  test("land and follow are no line command (ADR-0090)", () => {
+    expect(LINE_ACTIONS).toEqual(["setup", "publish"])
   })
 
-  describe("publish (ADR-0076)", () => {
-    const at = (published: LineRecord["published"], commands = true) =>
-      record({ commit: commitId("c1"), published, commands })
+  describe("publish (ADR-0076, ADR-0090)", () => {
     const main = commitId("m1")
-    test("moves the publish bookmark forward to the line, as the host, on any host", () => {
-      for (const commands of [true, false])
-        expect(
-          planLineAction(
-            "publish",
-            at({ commit: main, behind: 2, ahead: 0 }, commands),
-          ),
-        ).toEqual({ kind: "publish", onto: "pinetrie-onto", publish: "main" })
+    const yours = (
+      over: Partial<LineRecord["yours"]> = {},
+    ): LineRecord["yours"] => ({
+      behind: 0,
+      ahead: 0,
+      catchUp: null,
+      conflicts: { commits: 0, files: [] },
+      ...over,
     })
-    test("refused with no line, no bookmark, nothing unpublished, or commits the line lacks", () => {
-      const code = (r: LineRecord) => {
-        const s = lineActionState("publish", r)
-        return s.kind === "refused" ? s.code : null
-      }
+    const at = (
+      published: LineRecord["published"],
+      over: Partial<LineRecord> = {},
+    ) => record({ commit: commitId("c1"), published, ...over })
+    const unpublished = { commit: main, behind: 2, ahead: 0 }
+    const published = { commit: main, behind: 0, ahead: 0 }
+    const preview = { changes: 4, conflicts: [], heads: 1 }
+    const code = (r: LineRecord) => {
+      const s = lineActionState("publish", r)
+      return s.kind === "refused" ? s.code : null
+    }
+    test("on a host that admits others it moves the publish bookmark alone, whatever your files", () => {
+      const r = at(unpublished, {
+        commands: false,
+        yours: yours({
+          behind: 2,
+          ahead: 3,
+          conflicts: { commits: 1, files: ["a"] },
+        }),
+      })
+      expect(planLineAction("publish", r)).toEqual({
+        kind: "publish",
+        onto: "pinetrie-onto",
+        publish: "main",
+        catchUp: false,
+        integrate: false,
+      })
+      expect(publishWork(r)).toEqual({ accepted: 2, yours: 0, catchUp: false })
+    })
+    test("on the host's machine it catches your files up and integrates your commits", () => {
+      const r = at(unpublished, {
+        yours: yours({ behind: 2, ahead: 1, catchUp: preview }),
+      })
+      expect(planLineAction("publish", r)).toEqual({
+        kind: "publish",
+        onto: "pinetrie-onto",
+        publish: "main",
+        catchUp: true,
+        integrate: true,
+      })
+      expect(publishWork(r)).toEqual({ accepted: 2, yours: 1, catchUp: true })
+    })
+    test("with nothing unpublished, your commits or files behind are still work", () => {
+      expect(code(at(published, { yours: yours({ ahead: 1 }) }))).toBeNull()
+      expect(
+        code(at(published, { yours: yours({ behind: 1, catchUp: preview }) })),
+      ).toBeNull()
+    })
+    test("refused, in order: no line, no bookmark, main ahead, your conflicts, no shared commit, nothing to do", () => {
       expect(code(record())).toBe(ERR.NO_LINE)
       expect(code(at({ commit: null, behind: 0, ahead: 0 }))).toBe(
         ERR.NO_PUBLISH,
       )
-      expect(code(at({ commit: main, behind: 0, ahead: 0 }))).toBe(ERR.REFUSED)
-      expect(code(at({ commit: main, behind: 3, ahead: 2 }))).toBe(
-        ERR.NOT_FAST_FORWARD,
+      expect(
+        code(
+          at(
+            { commit: main, behind: 3, ahead: 2 },
+            { yours: yours({ conflicts: { commits: 1, files: [] } }) },
+          ),
+        ),
+      ).toBe(ERR.NOT_FAST_FORWARD)
+      for (const over of [
+        { conflicts: { commits: 1, files: [] } },
+        { conflicts: { commits: 0, files: ["a.txt"] } },
+        { behind: 1, catchUp: { ...preview, conflicts: ["a.txt"] } },
+      ])
+        expect(code(at(unpublished, { yours: yours(over) }))).toBe(
+          ERR.YOURS_CONFLICT,
+        )
+      expect(code(at(unpublished, { yours: yours({ behind: 1 }) }))).toBe(
+        ERR.REFUSED,
       )
+      expect(code(at(published))).toBe(ERR.REFUSED)
     })
-    test("the owner's three stay the host's alone", () => {
-      for (const action of ["setup", "land", "follow"] as const)
-        expect(lineActionState(action, record({ commands: false }))).toEqual({
-          kind: "refused",
-          code: ERR.NOT_YOURS,
-        })
+    test("nothingToPublish is the rule's own nothing to do", () => {
+      for (const r of [
+        at(published),
+        at(unpublished),
+        at(published, { yours: yours({ ahead: 1 }) }),
+        at(published, { commands: false, yours: yours({ ahead: 1 }) }),
+      ])
+        expect(nothingToPublish(publishWork(r))).toBe(code(r) === ERR.REFUSED)
     })
-    test("lineRefusal words each refusal once, naming the bookmark and counting", () => {
+    test("lineRefusal words each refusal once, naming the bookmark, the counts and the files", () => {
       const r = at({ commit: main, behind: 3, ahead: 2 })
       expect(lineRefusal("publish", ERR.NOT_FAST_FORWARD, r)).toBe(
-        "main has 2 commits the project doesn't: bring them into the project first",
+        "main has 2 commits accepted work doesn't: bring them into accepted work in jj first",
       )
       expect(lineRefusal("publish", ERR.NO_PUBLISH, r)).toBe(
         "this repo has no main bookmark to publish to",
       )
-      expect(lineRefusal("publish", ERR.REFUSED, r)).toBe(
-        "everything in the project is on main already",
-      )
-      expect(lineRefusal("land", ERR.NOT_YOURS, r)).toContain(
+      expect(lineRefusal("publish", ERR.REFUSED, r)).toBe("nothing to publish")
+      expect(
+        lineRefusal(
+          "publish",
+          ERR.YOURS_CONFLICT,
+          at(unpublished, {
+            yours: yours({
+              conflicts: { commits: 1, files: ["a", "b", "c", "d", "e"] },
+            }),
+          }),
+        ),
+      ).toBe("your files have conflicts in a, b, c and 2 more")
+      expect(
+        lineRefusal(
+          "publish",
+          ERR.YOURS_CONFLICT,
+          at(unpublished, {
+            yours: yours({
+              behind: 1,
+              catchUp: { ...preview, conflicts: ["x.ts"] },
+            }),
+          }),
+        ),
+      ).toBe("catching your files up would conflict in x.ts")
+      expect(lineRefusal("setup", ERR.NOT_YOURS, r)).toContain(
         "use jj on its machine",
       )
     })
+
+    describe("planPublishFinish: the second round, from the line read after the catch-up", () => {
+      const decision = {
+        kind: "publish",
+        onto: "pinetrie-onto",
+        publish: "main",
+        catchUp: true,
+        integrate: false,
+      } as const
+      const after = (over: Partial<LineRecord["yours"]> = {}, ahead = 0) =>
+        at({ commit: main, behind: 2, ahead }, { yours: yours(over) })
+      test.each([
+        [
+          "without a catch-up: the move as decided",
+          {
+            decision: { ...decision, catchUp: false, integrate: true },
+            after: after({ conflicts: { commits: 1, files: [] } }),
+            op: null,
+          },
+          {
+            kind: "move",
+            onto: "pinetrie-onto",
+            publish: "main",
+            integrate: true,
+          },
+        ],
+        [
+          "your commits conflicted by the catch-up: reverted",
+          {
+            decision,
+            after: after({ conflicts: { commits: 1, files: [] } }),
+            op: "op1",
+          },
+          { kind: "undo", op: "op1", code: ERR.YOURS_CONFLICT },
+        ],
+        [
+          "main moved meanwhile: reverted",
+          { decision, after: after({}, 1), op: "op1" },
+          { kind: "undo", op: "op1", code: ERR.NOT_FAST_FORWARD },
+        ],
+        [
+          "your commits, read after the catch-up, move with the line",
+          { decision, after: after({ ahead: 2 }), op: "op1" },
+          {
+            kind: "move",
+            onto: "pinetrie-onto",
+            publish: "main",
+            integrate: true,
+          },
+        ],
+        [
+          "none: the publish bookmark alone",
+          {
+            decision: { ...decision, integrate: true },
+            after: after(),
+            op: "op1",
+          },
+          {
+            kind: "move",
+            onto: "pinetrie-onto",
+            publish: "main",
+            integrate: false,
+          },
+        ],
+      ] as const)("%s", (_, input, finish) => {
+        expect(planPublishFinish(input)).toEqual(finish)
+      })
+    })
+  })
+
+  test("publishUndone: a reverted catch-up names the conflicts it would have left; main moving is worded as a refusal", () => {
+    const after = record({
+      commit: commitId("c1"),
+      published: { commit: commitId("m1"), behind: 1, ahead: 1 },
+      yours: {
+        behind: 0,
+        ahead: 2,
+        catchUp: null,
+        conflicts: { commits: 2, files: [] },
+      },
+    })
+    expect(publishUndone(ERR.YOURS_CONFLICT, after)).toBe(
+      "catching your files up would leave 2 commits of yours with conflicts",
+    )
+    expect(publishUndone(ERR.NOT_FAST_FORWARD, after)).toBe(
+      lineRefusal("publish", ERR.NOT_FAST_FORWARD, after),
+    )
+  })
+  test("movedOnLine names the base as catchUpName does", () => {
+    expect(movedOnLine({ kind: "line" })).toBe("accepted work has moved on")
+    expect(movedOnLine({ kind: "wip", bookmark: "wip/search" })).toBe(
+      "wip/search has moved on",
+    )
   })
 })
 

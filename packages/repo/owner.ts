@@ -234,12 +234,14 @@ export function startRepoOwner(input: {
     onMoved(listener) {
       listeners.add(listener)
       // A listener that joins after the first observation hears it as one:
-      // everything moved, for it.
+      // everything moved, for it, but the line's bookmark, as on a first
+      // observation (`planObserve`).
       if (seen !== null)
         queueMicrotask(() => {
           if (listeners.has(listener))
             listener({
               all: true,
+              onto: false,
               line: true,
               yours: true,
               lanes: new Set(),

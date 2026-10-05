@@ -31,6 +31,9 @@ while the thread runs; the agent catches up with its base through a tool;
 Amended by ADR-0083: a take is an *offer integration*, and the commit it
 leaves on the line an *integrated-offer commit*; the record's `taken` is
 `integratedAs`.
+Amended by ADR-0090: "land my work" goes; a publish integrates your
+commits below `@` and catches your files up first, on the host's own
+machine; the line is "accepted work" in every word the page shows.
 
 **Context.**
 

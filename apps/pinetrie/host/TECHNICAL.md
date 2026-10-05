@@ -774,16 +774,27 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 - **The `line` command** (`work/line.ts`, created by `startLaneWork` beside
   the offers, which rewrite its record when the owner observes the line or
   your `@` move): decided by `@pinetrie/rules` (`planLineAction`), its steps
-  `@pinetrie/repo`'s (`lineSteps`). `setup` creates the line's
-  bookmark at your `@-` and writes `immutable_heads()` and `revsets.log`
-  to the repo's config, the text the header's menu showed; `land` moves the line to your
-  `@-`, as you; `follow` rebases your work onto the line, as you
-  (`planFollow`, ADR-0061), only while the record it plans from has a
-  preview (`yours.follow`): the one you were shown. The record's preview
-  runs `git merge-tree` on your repo (the step's `git`). Only a host that admits no one else takes it
-  (`lineCommands`: no invite key), since all three act on the repo as its owner;
-  Kyneta does not say which connection a seat came over. Others are refused
-  `not_yours`.
+  `@pinetrie/repo`'s. `setup` creates the line's bookmark at your `@-` and
+  writes `immutable_heads()` and `revsets.log` to the repo's config, the
+  text the publish button's setup showed (`planLineSetup`). A publish
+  (ADR-0090) is two rounds of gather, plan and execute in one command: the
+  catch-up (`planPublishCatchUp`, as you, only on the host's own machine
+  and only when your files are behind), then the record read again, with
+  the catch-up's operation from `SharedFacts.op`, decided by
+  `planPublishFinish` into the move (`planPublishMove`) or the catch-up's
+  undo (`planCatchUpUndo`) and a worded refusal. A move jj refuses after a
+  catch-up runs the undo and rethrows: the one branch that is not a plan's
+  value. The record's preview runs `git merge-tree` on your repo (the
+  step's `git`). Setup, and a publish's moves of your files and commits,
+  act on the repo as its owner: only a host that admits no one else does
+  them (`lineCommands`: no invite key), since Kyneta does not say which
+  connection a seat came over. Elsewhere setup is refused `not_yours`, and
+  a publish moves the publish bookmark alone.
+- **The base snapshot follows the line** (`work/index.ts`): the owner's
+  `Moved.onto` refreshes it (`refreshBaseSoon`), so setup, an accept, an
+  integrating publish and a move made in jj outside pine·trie all reach it
+  by one path. An integration into a WIP does not, since the snapshot is
+  the line's.
 - **Shutdown closes the owner** (`LaneWork.owner`, the `close` step): it
   refuses every step from then on and stops its watch; `quiet` waits for
   what it holds (`LaneWork.quiet`).

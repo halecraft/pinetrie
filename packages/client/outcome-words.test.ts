@@ -3,9 +3,17 @@ import { outcomeWords } from "./outcome-words.ts"
 
 describe("outcomeWords: one wording for every command the page waits on", () => {
   test.each([
-    ["refused", "not done: no room"],
-    ["failed", "it failed, and may be part done: no room"],
-  ] as const)("a command %s is worded as such", (kind, words) => {
-    expect(outcomeWords({ kind, message: "no room" })).toBe(words)
+    [
+      "refused",
+      { kind: "refused", code: "refused", message: "no room" },
+      "not done: no room",
+    ],
+    [
+      "failed",
+      { kind: "failed", message: "no room" },
+      "it failed, and may be part done: no room",
+    ],
+  ] as const)("a command %s is worded as such", (_, said, words) => {
+    expect(outcomeWords(said)).toBe(words)
   })
 })

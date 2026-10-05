@@ -1,0 +1,97 @@
+import { commitId, ERR, type LineFacts } from "@pinetrie/core"
+import { DEFAULT_LINE } from "@pinetrie/lanes"
+import type { RepoOps, RepoOwner, RepoStep } from "@pinetrie/repo"
+import { describe, expect, test } from "vitest"
+import { applyWrites, basics, record } from "../fakes.ts"
+import { createLine } from "./line.ts"
+
+const facts = (over: Partial<LineFacts["yours"]> = {}): LineFacts => ({
+  commit: commitId("c1"),
+  heads: null,
+  log: null,
+  wips: [],
+  published: { commit: commitId("m0"), behind: 1, ahead: 0 },
+  yours: {
+    behind: 1,
+    ahead: 0,
+    catchUp: { changes: 1, conflicts: [], heads: 0 },
+    conflicts: { commits: 0, files: [] },
+    ...over,
+  },
+})
+
+/**
+ * A publish on a fake owner: `before` is the line until the catch-up runs,
+ * `after` from then on; the move's step throws when `moveFails`.
+ */
+function rig(after: LineFacts, moveFails = false) {
+  const b = basics()
+  const ran: RepoStep[][] = []
+  let now = facts()
+  let op = "op0"
+  const ops = record<RepoOps>({
+    shared: async () => ({
+      op,
+      line: now,
+      integratedOfferCommits: [],
+      untraced: [],
+      editing: new Set(),
+    }),
+    execute: async steps => {
+      ran.push([...steps])
+      const [first] = steps
+      if (first?.tool === "jj" && first.args[0] === "rebase") {
+        now = after
+        op = "op-catch-up"
+      }
+      if (moveFails && first?.tool === "jj" && first.args[0] === "bookmark")
+        throw new Error("jj refused the move")
+    },
+  }).port
+  const owner = record<Pick<RepoOwner, "later" | "command">>({
+    command: async step => step(ops),
+  }).port
+  const line = createLine({
+    owner,
+    basics: b,
+    line: DEFAULT_LINE,
+    lineCommands: true,
+    writeValues: async w => applyWrites(b, w),
+  })
+  const argv = () => ran.map(steps => steps.map(s => s.args.join(" ")))
+  return { line, argv }
+}
+
+describe("a publish on the host's own machine, in two rounds (ADR-0090)", () => {
+  test("the catch-up, then the move, from the line read after it", async () => {
+    const { line, argv } = rig(facts({ behind: 0, ahead: 0, catchUp: null }))
+    expect(await line.act("publish")).toBeNull()
+    expect(argv()).toEqual([
+      ['rebase -b @ -d "pinetrie-onto"'],
+      ['bookmark move main --to "pinetrie-onto"'],
+    ])
+  })
+  test("your commits conflicted by the catch-up: it is reverted, and the refusal said", async () => {
+    const { line, argv } = rig(
+      facts({ behind: 0, ahead: 1, conflicts: { commits: 1, files: [] } }),
+    )
+    const answer = await line.act("publish")
+    expect(answer?.code).toBe(ERR.YOURS_CONFLICT)
+    expect(argv()).toEqual([
+      ['rebase -b @ -d "pinetrie-onto"'],
+      ["op revert op-catch-up"],
+    ])
+  })
+  test("a move jj refuses after the catch-up reverts it, then fails", async () => {
+    const { line, argv } = rig(
+      facts({ behind: 0, ahead: 0, catchUp: null }),
+      true,
+    )
+    await expect(line.act("publish")).rejects.toThrow("jj refused the move")
+    expect(argv()).toEqual([
+      ['rebase -b @ -d "pinetrie-onto"'],
+      ['bookmark move main --to "pinetrie-onto"'],
+      ["op revert op-catch-up"],
+    ])
+  })
+})

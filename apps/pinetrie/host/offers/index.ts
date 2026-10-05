@@ -112,8 +112,6 @@ export function startOffers(input: {
   readonly agent: () => Agent
   /** Whether a lane is running now: an offer is described once it stops. */
   readonly running: (lane: LaneName) => boolean
-  /** After an offer integration: the base snapshot follows the bookmark it moved. */
-  readonly bookmarkMoved: () => void
   /** A lane's base record changed: a running thread is told its news (`base-news.ts`). */
   readonly baseChanged: (lane: LaneName) => void
   /** The line's record and commands (`host/work/line.ts`): its record is rewritten when the owner observes the line or your `@` move. */

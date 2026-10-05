@@ -195,8 +195,8 @@ const LINE = {
   wips: [],
   yours: {
     behind: 0,
-    ahead: null,
-    follow: null,
+    ahead: 0,
+    catchUp: null,
     conflicts: { commits: 0, files: [] },
   },
   commands: true,
@@ -538,7 +538,7 @@ describe("columnView: the work strip", () => {
     if (shows.strip.kind !== "offer") throw new Error("no offer strip")
     expect(shows.strip.words.menu.find(b => b.button === "update")).toEqual({
       button: "update",
-      label: "catch up with the project",
+      label: "catch up with accepted work",
       title: "merges pinetrie-onto into this thread's copy",
     })
     expect(shows.behind).toBeNull()
@@ -560,12 +560,17 @@ describe("columnView: the work strip", () => {
     } as const
     expect(columnView(own({ acting: sent })).strip).toMatchObject({
       waiting: true,
-      words: { note: "adding to the project…" },
+      words: { note: "accepting…" },
     })
     expect(
       columnView(
         own({
-          acting: { kind: "refused", action: "integrate", message: "no" },
+          acting: {
+            kind: "refused",
+            code: "refused",
+            action: "integrate",
+            message: "no",
+          },
         }),
       ).strip,
     ).toMatchObject({ waiting: false, words: { note: "not done: no" } })
@@ -732,12 +737,12 @@ describe("offerWords", () => {
     state: "ok",
   } as const
   test.each([
-    ["nothing", undefined, "idle", "nothing to add yet"],
+    ["nothing", undefined, "idle", "nothing to accept yet"],
     [
       "held: the project already has its work",
       { ...offer, files: [] },
       "idle",
-      "nothing to add: the project already has this thread's work",
+      "nothing to accept: accepted work already has this thread's work",
     ],
     ["running, nothing yet", undefined, "turn", "no files changed yet"],
     ["running", offer, "turn", "2 files so far"],
@@ -745,7 +750,7 @@ describe("offerWords", () => {
       "resolving",
       offer,
       "resolution",
-      "resolving the project's new work into this thread",
+      "resolving what's new in accepted work into this thread",
     ],
     ["ready", offer, "idle", "2 files ready"],
     [
@@ -765,20 +770,20 @@ describe("offerWords", () => {
       "conflicts",
       { ...offer, conflicts: ["a.txt"] },
       "idle",
-      "conflicts with the project in 1 file",
+      "conflicts with accepted work in 1 file",
     ],
     ["edited", { ...offer, edited: true }, "idle", "you edited this offer"],
     [
       "edited, and conflicting",
       { ...offer, edited: true, conflicts: ["a.txt", "b.txt"] },
       "idle",
-      "you edited this offer \u00b7 conflicts with the project in 2 files",
+      "you edited this offer \u00b7 conflicts with accepted work in 2 files",
     ],
     [
       "integrated",
       { ...offer, integratedAs: "zz12345678ab" },
       "idle",
-      "added as zz123456",
+      "accepted as zz123456",
     ],
   ] as const)("%s", (_, o, activity, line) => {
     const w = words(o, activity)
@@ -790,22 +795,22 @@ describe("offerWords", () => {
       o: OfferRecord,
       base = LINE_BASE as Parameters<typeof words>[2],
     ) => words(o, "idle", base).buttons.map(b => b.label)
-    expect(labels(offer)).toEqual(["add to the project", "split into a stack"])
+    expect(labels(offer)).toEqual(["accept", "split into a stack"])
     expect(labels({ ...offer, size: 3 })).toEqual([
-      "add stack to the project",
+      "accept stack",
       "squash to one",
     ])
     expect(labels({ ...offer, size: 3, stale: true })).toEqual([
       "split again",
-      "add stack and the rest to the project",
+      "accept stack and the rest",
     ])
     expect(labels({ ...offer, edited: true })).toEqual([
-      "add to the project",
+      "accept",
       "refresh (discards your edits)",
     ])
     expect(words(offer).menu.map(b => b.label)).toEqual([
       "rewrite description",
-      "catch up with the project",
+      "catch up with accepted work",
     ])
   })
   const MOVE = {
@@ -831,17 +836,17 @@ describe("offerWords", () => {
   const brings = { catchUp: { kind: "brings", move: MOVE, files: 3 } } as const
   test("behind its base, the strip says so and offers catching up beside the offer", () => {
     const behind = words(offer, "idle", LINE_BASE, brings)
-    expect(behind.line).toBe("2 files ready · the project has new work")
+    expect(behind.line).toBe("2 files ready · accepted work has moved on")
     expect(behind.buttons.find(b => b.button === "update")).toEqual({
       button: "update",
-      label: "catch up with the project",
+      label: "catch up with accepted work",
       title: "merges pinetrie-onto into this thread's copy · changes 3 files",
     })
     expect(words(undefined, "idle", LINE_BASE, brings).line).toBe(
-      "the project has new work since this thread started",
+      "accepted work has moved on since this thread started",
     )
     expect(words(undefined, "idle", WIP_BASE, brings).line).toBe(
-      "wip/search has new work since this thread started",
+      "wip/search has moved on since this thread started",
     )
   })
   test("catching up that would change nothing is disabled, and says why; one not yet read is not (S97)", () => {
@@ -851,20 +856,20 @@ describe("offerWords", () => {
       )
     expect(update({ kind: "current" })).toEqual({
       button: "update",
-      label: "catch up with the project",
-      title: "already caught up with the project",
+      label: "catch up with accepted work",
+      title: "already caught up with accepted work",
       disabled: true,
     })
     expect(update({ kind: "nothing-new" })).toEqual({
       button: "update",
-      label: "catch up with the project",
+      label: "catch up with accepted work",
       title:
-        "the project's new work is this thread's own: catching up changes no file",
+        "what's new in accepted work is this thread's own: catching up changes no file",
       disabled: true,
     })
     expect(update({ kind: "unknown" })).toEqual({
       button: "update",
-      label: "catch up with the project",
+      label: "catch up with accepted work",
       title: "merges pinetrie-onto into this thread's copy",
     })
     // Nothing new is no "new work" either.
@@ -877,31 +882,31 @@ describe("offerWords", () => {
   test("an untraced thread says why nothing is offered, and offers catching up (S97)", () => {
     const w = words(undefined, "idle", LINE_BASE, { untraced: true })
     expect(w.line).toBe(
-      "an earlier add of this thread can't be traced: catch up with the project to offer what's new",
+      "an earlier accept of this thread can't be traced: catch up with accepted work to offer what's new",
     )
     expect(w.buttons.map(b => [b.label, b.disabled])).toEqual([
-      ["catch up with the project", undefined],
+      ["catch up with accepted work", undefined],
     ])
   })
   test("a queued catch-up is the offer's activity: the strip says it is catching up", () => {
     expect(
       words(offer, "idle", LINE_BASE, { queued: ["bring-up-to-date"] }).line,
-    ).toBe("catching up with the project…")
+    ).toBe("catching up with accepted work…")
   })
   test("only a clean offer lands on the line: a conflicted one on the line is caught up and resolved, on a WIP added anyway to it", () => {
     const conflicted = { ...offer, conflicts: ["a.txt"] }
     expect(words(conflicted).buttons.map(b => b.label)).toEqual([
-      "catch up with the project and resolve",
+      "catch up with accepted work and resolve",
     ])
     expect(
       words(conflicted, "idle", WIP_BASE).buttons.map(b => b.label),
     ).toEqual([
       "catch up with wip/search and resolve",
-      "add anyway to wip/search",
+      "accept anyway into wip/search",
     ])
     expect(
       words(conflicted, "idle", WIP_BASE).menu.map(b => b.label),
-    ).not.toContain("add to the project, with your 2 commits beneath it")
+    ).not.toContain("accept, with your 2 commits beneath it")
   })
   test("a conflict that came with the copy says so, and names the thread that resolved it (ADR-0072)", () => {
     const parent: ParentNow = {
@@ -931,7 +936,7 @@ describe("offerWords", () => {
       "began from a copy with an unresolved conflict in 1 file",
     )
     expect(unresolved.buttons.map(b => b.label)).toEqual([
-      "catch up with the project and resolve",
+      "catch up with accepted work and resolve",
     ])
     const running = words(offer, "idle", LINE_BASE, {
       parent,
@@ -945,11 +950,11 @@ describe("offerWords", () => {
   })
   test("a WIP thread adds to its WIP, and offers the project with its commits", () => {
     const w = words(offer, "idle", WIP_BASE)
-    expect(w.buttons[0]?.label).toBe("add to wip/search")
+    expect(w.buttons[0]?.label).toBe("accept into wip/search")
     expect(w.menu.map(b => b.label)).toEqual([
       "rewrite description",
       "catch up with wip/search",
-      "add to the project, with your 2 commits beneath it",
+      "accept, with your 2 commits beneath it",
     ])
   })
   const sent = (
@@ -962,19 +967,19 @@ describe("offerWords", () => {
       "an integration into the line",
       LINE_BASE,
       sent("integrate"),
-      "adding to the project…",
+      "accepting…",
     ],
     [
       "an integration into its WIP",
       WIP_BASE,
       sent("integrate"),
-      "adding to wip/search…",
+      "accepting into wip/search…",
     ],
     [
       "an integration from a WIP into the line",
       WIP_BASE,
       sent("integrate", "pinetrie-onto"),
-      "adding to the project…",
+      "accepting…",
     ],
     ["a squash", LINE_BASE, sent("squash"), "squashing to one…"],
     ["a describe", LINE_BASE, sent("describe"), "rewriting the description…"],
@@ -982,7 +987,12 @@ describe("offerWords", () => {
     [
       "a refusal",
       LINE_BASE,
-      { kind: "refused", action: "integrate", message: "nothing to integrate" },
+      {
+        kind: "refused",
+        code: "refused",
+        action: "integrate",
+        message: "nothing to integrate",
+      },
       "not done: nothing to integrate",
     ],
     [
@@ -999,7 +1009,7 @@ describe("offerWords", () => {
     expect(w.buttons.map(b => b.label)).toEqual(["split into a stack"])
     expect(w.menu.map(b => b.label)).toEqual([
       "rewrite description",
-      "continue from the project",
+      "continue from accepted work",
     ])
   })
 })
@@ -1009,7 +1019,7 @@ describe("behindMark: the header's mark for a base that moved on", () => {
     expect(behindMark(BASE, LINE)).toEqual({
       mark: "↓",
       title:
-        "the project has new work since this thread started, in 2 files · pinetrie-onto: aaaaaaaa → bbbbbbbb",
+        "accepted work has moved on since this thread started, in 2 files · pinetrie-onto: aaaaaaaa → bbbbbbbb",
     })
   })
   test("a thread's details say it in full (ADR-0073)", () => {

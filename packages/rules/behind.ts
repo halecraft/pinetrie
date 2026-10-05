@@ -21,7 +21,7 @@ import {
 } from "@pinetrie/core"
 import { type Static, Type } from "typebox"
 import { CommitSchema, decodeWith } from "./decode.ts"
-import { catchUpName, catchUpOf } from "./line.ts"
+import { catchUpOf, movedOnLine } from "./line.ts"
 
 export const BEHIND_TYPE = "pinetrie.behind"
 
@@ -92,7 +92,7 @@ const plural = (n: number, one: string, many: string) =>
 
 /** The one line a column shows for a base's news. */
 export const behindLine = (v: BehindView): string =>
-  `↓ ${catchUpName(v.from)} has new work: ${plural(v.files.length, "file", "files")}${v.overlap.length === 0 ? "" : `, ${v.overlap.length} this thread changed too`}`
+  `↓ ${movedOnLine(v.from)}: ${plural(v.files.length, "file", "files")}${v.overlap.length === 0 ? "" : `, ${v.overlap.length} this thread changed too`}`
 
 /** Some names, then how many more. */
 const named = (files: readonly string[]): string => {
@@ -103,7 +103,6 @@ const named = (files: readonly string[]): string => {
 
 /** What the model reads: what changed, what it touches of this thread's work, and what to do. */
 export function behindContent(v: BehindView): string {
-  const where = catchUpName(v.from)
   const overlap =
     v.overlap.length === 0
       ? "None of them are files this thread changed.\n"
@@ -113,7 +112,7 @@ export function behindContent(v: BehindView): string {
       ? ""
       : `\nThis thread's offer conflicts with it in:\n${named(v.conflicts)}`
   return (
-    `${where} has new work since this thread's copy was made or last caught up. Catching up would change ${plural(v.files.length, "file", "files")}:\n${named(v.files)}\n` +
+    `${movedOnLine(v.from)} since this thread's copy was made or last caught up. Catching up would change ${plural(v.files.length, "file", "files")}:\n${named(v.files)}\n` +
     `${overlap}${conflicts}\n` +
     `To merge it into this copy, call \`${CATCH_UP_TOOL}\`, alone in its turn. Nothing is merged until you do.`
   )

@@ -298,7 +298,7 @@ test("attentionWords: each reason, as a value worded once", () => {
     "the run ended; pine·trie could not tell what it needs",
   )
   expect(attentionWords({ kind: "offer", source: null }, nameOf)).toBe(
-    "work ready to add to the project",
+    "work ready to accept",
   )
 })
 

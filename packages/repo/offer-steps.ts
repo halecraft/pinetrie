@@ -24,9 +24,9 @@ import {
 import {
   planAbandonOffer,
   planDescribe,
-  planFollowOffer,
   planOffer,
   planOfferIntegrationSteps,
+  planRebuildOffer,
   planRefreshOffer,
 } from "./plan.ts"
 import type { RepoStep } from "./step.ts"
@@ -144,14 +144,14 @@ export function offerEffects(
         },
         at,
       )
-    case "follow": {
+    case "rebuild": {
       // It holds more now: a work in progress again, its ledger the new tip
       // and start (ADR-0060).
       const { place, offer } = decision
       const [bottom] = changesOf(offer)
       if (bottom === undefined) return NOTHING
       return {
-        steps: planFollowOffer({
+        steps: planRebuildOffer({
           change: bottom,
           start: place.start,
           tip: place.tip,

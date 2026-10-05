@@ -51,7 +51,7 @@ describe("card words", () => {
         base: { kind: "line" },
         parent: null,
       }),
-      "catch up with the project",
+      "catch up with accepted work",
     ],
     [
       "commandWords, on a WIP",
@@ -67,12 +67,12 @@ describe("card words", () => {
         base: { kind: "line" },
         parent: null,
       }),
-      "continue from the project",
+      "continue from accepted work",
     ],
     [
       "commandNote",
       commandNote("bring-up-to-date", { base: { kind: "line" }, parent: null }),
-      "↓ catches up with the project first, then sends what you write",
+      "↓ catches up with accepted work first, then sends what you write",
     ],
     [
       "commandWords, the thread it branched from (ADR-0072)",

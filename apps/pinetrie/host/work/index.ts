@@ -105,8 +105,12 @@ export async function startLaneWork(input: {
           line: lineConfig,
           lineCommands: input.lineCommands,
           writeValues: writes => input.agent().writeValues(writes),
-          lineMoved: () => setup.refreshBaseSoon(),
         })
+  // The base snapshot follows the line, however it moved: setup, an accept,
+  // a publish, or jj outside pine·trie (ADR-0090).
+  owner?.onMoved(moved => {
+    if (moved.onto) setup.refreshBaseSoon()
+  })
   /** Each lane's offer in your repo (ADR-0038); none without lanes of their own. */
   const offers: Offers | null =
     owner === null || line === null
@@ -117,7 +121,6 @@ export async function startLaneWork(input: {
           basics,
           agent: input.agent,
           running: lane => readRunning(basics.live, lane),
-          bookmarkMoved: () => setup.refreshBaseSoon(),
           baseChanged: input.baseNews.baseChanged,
           lineWork: line,
         })

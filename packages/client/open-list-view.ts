@@ -255,9 +255,7 @@ export function offeredByRoot(
 
 /** What archiving a root does to its threads' offers, beside its item. */
 export const dropsWords = (drops: readonly ThreadName[]): string | null =>
-  drops.length === 0
-    ? null
-    : `work not added to the project goes: ${drops.join(", ")}`
+  drops.length === 0 ? null : `work not accepted goes: ${drops.join(", ")}`
 
 /** What a root's rename field sends, once planned (`planTitle`). */
 export const renameIntent = (root: EntryId, title: string | null): Intent => ({

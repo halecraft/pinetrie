@@ -319,16 +319,18 @@ export const ERR = {
   /** A new root's id that names a root the session already holds (ADR-0063). */
   ROOT_ID_IN_USE: "root_id_in_use",
   /**
-   * A command that acts on the repo as its owner (set up the line, land your
-   * work) from a host that admits others: it has an invite key (ADR-0060).
+   * A command that acts on the repo as its owner (set up the line) from a
+   * host that admits others: it has an invite key (ADR-0060).
    */
   NOT_YOURS: "not_yours",
-  /** An offer integrated, or work landed, before the line is set up (ADR-0060). */
+  /** An offer integrated, or a publish, before the line is set up (ADR-0060). */
   NO_LINE: "no_line",
   /** Publishing in a repo with no publish bookmark (ADR-0076). */
   NO_PUBLISH: "no_publish",
   /** Publishing while the publish bookmark has commits the line lacks (ADR-0076). */
   NOT_FAST_FORWARD: "not_fast_forward",
+  /** Publishing while your files have conflicts, or catching them up would make some (ADR-0090). */
+  YOURS_CONFLICT: "yours_conflict",
   /** An offer integration into a bookmark that is not one of the offer's destinations now. */
   BAD_DESTINATION: "bad_destination",
   /** A new thread's base that is not a WIP bookmark above the line. */
@@ -529,7 +531,7 @@ export type Intent =
       readonly to: string | null
       readonly seen: OfferSeen | null
     }
-  /** Set up the integration line, or land your work on it (ADR-0060). */
+  /** Set up the integration line, or publish it (ADR-0060, ADR-0090). */
   | { readonly kind: "line"; readonly action: LineAction }
   /**
    * Move cards, create one, or remove one (ADR-0059): one move, or a keep's
@@ -576,16 +578,11 @@ export const OFFER_ACTIONS: readonly OfferAction[] = [
 ]
 
 /**
- * What can be done with the integration line (ADR-0060): set it up at your
- * `@-`, writing your repo's immutable heads, or land your work on it.
+ * What can be done with the integration line: set it up at your `@-`,
+ * writing your repo's immutable heads (ADR-0060), or publish it (ADR-0090).
  */
-export type LineAction = "setup" | "land" | "follow" | "publish"
-export const LINE_ACTIONS: readonly LineAction[] = [
-  "setup",
-  "land",
-  "follow",
-  "publish",
-]
+export type LineAction = "setup" | "publish"
+export const LINE_ACTIONS: readonly LineAction[] = ["setup", "publish"]
 
 // --- the board (ADR-0085) ---------------------------------------------------
 
@@ -1242,18 +1239,18 @@ export interface LineRecord {
     readonly ahead: number
   }
   /**
-   * Your `@-` against the line: the line commits it lacks, and the commits
-   * of yours above the line when it descends from it (null when it does
-   * not). `follow` is what updating your files would do (ADR-0061, S80):
-   * how many files change, those that conflict, and your other heads that
-   * move with `@`; null when nothing is behind, or `@` descends from no
-   * line commit. `conflicts` are your conflicted commits above the line and
-   * the conflicted files in `@`.
+   * Your `@-` against the line: the line commits it lacks (`behind`), and
+   * your commits below `@` the line lacks (`ahead`, `::@- ~ ::<onto>`: what
+   * a publish integrates, ADR-0090). `catchUp` is what catching your files
+   * up would do (S80): how many files change, those that conflict, and your
+   * other heads that move with `@`; null when nothing is behind, or `@`
+   * shares no commit with the line. `conflicts` are your conflicted commits
+   * above the line, `@` included, and the conflicted files in `@`.
    */
   readonly yours: {
     readonly behind: number
-    readonly ahead: number | null
-    readonly follow: {
+    readonly ahead: number
+    readonly catchUp: {
       readonly changes: number
       readonly conflicts: readonly string[]
       readonly heads: number
@@ -1265,8 +1262,9 @@ export interface LineRecord {
   }
   /**
    * Whether this host accepts the `line` commands that act on the repo as its
-   * owner (set up, land, update your files): only when it admits no one but
-   * this machine (no invite key). Publishing is anyone's (ADR-0076).
+   * owner (setting up, and a publish's moves of your files and commits): only
+   * when it admits no one but this machine (no invite key). Moving the
+   * publish bookmark is anyone's (ADR-0076).
    */
   readonly commands: boolean
 }

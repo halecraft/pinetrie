@@ -119,7 +119,7 @@ describe("planRefresh", () => {
   test("what jj could not tell never builds an offer, and keeps one that is there (ADR-0067)", () => {
     expect(plan(facts(null, TIP, [BASE], "unknown"))).toBe("forget")
     expect(plan(facts(read(), TIP, [BASE], "unknown"))).toBe("none")
-    expect(plan(facts(read(), T2, [BASE], "unknown"))).toBe("follow")
+    expect(plan(facts(read(), T2, [BASE], "unknown"))).toBe("rebuild")
   })
   test("an untraced start builds nothing, withdraws an offer, and leaves one you edited, or one divergent, untouched (S97)", () => {
     const untraced: StartRead = {
@@ -139,7 +139,7 @@ describe("planRefresh", () => {
     const at = placed(TIP, [BASE])
     expect(planRefresh(facts(null))).toEqual({ kind: "build", place: at })
     expect(planRefresh(facts(read(), T2))).toEqual({
-      kind: "follow",
+      kind: "rebuild",
       place: placed(T2, [BASE]),
       offer: read(),
     })
@@ -173,12 +173,12 @@ describe("planRefresh", () => {
     expect(plan(facts(read({ onTarget: false })))).toBe("refresh")
     expect(plan(facts(read()))).toBe("none")
   })
-  test("the lane moved on: a single offer follows, a stack goes stale", () => {
-    expect(plan(facts(read(), T2))).toBe("follow")
+  test("the lane moved on: a single offer is rebuilt, a stack goes stale", () => {
+    expect(plan(facts(read(), T2))).toBe("rebuild")
     expect(plan(facts(read({ revisions: [rev(), rev()] }), T2))).toBe("stale")
   })
   test("where it starts moved (you integrated part of it): the same, or withdraw when nothing is left", () => {
-    expect(plan(facts(read(), TIP, [T2]))).toBe("follow")
+    expect(plan(facts(read(), TIP, [T2]))).toBe("rebuild")
     expect(
       plan(
         facts(read({ ledger: { source: TIP, start: [BASE, T2] } }), TIP, [
@@ -193,7 +193,7 @@ describe("planRefresh", () => {
     expect(plan(facts(read(), TIP, [TIP]))).toBe("withdraw")
   })
   test("an offer with no ledger, built before ADR-0060, reads as moved: it is followed once", () => {
-    expect(plan(facts(read({ ledger: null })))).toBe("follow")
+    expect(plan(facts(read({ ledger: null })))).toBe("rebuild")
   })
   test("you edited it: a version of yours that changed a revision, a commit of yours between, or its bottom moved (S48 item 7)", () => {
     const changed = { reached: true, yoursChanged: true }
@@ -212,7 +212,7 @@ describe("planRefresh", () => {
         ),
       ),
     ).toBe("leave")
-    expect(plan(facts(read(), T2))).toBe("follow")
+    expect(plan(facts(read(), T2))).toBe("rebuild")
   })
   test("divergent: repair, before anything else", () => {
     expect(plan(facts({ kind: "divergent", changes: ["k"] }, TIP, [TIP]))).toBe(
@@ -303,8 +303,8 @@ describe("records", () => {
       wips: [{ bookmark: "wip/x", commit: TIP, behind: 1, ahead: 2 }],
       yours: {
         behind: 0,
-        ahead: null,
-        follow: null,
+        ahead: 0,
+        catchUp: null,
         conflicts: { commits: 0, files: [] },
       },
       commands: true,
@@ -355,7 +355,7 @@ describe("the update and stack messages", () => {
     expect(m.content).toContain("- c.txt")
     expect(renderableMessage(m)).toEqual({
       role: "update",
-      content: "↓ caught up with the project: 2 files changed",
+      content: "↓ caught up with accepted work: 2 files changed",
       merged: [COPY],
     })
     expect(m.content).toContain("pinetrie-onto was merged into this thread")

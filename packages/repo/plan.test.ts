@@ -12,14 +12,14 @@ import {
   nonceRevset,
   offerStart,
   parseEvolog,
-  planFollow,
-  planFollowOffer,
+  planCatchUpUndo,
   planImport,
-  planLand,
   planLineSetup,
   planOffer,
   planOfferIntegrationSteps,
-  planPublish,
+  planPublishCatchUp,
+  planPublishMove,
+  planRebuildOffer,
   walkToHost,
 } from "./plan.ts"
 import { repoCommand } from "./run.ts"
@@ -135,10 +135,10 @@ describe("offers (ADR-0038)", () => {
       rw("describe", "-r", n(1), "-m", "two"),
     ])
   })
-  test("planFollowOffer: back onto the start, the tip restored, onto the target; described only when asked", () => {
+  test("planRebuildOffer: back onto the start, the tip restored, onto the target; described only when asked", () => {
     const follow = (description: string | null) =>
       argvs(
-        planFollowOffer({
+        planRebuildOffer({
           change: "ch",
           start: [C1, C2],
           tip: commitId("t2"),
@@ -199,7 +199,7 @@ describe("offers (ADR-0038)", () => {
       `git fetch -q /tmp/b.bundle +refs/heads/pinetrie/${LANE}-stack:refs/remotes/pinetrie-${LANE}/stack`,
     )
   })
-  test("the line's setup is the host's bookmark and your config; a land and a follow are yours; a publish the host's (ADR-0060, ADR-0061, ADR-0076)", () => {
+  test("the line's setup is the host's bookmark and your config (ADR-0060)", () => {
     expect(
       argvs(planLineSetup({ onto: "pinetrie-onto", heads: "H", log: "L" })),
     ).toEqual([
@@ -207,15 +207,19 @@ describe("offers (ADR-0038)", () => {
       'jj as you: config set --repo revset-aliases."immutable_heads()" H',
       "jj as you: config set --repo revsets.log L",
     ])
-    expect(argvs(planLand({ onto: "pinetrie-onto" }))).toEqual([
-      "jj as you: bookmark move pinetrie-onto --to @-",
-    ])
-    expect(
-      argvs(planPublish({ onto: "pinetrie-onto", publish: "main" })),
-    ).toEqual([op("bookmark", "move", "main", "--to", '"pinetrie-onto"')])
-    expect(argvs(planFollow({ onto: "pinetrie-onto" }))).toEqual([
+  })
+  test("a publish: your catch-up is yours; the move is the host's, or yours in one step when it integrates your commits; its undo reverts, never restores (ADR-0090, S111)", () => {
+    expect(argvs(planPublishCatchUp({ onto: "pinetrie-onto" }))).toEqual([
       'jj as you: rebase -b @ -d "pinetrie-onto"',
     ])
+    const move = { onto: "pinetrie-onto", publish: "main" }
+    expect(argvs(planPublishMove({ ...move, integrate: false }))).toEqual([
+      op("bookmark", "move", "main", "--to", '"pinetrie-onto"'),
+    ])
+    expect(argvs(planPublishMove({ ...move, integrate: true }))).toEqual([
+      "jj as you: bookmark move pinetrie-onto main --to @-",
+    ])
+    expect(argvs(planCatchUpUndo("op1"))).toEqual(["jj as you: op revert op1"])
   })
 })
 
@@ -340,6 +344,7 @@ describe("planObserve: what moved between two fingerprints", () => {
   }
   const none = {
     all: false,
+    onto: false,
     line: false,
     yours: false,
     lanes: new Set(),
@@ -348,9 +353,9 @@ describe("planObserve: what moved between two fingerprints", () => {
   test.each([
     ["nothing moved", fp(base), none],
     [
-      "the line moved",
+      "the line moved: the base snapshot follows it (ADR-0090)",
       fp({ ...base, "pinetrie-onto": "c9" }),
-      { ...none, all: true },
+      { ...none, all: true, onto: true },
     ],
     ["a WIP moved", fp({ ...base, "wip/a": "c9" }), { ...none, all: true }],
     ["a WIP appeared", fp({ ...base, "wip/b": "c9" }), { ...none, all: true }],
@@ -390,6 +395,9 @@ describe("planObserve: what moved between two fingerprints", () => {
   })
   test("the first observation is all, even with no line in the repo yet", () => {
     expect(planObserve(null, fp({}), DEFAULT_LINE).all).toBe(true)
+  })
+  test("the first observation is not the line moving: startup reads the base itself", () => {
+    expect(planObserve(null, fp(base), DEFAULT_LINE).onto).toBe(false)
   })
   test("a bookmark of yours outside the line, the WIPs, the publish bookmark, the offers and the lanes' remotes is not read", () => {
     const stdout = [

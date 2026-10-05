@@ -471,9 +471,7 @@ describe("where a new lane works: the chip and its menu", () => {
         c => c.checked,
       ),
     ).toEqual([false, false, true, undefined])
-    expect(own[0]?.detail).toBe(
-      "you review its work, then add it to the project",
-    )
+    expect(own[0]?.detail).toBe("you review its work, then accept it")
   })
   test("the working copy is never a used directory's row", () => {
     expect(

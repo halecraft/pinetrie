@@ -735,7 +735,8 @@
       /* The footer (ADR-0085): one row of chrome, split where your list's edge
          is. Its own cell, at the list's width, is yours: you and your
          inventory. Then everyone's: the board's strip, what needs you
-         (ADR-0069), the project, and "syncing…" while pending. Nothing here
+         (ADR-0069), the publish button (ADR-0090), and "syncing…" while
+         pending. Nothing here
          animates: your list, the column and the rail show where the agent
          works. */
       #bottom { grid-column: 1 / 3; grid-row: 2; display: flex; align-items: center;
@@ -813,8 +814,23 @@
       .activity-working { font-size: .75rem; color: #aab4c3; }
       .activity-badge { min-width: 1.1rem; padding: 0 .3rem; border-radius: 999px; background: #e0c080;
         color: #111; font-size: .72rem; font-weight: 600; text-align: center; }
-      .line-trigger { padding: .15rem .6rem; font-size: .8rem; background: none; color: #ddd;
+      /* The publish button (ADR-0090): a title that leads with a refusal
+         marks it, so you hover before you click. */
+      .publish-button { padding: .15rem .6rem; font-size: .8rem; background: none; color: #ddd;
         border: 1px solid #3a3f48; border-radius: 999px; }
+      .publish-button[data-refused] { color: #e8c07a; border-color: #5a4a2a; }
+      /* What a line command refused or failed says, above the footer, until
+         dismissed or your next command there. */
+      .toast { position: fixed; right: .75rem; bottom: 52px; z-index: 20; display: flex;
+        align-items: center; gap: .6rem; max-width: min(36rem, calc(100vw - 1.5rem));
+        padding: .5rem .6rem .5rem .8rem; background: var(--chrome); --surface: var(--chrome);
+        color: #e8c07a; border: 1px solid #5a4a2a; border-radius: 6px; font-size: .8rem;
+        box-shadow: 0 4px 16px rgba(0, 0, 0, .4); }
+      .toast-text { flex: 1 1 auto; min-width: 0; }
+      .toast-action { flex: 0 0 auto; padding: .15rem .5rem; background: none; color: #ddd;
+        border: 1px solid #3a3f48; border-radius: 999px; white-space: nowrap; }
+      .toast-dismiss { flex: 0 0 auto; padding: 0 .2rem; background: none; color: #8b93a1;
+        font-size: 1rem; line-height: 1; }
       .menu-heading { margin: .1rem .5rem .3rem; font-size: .75rem; color: #8b93a1; }
       /* A later section of a menu: its heading under a rule. Notes say how
          things stand, as text, not as items. A choice's ✓ keeps its column

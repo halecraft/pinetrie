@@ -301,7 +301,7 @@ export function attentionWords(
   raised: Raised,
   nameOf: (writer: WriterId) => string,
 ): string {
-  if (raised.kind === "offer") return "work ready to add to the project"
+  if (raised.kind === "offer") return "work ready to accept"
   const v = raised.verdict
   switch (v.kind) {
     case "said":

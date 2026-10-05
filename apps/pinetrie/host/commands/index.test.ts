@@ -128,7 +128,7 @@ test.each([
   ["an offer integration", { kind: "offer", action: "integrate" }, "repo"],
   ["a squash", { kind: "offer", action: "squash" }, "repo"],
   ["a description again", { kind: "offer", action: "describe" }, "repo"],
-  ["a line command", { kind: "line", action: "land" }, "repo"],
+  ["a line command", { kind: "line", action: "publish" }, "repo"],
   ["a move on the board", { kind: "move-root" }, "board"],
   ["a workflow edit", { kind: "workflow" }, "documents"],
   ["a chat", { kind: "chat" }, "documents"],

@@ -473,14 +473,22 @@ pending.
   `onToggle`, so an open menu keeps a section whose rows have gone and says
   so. Its first section has a heading and no items: it names the menu, and
   its empty `.menu-section` is hidden, with no rule under it.
-- **The project menu** (`line-view.ts`, ADR-0076): `lineView` decides two
-  sections, the project's (setting it up, publishing it, on every host) and
-  your files' (null on a host that admits others), each offering what
-  `@pinetrie/rules`' `lineActionState` allows, the rule the host decides by;
-  `lineWords` words them, a publish it does not offer with `lineRefusal`.
-  Notes name no files but those that would conflict; how many files
-  updating changes is the action's title. The trigger counts unpublished
-  commits, never your files being behind.
+- **The publish button and its toast** (`publish-view.ts`, `toast.tsx`,
+  ADR-0090): `publishView` decides the one button: `absent` with no record,
+  or before setup on a host that admits others; `setup`, before setup on the
+  host's own machine, whose `Menu` shows what it writes; `hidden` when
+  `@pinetrie/rules`' `nothingToPublish` says so, the same function the host
+  refuses by; else `publish`, carrying `lineActionState`. `publishWords`
+  words it: "publish", or "publishing…" while out, and a title that says
+  what it does from `publishWork` and the catch-up's preview (files it
+  changes, other lines of your work that move), then the jj, led by
+  `lineRefusal` when the host would refuse (`PublishWords.refused`, the
+  button's `data-refused`). The button still sends then: the
+  host's refusal is the toast, so there is one path and one source of words.
+  `publishToast` is the line's one place for a refusal or failure
+  (`outcomeWords`), from the session's `acting` store, until dismissed or
+  your next line command; `resolve` is set only by a refusal's
+  `yours_conflict` code (`Unsuccessful.code`), and opens `resolveIntent`.
 - **The inbox** (`inbox.ts`, pure): `mentionsOf` is every chat, from each
   root's directory record (`RootRecord.mentions`), whose mentions
   `address` resolves to your display name, never your own; `InboxItem` is one
@@ -523,8 +531,8 @@ pending.
   menu holds only menu items, and names it (`aria-labelledby`); each later
   section is a `<fieldset>` (role `group`, which Biome asks for as the
   element) named by its own, which is drawn `aria-hidden`. A section's notes
-  are text, not items, and describe it (`aria-describedby`): the project
-  menu's "your files have everything in the project". Items can carry
+  are text, not items, and describe it (`aria-describedby`): setting up's
+  "pinetrie-onto goes at your @-". Items can carry
   `data-*` attributes (`MenuItem.data`); one with `checked` is a
   `menuitemradio` with a ✓, and the arrow keys and the opening focus take
   both kinds.
@@ -834,14 +842,17 @@ became of its files (`strip`).
   With no revisions at all (a host without a project), every asked message
   falls back, and the whole path reads as the column's lane.
 - **What a catch-up merges is worded by `catchUpName` alone**
-  (`@pinetrie/rules`, ADR-0061, ADR-0072): the line is "the project", a
+  (`@pinetrie/rules`, ADR-0061, ADR-0072, ADR-0090): the line is "accepted
+  work", a
   WIP its bookmark, the thread a thread branched from its name. The words
   take core's `CatchUpFrom`, never a bookmark string, and the line's
   bookmark goes only in titles: `offerWords`' button titles ("moves
   pinetrie-onto forward to pinetrie-offer/amber-fox"), `behindMark`'s,
   `baseChoices`'. A card's command is worded from `CatchUps` (the thread's
   base and its parent), which `Column` keeps as one object while it says
-  the same, since the composer is memoised.
+  the same, since the composer is memoised. A base that moved is worded by
+  `movedOnLine` beside it ("accepted work has moved on"), never as "has new
+  work".
 - **The thread a thread branched from** (`parentNow`, ADR-0072) is read
   from the column's tree, the revisions and each lane's thread end, with no
   read of your repo, once per `columnView` (`ColumnShows.parent`): the
@@ -872,26 +883,27 @@ became of its files (`strip`).
   the lane's entry as `ColumnFacts.acting`: the strip's `waiting` disables
   its buttons and menu rows while it is `sent`, and `offerWords` words it
   as the strip's `note` (`.offer-note`, `role="status"`, `data-acting`
-  `sent` or `said`). An integration in flight names its destination by
-  `catchUpName`; a refusal or failure is `outcomeWords`, shared with the
-  project menu.
+  `sent` or `said`). An integration in flight names a WIP destination
+  ("accepting into wip/search…"); a refusal or failure is `outcomeWords`,
+  shared with the publish toast.
 - **`offerView` (`@pinetrie/rules`) decides an offer; `offerWords`
   words it**: its line and each button's label and title, by state. An
   offer that conflicts says so even when it is `edited` (S73), and its
-  integrate button reads "add anyway" whatever the state, as it does when a
-  resolution asked for you. Each integrate button names where the work goes
-  (ADR-0060, ADR-0061, ADR-0083): "add to
-  the project", "add to wip/search", and, from a WIP thread's menu, "add to
-  the project, with your 2 commits beneath it". A conflicted offer on the
+  integrate button reads "accept anyway" whatever the state, as it does when
+  a resolution asked for you. Each integrate button names a WIP the work
+  goes into (ADR-0060, ADR-0083, ADR-0090): "accept", "accept into
+  wip/search", and, from a WIP thread's menu, "accept, with your 2 commits
+  beneath it". A conflicted offer on the
   line offers "resolve in the thread", never an integration into it. The bookmark is
   a fact of its own, drawn apart (`.offer-bookmark`), never in the line.
   `workStrip` hands `offerView` the record decoded (`offerStatus`): a `held`
-  offer says "nothing to add: the project already has this thread's work",
+  offer says "nothing to accept: accepted work already has this thread's
+  work",
   and has no review.
 - **What catching up would do** (`catchUpOf`, from `pinetrie.base`'s `start`
   and `catchUp` against `pinetrie.line`'s commits, S97): when it `brings`
-  files, the strip's line adds "· the project has new work", or is that
-  alone with nothing to add, catching up moves from the `⋯` menu to the
+  files, the strip's line adds "· accepted work has moved on", or is that
+  alone with nothing to accept, catching up moves from the `⋯` menu to the
   buttons, its title counts the files, and the header shows `behindMark`'s
   ↓, titled with the count and the move (the bookmark, and the commits it
   went from and to). When it would change nothing (`current`, or
@@ -900,39 +912,35 @@ became of its files (`strip`).
   `column.tsx` disables it. Until the host has read the move (`unknown`), it
   stays in the menu, enabled, and claims nothing. So does a lane with no
   base record at all: the host has never read it. An untraced thread
-  (`pinetrie.base`'s `untraced`) says "an earlier add of this thread can't be
-  traced: catch up with the project to offer what's new", with catching up
+  (`pinetrie.base`'s `untraced`) says "an earlier accept of this thread
+  can't be traced: catch up with accepted work to offer what's new", with catching up
   beside it. `ColumnFacts.queuedCommands` are the commands of the cards
   queued on the lane: a catch-up among them is `offerView`'s `catch-up`
-  activity ("catching up with the project…"); a split only quiets the
+  activity ("catching up with accepted work…"); a split only quiets the
   split button (ADR-0080).
 - **A thread's base** shows in its header only when it is not the line
   (`baseWords`): "on wip/search", or "wip/search is gone", when the menu's
-  update becomes "continue from the project" and no integration is offered.
+  update becomes "continue from accepted work" and no integration is
+  offered.
   Catching up says its base: "catch up with wip/search". Two known limits,
   both in words only:
   - until a lane has a base record, the page names the line as its base
     (`effectiveBase(null)`), so a WIP thread that never changed a file says
-    "catch up with the project". The host merges the WIP, read from the
+    "catch up with accepted work". The host merges the WIP, read from the
     lane's own history;
   - with no line set up, `catchUpOf` is `current`, so the menu says
-    "already caught up with the project" where the project is not set up.
+    "already caught up with accepted work" where it is not set up.
     The host refuses the catch-up (`no_line`).
-- **The footer's project menu** (`LineMenu`, `lineView`, `lineWords`)
-  offers "set up the project", showing the config text it writes
-  (`immutable_heads()` and `revsets.log`); then notes of where your files
-  stand, from the line's record: conflicts first, then what the project has
-  that your files lack, with the record's preview of updating (ADR-0061).
-  Its actions (`LineMenuAction`): "resolve with the agent" when your work
-  has conflicts, "update my files" only with a preview, "add my work to the
-  project (N commits)". The first is no `line` command: `resolveIntent`
-  opens a new agent tab whose `Prefill` carries its text and its work
-  setting (your files), which the editor starts its choice from. Your last
-  command is said at the top of the notes (`lineNote`), from the session's
-  `acting` store, not the menu's state, so it outlives the menu closing:
-  what it is doing while out (its actions are disabled), then a refusal or
-  failure (`outcomeWords`).
-  A host that admits others offers none, and says to use jj on its machine.
+- **The footer's publish button** (`PublishButton`, `footer.tsx`,
+  ADR-0090): a plain button for a publish, a one-section `Menu` for setting
+  up (the config text it writes: `immutable_heads()` and `revsets.log`),
+  disabled while a line command is out. A refusal or failure is a `Toast`
+  above the footer, which keeps the `acting` entry you dismissed so the
+  same one does not come back. "Resolve with the agent" is no `line`
+  command: `resolveIntent` opens a new agent tab whose `Prefill` carries its
+  text (your conflicted files, or what catching up would conflict, with the
+  rebase to run) and its work setting (your files), which the editor starts
+  its choice from.
 - **The origin row and the details' "where it started" are `openAt`
   intents** (`planOpen`), which reveal the entry in whichever column shows
   it. A column's lane may have started in a column to its left.
@@ -1449,12 +1457,12 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   <dir> ▾". It opens a menu whose first section is `whereChoices`
   (`send.ts`): its own copy, your files, directories other lanes used, and
   "another directory…", each a name and what it means ("you review its
-  work, then add it to the project", "it edits them directly"), the current
+  work, then accept it", "it edits them directly"), the current
   one checked. Its own copy is disabled, with the project's reason, where
   the project cannot have one. For its own copy, and only when there are
   WIP bookmarks, a second section lists where the thread starts from
-  (`baseChoices`): the project, then each WIP with how far it is behind the
-  project; the line then names the WIP. The base is each editor's state, as
+  (`baseChoices`): accepted work, then each WIP with how far it is behind
+  accepted work; the line then names the WIP. The base is each editor's state, as
   the work choice is, and is sent with the chat. The choice is
   the composer's state until sent, as `asksAgent` is; its default is
   `workFor`, the host's own decision. The chip's words are `.where-words`,
@@ -1468,7 +1476,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   review while the offer is open and holds files (ADR-0047, below), the
   bookmark apart, which a press copies to find it in jj or jjui, its
   buttons, and a `⋯` menu for the rest
-  ("catch up with the project", "rewrite description"). What the lane runs
+  ("catch up with accepted work", "rewrite description"). What the lane runs
   now (`activityOf`: a turn, a resolution, or a split, from its latest
   prompt's role) comes first: while it runs, the line counts files so far
   and offers nothing. A lane that works directly says so ("edits your files
@@ -1501,8 +1509,8 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
 - **"Needs you" comes from the tree** (ADR-0080): the strip's `needs_you`
   is the thread's newest `ask_about_conflict` (`conflictAskedAt`) when it is
   newer than the offer's record.
-- **The footer's activity menu counts offers open** in your repo ("work ready to add to
-  the project"), as it counts mentions, and the agent's running threads;
+- **The footer's activity menu counts offers open** in your repo ("work ready to
+  accept"), as it counts mentions, and the agent's running threads;
   each row leads with the thread's name and opens its thread. Move to Done
   in an item's `⋯` names the threads whose offers it withdraws (`offeredByRoot`,
   `dropsWords`). Both read `openOffers`, which keeps only `offerStatus`'s

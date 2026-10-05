@@ -17,9 +17,9 @@ import {
 import {
   planAbandonOffer,
   planDescribe,
-  planFollowOffer,
   planOffer,
   planOfferIntegrationSteps,
+  planRebuildOffer,
   planRefreshOffer,
 } from "./plan.ts"
 
@@ -58,10 +58,10 @@ const AT = { ...TRAILERS, wip: "WIP (amber-fox): fix it", nonce: "n1" }
 const LEDGER = { source: NEW_TIP, start: [START] }
 
 describe("offerEffects: each refresh decision's steps, and what follows", () => {
-  test("follow: planFollowOffer's steps, its WIP line with the host's trailers and the new ledger, then a record", () => {
-    const e = offerEffects({ kind: "follow", place: PLACE, offer: OFFER }, AT)
+  test("rebuild: planRebuildOffer's steps, its WIP line with the host's trailers and the new ledger, then a record", () => {
+    const e = offerEffects({ kind: "rebuild", place: PLACE, offer: OFFER }, AT)
     expect(e).toEqual({
-      steps: planFollowOffer({
+      steps: planRebuildOffer({
         change: "kxyz",
         start: [START],
         tip: NEW_TIP,
@@ -139,7 +139,7 @@ describe("offerEffects: each refresh decision's steps, and what follows", () => 
   test("each decision's after carries its place", () => {
     const decisions: RefreshDecision[] = [
       { kind: "build", place: PLACE },
-      { kind: "follow", place: PLACE, offer: OFFER },
+      { kind: "rebuild", place: PLACE, offer: OFFER },
       { kind: "refresh", place: PLACE, offer: OFFER },
       { kind: "none", place: PLACE },
       { kind: "repair", place: PLACE, changes: ["k"] },

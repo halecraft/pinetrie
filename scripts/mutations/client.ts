@@ -141,28 +141,37 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "conflicts in your files offer no agent",
-    file: "packages/client/line-view.ts",
-    from: '        ...(conflicted ? (["resolve"] as const) : []),',
-    to: "",
+    file: "packages/client/publish-view.ts",
+    from: '          acting.kind === "refused" && acting.code === ERR.YOURS_CONFLICT,',
+    to: "          false,",
     command: unit,
-    expect: "conflicts in your files: said first, and resolved with the agent",
+    expect: "your files conflict: resolve with the agent",
   },
   {
-    name: "the preview hides what would conflict",
-    file: "packages/client/line-view.ts",
-    from: "  if (follow.conflicts.length > 0)\n",
-    to: "  if (false)\n",
+    name: "every refusal offers the agent",
+    file: "packages/client/publish-view.ts",
+    from: '          acting.kind === "refused" && acting.code === ERR.YOURS_CONFLICT,',
+    to: '          acting.kind === "refused",',
     command: unit,
-    expect:
-      "behind, with a preview: what updating changes and what would conflict, then the action",
+    expect: "a refusal",
+  },
+  {
+    name: "the publish title names no file the catch-up changes",
+    file: "packages/client/publish-view.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: '      `catches your files up with accepted work (changes ${count(preview?.changes ?? 0, "file", "files")}${moves})`,',
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
+    to: "      `catches your files up with accepted work${moves}`,",
+    command: unit,
+    expect: "your commits are accepted, then main moves",
   },
   {
     name: "a line command's refusal is not said",
-    file: "packages/client/line-view.ts",
-    from: "      : outcomeWords(acting)\n",
-    to: "      : null\n",
+    file: "packages/client/publish-view.ts",
+    from: '  acting === null || acting.kind === "sent"',
+    to: '  acting === null || acting.kind !== "failed"',
     command: unit,
-    expect: "lineNote: a refusal",
+    expect: "a refusal",
   },
   {
     name: "a refusal is worded as a failure",
@@ -296,9 +305,9 @@ export const mutations: readonly Mutation[] = [
     expect: "Move to Done names the threads whose offers it withdraws",
   },
   {
-    name: "the line's menu says nothing of jjui's own revset",
-    file: "packages/client/line-view.ts",
-    from: "            JJUI_NOTE,\n",
+    name: "setting up says nothing of jjui's own revset",
+    file: "packages/client/publish-view.ts",
+    from: "        JJUI_NOTE,\n",
     to: "",
     command: unit,
     expect: "no line yet: set up at your @-, showing the heads it writes",
@@ -307,11 +316,11 @@ export const mutations: readonly Mutation[] = [
     name: "an integration does not say where it goes",
     file: "packages/client/column-view.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: '      first === undefined ? "" : ` to ${catchUpName(destinationBase(first))}`',
-    to: '      ""',
+    from: "        : ` into ${first.bookmark}`",
+    to: '        : ""',
     command: unit,
     expect:
-      "the labels follow the state, and name where an integration adds the work",
+      "a WIP thread adds to its WIP, and offers the project with its commits",
   },
   {
     name: "a thread whose WIP is gone is offered a plain update",
@@ -2084,14 +2093,12 @@ export const mutations: readonly Mutation[] = [
       "catching up makes a card with the command and no text, and queues it at once",
   },
   {
-    name: "the project's button says the project",
-    file: "packages/client/line-view.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: '      unpublished > 0 ? `◆ project · ${unpublished} unpublished` : "◆ project",',
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
-    to: '      unpublished > 0 ? `◆ project · ${unpublished} unpublished` : "◆ the project",',
+    name: "the button shows with nothing to publish",
+    file: "packages/client/publish-view.ts",
+    from: '  if (nothingToPublish(work)) return { kind: "hidden" }\n',
+    to: "",
     command: unit,
-    expect: "the trigger counts what is not yet on main",
+    expect: "nothing to publish: hidden",
   },
   {
     name: "a busy answer spends the card",
@@ -2745,41 +2752,22 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a root that raises something offers not needed first",
   },
-  // ── the project menu (ADR-0076) ──
+  // ── the publish button (ADR-0076, ADR-0090) ──
   {
-    name: "the trigger marks your files behind",
-    file: "packages/client/line-view.ts",
-    from: "  const unpublished = published.commit === null ? 0 : published.behind",
-    to: "  const unpublished = published.commit === null ? 0 : published.behind + view.facts.behind",
+    name: "a host that admits others offers to set up",
+    file: "packages/client/publish-view.ts",
+    from: "    return record.commands\n      ? {",
+    to: "    return true\n      ? {",
     command: unit,
-    expect:
-      "the trigger counts what is not yet on main, never your files being behind",
+    expect: "a host that admits others, before setup",
   },
   {
-    name: "your files are shown on a host that admits others",
-    file: "packages/client/line-view.ts",
-    from: "    yours: record.commands\n      ? {",
-    to: "    yours: true\n      ? {",
+    name: "the button's title says nothing of a publish the host would refuse",
+    file: "packages/client/publish-view.ts",
+    from: '      view.state.kind === "refused"\n',
+    to: "      false\n",
     command: unit,
-    expect: "a host that admits others has no section for your files",
-  },
-  {
-    name: "the menu says nothing of a publish it does not offer",
-    file: "packages/client/line-view.ts",
-    from: '    return [lineRefusal("publish", state.code, view.facts)]',
-    to: "    return []",
-    command: unit,
-    expect:
-      "main with commits the project lacks, or no main: not offered, and why",
-  },
-  {
-    name: "update my files names no count of what it changes",
-    file: "packages/client/line-view.ts",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: '        title: `changes ${count(follow?.changes ?? 0, "file", "files")} · your work stays on top',
-    to: "        title: `your work stays on top",
-    command: unit,
-    expect: "their count in the title",
+    expect: "a publish the host would refuse leads its title with why",
   },
   {
     name: "Resume never shows",

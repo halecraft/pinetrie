@@ -481,6 +481,17 @@ file first, or refuses to start. The project is a host option apart from
 tools, so pi loads the project's settings with tools off too. As it starts,
 the host prints the store it opened, the user config it read (or why it could
 not), and where its model came from.
+
+**ADR-0090 — one publish button** (built). The project menu showed three
+refs and offered one action per move between them; "1 new commit in the
+project since you last updated" read as something to add. Now the footer
+has one **publish** button, shown only with something to publish. On the
+host's own machine it catches your files up with the line, accepts your
+commits below `@`, and moves `main`, in one act that is refused before its
+first step or undone after a failure (`jj op revert`, S111); elsewhere it
+moves `main` alone. A refusal is a toast. The line is "accepted work" on the
+page, an offer's button is **accept**, and threads and your files both
+**catch up**; `land` and `follow` are gone from the code.
 **ADR-0019 — a lane is a line of work, not a unit of parallelism.** A person's
 lane is a *conversation lane* and never touches disk. A *work lane* carries
 agent work and will own a jj workspace, so creating one is deliberate, and fold

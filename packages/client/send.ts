@@ -367,7 +367,7 @@ export function raceWords(by: WriterId | null, reader: Reader): string {
 /**
  * Where a new thread's agent works, and what that means for your files: the
  * line under the box, which opens the where menu. A lane of its own starts
- * from the project unless it starts from a WIP (ADR-0060).
+ * from accepted work unless it starts from a WIP (ADR-0060).
  */
 export function whereWords(
   work: WorkSetting,
@@ -427,7 +427,7 @@ export function whereChoices(
       className: "where-own",
       setting: own,
       row: "its own copy",
-      detail: "you review its work, then add it to the project",
+      detail: "you review its work, then accept it",
       checked: chosen(own),
       disabled: project.kind !== "lanes",
       title:
@@ -490,9 +490,10 @@ export interface BaseChoice {
 }
 
 /**
- * The bases a new lane may start from: the project, then each WIP bookmark
- * above it, with how far it is behind the project. None with no line yet, nor
- * with no WIP: the project is then the only start, and needs no choosing.
+ * The bases a new lane may start from: accepted work, then each WIP bookmark
+ * above it, with how far it is behind accepted work. None with no line yet,
+ * nor with no WIP: accepted work is then the only start, and needs no
+ * choosing.
  */
 export function baseChoices(
   line: LineRecord | null,
@@ -502,12 +503,12 @@ export function baseChoices(
   const behind = (n: number) =>
     n === 0
       ? "your unfinished work"
-      : `your unfinished work · ${n} ${n === 1 ? "commit" : "commits"} behind the project`
+      : `your unfinished work · ${n} ${n === 1 ? "commit" : "commits"} behind accepted work`
   return [
     {
       key: "base:line",
       base: null,
-      row: "the project",
+      row: "accepted work",
       detail: null,
       chosen: chosen === null,
       title: `${line.onto} at ${line.commit.slice(0, 8)}`,

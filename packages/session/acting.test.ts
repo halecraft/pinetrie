@@ -42,7 +42,7 @@ describe("nextActing: what is said of your last command on one thing", () => {
     ["a send is sent at once", null, send("1"), sent("1")],
     [
       "a send replaces a refusal",
-      { kind: "refused", action: "integrate", message: "x" },
+      { kind: "refused", code: "refused", action: "integrate", message: "x" },
       send("2", "squash"),
       sent("2", "squash"),
     ],
@@ -50,7 +50,12 @@ describe("nextActing: what is said of your last command on one thing", () => {
       "a refusal is kept, with its message",
       sent("1"),
       answered("1", REFUSED),
-      { kind: "refused", action: "integrate", message: "nothing to integrate" },
+      {
+        kind: "refused",
+        code: "refused",
+        action: "integrate",
+        message: "nothing to integrate",
+      },
     ],
     [
       "a failure is kept, with its message",
@@ -103,6 +108,7 @@ describe("sendActing: the session's store, around one command", () => {
     expect(await out).toEqual(REFUSED)
     expect(store.current().offers.get(A)).toEqual({
       kind: "refused",
+      code: "refused",
       action: "integrate",
       message: "nothing to integrate",
     })
@@ -118,13 +124,13 @@ describe("sendActing: the session's store, around one command", () => {
     const store = snapshotStore<ActingState>(NO_ACTING)
     await sendActing(
       store,
-      { kind: "line", action: "land" },
+      { kind: "line", action: "publish" },
       () => Promise.resolve({ kind: "failed", message: "jj said no" }),
       "1",
     )
     expect(store.current()).toEqual({
       offers: new Map(),
-      line: { kind: "failed", action: "land", message: "jj said no" },
+      line: { kind: "failed", action: "publish", message: "jj said no" },
     })
   })
 })

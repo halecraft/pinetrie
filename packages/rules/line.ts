@@ -1,13 +1,15 @@
 // line — the integration line and a thread's base on it (ADR-0060,
-// ADR-0061, ADR-0072, ADR-0076): the line's and each lane's base's records
-// (`pinetrie.line`, `pinetrie.base`), the line's record from what the host read
-// (`planLineRecord`), whether a `line` command may run (`lineActionState`)
-// and why not (`lineRefusal`), the command (`planLineAction`), where a new
-// lane begins (`planBegin`), the base a thread follows (`effectiveBase`),
-// what catching up with it would do (`catchUpOf`) and merge
-// (`planUpdateFrom`), and the thread a lane branched from (`parentNow`,
-// `planParentUpdate`).
-// A `line` command's steps are `@pinetrie/repo`'s (`lineSteps`).
+// ADR-0061, ADR-0072, ADR-0076, ADR-0090): the line's and each lane's base's
+// records (`pinetrie.line`, `pinetrie.base`), the line's record from what the
+// host read (`planLineRecord`), whether a `line` command may run
+// (`lineActionState`) and why not (`lineRefusal`), what a publish would do
+// (`publishWork`), the command (`planLineAction`) and a publish's second
+// round (`planPublishFinish`), where a new lane begins (`planBegin`), the
+// base a thread follows (`effectiveBase`), what catching up with it would do
+// (`catchUpOf`) and merge (`planUpdateFrom`), and the thread a lane branched
+// from (`parentNow`, `planParentUpdate`).
+// A `line` command's steps are `@pinetrie/repo`'s (`planLineSetup`,
+// `planPublishCatchUp`, `planPublishMove`, `planCatchUpUndo`).
 
 import {
   ancestry,
@@ -31,6 +33,8 @@ import {
   type LineRecord,
   nearestRevision,
   type ParentThread,
+  type PublishDecision,
+  type PublishFinish,
   type RevisionRecord,
   type ThreadBase,
   type ThreadName,
@@ -71,8 +75,8 @@ const LineRecordSchema = Type.Object({
   }),
   yours: Type.Object({
     behind: Type.Integer({ minimum: 0 }),
-    ahead: Type.Union([Type.Integer({ minimum: 0 }), Type.Null()]),
-    follow: Type.Union([
+    ahead: Type.Integer({ minimum: 0 }),
+    catchUp: Type.Union([
       Type.Object({
         changes: Type.Integer({ minimum: 0 }),
         conflicts: Type.Array(Type.String()),
@@ -131,12 +135,12 @@ export const LINE: RecordSpec<LineRecord, typeof LINE_KEY, "session"> = {
     published: { ...r.published },
     yours: {
       ...r.yours,
-      follow:
-        r.yours.follow === null
+      catchUp:
+        r.yours.catchUp === null
           ? null
           : {
-              ...r.yours.follow,
-              conflicts: [...r.yours.follow.conflicts],
+              ...r.yours.catchUp,
+              conflicts: [...r.yours.catchUp.conflicts],
             },
       conflicts: {
         ...r.yours.conflicts,
@@ -222,13 +226,6 @@ export function planLineRecord(input: {
   }
 }
 
-/**
- * The `line` commands that act on the repo as its owner: refused on a host
- * that admits others. Publishing moves a bookmark forward to work already on
- * the line, so anyone admitted may (ADR-0076).
- */
-const HOST_ONLY: ReadonlySet<LineAction> = new Set(["setup", "land", "follow"])
-
 /** Whether a `line` command may run now, and if not, why. */
 export type LineActionState =
   | { readonly kind: "ok" }
@@ -237,33 +234,67 @@ export type LineActionState =
 const OK: LineActionState = { kind: "ok" }
 const refused = (code: ErrCode): LineActionState => ({ kind: "refused", code })
 
+/** What a publish would do (ADR-0090): what the button counts and its title says. */
+export interface PublishWork {
+  /** Line commits the publish bookmark lacks. */
+  readonly accepted: number
+  /** Your commits below `@` it integrates: 0 on a host that admits others. */
+  readonly yours: number
+  /** Whether your files catch up first: never on a host that admits others. */
+  readonly catchUp: boolean
+}
+
+/**
+ * What a publish would do now. On a host that admits others it moves the
+ * publish bookmark alone, so your files and commits count for nothing there.
+ */
+export function publishWork(
+  record: Pick<LineRecord, "commands" | "published" | "yours">,
+): PublishWork {
+  const { commands, published, yours } = record
+  return {
+    accepted: published.commit === null ? 0 : published.behind,
+    yours: commands ? yours.ahead : 0,
+    catchUp: commands && yours.behind > 0,
+  }
+}
+
+/** Nothing for a publish to do: the page hides its button, and the host refuses it. */
+export const nothingToPublish = (work: PublishWork): boolean =>
+  work.accepted === 0 && work.yours === 0 && !work.catchUp
+
 /**
  * Whether `action` may run on the line as `record` has it: the one rule the
- * host's `planLineAction` and the page's menu both read. Update your files
- * only with a preview, since it is what you were shown before you chose it.
+ * host's `planLineAction` and the page's button both read. Setting up acts
+ * on the repo as its owner, so a host that admits others refuses it; anyone
+ * admitted may publish, which there moves only the publish bookmark
+ * (ADR-0076). A publish is refused before its first step for whatever can be
+ * checked then (ADR-0090): your files' conflicts and the catch-up's preview
+ * among them.
  */
 export function lineActionState(
   action: LineAction,
   record: LineRecord,
 ): LineActionState {
-  if (HOST_ONLY.has(action) && !record.commands) return refused(ERR.NOT_YOURS)
-  if (action === "setup")
+  if (action === "setup") {
+    if (!record.commands) return refused(ERR.NOT_YOURS)
     return record.commit === null ? OK : refused(ERR.REFUSED)
-  if (record.commit === null) return refused(ERR.NO_LINE)
-  switch (action) {
-    case "land":
-      return record.yours.ahead === null || record.yours.ahead === 0
-        ? refused(ERR.REFUSED)
-        : OK
-    case "follow":
-      return record.yours.follow === null ? refused(ERR.REFUSED) : OK
-    case "publish": {
-      const { commit, behind, ahead } = record.published
-      if (commit === null) return refused(ERR.NO_PUBLISH)
-      if (ahead > 0) return refused(ERR.NOT_FAST_FORWARD)
-      return behind === 0 ? refused(ERR.REFUSED) : OK
-    }
   }
+  if (record.commit === null) return refused(ERR.NO_LINE)
+  const { published, yours } = record
+  if (published.commit === null) return refused(ERR.NO_PUBLISH)
+  if (published.ahead > 0) return refused(ERR.NOT_FAST_FORWARD)
+  if (record.commands) {
+    if (
+      yours.conflicts.commits > 0 ||
+      yours.conflicts.files.length > 0 ||
+      (yours.catchUp?.conflicts.length ?? 0) > 0
+    )
+      return refused(ERR.YOURS_CONFLICT)
+    // Behind, with no commit in common: there is no rebase to preview.
+    if (yours.behind > 0 && yours.catchUp === null) return refused(ERR.REFUSED)
+  }
+  return nothingToPublish(publishWork(record)) ? refused(ERR.REFUSED) : OK
 }
 
 /**
@@ -278,54 +309,108 @@ export function planLineAction(
   const state = lineActionState(action, record)
   if (state.kind === "refused") return state
   const { onto } = record
-  switch (action) {
-    case "setup":
-      return {
-        kind: "setup",
-        onto,
-        heads: record.heads.proposed,
-        log: record.log.proposed,
-      }
-    case "land":
-    case "follow":
-      return { kind: action, onto }
-    case "publish":
-      return { kind: "publish", onto, publish: record.publish }
+  if (action === "setup")
+    return {
+      kind: "setup",
+      onto,
+      heads: record.heads.proposed,
+      log: record.log.proposed,
+    }
+  const work = publishWork(record)
+  return {
+    kind: "publish",
+    onto,
+    publish: record.publish,
+    catchUp: work.catchUp,
+    integrate: work.yours > 0,
   }
 }
 
 /**
+ * A publish's second round (ADR-0090), from the line's record as read again
+ * after the catch-up (`after`), and the operation the catch-up wrote. Without
+ * a catch-up there is nothing to undo, and every check ran before the first
+ * step. After one, the catch-up's operation is reverted when your commits are
+ * now conflicted, which the preview of `@` alone cannot show, or the publish
+ * bookmark moved meanwhile. Whether your commits move with the line is read
+ * from `after`. Pure.
+ */
+export function planPublishFinish(input: {
+  readonly decision: PublishDecision
+  readonly after: LineRecord
+  /** The catch-up's operation; null without a catch-up. */
+  readonly op: string | null
+}): PublishFinish {
+  const { decision, after, op } = input
+  const move = {
+    kind: "move",
+    onto: decision.onto,
+    publish: decision.publish,
+  } as const
+  if (op === null) return { ...move, integrate: decision.integrate }
+  if (after.yours.conflicts.commits > 0)
+    return { kind: "undo", op, code: ERR.YOURS_CONFLICT }
+  if (after.published.ahead > 0)
+    return { kind: "undo", op, code: ERR.NOT_FAST_FORWARD }
+  return { ...move, integrate: after.yours.ahead > 0 }
+}
+
+/** Files named, the first three, then how many more. */
+export const named = (files: readonly string[]): string =>
+  files.length <= 3
+    ? files.join(", ")
+    : `${files.slice(0, 3).join(", ")} and ${files.length - 3} more`
+
+const commits = (n: number) => (n === 1 ? "1 commit" : `${n} commits`)
+
+/**
  * Why a `line` command was refused, worded once: the host's answer, and the
- * project menu's reason for a publish it does not offer. `record` names the
- * bookmarks and counts.
+ * publish button's title for a publish it would refuse. `record` names the
+ * bookmarks, counts and files.
  */
 export function lineRefusal(
   action: LineAction,
   code: ErrCode,
-  record: Pick<LineRecord, "publish" | "published">,
+  record: LineRecord,
 ): string {
-  const { publish, published } = record
+  const { publish, published, yours } = record
   switch (code) {
     case ERR.NOT_YOURS:
       return "this host admits others, so it does not act on the repo as its owner: use jj on its machine"
     case ERR.NO_LINE:
-      return "set up the project first"
+      return "set up first"
     case ERR.NO_PUBLISH:
       return `this repo has no ${publish} bookmark to publish to`
     case ERR.NOT_FAST_FORWARD:
-      return `${publish} has ${published.ahead === 1 ? "1 commit" : `${published.ahead} commits`} the project doesn't: bring ${published.ahead === 1 ? "it" : "them"} into the project first`
+      return `${publish} has ${commits(published.ahead)} accepted work doesn't: bring ${published.ahead === 1 ? "it" : "them"} into accepted work in jj first`
+    case ERR.YOURS_CONFLICT: {
+      const would = yours.catchUp?.conflicts ?? []
+      if (yours.conflicts.files.length > 0)
+        return `your files have conflicts in ${named(yours.conflicts.files)}`
+      if (would.length > 0)
+        return `catching your files up would conflict in ${named(would)}`
+      return `${commits(yours.conflicts.commits)} of yours ${yours.conflicts.commits === 1 ? "has" : "have"} conflicts`
+    }
     default:
-      switch (action) {
-        case "setup":
-          return "the project is already set up"
-        case "land":
-          return "your @- is not above the project: rebase onto it first"
-        case "follow":
-          return "your files have nothing to bring in from the project, or share no commit with it"
-        case "publish":
-          return `everything in the project is on ${publish} already`
-      }
+      if (action === "setup") return "already set up"
+      return yours.behind > 0 && yours.catchUp === null && record.commands
+        ? "your files share no commit with accepted work: rebase onto it in jj"
+        : "nothing to publish"
   }
+}
+
+/**
+ * Why a publish's catch-up was reverted (`planPublishFinish`'s `undo`), from
+ * the record read after it: the conflicts it would have left, since the
+ * revert removed them; or the publish bookmark that moved meanwhile.
+ */
+export function publishUndone(
+  code: Extract<PublishFinish, { readonly kind: "undo" }>["code"],
+  after: LineRecord,
+): string {
+  if (code !== ERR.YOURS_CONFLICT) return lineRefusal("publish", code, after)
+  const n = after.yours.conflicts.commits
+  return `catching your files up would leave ${commits(n)} of yours with conflicts`
 }
 
 /**
@@ -610,17 +695,21 @@ export const mergedFrom = (merge: BaseMerge): CatchUpFrom =>
       : { kind: "parent", lane: merge.lane, name: merge.name }
 
 /**
- * What a catch-up merges, as people read it: the integration line is "the
- * project", whatever its bookmark is called; a WIP is its bookmark; the
- * thread a thread branched from is its name (ADR-0072). The one place it is
- * worded: the bookmark of the line goes in titles only.
+ * What a catch-up merges, as people read it: the integration line is
+ * "accepted work", whatever its bookmark is called (ADR-0090); a WIP is its
+ * bookmark; the thread a thread branched from is its name (ADR-0072). The
+ * one place it is worded: the bookmark of the line goes in titles only.
  */
 export const catchUpName = (from: CatchUpFrom): string =>
   from.kind === "line"
-    ? "the project"
+    ? "accepted work"
     : from.kind === "wip"
       ? from.bookmark
       : from.name
+
+/** That a thread's base has work the thread lacks, with the base named by `catchUpName`. */
+export const movedOnLine = (from: CatchUpFrom): string =>
+  `${catchUpName(from)} has moved on`
 
 /** The parent's newest commit is not the one the lane last caught up with (`ParentNow`). */
 export const parentAhead = (parent: ParentNow): boolean =>

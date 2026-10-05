@@ -34,8 +34,10 @@ translates to.
 - `observe.ts`: what an outside change moved, pure: the fingerprint
   (`fingerprintRead`, `parseFingerprint`) and `planObserve`.
 - `step.ts`: `RepoStep`, one command on your repo as data.
-- `plan.ts`: the steps, pure: the line's setup, land and follow
-  (`lineProposal`, `lineSteps`), an offer's build, follow, refresh, repair
+- `plan.ts`: the steps, pure: the line's setup (`lineProposal`,
+  `planLineSetup`), a publish's catch-up, move and undo
+  (`planPublishCatchUp`, `planPublishMove`, `planCatchUpUndo`, ADR-0090),
+  an offer's build, rebuild, refresh, repair
   and integration, lanes' refs (`laneRefSteps`), a bundle's import
   (`planImport`), where an offer starts (`offerStart`, `integratedOfferCommitsRevset`), the
   integrated-offer commits' revset (`INTEGRATED_OFFER_COMMITS`, read with `@pinetrie/lanes`' `INTEGRATED_OFFER_COMMIT_ROW` and
@@ -92,9 +94,12 @@ everything else reads at the head it last saw.**
   all its targets), and `@`'s commit. A bookmark of yours outside those is
   not read, so moving it moves nothing. The publish bookmark moving is
   `Moved.line`, not `all`: no offer depends on it, so it refreshes the
-  line's record alone (`planMarks`). `planObserve` says what moved; the listeners hear it, and the fingerprint
-  advances. The first observation reports `all`; a listener that subscribes
-  after it hears one `all` of its own.
+  line's record alone (`planMarks`). The line's bookmark moving is also
+  `Moved.onto`, which the host's base snapshot follows (ADR-0090), wherever
+  the move came from. `planObserve` says what moved; the listeners hear it, and the fingerprint
+  advances. The first observation reports `all`, and not `onto`, since
+  startup reads the base itself; a listener that subscribes after it hears
+  one `all` of its own, likewise without `onto`.
 - **The watch** (`fs.watch` on `op_heads/heads`, S87 items 5 and 6) and a
   `readdir` every 5 s as its backstop: neither starts jj. Heads that are
   exactly the last observed one do nothing; anything else queues an
@@ -201,13 +206,23 @@ operation is read once and kept until the head moves.**
   never snapshots your working copy, and the evolog says which commits the
   host made (S48 items 1 and 8). The import of a lane's bundle is the host's
   too (`planImport`), so it is `pinetrie-host`'s in your op log (S87 item 7),
-  and so is publishing (`planPublish`, ADR-0076), which changes no file and
-  is anyone's command.
-  Updating your files (`planFollow`: `jj rebase -b @ -d <onto>`) is one
-  exception, since it changes your files; landing your work is the other: it
-  moves the line to your commits, your act, so it runs as you (`as: "you"`,
-  `planLand`). The line's config is set as you too: `jj config set` is not
-  an operation.
+  and so is a publish's move of the publish bookmark alone
+  (`planPublishMove`, ADR-0076), which changes no file and is anyone's
+  command.
+  A publish's catch-up (`planPublishCatchUp`: `jj rebase -b @ -d <onto>`) is
+  one exception, since it changes your files; an integrating move is the
+  other: `jj bookmark move <onto> <publish> --to @-` moves the line to your
+  commits, your act, so it runs as you (`as: "you"`, ADR-0090), and its
+  undo (`planCatchUpUndo`) too. The line's config is set as you too: `jj
+  config set` is not an operation.
+- **A publish's undo is `jj op revert` of the catch-up's operation, never
+  `jj op restore`** (S111): a restore to the operation before deletes from
+  disk an edit made since, where a revert keeps it (an edit in between
+  leaves `@` divergent, which the window of one jj process makes rare).
+  The operation is `SharedFacts.op` after the catch-up's `execute`
+  observed it. Two bookmarks in one `jj bookmark move` move in one
+  operation, and a refusal of either moves neither (S111), so the move
+  itself needs no undo.
 - **The line is immutable** (`immutableHeads`, written to the repo's config
   only by the `line` command's setup): `present(<onto>)`, and the offers on
   it, joined to the repo's own definition. `present()`, or a repo without
@@ -252,7 +267,7 @@ operation is read once and kept until the head moves.**
   paragraph, on its WIP line and kept through a description. The source is
   the lane tip the whole offer holds, a stack's revisions included:
   integrated, it says you have that tip.
-- **`lineFacts` previews updating your files** (`yours.follow`, S80):
+- **`lineFacts` previews catching your files up** (`yours.catchUp`, S80):
   `git merge-tree --write-tree --name-only --merge-base=<fork point> <onto>
   <@>` exits 1 on conflicts and prints the merged tree, the conflicting
   paths, a blank line, then its messages; the tree against `@`'s names the
@@ -261,7 +276,11 @@ operation is read once and kept until the head moves.**
   behind, or `@` shares no commit with the line but the root. `-b @`
   moves every head on your work, which the preview counts: `-r` would
   strip them of the commits under them. `yours.conflicts` counts your
-  conflicted commits above the line, and lists `@`'s conflicted files.
+  conflicted commits above the line, and lists `@`'s conflicted files; a
+  publish's second round reads it again after the catch-up, since a commit
+  of yours that `@`'s tree resolves can conflict where the preview of `@`
+  says nothing. `yours.ahead` is `::@- ~ ::<onto>`, whether or not `@-`
+  descends from the line: what a publish accepts once caught up.
 - **`workChanges`** says whether a lane's work since its start changes any
   file: `none`, `some` or `unknown` (ADR-0067). From one start, `jj diff
   --from <start> --to <tip>`: the diff a build restores, so the two always
@@ -299,16 +318,16 @@ operation is read once and kept until the head moves.**
   another rule would read as a moved start to `planRefresh`, and a split
   would build on it. The exclusion above is inside it: sources read any
   other way bring S81's conflicted start back.
-- **An offer follows its lane in place** (`planFollowOffer`, S49): `rebase -s`
+- **An offer is rebuilt from its lane in place** (`planRebuildOffer`, S49): `rebase -s`
   back onto the start, `restore --from <tip>`, `rebase -s` onto the target.
   Restoring where it sits would give it the tip's tree, dropping your work
   under it. The change id and bookmark stay, and jj records no operation for
-  a restore that changes nothing. `planOffer` and the follow both end with
+  a restore that changes nothing. `planOffer` and the rebuild both end with
   `planRefreshOffer`'s rebase.
 - **An offer integration is a forward bookmark move**
   (`planOfferIntegrationSteps`, ADR-0060): `jj bookmark move <destination>
   --to <top>` as the host, then the offer's bookmark deleted. It never
-  rebases and never touches your `@`. An integration, a land and a publish each move a bookmark with `moveForward`, which never
+  rebases and never touches your `@`. An integration and a publish each move bookmarks with `moveForward`, which never
   passes `--allow-backwards`: jj refuses a move that is not forward, so a
   stale move fails rather than drops commits (S77 item 1). A colocated
   repo's git ref follows a host move made with `--ignore-working-copy`

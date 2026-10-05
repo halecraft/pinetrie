@@ -5,15 +5,22 @@
 // stand. `nextActing` decides, and `sendActing` is the one shell around it,
 // over the session's store.
 
-import type { LaneName, LineAction, OfferAction } from "@pinetrie/core"
+import type { ErrCode, LaneName, LineAction, OfferAction } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import type { SnapshotStore } from "./store.ts"
 
-/** A command's answer the page says (`outcomeWords`): refused, or failed. */
-export interface Unsuccessful {
-  readonly kind: "refused" | "failed"
-  readonly message: string
-}
+/**
+ * A command's answer the page says (`outcomeWords`): refused, with the code
+ * a view may act on (the publish toast's "resolve with the agent"), or
+ * failed.
+ */
+export type Unsuccessful =
+  | {
+      readonly kind: "refused"
+      readonly code: ErrCode
+      readonly message: string
+    }
+  | { readonly kind: "failed"; readonly message: string }
 
 /** One command of yours, until your next one on the same thing. */
 export type Acting<A> =
@@ -29,7 +36,7 @@ export type Acting<A> =
 
 /** An offer command of yours on a lane. */
 export type OfferActing = Acting<OfferAction>
-/** A project command of yours (ADR-0060). */
+/** A line command of yours: setting up, or publishing (ADR-0060, ADR-0090). */
 export type LineActing = Acting<LineAction>
 
 export type ActingEvent<A> =
@@ -56,8 +63,15 @@ export function nextActing<A>(
   }
   if (prev?.kind !== "sent" || prev.id !== event.id) return prev
   const { outcome } = event
-  return outcome.kind === "refused" || outcome.kind === "failed"
-    ? { kind: outcome.kind, action: prev.action, message: outcome.message }
+  if (outcome.kind === "refused")
+    return {
+      kind: "refused",
+      code: outcome.code,
+      action: prev.action,
+      message: outcome.message,
+    }
+  return outcome.kind === "failed"
+    ? { kind: "failed", action: prev.action, message: outcome.message }
     : null
 }
 

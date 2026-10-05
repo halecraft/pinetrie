@@ -140,7 +140,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       `${JSON.stringify(readProject(wh.session))}`,
     )
     // Threads start at the integration line (ADR-0060): set it up at the
-    // project's commit, as the header's menu does.
+    // project's commit, as the footer's set up button does.
     await setUpLine(wh.session, wu)
 
     // ── 1. Two lanes at once: the same file, the same port, their own ──────
@@ -580,19 +580,28 @@ async function mainSection(check: Checks["check"]): Promise<void> {
         .filter(l => l !== "" && !l.startsWith("pinetrie-offer-"))
         .reverse()
         .filter((l, i, all) => l !== all[i - 1])
-    // You change the same line, commit, land it on the line, and keep
-    // editing: the offer follows the line and shows the conflict before you
-    // integrate it (ADR-0060).
+    // You change the same line, commit, publish it, and keep editing: the
+    // offer is rebuilt on accepted work and shows the conflict before you
+    // accept it (ADR-0060, ADR-0090). Publishing needs a main to move: it is
+    // set at the project's first commit.
+    jj(
+      project,
+      "bookmark",
+      "create",
+      "main",
+      "-r",
+      "roots(::pinetrie-onto ~ root())",
+    )
     writeFileSync(path.join(project, "shared.txt"), "one\ntwo (you)\nthree\n")
     jj(project, "commit", "-m", "you edit line two")
-    const landed = await wu.line("land")
+    const landed = await wu.line("publish")
     writeFileSync(path.join(project, "still-editing.txt"), "wip\n")
     const conflicted = await waitFor(
       () => offerOf()?.conflicts.includes("shared.txt") === true,
       30_000,
     )
     check(
-      "the offer follows the line when you land your commit, and says it conflicts with it",
+      "the offer is rebuilt on accepted work when you publish your commit, and says it conflicts with it",
       landed.kind === "line-moved" && conflicted >= 0,
       `${JSON.stringify({ landed, conflicts: offerOf()?.conflicts })}`,
     )
@@ -601,7 +610,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
     // trigger plans `none` and writes nothing to your repo. The record's
     // `commits` names the offer as it is now, which is what a review reads
     // (ADR-0047). The first line stays, for the integration below.
-    // Landing moved every open offer: their writes are done first.
+    // Publishing moved every open offer: their writes are done first.
     await wh.quiet()
     const commitsBefore = JSON.stringify(offerOf()?.commits)
     /** Who made the offer's newest version: an operation's user. */
@@ -806,74 +815,54 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       `${JSON.stringify(offerOf()?.files)}`,
     )
     // A clean update: a fact in the thread, then the card's text, sent. Your
-    // work goes on the line first: "update my files" rebases it onto what you
-    // integrated, as you, after the line's record previews it (ADR-0061); then it
-    // is landed.
+    // work goes in accepted work first: a publish catches it up with what you
+    // accepted, as you, after the line's record previews it, then accepts it
+    // and moves main (ADR-0090).
     writeFileSync(path.join(project, "yours.txt"), "yours\n")
     jj(project, "commit", "-m", "you add yours.txt")
     const previewed = await waitFor(
-      () => (readLine(wh.session)?.yours.follow ?? null) !== null,
+      () => (readLine(wh.session)?.yours.catchUp ?? null) !== null,
       30_000,
     )
-    const preview = readLine(wh.session)?.yours.follow
-    const updated = await wu.line("follow")
-    const followedBy = jj(
-      project,
-      "op",
-      "log",
-      "-n",
-      "1",
-      "--no-graph",
-      "-T",
-      "user",
-    )
+    const preview = readLine(wh.session)?.yours.catchUp
+    const unpublished = readLine(wh.session)?.published.behind ?? 0
+    const published = await wu.line("publish")
+    /** Who ran the newest rebase in your op log: the catch-up. */
+    const caughtUpBy =
+      jj(
+        project,
+        "op",
+        "log",
+        "--no-graph",
+        "-T",
+        'description.first_line() ++ "\t" ++ user ++ "\n"',
+      )
+        .split("\n")
+        .find(l => l.startsWith("rebase"))
+        ?.split("\t")[1] ?? ""
+    const commitAt = (rev: string) =>
+      jj(project, "log", "--no-graph", "-r", rev, "-T", "commit_id")
     check(
-      "update my files previews what it changes, then rebases your work onto the project, as you",
+      "publish previews catching your files up, then rebases your work onto accepted work as you, and accepts it",
       previewed >= 0 &&
         preview?.conflicts.length === 0 &&
-        updated.kind === "line-moved" &&
-        jj(
-          project,
-          "log",
-          "--no-graph",
-          "-r",
-          "pinetrie-onto & ::@-",
-          "-T",
-          "commit_id",
-        ) !== "" &&
+        published.kind === "line-moved" &&
+        commitAt("pinetrie-onto") === commitAt("@-") &&
         existsSync(path.join(project, "yours.txt")) &&
-        !followedBy.startsWith(HOST_OPERATOR),
-      `${JSON.stringify({ preview, updated, followedBy })}`,
+        caughtUpBy !== "" &&
+        !caughtUpBy.startsWith(HOST_OPERATOR),
+      `${JSON.stringify({ preview, published, caughtUpBy })}`,
     )
-    await wu.line("land")
-    // Publish (ADR-0076): main, set at the project's first commit, moves
-    // forward to the line, and the record then has nothing unpublished.
-    jj(
-      project,
-      "bookmark",
-      "create",
-      "main",
-      "-r",
-      "roots(::pinetrie-onto ~ root())",
-    )
-    const unpublished = await waitFor(
-      () => (readLine(wh.session)?.published.behind ?? 0) > 0,
-      30_000,
-    )
-    const published = await wu.line("publish")
     const caughtUp = await waitFor(
       () => readLine(wh.session)?.published.behind === 0,
       30_000,
     )
-    const commitAt = (rev: string) =>
-      jj(project, "log", "--no-graph", "-r", rev, "-T", "commit_id")
     check(
-      "publish moves main forward to the project, and nothing is left unpublished",
-      unpublished >= 0 &&
-        published.kind === "line-moved" &&
+      "publish moves main forward to accepted work, and nothing is left unpublished",
+      unpublished > 0 &&
         caughtUp >= 0 &&
         commitAt("main") === commitAt("pinetrie-onto"),
-      `${JSON.stringify({ published, line: readLine(wh.session)?.published })}`,
+      `${JSON.stringify({ unpublished, line: readLine(wh.session)?.published })}`,
     )
     script.use([{ text: "it fits" }])
     if (two !== undefined)

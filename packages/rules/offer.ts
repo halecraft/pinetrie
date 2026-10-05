@@ -196,7 +196,7 @@ export function planRefresh(facts: RefreshFacts): RefreshDecision {
     if (offer.revisions.length > 1) return { kind: "stale", place }
     return reached
       ? { kind: "withdraw", offer }
-      : { kind: "follow", place, offer }
+      : { kind: "rebuild", place, offer }
   }
   return offer.onTarget
     ? { kind: "none", place }
@@ -269,7 +269,7 @@ export function offerIntegrationDestinations(input: {
  * What a lane's `pinetrie.offer` record says, decoded once (ADR-0067): every
  * reader of the page switches on this, never on the record's fields.
  * - `none`: no record;
- * - `integrated`: added to the project, as the change `as`;
+ * - `integrated`: accepted, as the change `as`;
  * - `held`: open, but it brings no file: the line already holds its work,
  *   by a route the ledger does not record (S89), so there is nothing to add;
  * - `open`: work to add. One you edited is open whatever its files: it is
@@ -554,8 +554,8 @@ export function planDescribeAsk(
 
 /**
  * Whether a message the model wrote for `asked` is still wanted, decided
- * from the offer read again in the command that writes it: the offer
- * followed its lane, or you edited it, while the model wrote, and the
+ * from the offer read again in the command that writes it: the offer was
+ * rebuilt from its lane, or you edited it, while the model wrote, and the
  * message describes what it held then. With no ledger, the place's tip and
  * start are the one it keeps.
  */

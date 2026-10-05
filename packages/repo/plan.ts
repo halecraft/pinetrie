@@ -1,5 +1,5 @@
 // repo/plan — every decision about your repo, as values (ADR-0038,
-// ADR-0060, ADR-0061).
+// ADR-0060, ADR-0061, ADR-0090).
 //
 // Each function here is pure and returns `RepoStep`s (`step.ts`), carried out
 // by `executeRepo`. What is gathered is read by `offer.ts` and `line.ts`. So
@@ -11,9 +11,9 @@ import {
   HOST_OPERATOR,
   type LaneBase,
   type LaneName,
-  type LineDecision,
   type LineFacts,
   type OfferSource,
+  type PublishMove,
   type ThreadName,
   trailerRevset,
 } from "@pinetrie/core"
@@ -80,43 +80,48 @@ export const planLineSetup = (input: {
 ]
 
 /**
- * `bookmark` moved forward to `to`: an offer integration, a land and a
- * publish are each one. Never `--allow-backwards`: jj refuses a move that is not forward, so
- * a move planned on stale facts fails rather than dropping commits (S77
- * item 1).
+ * `bookmarks` moved forward to `to`, in one operation: an offer integration
+ * and a publish are each one. Never `--allow-backwards`: jj refuses a move
+ * that is not forward, so a move planned on stale facts fails rather than
+ * dropping commits (S77 item 1); with several bookmarks, a refusal of one
+ * moves none (S111).
  */
 export const moveForward = (
   as: "host" | "you",
-  bookmark: string,
+  bookmarks: readonly string[],
   to: string,
 ): RepoStep =>
-  (as === "host" ? host : you)("bookmark", "move", bookmark, "--to", to)
+  (as === "host" ? host : you)("bookmark", "move", ...bookmarks, "--to", to)
 
 /**
- * Land your work (ADR-0060): the line moved to your `@-`, as you, since it is
- * your act.
+ * A publish's catch-up (ADR-0090): your work above the line rebased onto it,
+ * as you, since it changes your files; jj snapshots them first. `-b @` moves
+ * every head on your work with `@` (S80 item 1); `-r` would strip them of the
+ * commits under them. A conflict is recorded, not refused, and
+ * `planPublishFinish` reads it.
  */
-export const planLand = (input: { readonly onto: string }): RepoStep[] => [
-  moveForward("you", input.onto, "@-"),
+export const planPublishCatchUp = (input: {
+  readonly onto: string
+}): RepoStep[] => [you("rebase", "-b", "@", "-d", revsetName(input.onto))]
+
+/**
+ * The move that ends a publish (ADR-0090): the publish bookmark forward to
+ * the line, as the host, since it changes no file and anyone admitted may
+ * (ADR-0076); or, integrating your commits, the line and the publish bookmark
+ * together to your `@-`, as you, since it is your act.
+ */
+export const planPublishMove = (input: PublishMove): RepoStep[] => [
+  input.integrate
+    ? moveForward("you", [input.onto, input.publish], "@-")
+    : moveForward("host", [input.publish], revsetName(input.onto)),
 ]
 
 /**
- * Publish the line (ADR-0076): the publish bookmark moved forward to the
- * line, as the host, since it changes no file and anyone admitted may.
+ * Undo a publish's catch-up (S111): its operation reverted, as you. Never `op
+ * restore`, which deletes from disk an edit made since.
  */
-export const planPublish = (input: {
-  readonly onto: string
-  readonly publish: string
-}): RepoStep[] => [moveForward("host", input.publish, revsetName(input.onto))]
-
-/**
- * Update your files from the line (ADR-0061): your work above it rebased onto
- * it, as you, since it changes your files; jj snapshots them first. `-b @`
- * moves every head on your work with `@` (S80 item 1); `-r` would strip
- * them of the commits under them. A conflict is recorded, not refused.
- */
-export const planFollow = (input: { readonly onto: string }): RepoStep[] => [
-  you("rebase", "-b", "@", "-d", revsetName(input.onto)),
+export const planCatchUpUndo = (op: string): RepoStep[] => [
+  you("op", "revert", op),
 ]
 
 /**
@@ -131,22 +136,6 @@ export const lineProposal = (
   heads: immutableHeads(line, facts.heads),
   log: logRevset(facts.log),
 })
-
-/** A `line` command's steps (`planLineAction`'s decision). */
-export function lineSteps(
-  decision: Exclude<LineDecision, { readonly kind: "refused" }>,
-): RepoStep[] {
-  switch (decision.kind) {
-    case "setup":
-      return planLineSetup(decision)
-    case "land":
-      return planLand(decision)
-    case "follow":
-      return planFollow(decision)
-    case "publish":
-      return planPublish(decision)
-  }
-}
 
 /**
  * `jj git import` into your repo, as the host. A jj command with
@@ -397,14 +386,14 @@ export const planRefreshOffer = (
 ): RepoStep[] => [rewrite("rebase", "-s", bottom, "-o", target)]
 
 /**
- * A single offer following its lane in place (ADR-0039): back onto where it
+ * A single offer rebuilt from its lane in place (ADR-0039): back onto where it
  * starts now, the lane's tip restored into it, onto the target again. Its
  * tree is then your target plus the lane's change since the start, which the
  * tip's files cannot give where it sits; its change id and bookmark stay
  * (S49). With `description`, it is described again: the WIP line, when the
  * agent's message no longer describes it.
  */
-export function planFollowOffer(input: {
+export function planRebuildOffer(input: {
   readonly change: string
   readonly start: readonly CommitId[]
   readonly tip: CommitId
@@ -470,7 +459,7 @@ export function planOfferIntegrationSteps(input: {
   readonly destination: string
 }): RepoStep[] {
   return [
-    moveForward("host", input.destination, input.top),
+    moveForward("host", [input.destination], input.top),
     host("bookmark", "delete", input.bookmark),
   ]
 }

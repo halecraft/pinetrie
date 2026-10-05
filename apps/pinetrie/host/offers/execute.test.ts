@@ -86,7 +86,7 @@ describe("executeOffer", () => {
   test("follow: its steps run, then the offer is read again and recorded as it is after them", async () => {
     const p = ports()
     const effects = offerEffects(
-      { kind: "follow", place: PLACE, offer: BEFORE },
+      { kind: "rebuild", place: PLACE, offer: BEFORE },
       AT,
     )
     expect(await executeOffer(p.port, { base: null, effects }, BEFORE)).toBe(

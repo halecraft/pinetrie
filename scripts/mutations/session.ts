@@ -23,8 +23,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a refused offer command is forgotten",
     file: "packages/session/acting.ts",
-    from: '  return outcome.kind === "refused" || outcome.kind === "failed"',
-    to: '  return outcome.kind === "failed"',
+    from: '  if (outcome.kind === "refused")\n',
+    to: "  if (false)\n",
     command: unit,
     expect: "a refusal is kept, with its message",
   },

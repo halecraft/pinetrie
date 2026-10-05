@@ -96,10 +96,12 @@ async function catchUpSection(check: Checks["check"]): Promise<void> {
     const lane = laneWith("@agent start")?.name
     if (lane === undefined) throw new Error("no lane")
 
-    // The project moves on: your commit, landed on the line.
+    // Accepted work moves on: your commit, published, which accepts it and
+    // moves main (ADR-0090).
+    jj(project, "bookmark", "create", "main", "-r", "pinetrie-onto")
     writeFileSync(path.join(project, "landed.txt"), "landed\n")
     jj(project, "commit", "-m", "you land landed.txt")
-    await wu.line("land")
+    await wu.line("publish")
     await wh.quiet()
 
     // The agent catches up in its run, alone in its turn, then reads the

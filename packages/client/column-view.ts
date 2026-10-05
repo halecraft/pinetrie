@@ -42,9 +42,9 @@ import {
   catchUpName,
   catchUpOf,
   displayName,
+  movedOnLine,
   type OfferActivity,
   type OfferButton,
-  type OfferIntegrationDestination,
   type OfferView,
   offerStatus,
   offerView,
@@ -437,7 +437,7 @@ export function behindMark(
   const { move } = now
   return {
     mark: "↓",
-    title: `${catchUpName(move.base)} has new work since this thread started, in ${count(now.files, "file", "files")} · ${move.bookmark}: ${move.from.slice(0, 8)} → ${move.to.slice(0, 8)}`,
+    title: `${movedOnLine(move.base)} since this thread started, in ${count(now.files, "file", "files")} · ${move.bookmark}: ${move.from.slice(0, 8)} → ${move.to.slice(0, 8)}`,
   }
 }
 
@@ -758,12 +758,6 @@ const BUTTON_LABEL: Record<
   refresh: "refresh (discards your edits)",
 }
 
-/** An offer integration's destination as a base, to be named by `catchUpName`. */
-const destinationBase = (d: OfferIntegrationDestination) =>
-  d.kind === "line"
-    ? ({ kind: "line" } as const)
-    : ({ kind: "wip", bookmark: d.bookmark } as const)
-
 /** What an offer command in flight says, until the host answers. */
 const SENDING: Record<Exclude<OfferActing["action"], "integrate">, string> = {
   squash: "squashing to one…",
@@ -772,9 +766,9 @@ const SENDING: Record<Exclude<OfferActing["action"], "integrate">, string> = {
 }
 
 /**
- * Your last offer command, worded: an integration in flight names where it adds
- * ("adding to the project…"), the rest their own words; a refusal or a
- * failure as every command's (`outcomeWords`).
+ * Your last offer command, worded: an integration in flight names a WIP it
+ * goes into ("accepting into wip/search…"), the rest their own words; a
+ * refusal or a failure as every command's (`outcomeWords`).
  */
 function actingWords(
   acting: OfferActing | null,
@@ -784,7 +778,9 @@ function actingWords(
   if (acting.kind !== "sent") return outcomeWords(acting)
   if (acting.action !== "integrate") return SENDING[acting.action]
   const to = destinations.find(d => d.bookmark === acting.to) ?? destinations[0]
-  return `adding to ${catchUpName(to === undefined ? { kind: "line" } : destinationBase(to))}…`
+  return to === undefined || to.kind === "line"
+    ? "accepting…"
+    : `accepting into ${to.bookmark}…`
 }
 
 /** Every word an offer shows: its line, and its buttons' labels by state. */
@@ -807,17 +803,17 @@ export function offerWords(
         ? `began from a copy with an unresolved conflict in ${conflicted}${facts.parentResolves && parent !== null ? ` · ${parent} has resolved it` : ""}`
         : `conflicts with ${base} in ${conflicted}`
   const catchUps = { base: facts.base, parent: facts.parent }
-  const moved = `${base} has new work since this thread started`
+  const moved = `${movedOnLine(facts.base)} since this thread started`
   const brings = facts.catchUp.kind === "brings"
   const said =
     state === "nothing"
       ? facts.untraced
-        ? `an earlier add of this thread can't be traced: catch up with ${base} to offer what's new`
+        ? `an earlier accept of this thread can't be traced: catch up with ${base} to offer what's new`
         : brings
           ? moved
           : facts.held
-            ? "nothing to add: the project already has this thread's work"
-            : "nothing to add yet"
+            ? "nothing to accept: accepted work already has this thread's work"
+            : "nothing to accept yet"
       : state === "running"
         ? facts.files === 0
           ? "no files changed yet"
@@ -826,10 +822,10 @@ export function offerWords(
           ? facts.activity === "catch-up"
             ? `catching up with ${base}…`
             : facts.activity === "resolution"
-              ? `resolving ${base}'s new work into this thread`
+              ? `resolving what's new in ${base} into this thread`
               : "splitting the offer into a stack"
           : state === "integrated"
-            ? `added as ${(facts.integratedAs ?? "").slice(0, 8)}`
+            ? `accepted as ${(facts.integratedAs ?? "").slice(0, 8)}`
             : state === "needs_you"
               ? "the agent has a question about your edits · see the thread"
               : state === "edited"
@@ -843,7 +839,7 @@ export function offerWords(
                       : `${files} ready${yours}`
   const line =
     brings && state !== "nothing" && state !== "busy" && state !== "running"
-      ? `${said} · ${base} has new work`
+      ? `${said} · ${movedOnLine(facts.base)}`
       : said
   const [first] = view.destinations
   const toLine = view.destinations.find(d => d.kind === "line")
@@ -854,14 +850,16 @@ export function offerWords(
       : `moves ${bookmark} forward to ${facts.bookmark}`
   const integrateLabel = (): string => {
     const where =
-      first === undefined ? "" : ` to ${catchUpName(destinationBase(first))}`
+      first === undefined || first.kind === "line"
+        ? ""
+        : ` into ${first.bookmark}`
     return state === "stack"
-      ? `add stack${where}`
+      ? `accept stack${where}`
       : state === "stale"
-        ? `add stack and the rest${where}`
+        ? `accept stack and the rest${where}`
         : facts.conflicts > 0 || state === "needs_you"
-          ? `add anyway${where}`
-          : `add${where}`
+          ? `accept anyway${where}`
+          : `accept${where}`
   }
   const baseBookmark =
     facts.base.kind === "line" ? facts.onto : facts.base.bookmark
@@ -878,8 +876,8 @@ export function offerWords(
           button,
           label:
             toLine === undefined || toLine.bringsAlong === 0
-              ? "add to the project"
-              : `add to the project, with your ${count(toLine.bringsAlong, "commit", "commits")} beneath it`,
+              ? "accept"
+              : `accept, with your ${count(toLine.bringsAlong, "commit", "commits")} beneath it`,
           ...titled(moves(facts.onto)),
         }
       case "update": {
@@ -942,7 +940,7 @@ function catchUpTitle(
     case "current":
       return `already caught up with ${base}`
     case "nothing-new":
-      return `${base}'s new work is this thread's own: catching up changes no file`
+      return `what's new in ${base} is this thread's own: catching up changes no file`
     case "unknown":
       return merges
     case "brings":

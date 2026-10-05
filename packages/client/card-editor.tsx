@@ -1026,7 +1026,7 @@ export function PinnedCardEditor(p: {
 /**
  * The line under the box that says where a new thread's agent works, and
  * what that does to your files; it opens the menu that changes it. A lane of
- * its own may start from a WIP instead of the project (ADR-0060), offered
+ * its own may start from a WIP instead of accepted work (ADR-0060), offered
  * only when there is one.
  */
 function WhereMenu(p: {

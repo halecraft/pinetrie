@@ -10,7 +10,8 @@ export type RepoStep =
        * `host`: `--ignore-working-copy` and `operation.username=pinetrie-host`,
        * so it never snapshots your files and the evolog says the host made
        * what it made (S48 items 1 and 8). `you`: as you, for a step that is
-       * your act or moves your files (`planLand`, `planFollow`).
+       * your act or moves your files (`planPublishCatchUp`, an integrating
+       * `planPublishMove`, `planCatchUpUndo`).
        */
       readonly as: "host" | "you"
       readonly args: readonly string[]

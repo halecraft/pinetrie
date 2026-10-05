@@ -51,7 +51,6 @@ test("the records the host writes from your repo: only what changed, and only a 
     basics: b,
     agent: () => agent.port,
     running: () => false,
-    bookmarkMoved: () => {},
     baseChanged: lane => changed.push(lane),
   })
   await records.remove(LANE)

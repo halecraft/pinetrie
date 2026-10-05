@@ -143,10 +143,10 @@ changes pine·trie can keep this note true. You can skip them.
 
 ## This thread's base
 
-- When the thread's base (the project, or the WIP it started from) has new
-  work, a pine·trie note says so, before the person's message or between your
-  tool calls: which files would change, which of them you changed too, and
-  whether your offer conflicts with it. <!-- packages/rules/behind.ts behindContent -->
+- When the thread's base (accepted work, or the WIP it started from) has
+  moved on, a pine·trie note says so, before the person's message or between
+  your tool calls: which files would change, which of them you changed too,
+  and whether your offer conflicts with it. <!-- packages/rules/behind.ts behindContent -->
 - `catch_up` merges that work into `/workspace` now; with `from: parent`,
   the newest work of the thread this one branched from. It acts only when
   there is something new, and only as the one tool call in its turn: a call
@@ -156,8 +156,8 @@ changes pine·trie can keep this note true. You can skip them.
 - `split_offer` asks for this thread's offer to be split into a stack of
   reviewable revisions. The split runs after your run, as a run of its own.
   <!-- packages/rules/agent-commands.ts planSplitCall -->
-- Adding your work to the project is the person's: you offer it, they take
-  it. A note in the thread says when they do. <!-- packages/rules/fact.ts factContent -->
+- Accepting your work is the person's: you offer it, they accept it. A note
+  in the thread says when they do. <!-- packages/rules/fact.ts factContent -->
 
 ## When the lane can't do something
 

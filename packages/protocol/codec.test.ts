@@ -253,7 +253,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       seen: null,
     },
     { kind: "line", action: "setup" },
-    { kind: "line", action: "land" },
+    { kind: "line", action: "publish" },
     { kind: "reserve", lane: NEW_LANE },
     {
       kind: "move",
@@ -531,6 +531,9 @@ test("decode: a move needs its cards, each with a place; set-command a known com
     { kind: "set-command", cardId: "" },
     { kind: "undo-move", root: "", mode: "undo" },
     { kind: "undo-move", root: TEST_ROOT, mode: "sideways" },
+    // Land and follow are gone: a publish does both (ADR-0090).
+    { kind: "line", mode: "land" },
+    { kind: "line", mode: "follow" },
   ])
     assert.equal(decodeCommand(wire).kind, "refused")
 })

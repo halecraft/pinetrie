@@ -30,8 +30,8 @@ const line = (commit = L2): LineRecord => ({
   wips: [],
   yours: {
     behind: 0,
-    ahead: null,
-    follow: null,
+    ahead: 0,
+    catchUp: null,
     conflicts: { commits: 0, files: [] },
   },
   commands: true,
@@ -111,17 +111,18 @@ describe("the behind message", () => {
     expect(decodeBehind(stored)).toEqual(VIEW)
     expect(renderableMessage(stored)).toEqual({
       role: "behind",
-      content: "↓ the project has new work: 2 files, 1 this thread changed too",
+      content:
+        "↓ accepted work has moved on: 2 files, 1 this thread changed too",
       behind: VIEW,
     })
     expect(behindLine({ ...VIEW, overlap: [] })).toBe(
-      "↓ the project has new work: 2 files",
+      "↓ accepted work has moved on: 2 files",
     )
   })
 
   test("the model reads the files, those it changed, the conflicts, and how to catch up", () => {
     const text = behindContent(VIEW)
-    expect(text).toContain("the project has new work")
+    expect(text).toContain("accepted work has moved on")
     expect(text).toContain("This thread changed these too:\n- a.ts\n")
     expect(text).toContain("conflicts with it in:\n- a.ts\n")
     expect(text).toContain("call `catch_up`")

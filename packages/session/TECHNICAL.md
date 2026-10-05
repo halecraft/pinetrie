@@ -258,6 +258,10 @@ command on that lane (or the line); an answer that carried it out clears
 it, since the record then says how things stand. An offer integration names the offer
 this tab's record shows as it sends (`offerSeen`, ADR-0065). A split is
 no offer command: it is a card's command, queued (ADR-0080).
+A refusal keeps its code (`Unsuccessful.code`), so a view can act on why:
+the page's publish toast offers "resolve with the agent" only for
+`yours_conflict` (ADR-0090). A line command's refusal or failure is shown by
+that toast, not a menu.
 
 ## Presence (`presence-seat.ts`, ADR-0024)
 

@@ -9,6 +9,8 @@ ADR-0079 (an **integrated-offer commit** on the line, which a catch-up
 joins), and ADR-0072 (the parent commit a lane last **caught up with**).
 None of their decisions change. Their texts stay as written, and keep the
 old word.
+Amended by ADR-0090: the page's word for an offer integration is
+*accept*; the code's stays *integrate*, and "land" folds into it.
 
 **Context.** "Take" had come to mean five things in the code and docs,
 three of them acts in the domain:

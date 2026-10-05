@@ -31,7 +31,7 @@ export interface CatchUps {
 }
 
 /**
- * What a command merges: the base for `bring-up-to-date`, the project for
+ * What a command merges: the base for `bring-up-to-date`, accepted work for
  * `continue-on-line` (ADR-0060), the thread it branched from for
  * `catch-up-with-parent` (ADR-0072). Null for that one without a parent.
  */
@@ -60,7 +60,7 @@ export const commandWords = (command: CardCommand, at: CatchUps): string =>
   command === "split"
     ? SPLIT
     : command === "continue-on-line"
-      ? "continue from the project"
+      ? "continue from accepted work"
       : `catch up with ${fromName(commandFrom(command, at))}`
 
 /**
@@ -71,7 +71,7 @@ export const commandNote = (command: CardCommand, at: CatchUps): string =>
   command === "split"
     ? "⇶ splits the offer into a stack, with what you write as its brief"
     : command === "continue-on-line"
-      ? "↓ continues from the project first, then sends what you write"
+      ? "↓ continues from accepted work first, then sends what you write"
       : `↓ catches up with ${fromName(commandFrom(command, at))} first, then sends what you write`
 
 /** A queued card's button that takes it back below the line. */

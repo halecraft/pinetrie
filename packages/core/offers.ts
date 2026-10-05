@@ -11,6 +11,7 @@
 import type {
   BaseRecord,
   CommitId,
+  ERR,
   ErrCode,
   LaneBase,
   LineRecord,
@@ -228,9 +229,9 @@ export type RefreshDecision =
   | { readonly kind: "withdraw"; readonly offer: OfferInRepo }
   /** No offer: build one from the lane's tip (ADR-0067: known work, from a known start). */
   | { readonly kind: "build"; readonly place: Placed }
-  /** The lane, or where it starts, moved under a single offer you did not edit: update it in place (ADR-0039). */
+  /** The lane, or where it starts, moved under a single offer you did not edit: rebuild it in place (ADR-0039). */
   | {
-      readonly kind: "follow"
+      readonly kind: "rebuild"
       readonly place: Placed
       readonly offer: OfferNow
     }
@@ -292,6 +293,21 @@ export interface LineFacts
   readonly log: string | null
 }
 
+/**
+ * A publish (ADR-0090), decided before its first step: on the host's own
+ * machine, your files catch up with the line first (`catchUp`), and your
+ * commits below `@` move onto it with the publish bookmark (`integrate`).
+ */
+export interface PublishDecision {
+  readonly kind: "publish"
+  readonly onto: string
+  readonly publish: string
+  /** Rebase `@` onto the line first, as you. */
+  readonly catchUp: boolean
+  /** The line moves with the publish bookmark, to your `@-`. */
+  readonly integrate: boolean
+}
+
 /** A `line` command (`planLineAction`): what it does, or why not. */
 export type LineDecision =
   /** Set the line up, writing exactly the heads and log its record proposed. */
@@ -301,14 +317,27 @@ export type LineDecision =
       readonly heads: string
       readonly log: string
     }
-  /** Move the line to your work above it, as you. */
-  | { readonly kind: "land"; readonly onto: string }
-  /** Rebase your work onto the line, as you. */
-  | { readonly kind: "follow"; readonly onto: string }
-  /** Move the publish bookmark forward to the line, as the host (ADR-0076). */
-  | {
-      readonly kind: "publish"
-      readonly onto: string
-      readonly publish: string
-    }
+  | PublishDecision
   | { readonly kind: "refused"; readonly code: ErrCode }
+
+/**
+ * The bookmark move that ends a publish (`planPublishMove`): the publish
+ * bookmark to the line, or, with `integrate`, both to your `@-`.
+ */
+export interface PublishMove {
+  readonly onto: string
+  readonly publish: string
+  readonly integrate: boolean
+}
+
+/**
+ * A publish's second round (`planPublishFinish`), from the line as read after
+ * the catch-up: the move, or the catch-up's operation reverted (S111).
+ */
+export type PublishFinish =
+  | ({ readonly kind: "move" } & PublishMove)
+  | {
+      readonly kind: "undo"
+      readonly op: string
+      readonly code: typeof ERR.YOURS_CONFLICT | typeof ERR.NOT_FAST_FORWARD
+    }

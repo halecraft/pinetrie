@@ -101,7 +101,7 @@ export function activityWords(view: ActivityView): ActivityWords {
   const { unseen, working } = view
   const what = [
     ...(needsYou > 0 ? [count(needsYou, "run ended", "runs ended")] : []),
-    ...(readyYours > 0 ? [`${readyYours} ready to add`] : []),
+    ...(readyYours > 0 ? [`${readyYours} ready to accept`] : []),
     ...(unseen > 0 ? [count(unseen, "unseen mention", "unseen mentions")] : []),
   ]
   const needs =
@@ -118,7 +118,7 @@ export function activityWords(view: ActivityView): ActivityWords {
     heading: badge === 0 ? "Nothing needs you" : needs,
     sections: {
       needsYou: needsYou > 0 ? "Needs you" : "Nothing needs you now.",
-      ready: ready > 0 ? "Ready to add" : "Nothing left to add to the project.",
+      ready: ready > 0 ? "Ready to accept" : "Nothing left to accept.",
       worthARead: worthARead > 0 ? "Worth a read" : "Nothing left to read.",
       mentions: mentions > 0 ? "Mentions of you" : "No one has mentioned you.",
       working:

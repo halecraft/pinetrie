@@ -56,8 +56,8 @@ describe("a fact (ADR-0080)", () => {
   })
 
   test.each([
-    [INTEGRATED, "✓ added to the project as kabcdefg"],
-    [FACTS[1], "✓ added to wip/search as kabcdefg"],
+    [INTEGRATED, "✓ accepted as kabcdefg"],
+    [FACTS[1], "✓ accepted into wip/search as kabcdefg"],
     [FACTS[2], "✎ a new description was asked for"],
     [FACTS[3], "⇣ the stack was squashed into one revision"],
     [FACTS[4], "↻ the offer was rebuilt from this thread's work"],
@@ -67,7 +67,7 @@ describe("a fact (ADR-0080)", () => {
 
   test("the model reads who did it, and an integration's change and bookmark", () => {
     expect(factContent(INTEGRATED, "Ada")).toContain(
-      "Ada added this thread's work to the project, as the change kabcdefghij: pinetrie-onto moved forward to it.",
+      "Ada accepted this thread's work, as the change kabcdefghij: pinetrie-onto moved forward to it.",
     )
     expect(factContent(FACTS[4] as OfferFact, "Ada")).toMatch(/^Ada rebuilt/)
   })
@@ -75,7 +75,7 @@ describe("a fact (ADR-0080)", () => {
   test("the column draws it as its one line, role fact", () => {
     expect(renderableMessage(encodeFact(INTEGRATED, "Ada", 1))).toEqual({
       role: "fact",
-      content: "✓ added to the project as kabcdefg",
+      content: "✓ accepted as kabcdefg",
     })
   })
 

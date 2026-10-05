@@ -32,7 +32,7 @@ export interface Refresh {
 const newNonce = () => `pinetrie-offer-${crypto.randomUUID()}`
 
 export function createRefresh(
-  deps: Pick<OfferDeps, "basics" | "docs" | "records" | "bookmarkMoved">,
+  deps: Pick<OfferDeps, "basics" | "docs" | "records">,
 ): Refresh {
   const { basics, docs, records } = deps
   const { session, log } = basics
@@ -67,7 +67,6 @@ export function createRefresh(
       remove: () => records.remove(lane),
       async integrated(record) {
         await records.writeIntegratedOffer(record)
-        deps.bookmarkMoved()
       },
     }
   }

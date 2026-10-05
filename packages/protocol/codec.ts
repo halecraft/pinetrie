@@ -117,7 +117,7 @@ export type Outcome =
   | { readonly kind: "reserved" }
   /** Traces the sender has seen are gone (ADR-0048). */
   | { readonly kind: "seen" }
-  /** The integration line was set up, or moved forward to your work (ADR-0060). */
+  /** The integration line was set up, or published (ADR-0060, ADR-0090). */
   | { readonly kind: "line-moved" }
   | Refusal
   /**

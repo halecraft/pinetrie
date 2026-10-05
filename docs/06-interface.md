@@ -46,7 +46,7 @@ This document fixes the design before any code. It draws E and T directly.
 │              ││      ││ │ send to agent…  send │││ │ reply in thread…  │ │
 │              ││      ││ └──────────────────────┘││ └───────────────────┘ │
 ├──────────────┤└──────┘└────────────────────────┘└───────────────────────┘
-│ (A) inventory│ ▦ Board · Backlog 3 · Doing 3 (B)(C) · Done 41    ✦2  ◆ project
+│ (A) inventory│ ▦ Board · Backlog 3 · Doing 3 (B)(C) · Done 41    ✦2  publish
 └──────────────┴──────────────────────────────────────────────────────────────
 ```
 
@@ -87,7 +87,7 @@ beside it (ADR-0081, turned sideways).
   read; and, when a run you follow ends with nothing to do, a ✓ that fades.
   Its title says why ("needs you: asks whether to drop the v1 table").
   Reading the thread to its end, on any device of yours, clears it; work
-  ready to add clears when it is added, or with **Not needed** in the item's
+  ready to accept clears when it is accepted, or with **Not needed** in the item's
   `⋯`. A page that loads draws every mark still: only a change you see
   moves. After the label, small avatars of the others reading there, and a
   small dot in your colour when the root holds something you typed and have
@@ -97,7 +97,7 @@ beside it (ADR-0081, turned sideways).
   ("archive: read-only for everyone until moved out"), is disabled while
   the agent works in that root or cards are queued there, with the reason,
   and names the threads whose offers it withdraws from your repo ("work not
-  added to the project goes: amber-fox"); moving it out builds them again
+  accepted goes: amber-fox"); moving it out builds them again
   (ADR-0061). **×** is for putting a root away yourself.
 - **Archiving closes it for you** once the host accepts it, as **×** does,
   showing its neighbour below, else above, else nothing.
@@ -116,7 +116,7 @@ beside it (ADR-0081, turned sideways).
 
 One row along the bottom. Its own cell, under your list and as wide, is
 yours: your avatar and your inventory. To the right is everyone's, from
-live data only: the board's strip, then what needs you and the project.
+live data only: the board's strip, then what needs you and publish.
 While the page syncs, "syncing…" leads its right end.
 
 - **You:** your avatar opens your profile (ADR-0037): your name, and the
@@ -136,7 +136,7 @@ While the page syncs, "syncing…" leads its right end.
 - **Activity** (ADR-0069, ADR-0077): one menu of what needs you, its
   trigger a ✦. Its amber badge counts what the threads you follow need from
   you (a run that ended asking something, failing, or that no one could
-  tell; work ready to add) plus the mentions you have not seen; the page's
+  tell; work ready to accept) plus the mentions you have not seen; the page's
   title carries the same count, before the root you are on: "(2) Fix the
   sync bug · pine·trie". While the agent works, a steady count of its threads
   stands beside the ✦, never in the badge. Its sections, each shown only
@@ -150,40 +150,38 @@ While the page syncs, "syncing…" leads its right end.
   written on it; threads you do not follow raise nothing for you. With
   nothing in it, the menu is not shown. Nothing in the footer animates:
   your list, the column and the rail show where the agent works.
-- **The project** (ADR-0060, ADR-0061, ADR-0076): a menu for the
-  integration line, "◆ project", where finished work is added; its
-  bookmark is in its title. While the project has commits not yet on `main`
-  (`offers.publish`), it reads "◆ project · 2 unpublished". Before the line
-  exists, the host's own machine offers **set up the project**, showing the
+- **Publish** (ADR-0060, ADR-0076, ADR-0090): one button, no menu. The
+  integration line is **accepted work**, where finished work goes; its
+  bookmark (`offers.onto`) is in titles only. Before the line exists, the
+  host's own machine shows **set up**, which opens what it writes: the
   bookmark it makes at your `@-` and the exact `immutable_heads()` and
-  `revsets.log` text it writes to your repo's config (the log, so jj and
-  jjui show the offers), and what to add to a jjui revset of its own
-  (`docs/the-jujutsu-repo.md`), done only when you choose it; a host that
-  admits others says the project is not set up yet, with the jj
-  instructions in its title. After, the menu has two sections:
-  - **The project**, on every host: "2 commits not yet on main", or
-    "everything in the project is on main", and **publish to main (N
-    commits)**, which moves `main` forward to the line, as the host, for
-    anyone admitted. It does not push. With no `main`, or `main` holding
-    commits the project lacks, it is not offered, and the menu says why.
-  - **Your files**, only on the host's own machine: where they stand ("3 new
-    commits in the project since you last updated", or "your files have
-    everything in the project"), conflicts in them, and what updating would
-    conflict, at most three files named; then **update my files**, which
-    rebases your work onto the project, as you (its title says how many
-    files it changes, that your work stays on top, and the jj command that
-    shows the diff); **add my work to the project (N commits)**, which moves
-    the line forward to your `@-`; and, when your files have conflicts,
-    **resolve with the agent**, which opens a new agent thread working in your
-    files, its box holding the `resolve-conflicts` skill and the files, for
-    you to send. With no commit in common with the project, it says to
-    rebase in jj.
+  `revsets.log` text for your repo's config (the log, so jj and jjui show
+  the offers), and what to add to a jjui revset of its own
+  (`docs/the-jujutsu-repo.md`), done only when you choose it. A host that
+  admits others shows nothing until it is set up. After, **publish** shows
+  only while there is something to publish, and does it in one act:
+  - on the host's own machine, your files catch up with accepted work
+    (`jj rebase -b @ -d <onto>`, as you) when they are behind; your
+    commits below `@` are accepted; then `main` (`offers.publish`) moves
+    forward to accepted work. Your commits and `main` move together in one
+    jj operation;
+  - on a host that admits others, only `main` moves, as the host. No one's
+    files move.
 
-  While a command is out the menu says what it is doing ("setting up the
-  project…", "adding your work to the project…", "updating your files…",
-  "publishing the project…") and offers nothing else; refused, it says "not
-  done:" and why; failed, "it failed, and may be part done:" and why. That
-  stays, menu closed or open, until your next command there.
+  Its title says what it will do, with how many files catching up
+  changes and any other line of your work that moves with it, then the jj
+  commands. It does not push. What can be checked first is (your files'
+  conflicts, what catching up would conflict, `main` holding commits
+  accepted work lacks), and the title leads with why it would be refused.
+  If your commits come out of the catch-up conflicted, or the move fails,
+  the catch-up is reverted (`jj op revert`): nothing is left half done.
+
+  While a publish is out the button reads "publishing…". A refusal or a
+  failure is a **toast** above the footer ("not done:" and why; "it
+  failed, and may be part done:" and why), until you dismiss it or send
+  another. When your files conflict, the toast offers **resolve with the
+  agent**, which opens a new agent thread working in your files, its box
+  holding the `resolve-conflicts` skill and the files, for you to send.
 - **A menu you opened stays open until you close it.** The footer's and the
   board's avatars and counts come from live data, but when what one stands
   for goes while its menu is open (a person leaves, the agent finishes, the
@@ -301,26 +299,26 @@ tab's; with nothing in your list and nothing you are on, it opens by itself.
   grew meanwhile, it comes back at its old end, with ↓ new below.
 - **Above the composer, a work strip says what became of the agent's files**
   (ADR-0040): an agent on its own copy shows its offer in plain words ("2
-  files ready"), with **add** and its bookmark, which a press copies. The
-  button names where the work goes (ADR-0060, ADR-0061): "add to the
-  project", or "add to wip/search" for a thread on a WIP, whose menu also
-  offers "add to the project, with your 2 commits beneath it"; its title
-  names the bookmark it moves. Adding the offer (an *integration*,
+  files ready"), with **accept** and its bookmark, which a press copies. The
+  button names a WIP the work goes into (ADR-0060, ADR-0090): "accept", or
+  "accept into wip/search" for a thread on a WIP, whose menu also offers
+  "accept, with your 2 commits beneath it" into accepted work; its title
+  names the bookmark it moves. Accepting the offer (an *integration*,
   ADR-0083) moves that bookmark forward to the offer and never touches your
   working copy. From the click to the host's
-  answer the strip says what your command is doing ("adding to the
-  project…", "adding to wip/search…", "squashing to one…", "splitting into
+  answer the strip says what your command is doing ("accepting…",
+  "accepting into wip/search…", "squashing to one…", "splitting into
   a stack…", "rewriting the description…", "refreshing…"), and its buttons
-  wait. A command refused or failed says so there, as the project menu does
+  wait. A command refused or failed says so there, as the publish toast does
   ("not done: …", "it failed, and may be part done: …"), until your next
   one on that thread; one carried out says nothing, as the offer then shows
   it. An integration adds the offer the strip showed: if it now brings other work
   (the lane moved on), or conflicts where it did not, it is not done ("not
   done: the offer changed since you looked at it: review it again"), and
-  the strip shows the new offer. A rebase onto a moved project, or your own
-  edit of the offer, is still the offer you saw, and is added. An offer that conflicts is
-  never added to the project; its button is **catch up with the project
-  and resolve**: the agent resolves what the merge leaves. An offer whose
+  the strip shows the new offer. A rebase onto moved accepted work, or your
+  own edit of the offer, is still the offer you saw, and is accepted. An
+  offer that conflicts is never accepted into accepted work; its button is
+  **catch up with accepted work and resolve**: the agent resolves what the merge leaves. An offer whose
   every conflicted file was already conflicted where its thread's copy
   started says so instead: "began from a copy with an unresolved conflict
   in 1 file", and, when the thread it branched from has since resolved
@@ -328,43 +326,45 @@ tab's; with nothing in your list and nothing you are on, it opens by itself.
   amber-fox** as its button (ADR-0072). One
   working directly says "edits your files directly", and warns while
   another agent works in the same directory. Its **⋯** menu holds **catch
-  up with** the thread's base (the project, or its WIP), or, once its WIP is
-  gone, **continue from the project**; and, while the thread it branched
+  up with** the thread's base (accepted work, or its WIP), or, once its WIP
+  is gone, **continue from accepted work**; and, while the thread it branched
   from has new commits, **catch up with** that thread by its name, greyed
   out while that thread's agent works. When catching up would change files
-  in the thread, the strip says so ("2 files ready · the project has new
-  work"), catching up stands beside the offer, titled with how many files it
+  in the thread, the strip says so ("2 files ready · accepted work has
+  moved on"), catching up stands beside the offer, titled with how many files it
   changes, and the column's header shows ↓, titled with the count, the
   bookmark and both commits. When it would change nothing, it stays in the
-  menu, greyed out, and says why: "already caught up with the project", or,
-  when the project moved only by this thread's own work you added, "the
-  project's new work is this thread's own: catching up changes no file"
+  menu, greyed out, and says why: "already caught up with accepted work",
+  or, when accepted work moved only by this thread's own work you accepted,
+  "what's new in accepted work is this thread's own: catching up changes no
+  file"
   (ADR-0067). A thread whose base pine·trie has not read yet (one whose agent
   never changed a file, so its work never reached your repo) keeps it in
-  the menu, enabled, and claims nothing. An offer whose work the project already has says "nothing to
-  add: the project already has this thread's work": the header does not
+  the menu, enabled, and claims nothing. An offer whose work accepted work
+  already has says "nothing to accept: accepted work already has this
+  thread's work": the header does not
   count it, and archiving its thread warns of nothing. A thread whose
-  earlier add was made before pine·trie recorded what an add brought says "an
-  earlier add of this thread can't be traced: catch up with the project to
-  offer what's new", with catching up beside it. Every catch-up button does
+  earlier accept was made before pine·trie recorded what an accept brought
+  says "an earlier accept of this thread can't be traced: catch up with
+  accepted work to offer what's new", with catching up beside it. Every catch-up button does
   it at once
   (ADR-0061): each queues a new card holding the command and no text, which
   the host pops when the lane is free, and your composer is left as it
-  was. The queued card says "↓ catches up with the project first", and the
-  strip "catching up with the project…". A card that already carries a
+  was. The queued card says "↓ catches up with accepted work first", and
+  the strip "catching up with accepted work…". A card that already carries a
   command (one unqueued, say) says so above its box, with a × that sends it
   as a plain message instead, and its button reads "catch up", or "catch up
   and send"; what you write is what the agent should do with the new work
   (ADR-0055).
 - **The thread hears what was done to its work** (ADR-0080). An
   integration, a rewrite of the description, a squash and a refresh each add a line to
-  the thread: "✓ added to the project as k1a2b3c4", "✎ a new description
+  the thread: "✓ accepted as k1a2b3c4", "✎ a new description
   was asked for", "⇣ the stack was squashed into one revision", "↻ the
   offer was rebuilt from this thread's work". While the agent works, the
   line waits above the composer as a quiet row, and joins the thread when
-  the run ends. When the project has new work the thread lacks, its next
-  run, or its run in progress, begins with "↓ the project has new work: 2
-  files, 1 this thread changed too". A thread with no work of its own is
+  the run ends. When accepted work has moved on with work the thread
+  lacks, its next run, or its run in progress, begins with "↓ accepted
+  work has moved on: 2 files, 1 this thread changed too". A thread with no work of its own is
   caught up before it runs, and shows the update's "↓ caught up" line
   before your message.
 - **Split into a stack waits its turn** (ADR-0080): the button queues a
@@ -516,8 +516,8 @@ The rail is E; the column is T. Seeing both at once is the product.
   what that does to your files ("works on its own copy · your files stay as
   they are ▾", or "edits your files directly"), and opens the choices, the
   current one checked (ADR-0061). When you have WIP bookmarks, a second
-  section says where its copy **starts from**: the project, or a WIP, with
-  how far that is behind the project (ADR-0060).
+  section says where its copy **starts from**: accepted work, or a WIP,
+  with how far that is behind accepted work (ADR-0060).
 - **Who else is here** (ADR-0024) shows where there is room for it:
   - the **rail** rings the dot at the end of each thread someone else is reading,
     in their colour, with a count when several do; hovering names them. The

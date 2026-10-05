@@ -85,7 +85,7 @@ describe("activityWords (ADR-0069, ADR-0077)", () => {
         }),
       ).label,
     ).toBe(
-      "4 things need you: 1 run ended, 2 ready to add, 1 unseen mention · the agent is working in 3 threads",
+      "4 things need you: 1 run ended, 2 ready to accept, 1 unseen mention · the agent is working in 3 threads",
     )
     expect(activityWords(view({ working: 1 })).label).toBe(
       "nothing needs you · the agent is working in 1 thread",
@@ -103,7 +103,7 @@ describe("activityWords (ADR-0069, ADR-0077)", () => {
     expect(words.heading).toBe("Nothing needs you")
     expect(words.sections).toEqual({
       needsYou: "Nothing needs you now.",
-      ready: "Nothing left to add to the project.",
+      ready: "Nothing left to accept.",
       worthARead: "Nothing left to read.",
       mentions: "No one has mentioned you.",
       working: "The agent has finished",
@@ -122,7 +122,7 @@ describe("activityWords (ADR-0069, ADR-0077)", () => {
       ).sections,
     ).toEqual({
       needsYou: "Needs you",
-      ready: "Ready to add",
+      ready: "Ready to accept",
       worthARead: "Worth a read",
       mentions: "Mentions of you",
       working: "The agent is working in",

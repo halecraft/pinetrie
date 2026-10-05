@@ -17,13 +17,13 @@ const offersRefresh = [
 
 export const mutations: readonly Mutation[] = [
   {
-    name: "update my files moves only @'s line",
+    name: "a publish's catch-up moves only @'s line",
     file: "packages/repo/plan.ts",
-    from: '  you("rebase", "-b", "@", "-d", revsetName(input.onto)),',
-    to: '  you("rebase", "-r", "@", "-d", revsetName(input.onto)),',
+    from: '}): RepoStep[] => [you("rebase", "-b", "@", "-d", revsetName(input.onto))]',
+    to: '}): RepoStep[] => [you("rebase", "-r", "@", "-d", revsetName(input.onto))]',
     command: repoTest,
     expect:
-      "update my files (S80): a preview that writes nothing, then your work rebased onto the line, conflicts recorded",
+      "a publish's catch-up (S80, ADR-0090): a preview that writes nothing, then your work rebased onto the line, conflicts recorded",
   },
   {
     name: "the preview names no conflict",
@@ -32,7 +32,7 @@ export const mutations: readonly Mutation[] = [
     to: "  const conflicts = [].filter(",
     command: repoTest,
     expect:
-      "update my files (S80): a preview that writes nothing, then your work rebased onto the line, conflicts recorded",
+      "a publish's catch-up (S80, ADR-0090): a preview that writes nothing, then your work rebased onto the line, conflicts recorded",
   },
   {
     name: "the preview counts no other head",
@@ -42,7 +42,7 @@ export const mutations: readonly Mutation[] = [
     to: "    heads: 0,",
     command: repoTest,
     expect:
-      "update my files (S80): a preview that writes nothing, then your work rebased onto the line, conflicts recorded",
+      "a publish's catch-up (S80, ADR-0090): a preview that writes nothing, then your work rebased onto the line, conflicts recorded",
   },
   {
     name: "a lane's work always changes a file",
@@ -100,14 +100,56 @@ export const mutations: readonly Mutation[] = [
     expect: "added to jj's default when the repo defines none, and idempotent",
   },
   {
-    name: "landing leaves the line where it was",
+    name: "an integrating publish leaves the line where it was",
     file: "packages/repo/plan.ts",
-    from: '  moveForward("you", input.onto, "@-"),',
-    to: '  moveForward("you", input.onto, "@--"),',
+    from: '    ? moveForward("you", [input.onto, input.publish], "@-")',
+    to: '    ? moveForward("you", [input.onto, input.publish], "@--")',
     suite: "lanes",
     scenario: "main",
     expect:
-      "the offer follows the line when you land your commit, and says it conflicts with it",
+      "the offer is rebuilt on accepted work when you publish your commit, and says it conflicts with it",
+  },
+  {
+    name: "an integrating publish moves its two bookmarks one at a time",
+    file: "packages/repo/plan.ts",
+    from: '    ? moveForward("you", [input.onto, input.publish], "@-")',
+    to: '    ? moveForward("you", [input.onto], "@-") && moveForward("you", [input.publish], "@-")',
+    command: unit,
+    expect: "a publish: your catch-up is yours",
+  },
+  {
+    name: "a publish's undo restores",
+    file: "packages/repo/plan.ts",
+    from: '  you("op", "revert", op),',
+    to: '  you("op", "restore", op),',
+    command: unit,
+    expect: "its undo reverts, never restores",
+  },
+  {
+    name: "the line's record counts none of your commits conflicted",
+    file: "packages/repo/line.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "        commits: await count(jj, `(::@ ~ ::${onto}) & conflicts()`),",
+    to: "        commits: 0,",
+    command: repoTest,
+    expect:
+      "a publish's second round reads your commits conflicted by the catch-up",
+  },
+  {
+    name: "a WIP's move is the line's for the base snapshot",
+    file: "packages/repo/observe.ts",
+    from: "      if (name === line.onto && prev !== null) onto = true",
+    to: "      if (prev !== null) onto = true",
+    command: unit,
+    expect: "a WIP moved",
+  },
+  {
+    name: "the first observation refreshes the base snapshot again",
+    file: "packages/repo/observe.ts",
+    from: "      if (name === line.onto && prev !== null) onto = true",
+    to: "      if (name === line.onto) onto = true",
+    command: unit,
+    expect: "the first observation is not the line moving",
   },
   {
     name: "a new thread begins at your @-",
@@ -164,29 +206,29 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an offer integration may move the line backwards",
     file: "packages/repo/plan.ts",
-    from: '  (as === "host" ? host : you)("bookmark", "move", bookmark, "--to", to)',
-    to: '  (as === "host" ? host : you)("bookmark", "move", "--allow-backwards", bookmark, "--to", to)',
+    from: '  (as === "host" ? host : you)("bookmark", "move", ...bookmarks, "--to", to)',
+    to: '  (as === "host" ? host : you)("bookmark", "move", "--allow-backwards", ...bookmarks, "--to", to)',
     command: unit,
     expect:
       "planOfferIntegrationSteps: the destination moved forward to the top",
   },
   {
-    name: "a publish moves nothing",
+    name: "a publish leaves main where it was",
     file: "packages/repo/plan.ts",
-    from: '}): RepoStep[] => [moveForward("host", input.publish, revsetName(input.onto))]',
-    to: "}): RepoStep[] => []",
+    from: '    ? moveForward("you", [input.onto, input.publish], "@-")',
+    to: '    ? moveForward("you", [input.onto], "@-")',
     suite: "lanes",
     scenario: "main",
     expect:
-      "publish moves main forward to the project, and nothing is left unpublished",
+      "publish moves main forward to accepted work, and nothing is left unpublished",
   },
   {
     name: "a publish moves main as you",
     file: "packages/repo/plan.ts",
-    from: '}): RepoStep[] => [moveForward("host", input.publish, revsetName(input.onto))]',
-    to: '}): RepoStep[] => [moveForward("you", input.publish, revsetName(input.onto))]',
+    from: '    : moveForward("host", [input.publish], revsetName(input.onto)),',
+    to: '    : moveForward("you", [input.publish], revsetName(input.onto)),',
     command: unit,
-    expect: "a publish the host's",
+    expect: "a publish: your catch-up is yours",
   },
   {
     name: "a move of main is not watched",
@@ -667,20 +709,20 @@ export const mutations: readonly Mutation[] = [
       "archiving a root withdraws its threads' offers: no bookmark in your repo, no record",
   },
   {
-    name: "a follow builds another offer",
+    name: "a rebuild builds another offer",
     file: "packages/repo/offer-steps.ts",
     from: '    case "build":\n      return rebuildEffects(',
-    to: '    case "build":\n    case "follow":\n      return rebuildEffects(',
+    to: '    case "build":\n    case "rebuild":\n      return rebuildEffects(',
     command: unit,
-    expect: "follow: planFollowOffer's steps",
+    expect: "rebuild: planRebuildOffer's steps",
   },
   {
-    name: "a followed offer keeps the agent's message",
+    name: "a rebuilt offer keeps the agent's message",
     file: "packages/repo/offer-steps.ts",
     from: "          description: offerMessage(at.wip, {",
     to: '          description: offerMessage("offer: scripted", {',
     command: unit,
-    expect: "follow: planFollowOffer's steps",
+    expect: "rebuild: planRebuildOffer's steps",
   },
   {
     name: "a withdrawn offer keeps its record",

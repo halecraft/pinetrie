@@ -774,8 +774,8 @@ commit-message request `request.ts` (`describeRequest`).
   holds it (`OfferInRepo`); for an untraced start or a thread whose root is
   archived (ADR-0061), the offer alone. Each decision carries what its
   steps need: `build` (none: never built,
-  integrated, or gone), `follow` (the lane, or where the offer starts, moved under a single
-  offer: updated in place, ADR-0039), `withdraw` (where it starts reached the
+  integrated, or gone), `rebuild` (the lane, or where the offer starts, moved under a single
+  offer: rebuilt in place, ADR-0039), `withdraw` (where it starts reached the
   tip, the lane's work changes no file, its start is untraced and the host
   made it, or the thread is archived, edited or not), `forget` (no offer and none to build: a record left from one
   goes), `stale` (either moved under a stack), `refresh` (only
@@ -786,7 +786,7 @@ commit-message request `request.ts` (`describeRequest`).
   start, is built (ADR-0067): one built from less would be empty, or bring
   back what you integrated, and withdrawn after a build it would be built again on
   the next poll. `unknown` keeps an offer that is there, and builds none. Where it starts is compared as a set
-  (`sameStart`): a merge's parents come in any order. `follow` is not `update`, which is "update from
+  (`sameStart`): a merge's parents come in any order. `rebuild` is not `update`, which is "update from
   my work" (`planUpdate`). An offer is edited (`offerEdited`) when its
   bottom's parent is not an ancestor of the target (S48 item 7), a commit of
   yours sits between its revisions, or any revision is edited
@@ -795,7 +795,7 @@ commit-message request `request.ts` (`describeRequest`).
   yours. An offer you edit is never touched again, so nothing the host
   writes can hide your version. Moved (`offerMoved`) is its ledger against
   the lane's tip and start; an offer with no ledger reads as moved, and is
-  followed once. The record's `stale` uses the same rule.
+  rebuilt once. The record's `stale` uses the same rule.
 - **`offerRecord`** is the record, the page's cache, from the offer as
   your repo holds it: its files and conflicts, your edits (its files that
   `@` changes), described (its first line no longer the WIP line), edited,
@@ -886,8 +886,8 @@ commit-message request `request.ts` (`describeRequest`).
   it. `catchUpOf` owns those checks; the commit comparison under them
   (`baseMoved`) is private to it.
 - **`catchUpName`** (`line.ts`) is the one wording of what a catch-up
-  merges (`CatchUpFrom`): "the project" for the line, the bookmark for a
-  WIP (ADR-0061), the thread's name for the thread a thread branched from
+  merges (`CatchUpFrom`): "accepted work" for the line (ADR-0090), the
+  bookmark for a WIP (ADR-0061), the thread's name for the thread a thread branched from
   (ADR-0072). `updateLine` uses it through the update's `from`, decoded
   from the stored `parent`, else `base` and its `line` flag; an update
   stored before the flag names its base by its bookmark. Update and land
@@ -919,7 +919,7 @@ commit-message request `request.ts` (`describeRequest`).
 
 | record | namespace | key | written |
 |---|---|---|---|
-| the integration line: its commit, the WIP bookmarks above it, your `@-` against it, and whether this host accepts `line` commands | `pinetrie.line` | `line` | when your repo's operation head moves |
+| the integration line: its commit, the WIP bookmarks above it, the publish bookmark and your work against it (`yours.ahead`, `yours.catchUp`), and whether this host accepts `line` commands | `pinetrie.line` | `line` | when your repo's operation head moves |
 | a lane's base, as its newest `Pinetrie-Base` says it, whether a WIP base landed or is gone, what catching up would change and where that was read, and its untraced integrated-offer commits (S97) | `pinetrie.base` | the lane | when a refresh reads the lane |
 
 - **`planLineRecord`** is the line's record from what the host read
@@ -927,23 +927,42 @@ commit-message request `request.ts` (`describeRequest`).
   repo's config, which `@pinetrie/repo` words (`lineProposal`: jj's config
   text), and whether this host accepts `line` commands.
 - **`planLineAction`** decides a `line` command from the record read in
-  its own step (`LineDecision`): refused on a host that admits others
-  (`not_yours`), with no line (`no_line`), or with nothing to do
-  (`refused`); setup writes exactly the heads and log the record proposed,
-  the text you were shown, and follow runs only with the preview you were
-  shown. `@pinetrie/repo` turns it into steps (`lineSteps`).
-- **`effectiveBase`**, **`catchUpOf`**, **`parentNow`** and
-  **`catchUpName`** are here too. How the page reads them is under Offers,
+  its own step (`LineDecision`): setup writes exactly the heads and log the
+  record proposed, the text you were shown; a publish (`PublishDecision`,
+  ADR-0090) says whether your files catch up first (`catchUp`) and whether
+  your commits move with the line (`integrate`), both false on a host that
+  admits others. `@pinetrie/repo` turns it into steps (`planLineSetup`,
+  `planPublishCatchUp`, `planPublishMove`).
+- **`planPublishFinish` is a publish's second round** (ADR-0090): from the
+  record read again after the catch-up, the move, or the catch-up's
+  operation reverted (`undo`, S111) when your commits came out conflicted
+  (`yours.conflicts.commits`, which the preview of `@` alone cannot show)
+  or the publish bookmark moved meanwhile. `integrate` is read from the
+  record after, not the decision. `publishUndone` words an undo from that
+  record: the conflicts the catch-up would have left, since the revert took
+  them away, so `lineRefusal`'s "your commits have conflicts" would be
+  untrue. It lives here, not beside the steps,
+  because `@pinetrie/repo` does not import this package.
+- **`effectiveBase`**, **`catchUpOf`**, **`parentNow`**, **`catchUpName`**
+  (the line is "accepted work", ADR-0090) and **`movedOnLine`** (a base
+  that moved, worded once) are here too. How the page reads them is under Offers,
   "What the page reads".
-- **`lineActionState` is the one rule for a `line` command** (ADR-0076):
-  the host's `planLineAction` decides from it, and the page's `lineView`
-  offers what it allows. `HOST_ONLY` (setup, land, follow) act on the repo
-  as its owner and are refused on a host that admits others; publishing is
-  anyone's. `lineRefusal` words each refusal once, for the host's answer
-  and the menu's reason for a publish it does not offer.
+- **`lineActionState` is the one rule for a `line` command** (ADR-0076,
+  ADR-0090): the host's `planLineAction` decides from it, and the page's
+  publish button reads it. Setup acts on the repo as its owner, so a host
+  that admits others refuses it (`not_yours`); publishing is anyone's, and
+  there moves the publish bookmark alone. A publish is refused, in order:
+  `no_line`, `no_publish`, `not_fast_forward`; on the host's own machine,
+  `yours_conflict` (conflicted commits or files, or a preview that would
+  conflict) and `refused` for files behind with no commit in common; then
+  `refused` when `nothingToPublish(publishWork(record))`, the one "nothing
+  to do", which the page's hidden button reads too. `lineRefusal` words
+  each refusal once, naming files with `named`, for the host's answer and
+  the button's title.
 - **`pinetrie.line` and `pinetrie.base` are caches** (ADR-0060): the repo is
   the ledger, and the host rewrites each from it. A lost one costs a read.
-  A `pinetrie.line` from before `publish` and `published` (ADR-0076) does not
+  A `pinetrie.line` from before `publish` and `published` (ADR-0076), or
+  before `yours.catchUp` and a numeric `yours.ahead` (ADR-0090), does not
   decode, and is read as unknown until the host writes it again.
   A `pinetrie.base` from before `catchUp` and `untraced` does not decode, and
   is dropped (ADR-0067): the page reads catching up as unknown until the

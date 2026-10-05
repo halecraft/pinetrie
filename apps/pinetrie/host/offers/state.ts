@@ -77,8 +77,6 @@ export interface OfferDeps {
   readonly agent: () => Agent
   /** Whether a lane is running now: an offer is described once it stops. */
   readonly running: (lane: LaneName) => boolean
-  /** After an offer integration: the base snapshot follows the bookmark it moved. */
-  readonly bookmarkMoved: () => void
   readonly docs: OfferDocs
   readonly records: OfferRecords
 }
@@ -89,7 +87,6 @@ export function createOfferDeps(input: {
   readonly basics: Basics
   readonly agent: () => Agent
   readonly running: (lane: LaneName) => boolean
-  readonly bookmarkMoved: () => void
   readonly baseChanged: (lane: LaneName) => void
 }): OfferDeps {
   const { basics, line } = input
@@ -149,7 +146,6 @@ export function createOfferDeps(input: {
     basics,
     agent: input.agent,
     running: input.running,
-    bookmarkMoved: input.bookmarkMoved,
     docs: offerDocs,
     records,
   }

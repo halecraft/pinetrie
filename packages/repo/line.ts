@@ -1,8 +1,8 @@
 // repo/line — the integration line in your repo (ADR-0060): what it is now,
-// read as values for the host to plan from, and what updating your files
-// from it would do (ADR-0061, S80). Reads only; the host's steps that set it
-// up, move it, rebase your work onto it and publish it are `planLineSetup`,
-// `planLand`, `planFollow` and `planPublish` (`plan.ts`).
+// read as values for the host to plan from, and what catching your files up
+// with it would do (S80). Reads only; the host's steps that set it up and
+// publish it are `planLineSetup`, `planPublishCatchUp`, `planPublishMove` and
+// `planCatchUpUndo` (`plan.ts`, ADR-0090).
 
 import {
   type BaseRecord,
@@ -21,8 +21,8 @@ import {
 } from "@pinetrie/lanes"
 import { changeOf } from "./offer.ts"
 
-/** What `planFollow`'s rebase would do to your files (S80): `LineRecord`'s shape. */
-type FollowPreview = NonNullable<LineFacts["yours"]["follow"]>
+/** What `planPublishCatchUp`'s rebase would do to your files (S80): `LineRecord`'s shape. */
+type CatchUpPreview = NonNullable<LineFacts["yours"]["catchUp"]>
 
 const count = async (jj: Runner, revset: string): Promise<number> =>
   (await commitsOf(jj, revset)).length
@@ -54,8 +54,8 @@ export async function lineFacts(
       published: { commit: null, behind: 0, ahead: 0 },
       yours: {
         behind: 0,
-        ahead: null,
-        follow: null,
+        ahead: 0,
+        catchUp: null,
         conflicts: { commits: 0, files: [] },
       },
     }
@@ -85,7 +85,6 @@ export async function lineFacts(
           ahead: await count(jj, `::${id} ~ ::${onto}`),
         })
   }
-  const descends = (await count(jj, `${onto} & ::@-`)) > 0
   const behind = await count(jj, `::${onto} ~ ::@-`)
   return {
     commit,
@@ -95,8 +94,8 @@ export async function lineFacts(
     published: await publishedFacts(jj, onto, revsetName(line.publish)),
     yours: {
       behind,
-      ahead: descends ? await count(jj, `${onto}..@-`) : null,
-      follow: behind === 0 ? null : await followPreview(jj, git, onto),
+      ahead: await count(jj, `::@- ~ ::${onto}`),
+      catchUp: behind === 0 ? null : await catchUpPreview(jj, git, onto),
       conflicts: {
         commits: await count(jj, `(::@ ~ ::${onto}) & conflicts()`),
         files: await conflictedFilesAt(jj, "@").catch(() => []),
@@ -128,11 +127,11 @@ async function publishedFacts(
  * conflicting paths, then a blank line and its messages (S80 item 3). Null
  * when `@` descends from no commit of the line, or git cannot merge.
  */
-async function followPreview(
+async function catchUpPreview(
   jj: Runner,
   git: Runner,
   onto: string,
-): Promise<FollowPreview | null> {
+): Promise<CatchUpPreview | null> {
   if ((await count(jj, `(::@ & ::${onto}) ~ root()`)) === 0) return null
   const [base] = await commitsOf(jj, `fork_point(${onto} | @)`)
   const [line] = await commitsOf(jj, onto)

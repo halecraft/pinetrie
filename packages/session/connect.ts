@@ -314,7 +314,7 @@ export interface SessionClient {
     action: OfferAction,
     to?: string | null,
   ): Promise<Outcome>
-  /** Set up the integration line, or land your work on it (ADR-0060). Tracked in `acting`. */
+  /** Set up the integration line, or publish it (ADR-0060, ADR-0090). Tracked in `acting`. */
   line(action: LineAction): Promise<Outcome>
   /** Your offer and line commands out now, or refused or failed (`acting.ts`). */
   readonly acting: Readable<ActingState>

@@ -96,14 +96,15 @@ import {
   laneRefSteps,
   logRevset,
   planAbandonOffer,
+  planCatchUpUndo,
   planDescribe,
-  planFollow,
-  planFollowOffer,
   planImport,
   planLineSetup,
   planOffer,
   planOfferIntegrationSteps,
-  planPublish,
+  planPublishCatchUp,
+  planPublishMove,
+  planRebuildOffer,
   planRefreshOffer,
 } from "./plan.ts"
 import { executeRepo, hostJj, hostOps, runnerFor } from "./run.ts"
@@ -1361,7 +1362,7 @@ describe("a lane's repo, with jj", () => {
     ])
     expect(await sinceNow()).toEqual([{ reached: true, yoursChanged: false }])
 
-    // The lane moves on: the offer follows it in place (ADR-0039), its
+    // The lane moves on: the offer is rebuilt from it in place (ADR-0039), its
     // change kept, holding what a fresh build would.
     await edit(laneDir, "f.txt", "f\n")
     const t3 = await turnOn(laneJj, { ...TURN, entry: entryId("e-3") })
@@ -1373,7 +1374,7 @@ describe("a lane's repo, with jj", () => {
     if (b3 === null) throw new Error("no base")
     await executeRepo(
       yoursDir,
-      planFollowOffer({
+      planRebuildOffer({
         change: nc,
         start: await knownStart(ops, { tip: t3, base: b3, line }),
         tip: t3,
@@ -1694,9 +1695,9 @@ describe("a lane's repo, with jj", () => {
     expect(await commitsOf(ops, "conflicts()")).toEqual([])
   }, 60_000)
 
-  test("update my files (S80): a preview that writes nothing, then your work rebased onto the line, conflicts recorded", async () => {
+  test("a publish's catch-up (S80, ADR-0090): a preview that writes nothing, then your work rebased onto the line, conflicts recorded", async () => {
     const { yoursDir, yoursJj, ops, edit, line, setUpLine } =
-      await offerRig("follow")
+      await offerRig("catchup")
     const git: Runner = args => hostRunner(yoursDir)(["git", ...args])
     const change = async (rev: string) =>
       (
@@ -1727,7 +1728,7 @@ describe("a lane's repo, with jj", () => {
     const before = (await yoursJj(["op", "log", "-n", "1", "-T", "id"])).stdout
     const facts = await lineFacts(ops, git, line)
     expect(facts.yours.behind).toBe(1)
-    expect(facts.yours.follow).toEqual({
+    expect(facts.yours.catchUp).toEqual({
       changes: 2,
       conflicts: ["g.txt"],
       heads: 1,
@@ -1747,10 +1748,10 @@ describe("a lane's repo, with jj", () => {
         ])
       ).stdout,
     ).toBe(before)
-    await executeRepo(yoursDir, planFollow({ onto: line.onto }))
+    await executeRepo(yoursDir, planPublishCatchUp({ onto: line.onto }))
     const after = await lineFacts(ops, git, line)
     expect(after.yours.behind).toBe(0)
-    expect(after.yours.follow).toBe(null)
+    expect(after.yours.catchUp).toBe(null)
     // Y1 and @ conflict; the sibling moved too, and conflicts outside @'s line.
     expect(after.yours.conflicts).toEqual({ commits: 2, files: ["g.txt"] })
     expect(await readFile(path.join(yoursDir, "h.txt"), "utf8")).toBe("h\n")
@@ -1766,7 +1767,7 @@ describe("a lane's repo, with jj", () => {
     ).toHaveLength(1)
   }, 60_000)
 
-  test("publish (ADR-0076): main moved forward to the line as the host, git's main with it; refused once main has its own commits", async () => {
+  test("publish's move (ADR-0076): main moved forward to the line as the host, git's main with it; refused once main has its own commits", async () => {
     const { yoursDir, yoursJj, ops, edit, line, setUpLine } =
       await offerRig("publish")
     const git: Runner = args => hostRunner(yoursDir)(["git", ...args])
@@ -1790,7 +1791,11 @@ describe("a lane's repo, with jj", () => {
     expect(before.published).toMatchObject({ behind: 2, ahead: 0 })
     await executeRepo(
       yoursDir,
-      planPublish({ onto: line.onto, publish: line.publish }),
+      planPublishMove({
+        onto: line.onto,
+        publish: line.publish,
+        integrate: false,
+      }),
     )
     const after = await lineFacts(ops, git, line)
     expect(after.published).toEqual({
@@ -1814,10 +1819,147 @@ describe("a lane's repo, with jj", () => {
     await expect(
       executeRepo(
         yoursDir,
-        planPublish({ onto: line.onto, publish: line.publish }),
+        planPublishMove({
+          onto: line.onto,
+          publish: line.publish,
+          integrate: false,
+        }),
       ),
     ).rejects.toThrow()
     expect((await lineFacts(ops, git, line)).published.commit).toBe(moved)
+  }, 60_000)
+
+  test("publish from an empty @ on main (ADR-0090): main at the line, and @ empty on it", async () => {
+    const { yoursDir, yoursJj, ops, edit, line, setUpLine } =
+      await offerRig("publish-empty")
+    const git: Runner = args => hostRunner(yoursDir)(["git", ...args])
+    await edit(yoursDir, "a.txt", "a\n")
+    await yoursJj(["commit", "-m", "M0"])
+    await yoursJj(["bookmark", "create", "main", "-r", "@-"])
+    await setUpLine()
+    // An accept: the line moves on past main, and your empty @ stays on main.
+    await yoursJj(["new", line.onto, "-m", "accepted"])
+    await edit(yoursDir, "b.txt", "b\n")
+    await yoursJj(["bookmark", "move", line.onto, "--to", "@"])
+    await yoursJj(["new", "main"])
+    const before = await lineFacts(ops, git, line)
+    expect(before.yours).toMatchObject({ behind: 1, ahead: 0 })
+    await executeRepo(yoursDir, planPublishCatchUp({ onto: line.onto }))
+    await executeRepo(
+      yoursDir,
+      planPublishMove({
+        onto: line.onto,
+        publish: line.publish,
+        integrate: false,
+      }),
+    )
+    const after = await lineFacts(ops, git, line)
+    expect(after.published).toMatchObject({ behind: 0, ahead: 0 })
+    expect(after.yours).toMatchObject({ behind: 0, ahead: 0 })
+    expect(await commitsOf(ops, "main")).toEqual(
+      await commitsOf(ops, revsetName(line.onto)),
+    )
+    expect(await commitsOf(ops, "@-")).toEqual(await commitsOf(ops, "main"))
+    expect(await commitsOf(ops, "@ & empty()")).toHaveLength(1)
+    expect(await readFile(path.join(yoursDir, "b.txt"), "utf8")).toBe("b\n")
+  }, 60_000)
+
+  test("publish with your commits (ADR-0090): rebased onto the line, counted, then the line and main moved to them in one operation", async () => {
+    const { yoursDir, yoursJj, ops, edit, line, setUpLine } =
+      await offerRig("publish-mine")
+    const git: Runner = args => hostRunner(yoursDir)(["git", ...args])
+    await edit(yoursDir, "a.txt", "a\n")
+    await yoursJj(["commit", "-m", "M0"])
+    await yoursJj(["bookmark", "create", "main", "-r", "@-"])
+    await setUpLine()
+    await yoursJj(["new", line.onto, "-m", "accepted"])
+    await edit(yoursDir, "b.txt", "b\n")
+    await yoursJj(["bookmark", "move", line.onto, "--to", "@"])
+    await yoursJj(["new", "main"])
+    await edit(yoursDir, "m.txt", "mine\n")
+    await yoursJj(["commit", "-m", "mine"])
+    expect((await lineFacts(ops, git, line)).yours).toMatchObject({
+      behind: 1,
+      ahead: 1,
+    })
+    await executeRepo(yoursDir, planPublishCatchUp({ onto: line.onto }))
+    expect((await lineFacts(ops, git, line)).yours).toMatchObject({
+      behind: 0,
+      ahead: 1,
+    })
+    const ops0 = await yoursJj(["op", "log", "--no-graph", "-T", 'id ++ "\\n"'])
+    await executeRepo(
+      yoursDir,
+      planPublishMove({
+        onto: line.onto,
+        publish: line.publish,
+        integrate: true,
+      }),
+    )
+    const ops1 = await yoursJj(["op", "log", "--no-graph", "-T", 'id ++ "\\n"'])
+    // One operation moved both bookmarks.
+    expect(
+      ops1.stdout.split("\n").length - ops0.stdout.split("\n").length,
+    ).toBe(1)
+    const mine = await commitsOf(ops, 'description(exact:"mine\\n")')
+    expect(await commitsOf(ops, revsetName(line.onto))).toEqual(mine)
+    expect(await commitsOf(ops, "main")).toEqual(mine)
+  }, 60_000)
+
+  test("a publish's second round reads your commits conflicted by the catch-up, which the preview of @ cannot show; reverting the catch-up puts everything back, an edit made before it included (ADR-0090, S111)", async () => {
+    const { yoursDir, yoursJj, ops, edit, line, setUpLine } =
+      await offerRig("publish-undo")
+    const git: Runner = args => hostRunner(yoursDir)(["git", ...args])
+    await edit(yoursDir, "g.txt", "base\n")
+    await yoursJj(["commit", "-m", "M0"])
+    await yoursJj(["bookmark", "create", "main", "-r", "@-"])
+    await setUpLine()
+    // Y1 changes g.txt; Y2 puts it back, so @'s tree merges cleanly.
+    await edit(yoursDir, "g.txt", "yours\n")
+    await yoursJj(["commit", "-m", "Y1"])
+    await edit(yoursDir, "g.txt", "base\n")
+    await yoursJj(["commit", "-m", "Y2"])
+    // A file in @, so leaving it does not abandon it as empty.
+    await edit(yoursDir, "h.txt", "h\n")
+    const at = (
+      await yoursJj(["log", "--no-graph", "-r", "@", "-T", "change_id"])
+    ).stdout.trim()
+    await yoursJj(["new", line.onto, "-m", "accepted"])
+    await edit(yoursDir, "g.txt", "line\n")
+    await yoursJj(["bookmark", "move", line.onto, "--to", "@"])
+    await yoursJj(["edit", at])
+    // Not yet snapshotted: the catch-up snapshots it first, as you.
+    await edit(yoursDir, "e.txt", "edited\n")
+    const before = await lineFacts(ops, git, line)
+    expect(before.yours.catchUp?.conflicts).toEqual([])
+    expect(before.yours.conflicts.commits).toBe(0)
+    const commitsBefore = await commitsOf(ops, "::@- ~ ::main")
+    await executeRepo(yoursDir, planPublishCatchUp({ onto: line.onto }))
+    const op = (
+      await yoursJj([
+        "--ignore-working-copy",
+        "op",
+        "log",
+        "-n",
+        "1",
+        "--no-graph",
+        "-T",
+        "id",
+      ])
+    ).stdout.trim()
+    expect(
+      (await lineFacts(ops, git, line)).yours.conflicts.commits,
+    ).toBeGreaterThan(0)
+    await executeRepo(yoursDir, planCatchUpUndo(op))
+    const undone = await lineFacts(ops, git, line)
+    expect(undone.yours.behind).toBe(1)
+    expect(undone.yours.conflicts.commits).toBe(0)
+    expect(await commitsOf(ops, "::@- ~ ::main")).toEqual(commitsBefore)
+    expect(await commitsOf(ops, "@ & divergent()")).toEqual([])
+    expect(await readFile(path.join(yoursDir, "e.txt"), "utf8")).toBe(
+      "edited\n",
+    )
+    expect(await readFile(path.join(yoursDir, "g.txt"), "utf8")).toBe("base\n")
   }, 60_000)
 
   test("an unchanged offer's refresh reads at most 3 jj processes (ADR-0065), and what catching up changes is read once per move (S97)", async () => {

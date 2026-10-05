@@ -280,8 +280,8 @@ describe("offerView: ADR-0038's table", () => {
       wips: wips.map(w => ({ ...w, behind: 0, ahead: 1 })),
       yours: {
         behind: 0,
-        ahead: null,
-        follow: null,
+        ahead: 0,
+        catchUp: null,
         conflicts: { commits: 0, files: [] },
       },
       commands: true,

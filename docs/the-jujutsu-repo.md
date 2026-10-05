@@ -5,7 +5,7 @@ host runs on. This page is for someone who works in that repo with jj or
 jjui beside pine·trie. It says what pine·trie puts there, what it expects, and
 what to configure. Why each piece is shaped as it is: ADR-0038 (offers),
 ADR-0039 (thread names), ADR-0060 (the integration line and the ledger),
-ADR-0076 (publishing).
+ADR-0076 and ADR-0090 (publishing).
 
 Two parties act on the repo. **The host** runs its jj commands as the
 operation user `pinetrie-host@<hostname>`. **The owner** is whoever runs the
@@ -14,18 +14,18 @@ touch the repo: their threads' agents work in lanes of their own, and their
 work reaches the repo as offers.
 
 The page names these things by what they are for, not by their jj names
-(ADR-0061): the line is **the project**, integrating an offer is **add to
-the project**,
-bringing a thread up to date is **catch up**, and landing your work is
-**add my work to the project**. The jj names are in the page's titles.
+(ADR-0061, ADR-0090): the line is **accepted work**, integrating an offer is
+**accept**, bringing a thread or your files up to date is **catch up**, and
+moving `main` (with your own work, on the owner's machine) is **publish**.
+The jj names are in the page's titles.
 
 ## Bookmarks
 
 | bookmark | whose | what it is |
 |---|---|---|
-| `pinetrie-onto` | the owner's, moved by the host on an offer integration | **The integration line**: where finished work lands. It only moves forward. Immutable once set up. |
+| `pinetrie-onto` | the owner's, moved by the host on an offer integration, and by a publish of the owner's commits | **The integration line**, "accepted work" on the page: where finished work lands. It only moves forward. Immutable once set up. |
 | `pinetrie-offer/<name>` | the host's | **An offer**: a thread's work as one revision, or a stack, on the thread's base. Immutable while it sits on the line. `<name>` is the thread's two-word name. |
-| `main` | the owner's, moved by the host on a publish | **Where the project is published**: moved forward to `pinetrie-onto`, never anywhere else. |
+| `main` | the owner's, moved on a publish | **Where the project is published**: moved forward to `pinetrie-onto`, with it, never anywhere else. |
 | `wip/*` | the owner's | **A work in progress** a thread may start from, chosen at its first message. Never touched by the host, except an offer integration into it. |
 | `tip@pinetrie-<lane>` | the host's | **A lane's history**, fetched from the lane. A remote bookmark, untracked, so jj treats it as immutable and leaves it out of the default log. Archiving a thread deletes its lane's, and abandons its offer; restoring brings both back. |
 
@@ -44,36 +44,45 @@ integration fails instead of dropping commits. Only an offer with no
 conflicts can be integrated into the line. The commit it leaves there is an
 **integrated-offer commit** (ADR-0083).
 
-**Publish** ("publish to main", in the page's project menu) moves `main`
-forward to `pinetrie-onto`, as `pinetrie-host`: `jj bookmark move main --to
-pinetrie-onto`. It changes no file, so anyone in the session may, on a host
-that admits others too. It does not push. jj refuses a move that is not
-forward, so once `main` has commits the line lacks (someone pushed to it
-outside pine·trie), publishing is refused until they are brought into the
-line. The host watches `main` as it watches the line, so moving it in jj
-updates the menu's count of unpublished commits.
+**Publish**, the page's one button for the line (ADR-0090), shows only while
+there is something to publish. On the owner's machine it is up to three
+steps, as one act:
 
-**Update my files**, in the page's project menu, is the one act of
-pine·trie's that moves the owner's `@` (ADR-0061, S80): `jj rebase -b @ -d
-pinetrie-onto`, run as the owner. It moves the owner's work above the line
-and every head on it, other heads besides `@` included. Before it is
-offered, the menu shows a preview made with `git merge-tree`, which writes
-nothing jj or jjui shows: the files that change, those that would
-conflict, and the other heads that move. A conflict does not stop it: jj
-marks the lowest conflicted commit and those above it, and the markers are
-in `@`'s files. "Resolve with the agent" then opens a thread working in
-the owner's files with the `resolve-conflicts` skill, which resolves at
-the lowest conflicted commit (`jj new`, resolve, `jj squash`).
+1. When the owner's files are behind the line, `jj rebase -b @ -d
+   pinetrie-onto`, run as the owner: the owner's work above the line, and
+   every head on it besides `@`, moves onto the line. Before it, the
+   button's title says what this does, from a preview made with `git
+   merge-tree`, which writes nothing jj or jjui shows: how many files
+   change, and the other heads that move.
+2. and 3. `jj bookmark move pinetrie-onto main --to @-`, run as the owner,
+   when the owner has commits below `@` the line lacks: the line accepts
+   them, and `main` moves with it, in one operation. Without such commits,
+   `jj bookmark move main --to pinetrie-onto`, as `pinetrie-host`.
 
-**Land my work** ("add my work to the project", in the page's project
-menu) moves `pinetrie-onto` forward to the owner's `@-`. It runs as the owner, not as `pinetrie-host`, since it
-moves the line to the owner's commits: the operation log shows it as the
-owner's act. Moving the line by hand is the same
-act: `jj bookmark move pinetrie-onto --to @-`.
+On a host that admits others, a publish is the last move alone, as
+`pinetrie-host`: it changes no file, so anyone in the session may. It does
+not push.
+
+Publishing is refused before its first step when the owner's files have
+conflicts, when the preview says catching up would conflict, or when `main`
+has commits the line lacks (someone pushed to it outside pine·trie): those
+must be brought into the line first. When the rebase leaves one of the
+owner's commits conflicted (one that `@`'s own tree resolves, so the
+preview could not see it), or the move fails, the host reverts the rebase's
+operation with `jj op revert`, as the owner, and the repo is as it was. It
+never uses `jj op restore`, which would delete from disk an edit made since
+(S111). When the owner's files conflict, the page's toast offers "resolve
+with the agent", which opens a thread working in the owner's files with the
+`resolve-conflicts` skill, which resolves at the lowest conflicted commit
+(`jj new`, resolve, `jj squash`).
+
+The host watches `main` as it watches the line, so moving it in jj updates
+what the publish button says. Moving the line or `main` by hand is the same
+act as the host's: `jj bookmark move pinetrie-onto main --to @-`.
 
 ## Config the host writes
 
-"Set up the project", in the page's project menu, writes two settings to the
+"Set up", the page's button before the line exists, writes two settings to the
 repo's own config (`jj config set --repo`), shown in full before anything
 is written, and only when chosen:
 
@@ -153,4 +162,4 @@ believes:
   started from it is brought up to date with a fresh copy of it. Once the
   WIP's commits are on the line, its threads move to the line; if the
   bookmark is deleted without landing, their updates stop until "continue
-  from the project".
+  from accepted work".

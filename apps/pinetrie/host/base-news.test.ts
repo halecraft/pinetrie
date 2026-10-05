@@ -39,8 +39,8 @@ function behind(to = "l2") {
       wips: [],
       yours: {
         behind: 0,
-        ahead: null,
-        follow: null,
+        ahead: 0,
+        catchUp: null,
         conflicts: { commits: 0, files: [] },
       },
       commands: true,

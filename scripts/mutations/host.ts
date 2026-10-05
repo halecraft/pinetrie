@@ -4,6 +4,22 @@ import type { Mutation } from "../mutate.ts"
 const unit = ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host"]
 
 export const mutations: readonly Mutation[] = [
+  {
+    name: "a move jj refuses after a publish's catch-up leaves it",
+    file: "apps/pinetrie/host/work/line.ts",
+    from: "      if (op !== null) await ops.execute(planCatchUpUndo(op))\n",
+    to: "",
+    command: unit,
+    expect: "a move jj refuses after the catch-up reverts it, then fails",
+  },
+  {
+    name: "a publish's refused second round reverts nothing",
+    file: "apps/pinetrie/host/work/line.ts",
+    from: "      await ops.execute(planCatchUpUndo(finish.op))\n",
+    to: "",
+    command: unit,
+    expect: "your commits conflicted by the catch-up: it is reverted",
+  },
   // ── a resolution's prompt fits (ADR-0084) ──
   {
     name: "an unfittable catch-up is merged anyway",
@@ -225,7 +241,7 @@ export const mutations: readonly Mutation[] = [
     suite: "lanes",
     scenario: "main",
     expect:
-      "update my files previews what it changes, then rebases your work onto the project, as you",
+      "publish previews catching your files up, then rebases your work onto accepted work as you, and accepts it",
   },
   {
     name: "restoring does not refresh its lanes",

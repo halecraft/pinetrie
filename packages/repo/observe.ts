@@ -32,14 +32,17 @@ export interface Fingerprint {
 }
 
 /**
- * `all`: the line or a WIP moved, or this is the first observation. `line`:
- * the publish bookmark moved, which changes only the line's record, since no
- * offer depends on it (ADR-0076). `yours`: `@` moved, which changes only each
+ * `all`: the line or a WIP moved, or this is the first observation. `onto`:
+ * the line's bookmark moved since an earlier observation, which the base
+ * snapshot follows (ADR-0090); never on the first, since startup reads the
+ * base itself. `line`: the publish bookmark moved, which changes only the
+ * line's record, since no offer depends on it (ADR-0076). `yours`: `@` moved, which changes only each
  * record's `yourEdits` and the line's preview. `lanes`: lanes' refs moved.
  * `offers`: offer bookmarks moved, by thread name.
  */
 export interface Moved {
   readonly all: boolean
+  readonly onto: boolean
   readonly line: boolean
   readonly yours: boolean
   readonly lanes: ReadonlySet<LaneName>
@@ -123,6 +126,7 @@ export function planObserve(
   const offers = new Set<ThreadName>()
   let all = prev === null
   let published = false
+  let onto = false
   const names = new Set([
     ...(prev?.bookmarks.keys() ?? []),
     ...next.bookmarks.keys(),
@@ -137,10 +141,14 @@ export function planObserve(
     } else if (name.startsWith(OFFER_PREFIX))
       offers.add(name.slice(OFFER_PREFIX.length) as ThreadName)
     else if (name === line.publish) published = true
-    else if (watchedLocal(name, line)) all = true
+    else if (watchedLocal(name, line)) {
+      all = true
+      if (name === line.onto && prev !== null) onto = true
+    }
   }
   return {
     all,
+    onto,
     line: published,
     yours: prev === null || prev.at !== next.at,
     lanes,

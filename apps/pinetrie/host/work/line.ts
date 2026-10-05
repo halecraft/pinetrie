@@ -1,21 +1,25 @@
-// host/work/line — the integration line in your repo (ADR-0060, ADR-0061):
+// host/work/line — the integration line in your repo (ADR-0060, ADR-0090):
 // its record, read whenever the owner observes a move that changes it, and
 // the `line` commands. Gather (the shared facts' `lineFacts`), decide
-// (`planLineRecord`, `planLineAction`), translate (`lineProposal`,
-// `lineSteps`) and execute, each in one step on the owner: the record as
-// upkeep (`later("line")`), a command as a command.
+// (`planLineRecord`, `planLineAction`, `planPublishFinish`), translate
+// (`lineProposal`, `planLineSetup` and the publish's steps) and execute, on
+// the owner: the record as upkeep (`later("line")`), a command as a command.
 
 import type {
   ErrCode,
   LineAction,
   LineRecord,
+  PublishDecision,
   ValueWrite,
 } from "@pinetrie/core"
 import type { LineConfig } from "@pinetrie/lanes"
 import { readLine } from "@pinetrie/reads"
 import {
   lineProposal,
-  lineSteps,
+  planCatchUpUndo,
+  planLineSetup,
+  planPublishCatchUp,
+  planPublishMove,
   type RepoOps,
   type RepoOwner,
 } from "@pinetrie/repo"
@@ -24,9 +28,14 @@ import {
   lineRefusal,
   planLineAction,
   planLineRecord,
+  planPublishFinish,
+  publishUndone,
   setIfChanged,
 } from "@pinetrie/rules"
 import type { Basics } from "../basics.ts"
+
+/** A `line` command's answer: null when carried out, else why not, worded. */
+type LineAnswer = { readonly code: ErrCode; readonly message: string } | null
 
 export interface Line {
   /** Read the line and write its record when it changed, as upkeep. */
@@ -37,24 +46,20 @@ export interface Line {
    * A `line` command; null when carried out, else why not, worded
    * (`lineRefusal`) from the record it was decided on.
    */
-  act(
-    action: LineAction,
-  ): Promise<{ readonly code: ErrCode; readonly message: string } | null>
+  act(action: LineAction): Promise<LineAnswer>
 }
 
 export function createLine(deps: {
-  readonly owner: RepoOwner
+  readonly owner: Pick<RepoOwner, "later" | "command">
   readonly basics: Pick<Basics, "session">
   /** The integration line's names (ADR-0060). */
   readonly line: LineConfig
   /**
    * Whether this host accepts the owner's `line` commands: it admits no one
-   * else. Publishing is anyone's (ADR-0076).
+   * else. Moving the publish bookmark is anyone's (ADR-0076).
    */
   readonly lineCommands: boolean
   readonly writeValues: (writes: readonly ValueWrite[]) => Promise<void>
-  /** After the line moved (set up, or your work added): the base snapshot follows it. */
-  readonly lineMoved: () => void
 }): Line {
   const { owner, line } = deps
   const { session: doc } = deps.basics
@@ -72,6 +77,35 @@ export function createLine(deps: {
     return next
   }
 
+  /**
+   * A publish in two rounds (ADR-0090): the catch-up, then, from the line read
+   * again, the move or the catch-up reverted (`planPublishFinish`). A move jj
+   * refuses after a catch-up reverts it too, so nothing is left half done.
+   */
+  async function publish(
+    ops: RepoOps,
+    decision: PublishDecision,
+  ): Promise<LineAnswer> {
+    let op: string | null = null
+    if (decision.catchUp) {
+      await ops.execute(planPublishCatchUp(decision))
+      op = (await ops.shared()).op
+    }
+    const after = await record(ops)
+    const finish = planPublishFinish({ decision, after, op })
+    if (finish.kind === "undo") {
+      await ops.execute(planCatchUpUndo(finish.op))
+      return { code: finish.code, message: publishUndone(finish.code, after) }
+    }
+    try {
+      await ops.execute(planPublishMove(finish))
+    } catch (e) {
+      if (op !== null) await ops.execute(planCatchUpUndo(op))
+      throw e
+    }
+    return null
+  }
+
   return {
     refresh: () => owner.later("line", async ops => void (await record(ops))),
     record,
@@ -84,12 +118,11 @@ export function createLine(deps: {
             code: planned.code,
             message: lineRefusal(action, planned.code, now),
           }
-        await ops.execute(lineSteps(planned))
+        if (planned.kind === "setup") await ops.execute(planLineSetup(planned))
+        const answer =
+          planned.kind === "publish" ? await publish(ops, planned) : null
         await record(ops)
-        // Updating your files and publishing leave the line where it was.
-        if (planned.kind === "setup" || planned.kind === "land")
-          deps.lineMoved()
-        return null
+        return answer
       }),
   }
 }

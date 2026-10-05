@@ -114,11 +114,15 @@ export function decodeOfferFact(stored: string): OfferFact | undefined {
 export const decodeFact = (message: unknown): OfferFact | undefined =>
   decodeWith(FactSchema, message, ({ details }) => fromStored(details))
 
+/** Where an integration went, after "accepted": nothing for the line, else a WIP's name. */
+const into = (to: CatchUpFrom) =>
+  to.kind === "line" ? "" : ` into ${catchUpName(to)}`
+
 /** The one line a column shows for a fact. */
 export function factLine(fact: OfferFact): string {
   switch (fact.kind) {
     case "integrated":
-      return `✓ added to ${catchUpName(fact.to)} as ${fact.as.slice(0, 8)}`
+      return `✓ accepted${into(fact.to)} as ${fact.as.slice(0, 8)}`
     case "described":
       return "✎ a new description was asked for"
     case "squashed":
@@ -132,7 +136,7 @@ export function factLine(fact: OfferFact): string {
 export function factContent(fact: OfferFact, name: string): string {
   switch (fact.kind) {
     case "integrated":
-      return `${name} added this thread's work to ${catchUpName(fact.to)}, as the change ${fact.as}: ${fact.bookmark} moved forward to it. That work is no longer offered; what you do next is offered on top of it.`
+      return `${name} accepted this thread's work${into(fact.to)}, as the change ${fact.as}: ${fact.bookmark} moved forward to it. That work is no longer offered; what you do next is offered on top of it.`
     case "described":
       return `${name} asked for a new description of this thread's offer.`
     case "squashed":
