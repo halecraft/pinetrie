@@ -2,7 +2,8 @@
 // (ADR-0085).
 //
 // The shell of `root-target.ts`: a drop lands only where a key could move it
-// (`planRootDrop`), on the side of an item the pointer is on (`landingOf`).
+// (`planRootDrop`), at the place in a group the pointer is nearest
+// (`landingIn`).
 // While a root is dragged, the zone it would land on carries
 // `data-root-drop`, which draws a line where it goes, and the item dragged
 // carries `data-root-dragging`, which dims it. Both are written to the DOM,
@@ -13,10 +14,12 @@ import { type DragEvent as ReactDragEvent, useEffect } from "react"
 import type { Intent } from "./intent.ts"
 import {
   encodeRootDrag,
-  landingOf,
+  landingIn,
   parseRootDrag,
+  placeAfter,
   planRootDrop,
   ROOT_DROP_ZONE,
+  ROOT_GROUP_ZONE,
   ROOT_MIME,
   type RootDrag,
   type RootTarget,
@@ -42,32 +45,39 @@ export const startRootDrag =
     e.dataTransfer.setDragImage(item, e.clientX - box.left, e.clientY - box.top)
   }
 
-/**
- * The zone after `zone` (or after an item that is none, a closed row): the
- * next item beside it, or else the end it is in.
- */
-function zoneAfter(zone: Element): HTMLElement | null {
-  for (let s = zone.nextElementSibling; s !== null; s = s.nextElementSibling)
-    if (s instanceof HTMLElement && s.matches(ROOT_DROP_ZONE)) return s
-  return zone.parentElement?.closest<HTMLElement>(ROOT_DROP_ZONE) ?? null
+/** A group's places: its items, in order, and its end. */
+function placesOf(group: Element | null): {
+  readonly items: readonly HTMLElement[]
+  readonly end: HTMLElement
+} | null {
+  if (group === null) return null
+  const zones = [group, ...group.querySelectorAll(ROOT_DROP_ZONE)].filter(
+    (z): z is HTMLElement =>
+      z instanceof HTMLElement && z.matches(ROOT_DROP_ZONE),
+  )
+  const before = (z: HTMLElement) => rootTargetOfElement(z)?.before
+  const end = zones.find(z => before(z) === null)
+  if (end === undefined) return null
+  return { items: zones.filter(z => before(z) != null), end }
 }
 
 /** Where a drag event over the page would land: the zone, and its target. */
 function landingAt(
   e: DragEvent,
 ): { readonly el: HTMLElement; readonly target: RootTarget } | null {
-  const zone =
-    e.target instanceof Element
-      ? e.target.closest<HTMLElement>(ROOT_DROP_ZONE)
-      : null
-  const here = zone === null ? null : rootTargetOfElement(zone)
-  if (zone === null || here === null) return null
-  const box = zone.getBoundingClientRect()
-  const el = landingOf(
-    { here: zone, next: zoneAfter(zone), item: here.before !== null },
-    e.clientY > box.top + box.height / 2,
+  const places = placesOf(
+    e.target instanceof Element ? e.target.closest(ROOT_GROUP_ZONE) : null,
   )
-  const target = el === zone ? here : rootTargetOfElement(el)
+  if (places === null) return null
+  const el = landingIn(
+    places.items.map(zone => {
+      const box = zone.getBoundingClientRect()
+      return { zone, mid: box.top + box.height / 2 }
+    }),
+    places.end,
+    e.clientY,
+  )
+  const target = rootTargetOfElement(el)
   return target === null ? null : { el, target }
 }
 
@@ -108,11 +118,14 @@ export function useRootDrag(
         e.target instanceof Element
           ? e.target.closest<HTMLElement>(ROOT_ITEM)
           : null
-      const after = item === null ? null : zoneAfter(item)
+      const places = placesOf(item?.closest(ROOT_GROUP_ZONE) ?? null)
       from = {
         drag,
         item,
-        home: after === null ? null : rootTargetOfElement(after),
+        home:
+          item === null || places === null
+            ? null
+            : rootTargetOfElement(placeAfter(places.items, item, places.end)),
       }
       // Dimmed after the browser has drawn the drag's image from it.
       dim = setTimeout(() => {

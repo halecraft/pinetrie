@@ -33,7 +33,7 @@ import {
   RootStatus,
   StatusMark,
 } from "./root-signals.tsx"
-import { rootDropProps } from "./root-target.ts"
+import { rootDropProps, rootGroupProps } from "./root-target.ts"
 import { startRootDrag } from "./use-root-drag.ts"
 
 /** ▦'s mark's title: what the roots not in your list raise. */
@@ -186,6 +186,7 @@ export function Board({
           className="board-column"
           data-state={column.state.id}
           key={column.state.id}
+          {...rootGroupProps}
           {...rootDropProps({
             kind: "state",
             state: column.state.id,
@@ -268,6 +269,7 @@ export function Board({
       <div
         className="board-closed"
         data-state={view.closed.state.id}
+        {...rootGroupProps}
         {...rootDropProps({
           kind: "state",
           state: view.closed.state.id,

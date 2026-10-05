@@ -31,7 +31,7 @@ import {
 } from "./open-list-view.ts"
 import { planTitle, renameKey } from "./root-label.ts"
 import { Readers, RootStatus } from "./root-signals.tsx"
-import { type RootDrag, rootDropProps } from "./root-target.ts"
+import { type RootDrag, rootDropProps, rootGroupProps } from "./root-target.ts"
 import { startRootDrag } from "./use-root-drag.ts"
 
 /** Up and Down move focus between items. */
@@ -98,7 +98,7 @@ export function OpenList({
   return (
     <nav aria-label="your threads" id="open-list" ref={nav}>
       {/* biome-ignore lint/a11y/noStaticElementInteractions: Up and Down move focus between the buttons inside */}
-      <div className="open-items" onKeyDown={moveFocus}>
+      <div className="open-items" onKeyDown={moveFocus} {...rootGroupProps}>
         {view.items.map(item => {
           const key = listKey(item)
           if (item.kind === "new")

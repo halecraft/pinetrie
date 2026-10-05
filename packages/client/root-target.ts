@@ -4,8 +4,8 @@
 // A root is dragged from the board or from your list. A drop names a target
 // by the attributes the drop code marks it with (`rootDropProps`), and
 // `planRootDrop` turns it into the intent a keyboard move sends: a board
-// item's Move to ▸, and Move up and Move down (`stepsIn`) on both. Over an
-// item, which side of it the drop lands is `landingOf`'s.
+// item's Move to ▸, and Move up and Move down (`stepsIn`) on both. Where in
+// a group of places (`rootGroupProps`) the pointer lands is `landingIn`'s.
 
 import {
   type EntryId,
@@ -16,6 +16,7 @@ import {
   type WorkflowStateId,
 } from "@pineta/core"
 import type { Intent } from "./intent.ts"
+import { gapAt } from "./reorder.ts"
 
 /** The drag data type a root travels under, Pineta's own; never a card's. */
 export const ROOT_MIME = "application/x-pineta-root"
@@ -43,6 +44,8 @@ const LIST_BEFORE = "data-list-before"
 /** What a list's end carries, where there is no root to go before. */
 const END = "end"
 
+const ROOT_GROUP = "data-root-group"
+
 /** What an element a root's drop may land on matches. */
 export const ROOT_DROP_ZONE = `[${ROOT_STATE}],[${LIST_BEFORE}]`
 
@@ -56,6 +59,14 @@ export function rootDropProps(
         ...(target.before === null ? {} : { [ROOT_BEFORE]: target.before }),
       }
     : { [LIST_BEFORE]: target.before ?? END }
+}
+
+/** What a group of places matches: a board column, the closed state, your list. */
+export const ROOT_GROUP_ZONE = `[${ROOT_GROUP}]`
+
+/** The attribute that marks an element as a group of places. */
+export const rootGroupProps: Readonly<Record<string, string>> = {
+  [ROOT_GROUP]: "",
 }
 
 /** The target an element marks (`rootDropProps`); null for none. */
@@ -83,15 +94,30 @@ export const sameTarget = (a: RootTarget, b: RootTarget): boolean =>
     : b.kind === "list" && a.before === b.before
 
 /**
- * Where a drop over `here` lands. An item's upper half lands before it, its
- * lower half on the zone after it (`next`), so the gap between two items is
- * one place whichever side the pointer is on. An end lands on itself.
+ * Where a drop lands in a group, its items in order with their centres:
+ * before the first whose centre is below the pointer's `y`, or at `end`.
+ * Anywhere in the group lands, the gaps between items too, so the place
+ * changes only as the pointer passes an item's centre.
  */
-export function landingOf<Z>(
-  zone: { readonly here: Z; readonly next: Z | null; readonly item: boolean },
-  lower: boolean,
+export function landingIn<Z>(
+  items: readonly { readonly zone: Z; readonly mid: number }[],
+  end: Z,
+  y: number,
 ): Z {
-  return zone.item && lower && zone.next !== null ? zone.next : zone.here
+  const gap = gapAt(
+    items.map(i => i.mid),
+    y,
+  )
+  return items[gap]?.zone ?? end
+}
+
+/**
+ * The place just after `item` in a group: where a drop of it moves nothing.
+ * An item that is no place (a closed row) is at the group's end.
+ */
+export function placeAfter<Z>(zones: readonly Z[], item: Z, end: Z): Z {
+  const at = zones.indexOf(item)
+  return at < 0 ? end : (zones[at + 1] ?? end)
 }
 
 /** Where Move up or Move down puts an item: before `before`, or at the end. */

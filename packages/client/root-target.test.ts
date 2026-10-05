@@ -2,8 +2,9 @@ import { entryId, rootIdFor, workflowStateIdFor } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import {
   encodeRootDrag,
-  landingOf,
+  landingIn,
   parseRootDrag,
+  placeAfter,
   planRootDrop,
   type RootDrag,
   type RootTarget,
@@ -102,18 +103,38 @@ describe("a root's drop lands where a key could move it", () => {
   })
 })
 
-describe("landingOf", () => {
-  test("an item's upper half lands before it, its lower half on the zone after it", () => {
-    const item = { here: "b", next: "c", item: true }
-    expect(landingOf(item, false)).toBe("b")
-    expect(landingOf(item, true)).toBe("c")
+describe("landingIn", () => {
+  const items = [
+    { zone: "a", mid: 10 },
+    { zone: "b", mid: 30 },
+  ]
+
+  test("a drop lands before the first item whose centre is below it", () => {
+    expect(landingIn(items, "end", 0)).toBe("a")
+    expect(landingIn(items, "end", 15)).toBe("b")
+    expect(landingIn(items, "end", 29)).toBe("b")
   })
 
-  test("an end lands on itself, whichever half", () => {
-    const end = { here: "end", next: "past", item: false }
-    expect(landingOf(end, false)).toBe("end")
-    expect(landingOf(end, true)).toBe("end")
-    expect(landingOf({ here: "b", next: null, item: true }, true)).toBe("b")
+  test("past the last centre, or among no items, a drop lands at the end", () => {
+    expect(landingIn(items, "end", 31)).toBe("end")
+    expect(landingIn([], "end", 0)).toBe("end")
+  })
+
+  test("the gap between two items lands with the item below it", () => {
+    // Between a's bottom (20) and b's top (22), the place does not flicker.
+    for (const y of [19, 20, 21, 22, 23])
+      expect(landingIn(items, "end", y)).toBe("b")
+  })
+})
+
+describe("placeAfter", () => {
+  test("an item's place after it is the next item's, or the end's", () => {
+    expect(placeAfter(["a", "b"], "a", "end")).toBe("b")
+    expect(placeAfter(["a", "b"], "b", "end")).toBe("end")
+  })
+
+  test("an item that is no place, a closed row, is at the end", () => {
+    expect(placeAfter(["a", "b"], "z", "end")).toBe("end")
   })
 })
 
