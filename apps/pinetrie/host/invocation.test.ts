@@ -1,5 +1,5 @@
 import { expect, test } from "vitest"
-import { planInvocation, refusalText, storeFile } from "./invocation.ts"
+import { planInvocation, refusalText, storeChoice } from "./invocation.ts"
 
 const PINETRIE = "/src/pinetrie"
 
@@ -33,6 +33,12 @@ test("a flag, or a second folder, is refused", () => {
 })
 
 test("the store is PINETRIE_STORE when set, else .pinetrie/pinetrie.db in the project's root", () => {
-  expect(storeFile("/p", {})).toBe("/p/.pinetrie/pinetrie.db")
-  expect(storeFile("/p", { PINETRIE_STORE: "/tmp/s.db" })).toBe("/tmp/s.db")
+  expect(storeChoice("/p", {})).toEqual({
+    file: "/p/.pinetrie/pinetrie.db",
+    from: "project",
+  })
+  expect(storeChoice("/p", { PINETRIE_STORE: "/tmp/s.db" })).toEqual({
+    file: "/tmp/s.db",
+    from: "PINETRIE_STORE",
+  })
 })

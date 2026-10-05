@@ -42,12 +42,21 @@ export function planInvocation(
   }
 }
 
+/** The session's SQLite file, and what named it. */
+export interface StoreChoice {
+  readonly file: string
+  readonly from: "PINETRIE_STORE" | "project"
+}
+
 /** The session's SQLite file: `PINETRIE_STORE` when set, else in the project. */
-export function storeFile(
+export function storeChoice(
   root: string,
   env: Readonly<Record<string, string | undefined>>,
-): string {
-  return env.PINETRIE_STORE ?? pinetrieDir(root).store
+): StoreChoice {
+  const given = env.PINETRIE_STORE
+  return given === undefined
+    ? { file: pinetrieDir(root).store, from: "project" }
+    : { file: given, from: "PINETRIE_STORE" }
 }
 
 const USAGE = `usage: pnpm host [folder]  (a relative folder is read from ${PRODUCT_NAME}'s root)`

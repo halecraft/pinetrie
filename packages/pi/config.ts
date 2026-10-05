@@ -21,6 +21,7 @@ import type { GatheredCommand } from "@pinetrie/rules"
 import { gatherCommands, pinetrieCommands } from "./commands.ts"
 import {
   type buildSystemPrompt,
+  CONFIG_DIR_NAME,
   DefaultResourceLoader,
   ModelRuntime,
   SettingsManager,
@@ -33,7 +34,10 @@ import {
 } from "./scripted.ts"
 
 export type ModelChoice =
-  /** The person's pi setup: settings' default model and the extensions' providers. */
+  /**
+   * The person's pi setup: the default model in pi's settings, the project's
+   * file over the global one, and the extensions' providers.
+   */
   | {
       readonly kind: "configured"
       readonly provider?: string
@@ -48,19 +52,68 @@ export type ModelChoice =
   /** pi's faux provider, scripted by a suite. */
   | { readonly kind: "scripted"; readonly script: ScriptedModel }
 
+/** Where one field of a configured model came from. */
+export type FieldSource =
+  | { readonly kind: "override" }
+  | { readonly kind: "settings"; readonly file: string }
+
+/** Where the model a host runs came from. */
+export type ModelOrigin =
+  | {
+      readonly kind: "configured"
+      readonly provider: FieldSource
+      readonly model: FieldSource
+    }
+  | { readonly kind: "named" }
+  | { readonly kind: "scripted" }
+
+/** One of pi's settings files, and the default model it names. */
+export interface SettingsLayer {
+  readonly file: string
+  readonly provider?: string
+  readonly model?: string
+}
+
 /**
- * The model to use: an override's fields win over the settings' defaults. Pure;
- * undefined when neither names both a provider and a model.
+ * The model to use, field by field: the override's, else the project
+ * settings', else the global settings', as pi merges them. Pure; undefined
+ * when no source names a provider, or none names a model.
  */
 export function pickModel(
-  settings: { readonly provider?: string; readonly model?: string },
+  settings: { readonly global: SettingsLayer; readonly project: SettingsLayer },
   override: { readonly provider?: string; readonly model?: string },
-): { readonly provider: string; readonly model: string } | undefined {
-  const provider = override.provider ?? settings.provider
-  const model = override.model ?? settings.model
+):
+  | {
+      readonly provider: string
+      readonly model: string
+      readonly origin: ModelOrigin
+    }
+  | undefined {
+  const pick = (field: "provider" | "model") => {
+    const given = override[field]
+    if (given !== undefined)
+      return { value: given, from: { kind: "override" } as const }
+    const layer = [settings.project, settings.global].find(
+      l => l[field] !== undefined,
+    )
+    const value = layer?.[field]
+    return layer === undefined || value === undefined
+      ? undefined
+      : { value, from: { kind: "settings", file: layer.file } as const }
+  }
+  const provider = pick("provider")
+  const model = pick("model")
   return provider === undefined || model === undefined
     ? undefined
-    : { provider, model }
+    : {
+        provider: provider.value,
+        model: model.value,
+        origin: {
+          kind: "configured",
+          provider: provider.from,
+          model: model.from,
+        },
+      }
 }
 
 export const DEFAULT_AGENT_DIR = path.join(homedir(), ".pi", "agent")
@@ -137,6 +190,7 @@ function openRouterImages(models: Runtime): ImagesSetup {
 export interface ModelSetup {
   readonly models: Models
   readonly model: Model
+  readonly origin: ModelOrigin
   /**
    * The model a commit message is asked of (ADR-0038): the run's, except for
    * a scripted model, whose describe requests have a provider of their own so
@@ -214,6 +268,7 @@ export async function setUpModel(
       return {
         models,
         model: faux.getModel(),
+        origin: { kind: "scripted" },
         describeModel: describe.getModel(),
         images: {
           models: images,
@@ -231,6 +286,7 @@ export async function setUpModel(
       return {
         models,
         model,
+        origin: { kind: "named" },
         describeModel: model,
         images: openRouterImages(models),
         ...resources,
@@ -244,10 +300,21 @@ export async function setUpModel(
         models.registerProvider(name, config)
       for (const { provider } of runtime.pendingNativeProviderRegistrations)
         models.registerNativeProvider(provider)
+      const global = settingsManager.getGlobalSettings()
+      const project = settingsManager.getProjectSettings()
+      // The files `SettingsManager.create` reads.
       const picked = pickModel(
         {
-          provider: settingsManager.getDefaultProvider(),
-          model: settingsManager.getDefaultModel(),
+          global: {
+            file: path.join(agentDir, "settings.json"),
+            provider: global.defaultProvider,
+            model: global.defaultModel,
+          },
+          project: {
+            file: path.join(where.cwd, CONFIG_DIR_NAME, "settings.json"),
+            provider: project.defaultProvider,
+            model: project.defaultModel,
+          },
         },
         choice,
       )
@@ -259,6 +326,7 @@ export async function setUpModel(
       return {
         models,
         model,
+        origin: picked.origin,
         describeModel: model,
         images: openRouterImages(models),
         ...resources,

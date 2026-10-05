@@ -337,6 +337,19 @@ const isRecord = (v: unknown): v is Readonly<Record<string, unknown>> =>
 const strings = (v: unknown): string[] =>
   Array.isArray(v) ? v.filter((x): x is string => typeof x === "string") : []
 
+/**
+ * A JSON config file as read: the user config or a project's `pinetrie.json`.
+ * `broken` is a file that exists but could not be read or parsed.
+ */
+export type ConfigRead =
+  | { readonly kind: "read"; readonly json: unknown }
+  | { readonly kind: "missing" }
+  | { readonly kind: "broken"; readonly reason: string }
+
+/** What a config's decoder is given: its JSON, else null, which decodes as empty. */
+export const configJson = (read: ConfigRead): unknown =>
+  read.kind === "read" ? read.json : null
+
 /** A `lanes` key: the project's `pinetrie.json`, or the user's config. */
 export interface LaneConfig {
   readonly grants: LaneGrants

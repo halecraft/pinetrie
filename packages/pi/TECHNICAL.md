@@ -326,8 +326,12 @@ never cuts the newest, so a prompt within it is kept whole (S106).
   - Its handles never leave this package.
 
 Loading runs every package's factory, so side effects happen (`pi-subagents`
-logs a warning). `pickModel` is the pure choice: an override's fields win over
-the settings' defaults. With tools (`CreateAgentOptions.tools`), pi-agent-core's
+logs a warning). `pickModel` is the pure choice, field by field: the
+override's, else the project's `.pi/settings.json`, else the global
+`settings.json` in the agent directory, as pi's own merge orders them. It
+returns where each field came from (`ModelOrigin`), which the agent exposes as
+`modelOrigin` for the host's startup line; a named or scripted model's origin
+is its kind. With tools (`CreateAgentOptions.tools`), pi-agent-core's
 `read`, `write`, `edit` and `bash`, and pine·trie's `grep` and `find`, run in
 each lane's own directory (below).
 Settings, context files and skills load from `CreateAgentOptions.project`,

@@ -12,6 +12,7 @@ import {
   BASE_LANE,
   checkImage,
   commitsOf,
+  configJson,
   DEFAULT_LINE,
   type DiskPaths,
   decodeLaneConfig,
@@ -34,13 +35,14 @@ import {
   prepareImages,
   prepareShared,
   projectContainerfile,
-  readLaneConfig,
+  readConfigFile,
   refreshBase,
   revsetName,
 } from "@pinetrie/lanes"
 import type { Agent } from "@pinetrie/pi"
 import { type RepoOwner, startRepoOwner } from "@pinetrie/repo"
 import { type Basics, failed, messageOf, slow } from "../basics.ts"
+import { brokenConfigLine } from "../startup-lines.ts"
 import { lockHashAt } from "./disk.ts"
 import { openLink } from "./registry.ts"
 
@@ -296,11 +298,11 @@ async function prepareLanes(
     () => true,
     () => false,
   )
-  const config = await readLaneConfig(
-    path.join(at, "pinetrie.json"),
-    at,
-    pnpmLock,
-  )
+  // A missing pinetrie.json is the usual case, and goes unsaid.
+  const read = await readConfigFile(path.join(at, "pinetrie.json"))
+  if (read.kind === "broken")
+    log(brokenConfigLine("pinetrie.json", read.reason))
+  const config = decodeLaneConfig(configJson(read), at, pnpmLock)
   const user = decodeLaneConfig(userConfig.json, at, false)
   const { grants } = config
   const on = [

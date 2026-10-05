@@ -5,7 +5,6 @@
 //
 // Imports NO pi. Everything pi-shaped arrives through pi/.
 
-import { readFile } from "node:fs/promises"
 import {
   createInMemoryStore,
   Exchange,
@@ -21,7 +20,7 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
-import { userConfigFile } from "@pinetrie/lanes"
+import { configJson, readConfigFile, userConfigFile } from "@pinetrie/lanes"
 import { type Agent, createAgent, type ModelChoice, newId } from "@pinetrie/pi"
 import { Control } from "@pinetrie/protocol/line"
 import {
@@ -117,6 +116,7 @@ import { createSettle } from "./settle.ts"
 import { planShutdown, type ShutdownStep } from "./shutdown.ts"
 import { createSplitCall } from "./split-call.ts"
 import { recover } from "./startup.ts"
+import { agentReadyLine, configLine } from "./startup-lines.ts"
 import { openStore } from "./store.ts"
 import { createTitles } from "./titles.ts"
 import { startLaneWork } from "./work/index.ts"
@@ -347,10 +347,10 @@ export async function startHost({
   }
   // The user config, read once: its shared directories (ADR-0035), its
   // renames for command packages (ADR-0036) and whether threads get banners.
-  // Missing or malformed is empty.
-  const userJson = await readFile(userConfig, "utf8")
-    .then(t => JSON.parse(t) as unknown)
-    .catch(() => null)
+  // Missing or broken decodes as empty, and the log says which.
+  const userRead = await readConfigFile(userConfig)
+  log(configLine(userConfig, userRead))
+  const userJson = configJson(userRead)
   const keeper: HostKeeper = createKeeper<HostKey>({
     onError: failed(basics, "step"),
     onSlow: slow(basics),
@@ -490,7 +490,11 @@ export async function startHost({
     )
 
   log(
-    `[host] agent ready — model ${agent.modelLabel}; tools ${toolsIn === null ? "off" : `on, in ${projectRoot}`}`,
+    agentReadyLine({
+      label: agent.modelLabel,
+      origin: agent.modelOrigin,
+      tools: toolsIn === null ? null : (projectRoot ?? toolsIn),
+    }),
   )
 
   // --- the shell -----------------------------------------------------------

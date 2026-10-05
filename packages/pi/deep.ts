@@ -16,8 +16,8 @@
 // `@earendil-works/pi-coding-agent`'s root ALSO cannot be imported here: it
 // pulls in dist/experimental/server.js, which requires `@earendil-works/pi-server`,
 // a package the install does not ship. So `ModelRuntime`, and the pieces that
-// load a person's pi setup (`SettingsManager`, `DefaultResourceLoader`,
-// `buildSystemPrompt`; S23), come from their files.
+// load a person's pi setup (`SettingsManager`, `CONFIG_DIR_NAME`,
+// `DefaultResourceLoader`, `buildSystemPrompt`; S23), come from their files.
 //
 // TYPING NOTE: the runtime import is a URL, which carries no types — but the
 // matching `.d.ts` files DO exist on disk. `typeof import(...)` recovers pi's
@@ -38,6 +38,8 @@ type ModelRuntimeModule =
   typeof import("./node_modules/@earendil-works/pi-coding-agent/dist/core/model-runtime.js")
 type SettingsModule =
   typeof import("./node_modules/@earendil-works/pi-coding-agent/dist/core/settings-manager.js")
+type PiConfigModule =
+  typeof import("./node_modules/@earendil-works/pi-coding-agent/dist/config.js")
 type ResourceLoaderModule =
   typeof import("./node_modules/@earendil-works/pi-coding-agent/dist/core/resource-loader.js")
 type SystemPromptModule =
@@ -69,6 +71,9 @@ const modelRuntime = (await deep(
 const settings = (await deep(
   "@earendil-works/pi-coding-agent/dist/core/settings-manager.js",
 )) as SettingsModule
+const piConfig = (await deep(
+  "@earendil-works/pi-coding-agent/dist/config.js",
+)) as PiConfigModule
 const resourceLoader = (await deep(
   "@earendil-works/pi-coding-agent/dist/core/resource-loader.js",
 )) as ResourceLoaderModule
@@ -104,6 +109,7 @@ export const { detectSupportedImageMimeType } = mime
 export const { resizeImage, formatDimensionNote } = imageResize
 export const { ensureTool } = toolsManager
 export const { SettingsManager } = settings
+export const { CONFIG_DIR_NAME } = piConfig
 export const { DefaultResourceLoader } = resourceLoader
 export const { buildSystemPrompt } = systemPrompt
 export const { createAgentHarness } = runtime

@@ -19,8 +19,13 @@
 //   PINETRIE_STORE     the SQLite file the session and pasted images are kept in
 //                    (default .pinetrie/pinetrie.db in the project's root)
 //   PINETRIE_PROVIDER, PINETRIE_MODEL
-//                    override the model; by default, pi's settings' default,
-//                    with the providers your pi extensions register
+//                    override the model; by default, the default in pi's
+//                    settings (the project's .pi/settings.json over
+//                    ~/.pi/agent/settings.json), with the providers your pi
+//                    extensions register
+//
+// As it starts, the host prints the project, the store, the user config it
+// read, and where its model came from.
 //
 // A refused folder or argument prints why and exits 2, before anything opens.
 // The first SIGINT or SIGTERM shuts the host down; a second ends the process.
@@ -31,8 +36,14 @@ import {
   planInvocation,
   type Refusal,
   refusalText,
-  storeFile,
+  storeChoice,
 } from "./invocation.ts"
+import {
+  listeningLine,
+  openLine,
+  projectLine,
+  storeLine,
+} from "./startup-lines.ts"
 
 const env = process.env
 function refuse(refusal: Refusal): never {
@@ -49,7 +60,9 @@ const prepared = await prepareProjectDir(invocation.folder)
 if (prepared.kind === "refused")
   refuse({ kind: "project", refusal: prepared.refusal })
 const { root } = prepared
-console.log(`[host] project     ${root}`)
+const store = storeChoice(root, env)
+console.log(projectLine(root))
+console.log(storeLine(store))
 const host = await startHost({
   port: Number.parseInt(env.PINETRIE_PORT ?? "7391", 10),
   bind: env.PINETRIE_BIND ?? "127.0.0.1",
@@ -63,14 +76,11 @@ const host = await startHost({
   },
   project: { dir: root, tools: env.PINETRIE_TOOLS !== "0" },
   lanes: env.PINETRIE_LANES !== "0",
-  store: storeFile(root, env),
+  store: store.file,
 })
 
-console.log(`[host] listening   ${host.httpUrl}`)
-for (const invite of host.invites) console.log(`[host] open        ${invite}`)
-console.log(
-  "[host] lanes       one per thread where agent work is wanted (ADR-0020)",
-)
+console.log(listeningLine(host.httpUrl))
+for (const invite of host.invites) console.log(openLine(invite))
 
 const signals = ["SIGINT", "SIGTERM"] as const
 // Once the listeners are off, Node's default action ends the process.

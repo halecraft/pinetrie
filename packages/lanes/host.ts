@@ -27,12 +27,11 @@ import { homedir } from "node:os"
 import path from "node:path"
 import type { ProjectRecord } from "@pinetrie/core"
 import {
+  type ConfigRead,
   type DiskPaths,
-  decodeLaneConfig,
   EXCLUDE_LINE,
   type HostFacts,
   IGNORE_FILE,
-  type LaneConfig,
   type Link,
   laneIgnores,
   PROJECT_DIR,
@@ -191,17 +190,28 @@ async function excludeInYours(
   return true
 }
 
-/** A lane config file, read and decoded; an empty one when missing or malformed. */
-export async function readLaneConfig(
-  file: string,
-  root: string,
-  pnpmLock: boolean,
-): Promise<LaneConfig> {
-  const json = await readFile(file, "utf8")
-    .then(t => JSON.parse(t) as unknown)
-    .catch(() => null)
-  return decodeLaneConfig(json, root, pnpmLock)
+/** Read a JSON config file. Only a file that does not exist is `missing`. */
+export async function readConfigFile(file: string): Promise<ConfigRead> {
+  let text: string
+  try {
+    text = await readFile(file, "utf8")
+  } catch (error) {
+    return isMissing(error)
+      ? { kind: "missing" }
+      : { kind: "broken", reason: messageOf(error) }
+  }
+  try {
+    return { kind: "read", json: JSON.parse(text) as unknown }
+  } catch (error) {
+    return { kind: "broken", reason: messageOf(error) }
+  }
 }
+
+const isMissing = (error: unknown): boolean =>
+  error instanceof Error && "code" in error && error.code === "ENOENT"
+
+const messageOf = (error: unknown): string =>
+  error instanceof Error ? error.message : String(error)
 
 /** The user's lane config file: `$XDG_CONFIG_HOME/pinetrie/config.json`. */
 export const userConfigFile = (

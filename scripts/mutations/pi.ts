@@ -633,4 +633,20 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "every thread is told what pinned cards are",
   },
+  {
+    name: "global settings win over the project's",
+    file: "packages/pi/config.ts",
+    from: "    const layer = [settings.project, settings.global].find(",
+    to: "    const layer = [settings.global, settings.project].find(",
+    command: unit,
+    expect: "pickModel",
+  },
+  {
+    name: "an override is credited to settings",
+    file: "packages/pi/config.ts",
+    from: '      return { value: given, from: { kind: "override" } as const }',
+    to: '      return { value: given, from: { kind: "settings", file: "" } as const }',
+    command: unit,
+    expect: "pickModel",
+  },
 ]

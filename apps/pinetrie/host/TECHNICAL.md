@@ -10,7 +10,8 @@ wires them.
 
 | module | owns |
 |---|---|
-| `server.ts`, `invocation.ts` | `pnpm host [folder]` (ADR-0086): `planInvocation` (the folder), `storeFile` (the session's file), `refusalText` (a refusal's words); `server.ts` carries them out |
+| `server.ts`, `invocation.ts` | `pnpm host [folder]` (ADR-0086): `planInvocation` (the folder), `storeChoice` (the session's file, and whether `PINETRIE_STORE` named it), `refusalText` (a refusal's words); `server.ts` carries them out |
+| `startup-lines.ts` | the words of what a starting host logs about its inputs: the project, the store, the user config, the agent's model and where it came from, the URL and invites |
 | `index.ts` | `startHost`: the store, the Exchange (with its `resolve` for the documents clients create, `resolveDoc`), the documents, lane work and the agent, then the wiring below |
 | `basics.ts` | `Basics` (the session, `pinetrie:live`, the documents, the places, log, ids, clock) and how a failure is logged (`messageOf`, `failed`) |
 | `places.ts` | `applyPlaceSteps`: the one writer of the places document (ADR-0059), which writes its records in one batch, in an undo step when given one, then raises its `rev` in a batch of its own (`raiseRev`) |
@@ -214,6 +215,14 @@ too), and last `settle` for the lanes with cards queued:
 its compaction is `later`, so it runs after every write above, and after
 any refresh they queued.
 
+- **A starting host says what it read** (`startup-lines.ts`). `server.ts`
+  logs the project and the store, `startHost` the user config (with
+  `(none)` when missing, or why it is broken), then the roots it opened,
+  then `agent ready` with the model and where each of its fields came from
+  (`Agent.modelOrigin`: `PINETRIE_PROVIDER`/`PINETRIE_MODEL`, or the pi
+  settings file that named it), and `server.ts` the URL and invites. The
+  user config is read with `readConfigFile` (`@pinetrie/lanes`): missing or
+  broken, its decoders get null and decode it as empty, as ADR-0071 says.
 - **The project folder is prepared before `startHost`** (`server.ts`):
   `prepareProjectDir` (`@pinetrie/lanes`) finds its root and adds `/.pinetrie/`
   to its repo's exclude file, so the store, opened first in `startHost`, is
@@ -783,7 +792,8 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 
 - **Test a decision as a value** where the shell has one: `planRunEnd`,
   `planInvites`, `draftSent`, the responses, `planSettle`, `planInvocation`,
-  `storeFile`, `isHeld`, and `planStartup` (`@pinetrie/rules`).
+  `storeChoice`, the startup lines' words (`startup-lines.ts`), `isHeld`, and
+  `planStartup` (`@pinetrie/rules`).
 - **Otherwise, drive a module with `record<T>()`** for exactly the port it
   takes, and a real `newSessionDoc()`. A method the test did not give throws,
   naming itself, so a module that touches an undeclared port fails at once.

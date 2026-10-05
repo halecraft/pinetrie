@@ -478,7 +478,9 @@ one; a relative folder is read from pine·trie's root, since pnpm does not pass
 on the shell's directory (S108). Each project keeps its session in its own
 `.pinetrie/pinetrie.db`, and the host adds `/.pinetrie/` to the repo's exclude
 file first, or refuses to start. The project is a host option apart from
-tools, so pi loads the project's settings with tools off too.
+tools, so pi loads the project's settings with tools off too. As it starts,
+the host prints the store it opened, the user config it read (or why it could
+not), and where its model came from.
 **ADR-0019 — a lane is a line of work, not a unit of parallelism.** A person's
 lane is a *conversation lane* and never touches disk. A *work lane* carries
 agent work and will own a jj workspace, so creating one is deliberate, and fold

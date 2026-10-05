@@ -232,6 +232,9 @@ containers, disks and the helper.
     index, which can lag in a colocated repo.
 
   Each refusal is logged with its reason, and the rest still apply.
+  Both files are read with `readConfigFile`: a missing file is empty, and
+  so is one that cannot be read or parsed (`broken`), which the host logs
+  with its reason.
 - **No repo may track a shared directory.**
   - **In a lane,** the host writes `.pinetrie/lane-git/ignore` (`laneIgnores`:
     `/.pinetrie-lane/`, `/lost+found/`, each shared directory). It mounts its

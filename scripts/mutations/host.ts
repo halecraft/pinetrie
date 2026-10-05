@@ -1529,11 +1529,40 @@ export const mutations: readonly Mutation[] = [
   {
     name: "PINETRIE_STORE is ignored",
     file: "apps/pinetrie/host/invocation.ts",
-    from: "  return env.PINETRIE_STORE ?? pinetrieDir(root).store",
-    to: "  return pinetrieDir(root).store",
+    from: "  return given === undefined\n",
+    to: "  return true\n",
     command: unit,
     expect:
       "the store is PINETRIE_STORE when set, else .pinetrie/pinetrie.db in the project's root",
+  },
+  {
+    name: "a store from PINETRIE_STORE is credited to the project",
+    file: "apps/pinetrie/host/invocation.ts",
+    from: '    : { file: given, from: "PINETRIE_STORE" }',
+    to: '    : { file: given, from: "project" }',
+    command: unit,
+    expect:
+      "the store is PINETRIE_STORE when set, else .pinetrie/pinetrie.db in the project's root",
+  },
+  // ── what a starting host logs ──
+  {
+    name: "a missing user config is worded as read",
+    file: "apps/pinetrie/host/startup-lines.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: '      return line("config", `${file} (none)`)',
+    to: '      return line("config", file)',
+    command: unit,
+    expect: "configLine",
+  },
+  {
+    name: "an overridden model is credited to its settings file",
+    file: "apps/pinetrie/host/startup-lines.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: '    from.kind === "override" ? OVERRIDES[field] : `${field} from ${from.file}`',
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
+    to: "    `${field} from settings`",
+    command: unit,
+    expect: "agentReadyLine",
   },
   // ── queue control (ADR-0048 step 7) ──
   {

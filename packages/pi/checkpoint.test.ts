@@ -76,12 +76,41 @@ describe("KynetaStorage: a growing checkpoint is stored as text edits", () => {
   })
 })
 
-test("pickModel: an override's fields win over the settings' defaults", () => {
-  const settings = { provider: "anthropic", model: "claude-opus-5-5" }
-  expect(pickModel(settings, {})).toEqual(settings)
-  expect(pickModel(settings, { model: "claude-fable-5-1" })).toEqual({
+test("pickModel: per field, the override, else the project's settings, else the global settings, each named as the source", () => {
+  const global = {
+    file: "/g/settings.json",
+    provider: "anthropic",
+    model: "claude-opus-5-5",
+  }
+  const project = { file: "/p/.pi/settings.json", model: "claude-fable-5-1" }
+  const fromGlobal = { kind: "settings", file: global.file }
+  expect(pickModel({ global, project: { file: project.file } }, {})).toEqual({
+    provider: "anthropic",
+    model: "claude-opus-5-5",
+    origin: { kind: "configured", provider: fromGlobal, model: fromGlobal },
+  })
+  expect(pickModel({ global, project }, {})).toEqual({
     provider: "anthropic",
     model: "claude-fable-5-1",
+    origin: {
+      kind: "configured",
+      provider: fromGlobal,
+      model: { kind: "settings", file: project.file },
+    },
   })
-  expect(pickModel({}, { provider: "cerebras" })).toBeUndefined()
+  expect(pickModel({ global, project }, { model: "claude-x" })).toEqual({
+    provider: "anthropic",
+    model: "claude-x",
+    origin: {
+      kind: "configured",
+      provider: fromGlobal,
+      model: { kind: "override" },
+    },
+  })
+  expect(
+    pickModel(
+      { global: { file: global.file }, project: { file: project.file } },
+      { provider: "cerebras" },
+    ),
+  ).toBeUndefined()
 })

@@ -53,6 +53,7 @@ import {
   complete,
   DEFAULT_AGENT_DIR,
   type ModelChoice,
+  type ModelOrigin,
   setUpModel,
   titleModelOf,
 } from "./config.ts"
@@ -236,6 +237,8 @@ type Harness = Awaited<ReturnType<typeof createAgentHarness>>["harness"]
  */
 export interface Agent extends CommandFiles, Banners {
   readonly modelLabel: string
+  /** Where the model came from: an override or a settings file, per field. */
+  readonly modelOrigin: ModelOrigin
   /**
    * Create a thread's lane at `spot`, in its root, named `lane` (the host
    * decides the id, ADR-0057). Refused `lane_id_in_use` for an id pi holds.
@@ -497,6 +500,7 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
     ),
     ...banners(setup.images, options.banners?.config),
     modelLabel: `${resolved.provider}/${resolved.id}`,
+    modelOrigin: setup.origin,
 
     complete: ({ purpose, ...request }) =>
       complete(
