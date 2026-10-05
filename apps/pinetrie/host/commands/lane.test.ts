@@ -7,7 +7,7 @@ import {
   runId,
   writerId,
 } from "@pinetrie/core"
-import type { Agent } from "@pinetrie/pi"
+import type { Agent, Scribe } from "@pinetrie/pi"
 import { readCardHistories, readPlaces } from "@pinetrie/reads"
 import {
   deleteRecord,
@@ -59,23 +59,24 @@ function running() {
   writeLaneTip(b.root, lane, entryId("e-2"))
   beginRun(b.live, lane, runId("r-1"))
   const handle = fakeLane(lane, { abort: async () => {} })
-  const agent = record<Pick<Agent, "lane" | "writeValues">>({
+  // The agent and the scribe in one record, so the order of their calls shows.
+  const pi = record<Pick<Agent, "lane"> & Pick<Scribe, "writeValues">>({
     lane: () => handle.lane,
     writeValues: async () => {},
   })
-  return { b, lane, handle, agent }
+  return { b, lane, handle, pi }
 }
 
 test("stopping a running lane records who stopped its ask, then aborts its run", async () => {
-  const { b, lane, handle, agent } = running()
+  const { b, lane, handle, pi } = running()
   expect(
     await handleStop(
-      { basics: b, agent: agent.port, cancel: () => false },
+      { basics: b, agent: pi.port, scribe: pi.port, cancel: () => false },
       lane,
       ada,
     ),
   ).toEqual({ kind: "stopped" })
-  expect(agent.calls).toEqual([
+  expect(pi.calls).toEqual([
     {
       method: "writeValues",
       args: [
@@ -94,27 +95,28 @@ test("stopping a running lane records who stopped its ask, then aborts its run",
 })
 
 test("a second stop of the same ask records nothing more", async () => {
-  const { b, lane, handle, agent } = running()
+  const { b, lane, handle, pi } = running()
   putValue(
     b,
     setRecord(STOP, { prompt: entryId("e-1"), by: bea, at: 1 }, ROOT_ID),
   )
   await handleStop(
-    { basics: b, agent: agent.port, cancel: () => false },
+    { basics: b, agent: pi.port, scribe: pi.port, cancel: () => false },
     lane,
     ada,
   )
-  expect(methods(agent.calls)).toEqual(["lane"])
+  expect(methods(pi.calls)).toEqual(["lane"])
   expect(methods(handle.calls)).toEqual(["abort"])
 })
 
 test("a stop while a chat's run waits for its pinned cards cancels it there, and asks pi to abort nothing", async () => {
-  const { b, lane, handle, agent } = running()
+  const { b, lane, handle, pi } = running()
   const cancelled: string[] = []
   await handleStop(
     {
       basics: b,
-      agent: agent.port,
+      agent: pi.port,
+      scribe: pi.port,
       cancel: l => {
         cancelled.push(l)
         return true
@@ -124,12 +126,12 @@ test("a stop while a chat's run waits for its pinned cards cancels it there, and
     ada,
   )
   expect(cancelled).toEqual([lane])
-  expect(methods(agent.calls)).toEqual(["writeValues"])
+  expect(methods(pi.calls)).toEqual(["writeValues"])
   expect(methods(handle.calls)).toEqual([])
 })
 
 test("a stop with a message card queued holds the queue in the same write as its stop record, before the abort (ADR-0048 step 7)", async () => {
-  const { b, lane, handle, agent } = running()
+  const { b, lane, handle, pi } = running()
   b.places.cards.set(
     "c-1",
     encodeCard({
@@ -150,11 +152,11 @@ test("a stop with a message card queued holds the queue in the same write as its
     }),
   )
   await handleStop(
-    { basics: b, agent: agent.port, cancel: () => false },
+    { basics: b, agent: pi.port, scribe: pi.port, cancel: () => false },
     lane,
     ada,
   )
-  expect(agent.calls[0]).toEqual({
+  expect(pi.calls[0]).toEqual({
     method: "writeValues",
     args: [
       [
@@ -176,8 +178,8 @@ test("a hold is written once, its release deleted and the lane drained, each ans
   const drained: string[] = []
   const deps = {
     basics: b,
-    agent: {
-      writeValues: async (w: Parameters<Agent["writeValues"]>[0]) => {
+    scribe: {
+      writeValues: async (w: Parameters<Scribe["writeValues"]>[0]) => {
         writes.push(w)
         applyWrites(b, w)
       },
@@ -226,7 +228,7 @@ test("an offer's fact is queued as a card at the thread's end, after the cards t
       provenance: createProvenance({
         basics: b,
         presence: newPresenceDoc(),
-        agent: () => ({ writeValues: async w => applyWrites(b, w) }),
+        scribe: { writeValues: async w => applyWrites(b, w) },
       }),
     },
     fact,

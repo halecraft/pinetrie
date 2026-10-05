@@ -2,7 +2,7 @@
 
 import type { LaneName, RootId } from "@pinetrie/core"
 import type { Keeper } from "@pinetrie/keeper"
-import type { Agent } from "@pinetrie/pi"
+import type { Agent, PiSetup, Scribe } from "@pinetrie/pi"
 import {
   readPlaces,
   readProject,
@@ -38,10 +38,10 @@ export interface StartupDeps {
   readonly basics: Pick<Basics, "session" | "docs" | "live" | "places" | "log">
   /** The roots this host opened at its start (`planLoads`): every lane that could be running. */
   readonly roots: readonly RootId[]
-  readonly agent: Pick<
-    Agent,
-    "commands" | "interrupted" | "refusedCommands" | "writeValues"
-  >
+  readonly agent: Pick<Agent, "interrupted">
+  readonly scribe: Pick<Scribe, "writeValues">
+  /** The commands pi loaded, written as a record, and those it refused, logged. */
+  readonly piSetup: Pick<PiSetup, "commands" | "refusedCommands">
   readonly work: Pick<LaneWork, "project">
   /** Name every lane that has none (ADR-0039). */
   readonly ensureNames: () => Promise<void>
@@ -72,12 +72,12 @@ export interface StartupDeps {
  * clearing the streams needs no keeper step.
  */
 export async function recover(deps: StartupDeps): Promise<void> {
-  const { agent, work, keeper, settle } = deps
+  const { agent, scribe, piSetup, work, keeper, settle } = deps
   const { session: doc, docs, live, places, log } = deps.basics
   clearStreams(live)
   const { carryOver } = deps
   if (carryOver !== null) {
-    await keeper.run(() => agent.writeValues(carryOverWrites(carryOver)))
+    await keeper.run(() => scribe.writeValues(carryOverWrites(carryOver)))
     log(
       `[host] carried the store over to the board: ${carryOver.places.length} root(s), ${carryOver.old.length} archive record(s) replaced`,
     )
@@ -109,7 +109,7 @@ export async function recover(deps: StartupDeps): Promise<void> {
     ...setIfChanged(
       COMMANDS,
       {
-        commands: agent.commands().map(c => ({
+        commands: piSetup.commands().map(c => ({
           name: c.name,
           kind: c.kind,
           description: c.description,
@@ -119,8 +119,8 @@ export async function recover(deps: StartupDeps): Promise<void> {
       readRecords(doc, COMMANDS).get(COMMANDS_KEY),
     ),
   ]
-  if (changed.length > 0) await keeper.run(() => agent.writeValues(changed))
-  for (const r of agent.refusedCommands())
+  if (changed.length > 0) await keeper.run(() => scribe.writeValues(changed))
+  for (const r of piSetup.refusedCommands())
     log(`[host] command ${r.name} is refused: ${r.reason}`)
   await sweepTexts(deps)
   // Last, so the startup compaction it ends with holds every write above.
@@ -134,7 +134,7 @@ export async function recover(deps: StartupDeps): Promise<void> {
  * records are read with no await between them.
  */
 async function sweepTexts(deps: StartupDeps): Promise<void> {
-  const { agent, cards } = deps
+  const { scribe, cards } = deps
   const { session: doc, places, log } = deps.basics
   // gather
   const texts = await cards.texts(readPlaces(places).map(c => c.id))
@@ -158,7 +158,7 @@ async function sweepTexts(deps: StartupDeps): Promise<void> {
     swept.records.map(id => ({ kind: "remove", id })),
   )
   await cards.destroyDocs(swept.docs)
-  await agent.writeValues(staleSeats.map(s => deleteRecord(SEAT, s.peer)))
+  await scribe.writeValues(staleSeats.map(s => deleteRecord(SEAT, s.peer)))
   // The swept cards' histories, and traces too old to keep.
   await deps.provenance.sweep()
   if (swept.records.length + swept.docs.length + staleSeats.length > 0)

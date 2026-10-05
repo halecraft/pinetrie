@@ -1,6 +1,6 @@
 import { laneNameForThread, NOBODY, writerId } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
-import type { Agent } from "@pinetrie/pi"
+import type { Scribe } from "@pinetrie/pi"
 import { readRoots } from "@pinetrie/reads"
 import { encodeChat } from "@pinetrie/rules"
 import { writeEntry } from "@pinetrie/schema"
@@ -33,22 +33,22 @@ const chat = (text: string) =>
 function setUp() {
   const b = basics()
   const keeper = createKeeper<HostKey>()
-  const agent = record<Pick<Agent, "writeValues">>({
+  const scribe = record<Pick<Scribe, "writeValues">>({
     writeValues: async writes => applyWrites(b, writes),
   })
-  startDirectory({ basics: b, keeper, agent: agent.port })
-  return { b, keeper, agent }
+  startDirectory({ basics: b, keeper, scribe: scribe.port })
+  return { b, keeper, scribe }
 }
 
 test("a root's record follows its document: a new entry refreshes it, once per burst (ADR-0063)", async () => {
-  const { b, keeper, agent } = setUp()
+  const { b, keeper, scribe } = setUp()
   // The refresh as the directory starts is over before the root changes.
   await keeper.idle()
-  const before = writesOf(agent.calls).length
+  const before = writesOf(scribe.calls).length
   writeEntry(b.root, row("e1", null, chat("plan the rail")))
   writeEntry(b.root, row("e2", "e1", chat("and the tabs")))
   await keeper.idle()
-  expect(writesOf(agent.calls)).toHaveLength(before + 1)
+  expect(writesOf(scribe.calls)).toHaveLength(before + 1)
   expect(readRoots(b.session).get(ROOT_ID)).toMatchObject({
     entry: "e1",
     firstLine: "plan the rail",
@@ -57,13 +57,13 @@ test("a root's record follows its document: a new entry refreshes it, once per b
 })
 
 test("a change the record does not show writes nothing", async () => {
-  const { b, keeper, agent } = setUp()
+  const { b, keeper, scribe } = setUp()
   writeEntry(b.root, row("e1", null, chat("plan")))
   await keeper.idle()
-  const before = agent.calls.length
+  const before = scribe.calls.length
   b.root.values.set("x", { namespace: "pi.op.state", key: "x", value: 1 })
   await keeper.idle()
-  expect(agent.calls.length).toBe(before)
+  expect(scribe.calls.length).toBe(before)
 })
 
 test("a compaction queued while refreshes and drains wait runs after all of them, and compacts records that show every change", async () => {
@@ -96,7 +96,7 @@ test("a compaction queued while refreshes and drains wait runs after all of them
 test("five changes to one root before its refresh starts read and write it once", async () => {
   const b = basics()
   const keeper = createKeeper<HostKey>()
-  const agent = record<Pick<Agent, "writeValues">>({
+  const scribe = record<Pick<Scribe, "writeValues">>({
     writeValues: async writes => applyWrites(b, writes),
   })
   let reads = 0
@@ -112,11 +112,11 @@ test("five changes to one root before its refresh starts read and write it once"
       },
     },
     keeper,
-    agent: agent.port,
+    scribe: scribe.port,
   })
   await keeper.idle()
   reads = 0
-  const written = writesOf(agent.calls).length
+  const written = writesOf(scribe.calls).length
   const gate = deferred<void>()
   void keeper.run(() => gate.promise)
   for (let i = 1; i <= 5; i += 1)
@@ -127,23 +127,23 @@ test("five changes to one root before its refresh starts read and write it once"
   gate.resolve()
   await keeper.idle()
   expect(reads).toBe(1)
-  expect(writesOf(agent.calls)).toHaveLength(written + 1)
+  expect(writesOf(scribe.calls)).toHaveLength(written + 1)
 })
 
 test("the roots held when the directory starts are refreshed, and an unchanged record is not written again (ADR-0077)", async () => {
   const b = basics()
   const keeper = createKeeper<HostKey>()
-  const agent = record<Pick<Agent, "writeValues">>({
+  const scribe = record<Pick<Scribe, "writeValues">>({
     writeValues: async writes => applyWrites(b, writes),
   })
   writeEntry(b.root, row("e1", null, chat("plan")))
-  const start = () => startDirectory({ basics: b, keeper, agent: agent.port })
+  const start = () => startDirectory({ basics: b, keeper, scribe: scribe.port })
   start()
   await keeper.idle()
   expect(readRoots(b.session).get(ROOT_ID)).toMatchObject({ entry: "e1" })
-  const written = agent.calls.length
+  const written = scribe.calls.length
   // A host started again holds the same root.
   start()
   await keeper.idle()
-  expect(agent.calls.length).toBe(written)
+  expect(scribe.calls.length).toBe(written)
 })

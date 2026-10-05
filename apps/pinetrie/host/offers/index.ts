@@ -23,7 +23,7 @@ import type {
   WriterId,
 } from "@pinetrie/core"
 import type { LineConfig } from "@pinetrie/lanes"
-import type { Agent } from "@pinetrie/pi"
+import type { PiSetup, Scribe } from "@pinetrie/pi"
 import { readNames, readOffers, readRevisions } from "@pinetrie/reads"
 import {
   fileDiff,
@@ -109,10 +109,12 @@ export function startOffers(input: {
   /** The integration line's names (ADR-0060). */
   readonly line: LineConfig
   readonly basics: Basics
-  readonly agent: () => Agent
+  readonly scribe: Pick<Scribe, "writeValues">
+  /** What a description asks of the model. */
+  readonly piSetup: Pick<PiSetup, "skill" | "complete">
   /** Whether a lane is running now: an offer is described once it stops. */
   readonly running: (lane: LaneName) => boolean
-  /** A lane's base record changed: a running thread is told its news (`base-news.ts`). */
+  /** A lane's base record changed: lane work announces it (`onBaseChanged`). */
   readonly baseChanged: (lane: LaneName) => void
   /** The line's record and commands (`host/work/line.ts`): its record is rewritten when the owner observes the line or your `@` move. */
   readonly lineWork: Line

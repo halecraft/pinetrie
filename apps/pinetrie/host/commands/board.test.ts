@@ -48,18 +48,18 @@ function setUp() {
       at: 0,
     }),
   )
-  const agent = record<BoardDeps["agent"]>({ writeValues: async () => {} })
+  const scribe = record<BoardDeps["scribe"]>({ writeValues: async () => {} })
   const work = record<BoardDeps["work"]>({
     offers: null,
     teardown: async () => {},
   })
   const deps: BoardDeps = {
     basics: b,
-    agent: agent.port,
+    scribe: scribe.port,
     work: work.port,
     keeper: createKeeper(),
   }
-  return { b, root, agent, work, deps }
+  return { b, root, scribe, work, deps }
 }
 
 const toDone = {
@@ -71,28 +71,28 @@ const toDone = {
 } as const
 
 test("a root the agent works in is not closed, and nothing is written", async () => {
-  const { b, root, agent, deps } = setUp()
+  const { b, root, scribe, deps } = setUp()
   const lane = laneNameForThread("0123456789abcdef")
   putLane(b, lane, root)
   writeLaneTip(b.root, lane, root)
   beginRun(b.live, lane, runId("r-1"))
   const out = await handleRootMove(deps, ADA, toDone)
   expect(out).toMatchObject({ kind: "refused", code: ERR.ROOT_BUSY })
-  expect(agent.calls).toEqual([])
+  expect(scribe.calls).toEqual([])
 })
 
 test("an idle root moved to Done: its place written, then torn down and unloaded", async () => {
-  const { agent, work, deps } = setUp()
+  const { scribe, work, deps } = setUp()
   const out = await handleRootMove(deps, ADA, toDone)
   expect(out).toEqual({ kind: "moved-root" })
-  expect(writesOf(agent.calls)).toMatchObject([
+  expect(writesOf(scribe.calls)).toMatchObject([
     { namespace: "pinetrie.board", key: ROOT_ID, value: { state: DONE } },
   ])
   expect(methods(work.calls)).toEqual(["teardown"])
 })
 
 test("a move within open states writes only the place, and opens no root", async () => {
-  const { b, agent, work, deps } = setUp()
+  const { b, scribe, work, deps } = setUp()
   const review = workflowStateIdFor("r")
   putValue(
     b,
@@ -103,26 +103,26 @@ test("a move within open states writes only the place, and opens no root", async
   )
   const out = await handleRootMove(deps, ADA, { ...toDone, to: review })
   expect(out).toEqual({ kind: "moved-root" })
-  expect(writesOf(agent.calls)).toHaveLength(1)
+  expect(writesOf(scribe.calls)).toHaveLength(1)
   expect(work.calls).toEqual([])
 })
 
 test("a workflow edit writes the workflow; a refusal writes nothing", async () => {
-  const { agent, deps } = setUp()
+  const { scribe, deps } = setUp()
   expect(
     await handleWorkflow(deps, {
       kind: "workflow",
       edit: { action: "remove", state: DOING, name: "", before: null },
     }),
   ).toMatchObject({ kind: "refused", code: ERR.STATE_NOT_EMPTY })
-  expect(agent.calls).toEqual([])
+  expect(scribe.calls).toEqual([])
   expect(
     await handleWorkflow(deps, {
       kind: "workflow",
       edit: { action: "rename", state: DONE, name: "Shipped", before: null },
     }),
   ).toEqual({ kind: "workflow-changed" })
-  expect(writesOf(agent.calls)).toMatchObject([
+  expect(writesOf(scribe.calls)).toMatchObject([
     { namespace: "pinetrie.workflow", value: { closed: { name: "Shipped" } } },
   ])
 })

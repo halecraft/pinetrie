@@ -22,7 +22,7 @@ import {
   removeLane,
   revsetName,
 } from "@pinetrie/lanes"
-import type { Agent } from "@pinetrie/pi"
+import type { Scribe } from "@pinetrie/pi"
 import { type RootView, readRevisions, readTreeIndex } from "@pinetrie/reads"
 import { beginFacts, type RepoOwner } from "@pinetrie/repo"
 import {
@@ -98,7 +98,7 @@ export function createNewLanes(deps: {
   readonly registry: LaneRegistry
   /** Work nobody awaits: `quiet` waits for it. */
   readonly keeper: Keeper
-  readonly agent: () => Agent
+  readonly scribe: Pick<Scribe, "writeValues">
   readonly ensureNames: () => Promise<void>
   readonly pendingRecords: Turns["pendingRecords"]
 }): NewLanes {
@@ -154,7 +154,7 @@ export function createNewLanes(deps: {
 
     async prepareLane(view, lane, work, at, by, base) {
       const { doc } = view
-      await deps.agent().writeValues([
+      await deps.scribe.writeValues([
         setRecord(LANE, {
           lane,
           root: view.root,

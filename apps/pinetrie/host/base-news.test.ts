@@ -57,7 +57,7 @@ function behind(to = "l2") {
   let tail: Promise<unknown> = Promise.resolve()
   const news = createBaseNews({
     basics: b,
-    agent: () => ({ lane: () => handle }),
+    agent: { lane: () => handle },
     keeper: {
       run: f => {
         const next = tail.then(f)

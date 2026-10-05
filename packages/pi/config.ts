@@ -186,7 +186,11 @@ function openRouterImages(models: Runtime): ImagesSetup {
   }
 }
 
-/** What `createAgent` needs from the choice. */
+/**
+ * What pi loads for the choice: the model, and the context files, skills,
+ * commands and image models beside it. `loadPiSetup` wraps it, and
+ * `createAgent` builds every harness from it.
+ */
 export interface ModelSetup {
   readonly models: Models
   readonly model: Model
@@ -205,7 +209,7 @@ export interface ModelSetup {
   readonly images: ImagesSetup
 }
 
-export async function setUpModel(
+export async function loadModelSetup(
   choice: ModelChoice,
   where: {
     readonly cwd: string

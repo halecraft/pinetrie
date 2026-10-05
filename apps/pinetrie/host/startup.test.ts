@@ -28,8 +28,13 @@ import { recover, type StartupDeps } from "./startup.ts"
 
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
-const agentPort = (impl: Partial<StartupDeps["agent"]> = {}) =>
-  record<StartupDeps["agent"]>({
+/** The agent, the scribe and the setup in one record, so the order of their calls shows. */
+type FakePi = StartupDeps["agent"] &
+  StartupDeps["scribe"] &
+  StartupDeps["piSetup"]
+
+const fakePi = (impl: Partial<FakePi> = {}) =>
+  record<FakePi>({
     interrupted: async () => [],
     commands: () => [],
     refusedCommands: () => [],
@@ -37,11 +42,18 @@ const agentPort = (impl: Partial<StartupDeps["agent"]> = {}) =>
     ...impl,
   })
 
+/** One fake as all three of `recover`'s pi ports. */
+const ports = ({ port }: ReturnType<typeof fakePi>) => ({
+  agent: port,
+  scribe: port,
+  piSetup: port,
+})
+
 /** What `recover` needs, doing nothing, with `over` in place. */
 const deps = (over: Partial<StartupDeps> = {}): StartupDeps => ({
   basics: basics(),
   roots: [ROOT_ID],
-  agent: agentPort().port,
+  ...ports(fakePi()),
   work: record<StartupDeps["work"]>({ project: null }).port,
   ensureNames: async () => {},
   keeper: createKeeper(),
@@ -84,12 +96,14 @@ test("recover resumes each interrupted lane before it settles the others, and na
   await recover(
     deps({
       basics: basics(undefined, placesDoc),
-      agent: agentPort({
-        interrupted: async () => {
-          events.push("interrupted")
-          return [LANE]
-        },
-      }).port,
+      ...ports(
+        fakePi({
+          interrupted: async () => {
+            events.push("interrupted")
+            return [LANE]
+          },
+        }),
+      ),
       ensureNames: async () => {
         events.push("names")
       },
@@ -130,11 +144,11 @@ test("recover writes the project record only when it changed, in one write", asy
     rootDefault: "own",
   }
   const run = async (b: ReturnType<typeof basics>) => {
-    const agent = agentPort()
+    const agent = fakePi()
     await recover(
       deps({
         basics: b,
-        agent: agent.port,
+        ...ports(agent),
         work: record<StartupDeps["work"]>({ project }).port,
       }),
     )
@@ -156,8 +170,8 @@ test("recover writes unclassified over a verdict a stopped host left pending (AD
   const b = basics()
   const pending = pendingVerdict(LANE, entryId("p-1"), entryId("w-1"))
   putValue(b, setRecord(VERDICT, pending))
-  const agent = agentPort()
-  await recover(deps({ basics: b, agent: agent.port }))
+  const agent = fakePi()
+  await recover(deps({ basics: b, ...ports(agent) }))
   expect(
     writesOf(agent.calls).filter(w => w.namespace === VERDICT.namespace),
   ).toEqual([
@@ -194,7 +208,7 @@ test("recover sweeps empty cards, texts no record names, and seats no text names
         at: clientId,
       }),
     )
-  const agent = agentPort()
+  const agent = fakePi()
   const cards = record<StartupDeps["cards"]>({
     texts: async () => [
       { id: cardId("c-full"), text: "keep me", clients: [11] },
@@ -203,7 +217,7 @@ test("recover sweeps empty cards, texts no record names, and seats no text names
     stored: async () => ["card:c-full", "card:c-empty", "card:c-gone"],
     destroyDocs: async () => {},
   })
-  await recover(deps({ basics: b, agent: agent.port, cards: cards.port }))
+  await recover(deps({ basics: b, ...ports(agent), cards: cards.port }))
   expect(readPlaces(placesDoc).map(c => c.id)).toEqual(["c-full"])
   expect(readPlacesRev(placesDoc)).toBe(1)
   expect(cards.calls.find(c => c.method === "destroyDocs")?.args[0]).toEqual([
@@ -227,11 +241,13 @@ test("recover writes a carry-over from before the board first, before it resumes
   }
   await recover(
     deps({
-      agent: agentPort({
-        writeValues: async writes => {
-          events.push(writes.map(w => `${w.kind} ${w.namespace}`).join(", "))
-        },
-      }).port,
+      ...ports(
+        fakePi({
+          writeValues: async writes => {
+            events.push(writes.map(w => `${w.kind} ${w.namespace}`).join(", "))
+          },
+        }),
+      ),
       ensureNames: async () => {
         events.push("names")
       },

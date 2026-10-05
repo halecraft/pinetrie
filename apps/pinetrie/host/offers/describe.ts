@@ -30,7 +30,7 @@ const DESCRIBE_BUDGET = 24_000
  * already described. A failure is logged.
  */
 export function describe(
-  deps: Pick<OfferDeps, "owner" | "basics" | "docs" | "agent"> & {
+  deps: Pick<OfferDeps, "owner" | "basics" | "docs" | "piSetup"> & {
     readonly describing: Set<LaneName>
   },
   refresh: Pick<Refresh, "ports">,
@@ -64,10 +64,10 @@ export function describe(
             const messages = transcriptLines(
               doc === null ? [] : projectTranscript(readTreeIndex(doc), tip),
             )
-            const skill = await deps
-              .agent()
-              .skill("pinetrie:skill:commit-message")
-            return deps.agent().complete(
+            const skill = await deps.piSetup.skill(
+              "pinetrie:skill:commit-message",
+            )
+            return deps.piSetup.complete(
               describeRequest({
                 skill:
                   skill?.content ?? "Write a commit message for this change.",

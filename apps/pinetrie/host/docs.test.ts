@@ -3,6 +3,7 @@ import {
   entryId,
   type RootId,
   type RootRecord,
+  rootDocId,
   rootIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -69,4 +70,40 @@ test("onOpened hears every root already held, then each root as it is opened, on
   await docs.root(b)
   await docs.root(a)
   expect(heard).toEqual([a, b])
+})
+
+test("a root's releasing listeners run in order, before its document is let go", async () => {
+  const heard: string[] = []
+  const exchange = new Exchange({
+    principal: "pinetrie-host",
+    store: createInMemoryStore(),
+  })
+  // The exchange as `hostDocuments` sees it, its `unload` heard in order.
+  const watched = new Proxy(exchange, {
+    get(target, key) {
+      if (key === "unload")
+        return (id: string) => {
+          heard.push(`unload ${id}`)
+          target.unload(id)
+        }
+      const value: unknown = Reflect.get(target, key, target)
+      return typeof value === "function" ? value.bind(target) : value
+    },
+  })
+  const docs = hostDocuments({
+    exchange: watched,
+    session: newSessionDoc(),
+    live: newLiveDoc(),
+    places: newPlacesDoc(),
+  })
+  const a = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
+  await docs.root(a)
+  const listen = (who: string) => async (root: RootId) => {
+    await Promise.resolve()
+    heard.push(`${who} ${root}`)
+  }
+  docs.onReleasing(listen("first"))
+  docs.onReleasing(listen("second"))
+  await docs.unload(a)
+  expect(heard).toEqual([`first ${a}`, `second ${a}`, `unload ${rootDocId(a)}`])
 })

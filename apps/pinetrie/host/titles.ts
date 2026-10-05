@@ -17,7 +17,7 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import type { Keeper } from "@pinetrie/keeper"
-import type { Agent } from "@pinetrie/pi"
+import type { PiSetup, Scribe } from "@pinetrie/pi"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import {
   readArchived,
@@ -65,8 +65,6 @@ export interface Titles {
   asked(root: RootId, by: WriterId): Promise<Outcome>
 }
 
-type TitleAgent = Pick<Agent, "complete" | "skill" | "writeValues">
-
 const rootEntryOf = (doc: RootDocHandle): EntryId | null =>
   summarizeRoots(readTreeIndex(doc))[0]?.root ?? null
 
@@ -93,8 +91,9 @@ export function createTitles(deps: {
   readonly keeper: Pick<Keeper, "run" | "track">
   /** The user config's `titles.enabled`: whether a root is titled unasked. */
   readonly enabled: boolean
-  /** Read lazily: the agent is made after this. */
-  readonly agent: () => TitleAgent
+  readonly scribe: Pick<Scribe, "writeValues">
+  /** The title model, and its skill. */
+  readonly piSetup: Pick<PiSetup, "complete" | "skill">
   /** How long an unasked title waits for its root's first entry; tests shorten it. */
   readonly rootedWait?: number
 }): Titles {
@@ -129,12 +128,12 @@ export function createTitles(deps: {
       ...(trigger.kind === "lane" ? { held: { set: asking, key: root } } : {}),
       failed: failed(basics, "titling a thread"),
       request: async () => {
-        const skill = await deps.agent().skill("pinetrie:skill:tab-title")
+        const skill = await deps.piSetup.skill("pinetrie:skill:tab-title")
         if (skill === null) {
           log("[host] no tab-title skill")
           return null
         }
-        const reply = await deps.agent().complete({
+        const reply = await deps.piSetup.complete({
           ...titleRequest({
             skill: skill.content,
             lines: plan.lines,
@@ -165,9 +164,7 @@ export function createTitles(deps: {
           marks,
         })
         if (planned.kind === "write")
-          await deps
-            .agent()
-            .writeValues([setRecord(MARK, planned.record, root)])
+          await deps.scribe.writeValues([setRecord(MARK, planned.record, root)])
       },
     })
     return null

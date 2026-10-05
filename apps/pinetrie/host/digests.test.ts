@@ -1,9 +1,10 @@
 import { entryId, laneNameForThread, runId, writerId } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
 import {
-  type Agent,
+  type PiSetup,
   SCRIPTED_DESCRIPTION,
   SCRIPTED_VERDICT,
+  type Scribe,
 } from "@pinetrie/pi"
 import { readVerdicts } from "@pinetrie/reads"
 import {
@@ -73,7 +74,10 @@ function running(
   writeLaneTip(b.root, lane, entryId("e-4"))
   beginRun(b.live, lane, runId("r-1"))
   const presence = newPresenceDoc()
-  const agent = record<Pick<Agent, "complete" | "skill" | "writeValues">>({
+  // The setup and the scribe in one record, so the order of their calls shows.
+  const pi = record<
+    Pick<PiSetup, "complete" | "skill"> & Pick<Scribe, "writeValues">
+  >({
     skill: async () => ({ path: "SKILL.md", content: "Summarize.", hash: "h" }),
     complete: async () => answer,
     writeValues: async () => {},
@@ -83,7 +87,8 @@ function running(
     basics: b,
     keeper,
     presence,
-    agent: () => agent.port,
+    scribe: pi.port,
+    piSetup: pi.port,
     enabled,
   })
   const read = () =>
@@ -91,19 +96,19 @@ function running(
       readingKey(seatKey(writerId("ada@example.com"), "s1"), "c1"),
       "e-2",
     )
-  return { b, agent, keeper, digests, read }
+  return { b, pi, keeper, digests, read }
 }
 
 test("a live digest waits for someone to read the thread", async () => {
-  const { agent, keeper, digests, read } = running()
+  const { pi, keeper, digests, read } = running()
   await digests.step(ROOT_ID, entryId("e-2"), failed)
   await keeper.idle()
-  expect(methods(agent.calls)).toEqual([])
+  expect(methods(pi.calls)).toEqual([])
   read()
   await digests.step(ROOT_ID, entryId("e-2"), failed)
   await keeper.idle()
-  expect(methods(agent.calls)).toEqual(["skill", "complete", "writeValues"])
-  expect(writesOf(agent.calls)).toEqual([
+  expect(methods(pi.calls)).toEqual(["skill", "complete", "writeValues"])
+  expect(writesOf(pi.calls)).toEqual([
     setRecord(
       DIGEST,
       {
@@ -119,22 +124,22 @@ test("a live digest waits for someone to read the thread", async () => {
 })
 
 test("at the run's end, the final digest, read or not; once written, no more", async () => {
-  const { b, agent, keeper, digests } = running(
+  const { b, pi, keeper, digests } = running(
     "Fixed the rail.\n- `rail.tsx` draws it",
   )
   await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
   await keeper.idle()
-  expect(agent.calls.at(-1)?.args).toEqual([[FINAL]])
+  expect(pi.calls.at(-1)?.args).toEqual([[FINAL]])
   putValue(b, FINAL)
-  const before = agent.calls.length
+  const before = pi.calls.length
   await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
   await keeper.idle()
-  expect(agent.calls.length).toBe(before)
+  expect(pi.calls.length).toBe(before)
 })
 
 test("a live digest that comes back after the final one is dropped", async () => {
   const late = Promise.withResolvers<string | null>()
-  const { b, agent, keeper, digests, read } = running(late.promise)
+  const { b, pi, keeper, digests, read } = running(late.promise)
   read()
   await digests.step(ROOT_ID, entryId("e-2"), failed)
   // The final one is written while the live one is out.
@@ -154,7 +159,7 @@ test("a live digest that comes back after the final one is dropped", async () =>
   )
   late.resolve("still working")
   await keeper.idle()
-  expect(methods(agent.calls)).toEqual(["skill", "complete"])
+  expect(methods(pi.calls)).toEqual(["skill", "complete"])
 })
 
 test.each([
@@ -178,7 +183,7 @@ test.each([
   tip,
   next,
 }) => {
-  const { b, agent, keeper, digests } = running(
+  const { b, pi, keeper, digests } = running(
     "Fixed the rail.\n- `rail.tsx` draws it",
   )
   endRun(b.live, lane, runId("r-1"))
@@ -187,8 +192,8 @@ test.each([
   if (next) beginRun(b.live, lane, runId("r-2"))
   await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
   await keeper.idle()
-  expect(writesOf(agent.calls)).toEqual([FINAL])
-  const asked = agent.calls.find(c => c.method === "complete")?.args[0] as {
+  expect(writesOf(pi.calls)).toEqual([FINAL])
+  const asked = pi.calls.find(c => c.method === "complete")?.args[0] as {
     user: string
   }
   expect(asked.user).toContain("looking")
@@ -196,13 +201,13 @@ test.each([
 })
 
 test("a reply in another shape is logged, and a live one writes nothing", async () => {
-  const { b, agent, keeper, digests, read } = running(
+  const { b, pi, keeper, digests, read } = running(
     "Fixing the rail.\nIt is going well.",
   )
   read()
   await digests.step(ROOT_ID, entryId("e-2"), failed)
   await keeper.idle()
-  expect(methods(agent.calls)).toEqual(["skill", "complete"])
+  expect(methods(pi.calls)).toEqual(["skill", "complete"])
   expect(
     b.lines.filter(l => l.includes("the model's digest is not one")),
   ).toHaveLength(1)
@@ -212,7 +217,7 @@ test.each([
   ["a refused one", "It went well.\nVery well."],
   ["nothing to add", "Nothing to add."],
 ])("at the run's end, %s clears the live headline for good", async (_, answer) => {
-  const { b, agent, keeper, digests } = running(answer)
+  const { b, pi, keeper, digests } = running(answer)
   const live = setRecord(
     DIGEST,
     {
@@ -238,16 +243,16 @@ test.each([
     },
     ROOT_ID,
   )
-  expect(writesOf(agent.calls)).toEqual([cleared])
+  expect(writesOf(pi.calls)).toEqual([cleared])
   putValue(b, cleared)
-  const before = agent.calls.length
+  const before = pi.calls.length
   await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
   await keeper.idle()
-  expect(agent.calls.length).toBe(before)
+  expect(pi.calls.length).toBe(before)
 })
 
 test("a short ask is not asked about", async () => {
-  const { b, agent, keeper, digests } = running()
+  const { b, pi, keeper, digests } = running()
   const short = entryId("e-7")
   writeEntry(b.root, row(short, "e-4", { role: "chat", content: "and?" }))
   writeEntry(
@@ -256,7 +261,7 @@ test("a short ask is not asked about", async () => {
   )
   await digests.ended(ROOT_ID, lane, short, failed)
   await keeper.idle()
-  expect(methods(agent.calls)).toEqual([])
+  expect(methods(pi.calls)).toEqual([])
 })
 
 test("the scripted model's answer is a digest, so the suites have one", () => {
@@ -272,10 +277,7 @@ async function stopping(
 ) {
   const set = running(answer, enabled)
   await set.digests.pending(lane, entryId("e-1"))
-  putValue(
-    set.b,
-    writesOf(set.agent.calls)[0] as Parameters<typeof putValue>[1],
-  )
+  putValue(set.b, writesOf(set.pi.calls)[0] as Parameters<typeof putValue>[1])
   endRun(set.b.live, lane, runId("r-1"))
   return set
 }
@@ -288,18 +290,18 @@ test("a run's verdict is pending as it stops, at the run's last entry", async ()
 })
 
 test("at a run's end, one request for the verdict and the final digest, written in one write", async () => {
-  const { agent, keeper, digests } = await stopping(
+  const { pi, keeper, digests } = await stopping(
     "needs you: which rail to keep\nFixed the rail.\n- `rail.tsx` draws it",
   )
-  const before = agent.calls.length
+  const before = pi.calls.length
   await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
   await keeper.idle()
-  expect(methods(agent.calls.slice(before))).toEqual([
+  expect(methods(pi.calls.slice(before))).toEqual([
     "skill",
     "complete",
     "writeValues",
   ])
-  expect(agent.calls.at(-1)?.args).toEqual([
+  expect(pi.calls.at(-1)?.args).toEqual([
     [
       setRecord(VERDICT, {
         lane,
@@ -314,7 +316,7 @@ test("at a run's end, one request for the verdict and the final digest, written 
       FINAL,
     ],
   ])
-  const asked = agent.calls.find(c => c.method === "complete")?.args[0] as {
+  const asked = pi.calls.find(c => c.method === "complete")?.args[0] as {
     user: string
   }
   expect(asked.user).toContain(
@@ -323,15 +325,15 @@ test("at a run's end, one request for the verdict and the final digest, written 
 })
 
 test("with digests off, a run's end asks for its verdict alone, and no live digest is asked", async () => {
-  const { agent, keeper, digests, read } = await stopping("done", false)
+  const { pi, keeper, digests, read } = await stopping("done", false)
   read()
-  const before = agent.calls.length
+  const before = pi.calls.length
   await digests.step(ROOT_ID, entryId("e-2"), failed)
   await keeper.idle()
-  expect(agent.calls.length).toBe(before)
+  expect(pi.calls.length).toBe(before)
   await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
   await keeper.idle()
-  expect(writesOf(agent.calls).at(-1)).toEqual(
+  expect(writesOf(pi.calls).at(-1)).toEqual(
     setRecord(VERDICT, {
       lane,
       ask: entryId("e-1"),
@@ -339,7 +341,7 @@ test("with digests off, a run's end asks for its verdict alone, and no live dige
       verdict: { kind: "said", said: "done", reason: null },
     }),
   )
-  const asked = agent.calls.findLast(c => c.method === "complete")?.args[0] as {
+  const asked = pi.calls.findLast(c => c.method === "complete")?.args[0] as {
     user: string
   }
   expect(asked.user).toContain("Answer with the verdict line alone.")
@@ -349,10 +351,10 @@ test.each([
   ["fails", null],
   ["answers in another shape", "All done here."],
 ])("a request that %s leaves the verdict unclassified, never pending", async (_, answer) => {
-  const { agent, keeper, digests } = await stopping(answer, false)
+  const { pi, keeper, digests } = await stopping(answer, false)
   await digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
   await keeper.idle()
-  expect(writesOf(agent.calls).at(-1)).toEqual(
+  expect(writesOf(pi.calls).at(-1)).toEqual(
     setRecord(VERDICT, {
       lane,
       ask: entryId("e-1"),
@@ -375,14 +377,11 @@ test("a failed run's verdict is its error, and no verdict is asked for", async (
   )
   writeLaneTip(set.b.root, lane, entryId("e-5"))
   await set.digests.pending(lane, entryId("e-1"))
-  putValue(
-    set.b,
-    writesOf(set.agent.calls)[0] as Parameters<typeof putValue>[1],
-  )
+  putValue(set.b, writesOf(set.pi.calls)[0] as Parameters<typeof putValue>[1])
   await set.digests.ended(ROOT_ID, lane, entryId("e-1"), failed)
   await set.keeper.idle()
-  expect(methods(set.agent.calls)).not.toContain("complete")
-  expect(writesOf(set.agent.calls).at(-1)).toEqual(
+  expect(methods(set.pi.calls)).not.toContain("complete")
+  expect(writesOf(set.pi.calls).at(-1)).toEqual(
     setRecord(VERDICT, {
       lane,
       ask: entryId("e-1"),

@@ -15,7 +15,7 @@ import type {
   TreeIndex,
   WriterId,
 } from "@pinetrie/core"
-import type { Agent } from "@pinetrie/pi"
+import type { Scribe } from "@pinetrie/pi"
 import {
   readCardHistories,
   readLanes,
@@ -63,7 +63,7 @@ export interface ProvenanceDeps {
     "docs" | "live" | "places" | "session" | "now" | "newId"
   >
   readonly presence: PresenceDocHandle
-  readonly agent: () => Pick<Agent, "writeValues">
+  readonly scribe: Pick<Scribe, "writeValues">
 }
 
 /**
@@ -104,7 +104,7 @@ export function createProvenance(deps: ProvenanceDeps): Provenance {
           : deleteRecord(TRACE, s.key),
       ),
     ]
-    if (writes.length > 0) await deps.agent().writeValues(writes)
+    if (writes.length > 0) await deps.scribe.writeValues(writes)
   }
 
   return {

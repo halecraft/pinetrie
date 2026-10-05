@@ -10,7 +10,7 @@ import {
   type RootId,
   type WriterId,
 } from "@pinetrie/core"
-import type { Agent } from "@pinetrie/pi"
+import type { Scribe } from "@pinetrie/pi"
 import {
   decodeCommand,
   encodeOutcome,
@@ -56,11 +56,13 @@ import { handleMark, type MarkDeps } from "./mark.ts"
 
 export interface CommandDeps {
   readonly basics: ChatDeps["basics"]
-  readonly agent: ChatDeps["agent"] &
-    BoardDeps["agent"] &
-    MarkDeps["agent"] &
-    LaneDeps["agent"] &
-    Pick<Agent, "writeValues">
+  readonly agent: ChatDeps["agent"] & LaneDeps["agent"]
+  readonly scribe: ChatDeps["scribe"] &
+    BoardDeps["scribe"] &
+    MarkDeps["scribe"] &
+    LaneDeps["scribe"] &
+    Pick<Scribe, "writeValues">
+  readonly piSetup: ChatDeps["piSetup"]
   readonly work: ChatDeps["work"] & BoardDeps["work"] & LaneDeps["work"]
   readonly blobs: ChatDeps["blobs"]
   readonly cards: ChatDeps["cards"] & CardCommandDeps["cards"]
@@ -118,7 +120,7 @@ export interface Commands {
 }
 
 export function createCommands(deps: CommandDeps): Commands {
-  const { agent } = deps
+  const { scribe } = deps
   const { newId } = deps.basics
   const cardCommands = createCardCommands(deps)
 
@@ -215,7 +217,7 @@ export function createCommands(deps: CommandDeps): Commands {
       case "traces-seen":
         return cardCommands.tracesSeen(writer, intent.traces)
       case "name":
-        await agent.writeValues([
+        await scribe.writeValues([
           setRecord(PARTICIPANT, { writer, name: intent.name }),
         ])
         return settled({ kind: "named" })
@@ -263,14 +265,14 @@ export function createCommands(deps: CommandDeps): Commands {
 
 /** A root a chat started, put at the end of the state its sender chose (ADR-0085). */
 async function placeNewRoot(
-  deps: Pick<CommandDeps, "basics" | "agent">,
+  deps: Pick<CommandDeps, "basics" | "scribe">,
   writer: WriterId,
   chat: Chat,
 ): Promise<void> {
   const { session, now } = deps.basics
   const workflow = readWorkflow(session)
   if (workflow === null) return
-  await deps.agent.writeValues([
+  await deps.scribe.writeValues([
     setRecord(
       BOARD,
       placeStarted({

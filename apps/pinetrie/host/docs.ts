@@ -40,7 +40,7 @@ export interface HostDocuments {
   rootOfEntry(entry: EntryId): RootId | null
   /**
    * Let a root's document go from memory, once what holds it has let go
-   * (`releasing`); it stays in the store.
+   * (`onReleasing`'s listeners); it stays in the store.
    */
   unload(root: RootId): Promise<void>
   /** The roots whose documents are held now. */
@@ -51,6 +51,12 @@ export interface HostDocuments {
    * loading when it joins is heard once, as it finishes.
    */
   onOpened(listener: (root: RootId, doc: RootDocHandle) => void): void
+  /**
+   * Call `listener` as a root's document is about to go, in the order
+   * listeners joined: whatever holds it lets go, so nothing writes to a
+   * closed document. `unload` awaits each.
+   */
+  onReleasing(listener: (root: RootId) => Promise<void>): void
 }
 
 /**
@@ -85,16 +91,12 @@ export function hostDocuments(input: {
   readonly session: SessionDocHandle
   readonly live: LiveDocHandle
   readonly places: PlacesDocHandle
-  /**
-   * Called as a root's document is about to go: whatever holds it lets go,
-   * so nothing writes to a closed document.
-   */
-  readonly releasing?: (root: RootId) => Promise<void>
 }): HostDocuments {
   const { exchange, session, live, places } = input
   const held = new Map<RootId, RootDocHandle>()
   const loading = new Map<RootId, Promise<RootDocHandle>>()
   const listeners: ((root: RootId, doc: RootDocHandle) => void)[] = []
+  const releasing: ((root: RootId) => Promise<void>)[] = []
 
   return {
     session,
@@ -136,13 +138,16 @@ export function hostDocuments(input: {
     },
     async unload(root) {
       if (!held.delete(root)) return
-      await input.releasing?.(root)
+      for (const listener of releasing) await listener(root)
       exchange.unload(rootDocId(root))
     },
     loaded: () => [...held.keys()],
     onOpened(listener) {
       for (const [root, doc] of held) listener(root, doc)
       listeners.push(listener)
+    },
+    onReleasing(listener) {
+      releasing.push(listener)
     },
   }
 }

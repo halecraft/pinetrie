@@ -10,7 +10,7 @@ import {
   type RootId,
   rootDocId,
 } from "@pinetrie/core"
-import type { Agent } from "@pinetrie/pi"
+import type { Scribe } from "@pinetrie/pi"
 import {
   LIVE_DOC_ID,
   PLACES_DOC_ID,
@@ -134,7 +134,7 @@ export async function sweepHistories(input: {
  */
 export async function sweepHolds(input: {
   readonly basics: Pick<Basics, "session" | "log">
-  readonly agent: Pick<Agent, "writeValues">
+  readonly scribe: Pick<Scribe, "writeValues">
 }): Promise<void> {
   const { session, log } = input.basics
   // gather
@@ -148,7 +148,7 @@ export async function sweepHolds(input: {
   })
   // execute
   if (swept.length === 0) return
-  await input.agent.writeValues(
+  await input.scribe.writeValues(
     swept.map(lane => deleteRecord(QUEUE_HOLD, lane)),
   )
   log(`[host] swept ${swept.length} hold(s) on queues nobody can use`)

@@ -1,5 +1,5 @@
 import { laneNameForThread } from "@pinetrie/core"
-import type { Agent } from "@pinetrie/pi"
+import type { Scribe } from "@pinetrie/pi"
 import { expect, test } from "vitest"
 import { applyWrites, basics, putLane, record, writesOf } from "./fakes.ts"
 import { createNames } from "./names.ts"
@@ -8,8 +8,8 @@ test("two ensures called together write each lane's name once, and no two lanes 
   const b = basics()
   const lanes = [laneNameForThread("a"), laneNameForThread("b")]
   for (const lane of lanes) putLane(b, lane)
-  const agent = record<Pick<Agent, "writeValues">>({
-    // Written a moment later, as the agent's storage does: a second plan made
+  const scribe = record<Pick<Scribe, "writeValues">>({
+    // Written a moment later, as the scribe's session does: a second plan made
     // meanwhile would not see it.
     writeValues: async writes => {
       await new Promise(done => setTimeout(done, 5))
@@ -19,11 +19,11 @@ test("two ensures called together write each lane's name once, and no two lanes 
   const named: string[] = []
   const names = createNames({
     basics: b,
-    agent: agent.port,
+    scribe: scribe.port,
     onNamed: lane => named.push(lane),
   })
   await Promise.all([names.ensure(), names.ensure()])
-  const written = writesOf(agent.calls)
+  const written = writesOf(scribe.calls)
   expect(written).toHaveLength(2)
   const given = written.map(w =>
     w.kind === "set" ? (w.value as { name: string }).name : null,
@@ -37,7 +37,7 @@ test("a reservation is named on the same queue as new lanes, and starts its bann
   const lane = laneNameForThread("a")
   const reserved = laneNameForThread("r")
   putLane(b, lane)
-  const agent = record<Pick<Agent, "writeValues">>({
+  const scribe = record<Pick<Scribe, "writeValues">>({
     writeValues: async writes => {
       await new Promise(done => setTimeout(done, 5))
       applyWrites(b, writes)
@@ -46,7 +46,7 @@ test("a reservation is named on the same queue as new lanes, and starts its bann
   const named: string[] = []
   const names = createNames({
     basics: b,
-    agent: agent.port,
+    scribe: scribe.port,
     onNamed: l => named.push(l),
   })
   const [, first, again, held] = await Promise.all([
@@ -56,7 +56,7 @@ test("a reservation is named on the same queue as new lanes, and starts its bann
     names.reserve(lane),
   ])
   expect([first, again, held]).toEqual(["name", "known", "known"])
-  const written = writesOf(agent.calls)
+  const written = writesOf(scribe.calls)
   const all = written.map(w =>
     w.kind === "set" ? (w.value as { name: string }).name : null,
   )

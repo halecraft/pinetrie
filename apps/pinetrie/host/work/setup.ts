@@ -44,7 +44,7 @@ import {
   refreshBase,
   revsetName,
 } from "@pinetrie/lanes"
-import type { Agent } from "@pinetrie/pi"
+import type { PiSetup } from "@pinetrie/pi"
 import { type RepoOwner, startRepoOwner } from "@pinetrie/repo"
 import { type Basics, failed, slow } from "../basics.ts"
 import { brokenConfigLine } from "../startup-lines.ts"
@@ -98,10 +98,9 @@ export interface Setup {
   readonly ready: Promise<Ready> | null
   /**
    * The host paths every lane of its own is granted, read-only: the roots of
-   * the commands pi loaded (ADR-0036). Read on first use, once the agent
-   * exists, which is before any lane's spec or access is asked for.
+   * the commands pi loaded (ADR-0036). None when lanes have no copies here.
    */
-  hostPaths(): readonly string[]
+  readonly hostPaths: readonly string[]
   /** A lane's spec. The base lane gets no shared directories and no host paths. */
   specOf(lane: LaneName, ready: Ready, base?: boolean): LaneSpec
   /** Refresh the base snapshot after the refreshes queued before, in the background. */
@@ -114,43 +113,70 @@ export interface Setup {
   baseAtLine(): Promise<void>
 }
 
-export async function startSetup(input: {
-  readonly basics: Basics
+/** What the host found where it runs: the project, and the disks' paths when lanes have their own. */
+export interface Found {
+  readonly project: ProjectRecord
+  readonly paths: DiskPaths | null
+}
+
+/**
+ * The project as the host keeps it. `PINETRIE_LANES=0` (`defaultDirect`)
+ * changes a new root lane's default, never whether a lane may have its own
+ * copy. Pure.
+ */
+export function projectOf(
+  found: Pick<Found, "project"> | null,
+  defaultDirect: boolean,
+): ProjectRecord | null {
+  if (found === null) return null
+  const { project } = found
+  return project.kind === "lanes" && defaultDirect
+    ? { ...project, rootDefault: "direct" }
+    : project
+}
+
+/**
+ * Find the project in `dir`, and whether its lanes can have their own copies:
+ * `prepareHost` asks `container`, unless containers are off. Null with no
+ * tools (`dir` null). Read before pi's setup, which loads from its root.
+ */
+export async function findProject(input: {
   /** The project's folder, whose root `prepareHost` finds; null with no tools. */
   readonly dir: string | null
   /** `PINETRIE_LANES=0`: a new root lane works directly by default. */
   readonly defaultDirect: boolean
   /** False: lanes never get containers here, and `container` is not asked. */
   readonly containers: boolean
+}): Promise<Found | null> {
+  if (input.dir === null) return null
+  const found: Found = input.containers
+    ? await prepareHost(input.dir)
+    : {
+        project: {
+          kind: "direct",
+          root: input.dir,
+          reason: "lanes of their own are off for this host",
+        },
+        paths: null,
+      }
+  const project = projectOf(found, input.defaultDirect)
+  return project === null ? null : { ...found, project }
+}
+
+export async function startSetup(input: {
+  readonly basics: Basics
+  /** What `findProject` found; null with no tools. */
+  readonly found: Found | null
   /** The user's config, as read at startup (ADR-0035): its file, for logs. */
   readonly userConfig: { readonly file: string; readonly json: unknown }
-  readonly agent: () => Agent
+  /** The commands pi loaded, whose roots lanes are granted (ADR-0036). */
+  readonly setup: Pick<PiSetup, "commands" | "agentDir">
   /** Work nobody awaits: `quiet` waits for it. */
   readonly keeper: Keeper
 }): Promise<Setup> {
-  const { basics, keeper } = input
+  const { basics, keeper, found } = input
   const { log } = basics
-  const found =
-    input.dir === null
-      ? null
-      : input.containers
-        ? await prepareHost(input.dir)
-        : {
-            project: {
-              kind: "direct" as const,
-              root: input.dir,
-              reason: "lanes of their own are off for this host",
-            },
-            paths: null,
-          }
-  // `PINETRIE_LANES=0` changes a new root lane's default, never whether a lane
-  // may have its own copy.
-  const project: ProjectRecord | null =
-    found === null
-      ? null
-      : found.project.kind === "lanes" && input.defaultDirect
-        ? { ...found.project, rootDefault: "direct" }
-        : found.project
+  const project = found?.project ?? null
   const paths: DiskPaths | null = found?.paths ?? null
   const root = project?.kind === "lanes" ? project.root : null
   if (project !== null) {
@@ -184,20 +210,17 @@ export async function startSetup(input: {
       () => true,
     ))
 
-  let hostMounts: ReturnType<typeof planHostMounts> | null = null
-  const hostPaths = (): readonly string[] => {
-    if (hostMounts === null) {
-      const agent = input.agent()
-      hostMounts = planHostMounts({
-        roots: agent.commands().map(c => c.root),
-        home: homedir(),
-        agentDir: agent.agentDir(),
-      })
-      for (const r of hostMounts.refused)
-        log(`[host] ${r.path} is not readable in lanes: ${r.reason}`)
-    }
-    return hostMounts.mounts
-  }
+  const hostMounts =
+    root === null
+      ? null
+      : planHostMounts({
+          roots: input.setup.commands().map(c => c.root),
+          home: homedir(),
+          agentDir: input.setup.agentDir(),
+        })
+  for (const r of hostMounts?.refused ?? [])
+    log(`[host] ${r.path} is not readable in lanes: ${r.reason}`)
+  const hostPaths = hostMounts?.mounts ?? []
 
   const specOf = (lane: LaneName, r: Ready, base = false): LaneSpec => {
     if (root === null)
@@ -216,7 +239,7 @@ export async function startSetup(input: {
         links: r.links,
         grants: grants.mounts,
         shared: base ? [] : (lanes?.shared ?? []),
-        hostPaths: base ? [] : hostPaths(),
+        hostPaths: base ? [] : hostPaths,
       }),
       grants: { ssh: grants.ssh, env: grants.env },
       identity: r.identity,

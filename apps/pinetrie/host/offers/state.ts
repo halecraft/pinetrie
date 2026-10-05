@@ -17,7 +17,7 @@ import {
   wipDescription,
 } from "@pinetrie/core"
 import type { LineConfig } from "@pinetrie/lanes"
-import type { Agent } from "@pinetrie/pi"
+import type { PiSetup, Scribe } from "@pinetrie/pi"
 import {
   readArchived,
   readBases,
@@ -74,7 +74,8 @@ export interface OfferDeps {
   /** The integration line's names (ADR-0060). */
   readonly line: LineConfig
   readonly basics: Basics
-  readonly agent: () => Agent
+  /** What a description asks of the model. */
+  readonly piSetup: Pick<PiSetup, "skill" | "complete">
   /** Whether a lane is running now: an offer is described once it stops. */
   readonly running: (lane: LaneName) => boolean
   readonly docs: OfferDocs
@@ -85,14 +86,16 @@ export function createOfferDeps(input: {
   readonly owner: RepoOwner
   readonly line: LineConfig
   readonly basics: Basics
-  readonly agent: () => Agent
+  readonly scribe: Pick<Scribe, "writeValues">
+  readonly piSetup: Pick<PiSetup, "skill" | "complete">
   readonly running: (lane: LaneName) => boolean
+  /** A lane's base record changed. */
   readonly baseChanged: (lane: LaneName) => void
 }): OfferDeps {
   const { basics, line } = input
   const { session: doc, docs } = basics
   const writeValues = (writes: readonly ValueWrite[]) =>
-    writes.length === 0 ? Promise.resolve() : input.agent().writeValues(writes)
+    writes.length === 0 ? Promise.resolve() : input.scribe.writeValues(writes)
   const nameOf = (lane: LaneName) => readNames(doc).get(lane)
   const offerDocs: OfferDocs = {
     nameOf,
@@ -136,7 +139,7 @@ export function createOfferDeps(input: {
       const writes = setIfChanged(BASE, next, readBases(doc).get(next.lane))
       if (writes.length === 0) return
       await writeValues(writes)
-      // A running thread whose base now has news is told (ADR-0080).
+      // Announced, so a running thread whose base now has news is told (ADR-0080).
       input.baseChanged(next.lane)
     },
   }
@@ -144,7 +147,7 @@ export function createOfferDeps(input: {
     owner: input.owner,
     line,
     basics,
-    agent: input.agent,
+    piSetup: input.piSetup,
     running: input.running,
     docs: offerDocs,
     records,

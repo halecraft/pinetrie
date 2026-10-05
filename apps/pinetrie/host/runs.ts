@@ -4,7 +4,7 @@
 // follows: `startHost` wires the drain and hot reload to `onEnded`, which is
 // what keeps the queue's pops and the commands out of this module. What a
 // run reads of its pinned cards is `readPinned`'s (`pinned.ts`); what it is
-// told of its base's new work, `readBehind`'s (`base-news.ts`, ADR-0080).
+// told of its base's new work, `baseNews`' (`base-news.ts`, ADR-0080).
 
 import {
   type EntryId,
@@ -17,7 +17,6 @@ import {
 import type { Agent } from "@pinetrie/pi"
 import { readLatestPrompt } from "@pinetrie/reads"
 import {
-  type BehindMessage,
   CHAT_TYPE,
   type PinnedMessage,
   type PromptMessage,
@@ -32,6 +31,7 @@ import {
   readLaneTip,
   readStreams,
 } from "@pinetrie/schema"
+import type { BaseNews } from "./base-news.ts"
 import { type Basics, failed } from "./basics.ts"
 import type { LaneWork } from "./work/index.ts"
 
@@ -54,9 +54,6 @@ export type ReadPinned = (
   seen: readonly SentCard[],
   signal: AbortSignal,
 ) => Promise<PinnedMessage | null>
-
-/** What a chat's run on `lane` is told of its base's new work first, or null (`base-news.ts`). */
-export type ReadBehind = (lane: LaneName) => Promise<BehindMessage | null>
 
 export interface Runs {
   /**
@@ -131,11 +128,12 @@ export function createRuns(deps: {
   readonly agent: Pick<Agent, "lane">
   readonly work: Pick<LaneWork, "beforeRun" | "runEnded" | "splitEnded">
   readonly readPinned: ReadPinned
-  readonly readBehind: ReadBehind
+  /** What a chat's run is told first of its base's new work, and forgetting what was steered once the lane stops. */
+  readonly baseNews: Pick<BaseNews, "atStart" | "runEnded">
   /** Write `lane`'s run's verdict as pending (`Digests.pending`). */
   readonly pending: (lane: LaneName, prompt: EntryId) => Promise<void>
 }): Runs {
-  const { basics, agent, work, readPinned, readBehind } = deps
+  const { basics, agent, work, readPinned, baseNews } = deps
   const { docs, live, log } = basics
   let ended: (lane: LaneName, prompt: EntryId | null) => void = () => {}
   /**
@@ -166,6 +164,7 @@ export function createRuns(deps: {
           return endRun(live, lane, id)
         case "laneStopped":
           work.runEnded(lane)
+          baseNews.runEnded(lane)
           log(`[host] run ${id.slice(-8)} done`)
           return
         case "ended":
@@ -218,7 +217,7 @@ export function createRuns(deps: {
           const behind =
             chat === null
               ? null
-              : await readBehind(lane).catch(error => {
+              : await baseNews.atStart(lane).catch(error => {
                   failed(basics, "the base's news")(error)
                   return null
                 })

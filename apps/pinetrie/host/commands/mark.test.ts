@@ -14,13 +14,13 @@ test("clearing a root's title removes its mark", async () => {
     b,
     setRecord(MARK, { entry: root, title: "Plans", by: ada, at: 1 }, ROOT_ID),
   )
-  const agent = record<MarkDeps["agent"]>({ writeValues: async () => {} })
-  const out = await handleMark({ basics: b, agent: agent.port }, ada, {
+  const scribe = record<MarkDeps["scribe"]>({ writeValues: async () => {} })
+  const out = await handleMark({ basics: b, scribe: scribe.port }, ada, {
     kind: "mark",
     root: ROOT_ID,
     entry: root,
     title: null,
   })
   expect(out).toEqual({ kind: "marked" })
-  expect(writesOf(agent.calls)).toEqual([deleteRecord(MARK, root, ROOT_ID)])
+  expect(writesOf(scribe.calls)).toEqual([deleteRecord(MARK, root, ROOT_ID)])
 })

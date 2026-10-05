@@ -21,14 +21,9 @@ import {
   writeLaneTip,
 } from "@pinetrie/schema"
 import { describe, expect, test } from "vitest"
+import type { BaseNews } from "./base-news.ts"
 import { basics, deferred, fakeLane, methods, record, row } from "./fakes.ts"
-import {
-  createRuns,
-  planRunEnd,
-  type ReadBehind,
-  type ReadPinned,
-  streamInto,
-} from "./runs.ts"
+import { createRuns, planRunEnd, type ReadPinned, streamInto } from "./runs.ts"
 import type { LaneWork } from "./work/index.ts"
 
 const LANE = laneNameForThread("0123456789abcdef")
@@ -79,7 +74,7 @@ function setUp(
   lane = fakeLane(LANE),
   splitEnded: LaneWork["splitEnded"] = async () => null,
   readPinned: ReadPinned = async () => null,
-  readBehind: ReadBehind = async () => null,
+  atStart: BaseNews["atStart"] = async () => null,
 ) {
   const b = basics()
   const work = record<Pick<LaneWork, "beforeRun" | "runEnded" | "splitEnded">>({
@@ -95,7 +90,7 @@ function setUp(
     agent: agent.port,
     work: work.port,
     readPinned,
-    readBehind,
+    baseNews: { atStart, runEnded: () => {} },
     pending: async (l, prompt) => {
       pending.push({ prompt, running: readActiveRun(b.live, l) !== undefined })
     },
@@ -345,4 +340,33 @@ describe("a run's pinned cards (ADR-0048)", () => {
     lane.finish({ kind: "ok" })
     await ended
   })
+})
+
+test("a run's end forgets the lane's base news as the lane stops, before ended", async () => {
+  const lane = fakeLane(LANE)
+  const order: string[] = []
+  const runs = createRuns({
+    basics: basics(),
+    agent: { lane: () => lane.lane },
+    work: {
+      beforeRun: () => {},
+      runEnded: l => order.push(`work ${l}`),
+      splitEnded: async () => null,
+    },
+    readPinned: async () => null,
+    baseNews: {
+      atStart: async () => null,
+      runEnded: l => order.push(`news ${l}`),
+    },
+    pending: async () => {},
+  })
+  const ended = deferred<void>()
+  runs.onEnded(l => {
+    order.push(`ended ${l}`)
+    ended.resolve()
+  })
+  runs.start(LANE, { kind: "prompt", message: chat, pinnedSeen: [] })
+  lane.finish({ kind: "ok" })
+  await ended.promise
+  expect(order).toEqual([`work ${LANE}`, `news ${LANE}`, `ended ${LANE}`])
 })

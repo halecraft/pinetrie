@@ -12,21 +12,21 @@ wires them.
 |---|---|
 | `server.ts`, `invocation.ts` | `pnpm host [folder]` (ADR-0086): `planInvocation` (the folder), `storeChoice` (the session's file, and whether `PINETRIE_STORE` named it), `refusalText` (a refusal's words); `server.ts` carries them out |
 | `startup-lines.ts` | the words of what a starting host logs about its inputs: the project, the store, the user config, the agent's model and where it came from, the URL and invites |
-| `index.ts` | `startHost`: the store, the Exchange (with its `resolve` for the documents clients create, `resolveDoc`), the documents, lane work and the agent, then the wiring below |
+| `index.ts` | `startHost`: the store, the Exchange (with its `resolve` for the documents clients create, `resolveDoc`), the documents, then pi's scribe and setup, lane work and the agent, in that order (§ Startup), then the wiring below |
 | `basics.ts` | `Basics` (the session, `pinetrie:live`, the documents, the places, log, ids, clock) and how a failure is logged (`failed`, which words the error with core's `errorText`) |
 | `places.ts` | `applyPlaceSteps`: the one writer of the places document (ADR-0059), which writes its records in one batch, in an undo step when given one, then raises its `rev` in a batch of its own (`raiseRev`) |
 | `move-history.ts` | each person's history of moves per root (ADR-0066): `MoveHistories`, a shell over Kyneta's undo stacks |
 | `provenance.ts` | each card's history and the traces left where someone else moved your card (ADR-0048 step 6): `before` at a step's start, `after` its places write, `seen` and `sweep` |
-| `shutdown.ts` | the order a host stops in (`planShutdown`) |
-| `runs.ts` | a run from its start to its end (`createRuns`, `planRunEnd`), a Stop before pi starts (`cancel`), and the agent's `onStream` (`streamInto`) |
+| `shutdown.ts` | the order a host stops in (`planShutdown`): the agent, then the scribe, among its steps |
+| `runs.ts` | a run from its start to its end (`createRuns`, `planRunEnd`), a Stop before pi starts (`cancel`), and the agent's `onStream` (`streamInto`); a run asks base news what it is told first, and its lane's stop has base news forget what was steered |
 | `pinned.ts` | what a run reads of its thread's pinned cards (ADR-0048 step 5): `readPinned` gathers, waits a bounded time for the sender's text (`waitFor`), and plans the cards entry |
-| `base-news.ts` | what a thread is told of its base's new work (ADR-0080): `atStart`, a chat's run's behind entry; `baseChanged`, a steer into a running lane, at most once per base commit (`told`); `runEnded` forgets what was steered |
-| `split-call.ts` | `split_offer` (ADR-0080): a split card queued on the thread, popped when its run ends |
+| `base-news.ts` | what a thread is told of its base's new work (ADR-0080): `atStart`, a chat's run's behind entry; `baseChanged`, a steer into a running lane, at most once per base commit (`told`), heard from lane work's `onBaseChanged`; `runEnded` forgets what was steered. Made after the agent, whose lanes it steers |
+| `split-call.ts` | `split_offer` (ADR-0080): a split card queued on the thread, popped when its run ends: pi calls it only during a run, so its step is queued before the run's end queues the drain, which the keeper runs after it |
 | `queued-card-pop.ts` | popping a lane's queued cards to send them (ADR-0048, ADR-0083): `popNextQueuedCard`, and `drain`, which carries each out as `planCarry` decides: a fact appended, a catch-up, a split's run, a message sent (ADR-0055, ADR-0080); and `createWaits`, the drain's waits for its top card's text or for someone's typing in it to stop (ADR-0048 step 7) |
 | `settle.ts` | what happens between runs: drains, then the compaction and sweep as upkeep (the keeper's `later`) |
 | `housekeeping.ts` | which documents a run's end compacts (`planCompaction`: its roots, the session, the places, `pinetrie:live`), deleting images nothing shows, retiring histories of moves (`sweepHistories`), and deleting holds on queues nobody can use (`sweepHolds`, ADR-0048 step 7) |
-| `docs.ts` | `HostDocuments`: every document the host holds, a root's opened as it is asked for, and `onOpened`, which replays the roots already held to a listener that joins late; `planLoads` |
-| `directory.ts` | each root's directory record, refreshed as its document changes: `startDirectory`, started with the agent |
+| `docs.ts` | `HostDocuments`: every document the host holds, a root's opened as it is asked for, `onOpened`, which replays the roots already held to a listener that joins late, and `onReleasing`, whose listeners `unload` awaits, in order, before it lets a root go; `planLoads` |
+| `directory.ts` | each root's directory record, refreshed as its document changes: `startDirectory`, started with the scribe |
 | `cards.ts` | the card port (ADR-0048), about texts only: who wrote in a card, destroying one, loading and reading texts for the queue's pops and a run's pinned cards, waiting until a text holds a version (`whenHolds`, which an `AbortSignal` gives up), and the texts of given cards gathered for the sweeps; where the shell opens card documents |
 | `seats.ts` | each connected seat's person, written once as a `pinetrie.seat` record (started after `recover`), and unloading the histories of moves of a person with no seat left |
 | `startup.ts` | `recover`: what a starting host does before it takes a command |
@@ -134,7 +134,8 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
 - **`endRun` comes before `laneStopped` and `ended`.** It closes the lane's
   streams (ADR-0044: a stream stays open past its message's end) and clears
   its active run. `laneStopped` is lane work's `runEnded`: the container
-  stops, and the offer is refreshed. `ended` runs hot reload, which reads
+  stops, and the offer is refreshed; then base news forgets what it
+  steered into the lane, so the next run plans from the tree alone. `ended` runs hot reload, which reads
   which lanes run, and drains the lane; a drain that ran before
   `endRun` could start the next run with the last one's reply still open.
 - **The verdict is pending before `endRun`** (ADR-0077, `Digests.pending`):
@@ -166,10 +167,12 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
   archived, so these hold every lane a crash could have interrupted. Which
   roots are archived is the board's (`readArchived`), or, for a store from
   before the board, the carry-over's, planned before the roots are opened
-  since the agent that writes it is made after (ADR-0085).
+  and written in `recover` (ADR-0085).
   Archiving `unload`s a root (`work/archive.ts`); restoring opens it.
-  `unload` first has pi close its harness over the root (`releasing`,
-  `Agent.release`): a harness kept would write to the closed document, and
+  `unload` first runs its `onReleasing` listeners: the scribe's `release`
+  closes the agent's harness over the root, then the root's pi session
+  (`packages/pi/TECHNICAL.md`, ADR-0092), and the root's histories of moves
+  are unloaded. A harness kept would write to the closed document, and
   every later command in the root, the restored one included, would fail
   with "This document was unloaded, and is closed".
 - **The host is every document's authority** (`{ authority: "self" }`), so
@@ -179,7 +182,7 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
 - **The directory follows each root's document** (`directory.ts`): a change
   to its entries or values queues one refresh, the keeper's `once`
   (`root:<id>`), absorbed by one already queued, which writes
-  `readRootRecord` with `setIfChanged`. It starts once the agent exists,
+  `readRootRecord` with `setIfChanged`. It starts once the scribe exists,
   since a refresh writes through it, and follows every root through
   `onOpened`: the roots `startHost` opened before it, then each opened
   later. It refreshes each as it starts to follow it, so a record stored
@@ -219,7 +222,7 @@ any refresh they queued.
   logs the project and the store, `startHost` the user config (with
   `(none)` when missing, or why it is broken), then the roots it opened,
   then `agent ready` with the model and where each of its fields came from
-  (`Agent.modelOrigin`: `PINETRIE_PROVIDER`/`PINETRIE_MODEL`, or the pi
+  (`PiSetup.modelOrigin`: `PINETRIE_PROVIDER`/`PINETRIE_MODEL`, or the pi
   settings file that named it), and `server.ts` the URL and invites. The
   user config is read with `readConfigFile` (`@pinetrie/lanes`): missing or
   broken, its decoders get null and decode it as empty, as ADR-0071 says.
@@ -237,24 +240,34 @@ any refresh they queued.
   earlier, and `startControl` registers `onReceive` after `recover`. Earlier,
   a new message could run before an interrupted lane resumed, and jump a
   queued card.
-- **The agent, lane work and banners are made in a cycle.** Lane work and
-  banners are made first and read the agent lazily (`theAgent()`), because
-  the agent is made with lane work's `access` and `hooks` and banners'
-  `request`. Digests, titles and names are made before it too, and read it
-  the same way. Those are the only lazy reads: every module made after the
-  agent is given the agent. The documents' keeper is made before them, for banners.
-- **A module made before the agent writes nothing as it is made.**
-  `theAgent()` throws until the agent exists, and the documents' keeper runs
-  a step at once. A directory that refreshed each root as `startHost`
-  opened it, before the agent, failed on every stale record; so the
-  directory starts after the agent, and `onOpened` replays the roots opened
-  before it.
+- **pi is made in three parts, each when what it needs exists**
+  (ADR-0092, `packages/pi/TECHNICAL.md`), and every module is given values,
+  never a function that returns one:
+  1. the documents, then the scribe, which every module that writes a
+     record takes (`Pick<Scribe, "writeValues">`);
+  2. the project (`findProject`), then pi's setup (`loadPiSetup`), which
+     loads from its root and reads no document; the title-model and banner
+     logs follow it;
+  3. the documents' keeper, the roots `planLoads` names, the directory,
+     banners, digests, titles, names, provenance and the split call, each
+     with the scribe and the setup;
+  4. lane work, with them;
+  5. the agent, last, with lane work's `access` and `hooks`, banners'
+     `request` and digests' `step`; then base news, which steers its lanes
+     and joins lane work's `onBaseChanged`, the runs, the commands and the
+     drain.
+
+  A base change announced before base news joins is lost harmlessly: it
+  steers only a running lane, and no lane runs before `recover`. The
+  commands and the queue's drain still refer to each other (a command asks
+  for a drain, a drain sends through the commands), as closures that run
+  only once both exist.
 
 ## Shutdown
 
 `planShutdown` (`shutdown.ts`) returns the order, and `shutdown()` carries
-it out, each step but `server` in its own `try`: `intake` (seats, control), `close` (the documents' keeper and the owner of your repo, which stops its watch), `quiet`, `agent`,
-`work` (the containers), `exchange`, `server`. Only a failure in `server`
+it out, each step but `server` in its own `try`: `intake` (seats, control), `close` (the documents' keeper and the owner of your repo, which stops its watch), `quiet`, `agent` (every harness),
+`scribe` (every pi session, so a later write is refused in any document), `work` (the containers), `exchange`, `server`. Only a failure in `server`
 rejects `shutdown()`.
 
 - **`shutdown()` runs once.** A later call returns the first call's
@@ -402,7 +415,7 @@ rejects `shutdown()`.
   `retire` destroys a stack loaded or not (S91).
 - **Unloaded when nobody can use them:** a person's when their last seat
   leaves (the seats step, `idleWriters`), a root's when it is archived
-  (`docs.unload`'s `releasing`). The next move loads one again (S91).
+  (one of `docs.unload`'s `onReleasing` listeners). The next move loads one again (S91).
 - **Shutdown disposes them, then flushes,** so a stack's open step is
   stored before the Exchange stops.
 
@@ -568,11 +581,11 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   created. It is due again at each run's end, which draws only when it still has none: the
   retry for a failed one. `recover` does not: turning banners on must not
   draw one for every thread that ever ran. Banners are made before
-  `createNames`, which is made before lane work.
+  `createNames`, whose `onNamed` asks them.
 - **Only the name goes out**: the prompt is the `column-banner` skill's
   body, filled from the thread's name (`bannerPrompt`). No text model is
   asked, and no message leaves for the image model.
-- **A drawn image arrives fitted** (`Agent.drawBanner`), as an upload is,
+- **A drawn image arrives fitted** (`PiSetup.drawBanner`), as an upload is,
   so the host stores it as given. `drawWithRetries` asks up to three times.
 - **A failure is logged, never thrown**: `[host] no banner for <name>: …`,
   one line per failed attempt.
@@ -619,7 +632,7 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 
 | module | owns |
 |---|---|
-| `setup.ts` | `Setup`: the project, lane configs and shared directories, the owner of your repo (`Setup.owner`, made from the project root once the line's names are read, before anything else reads your repo), the default-image check, the images and runtime (`ready`), `specOf`, the granted host paths (read once, lazily: the agent exists only after lane work), and the base snapshot's refreshes |
+| `setup.ts` | `Setup`: the project, lane configs and shared directories, the owner of your repo (`Setup.owner`, made from the project root once the line's names are read, before anything else reads your repo), the default-image check, the images and runtime (`ready`), `specOf`, the granted host paths (planned at its start, from the commands pi's setup loaded), and the base snapshot's refreshes. The project is found before it (`findProject`, its rule `projectOf`), since pi's setup loads from its root |
 | `registry.ts` | `LaneRegistry`: each lane's handle, its jj, its record, whether it is a lane of its own; the only module that touches the handles |
 | `containers.ts` | `access`, a container's start (`planContainer`, `planStartFrom`), `beforeRun`, `runEnded` |
 | `fetch.ts` | a lane's history into your repo: the bundle on the lane's queue, the import an owner command (`importLane`) |
@@ -821,7 +834,9 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   running lane is `beginRun`. Both of those are `@pinetrie/schema`'s.
 - **A port's writes are values.** Every record goes through one
   `writeValues` (ADR-0062), so a test asserts what was written:
-  `expect(writesOf(agent.calls)).toEqual([deleteRecord(MARK, entry)])`.
+  `expect(writesOf(scribe.calls)).toEqual([deleteRecord(MARK, entry)])`.
+  A test that needs the order of calls across the scribe, pi's setup and the
+  agent gives one `record` as each of them.
   `applyWrites` is a fake `writeValues` that applies them to the document.
 - **Admission is two pure plans**, `planRequest` and `planUpgrade`
   (`routes.ts`): every admission rule is a unit test there, and `http.ts`

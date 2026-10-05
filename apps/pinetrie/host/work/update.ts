@@ -39,7 +39,7 @@ import {
   type Runner,
   type TouchedRevision,
 } from "@pinetrie/lanes"
-import { type Agent, LAND_BUDGET, type ThreadLaneHandle } from "@pinetrie/pi"
+import { LAND_BUDGET, type PiSetup, type ThreadLaneHandle } from "@pinetrie/pi"
 import {
   readBases,
   readLine,
@@ -335,11 +335,12 @@ export async function applySettle(
 
 export interface Updates {
   /**
-   * Merge what `command` names into the lane: the thread's base (ADR-0060),
+   * Merge what `command` names into the lane `handle` names, whose handle the
+   * caller holds: the thread's base (ADR-0060),
    * the line's commit or a fresh copy of its WIP; with `continue-on-line`,
    * the line, moving the thread there; with `catch-up-with-parent`, the
    * newest commit of the thread it branched from (ADR-0072).
-   * Clean: the update is appended to the thread. Conflicted: the land
+   * Clean: the update is appended to the thread, through `handle`. Conflicted: the land
    * message for the resolution run, with `intent` (the card's text) after
    * the conflicts. Nothing new: nothing to do, but a move to the line is
    * fetched. Refused, with the lane untouched, when even the smallest
@@ -347,7 +348,7 @@ export interface Updates {
    * unless a run follows (`follows`).
    */
   prepareUpdate(
-    lane: LaneName,
+    handle: Pick<ThreadLaneHandle, "name" | "append">,
     by: WriterId,
     intent: string,
     command: CatchUpCommand,
@@ -373,7 +374,7 @@ export function createUpdates(deps: {
   readonly basics: Basics
   readonly setup: Pick<Setup, "root" | "owner" | "paths" | "lanes">
   readonly registry: LaneRegistry
-  readonly agent: () => Agent
+  readonly piSetup: Pick<PiSetup, "skill">
   readonly containers: Pick<Containers, "beforeRun" | "runEnded">
   readonly fetchLane: Fetches["fetchLane"]
   readonly writeRevision: Turns["writeRevision"]
@@ -521,7 +522,7 @@ export function createUpdates(deps: {
     intent: string,
   ): Promise<Parameters<typeof planCatchUp>[1]> => ({
     budget: LAND_BUDGET,
-    skill: await deps.agent().skill("pinetrie:skill:resolve-conflicts"),
+    skill: await deps.piSetup.skill("pinetrie:skill:resolve-conflicts"),
     intent,
   })
 
@@ -594,7 +595,8 @@ export function createUpdates(deps: {
       )
     },
 
-    async prepareUpdate(lane, by, intent, command, follows) {
+    async prepareUpdate(handle, by, intent, command, follows) {
+      const lane = handle.name
       const { owner } = setup
       if (!registry.isOwn(lane) || owner === null)
         return refused("the lane has no copy of its own")
@@ -624,7 +626,7 @@ export function createUpdates(deps: {
           })
           return applySettle(
             {
-              append: message => deps.agent().lane(lane).append(message),
+              append: message => handle.append(message),
               recordUpdate: (entry, merge) => recordUpdate(lane, entry, merge),
               fetchLane: have => void deps.fetchLane(lane, have),
             },

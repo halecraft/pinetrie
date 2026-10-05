@@ -10,7 +10,7 @@
 import type { Exchange } from "@kyneta/exchange"
 import type { WriterId } from "@pinetrie/core"
 import type { Keeper } from "@pinetrie/keeper"
-import type { Agent } from "@pinetrie/pi"
+import type { Scribe } from "@pinetrie/pi"
 import { readSeats } from "@pinetrie/reads"
 import { planSeats, SEAT, setRecord } from "@pinetrie/rules"
 import { seatOf } from "@pinetrie/schema"
@@ -35,10 +35,10 @@ export function startSeats(input: {
   }
   readonly basics: Pick<Basics, "session" | "now">
   readonly keeper: Keeper
-  readonly agent: Pick<Agent, "writeValues">
+  readonly scribe: Pick<Scribe, "writeValues">
   readonly histories: Pick<MoveHistories, "loaded" | "unloadWriters">
 }): { stop(): void } {
-  const { exchange, keeper, agent, histories } = input
+  const { exchange, keeper, scribe, histories } = input
   const { session: doc, now } = input.basics
   const step = () =>
     keeper.run(async () => {
@@ -53,7 +53,7 @@ export function startSeats(input: {
         histories.loaded(),
         connected.map(s => s.writer),
       )
-      await agent.writeValues(seats.map(seat => setRecord(SEAT, seat)))
+      await scribe.writeValues(seats.map(seat => setRecord(SEAT, seat)))
       await histories.unloadWriters(idle)
     })
   void step()

@@ -115,7 +115,7 @@ Each host record is one `RecordSpec<R, K>`: its `namespace`, `keyOf`,
 `encode` and `decode`, exported beside its type (`MARK` in `mark.ts`,
 `OFFER` in `offer.ts`). Everything else goes through the spec:
 `setRecord` and `deleteRecord` build the `ValueWrite`s the host hands
-`Agent.writeValues`; `recordsOf` decodes a namespace's values, which
+`Scribe.writeValues`; `recordsOf` decodes a namespace's values, which
 `readRecords` in `@pinetrie/reads` reads from the document; `setIfChanged`
 writes only a record that changed.
 

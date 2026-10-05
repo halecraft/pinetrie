@@ -29,7 +29,7 @@ browser ──commands (Kyneta Line)──▶ host ──▶ pi agent core
 |---|---|
 | `core` | pure types and decisions; depends on nothing |
 | `schema` | the document's shape |
-| `pi` | the only package that imports pi |
+| `pi` | the only package that imports pi: the scribe, the person's pi setup, and the agent |
 | `protocol` | the wire contract |
 | `rules` | each stored shape and the pure rules about it |
 | `reads` | document reads shared by host and client |

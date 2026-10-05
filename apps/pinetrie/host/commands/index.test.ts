@@ -69,13 +69,18 @@ function setUp(
   writeEntry(b.root, row(ROOT_ENTRY, null))
   writeDirectory(b)
   placeRoot(b, DOING)
-  const agent = record<CommandDeps["agent"]>({
+  // The agent, the scribe and the setup in one record, so the order of their calls shows.
+  const pi = record<
+    CommandDeps["agent"] & CommandDeps["scribe"] & CommandDeps["piSetup"]
+  >({
     appendToTree: async () => ({ kind: "appended", id: entryId("e-2") }),
     ...(writes ? { writeValues: async w => applyWrites(b, w) } : {}),
   })
   const commands = createCommands({
     basics: b,
-    agent: agent.port,
+    agent: pi.port,
+    scribe: pi.port,
+    piSetup: pi.port,
     work: record<CommandDeps["work"]>(work).port,
     blobs: record<CommandDeps["blobs"]>({ ref: () => undefined }).port,
     cards: cards.port,
@@ -92,7 +97,7 @@ function setUp(
     provenance: createProvenance({
       basics: b,
       presence: newPresenceDoc(),
-      agent: () => ({ writeValues: async w => applyWrites(b, w) }),
+      scribe: { writeValues: async w => applyWrites(b, w) },
     }),
     titles: titles.port,
     keeper,
@@ -113,7 +118,7 @@ function setUp(
   return {
     b,
     keeper,
-    agent,
+    pi,
     cards,
     commands,
     replies,
@@ -194,19 +199,19 @@ test("a move into Done holds the keeper only for its place and its unload: a com
 })
 
 test("a chat in an archived root is refused, and the agent is never called", async () => {
-  const { b, agent, commands, replies, sender, chat } = setUp()
+  const { b, pi, commands, replies, sender, chat } = setUp()
   placeRoot(b, DONE)
   await commands.handle(sender, ALICE, chat("c-1"))
   expect(replies[0]).toMatchObject({ id: "c-1", outcome: "refused" })
   expect(replies[0]?.errorMessage).toMatch(/^archived by /)
-  expect(agent.calls).toEqual([])
+  expect(pi.calls).toEqual([])
 })
 
 test("the command's id is the send's id", async () => {
-  const { agent, commands, replies, sender, chat } = setUp()
+  const { pi, commands, replies, sender, chat } = setUp()
   await commands.handle(sender, ALICE, chat("c-2"))
   expect(replies[0]).toMatchObject({ id: "c-2", outcome: "appended" })
-  expect(agent.calls[0]?.args[0]).toMatchObject({
+  expect(pi.calls[0]?.args[0]).toMatchObject({
     details: { sendId: "c-2" },
   })
 })
@@ -250,7 +255,7 @@ test("a chat command spends its card once written, record then text, answering w
 })
 
 test("a popped queued card in an archived root is refused, and the agent is never called", async () => {
-  const { b, agent, commands } = setUp()
+  const { b, pi, commands } = setUp()
   placeRoot(b, DONE)
   const out = await commands.sendPoppedQueuedCard(ALICE, "s-1", {
     text: "from the queue",
@@ -268,14 +273,14 @@ test("a popped queued card in an archived root is refused, and the agent is neve
     state: null,
   })
   expect(out).toMatchObject({ kind: "refused", code: ERR.ARCHIVED })
-  expect(agent.calls).toEqual([])
+  expect(pi.calls).toEqual([])
 })
 
 test("a seat whose principal names nobody is refused whatever it sends", async () => {
-  const { agent, commands, replies, sender, chat } = setUp()
+  const { pi, commands, replies, sender, chat } = setUp()
   await commands.handle(sender, undefined, chat("c-3"))
   expect(replies[0]).toMatchObject({ outcome: "refused" })
-  expect(agent.calls).toEqual([])
+  expect(pi.calls).toEqual([])
 })
 
 test("a command that throws is answered failed, and logged", async () => {

@@ -7,7 +7,7 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
-import type { Agent } from "@pinetrie/pi"
+import type { PiSetup, Scribe } from "@pinetrie/pi"
 import { readMarks } from "@pinetrie/reads"
 import { BOARD, MARK, setRecord, WORKFLOW } from "@pinetrie/rules"
 import { writeEntry } from "@pinetrie/schema"
@@ -41,7 +41,10 @@ function setUp(
 ) {
   const b = basics()
   const reply = deferred<string | null>()
-  const agent = record<Pick<Agent, "complete" | "skill" | "writeValues">>({
+  // The setup and the scribe in one record, so the order of their calls shows.
+  const pi = record<
+    Pick<PiSetup, "complete" | "skill"> & Pick<Scribe, "writeValues">
+  >({
     skill: async () => ({ path: "SKILL.md", content: "Title it.", hash: "h" }),
     complete: async () =>
       over.reply === undefined ? reply.promise : over.reply,
@@ -52,15 +55,16 @@ function setUp(
     basics: b,
     keeper,
     enabled: over.enabled ?? true,
-    agent: () => agent.port,
+    scribe: pi.port,
+    piSetup: pi.port,
     rootedWait: 50,
   })
   const title = () => readMarks(b.root).get(E1)
-  return { b, agent, keeper, titles, reply, title }
+  return { b, pi, keeper, titles, reply, title }
 }
 
 test("a new root's first lane: titled by the agent once the run writes its prompt", async () => {
-  const { b, agent, keeper, titles, reply, title } = setUp()
+  const { b, pi, keeper, titles, reply, title } = setUp()
   putLane(b, L1)
   await keeper.run(() => titles.laneStarted(started))
   reply.resolve("Rail layout")
@@ -69,7 +73,7 @@ test("a new root's first lane: titled by the agent once the run writes its promp
   writeEntry(b.root, row(E1, null))
   await keeper.idle()
   expect(title()).toMatchObject({ title: "Rail layout", by: THE_AGENT })
-  const asked = agent.calls.find(c => c.method === "complete")?.args[0]
+  const asked = pi.calls.find(c => c.method === "complete")?.args[0]
   expect(asked).toMatchObject({ purpose: "title", system: "Title it." })
   expect(JSON.stringify(asked)).toContain("Ada: fix the rail")
 })
@@ -80,11 +84,11 @@ test("a root with a lane already, or with titles off, is not titled unasked", as
     { s: setUp({ enabled: false, reply: "Rail" }), lane: L1 },
   ]
   for (const { s, lane } of cases) {
-    const { b, agent, keeper, titles } = s
+    const { b, pi, keeper, titles } = s
     putLane(b, lane)
     await keeper.run(() => titles.laneStarted(started))
     await keeper.idle()
-    expect(agent.calls).toEqual([])
+    expect(pi.calls).toEqual([])
   }
 })
 
@@ -117,10 +121,10 @@ test("asked: answers at once, and its title replaces a person's, as theirs", asy
 })
 
 test("asked, with no message yet: refused, and nothing asked", async () => {
-  const { agent, keeper, titles } = setUp()
+  const { pi, keeper, titles } = setUp()
   const answer = await keeper.run(() => titles.asked(ROOT_ID, ADA))
   expect(answer.kind).toBe("refused")
-  expect(agent.calls).toEqual([])
+  expect(pi.calls).toEqual([])
 })
 
 const DONE = workflowStateIdFor("x")

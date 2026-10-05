@@ -270,7 +270,7 @@ function setUp(
     provenance: createProvenance({
       basics: b,
       presence,
-      agent: () => ({ writeValues: async w => applyWrites(b, w) }),
+      scribe: { writeValues: async w => applyWrites(b, w) },
     }),
   }
   return { b, events, deps, appended, presence }

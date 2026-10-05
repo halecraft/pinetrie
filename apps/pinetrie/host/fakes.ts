@@ -176,6 +176,7 @@ export function fakeDocuments(input: {
   const rootOfLane = (lane: LaneName): RootId =>
     readLaneRecords(session).get(lane)?.root ?? ROOT_ID
   const listeners: ((root: RootId, doc: RootDocHandle) => void)[] = []
+  const releasing: ((root: RootId) => Promise<void>)[] = []
   const open = (root: RootId): RootDocHandle => {
     const known = roots.get(root)
     if (known !== undefined) return known
@@ -202,12 +203,17 @@ export function fakeDocuments(input: {
       return null
     },
     unload: async root => {
+      if (!roots.has(root)) return
+      for (const listener of releasing) await listener(root)
       roots.delete(root)
     },
     loaded: () => [...roots.keys()],
     onOpened(listener) {
       for (const [root, doc] of roots) listener(root, doc)
       listeners.push(listener)
+    },
+    onReleasing(listener) {
+      releasing.push(listener)
     },
   }
 }

@@ -2,7 +2,6 @@
 export {
   type Agent,
   type AgentDocuments,
-  type CreateAgentOptions,
   createAgent,
   newId,
 } from "./agent.ts"
@@ -26,6 +25,8 @@ export {
   openChannel,
 } from "./lane-env.ts"
 export type { LaneAccess, LaneHooks } from "./lanes.ts"
+export { loadPiSetup, type PiSetup } from "./pi-setup.ts"
+export { createScribe, type Scribe } from "./scribe.ts"
 export {
   SCRIPTED_DESCRIPTION,
   SCRIPTED_VERDICT,

@@ -9,34 +9,68 @@ app every spelling fails with `ERR_MODULE_NOT_FOUND`. See
 `index.ts` re-exports our shapes only. No pi type crosses the boundary
 (ADR-0003).
 
-## Where the facade lives
+## Where the facades live (ADR-0092)
 
-`createAgent` (`agent.ts`) builds the pi stack over the session's documents,
-and wires the parts below into the `Agent` the host sees.
+The host holds three facades, made in this order, each from what exists by
+then:
 
-### A pi session per document (ADR-0063)
+| facade | made by | what it is | it needs |
+|---|---|---|---|
+| `Scribe` | `createScribe` (`scribe.ts`) | the host's writes into the documents: `writeValues`, `appendToTree`; and every session's end: `release`, `close` | the documents, a replica id, the image store |
+| `PiSetup` | `loadPiSetup` (`pi-setup.ts`) | the person's pi setup, loaded: `complete`, `skill`, `commands`, `refusedCommands`, `expand`, `canDrawBanners`, `drawBanner`, `agentDir`, the model's label and origin | the model choice, the project's root, the user config; no document |
+| `Agent` | `createAgent` (`agent.ts`) | the agent at work in threads' lanes: `createThreadLane`, `lane`, `interrupted`, `close` | the scribe, the setup, lane work's `access` and `hooks`, `set_banner`'s asks |
 
-The host gives `createAgent` its `AgentDocuments`: the session's document, a
-root's by its `RootId`, and the root a lane works in (its `LANE` record).
+Only the agent needs the host, since pi's tools call lane work, so the host
+makes it last and every other module it makes takes values
+(`apps/pinetrie/host/TECHNICAL.md`, Startup). No facade's type names a pi
+type. `createAgent` reaches what is behind the other two (the scribe's
+sessions, the setup's `ModelSetup`) through `sealed` (`inside.ts`): a
+module-private map from each facade to its inside, which throws for an
+object its factory did not make. `index.ts` exports neither the maps nor
+`inside.ts`.
 
-- **One model setup, tool list, system prompt and hook set serve every
-  document.** A `KynetaStorage`, `StorageBackedSession` and harness are made
-  per document the first time it is asked for, and held until the host
-  releases its root (`release`, before it unloads the document) or the agent
-  closes. The next call in a released root opens its document again.
-  The promise is held, so two callers asking at once share one harness. S84
-  measured one at about 0.35 ms and 49 KB.
-- **Routing.** `createThreadLane(spot, lane)` and `appendToTree(message,
-  spot)` act in `spot.root`'s session. `lane(name)` returns a handle whose
-  every call finds the lane's root when it is made: a lane is created, then
-  its record written, then it runs. `interrupted(roots)` asks the roots the
-  host opened. `recordTurn` reads the tip from the lane's root.
-- **`writeValues` groups writes by their `target`** (`byTarget`), and commits
-  each group to its document's session: the session's harness serves only
-  this. The foreign-namespace guard runs before any group is written.
+### One pi session per document (ADR-0063, S113)
+
+The host gives the scribe and the agent its `AgentDocuments`: the session's
+document, a root's by its `RootId`, and the root a lane works in (its `LANE`
+record).
+
+- **The scribe holds each document's one `KynetaStorage` and
+  `StorageBackedSession`**, made the first time a write or the agent asks,
+  the promise held so two callers share one. Nothing else opens a session:
+  two over one document drift apart, since `KynetaStorage` indexes its own
+  commits and reconciles only `replay` changes, so after its first read
+  neither sees the other's (S113 case A).
+- **The agent builds a root's harness through the scribe**
+  (`scribeInside.over(root, build)`): over that root's session, once, and
+  the scribe holds it beside the session. The agent keeps no map of its own.
+  A root's harness is made at the first lane call there, not at its first
+  write; making one writes nothing (S113 case B). The session document has a
+  session and no harness. One setup, tool list, system prompt and hook set
+  serve every harness.
+- **The scribe ends every session.** A harness closes the session it was
+  given, and both closes are idempotent. `release(root)`, before the host
+  lets the document go, forgets the root's entry, closes its harness, then
+  the session, which also ends a root written to and never run; the next
+  call opens the document again (S113 case G). `close()` closes every
+  harness, then every session, and refuses every later write, in a document
+  it never opened too. `Agent.close()` closes the harnesses alone
+  (`closeBuilt`), which ends running runs; the host's shutdown closes the
+  scribe after it.
+- **Routing.** `createThreadLane(spot, lane)` acts in `spot.root`'s
+  harness. `lane(name)` returns a handle whose every call finds the lane's
+  root when it is made: a lane is created, then its record written, then it
+  runs. `interrupted(roots)` asks the roots the host opened. `recordTurn`
+  reads the tip from the lane's root.
+- **The scribe's writes.** `planWrites` (pure) refuses the first namespace
+  outside `pinetrie.`, else groups the writes by their `target`
+  (`byTarget`), in first-seen order; `writeValues` throws for a refusal,
+  writing nothing, else commits each group to its document's session.
+  `appendToTree` writes an entry with no lane into its root's session.
 - **Roots never wait on one another**: pi serializes commits per session.
-- `one-root.ts` is the documents of a session with one root, for tests. `Agent` is the sum of their
-interfaces, plus `appendToTree`, `writeValues`, `complete` and `stats`.
+- `one-root.ts` is the documents of a session with one root, for tests;
+  `start-pi.ts`'s `startPi` makes the three facades over them in the host's
+  order.
 
 | module | its one job |
 |---|---|
@@ -47,11 +81,14 @@ interfaces, plus `appendToTree`, `writeValues`, `complete` and `stats`.
 | `stream.ts` | pi's events as `StreamEvent`s (`streamEventOf`) |
 | `commands.ts` | the commands pi loaded, and a command's file as the model reads it (`CommandFiles`) |
 | `banner.ts` | `set_banner`, and drawing a banner (`Banners`) |
-| `config.ts` | the model, its setup, and `complete` |
+| `config.ts` | the model, its setup (`loadModelSetup`), and `complete` |
+| `pi-setup.ts` | the person's pi setup, loaded (`PiSetup`) |
+| `scribe.ts` | the host's writes and every session's life (`Scribe`, `planWrites`) |
+| `inside.ts` | a facade's inside, reachable only in this package (`sealed`) |
 
 The decisions in them are pure and tested without a harness:
 `activeToolNames`, `toolsChanged`, `toolContextOf`, `streamEventOf`,
-`expandCommand`, `skillOf`, and the search tools' `grepArgs`, `findArgs`,
+`expandCommand`, `skillOf`, `planWrites`, and the search tools' `grepArgs`, `findArgs`,
 `searchOutcome` and `searchText`.
 
 ## `storage.ts` — our implementation of pi's `Storage` port
@@ -150,7 +187,7 @@ Four facts from pi's source and the probes shape it:
 
 ### Conversation threads have no lane (S21)
 
-A thread where the agent has not been asked has no lane. `appendToTree` inserts
+A thread where the agent has not been asked has no lane. `Scribe.appendToTree` inserts
 its messages with `session.mutate` + `insertEntry`, parented at exactly the
 entry the plan chose; the entry is a full member of the tree (navigable, and a
 lane can later be created at it, whose agent reads it). The host's serial
@@ -329,12 +366,12 @@ Loading runs every package's factory, so side effects happen (`pi-subagents`
 logs a warning). `pickModel` is the pure choice, field by field: the
 override's, else the project's `.pi/settings.json`, else the global
 `settings.json` in the agent directory, as pi's own merge orders them. It
-returns where each field came from (`ModelOrigin`), which the agent exposes as
-`modelOrigin` for the host's startup line; a named or scripted model's origin
+returns where each field came from (`ModelOrigin`), which the setup exposes as
+`PiSetup.modelOrigin` for the host's startup line; a named or scripted model's origin
 is its kind. With tools (`CreateAgentOptions.tools`), pi-agent-core's
 `read`, `write`, `edit` and `bash`, and pine·trie's `grep` and `find`, run in
 each lane's own directory (below).
-Settings, context files and skills load from `CreateAgentOptions.project`,
+Settings, context files and skills load from `PiSetupOptions.project`,
 with tools on or off (ADR-0086); with none, from the process's working
 directory. The system prompt
 is pi's `buildSystemPrompt`, with the loader's context files (the repo's
@@ -478,7 +515,7 @@ item 18, and in `lanes.test.ts` against the harness.
   `executionMode`, so `catch_up` cannot ask to run alone; the host refuses a
   call with a sibling instead.
 - **`set_banner`** (`banner.ts`, ADR-0050) is registered whenever the host
-  has tools, and active when `createAgent` is given `banners`. pi fails a
+  has tools, and active when `createAgent` is given `bannerAsks`. pi fails a
   run whose stored list names a tool not registered, so every tool is
   registered whatever the setting. A call while banners are off answers
   that they are off. The tool reads its arguments (`parseBannerArgs`: an
@@ -492,7 +529,7 @@ item 18, and in `lanes.test.ts` against the harness.
   host reads (`digestOf`, ADR-0075): a replacement must ask for it too. So
   one of yours or the repo's of the same name replaces pine·trie's. All five are
   `disable-model-invocation: true`: only the host asks for them.
-  `Agent.skill(name)` reads the file at call time, without its frontmatter,
+  `PiSetup.skill(name)` reads the file at call time, without its frontmatter,
   and hashes it. The scripted and named model choices load no resources, so
   it falls back to the file in `skills/`.
 
@@ -535,7 +572,7 @@ item 18, and in `lanes.test.ts` against the harness.
 ### Commands: your skills and prompts (`commands.ts`, ADR-0036)
 
 - **Every skill and prompt template pi loaded** comes back from
-  `setUpModel` as a command to be labelled, those pi's collision handling
+  `loadModelSetup` as a command to be labelled, those pi's collision handling
   dropped included:
   - pi keeps one of each name and records the loser's file in a `collision`
     diagnostic;
@@ -545,7 +582,7 @@ item 18, and in `lanes.test.ts` against the harness.
     read from the package root pi records (`sourceInfo.baseDir`).
   - A skill under pine·trie's own skills directory is `pinetrie`.
   - The model's own skill list keeps pi's precedence: one per name.
-- **`createAgent` labels them** with the user config's renames
+- **`loadPiSetup` labels them** with the user config's renames
   (`commandRenames`) through `labelCommands` (`@pinetrie/rules`). `commands()` is
   the list, `refusedCommands()` what clashed, and `skill(name)` takes a
   qualified name: a conflicted update asks for
@@ -597,7 +634,7 @@ as an entry is. The replay test in `storage.test.ts` relies on this.
 
 ### Values
 
-`writeValues(writes)` writes the host's records (ADR-0062): the
+`Scribe.writeValues(writes)` writes the host's records (ADR-0062): the
 `ValueWrite`s that `setRecord` and `deleteRecord` (`@pinetrie/rules`) build, in one
 `session.mutate` commit of pi's `setValue` and `deleteValue` writes. That is
 the path `Session.setValue` takes for one write, so conformance covers the
@@ -676,14 +713,14 @@ Note what it does **not** do: it detects change, it does not design for it.
 Probes P1 and P2 in `sandbox/s17-typed-entries/` could each have failed while
 conformance stayed green, which is why they ran first.
 
-### Requests outside every thread (`Agent.complete`, ADR-0038, ADR-0056, ADR-0074)
+### Requests outside every thread (`PiSetup.complete`, ADR-0038, ADR-0056, ADR-0074)
 
 `complete({ system, user, purpose })` is one `completeSimple` request, with
 no tools and no session: nothing enters the tree or a lane's context. It
 writes an offer's commit message (`describeRequest`) and an ask's digest
 (`digestRequest`, the `ask-digest` skill) on `describeModel`, and a root's
 title (`titleRequest`, the `tab-title` skill, `purpose: "title"`) on the
-model `titleModelOf` chose at start: `CreateAgentOptions.titleModel` when pi
+model `titleModelOf` chose at load: `PiSetupOptions.titleModel` when pi
 has it (`titleModelFound` says whether), else `describeModel`, and always
 `describeModel` for a scripted model; the host
 builds each request and this package only carries it out. A failed request
@@ -691,7 +728,7 @@ returns null: the offer keeps its placeholder, the ask its last digest, and
 the root its label. A scripted model answers it from its own provider
 (`describe`), so none takes a reply from the run's script.
 
-### Banners' images (`Agent.drawBanner`, ADR-0050, ADR-0053)
+### Banners' images (`PiSetup.drawBanner`, ADR-0050, ADR-0053)
 
 - **`setup.images`** is pi-ai's image registry (`createImagesModels`):
   `openrouterImagesProvider()` for a named or configured model, and

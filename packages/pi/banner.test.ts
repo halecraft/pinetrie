@@ -26,7 +26,7 @@ import {
   rowMessage,
 } from "@pinetrie/schema"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
-import { createAgent, newId } from "./agent.ts"
+import { newId } from "./agent.ts"
 import {
   BANNER_TOOL,
   bannerImageConfig,
@@ -39,6 +39,7 @@ import {
   type ScriptedModel,
   scriptedModel,
 } from "./scripted.ts"
+import { startPi } from "./start-pi.ts"
 
 const SHA = "c".repeat(64) as Sha256
 
@@ -114,15 +115,13 @@ describe("banners in a harness", () => {
       Date.now(),
     )
 
-  /** An agent over `doc`, with banners when `asks` is given. */
+  /** pi over `doc`, with banners when `asks` is given. */
   const agentOver = (
     doc: RootDocHandle,
     script: ScriptedModel,
     asks?: { lane: LaneName; ask: BannerAsk }[],
   ) =>
-    createAgent({
-      documents: oneRoot(doc),
-      replicaId: "test",
+    startPi(oneRoot(doc), {
       model: { kind: "scripted", script },
       project: root,
       tools: {
@@ -141,12 +140,13 @@ describe("banners in a harness", () => {
       ...(asks === undefined
         ? {}
         : {
-            banners: {
-              config: DEFAULT_BANNER,
-              request: async (lane, ask): Promise<BannerAnswer> => {
-                asks.push({ lane, ask })
-                return { kind: "requested" }
-              },
+            banner: DEFAULT_BANNER,
+            bannerAsks: async (
+              lane: LaneName,
+              ask: BannerAsk,
+            ): Promise<BannerAnswer> => {
+              asks.push({ lane, ask })
+              return { kind: "requested" }
             },
           }),
     })
@@ -162,7 +162,7 @@ describe("banners in a harness", () => {
     const script = scriptedModel()
     const asks: { lane: LaneName; ask: BannerAsk }[] = []
     const agent = await agentOver(doc, script, asks)
-    const made = await agent.createThreadLane(
+    const made = await agent.agent.createThreadLane(
       { root: ONE_ROOT, at: ROOT },
       laneNameForThread(newId()),
     )
@@ -171,7 +171,7 @@ describe("banners in a harness", () => {
       { tool: BANNER_TOOL, args: { direction: "at dusk" } },
       { text: "done" },
     ])
-    await agent.lane(made.lane).run(prompt("a dusk banner, please"), [])
+    await agent.agent.lane(made.lane).run(prompt("a dusk banner, please"), [])
     expect(asks).toEqual([
       {
         lane: made.lane,
@@ -186,7 +186,7 @@ describe("banners in a harness", () => {
     const doc = newRootDoc()
     // pi stores a new lane's tools: then banners were off.
     const before = await agentOver(doc, scriptedModel())
-    const made = await before.createThreadLane(
+    const made = await before.agent.createThreadLane(
       { root: ONE_ROOT, at: ROOT },
       laneNameForThread(newId()),
     )
@@ -196,7 +196,7 @@ describe("banners in a harness", () => {
     const asks: { lane: LaneName; ask: BannerAsk }[] = []
     const after = await agentOver(doc, script, asks)
     script.use([{ tool: BANNER_TOOL, args: {} }, { text: "done" }])
-    await after.lane(made.lane).run(prompt("a banner, please"), [])
+    await after.agent.lane(made.lane).run(prompt("a banner, please"), [])
     expect(asks.map(a => a.lane)).toEqual([made.lane])
     await after.close()
   })
@@ -204,7 +204,7 @@ describe("banners in a harness", () => {
   test("a lane stored while banners were on still runs once they are off, and asks for none", async () => {
     const doc = newRootDoc()
     const before = await agentOver(doc, scriptedModel(), [])
-    const made = await before.createThreadLane(
+    const made = await before.agent.createThreadLane(
       { root: ONE_ROOT, at: ROOT },
       laneNameForThread(newId()),
     )
@@ -213,7 +213,9 @@ describe("banners in a harness", () => {
     const script = scriptedModel()
     const after = await agentOver(doc, script)
     script.use([{ tool: BANNER_TOOL, args: {} }, { text: "no banner" }])
-    const ran = await after.lane(made.lane).run(prompt("a banner, please"), [])
+    const ran = await after.agent
+      .lane(made.lane)
+      .run(prompt("a banner, please"), [])
     expect(ran).toEqual({ kind: "ok" })
     expect(toolResults(doc).join("\n")).not.toContain(
       "A new banner is being made",
@@ -223,15 +225,15 @@ describe("banners in a harness", () => {
 
   test("a scripted model draws its fixed image; with banners off, nothing", async () => {
     const on = await agentOver(newRootDoc(), scriptedModel(), [])
-    expect(await on.canDrawBanners()).toBe(true)
-    expect(await on.drawBanner("a zebra")).toMatchObject({
+    expect(await on.setup.canDrawBanners()).toBe(true)
+    expect(await on.setup.drawBanner("a zebra")).toMatchObject({
       kind: "drawn",
       image: { mimeType: "image/png", width: 4, height: 4 },
     })
     await on.close()
     const off = await agentOver(newRootDoc(), scriptedModel())
-    expect(await off.canDrawBanners()).toBe(false)
-    expect(await off.drawBanner("a zebra")).toMatchObject({
+    expect(await off.setup.canDrawBanners()).toBe(false)
+    expect(await off.setup.drawBanner("a zebra")).toMatchObject({
       kind: "failed",
     })
     await off.close()

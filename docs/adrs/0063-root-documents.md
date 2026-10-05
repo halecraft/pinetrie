@@ -12,6 +12,9 @@ the host opens it.
 Amended by ADR-0085: the archive record goes; a root is archived while its
 board place, keyed by its `RootId`, is in the closed state, and the Archive
 tab's search over labels is the closed state's.
+Amended by ADR-0092: a root is released through the scribe, which closes
+the agent's harness over the root's one pi session, then the session; the
+session document has a session and no harness.
 
 **Context.** The session was one Kyneta document, `pinetrie:session`: pi's
 storage for every root ever started, the host's records, and what is

@@ -14,6 +14,7 @@ import {
   type Sha256,
   writerId,
 } from "@pinetrie/core"
+import type { ThreadLaneHandle } from "@pinetrie/pi"
 import { readTreeIndex } from "@pinetrie/reads"
 import {
   BASE,
@@ -55,12 +56,15 @@ const details: ChatDetails = {
   sendId: "s-1",
 }
 
+/** The agent, the scribe and the setup in one record, so the order of their calls shows. */
+type FakePi = ChatDeps["agent"] & ChatDeps["scribe"] & ChatDeps["piSetup"]
+
 function setUp(
   bad: typeof ERR.BAD_DIRECTORY | null,
   begin: ErrCode | null = null,
 ) {
   const b = basics()
-  const agent = record<ChatDeps["agent"]>({
+  const pi = record<FakePi>({
     createThreadLane: async () => ({ kind: "created", lane: LANE }),
   })
   const work = record<ChatDeps["work"]>({
@@ -74,7 +78,9 @@ function setUp(
   const titles = record<ChatDeps["titles"]>({ laneStarted: async () => {} })
   const deps: ChatDeps = {
     basics: b,
-    agent: agent.port,
+    agent: pi.port,
+    scribe: pi.port,
+    piSetup: pi.port,
     work: work.port,
     blobs: record<ChatDeps["blobs"]>().port,
     cards: record<ChatDeps["cards"]>().port,
@@ -93,31 +99,31 @@ function setUp(
     base: null,
     pinned: [],
   }
-  return { b, agent, work, started, seen, titles, deps, context }
+  return { b, pi, work, started, seen, titles, deps, context }
 }
 
 describe("executeChat", () => {
   test("createAndRun in a missing directory refuses, and never creates the lane", async () => {
-    const { agent, started, deps, context } = setUp(ERR.BAD_DIRECTORY)
+    const { pi, started, deps, context } = setUp(ERR.BAD_DIRECTORY)
     const out = await executeChat(
       deps,
       { kind: "createAndRun", at: ROOT, lane: LANE, details },
       context,
     )
     expect(out).toMatchObject({ kind: "refused", code: ERR.BAD_DIRECTORY })
-    expect(methods(agent.calls)).toEqual([])
+    expect(methods(pi.calls)).toEqual([])
     expect(started).toEqual([])
   })
 
   test("createAndRun creates the lane, prepares it, may title its root, and runs there", async () => {
-    const { agent, work, started, titles, deps, context } = setUp(null)
+    const { pi, work, started, titles, deps, context } = setUp(null)
     const out = await executeChat(
       deps,
       { kind: "createAndRun", at: ROOT, lane: LANE, details },
       context,
     )
     expect(out).toEqual({ kind: "started", runId: "r-1" })
-    expect(agent.calls.map(c => [c.method, ...c.args])).toEqual([
+    expect(pi.calls.map(c => [c.method, ...c.args])).toEqual([
       ["createThreadLane", { root: ROOT_ID, at: ROOT }, LANE],
     ])
     expect(methods(work.calls)).toEqual([
@@ -158,22 +164,22 @@ describe("executeChat", () => {
   })
 
   test("createAndRun from a base that cannot begin refuses, and never creates the lane (ADR-0060)", async () => {
-    const { agent, started, deps, context } = setUp(null, ERR.BAD_BASE)
+    const { pi, started, deps, context } = setUp(null, ERR.BAD_BASE)
     const out = await executeChat(
       deps,
       { kind: "createAndRun", at: ROOT, lane: LANE, details },
       { ...context, base: "wip/gone" },
     )
     expect(out).toMatchObject({ kind: "refused", code: ERR.BAD_BASE })
-    expect(agent.calls).toEqual([])
+    expect(pi.calls).toEqual([])
     expect(started).toEqual([])
   })
 
   test("busy writes nothing and answers busy: the sender's client queues its card", async () => {
-    const { agent, work, started, deps, context } = setUp(null)
+    const { pi, work, started, deps, context } = setUp(null)
     const out = await executeChat(deps, { kind: "busy" }, context)
     expect(out).toEqual({ kind: "busy" })
-    expect([agent.calls, work.calls, started]).toEqual([[], [], []])
+    expect([pi.calls, work.calls, started]).toEqual([[], [], []])
   })
 })
 
@@ -208,16 +214,20 @@ describe("sendChat", () => {
     const cards = record<ChatDeps["cards"]>({
       writers: async () => [ALICE, BEA],
     })
-    const agent = record<ChatDeps["agent"]>({
+    const pi = record<FakePi>({
       commands: () => [],
       appendToTree: async () => ({ kind: "appended", id: entryId("e-2") }),
       createThreadLane: async () => ({ kind: "created", lane: LANE }),
+      // A catch-up is handed the lane's handle (`prepareUpdate`).
+      lane: name => record<ThreadLaneHandle>({ name }).port,
     })
     const started: ChatMessage[] = []
     const seen: (readonly SentCard[])[] = []
     const deps: ChatDeps = {
       basics: b,
-      agent: agent.port,
+      agent: pi.port,
+      scribe: pi.port,
+      piSetup: pi.port,
       work: record<ChatDeps["work"]>({
         project,
         checkDirectory: async () => null,
@@ -241,11 +251,11 @@ describe("sendChat", () => {
       },
       titles: record<ChatDeps["titles"]>({ laneStarted: async () => {} }).port,
     }
-    return { b, agent, cards, started, seen, deps }
+    return { b, pi, cards, started, seen, deps }
   }
 
   test("a thread at the root under a root id in use is refused, and nothing is written", async () => {
-    const { b, agent, started, deps } = setUp()
+    const { b, pi, started, deps } = setUp()
     writeDirectory(b)
     const out = await sendChat(deps, ALICE, "s-1", {
       ...chat("do it", true),
@@ -253,7 +263,7 @@ describe("sendChat", () => {
       mode: "branch",
     })
     expect(out).toMatchObject({ kind: "refused", code: ERR.ROOT_ID_IN_USE })
-    expect([agent.calls, started]).toEqual([[], []])
+    expect([pi.calls, started]).toEqual([[], []])
   })
 
   test("a Start Agent column's message, naming nobody, starts a run", async () => {
@@ -271,17 +281,17 @@ describe("sendChat", () => {
   })
 
   test("a new lane is created under the column's reserved id (ADR-0057)", async () => {
-    const { agent, deps } = setUp()
+    const { pi, deps } = setUp()
     const reserved = laneNameForThread("01a0f9eb-86e1-77ad-a822-2a306786223f")
     await sendChat(deps, ALICE, "s-1", { ...chat("do it", true), reserved })
-    const created = agent.calls.find(c => c.method === "createThreadLane")
+    const created = pi.calls.find(c => c.method === "createThreadLane")
     expect(created?.args[1]).toBe(reserved)
   })
 
   test("a sent message keeps the images its text shows, as references", async () => {
-    const { agent, deps } = setUp()
+    const { pi, deps } = setUp()
     await sendChat(deps, ALICE, "s-1", chat(`look ![a](/blob/${SHA})`))
-    const appended = agent.calls.find(c => c.method === "appendToTree")
+    const appended = pi.calls.find(c => c.method === "appendToTree")
     expect(appended?.args[0]).toMatchObject({
       details: {
         images: [{ sha256: SHA, mimeType: "image/png", width: 2, height: 3 }],
@@ -351,8 +361,8 @@ describe("sendChat", () => {
         started,
         deps,
         b: made,
-      } = setUp(null, async (...args) => {
-        updates.push(args)
+      } = setUp(null, async (handle, ...args) => {
+        updates.push([handle.name, ...args])
         if (updates.length > 1) throw new Error("caught up twice")
         // The update's entry is the thread's end now.
         if (b !== null) {
@@ -429,13 +439,13 @@ describe("sendChat", () => {
   })
 
   test("a message sent from a card carries its other writers, and spends nothing itself (ADR-0048)", async () => {
-    const { agent, cards, deps } = setUp()
+    const { pi, cards, deps } = setUp()
     const out = await sendChat(deps, ALICE, "s-1", {
       ...chat("from the card"),
       card: { id: cardId("c-1"), seen: "" },
     })
     expect(out).toEqual({ kind: "appended", id: "e-2" })
-    const appended = agent.calls.find(c => c.method === "appendToTree")
+    const appended = pi.calls.find(c => c.method === "appendToTree")
     expect(appended?.args[0]).toMatchObject({
       details: { contributors: [BEA] },
     })
@@ -469,8 +479,7 @@ describe("sendChat", () => {
     const late = await sendChat(
       {
         ...deps,
-        agent: {
-          ...deps.agent,
+        scribe: {
           appendToTree: async () => ({ kind: "refused", code: ERR.REFUSED }),
         },
       },
@@ -482,7 +491,7 @@ describe("sendChat", () => {
   })
 
   test("a busy lane is answered busy, and nothing is written", async () => {
-    const { b, agent, deps } = setUp()
+    const { b, pi, deps } = setUp()
     writeLaneTip(b.root, LANE, E1)
     beginRun(b.live, LANE, runId("r-0"))
     putValue(b, setRecord(PARTICIPANT, { writer: BEA, name: "Bea" }))
@@ -492,14 +501,14 @@ describe("sendChat", () => {
       card: { id: cardId("c-1"), seen: "" },
     })
     expect(out).toEqual({ kind: "busy" })
-    expect(agent.calls).toEqual([])
+    expect(pi.calls).toEqual([])
   })
 
   test("a message with no card names no one else", async () => {
-    const { agent, cards, deps } = setUp()
+    const { pi, cards, deps } = setUp()
     await sendChat(deps, ALICE, "s-1", chat("plain"))
     expect(cards.calls).toEqual([])
-    const appended = agent.calls.find(c => c.method === "appendToTree")
+    const appended = pi.calls.find(c => c.method === "appendToTree")
     expect(
       (appended?.args[0] as { details: ChatDetails }).details.contributors,
     ).toBeUndefined()

@@ -23,7 +23,7 @@ import {
   offerBookmark,
   run,
 } from "@pinetrie/lanes"
-import type { Agent } from "@pinetrie/pi"
+import type { PiSetup, Scribe } from "@pinetrie/pi"
 import { readBases, readOffers } from "@pinetrie/reads"
 import { startRepoOwner } from "@pinetrie/repo"
 import { NAME, setRecord } from "@pinetrie/rules"
@@ -89,7 +89,7 @@ async function yourRepo(tag: string) {
 async function settles(dir: string, lane: LaneName, name: ThreadName) {
   const b = basics()
   putValue(b, setRecord(NAME, { lane, name, at: 1 }))
-  const agent = record<Agent>({
+  const scribe = record<Scribe>({
     writeValues: async writes => applyWrites(b, writes),
   })
   const owner = startRepoOwner({ root: dir, line: DEFAULT_LINE })
@@ -98,7 +98,8 @@ async function settles(dir: string, lane: LaneName, name: ThreadName) {
       owner,
       line: DEFAULT_LINE,
       basics: b,
-      agent: () => agent.port,
+      scribe: scribe.port,
+      piSetup: record<PiSetup>({}).port,
       running: () => false,
       baseChanged: () => {},
     })

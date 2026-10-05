@@ -1086,8 +1086,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the agent is never given set_banner",
     file: "apps/pinetrie/host/index.ts",
-    from: "      : { banners: { config: bannerConfig, request: banners.request } }),",
-    to: "      : {}),",
+    from: "    ...(banners === null ? {} : { bannerAsks: banners.request }),",
+    to: "    ...{},",
     suite: "host",
     scenario: "banners",
     expect:
@@ -1155,7 +1155,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the host writes no seat records",
     file: "apps/pinetrie/host/seats.ts",
-    from: "      await agent.writeValues(seats.map(seat => setRecord(SEAT, seat)))",
+    from: "      await scribe.writeValues(seats.map(seat => setRecord(SEAT, seat)))",
     to: "      void seats",
     suite: "host",
     scenario: "cards",
@@ -1243,8 +1243,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a root moved out of Done keeps its place there",
     file: "apps/pinetrie/host/commands/board.ts",
-    from: "  // execute\n  await deps.agent.writeValues(writes)\n",
-    to: '  // execute\n  if (moved.transition === "close") await deps.agent.writeValues(writes)\n',
+    from: "  // execute\n  await deps.scribe.writeValues(writes)\n",
+    to: '  // execute\n  if (moved.transition === "close") await deps.scribe.writeValues(writes)\n',
     suite: "host",
     scenario: "board",
     expect:
@@ -1288,10 +1288,10 @@ export const mutations: readonly Mutation[] = [
       "a client cannot write the session: its write is refused before it is made, and the host's copy is unchanged",
   },
   {
-    name: "the agent writes into another document",
+    name: "the scribe writes into another document",
     file: "apps/pinetrie/host/index.ts",
-    from: "    documents: docs,\n    replicaId: newId(),",
-    to: "    documents: { ...docs, root: async () => newRootDoc() },\n    replicaId: newId(),",
+    from: "  const scribe = createScribe({ documents: docs, replicaId: newId(), blobs })",
+    to: "  const scribe = createScribe({\n    documents: { ...docs, root: async () => newRootDoc() },\n    replicaId: newId(),\n    blobs,\n  })",
     suite: "host",
     scenario: "chat",
     expect: "the thread reads the message, then the agent's reply",
@@ -1308,8 +1308,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the commands record lists none",
     file: "apps/pinetrie/host/startup.ts",
-    from: "      commands: agent.commands().map(c => ({",
-    to: "      commands: agent.commands().filter(() => false).map(c => ({",
+    from: "        commands: piSetup.commands().map(c => ({",
+    to: "        commands: piSetup.commands().filter(() => false).map(c => ({",
     suite: "host",
     scenario: "commands",
     expect:
@@ -1754,7 +1754,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an archived root's harness outlives its document",
     file: "apps/pinetrie/host/index.ts",
-    from: "      await created?.release(root)\n",
+    from: "  docs.onReleasing(root => scribe.release(root))\n",
     to: "",
     suite: "browser",
     scenario: "page",
@@ -1802,8 +1802,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "startHost runs read no pinned cards",
     file: "apps/pinetrie/host/index.ts",
-    from: "    readPinned,\n    readBehind: baseNews.atStart,\n",
-    to: "    readPinned: async () => null,\n    readBehind: baseNews.atStart,\n",
+    from: "    readPinned,\n    baseNews,\n",
+    to: "    readPinned: async () => null,\n    baseNews,\n",
     suite: "host",
     scenario: "cards",
     expect:

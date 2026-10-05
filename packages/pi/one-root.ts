@@ -1,6 +1,6 @@
-// pi/one-root — the documents of a session with one root, for tests: pi's
-// sessions over the session's document and that root's (ADR-0063). Every
-// lane is in it unless its record names another.
+// pi/one-root — the documents of a session with one root, for tests: what
+// the scribe and the agent are over, the session's document and that root's
+// (ADR-0063). Every lane is in it unless its record names another.
 
 import { type LaneName, type RootId, rootIdFor } from "@pinetrie/core"
 import { LANE, recordsOf } from "@pinetrie/rules"

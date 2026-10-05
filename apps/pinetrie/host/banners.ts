@@ -10,7 +10,7 @@ import {
   type StoredImage,
 } from "@pinetrie/core"
 import type { Keeper } from "@pinetrie/keeper"
-import type { Agent } from "@pinetrie/pi"
+import type { PiSetup, Scribe } from "@pinetrie/pi"
 import { readBanners, readNames } from "@pinetrie/reads"
 import {
   answerOf,
@@ -34,17 +34,13 @@ export interface Banners {
   request(lane: LaneName, ask: BannerAsk): Promise<BannerAnswer>
 }
 
-type BannerAgent = Pick<
-  Agent,
-  "canDrawBanners" | "drawBanner" | "skill" | "writeValues"
->
-
 export function createBanners(deps: {
   readonly basics: Pick<Basics, "session" | "log" | "now">
   readonly keeper: Keeper
   readonly blobs: Pick<BlobStore, "put" | "ref">
-  /** Read lazily: the agent is made with `request` as its tool's port. */
-  readonly agent: () => BannerAgent
+  readonly scribe: Pick<Scribe, "writeValues">
+  /** The image model, and the banner's skill. */
+  readonly piSetup: Pick<PiSetup, "canDrawBanners" | "drawBanner" | "skill">
 }): Banners {
   const { basics, keeper, blobs } = deps
   const { session: doc, log } = basics
@@ -52,9 +48,9 @@ export function createBanners(deps: {
   const generating = new Set<LaneName>()
 
   const write = (lane: LaneName, sha: Sha256) =>
-    deps
-      .agent()
-      .writeValues([setRecord(BANNER, { lane, sha, at: basics.now() })])
+    deps.scribe.writeValues([
+      setRecord(BANNER, { lane, sha, at: basics.now() }),
+    ])
 
   const failedFor = (lane: LaneName) => (why: string) =>
     log(`[host] no banner for ${readNames(doc).get(lane) ?? lane}: ${why}`)
@@ -81,31 +77,30 @@ export function createBanners(deps: {
     lane: LaneName,
     direction: string | null,
   ): Promise<StoredImage | null> {
-    const agent = deps.agent()
+    const { piSetup } = deps
     const name = readNames(doc).get(lane)
     const failed = failedFor(lane)
     if (name === undefined) {
       failed("the thread has no name yet")
       return null
     }
-    if (!(await agent.canDrawBanners())) return null
-    const skill = await agent.skill("pinetrie:skill:column-banner")
+    if (!(await piSetup.canDrawBanners())) return null
+    const skill = await piSetup.skill("pinetrie:skill:column-banner")
     if (skill === null) {
       failed("no column-banner skill")
       return null
     }
     const prompt = bannerPrompt({ template: skill.content, name, direction })
-    return drawWithRetries(agent, prompt, failed)
+    return drawWithRetries(prompt, failed)
   }
 
   /** Up to `BANNER_ATTEMPTS` draws; each failure logged. */
   async function drawWithRetries(
-    agent: BannerAgent,
     prompt: string,
     failed: (why: string) => void,
   ): Promise<StoredImage | null> {
     for (let n = 0; n < BANNER_ATTEMPTS; n += 1) {
-      const drawn = await agent.drawBanner(prompt)
+      const drawn = await deps.piSetup.drawBanner(prompt)
       if (drawn.kind === "drawn") return drawn.image
       failed(`attempt ${n + 1}: ${drawn.reason}`)
     }

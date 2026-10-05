@@ -436,8 +436,7 @@ describe("askedAboutConflict (ADR-0080)", () => {
             Parameters<typeof createUpdates>[0]["registry"]["handleOf"]
           >,
       }).port,
-      agent: () =>
-        record<ReturnType<Parameters<typeof createUpdates>[0]["agent"]>>().port,
+      piSetup: record<Parameters<typeof createUpdates>[0]["piSetup"]>().port,
       containers:
         record<Parameters<typeof createUpdates>[0]["containers"]>().port,
       fetchLane: async () => {},
@@ -549,10 +548,9 @@ describe("catchUpInRun (ADR-0080)", () => {
           >,
       }).port,
       // The skill is read before the merge, for the floor (ADR-0084).
-      agent: () =>
-        record<ReturnType<Parameters<typeof createUpdates>[0]["agent"]>>({
-          skill: async () => null,
-        }).port,
+      piSetup: record<Parameters<typeof createUpdates>[0]["piSetup"]>({
+        skill: async () => null,
+      }).port,
       // Neither starts nor stops the lane: the port throws if asked.
       containers:
         record<Parameters<typeof createUpdates>[0]["containers"]>().port,

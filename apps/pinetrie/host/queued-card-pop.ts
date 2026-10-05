@@ -249,7 +249,13 @@ async function catchUpThenSend(
 ): Promise<"ran" | "next"> {
   const { card } = popped
   const prepared = await deps.work
-    .prepareUpdate(lane, card.place.by, popped.text, plan.command, "send")
+    .prepareUpdate(
+      deps.agent.lane(lane),
+      card.place.by,
+      popped.text,
+      plan.command,
+      "send",
+    )
     .catch((error: unknown) => {
       unsent(deps, card, hostFailedWords(errorText(error)))
       return null

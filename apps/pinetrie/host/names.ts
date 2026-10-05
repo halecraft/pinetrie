@@ -4,7 +4,7 @@
 
 import type { LaneName, NameRecord } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
-import type { Agent } from "@pinetrie/pi"
+import type { Scribe } from "@pinetrie/pi"
 import { readLaneRecords, readNames } from "@pinetrie/reads"
 import {
   NAME,
@@ -29,13 +29,13 @@ export interface Names {
  */
 export function createNames(deps: {
   readonly basics: Pick<Basics, "session" | "now">
-  readonly agent: Pick<Agent, "writeValues">
+  readonly scribe: Pick<Scribe, "writeValues">
   readonly onNamed: (lane: LaneName) => void
 }): Names {
   const { session, now } = deps.basics
   const keeper = createKeeper()
   const write = async (record: NameRecord) => {
-    await deps.agent.writeValues([setRecord(NAME, record)])
+    await deps.scribe.writeValues([setRecord(NAME, record)])
     deps.onNamed(record.lane)
   }
   return {

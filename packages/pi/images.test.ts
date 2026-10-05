@@ -15,10 +15,11 @@ import {
 import { encodeChat } from "@pinetrie/rules"
 import { newRootDoc } from "@pinetrie/schema"
 import { expect, test } from "vitest"
-import { createAgent, newId } from "./agent.ts"
+import { newId } from "./agent.ts"
 import { prepareImage, readImageProcessor, sha256Of } from "./images.ts"
 import { ONE_ROOT, oneRoot } from "./one-root.ts"
 import { scriptedModel } from "./scripted.ts"
+import { startPi } from "./start-pi.ts"
 
 /** A 40×30 red PNG, 98 bytes. */
 const RED = Buffer.from(
@@ -111,11 +112,8 @@ test("the model reads a chat's text, then its image's bytes, from the store", as
   const doc = newRootDoc()
   const script = scriptedModel()
   const sha = createHash("sha256").update(RED).digest("hex") as Sha256
-  const agent = await createAgent({
-    documents: oneRoot(doc),
-    replicaId: "test",
+  const { agent } = await startPi(oneRoot(doc), {
     model: { kind: "scripted", script },
-    tools: null,
     blobs: {
       get: s => (s === sha ? { bytes: RED, mimeType: "image/png" } : undefined),
       ref: () => undefined,

@@ -51,7 +51,7 @@ test("before: a shared card's thread end in a loaded root; none for a root not l
   const provenance = createProvenance({
     basics: b,
     presence: newPresenceDoc(),
-    agent: () => ({ writeValues: async w => applyWrites(b, w) }),
+    scribe: { writeValues: async w => applyWrites(b, w) },
   })
   expect([...provenance.before().ends]).toEqual([[cardId("here"), E1]])
 })

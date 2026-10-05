@@ -25,7 +25,7 @@ import {
 } from "@pinetrie/rules"
 import { newRootDoc, readEntries, rowMessage } from "@pinetrie/schema"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
-import { createAgent, newId } from "./agent.ts"
+import { newId } from "./agent.ts"
 import { type LaneChannel, openChannel } from "./lane-env.ts"
 import {
   conflictTool,
@@ -41,6 +41,7 @@ import {
 } from "./lanes.ts"
 import { ONE_ROOT, oneRoot } from "./one-root.ts"
 import { scriptedModel } from "./scripted.ts"
+import { startPi } from "./start-pi.ts"
 import { assembleTools } from "./tools.ts"
 
 // ── what a lane of its own is told (ADR-0046) ────────────────────────────
@@ -286,9 +287,7 @@ describe("lanes in a harness", () => {
   ) {
     const doc = newRootDoc()
     const script = scriptedModel()
-    const agent = await createAgent({
-      documents: oneRoot(doc),
-      replicaId: "test",
+    const { agent } = await startPi(oneRoot(doc), {
       model: { kind: "scripted", script },
       project: root,
       tools: {
@@ -511,8 +510,7 @@ describe("lanes in a harness", () => {
     // The next process, over the same document: a second agent.
     const wheres = new Map([[lane, where(after)]])
     const script = scriptedModel()
-    const second = await createAgent({
-      documents: oneRoot(first.doc),
+    const { agent: second } = await startPi(oneRoot(first.doc), {
       replicaId: "after",
       model: { kind: "scripted", script },
       project: root,

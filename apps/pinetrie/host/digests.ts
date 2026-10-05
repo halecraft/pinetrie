@@ -22,7 +22,7 @@ import {
   type RootId,
 } from "@pinetrie/core"
 import type { Keeper } from "@pinetrie/keeper"
-import type { Agent } from "@pinetrie/pi"
+import type { PiSetup, Scribe } from "@pinetrie/pi"
 import {
   readDigests,
   readReading,
@@ -78,15 +78,14 @@ export interface Digests {
   ): Promise<void>
 }
 
-type DigestAgent = Pick<Agent, "complete" | "skill" | "writeValues">
-
 export function createDigests(deps: {
   readonly basics: Pick<Basics, "session" | "docs" | "log" | "now">
   readonly keeper: Keeper
   /** Who is reading which thread (ADR-0024): a live digest waits for a reader. */
   readonly presence: PresenceDocHandle
-  /** Read lazily: the agent is made after this. */
-  readonly agent: () => DigestAgent
+  readonly scribe: Pick<Scribe, "writeValues">
+  /** The model a digest is asked of, and its skill. */
+  readonly piSetup: Pick<PiSetup, "complete" | "skill">
   /** The user config's `digests` (`decodeDigestConfig`): off, a run's end asks for its verdict alone. */
   readonly enabled: boolean
 }): Digests {
@@ -101,12 +100,12 @@ export function createDigests(deps: {
   async function askModel(
     request: Omit<Parameters<typeof digestRequest>[0], "skill" | "budget">,
   ): Promise<EndReply | null> {
-    const skill = await deps.agent().skill("pinetrie:skill:ask-digest")
+    const skill = await deps.piSetup.skill("pinetrie:skill:ask-digest")
     if (skill === null) {
       basics.log("[host] no ask-digest skill")
       return null
     }
-    const reply = await deps.agent().complete(
+    const reply = await deps.piSetup.complete(
       digestRequest({
         ...request,
         skill: skill.content,
@@ -173,7 +172,7 @@ export function createDigests(deps: {
               at: basics.now(),
             })
             if (record !== null)
-              await deps.agent().writeValues([setRecord(DIGEST, record, root)])
+              await deps.scribe.writeValues([setRecord(DIGEST, record, root)])
           },
         })
       })
@@ -217,7 +216,7 @@ export function createDigests(deps: {
             : null,
         })
         if (plan.verdict !== null)
-          await deps.agent().writeValues([
+          await deps.scribe.writeValues([
             setRecord(VERDICT, {
               lane,
               ask: prompt,
@@ -260,7 +259,7 @@ export function createDigests(deps: {
               reply,
               at: basics.now(),
             })
-            if (writes.length > 0) await deps.agent().writeValues(writes)
+            if (writes.length > 0) await deps.scribe.writeValues(writes)
           },
         })
       })
@@ -272,9 +271,9 @@ export function createDigests(deps: {
       const doc = basics.docs.docOfLane(lane)
       if (doc === null) return
       const end = indexAsks(readTreeIndex(doc)).last.get(prompt) ?? prompt
-      await deps
-        .agent()
-        .writeValues([setRecord(VERDICT, pendingVerdict(lane, prompt, end))])
+      await deps.scribe.writeValues([
+        setRecord(VERDICT, pendingVerdict(lane, prompt, end)),
+      ])
     },
     ended,
   }

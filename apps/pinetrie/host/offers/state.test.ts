@@ -5,7 +5,7 @@ import {
   type OfferRecord,
 } from "@pinetrie/core"
 import { DEFAULT_LINE } from "@pinetrie/lanes"
-import type { Agent } from "@pinetrie/pi"
+import type { PiSetup, Scribe } from "@pinetrie/pi"
 import { readBases, readOffers } from "@pinetrie/reads"
 import type { RepoOwner } from "@pinetrie/repo"
 import { expect, test } from "vitest"
@@ -41,7 +41,7 @@ const OFFER: OfferRecord = {
 
 test("the records the host writes from your repo: only what changed, and only a record that is there is removed", async () => {
   const b = basics()
-  const agent = record<Agent>({
+  const scribe = record<Scribe>({
     writeValues: async writes => applyWrites(b, writes),
   })
   const changed: string[] = []
@@ -49,25 +49,26 @@ test("the records the host writes from your repo: only what changed, and only a 
     owner: record<RepoOwner>({}).port,
     line: DEFAULT_LINE,
     basics: b,
-    agent: () => agent.port,
+    scribe: scribe.port,
+    piSetup: record<PiSetup>({}).port,
     running: () => false,
     baseChanged: lane => changed.push(lane),
   })
   await records.remove(LANE)
   await records.writeBase(null)
-  expect(agent.calls).toEqual([])
+  expect(scribe.calls).toEqual([])
   await records.writeBase(BASE)
   await records.writeBase(BASE)
   await records.write(OFFER)
   await records.write(OFFER)
-  expect(agent.calls).toHaveLength(2)
+  expect(scribe.calls).toHaveLength(2)
   expect(readBases(b.session).get(LANE)).toEqual(BASE)
-  // A base record that changed asks whether its thread is told (ADR-0080).
+  // A base record that changed is announced, and one unchanged is not (ADR-0080).
   expect(changed).toEqual([LANE])
   // An integrated offer's record is written whatever is there.
   await records.writeIntegratedOffer({ ...OFFER, integratedAs: "kt" })
   expect(readOffers(b.session).get(LANE)?.integratedAs).toBe("kt")
   await records.remove(LANE)
   expect(readOffers(b.session).has(LANE)).toBe(false)
-  expect(agent.calls).toHaveLength(4)
+  expect(scribe.calls).toHaveLength(4)
 })

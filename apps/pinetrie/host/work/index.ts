@@ -10,13 +10,12 @@
 // flag). Your repo is its owner's (`Setup.owner`, `@pinetrie/repo`); offers are
 // `host/offers/`'s, and the integration line `line.ts`'s.
 
-import type { ProjectRecord } from "@pinetrie/core"
+import type { LaneName, ProjectRecord } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
 import { DEFAULT_LINE } from "@pinetrie/lanes"
-import type { Agent, LaneHooks } from "@pinetrie/pi"
+import type { LaneHooks, PiSetup, Scribe } from "@pinetrie/pi"
 import { readRunning } from "@pinetrie/reads"
 import type { RepoOwner } from "@pinetrie/repo"
-import type { BaseNews } from "../base-news.ts"
 import type { Basics } from "../basics.ts"
 import { type Offers, startOffers } from "../offers/index.ts"
 import { type Archive, createArchive } from "./archive.ts"
@@ -25,7 +24,7 @@ import { createNewLanes, type NewLanes } from "./create.ts"
 import { createFetches } from "./fetch.ts"
 import { createLine, type Line } from "./line.ts"
 import { createRegistry } from "./registry.ts"
-import { startSetup } from "./setup.ts"
+import { type Found, startSetup } from "./setup.ts"
 import { createSplits, type Splits } from "./split.ts"
 import { createTurns } from "./turns.ts"
 import { createUpdates, type Updates } from "./update.ts"
@@ -58,27 +57,29 @@ export type LaneWork = Pick<
      * records they write when they finish.
      */
     quiet(): Promise<void>
+    /** `listener` hears each lane whose base record changed (ADR-0080). */
+    onBaseChanged(listener: (lane: LaneName) => void): void
   }
 
 /**
- * Find the project, check `container`, and return what the host needs for
- * lanes. `agent` is read lazily: the agent is created with this module's
- * `access` and `hooks`, after it. Images, the lane runtime and the base
- * snapshot are made in the background; a lane's first steps wait for them.
+ * Return what the host needs for lanes, in the project `findProject` found.
+ * The agent is made after this, with its `access` and `hooks`. Images, the
+ * lane runtime and the base snapshot are made in the background; a lane's
+ * first steps wait for them.
  */
 export async function startLaneWork(input: {
   readonly basics: Basics
-  /** The project's folder, whose root `prepareHost` finds; null with no tools. */
-  readonly dir: string | null
-  /** `PINETRIE_LANES=0`: a new root lane works directly by default. */
-  readonly defaultDirect: boolean
-  /** False: lanes never get containers here, and `container` is not asked. */
-  readonly containers: boolean
+  /** What `findProject` found; null with no tools. */
+  readonly found: Found | null
   /** The user's config, as read at startup (ADR-0035): its file, for logs. */
   readonly userConfig: { readonly file: string; readonly json: unknown }
-  readonly agent: () => Agent
-  /** A thread's base and its news (`base-news.ts`, ADR-0080). */
-  readonly baseNews: Pick<BaseNews, "baseChanged" | "runEnded">
+  /** Where lane work writes its records (ADR-0062). */
+  readonly scribe: Pick<Scribe, "writeValues">
+  /** The person's pi setup: the commands' roots lanes are granted, the skills updates and splits ask for, and descriptions. */
+  readonly piSetup: Pick<
+    PiSetup,
+    "commands" | "agentDir" | "skill" | "complete"
+  >
   /** Name every lane that has none (`host/names.ts`): a new lane, before its first run. */
   readonly ensureNames: () => Promise<void>
   /**
@@ -91,7 +92,14 @@ export async function startLaneWork(input: {
   const { session } = basics
   /** Work nobody awaits, until it settles: what `quiet` waits for. */
   const keeper = createKeeper()
-  const setup = await startSetup({ ...input, basics, keeper })
+  const setup = await startSetup({
+    basics,
+    found: input.found,
+    userConfig: input.userConfig,
+    setup: input.piSetup,
+    keeper,
+  })
+  const baseListeners: ((lane: LaneName) => void)[] = []
   const { root, owner, paths } = setup
   const registry = createRegistry({ session, root })
   const lineConfig = setup.lanes?.line ?? DEFAULT_LINE
@@ -104,7 +112,7 @@ export async function startLaneWork(input: {
           basics,
           line: lineConfig,
           lineCommands: input.lineCommands,
-          writeValues: writes => input.agent().writeValues(writes),
+          writeValues: writes => input.scribe.writeValues(writes),
         })
   // The base snapshot follows the line, however it moved: setup, an accept,
   // a publish, or jj outside pine·trie (ADR-0090).
@@ -119,9 +127,12 @@ export async function startLaneWork(input: {
           owner,
           line: lineConfig,
           basics,
-          agent: input.agent,
+          scribe: input.scribe,
+          piSetup: input.piSetup,
           running: lane => readRunning(basics.live, lane),
-          baseChanged: input.baseNews.baseChanged,
+          baseChanged: lane => {
+            for (const listener of baseListeners) listener(lane)
+          },
           lineWork: line,
         })
   const containers = createContainers({
@@ -143,7 +154,7 @@ export async function startLaneWork(input: {
     setup,
     registry,
     keeper,
-    agent: input.agent,
+    scribe: input.scribe,
     fetchLane,
   })
   const newLanes = createNewLanes({
@@ -151,7 +162,7 @@ export async function startLaneWork(input: {
     setup,
     registry,
     keeper,
-    agent: input.agent,
+    scribe: input.scribe,
     ensureNames: input.ensureNames,
     pendingRecords: turns.pendingRecords,
   })
@@ -159,7 +170,7 @@ export async function startLaneWork(input: {
     basics,
     setup,
     registry,
-    agent: input.agent,
+    piSetup: input.piSetup,
     containers,
     fetchLane,
     writeRevision: turns.writeRevision,
@@ -169,7 +180,7 @@ export async function startLaneWork(input: {
     owner,
     registry,
     offers,
-    agent: input.agent,
+    piSetup: input.piSetup,
     beforeRun: containers.beforeRun,
     fetchLane,
   })
@@ -188,10 +199,7 @@ export async function startLaneWork(input: {
     checkBegin: newLanes.checkBegin,
     prepareLane: newLanes.prepareLane,
     beforeRun: containers.beforeRun,
-    runEnded(lane) {
-      containers.runEnded(lane)
-      input.baseNews.runEnded(lane)
-    },
+    runEnded: containers.runEnded,
     prepareUpdate: updates.prepareUpdate,
     prepareSplit: splits.prepareSplit,
     splitEnded: splits.splitEnded,
@@ -204,5 +212,8 @@ export async function startLaneWork(input: {
       await owner?.idle()
     },
     close: containers.close,
+    onBaseChanged(listener) {
+      baseListeners.push(listener)
+    },
   }
 }

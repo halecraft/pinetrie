@@ -18,7 +18,7 @@ import {
   type WorkSetting,
   type WriterId,
 } from "@pinetrie/core"
-import type { Agent } from "@pinetrie/pi"
+import type { Agent, PiSetup, Scribe } from "@pinetrie/pi"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import {
   type RootView,
@@ -62,10 +62,11 @@ export type Chat = Omit<Extract<Intent, { kind: "chat" }>, "kind" | "mode"> & {
 
 export interface ChatDeps {
   readonly basics: Basics
-  readonly agent: Pick<
-    Agent,
-    "appendToTree" | "commands" | "createThreadLane" | "expand" | "lane"
-  >
+  readonly agent: Pick<Agent, "createThreadLane" | "lane">
+  /** A message on a thread with no lane is written through the scribe (S21). */
+  readonly scribe: Pick<Scribe, "appendToTree">
+  /** The commands pi loaded, which a `/` message names (ADR-0036). */
+  readonly piSetup: Pick<PiSetup, "commands" | "expand">
   readonly work: Pick<
     LaneWork,
     | "project"
@@ -117,7 +118,7 @@ export async function sendChat(
   /** This send has caught its lane up already (`catch-up-first`). */
   caughtUp = false,
 ): Promise<Outcome> {
-  const { agent, work, blobs, cards } = deps
+  const { work, blobs, cards } = deps
   const { docs, session, live, newId } = deps.basics
 
   // A thread at the root starts a root (ADR-0063), under the id its tab
@@ -184,13 +185,13 @@ export async function sendChat(
   // gather: the command its first word names, from its file as it is now
   const typed = parseCommand(chat.text)
   const source =
-    typed === null ? null : resolveCommand(typed.name, agent.commands())
+    typed === null ? null : resolveCommand(typed.name, deps.piSetup.commands())
   const command =
     typed === null
       ? null
       : source === null
         ? { unknown: typed.name }
-        : ((await agent.expand(source, typed.args, own)) ?? {
+        : ((await deps.piSetup.expand(source, typed.args, own)) ?? {
             unreadable: typed.name,
           })
   // gather: the store's refs of the images its text shows (ADR-0042)
@@ -278,7 +279,7 @@ async function catchUpFirst(
   lane: LaneName,
 ): Promise<Outcome> {
   const prepared = await deps.work.prepareUpdate(
-    lane,
+    deps.agent.lane(lane),
     writer,
     chat.text,
     "bring-up-to-date",
@@ -327,7 +328,7 @@ export async function executeChat(
     case "appendToLane": {
       const appended =
         planned.kind === "appendToTree"
-          ? await agent.appendToTree(message(planned.details), {
+          ? await deps.scribe.appendToTree(message(planned.details), {
               root,
               at: planned.parent,
             })

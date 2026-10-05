@@ -5,8 +5,8 @@
 //
 // The directory follows every root the documents hold (`onOpened`), those
 // opened before it started among them, and refreshes each as it starts to
-// follow it. It starts once the agent exists, since a refresh writes through
-// the agent.
+// follow it. A refresh writes through the scribe, so it can start as soon
+// as the scribe exists.
 //
 // A change queues one refresh per root, the documents' keeper's `once`
 // (`root:<id>`): changes before it starts are absorbed by it. The refresh
@@ -18,7 +18,7 @@
 
 import { subscribe } from "@kyneta/schema"
 import type { RootId } from "@pinetrie/core"
-import type { Agent } from "@pinetrie/pi"
+import type { Scribe } from "@pinetrie/pi"
 import { readRootRecord, readRoots } from "@pinetrie/reads"
 import { ROOT, setIfChanged } from "@pinetrie/rules"
 import type { RootDocHandle } from "@pinetrie/schema"
@@ -27,7 +27,7 @@ import { type Basics, failed, type HostKeeper } from "./basics.ts"
 export function startDirectory(deps: {
   readonly basics: Pick<Basics, "session" | "docs" | "log">
   readonly keeper: HostKeeper
-  readonly agent: Pick<Agent, "writeValues">
+  readonly scribe: Pick<Scribe, "writeValues">
 }): void {
   const { basics, keeper } = deps
 
@@ -40,7 +40,7 @@ export function startDirectory(deps: {
       record,
       readRoots(basics.session).get(root),
     )
-    if (writes.length > 0) await deps.agent.writeValues(writes)
+    if (writes.length > 0) await deps.scribe.writeValues(writes)
   }
 
   // A failure is logged inside the step, once, however many changes it covered.

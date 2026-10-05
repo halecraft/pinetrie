@@ -3,7 +3,9 @@
 **Status:** Accepted (Duane, 2026-10-03). Implemented by
 `PLAN-2026-10-03-agent-records`. Sits beside ADR-0003 (only `packages/pi`
 imports pi) and ADR-0016 (a value's physical key is an identity, never
-parsed).
+parsed). Amended by ADR-0092: the scribe (`Scribe.writeValues`) carries
+the writes, not the agent; what is written, and the guard on its
+namespace, do not change.
 
 **Context.** The host keeps its own records as pi values under `pinetrie.`
 namespaces: a root's archive state, an entry's mark, a lane's offer, the

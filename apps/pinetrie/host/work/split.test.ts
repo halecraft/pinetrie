@@ -1,5 +1,5 @@
 import { commitId, laneNameForThread, writerId } from "@pinetrie/core"
-import type { Agent } from "@pinetrie/pi"
+import type { PiSetup } from "@pinetrie/pi"
 import type { RepoOwner } from "@pinetrie/repo"
 import { expect, test } from "vitest"
 import { basics, record } from "../fakes.ts"
@@ -45,7 +45,7 @@ test("a split's end fetches the stack before stackEnded, then moves the lane bac
 test("a split whose skill read fails starts no container", async () => {
   const lane = laneNameForThread("0123456789abcdef")
   const started: string[] = []
-  const agent = record<Agent>({
+  const piSetup = record<PiSetup>({
     skill: async () => {
       throw new Error("no skill")
     },
@@ -60,7 +60,7 @@ test("a split whose skill read fails starts no container", async () => {
         tip: commitId("bbbb0000"),
       }),
     }).port,
-    agent: () => agent.port,
+    piSetup: piSetup.port,
     beforeRun: l => {
       started.push(l)
     },

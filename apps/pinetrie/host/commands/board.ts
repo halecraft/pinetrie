@@ -19,7 +19,7 @@ import {
   refused,
   type WriterId,
 } from "@pinetrie/core"
-import type { Agent } from "@pinetrie/pi"
+import type { Scribe } from "@pinetrie/pi"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import {
   readBoardPlaces,
@@ -53,7 +53,7 @@ export interface BoardDeps {
     Basics,
     "session" | "docs" | "live" | "places" | "now" | "newId"
   >
-  readonly agent: Pick<Agent, "writeValues">
+  readonly scribe: Pick<Scribe, "writeValues">
   readonly work: Pick<LaneWork, "teardown" | "offers">
   readonly keeper: Pick<HostKeeper, "run" | "track">
 }
@@ -125,7 +125,7 @@ async function record(
   if (moved.kind === "unchanged") return done(MOVED)
   const writes = moved.places.map(p => setRecord(BOARD, p))
   if (moved.transition === "within") {
-    await deps.agent.writeValues(writes)
+    await deps.scribe.writeValues(writes)
     return done(MOVED)
   }
   // gather what crossing the closed state's edge needs, and plan it (pure)
@@ -134,7 +134,7 @@ async function record(
   const crossed = await planCrossing(deps, intent.root, entry, moved.transition)
   if (crossed.kind === "refused") return done(crossed)
   // execute
-  await deps.agent.writeValues(writes)
+  await deps.scribe.writeValues(writes)
   return {
     kind: "follow",
     outcome: MOVED,
@@ -182,7 +182,7 @@ const done = (outcome: Outcome): Recorded => ({ kind: "done", outcome })
  * documents' keeper, which the dispatcher runs it in (`placeOfCommand`).
  */
 export async function handleWorkflow(
-  deps: Pick<BoardDeps, "basics" | "agent">,
+  deps: Pick<BoardDeps, "basics" | "scribe">,
   intent: Extract<Intent, { kind: "workflow" }>,
 ): Promise<Outcome> {
   const { session, newId } = deps.basics
@@ -193,6 +193,6 @@ export async function handleWorkflow(
   const planned = planWorkflowEdit(workflow, board, intent.edit, newId)
   if (planned.kind === "refused") return planned
   if (planned.kind === "write")
-    await deps.agent.writeValues([setRecord(WORKFLOW, planned.workflow)])
+    await deps.scribe.writeValues([setRecord(WORKFLOW, planned.workflow)])
   return { kind: "workflow-changed" }
 }

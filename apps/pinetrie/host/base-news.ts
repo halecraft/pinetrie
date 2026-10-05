@@ -36,7 +36,7 @@ export interface BaseNews {
 
 export function createBaseNews(deps: {
   readonly basics: Pick<Basics, "docs" | "session" | "live" | "log" | "now">
-  readonly agent: () => Pick<Agent, "lane">
+  readonly agent: Pick<Agent, "lane">
   readonly keeper: Pick<HostKeeper, "run">
 }): BaseNews {
   const { basics } = deps
@@ -73,8 +73,7 @@ export function createBaseNews(deps: {
           const view = await newsOf(lane)
           if (view === null) return
           told.set(lane, view.to)
-          const steered = await deps
-            .agent()
+          const steered = await deps.agent
             .lane(lane)
             .steer(encodeBehind(view, basics.now()))
           if (steered.kind === "refused") told.delete(lane)

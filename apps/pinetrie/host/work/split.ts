@@ -14,7 +14,7 @@ import {
   laneStackName,
   stackBookmark,
 } from "@pinetrie/lanes"
-import type { Agent } from "@pinetrie/pi"
+import type { PiSetup } from "@pinetrie/pi"
 import { readThreadName } from "@pinetrie/reads"
 import type { RepoOwner } from "@pinetrie/repo"
 import { decodeStack, planStack, type StackMessage } from "@pinetrie/rules"
@@ -66,7 +66,7 @@ export function createSplits(deps: {
   readonly owner: RepoOwner | null
   readonly registry: LaneRegistry
   readonly offers: Offers | null
-  readonly agent: () => Agent
+  readonly piSetup: Pick<PiSetup, "skill">
   readonly beforeRun: Containers["beforeRun"]
   readonly fetchLane: Fetches["fetchLane"]
 }): Splits {
@@ -78,7 +78,7 @@ export function createSplits(deps: {
         return { refused: "the lane has no copy of its own" }
       const span = await offers.stackSpan(lane)
       if (span === null) return { refused: "the lane has nothing to offer" }
-      const skill = await deps.agent().skill("pinetrie:skill:offer-stack")
+      const skill = await deps.piSetup.skill("pinetrie:skill:offer-stack")
       // Last: nothing between the lane's start and its run can fail.
       deps.beforeRun(lane)
       return planStack({

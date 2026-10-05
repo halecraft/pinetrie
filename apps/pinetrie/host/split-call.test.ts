@@ -1,4 +1,5 @@
 import { entryId, laneNameForThread, runId, writerId } from "@pinetrie/core"
+import { createKeeper } from "@pinetrie/keeper"
 import { readCardHistories, readPlaces } from "@pinetrie/reads"
 import { OFFER, SPLIT_QUEUED, setRecord, splitRefusal } from "@pinetrie/rules"
 import {
@@ -8,6 +9,7 @@ import {
   writeLaneTip,
 } from "@pinetrie/schema"
 import { expect, test } from "vitest"
+import type { HostKey } from "./basics.ts"
 import { applyWrites, basics, putLane, putValue, row } from "./fakes.ts"
 import { createProvenance } from "./provenance.ts"
 import { createSplitCall } from "./split-call.ts"
@@ -15,7 +17,8 @@ import { createSplitCall } from "./split-call.ts"
 const LANE = laneNameForThread("0123456789abcdef")
 const ADA = writerId("ada@x.io")
 
-test("split_offer queues a split card by the person behind the run, once (ADR-0080)", async () => {
+/** A running lane, its prompt by Ada, with an open offer: what `split_offer` splits. */
+function runningWithOffer() {
   const b = basics()
   putLane(b, LANE, entryId("p-1"))
   writeEntry(
@@ -43,15 +46,18 @@ test("split_offer queues a split card by the person behind the run, once (ADR-00
       at: 1,
     }),
   )
-  const drained: string[] = []
+  return b
+}
+
+test("split_offer queues a split card by the person behind the run, once (ADR-0080)", async () => {
+  const b = runningWithOffer()
   const askSplit = createSplitCall({
     basics: b,
     keeper: { run: f => f() },
-    drain: lane => drained.push(lane),
     provenance: createProvenance({
       basics: b,
       presence: newPresenceDoc(),
-      agent: () => ({ writeValues: async w => applyWrites(b, w) }),
+      scribe: { writeValues: async w => applyWrites(b, w) },
     }),
   })
   expect(await askSplit(LANE)).toEqual({
@@ -59,7 +65,6 @@ test("split_offer queues a split card by the person behind the run, once (ADR-00
     isError: false,
     details: null,
   })
-  expect(drained).toEqual([LANE])
   // The host's write, with a history like any card's.
   const [queued] = readPlaces(b.places)
   expect(
@@ -77,4 +82,27 @@ test("split_offer queues a split card by the person behind the run, once (ADR-00
       carries: { kind: "message", command: "split" },
     },
   ])
+})
+
+test("a split asked as its run is stopped is popped by the run's end: its step comes before the end's drain (ADR-0080)", async () => {
+  const b = runningWithOffer()
+  const keeper = createKeeper<HostKey>()
+  const askSplit = createSplitCall({
+    basics: b,
+    keeper,
+    provenance: createProvenance({
+      basics: b,
+      presence: newPresenceDoc(),
+      scribe: { writeValues: async w => applyWrites(b, w) },
+    }),
+  })
+  // The tool's call queues its step; a Stop ends the run before it runs,
+  // and the run's end queues the lane's drain (`settle.ts`).
+  const asked = askSplit(LANE)
+  let found: unknown[] = []
+  await keeper.once(`drain:${LANE}`, async () => {
+    found = readPlaces(b.places).map(c => c.carries)
+  })
+  expect(found).toEqual([{ kind: "message", command: "split" }])
+  expect(await asked).toMatchObject({ text: SPLIT_QUEUED })
 })

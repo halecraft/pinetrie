@@ -3,7 +3,7 @@
 import path from "node:path"
 import { VERDICT_ALONE, VERDICT_THEN_DIGEST } from "@pinetrie/rules"
 import { expect, test, vi } from "vitest"
-import { setUpModel } from "./config.ts"
+import { loadModelSetup } from "./config.ts"
 import {
   SCRIPTED_DESCRIPTION,
   SCRIPTED_VERDICT,
@@ -15,7 +15,7 @@ const cwd = path.join(import.meta.dirname, "fixtures", "pi-agent")
 const ANSWER = { text: "the answer" }
 
 async function asker(script: ScriptedModel) {
-  const setup = await setUpModel({ kind: "scripted", script }, { cwd })
+  const setup = await loadModelSetup({ kind: "scripted", script }, { cwd })
   return (prompt: string, signal?: AbortSignal) =>
     setup.models.completeSimple(
       setup.model,
@@ -109,7 +109,7 @@ test("a scripted tool step's call carries its arguments", async () => {
 })
 
 test("a run's end is answered with a verdict line, first, so the suites' threads are done (ADR-0077)", async () => {
-  const setup = await setUpModel(
+  const setup = await loadModelSetup(
     { kind: "scripted", script: scriptedModel() },
     { cwd },
   )

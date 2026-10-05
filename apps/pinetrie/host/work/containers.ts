@@ -154,7 +154,7 @@ export function createContainers(deps: {
           install: PINETRIE_MOUNT,
           note: LANE_NOTE,
         },
-        hostPaths: setup.hostPaths(),
+        hostPaths: setup.hostPaths,
         programs: RUNTIME_BIN,
         gate: async () => {
           await handle.queue.idle()

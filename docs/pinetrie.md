@@ -288,7 +288,7 @@ files.
 **ADR-0062 — each host record is one spec** (built). A `RecordSpec` in
 `@pinetrie/rules` names a record's namespace, key, encoding and decoding; the host
 builds `ValueWrite`s with `setRecord` and `deleteRecord`, and pi's
-`writeValues` carries them in one commit, refusing any namespace outside
+scribe (`Scribe.writeValues`, ADR-0092) carries them in one commit, refusing any namespace outside
 `pinetrie.`. The address holds a record's key and the contents never repeat
 it; old values with a copy still decode. A seat is keyed by its peer.
 
@@ -380,7 +380,7 @@ density; both are addressed by key, so they work in new tabs and the
 Archive preview too.
 
 **ADR-0074 — a model titles a root** (built). When a root's first lane
-starts, the host asks a model (`Agent.complete`, the run's model unless
+starts, the host asks a model (`PiSetup.complete`, the run's model unless
 `titles.model` names another) for one to three words, written as the root's
 mark by the agent; a mark written meanwhile wins. **Auto-update title** in
 the tab's `⋯` asks again from the root's messages, and replaces any title.
@@ -525,6 +525,17 @@ badge, always drawn. Everyone's facts went to the board: each state on the
 strip counts its roots the agent works in (◌) and with work ready (⇡), an
 item with an open offer carries ⇡, and a root's ring reads lanes running
 in any root, not only those this tab holds.
+
+**ADR-0092 — pi is three things to the host** (built). `Agent` carried the
+host's writes, the person's pi setup and the agent's lanes at once, so the
+host made half its modules first and had them read the agent lazily,
+through a getter that threw until it existed. Now `@pinetrie/pi` gives the
+scribe (the writes, one pi session per document), the setup (the model's
+one-off requests, banners, commands and skills) and the agent (lanes, made
+last, with lane work's hooks), and every host module is given values. The
+agent's harness is built over the scribe's session for its root, never one
+of its own: two over one document drift apart (S113). The scribe ends every
+session, and shutdown closes it after the agent.
 
 **ADR-0019 — a lane is a line of work, not a unit of parallelism.** A person's
 lane is a *conversation lane* and never touches disk. A *work lane* carries

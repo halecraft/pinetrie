@@ -1,7 +1,7 @@
 // host — the composition root. It builds the store, the Exchange, the
-// documents, lane work and the agent, and wires the shell's modules; each
-// module takes what it needs as a parameter, and only this file wires them
-// (TECHNICAL.md).
+// documents, pi's scribe and setup, lane work and the agent, in that order,
+// and wires the shell's modules; each module takes what it needs as a
+// parameter, and only this file wires them (TECHNICAL.md).
 //
 // Imports NO pi. Everything pi-shaped arrives through pi/.
 
@@ -21,7 +21,14 @@ import {
 } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
 import { configJson, readConfigFile, userConfigFile } from "@pinetrie/lanes"
-import { type Agent, createAgent, type ModelChoice, newId } from "@pinetrie/pi"
+import {
+  createAgent,
+  createScribe,
+  loadPiSetup,
+  type ModelChoice,
+  newId,
+  type Scribe,
+} from "@pinetrie/pi"
 import { Control } from "@pinetrie/protocol/line"
 import {
   CONTROL_TOPIC,
@@ -120,6 +127,7 @@ import { agentReadyLine, configLine } from "./startup-lines.ts"
 import { openStore } from "./store.ts"
 import { createTitles } from "./titles.ts"
 import { startLaneWork } from "./work/index.ts"
+import { findProject } from "./work/setup.ts"
 
 /** How long an unreferenced image is kept (ADR-0042). */
 const BLOB_GRACE_MS = 24 * 60 * 60 * 1000
@@ -206,7 +214,8 @@ export interface RunningHost {
   readonly places: PlacesDocHandle
   /** A card's text as the host holds it: for the suites. */
   cardText(id: CardId): string
-  readonly agent: Agent
+  /** The host's writes (ADR-0062): for a suite to write a record as the host would. */
+  readonly scribe: Scribe
   /** The invite key, or null on loopback. */
   readonly key: string | null
   /** Links a collaborator can open, key included; the local URL on loopback. */
@@ -313,18 +322,7 @@ export async function startHost({
   await whenHydrated(live)
   // Each person's history of moves, per root (ADR-0066).
   const histories = createMoveHistories(exchange)
-  // The agent, made below, holds a harness over each root it has used.
-  let created: Agent | undefined
-  const docs = hostDocuments({
-    exchange,
-    session,
-    live,
-    places,
-    releasing: async root => {
-      await created?.release(root)
-      await histories.unloadRoot(root)
-    },
-  })
+  const docs = hostDocuments({ exchange, session, live, places })
   const basics: Basics = {
     session,
     live,
@@ -335,29 +333,52 @@ export async function startHost({
     now: Date.now,
   }
 
-  // --- where lanes work (ADR-0032, ADR-0034) --------------------------------
-  // Lane work is made before the agent, which is made with lane work's
-  // `access` and `hooks`, so lane work reads the agent lazily, as do
-  // banners, digests, titles and names, made before it too. Every module
-  // made after the agent is given the agent. One made before it must not
-  // write as it is made: `theAgent()` throws until then.
-  const theAgent = (): Agent => {
-    if (created === undefined) throw new Error("the agent is not created yet")
-    return created
-  }
+  // --- pi: the scribe and the person's pi setup (ADR-0092) -----------------
+  // The host's writes go through the scribe, which holds each document's one
+  // pi session; the agent, made last, builds its harnesses over them.
+  const scribe = createScribe({ documents: docs, replicaId: newId(), blobs })
+  // Before a root's document goes, what holds it lets go: the scribe closes
+  // the agent's harness over it, then its session (ADR-0063).
+  docs.onReleasing(root => scribe.release(root))
+  docs.onReleasing(root => histories.unloadRoot(root))
   // The user config, read once: its shared directories (ADR-0035), its
   // renames for command packages (ADR-0036) and whether threads get banners.
   // Missing or broken decodes as empty, and the log says which.
   const userRead = await readConfigFile(userConfig)
   log(configLine(userConfig, userRead))
   const userJson = configJson(userRead)
+  // The project, before pi's setup, which loads from its root (ADR-0086).
+  const found = await findProject({
+    dir: toolsIn,
+    defaultDirect: !lanes,
+    containers,
+  })
+  const projectRoot = found?.project.root ?? project?.dir ?? null
+  const bannerConfig = decodeBannerConfig(userJson)
+  const titleConfig = decodeTitleConfig(userJson)
+  const piSetup = await loadPiSetup({
+    model,
+    commandRenames: decodeCommandRenames(userJson),
+    titleModel: titleConfig.model,
+    ...(bannerConfig === null ? {} : { banner: bannerConfig }),
+    ...(agentDir === undefined ? {} : { agentDir }),
+    ...(projectRoot === null ? {} : { project: projectRoot }),
+  })
+  if (titleConfig.model !== null && !piSetup.titleModelFound)
+    log(
+      `[host] titles name ${titleConfig.model.provider}/${titleConfig.model.model}, which pi does not have: titles use the run's model`,
+    )
+  if (bannerConfig !== null && !(await piSetup.canDrawBanners()))
+    log(
+      `[host] banners are on, but ${bannerConfig.provider}/${bannerConfig.model} cannot be drawn: no key, or no such model`,
+    )
+
   const keeper: HostKeeper = createKeeper<HostKey>({
     onError: failed(basics, "step"),
     onSlow: slow(basics),
   })
   // A store from before the board is carried over (ADR-0085): planned here,
-  // since it says which roots are archived, and written in `recover`, once
-  // the agent is made.
+  // since it says which roots are archived, and written in `recover`.
   const directoryNow = readRoots(session)
   const carryOver = planCarryOver({
     workflow: readWorkflow(session),
@@ -382,72 +403,66 @@ export async function startHost({
   log(
     `[host] ${rootsOpenedWords({ opened: roots.length, total: directoryNow.size })}`,
   )
-  // Each thread's column banner, when the user config turns banners on. Made
-  // before the agent, whose `set_banner` asks it, so it reads the agent
-  // lazily, as lane work does.
-  const bannerConfig = decodeBannerConfig(userJson)
+  // The directory follows the roots opened above as well as those opened
+  // later (`onOpened`).
+  startDirectory({ basics, keeper, scribe })
+  // Each thread's column banner, when the user config turns banners on.
   const banners =
     bannerConfig === null
       ? null
-      : createBanners({ basics, keeper, blobs, agent: theAgent })
+      : createBanners({ basics, keeper, blobs, scribe, piSetup })
   // Each run's verdict (ADR-0077), and each ask's digest unless the user
-  // config turns digests off (ADR-0071). Made before the agent, which it
-  // reads lazily, as banners do.
+  // config turns digests off (ADR-0071).
   const digests = createDigests({
     basics,
     keeper,
     presence,
-    agent: theAgent,
+    scribe,
+    piSetup,
     enabled: decodeDigestConfig(userJson),
   })
   const digestFailed = (lane: LaneName) =>
     failed(basics, "summarizing its ask", lane)
   // Each root's title, unasked as its first lane starts unless the user
   // config turns that off, or when a person asks (ADR-0074).
-  const titleConfig = decodeTitleConfig(userJson)
   const titles = createTitles({
     basics,
     keeper,
     enabled: titleConfig.enabled,
-    agent: theAgent,
+    scribe,
+    piSetup,
   })
-  // Every thread's name (ADR-0039, ADR-0057), one plan at a time. A thread's
-  // banner is drawn from its name, so it starts as the name is written.
+  // Every thread's name (ADR-0039, ADR-0057). A thread's banner is drawn
+  // from its name, so it starts as the name is written.
   const names = createNames({
     basics,
-    agent: { writeValues: writes => theAgent().writeValues(writes) },
+    scribe,
     onNamed: lane => {
       banners?.due(lane).catch(failed(basics, "banner"))
     },
   })
-  // What each thread is told of its base's new work (ADR-0080). Made before
-  // lane work, whose refreshes tell it, so it reads the agent lazily.
-  const baseNews = createBaseNews({ basics, agent: theAgent, keeper })
+  const provenance = createProvenance({ basics, presence, scribe })
+  // `split_offer`: a split card queued on the agent's lane (ADR-0080), which
+  // its run's end pops.
+  const askSplit = createSplitCall({ basics, keeper, provenance })
+
+  // --- where lanes work (ADR-0032, ADR-0034) --------------------------------
   const work = await startLaneWork({
     basics,
-    baseNews,
-    ensureNames: names.ensure,
-    dir: toolsIn,
-    defaultDirect: !lanes,
-    containers,
+    found,
     userConfig: { file: userConfig, json: userJson },
-    agent: theAgent,
+    scribe,
+    piSetup,
+    ensureNames: names.ensure,
     lineCommands: key === null,
   })
 
-  // Lane work's root when it has one; the folder as given without tools.
-  const projectRoot = work.project?.root ?? project?.dir ?? null
-
-  // --- pi stack ------------------------------------------------------------
-  const commandRenames = decodeCommandRenames(userJson)
+  // --- the agent, at work in threads' lanes ---------------------------------
   const agent = await createAgent({
     documents: docs,
-    replicaId: newId(),
-    model,
-    commandRenames,
+    scribe,
+    setup: piSetup,
     blobs,
-    ...(agentDir === undefined ? {} : { agentDir }),
-    ...(projectRoot === null ? {} : { project: projectRoot }),
     tools:
       toolsIn === null
         ? null
@@ -455,9 +470,7 @@ export async function startHost({
             access: work.access,
             hooks: {
               ...work.hooks,
-              // A split the agent asks for is a card queued on its lane: the
-              // documents' keeper writes it (ADR-0080).
-              askSplit: lane => askSplit(lane),
+              askSplit,
               // A turn recorded, then a live digest of the ask `tip` is in,
               // when due.
               turnDone: async (lane, tip) => {
@@ -473,50 +486,39 @@ export async function startHost({
       log(
         `[host] ${readThreadName(session, lane)}: the model's prompt or tools changed`,
       ),
-    ...(bannerConfig === null || banners === null
-      ? {}
-      : { banners: { config: bannerConfig, request: banners.request } }),
-    titleModel: titleConfig.model,
+    ...(banners === null ? {} : { bannerAsks: banners.request }),
   })
-  created = agent
-  // The directory writes through the agent, so it starts here; it follows
-  // the roots opened above as well as those opened later (`onOpened`).
-  startDirectory({ basics, keeper, agent })
-  if (titleConfig.model !== null && !agent.titleModelFound)
-    log(
-      `[host] titles name ${titleConfig.model.provider}/${titleConfig.model.model}, which pi does not have: titles use the run's model`,
-    )
-  if (bannerConfig !== null && !(await agent.canDrawBanners()))
-    log(
-      `[host] banners are on, but ${bannerConfig.provider}/${bannerConfig.model} cannot be drawn: no key, or no such model`,
-    )
-
   log(
     agentReadyLine({
-      label: agent.modelLabel,
-      origin: agent.modelOrigin,
+      label: piSetup.modelLabel,
+      origin: piSetup.modelOrigin,
       tools: toolsIn === null ? null : (projectRoot ?? toolsIn),
     }),
   )
 
   // --- the shell -----------------------------------------------------------
+  // What each thread is told of its base's new work (ADR-0080): lane work's
+  // refreshes announce a changed base, and a running lane is steered.
+  const baseNews = createBaseNews({ basics, agent, keeper })
+  work.onBaseChanged(lane => baseNews.baseChanged(lane))
   const hotReload = holdHotReload({ session, live })
   // Commands are received only from `startControl`, after `recover`.
   const listener = Control.listen(exchange)
   const cardPort = startCards({ exchange, store, session })
-  const provenance = createProvenance({ basics, presence, agent: () => agent })
   const { readPinned } = createPinned({ basics, cards: cardPort })
   const runs = createRuns({
     basics,
     agent,
     work,
     readPinned,
-    readBehind: baseNews.atStart,
+    baseNews,
     pending: digests.pending,
   })
   const commands = createCommands({
     basics,
     agent,
+    scribe,
+    piSetup,
     work,
     blobs,
     cards: cardPort,
@@ -571,7 +573,7 @@ export async function startHost({
         texts: cardPort.texts,
       })
       await sweepHistories({ basics, store, histories, startup: false })
-      await sweepHolds({ basics, agent })
+      await sweepHolds({ basics, scribe })
       await provenance.sweep()
     },
   })
@@ -596,14 +598,6 @@ export async function startHost({
     if (readRunning(live, lane)) return
     void keeper.once(`drain:${lane}`, () => drain(lane))
   }
-  // `split_offer`: a split card queued on the agent's lane (ADR-0080).
-  const askSplit = createSplitCall({
-    basics,
-    keeper,
-    drain: queueDrain,
-    provenance,
-  })
-
   /**
    * Resolves when no queued step remains (a compaction after a run among
    * them), no lane's queue has work, and every write has reached the store.
@@ -619,6 +613,8 @@ export async function startHost({
     basics,
     roots,
     agent,
+    scribe,
+    piSetup,
     work,
     keeper,
     start: runs.start,
@@ -629,8 +625,8 @@ export async function startHost({
     carryOver,
   })
   await sweepHistories({ basics, store, histories, startup: true })
-  await sweepHolds({ basics, agent })
-  const seats = startSeats({ exchange, basics, keeper, agent, histories })
+  await sweepHolds({ basics, scribe })
+  const seats = startSeats({ exchange, basics, keeper, scribe, histories })
   const control = startControl({
     exchange,
     listener,
@@ -664,7 +660,11 @@ export async function startHost({
           // Queued steps, a compaction among them, finish their writes.
           return quiet()
         case "agent":
+          // Every harness closes, which ends running runs.
           return agent.close()
+        case "scribe":
+          // Every session, the session document's too: a later write is refused.
+          return scribe.close()
         case "work":
           // A container runs only while its lane runs (ADR-0034).
           return work.close()
@@ -696,7 +696,7 @@ export async function startHost({
     presence,
     places,
     cardText: (id: CardId) => exchange.get(cardDocId(id), TextDoc).text(),
-    agent,
+    scribe,
     key,
     invites: server.invites,
     quiet,

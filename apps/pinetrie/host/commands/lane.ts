@@ -18,7 +18,7 @@ import {
   type TreeIndex,
   type WriterId,
 } from "@pinetrie/core"
-import type { Agent } from "@pinetrie/pi"
+import type { Agent, Scribe } from "@pinetrie/pi"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import {
   readLanes,
@@ -48,7 +48,8 @@ import type { LaneWork } from "../work/index.ts"
 
 export interface LaneDeps {
   readonly basics: Basics
-  readonly agent: Pick<Agent, "lane" | "writeValues">
+  readonly agent: Pick<Agent, "lane">
+  readonly scribe: Pick<Scribe, "writeValues">
   readonly work: Pick<LaneWork, "offers" | "line">
   readonly start: Runs["start"]
   /** Stop a chat's run that has not reached pi yet (`Runs.cancel`). */
@@ -100,7 +101,7 @@ async function laneAt(
  * abort would reach nothing: it is cancelled instead.
  */
 export async function handleStop(
-  deps: Pick<LaneDeps, "basics" | "agent" | "cancel">,
+  deps: Pick<LaneDeps, "basics" | "agent" | "scribe" | "cancel">,
   lane: LaneName,
   by: WriterId,
 ): Promise<Outcome> {
@@ -129,7 +130,7 @@ export async function handleStop(
         : [setRecord(STOP, planned.record, root)]),
       ...(planned.hold === null ? [] : [setRecord(QUEUE_HOLD, planned.hold)]),
     ]
-    if (writes.length > 0) await agent.writeValues(writes)
+    if (writes.length > 0) await deps.scribe.writeValues(writes)
     if (!deps.cancel(lane)) await agent.lane(lane).abort()
   }
   return { kind: "stopped" }
@@ -141,9 +142,7 @@ export async function handleStop(
  * asks for the lane's drain: nothing else would pop what waited.
  */
 export async function handleQueueHold(
-  deps: Pick<LaneDeps, "basics" | "drain"> & {
-    readonly agent: Pick<Agent, "writeValues">
-  },
+  deps: Pick<LaneDeps, "basics" | "drain" | "scribe">,
   lane: LaneName,
   held: boolean,
   by: WriterId,
@@ -165,7 +164,7 @@ export async function handleQueueHold(
     held,
   })
   // execute
-  if (writes.length > 0) await deps.agent.writeValues(writes)
+  if (writes.length > 0) await deps.scribe.writeValues(writes)
   if (!held) deps.drain(lane)
   return { kind: held ? "held" : "released" }
 }

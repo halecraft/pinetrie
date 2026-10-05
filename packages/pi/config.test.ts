@@ -4,13 +4,13 @@
 import path from "node:path"
 import { labelCommands } from "@pinetrie/rules"
 import { expect, test } from "vitest"
-import { imageModelFor, setUpModel, titleModelOf } from "./config.ts"
+import { imageModelFor, loadModelSetup, titleModelOf } from "./config.ts"
 import { scriptedModel } from "./scripted.ts"
 
 const agentDir = path.join(import.meta.dirname, "fixtures", "pi-agent")
 
 test("every skill and template pi loaded, the ones it dropped for their names included, each under its package", async () => {
-  const setup = await setUpModel(
+  const setup = await loadModelSetup(
     { kind: "scripted", script: scriptedModel() },
     { cwd: agentDir, agentDir },
   )
@@ -32,7 +32,7 @@ test("every skill and template pi loaded, the ones it dropped for their names in
 })
 
 test("a scripted model given no agent directory loads nothing of pi's, and still has pinetrie's own skills as commands", async () => {
-  const setup = await setUpModel(
+  const setup = await loadModelSetup(
     { kind: "scripted", script: scriptedModel() },
     {
       cwd: agentDir,
@@ -59,7 +59,7 @@ test("a scripted model answers commit messages from a provider of its own: the r
     describe: { reply: context => `feat: ${context.at(-1)?.length}` },
   })
   script.use([{ text: "the run's reply" }])
-  const setup = await setUpModel(
+  const setup = await loadModelSetup(
     { kind: "scripted", script },
     { cwd: agentDir },
   )
@@ -97,7 +97,7 @@ test("imageModelFor: pi-ai's entry, else one for an unlisted OpenRouter id, else
 })
 
 test("titleModelOf: the named model, else the describe model, and whether pi had the one named", async () => {
-  const setup = await setUpModel(
+  const setup = await loadModelSetup(
     { kind: "scripted", script: scriptedModel() },
     { cwd: agentDir },
   )

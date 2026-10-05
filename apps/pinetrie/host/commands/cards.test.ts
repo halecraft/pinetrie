@@ -85,7 +85,7 @@ function setUp() {
   const provenance = createProvenance({
     basics: b,
     presence,
-    agent: () => ({ writeValues: async writes => applyWrites(b, writes) }),
+    scribe: { writeValues: async writes => applyWrites(b, writes) },
   })
   const commands = createCardCommands({
     basics: b,

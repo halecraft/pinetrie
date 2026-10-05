@@ -1,6 +1,10 @@
 // host/split-call — `split_offer` (ADR-0080): a split card queued on the
 // agent's lane, in one step on the documents' keeper, as the strip's button
-// queues one. The drain pops it when the run ends (`queued-card-pop.ts`).
+// queues one. Its run's end pops it (`settle.ts`, `queued-card-pop.ts`): pi
+// calls the hook only during a run, and the tool awaits the step, so the
+// step is queued before the run's end queues its drain, which a keeper runs
+// after it (`packages/keeper/TECHNICAL.md`), even when a Stop ends the run
+// while the step waits.
 
 import { atEntry, cardId, type LaneName } from "@pinetrie/core"
 import {
@@ -36,8 +40,6 @@ export const createSplitCall =
       "docs" | "session" | "live" | "places" | "newId"
     >
     readonly keeper: Pick<HostKeeper, "run">
-    /** Drain a lane whose queue a card joined, unless it runs. */
-    readonly drain: (lane: LaneName) => void
     /** Each card's history: the split's card is the host's write. */
     readonly provenance: Pick<Provenance, "before" | "after">
   }) =>
@@ -69,6 +71,5 @@ export const createSplitCall =
       const before = deps.provenance.before()
       applyPlaceSteps(places, [planned.step])
       await deps.provenance.after({ kind: "host" }, before)
-      deps.drain(lane)
       return { text: SPLIT_QUEUED, isError: false, details: null }
     })

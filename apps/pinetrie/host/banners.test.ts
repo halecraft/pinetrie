@@ -1,6 +1,6 @@
 import { laneNameForThread, type Sha256, type ThreadName } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
-import { type Agent, type Drawn, sha256Of } from "@pinetrie/pi"
+import { type Drawn, type PiSetup, type Scribe, sha256Of } from "@pinetrie/pi"
 import { readBanners } from "@pinetrie/reads"
 import { type BannerAsk, NAME as NAME_RECORD, setRecord } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
@@ -24,18 +24,17 @@ const DRAWN: Drawn = {
   image: { bytes: BYTES, mimeType: "image/png", width: 1, height: 1 },
 }
 
-type BannerAgent = Pick<
-  Agent,
-  "canDrawBanners" | "drawBanner" | "skill" | "writeValues"
->
+/** The setup and the scribe in one record, so the order of their calls shows. */
+type FakePi = Pick<PiSetup, "canDrawBanners" | "drawBanner" | "skill"> &
+  Pick<Scribe, "writeValues">
 
-function setUp(agent: Partial<BannerAgent> = {}, named = true) {
+function setUp(pi: Partial<FakePi> = {}, named = true) {
   const b = basics()
   if (named)
     putValue(b, setRecord(NAME_RECORD, { lane: LANE, name: NAME, at: 1 }))
   const keeper = createKeeper()
   const blobs = memoryBlobs(() => 1_000)
-  const fake = record<BannerAgent>({
+  const fake = record<FakePi>({
     canDrawBanners: async () => true,
     skill: async () => ({
       path: "SKILL.md",
@@ -44,13 +43,14 @@ function setUp(agent: Partial<BannerAgent> = {}, named = true) {
     }),
     drawBanner: async () => DRAWN,
     writeValues: async writes => applyWrites(b, writes),
-    ...agent,
+    ...pi,
   })
   const banners = createBanners({
     basics: b,
     keeper,
     blobs,
-    agent: () => fake.port,
+    scribe: fake.port,
+    piSetup: fake.port,
   })
   return { b, keeper, blobs, fake, banners }
 }

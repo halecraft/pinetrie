@@ -1,5 +1,5 @@
 // pi/thread-lanes — each thread's pi lane (ADR-0020) in one root's document,
-// held while that root's harness is (`Agent.release` closes it), behind
+// held while that root's harness is (`Scribe.release` closes it), behind
 // handles that speak only pinetrie's types. A lane is never moved, and its tip
 // is never read here: readers use the document.
 

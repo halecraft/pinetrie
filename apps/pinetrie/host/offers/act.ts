@@ -36,7 +36,7 @@ import type { OfferDeps } from "./state.ts"
 export async function act(
   deps: Pick<
     OfferDeps,
-    "owner" | "line" | "basics" | "docs" | "agent" | "running"
+    "owner" | "line" | "basics" | "docs" | "piSetup" | "running"
   > & { readonly describing: Set<LaneName> },
   refresh: Pick<Refresh, "rebuild" | "ports">,
   lane: LaneName,
