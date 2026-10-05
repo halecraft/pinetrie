@@ -269,6 +269,22 @@ The scripted model's `reply` shows an image part as
 `[image <mimeType> <sha256 of its bytes>]`, so a suite can check which image
 the model was given.
 
+### Compaction, and the land message's budget (`compaction.ts`, ADR-0084)
+
+`createAgent` gives every harness `PINETA_COMPACTION`, and `LAND_BUDGET`,
+the resolution prompt's limit (`@pineta/rules`' `PromptBudget`), is derived
+from it: its `keepRecentTokens`, measured with pi's `estimateTokens` of a
+custom message. pi keeps the newest messages back to `keepRecentTokens` and
+never cuts the newest, so a prompt within it is kept whole (S106).
+
+- **Change the setting, and the budget moves with it.** Nothing else states
+  20 000 or a ratio of characters to tokens.
+- **The `compaction` option equals pi's default today**, so removing it
+  would change nothing yet. It is passed so that the setting is Pineta's.
+- **pi-agent-core's harness compaction is not pi-coding-agent's.** The
+  harness reads `options.compaction ?? DEFAULT_COMPACTION_SETTINGS`, never a
+  person's `settings.json`.
+
 ### Models, tools and the prompt (`config.ts`, S23)
 
 `ModelChoice` is one of three:

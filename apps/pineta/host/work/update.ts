@@ -29,12 +29,13 @@ import {
   DEFAULT_LINE,
   laneBase,
   type Merged,
+  type MergePlan,
   mergeUpdate,
   planMerge,
   type Runner,
   type TouchedRevision,
 } from "@pineta/lanes"
-import type { Agent, ThreadLaneHandle } from "@pineta/pi"
+import { type Agent, LAND_BUDGET, type ThreadLaneHandle } from "@pineta/pi"
 import {
   readLatestPrompt,
   readNames,
@@ -47,15 +48,19 @@ import {
   catchUpName,
   decodeLand,
   encodeUpdate,
+  type Floor,
   LANDING,
   type LandMessage,
+  type LandSkill,
   landingRecord,
   mergedFrom,
   type ParentNow,
+  type PromptBudget,
   parentNow,
   planParentUpdate,
   planResolution,
   planUpdateFrom,
+  resolutionFloor,
   setRecord,
   type UpdateMessage,
   type UpdateRefusal,
@@ -83,8 +88,51 @@ function updateRefusal(code: UpdateRefusal): string {
   }
 }
 
-/** How long a resolution prompt's reasons may run before the oldest go (ADR-0033). */
-const RESOLUTION_BUDGET = 60_000
+/**
+ * Why a catch-up was refused before it merged: the smallest resolution
+ * prompt for it would not fit what a run keeps when pi compacts (ADR-0084).
+ */
+export function unfittableWords(tokens: number, budget: number): string {
+  return `a resolution's prompt would need ${tokens} tokens, over the ${budget} a run keeps: shorten the card's text or the resolve-conflicts skill`
+}
+
+/** Whose work a catch-up brings in, as a resolution's prompt says it to the model. */
+export function incomingOf(from: BaseMerge): string {
+  const caughtUp = mergedFrom(from)
+  return caughtUp.kind === "parent"
+    ? `The work of the thread this one branched from (${caughtUp.name})`
+    : "The project's work"
+}
+
+/**
+ * What a catch-up may do once its base is known (ADR-0084): merge, with the
+ * floor its resolution's prompt will fit, or refuse with the lane untouched,
+ * when even the smallest prompt would not fit. Decided before the merge,
+ * since a merge left without a prompt is one no later catch-up merges again.
+ * Pure.
+ */
+export function planCatchUp(
+  from: BaseMerge,
+  resolution: {
+    readonly budget: PromptBudget
+    readonly skill: LandSkill | null
+    readonly intent: string
+  },
+):
+  | { readonly kind: "refused"; readonly reason: string }
+  | {
+      readonly kind: "merge"
+      readonly plan: MergePlan
+      readonly floor: Floor
+    } {
+  const found = resolutionFloor({ ...resolution, incoming: incomingOf(from) })
+  if (found.kind === "too-large")
+    return {
+      kind: "refused",
+      reason: unfittableWords(found.tokens, found.budget),
+    }
+  return { kind: "merge", plan: planMerge(from), floor: found.floor }
+}
 
 /**
  * Why one side changed a file: the message a revision's trailer names,
@@ -131,7 +179,8 @@ export async function withLaneStarted(
 export type SettleFacts =
   | Exclude<Merged, { readonly kind: "conflicted" }>
   | (Extract<Merged, { readonly kind: "conflicted" }> & {
-      readonly skill: Parameters<typeof planResolution>[0]["skill"]
+      /** What the prompt must fit, settled before the merge (`planCatchUp`). */
+      readonly floor: Floor
       /** The resolution's id. */
       readonly landing: string
     })
@@ -160,16 +209,16 @@ const touching = (revisions: readonly TouchedRevision[], path: string) =>
 /**
  * What a merge comes to (ADR-0060, ADR-0033). Clean: the update, written in
  * the thread, and the merge fetched. Nothing: a mark naming the line, when
- * one was made, fetched. Conflicted: the resolution's prompt, each file with
- * why each side changed it, and the card's text (`intent`) after; nothing is
- * fetched: the resolution's turns fetch the lane as they commit. Pure.
+ * one was made, fetched. Conflicted: the resolution's prompt, within the
+ * floor's budget, each file with why each side changed it, and the card's
+ * text after; nothing is fetched: the resolution's turns fetch the lane as
+ * they commit. Pure.
  */
 export function planSettle(
   facts: SettleFacts,
   ctx: {
     readonly lane: LaneName
     readonly by: WriterId
-    readonly intent: string
     readonly from: BaseMerge
     readonly index: TreeIndex
     readonly now: number
@@ -211,7 +260,7 @@ export function planSettle(
       return {
         kind: "conflicted",
         message: planResolution({
-          skill: facts.skill,
+          floor: facts.floor,
           files: facts.contents.map(({ path, content }) => ({
             path,
             content,
@@ -228,13 +277,7 @@ export function planSettle(
               reasons: touching(facts.theirs, path).map(d => firstLine(d, 200)),
             },
           })),
-          budget: RESOLUTION_BUDGET,
           details: { landing: facts.landing, lane, yours: [facts.from], by },
-          intent: ctx.intent,
-          incoming:
-            caughtUp.kind === "parent"
-              ? `The work of the thread this one branched from (${caughtUp.name})`
-              : "The project's work",
           timestamp: ctx.now,
         }),
         fetch: null,
@@ -280,7 +323,9 @@ export interface Updates {
    * Clean: the update is appended to the thread. Conflicted: the land
    * message for the resolution run, with `intent` (the card's text) after
    * the conflicts. Nothing new: nothing to do, but a move to the line is
-   * fetched. The lane is stopped after, unless a resolution runs.
+   * fetched. Refused, with the lane untouched, when even the smallest
+   * resolution prompt would not fit (ADR-0084). The lane is stopped after,
+   * unless a resolution runs.
    */
   prepareUpdate(
     lane: LaneName,
@@ -380,13 +425,15 @@ export function createUpdates(deps: {
    * One step on the lane's queue, so nothing changes the lane between what
    * is read and what is merged: what the command merges (the lane's base
    * from its own history, the line and the WIP from your repo, a pinned
-   * read; or the parent, from the document), the plan, and, unless it is
-   * refused or has nothing to merge, the edits committed and the merge.
+   * read; or the parent, from the document), the plan with the floor its
+   * resolution's prompt must fit (`planCatchUp`), and, unless it is refused
+   * or has nothing to merge, the edits committed and the merge.
    */
   const updateOnQueue = (
     lane: LaneName,
     owner: RepoOwner,
     command: CardCommand,
+    resolution: Parameters<typeof planCatchUp>[1],
   ) => {
     const handle = registry.handleOf(lane)
     const jj = registry.laneJjOf(lane)
@@ -397,6 +444,7 @@ export function createUpdates(deps: {
             readonly kind: "merged"
             readonly from: BaseMerge
             readonly merged: Merged
+            readonly floor: Floor
           }
       > => {
         const from =
@@ -405,14 +453,11 @@ export function createUpdates(deps: {
             : await baseUpdate(command === "continue-on-line")
         if (typeof from === "string") return refused(updateRefusal(from))
         if (from.kind === "nothing") return { kind: "nothing" }
+        const catchUp = planCatchUp(from, resolution)
+        if (catchUp.kind === "refused") return refused(catchUp.reason)
         await commitEdits(lane, jj)
-        const merged = await mergeUpdate(
-          jj,
-          handle.runners,
-          lane,
-          planMerge(from),
-        )
-        return { kind: "merged", from, merged }
+        const merged = await mergeUpdate(jj, handle.runners, lane, catchUp.plan)
+        return { kind: "merged", from, merged, floor: catchUp.floor }
       },
     )
 
@@ -458,24 +503,25 @@ export function createUpdates(deps: {
           runEnded: () => containers.runEnded(lane),
         },
         async () => {
-          const done = await updateOnQueue(lane, owner, command)
+          // Read before the merge: the floor its prompt must fit needs it.
+          const skill = await deps
+            .agent()
+            .skill("pineta:skill:resolve-conflicts")
+          const done = await updateOnQueue(lane, owner, command, {
+            budget: LAND_BUDGET,
+            skill,
+            intent,
+          })
           if (done.kind !== "merged") return done
-          const { from, merged } = done
+          const { from, merged, floor } = done
           const facts: SettleFacts =
             merged.kind === "conflicted"
-              ? {
-                  ...merged,
-                  skill: await deps
-                    .agent()
-                    .skill("pineta:skill:resolve-conflicts"),
-                  landing: basics.newId(),
-                }
+              ? { ...merged, floor, landing: basics.newId() }
               : merged
           const doc = await docs.laneDoc(lane)
           const settle = planSettle(facts, {
             lane,
             by,
-            intent,
             from,
             index: doc === null ? indexTree({}) : readTreeIndex(doc),
             now: basics.now(),

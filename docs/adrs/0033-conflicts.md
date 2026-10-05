@@ -6,7 +6,9 @@ the fold's merge comes with `PLAN-2026-09-27-fold`). **Amended by ADR-0038
 only when the merge conflicts. Builds on ADR-0032 (folds
 and landing are jj merges in a
 lane's workspace) and ADR-0010 (labelled legs, and the destination's is
-mandatory).
+mandatory). **Amended by ADR-0084:** a resolution's prompt fits what pi keeps
+when it compacts; over it, the hunks give way to conflict sections, then
+names, then a count, before the reasons do.
 
 **Context.** A fold of files and a landing are jj merges in a lane's
 workspace (ADR-0032). jj records conflicts rather than failing, so a merge
@@ -35,7 +37,8 @@ still break each other. How cautious to be varies by person and by repo.
 
   ADR-0010 holds: the labels are always present, and the destination's side
   is never dropped. Under a budget, the messages are compacted first, never
-  the hunks.
+  the hunks. (*Amended by ADR-0084:* the hunks give way first, to conflict
+  sections, names or a count, since the agent can read them in its lane.)
 - **The policy is a skill, `resolve-conflicts`.** Pineta ships a `SKILL.md`
   and loads it as an extra skill path. pi loads your skills, then the repo's
   (`.pi/skills`), then extra paths, and the first of a name wins. So a

@@ -8,8 +8,14 @@ import {
   type ThreadName,
   writerId,
 } from "@pineta/core"
+import { planMerge } from "@pineta/lanes"
 import { readTreeIndex } from "@pineta/reads"
-import { encodeChat, encodeUpdate } from "@pineta/rules"
+import {
+  encodeChat,
+  encodeUpdate,
+  type Floor,
+  type PromptBudget,
+} from "@pineta/rules"
 import { newRootDoc, writeEntry, writeLaneTip } from "@pineta/schema"
 import { describe, expect, test } from "vitest"
 import { basics, record, row } from "../fakes.ts"
@@ -17,6 +23,7 @@ import {
   applySettle,
   createUpdates,
   type Prepared,
+  planCatchUp,
   planSettle,
   reasonOf,
   type Settle,
@@ -70,12 +77,62 @@ const lineFrom: BaseMerge = {
   commit: LINE,
   mark: false,
 }
+const parentFrom: BaseMerge = {
+  kind: "parent",
+  lane: laneNameForThread("p"),
+  name: "amber-fox" as ThreadName,
+  commit: LINE,
+  caughtUpWith: OURS,
+}
+/** pi's estimate of a custom message: a token per four characters. */
+const budgetOf = (tokens: number): PromptBudget => ({
+  tokens,
+  estimate: content => Math.ceil(content.length / 4),
+})
+
+/** The floor `planCatchUp` settles for `from`, with room for anything. */
+function floorFor(from: BaseMerge, intent: string): Floor {
+  const planned = planCatchUp(from, {
+    budget: budgetOf(100_000),
+    skill: null,
+    intent,
+  })
+  if (planned.kind !== "merge") throw new Error("refused")
+  return planned.floor
+}
+
+describe("planCatchUp: whether a catch-up may merge (ADR-0084)", () => {
+  test("refused, before the merge, when even the smallest prompt would not fit; it names what can be shortened", () => {
+    const planned = planCatchUp(lineFrom, {
+      budget: budgetOf(50),
+      skill: null,
+      intent: "x".repeat(400),
+    })
+    expect(planned.kind).toBe("refused")
+    if (planned.kind === "refused") {
+      expect(planned.reason).toContain("over the 50")
+      expect(planned.reason).toContain("the card's text")
+      expect(planned.reason).toContain("resolve-conflicts skill")
+    }
+  })
+  test("with room, it merges as `planMerge` says, and the prompt names whose work comes in", () => {
+    const planned = planCatchUp(parentFrom, {
+      budget: budgetOf(1_000),
+      skill: null,
+      intent: "",
+    })
+    if (planned.kind !== "merge") throw new Error("refused")
+    expect(planned.plan).toEqual(planMerge(parentFrom))
+    expect(planned.floor.content).toContain(
+      "The work of the thread this one branched from (amber-fox) was merged",
+    )
+  })
+})
 
 describe("planSettle: what a merge comes to (ADR-0060, ADR-0033)", () => {
   const ctx = {
     lane: LANE,
     by: ADA,
-    intent: "keep both sides",
     from: lineFrom,
     index: readTreeIndex(newRootDoc()),
     now: 7,
@@ -163,7 +220,7 @@ describe("planSettle: what a merge comes to (ADR-0060, ADR-0033)", () => {
           { description: "yours a\n\nbody", paths: ["a.txt", "b.txt"] },
           { description: "yours b\n", paths: ["b.txt"] },
         ],
-        skill: null,
+        floor: floorFor(lineFrom, "keep both sides"),
         landing: "l-1",
       },
       { ...ctx, index: readTreeIndex(doc) },
@@ -188,13 +245,7 @@ describe("planSettle: what a merge comes to (ADR-0060, ADR-0033)", () => {
     expect(content.endsWith("keep both sides")).toBe(true)
   })
   test("from the thread it branched from: the update and the resolution name it (ADR-0072)", () => {
-    const parent: BaseMerge = {
-      kind: "parent",
-      lane: laneNameForThread("p"),
-      name: "amber-fox" as ThreadName,
-      commit: LINE,
-      caughtUpWith: OURS,
-    }
+    const parent = parentFrom
     const clean = planSettle(
       {
         kind: "clean",
@@ -217,7 +268,7 @@ describe("planSettle: what a merge comes to (ADR-0060, ADR-0033)", () => {
         contents: [{ path: "a.txt", content: "<<<<<<< a" }],
         ours: [],
         theirs: [],
-        skill: null,
+        floor: floorFor(parent, ""),
         landing: "l-2",
       },
       { ...ctx, from: parent },

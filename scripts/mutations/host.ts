@@ -4,6 +4,16 @@ import type { Mutation } from "../mutate.ts"
 const unit = ["pnpm", "exec", "vitest", "run", "apps/pineta/host"]
 
 export const mutations: readonly Mutation[] = [
+  // ── a resolution's prompt fits (ADR-0084) ──
+  {
+    name: "an unfittable catch-up is merged anyway",
+    file: "apps/pineta/host/work/update.ts",
+    from: '  if (found.kind === "too-large")',
+    to: "  if (false)",
+    command: unit,
+    expect:
+      "refused, before the merge, when even the smallest prompt would not fit",
+  },
   // ── card history and traces (ADR-0048 step 6) ──
   {
     name: "traces seen delete someone else's trace",
@@ -973,9 +983,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the land message leaves out the card's text",
-    file: "apps/pineta/host/work/update.ts",
-    from: "          intent: ctx.intent,",
-    to: '          intent: "",',
+    file: "packages/rules/land.ts",
+    from: "  const floor = { ...input, intent, content } as Floor",
+    to: '  const floor = { ...input, intent: "", content } as Floor',
     command: unit,
     expect: "the land message ends with the card's text",
   },

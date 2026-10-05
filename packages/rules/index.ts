@@ -108,11 +108,18 @@ export {
 } from "./digest.ts"
 export { pastedImages, planImages } from "./images.ts"
 export {
+  type ConflictShown,
   decodeLand,
+  type Floor,
+  type FloorFound,
+  LAND_TYPE,
   LANDING,
   type LandMessage,
+  type LandSkill,
   landingRecord,
+  type PromptBudget,
   planResolution,
+  resolutionFloor,
 } from "./land.ts"
 export {
   BASE,

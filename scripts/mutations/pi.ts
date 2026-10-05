@@ -5,6 +5,14 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/pi"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "the land budget is a number of its own",
+    file: "packages/pi/compaction.ts",
+    from: "  tokens: PINETA_COMPACTION.keepRecentTokens,",
+    to: "  tokens: 60_000,",
+    command: unit,
+    expect: "one source: the budget is the harness's keepRecentTokens",
+  },
+  {
     name: "every write goes to the first target's document",
     file: "packages/pi/agent.ts",
     from: '    const key = w.target.kind === "session" ? "" : w.target.root',

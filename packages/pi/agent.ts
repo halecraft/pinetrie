@@ -48,6 +48,7 @@ import {
 } from "@pineta/schema"
 import { type Banners, banners } from "./banner.ts"
 import { type CommandFiles, commandFiles } from "./commands.ts"
+import { PINETA_COMPACTION } from "./compaction.ts"
 import {
   complete,
   DEFAULT_AGENT_DIR,
@@ -363,6 +364,7 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
         // Pineta's queued cards mean pi's own queue is never used; should it
         // be, it answers one message at a time rather than batching (S20).
         followUpMode: "one-at-a-time",
+        compaction: PINETA_COMPACTION,
       },
       CTX,
     )

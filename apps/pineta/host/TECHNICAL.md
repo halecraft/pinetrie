@@ -550,7 +550,12 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   the lane's base from its own history, the line and the WIP from your
   repo (pinned), `planUpdateFrom`, the edits committed and `mergeUpdate`
   (which first joins each integrated-offer commit the lane holds to its source, ADR-0079), so nothing
-  changes the lane between what is read and what is merged. Then
+  changes the lane between what is read and what is merged. Before the
+  merge, `planCatchUp` settles the floor a resolution's prompt must fit
+  (ADR-0084), from the resolve-conflicts skill, read before the step, and
+  the card's text: a catch-up whose smallest prompt would not fit is refused
+  with the lane untouched, since a merge left without a prompt is one no
+  later catch-up merges again (S106). Then
   `planSettle`, pure, decides what the thread gets, the land message
   included, and `applySettle` writes it. `Settle.fetch` alone decides
   what is fetched: a clean merge, and a move to the line with nothing to

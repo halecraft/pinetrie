@@ -429,6 +429,16 @@ commit**, and the host **pops the next queued card**. A lane **catches up
 with** its base, and an id already used is **in use**. The page keeps its
 short labels ("take", "add to the project"). An offer record written
 before reads its old `taken` as `integratedAs`.
+
+**ADR-0084 — a resolution's prompt always fits what pi keeps when it
+compacts** (built). A 37-file conflict made a 1 MB land message, every file
+whole; pi never compacts the newest message, so the run could not start,
+and the thread was stuck behind it (S106). Now the budget is pi's
+`keepRecentTokens`, measured with pi's own estimate on the whole message.
+The files show whole, by their conflict sections, by name or as a count,
+whichever fits with each side's newest reason, and `jj resolve --list` is
+the list of what is left. A catch-up whose smallest prompt cannot fit is
+refused before it merges.
 **ADR-0019 — a lane is a line of work, not a unit of parallelism.** A person's
 lane is a *conversation lane* and never touches disk. A *work lane* carries
 agent work and will own a jj workspace, so creating one is deliberate, and fold

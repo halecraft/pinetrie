@@ -7,6 +7,7 @@ export {
   newId,
 } from "./agent.ts"
 export type { Drawn } from "./banner.ts"
+export { LAND_BUDGET } from "./compaction.ts"
 export { type ModelChoice, pickModel } from "./config.ts"
 export {
   type PreparedImage,

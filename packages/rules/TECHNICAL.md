@@ -949,10 +949,41 @@ are what the column shows: `landLine`'s one line, from the file count.
 `renderableMessage` makes it role `land` with that line, so the column shows the
 line, never the prompt.
 
-`planResolution` builds it. Over its budget, each side's reasons are trimmed,
-oldest first; the labels, both sides and every file's content are always
-kept (ADR-0010). The skill's path and a hash of its content are recorded, so a
+`planResolution` builds it, within a `PromptBudget` in pi's tokens
+(ADR-0084, S106): `LAND_BUDGET` (`packages/pi/compaction.ts`), the
+`keepRecentTokens` every lane's harness runs with, measured with pi's
+`estimateTokens`. A prompt within it is kept whole when pi compacts.
+
+- **The whole message is measured**, never its parts: each candidate is
+  rendered and estimated, and the fullest that fits is returned.
+- **The files show one way for every file** (`ConflictShown`): `whole`, by
+  their conflict sections (`conflictSections`, each headed by its lines),
+  by name, or as a `count`. The way is the fullest that fits with each
+  side's newest reason; then each side keeps its newest `k` reasons, the
+  most that fit, the older counted by `leftOut`. The code gives way before
+  the reasons, since the agent can read the files in its lane again.
+- **The floor is made before the merge** (`resolutionFloor`): the `count`
+  message, from the skill, the person's text and whose work came in. It
+  states no number of files, so the message measured before the merge is
+  the one `planResolution` returns when nothing fuller fits. Only
+  `resolutionFloor` makes a `Floor`, and `planResolution` requires one, so
+  it always has a message within the budget. A floor too large is the
+  host's refusal (`planCatchUp`), with the lane untouched.
+- **`jj resolve --list` is the list of what is left**, and every prompt says
+  so: a file not shown whole is read in the lane.
+- In every way but the `count`, each file keeps its path and both labelled
+  sides (ADR-0010); the `count` lists no file.
+
+The skill's path and a hash of its content are recorded, so a
 surprising resolution can be traced to the policy that produced it.
+
+Gotchas:
+- jj's markers are longer than seven characters when a file holds lines
+  that look like them; a section closes only at a `>` marker as long as its
+  `<`.
+- A conflict with a deletion is one section the size of the surviving file.
+- pi never compacts the newest message, so this budget is the only guard on
+  the prompt's size.
 
 | record | namespace | key | written |
 |---|---|---|---|

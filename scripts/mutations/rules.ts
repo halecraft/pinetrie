@@ -505,11 +505,61 @@ export const mutations: readonly Mutation[] = [
     name: "a tight budget drops the destination's side",
     file: "packages/rules/land.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "    `### ${f.ours.label}: ${f.ours.who}\\n${ours}\\n` +",
+    from: "  `### ${f.ours.label}: ${f.ours.who}\\n${reasonLines(f.ours.reasons, k)}\\n` +",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    to: '    (input.budget < 1000 ? "" : `### ${f.ours.label}: ${f.ours.who}\\n${ours}\\n`) +',
+    to: '  (shown === "whole" ? `### ${f.ours.label}: ${f.ours.who}\\n${reasonLines(f.ours.reasons, k)}\\n` : "") +',
     command: unit,
-    expect: "under budget, older reasons go first",
+    expect:
+      "the files show whole, by their conflict sections, by name, or as a count",
+  },
+  {
+    name: "a resolution shows whole files over any budget",
+    file: "packages/rules/land.ts",
+    from: "      if (!fits(best)) continue",
+    to: "      if (false) continue",
+    command: unit,
+    expect: "whatever the files and reasons, the message fits its budget",
+  },
+  {
+    name: "a resolution skips the conflict sections",
+    file: "packages/rules/land.ts",
+    from: 'const SHOWN_FULLEST_FIRST = ["whole", "sections", "names"] as const',
+    to: 'const SHOWN_FULLEST_FIRST = ["whole", "names"] as const',
+    command: unit,
+    expect:
+      "the files show whole, by their conflict sections, by name, or as a count",
+  },
+  {
+    name: "a resolution's way of showing the files is chosen with no reasons",
+    file: "packages/rules/land.ts",
+    from: "      let best = contentOf(shown, 1)",
+    to: "      let best = contentOf(shown, 0)",
+    command: unit,
+    expect: "the code gives way before the reasons",
+  },
+  {
+    name: "a resolution past every way writes its files whole",
+    file: "packages/rules/land.ts",
+    from: "    return floor.content",
+    to: '    return contentOf("whole", 1)',
+    command: unit,
+    expect: "whatever the files and reasons, the message fits its budget",
+  },
+  {
+    name: "a conflict section ends at any closing marker",
+    file: "packages/rules/land.ts",
+    from: "    } else if (/^(>{7,})(?: |$)/.exec(line)?.[1] === open.marker) {",
+    to: "    } else if (/^(>{7,})(?: |$)/.test(line)) {",
+    command: unit,
+    expect: "longer markers close only at a closing marker as long",
+  },
+  {
+    name: "a resolution leaves out where the list of conflicts is",
+    file: "packages/rules/land.ts",
+    from: '  "`jj resolve --list` in this thread\'s copy lists the files still conflicted: it, not this message, is what is left."',
+    to: '  ""',
+    command: unit,
+    expect: "every prompt says jj lists what is left",
   },
   {
     name: "an unnamed writer is a guest again",
@@ -887,9 +937,8 @@ export const mutations: readonly Mutation[] = [
     name: "the resolution leaves out what the person asked",
     file: "packages/rules/land.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "    content: `${`${skill}${intro}\\n\\n${body}`.trimEnd()}${asked}`,",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    to: "    content: `${skill}${intro}\\n\\n${body}`.trimEnd(),",
+    from: '  intent === "" ? "" : `\\n\\n## What the person asked\\n\\n${intent}`',
+    to: '  ""',
     command: unit,
     expect: "the person's text follows the conflict material",
   },
