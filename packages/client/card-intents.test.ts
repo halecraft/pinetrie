@@ -98,6 +98,7 @@ const state = (
   cards: facts(cards),
   rootEntries: new Map([[TEST_ROOT, R1]]),
   rootIds: new Map([[R1, TEST_ROOT]]),
+  listWidth: "full",
 })
 const plan = (intent: Intent, s: IntentState) =>
   planIntent(intent, s, "new-k", NEW_ROOT)

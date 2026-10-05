@@ -6,16 +6,19 @@
 
 import type { RevisionReview } from "@pinetrie/core"
 import { decodeRevisionReview, diffUrl, reviewUrl } from "@pinetrie/rules"
-import { memo, useEffect, useRef, useState } from "react"
+import { memo, useContext, useEffect, useRef, useState } from "react"
 import type { ReviewTarget } from "./column-view.ts"
 import { PaneHead } from "./pane-head.tsx"
 import {
   DIFF_LINES_SHOWN,
   diffLines,
   type FileRow,
+  type ReviewPref,
+  reviewPrefWords,
   reviewView,
   sectionState,
 } from "./review.ts"
+import { ReviewPrefsContext } from "./review-prefs.ts"
 import { sameProps } from "./same-props.ts"
 import { useFetched } from "./use-fetched.ts"
 import { useStable } from "./use-stable.ts"
@@ -101,10 +104,39 @@ function ReviewPaneView(p: ReviewPaneProps) {
       if (s.dataset.key === key) s.scrollIntoView({ block: "start" })
   }
 
+  const { prefs, setPrefs } = useContext(ReviewPrefsContext)
+  const toggle = (pref: ReviewPref) => {
+    const words = reviewPrefWords(pref, prefs[pref])
+    return (
+      <button
+        aria-label={words.label}
+        aria-pressed={prefs[pref]}
+        className="review-pref"
+        data-pref={pref}
+        key={pref}
+        onClick={() => setPrefs({ ...prefs, [pref]: !prefs[pref] })}
+        title={words.label}
+        type="button"
+      >
+        {words.glyph}
+      </button>
+    )
+  }
+
   return (
-    <div className="review">
+    <div
+      className="review"
+      data-list-folded={prefs.listFolded || undefined}
+      data-wrap={prefs.wrap || undefined}
+    >
       <PaneHead
         close={p.close}
+        extra={
+          <>
+            {toggle("wrap")}
+            {view.listed && toggle("listFolded")}
+          </>
+        }
         line={p.line}
         narrow={p.narrow}
         title={view.title}

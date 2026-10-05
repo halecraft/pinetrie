@@ -47,6 +47,7 @@ import {
   msg,
   OWN_MENU,
   openFromBoard,
+  PANE_VIEWPORT,
   railCount,
   readRaw,
   recordFrames,
@@ -388,7 +389,7 @@ async function run(
         await setUpLine(toolHost.session, owner)
         await owner.close()
       }
-      const tp = await browser.newPage()
+      const tp = await browser.newPage({ viewport: PANE_VIEWPORT })
       await asPerson(tp, "tools@browser.test", "Tess")
       try {
         await tp.goto(toolHost.httpUrl, { waitUntil: "domcontentloaded" })

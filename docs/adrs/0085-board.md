@@ -9,7 +9,9 @@ go), ADR-0027 (a stored layout no longer holds your open roots), ADR-0063
 (the archive record's key and its readers), ADR-0077 (a third person
 document; the Archive tab's mark moves to the board), ADR-0080 (the
 `archive` command becomes `move-root` and `workflow`) and ADR-0081 (the
-header row goes; the message count moves to the board). Evidence:
+header row goes; the message count moves to the board). Amended by
+ADR-0088 (proposed): your list folds to icons, and the footer's corner to
+your avatar, which answers this ADR's deferred narrow screens. Evidence:
 screenshots of the client restyled into this layout, at 1440 and 860 pixels
 wide, made while deciding.
 

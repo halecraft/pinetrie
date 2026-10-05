@@ -1,5 +1,6 @@
 // client/profile — you, at the footer's left: your name, the handle it gives
-// you, your email, and signing in as someone else (ADR-0037).
+// you, your email, and signing in as someone else (ADR-0037); and, while your
+// list is folded, your inventory's toggle (ADR-0088).
 //
 // A dialog, not a `Menu`: a `role="menu"` may hold only menu items, and this
 // holds a text field. A rename is sent on Enter or save and discarded on
@@ -10,6 +11,10 @@ import type { WriterId } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import { useState } from "react"
 import { planRename, renameProblem } from "./identity.ts"
+import {
+  InventoryToggle,
+  type InventoryToggleProps,
+} from "./inventory-toggle.tsx"
 import { NAME_PROBLEM, NameInput, type NameProblem } from "./name-input.tsx"
 import { Popover } from "./popover.tsx"
 import { Initial, nameFor } from "./presence.tsx"
@@ -30,9 +35,15 @@ export function Profile({
   signOut,
   nameOf,
   colorOf,
+  inventory,
 }: Me & {
   readonly nameOf: ReadonlyMap<WriterId, string>
   readonly colorOf: (writer: WriterId) => string
+  /**
+   * Your inventory's toggle, drawn here while your list is folded and the
+   * footer's corner holds only your avatar (ADR-0088).
+   */
+  readonly inventory?: InventoryToggleProps
 }) {
   const shown = nameFor(nameOf, writer)
   const [draft, setDraft] = useState(shown)
@@ -95,6 +106,7 @@ export function Profile({
               save
             </button>
           </form>
+          {inventory !== undefined && <InventoryToggle {...inventory} />}
           <p className="profile-email">{email}</p>
           <button className="not-you" onClick={signOut} type="button">
             Not you? Sign in as someone else

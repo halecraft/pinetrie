@@ -265,6 +265,21 @@ and each item's signals.
   `--page`, the list `--chrome`. The footer (`footer.tsx`) holds
   `.footer-you` (your profile and inventory), the board's strip
   (`BoardStrip`), then `.footer-right` (activity, project, sync note).
+- **Your list folds to icons** (ADR-0088). The width is a value
+  (`ListWidth`, `list-width.ts`): your choice in this tab, else icons on a
+  small window (`shownWidth`, `useSmallWindow`). Folding is an intent,
+  `foldList`, from the control at the list's foot or Ctrl+Shift+L
+  (`keyAct`); `planIntent` asks for the width not shown, and `perform`'s
+  `listWidth` port sets it and saves it. `App` writes it as `data-list` on
+  the root element, and the CSS sets `--side` from that, so the body's
+  grid, the footer's corner and the board follow. Folded, `OpenList` draws
+  each item as `FoldedItem`: `openListView` decides its `ItemIcon` (a
+  sprite from `rootSprites`, else `initialsOf` its label on `rootColor`,
+  else a new tab's hollow tile). The icon is the trigger of a `Menu` opened
+  by `contextmenu` (`Popover`'s `opensOn`), whose click shows the root;
+  the tooltip and the rename field are fixed to the window beside it, since
+  the list clips. The footer's corner then draws only `Profile`, which
+  draws `InventoryToggle` inside it.
 - **`resolveLayout` keeps an archived root you are on** in your list as
   drawn, read-only, until you leave it. `prune`, once after `whenSettled`,
   drops columns of roots the document lacks, and replaces a gone or
@@ -580,15 +595,18 @@ pending.
 `tabState` keeps a value under one key in two slots: the tab's
 (`sessionStorage`), read first, which survives a reload; and the device's
 (`localStorage`), which a new tab starts from. It knows nothing of pine·trie; a
-value's stored form is its codec's. The layout is its one use, under the key
-`pinetrie-columns:<session>`, which predates root tabs.
+value's stored form is its codec's. It keeps the layout, under the key
+`pinetrie-columns:<session>`, which predates root tabs, and your list's width
+(`pinetrie-list`, `list-width.ts`, ADR-0088). The width is saved only when you
+fold or unfold, so until then the default follows the window (`shownWidth`).
 
 The stores are built in `main.tsx`, the one module that touches
 `sessionStorage`, `localStorage` and `window` as it loads, and `App` is
 given them (`AppStores`).
 
 `deviceState` keeps a value in the device's slot only, shared by the device's
-tabs: where the inventory is docked, and who you are (`pinetrie-identity`,
+tabs: where the inventory is docked, how you read a review
+(`pinetrie-review`, ADR-0087), and who you are (`pinetrie-identity`,
 below), which `reconcileName`'s `store` also saves, with the same email, so
 it reloads no tab. What you have dealt with is not here but in your
 attention document, on every device of yours (ADR-0077), which merges; here
@@ -1026,7 +1044,8 @@ change of wording then touches the words function, its one test, and
 `:root` names them: `--page` (the paper the columns and the root you are on
 are drawn on), `--chrome` (your list and the footer), `--edge` (their lines
 and the selected item's sides), `--on` (the selected item's left edge) and
-`--side` (your list's width, which the footer's own cell shares). No
+`--side` (your list's width, which the footer's own cell shares: 15rem,
+11.5rem under 56rem, 3rem under `:root[data-list="icons"]`, ADR-0088). No
 page-colour literal is left in the stylesheet. `--surface` is the colour
 behind a thing, set by context: `--page` by default, `--chrome` in
 `#open-list` and `#bottom`, the hover fill on a hovered item, `--page` on
@@ -1040,18 +1059,32 @@ Each column takes the rail track of its last message (`branchColors`); its
 header, its fork dot in the parent column and its rail track share that
 colour. There are no connector lines, so sibling branches never cross.
 
-- **One inline `--track` per column** (`trackStyle`, `rail.tsx`), on
+- **A root seeds its colours** (`palette.ts`, ADR-0089, S110). Its
+  `RootId`'s hash picks the slot its trunk takes, and track *n* takes
+  `(seed + 7n) mod 12`. The seed of the root you are on, or of the root a
+  new tab minted, is `TrackSeed`, a context `App` provides around the
+  workspace; `useTrackColors()` turns a track into its colour, slot and
+  `--track` style. It changes only with the root, which remounts the
+  columns anyway, so memoised messages are not redrawn for it. Context
+  reaches the narrow pane's dialog through its portal.
+- **One inline `--track` per column** (`useTrackColors().style`), on
   `.column`: the header's border, name and origin dot, the thread's details
   and the pane read `var(--track)` in CSS. A fork dot sets its own, the
   track of the branch it opens, and so does the narrow pane's dialog, which
   is outside the column.
-- **Hover linking is CSS.** Headers and fork dots carry `data-color`, the track
-  modulo the palette; `:has()` rules in `index.html` outline one in
-  `var(--track)` when the other is hovered. No component state. The rules are
-  eight pairs: CSS cannot match two elements' attribute values.
-- **The palette is eight colours**, so tracks eight apart share one. A track
-  is a branch's rank by creation (ADR-0068), so two columns share a colour
-  only then; the rail shows them the same way.
+- **Hover linking is CSS.** Headers and fork dots carry `data-color`, the
+  track's palette slot; `:has()` rules in `index.html` outline one in
+  `var(--track)` when the other is hovered. No component state. CSS cannot
+  match two elements' attribute values, so there is a selector pair per
+  slot, all in one rule, and `palette.test.ts` checks there is one for
+  each. One declaration means a mutation of it reaches whichever slot the
+  browser check's branch lands on.
+- **The palette is twelve colours**, in hue order, so tracks twelve apart in
+  one root share one; the rail shows them the same way. `data-track` stays
+  the track itself, which the browser suite matches between a column, its
+  fork dot and the rail.
+- **A root's colour is its trunk's** (`rootColor`): a folded list's tile
+  (ADR-0088), the rail's trunk and the first column all take it.
 
 ## Layout: columns scroll independently
 
@@ -1569,6 +1602,14 @@ heads a range, which has no description.
 - **Each file's head is `position: sticky` in `.review-diffs`.** Chromium's
   scroll anchoring keeps the view still as sections above it load and
   replace their placeholders.
+- **How you read a review is the device's** (`review-prefs.ts`, ADR-0087):
+  wrapping and the folded file list, a `deviceState` under
+  `pinetrie-review`, the same in every column. `App` provides them as
+  `ReviewPrefsContext`, which only `ReviewPane` reads, so no message list
+  redraws for them. Wrapping is CSS on `.review[data-wrap]`: `pre-wrap`, and
+  a hanging indent of one character, so a continuation clears the `+`/`−`
+  column. A wrapped section may load taller than its placeholder's
+  estimate; scroll anchoring absorbs it, as it does any section.
 - **A 404 for a commit the offer has just left is brief:** the record arrives
   with the new commits, and the review asks for their URLs.
 
@@ -1591,12 +1632,24 @@ offer's review, an ask's, a table from a message, or a stored image.
   per node (`treeOf`, a `WeakMap`), and `App` keeps a column's nodes while
   the index is the same, so a table keeps its identity and `TablePane`,
   memoised, redraws only when the column's messages change.
-- **Two frames, one breakpoint** (`useNarrow`, `NARROW`). Wide, the pane is
-  `section.pane`, `.column`'s child after `.column-thread`. Under
-  `NARROW_REM` (76rem, the 36rem margin plus the 40rem minimum of `.pane`'s
-  `clamp`; `pane.test.ts` reads `index.html` to hold them together), it is
-  `dialog.pane`, modal, portalled to `body`: the top layer covers every
-  stacking context and makes the page inert. Crossing the line remounts it.
+- **The pane's width is the strip's** (ADR-0087, S109). `#strip` is an
+  inline-size container, and `.pane` is
+  `clamp(40rem, 100cqw - 28rem - 1px, 64rem)`: what the strip has beside the
+  thread and `.column`'s right border. Your list and the rail are outside
+  the container, whatever their width. A container applies no layout
+  containment, so the fixed menus inside columns still place against the
+  window (S109). `pane.test.ts` reads `index.html` to hold the numbers to
+  `pane.ts`'s.
+- **Two frames, one breakpoint, measured on the strip** (`narrowStrip`,
+  `useStripNarrow`, `NarrowContext`). Wide, the pane is `section.pane`,
+  `.column`'s child after `.column-thread`. Where the strip is narrower than
+  the thread and 40rem, it is `dialog.pane`, modal, portalled to `body`:
+  the top layer covers every stacking context and makes the page inert.
+  `App` measures `#strip` with a `ResizeObserver`, so folding your list
+  crosses the line as a window resize does; crossing it remounts the pane.
+  A media query could not: it reads the window, and your list's width
+  varies. The strip comes and goes with what the workspace shows, so the
+  hook checks on each render whether it still observes the element there.
 - **Focus goes back to what had it.** The wide frame reads
   `document.activeElement` in render, before `PaneHead`'s layout effect
   takes focus, and gives it back in its layout cleanup, which React runs
@@ -1683,8 +1736,9 @@ pipeline keeps the tree a pure function, testable without a DOM.
   under Renders.
 - **A person's colour** (`presenceColors`): the first three people, in the
   order they first wrote (`writerOrder`, the same in every window), get
-  magenta, white and yellow, far from each other and from the tracks; anyone
-  later, a hue from their writer id at a saturation the tracks don't use. A
+  magenta, white and yellow, far from each other and from the tracks (S110);
+  anyone later, a hue from their writer id (`stringHash`, `palette.ts`) at a
+  saturation the tracks don't use. A
   ring on the rail has a dark gap between it and the dot, so it reads against
   any track.
   Names go through `displayName`, the fallback to an email's part before the
@@ -1976,14 +2030,16 @@ state, never stored.
   Ctrl+Shift+O puts the selected one in the column whose element last held
   focus; Cmd or Ctrl with Z, Shift+Z, or Ctrl+Y undo and redo a move, only
   outside a text box, where the box's own text undo has them; arrows and
-  `hjkl` move through the grid while the panel has focus.
+  `hjkl` move through the grid while the panel has focus. Ctrl+Shift+L
+  folds or unfolds your list (ADR-0088), from anywhere, as I and O.
 - **A move flies** (`use-flight.ts`): `perform` measures the card's element
   before the move (`ports.fly`), and once it is drawn elsewhere that
   element animates from the old box. A take into the inventory while the
   panel is closed opens it briefly.
 - **Selectors for the browser suite:** `.inventory` (the panel),
   `.inventory .slot[data-slot][data-card]` and `.slot-line`, `.inventory
-  .put`, `.inventory .remove`, `#bottom .inventory-toggle`, a card's
+  .put`, `.inventory .remove`, `#bottom .inventory-toggle` (`#profile
+  .inventory-toggle` while your list is folded), a card's
   `.take-into-inventory`, a message's `.take-copy-into-inventory`, and a
   fresh column's `.close-keep`,
   `.close-discard` and `.close-cancel`.
@@ -2075,6 +2131,9 @@ shown by their email's part before the `@`. Each rendered chat carries its
   a blur after Enter or Escape, which would save again, or save a cancel.
   Only Enter and Escape give the item focus back; a blur leaves focus where
   the person put it.
+- **A folded list draws no `⋯` or ×**: its item's menu opens on
+  `contextmenu`, and a check opens it with a right-click. `Popover` leaves
+  ArrowDown to the list there, which moves focus between items.
 - **An item's `⋯` and × are always rendered, hidden with `visibility`**,
   shown while it is hovered or focused, the one you are on too, or (the
   `⋯`) while its menu is open (`Menu`'s wrapper, `.open-more`, gains
@@ -2118,7 +2177,11 @@ shown by their email's part before the `@`. Each rendered chat carries its
   `.retitle-root` and `.move-to` (`.closes` for
   the closed state), a root being renamed is `.open-title-input`, new tabs
   are `.open-new`, and ＋'s buttons are `.add-agent`, `.add-menu` and
-  `.add-conversation`. The board is `#board`: a `.board-column[data-state]`
+  `.add-conversation`. Folded, an item's `.open-root` or `.open-new` holds
+  `.open-icon` (`.open-sprite`, `.open-initials` or `.open-fresh`), its
+  menu ends in `.open-close-item`, its tooltip is `.open-tip` and its
+  rename field sits in `.open-rename`; the fold control is `.list-fold`, and
+  the inventory toggle is `#profile .inventory-toggle`. The board is `#board`: a `.board-column[data-state]`
   per open state and `.board-closed` for the closed one, each item a
   `.board-item[data-root][data-entry]` with `.board-open`, `.board-label`,
   `.reader-trigger` per reader and `.item-menu`; `.closed-search`,

@@ -21,6 +21,7 @@ import {
   chooseFromMenu,
   col,
   launchBrowser,
+  PANE_VIEWPORT,
   readRaw,
 } from "./page.ts"
 
@@ -36,7 +37,9 @@ async function run(check: Checks["check"]): Promise<void> {
         model: { kind: "scripted", script: suiteModel() },
         log: () => {},
       })
-      const pp = await (await browser.newContext()).newPage()
+      const pp = await (
+        await browser.newContext({ viewport: PANE_VIEWPORT })
+      ).newPage()
       await asPerson(pp, "pia@browser.test", "Pia")
       const qp = await (await browser.newContext()).newPage()
       await asPerson(qp, "quinn@browser.test", "Quinn")
@@ -160,40 +163,59 @@ async function run(check: Checks["check"]): Promise<void> {
         const url = pp.url()
         const pane = `${col(0)} > .pane`
         await pp.click(drawn)
-        const beside = await pp
+        // The pane beside the thread: the thread's 28rem, and both inside
+        // the strip. Opening scrolls the pane into view, so a pane too wide
+        // pushes the thread out on the left instead.
+        const measure = () =>
+          pp.evaluate(
+            ([column, panel]) => {
+              const thread = document.querySelector(
+                `${column} > .column-thread`,
+              )
+              const shown = document.querySelector(panel)
+              const s = document
+                .querySelector("#strip")
+                ?.getBoundingClientRect()
+              if (thread === null || shown === null || s === undefined)
+                return null
+              const rem = Number.parseFloat(
+                getComputedStyle(document.documentElement).fontSize,
+              )
+              const t = thread.getBoundingClientRect()
+              const q = shown.getBoundingClientRect()
+              return {
+                thread: Math.round(t.width) === Math.round(28 * rem),
+                right: q.left >= t.right - 1,
+                inside: t.left >= s.left - 0.5 && q.right <= s.right + 0.5,
+                pane: Math.round(q.width),
+              }
+            },
+            [col(0), pane] as const,
+          )
+        const full = await pp
           .waitForSelector(`${pane} .pane-image img[src="/blob/${sha}"]`, {
             timeout: 5_000,
           })
-          .then(
-            () =>
-              pp.evaluate(
-                ([column, panel]) => {
-                  const thread = document.querySelector(
-                    `${column} > .column-thread`,
-                  )
-                  const shown = document.querySelector(panel)
-                  if (thread === null || shown === null) return null
-                  const rem = Number.parseFloat(
-                    getComputedStyle(document.documentElement).fontSize,
-                  )
-                  const t = thread.getBoundingClientRect()
-                  const q = shown.getBoundingClientRect()
-                  return {
-                    thread: Math.round(t.width) === Math.round(28 * rem),
-                    right: q.left >= t.right - 1,
-                  }
-                },
-                [col(0), pane] as const,
-              ),
-            () => null,
+          .then(measure, () => null)
+        // Folded to icons (ADR-0088), the strip widens and the pane with it.
+        await pp.click("#open-list .list-fold")
+        const folded = await pp
+          .waitForFunction(
+            () => document.documentElement.dataset.list === "icons",
+            null,
+            { timeout: 5_000 },
           )
+          .then(measure, () => null)
+        await pp.click("#open-list .list-fold")
         check(
-          "a click on an image opens it beside the thread, which keeps its 28rem, and no new tab",
-          beside?.thread === true &&
-            beside.right &&
+          "a click on an image opens it beside the thread, which keeps its 28rem, inside the strip, and no new tab",
+          [full, folded].every(
+            m => m?.thread === true && m.right && m.inside,
+          ) &&
+            (folded?.pane ?? 0) > (full?.pane ?? 0) &&
             pages.length === 0 &&
             pp.url() === url,
-          `${JSON.stringify(beside)}, ${pages.length} new pages`,
+          `${JSON.stringify({ full, folded })}, ${pages.length} new pages`,
         )
         await pp.click(`${pane} .pane-close`)
         // A person's table, long enough to scroll the pane.

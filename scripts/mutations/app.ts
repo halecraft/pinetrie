@@ -139,8 +139,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a fork dot takes another track's colour",
     file: "packages/client/message.tsx",
-    from: "            style={trackStyle(t)}",
-    to: "            style={trackStyle(t + 1)}",
+    from: "            style={colors.style(t)}",
+    to: "            style={colors.style(t + 1)}",
     suite: "browser",
     scenario: "page",
     expect:
@@ -724,8 +724,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the hover outline is the text colour",
     file: "packages/client/index.html",
-    from: '      #strip:has(.fork-dot[data-color="1"]:hover) .column-head[data-color="1"] { outline: 2px solid var(--track);',
-    to: '      #strip:has(.fork-dot[data-color="1"]:hover) .column-head[data-color="1"] { outline: 2px solid currentColor;',
+    from: "        outline: 2px solid var(--track); outline-offset: 2px; }",
+    to: "        outline: 2px solid currentColor; outline-offset: 2px; }",
     suite: "browser",
     scenario: "page",
     expect:
@@ -805,7 +805,27 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "images",
     expect:
-      "a click on an image opens it beside the thread, which keeps its 28rem, and no new tab",
+      "a click on an image opens it beside the thread, which keeps its 28rem, inside the strip, and no new tab",
+  },
+  {
+    name: "the pane is sized against the window",
+    file: "packages/client/index.html",
+    from: "width: clamp(40rem, 100cqw - 28rem - 1px, 64rem);",
+    to: "width: clamp(40rem, 100vw - 36rem, 64rem);",
+    suite: "browser",
+    scenario: "images",
+    expect:
+      "a click on an image opens it beside the thread, which keeps its 28rem, inside the strip, and no new tab",
+  },
+  {
+    name: "folding the list leaves its width",
+    file: "packages/client/index.html",
+    from: '      :root[data-list="icons"] { --side: 3rem; }',
+    to: "",
+    suite: "browser",
+    scenario: "images",
+    expect:
+      "a click on an image opens it beside the thread, which keeps its 28rem, inside the strip, and no new tab",
   },
   {
     name: "a table's header row scrolls away in the pane",
@@ -820,8 +840,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the pane is never narrow",
     file: "packages/client/use-narrow.ts",
-    from: "const narrow = (): boolean => query().matches",
-    to: "const narrow = (): boolean => false",
+    from: "    const measure = () => setNarrow(narrowStrip(el.clientWidth, remPx()))",
+    to: "    const measure = () => setNarrow(false)",
     suite: "browser",
     scenario: "images",
     expect:

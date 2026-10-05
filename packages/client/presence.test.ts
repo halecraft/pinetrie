@@ -22,3 +22,7 @@ test("presenceColors: the first three people each have their own colour", () => 
   expect(presenceColors([ADA, BEA, CAT])(BEA)).toBe(first[1])
   expect(colorOf(DAN)).toMatch(/^hsl\(/)
 })
+
+test("presenceColors: a later person's colour comes from their id, the same in every window", () => {
+  expect(presenceColors([ADA, BEA, CAT])(DAN)).toBe("hsl(171 45% 62%)")
+})

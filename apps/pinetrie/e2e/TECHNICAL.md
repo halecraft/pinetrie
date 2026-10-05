@@ -166,6 +166,12 @@ They share `checks.ts` (recording a check, and stopping at one),
   (`scripts/mutate.ts`) counts a thrown error as ELSEWHERE. A step a mutant
   can break returns early rather than waiting for what will not come
   (`rename` in `page`).
+- **A page that opens a column's pane is 1440 pixels wide**
+  (`PANE_VIEWPORT`, `browser/page.ts`): `images`' and `tools`' pages. The
+  pane goes beside the thread only where the strip holds the thread and
+  40rem (ADR-0087), and at Playwright's default 1280 your full list leaves
+  the strip short of that, so the pane would cover the page, a dialog
+  outside `${col(0)}` that the checks would not find.
 - **A scenario's paths are one directory deeper than its runner's.**
   `import.meta.dirname` in a scenario is its suite's directory
   (`../../../../packages/pi/fixtures`).

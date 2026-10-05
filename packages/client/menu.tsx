@@ -2,7 +2,7 @@
 // and closing are `Popover`'s (`popover.tsx`).
 
 import { type ReactNode, useId } from "react"
-import { Popover } from "./popover.tsx"
+import { Popover, type TriggerProps } from "./popover.tsx"
 
 /** A menu's items that can take focus, in order. */
 const focusable = (list: HTMLElement | null): HTMLButtonElement[] => [
@@ -49,6 +49,8 @@ export function Menu({
   sections,
   onToggle,
   gone,
+  opensOn,
+  triggerProps,
 }: {
   /** The wrapper's class; `open` is added while the menu is open. */
   className: string
@@ -68,6 +70,9 @@ export function Menu({
   onToggle?: (open: boolean) => void
   /** `Popover`'s: no trigger is drawn, except while the menu is open. */
   gone?: boolean
+  /** `Popover`'s: what opens the menu, and what else its trigger carries. */
+  opensOn?: "click" | "contextmenu"
+  triggerProps?: TriggerProps
 }) {
   return (
     <Popover
@@ -79,10 +84,12 @@ export function Menu({
       // Opened, the first item takes focus.
       onOpen={box => focusable(box)[0]?.focus()}
       onToggle={onToggle}
+      opensOn={opensOn}
       role="menu"
       title={title}
       trigger={trigger}
       triggerClassName={triggerClassName}
+      triggerProps={triggerProps}
     >
       {({ close, headingId }) => (
         <div

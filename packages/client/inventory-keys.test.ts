@@ -29,6 +29,15 @@ const focus = (over: Partial<KeyFocus> = {}): KeyFocus => ({
 const chord = { ctrlKey: true, shiftKey: true }
 
 describe("keyAct", () => {
+  test("Ctrl+Shift+L folds or unfolds your list, in a text box too, and not with Meta or Alt", () => {
+    const fold = { kind: "foldList" }
+    expect(keyAct(key("L", chord), focus())).toEqual(fold)
+    expect(keyAct(key("L", chord), focus({ inText: true }))).toEqual(fold)
+    expect(keyAct(key("L", { ...chord, metaKey: true }), focus())).toBeNull()
+    expect(keyAct(key("L", { ...chord, altKey: true }), focus())).toBeNull()
+    expect(keyAct(key("l", { ctrlKey: true }), focus())).toBeNull()
+  })
+
   test("Ctrl+Shift+I takes the focused card, in a text box too; Ctrl+Shift+O puts the selected one in the last focused column", () => {
     expect(keyAct(key("I", chord), focus({ card: C1, inText: true }))).toEqual({
       kind: "takeIntoInventory",

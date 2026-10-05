@@ -1,27 +1,24 @@
 // client/presence — how people are drawn, you included (ADR-0024).
 //
-// A person's colour is kept apart from the branch palette (`rail.tsx`): a ring
-// or an avatar must never read as a track. The first few people in a session
-// get colours far from each other and from the tracks; the rest, a hue from
-// their writer id.
+// A person's colour is kept apart from the branch palette (`palette.ts`): a
+// ring or an avatar must never read as a track. The first few people in a
+// session get colours far from each other and from the tracks (S110); the
+// rest, a hue from their writer id.
 
 import { type TreeIndex, type WriterId, writersOf } from "@pinetrie/core"
 import { displayName } from "@pinetrie/rules"
+import { stringHash } from "./palette.ts"
 
 /**
- * The first people's colours: magenta, white and yellow, far apart, and apart
- * from the tracks' blues and greens. A ring also has a dark gap between it and
- * the dot (`Rail`), so it reads against a track of any colour.
+ * The first people's colours: magenta, white and yellow, far apart, and
+ * lighter or more saturated than any track (S110). A ring also has a dark gap
+ * between it and the dot (`Rail`), so it reads against a track of any colour.
  */
 const FIRST = ["#ff4fd8", "#ffffff", "#ffe030"]
 
 /** A colour from a writer's id, at a saturation the tracks don't use. */
-function hashed(writer: WriterId): string {
-  let h = 0
-  for (let i = 0; i < writer.length; i += 1)
-    h = (Math.imul(h, 31) + writer.charCodeAt(i)) >>> 0
-  return `hsl(${h % 360} 45% 62%)`
-}
+const hashed = (writer: WriterId): string =>
+  `hsl(${stringHash(writer) % 360} 45% 62%)`
 
 /**
  * Writers in the order they joined: by their first message in the session

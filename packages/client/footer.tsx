@@ -1,6 +1,7 @@
 // client/footer — the page's one row of chrome, along its bottom (ADR-0085).
 // It splits where your list's edge does: below your list, what is yours (you,
-// whose avatar opens your profile, `profile.tsx`, and your inventory); to the
+// whose avatar opens your profile, `profile.tsx`, and your inventory, which
+// moves into your profile while your list is folded, ADR-0088); to the
 // right, what is everyone's: the board's strip (`board.tsx`), then one menu
 // of what needs you (`activity.ts`, ADR-0069, ADR-0077), the publish button
 // (ADR-0090), and "syncing…" while the document is pending. The
@@ -33,11 +34,14 @@ import {
   LEVEL_CLASS,
   type Level,
 } from "./attention.ts"
-import { INVENTORY } from "./card-words.ts"
 import { AGENT_MARK } from "./column-view.ts"
 import type { RunHere } from "./here.ts"
 import type { InboxItem } from "./inbox.ts"
 import type { Intent } from "./intent.ts"
+import {
+  InventoryToggle,
+  type InventoryToggleProps,
+} from "./inventory-toggle.tsx"
 import { Menu, type MenuItem } from "./menu.tsx"
 import { nameFor } from "./presence.tsx"
 import { type Me, Profile } from "./profile.tsx"
@@ -100,6 +104,7 @@ export function Footer({
   onIntent,
   inventory,
   me,
+  folded,
 }: {
   /** The document's status is "pending" (`useDocStatus`). */
   syncing: boolean
@@ -129,12 +134,13 @@ export function Footer({
   /** Where the publish toast's "resolve with the agent" goes. */
   onIntent: (intent: Intent) => void
   /** Your inventory's toggle: whether its panel is open, and its cards. */
-  inventory: {
-    readonly open: boolean
-    readonly count: number
-    readonly onToggle: () => void
-  }
+  inventory: InventoryToggleProps
   me: Me
+  /**
+   * Your list is folded to icons (ADR-0088): the corner, as narrow, holds
+   * only your avatar, and the inventory's toggle is in your profile.
+   */
+  folded: boolean
 }) {
   const thread = threadRow({ index, labelOf, onOpen })
   /** A raised item's rows: its thread, with its reason, and "not needed". */
@@ -186,16 +192,19 @@ export function Footer({
   return (
     <footer id="bottom">
       <div className="footer-you">
-        <Profile {...me} colorOf={colorOf} nameOf={nameOf} />
-        <button
-          aria-pressed={inventory.open}
-          className="inventory-toggle"
-          onClick={inventory.onToggle}
-          title="your inventory: cards you keep for later"
-          type="button"
-        >
-          {INVENTORY} {inventory.count}
-        </button>
+        {folded ? (
+          <Profile
+            {...me}
+            colorOf={colorOf}
+            inventory={inventory}
+            nameOf={nameOf}
+          />
+        ) : (
+          <>
+            <Profile {...me} colorOf={colorOf} nameOf={nameOf} />
+            <InventoryToggle {...inventory} />
+          </>
+        )}
       </div>
       {strip}
       <div className="footer-right">

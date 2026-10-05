@@ -111,12 +111,30 @@ beside it (ADR-0081, turned sideways).
   start, so it is the one behind the menu. What each does is under
   "Starting" below. A board column has its own ＋, which lands the new root
   in that column's state.
+- **Your list folds to icons** (ADR-0088), about 3rem wide, from **«** at
+  its foot or Ctrl+Shift+L; **»** shows its titles again. Which you chose is
+  this browser tab's, and a new tab starts from your latest. Until you
+  choose, a window under 56rem shows icons. Nothing folds it by itself.
+  - **An item's icon** is the sprite of its root's earliest thread that has
+    one (ADR-0053), else two initials on the root's colour, the colour of
+    its trunk (ADR-0089): "Kanban outside click" is **KO**, "Sidebar" is
+    **SI**. A new tab is a hollow tile until its first message.
+  - **Its signals stay on it:** the blue ring round it while the agent
+    works, the amber dot and the fading ✓ on its top-right corner, your
+    dot on its bottom-right. Hovering or focusing it shows its label and
+    who is reading there.
+  - **Its menu** opens with a right-click, Shift+F10 or the Menu key: what
+    `⋯` holds, then **Close**. **Rename** opens the title field beside the
+    icon.
+  - **＋** stands over its ▾.
 
 ### The footer: you, the board, and what needs you (ADR-0069, ADR-0077, ADR-0085)
 
 One row along the bottom. Its own cell, under your list and as wide, is
-yours: your avatar and your inventory. To the right is everyone's, from
-live data only: the board's strip, then what needs you and publish.
+yours: your avatar and your inventory. While your list is folded, the cell
+holds only your avatar, and your inventory's toggle is in your profile. To
+the right is everyone's, from live data only: the board's strip, then what
+needs you and publish.
 While the page syncs, "syncing…" leads its right end.
 
 - **You:** your avatar opens your profile (ADR-0037): your name, and the
@@ -125,7 +143,8 @@ While the page syncs, "syncing…" leads its right end.
   again. A rename is sent on Enter or **save**, and Escape or a click
   elsewhere discards it. A name no mention could reach is refused before it
   is sent.
-- **Your inventory** (below), beside you.
+- **Your inventory** (below), beside you, or in your profile while your list
+  is folded.
 - **The board's strip**: ▦ **Board**, then each workflow state's name and
   count, avatars of the people reading in its roots, and an amber dot when a
   root there needs you. ▦ carries the highest mark of the roots not in your
@@ -382,15 +401,20 @@ tab's; with nothing in your list and nothing you are on, it opens by itself.
 - **A column's pane opens what you read beside the thread** (ADR-0078):
   the offer's review, an ask's review, a table, or an image, one at a time.
   The thread keeps its place and width, and the column widens to hold the
-  pane. Opening something else replaces it; opening it again, the pane's
-  ×, or Escape inside it closes it, and its source in the thread is
-  outlined in the column's colour while it shows. A window too narrow for
-  both (under 76rem) shows the pane over the page instead, with ← to go
-  back to the thread. Nothing in it is kept: a reload closes it.
+  pane, which takes what the strip has beside the thread, from 40rem to
+  64rem (ADR-0087). Opening something else replaces it; opening it again,
+  the pane's ×, or Escape inside it closes it, and its source in the thread
+  is outlined in the column's colour while it shows. A strip too narrow for
+  the thread and 40rem shows the pane over the page instead, with ← to go
+  back to the thread; folding your list can make room for it beside the
+  thread. Nothing in it is kept: a reload closes it.
 - **The offer's line opens its review in the pane** (ADR-0047): a file
   list when there is more than one file, and one scroll of every file's
   diff, each file's head pinned while its diff is in view, with the files
-  that conflict and those you are editing flagged.
+  that conflict and those you are editing flagged. In its head, **↩** wraps
+  long lines, each continuation hanging under its line's text, and **☰**
+  hides the file list, giving the diffs the pane's width (ADR-0087). Both
+  are kept for this device, in every review; lines start unwrapped.
 - On a narrow screen, columns stack as a back-navigable sequence (the macOS
   Finder column view on a phone), with a breadcrumb of fork points.
 
@@ -452,7 +476,10 @@ the tree.
   is a depth, not a turn in one order: a branch starts on the row under its
   fork, beside the messages it diverged from, in the leftmost place free for
   its whole height (ADR-0068). Each branch has its own colour, by when it
-  was made. The tree is centred in the rail.
+  was made, starting from a colour of its root's own (ADR-0089): its trunk
+  takes a colour the root's id picks from twelve, and each later branch
+  steps on round them, so roots don't all start alike, and neighbouring
+  branches are far apart. The tree is centred in the rail.
 - **A new tab has a rail too**: a hollow dot where its first message will be.
   It is as wide as the rail it becomes, so the columns do not move when the
   first message lands.

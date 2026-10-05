@@ -78,6 +78,7 @@ const at = (
   cards,
   rootEntries: new Map([...ROOT_IDS].map(([e, r]) => [r, e] as const)),
   rootIds: ROOT_IDS,
+  listWidth: "full",
 })
 /** A root shown: the root you are on, and in your list, at its end if it was not. */
 const shown = (root: string, id: RootId): Effect[] => [
@@ -692,4 +693,13 @@ test("the column you opened takes focus once; no other column does", () => {
   expect(claimFocus("k", "k")).toEqual({ focus: true, armed: null })
   expect(claimFocus("k", "other")).toEqual({ focus: false, armed: "k" })
   expect(claimFocus(null, "k")).toEqual({ focus: false, armed: null })
+})
+
+test("foldList asks for the width your list does not show", () => {
+  expect(plan({ kind: "foldList" }, { ...R1, listWidth: "full" })).toEqual([
+    { kind: "listWidth", width: "icons" },
+  ])
+  expect(plan({ kind: "foldList" }, { ...R1, listWidth: "icons" })).toEqual([
+    { kind: "listWidth", width: "full" },
+  ])
 })

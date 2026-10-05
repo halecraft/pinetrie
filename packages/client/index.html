@@ -9,10 +9,13 @@
          footer around it (ADR-0081, ADR-0085). --surface is whatever a thing
          sits on, set by its context: a ring that must read as a gap around a
          dot uses it. --side is your list's width, which the footer's own
-         cell shares, so the two split along one line. */
+         cell shares, so the two split along one line; folded to icons, it is
+         3rem (ADR-0088). */
       :root { color-scheme: dark; --page: #14161a; --chrome: #0e1013; --edge: #23272e;
         --on: #c9d1d9; --surface: var(--page); --side: 15rem; }
       @media (width < 56rem) { :root { --side: 11.5rem; } }
+      /* Your list folded to icons (ADR-0088), at any window width. */
+      :root[data-list="icons"] { --side: 3rem; }
       * { box-sizing: border-box; }
       button { padding: .5rem .9rem; border-radius: 6px; border: 0; background: #2f6feb; color: #fff; font: inherit; cursor: pointer; }
       .actions button, .tools button { background: none; border: 1px solid #3a3f48; color: #aaa;
@@ -120,6 +123,46 @@
       .add-root .add-agent { border-radius: 6px 0 0 6px; }
       .add-root .add-menu { border-radius: 0 6px 6px 0; border-left: 0; }
       .add-root button:hover { color: #e6e6e6; background: #1b1e24; }
+      /* The control at the list's foot that folds it, or shows its titles. */
+      .list-fold { margin-top: auto; align-self: flex-start; padding: .2rem .55rem; background: none;
+        color: #6f7784; font-size: .9rem; }
+      .list-fold:hover, .list-fold:focus-visible { color: #e6e6e6; }
+
+      /* Your list folded (ADR-0088): an icon per item, the item's own menu
+         behind a right-click, ＋ over its ▾. The item's wrap, its selected
+         fill and its left edge are the full list's. */
+      :root[data-list="icons"] #open-list { padding-left: .3rem; }
+      .open-icon-menu { position: relative; flex: 1; min-width: 0; display: flex; }
+      .open-icon-menu > .open-root, .open-icon-menu > .open-new { justify-content: center;
+        padding: .35rem 0; }
+      .open-icon { position: relative; flex: 0 0 auto; display: inline-flex; width: 1.75rem;
+        height: 1.75rem; }
+      .open-sprite, .open-initials, .open-fresh { width: 100%; height: 100%; border-radius: 6px; }
+      /* A sprite is drawn on black, which lighten takes out (ADR-0053). */
+      .open-sprite { object-fit: contain; mix-blend-mode: lighten; }
+      .open-initials { display: flex; align-items: center; justify-content: center; color: var(--page);
+        font-size: .68rem; font-weight: 700; font-style: normal; line-height: 1; letter-spacing: .02em; }
+      .open-root.archived .open-initials { opacity: .45; }
+      /* A new tab: hollow, as its rail's dot is, until its first message. */
+      .open-fresh { border: 1.5px dashed #777; }
+      /* Its signals sit on its corners: the working ring round it. */
+      .open-icon .root-status { position: absolute; top: -3px; right: -3px; }
+      .open-icon .root-status.working { inset: -4px; width: auto; height: auto; border-radius: 9px; }
+      .open-icon .root-status.done { top: -.35rem; right: -.2rem; font-size: .6rem; }
+      /* Fixed, as the list scrolls and would clip them (packages/client/TECHNICAL.md, Gotchas). */
+      .open-tip, .open-rename { position: fixed; z-index: 5; }
+      .open-tip { display: flex; flex-direction: column; gap: .25rem; max-width: 20rem;
+        padding: .3rem .55rem; background: #1b1e24; border: 1px solid #3a3f48; border-radius: 6px;
+        color: #e6e6e6; font-size: .8rem; pointer-events: none; }
+      .open-rename { display: flex; width: 16rem; }
+      .add-root.folded { flex-direction: column; align-items: stretch; align-self: center;
+        margin-left: 0; }
+      .add-root.folded .add-more { display: flex; }
+      .add-root.folded .add-menu { flex: 1; }
+      .add-root.folded .add-agent { border-radius: 6px 6px 0 0; }
+      .add-root.folded .add-menu { border-radius: 0 0 6px 6px; border-left: 1px dashed #3a3f48;
+        border-top: 0; padding: 0 .6rem; }
+      :root[data-list="icons"] .list-fold { align-self: center; }
       .connecting, .nothing-here { margin: 1rem; color: #6f7784; }
 
       /* The workspace: the rail (E, everything in this root) beside the columns (paths). */
@@ -158,7 +201,9 @@
          around it. 4 px in the 8 px dot keeps it on whole pixels. */
       .rail-dot > .card-pip { position: absolute; left: 2px; top: 2px; width: 4px; height: 4px;
         box-shadow: none; }
-      #strip { flex: 1; display: flex; overflow-x: auto; min-width: 0; }
+      /* The pane's container: `100cqw` is the strip's width (S109). */
+      #strip { flex: 1; display: flex; overflow-x: auto; min-width: 0;
+        container-type: inline-size; }
 
       /* A column is its thread, and its pane beside it while you have opened
          something there (ADR-0078). The thread is one path, on its own scroll, its
@@ -295,11 +340,12 @@
       .work .offer-note[data-acting="said"] { color: #e8c07a; }
       .work button:disabled { opacity: .5; cursor: progress; }
 
-      /* A column's pane (ADR-0078): beside the thread, or, below 76rem
-         (`NARROW_REM` in pane.ts, which pane.test.ts holds to this width), a
-         modal dialog over the page. One thing at a time: a review, a table or
-         an image, each under one head. */
-      .pane { flex: 0 0 auto; width: clamp(40rem, 100vw - 36rem, 64rem); min-height: 0;
+      /* A column's pane (ADR-0078, ADR-0087): beside the thread, filling what
+         the strip has beside it, or, where the strip can't hold the thread
+         and 40rem (`narrowStrip` in pane.ts, which pane.test.ts holds to these
+         numbers), a modal dialog over the page. One thing at a time: a
+         review, a table or an image, each under one head. */
+      .pane { flex: 0 0 auto; width: clamp(40rem, 100cqw - 28rem - 1px, 64rem); min-height: 0;
         display: flex; flex-direction: column; border-top: 4px solid var(--track, #777);
         border-left: 1px solid #23272e; font-size: .8rem; }
       dialog.pane { width: 100vw; height: 100dvh; max-width: none; max-height: none; margin: 0;
@@ -316,6 +362,10 @@
       .pane-head .pane-close { margin-left: auto; background: none; border: none; color: #8b93a1;
         font-size: 1rem; padding: 0 .25rem; }
       .pane-head .pane-close:hover, .pane-head .pane-close:focus-visible { color: #e6e6e6; }
+      .pane-head .review-pref { background: none; border: 1px solid transparent; border-radius: 4px;
+        color: #8b93a1; padding: 0 .35rem; }
+      .pane-head .review-pref:hover, .pane-head .review-pref:focus-visible { color: #e6e6e6; }
+      .pane-head .review-pref[aria-pressed="true"] { color: #e6e6e6; border-color: #3a3f48; }
       .pane-body { flex: 1; min-height: 0; overflow: auto; }
 
       /* A review (ADR-0047): a file list (for more than one file), and one
@@ -355,6 +405,11 @@
       .review-diff { margin: 0; padding: .3rem 0; overflow-x: auto; white-space: pre;
         font-family: ui-monospace, monospace; font-size: .75rem; line-height: var(--diff-line); }
       .review-diff span { display: block; padding: 0 .75rem; min-width: max-content; }
+      /* Wrapped (ADR-0087): a line's continuation hangs under its text, one
+         character in, clear of its +/− column. */
+      .review[data-wrap] .review-diff { white-space: pre-wrap; overflow-wrap: anywhere; overflow-x: hidden; }
+      .review[data-wrap] .review-diff span { min-width: 0; padding-left: calc(.75rem + 1ch); text-indent: -1ch; }
+      .review[data-list-folded] .review-list { display: none; }
       .review-diff [data-kind="add"] { color: #a8d8a8; background: #1b2a1d; }
       .review-diff [data-kind="del"] { color: #e89a9a; background: #2d1c1e; }
       .review-diff [data-kind="hunk"] { color: #7fa7d8; }
@@ -713,25 +768,36 @@
       }
 
       /* A branch's header and its fork dots share a colour slot; hovering one
-         outlines the other. */
+         outlines the other. CSS can't match two attributes' values, so there
+         is a selector pair per palette slot (`palette.ts`, held by
+         palette.test.ts), all sharing one outline. */
       #strip:has(.column-head[data-color="0"]:hover) .fork-dot[data-color="0"],
-      #strip:has(.fork-dot[data-color="0"]:hover) .column-head[data-color="0"] { outline: 2px solid var(--track); outline-offset: 2px; }
+      #strip:has(.fork-dot[data-color="0"]:hover) .column-head[data-color="0"],
       #strip:has(.column-head[data-color="1"]:hover) .fork-dot[data-color="1"],
-      #strip:has(.fork-dot[data-color="1"]:hover) .column-head[data-color="1"] { outline: 2px solid var(--track); outline-offset: 2px; }
+      #strip:has(.fork-dot[data-color="1"]:hover) .column-head[data-color="1"],
       #strip:has(.column-head[data-color="2"]:hover) .fork-dot[data-color="2"],
-      #strip:has(.fork-dot[data-color="2"]:hover) .column-head[data-color="2"] { outline: 2px solid var(--track); outline-offset: 2px; }
+      #strip:has(.fork-dot[data-color="2"]:hover) .column-head[data-color="2"],
       #strip:has(.column-head[data-color="3"]:hover) .fork-dot[data-color="3"],
-      #strip:has(.fork-dot[data-color="3"]:hover) .column-head[data-color="3"] { outline: 2px solid var(--track); outline-offset: 2px; }
+      #strip:has(.fork-dot[data-color="3"]:hover) .column-head[data-color="3"],
       #strip:has(.column-head[data-color="4"]:hover) .fork-dot[data-color="4"],
-      #strip:has(.fork-dot[data-color="4"]:hover) .column-head[data-color="4"] { outline: 2px solid var(--track); outline-offset: 2px; }
+      #strip:has(.fork-dot[data-color="4"]:hover) .column-head[data-color="4"],
       #strip:has(.column-head[data-color="5"]:hover) .fork-dot[data-color="5"],
-      #strip:has(.fork-dot[data-color="5"]:hover) .column-head[data-color="5"] { outline: 2px solid var(--track); outline-offset: 2px; }
+      #strip:has(.fork-dot[data-color="5"]:hover) .column-head[data-color="5"],
       #strip:has(.column-head[data-color="6"]:hover) .fork-dot[data-color="6"],
-      #strip:has(.fork-dot[data-color="6"]:hover) .column-head[data-color="6"] { outline: 2px solid var(--track); outline-offset: 2px; }
+      #strip:has(.fork-dot[data-color="6"]:hover) .column-head[data-color="6"],
       #strip:has(.column-head[data-color="7"]:hover) .fork-dot[data-color="7"],
-      #strip:has(.fork-dot[data-color="7"]:hover) .column-head[data-color="7"] { outline: 2px solid var(--track); outline-offset: 2px; }
+      #strip:has(.fork-dot[data-color="7"]:hover) .column-head[data-color="7"],
+      #strip:has(.column-head[data-color="8"]:hover) .fork-dot[data-color="8"],
+      #strip:has(.fork-dot[data-color="8"]:hover) .column-head[data-color="8"],
+      #strip:has(.column-head[data-color="9"]:hover) .fork-dot[data-color="9"],
+      #strip:has(.fork-dot[data-color="9"]:hover) .column-head[data-color="9"],
+      #strip:has(.column-head[data-color="10"]:hover) .fork-dot[data-color="10"],
+      #strip:has(.fork-dot[data-color="10"]:hover) .column-head[data-color="10"],
+      #strip:has(.column-head[data-color="11"]:hover) .fork-dot[data-color="11"],
+      #strip:has(.fork-dot[data-color="11"]:hover) .column-head[data-color="11"],
       #strip:has(.column-head[data-color="pending"]:hover) .fork-dot[data-color="pending"],
-      #strip:has(.fork-dot[data-color="pending"]:hover) .column-head[data-color="pending"] { outline: 2px solid var(--track); outline-offset: 2px; }
+      #strip:has(.fork-dot[data-color="pending"]:hover) .column-head[data-color="pending"] {
+        outline: 2px solid var(--track); outline-offset: 2px; }
       /* The footer (ADR-0085): one row of chrome, split where your list's edge
          is. Its own cell, at the list's width, is yours: you and your
          inventory. Then everyone's: the board's strip, what needs you
@@ -875,6 +941,13 @@
       .not-you { align-self: flex-start; background: none; border: 0; padding: 0; color: #8b93a1;
         font: inherit; font-size: .8rem; cursor: pointer; }
       .not-you:hover { color: #d6dce5; text-decoration: underline; }
+
+      /* Your list folded (ADR-0088), after the rules these refine: your pip
+         on an icon's corner, the footer's corner holding only your avatar,
+         and the inventory's toggle in your profile. */
+      .open-icon .card-pip { position: absolute; bottom: -2px; right: -2px; }
+      :root[data-list="icons"] .footer-you { justify-content: center; padding: 0; }
+      .profile .inventory-toggle { align-self: flex-start; margin-top: .5rem; }
     </style>
   </head>
   <body>

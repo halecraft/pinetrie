@@ -10,6 +10,7 @@ import { describe, expect, test } from "vitest"
 import {
   CHAT_LABEL,
   firstLinesOf,
+  initialsOf,
   labelsOf,
   messageCount,
   messageCountTitle,
@@ -128,4 +129,18 @@ test("renameKey: Enter saves, Escape leaves the title as it was; both refocus", 
   expect(renameKey("Enter")).toEqual({ save: true, refocus: true })
   expect(renameKey("Escape")).toEqual({ save: false, refocus: true })
   expect(renameKey("a")).toBe(null)
+})
+
+describe("initialsOf", () => {
+  test.each<[string, string]>([
+    ["Kanban outside click", "KO"],
+    ["Sidebar", "SI"],
+    ["ADR-0048 next steps", "A0"],
+    ["  project menu: jj state", "PM"],
+    ["été à Paris", "ÉÀ"],
+    ["(no text)", "NT"],
+    ["…", ""],
+  ])("%s → %s", (label, letters) => {
+    expect(initialsOf(label)).toBe(letters)
+  })
 })

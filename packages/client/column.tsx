@@ -109,6 +109,7 @@ import type { LiveWork } from "./live.ts"
 import { Menu } from "./menu.tsx"
 import { MessageList } from "./message-list.tsx"
 import { MessageText } from "./message-text.tsx"
+import { useTrackColors } from "./palette-context.ts"
 import {
   askReviewTarget,
   type PaneSubject,
@@ -121,7 +122,6 @@ import { MessageSource, PaneReach, STREAMING } from "./pane-context.ts"
 import { PinnedStrip } from "./pinned-strip.tsx"
 import { Avatars, nameFor } from "./presence.tsx"
 import { type ComposerPlacesStore, dropProps } from "./put-target.ts"
-import { colorSlot, trackStyle } from "./rail.tsx"
 import { keyMove } from "./reorder.ts"
 import type { ScreenMemory } from "./screen-memory.ts"
 import type { ColumnHow, Reader } from "./send.ts"
@@ -148,7 +148,7 @@ export interface ColumnProps {
   count: number
   view: ColumnView
   index: TreeIndex
-  /** This column's colour track: `--track` on the column (`trackStyle`). */
+  /** This column's colour track: `--track` on the column (`useTrackColors`). */
   track: number
   /** Fork dots, by the message they sit on. */
   forks: ReadonlyMap<EntryId, readonly number[]>
@@ -226,6 +226,7 @@ export interface ColumnProps {
 
 export function Column(p: ColumnProps) {
   const { view, index } = p
+  const colors = useTrackColors()
   const body = useRef<HTMLDivElement>(null)
   const content = useRef<HTMLDivElement>(null)
   const spacer = useRef<HTMLDivElement>(null)
@@ -725,11 +726,11 @@ export function Column(p: ColumnProps) {
       data-position={p.position}
       data-pane={pane?.kind}
       data-track={p.track}
-      style={trackStyle(p.track)}
+      style={colors.style(p.track)}
     >
       <PaneReach value={reach}>
         <div className="column-thread">
-          <header className="column-head" data-color={colorSlot(p.track)}>
+          <header className="column-head" data-color={colors.slot(p.track)}>
             <div className="head-row">
               {p.count > 1 && (
                 <button

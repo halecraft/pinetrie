@@ -1,10 +1,14 @@
 import {
+  type BannerRecord,
+  blobUrl,
   type EntryId,
   entryId,
   type LaneName,
+  type LaneView,
   laneNameForThread,
   type MarkRecord,
   rootIdFor,
+  type Sha256,
   type ThreadName,
   type Workflow,
   workflowStateIdFor,
@@ -28,7 +32,9 @@ import {
   offeredByRoot,
   openListView,
   pageTitle,
+  rootSprites,
 } from "./open-list-view.ts"
+import { PENDING_COLOR, rootColor } from "./palette.ts"
 
 const R1: Here = { kind: "root", root: entryId("r1") }
 const R2: Here = { kind: "root", root: entryId("r2") }
@@ -103,6 +109,7 @@ const input = (over: Partial<OpenListViewInput> = {}): OpenListViewInput => ({
     [entryId("r2"), ID(2)],
     [entryId("r3"), ID(3)],
   ]),
+  sprites: new Map(),
   ...over,
 })
 const items = (over: Partial<OpenListViewInput> = {}) =>
@@ -308,5 +315,66 @@ describe("pageTitle", () => {
     [0, "a new tab", t, "new agent · pine·trie"],
   ])("%i needing you, on %s", (count, _, here, words) => {
     expect(pageTitle(count, here ?? null)).toBe(words)
+  })
+})
+
+describe("icons (ADR-0088)", () => {
+  const SHA = "b".repeat(64) as Sha256
+  test("a root with a sprite draws it; one without, its initials on its colour; a new tab, a hollow tile", () => {
+    const [r1, r2, r3, fresh] = items({
+      sprites: new Map([[entryId("r2"), SHA]]),
+      rootIds: new Map([
+        [entryId("r1"), ID(1)],
+        [entryId("r2"), ID(2)],
+      ]),
+    })
+    expect(r1?.icon).toEqual({
+      kind: "initials",
+      letters: "TN",
+      color: rootColor(ID(1)),
+    })
+    expect(r2?.icon).toEqual({ kind: "sprite", src: blobUrl(SHA) })
+    expect(r3?.icon).toEqual({
+      kind: "initials",
+      letters: "NT",
+      color: PENDING_COLOR,
+    })
+    expect(fresh?.icon).toEqual({ kind: "fresh" })
+  })
+})
+
+describe("rootSprites", () => {
+  const lane = (n: number, tip: string): LaneView => ({
+    name: laneNameForThread(`01a0ffd2-0000-7000-8000-00000000000${n}`),
+    tip: entryId(tip),
+    running: false,
+    waiting: 0,
+    askedBy: null,
+    lastWaiting: null,
+    heldBy: null,
+  })
+  const banner = (l: LaneView, c: string): [LaneName, BannerRecord] => [
+    l.name,
+    { lane: l.name, sha: c.repeat(64) as Sha256, at: 1 },
+  ]
+  const index = tree({ r1: null, a: "r1", b: "r1", r2: null, c: "r2" })
+  const [early, late, other] = [lane(1, "a"), lane(2, "b"), lane(3, "c")]
+
+  test("a root takes the banner of its earliest thread with one", () => {
+    const sprites = rootSprites(
+      index,
+      [late, other, early],
+      new Map([banner(late, "2"), banner(early, "1")]),
+    )
+    expect(sprites).toEqual(new Map([[entryId("r1"), "1".repeat(64)]]))
+  })
+
+  test("a thread with no banner gives way to a later one; a lane with no tip has no root", () => {
+    const sprites = rootSprites(
+      index,
+      [early, late, { ...other, tip: null }],
+      new Map([banner(late, "2"), banner(other, "3")]),
+    )
+    expect(sprites).toEqual(new Map([[entryId("r1"), "2".repeat(64)]]))
   })
 })

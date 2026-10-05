@@ -238,6 +238,12 @@ export const asPerson = (p: Page, email: string, name: string) =>
     IDENTITY_KEY,
     JSON.stringify(identityCodec.encode({ email, name })),
   ] as const)
+/**
+ * A page that opens a column's pane: wide enough for your full list, the
+ * rail, the thread and the pane's 40rem beside it (ADR-0087). At the
+ * default 1280, the pane covers the page.
+ */
+export const PANE_VIEWPORT = { width: 1440, height: 720 }
 /** Column `n` of the strip, by position. */
 export const col = (n: number) => `.column[data-position="${n}"]`
 /**

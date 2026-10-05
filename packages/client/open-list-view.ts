@@ -1,22 +1,27 @@
 // client/open-list-view — what your list shows and offers (ADR-0030,
-// ADR-0085), decided. PURE: `OpenList` (`open-list.tsx`) draws it, and each
-// click sends the intent it names.
+// ADR-0085), full or folded to icons (ADR-0088), decided. PURE: `OpenList`
+// (`open-list.tsx`) draws it, and each click sends the intent it names.
 
 import type {
+  BannerRecord,
   EntryId,
   LaneName,
+  LaneView,
   MarkRecord,
   RootId,
+  Sha256,
   ThreadName,
+  TreeIndex,
   Workflow,
   WorkflowStateId,
 } from "@pinetrie/core"
-import { PRODUCT_NAME } from "@pinetrie/core"
+import { blobUrl, PRODUCT_NAME, rootOf } from "@pinetrie/core"
 import type { Moments, Status } from "./attention.ts"
 import type { CardMarks } from "./card-marks.ts"
 import type { Intent } from "./intent.ts"
 import { type Here, type Layout, listOf, sameHere } from "./layout.ts"
-import { NO_TEXT } from "./root-label.ts"
+import { PENDING_COLOR, rootColor } from "./palette.ts"
+import { initialsOf, NO_TEXT } from "./root-label.ts"
 
 /** What a root's ⋯ in your list offers. */
 export type ItemMenuItem =
@@ -40,9 +45,25 @@ export type ItemMenuItem =
       readonly intent: Intent
     }
 
+/**
+ * What an item draws while your list is folded (ADR-0088): the sprite of the
+ * root's earliest thread with one (`rootSprites`), else its initials on its
+ * colour (ADR-0089). A new tab has neither yet: a hollow tile, as its rail
+ * has a hollow dot where its first message will be.
+ */
+export type ItemIcon =
+  | { readonly kind: "sprite"; readonly src: string }
+  | {
+      readonly kind: "initials"
+      readonly letters: string
+      readonly color: string
+    }
+  | { readonly kind: "fresh" }
+
 interface ItemCommon {
   /** What the item says, and what the window's title names (`pageTitle`). */
   readonly label: string
+  readonly icon: ItemIcon
   readonly selected: boolean
   readonly show: Intent
   /** An unsent card of yours is in it (ADR-0048, `cardMarks`). */
@@ -108,6 +129,8 @@ export interface OpenListViewInput {
   readonly stateOf: ReadonlyMap<EntryId, WorkflowStateId>
   /** Each root's id, by root entry. */
   readonly rootIds: ReadonlyMap<EntryId, RootId>
+  /** Each root's sprite, by root entry (`rootSprites`). */
+  readonly sprites: ReadonlyMap<EntryId, Sha256>
 }
 
 export function openListView(input: OpenListViewInput): OpenListView {
@@ -143,16 +166,19 @@ function itemView(here: Here, input: OpenListViewInput): ItemView {
             ? "new agent"
             : "new conversation",
         pip: here.kind === "new" && input.unsent.newTabs.has(here.key),
+        icon: { kind: "fresh" },
       }
     case "root": {
       const { root } = here
       const archived = input.archived.has(root)
       const status = input.status.get(root) ?? null
+      const label = input.labels.get(root) ?? NO_TEXT
       return {
         ...common,
         kind: "root",
         root,
-        label: input.labels.get(root) ?? NO_TEXT,
+        label,
+        icon: iconOf(root, label, input),
         line: input.lines.get(root) ?? NO_TEXT,
         title: input.marks.get(root)?.title ?? null,
         status,
@@ -164,6 +190,45 @@ function itemView(here: Here, input: OpenListViewInput): ItemView {
       }
     }
   }
+}
+
+function iconOf(
+  root: EntryId,
+  label: string,
+  input: OpenListViewInput,
+): ItemIcon {
+  const sprite = input.sprites.get(root)
+  if (sprite !== undefined) return { kind: "sprite", src: blobUrl(sprite) }
+  const id = input.rootIds.get(root)
+  return {
+    kind: "initials",
+    letters: initialsOf(label),
+    color: id === undefined ? PENDING_COLOR : rootColor(id),
+  }
+}
+
+/**
+ * Each root's sprite (ADR-0053): the banner of its earliest thread that has
+ * one. A lane's name is `t-` and a uuidv7, so names sort by creation; a lane
+ * belongs to the root its tip is in, as `rootWork` finds it. A root this tab
+ * does not hold has no tips here, and so no sprite. Pure.
+ */
+export function rootSprites(
+  index: TreeIndex,
+  lanes: readonly LaneView[],
+  banners: ReadonlyMap<LaneName, BannerRecord>,
+): ReadonlyMap<EntryId, Sha256> {
+  const sprites = new Map<EntryId, Sha256>()
+  const byName = [...lanes].sort((a, b) =>
+    a.name < b.name ? -1 : a.name > b.name ? 1 : 0,
+  )
+  for (const lane of byName) {
+    const banner = banners.get(lane.name)
+    if (banner === undefined || lane.tip === null) continue
+    const root = rootOf(index, lane.tip)
+    if (root !== null && !sprites.has(root)) sprites.set(root, banner.sha)
+  }
+  return sprites
 }
 
 function menuOf(

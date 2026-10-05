@@ -15,9 +15,9 @@ import {
 import { createPortal } from "react-dom"
 import { BlobImage } from "./blob-image.tsx"
 import { drawTree } from "./message-text.tsx"
+import { useTrackColors } from "./palette-context.ts"
 import { OPEN_IN_TAB, type PaneView, paneLabel } from "./pane.ts"
 import { PaneHead } from "./pane-head.tsx"
-import { trackStyle } from "./rail.tsx"
 import { ReviewPane } from "./review-pane.tsx"
 import { useNarrow } from "./use-narrow.ts"
 
@@ -132,6 +132,7 @@ function NarrowFrame({
   track,
   children,
 }: FrameProps & { track: number }) {
+  const colors = useTrackColors()
   const dialog = useRef<HTMLDialogElement>(null)
   useLayoutEffect(() => {
     const el = dialog.current
@@ -154,7 +155,7 @@ function NarrowFrame({
         if (el.isConnected && !el.open) close()
       }}
       ref={dialog}
-      style={trackStyle(track)}
+      style={colors.style(track)}
     >
       {children}
     </dialog>,

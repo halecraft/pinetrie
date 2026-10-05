@@ -27,9 +27,9 @@ import {
   showsText,
 } from "./message-tools.ts"
 import { speakerLabel, withContributors } from "./names.ts"
+import { useTrackColors } from "./palette-context.ts"
 import { MessageSource } from "./pane-context.ts"
 import { nameFor } from "./presence.tsx"
-import { colorSlot, trackStyle } from "./rail.tsx"
 import type { ScreenMemory } from "./screen-memory.ts"
 import {
   CALL_MARK,
@@ -55,6 +55,7 @@ const ROLE_LABEL: Readonly<Record<string, string>> = {
 
 function MessageView(p: MessageProps) {
   const { node } = p
+  const colors = useTrackColors()
   const speaker =
     node.role === "chat"
       ? withContributors(
@@ -109,7 +110,7 @@ function MessageView(p: MessageProps) {
           <button
             aria-label="show the branch that forks here"
             className="fork-dot"
-            data-color={colorSlot(t)}
+            data-color={colors.slot(t)}
             data-track={t}
             key={t}
             onClick={e =>
@@ -118,7 +119,7 @@ function MessageView(p: MessageProps) {
                 ?.querySelector(`.column[data-track="${t}"]`)
                 ?.scrollIntoView({ block: "nearest", inline: "nearest" })
             }
-            style={trackStyle(t)}
+            style={colors.style(t)}
             type="button"
           />
         ))}

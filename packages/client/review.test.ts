@@ -8,7 +8,14 @@ import {
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import type { ReviewTarget } from "./column-view.ts"
-import { diffLines, type Loaded, reviewView, sectionState } from "./review.ts"
+import {
+  diffLines,
+  type Loaded,
+  type ReviewPref,
+  reviewPrefWords,
+  reviewView,
+  sectionState,
+} from "./review.ts"
 
 const LANE = laneNameForThread("1")
 const C1 = commitId("c1")
@@ -162,4 +169,15 @@ test("diffLines: headers, hunks, added, removed, context, and no newline", () =>
     ),
   ).toEqual(["meta", "meta", "meta"])
   expect(diffLines("")).toEqual([])
+})
+
+describe("reviewPrefWords", () => {
+  test.each<[ReviewPref, boolean, string, string]>([
+    ["wrap", false, "↩", "wrap long lines"],
+    ["wrap", true, "↩", "stop wrapping long lines"],
+    ["listFolded", false, "☰", "hide the file list"],
+    ["listFolded", true, "☰", "show the file list"],
+  ])("%s, on %s", (pref, on, glyph, label) => {
+    expect(reviewPrefWords(pref, on)).toEqual({ glyph, label })
+  })
 })

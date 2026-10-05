@@ -404,8 +404,9 @@ offer's review, an ask's, a table or a stored image. Every table in a
 message has a bar whose ⤢ opens it there, scrolling both ways under its
 pinned header row; a click on an image opens it there instead of over the
 page. A subject is a name, never data (`paneView` decides what it draws and
-when it is gone), and nothing about it is stored. Under 76rem the pane is
-a modal dialog over the page, the first piece of the narrow layout.
+when it is gone), and nothing about it is stored. Where the strip can't hold the thread
+beside the pane at 40rem (ADR-0087), the pane is a modal dialog over the
+page, the first piece of the narrow layout.
 
 **ADR-0079 — a catch-up joins each integrated-offer commit the lane holds to
 its source** (built). A thread whose work you integrated conflicted when it
@@ -481,6 +482,27 @@ file first, or refuses to start. The project is a host option apart from
 tools, so pi loads the project's settings with tools off too. As it starts,
 the host prints the store it opened, the user config it read (or why it could
 not), and where its model came from.
+
+**ADR-0087 — a column's pane fills the strip's free width** (built). The pane
+was sized against the window, so once your list took the left edge it ran
+about 15rem past the strip. `#strip` is now a size container and the pane
+`clamp(40rem, 100cqw - 28rem - 1px, 64rem)` (S109); whether it covers the
+page is measured on the strip (`narrowStrip`), so folding your list can
+bring it back beside the thread. A review wraps long lines and folds its
+file list on request, both kept per device.
+
+**ADR-0088 — your list folds to icons** (built). About 3rem wide, from «
+at its foot or Ctrl+Shift+L, kept per browser tab, and icons by default
+under 56rem. An item is its root's earliest sprite, else two initials on
+the root's colour; its signals stay on the icon, and its menu opens on a
+right-click. Folded, the footer's corner is your avatar alone, with the
+inventory in your profile.
+
+**ADR-0089 — each root seeds its colours** (built). Twelve track colours
+(S110) at one lightness and chroma, kept off the attention amber, people's
+colours and the review's lines. A root's id picks its trunk's slot and each
+later branch steps on by 7, so roots don't all start blue, and a root's
+colour (its trunk's) links its tile in your list to its rail and columns.
 
 **ADR-0090 — one publish button** (built). The project menu showed three
 refs and offered one action per move between them; "1 new commit in the

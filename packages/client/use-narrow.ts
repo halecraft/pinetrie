@@ -1,23 +1,51 @@
-// client/use-narrow — whether the window is too narrow for the pane beside
-// the thread (`NARROW`, ADR-0078).
+// client/use-narrow — whether the strip is too narrow for the pane beside
+// the thread (`narrowStrip`, ADR-0087). `App` measures the strip and
+// provides the answer; a pane reads it.
 
-import { useSyncExternalStore } from "react"
-import { NARROW } from "./pane.ts"
+import {
+  createContext,
+  type RefObject,
+  useContext,
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+} from "react"
+import { narrowStrip } from "./pane.ts"
 
-let list: MediaQueryList | null = null
-/** One list for the page, made when a pane first asks. */
-const query = (): MediaQueryList => {
-  list ??= window.matchMedia(NARROW)
-  return list
+/** Whether the pane covers the page. False until the strip is measured. */
+export const NarrowContext = createContext(false)
+
+/** What `App` provides as `NarrowContext`. */
+export const useNarrow = (): boolean => useContext(NarrowContext)
+
+const remPx = (): number =>
+  Number.parseFloat(getComputedStyle(document.documentElement).fontSize)
+
+/**
+ * Whether the strip in `strip` is too narrow, kept as it resizes: your list
+ * folding or unfolding, or the window. The strip comes and goes with what
+ * the workspace shows, so each render checks whether it is still the element
+ * observed. State changes only when the answer does.
+ */
+export function useStripNarrow(strip: RefObject<HTMLElement | null>): boolean {
+  const [narrow, setNarrow] = useState(false)
+  const observed = useRef<{
+    readonly el: HTMLElement
+    readonly observer: ResizeObserver
+  } | null>(null)
+  useLayoutEffect(() => {
+    const el = strip.current
+    if (el === (observed.current?.el ?? null)) return
+    observed.current?.observer.disconnect()
+    observed.current = null
+    if (el === null) return
+    const measure = () => setNarrow(narrowStrip(el.clientWidth, remPx()))
+    measure()
+    const observer = new ResizeObserver(measure)
+    observer.observe(el)
+    observed.current = { el, observer }
+  })
+  useEffect(() => () => observed.current?.observer.disconnect(), [])
+  return narrow
 }
-
-const subscribe = (change: () => void): (() => void) => {
-  const at = query()
-  at.addEventListener("change", change)
-  return () => at.removeEventListener("change", change)
-}
-
-const narrow = (): boolean => query().matches
-
-/** Whether the pane covers the page, kept as the window crosses `NARROW`. */
-export const useNarrow = (): boolean => useSyncExternalStore(subscribe, narrow)

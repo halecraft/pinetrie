@@ -197,3 +197,25 @@ export function diffLines(text: string): readonly DiffLine[] {
     return { kind: "same", text: line }
   })
 }
+
+/** A review head's toggle (ADR-0087): wrapping long lines, or the file list. */
+export type ReviewPref = "wrap" | "listFolded"
+
+/** A review toggle's glyph and label, by what it does from `on`. */
+export function reviewPrefWords(
+  pref: ReviewPref,
+  on: boolean,
+): { readonly glyph: string; readonly label: string } {
+  switch (pref) {
+    case "wrap":
+      return {
+        glyph: "↩",
+        label: on ? "stop wrapping long lines" : "wrap long lines",
+      }
+    case "listFolded":
+      return {
+        glyph: "☰",
+        label: on ? "show the file list" : "hide the file list",
+      }
+  }
+}

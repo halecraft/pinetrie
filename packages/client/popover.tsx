@@ -14,6 +14,7 @@
 // (`gone`) stays while its box is open, and leaves when the person closes it.
 
 import {
+  type ButtonHTMLAttributes,
   type ReactNode,
   useEffect,
   useId,
@@ -27,6 +28,14 @@ export interface PopoverApi {
   readonly close: (refocus: boolean) => void
   /** The heading's id, for whatever the heading names; none without one. */
   readonly headingId: string | undefined
+}
+
+/**
+ * What else the trigger carries, when it is more than a menu's button: a
+ * folded list's icon (ADR-0088) shows its root on a click and is dragged.
+ */
+export type TriggerProps = ButtonHTMLAttributes<HTMLButtonElement> & {
+  readonly [data: `data-${string}`]: string | undefined
 }
 
 /** Where the box goes: from its trigger's foot or top, and its left or right edge. */
@@ -46,6 +55,8 @@ export function Popover({
   onOpen,
   onToggle,
   gone = false,
+  opensOn = "click",
+  triggerProps = {},
   children,
 }: {
   /** The wrapper's class; `open` is added while the box is open. */
@@ -75,6 +86,13 @@ export function Popover({
    * box is open, which stays until the person closes it.
    */
   gone?: boolean
+  /**
+   * What opens the box: a click, or a `contextmenu` event (a right-click,
+   * Shift+F10 or the Menu key), leaving the click to `triggerProps`. With
+   * `contextmenu`, ArrowDown is left to the trigger's list too.
+   */
+  opensOn?: "click" | "contextmenu"
+  triggerProps?: TriggerProps
   children: (api: PopoverApi) => ReactNode
 }) {
   // Below its trigger; above it when the trigger is in the window's lower
@@ -192,17 +210,35 @@ export function Popover({
   return (
     <span className={open ? `${className} open` : className} ref={wrapper}>
       <button
+        {...triggerProps}
         aria-controls={open ? boxId : undefined}
         aria-expanded={open}
         aria-haspopup={role}
         aria-label={label}
         className={triggerClassName}
-        onClick={() => (open ? close(false) : show())}
-        onKeyDown={e => {
-          if (e.key !== "ArrowDown" || open) return
-          e.preventDefault()
-          show()
-        }}
+        onClick={
+          opensOn === "click"
+            ? () => (open ? close(false) : show())
+            : triggerProps.onClick
+        }
+        onContextMenu={
+          opensOn === "contextmenu"
+            ? e => {
+                e.preventDefault()
+                if (open) close(false)
+                else show()
+              }
+            : triggerProps.onContextMenu
+        }
+        onKeyDown={
+          opensOn === "click"
+            ? e => {
+                if (e.key !== "ArrowDown" || open) return
+                e.preventDefault()
+                show()
+              }
+            : triggerProps.onKeyDown
+        }
         ref={button}
         title={title}
         type="button"

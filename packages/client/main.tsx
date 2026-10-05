@@ -12,6 +12,8 @@ import { IDENTITY_KEY, type Identity, identityCodec } from "./identity.ts"
 import { askIdentity } from "./identity-form.tsx"
 import { DOCK_KEY, type Dock, dockCodec } from "./inventory-dock.ts"
 import { decodeLayout, encodeLayout } from "./layout.ts"
+import { LIST_KEY, listWidthCodec } from "./list-width.ts"
+import { REVIEW_PREFS_KEY, reviewPrefsCodec } from "./review-prefs.ts"
 import { deviceState, tabState } from "./tab-state.ts"
 
 const stores: AppStores = {
@@ -44,6 +46,23 @@ const stores: AppStores = {
   dock: deviceState<Dock>({
     key: DOCK_KEY,
     codec: dockCodec,
+    device: localStorage,
+    events: window,
+  }),
+  /**
+   * Your list full or folded to icons (ADR-0088): this browser tab's choice,
+   * or on a new one the device's latest.
+   */
+  list: tabState({
+    key: LIST_KEY,
+    codec: listWidthCodec,
+    tab: sessionStorage,
+    device: localStorage,
+  }),
+  /** How you read a review: wrapped, its file list folded (ADR-0087). */
+  review: deviceState({
+    key: REVIEW_PREFS_KEY,
+    codec: reviewPrefsCodec,
     device: localStorage,
     events: window,
   }),

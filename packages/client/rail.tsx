@@ -3,8 +3,10 @@
 // A dot per message, a capsule per stretch of uneventful messages, and a line
 // per parent link, drawn from `compactRail`. A long ask is a dot and a
 // capsule of its own (ADR-0056). The rail is E (everything in this
-// root); the lit column is T (what the agent reads). Colours come from one palette indexed by track, which the column
-// headers and fork dots share, so a branch looks the same everywhere.
+// root); the lit column is T (what the agent reads). A track's colour comes
+// from the palette, seeded by the root (`useTrackColors`, ADR-0089), and the
+// column headers and fork dots take the same, so a branch looks the same
+// everywhere.
 
 import {
   type AgentRun,
@@ -13,7 +15,6 @@ import {
   type DigestBody,
   type EntryId,
   messageAt,
-  PENDING_TRACK,
   type RailItem,
   type RailRow,
   type RailStretch,
@@ -24,7 +25,6 @@ import {
 import type { SessionClient } from "@pinetrie/session"
 import {
   type ComponentProps,
-  type CSSProperties,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -33,6 +33,7 @@ import {
 } from "react"
 import { askWords, workWords } from "./ask-words.ts"
 import { CardPip } from "./card-pip.tsx"
+import { useTrackColors } from "./palette-context.ts"
 import { nameFor } from "./presence.tsx"
 import {
   pickAt,
@@ -46,36 +47,6 @@ import {
 } from "./rail-view.ts"
 import { useReadingAt } from "./use-presence.ts"
 import { railScroll, type ViewportStore } from "./viewport.ts"
-
-const PALETTE = [
-  "#9ecbff",
-  "#7bd88f",
-  "#e0c080",
-  "#f28b82",
-  "#c792ea",
-  "#80cbc4",
-  "#ffab70",
-  "#b2ccd6",
-]
-
-/**
- * A track's colour slot: its palette index, or "pending" for a fresh branch.
- * Elements carry it as `data-color`, so CSS can link a column header with its
- * fork dots on hover without any component state.
- */
-export const colorSlot = (track: number): string =>
-  track === PENDING_TRACK ? "pending" : String(track % PALETTE.length)
-
-/** A track's colour. A fresh branch, which has no track yet, is grey. */
-export const trackColor = (track: number): string =>
-  track === PENDING_TRACK ? "#777" : (PALETTE[track % PALETTE.length] ?? "#777")
-
-/**
- * A track's colour as `--track`, the one inline style of a track-coloured
- * element in a column: its CSS reads `var(--track)` for every colour it takes.
- */
-export const trackStyle = (track: number): CSSProperties =>
-  ({ "--track": trackColor(track) }) as CSSProperties
 
 const ROW = 16
 const GAP = 12
@@ -121,6 +92,7 @@ export function Rail({
   /** Each mounted column's view, outlined (ADR-0058); none, no outlines. */
   viewports?: ViewportStore
 }) {
+  const colors = useTrackColors()
   // Every message, a stretch's included, to the item that draws it.
   const itemOf = new Map(items.flatMap(it => it.ids.map(id => [id, it])))
   const places = items.reduce((n, it) => Math.max(n, it.across + 1), 1)
@@ -150,7 +122,7 @@ export function Rail({
                 d={d}
                 fill="none"
                 key={`e-${it.ids[0]}`}
-                stroke={trackColor(it.track)}
+                stroke={colors.color(it.track)}
                 strokeWidth={2}
               />
             )
@@ -235,11 +207,12 @@ function RailViewport({
   store: ViewportStore
 }) {
   const views = useSyncExternalStore(store.subscribe, store.get)
+  const colors = useTrackColors()
   const drawn = [...views.columns].map(
     ([key, v]) =>
       ({
         key,
-        color: trackColor(v.track),
+        color: colors.color(v.track),
         ...railView(itemOf, v.ids, v.first, v.last),
       }) as const,
   )
@@ -437,6 +410,7 @@ function Dot(p: {
   people: readonly { name: string; color: string }[]
   onPick: (id: EntryId) => void
 }) {
+  const colors = useTrackColors()
   const [first] = p.people
   const here =
     p.people.length === 0
@@ -459,7 +433,7 @@ function Dot(p: {
       style={{
         left: x(p.across) - DOT,
         top: y(p.slot) - DOT,
-        background: trackColor(p.track),
+        background: colors.color(p.track),
         // Someone else is reading this thread: a ring in their colour, with a
         // dark gap so it reads against any track's colour. The dot is 8 px,
         // so the rail marks and the column header names.
@@ -507,7 +481,7 @@ function Capsule(p: {
   onPick: (id: EntryId) => void
 }) {
   const { stretch } = p
-  const color = trackColor(stretch.track)
+  const color = useTrackColors().color(stretch.track)
   const fill = stretchFill(stretch.stats)
   return (
     <button

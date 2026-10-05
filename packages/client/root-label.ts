@@ -130,3 +130,18 @@ export function renameKey(
   if (key === "Escape") return { save: false, refocus: true }
   return null
 }
+
+/**
+ * What a folded list draws for a root without a sprite (ADR-0088): the first
+ * letters of the label's first two words, or a one-word label's first two
+ * letters, in capitals. A word is a run of letters and digits.
+ */
+export function initialsOf(label: string): string {
+  const words = label.match(/[\p{L}\p{N}]+/gu) ?? []
+  const [first = "", second] = words
+  const letters =
+    second === undefined
+      ? Array.from(first).slice(0, 2)
+      : [Array.from(first)[0] ?? "", Array.from(second)[0] ?? ""]
+  return letters.join("").toLocaleUpperCase()
+}

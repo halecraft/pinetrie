@@ -65,6 +65,7 @@ import {
   type LayoutAction,
   planOpen,
 } from "./layout.ts"
+import { type ListWidth, otherWidth } from "./list-width.ts"
 import type { MessageAct } from "./message-tools.ts"
 import type { ComposerPlaces, PutTarget } from "./put-target.ts"
 
@@ -202,6 +203,8 @@ export type Intent =
   | { readonly kind: "editWorkflow"; readonly edit: WorkflowEdit }
   /** Open or close the board. */
   | { readonly kind: "board"; readonly open: boolean }
+  /** Fold your list to icons, or unfold it (ADR-0088). */
+  | { readonly kind: "foldList" }
   | {
       readonly kind: "rename"
       readonly root: EntryId
@@ -247,6 +250,8 @@ export type Intent =
 
 export type Effect =
   | { readonly kind: "layout"; readonly action: LayoutAction }
+  /** Show your list at `width`, and keep that choice for this tab. */
+  | { readonly kind: "listWidth"; readonly width: ListWidth }
   /** Mark what `lane` raised "not needed", in your attention document. */
   | {
       readonly kind: "notNeeded"
@@ -367,6 +372,8 @@ export interface IntentState {
   readonly rootEntries: ReadonlyMap<RootId, EntryId>
   /** Each root's id, by its root entry: your list's key. */
   readonly rootIds: ReadonlyMap<EntryId, RootId>
+  /** What your list shows now (`shownWidth`). */
+  readonly listWidth: ListWidth
 }
 
 /** What the card intents decide from (ADR-0048 step 4). */
@@ -487,6 +494,8 @@ export function planIntent(
       ]
     case "board":
       return [layout({ kind: "board", open: intent.open })]
+    case "foldList":
+      return [{ kind: "listWidth", width: otherWidth(state.listWidth) }]
     case "rename":
       return [{ kind: "mark", root: intent.root, title: intent.title }]
     case "retitle":

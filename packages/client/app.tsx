@@ -92,8 +92,16 @@ import {
   layoutReducer,
   resolveLayout,
 } from "./layout.ts"
+import { type ListWidth, shownWidth } from "./list-width.ts"
 import { OpenList } from "./open-list.tsx"
-import { offeredByRoot, openListView, pageTitle } from "./open-list-view.ts"
+import {
+  offeredByRoot,
+  openListView,
+  pageTitle,
+  rootSprites,
+} from "./open-list-view.ts"
+import { rootSeed } from "./palette.ts"
+import { TrackSeed } from "./palette-context.ts"
 import { type AppPorts, perform } from "./perform.ts"
 import { nameFor, presenceColors, writerOrder } from "./presence.tsx"
 import { planReading, type TypedLast, typingDue } from "./presence-report.ts"
@@ -106,6 +114,11 @@ import {
 } from "./put-target.ts"
 import { EmptyRail, LiveRail } from "./rail.tsx"
 import { columnLandmarks } from "./rail-view.ts"
+import {
+  NO_PREFS,
+  type ReviewPrefs,
+  ReviewPrefsContext,
+} from "./review-prefs.ts"
 import {
   firstLinesOf,
   labelsOf,
@@ -123,8 +136,10 @@ import { useFilledCards } from "./use-filled-cards.ts"
 import { FLIGHT_MS, useFlight } from "./use-flight.ts"
 import { PLACED } from "./use-follow.ts"
 import { useInbox } from "./use-inbox.ts"
+import { NarrowContext, useStripNarrow } from "./use-narrow.ts"
 import { useReveal } from "./use-reveal.ts"
 import { useRootDrag } from "./use-root-drag.ts"
+import { useSmallWindow } from "./use-small-window.ts"
 import { useStable } from "./use-stable.ts"
 import {
   placeAt,
@@ -140,6 +155,10 @@ export interface AppStores {
   readonly identity: DeviceState<Identity>
   /** Where the inventory panel is docked, on this device (ADR-0048). */
   readonly dock: DeviceState<Dock>
+  /** How you read a review, on this device (ADR-0087). */
+  readonly review: DeviceState<ReviewPrefs>
+  /** Your list full or folded to icons, chosen in this tab (ADR-0088). */
+  readonly list: TabState<ListWidth>
 }
 
 /** How long a card's drag held over a root in your list opens it. */
@@ -517,6 +536,14 @@ export function App({
   const hereId =
     active?.kind === "root" ? (rootIds.get(active.root) ?? null) : null
   useEffect(() => session.openList.here(hereId), [session, hereId])
+  // The root whose colours the workspace draws in (ADR-0089): the root you
+  // are on, or the root a new tab will start, whose id it minted as it opened.
+  const seedRoot =
+    hereId ??
+    (active?.kind === "new"
+      ? (layout.newTabs.find(c => c.key === active.key)?.fresh?.root ?? null)
+      : null)
+  const seed = seedRoot === null ? 0 : rootSeed(seedRoot)
   const order = useMemo(
     () => writerOrder(index, nameOf.keys()),
     [index, nameOf],
@@ -670,6 +697,10 @@ export function App({
     settled,
   })
   const needsYou = needsYouCount(attention.items) + inbox.unseen
+  const sprites = useMemo(
+    () => rootSprites(index, lanes, workFacts.banners),
+    [index, lanes, workFacts.banners],
+  )
   const listView =
     active === null
       ? null
@@ -688,6 +719,7 @@ export function App({
           workflow,
           stateOf,
           rootIds,
+          sprites,
         })
   const title = pageTitle(needsYou, listView?.selected ?? null)
   // The closed state's search and "mine": never stored.
@@ -729,6 +761,7 @@ export function App({
   }, [title])
 
   const strip = useRef<HTMLDivElement>(null)
+  const narrow = useStripNarrow(strip)
 
   // Align each column once, when it appears. A column of another tab is
   // unmounted, so it is aligned again when its tab is shown. Columns are
@@ -811,6 +844,26 @@ export function App({
   openNow.current = inventoryOpen
   const [dock, setDock] = useState<Dock>(() => stores.dock.load() ?? "centre")
   useEffect(() => stores.dock.subscribe(d => setDock(d ?? "centre")), [stores])
+  // Your list's width: your choice in this tab, else by the window's size.
+  const [chosenWidth, setChosenWidth] = useState(() => stores.list.load())
+  const listWidth = shownWidth(chosenWidth, useSmallWindow())
+  useEffect(() => {
+    document.documentElement.dataset.list = listWidth
+  }, [listWidth])
+  const [reviewPrefs, setReviewPrefs] = useState<ReviewPrefs>(
+    () => stores.review.load() ?? NO_PREFS,
+  )
+  useEffect(
+    () => stores.review.subscribe(p => setReviewPrefs(p ?? NO_PREFS)),
+    [stores],
+  )
+  const saveReviewPrefs = useStable((p: ReviewPrefs) =>
+    setReviewPrefs(stores.review.save(p)),
+  )
+  const reviewReach = useMemo(
+    () => ({ prefs: reviewPrefs, setPrefs: saveReviewPrefs }),
+    [reviewPrefs, saveReviewPrefs],
+  )
   const fly = useFlight()
   // Each column's composer place (`composerPlace`), which a put lands in.
   const [composers] = useState(() => composerPlacesStore())
@@ -838,6 +891,10 @@ export function App({
     },
     identity: stores.identity,
     reload: () => location.reload(),
+    listWidth: width => {
+      setChosenWidth(width)
+      stores.list.save(width)
+    },
     inventory: {
       // A take into the inventory while the panel is closed shows it for the
       // card's flight.
@@ -873,6 +930,7 @@ export function App({
           },
           rootEntries,
           rootIds,
+          listWidth,
         },
         crypto.randomUUID(),
         newRootId(),
@@ -1081,6 +1139,7 @@ export function App({
           order={order}
           session={session}
           view={listView}
+          width={listWidth}
         />
       ) : (
         <nav aria-label="your threads" id="open-list" />
@@ -1102,81 +1161,92 @@ export function App({
         />
       )}
       <main id="workspace">
-        {listView === null || workspace.kind === "connecting" ? (
-          <p className="connecting">connecting…</p>
-        ) : workspace.kind === "nothing" ? (
-          <p className="nothing-here">
-            Open a thread from the board, or start one with ＋.
-          </p>
-        ) : (
-          <>
-            {workspace.kind === "root" ? (
-              <LiveRail
-                activity={activity}
-                asks={asks}
-                digests={digests}
-                revisions={workFacts.revisions}
-                colorOf={colorOf}
-                ends={ends}
-                index={index}
-                names={nameOf}
-                onPick={openAt}
-                open={shown}
-                rows={rail}
-                session={session}
-                viewports={viewports}
-                yours={yours}
-              />
-            ) : (
-              <EmptyRail />
-            )}
-            {/* A column's header is its drag handle; its grip is the
+        {/* What the workspace's columns draw by (ADR-0087, ADR-0089): the
+            root's colours, whether the pane covers the page, how you read a
+            review. Each changes rarely, and only its readers redraw. */}
+        <TrackSeed value={seed}>
+          <NarrowContext value={narrow}>
+            <ReviewPrefsContext value={reviewReach}>
+              {listView === null || workspace.kind === "connecting" ? (
+                <p className="connecting">connecting…</p>
+              ) : workspace.kind === "nothing" ? (
+                <p className="nothing-here">
+                  Open a thread from the board, or start one with ＋.
+                </p>
+              ) : (
+                <>
+                  {workspace.kind === "root" ? (
+                    <LiveRail
+                      activity={activity}
+                      asks={asks}
+                      digests={digests}
+                      revisions={workFacts.revisions}
+                      colorOf={colorOf}
+                      ends={ends}
+                      index={index}
+                      names={nameOf}
+                      onPick={openAt}
+                      open={shown}
+                      rows={rail}
+                      session={session}
+                      viewports={viewports}
+                      yours={yours}
+                    />
+                  ) : (
+                    <EmptyRail />
+                  )}
+                  {/* A column's header is its drag handle; its grip is the
                   keyboard's way to move it. */}
-            <div id="strip" onPointerDown={dragColumn} ref={strip}>
-              {workspace.slots.map(slot => {
-                const column = columns[slot.position]
-                const columnView = views[slot.position]
-                if (column === undefined || columnView === undefined)
-                  return null
-                return (
-                  <Column
-                    {...shared}
-                    closable={slot.closable}
-                    column={column}
-                    count={workspace.slots.length}
-                    landmarks={landmarks}
-                    seenEnd={seenEnds}
-                    forks={colors.forks}
-                    key={slot.key}
-                    onIntent={onIntent}
-                    onTyping={card => typing(columnView.tipId, card)}
-                    path={paths[slot.position] ?? new Set()}
-                    position={slot.position}
-                    readOnly={
-                      workspace.kind === "root" ? workspace.readOnly : null
-                    }
-                    shown={shown}
-                    track={slot.track}
-                    view={columnView}
-                  />
-                )
-              })}
-            </div>
-          </>
-        )}
-        {layout.board && boardShown !== null && (
-          <Board
-            mine={boardMine}
-            onIntent={onIntent}
-            onMine={setBoardMine}
-            onQuery={setBoardQuery}
-            pip={pip}
-            query={boardQuery}
-            readers={readers}
-            thread={(end, root) => thread(end, end, root)}
-            view={boardShown}
-          />
-        )}
+                  <div id="strip" onPointerDown={dragColumn} ref={strip}>
+                    {workspace.slots.map(slot => {
+                      const column = columns[slot.position]
+                      const columnView = views[slot.position]
+                      if (column === undefined || columnView === undefined)
+                        return null
+                      return (
+                        <Column
+                          {...shared}
+                          closable={slot.closable}
+                          column={column}
+                          count={workspace.slots.length}
+                          landmarks={landmarks}
+                          seenEnd={seenEnds}
+                          forks={colors.forks}
+                          key={slot.key}
+                          onIntent={onIntent}
+                          onTyping={card => typing(columnView.tipId, card)}
+                          path={paths[slot.position] ?? new Set()}
+                          position={slot.position}
+                          readOnly={
+                            workspace.kind === "root"
+                              ? workspace.readOnly
+                              : null
+                          }
+                          shown={shown}
+                          track={slot.track}
+                          view={columnView}
+                        />
+                      )
+                    })}
+                  </div>
+                </>
+              )}
+              {layout.board && boardShown !== null && (
+                <Board
+                  mine={boardMine}
+                  onIntent={onIntent}
+                  onMine={setBoardMine}
+                  onQuery={setBoardQuery}
+                  pip={pip}
+                  query={boardQuery}
+                  readers={readers}
+                  thread={(end, root) => thread(end, end, root)}
+                  view={boardShown}
+                />
+              )}
+            </ReviewPrefsContext>
+          </NarrowContext>
+        </TrackSeed>
       </main>
       <Footer
         syncing={status === "pending"}
@@ -1217,6 +1287,7 @@ export function App({
           count: held.length,
           onToggle: () => setInventoryOpen(open => !open),
         }}
+        folded={listWidth === "icons"}
       />
     </CardHistories>
   )

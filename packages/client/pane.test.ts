@@ -15,13 +15,17 @@ import { entry, indexOf } from "./fixtures.ts"
 import {
   ASK_REVIEW_LINE,
   askReviewTarget,
+  COLUMN_EDGE_PX,
   imageTitle,
-  NARROW_REM,
+  narrowStrip,
+  PANE_MAX_REM,
+  PANE_MIN_REM,
   type PaneFacts,
   type PaneSubject,
   paneCloseWords,
   paneView,
   type TableOpenState,
+  THREAD_REM,
   tableOpenWords,
   tableTitle,
   togglePane,
@@ -159,11 +163,38 @@ describe("askReviewTarget", () => {
   })
 })
 
-test("NARROW_REM is where .pane's width stops fitting beside the thread", () => {
+describe("narrowStrip", () => {
+  const line = (THREAD_REM + PANE_MIN_REM) * 16 + COLUMN_EDGE_PX
+  test.each<[string, number, number, boolean]>([
+    ["a pixel short of the thread and the narrowest pane", line - 1, 16, true],
+    ["exactly the thread and the narrowest pane", line, 16, false],
+    ["a pixel more", line + 1, 16, false],
+    ["the same pixels at a larger rem", line, 18, true],
+  ])("%s", (_, width, rem, narrow) => {
+    expect(narrowStrip(width, rem)).toBe(narrow)
+  })
+})
+
+test("index.html sizes the pane and the thread by pane.ts's numbers", () => {
   const html = readFileSync(new URL("./index.html", import.meta.url), "utf8")
-  const width = /\.pane \{[^}]*clamp\((\d+)rem, 100vw - (\d+)rem/.exec(html)
-  expect(width).not.toBeNull()
-  expect(Number(width?.[1]) + Number(width?.[2])).toBe(NARROW_REM)
+  const pane =
+    /\.pane \{[^}]*width: clamp\((\d+)rem, 100cqw - (\d+)rem - (\d+)px, (\d+)rem\)/.exec(
+      html,
+    )
+  expect(pane?.slice(1).map(Number)).toEqual([
+    PANE_MIN_REM,
+    THREAD_REM,
+    COLUMN_EDGE_PX,
+    PANE_MAX_REM,
+  ])
+  const thread = /\.column-thread \{ flex: 0 0 (\d+)rem; width: (\d+)rem;/.exec(
+    html,
+  )
+  expect(thread?.slice(1).map(Number)).toEqual([THREAD_REM, THREAD_REM])
+  expect(html).toMatch(/#strip \{[^}]*container-type: inline-size;/)
+  expect(html).toMatch(
+    new RegExp(`\\.column \\{[^}]*border-right: ${COLUMN_EDGE_PX}px solid`),
+  )
 })
 
 describe("words", () => {

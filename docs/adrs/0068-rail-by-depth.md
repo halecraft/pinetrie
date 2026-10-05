@@ -4,7 +4,8 @@
 `PLAN-2026-10-04-rail-side-by-side`. Amends ADR-0029 (tracks still start at
 0 in each rail, but a track is a branch's colour, not its place) and
 ADR-0031 (a capsule is drawn in its branch's place, not on a track of its
-own).
+own). Amended by ADR-0089 (proposed): a track is still a branch's rank,
+but its colour starts from a slot its root's id picks, in a larger palette.
 
 **Context.** The rail drew a root's tree as a git graph. Every item took the
 next row in depth-first order, so a branch's first dot came after every row

@@ -167,12 +167,27 @@ export function askReviewTarget(
 }
 
 /**
- * Below this width, in rem, the pane covers the page: the 36rem margin plus
- * the 40rem minimum of `.pane`'s `clamp(40rem, 100vw - 36rem, 64rem)`, where
- * it stops fitting beside the thread. `pane.test.ts` holds the two together.
+ * `.column-thread`'s width, and `.pane`'s narrowest and widest, in rem.
+ * `.pane` is `clamp(40rem, 100cqw - 28rem - 1px, 64rem)`, with `#strip` its
+ * container (ADR-0087, S109): it fills what the strip has beside the thread.
+ * `pane.test.ts` holds `index.html` to these.
  */
-export const NARROW_REM = 76
-export const NARROW = `(width < ${NARROW_REM}rem)`
+export const THREAD_REM = 28
+export const PANE_MIN_REM = 40
+export const PANE_MAX_REM = 64
+/**
+ * `.column`'s right border: the one edge between the thread and the pane
+ * that is outside `.pane`'s box.
+ */
+export const COLUMN_EDGE_PX = 1
+
+/**
+ * Whether a strip `width` px wide is too narrow for the thread beside the
+ * pane at its narrowest: the pane then covers the page. `rem` is the root
+ * font size in px.
+ */
+export const narrowStrip = (width: number, rem: number): boolean =>
+  width < (THREAD_REM + PANE_MIN_REM) * rem + COLUMN_EDGE_PX
 
 /** The line heading an ask's review. */
 export const ASK_REVIEW_LINE = "what this ask changed"

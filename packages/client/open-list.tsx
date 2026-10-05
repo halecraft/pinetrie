@@ -1,5 +1,6 @@
 // client/open-list — your list, down the left edge: the roots you have open,
-// in your order, then new tabs, then ＋ (ADR-0030, ADR-0085).
+// in your order, then new tabs, then ＋ (ADR-0030, ADR-0085); full, or folded
+// to an icon per item (ADR-0088, `FoldedItem`).
 //
 // Your list is yours, on every device: × closes a root for you and writes
 // nothing shared. Drag an item to reorder; a root dragged here from the
@@ -13,7 +14,9 @@ import { MAX_TITLE, type TreeIndex, type WriterId } from "@pinetrie/core"
 import { ROOT_BUSY_REASON } from "@pinetrie/rules"
 import type { SessionClient } from "@pinetrie/session"
 import {
+  type DragEvent,
   type KeyboardEvent,
+  type ReactNode,
   useEffect,
   useLayoutEffect,
   useRef,
@@ -21,16 +24,18 @@ import {
 } from "react"
 import { CardPip } from "./card-pip.tsx"
 import type { Intent } from "./intent.ts"
+import { type ListWidth, listFoldWords } from "./list-width.ts"
 import { Menu, type MenuItem } from "./menu.tsx"
 import {
   dropsWords,
+  type ItemIcon,
   type ItemMenuItem,
   listKey,
   type OpenListView,
   renameIntent,
 } from "./open-list-view.ts"
 import { planTitle, renameKey } from "./root-label.ts"
-import { Readers, RootStatus } from "./root-signals.tsx"
+import { Readers, type ReadersProps, RootStatus } from "./root-signals.tsx"
 import { type RootDrag, rootDropProps, rootGroupProps } from "./root-target.ts"
 import { startRootDrag } from "./use-root-drag.ts"
 
@@ -50,6 +55,7 @@ function moveFocus(e: KeyboardEvent<HTMLElement>) {
 
 export function OpenList({
   view,
+  width,
   onIntent,
   session,
   index,
@@ -60,6 +66,8 @@ export function OpenList({
 }: {
   /** What the list shows and offers (`openListView`). */
   view: OpenListView
+  /** Full, or folded to icons (ADR-0088). */
+  width: ListWidth
   onIntent: (intent: Intent) => void
   /** Whose presence an item shows: others reading in its root. */
   session: SessionClient
@@ -101,6 +109,35 @@ export function OpenList({
       <div className="open-items" onKeyDown={moveFocus} {...rootGroupProps}>
         {view.items.map(item => {
           const key = listKey(item)
+          if (width === "icons")
+            return (
+              <FoldedItem
+                item={item}
+                key={key}
+                nameOf={nameOf}
+                onIntent={onIntent}
+                onRename={root => setRenaming(root)}
+                pip={pip}
+                readers={readers}
+                rename={
+                  item.kind === "root" && renaming === item.root
+                    ? {
+                        onEnd: focusItem => {
+                          setRenaming(null)
+                          if (focusItem) setRefocus(item.root)
+                        },
+                        onSend: title =>
+                          onIntent(renameIntent(item.root, title)),
+                      }
+                    : null
+                }
+                startDrag={
+                  item.kind === "root"
+                    ? startRootDrag(dragOf(item.root))
+                    : undefined
+                }
+              />
+            )
           if (item.kind === "new")
             return (
               <span
@@ -209,8 +246,192 @@ export function OpenList({
           {...rootDropProps({ kind: "list", before: null })}
         />
       </div>
-      <AddButton add={view.add} onIntent={onIntent} />
+      <AddButton
+        add={view.add}
+        folded={width === "icons"}
+        onIntent={onIntent}
+      />
+      <FoldControl onIntent={onIntent} width={width} />
     </nav>
+  )
+}
+
+/** At the list's foot: fold it to icons, or show its titles again. */
+function FoldControl({
+  width,
+  onIntent,
+}: {
+  width: ListWidth
+  onIntent: (intent: Intent) => void
+}) {
+  const words = listFoldWords(width)
+  return (
+    <button
+      aria-label={words.label}
+      className="list-fold"
+      onClick={() => onIntent({ kind: "foldList" })}
+      title={words.title}
+      type="button"
+    >
+      {words.glyph}
+    </button>
+  )
+}
+
+/** An item's picture while the list is folded (`ItemIcon`). */
+function IconFace({ icon }: { icon: ItemIcon }) {
+  switch (icon.kind) {
+    case "sprite":
+      return <img alt="" className="open-sprite" src={icon.src} />
+    case "initials":
+      return (
+        <span className="open-initials" style={{ background: icon.color }}>
+          {icon.letters}
+        </span>
+      )
+    case "fresh":
+      return <span className="open-fresh" />
+  }
+}
+
+/**
+ * An item of the folded list (ADR-0088): its icon, carrying its status and
+ * pip, and a menu a right-click, Shift+F10 or the Menu key opens, which
+ * holds ⋯'s items and Close. Hover and focus show its label and who reads
+ * there; a rename's field opens beside it. The tooltip and the field are
+ * fixed to the window, since the list scrolls and would clip them.
+ */
+function FoldedItem({
+  item,
+  onIntent,
+  onRename,
+  rename,
+  startDrag,
+  pip,
+  readers,
+  nameOf,
+}: {
+  item: OpenListView["items"][number]
+  onIntent: (intent: Intent) => void
+  onRename: (root: string) => void
+  /** While this root is renamed, what its field does; else null. */
+  rename: {
+    readonly onSend: (title: string | null) => void
+    readonly onEnd: (focusItem: boolean) => void
+  } | null
+  startDrag: ((e: DragEvent<HTMLElement>) => void) | undefined
+  pip: ReactNode
+  readers: ReadersProps
+  nameOf: ReadonlyMap<WriterId, string>
+}) {
+  const wrap = useRef<HTMLSpanElement>(null)
+  // Where the tooltip or the rename field goes: beside the item, measured as
+  // either opens.
+  const [at, setAt] = useState<DOMRect | null>(null)
+  const [tip, setTip] = useState(false)
+  const showTip = () => {
+    setAt(wrap.current?.getBoundingClientRect() ?? null)
+    setTip(true)
+  }
+  const renaming = rename !== null
+  useLayoutEffect(() => {
+    if (renaming) setAt(wrap.current?.getBoundingClientRect() ?? null)
+  }, [renaming])
+  const close: MenuItem = {
+    key: "close",
+    className: "open-close-item",
+    title:
+      item.kind === "root"
+        ? "close for you; open it again from the board"
+        : "close this new thread; nothing has been written",
+    label: "Close",
+    onChoose: () => onIntent(item.close),
+  }
+  const items =
+    item.kind === "root"
+      ? [
+          ...item.menu.map(m =>
+            menuItem(m, () => onRename(item.root), onIntent),
+          ),
+          close,
+        ]
+      : [close]
+  const root = item.kind === "root" ? item.root : undefined
+  return (
+    <span
+      className="open-item"
+      data-selected={item.selected || undefined}
+      ref={wrap}
+      {...(root === undefined
+        ? {}
+        : rootDropProps({ kind: "list", before: root }))}
+    >
+      <Menu
+        className="open-icon-menu"
+        label={item.label}
+        opensOn="contextmenu"
+        sections={[{ key: "item", items }]}
+        trigger={
+          <span className="open-icon">
+            <IconFace icon={item.icon} />
+            {item.kind === "root" && (
+              <RootStatus
+                arrived={item.arrived}
+                done={item.done}
+                nameOf={nameOf}
+                status={item.status}
+              />
+            )}
+            {item.pip && pip}
+          </span>
+        }
+        triggerClassName={
+          item.kind === "new"
+            ? "open-new"
+            : item.archived
+              ? "open-root archived"
+              : "open-root"
+        }
+        triggerProps={{
+          "aria-current": item.selected || undefined,
+          ...(item.kind === "new"
+            ? { "data-new": item.key }
+            : {
+                "data-root": item.root,
+                draggable: true,
+                onDragStart: startDrag,
+              }),
+          onBlur: () => setTip(false),
+          onClick: () => onIntent(item.show),
+          onFocus: showTip,
+          onMouseEnter: showTip,
+          onMouseLeave: () => setTip(false),
+        }}
+      />
+      {at !== null && tip && rename === null && (
+        <span
+          className="open-tip"
+          role="tooltip"
+          style={{ left: at.right + 6, top: at.top }}
+        >
+          <span className="open-tip-label">{item.label}</span>
+          {root !== undefined && <Readers {...readers} roots={[root]} />}
+        </span>
+      )}
+      {at !== null && rename !== null && item.kind === "root" && (
+        <span
+          className="open-rename"
+          style={{ left: at.right + 6, top: at.top }}
+        >
+          <TitleField
+            onEnd={rename.onEnd}
+            onSend={rename.onSend}
+            placeholder={item.line}
+            stored={item.title}
+          />
+        </span>
+      )}
+    </span>
   )
 }
 
@@ -339,20 +560,24 @@ function TitleField({
  */
 export function AddButton({
   add,
+  folded = false,
   onIntent,
 }: {
   add: OpenListView["add"]
+  /** In a folded list (ADR-0088): ＋ alone, its ▾ under it. */
+  folded?: boolean
   onIntent: (intent: Intent) => void
 }) {
   return (
-    <span className="add-root">
+    <span className={folded ? "add-root folded" : "add-root"}>
       <button
+        aria-label={folded ? "new agent thread" : undefined}
         className="add-agent"
         onClick={() => onIntent(add.agent)}
         title="a new thread where the agent answers every message that names no one"
         type="button"
       >
-        ＋ agent
+        {folded ? "＋" : "＋ agent"}
       </button>
       <Menu
         className="add-more"

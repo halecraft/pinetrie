@@ -1429,8 +1429,8 @@ export interface BranchColors {
  * Each column's colour, and the dots it puts where it forks. Colour, not drawn
  * lines, links a branch to its parent, so sibling branches never cross. A
  * column takes the track of its last message, which is where its path ends in
- * the rail; the renderer maps a track to one fixed palette, so the rail, the
- * column's header and its fork dot always agree.
+ * the rail; the client maps a track to a colour by the track and its root
+ * (ADR-0089), so the rail, the column's header and its fork dot agree.
  */
 export function branchColors(
   rail: readonly RailRow[],

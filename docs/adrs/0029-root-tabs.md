@@ -10,6 +10,8 @@ withdrawn), ADR-0021 (where Start Chat and Start Agent live) and ADR-0024
 (which columns report presence).
 Amended by ADR-0061: archiving a root withdraws its threads' offers from
 your repo, and restoring builds them again.
+Amended by ADR-0089 (proposed): tracks still start at 0, but trunks no
+longer share a colour: each root's id seeds its palette.
 Amended by ADR-0068: a track is a branch's colour, by creation order, not
 its place on the rail.
 Amended by ADR-0081: the tab bar is the header, and the tab you are on is
