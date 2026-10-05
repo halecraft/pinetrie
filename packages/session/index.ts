@@ -35,3 +35,4 @@ export {
   type Slots,
   settleSlots,
 } from "./inventory.ts"
+export type { OpenList } from "./open-list.ts"

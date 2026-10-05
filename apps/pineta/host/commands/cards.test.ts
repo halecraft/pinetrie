@@ -291,6 +291,7 @@ describe("a chat from a card that found its lane busy", () => {
     pinned: [],
     reserved: null,
     base: null,
+    state: null,
   } as const
 
   test("its card is queued behind the others in the same step, and answered queued with the rev", async () => {
@@ -340,6 +341,7 @@ const sentChat = {
   pinned: [],
   reserved: null,
   base: null,
+  state: null,
 } as const
 
 test("spend: the record goes, then its text; a card already gone answers the current rev", async () => {

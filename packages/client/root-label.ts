@@ -40,18 +40,14 @@ export const messageCount = (
   return { held: inHeld, total }
 }
 
-/** The count's words, in the Archive tab's list. */
-export const messageCountWords = ({ held, total }: MessageCount): string =>
-  `messages ${held} of ${total}`
-
-/** The count's tooltip: on the Archive tab, and on its list's count. */
+/** The count's tooltip: ▦'s, in the footer (ADR-0085). */
 export const messageCountTitle = ({ held, total }: MessageCount): string =>
   `${held} in the threads this tab has loaded, of ${total} in the session`
 
 /**
- * Every root with a message, ascending by its root entry, as the tabs and
- * the Archive tab read it: from the directory (ADR-0063), not the tree, so a
- * root no tab holds is there too.
+ * Every root with a message, ascending by its root entry, as your list and
+ * the board read it: from the directory (ADR-0063), not the tree, so a
+ * root this tab does not hold is there too.
  */
 export const summariesOf = (
   directory: ReadonlyMap<RootId, RootRecord>,
@@ -84,8 +80,8 @@ export const CHAT_LABEL = "Chat"
 /**
  * Every root's label, by its root entry: its title; else, for a root no lane
  * works in (only people have written there), `CHAT_LABEL`; else its first
- * line. `App` builds it once per change, and the tabs, the header, the inbox
- * and the Archive tab look labels up in it.
+ * line. `App` builds it once per change, and your list, the board, the
+ * activity menu and the inbox look labels up in it.
  */
 export function labelsOf(
   directory: ReadonlyMap<RootId, RootRecord>,

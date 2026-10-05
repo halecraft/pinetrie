@@ -194,6 +194,7 @@ describe("sendChat", () => {
     pinned: [],
     reserved: null,
     base: null,
+    state: null,
   })
   function setUp(
     project: ProjectRecord | null = null,

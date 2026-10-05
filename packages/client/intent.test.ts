@@ -1,5 +1,4 @@
 import {
-  type ArchiveRecord,
   type AskIndex,
   atEntry,
   type CardRecord,
@@ -8,17 +7,18 @@ import {
   entryId,
   indexAsks,
   laneNameForThread,
+  type RootId,
   rootIdFor,
+  workflowStateIdFor,
   writerId,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import { NEW_ROOT, tree } from "./fixtures.ts"
 import {
-  afterArchive,
+  afterRootMove,
   type CardFacts,
   claimFocus,
   type Effect,
-  entryShown,
   type Intent,
   type IntentState,
   nameEffects,
@@ -33,6 +33,15 @@ import {
 } from "./layout.ts"
 
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
+/** Each root's id, by its root entry: your list's key. */
+const R1_ID = rootIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
+const R2_ID = rootIdFor("01a0ffd2-0000-7000-8000-0000000000a2")
+const R9_ID = rootIdFor("01a0ffd2-0000-7000-8000-0000000000a9")
+const ROOT_IDS = new Map<EntryId, RootId>([
+  [entryId("1-r1"), R1_ID],
+  [entryId("5-r2"), R2_ID],
+  [entryId("8-r9"), R9_ID],
+])
 
 // r1 -> a -> b, with a branch a -> c; and r2 -> d.
 const index = tree({
@@ -48,9 +57,9 @@ const onRoot = (root: string): Layout =>
   resolveLayout(
     layoutReducer(initialLayout(), {
       kind: "show",
-      tab: { kind: "root", root: entryId(root) },
+      here: { kind: "root", root: entryId(root) },
     }),
-    { index, lanes: [], archive: new Map() },
+    { index, lanes: [], archived: new Set(), list: [entryId(root)] },
   )
 const onNewTab: Layout = layoutReducer(initialLayout(), {
   kind: "newTab",
@@ -60,17 +69,24 @@ const onNewTab: Layout = layoutReducer(initialLayout(), {
 })
 const at = (
   layout: Layout,
-  archive = new Map<EntryId, ArchiveRecord>(),
   asks: AskIndex = indexAsks(index),
   cards: CardFacts = NO_CARDS,
-) => ({
+): IntentState => ({
   layout,
   index,
-  archive,
   asks,
   cards,
-  rootEntries: new Map(),
+  rootEntries: new Map([...ROOT_IDS].map(([e, r]) => [r, e] as const)),
+  rootIds: ROOT_IDS,
 })
+/** A root shown: the root you are on, and in your list, at its end if it was not. */
+const shown = (root: string, id: RootId): Effect[] => [
+  {
+    kind: "layout",
+    action: { kind: "show", here: { kind: "root", root: entryId(root) } },
+  },
+  { kind: "list", act: { kind: "ensure", root: id } },
+]
 const ME = writerId("ada@x.io")
 const NO_CARDS: CardFacts = {
   cards: [],
@@ -90,17 +106,98 @@ const column = (
 ): Intent => ({ kind: "column", position, key: "col-k", act })
 
 describe("planIntent", () => {
-  test("× on a root's tab closes it for you, and writes nothing", () => {
+  test("× on a root closes it for you: it leaves your list, and nothing shared is written", () => {
     expect(
-      plan({ kind: "closeTab", tab: { kind: "root", root: entryId("1-r1") } }),
-    ).toEqual([{ kind: "layout", action: { kind: "closeRoot", root: "1-r1" } }])
+      plan({ kind: "close", here: { kind: "root", root: entryId("1-r1") } }),
+    ).toEqual([
+      { kind: "list", act: { kind: "close", root: R1_ID } },
+      { kind: "layout", action: { kind: "closeRoot", root: "1-r1" } },
+    ])
   })
 
-  test("× on a new tab closes it; the Archive tab has none", () => {
-    expect(plan({ kind: "closeTab", tab: { kind: "new", key: "t" } })).toEqual([
+  test("× on a new tab closes it; nothing has none", () => {
+    expect(plan({ kind: "close", here: { kind: "new", key: "t" } })).toEqual([
       { kind: "layout", action: { kind: "closeNewTab", key: "t" } },
     ])
-    expect(plan({ kind: "closeTab", tab: { kind: "archive" } })).toEqual([])
+    expect(plan({ kind: "close", here: { kind: "nothing" } })).toEqual([])
+  })
+
+  test("showing a root opens it in your list; reordering your list places it by id (ADR-0085)", () => {
+    expect(
+      plan({ kind: "show", here: { kind: "root", root: entryId("5-r2") } }),
+    ).toEqual(shown("5-r2", R2_ID))
+    expect(plan({ kind: "show", here: { kind: "nothing" } })).toEqual([
+      { kind: "layout", action: { kind: "show", here: { kind: "nothing" } } },
+    ])
+    expect(
+      plan({
+        kind: "moveInList",
+        root: entryId("5-r2"),
+        before: entryId("1-r1"),
+      }),
+    ).toEqual([
+      { kind: "list", act: { kind: "place", root: R2_ID, before: R1_ID } },
+    ])
+    expect(
+      plan({ kind: "moveInList", root: entryId("5-r2"), before: null }),
+    ).toEqual([
+      { kind: "list", act: { kind: "place", root: R2_ID, before: null } },
+    ])
+  })
+
+  test("a move on the board asks the host; into the closed state it closes the root for you once accepted (ADR-0085)", () => {
+    const [from, to] = [workflowStateIdFor("d"), workflowStateIdFor("x")]
+    const move = (closes: boolean) =>
+      plan({ kind: "moveRoot", root: R1_ID, from, to, before: null, closes })
+    const request = {
+      kind: "move-root",
+      root: R1_ID,
+      from,
+      to,
+      before: null,
+    } as const
+    expect(move(false)).toEqual([
+      { kind: "moveRoot", move: request, moved: [] },
+    ])
+    expect(move(true)).toEqual([
+      {
+        kind: "moveRoot",
+        move: request,
+        moved: [
+          { kind: "list", act: { kind: "close", root: R1_ID } },
+          { kind: "layout", action: { kind: "closeRoot", root: "1-r1" } },
+        ],
+      },
+    ])
+  })
+
+  test("a workflow edit is a request; the board opens and closes in the layout", () => {
+    const edit = {
+      action: "add",
+      state: null,
+      name: "Review",
+      before: null,
+    } as const
+    expect(plan({ kind: "editWorkflow", edit })).toEqual([
+      { kind: "request", intent: { kind: "workflow", edit } },
+    ])
+    expect(plan({ kind: "board", open: true })).toEqual([
+      { kind: "layout", action: { kind: "board", open: true } },
+    ])
+  })
+
+  test("a new tab from a board column carries its state", () => {
+    const state = workflowStateIdFor("d")
+    expect(plan({ kind: "newTab", asksAgent: true, state })).toContainEqual({
+      kind: "layout",
+      action: {
+        kind: "newTab",
+        key: "k",
+        root: NEW_ROOT,
+        asksAgent: true,
+        state,
+      },
+    })
   })
 
   test("a branch opens a fresh column after its own, which takes focus", () => {
@@ -188,7 +285,7 @@ describe("planIntent", () => {
       unsent: null,
     }
     const holding = { ...NO_CARDS, cards: [held] }
-    const R1 = at(onRoot("1-r1"), undefined, undefined, holding)
+    const R1 = at(onRoot("1-r1"), undefined, holding)
     const discard = {
       kind: "moveCard",
       move: { card: "c", from: place, to: null },
@@ -210,7 +307,7 @@ describe("planIntent", () => {
         },
       },
     ])
-    expect(plan(close, at(onNewTab, undefined, undefined, holding))).toEqual([
+    expect(plan(close, at(onNewTab, undefined, holding))).toEqual([
       discard,
       { kind: "layout", action: { kind: "closeNewTab", key: "t" } },
     ])
@@ -281,10 +378,7 @@ describe("planIntent", () => {
     test("an entry a column shows is scrolled to, on its root's tab", () => {
       expect(plan({ kind: "openAt", entry: entryId("4-c") })).toEqual([
         { kind: "reveal", entry: "4-c" },
-        {
-          kind: "layout",
-          action: { kind: "show", tab: { kind: "root", root: "1-r1" } },
-        },
+        ...shown("1-r1", R1_ID),
       ])
     })
 
@@ -302,29 +396,6 @@ describe("planIntent", () => {
       expect(effects.some(e => e.kind === "armFocus")).toBe(false)
     })
 
-    test("an entry in an archived root is previewed in the Archive tab", () => {
-      const archive = new Map<EntryId, ArchiveRecord>([
-        [
-          entryId("5-r2"),
-          {
-            root: entryId("5-r2"),
-            state: "archived",
-            by: writerId("a@x.test"),
-            at: 1,
-          },
-        ],
-      ])
-      expect(
-        plan(
-          { kind: "openAt", entry: entryId("6-d") },
-          at(onRoot("1-r1"), archive),
-        ),
-      ).toEqual([
-        { kind: "pickArchived", root: "5-r2" },
-        { kind: "layout", action: { kind: "show", tab: { kind: "archive" } } },
-      ])
-    })
-
     test("a pick into an ask's work opens its fold before it is revealed (ADR-0056)", () => {
       const asks: AskIndex = {
         askOf: new Map([[entryId("4-c"), entryId("2-a")]]),
@@ -333,7 +404,7 @@ describe("planIntent", () => {
       }
       const effects = plan(
         { kind: "openAt", entry: entryId("4-c") },
-        at(onRoot("1-r1"), new Map(), asks),
+        at(onRoot("1-r1"), asks),
       )
       expect(effects.slice(0, 2)).toEqual([
         { kind: "openFold", ask: "2-a" },
@@ -343,12 +414,12 @@ describe("planIntent", () => {
       expect(
         plan(
           { kind: "openAt", entry: entryId("3-b") },
-          at(onRoot("1-r1"), new Map(), asks),
+          at(onRoot("1-r1"), asks),
         ).some(e => e.kind === "openFold"),
       ).toBe(false)
     })
 
-    test("openIn: an entry this tab holds opens as openAt does; another root's tab is shown, and the entry once it arrives (ADR-0063)", () => {
+    test("openIn: an entry this tab holds opens as openAt does; another root is shown, archived or not, and the entry once it arrives (ADR-0063)", () => {
       expect(
         plan({ kind: "openIn", entry: entryId("3-b"), root: entryId("1-r1") }),
       ).toEqual(plan({ kind: "openAt", entry: entryId("3-b") }))
@@ -359,42 +430,16 @@ describe("planIntent", () => {
           root: entryId("8-r9"),
         }),
       ).toEqual([
-        {
-          kind: "layout",
-          action: { kind: "show", tab: { kind: "root", root: "8-r9" } },
-        },
+        ...shown("8-r9", R9_ID),
         { kind: "openWhenHeld", entry: "9-far" },
-      ])
-      const archive = new Map<EntryId, ArchiveRecord>([
-        [
-          entryId("8-r9"),
-          {
-            root: entryId("8-r9"),
-            state: "archived",
-            by: writerId("a@x.test"),
-            at: 1,
-          },
-        ],
-      ])
-      expect(
-        plan(
-          { kind: "openIn", entry: entryId("9-far"), root: entryId("8-r9") },
-          at(onRoot("1-r1"), archive),
-        ),
-      ).toEqual([
-        { kind: "pickArchived", root: "8-r9" },
-        { kind: "layout", action: { kind: "show", tab: { kind: "archive" } } },
       ])
     })
 
-    test("a message's closed branch opens as openAt does; no entry, nothing", () => {
+    test("a message's closed branch opens as openAt does; an unknown entry, nothing", () => {
       const fromColumn = column({ kind: "openAt", entry: entryId("3-b") })
       expect(plan(fromColumn)).toEqual(
         plan({ kind: "openAt", entry: entryId("3-b") }),
       )
-      expect(entryShown(fromColumn)).toBe("3-b")
-      expect(entryShown({ kind: "openAt", entry: entryId("3-b") })).toBe("3-b")
-      expect(entryShown({ kind: "signOut" })).toBe(null)
       expect(plan({ kind: "openAt", entry: entryId("nowhere") })).toEqual([])
     })
   })
@@ -442,7 +487,7 @@ describe("planIntent", () => {
     test("a queue is one move, into its lane's root, said in the column; with no root, or no card, nothing", () => {
       const queue = column({ kind: "queue", card: c, lane, at: where })
       for (const layout of [onRoot("1-r1"), onNewTab]) {
-        const state = at(layout, undefined, undefined, withCard(drafting))
+        const state = at(layout, undefined, withCard(drafting))
         const move = {
           card: c,
           from: drafting,
@@ -462,17 +507,12 @@ describe("planIntent", () => {
         { kind: "fresh", column: "f", root: TEST_ROOT, at: where },
         new Map(),
       )
-      expect(plan(queue, at(onNewTab, undefined, undefined, fresh))).toEqual([])
+      expect(plan(queue, at(onNewTab, undefined, fresh))).toEqual([])
       expect(plan(queue)).toEqual([])
     })
     test("an unqueue puts the card back where it was queued, saying who queued it; a card not queued, nothing", () => {
       const unqueue = column({ kind: "unqueue", card: c, lane, by: ada })
-      const state = at(
-        onRoot("1-r1"),
-        undefined,
-        undefined,
-        withCard(queuedPlace),
-      )
+      const state = at(onRoot("1-r1"), undefined, withCard(queuedPlace))
       const move = {
         card: c,
         from: { kind: "queued", root: TEST_ROOT, at: where, lane, seen: "v" },
@@ -488,10 +528,7 @@ describe("planIntent", () => {
         },
       ])
       expect(
-        plan(
-          unqueue,
-          at(onRoot("1-r1"), undefined, undefined, withCard(drafting)),
-        ),
+        plan(unqueue, at(onRoot("1-r1"), undefined, withCard(drafting))),
       ).toEqual([])
     })
     test("a command is one write", () => {
@@ -568,14 +605,8 @@ describe("planIntent", () => {
     ])
   })
 
-  test("archive, restore, rename and retitle are one write each", () => {
+  test("rename and retitle are one write each", () => {
     const root = entryId("1-r1")
-    expect(plan({ kind: "archive", root })).toEqual([
-      { kind: "archive", action: "archive", root },
-    ])
-    expect(plan({ kind: "restore", root })).toEqual([
-      { kind: "archive", action: "restore", root },
-    ])
     expect(plan({ kind: "rename", root, title: "T" })).toEqual([
       { kind: "mark", root, title: "T" },
     ])
@@ -583,16 +614,16 @@ describe("planIntent", () => {
   })
 })
 
-test("archiving closes your tab once it is archived, and a restore shows its root once it is restored", () => {
-  const root = entryId("1-r1")
-  expect(afterArchive({ kind: "archived" }, root)).toEqual<Effect[]>([
-    { kind: "layout", action: { kind: "closeRoot", root } },
-  ])
-  expect(afterArchive({ kind: "restored" }, root)).toEqual<Effect[]>([
-    { kind: "layout", action: { kind: "show", tab: { kind: "root", root } } },
-  ])
+test("afterRootMove: what follows a move runs only once the host accepts it", () => {
+  const moved: Effect[] = [
+    { kind: "layout", action: { kind: "closeRoot", root: entryId("1-r1") } },
+  ]
+  expect(afterRootMove({ kind: "moved-root" }, moved)).toBe(moved)
   expect(
-    afterArchive({ kind: "refused", code: "x", message: "no" } as never, root),
+    afterRootMove(
+      { kind: "refused", code: "root_moved", message: "no" },
+      moved,
+    ),
   ).toEqual([])
 })
 

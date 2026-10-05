@@ -14,8 +14,9 @@
 
 import {
   type AgentRun,
-  type ArchiveRecord,
+  type ArchivedRoot,
   type AskIndex,
+  type BoardPlace,
   type CardHistoryRecord,
   type CardId,
   type CardRecord,
@@ -31,12 +32,14 @@ import {
   type TraceRecord,
   type TreeIndex,
   type VerdictRecord,
+  type Workflow,
 } from "@pineta/core"
 import {
   readAgentActivity,
-  readArchive,
+  readArchived,
   readBanners,
   readBases,
+  readBoardPlaces,
   readCardHistories,
   readCommands,
   readDigests,
@@ -55,6 +58,7 @@ import {
   readStops,
   readTraces,
   readVerdicts,
+  readWorkflow,
 } from "@pineta/reads"
 import {
   type LiveDocHandle,
@@ -91,7 +95,12 @@ export interface SessionFacts {
   readonly live: LiveWork
   /** Every seat the host has seen: who wrote in a card (ADR-0048). */
   readonly seats: readonly SeatRecord[]
-  readonly archive: ReadonlyMap<EntryId, ArchiveRecord>
+  /** The board's workflow states (ADR-0085), or null before the host wrote them. */
+  readonly workflow: Workflow | null
+  /** Each root's place on the board, by its id. */
+  readonly places: ReadonlyMap<RootId, BoardPlace>
+  /** The roots in the closed state, by id (`readArchived`). */
+  readonly archived: ReadonlyMap<RootId, ArchivedRoot>
   /** Each entry's title (ADR-0045); a root's is its label. */
   readonly marks: ReadonlyMap<EntryId, MarkRecord>
   /** Each thread's last run's verdict, in any root (ADR-0077), by lane. */
@@ -165,7 +174,9 @@ function readFacts(view: HeldView): SessionFacts {
     running: readRunningLanes(doc, live),
     live: liveWork(readStreamRecords(live), activity),
     seats: readSeats(doc),
-    archive: readArchive(doc),
+    workflow: readWorkflow(doc),
+    places: readBoardPlaces(doc),
+    archived: readArchived(doc),
     marks: readHeld(roots, readMarks),
     verdicts: readVerdicts(doc),
     histories: readCardHistories(doc),

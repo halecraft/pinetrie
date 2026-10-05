@@ -131,7 +131,7 @@ export function refusalWords(refusal: CardRefusal, reader: Reader): string {
 export const cardStatus = (status: string, unsent: string | null): string =>
   status !== "" || unsent === null ? status : unsentWords(unsent)
 
-/** The inventory panel's name, and its button in the header. */
+/** The inventory panel's name, and its button in the footer. */
 export const INVENTORY = "inventory"
 /** A card's button that takes it into your inventory; its drag handle too. */
 export const TAKE_INTO_INVENTORY = "take"

@@ -4,6 +4,7 @@ import {
   cardId,
   entryId,
   laneNameForThread,
+  workflowStateIdFor,
   writerId,
 } from "@pineta/core"
 import type { Outcome } from "@pineta/protocol/codec"
@@ -16,7 +17,7 @@ import { type AppPorts, perform } from "./perform.ts"
 const accepted: MoveAnswer = { kind: "accepted", rev: 1 }
 const how: MoveHow = { actedAt: { kind: "inventory" }, slot: null }
 const ports = () => {
-  const answer = { kind: "restored" } as const
+  const answer = { kind: "marked" } as const
   return {
     dispatch: vi.fn(),
     session: {
@@ -31,6 +32,15 @@ const ports = () => {
       swapSlots: vi.fn(),
       undoSwap: vi.fn(async () => {}),
       refuse: vi.fn(),
+      openList: {
+        roots: { current: () => [], subscribe: () => () => {} },
+        open: vi.fn(),
+        ensure: vi.fn(),
+        close: vi.fn(),
+        here: vi.fn(),
+        repair: vi.fn(),
+        dispose: vi.fn(),
+      },
     },
     inventory: { show: vi.fn(), select: vi.fn() },
     attention: { dismiss: vi.fn(), dismissOffer: vi.fn() },
@@ -39,7 +49,6 @@ const ports = () => {
     reveal: vi.fn(),
     openWhenHeld: vi.fn(),
     openFold: vi.fn(),
-    pickArchived: vi.fn(),
     arm: vi.fn(),
     identity: { save: vi.fn(), clear: vi.fn() },
     reload: vi.fn(),
@@ -49,7 +58,7 @@ type Ports = ReturnType<typeof ports>
 
 const root = entryId("r")
 const identity = { email: "a@x.test", name: "Ada" }
-const show = { kind: "show", tab: { kind: "archive" } } as const
+const show = { kind: "show", here: { kind: "nothing" } } as const
 const lane = laneNameForThread("x")
 const at = atEntry(entryId("e"))
 const ada = writerId("ada@x.test")
@@ -115,9 +124,22 @@ test.each<Row>([
     args: ["a"],
   },
   {
-    effect: { kind: "pickArchived", root: entryId("r") },
-    port: p => p.pickArchived,
-    args: ["r"],
+    effect: { kind: "list", act: { kind: "ensure", root: TEST_ROOT } },
+    port: p => p.session.openList.ensure,
+    args: [TEST_ROOT],
+  },
+  {
+    effect: {
+      kind: "list",
+      act: { kind: "place", root: TEST_ROOT, before: null },
+    },
+    port: p => p.session.openList.open,
+    args: [TEST_ROOT, null],
+  },
+  {
+    effect: { kind: "list", act: { kind: "close", root: TEST_ROOT } },
+    port: p => p.session.openList.close,
+    args: [TEST_ROOT],
   },
   { effect: { kind: "armFocus", key: "k" }, port: p => p.arm, args: ["k"] },
   {
@@ -205,34 +227,34 @@ test("an undo of moves plans what its answer shows, afresh", async () => {
   )
 })
 
-test("an archive, once answered archived, closes its tab", async () => {
+test("a move on the board runs what follows it only once the host accepts it (ADR-0085)", async () => {
+  const request = {
+    kind: "move-root",
+    root: TEST_ROOT,
+    from: workflowStateIdFor("d"),
+    to: workflowStateIdFor("x"),
+    before: null,
+  } as const
+  const closed = { kind: "closeRoot", root } as const
+  const effect: Effect = {
+    kind: "moveRoot",
+    move: request,
+    moved: [{ kind: "layout", action: closed }],
+  }
   const p = ports()
-  p.session.request.mockImplementationOnce(async () => ({ kind: "archived" }))
-  perform([{ kind: "archive", action: "archive", root }], p)
-  expect(p.session.request).toHaveBeenCalledWith({
-    kind: "archive",
-    action: "archive",
-    root,
-  })
-  await vi.waitFor(() =>
-    expect(p.dispatch).toHaveBeenCalledWith({ kind: "closeRoot", root }),
-  )
-})
-
-test("a restore, once answered restored, shows its root", async () => {
-  const p = ports()
-  perform([{ kind: "archive", action: "restore", root }], p)
-  expect(p.session.request).toHaveBeenCalledWith({
-    kind: "archive",
-    action: "restore",
-    root,
-  })
-  await vi.waitFor(() =>
-    expect(p.dispatch).toHaveBeenCalledWith({
-      kind: "show",
-      tab: { kind: "root", root },
-    }),
-  )
+  p.session.request.mockImplementationOnce(async () => ({ kind: "moved-root" }))
+  perform([effect], p)
+  expect(p.session.request).toHaveBeenCalledWith(request)
+  await vi.waitFor(() => expect(p.dispatch).toHaveBeenCalledWith(closed))
+  const q = ports()
+  q.session.request.mockImplementationOnce(async () => ({
+    kind: "refused",
+    code: "root_moved",
+    message: "not moved",
+  }))
+  perform([effect], q)
+  await new Promise(r => setTimeout(r, 0))
+  expect(q.dispatch).not.toHaveBeenCalled()
 })
 
 test("a move flies only when its plan says so", () => {

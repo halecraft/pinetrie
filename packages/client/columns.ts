@@ -12,6 +12,7 @@ import {
   type LaneView,
   type RootId,
   type TreeIndex,
+  type WorkflowStateId,
   type WorkSetting,
 } from "@pineta/core"
 import type { Density } from "./ask-words.ts"
@@ -82,13 +83,15 @@ export interface Column {
    * conflict), sent by the column's own composer so its outcome shows there.
    * `prefill` is what its composer starts with. `root` is a new tab's
    * root, minted as it opens (ADR-0066): its cards and its first send name
-   * it. A branch's root is its tab's.
+   * it. A branch's root is its tab's. `state` is the workflow state a new
+   * tab opened from a board column lands its root in (ADR-0085).
    */
   readonly fresh?: {
     readonly sendId?: string
     readonly pending?: Pending
     readonly prefill?: Prefill
     readonly root?: RootId
+    readonly state?: WorkflowStateId
   }
 }
 
@@ -130,8 +133,7 @@ export type ColumnAction =
 /**
  * The reader's settings for column `key`: how much of each ask it draws
  * (ADR-0056), and whether its thread's details are open (ADR-0073). By key,
- * so they reach a new tab's one column and the Archive preview's as they
- * reach a root's.
+ * so they reach a new tab's one column as they reach a root's.
  */
 export type ReaderAction =
   | {

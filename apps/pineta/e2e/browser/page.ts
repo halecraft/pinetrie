@@ -14,8 +14,9 @@ export const TO_AGENT = recipientWords({
 }).label
 export const TO_NOBODY = recipientWords({ compels: NOBODY, people: [] }).label
 
-/** The ⋯ of the tab you are on: every root tab has one, shown on hover. */
-export const OWN_MENU = '#tabs .tab[aria-selected="true"] ~ .tab-more .tab-menu'
+/** The ⋯ of the root you are on in your list: every root has one, shown on hover or focus. */
+export const OWN_MENU =
+  '#open-list [aria-current="true"] ~ .open-more .open-menu'
 
 /**
  * Open the menu behind `trigger`, and find `item` in it if a person could see
@@ -24,6 +25,14 @@ export const OWN_MENU = '#tabs .tab[aria-selected="true"] ~ .tab-more .tab-menu'
  * centre (`packages/client/TECHNICAL.md`, Gotchas). Null when not seen.
  */
 export async function seeInMenu(p: Page, trigger: string, item: string) {
+  // A ⋯ in your list or on the board shows only while its item is hovered.
+  const holder = p
+    .locator(trigger)
+    .first()
+    .locator(
+      "xpath=ancestor::*[contains(@class,'open-item') or contains(@class,'board-item')][1]",
+    )
+  if ((await holder.count()) > 0) await holder.hover()
   await p.click(trigger)
   const el = await p
     .waitForSelector(`.menu ${item}`, { timeout: 15_000 })
@@ -55,13 +64,16 @@ export async function chooseFromMenu(
     await p.keyboard.press("Escape")
     return false
   }
-  await el.click()
-  return true
+  // A menu that closes under the click (its list scrolled) chose nothing.
+  return el.click().then(
+    () => true,
+    () => false,
+  )
 }
 
 /** Your name as the page shows it: the one mentions resolve against. */
 export const shownName = async (p: Page) =>
-  (await p.getAttribute("#top .me-trigger", "title")) ?? ""
+  (await p.getAttribute("#bottom .me-trigger", "title")) ?? ""
 
 /** The name this device keeps for you (`pineta-identity`), or null. */
 export const storedName = (p: Page) =>
@@ -75,7 +87,7 @@ export const storedName = (p: Page) =>
  * at its centre, as `seeInMenu` checks a menu.
  */
 export async function openProfile(p: Page): Promise<boolean> {
-  await p.click("#top .me-trigger")
+  await p.click("#bottom .me-trigger")
   const box = await p
     .waitForSelector("#profile", { timeout: 15_000 })
     .catch(() => null)
@@ -250,28 +262,61 @@ export async function readRaw(p: Page, n = 0): Promise<void> {
   if ((await p.getAttribute(raw, "aria-pressed")) !== "true") await p.click(raw)
 }
 /**
- * Wait until `p` has connected and synced: its tab bar is drawn, which waits
+ * Wait until `p` has connected and synced: your list is drawn, which waits
  * for the document to settle, and it shows no "syncing…". Rejects after
  * `timeout`.
  */
 export const connected = (p: Page, timeout = 20_000) =>
   p.waitForFunction(
     () =>
-      document.querySelector("#tabs .tab-archive") !== null &&
+      document.querySelector("#open-list .add-agent") !== null &&
       document.querySelector(".sync-note") === null,
     undefined,
     { timeout },
   )
-/** A root's tab. */
-export const tabSel = (root: string) => `#tabs .tab[data-root="${root}"]`
+/** A root in your list (ADR-0085). */
+export const itemSel = (root: string) =>
+  `#open-list .open-root[data-root="${root}"]`
+/** A root on the board, by its root entry: inside `#board`. */
+export const boardSel = (root: string) => `.board-item[data-entry="${root}"]`
+/**
+ * Step away from the root you are on, so its columns unmount: to a new tab,
+ * which is closed again by `stepBack`. Your list has nothing else to step to
+ * that every scenario holds.
+ */
+export async function stepAway(p: Page): Promise<void> {
+  await p.click("#open-list .add-agent")
+  await p.waitForSelector('#open-list .open-new[aria-current="true"]', {
+    timeout: 15_000,
+  })
+}
+/** Back on `root` from `stepAway`, and the new tab closed. */
+export async function stepBack(p: Page, root: string): Promise<void> {
+  await p.click(itemSel(root))
+  await p.$$eval("#open-list .open-new ~ .open-close", bs => {
+    for (const b of bs) (b as HTMLButtonElement).click()
+  })
+}
+/**
+ * Open the board, unless it is open. A page with nothing in its list opens
+ * it itself once settled, so it waits for that first.
+ */
+export async function openBoard(p: Page): Promise<void> {
+  await connected(p)
+  if ((await p.$("#board")) === null) await p.click("#bottom .board-toggle")
+  await p.waitForSelector("#board", { timeout: 15_000 })
+}
 /** The messages the rail on `p` accounts for: dots, and each stretch's count. */
 export const railCount = (p: Page) => p.evaluate(RAIL_MESSAGES)
-/** Open root `r` from the Archive tab, and wait for its tab. */
-export const openFromArchive = async (p: Page, r: string) => {
-  await p.click("#tabs .tab-archive")
-  await p.click(`.archive-row[data-root="${r}"]`)
-  await p.click(".archive-preview .read-only-action")
-  await p.waitForSelector(`${tabSel(r)}[aria-selected="true"]`, {
+/**
+ * Open root `r` from the board (ADR-0085): select its item, which shows it
+ * and puts it in your list, and wait until you are on it. An archived root
+ * is found in the closed state's rows, by its label's search.
+ */
+export const openFromBoard = async (p: Page, r: string) => {
+  await openBoard(p)
+  await p.click(`#board ${boardSel(r)} .board-open`)
+  await p.waitForSelector(`${itemSel(r)}[aria-current="true"]`, {
     timeout: 15_000,
   })
 }

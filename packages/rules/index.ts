@@ -17,9 +17,9 @@ export {
   type ToolAnswer,
 } from "./agent-commands.ts"
 export {
-  ARCHIVE,
   type ArchiveTeardown,
   archivedIn,
+  type Crossing,
   planArchive,
   ROOT_BUSY_REASON,
   writesIn,
@@ -49,6 +49,24 @@ export {
   planBaseNews,
 } from "./behind.ts"
 export {
+  archivedOf,
+  BOARD,
+  type Board,
+  type BoardColumn,
+  boardOf,
+  placeStarted,
+  planRootMove,
+  planWorkflowEdit,
+  type RootMovePlan,
+  stateIn,
+  statesOf,
+  type Transition,
+  transitionOf,
+  WORKFLOW,
+  WORKFLOW_KEY,
+  type WorkflowPlan,
+} from "./board.ts"
+export {
   type CarryPlan,
   cardEnd,
   cardsAt,
@@ -57,7 +75,6 @@ export {
   historyOf,
   type MoveStep,
   type MovesStep,
-  orderAfter,
   type PlaceStep,
   placeEnd,
   planCardSweep,
@@ -89,6 +106,13 @@ export {
   type Verb,
   verbOf,
 } from "./card-history.ts"
+export {
+  ARCHIVE,
+  type CarryOver,
+  carryOverWrites,
+  type OldArchiveRecord,
+  planCarryOver,
+} from "./carry-over.ts"
 export {
   addressChat,
   agentByDefault,
@@ -205,6 +229,7 @@ export {
   offerSeen,
   offerView,
 } from "./offer-view.ts"
+export { keyAfter, orderAfter, orderBetween, orderKeys } from "./order.ts"
 export { displayName, PARTICIPANT, participants } from "./participant.ts"
 export {
   decodePinned,

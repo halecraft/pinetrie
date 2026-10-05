@@ -12,6 +12,9 @@ command), ADR-0060 and ADR-0072 (the catch-up commands get a tool), and
 own result carries a merge, and a steer carries a host's fact; see
 Decision).
 
+Amended by ADR-0085: the `archive` command is gone; `move-root` and
+`workflow` change the workspace people share in its place.
+
 **Context.** Pineta has grown commands the host carries out, each started
 by a button and nothing else (`packages/core/index.ts`):
 

@@ -157,11 +157,6 @@ export interface ColumnProps {
   nameOf: ReadonlyMap<WriterId, string>
   /** Everyone who can be mentioned (`readParticipants`). */
   participants: readonly string[]
-  /**
-   * Whether its header and composer show who else is reading and typing here
-   * (ADR-0024): not in the Archive tab's preview.
-   */
-  showsPresence: boolean
   /** Each person's colour (`presenceColors`). */
   colorOf: (writer: WriterId) => string
   /** This window is typing in this column's composer. */
@@ -191,13 +186,13 @@ export interface ColumnProps {
    * focus. True once per opening.
    */
   takeFocus: (key: string) => boolean
-  /** Whether × shows (`ColumnSlot.closable`); never in a preview. */
+  /** Whether × shows (`ColumnSlot.closable`). */
   closable: boolean
   /**
    * What each column knew of its end when last unmounted, by its key
-   * (`follow.ts`). None in the Archive preview.
+   * (`follow.ts`).
    */
-  seenEnd?: ScreenMemory<SeenEnd>
+  seenEnd: ScreenMemory<SeenEnd>
   /** Each tool row's state, by its call's id, across unmounts. */
   rows: ScreenMemory<RowMemory>
   /** Every ask (`indexAsks`), from the same moment as `index`. */
@@ -212,18 +207,18 @@ export interface ColumnProps {
   digests: ReadonlyMap<EntryId, DigestRecord>
   /**
    * How far you have read each thread, on every device of yours (ADR-0056,
-   * ADR-0077); none in a preview.
+   * ADR-0077).
    */
-  attention?: AttentionStore
+  attention: AttentionStore
   /** Every mounted column's view, which the rail outlines (ADR-0058). */
-  viewports?: ViewportStore
+  viewports: ViewportStore
   /** Where columns were left, by message (ADR-0058). */
-  spots?: SpotStore
+  spots: SpotStore
   /**
    * Every trace, by id (ADR-0048): the column draws its reader's own at its
-   * thread's end. None in the Archive preview.
+   * thread's end.
    */
-  traces?: ReadonlyMap<string, TraceRecord>
+  traces: ReadonlyMap<string, TraceRecord>
   /** Each column's composer place, which a put lands in (`put-target.ts`). */
   composers: ComposerPlacesStore
 }
@@ -287,13 +282,13 @@ export function Column(p: ColumnProps) {
   const streamingLanes = p.activity
     .filter(r => p.path.has(r.tip))
     .map(r => r.lane)
-  // Mounted again (its tab shown again) past the end its reader saw, it shows
+  // Mounted again (its root shown again) past the end its reader saw, it shows
   // ↓ new below wherever `alignOnOpen` places it short of its end.
   const [mountedBehind] = useState(() =>
-    behind(p.seenEnd?.get(p.column.key), view.tipId),
+    behind(p.seenEnd.get(p.column.key), view.tipId),
   )
   const [mountedReleased] = useState(
-    () => p.seenEnd?.get(p.column.key)?.released ?? null,
+    () => p.seenEnd.get(p.column.key)?.released ?? null,
   )
   // Where you last left the thread, on any device: read as the column
   // mounts and when the page shows again, so the line stays where it was
@@ -302,7 +297,7 @@ export function Column(p: ColumnProps) {
   const readLeft = useStable(() =>
     leftLane === null
       ? undefined
-      : p.attention?.attention.current().read.get(leftLane),
+      : p.attention.attention.current().read.get(leftLane),
   )
   const [leftAt, setLeftAt] = useState(readLeft)
   const [visible, setVisible] = useState(
@@ -334,15 +329,15 @@ export function Column(p: ColumnProps) {
       readonly released: EntryId | null
       readonly following: boolean
     }) => {
-      p.seenEnd?.remember(p.column.key, {
+      p.seenEnd.remember(p.column.key, {
         tip: view.tipId,
         unseen: left.unseen,
         released: left.released,
       })
       if (left.following && leftLane !== null && view.tipId !== null)
-        p.attention?.read(leftLane, view.tipId)
-      p.attention?.leave()
-      p.spots?.save(
+        p.attention.read(leftLane, view.tipId)
+      p.attention.leave()
+      p.spots.save(
         keepSpot(
           p.spots.load(),
           ids,
@@ -675,13 +670,13 @@ export function Column(p: ColumnProps) {
   // else moved them while you were away (ADR-0048). Drawn in a page you can
   // see, a trace is seen: the host deletes it, and this column keeps drawing
   // what it drew until it unmounts (`keptTraces`). Not in a column that
-  // cannot be written: the Archive preview is a glance, not a return.
+  // cannot be written: an archived root's is a glance, not a return.
   const watches = writable && threadEnd !== null
   const traces =
     !watches || threadEnd === null
       ? []
       : tracesAt(
-          p.traces?.values() ?? [],
+          p.traces.values(),
           p.session.writer,
           threadEnd,
           (from, placer) =>
@@ -801,7 +796,7 @@ export function Column(p: ColumnProps) {
                   }}
                 />
               )}
-              {p.showsPresence && view.tipId !== null && (
+              {view.tipId !== null && (
                 <SeenBy
                   colorOf={p.colorOf}
                   end={view.tipId}
@@ -1144,7 +1139,7 @@ export function Column(p: ColumnProps) {
             participants={p.participants}
             pending={p.column.fresh?.pending}
             readOnly={p.readOnly}
-            typingAt={p.showsPresence ? view.tipId : null}
+            typingAt={view.tipId}
             session={p.session}
           />
         </div>

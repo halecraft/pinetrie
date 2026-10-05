@@ -261,7 +261,7 @@ branches from the op log. Our mapping is exact. (ADR-0008)
 pineta:session   StorageDoc, no entries   session-wide host records:
                                           the directory of roots (pineta.root),
                                           every lane's record (pineta.lane),
-                                          the archive, names, offers, banners
+                                          the board, names, offers, banners
 root:<RootId>    StorageDoc, one a root   that root's pi storage (entries,
                                           values, lists) and the records keyed
                                           by its entries (revision, mark, stop)
@@ -279,7 +279,8 @@ moves:<writer>:<RootId>
 presence         ephemeral                who reads which thread, in which root
 ```
 
-The host holds the session, `live`, the places and every root not archived.
+The host holds the session, `live`, the places and every root not archived
+(not in the board's closed state, ADR-0085).
 A client holds the session, `live`, the places and only the roots its tabs
 show; it reads every other root through its directory record. pi runs one
 session and one harness per document.

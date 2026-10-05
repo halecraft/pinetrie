@@ -14,6 +14,9 @@ Amended by ADR-0068: a track is a branch's colour, by creation order, not
 its place on the rail.
 Amended by ADR-0081: the tab bar is the header, and the tab you are on is
 drawn as part of the page.
+Amended by ADR-0085: the tab bar becomes your list down the left, and the
+Archive tab the board; archiving is moving a root to the closed workflow
+state, whose place replaces the archive record.
 
 **Context.** The rail draws every tree in one strip, one after another, and
 columns from different trees sit side by side. `projectRail` starts each

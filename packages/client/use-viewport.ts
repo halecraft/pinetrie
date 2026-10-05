@@ -15,8 +15,7 @@ import {
  * view on scroll and resize, as `useAskBar` does, and write the span to
  * `store` under `key` with the messages between its edges, out of `ids`, the
  * column's messages in order. Returns the latest span, which a column leaving
- * keeps as its spot. With no store (the Archive preview has one too), it
- * still measures.
+ * keeps as its spot.
  */
 export function useViewport(
   body: RefObject<HTMLElement | null>,
@@ -25,7 +24,7 @@ export function useViewport(
     readonly key: string
     readonly track: number
     readonly ids: readonly string[]
-    readonly store: ViewportStore | undefined
+    readonly store: ViewportStore
   },
 ): RefObject<Span | null> {
   const span = useRef<Span | null>(null)
@@ -50,11 +49,11 @@ export function useViewport(
       span.current = next
       if (sameSpan(next, told)) return
       told = next
-      if (next === null) return store?.set(key, null)
+      if (next === null) return store.set(key, null)
       const from = at.get(next.first.id)
       const to = at.get(next.last.id)
       if (from === undefined || to === undefined) return
-      store?.set(key, {
+      store.set(key, {
         track,
         ids: ids.slice(from, to + 1),
         first: next.first.at,
@@ -76,6 +75,6 @@ export function useViewport(
     }
   }, [body, content, key, track, ids, at, store])
   // Gone from the rail when the column is.
-  useEffect(() => () => store?.set(key, null), [store, key])
+  useEffect(() => () => store.set(key, null), [store, key])
   return span
 }

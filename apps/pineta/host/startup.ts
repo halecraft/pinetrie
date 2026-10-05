@@ -12,8 +12,10 @@ import {
   readVerdicts,
 } from "@pineta/reads"
 import {
+  type CarryOver,
   COMMANDS,
   COMMANDS_KEY,
+  carryOverWrites,
   deleteRecord,
   PROJECT,
   planCardSweep,
@@ -49,10 +51,17 @@ export interface StartupDeps {
   readonly cards: Pick<CardPort, "texts" | "stored" | "destroyDocs">
   /** Each card's history and traces (ADR-0048 step 6), swept with the cards. */
   readonly provenance: Pick<Provenance, "sweep">
+  /**
+   * A store from before the board, carried over (ADR-0085): planned before
+   * the roots were opened, since it says which are archived, and written
+   * here, first. Null when the store has a workflow.
+   */
+  readonly carryOver: CarryOver | null
 }
 
 /**
- * In order: no stream survives a process, so clear them; log the stored lane
+ * In order: no stream survives a process, so clear them; write a carry-over
+ * from before the board (ADR-0085); log the stored lane
  * names that are not a thread's, which no reader is given; name every lane
  * that has none (ADR-0039); resume each lane a crash interrupted, in its own
  * directory (`planStartup`); write what the host found, the commands its
@@ -66,6 +75,13 @@ export async function recover(deps: StartupDeps): Promise<void> {
   const { agent, work, keeper, settle } = deps
   const { session: doc, docs, live, places, log } = deps.basics
   clearStreams(live)
+  const { carryOver } = deps
+  if (carryOver !== null) {
+    await keeper.run(() => agent.writeValues(carryOverWrites(carryOver)))
+    log(
+      `[host] carried the store over to the board: ${carryOver.places.length} root(s), ${carryOver.old.length} archive record(s) replaced`,
+    )
+  }
   const malformed: string[] = []
   for (const root of deps.roots)
     malformed.push(...readStoredLanes(await docs.root(root)).malformed)

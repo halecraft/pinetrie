@@ -7,6 +7,7 @@ import {
   type ProjectRecord,
   rootIdFor,
   runId,
+  workflowStateIdFor,
   writerId,
 } from "@pineta/core"
 import { createKeeper } from "@pineta/keeper"
@@ -52,6 +53,7 @@ const deps = (over: Partial<StartupDeps> = {}): StartupDeps => ({
     destroyDocs: async () => {},
   }).port,
   provenance: { sweep: async () => {} },
+  carryOver: null,
   ...over,
 })
 
@@ -215,4 +217,41 @@ test("recover sweeps empty cards, texts no record names, and seats no text names
       .map(c => c.args[0])
       .filter(ws => (ws as { kind: string }[]).some(w => w.kind === "delete")),
   ).toEqual([[deleteRecord(SEAT, "p-22"), deleteRecord(SEAT, "p-33")]])
+})
+
+test("recover writes a carry-over from before the board first, before it resumes anything (ADR-0085)", async () => {
+  const events: string[] = []
+  const workflow = {
+    open: [{ id: workflowStateIdFor("d"), name: "Doing" }],
+    closed: { id: workflowStateIdFor("x"), name: "Done" },
+  }
+  await recover(
+    deps({
+      agent: agentPort({
+        writeValues: async writes => {
+          events.push(writes.map(w => `${w.kind} ${w.namespace}`).join(", "))
+        },
+      }).port,
+      ensureNames: async () => {
+        events.push("names")
+      },
+      carryOver: {
+        workflow,
+        places: [
+          {
+            root: ROOT_ID,
+            state: workflow.closed.id,
+            rank: "a",
+            by: writerId("ada@x.io"),
+            at: 1,
+          },
+        ],
+        old: [entryId("e-1")],
+      },
+    }),
+  )
+  expect(events.slice(0, 2)).toEqual([
+    "set pineta.workflow, set pineta.board, delete pineta.archive",
+    "names",
+  ])
 })

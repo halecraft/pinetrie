@@ -19,12 +19,11 @@ import {
 import type { LineConfig } from "@pineta/lanes"
 import type { Agent } from "@pineta/pi"
 import {
-  readArchive,
+  readArchived,
   readBases,
   readNames,
   readOffers,
   readRevisions,
-  readRoots,
   readTreeIndex,
 } from "@pineta/reads"
 import type { OfferInput, RepoOwner } from "@pineta/repo"
@@ -102,13 +101,7 @@ export function createOfferDeps(input: {
     nameOf,
     archived(lane) {
       const root = docs.rootOfLane(lane)
-      return (
-        archivedIn(
-          root === null ? [] : [root],
-          readRoots(doc),
-          readArchive(doc),
-        ) !== null
-      )
+      return archivedIn(root === null ? [] : [root], readArchived(doc)) !== null
     },
     input: lane => ({
       lane,

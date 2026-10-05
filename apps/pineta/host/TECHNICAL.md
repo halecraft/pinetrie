@@ -30,7 +30,7 @@ wires them.
 | `seats.ts` | each connected seat's person, written once as a `pineta.seat` record (started after `recover`), and unloading the histories of moves of a person with no seat left |
 | `startup.ts` | `recover`: what a starting host does before it takes a command |
 | `control.ts` | the command Line of each client seat, and who its writer is |
-| `commands/` | one module per command: `chat`, `archive`, `mark`, `lane` (stop, carry on, offer: each finds its lane through `laneAt`), `cards` (a move, an undo of moves, a command, a busy chat's card queued, a sent card spent: ADR-0059, ADR-0066); `index.ts` decodes, decides where it runs (`placeOfCommand`), checks the archive, routes, and sends a popped queued card behind the same check (`sendPoppedQueuedCard`) |
+| `commands/` | one module per command: `chat`, `board` (a move on the board, a change to its states: ADR-0085), `mark`, `lane` (stop, carry on, offer: each finds its lane through `laneAt`), `cards` (a move, an undo of moves, a command, a busy chat's card queued, a sent card spent: ADR-0059, ADR-0066); `index.ts` decodes, decides where it runs (`placeOfCommand`), checks the archive, routes, and sends a popped queued card behind the same check (`sendPoppedQueuedCard`) |
 | `http.ts` | the HTTP server: admission, Vite, the websocket, blobs, offer reads, invites |
 | `responses.ts` | every answer the host writes itself, as a pure `HttpAnswer` |
 | `routes.ts` | what a request or an upgrade gets, pure: admission first (`planRequest`, `planUpgrade`), then which requests are the host's (`route`) |
@@ -51,11 +51,12 @@ wires them.
   `HostKey` in `basics.ts`). Where a command runs is decided, pure, by
   `placeOfCommand` (`commands/index.ts`, ADR-0065): an offer action but a
   split, and a `line` command, go straight to the owner of your repo after
-  the archive gate (a synchronous read), and hold no other command; an
-  archive is three parts (`commands/archive.ts`): its record on the keeper,
-  its teardown (containers, refs through the owner, snapshots) off it,
-  tracked, and its unload on the keeper again, the reply after all three.
-  Between the record and the unload, the gate refuses any write into the
+  the archive gate (a synchronous read), and hold no other command; a move
+  on the board is up to three parts (`commands/board.ts`): its place on the
+  keeper, and, when it crosses the closed state's edge, its teardown
+  (containers, refs through the owner, snapshots) off it, tracked, and, for
+  a close, its unload on the keeper again, the reply after all of it.
+  Between the place and the unload, the gate refuses any write into the
   root. A split stays one keeper step: it reads the lane and starts a run. A
   step
   gathers, plans and executes with nothing in between, so its plan is still
@@ -161,7 +162,10 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
   `root` or `laneDoc`.
 - **A starting host opens the roots `planLoads` names**: every root in the
   directory that is not archived, before `recover`. A busy root cannot be
-  archived, so these hold every lane a crash could have interrupted.
+  archived, so these hold every lane a crash could have interrupted. Which
+  roots are archived is the board's (`readArchived`), or, for a store from
+  before the board, the carry-over's, planned before the roots are opened
+  since the agent that writes it is made after (ADR-0085).
   Archiving `unload`s a root (`work/archive.ts`); restoring opens it.
   `unload` first has pi close its harness over the root (`releasing`,
   `Agent.release`): a harness kept would write to the closed document, and
@@ -191,7 +195,9 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
 After `recover`, `sweepHistories` retires the histories of moves no one will undo again (§
 Moves' history).
 
-`recover` runs, in order: `clearStreams` (no stream survives a process), a
+`recover` runs, in order: `clearStreams` (no stream survives a process), the
+carry-over's writes from before the board, if `planCarryOver` planned any
+(`carryOverWrites`, ADR-0085), a
 log of the stored lane names, in the roots opened, that fail `isLaneName`
 (`readStoredLanes`: no reader is given them, so the log is where one shows;
 it never throws, and nothing is deleted), `ensureNames` (ADR-0039),
@@ -274,9 +280,19 @@ rejects `shutdown()`.
   written part of it. The seat's loop goes on to its next command.
 - **A command's id is its send's id.** The column that sent a chat finds its
   message by it (`TreeIndex.bySend`).
-- **The archive gate is in the dispatcher** (`refuseInArchive`). Only the
+- **The archive gate is in the dispatcher** (`refuseInArchive`), over
+  `readArchived`: a root in the closed workflow state. Only the
   `chat` command and `sendPoppedQueuedCard` call `sendChat`, both behind the gate, so
   `sendChat` has no gate of its own.
+- **A root a chat starts takes its place on the board in the same step**
+  (`placeNewRoot`, `placeStarted`): at the end of the state the chat names
+  (`Command.state`, a board column's ＋), else of the first open state.
+- **A move on the board** (`handleRootMove`): `planRootMove` over the
+  workflow and the places; a move within open states writes its place and
+  answers; one that crosses the closed state's edge gathers the root's
+  document (`docs.root` loads an unloaded one, S86) and `planArchive`s the
+  crossing first. **A change to the states** (`handleWorkflow`) is one
+  keeper step, `planWorkflowEdit` over the workflow and the board.
 - **A message sent from a card spends it** (ADR-0048): `sendChat` names the
   card's other writers as contributors, through the card port, and spends
   nothing. The dispatcher's `chat` case spends the card when the answer
@@ -330,9 +346,9 @@ rejects `shutdown()`.
   place now, `unmoved` (shaped as a refused move) when someone moved a card
   since, or `nothing`.
 - **A person's documents are clients' documents the host only keeps**
-  (ADR-0059, ADR-0077): their inventory and their attention. `resolveDoc`
-  names a `<kind>:<writer>` id's kind, and the host interprets it as
-  `InventoryDoc` or `AttentionDoc`; the policy shares it only with the
+  (ADR-0059, ADR-0077, ADR-0085): their inventory, their attention and
+  their list. `resolveDoc` names a `<kind>:<writer>` id's kind, and the host
+  interprets it as `InventoryDoc`, `AttentionDoc` or `OpenDoc`; the policy shares it only with the
   peers whose principal is that writer (`holdsPersonDoc`), and who may
   write it is the protocol's (`writersPolicy`, below). Kyneta fires
   `resolve` only for a peer `canShare` grants (S76), so nobody else can
@@ -568,7 +584,7 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 | `create.ts` | a new lane: `checkDirectory`, its record and name, its fork (`forkFacts` waits for `pendingRecords`) |
 | `update.ts` | an update (`withLaneStarted`, then one queued step, `planSettle` and `applySettle`); `catchUpInRun`, the agent's `catch_up`; `askedAboutConflict`, which asks jj for conflicts in the lane's copy |
 | `split.ts` | a split's prompt, and its end (`finishSplit`) |
-| `archive.ts` | an archive's or a restore's teardown (`planArchive`'s), off the documents' keeper |
+| `archive.ts` | a close's or a reopen's teardown (`planArchive`'s), off the documents' keeper |
 | `disk.ts` | the snapshot on a lane's queue, and the lockfile's hash |
 
 - **State lives where it changes.** What startup found is `Setup`'s, fixed
@@ -678,8 +694,8 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   packages, what the host writes is tested over `record<T>()`, and
   `packages/repo/repo.test.ts` proves the reads and steps against real jj.
 - **What only the documents know is read here, first** (`state.ts`,
-  `OfferDocs`): the thread's name, whether its root is archived (from the
-  archive record, never from the lane's tip being missing: a tip missing
+  `OfferDocs`): the thread's name, whether its root is archived (from its
+  board place, `readArchived`, never from the lane's tip being missing: a tip missing
   for one import, S78, must not withdraw a live offer), the last catch-up
   read (`pineta.base`, a memo `readCatchUp` keeps at the same tip and base
   commit, never read to decide), the lane's tip entry and the WIP line.

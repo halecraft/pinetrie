@@ -6,6 +6,9 @@ work), and by ADR-0029, which replaces that: a stored layout holds
 the active root tab and each root's columns; and by ADR-0030: it
 also holds your open roots. ADR-0037 makes a person their email, so a tab is
 no longer a writer.
+Amended by ADR-0085: your open roots leave the stored layout for your own
+document, on every device; the layout keeps which root you are on, each
+root's columns, new tabs and whether the board is open.
 
 **Context.** Which columns are open is view state, never written (ADR-0024's
 reasoning: which paths a person reads is theirs). Nothing else kept it either,

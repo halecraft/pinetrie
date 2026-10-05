@@ -1,20 +1,23 @@
-// client/layout — which tab you are on, your tabs, and each root's columns
-// (ADR-0029, ADR-0030).
+// client/layout — which root you are on, your list, and each root's columns
+// (ADR-0029, ADR-0030, ADR-0085).
 //
-// A root tab shows one root: its rail and its columns. Your tabs are the roots
-// you have open, in the order you opened them; a root someone else starts
-// opens none. The layout also keeps a column list per root you have opened,
-// and new tabs, each one fresh column at the root that becomes your tab once
-// its first message is written. It is this browser tab's view state, never
-// written to the document; it is stored per browser tab (ADR-0027) in the form
-// at the end of this file. Pure.
+// The root you are on shows one root: its rail and its columns. Your list is
+// the roots you have open, in your order: it is your own document, the same
+// on every device (`openList`, `@pineta/session`), and comes in here as a
+// fact, so the layout draws it but never stores it. The layout keeps a
+// column list per root you have opened, and new tabs: each one fresh column
+// at the root that becomes a root of your list once its first message is
+// written. Which root you are on, the columns, the new tabs and whether the
+// board is open are this browser tab's view state, never written to the
+// document; they are stored per browser tab (ADR-0027) in the form at the end
+// of this file. Pure.
 
 import {
-  type ArchiveRecord,
   ancestry,
   type EntryId,
   entryId,
   isLaneName,
+  isWorkflowStateId,
   type LaneView,
   parseNewLane,
   parseNewRoot,
@@ -23,6 +26,7 @@ import {
   type RootId,
   rootOf,
   type TreeIndex,
+  type WorkflowStateId,
 } from "@pineta/core"
 import { type Static, Type } from "typebox"
 import { Value } from "typebox/value"
@@ -35,30 +39,39 @@ import {
   type ReaderAction,
 } from "./columns.ts"
 
-export type ActiveTab =
-  | { readonly kind: "archive" }
+/** What the workspace shows: a root of your list, a new tab, or nothing. */
+export type Here =
+  | { readonly kind: "nothing" }
   | { readonly kind: "root"; readonly root: EntryId }
   | { readonly kind: "new"; readonly key: string }
 
+export const NOTHING: Here = { kind: "nothing" }
+
 export interface Layout {
   /**
-   * Null until a tab is chosen: a browser tab with nothing stored, before the
+   * Null until it is chosen: a browser tab with nothing stored, before the
    * document settles. `prune` chooses; no action sets it back to null.
    */
-  readonly active: ActiveTab | null
-  /** Your open roots, in the order you opened them: the bar's root tabs. */
+  readonly active: Here | null
+  /**
+   * Your list as drawn: your open roots in your order (`LayoutFacts.list`),
+   * less the archived ones but the root you are on, and the root you are on
+   * wherever the list lacks it. Derived by `resolveLayout`, never stored.
+   */
   readonly open: readonly EntryId[]
   /**
-   * Each opened root's columns, in order, kept when its tab is closed so
+   * Each opened root's columns, in order, kept when it leaves your list so
    * opening it again brings them back. A root with none is absent.
    */
   readonly roots: ReadonlyMap<EntryId, readonly Column[]>
   /** New tabs: each one fresh column at the root, local until its first send. */
   readonly newTabs: readonly Column[]
+  /** Whether the board is open over the columns (ADR-0085). */
+  readonly board: boolean
 }
 
 export type LayoutAction =
-  | { readonly kind: "show"; readonly tab: ActiveTab }
+  | { readonly kind: "show"; readonly here: Here }
   | {
       readonly kind: "newTab"
       readonly key: string
@@ -67,10 +80,15 @@ export type LayoutAction =
       readonly asksAgent: boolean
       /** What its composer starts with. */
       readonly prefill?: Prefill
+      /** The workflow state its root lands in: the board column it was opened from. */
+      readonly state?: WorkflowStateId
     }
   /** Close an unsent new tab; nothing was written. */
   | { readonly kind: "closeNewTab"; readonly key: string }
-  /** Close a root's tab for you: nothing is written, and its columns are kept. */
+  /**
+   * A root leaves your list (its document is written apart): if you are on
+   * it, show its neighbour. Its columns are kept.
+   */
   | { readonly kind: "closeRoot"; readonly root: EntryId }
   /** A column action on one root's columns; `sync` and `prune` are the layout's. */
   | {
@@ -89,22 +107,25 @@ export type LayoutAction =
         | Extract<ColumnAction, { kind: "sent" | "reserve" }>
         | ReaderAction
     }
+  /** Open or close the board. */
+  | { readonly kind: "board"; readonly open: boolean }
   /** Store what `resolveLayout` draws for these facts. */
   | ({ readonly kind: "resolve" } & LayoutFacts)
   /** Once, after the documents settle: the roots the directory lacks go, and `active` is chosen. */
-  | {
+  | ({
       readonly kind: "prune"
-      readonly index: TreeIndex
-      readonly archive: ReadonlyMap<EntryId, ArchiveRecord>
       /** Every root the directory names, by its root entry (ADR-0063). */
       readonly known: ReadonlySet<EntryId>
-    }
+    } & LayoutFacts)
 
 /** The document facts a layout follows: one moment's, read together. */
 export interface LayoutFacts {
   readonly index: TreeIndex
   readonly lanes: readonly LaneView[]
-  readonly archive: ReadonlyMap<EntryId, ArchiveRecord>
+  /** The roots in the closed workflow state, by root entry (ADR-0085). */
+  readonly archived: ReadonlySet<EntryId>
+  /** Your list (`openList`), by root entry: a root the directory lacks is left out. */
+  readonly list: readonly EntryId[]
 }
 
 export const initialLayout = (): Layout => ({
@@ -112,6 +133,7 @@ export const initialLayout = (): Layout => ({
   open: [],
   roots: new Map(),
   newTabs: [],
+  board: false,
 })
 
 /**
@@ -123,20 +145,17 @@ export function columnsOf(layout: Layout, root: EntryId): readonly Column[] {
 }
 
 /**
- * The tab a column is in, by its key: a new tab's, or a root's, whether or not
- * that root's tab is open. Undefined for a key this layout does not hold.
+ * Where a column is, by its key: a new tab's, or a root's, whether or not
+ * that root is in your list. Undefined for a key this layout does not hold.
  */
-export function tabOfColumn(
-  layout: Layout,
-  key: string,
-): ActiveTab | undefined {
+export function hereOfColumn(layout: Layout, key: string): Here | undefined {
   if (layout.newTabs.some(c => c.key === key)) return { kind: "new", key }
   for (const [root, columns] of layout.roots)
     if (columns.some(c => c.key === key)) return { kind: "root", root }
   return undefined
 }
 
-export const sameTab = (a: ActiveTab | null, b: ActiveTab): boolean =>
+export const sameHere = (a: Here | null, b: Here): boolean =>
   a !== null &&
   a.kind === b.kind &&
   (a.kind !== "root" || b.kind !== "root" || a.root === b.root) &&
@@ -154,50 +173,48 @@ const withRoot = (
   return next
 }
 
-/** `open` with `root` at its end, unless it is there already. */
-const opened = (open: readonly EntryId[], root: EntryId): readonly EntryId[] =>
-  open.includes(root) ? open : [...open, root]
-
-/** Your open roots, less the archived ones other than the root you are on. */
-function withoutArchived(
-  open: readonly EntryId[],
-  archive: ReadonlyMap<EntryId, ArchiveRecord>,
-  active: ActiveTab | null,
+/**
+ * Your list as drawn: the archived roots leave it, but the root you are on,
+ * which stays where it is, or comes at the end where the list lacks it:
+ * another device's repair may have taken it out (`planOpenRepair`).
+ */
+function drawnList(
+  list: readonly EntryId[],
+  archived: ReadonlySet<EntryId>,
+  active: Here | null,
 ): readonly EntryId[] {
-  const kept = open.filter(
-    root =>
-      archive.get(root)?.state !== "archived" ||
-      (active?.kind === "root" && active.root === root),
-  )
-  return kept.length === open.length ? open : kept
+  const here = active?.kind === "root" ? active.root : null
+  const kept = list.filter(r => !archived.has(r) || r === here)
+  return here === null || kept.includes(here) ? kept : [...kept, here]
 }
 
+const sameList = (a: readonly EntryId[], b: readonly EntryId[]): boolean =>
+  a.length === b.length && a.every((r, i) => b[i] === r)
+
 /**
- * The tab to show once `closed` is closed: its right neighbour in the bar,
- * else its left, else Archive. `layout` is before the close. Pure.
+ * What to show once `closed` is closed: its neighbour below in your list,
+ * else above, else nothing. `layout` is before the close. Pure.
  */
-export function afterClosing(layout: Layout, closed: ActiveTab): ActiveTab {
-  const bar = tabBar(layout)
-  const at = bar.findIndex(t => sameTab(t, closed))
-  const next = bar[at + 1] ?? bar[at - 1]
-  return at < 0 || next === undefined ? { kind: "archive" } : next
+export function afterClosing(layout: Layout, closed: Here): Here {
+  const items = listOf(layout)
+  const at = items.findIndex(t => sameHere(t, closed))
+  const next = items[at + 1] ?? items[at - 1]
+  return at < 0 || next === undefined ? NOTHING : next
 }
 
 export function layoutReducer(state: Layout, action: LayoutAction): Layout {
   switch (action.kind) {
+    // Choosing what to work in closes the board, which lay over it.
     case "show": {
-      // Showing a root is opening it.
-      const open =
-        action.tab.kind === "root"
-          ? opened(state.open, action.tab.root)
-          : state.open
-      return sameTab(state.active, action.tab) && open === state.open
+      const board = action.here.kind === "nothing" && state.board
+      return sameHere(state.active, action.here) && board === state.board
         ? state
-        : { ...state, active: action.tab, open }
+        : { ...state, active: action.here, board }
     }
     case "newTab":
       return {
         ...state,
+        board: false,
         active: { kind: "new", key: action.key },
         newTabs: [
           ...state.newTabs,
@@ -209,31 +226,26 @@ export function layoutReducer(state: Layout, action: LayoutAction): Layout {
               ...(action.prefill === undefined
                 ? {}
                 : { prefill: action.prefill }),
+              ...(action.state === undefined ? {} : { state: action.state }),
             },
             ...(action.asksAgent ? { asksAgent: true } : {}),
           },
         ],
       }
     case "closeNewTab": {
-      const tab: ActiveTab = { kind: "new", key: action.key }
+      const here: Here = { kind: "new", key: action.key }
       return {
         ...state,
         newTabs: state.newTabs.filter(c => c.key !== action.key),
-        active: sameTab(state.active, tab)
-          ? afterClosing(state, tab)
+        active: sameHere(state.active, here)
+          ? afterClosing(state, here)
           : state.active,
       }
     }
     case "closeRoot": {
-      if (!state.open.includes(action.root)) return state
-      const tab: ActiveTab = { kind: "root", root: action.root }
-      return {
-        ...state,
-        open: state.open.filter(r => r !== action.root),
-        active: sameTab(state.active, tab)
-          ? afterClosing(state, tab)
-          : state.active,
-      }
+      const here: Here = { kind: "root", root: action.root }
+      if (!sameHere(state.active, here)) return state
+      return { ...state, active: afterClosing(state, here) }
     }
     case "columns": {
       const before = columnsOf(state, action.root)
@@ -251,30 +263,35 @@ export function layoutReducer(state: Layout, action: LayoutAction): Layout {
             : c,
         ),
       }
+    case "board":
+      return state.board === action.open
+        ? state
+        : { ...state, board: action.open }
     case "resolve":
       return resolveLayout(state, action)
     case "prune":
-      return pruneLayout(state, action.index, action.archive, action.known)
+      return pruneLayout(state, action, action.known)
   }
 }
 
 /**
  * The layout to draw: `stored` brought up to `facts`. `App` draws this in the
  * render that reads the facts, and stores it after, so no render pairs new
- * entries with an old anchor (S35). Archived roots leave your tabs, except
- * the one you are on (ADR-0030). Returns `stored` itself when nothing changes.
+ * entries with an old anchor (S35). Your list is the facts' (`drawnList`).
+ * Returns `stored` itself when nothing changes.
  */
 export function resolveLayout(stored: Layout, facts: LayoutFacts): Layout {
   const synced = syncLayout(stored, facts.index, facts.lanes)
-  const open = withoutArchived(synced.open, facts.archive, synced.active)
-  return open === synced.open ? synced : { ...synced, open }
+  const open = drawnList(facts.list, facts.archived, synced.active)
+  return sameList(open, synced.open) ? synced : { ...synced, open }
 }
 
 /**
  * Every root's columns follow the tree, not only the active root's: a stored
  * anchor left behind can later follow a newer branch below it (ADR-0027). A
- * new tab whose first message is written becomes that root's tab, and joins
- * your open roots at the end.
+ * new tab whose first message is written becomes its root's columns, and the
+ * root you are on; the session puts that root in your list as its send is
+ * answered.
  */
 function syncLayout(
   state: Layout,
@@ -294,7 +311,6 @@ function syncLayout(
     roots.set(root, next)
   }
   let active = state.active
-  let open = state.open
   const newTabs: Column[] = []
   for (const tab of state.newTabs) {
     const [column = tab] = columnsReducer([tab], { kind: "sync", index, lanes })
@@ -309,72 +325,77 @@ function syncLayout(
     }
     changed = true
     roots.set(root, [...(roots.get(root) ?? []), column])
-    open = opened(open, root)
-    if (sameTab(active, { kind: "new", key: tab.key }))
+    if (sameHere(active, { kind: "new", key: tab.key }))
       active = { kind: "root", root }
   }
-  return changed ? { active, open, roots, newTabs } : state
+  return changed ? { ...state, active, roots, newTabs } : state
 }
 
 /**
  * Once the documents have settled: roots the directory lacks go (`known`),
- * anchors a held root lacks go, archived roots leave your tabs, and the tab
- * to show is chosen. A root's columns are pruned only where this tab holds
- * it: another's anchors are in no index. A tab you were on that is gone or
- * archived gives way to your last open tab, else Archive; with nothing stored,
- * that is Archive, since nothing opens a tab by itself (ADR-0030).
+ * anchors a held root lacks go, and what to show is chosen. A root's columns
+ * are pruned only where this tab holds it: another's anchors are in no index.
+ * A root you were on that is gone or archived gives way to the last root of
+ * your list, else nothing, and with nothing the board opens: nothing opens a
+ * root by itself (ADR-0030).
  */
 function pruneLayout(
   state: Layout,
-  index: TreeIndex,
-  archive: ReadonlyMap<EntryId, ArchiveRecord>,
+  facts: LayoutFacts,
   knownRoots: ReadonlySet<EntryId>,
 ): Layout {
   let roots = state.roots
   for (const [root, columns] of state.roots) {
     const next = !knownRoots.has(root)
       ? []
-      : index.entries[root] === undefined
+      : facts.index.entries[root] === undefined
         ? columns
-        : columnsReducer(columns, { kind: "prune", index })
+        : columnsReducer(columns, { kind: "prune", index: facts.index })
     if (next !== columns) roots = withRoot(roots, root, next)
   }
-  const known = state.open.filter(r => knownRoots.has(r))
-  // An archived root you are on stays only until you leave it, and a reload
-  // leaves it (ADR-0029).
-  const open = withoutArchived(known, archive, null)
+  const list = facts.list.filter(
+    r => knownRoots.has(r) && !facts.archived.has(r),
+  )
   const active = state.active
+  // An archived root you were on is left at a reload (ADR-0029).
   const stays =
     active !== null &&
-    (active.kind === "archive" ||
-      (active.kind === "root" && open.includes(active.root)) ||
+    (active.kind === "nothing" ||
+      (active.kind === "root" &&
+        knownRoots.has(active.root) &&
+        !facts.archived.has(active.root)) ||
       (active.kind === "new" && state.newTabs.some(c => c.key === active.key)))
-  if (roots === state.roots && open === state.open && stays) return state
-  const last = open.at(-1)
-  const fallback: ActiveTab =
-    last === undefined ? { kind: "archive" } : { kind: "root", root: last }
-  return { ...state, roots, open, active: stays ? active : fallback }
+  if (roots === state.roots && stays) return state
+  const last = list.at(-1)
+  const fallback: Here =
+    last === undefined ? NOTHING : { kind: "root", root: last }
+  const shown = stays ? active : fallback
+  return {
+    ...state,
+    roots,
+    active: shown,
+    board: state.board || shown.kind === "nothing",
+  }
 }
 
 /**
- * Archive, your open roots in the order you opened them, then new tabs. An
- * archived root you are on is still in `open` (`resolveLayout` keeps it), so
- * it keeps its place.
+ * Your list as drawn, then new tabs: what the sidebar shows. An archived
+ * root you are on is still in `open` (`resolveLayout` keeps it), so it keeps
+ * its place.
  */
-export function tabBar(layout: Layout): readonly ActiveTab[] {
+export function listOf(layout: Layout): readonly Here[] {
   return [
-    { kind: "archive" },
     ...layout.open.map(root => ({ kind: "root", root }) as const),
     ...layout.newTabs.map(c => ({ kind: "new", key: c.key }) as const),
   ]
 }
 
 /**
- * The roots among `roots` with no tab in your bar and not archived: what
- * the Archive tab marks for them. An archived root's work is done, so it
- * marks only its own row.
+ * The roots among `roots` not in your list and not archived: what ▦ marks
+ * for them (ADR-0077, ADR-0085). An archived root's work is done, so it marks
+ * only its own row on the board.
  */
-export const untabbed = (
+export const unlisted = (
   layout: Pick<Layout, "open">,
   archived: ReadonlySet<EntryId>,
   roots: Iterable<EntryId>,
@@ -409,25 +430,20 @@ export type OpenPlan =
   | { readonly kind: "scroll"; readonly root: EntryId; readonly key: string }
   /** Show `root` and open a column anchored at the entry, after column `after`. */
   | { readonly kind: "open"; readonly root: EntryId; readonly after: number }
-  /** Its root is archived and not the tab you are on: preview it in the Archive tab. */
-  | { readonly kind: "preview"; readonly root: EntryId }
 
 /**
- * Show entry `id`, wherever it is. A message on a shared stretch of paths is
- * drawn once, in the leftmost column showing it, so every column's path is
- * searched. Null for an entry the index lacks.
+ * Show entry `id`, wherever it is: an archived root opens as any other, read
+ * only (`appView`). A message on a shared stretch of paths is drawn once, in
+ * the leftmost column showing it, so every column's path is searched. Null
+ * for an entry the index lacks.
  */
 export function planOpen(
   layout: Layout,
   index: TreeIndex,
-  archive: ReadonlyMap<EntryId, ArchiveRecord>,
   id: EntryId,
 ): OpenPlan | null {
   const root = rootOf(index, id)
   if (root === null) return null
-  const here = layout.active?.kind === "root" && layout.active.root === root
-  if (archive.get(root)?.state === "archived" && !here)
-    return { kind: "preview", root }
   const columns = columnsOf(layout, root)
   const views = projectColumns(
     index,
@@ -472,6 +488,7 @@ const StoredColumn = Type.Object({
     Type.Object({
       sendId: Type.Optional(Type.String()),
       root: Type.Optional(Type.String()),
+      state: Type.Optional(Type.String()),
       prefill: Type.Optional(
         Type.Object({
           text: Type.String(),
@@ -491,19 +508,23 @@ const StoredColumn = Type.Object({
   ),
 })
 
-const StoredTab = Type.Union([
-  Type.Object({ kind: Type.Literal("archive") }),
+const StoredHere = Type.Union([
+  Type.Object({ kind: Type.Literal("nothing") }),
   Type.Object({ kind: Type.Literal("root"), root: Type.String() }),
   Type.Object({ kind: Type.Literal("new"), key: Type.String() }),
 ])
 
-/** `v` changes when the shape does; an older layout is dropped, not migrated. */
+/**
+ * `v` changes when the shape does; an older layout is dropped, not migrated.
+ * `v: 5` (ADR-0085): your list left for your own document, and the board's
+ * state came in.
+ */
 const StoredLayout = Type.Object({
-  v: Type.Literal(4),
-  active: Type.Union([StoredTab, Type.Null()]),
-  open: Type.Array(Type.String()),
+  v: Type.Literal(5),
+  active: Type.Union([StoredHere, Type.Null()]),
   roots: Type.Record(Type.String(), Type.Array(StoredColumn, { minItems: 1 })),
   newTabs: Type.Array(StoredColumn),
+  board: Type.Boolean(),
 })
 
 type Stored = Static<typeof StoredColumn>
@@ -522,6 +543,7 @@ const toStored = (c: Column): Stored => ({
         fresh: {
           ...(c.fresh.sendId === undefined ? {} : { sendId: c.fresh.sendId }),
           ...(c.fresh.root === undefined ? {} : { root: c.fresh.root }),
+          ...(c.fresh.state === undefined ? {} : { state: c.fresh.state }),
           ...(c.fresh.prefill === undefined
             ? {}
             : {
@@ -565,6 +587,9 @@ const fromStored = (s: Stored, mintRoot: (() => RootId) | null): Column => ({
                     ? undefined
                     : parseNewRoot(s.fresh.root)) ?? mintRoot(),
               }),
+          ...(s.fresh.state !== undefined && isWorkflowStateId(s.fresh.state)
+            ? { state: s.fresh.state }
+            : {}),
           ...(s.fresh.prefill === undefined
             ? {}
             : {
@@ -587,13 +612,13 @@ const reservedFromStored = (stored: string | undefined) => {
 }
 
 export const encodeLayout = (layout: Layout): Static<typeof StoredLayout> => ({
-  v: 4,
+  v: 5,
   active: layout.active,
-  open: [...layout.open],
   roots: Object.fromEntries(
     [...layout.roots].map(([root, columns]) => [root, columns.map(toStored)]),
   ),
   newTabs: layout.newTabs.map(toStored),
+  board: layout.board,
 })
 
 /**
@@ -611,7 +636,7 @@ export const decodeLayout = (
           raw.active?.kind === "root"
             ? { kind: "root", root: entryId(raw.active.root) }
             : raw.active,
-        open: raw.open.map(entryId),
+        open: [],
         roots: new Map(
           Object.entries(raw.roots).map(([root, columns]) => [
             entryId(root),
@@ -619,5 +644,6 @@ export const decodeLayout = (
           ]),
         ),
         newTabs: raw.newTabs.map(c => fromStored(c, mintRoot)),
+        board: raw.board,
       }
     : undefined

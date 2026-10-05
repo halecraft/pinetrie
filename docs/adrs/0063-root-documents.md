@@ -9,6 +9,9 @@ send; a fresh card's place carries a `Spot`; `places` is Yjs, not `json`.
 Amended by ADR-0077: a root's directory record holds who has written on each
 of its threads (`threads`), and the directory refreshes a root's record as
 the host opens it.
+Amended by ADR-0085: the archive record goes; a root is archived while its
+board place, keyed by its `RootId`, is in the closed state, and the Archive
+tab's search over labels is the closed state's.
 
 **Context.** The session was one Kyneta document, `pineta:session`: pi's
 storage for every root ever started, the host's records, and what is

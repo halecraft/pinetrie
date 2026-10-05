@@ -1,7 +1,7 @@
 // host/commands — one command from one writer: decoded, checked against the
 // archive, and routed to its module, in the place it runs
 // (`placeOfCommand`, ADR-0065): a step on the documents' keeper, straight
-// through to the owner of your repo, or an archive's three parts.
+// through to the owner of your repo, or a board move's three parts.
 
 import { ERR, type Intent, type RootId, type WriterId } from "@pineta/core"
 import type { Agent } from "@pineta/pi"
@@ -11,11 +11,18 @@ import {
   type Outcome,
   type WireCommand,
 } from "@pineta/protocol/codec"
-import { readArchive, readParticipantNames, readRoots } from "@pineta/reads"
+import {
+  readArchived,
+  readBoardPlaces,
+  readParticipantNames,
+  readWorkflow,
+} from "@pineta/reads"
 import {
   archivedIn,
+  BOARD,
   displayName,
   PARTICIPANT,
+  placeStarted,
   setRecord,
   writesIn,
 } from "@pineta/rules"
@@ -23,7 +30,7 @@ import { type Basics, failed, type HostKeeper, messageOf } from "../basics.ts"
 import type { ControlSender } from "../control.ts"
 import type { Names } from "../names.ts"
 import type { Titles } from "../titles.ts"
-import { type ArchiveDeps, handleArchive } from "./archive.ts"
+import { type BoardDeps, handleRootMove, handleWorkflow } from "./board.ts"
 import {
   type CardCommandDeps,
   createCardCommands,
@@ -43,11 +50,11 @@ import { handleMark, type MarkDeps } from "./mark.ts"
 export interface CommandDeps {
   readonly basics: ChatDeps["basics"]
   readonly agent: ChatDeps["agent"] &
-    ArchiveDeps["agent"] &
+    BoardDeps["agent"] &
     MarkDeps["agent"] &
     LaneDeps["agent"] &
     Pick<Agent, "writeValues">
-  readonly work: ChatDeps["work"] & ArchiveDeps["work"] & LaneDeps["work"]
+  readonly work: ChatDeps["work"] & BoardDeps["work"] & LaneDeps["work"]
   readonly blobs: ChatDeps["blobs"]
   readonly cards: ChatDeps["cards"] & CardCommandDeps["cards"]
   readonly start: ChatDeps["start"]
@@ -64,18 +71,16 @@ export interface CommandDeps {
 /**
  * Where a command runs (ADR-0065). An offer action and a `line` command act
  * on your repo only: they go straight to its owner, and hold no other
- * command. An archive is three parts (`handleArchive`). Everything else is
- * one step on the documents' keeper.
+ * command. A move on the board is up to three parts (`handleRootMove`).
+ * Everything else is one step on the documents' keeper.
  */
-export function placeOfCommand(
-  intent: Intent,
-): "documents" | "repo" | "archive" {
+export function placeOfCommand(intent: Intent): "documents" | "repo" | "board" {
   switch (intent.kind) {
     case "offer":
     case "line":
       return "repo"
-    case "archive":
-      return "archive"
+    case "move-root":
+      return "board"
     default:
       return "documents"
   }
@@ -146,7 +151,7 @@ export function createCommands(deps: CommandDeps): Commands {
       case "documents":
         return deps.keeper.run(() => carry(writer, intent, id))
       case "repo":
-      case "archive":
+      case "board":
         // The archive gate is a synchronous read, so it needs no keeper.
         return carry(writer, intent, id)
     }
@@ -168,6 +173,10 @@ export function createCommands(deps: CommandDeps): Commands {
         // The command's id is the send's id: its column finds its message by it.
         const sendId = id === "" ? newId() : id
         const sent = await sendChat(deps, writer, sendId, intent)
+        // A thread at the root that was written started a root: it takes its
+        // place on the board in the same step (ADR-0085).
+        if (intent.at.kind === "root" && spendsCard(sent))
+          await placeNewRoot(deps, writer, intent)
         const card = intent.card
         if (card === null) return settled(sent)
         if (spendsCard(sent))
@@ -199,8 +208,10 @@ export function createCommands(deps: CommandDeps): Commands {
         return settled(await handleStop(deps, intent.lane, writer))
       case "carry-on":
         return settled(await handleCarryOn(deps, intent.lane, writer))
-      case "archive":
-        return settled(await handleArchive(deps, writer, intent))
+      case "move-root":
+        return settled(await handleRootMove(deps, writer, intent))
+      case "workflow":
+        return settled(await handleWorkflow(deps, intent))
       case "mark":
         return settled(await handleMark(deps, writer, intent))
       case "retitle":
@@ -235,9 +246,33 @@ export function createCommands(deps: CommandDeps): Commands {
   }
 }
 
+/** A root a chat started, put at the end of the state its sender chose (ADR-0085). */
+async function placeNewRoot(
+  deps: Pick<CommandDeps, "basics" | "agent">,
+  writer: WriterId,
+  chat: Chat,
+): Promise<void> {
+  const { session, now } = deps.basics
+  const workflow = readWorkflow(session)
+  if (workflow === null) return
+  await deps.agent.writeValues([
+    setRecord(
+      BOARD,
+      placeStarted({
+        root: chat.root,
+        state: chat.state,
+        by: writer,
+        now: now(),
+        workflow,
+        places: readBoardPlaces(session),
+      }),
+    ),
+  ])
+}
+
 /**
- * A command that would write in an archived root is refused, naming who
- * archived it (ADR-0029). `sendChat`'s only callers are this dispatcher and
+ * A command that would write in an archived root, one in the closed
+ * workflow state, is refused, naming who moved it there (ADR-0029, ADR-0085). `sendChat`'s only callers are this dispatcher and
  * `sendPoppedQueuedCard`, both behind it, so it needs no check of its own.
  * `root` is the roots the command writes in (`writesIn`), which names them,
  * so no root's document is opened to check. Null when the command may go on.
@@ -247,9 +282,9 @@ function refuseInArchive(
   roots: readonly RootId[],
 ): Outcome | null {
   const { session } = basics
-  const archive = readArchive(session)
-  if (archive.size === 0) return null
-  const record = archivedIn(roots, readRoots(session), archive)
+  const archived = readArchived(session)
+  if (archived.size === 0) return null
+  const record = archivedIn(roots, archived)
   if (record === null) return null
   const names = readParticipantNames(session)
   return {

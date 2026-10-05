@@ -1,0 +1,64 @@
+// session/open-repair — what your list's document should say (ADR-0085).
+// Pure: `open-list.ts` writes what these decide.
+
+import type { RootId } from "@pineta/core"
+import { keyAfter, orderBetween, orderKeys } from "@pineta/rules"
+import { orderOpen } from "@pineta/schema"
+
+/** Keys to set, by root, and roots to delete: one batch to your document. */
+export interface OpenWrites {
+  readonly set: ReadonlyMap<RootId, string>
+  readonly delete: readonly RootId[]
+}
+
+const NO_OPEN_WRITES: OpenWrites = { set: new Map(), delete: [] }
+
+/**
+ * `root` put before `before` in your list, or at its end for null or a root
+ * not in it; a root already in it moves. Renumbers every root when there is
+ * no room between its neighbours.
+ */
+export function placeInList(
+  keys: ReadonlyMap<RootId, string>,
+  root: RootId,
+  before: RootId | null,
+): OpenWrites {
+  const others = orderOpen(keys).filter(r => r !== root)
+  const at =
+    before === null || !others.includes(before)
+      ? others.length
+      : others.indexOf(before)
+  const order = [...others.slice(0, at), root, ...others.slice(at)]
+  const current = orderOpen(keys)
+  if (keys.has(root) && order.every((r, i) => current[i] === r))
+    return NO_OPEN_WRITES
+  const low = order[at - 1]
+  const high = order[at + 1]
+  const key =
+    high === undefined
+      ? keyAfter(others.map(r => keys.get(r) ?? ""))
+      : orderBetween(
+          low === undefined ? null : (keys.get(low) ?? null),
+          keys.get(high) ?? null,
+        )
+  if (key !== null) return { set: new Map([[root, key]]), delete: [] }
+  const renumbered = orderKeys(order.length)
+  return {
+    set: new Map(order.map((r, i) => [r, renumbered[i] ?? ""] as const)),
+    delete: [],
+  }
+}
+
+/**
+ * The repair: archived roots leave your list, but the one you are on, which
+ * leaves once you switch away. A restore then brings a root back only for
+ * whoever restores it (ADR-0030). Nothing when nothing differs.
+ */
+export function planOpenRepair(
+  keys: ReadonlyMap<RootId, string>,
+  archived: ReadonlySet<RootId>,
+  here: RootId | null,
+): OpenWrites {
+  const gone = [...keys.keys()].filter(r => archived.has(r) && r !== here)
+  return gone.length === 0 ? NO_OPEN_WRITES : { set: new Map(), delete: gone }
+}

@@ -5,13 +5,14 @@ import {
   entryId,
   type Intent,
   laneNameForThread,
+  workflowStateIdFor,
   writerId,
 } from "@pineta/core"
 import { createKeeper } from "@pineta/keeper"
 import type { WireCommand } from "@pineta/protocol/codec"
 import type { Reply } from "@pineta/protocol/messages"
 import { readPlaces } from "@pineta/reads"
-import { ARCHIVE, setRecord } from "@pineta/rules"
+import { BOARD, setRecord, WORKFLOW } from "@pineta/rules"
 import { newPresenceDoc, writeEntry } from "@pineta/schema"
 import { expect, test } from "vitest"
 import type { HostKey } from "../basics.ts"
@@ -33,6 +34,22 @@ const ALICE = writerId("alice@example.com")
 const ROOT_ENTRY = entryId("e-1")
 const HELD = laneNameForThread("01a0f9eb-86e1-77ad-a822-2a306786223f")
 const NEW = laneNameForThread("01a0f9eb-86e1-77ad-a822-2a3067862240")
+const [DOING, DONE] = [workflowStateIdFor("d"), workflowStateIdFor("x")]
+
+/** The test's root in `state` on a board of Doing and Done (ADR-0085). */
+const placeRoot = (b: ReturnType<typeof basics>, state: typeof DOING) => {
+  putValue(
+    b,
+    setRecord(WORKFLOW, {
+      open: [{ id: DOING, name: "Doing" }],
+      closed: { id: DONE, name: "Done" },
+    }),
+  )
+  putValue(
+    b,
+    setRecord(BOARD, { root: ROOT_ID, state, rank: "a", by: ALICE, at: 1 }),
+  )
+}
 
 function setUp(
   work: Partial<CommandDeps["work"]> = {},
@@ -51,6 +68,7 @@ function setUp(
   })
   writeEntry(b.root, row(ROOT_ENTRY, null))
   writeDirectory(b)
+  placeRoot(b, DOING)
   const agent = record<CommandDeps["agent"]>({
     appendToTree: async () => ({ kind: "appended", id: entryId("e-2") }),
     ...(writes ? { writeValues: async w => applyWrites(b, w) } : {}),
@@ -111,7 +129,8 @@ test.each([
   ["a squash", { kind: "offer", action: "squash" }, "repo"],
   ["a description again", { kind: "offer", action: "describe" }, "repo"],
   ["a line command", { kind: "line", action: "land" }, "repo"],
-  ["an archive", { kind: "archive", action: "archive" }, "archive"],
+  ["a move on the board", { kind: "move-root" }, "board"],
+  ["a workflow edit", { kind: "workflow" }, "documents"],
   ["a chat", { kind: "chat" }, "documents"],
   ["a move", { kind: "move" }, "documents"],
   ["a stop", { kind: "stop" }, "documents"],
@@ -145,7 +164,7 @@ test("a chat completes while an offer integration is held open on your repo's ow
   ])
 })
 
-test("an archive holds the keeper only for its record and its unload: a command waits on neither its teardown, and one into the root is refused meanwhile; its reply comes after it all", async () => {
+test("a move into Done holds the keeper only for its place and its unload: a command waits on neither its teardown, and one into the root is refused meanwhile; its reply comes after it all", async () => {
   const teardown = Promise.withResolvers<void>()
   const { b, commands, replies, sender, chat } = setUp({
     offers: null,
@@ -153,9 +172,9 @@ test("an archive holds the keeper only for its record and its unload: a command 
   })
   const archive = commands.handle(sender, ALICE, {
     id: "a-1",
-    kind: "archive",
-    mode: "archive",
-    targetId: ROOT_ENTRY,
+    kind: "move-root",
+    root: ROOT_ID,
+    text: JSON.stringify({ from: DOING, to: DONE, before: null }),
   })
   await new Promise(r => setTimeout(r, 5))
   await commands.handle(sender, ALICE, {
@@ -170,21 +189,13 @@ test("an archive holds the keeper only for its record and its unload: a command 
   ])
   teardown.resolve()
   await archive
-  expect(replies.at(-1)).toMatchObject({ id: "a-1", outcome: "archived" })
+  expect(replies.at(-1)).toMatchObject({ id: "a-1", outcome: "moved-root" })
   expect(b.docs.loaded()).not.toContain(ROOT_ID)
 })
 
 test("a chat in an archived root is refused, and the agent is never called", async () => {
   const { b, agent, commands, replies, sender, chat } = setUp()
-  putValue(
-    b,
-    setRecord(ARCHIVE, {
-      root: ROOT_ENTRY,
-      state: "archived",
-      by: ALICE,
-      at: 1,
-    }),
-  )
+  placeRoot(b, DONE)
   await commands.handle(sender, ALICE, chat("c-1"))
   expect(replies[0]).toMatchObject({ id: "c-1", outcome: "refused" })
   expect(replies[0]?.errorMessage).toMatch(/^archived by /)
@@ -240,15 +251,7 @@ test("a chat command spends its card once written, record then text, answering w
 
 test("a popped queued card in an archived root is refused, and the agent is never called", async () => {
   const { b, agent, commands } = setUp()
-  putValue(
-    b,
-    setRecord(ARCHIVE, {
-      root: ROOT_ENTRY,
-      state: "archived",
-      by: ALICE,
-      at: 1,
-    }),
-  )
+  placeRoot(b, DONE)
   const out = await commands.sendPoppedQueuedCard(ALICE, "s-1", {
     text: "from the queue",
     root: ROOT_ID,
@@ -262,6 +265,7 @@ test("a popped queued card in an archived root is refused, and the agent is neve
     pinned: [],
     reserved: null,
     base: null,
+    state: null,
   })
   expect(out).toMatchObject({ kind: "refused", code: ERR.ARCHIVED })
   expect(agent.calls).toEqual([])

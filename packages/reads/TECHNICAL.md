@@ -9,7 +9,8 @@ What the session document says, read once, by the host and the client alike.
   `readStops`, `readDigests`, and `readRootRecord`, the root's directory
   record as the host writes it.
 - **The session's reads take its `SessionDocHandle`**: every record read
-  across roots (`readLaneRecords`, `readNames`, `readOffers`, `readArchive`,
+  across roots (`readLaneRecords`, `readNames`, `readOffers`, `readWorkflow`,
+  `readBoardPlaces`, `readArchived`,
   `readRoots`, the singletons…), `readRunningLanes` with `pineta:live`, and
   `readReferencedBlobs`, which takes each root's images from its directory
   record, so no root is opened to sweep.
@@ -39,14 +40,16 @@ run's end and `split_offer` decide by it), `readRunAuthor` (the person
 behind it, `promptAuthor`, ADR-0080),
 `readParticipantNames`, `readParticipants`, `readReading`, `readTyping`,
 `readAgentActivity`, `readSeats`, `readPlaces` and `readPlacesRev` (ADR-0059),
-`readArchive`, `readMarks` (ADR-0045), `readStops` and `readDigests`
-(ADR-0056), and
+`readWorkflow`, `readBoardPlaces` and `readArchived` (the board, ADR-0085:
+the roots in the closed state, derived and kept while the same, since every
+write to the session's values wakes it), `readMarks` (ADR-0045), `readStops`
+and `readDigests` (ADR-0056), and
 where lanes work (ADR-0032, ADR-0034): `readLaneRecords`, `readRevisions`, `readLandings`,
 `readProject` (`lanes`, or `direct` and why). `workAt` is where a lane created
 at an entry would work, and the commit and snapshot it would start from: the
 composer shows it, and the host creates the lane by it, and decides by it
-whether a sent message's paths are stored under `/mnt/host-working-copy`. The Archive tab's rows are a
-client-only read, in `packages/client/archive-rows.ts`. Live streams are read with `readStreams` in
+whether a sent message's paths are stored under `/mnt/host-working-copy`. The board's items are a
+client-only read, in `packages/client/board-view.ts`. Live streams are read with `readStreams` in
 `@pineta/schema`; an entry count stays in `packages/client/projection.ts`.
 
 ## Where entry ids are branded
@@ -121,7 +124,7 @@ Kyneta has let go.
 - **Build a `Record<EntryId, …>` from each entry's own `id`.** `Object.entries`
   and `Object.keys` give back `string`, which cannot index it (TS7053), so
   `renderableEntries` walks `Object.values` and keys by `entry.id`.
-- **A map keyed by an entry or a lane says so in its type** (`readArchive`,
+- **A map keyed by an entry, a root or a lane says so in its type** (`readArchived`,
   `readRevisions`, `readOffers`…). A `string`-keyed map still accepts an
   `EntryId`, so a key type left `string` compiles and leaves its lookups
   unchecked (S95).

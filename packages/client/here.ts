@@ -1,9 +1,11 @@
-// client/here — who else is in the session, for the header (ADR-0030). Pure.
+// client/here — who else is in the session, for the board and your list
+// (ADR-0030, ADR-0085). Pure.
 //
-// Presence is thread-level (ADR-0024): each column of the tab a person is on
-// reports the end of its thread. The header groups those by person, where
-// `readingAt` groups them by thread end; "never you" is `readingAt`'s.
-// The tabs' avatars are the same people turned around, by root.
+// Presence is thread-level (ADR-0024): each column of the root a person is on
+// reports the end of its thread. `peopleHere` groups those by person, where
+// `readingAt` groups them by thread end; "never you" is `readingAt`'s. A
+// board item's readers are those people in its root (`peopleIn`); your
+// list's avatars are the same people turned around, by root.
 
 import {
   type AgentRun,
@@ -94,7 +96,22 @@ export function runsHere(input: {
   return out
 }
 
-/** Each root's readers, for the tabs' avatars: `people` turned around. */
+/**
+ * The people reading in `roots`, each with only their threads there: a board
+ * item's readers, or a board state's (ADR-0085). A person reading elsewhere
+ * only is left out.
+ */
+export function peopleIn(
+  people: readonly PersonHere[],
+  roots: ReadonlySet<string>,
+): readonly PersonHere[] {
+  return people.flatMap(p => {
+    const threads = p.threads.filter(t => roots.has(t.root))
+    return threads.length === 0 ? [] : [{ ...p, threads }]
+  })
+}
+
+/** Each root's readers, for your list's avatars: `people` turned around. */
 export function readersByRoot(
   people: readonly PersonHere[],
 ): ReadonlyMap<string, readonly WriterId[]> {
@@ -108,7 +125,7 @@ export function readersByRoot(
   return readers
 }
 
-/** A person in the header: here, or gone and kept while their menu is open. */
+/** A person shown on the board: here, or gone and kept while their menu is open. */
 export interface PersonShown {
   readonly person: PersonHere
   readonly gone: boolean

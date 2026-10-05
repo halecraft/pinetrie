@@ -5,11 +5,13 @@ import {
   entryId,
   laneNameForThread,
   moveOf,
+  ROOT,
+  runId,
   writerId,
 } from "@pineta/core"
 import { expect, test } from "vitest"
 import { IN_COLUMN, pendingOf } from "./card-moves.ts"
-import { planChatRequest } from "./chat.ts"
+import { planChatRequest, startsRoot } from "./chat.ts"
 import { TEST_ROOT } from "./fixtures.ts"
 
 const at = atEntry(entryId("e-1"))
@@ -103,4 +105,14 @@ test("a send with no card is not drawn; one from a card draws the card out of it
   expect(fromCard.pending).toEqual(
     pendingOf("f-1", moveOf(card, null), IN_COLUMN("col-1"), null),
   )
+})
+
+test("startsRoot: a thread at the root written, as a conversation or a run; nothing else", () => {
+  const at = { kind: "entry", id: entryId("e-1") } as const
+  expect(startsRoot(ROOT, { kind: "appended", id: entryId("e-1") })).toBe(true)
+  expect(startsRoot(ROOT, { kind: "started", runId: runId("r-1") })).toBe(true)
+  expect(
+    startsRoot(ROOT, { kind: "refused", code: "x", message: "" } as never),
+  ).toBe(false)
+  expect(startsRoot(at, { kind: "appended", id: entryId("e-2") })).toBe(false)
 })

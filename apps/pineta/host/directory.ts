@@ -1,6 +1,6 @@
 // host/directory — the directory of roots (ADR-0063): each root's `pineta.root`
 // record, refreshed whenever its document's entries or values change, so
-// what the tabs, the Archive tab, the inbox and the image sweep read of a
+// what your list, the board, the inbox and the image sweep read of a
 // root follows it without any of them opening it.
 //
 // The directory follows every root the documents hold (`onOpened`), those

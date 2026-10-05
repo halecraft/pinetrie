@@ -1,4 +1,4 @@
-// client/profile — you, at the header's right: your name, the handle it gives
+// client/profile — you, at the footer's left: your name, the handle it gives
 // you, your email, and signing in as someone else (ADR-0037).
 //
 // A dialog, not a `Menu`: a `role="menu"` may hold only menu items, and this

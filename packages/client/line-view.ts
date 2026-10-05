@@ -1,4 +1,4 @@
-// client/line-view — the integration line in the header (ADR-0060), "the
+// client/line-view — the integration line in the footer (ADR-0060), "the
 // project" (ADR-0061), and publishing it (ADR-0076): what the host last read
 // of it, decided as a value (`lineView`) and worded in one function
 // (`lineWords`). Which actions may run is `@pineta/rules`' `lineActionState`,

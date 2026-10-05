@@ -12,8 +12,10 @@ import {
   parseMentions,
   type RootId,
   type SentCard,
+  type WorkflowStateId,
   type WorkSetting,
 } from "@pineta/core"
+import type { Outcome } from "@pineta/protocol/codec"
 import { IN_COLUMN, type Pending, pendingOf } from "./card-moves.ts"
 
 /** How a chat is sent: its mode, its column's lane, and its send id. */
@@ -42,6 +44,11 @@ export interface ChatHow {
   readonly root?: RootId
   /** The WIP bookmark a lane this send creates starts from; absent, the line (ADR-0060). */
   readonly base?: string
+  /**
+   * The workflow state a root this send starts lands in; absent, the first
+   * open state (ADR-0085).
+   */
+  readonly state?: WorkflowStateId
 }
 
 /** A chat as the host is asked for it: `how`'s defaults filled in. */
@@ -68,6 +75,7 @@ function chatIntent(input: {
     pinned: input.pinned,
     reserved: how.reserved ?? null,
     base: how.base ?? null,
+    state: how.state ?? null,
   }
 }
 
@@ -129,3 +137,12 @@ export function planChatRequest(input: {
           ),
   }
 }
+
+/**
+ * Whether a send's answer started a root: a thread at the root written, as
+ * a conversation or a run (ADR-0085). The session then puts the root in your
+ * list, so a root you start is yours.
+ */
+export const startsRoot = (at: Position, outcome: Outcome): boolean =>
+  at.kind === "root" &&
+  (outcome.kind === "appended" || outcome.kind === "started")

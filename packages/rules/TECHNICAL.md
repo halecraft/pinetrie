@@ -46,10 +46,12 @@ follow this list. A name only this package uses is imported from its module.
   agent's `catch_up` and `split_offer` (ADR-0080).
 - `card.ts`, `seat.ts`, `startup.ts`: cards and their moves, who wrote in a
   text, what a starting host resumes.
-- `archive.ts`, `roots.ts`, `mark.ts`, `title.ts`, `stop.ts`, `digest.ts`,
-  `verdict.ts`: a root put aside, the directory of roots, titles, who
-  stopped a run and carrying on after it, an ask's digest, and how a
-  thread's last run ended.
+- `board.ts`, `archive.ts`, `carry-over.ts`, `order.ts`: the board's
+  workflow states and each root's place, what crossing the closed state's
+  edge does, a store from before the board carried over, and order keys.
+- `roots.ts`, `mark.ts`, `title.ts`, `stop.ts`, `digest.ts`, `verdict.ts`:
+  the directory of roots, titles, who stopped a run and carrying on after
+  it, an ask's digest, and how a thread's last run ended.
 - `names.ts`, `banner.ts`: a thread's name and its banner, each with its
   record.
 - `work.ts`: where lanes work (`pineta.lane`, `pineta.revision`,
@@ -99,9 +101,12 @@ cannot reach the wrong document and needs no guard at run time.
   which each client decides for its person.
 - **`LANE`** is written for every lane as it is created, naming its root;
   `work` is null for a lane with no work of its own.
+- **`WORKFLOW` and `BOARD`** (`board.ts`, ADR-0085): the session's workflow
+  states, a singleton, and each root's place on the board, keyed by its
+  `RootId`.
 - **The archive gate** reads the roots a command writes in (`writesIn`) and
-  each root's record by its root entry (`archivedIn`): a command carries its
-  roots, so no root's document is opened to check.
+  looks each up among the archived (`archivedIn`, over `archivedOf`): a
+  command carries its roots, so no root's document is opened to check.
 
 Each host record is one `RecordSpec<R, K>`: its `namespace`, `keyOf`,
 `encode` and `decode`, exported beside its type (`MARK` in `mark.ts`,
@@ -131,8 +136,9 @@ writes only a record that changed.
   unchanged record on every check. The host writes only a changed record: a
   write compacted with no client connected moves the document's base past
   what a new client reports.
-- **The singletons** (`LINE`, `PROJECT`, `COMMANDS`) have one fixed key
-  (`LINE_KEY`, `PROJECT_KEY`, `COMMANDS_KEY`), and `decode` refuses any other.
+- **The singletons** (`LINE`, `PROJECT`, `COMMANDS`, `WORKFLOW`) have one
+  fixed key (`LINE_KEY`, `PROJECT_KEY`, `COMMANDS_KEY`, `WORKFLOW_KEY`), and
+  `decode` refuses any other.
 
 # Chat (`chat.ts`)
 
@@ -407,32 +413,75 @@ contents: Yjs derives it from the peer, which this package cannot.
   A seat stored under its `clientID` before ADR-0062 reads with that text as
   its `peer`, which is its address, so the delete finds it.
 
-# The archive (`archive.ts`, ADR-0029)
+# The board (`board.ts`, ADR-0085)
 
-A root put aside for everyone. The record is a host-written `pineta.archive`
-value keyed by the root's entry id, `archived` or `restored`, with who changed
-it and when. Archiving writes only the record: entries are immutable, so a root
-is hidden and made read-only, never removed, and restoring keeps the record.
+Every root is in one workflow state. The workflow is a host-written
+singleton (`WORKFLOW`): the open states in board order, then the closed
+state, always there and always last. A root's place is a host-written
+value keyed by its `RootId` (`BOARD`): its state, its rank there, who moved
+it, and when.
 
-- **`planArchive` decides**, pure. A root is anything `rootOf` maps to itself
-  (a root is always a message, S30). Archiving is refused `root_busy` while
-  `rootWork` lists the root: a lane with its tip there runs, or has messages
-  waiting. `ROOT_BUSY_REASON` is the one wording, which the tab's menu shows
-  too. The state it already has is `unchanged`, and answered the same.
-- **An archive or restore is planned whole, in three parts** (ADR-0065):
-  the record, written on the documents' keeper; the `teardown`, carried out
-  off it (lanes to forget and remove, their refs in your repo, null on
-  archive and each tip's nearest revision's commit on restore, and
-  `planRetention`'s snapshots); and `unload`, for an archive, on the keeper
-  again. The host passes its lanes of their own (`own`, empty on a host
-  without them) and the root's revision records, so no part decides
-  anything when it runs.
+- **The board is total** (`boardOf`): every root it is given, in its
+  place's state, by rank, then by id; a root with no place, or one in a
+  state the workflow no longer holds, at the end of the first open state.
+  A missing or stale record never hides a root.
+- **Archived is derived, never stored** (`archivedOf`): the roots whose
+  place is the closed state, with who moved them there and when
+  (`ArchivedRoot`), keyed by `RootId`. Every former reader of the archive
+  record reads it (`readArchived`).
+- **`planRootMove` decides a move over the board alone.** The sender names
+  the state it saw the root in; one that has left it is refused
+  `root_moved`, naming who moved it and where. `before` is the root it goes
+  before, or the end. The new rank is `orderBetween` its neighbours; with no
+  room, or a neighbour with no place yet, the whole state is renumbered,
+  the others keeping who put them there. A reorder within the closed state
+  keeps `by` and `at`, which say when the root was archived and so when its
+  move histories retire (`planHistorySweep`).
+- **`transitionOf` says whether a move crosses the closed state's edge**:
+  `within`, `close` or `reopen`. The host gathers a root's document only to
+  cross it (`apps/pineta/host/commands/board.ts`).
+- **`planWorkflowEdit`**: add (before a state, or after every open one),
+  rename (trimmed; names may repeat), move, remove. The closed state is
+  renamed only; a state holding a root is not removed, nor the only open
+  state.
+- **`placeStarted`** puts a new root at the end of the state its chat names,
+  or of the first open state when it names none, one gone, or the closed
+  one.
+- **Order keys are `order.ts`'s**, shared with cards' queues and pins:
+  fixed-width base-36, so string order is numeric order; `keyAfter`,
+  `orderBetween` (null with no room), `orderKeys`.
+- **The carry-over** (`carry-over.ts`): a store with no workflow gets the
+  default one, every root a place (an old `pineta.archive` `archived`
+  record's root in the closed state, by who archived it, when; every other
+  root in Doing, by its first writer), and the old records deleted. It keeps
+  `ARCHIVE` itself, so both go together once it has run on Duane's store.
+
+# The archive (`archive.ts`, ADR-0029, ADR-0085)
+
+A root put aside for everyone: one in the closed workflow state. Moving it
+there or out writes only its board place: entries are immutable, so a root
+is hidden and made read-only, never removed.
+
+- **`planArchive` decides what crossing the edge does**, pure, for a
+  `Crossing` (`close` or `reopen`). A root is anything `rootOf` maps to
+  itself (a root is always a message, S30). Closing is refused `root_busy`
+  while `rootWork` lists the root: a lane with its tip there runs, or has
+  messages waiting. `ROOT_BUSY_REASON` is the one wording, which your
+  list's and the board's Move to ▸ show too. Reopening is never busy.
+- **A crossing is planned whole, in three parts** (ADR-0065): the place,
+  written on the documents' keeper; the `teardown`, carried out off it
+  (lanes to forget and remove, their refs in your repo, null on close and
+  each tip's nearest revision's commit on reopen, and `planRetention`'s
+  snapshots); and `unload`, for a close, on the keeper again. The host
+  passes its lanes of their own (`own`, empty on a host without them) and
+  the root's revision records, so no part decides anything when it runs.
 - **The gate keys on the roots a command writes in** (ADR-0063). `writesIn`
   names them for every intent (a chat's root, a mark's, an undo of moves',
   an offer's lane's, each root a move's cards go to), or none for one that
-  writes in no root (a new root, a name, a stop, an archive action, a
-  reservation, a move into an inventory). `archivedIn` finds an archived
-  one by its root entry. One rule, applied by the host before dispatch
+  writes in no root (a new root, a name, a stop, a move on the board or a
+  change to its states, a reservation, a move into an inventory), so a
+  closed root can always be reopened. `archivedIn` finds an archived one by
+  its `RootId`. One rule, applied by the host before dispatch
   (`apps/pineta/host/commands/index.ts`); `sendChat` needs no copy, since
   only the `chat` command calls it. No card moves into an archived root,
   a fresh column's included (ADR-0066); a command on a card writes nowhere,

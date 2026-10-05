@@ -6,7 +6,7 @@
 // memoised child new props (S54, S59).
 
 import {
-  type ArchiveRecord,
+  type ArchivedRoot,
   type EntryId,
   type LaneName,
   type LaneRecord,
@@ -17,29 +17,31 @@ import {
   type RailRow,
   type RootId,
   type TreeIndex,
+  type Workflow,
   type WriterId,
 } from "@pineta/core"
 import { displayName, offerStatus } from "@pineta/rules"
 import type { Column } from "./columns.ts"
 import type { Intent } from "./intent.ts"
-import type { ActiveTab } from "./layout.ts"
+import type { Here } from "./layout.ts"
 
 /**
  * A column nothing may be written in (ADR-0029): its composer stays mounted,
  * disabled, so what was typed survives, and shows `label` and `action` in
- * place of its buttons.
+ * place of its buttons. `action` is null when nothing can restore it (no
+ * workflow yet).
  */
 export interface ReadOnly {
   readonly label: string
-  readonly action: { readonly title: string; readonly intent: Intent }
+  readonly action: { readonly title: string; readonly intent: Intent } | null
 }
 
-/** One column of the tab you are on, as the strip draws it. */
+/** One column of the root you are on, or of a new tab, as the strip draws it. */
 export interface ColumnSlot {
   readonly key: string
   readonly position: number
   /**
-   * Whether × shows: not on a root tab's only column, which the root would
+   * Whether × shows: not on a root's only column, which the root would
    * give back at once (`columnsOf`). A new tab's one column closes the tab.
    */
   readonly closable: boolean
@@ -47,9 +49,10 @@ export interface ColumnSlot {
 }
 
 export type Workspace =
-  /** Before the first `prune`: no tab is chosen yet. */
+  /** Before the first `prune`: nothing is chosen yet. */
   | { readonly kind: "connecting" }
-  | { readonly kind: "archive" }
+  /** No root and no new tab: the board, and ＋ (ADR-0085). */
+  | { readonly kind: "nothing" }
   | {
       readonly kind: "root"
       readonly root: EntryId
@@ -65,12 +68,14 @@ export type Workspace =
 
 /** Facts `App` already holds; nothing here is projected again. */
 export interface AppViewInput {
-  readonly active: ActiveTab | null
+  readonly active: Here | null
   /** The tab's columns: `columnsOf`, or the new tab's one. */
   readonly columns: readonly Column[]
   /** `branchColors(rail, views).track`, memoised by `App`. */
   readonly tracks: readonly number[]
-  readonly archive: ReadonlyMap<EntryId, ArchiveRecord>
+  /** The roots in the closed state, by root entry (ADR-0085). */
+  readonly archived: ReadonlyMap<EntryId, ArchivedRoot>
+  readonly workflow: Workflow | null
   readonly nameOf: ReadonlyMap<WriterId, string>
   readonly offers: ReadonlyMap<LaneName, OfferRecord>
   /** The lanes of the roots this tab holds. */
@@ -126,19 +131,19 @@ function workspaceOf(input: AppViewInput): Workspace {
       track: tracks[position] ?? PENDING_TRACK,
     }))
   switch (active.kind) {
-    case "archive":
-      return { kind: "archive" }
+    case "nothing":
+      return { kind: "nothing" }
     case "new":
       return { kind: "new", key: active.key, slots: slots(true) }
     case "root": {
-      const record = input.archive.get(active.root)
+      const archived = input.archived.get(active.root)
       return {
         kind: "root",
         root: active.root,
         readOnly:
-          record?.state === "archived"
-            ? readOnlyWords(active.root, record, input.nameOf)
-            : null,
+          archived === undefined
+            ? null
+            : readOnlyWords(archived, input.workflow, input.nameOf),
         slots: slots(columns.length > 1),
       }
     }
@@ -163,32 +168,38 @@ const openOffers = (input: AppViewInput): readonly OpenOffer[] =>
       : [{ lane: o.lane, root, end: held.tip, source }]
   })
 
-/** The rows the tab's rail draws: its own root's only, and none off a root. */
-export const tabRail = (
+/** The rows the rail draws: the root you are on's only, and none off a root. */
+export const hereRail = (
   index: TreeIndex,
-  active: ActiveTab | null,
+  active: Here | null,
 ): readonly RailRow[] =>
   active?.kind === "root" ? projectRail(index, active.root) : []
 
 /**
- * What a read-only column says and offers: Restore for an archived root, Open
- * for an open one (the Archive tab's preview).
+ * What an archived root's column says and offers (ADR-0085): who moved it to
+ * the closed state, and Restore, which moves it to the first open state.
  */
 export function readOnlyWords(
-  root: EntryId,
-  record: ArchiveRecord | undefined,
+  archived: ArchivedRoot,
+  workflow: Workflow | null,
   nameOf: ReadonlyMap<WriterId, string>,
 ): ReadOnly {
-  return record?.state === "archived"
-    ? {
-        label: `archived by ${displayName(record.by, nameOf.get(record.by))}`,
-        action: { title: "Restore", intent: { kind: "restore", root } },
-      }
-    : {
-        label: "open",
-        action: {
-          title: "Open",
-          intent: { kind: "show", tab: { kind: "root", root } },
-        },
-      }
+  const to = workflow?.open[0]
+  return {
+    label: `archived by ${displayName(archived.by, nameOf.get(archived.by))}`,
+    action:
+      workflow === null || to === undefined
+        ? null
+        : {
+            title: "Restore",
+            intent: {
+              kind: "moveRoot",
+              root: archived.root,
+              from: workflow.closed.id,
+              to: to.id,
+              before: null,
+              closes: false,
+            },
+          },
+  }
 }

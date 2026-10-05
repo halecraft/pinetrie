@@ -14,7 +14,7 @@ import {
 } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
 
-import { asPerson, col, launchBrowser } from "./page.ts"
+import { asPerson, col, launchBrowser, stepAway, stepBack } from "./page.ts"
 
 export const scenario: Scenario = {
   run: ({ check }) => run(check),
@@ -42,7 +42,7 @@ async function run(check: Checks["check"]): Promise<void> {
       try {
         await bp.goto(bannerHost.httpUrl, { waitUntil: "domcontentloaded" })
         // Drawn before the first message is typed (ADR-0057).
-        await bp.click("#tabs .add-agent")
+        await bp.click("#open-list .add-agent")
         const drawn = await bp
           .waitForSelector(`${col(0)} .column-head .banner[data-loaded]`, {
             timeout: 30_000,
@@ -107,16 +107,18 @@ async function run(check: Checks["check"]): Promise<void> {
           `${JSON.stringify(header)}`,
         )
 
-        // The first send makes the thread's root, whose tab the check below
+        // The first send makes the thread's root, which the check below
         // returns to. That the lane keeps the reserved name is `page`'s check:
         // a scripted model draws one image for every name.
         await bp.fill(`${col(0)} .composer .input`, "plan the parser")
         await bp.click(`${col(0)} .composer .send`)
-        await bp.waitForSelector("#tabs .tab-root", { timeout: 15_000 })
+        await bp.waitForSelector("#open-list .open-root", { timeout: 15_000 })
 
-        // Back to the tab, the column mounts again with its banner already there.
-        await bp.click("#tabs .tab-archive")
-        await bp.click("#tabs .tab-root")
+        // Back to its root, the column mounts again with its banner already there.
+        const root =
+          (await bp.getAttribute("#open-list .open-root", "data-root")) ?? ""
+        await stepAway(bp)
+        await stepBack(bp, root)
         const again = await bp
           .waitForSelector(`${col(0)} .column-head .banner`, {
             timeout: 15_000,

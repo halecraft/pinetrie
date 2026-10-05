@@ -36,12 +36,13 @@ export const isHostDoc = (docId: string): boolean =>
   docId.startsWith(MOVES_DOC_PREFIX)
 
 /**
- * A person's own documents (ADR-0059, ADR-0077): only that person's tabs
+ * A person's own documents (ADR-0059, ADR-0077, ADR-0085): their inventory,
+ * what they have dealt with, and the roots they have open. Only that person's tabs
  * write one, and the host stores it and shares it with that person only.
  * Each kind is its own document, since each is written at its own rate and
  * keeps its own history.
  */
-export const PERSON_DOC_KINDS = ["inventory", "attention"] as const
+export const PERSON_DOC_KINDS = ["inventory", "attention", "open"] as const
 export type PersonDocKind = (typeof PERSON_DOC_KINDS)[number]
 
 /** The document holding `writer`'s `kind`: `inventory:w-ada@x.io`. */

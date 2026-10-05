@@ -4,6 +4,9 @@
 `PLAN-2026-10-04-tabs-header`. Amends ADR-0029 (where the tab bar sits,
 and how the tab you are on is drawn) and ADR-0030 (the header holds your
 tabs; the message count moves to the Archive tab).
+Amended by ADR-0085: the header row goes; your list runs down the left, its
+root you are on joined to the page sideways, and the footer holds the
+indicators, with the message count on ▦.
 
 **Context.** Duane could not tell which tab was selected, nor that the
 columns belonged to it:

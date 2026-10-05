@@ -1,5 +1,5 @@
 // client/presence-report — what this page writes about you: which thread end
-// each column of the tab you are on reads (ADR-0024, ADR-0029), and when you
+// each column of the root you are on reads (ADR-0024, ADR-0029), and when you
 // are typing. PURE: `App` gathers and writes.
 
 /** Each reported column's key, and the thread end it shows (null: none yet). */

@@ -1,4 +1,4 @@
-// client/activity — the header's one menu of what needs you (ADR-0069,
+// client/activity — the footer's one menu of what needs you (ADR-0069,
 // ADR-0077): how the threads you follow ended, work ready to add to the
 // project, what is worth a read, mentions of you, and where the agent works.
 // Decided as a value (`activityView`) and worded in one function

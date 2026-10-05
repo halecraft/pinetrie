@@ -256,7 +256,7 @@ would refuse each whole undo of a move (S82).
   rows written before it existed do not decode, and no stored session held
   any.
 
-## A person's documents (`inventory.ts`, `attention.ts`, ADR-0059, ADR-0077)
+## A person's documents (`inventory.ts`, `attention.ts`, `open.ts`, ADR-0059, ADR-0077, ADR-0085)
 
 A person has one document of each kind in `PERSON_DOC_KINDS`, at
 `<kind>:<writer>` (`personDocId`, `ownerOfPersonDoc` in
@@ -299,6 +299,12 @@ panel draws a slot whose card is not held as empty.
   the `ledger.source` whose offer, was marked "not needed".
 - A key that is no lane name is left out when read.
 
+`OpenDoc` is the roots the person has open, their list (ADR-0085): each
+root's `RootId` to an order key, read by `readOpenKeys` (a key that is no
+root is left out) and ordered by `orderOpen` (by key, then id). A record,
+not a list: two devices reordering at once merge per root, and a list could
+hold a root twice.
+
 ## A document per root (ADR-0063)
 
 A session is a document per root, the session's own, and `pineta:live`. The
@@ -308,7 +314,7 @@ root and the session share one schema, `StorageDoc`, pi's storage, so
 | document | id | holds |
 |---|---|---|
 | a root's | `root:<RootId>` (`rootDocId`, core) | its entries, usage rows, pi's values and lists for its lanes, checkpoints, and the host records keyed by its entries (revision, mark, stop, digest) |
-| the session's | `pineta:session` | the records read across roots: the directory (`pineta.root`), every lane's record (`pineta.lane`, naming its root), names, offers, banners, bases, the archive, seats, participants and the singletons. No entries |
+| the session's | `pineta:session` | the records read across roots: the directory (`pineta.root`), every lane's record (`pineta.lane`, naming its root), names, offers, banners, bases, the board (`pineta.workflow`, `pineta.board`), seats, participants and the singletons. No entries |
 | what streams | `pineta:live` (`LiveDoc`) | streams, their text, active runs |
 
 - **Brands keep the two storage documents apart.** `RootDocHandle` and

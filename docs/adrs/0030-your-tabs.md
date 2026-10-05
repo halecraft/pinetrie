@@ -10,6 +10,8 @@ part of that menu's badge, with open offers. Amended by ADR-0077: which
 mentions you have seen is kept per person, in your attention document, not
 per device. Amended by ADR-0081: the header holds your tabs, and the
 message count moved to the Archive tab.
+Amended by ADR-0085: your tabs are your list, kept per person; the header's
+people go, and who is where shows on your list's items and the board's.
 
 **Context.** ADR-0029 gave everyone the same tab bar, every root not archived,
 and rejected tabs each person opens and closes: a collaborator's new root would

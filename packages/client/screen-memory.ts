@@ -1,5 +1,5 @@
 // client/screen-memory — what a component knew of the screen when it was
-// unmounted, kept for the page's life. A root tab shown again mounts its
+// unmounted, kept for the page's life. A root shown again mounts its
 // columns anew (ADR-0049); this is how they come back as they were left.
 
 export interface ScreenMemory<V> {

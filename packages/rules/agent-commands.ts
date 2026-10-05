@@ -16,10 +16,11 @@ import {
   type RootId,
   type WriterId,
 } from "@pineta/core"
-import { orderAfter, type PlaceStep, queuedOn } from "./card.ts"
+import { type PlaceStep, queuedOn } from "./card.ts"
 import type { LandMessage } from "./land.ts"
 import { type CatchUpNow, type ParentNow, parentAhead } from "./line.ts"
 import type { OfferStatus } from "./offer.ts"
+import { orderAfter } from "./order.ts"
 import type { UpdateMessage } from "./update.ts"
 
 /** What a host tool answers the agent: its text, whether it refused, and what it says as a fact. */

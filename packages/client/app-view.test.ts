@@ -1,38 +1,45 @@
 import {
-  type ArchiveRecord,
+  type ArchivedRoot,
   entryId,
   type LaneName,
   type LaneView,
   laneNameForThread,
   type OfferRecord,
   PENDING_TRACK,
+  rootIdFor,
+  type Workflow,
+  workflowStateIdFor,
   writerId,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import {
   type AppViewInput,
   appView,
+  hereRail,
   readOnlyWords,
-  tabRail,
 } from "./app-view.ts"
 import type { Column } from "./columns.ts"
 import { tree } from "./fixtures.ts"
 
 const ADA = writerId("ada@x.test")
 const nameOf = new Map([[ADA, "Ada"]])
-const archived = (root: string): ArchiveRecord => ({
-  root: entryId(root),
-  state: "archived",
-  by: ADA,
-  at: 1,
-})
+const R_ID = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
+const archived: ArchivedRoot = { root: R_ID, by: ADA, at: 1 }
+const WORKFLOW: Workflow = {
+  open: [
+    { id: workflowStateIdFor("b"), name: "Backlog" },
+    { id: workflowStateIdFor("d"), name: "Doing" },
+  ],
+  closed: { id: workflowStateIdFor("x"), name: "Done" },
+}
 const columns = (...keys: string[]): Column[] =>
   keys.map(key => ({ key, anchor: entryId("r") }))
 const input = (over: Partial<AppViewInput>): AppViewInput => ({
   active: { kind: "root", root: entryId("r") },
   columns: columns("a"),
   tracks: [3],
-  archive: new Map(),
+  archived: new Map(),
+  workflow: WORKFLOW,
   nameOf,
   offers: new Map(),
   lanes: [],
@@ -43,9 +50,9 @@ const workspace = (over: Partial<AppViewInput>) =>
   appView(input(over)).workspace
 
 describe("appView's workspace", () => {
-  test("before a tab is chosen, the page is connecting; Archive is its own", () => {
+  test("before anything is chosen, the page is connecting; nothing is its own", () => {
     expect(workspace({ active: null }).kind).toBe("connecting")
-    expect(workspace({ active: { kind: "archive" } }).kind).toBe("archive")
+    expect(workspace({ active: { kind: "nothing" } }).kind).toBe("nothing")
   })
 
   test("a new tab has its own kind, and its one column closes the tab", () => {
@@ -68,34 +75,33 @@ describe("appView's workspace", () => {
     ])
   })
 
-  test("an archived root is read-only, with Restore; a restored one is not", () => {
-    const here = workspace({
-      archive: new Map([[entryId("r"), archived("r")]]),
-    })
+  test("an archived root is read-only, with Restore to the first open state; one not archived is not", () => {
+    const here = workspace({ archived: new Map([[entryId("r"), archived]]) })
     expect(here.kind === "root" && here.readOnly).toEqual({
       label: "archived by Ada",
-      action: { title: "Restore", intent: { kind: "restore", root: "r" } },
+      action: {
+        title: "Restore",
+        intent: {
+          kind: "moveRoot",
+          root: R_ID,
+          from: WORKFLOW.closed.id,
+          to: WORKFLOW.open[0]?.id,
+          before: null,
+          closes: false,
+        },
+      },
     })
-    const back = workspace({
-      archive: new Map([
-        [entryId("r"), { ...archived("r"), state: "restored" }],
-      ]),
+    expect(workspace({}).kind === "root" && workspace({})).toMatchObject({
+      readOnly: null,
     })
-    expect(back.kind === "root" && back.readOnly).toBe(null)
   })
 })
 
-test("readOnlyWords offers Restore for an archived root, Open for any other", () => {
-  expect(readOnlyWords(entryId("r"), undefined, nameOf)).toEqual({
-    label: "open",
-    action: {
-      title: "Open",
-      intent: { kind: "show", tab: { kind: "root", root: "r" } },
-    },
+test("readOnlyWords offers no Restore before the board has states", () => {
+  expect(readOnlyWords(archived, null, nameOf)).toEqual({
+    label: "archived by Ada",
+    action: null,
   })
-  expect(readOnlyWords(entryId("r"), archived("r"), nameOf).action.title).toBe(
-    "Restore",
-  )
 })
 
 test("the header's offers are the open ones, never one the line already holds: a held lane's at its tip, if it has one; another's at its root (ADR-0063)", () => {
@@ -146,10 +152,10 @@ test("the header's offers are the open ones, never one the line already holds: a
 test("a tab's rail draws its own root's tree only", () => {
   const index = tree({ r1: null, a: "r1", r2: null, b: "r2" })
   const ids = (rows: readonly { readonly id: string }[]) => rows.map(r => r.id)
-  expect(ids(tabRail(index, { kind: "root", root: entryId("r1") }))).toEqual([
+  expect(ids(hereRail(index, { kind: "root", root: entryId("r1") }))).toEqual([
     "r1",
     "a",
   ])
-  expect(tabRail(index, { kind: "new", key: "t" })).toEqual([])
-  expect(tabRail(index, null)).toEqual([])
+  expect(hereRail(index, { kind: "new", key: "t" })).toEqual([])
+  expect(hereRail(index, null)).toEqual([])
 })

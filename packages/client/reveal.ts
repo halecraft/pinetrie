@@ -9,18 +9,18 @@
 import type { PlaceKey } from "@pineta/core"
 import { placeEnd } from "@pineta/rules"
 import { type ActedAt, AT_INVENTORY } from "@pineta/session"
-import { type Effect, type IntentState, planOpenAt } from "./intent.ts"
-import { columnsOf, planOpen, tabOfColumn } from "./layout.ts"
+import { type Effect, type IntentState, planOpenAt, show } from "./intent.ts"
+import { columnsOf, hereOfColumn, planOpen } from "./layout.ts"
 
 const at = (key: string): ActedAt => ({ kind: "column", key })
 
 /**
  * The effects that show `place`, and where a refusal there is said: your
  * inventory's panel; a thread's end, as `openAt` shows an entry; or a fresh
- * column, shown in its tab, or opened again at the end of its root's tab.
- * A fresh column whose root the directory does not name belongs to a new
- * tab, whose history only that tab reaches while it is open, so the layout
- * holds it.
+ * column, shown where it is, or opened again at the end of its root's
+ * columns. A fresh column whose root the directory does not name belongs to
+ * a new tab, whose history only that tab reaches while it is open, so the
+ * layout holds it.
  */
 export function revealOf(
   place: PlaceKey,
@@ -34,21 +34,15 @@ export function revealOf(
         actedAt: AT_INVENTORY,
       }
     case "fresh": {
-      const tab = tabOfColumn(state.layout, place.column)
-      if (tab !== undefined)
-        return {
-          effects: [{ kind: "layout", action: { kind: "show", tab } }],
-          actedAt: at(place.column),
-        }
+      const here = hereOfColumn(state.layout, place.column)
+      if (here !== undefined)
+        return { effects: show(here, state), actedAt: at(place.column) }
       const root = state.rootEntries.get(place.root)
       if (root === undefined || place.at.kind !== "entry")
         return { effects: [], actedAt: at(place.column) }
       return {
         effects: [
-          {
-            kind: "layout",
-            action: { kind: "show", tab: { kind: "root", root } },
-          },
+          ...show({ kind: "root", root }, state),
           {
             kind: "layout",
             action: {
@@ -73,7 +67,7 @@ export function revealOf(
         placeEnd(place, state.cards.me, state.cards.lanes, state.index) ??
         (place.at.kind === "entry" ? place.at.id : null)
       if (end === null) return { effects: [], actedAt: AT_INVENTORY }
-      const plan = planOpen(state.layout, state.index, state.archive, end)
+      const plan = planOpen(state.layout, state.index, end)
       return {
         effects: planOpenAt(end, state, fresh),
         actedAt:

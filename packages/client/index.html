@@ -5,97 +5,98 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Pineta</title>
     <style>
-      /* --page is the paper the columns are on, --chrome the darker bar above
-         it (ADR-0081). --surface is whatever a thing sits on, set by its
-         context: a ring that must read as a gap around a dot uses it. */
+      /* --page is the paper the columns are on, --chrome the darker list and
+         footer around it (ADR-0081, ADR-0085). --surface is whatever a thing
+         sits on, set by its context: a ring that must read as a gap around a
+         dot uses it. --side is your list's width, which the footer's own
+         cell shares, so the two split along one line. */
       :root { color-scheme: dark; --page: #14161a; --chrome: #0e1013; --edge: #23272e;
-        --on: #c9d1d9; --surface: var(--page); }
+        --on: #c9d1d9; --surface: var(--page); --side: 15rem; }
+      @media (width < 56rem) { :root { --side: 11.5rem; } }
       * { box-sizing: border-box; }
       button { padding: .5rem .9rem; border-radius: 6px; border: 0; background: #2f6feb; color: #fff; font: inherit; cursor: pointer; }
       .actions button, .tools button { background: none; border: 1px solid #3a3f48; color: #aaa;
         padding: .05rem .45rem; border-radius: 3px; }
+      /* Your list down the left, the workspace beside it, and the footer under
+         both (ADR-0085). There is no header: the columns start at the top. */
       body {
-        margin: 0; height: 100vh; display: flex; flex-direction: column;
+        margin: 0; height: 100vh; display: grid;
+        grid-template-columns: var(--side) minmax(0, 1fr);
+        grid-template-rows: minmax(0, 1fr) auto;
         font: 15px/1.55 ui-sans-serif, system-ui, sans-serif;
         background: var(--page); color: #e6e6e6;
       }
       #root { display: contents; }
-      /* The header is the tab bar, then the session's indicators at its right
-         (ADR-0081). Its bottom line is an inset shadow: a descendant's fill
-         paints over it, so the tab you are on, filled with the page's colour,
-         opens into the page. A negative margin could not: `.tab-list` scrolls
-         sideways, which clips what hangs below it. */
-      #top { display: flex; flex-wrap: wrap; align-items: flex-end; gap: .5rem;
-        padding: .35rem .5rem 0; background: var(--chrome); --surface: var(--chrome);
-        box-shadow: inset 0 -1px 0 var(--edge); }
       /* The identity form's title. */
       h1 { font-size: 1rem; letter-spacing: .08em; text-transform: uppercase; color: #8b93a1; margin: 0 0 .25rem; }
 
 
-      /* A tab per root (ADR-0029): Archive, the open roots, new tabs, and ＋. The
-         list scrolls; Archive and ＋ stay put. A tab is its wrap: its button,
-         ⋯ and ×. At rest it has no fill, and its border is there but clear,
-         so the border takes the same room chosen or not. */
-      #tabs { display: flex; align-items: flex-end; gap: .25rem; flex: 1; min-width: 0;
-        font-size: .8rem; --tab-control: 1.4rem; }
-      .tab-list { display: flex; align-items: flex-end; gap: .15rem; flex: 1; min-width: 0;
-        overflow-x: auto; scroll-padding-inline-start: 7rem; }
-      .tab-wrap { position: relative; display: inline-flex; align-items: center; flex: 0 1 auto;
-        min-width: 7.5rem;
-        border: 1px solid transparent; border-top-width: 2px; border-bottom: 0;
-        border-radius: 6px 6px 0 0; }
-      /* Archive stays put, over the tabs scrolled under it, and never shrinks. */
-      .tab-wrap:has(> .tab-archive) { position: sticky; left: 0; z-index: 1; flex-shrink: 0;
-        min-width: 0; background: var(--chrome); }
-      .tab-wrap:hover { background: #1b1e24; --surface: #1b1e24; }
-      /* The tab you are on is the page's colour, and covers the bar's line. */
-      .tab-wrap[data-selected] { flex-shrink: 0;
-        background: var(--page); --surface: var(--page); border-color: var(--edge);
-        border-top-color: var(--on); }
-      .tab { display: inline-flex; gap: .35rem; align-items: center; min-width: 0; max-width: 16rem;
-        padding: .45rem .7rem; border-radius: 0; background: none; color: #aab4c3; }
-      .tab[aria-selected="true"] { max-width: 32rem; color: #e6e6e6; font-weight: 600; }
-      .tab-label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-      /* A root tab while it is renamed: a field in the tab's place. */
-      .tab-title-input { width: 14rem; margin: .2rem .3rem; padding: .2rem .5rem; border-radius: 4px;
-        background: #1b1e24; color: #e6e6e6; border: 1px solid #3a3f48; font: inherit; }
-      .tab-title-input[aria-invalid="true"] { border-color: #d66; }
-      /* A tab's status, before its label (ADR-0077). Working is a still ring: it
-         needs nothing from you, so it does not move. What needs you is a
-         filled amber dot, the colour of the "since you were here" line the tab
-         opens onto, which pulses three times as it arrives and then stays;
-         what is worth a read is a dim one. Done is a ✓ that fades. */
-      .tab-status { flex: 0 0 auto; width: 6px; height: 6px; box-sizing: border-box;
-        border-radius: 50%; }
-      .tab-status.working { border: 1.5px solid #9ecbff; }
-      .tab-status.needs-you { background: #e0c080; box-shadow: 0 0 0 1.5px var(--surface); }
-      .tab-status.worth-a-read { background: #e0c080; opacity: .45; }
-      .tab-status.needs-you[data-arrived] { animation: arrive .6s ease-in-out 3; }
+      /* Your list (ADR-0085): your open roots, in your order, then new tabs,
+         then ＋. Its right edge is an inset shadow: a descendant's fill paints
+         over it, so the root you are on, filled with the page's colour,
+         opens into the page beside it (ADR-0081, turned sideways). An item is
+         its wrap: its button, ⋯ and ×. At rest it has no fill, and its
+         border is there but clear, so it takes the same room chosen or not. */
+      #open-list { grid-column: 1; grid-row: 1; display: flex; flex-direction: column;
+        gap: .6rem; min-height: 0; overflow-y: auto; padding: .6rem 0 .6rem .45rem;
+        background: var(--chrome); --surface: var(--chrome);
+        box-shadow: inset -1px 0 0 var(--edge); font-size: .8rem; --item-control: 1.4rem; }
+      .open-items { display: flex; flex-direction: column; gap: .1rem; }
+      .open-item { position: relative; display: flex; align-items: center; min-width: 0;
+        border: 1px solid transparent; border-left-width: 2px; border-right: 0;
+        border-radius: 6px 0 0 6px; }
+      .open-item:hover { background: #1b1e24; --surface: #1b1e24; }
+      /* The root you are on is the page's colour, and covers the list's edge. */
+      .open-item[data-selected] { background: var(--page); --surface: var(--page);
+        border-color: var(--edge); border-left-color: var(--on); }
+      .open-root, .open-new { flex: 1; display: flex; gap: .35rem; align-items: center;
+        min-width: 0; padding: .45rem .6rem; border-radius: 0; background: none;
+        color: #aab4c3; text-align: left; }
+      .open-item[data-selected] > .open-root, .open-item[data-selected] > .open-new {
+        color: #e6e6e6; font-weight: 600; }
+      /* A title wraps to two lines before it is cut. */
+      .open-label { flex: 1; min-width: 0; overflow: hidden; display: -webkit-box;
+        -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.25; }
+      .open-root.archived .open-label { text-decoration: line-through; color: #777; }
+      .open-new { font-style: italic; }
+      /* A root while it is renamed: a field in the item's place. */
+      .open-title-input { flex: 1; min-width: 0; margin: .2rem .3rem; padding: .2rem .5rem;
+        border-radius: 4px; background: #1b1e24; color: #e6e6e6; border: 1px solid #3a3f48;
+        font: inherit; }
+      .open-title-input[aria-invalid="true"] { border-color: #d66; }
+      .open-close, .open-menu { width: var(--item-control); padding: 0; background: none; color: #aaa; }
+      .open-more { position: relative; }
+      /* ⋯ and × only while an item is hovered or focused, the one you are on
+         too. Hidden with visibility, and laid over the label's end in the
+         colour behind them, so the label keeps its room. */
+      .open-item .open-more, .open-item .open-close { visibility: hidden; }
+      .open-item > .open-close { position: absolute; top: 0; bottom: 0; right: 0;
+        background: var(--surface); }
+      .open-item > .open-more { position: absolute; top: 0; bottom: 0;
+        right: var(--item-control); display: flex; background: var(--surface); }
+      .open-item:hover .open-more, .open-item:focus-within .open-more, .open-more.open,
+      .open-item:hover .open-close, .open-item:focus-within .open-close { visibility: visible; }
+      /* Where a root dragged to the end of your list lands. */
+      .open-end { display: block; min-height: .6rem; }
+      /* A root's status, before its label (ADR-0077), in your list and on the
+         board. Working is a still ring: it needs nothing from you, so it does
+         not move. What needs you is a filled amber dot, the colour of the
+         "since you were here" line the root opens onto, which pulses three
+         times as it arrives and then stays; what is worth a read is a dim one.
+         Done is a ✓ that fades. */
+      .root-status { flex: 0 0 auto; display: inline-block; width: 6px; height: 6px;
+        box-sizing: border-box; border-radius: 50%; }
+      .root-status.working { border: 1.5px solid #9ecbff; }
+      .root-status.needs-you { background: #e0c080; box-shadow: 0 0 0 1.5px var(--surface); }
+      .root-status.worth-a-read { background: #e0c080; opacity: .45; }
+      .root-status.needs-you[data-arrived] { animation: arrive .6s ease-in-out 3; }
       @keyframes arrive { 50% { transform: scale(1.8); } }
-      .tab-status.done { width: .7rem; height: auto; overflow: hidden; border-radius: 0;
+      .root-status.done { width: .7rem; height: auto; overflow: hidden; border-radius: 0;
         font-size: .7rem; line-height: 1; color: #9ecbff;
         animation: done-fade 3s ease-out forwards; }
       /* It ends taking no room, so nothing need be redrawn to remove it. */
       @keyframes done-fade { to { opacity: 0; width: 0; } }
-      @media (prefers-reduced-motion: reduce) { .tab-status { animation: none; } }
-      .tab.archived .tab-label { text-decoration: line-through; color: #777; }
-      .tab-new { font-style: italic; }
-      .tab-close, .tab-menu { width: var(--tab-control); padding: 0; background: none; color: #aaa; }
-      .tab-more { position: relative; }
-      /* ⋯ and × on the tab you are on, and on another while hovered or focused.
-         Hidden with visibility, so the tab's width never jumps. On another
-         tab they lie over its label's end, in the colour behind them, so a
-         label shrunk to the tab's min-width keeps all of it. */
-      .tab-wrap .tab-more, .tab-wrap .tab-close { visibility: hidden; }
-      .tab-wrap:not([data-selected]) > .tab-close {
-        position: absolute; top: 0; bottom: 0; right: 0; background: var(--surface); }
-      .tab-wrap:not([data-selected]) > .tab-more {
-        position: absolute; top: 0; bottom: 0; right: var(--tab-control); display: flex;
-        background: var(--surface); }
-      .tab-wrap:hover .tab-more, .tab-wrap:focus-within .tab-more, .tab-more.open,
-      .tab-wrap[data-selected] .tab-more,
-      .tab-wrap:hover .tab-close, .tab-wrap:focus-within .tab-close,
-      .tab-wrap[data-selected] .tab-close { visibility: visible; }
+      @media (prefers-reduced-motion: reduce) { .root-status { animation: none; } }
       .popover { position: absolute; z-index: 4; top: 100%; right: 0; display: flex;
         flex-direction: column; min-width: 12rem; padding: .25rem; background: #1b1e24;
         border: 1px solid #3a3f48; border-radius: 6px; }
@@ -103,17 +104,20 @@
       .menu button { text-align: left; background: none; color: #ddd; padding: .3rem .5rem; }
       .menu button:disabled { color: #777; cursor: default; }
       .menu .why { font-size: .75rem; }
-      /* The add tab looks like an empty tab: its split button is the tab. */
-      .add-tab { position: relative; display: inline-flex; flex: 0 0 auto; }
-      .add-tab button { padding: .3rem .6rem; background: none; color: #aab4c3;
-        border: 1px dashed #3a3f48; border-bottom: 0; border-radius: 0; }
-      .add-tab .add-agent { border-radius: 6px 0 0 0; }
-      .add-tab .add-menu { border-radius: 0 6px 0 0; border-left: 0; }
-      .add-tab button:hover { color: #e6e6e6; background: #1b1e24; }
-      .connecting { margin: 1rem; color: #6f7784; }
+      /* ＋: a split button, dashed, at the foot of your list and of each
+         board column. */
+      .add-root { position: relative; display: inline-flex; flex: 0 0 auto; align-self: flex-start;
+        margin-left: .2rem; }
+      .add-root button { padding: .3rem .6rem; background: none; color: #aab4c3;
+        border: 1px dashed #3a3f48; border-radius: 0; }
+      .add-root .add-agent { border-radius: 6px 0 0 6px; }
+      .add-root .add-menu { border-radius: 0 6px 6px 0; border-left: 0; }
+      .add-root button:hover { color: #e6e6e6; background: #1b1e24; }
+      .connecting, .nothing-here { margin: 1rem; color: #6f7784; }
 
       /* The workspace: the rail (E, everything in this root) beside the columns (paths). */
-      #workspace { position: relative; flex: 1; display: flex; min-height: 0; background: var(--page); }
+      #workspace { grid-column: 2; grid-row: 1; position: relative; display: flex;
+        min-height: 0; min-width: 0; background: var(--page); }
       .rail { position: relative; flex: 0 0 auto; min-width: 3rem; padding: 0 .25rem;
         overflow-y: auto; border-right: 1px solid #23272e; }
       /* Centred in the rail, whose min-width is wider than a narrow tree. */
@@ -140,15 +144,13 @@
         color: #ddd; pointer-events: none; }
       @keyframes pulse { 50% { transform: scale(1.8); } }
       /* An unsent card of yours (ADR-0048): a round pip in your colour, ringed in
-         the colour behind it so it reads against a tab or a track. */
+         the colour behind it (--surface) so it reads on whatever it sits on. */
       .card-pip { display: inline-block; flex: 0 0 auto; width: 6px; height: 6px;
         border-radius: 50%; box-shadow: 0 0 0 1.5px var(--surface); }
       /* On a rail dot: centred, with no ring, so the track's colour shows
          around it. 4 px in the 8 px dot keeps it on whole pixels. */
       .rail-dot > .card-pip { position: absolute; left: 2px; top: 2px; width: 4px; height: 4px;
         box-shadow: none; }
-      .archive-row { position: relative; }
-      .archive-row > .card-pip { position: absolute; top: .6rem; right: .5rem; }
       #strip { flex: 1; display: flex; overflow-x: auto; min-width: 0; }
 
       /* A column is its thread, and its pane beside it while you have opened
@@ -576,7 +578,7 @@
         border: 1px solid #9ecbff; border-radius: 1rem; white-space: nowrap; }
 
       .composer { padding: .5rem .75rem .75rem; border-top: 1px solid #23272e; }
-      /* An archived root, a preview, or a send on its way: what was typed
+      /* An archived root, or a send on its way: what was typed
          stays, and nothing more is typed. */
       .card-editor .input[readonly] { opacity: .5; }
       /* Everyone else's cards at this end (ADR-0048), above your composer. */
@@ -589,26 +591,6 @@
       .read-only { display: flex; gap: .5rem; align-items: center; justify-content: flex-end;
         margin-top: .4rem; font-size: .8rem; color: #aab4c3; }
 
-      /* The Archive tab: every root, a list beside a read-only preview. */
-      .archive { flex: 1; display: flex; min-height: 0; }
-      .archive-list { flex: 0 0 26rem; overflow-y: auto; padding: .75rem;
-        border-right: 1px solid #23272e; }
-      .archive-controls { display: flex; flex-direction: column; gap: .4rem; margin-bottom: .5rem; }
-      .archive-filters { display: flex; gap: .25rem; }
-      .archive-filters button { padding: .1rem .5rem; font-size: .75rem; background: none;
-        border: 1px solid #3a3f48; color: #aaa; }
-      .archive-filters button[aria-pressed="true"] { border-color: #9ecbff; color: #e6e6e6; }
-      .archive-rows { list-style: none; margin: 0; padding: 0; }
-      .archive-row { display: flex; flex-direction: column; width: 100%; text-align: left;
-        margin-bottom: .25rem; padding: .4rem .5rem; background: #1b1e24; color: #e6e6e6; }
-      .archive-row[aria-current="true"] { outline: 1px solid #9ecbff; }
-      .archive-row[data-state="archived"] .archive-label { color: #8b93a1; }
-      .archive-meta { font-size: .72rem; color: #6f7784; }
-      .archive-count { margin: 0; font-size: .72rem; color: #6f7784; }
-      .archive-empty, .archive-hint { color: #6f7784; }
-      .archive-preview { flex: 1; display: flex; min-width: 0; }
-      .preview { flex: 1; display: flex; min-height: 0; }
-      .preview-strip { display: flex; min-width: 0; }
       .typing { font-size: .75rem; color: #8b93a1; margin-bottom: .3rem; font-style: italic; }
       .card-editor .input { display: block; width: 100%; resize: vertical; }
       /* Commands matching what is typed (ADR-0036), above the input. */
@@ -736,21 +718,68 @@
       #strip:has(.fork-dot[data-color="7"]:hover) .column-head[data-color="7"] { outline: 2px solid var(--track); outline-offset: 2px; }
       #strip:has(.column-head[data-color="pending"]:hover) .fork-dot[data-color="pending"],
       #strip:has(.fork-dot[data-color="pending"]:hover) .column-head[data-color="pending"] { outline: 2px solid var(--track); outline-offset: 2px; }
-      /* The header's right: "syncing…" while pending, who is here, what needs
-         you (ADR-0069), the project, then your inventory and you. Nothing here animates: the tab,
-         the column and the rail show where the agent works. */
-      .header-right { display: flex; align-items: center; gap: .75rem; margin-left: auto;
-        align-self: center; padding-bottom: .3rem; }
+      /* The footer (ADR-0085): one row of chrome, split where your list's edge
+         is. Its own cell, at the list's width, is yours: you and your
+         inventory. Then everyone's: the board's strip, what needs you
+         (ADR-0069), the project, and "syncing…" while pending. Nothing here
+         animates: your list, the column and the rail show where the agent
+         works. */
+      #bottom { grid-column: 1 / 3; grid-row: 2; display: flex; align-items: center;
+        gap: 1rem; min-height: 42px; padding-right: .6rem; background: var(--chrome);
+        --surface: var(--chrome); box-shadow: inset 0 1px 0 var(--edge); font-size: .8rem; }
+      .footer-you { flex: 0 0 var(--side); align-self: stretch; display: flex; align-items: center;
+        gap: .5rem; padding: 0 .6rem; box-shadow: inset -1px 0 0 var(--edge); }
+      .footer-right { margin-left: auto; display: flex; align-items: center; gap: .75rem; }
       .sync-note { font-size: .75rem; color: #6f7784; }
-      /* Too narrow for both on one row: the indicators go above the tabs. */
-      @media (width < 56rem) {
-        .header-right { order: -1; flex-basis: 100%; justify-content: flex-end; }
-      }
-      .here { display: flex; align-items: center; gap: .25rem; }
-      .here-trigger, .activity-trigger, .me-trigger { display: inline-flex; align-items: center; gap: .3rem;
+      /* The board's strip: ▦, then each state's name, count, readers and mark. */
+      .board-strip { display: flex; align-items: center; gap: .9rem; min-width: 0;
+        overflow-x: auto; }
+      .board-toggle, .strip-state { display: inline-flex; align-items: center; gap: .35rem;
+        padding: .2rem .4rem; background: none; color: #aab4c3; white-space: nowrap; }
+      .board-toggle { color: #c9d1d9; font-weight: 600; }
+      .board-toggle[aria-expanded="true"] { background: var(--page); }
+      .board-toggle .glyph { color: #8b949e; }
+      .strip-count { color: #e6e6e6; font-weight: 600; }
+      .reader-trigger, .activity-trigger, .me-trigger { display: inline-flex; align-items: center; gap: .3rem;
         padding: .1rem .3rem; background: none; color: #ddd; border-radius: 999px; }
-      .here-trigger .initial, .activity-trigger .initial, .me-trigger .initial { width: 22px; height: 22px;
+      .reader-trigger .initial, .activity-trigger .initial, .me-trigger .initial { width: 22px; height: 22px;
         line-height: 22px; font-size: 12px; }
+      /* The board, open (ADR-0085): over the columns, from the footer's edge,
+         moving none of them. A column per open state, a column to add one,
+         and the closed state collapsed to a count, a search and its rows. */
+      #board { position: absolute; z-index: 3; left: 0; right: 0; bottom: 0; max-height: 70%;
+        display: flex; align-items: flex-start; gap: .75rem; padding: .9rem; overflow: auto;
+        background: #111317;
+        border-top: 1px solid var(--edge); box-shadow: 0 -12px 24px #0008;
+        font-size: .8rem; color: #c9d1d9; --surface: #111317; }
+      .board-column, .board-closed { display: flex; flex-direction: column; gap: .4rem; min-width: 0; }
+      .board-column { flex: 1 1 12rem; }
+      .board-closed { flex: 0 0 14rem; }
+      .board-head { display: flex; align-items: center; gap: .4rem; }
+      .state-name { padding: 0; background: none; color: #8b949e; font-size: .7rem; font-weight: 600;
+        letter-spacing: .06em; text-transform: uppercase; }
+      .state-name-input { width: 9rem; padding: .1rem .4rem; background: var(--page); color: #e6e6e6;
+        border: 1px solid #3a3f48; border-radius: 4px; font: inherit; }
+      .board-count { color: #6f7784; font-size: .7rem; }
+      .state-more { position: relative; margin-left: auto; }
+      .state-menu, .item-menu { padding: 0 .3rem; background: none; color: #aaa; }
+      .board-items { display: flex; flex-direction: column; gap: .4rem; min-height: 1.5rem; }
+      .board-item { position: relative; display: flex; flex-direction: column; gap: .2rem;
+        padding: .5rem .6rem; background: var(--page); border: 1px solid var(--edge);
+        border-radius: 6px; --surface: var(--page); }
+      .board-open { display: flex; gap: .35rem; align-items: center; padding: 0; background: none;
+        color: #e6e6e6; text-align: left; line-height: 1.25; }
+      .board-label { flex: 1; min-width: 0; }
+      .board-meta { display: flex; align-items: center; gap: .4rem; min-height: 22px; }
+      .board-writers { color: #8b949e; font-size: .72rem; }
+      .readers { display: inline-flex; gap: .1rem; margin-left: auto; }
+      .item-more { position: absolute; top: .3rem; right: .3rem; visibility: hidden; }
+      .board-item:hover .item-more, .board-item:focus-within .item-more, .item-more.open { visibility: visible; }
+      .board-add-state { flex: 0 0 auto; }
+      .add-state { padding: .3rem .6rem; background: none; color: #aab4c3; border: 1px dashed #3a3f48; }
+      .closed-search { padding: .3rem .5rem; background: var(--page); color: #ddd;
+        border: 1px solid var(--edge); border-radius: 4px; font: inherit; }
+      .closed-mine { color: #8b949e; font-size: .75rem; }
       .activity-trigger .agent-mark { background: #3a3f48; color: #aab4c3; }
       .activity-trigger:has(.activity-working) .agent-mark { background: #9ecbff; color: #111; }
       .activity-working { font-size: .75rem; color: #aab4c3; }
@@ -758,7 +787,6 @@
         color: #111; font-size: .72rem; font-weight: 600; text-align: center; }
       .line-trigger { padding: .15rem .6rem; font-size: .8rem; background: none; color: #ddd;
         border: 1px solid #3a3f48; border-radius: 999px; }
-      .header-tools { display: flex; align-items: center; gap: .5rem; margin-left: .75rem; }
       .menu-heading { margin: .1rem .5rem .3rem; font-size: .75rem; color: #8b93a1; }
       /* A later section of a menu: its heading under a rule. Notes say how
          things stand, as text, not as items. A choice's ✓ keeps its column
@@ -785,8 +813,8 @@
       .here-thread.raised.worth-a-read .here-at { color: #c9b48a; }
       .menu button.not-needed { padding: 0 .5rem .3rem 1.2rem; font-size: .72rem; color: #8b93a1; }
       /* Who you are, asked once per device before anything connects (ADR-0037). */
-      #identity { display: flex; flex-direction: column; gap: .6rem; width: 20rem;
-        margin: 20vh auto 0; padding: 1.25rem; border: 1px solid #23272e; border-radius: 8px;
+      #identity { grid-column: 1 / 3; align-self: start; display: flex; flex-direction: column;
+        gap: .6rem; width: 20rem; margin: 20vh auto 0; padding: 1.25rem; border: 1px solid #23272e; border-radius: 8px;
         background: #1b1e24; }
       #identity label, #profile label { display: flex; justify-content: space-between;
         align-items: center; gap: .5rem; }
@@ -794,7 +822,7 @@
       #identity button { align-self: flex-end; padding: .3rem .9rem; }
       .identity-problem, .name-problem { margin: 0; color: #f0a0a0; font-size: .85rem; }
       .name-handle { margin: 0; color: #8b93a1; font-size: .8rem; }
-      /* Your profile, from your avatar at the header's right. */
+      /* Your profile, from your avatar at the footer's left. */
       .profile { min-width: 18rem; padding: .5rem .75rem .75rem; gap: .5rem; }
       .profile form { display: flex; flex-direction: column; gap: .4rem; }
       .profile-save { align-self: flex-end; padding: .25rem .8rem; }

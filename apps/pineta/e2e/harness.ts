@@ -27,7 +27,9 @@ import {
 } from "@pineta/core"
 import { prepareHost } from "@pineta/lanes"
 import { scriptedModel } from "@pineta/pi"
+import type { Outcome } from "@pineta/protocol/codec"
 import {
+  readBoardPlaces,
   readHeld,
   readHeldIndex,
   readLaneRecords,
@@ -35,6 +37,7 @@ import {
   readLine,
   readPlaces,
   readRoots,
+  readWorkflow,
 } from "@pineta/reads"
 import {
   hasLaneRecord,
@@ -333,6 +336,33 @@ function drawnCard(client: SessionClient, id: CardId): CardRecord {
   if (card === undefined)
     throw new Error(`${client.writer} draws no card ${id}`)
   return card
+}
+
+/**
+ * Move the root whose root entry is `entry` to the closed workflow state, or
+ * out of it to the first open one, as the board does (ADR-0085): archive or
+ * restore it. The state it is in is read from `client`'s copy of the board.
+ */
+export function moveRootTo(
+  client: Pick<SessionClient, "session" | "request">,
+  entry: EntryId,
+  to: "closed" | "open",
+): Promise<Outcome> {
+  const workflow = readWorkflow(client.session)
+  const root = [...readRoots(client.session).values()].find(
+    r => r.entry === entry,
+  )?.root
+  const first = workflow?.open[0]
+  if (workflow === null || root === undefined || first === undefined)
+    throw new Error(`no board place for ${entry}`)
+  const from = readBoardPlaces(client.session).get(root)?.state ?? first.id
+  return client.request({
+    kind: "move-root",
+    root,
+    from,
+    to: to === "closed" ? workflow.closed.id : first.id,
+    before: null,
+  })
 }
 
 /**

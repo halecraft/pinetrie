@@ -42,7 +42,7 @@ async function run(check: Checks["check"]): Promise<void> {
       await asPerson(qp, "quinn@browser.test", "Quinn")
       try {
         await pp.goto(imageHost.httpUrl, { waitUntil: "domcontentloaded" })
-        await pp.click("#tabs .add-agent")
+        await pp.click("#open-list .add-agent")
         const box = `${col(0)} .composer .input`
         const sendButton = `${col(0)} .composer .send`
         await pp.fill(box, "what colour is this?")
@@ -142,16 +142,12 @@ async function run(check: Checks["check"]): Promise<void> {
           `${JSON.stringify(mine)}`,
         )
         await qp.goto(imageHost.httpUrl, { waitUntil: "domcontentloaded" })
+        // A window with nothing in its list opens on the board, where the
+        // other window's reader avatar leads to its thread (ADR-0085).
         await qp
-          .waitForSelector("#top .here-person .here-trigger", {
-            timeout: 20_000,
-          })
+          .waitForSelector("#board .reader-trigger", { timeout: 20_000 })
           .catch(() => null)
-        await chooseFromMenu(
-          qp,
-          "#top .here-person .here-trigger",
-          ".here-thread",
-        )
+        await chooseFromMenu(qp, "#board .reader-trigger", ".here-thread")
         const theirs = await loaded(qp)
         check(
           "another window draws it too",
@@ -319,7 +315,7 @@ async function run(check: Checks["check"]): Promise<void> {
       await asPerson(ip, "ida@browser.test", "Ida")
       try {
         await ip.goto(imageHost.httpUrl, { waitUntil: "domcontentloaded" })
-        await ip.click("#tabs .add-agent")
+        await ip.click("#open-list .add-agent")
         const say = async (text: string) => {
           await ip.fill(`${col(0)} .composer .input`, text)
           await ip.click(`${col(0)} .composer .send`)

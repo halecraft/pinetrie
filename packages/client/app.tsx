@@ -1,13 +1,15 @@
 // client/app — the page: `App`, which `main.tsx` mounts.
 //
-// The screen is your tabs, one per root you opened, each a rail beside a strip
-// of columns, under a header showing who is here, your inbox of mentions and
-// you (docs/06-interface.md, ADR-0029, ADR-0030). The rail draws the root's tree;
-// each column is one path, read on its own scroll. What is drawn is a read of
-// the document, through `@pineta/reads` and `projection.ts`. Which tab you are
-// on, your tabs and each root's columns are this window's own view state: a
-// reducer (`layout.ts`), kept in this browser tab's storage and never in the
-// document (ADR-0027). Which mentions you have seen is kept per device.
+// The screen is your list down the left, the root you are on beside it, a
+// rail beside a strip of columns, and the footer along the bottom: you, the
+// board's strip, what needs you and the project (docs/06-interface.md,
+// ADR-0085). The rail draws the root's tree; each column is one path, read on
+// its own scroll; the board opens over them. What is drawn is a read of the
+// document, through `@pineta/reads` and `projection.ts`. Your list is your
+// own document, on every device (`openList`). Which root you are on, each
+// root's columns and whether the board is open are this window's own view
+// state: a reducer (`layout.ts`), kept in this browser tab's storage and
+// never in the document (ADR-0027).
 //
 // `App` gathers, `appView` (`app-view.ts`) decides what is shown, and a click
 // comes back as an `Intent`, which `planIntent` (`intent.ts`) plans and
@@ -21,15 +23,16 @@
 import { whenSettled } from "@kyneta/exchange"
 import { useDocStatus, useSelector } from "@kyneta/react"
 import {
+  type ArchivedRoot,
   branchColors,
   type CardId,
   cardId,
   type EntryId,
-  PENDING_TRACK,
   pathIds,
   projectColumns,
-  projectRail,
+  type RootId,
   rootWork,
+  type WorkflowStateId,
 } from "@pineta/core"
 import {
   participantsIn,
@@ -37,6 +40,7 @@ import {
   readParticipantNames,
   readRoots,
 } from "@pineta/reads"
+import { boardOf } from "@pineta/rules"
 import {
   heldBy,
   intentsOf,
@@ -45,7 +49,6 @@ import {
   settleSlots,
 } from "@pineta/session"
 import {
-  type ComponentProps,
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -56,27 +59,18 @@ import {
   useSyncExternalStore,
 } from "react"
 import { placement } from "./align.ts"
-import {
-  appView,
-  laneRootsOf,
-  type ReadOnly,
-  readOnlyWords,
-  tabRail,
-} from "./app-view.ts"
-import { ArchiveTab } from "./archive.tsx"
-import { type ArchiveFilter, archiveIndex } from "./archive-rows.ts"
+import { appView, hereRail, laneRootsOf } from "./app-view.ts"
 import { foldMemory } from "./ask-fold.ts"
 import { needsYouCount } from "./attention.ts"
+import { Board, BoardStrip } from "./board.tsx"
+import { boardView } from "./board-view.ts"
 import { CardHistories } from "./card-history.tsx"
 import { cardMarks, ownCards } from "./card-marks.ts"
-import { Column, type ColumnProps } from "./column.tsx"
-import {
-  type Column as ColumnSpec,
-  columnsReducer,
-  isAnchored,
-} from "./columns.ts"
+import { CardPip } from "./card-pip.tsx"
+import { Column } from "./column.tsx"
+import { type Column as ColumnSpec, isAnchored } from "./columns.ts"
 import type { SeenEnd } from "./follow.ts"
-import { Header } from "./header.tsx"
+import { Footer, threadRow } from "./footer.tsx"
 import { planHeldRoots, rootEntriesOf } from "./held-roots.ts"
 import { runsHere } from "./here.ts"
 import { type Identity, reconcileName } from "./identity.ts"
@@ -84,11 +78,9 @@ import { mentionsOf } from "./inbox.ts"
 import {
   claimFocus,
   type Effect,
-  entryShown,
   type Intent,
   nameEffects,
   planIntent,
-  readerAction,
 } from "./intent.ts"
 import type { Dock } from "./inventory-dock.ts"
 import { keyAct } from "./inventory-keys.ts"
@@ -100,6 +92,8 @@ import {
   layoutReducer,
   resolveLayout,
 } from "./layout.ts"
+import { OpenList } from "./open-list.tsx"
+import { offeredByRoot, openListView, pageTitle } from "./open-list-view.ts"
 import { type AppPorts, perform } from "./perform.ts"
 import { nameFor, presenceColors, writerOrder } from "./presence.tsx"
 import { planReading, typingDue } from "./presence-report.ts"
@@ -119,10 +113,16 @@ import {
   NO_TEXT,
   summariesOf,
 } from "./root-label.ts"
+import {
+  parseRootDrag,
+  planRootDrop,
+  ROOT_DROP_ZONE,
+  ROOT_MIME,
+  type RootDrag,
+  rootTargetOfElement,
+} from "./root-target.ts"
 import { screenMemory } from "./screen-memory.ts"
 import type { DeviceState, TabState } from "./tab-state.ts"
-import { TabBar } from "./tabs.tsx"
-import { offeredByRoot, pageTitle, tabsView } from "./tabs-view.ts"
 import type { RowMemory } from "./tool-row.ts"
 import { useAttention } from "./use-attention.ts"
 import { useColumnDrag } from "./use-column-drag.ts"
@@ -148,8 +148,8 @@ export interface AppStores {
   readonly dock: DeviceState<Dock>
 }
 
-/** How long a card's drag held over a root's tab opens it. */
-const TAB_HOVER_MS = 600
+/** How long a card's drag held over a root in your list opens it. */
+const ITEM_HOVER_MS = 600
 
 const cardOrNull = (id: string | undefined): CardId | null =>
   id === undefined || id === "" ? null : cardId(id)
@@ -271,9 +271,9 @@ export function App({
 }) {
   const doc = session.session
   const status = useDocStatus(doc)
-  // The roots this tab holds (ADR-0063): the roots of your open tabs, the one
-  // you are on and the Archive tab's preview, set by the effect below. Every
-  // read of the tree reads them as one.
+  // The roots this tab holds (ADR-0063): the roots of your list and the one
+  // you are on, set by the effect below. Every read of the tree reads them
+  // as one.
   const roots = useSyncExternalStore(
     session.roots.subscribe,
     session.roots.current,
@@ -286,8 +286,8 @@ export function App({
     }),
     [session, roots],
   )
-  // The directory of every root (ADR-0063): what the tabs, the Archive tab
-  // and the inbox read of a root without holding it.
+  // The directory of every root (ADR-0063): what your list, the board and
+  // the inbox read of a root without holding it.
   const directory = useSelector(doc, readRoots)
   // Every read is `useSelector` over a named read, never an inline
   // `useTracked` thunk: a new thunk re-runs, so an inline one would read the
@@ -299,7 +299,9 @@ export function App({
     running,
     live,
     seats,
-    archive,
+    workflow,
+    places,
+    archived,
     marks,
     verdicts,
     workFacts,
@@ -329,8 +331,8 @@ export function App({
   // identity, so it may change only when a name does.
   const nameOf = useSelector(doc, readParticipantNames)
 
-  // Each root, for the Archive tab and its label: its title, else its first
-  // line (ADR-0045). Which roots have tabs is yours (`layout.open`, ADR-0030).
+  // Each root, for the board and its label: its title, else its first line
+  // (ADR-0045). Which roots are in your list is yours (`openList`, ADR-0085).
   const summaries = useMemo(() => summariesOf(directory), [directory])
   const lines = useMemo(() => firstLinesOf(directory), [directory])
   const labels = useMemo(
@@ -352,6 +354,52 @@ export function App({
   // The agent's runs and each lane's root, in every root, held or not
   // (ADR-0063): what the header lists.
   const rootEntries = useMemo(() => rootEntriesOf(directory), [directory])
+  const rootIds = useMemo(
+    () => new Map([...rootEntries].map(([id, entry]) => [entry, id] as const)),
+    [rootEntries],
+  )
+  // The roots in the closed state (ADR-0085), by root entry: the layout, the
+  // marks and attention are keyed by it.
+  const archivedEntries = useMemo(() => {
+    const out = new Map<EntryId, ArchivedRoot>()
+    for (const [id, a] of archived) {
+      const entry = rootEntries.get(id)
+      if (entry !== undefined) out.set(entry, a)
+    }
+    return out
+  }, [archived, rootEntries])
+  const archivedRoots = useMemo(
+    () => new Set(archivedEntries.keys()),
+    [archivedEntries],
+  )
+  // Your list (ADR-0085): your own document, by root entry; a root the
+  // directory does not name yet is left out until it does.
+  const listIds = useSyncExternalStore(
+    session.openList.roots.subscribe,
+    session.openList.roots.current,
+  )
+  const list = useMemo(
+    () =>
+      listIds.flatMap(id => {
+        const entry = rootEntries.get(id)
+        return entry === undefined ? [] : [entry]
+      }),
+    [listIds, rootEntries],
+  )
+  // The board (ADR-0085): each root's state, by root entry.
+  const board = useMemo(
+    () =>
+      workflow === null ? null : boardOf(workflow, places, rootEntries.keys()),
+    [workflow, places, rootEntries],
+  )
+  const stateOf = useMemo(() => {
+    const out = new Map<EntryId, WorkflowStateId>()
+    for (const [id, state] of board?.stateOf ?? []) {
+      const entry = rootEntries.get(id)
+      if (entry !== undefined) out.set(entry, state)
+    }
+    return out
+  }, [board, rootEntries])
   const runs = useMemo(
     () => runsHere({ activity, running, rootEntries, index }),
     [activity, running, rootEntries, index],
@@ -376,12 +424,14 @@ export function App({
   // it, so an action reduces from it: React runs pending effects before it
   // handles the next event.
   const layout = useMemo(
-    () => resolveLayout(stored, { index, lanes, archive }),
-    [stored, index, lanes, archive],
+    () =>
+      resolveLayout(stored, { index, lanes, archived: archivedRoots, list }),
+    [stored, index, lanes, archivedRoots, list],
   )
   useEffect(() => {
-    if (layout !== stored) dispatch({ kind: "resolve", index, lanes, archive })
-  }, [layout, stored, index, lanes, archive])
+    if (layout !== stored)
+      dispatch({ kind: "resolve", index, lanes, archived: archivedRoots, list })
+  }, [layout, stored, index, lanes, archivedRoots, list])
   // Every change is saved, the document's too: restored from an older
   // anchor, `followTip` could land on a newer branch below it.
   useEffect(() => stores.layout.save(layout), [stores, layout])
@@ -389,17 +439,22 @@ export function App({
   // settled, and the tab to show is chosen then: before, missing means not
   // yet arrived. `"populated"` comes with the first data, so it cannot tell
   // (S29).
-  // The roots your stored tabs name are held, and settled, first: their
-  // anchors are in no index before (ADR-0063).
+  // The roots your list and the stored root you were on name are held, and
+  // settled, first: their anchors are in no index before (ADR-0063).
   const [settled, setSettled] = useState(false)
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, with the stored layout of that render
   useEffect(() => {
     let alive = true
     void whenSettled(doc).then(async () => {
+      const known = rootEntriesOf(readRoots(doc))
       session.holdRoots(
         planHeldRoots({
-          layout: stored,
-          preview: null,
+          layout: {
+            active: stored.active,
+            open: session.openList.roots
+              .current()
+              .flatMap(id => known.get(id) ?? []),
+          },
           directory: readRoots(doc),
         }),
       )
@@ -412,19 +467,21 @@ export function App({
       alive = false
     }
   }, [doc, session])
-  // The Archive tab's pick: its preview is a root this tab holds.
-  const [archivePick, setArchivePick] = useState<EntryId | null>(null)
-  // What this tab holds follows your tabs, once the stored ones are settled.
+  // What this tab holds follows your list, once the stored roots are settled.
   useEffect(() => {
-    if (settled)
-      session.holdRoots(
-        planHeldRoots({ layout, preview: archivePick, directory }),
-      )
-  }, [settled, session, layout, archivePick, directory])
+    if (settled) session.holdRoots(planHeldRoots({ layout, directory }))
+  }, [settled, session, layout, directory])
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, at settle, with the index of that render
   useEffect(() => {
     if (settled)
-      dispatch({ kind: "prune", index, archive, known: new Set(labels.keys()) })
+      dispatch({
+        kind: "prune",
+        index,
+        lanes,
+        archived: archivedRoots,
+        list,
+        known: new Set(labels.keys()),
+      })
   }, [settled])
 
   const active = layout.active
@@ -461,7 +518,11 @@ export function App({
       ),
     [index, columns],
   )
-  const rail = useMemo(() => tabRail(index, active), [index, active])
+  const rail = useMemo(() => hereRail(index, active), [index, active])
+  // The root you are on, which your list's repair keeps while it is archived.
+  const hereId =
+    active?.kind === "root" ? (rootIds.get(active.root) ?? null) : null
+  useEffect(() => session.openList.here(hereId), [session, hereId])
   const order = useMemo(
     () => writerOrder(index, nameOf.keys()),
     [index, nameOf],
@@ -474,15 +535,6 @@ export function App({
     [cards, session.writer],
   )
   const filled = useFilledCards(session, mine)
-  const archivedRoots = useMemo(
-    () =>
-      new Set(
-        [...archive.values()].flatMap(r =>
-          r.state === "archived" ? [r.root] : [],
-        ),
-      ),
-    [archive],
-  )
   const unsent = useMemo(
     () =>
       cardMarks({
@@ -517,7 +569,7 @@ export function App({
   // column on each write, the refresh and others' typing included (S59).
   // Each part that shows presence reads it (`use-presence.ts`).
   //
-  // Each column of the tab you are on reports its thread end (ADR-0024,
+  // Each column of the root you are on reports its thread end (ADR-0024,
   // ADR-0029; `planReading`), and its root, so a window that does not hold
   // that root can name it (ADR-0063). While the page is visible the entries
   // are refreshed, so they outlive their decay.
@@ -567,7 +619,8 @@ export function App({
         active,
         columns,
         tracks: colors.track,
-        archive,
+        archived: archivedEntries,
+        workflow,
         nameOf,
         offers: workFacts.offers,
         lanes,
@@ -577,7 +630,8 @@ export function App({
       active,
       columns,
       colors.track,
-      archive,
+      archivedEntries,
+      workflow,
       nameOf,
       workFacts.offers,
       lanes,
@@ -605,8 +659,8 @@ export function App({
     items: mentions,
     shown,
   })
-  // What needs you, and where (ADR-0077): each tab's status, the header's
-  // rows, and the page's title.
+  // What needs you, and where (ADR-0077): each root's status, the activity
+  // menu's rows, and the page's title.
   const attention = useAttention({
     me: session.writer,
     attention: session.attention,
@@ -622,10 +676,10 @@ export function App({
     settled,
   })
   const needsYou = needsYouCount(attention.items) + inbox.unseen
-  const tabs =
+  const listView =
     active === null
       ? null
-      : tabsView({
+      : openListView({
           layout,
           active,
           labels,
@@ -636,11 +690,46 @@ export function App({
           offered,
           unsent,
           status: attention.status,
-          elsewhere: attention.elsewhere,
           arrivals: attention.arrivals,
-          count,
+          workflow,
+          stateOf,
+          rootIds,
         })
-  const title = pageTitle(needsYou, tabs?.selected ?? null)
+  const title = pageTitle(needsYou, listView?.selected ?? null)
+  // The closed state's search and "mine": never stored.
+  const [boardQuery, setBoardQuery] = useState("")
+  const [boardMine, setBoardMine] = useState(false)
+  const boardShown = useMemo(
+    () =>
+      workflow === null
+        ? null
+        : boardView({
+            workflow,
+            places,
+            rootEntries,
+            summaries,
+            labels,
+            status: attention.status,
+            cardRoots: unsent.roots,
+            query: boardQuery,
+            mine: boardMine,
+            me: session.writer,
+            work,
+          }),
+    [
+      workflow,
+      places,
+      rootEntries,
+      summaries,
+      labels,
+      attention.status,
+      unsent.roots,
+      boardQuery,
+      boardMine,
+      session.writer,
+      work,
+    ],
+  )
   useEffect(() => {
     document.title = title
   }, [title])
@@ -697,10 +786,6 @@ export function App({
   // view is scrolled to.
   const reveal = useReveal(strip)
 
-  // The Archive tab's own state: never stored.
-  const [archiveFilter, setArchiveFilter] = useState<ArchiveFilter>("all")
-  const [archiveQuery, setArchiveQuery] = useState("")
-
   // Your inventory (ADR-0048 step 4): this tab's moves and your slots, the
   // panel's selection, whether it is open (never stored), and its dock
   // (this device's).
@@ -754,7 +839,6 @@ export function App({
       folds.set(ask, "open")
       setOpened(n => n + 1)
     },
-    pickArchived: setArchivePick,
     arm: key => {
       armed.current = key
     },
@@ -783,7 +867,6 @@ export function App({
         {
           layout,
           index,
-          archive,
           asks,
           cards: {
             cards,
@@ -795,6 +878,7 @@ export function App({
             composers: composers.current(),
           },
           rootEntries,
+          rootIds,
         },
         crypto.randomUUID(),
         newRootId(),
@@ -840,9 +924,10 @@ export function App({
     document.addEventListener("focusin", onFocus)
     return () => document.removeEventListener("focusin", onFocus)
   }, [])
-  // A card's drag (HTML drag and drop: it crosses elements and tabs). A
-  // drop lands only where put can (`targetOfElement`); held over a root's
-  // tab, the drag opens it.
+  // A card's drag (HTML drag and drop: it crosses elements and roots). A
+  // drop lands only where put can (`targetOfElement`); held over a root in
+  // your list, the drag opens it. A root's drag is not a card's: it is
+  // `ROOT_MIME`, and lands below.
   useEffect(() => {
     let hover: {
       readonly root: EntryId
@@ -859,12 +944,12 @@ export function App({
     }
     const onOver = (e: DragEvent) => {
       if (!carriesCard(e)) return
-      const tab =
+      const item =
         e.target instanceof Element
-          ? e.target.closest<HTMLElement>(".tab[data-root]")?.dataset.root
+          ? e.target.closest<HTMLElement>(".open-root[data-root]")?.dataset.root
           : undefined
-      // The tab's root, as your layout holds it.
-      const root = layout.open.find(r => r === tab)
+      // The item's root, as your list holds it.
+      const root = layout.open.find(r => r === item)
       if (root !== hover?.root) {
         if (hover !== null) clearTimeout(hover.timer)
         hover =
@@ -876,9 +961,9 @@ export function App({
                   () =>
                     onIntent({
                       kind: "show",
-                      tab: { kind: "root", root },
+                      here: { kind: "root", root },
                     }),
-                  TAB_HOVER_MS,
+                  ITEM_HOVER_MS,
                 ),
               }
       }
@@ -915,6 +1000,46 @@ export function App({
       document.removeEventListener("drop", onDrop)
     }
   }, [onIntent, layout.open])
+  // A root's drag, from the board or your list (ADR-0085): it lands only
+  // where a key could move it (`planRootDrop`).
+  const closedState = workflow?.closed.id ?? null
+  useEffect(() => {
+    const carriesRoot = (e: DragEvent) =>
+      e.dataTransfer?.types.includes(ROOT_MIME) === true
+    const targetOf = (e: DragEvent) => {
+      const el =
+        e.target instanceof Element
+          ? e.target.closest<HTMLElement>(ROOT_DROP_ZONE)
+          : null
+      return el === null ? null : rootTargetOfElement(el)
+    }
+    const onOver = (e: DragEvent) => {
+      if (carriesRoot(e) && targetOf(e) !== null) e.preventDefault()
+    }
+    const onDrop = (e: DragEvent) => {
+      if (!carriesRoot(e) || closedState === null) return
+      const target = targetOf(e)
+      const drag = parseRootDrag(e.dataTransfer?.getData(ROOT_MIME) ?? "")
+      if (target === null || drag === null) return
+      e.preventDefault()
+      const intent = planRootDrop(drag, target, closedState)
+      if (intent !== null) onIntent(intent)
+    }
+    document.addEventListener("dragover", onOver)
+    document.addEventListener("drop", onDrop)
+    return () => {
+      document.removeEventListener("dragover", onOver)
+      document.removeEventListener("drop", onDrop)
+    }
+  }, [onIntent, closedState])
+  /** A root's drag from your list: its id and state, or null with no id yet. */
+  const dragOf = (root: string): RootDrag | null => {
+    const entry = root as EntryId
+    const id: RootId | undefined = rootIds.get(entry)
+    return id === undefined
+      ? null
+      : { root: id, entry, state: stateOf.get(entry) ?? null }
+  }
   const openAt = (entry: EntryId) => onIntent({ kind: "openAt", entry })
   const openIn = (entry: EntryId, root: EntryId) =>
     onIntent({ kind: "openIn", entry, root })
@@ -976,64 +1101,26 @@ export function App({
     [histories, seats, session, nameOf],
   )
 
-  /** A root, read-only, for the Archive tab: its rail and one column. */
-  const preview = (r: EntryId) => (
-    <Preview
-      key={r}
-      onIntent={onIntent}
-      readOnly={readOnlyWords(r, archive.get(r), nameOf)}
-      root={r}
-      shared={shared}
-      yours={yours}
-    />
-  )
-
   const { workspace } = view
+  const readers = { session, index, order, nameOf, colorOf }
+  const pip = <CardPip color={colorOf(session.writer)} />
+  const thread = threadRow({ index, labelOf, onOpen: openIn })
   return (
     <CardHistories value={historyFacts}>
-      <header id="top">
-        {tabs !== null && workspace.kind !== "connecting" && (
-          <TabBar
-            colorOf={colorOf}
-            index={index}
-            nameOf={nameOf}
-            onIntent={onIntent}
-            order={order}
-            session={session}
-            view={tabs}
-          />
-        )}
-        <Header
-          syncing={status === "pending"}
+      {listView !== null && workspace.kind !== "connecting" ? (
+        <OpenList
           colorOf={colorOf}
-          inbox={inbox}
+          dragOf={dragOf}
           index={index}
-          labelOf={labelOf}
-          mentions={mentions}
           nameOf={nameOf}
-          names={workFacts.names}
-          line={workFacts.line}
-          project={workFacts.project}
           onIntent={onIntent}
-          offers={view.offers}
-          attention={attention.items}
-          me={{
-            writer: session.writer,
-            email: session.principal,
-            rename: name => session.request({ kind: "name", name }),
-            signOut: () => onIntent({ kind: "signOut" }),
-          }}
-          onOpen={openIn}
           order={order}
           session={session}
-          runs={runs}
-          inventory={{
-            open: inventoryOpen,
-            count: held.length,
-            onToggle: () => setInventoryOpen(open => !open),
-          }}
+          view={listView}
         />
-      </header>
+      ) : (
+        <nav aria-label="your threads" id="open-list" />
+      )}
       {inventoryOpen && (
         <InventoryPanel
           colorOf={colorOf}
@@ -1050,209 +1137,123 @@ export function App({
           slots={slots}
         />
       )}
-      {tabs === null || workspace.kind === "connecting" ? (
-        <main id="workspace">
+      <main id="workspace">
+        {listView === null || workspace.kind === "connecting" ? (
           <p className="connecting">connecting…</p>
-        </main>
-      ) : (
-        <main id="workspace">
-          {workspace.kind === "archive" ? (
-            <ArchiveTab
-              count={count}
-              filter={archiveFilter}
-              labelOf={labelOf}
-              myColor={yours.color}
-              nameOf={nameOf}
-              onFilter={setArchiveFilter}
-              onQuery={setArchiveQuery}
-              onSelect={setArchivePick}
-              preview={preview}
-              query={archiveQuery}
-              rows={archiveIndex({
-                roots: summaries,
-                labels,
-                archive,
-                filter: archiveFilter,
-                query: archiveQuery,
-                me: session.writer,
-                cardRoots: unsent.roots,
+        ) : workspace.kind === "nothing" ? (
+          <p className="nothing-here">
+            Open a thread from the board, or start one with ＋.
+          </p>
+        ) : (
+          <>
+            {workspace.kind === "root" ? (
+              <LiveRail
+                activity={activity}
+                asks={asks}
+                digests={digests}
+                revisions={workFacts.revisions}
+                colorOf={colorOf}
+                ends={ends}
+                index={index}
+                names={nameOf}
+                onPick={openAt}
+                open={shown}
+                rows={rail}
+                session={session}
+                viewports={viewports}
+                yours={yours}
+              />
+            ) : (
+              <EmptyRail />
+            )}
+            {/* A column's header is its drag handle; its grip is the
+                  keyboard's way to move it. */}
+            <div id="strip" onPointerDown={dragColumn} ref={strip}>
+              {workspace.slots.map(slot => {
+                const column = columns[slot.position]
+                const columnView = views[slot.position]
+                if (column === undefined || columnView === undefined)
+                  return null
+                return (
+                  <Column
+                    {...shared}
+                    closable={slot.closable}
+                    column={column}
+                    count={workspace.slots.length}
+                    landmarks={landmarks}
+                    seenEnd={seenEnds}
+                    forks={colors.forks}
+                    key={slot.key}
+                    onIntent={onIntent}
+                    onTyping={() => typing(columnView.tipId)}
+                    path={paths[slot.position] ?? new Set()}
+                    position={slot.position}
+                    readOnly={
+                      workspace.kind === "root" ? workspace.readOnly : null
+                    }
+                    shown={shown}
+                    track={slot.track}
+                    view={columnView}
+                  />
+                )
               })}
-              selected={archivePick}
-            />
-          ) : (
-            <>
-              {workspace.kind === "root" ? (
-                <LiveRail
-                  activity={activity}
-                  asks={asks}
-                  digests={digests}
-                  revisions={workFacts.revisions}
-                  colorOf={colorOf}
-                  ends={ends}
-                  index={index}
-                  names={nameOf}
-                  onPick={openAt}
-                  open={shown}
-                  rows={rail}
-                  session={session}
-                  viewports={viewports}
-                  yours={yours}
-                />
-              ) : (
-                <EmptyRail />
-              )}
-              {/* A column's header is its drag handle; its grip is the
-                    keyboard's way to move it. */}
-              <div id="strip" onPointerDown={dragColumn} ref={strip}>
-                {workspace.slots.map(slot => {
-                  const column = columns[slot.position]
-                  const columnView = views[slot.position]
-                  if (column === undefined || columnView === undefined)
-                    return null
-                  return (
-                    <Column
-                      {...shared}
-                      closable={slot.closable}
-                      column={column}
-                      count={workspace.slots.length}
-                      landmarks={landmarks}
-                      seenEnd={seenEnds}
-                      forks={colors.forks}
-                      key={slot.key}
-                      onIntent={onIntent}
-                      onTyping={() => typing(columnView.tipId)}
-                      path={paths[slot.position] ?? new Set()}
-                      position={slot.position}
-                      readOnly={
-                        workspace.kind === "root" ? workspace.readOnly : null
-                      }
-                      shown={shown}
-                      track={slot.track}
-                      showsPresence
-                      view={columnView}
-                    />
-                  )
-                })}
-              </div>
-            </>
-          )}
-        </main>
-      )}
-    </CardHistories>
-  )
-}
-
-/**
- * A root, read-only, in the Archive tab: its rail, and one column that a pick
- * on the rail moves. Its anchor is its own state, never stored. A click that
- * shows an entry picks it here; a read-only action (Restore, Open) goes on to
- * `App`; a reader's setting (density, details) is kept here, as long as the
- * preview shows; the column offers nothing else.
- */
-function Preview({
-  root,
-  readOnly,
-  yours,
-  shared,
-  onIntent,
-}: {
-  root: EntryId
-  readOnly: ReadOnly
-  /** Thread ends holding a card of yours, for the rail's pips. */
-  yours: ComponentProps<typeof LiveRail>["yours"]
-  shared: Omit<
-    ColumnProps,
-    | "closable"
-    | "column"
-    | "count"
-    | "forks"
-    | "landmarks"
-    | "onIntent"
-    | "onTyping"
-    | "path"
-    | "position"
-    | "readOnly"
-    | "showsPresence"
-    | "shown"
-    | "track"
-    | "view"
-  >
-  onIntent: (intent: Intent) => void
-}) {
-  const [anchor, setAnchor] = useState(root)
-  const key = `preview-${root}`
-  // The reader's settings, by the same reducer a root's columns take.
-  const [own, setOwn] = useState<readonly ColumnSpec[]>(() => [
-    { key, anchor: root },
-  ])
-  const previewStrip = useRef<HTMLDivElement>(null)
-  const reveal = useReveal(previewStrip)
-  const pick = (id: EntryId) => {
-    setAnchor(id)
-    reveal(id)
-  }
-  const onPreviewIntent = useStable((intent: Intent) => {
-    const entry = entryShown(intent)
-    if (entry !== null) pick(entry)
-    else if (intent.kind === "restore" || intent.kind === "show")
-      onIntent(intent)
-    else if (intent.kind === "column") {
-      const action = readerAction(intent.act, key)
-      if (action !== null) setOwn(columns => columnsReducer(columns, action))
-    }
-  })
-  const { index } = shared
-  const [settings] = own
-  const column: ColumnSpec = { ...settings, key, anchor }
-  const [view] = projectColumns(index, [{ anchor }])
-  const rail = projectRail(index, root)
-  const landmarks = columnLandmarks(rail, {
-    activity: shared.activity,
-    ends: [view?.tipId ?? null],
-    cards: yours.ends,
-  })
-  const path = pathIds(index, view?.tipId ?? null)
-  const track = branchColors(rail, view === undefined ? [] : [view]).track[0]
-  if (view === undefined) return null
-  return (
-    <div className="preview">
-      <LiveRail
-        activity={shared.activity}
-        asks={shared.asks}
-        digests={shared.digests}
-        revisions={shared.work.revisions}
-        colorOf={shared.colorOf}
-        ends={[view.tipId]}
+            </div>
+          </>
+        )}
+        {layout.board && boardShown !== null && (
+          <Board
+            mine={boardMine}
+            onIntent={onIntent}
+            onMine={setBoardMine}
+            onQuery={setBoardQuery}
+            pip={pip}
+            query={boardQuery}
+            readers={readers}
+            thread={(end, root) => thread(end, end, root)}
+            view={boardShown}
+          />
+        )}
+      </main>
+      <Footer
+        syncing={status === "pending"}
+        strip={
+          <BoardStrip
+            count={count}
+            elsewhere={attention.elsewhere}
+            onIntent={onIntent}
+            open={layout.board}
+            pip={unsent.elsewhere ? pip : null}
+            readers={readers}
+            view={boardShown}
+          />
+        }
+        colorOf={colorOf}
+        inbox={inbox}
         index={index}
-        names={shared.nameOf}
-        onPick={pick}
-        open={path}
-        rows={rail}
-        session={shared.session}
-        viewports={shared.viewports}
-        yours={yours}
+        labelOf={labelOf}
+        mentions={mentions}
+        nameOf={nameOf}
+        names={workFacts.names}
+        line={workFacts.line}
+        project={workFacts.project}
+        onIntent={onIntent}
+        offers={view.offers}
+        attention={attention.items}
+        me={{
+          writer: session.writer,
+          email: session.principal,
+          rename: name => session.request({ kind: "name", name }),
+          signOut: () => onIntent({ kind: "signOut" }),
+        }}
+        onOpen={openIn}
+        session={session}
+        runs={runs}
+        inventory={{
+          open: inventoryOpen,
+          count: held.length,
+          onToggle: () => setInventoryOpen(open => !open),
+        }}
       />
-      <div className="preview-strip" ref={previewStrip}>
-        <Column
-          {...shared}
-          closable={false}
-          column={column}
-          count={1}
-          forks={new Map()}
-          landmarks={landmarks}
-          onIntent={onPreviewIntent}
-          onTyping={() => {}}
-          path={path}
-          position={0}
-          readOnly={readOnly}
-          showsPresence={false}
-          shown={path}
-          // A glance: where it is left is not where the root's tab was.
-          spots={undefined}
-          track={track ?? PENDING_TRACK}
-          view={view}
-        />
-      </div>
-    </div>
+    </CardHistories>
   )
 }

@@ -14,7 +14,12 @@ import {
 } from "@kyneta/exchange"
 import { Interpret, Reject } from "@kyneta/schema"
 import { WebsocketServerTransport } from "@kyneta/websocket-transport/server"
-import type { BlobStore, CardId, LaneName } from "@pineta/core"
+import {
+  type BlobStore,
+  type CardId,
+  type LaneName,
+  writerId,
+} from "@pineta/core"
 import { createKeeper } from "@pineta/keeper"
 import { userConfigFile } from "@pineta/lanes"
 import { type Agent, createAgent, type ModelChoice, newId } from "@pineta/pi"
@@ -29,16 +34,21 @@ import {
 } from "@pineta/protocol/messages"
 import { writersPolicy } from "@pineta/protocol/writers"
 import {
-  readArchive,
+  readArchived,
+  readRecords,
   readRoots,
   readRunning,
   readThreadName,
+  readWorkflow,
 } from "@pineta/reads"
 import {
+  ARCHIVE,
+  archivedOf,
   decodeBannerConfig,
   decodeCommandRenames,
   decodeDigestConfig,
   decodeTitleConfig,
+  planCarryOver,
 } from "@pineta/rules"
 import {
   AttentionDoc,
@@ -47,6 +57,7 @@ import {
   InventoryDoc,
   LiveDoc,
   type LiveDocHandle,
+  OpenDoc,
   PlacesDoc,
   type PlacesDocHandle,
   PRESENCE_DECAY,
@@ -259,6 +270,8 @@ export async function startHost({
           return Interpret(InventoryDoc)
         case "attention":
           return Interpret(AttentionDoc)
+        case "open":
+          return Interpret(OpenDoc)
         case "root":
           return Interpret(StorageDoc)
         case "reject":
@@ -335,10 +348,29 @@ export async function startHost({
     onError: failed(basics, "step"),
     onSlow: slow(basics),
   })
+  // A store from before the board is carried over (ADR-0085): planned here,
+  // since it says which roots are archived, and written in `recover`, once
+  // the agent is made.
+  const directoryNow = readRoots(session)
+  const carryOver = planCarryOver({
+    workflow: readWorkflow(session),
+    roots: directoryNow,
+    archive: readRecords(session, ARCHIVE),
+    host: writerId(HOST_PRINCIPAL),
+    now: basics.now(),
+    newId: basics.newId,
+  })
   // The roots that are not archived, opened before anything reads one: every
   // lane that could be running is in one of them (`planLoads`).
-  const directoryNow = readRoots(session)
-  const roots = planLoads(directoryNow, readArchive(session))
+  const roots = planLoads(
+    directoryNow,
+    carryOver === null
+      ? readArchived(session)
+      : archivedOf(
+          carryOver.workflow,
+          new Map(carryOver.places.map(p => [p.root, p])),
+        ),
+  )
   for (const root of roots) await docs.root(root)
   log(`[host] ${openedWords(roots.length, directoryNow.size)}`)
   // Each thread's column banner, when the user config turns banners on. Made
@@ -576,6 +608,7 @@ export async function startHost({
     cards: cardPort,
     provenance,
     ensureNames: names.ensure,
+    carryOver,
   })
   await sweepHistories({ basics, store, histories, startup: true })
   const seats = startSeats({ exchange, basics, keeper, agent, histories })

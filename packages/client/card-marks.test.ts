@@ -14,7 +14,7 @@ import {
 import { describe, expect, test } from "vitest"
 import { cardMarks, holdsText, ownCards, withFilled } from "./card-marks.ts"
 import { entry, indexOf } from "./fixtures.ts"
-import { initialLayout, type Layout, tabOfColumn } from "./layout.ts"
+import { hereOfColumn, initialLayout, type Layout } from "./layout.ts"
 
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 /** A root this tab does not hold: its root entry is f1. */
@@ -103,14 +103,14 @@ test("withFilled: the same set unless the card flips", () => {
   expect([...withFilled(some, C, false)]).toEqual([])
 })
 
-test("tabOfColumn: a new tab's column, a root's open or closed, or none", () => {
-  expect(tabOfColumn(layout, "new-1")).toEqual({ kind: "new", key: "new-1" })
-  expect(tabOfColumn(layout, "branch")).toEqual({ kind: "root", root: "e1" })
-  expect(tabOfColumn(layout, "first-g1")).toEqual({
+test("hereOfColumn: a new tab's column, a root's open or closed, or none", () => {
+  expect(hereOfColumn(layout, "new-1")).toEqual({ kind: "new", key: "new-1" })
+  expect(hereOfColumn(layout, "branch")).toEqual({ kind: "root", root: "e1" })
+  expect(hereOfColumn(layout, "first-g1")).toEqual({
     kind: "root",
     root: "g1",
   })
-  expect(tabOfColumn(layout, "elsewhere")).toBeUndefined()
+  expect(hereOfColumn(layout, "elsewhere")).toBeUndefined()
 })
 
 describe("cardMarks", () => {

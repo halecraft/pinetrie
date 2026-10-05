@@ -581,35 +581,26 @@ export const mutations: readonly Mutation[] = [
   {
     name: "archiving ignores the root's work",
     file: archive,
-    from: '  if (action === "archive" && busy !== undefined)',
-    to: '  if (action === "restore" && busy !== undefined)',
+    from: '  if (crossing === "close" && busy !== undefined)',
+    to: '  if (crossing === "reopen" && busy !== undefined)',
     command: unit,
     expect: "refuses while the agent works in the root",
   },
   {
-    name: "an archived root's records are found by no entry",
+    name: "archivedIn finds no root",
     file: "packages/rules/archive.ts",
-    from: '    const record = entry === null ? undefined : archive.get(entry)\n    if (record?.state === "archived") return record',
-    to: "    const record = entry === null ? undefined : archive.get(entry)\n    if (record !== undefined) return record",
+    from: "    if (found !== undefined) return found",
+    to: "    if (found !== undefined) return null",
     command: unit,
-    expect:
-      "an archived root refuses; a restored one, an unknown one and none do not",
+    expect: "a written root that is archived refuses, by who archived it",
   },
   {
-    name: "a restored root stays read-only",
-    file: archive,
-    from: '  const record = root === null ? undefined : archive.get(root)\n  return record?.state === "archived" ? record : null',
-    to: "  const record = root === null ? undefined : archive.get(root)\n  return record ?? null",
+    name: "every root on the board is archived",
+    file: "packages/rules/board.ts",
+    from: "    if (p.state === workflow.closed.id)",
+    to: "    if (p.state !== undefined)",
     command: unit,
-    expect: "a restored root, a root with no record",
-  },
-  {
-    name: "ARCHIVE accepts any state",
-    file: archive,
-    from: '  state: Type.Union([Type.Literal("archived"), Type.Literal("restored")]),',
-    to: "  state: Type.String(),",
-    command: unit,
-    expect: "a malformed value is dropped",
+    expect: "archivedOf: only the closed state's roots",
   },
   {
     name: "a prompt with no new edits records no commit",
@@ -1077,7 +1068,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "orderAfter puts a card before the last",
-    file: "packages/rules/card.ts",
+    file: "packages/rules/order.ts",
     from: "    last === Number.NEGATIVE_INFINITY ? ORDER_START : last + ORDER_STEP,",
     to: "    last === Number.NEGATIVE_INFINITY ? ORDER_START : last - ORDER_STEP,",
     command: unit,
@@ -1474,8 +1465,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an archived root's histories are retired at once",
     file: "packages/rules/card.ts",
-    from: "      input.now - record.at >= ARCHIVED_HISTORY_MS",
-    to: "      input.now - record.at >= 0",
+    from: "      archived !== undefined && input.now - archived.at >= ARCHIVED_HISTORY_MS",
+    to: "      archived !== undefined && input.now - archived.at >= 0",
     command: unit,
     expect:
       "a root archived 7 days and a second ago is retired; one archived 6 days ago",
@@ -1483,8 +1474,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a history in no root is retired after every run",
     file: "packages/rules/card.ts",
-    from: "    if (known === undefined) return input.startup\n",
-    to: "    if (known === undefined) return true\n",
+    from: "    if (!input.roots.has(of.root)) return input.startup\n",
+    to: "    if (!input.roots.has(of.root)) return true\n",
     command: unit,
     expect:
       "a root archived 7 days and a second ago is retired; one archived 6 days ago",
@@ -1524,7 +1515,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an archive unloads nothing",
     file: "packages/rules/archive.ts",
-    from: '    unload: action === "archive",',
+    from: '    unload: crossing === "close",',
     to: "    unload: false,",
     command: ["pnpm", "exec", "vitest", "run", "packages/rules"],
     expect: "archive: its lanes forgotten",
@@ -2013,5 +2004,55 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "planCarryOn: a run whose prompt names who resumed, read back as its line",
+  },
+  // ── the board (ADR-0085) ──
+  {
+    name: "the board leaves out a root with no place",
+    file: "packages/rules/board.ts",
+    from: "    const state = effectiveState(workflow, placed(workflow, places, root))\n",
+    to: "    const state = effectiveState(workflow, placed(workflow, places, root))\n    if (places.get(root) === undefined) continue\n",
+    command: unit,
+    expect: "boardOf > by rank, then id",
+  },
+  {
+    name: "a move ignores the state its sender saw",
+    file: "packages/rules/board.ts",
+    from: "  if (now !== input.from) {",
+    to: "  if (now !== input.from && false) {",
+    command: unit,
+    expect: "moved first: refused, naming who moved it and where",
+  },
+  {
+    name: "a move out of the closed state stays within",
+    file: "packages/rules/board.ts",
+    from: '  if (from === closed && to !== closed) return "reopen"',
+    to: '  if (from === closed && to !== closed) return "within"',
+    command: unit,
+    expect: "transitionOf",
+  },
+  {
+    name: "a state holding a root is removed",
+    file: "packages/rules/board.ts",
+    from: "      if (held > 0)",
+    to: "      if (held < 0)",
+    command: unit,
+    expect: "refuses removing a state that holds a root",
+  },
+  {
+    name: "the closed state can be removed",
+    file: "packages/rules/board.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "      if (isClosed)\n        return refused(ERR.STATE_CLOSED, `${closed.name} cannot be removed`)",
+    to: "",
+    command: unit,
+    expect: "refuses removing the closed state",
+  },
+  {
+    name: "orderBetween gives a key outside its neighbours",
+    file: "packages/rules/order.ts",
+    from: "  return m > low && m < high ? orderKey(m) : null",
+    to: "  return m > low && m < high ? orderKey(high) : null",
+    command: unit,
+    expect: "orderBetween between two neighbours",
   },
 ]

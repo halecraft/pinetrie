@@ -164,16 +164,32 @@ export function attentionOf(input: AttentionInput): readonly Item[] {
 }
 
 /**
- * What needs you: the header's badge, with unseen mentions, and the page's
+ * What needs you: the activity menu's badge, with unseen mentions, and the page's
  * title. An offer of a thread you follow is one of them, once.
  */
 export const needsYouCount = (items: readonly Item[]): number =>
   items.filter(i => i.level === "needsYou").length
 
-/** A root tab's status: what its mark draws. */
+/** A root's status: what its mark draws, in your list and on the board. */
 export type Status =
   | { readonly kind: "working" }
   | { readonly kind: Level; readonly item: Item }
+
+/**
+ * The highest level among `roots` (`highest`): what one mark says for them
+ * all. The one rule for a root's item, a board column's dot and ▦'s, which
+ * covers the roots not in your list (ADR-0085). Working raises nothing.
+ */
+export const markOf = (
+  status: ReadonlyMap<EntryId, Status>,
+  roots: Iterable<EntryId>,
+): Level | null =>
+  highest(
+    [...roots].map(r => {
+      const s = status.get(r)
+      return s === undefined || s.kind === "working" ? null : s.kind
+    }),
+  )
 
 /**
  * Each root's status: working while a lane of it is busy or its verdict is
@@ -217,7 +233,7 @@ export function doneRoots(input: AttentionInput): ReadonlySet<EntryId> {
   return out
 }
 
-/** What each change of a tab's status draws, seen live. */
+/** What each change of a root's status draws, seen live. */
 export interface Arrivals {
   /** Roots whose status rose to needs you: their mark pulses, then stays. */
   readonly arrived: ReadonlySet<EntryId>
@@ -270,7 +286,7 @@ export const LEVEL_WORDS: Readonly<Record<Level, string>> = {
   worthARead: "worth a read",
 }
 
-/** Each level's class, on a tab's mark and a header row: what the styles key on. */
+/** Each level's class, on a root's mark and an activity row: what the styles key on. */
 export const LEVEL_CLASS: Readonly<Record<Level, string>> = {
   needsYou: "needs-you",
   worthARead: "worth-a-read",

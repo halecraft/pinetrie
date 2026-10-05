@@ -375,4 +375,21 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a person starts at the directory's newest entry",
   },
+  // ── your list (ADR-0085) ──
+  {
+    name: "the repair drops the root you are on",
+    file: "packages/session/open-repair.ts",
+    from: "  const gone = [...keys.keys()].filter(r => archived.has(r) && r !== here)",
+    to: "  const gone = [...keys.keys()].filter(r => archived.has(r))",
+    command: unit,
+    expect: "planOpenRepair: archived roots leave, but the one you are on",
+  },
+  {
+    name: "a refused send at the root opens a root in your list",
+    file: "packages/session/chat.ts",
+    from: '  (outcome.kind === "appended" || outcome.kind === "started")',
+    to: '  outcome.kind !== "busy"',
+    command: unit,
+    expect: "startsRoot: a thread at the root written",
+  },
 ]

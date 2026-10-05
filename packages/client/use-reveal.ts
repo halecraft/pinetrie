@@ -28,9 +28,9 @@ function show(container: HTMLElement, id: string): boolean {
 
 /**
  * Bring entry `id` into view in `container`: now, if it is drawn, or once it
- * is. Picking a message a column on this tab already draws changes no state,
- * so no render follows (S33); a message in a column that is opening, or in
- * another tab, is drawn by the render the pick causes. A newer pick replaces
+ * is. Picking a message a column already draws changes no state, so no
+ * render follows (S33); a message in a column that is opening, or in another
+ * root, is drawn by the render the pick causes. A newer pick replaces
  * one still waiting.
  *
  * Call it after any layout effect that places columns: layout effects run in

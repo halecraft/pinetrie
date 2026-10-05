@@ -13,7 +13,6 @@ import {
   labelsOf,
   messageCount,
   messageCountTitle,
-  messageCountWords,
   planTitle,
   renameKey,
   summariesOf,
@@ -91,12 +90,6 @@ describe("labels and summaries, from the directory (ADR-0063)", () => {
     ],
   ])("messageCountTitle(%o)", (count, words) => {
     expect(messageCountTitle(count)).toBe(words)
-  })
-
-  test.each([
-    [{ held: 2, total: 4 }, "messages 2 of 4"],
-  ])("messageCountWords(%o)", (count, words) => {
-    expect(messageCountWords(count)).toBe(words)
   })
 
   test("summaries: each root with a message, by its root entry", () => {

@@ -1,7 +1,8 @@
 // client/card-marks — where your unsent cards are, as marks (ADR-0048, step
-// 2): on root tabs and new tabs, on the rail at a thread's end, and on the
-// Archive tab for a root whose tab you closed. An archived root's work is
-// done, so it lights only its own row, never the Archive tab. They answer "where was I?",
+// 2): on your list's roots and new tabs, on the rail at a thread's end, on
+// the board's items, and on ▦ for a root not in your list (ADR-0085). An
+// archived root's work is done, so it lights only its own item on the board,
+// never ▦. They answer "where was I?",
 // so they count only the cards you own (contributors wait for Kyneta,
 // ADR-0048's *Who contributed*). A card counts while it holds text, not while its record exists:
 // a record outlives its text. Only drafting and fresh cards count: a queued
@@ -21,7 +22,7 @@ import {
 } from "@pineta/core"
 import { cardEnd } from "@pineta/rules"
 import { needsCard } from "./card-state.ts"
-import { type Layout, tabOfColumn, untabbed } from "./layout.ts"
+import { hereOfColumn, type Layout, unlisted } from "./layout.ts"
 import { AGENT_PREFILL } from "./message-tools.ts"
 
 /**
@@ -59,15 +60,15 @@ export function withFilled(
 
 /** Where your unsent cards are: the marks that answer "where was I?". */
 export interface CardMarks {
-  /** Roots holding a card of yours: their tabs, and their Archive rows. */
+  /** Roots holding a card of yours: their items in your list and on the board. */
   readonly roots: ReadonlySet<EntryId>
   /** New tabs, by key, whose column holds a card of yours. */
   readonly newTabs: ReadonlySet<string>
   /** Thread ends holding a drafting card of yours: dots on the rail. */
   readonly ends: ReadonlySet<EntryId>
   /**
-   * A root in `roots` has no tab in your bar and is not archived: the
-   * Archive tab is marked.
+   * A root in `roots` is not in your list and not archived: ▦ is marked
+   * (ADR-0085).
    */
   readonly elsewhere: boolean
 }
@@ -78,7 +79,7 @@ export function cardMarks(input: {
   /** Cards that hold text (`holdsText`), by id. */
   readonly filled: ReadonlySet<CardId>
   readonly layout: Layout
-  /** Roots in state `archived` (ADR-0029). */
+  /** Roots in the closed workflow state (ADR-0029, ADR-0085), by root entry. */
   readonly archived: ReadonlySet<EntryId>
   readonly lanes: readonly LaneView[]
   readonly index: TreeIndex
@@ -108,7 +109,7 @@ export function cardMarks(input: {
       case "fresh": {
         // A column this browser tab's layout lacks was typed in another
         // browser tab, and is marked nowhere here.
-        const tab = tabOfColumn(input.layout, card.place.column)
+        const tab = hereOfColumn(input.layout, card.place.column)
         if (tab?.kind === "new") newTabs.add(tab.key)
         if (tab?.kind === "root") roots.add(tab.root)
         break
@@ -125,6 +126,6 @@ export function cardMarks(input: {
     roots,
     newTabs,
     ends,
-    elsewhere: untabbed(input.layout, input.archived, roots).length > 0,
+    elsewhere: unlisted(input.layout, input.archived, roots).length > 0,
   }
 }

@@ -29,7 +29,6 @@ import {
   decodeCard,
   encodeCard,
   historyOf,
-  orderAfter,
   ownsPlace,
   placeEnd,
   planCardSweep,
@@ -48,6 +47,7 @@ import {
   undoAnswer,
   yourCard,
 } from "./card.ts"
+import { orderAfter } from "./order.ts"
 
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
@@ -1082,24 +1082,19 @@ describe("planHistorySweep (ADR-0066)", () => {
     rootAt(R("3"), "e-3"),
     rootAt(R("4"), "e-4"),
   ])
-  const archived = (
-    entry: string,
-    ago: number,
-    state: "archived" | "restored" = "archived",
-  ) =>
-    [
-      entryId(entry),
-      { root: entryId(entry), state, by: ADA, at: NOW - ago },
-    ] as const
-  const archive = new Map([
-    archived("e-1", 7 * DAY + 1000),
-    archived("e-2", 6 * DAY),
-    archived("e-3", 30 * DAY, "restored"),
-  ])
+  // A restored root (R3) and one never archived (R4) are in no state of it.
+  const archived = new Map(
+    (
+      [
+        [R("1"), 7 * DAY + 1000],
+        [R("2"), 6 * DAY],
+      ] as const
+    ).map(([root, ago]) => [root, { root, by: ADA, at: NOW - ago }] as const),
+  )
   const doc = (root: RootId) => movesDocId(ADA, root)
   const stored = [R("1"), R("2"), R("3"), R("4"), R("5")].map(doc)
   const sweep = (startup: boolean) =>
-    planHistorySweep({ stored, roots, archive, now: NOW, startup })
+    planHistorySweep({ stored, roots, archived, now: NOW, startup })
 
   test("a root archived 7 days and a second ago is retired; one archived 6 days ago, a restored one and one never archived are not", () => {
     expect(sweep(false)).toEqual([doc(R("1"))])

@@ -455,6 +455,17 @@ The files show whole, by their conflict sections, by name or as a count,
 whichever fits with each side's newest reason, and `jj resolve --list` is
 the list of what is left. A catch-up whose smallest prompt cannot fit is
 refused before it merges.
+**ADR-0085 — your open roots run down the left; a board in the footer
+shows where everyone's work stands** (built). The tab bar did two jobs: your
+view, and a sign of shared work. Your list is now yours, down the left edge,
+in your order, kept in your own document (`open:`) on every device. The
+board is everyone's: every root in a workflow state (Backlog, Doing, Done
+in a new session; anyone edits them), its strip in the footer, opened over
+the columns. Done is the archive: a root's board place (`pineta.board`)
+replaces the archive record, and a move into Done is refused while the
+agent works there. There is no header; the footer splits where your list's
+edge does, you and your inventory under it, the board and what needs you
+beside. A backlog item is a conversation root.
 
 **ADR-0086 — the host serves the project its command line names** (built).
 `pnpm host [folder]` serves that folder's root, Pineta's own repo without
@@ -626,16 +637,19 @@ Hook names, verified against source: **`useTracked(thunk)`** for a derived
 read — *not* `useValue`, which takes a `CallableRef`; `useDocStatus` returns the
 string union `"pending" | "empty" | "populated"`, not an object.
 
-**The interface is your tabs, one per root, each a rail beside columns**
-(`docs/06-interface.md`, `packages/client/TECHNICAL.md`, ADR-0029, ADR-0030),
-under a header showing who is here and your inbox of mentions: each
+**The interface is your list of roots down the left, and the root you are
+on, a rail beside columns** (`docs/06-interface.md`,
+`packages/client/TECHNICAL.md`, ADR-0029, ADR-0085), over a footer showing
+who is here, what needs you and the board, which slides up over the columns
+with every root in its workflow state: each
 column is one path on its own scroll, a branch opens beside its parent in its
-rail track's colour, and the rail draws the tab's root, with each uneventful
+rail track's colour, and the rail draws the root, with each uneventful
 stretch drawn as one capsule (ADR-0031), a long ask's work a capsule of its
-own (ADR-0056). The Archive tab lists every root.
+own (ADR-0056).
 Views are pure functions over one `indexTree` (`packages/core/tree.ts`,
-`roots.ts`); which tab you are on, your open roots and each root's columns are
-a reducer in `packages/client/layout.ts`, never written, and the inbox is
+`roots.ts`); which root you are on and each root's columns are a reducer in
+`packages/client/layout.ts`, your list is your `open:` document
+(`packages/session/open-list.ts`), and the inbox is
 `packages/client/inbox.ts`.
 
 The composer is your drafting card (ADR-0048), the text people edit
@@ -822,7 +836,7 @@ context.**
 - **Who you are** (ADR-0037): the page asks for your email and name once per
   browser. The email is who you are, in every tab and on every device; the
   name is how you are shown, renamed in your profile: the avatar at the
-  header's right. **Not you?** there forgets the email on that browser.
+  footer's left. **Not you?** there forgets the email on that browser.
 - **Your pi skills and prompts are commands** (ADR-0036):
   `/<package>:skill:<name>` for a skill, `/<package>:<name>` for a prompt
   template. For example `/duane:skill:plan` or `/duane:comments`. Typing `/`

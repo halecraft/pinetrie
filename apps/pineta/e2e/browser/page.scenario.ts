@@ -19,6 +19,7 @@ import {
 } from "@pineta/core"
 import { SCRIPTED_DESCRIPTION } from "@pineta/pi"
 import {
+  readBoardPlaces,
   readMarks,
   readNames,
   readParticipantNames,
@@ -26,6 +27,7 @@ import {
   readReading,
   readRoots,
   readTyping,
+  readWorkflow,
 } from "@pineta/reads"
 import { titleOf } from "@pineta/rules"
 import type { Page } from "@playwright/test"
@@ -35,6 +37,7 @@ import {
   idleNow,
   join,
   lanesOf,
+  moveRootTo,
   queueCard,
   rootAt,
   rootRecordsOf,
@@ -46,15 +49,21 @@ import {
 import type { Scenario } from "../scenario.ts"
 
 import {
+  boardSel,
   chooseFromMenu,
   componentRenders,
   connected,
+  itemSel,
   launchBrowser,
   OWN_MENU,
+  openBoard,
+  openFromBoard,
   openProfile,
   RAIL_MESSAGES,
   seeInMenu,
   shownName,
+  stepAway,
+  stepBack,
   storedName,
   TO_NOBODY,
   twoFrames,
@@ -74,15 +83,15 @@ async function run(check: Checks["check"]): Promise<void> {
     })
     console.log(`  host              : ${host.httpUrl}\n`)
     /**
-     * The page's message count, on the Archive tab, reaches the host's
-     * directory's: it has every root's record, held or not (ADR-0063).
+     * The page's message count, on ▦, reaches the host's directory's: it has
+     * every root's record, held or not (ADR-0063, ADR-0085).
      */
     const countIsHosts = (p: Page) =>
       waitFor(async () => {
         let n = 0
         for (const r of readRoots(host.session).values()) n += r.messages
         const shown = await p
-          .getAttribute("#tabs .tab-archive", "data-messages")
+          .getAttribute("#bottom .board-toggle", "data-messages")
           .catch(() => null)
         return shown === String(n)
       }, 15_000)
@@ -245,8 +254,8 @@ async function run(check: Checks["check"]): Promise<void> {
         () => readParticipantNames(host.session).get(ME) === "Ada",
         15_000,
       )
-      await page.waitForSelector("#tabs .add-agent", { timeout: 15_000 })
-      await page.click("#tabs .add-agent")
+      await page.waitForSelector("#open-list .add-agent", { timeout: 15_000 })
+      await page.click("#open-list .add-agent")
       await page.waitForSelector(`${col(0)} .composer`, { timeout: 15_000 })
       check(
         "＋ agent's new tab is ready to type in: its box has focus",
@@ -264,25 +273,64 @@ async function run(check: Checks["check"]): Promise<void> {
                 }
           }
           return {
-            tab: look("#tabs .tab-wrap[data-selected]"),
+            item: look("#open-list .open-item[data-selected]"),
             page: look("#workspace"),
-            bar: look("#top"),
+            list: look("#open-list"),
           }
         })
-        const { tab, page: paper, bar } = surface
+        const { item, page: paper, list } = surface
         check(
-          "the tab you are on is the page's colour, the bar is not, and the tab meets the page",
-          tab !== null &&
+          "the root you are on is the page's colour, your list is not, and it meets the page",
+          item !== null &&
             paper !== null &&
-            bar !== null &&
-            tab.fill === paper.fill &&
-            bar.fill !== paper.fill &&
-            Math.abs(tab.rect.bottom - paper.rect.top) <= 1,
+            list !== null &&
+            item.fill === paper.fill &&
+            list.fill !== paper.fill &&
+            Math.abs(item.rect.right - paper.rect.left) <= 1,
           JSON.stringify({
-            tab: tab && [tab.fill, tab.rect.bottom],
-            page: paper && [paper.fill, paper.rect.top],
-            bar: bar?.fill,
+            item: item && [item.fill, item.rect.right],
+            page: paper && [paper.fill, paper.rect.left],
+            list: list?.fill,
           }),
+        )
+      }
+      // The board opens over the columns, from the footer's edge, and moves
+      // none of them (ADR-0085).
+      {
+        const rects = () =>
+          page.$$eval(".column", cs =>
+            cs.map(c => {
+              const r = c.getBoundingClientRect()
+              return [r.x, r.y, r.width, r.height].map(Math.round).join()
+            }),
+          )
+        const before = await rects()
+        await page.click("#bottom .board-toggle")
+        const board = await page
+          .waitForSelector("#board", { timeout: 15_000 })
+          .then(
+            () => true,
+            () => false,
+          )
+        const during = await rects()
+        const over = await page
+          .$eval("#board", b => {
+            const r = b.getBoundingClientRect()
+            const c = document.querySelector(".column")?.getBoundingClientRect()
+            return c !== undefined && r.top < c.bottom && r.bottom > c.top
+          })
+          .catch(() => false)
+        await page.click("#bottom .board-toggle")
+        await page
+          .waitForSelector("#board", { state: "detached", timeout: 15_000 })
+          .catch(() => null)
+        check(
+          "the board opens over the columns and moves none of them",
+          board &&
+            over &&
+            before.length > 0 &&
+            during.join("|") === before.join("|"),
+          `${before.join("|")} → ${during.join("|")}`,
         )
       }
       // Its thread is named before anything is typed (ADR-0057).
@@ -920,7 +968,7 @@ async function run(check: Checks["check"]): Promise<void> {
         mode: "branch",
       })
       const working = await page
-        .waitForSelector("#top .activity .activity-working", {
+        .waitForSelector("#bottom .activity .activity-working", {
           timeout: 30_000,
         })
         .then(
@@ -928,14 +976,14 @@ async function run(check: Checks["check"]): Promise<void> {
           () => false,
         )
       const tabWorking = await page
-        .waitForSelector("#tabs .tab-status.working", { timeout: 15_000 })
+        .waitForSelector("#open-list .root-status.working", { timeout: 15_000 })
         .then(
           () => true,
           () => false,
         )
       const animated = await page
         .$$eval(
-          "#top .activity-trigger, #top .activity-trigger *, #tabs .tab-status",
+          "#bottom .activity-trigger, #bottom .activity-trigger *, #open-list .root-status",
           ns =>
             ns.flatMap(n => {
               const name = getComputedStyle(n).animationName
@@ -944,7 +992,7 @@ async function run(check: Checks["check"]): Promise<void> {
         )
         .catch(() => ["no trigger"])
       check(
-        "the header's activity and the thread's tab are still while the agent works",
+        "the footer's activity and the thread's item are still while the agent works",
         working && tabWorking && animated.length === 0,
         !working
           ? "no working count"
@@ -953,9 +1001,9 @@ async function run(check: Checks["check"]): Promise<void> {
             : animated.join(", "),
       )
       const heldOpen = await page
-        .click("#top .activity .activity-trigger")
+        .click("#bottom .activity .activity-trigger")
         .then(() =>
-          page.waitForSelector("#top .activity .menu .here-thread", {
+          page.waitForSelector("#bottom .activity .menu .here-thread", {
             timeout: 15_000,
           }),
         )
@@ -968,9 +1016,9 @@ async function run(check: Checks["check"]): Promise<void> {
       const finished = await page
         .waitForFunction(
           () =>
-            [...document.querySelectorAll("#top .activity .menu-heading")].some(
-              h => h.textContent === "The agent has finished",
-            ),
+            [
+              ...document.querySelectorAll("#bottom .activity .menu-heading"),
+            ].some(h => h.textContent === "The agent has finished"),
           undefined,
           { timeout: 15_000 },
         )
@@ -981,7 +1029,7 @@ async function run(check: Checks["check"]): Promise<void> {
       await page.keyboard.press("Escape")
       const left = await page
         .waitForFunction(
-          () => document.querySelector("#top .activity") === null,
+          () => document.querySelector("#bottom .activity") === null,
           undefined,
           { timeout: 15_000 },
         )
@@ -1070,7 +1118,7 @@ async function run(check: Checks["check"]): Promise<void> {
       const firstRoot = treeOf(host).roots[0] ?? ""
       // A new tab holds one column, so the thread's columns count from 0.
       const before = 0
-      await page.click("#tabs .add-agent")
+      await page.click("#open-list .add-agent")
       const agentCol = col(before)
       await page.waitForSelector(`${agentCol} .composer`, { timeout: 15_000 })
       await send(before, "say exactly: DOWN-ONE")
@@ -1222,36 +1270,70 @@ async function run(check: Checks["check"]): Promise<void> {
         undefined,
         { timeout: 15_000 },
       )
+      // Your list is your own document (ADR-0085): another device of yours,
+      // a browser context of its own, has it, in your order. A reload reads
+      // it the same way.
+      {
+        const listOf = (p: Page) =>
+          p.$$eval("#open-list .open-root", ts =>
+            ts.map(t => t.getAttribute("data-root") ?? ""),
+          )
+        const mine = await listOf(page)
+        const device = await browser.newPage()
+        let theirs: string[] = []
+        try {
+          await asPerson(device, "ada@browser.test", await shownName(page))
+          await device.goto(host.httpUrl, { waitUntil: "domcontentloaded" })
+          await connected(device).catch(() => null)
+          await device
+            .waitForFunction(
+              order =>
+                [...document.querySelectorAll("#open-list .open-root")]
+                  .map(n => n.getAttribute("data-root"))
+                  .join() === order,
+              mine.join(),
+              { timeout: 15_000 },
+            )
+            .catch(() => null)
+          theirs = await listOf(device)
+        } finally {
+          await device.close().catch(() => {})
+        }
+        check(
+          "your list is your own: another device of yours has it, in your order",
+          mine.length >= 2 && theirs.join() === mine.join(),
+          `${theirs.length} of ${mine.length}`,
+        )
+      }
       // A root's first message has no parent: its edit is a new tab, an agent's
       // since the message asked the agent.
       const first = `${agentCol} ${msg("say exactly: DOWN-ONE")}`
       await page.hover(first)
       await page.click(`${first} > .tools > .edit-new-tab`)
-      await page.waitForSelector('#tabs .tab-new[aria-selected="true"]', {
+      await page.waitForSelector('#open-list .open-new[aria-current="true"]', {
         timeout: 15_000,
       })
       await page.click(`${col(0)} .close`)
       const agentRoot = treeOf(host).roots.at(-1) ?? ""
-      await page.click(`#tabs .tab[data-root="${agentRoot}"]`)
+      await page.click(`#open-list .open-root[data-root="${agentRoot}"]`)
       await page.waitForFunction(
         () => document.querySelectorAll(".column").length === 2,
         undefined,
         { timeout: 15_000 },
       )
 
-      // ── your tabs, the header and the inbox (ADR-0029, ADR-0030) ───────────
+      // ── your list, the board and the inbox (ADR-0030, ADR-0085) ───────────
       const downRoot = treeOf(host).roots.at(-1) ?? ""
-      const tabSel = (root: string) => `#tabs .tab[data-root="${root}"]`
       const selectedRoot = (p: Page) =>
         p
-          .$eval('#tabs .tab[aria-selected="true"]', n =>
+          .$eval('#open-list [aria-current="true"]', n =>
             n.getAttribute("data-root"),
           )
           .catch(() => null)
       const messagesIn = (root: string) =>
         projectRail(treeOf(host), entryId(root)).length
-      // 1. Which tree a tab's rail draws is `tabRail`'s, proven by its unit test.
-      await page.click(tabSel(firstRoot))
+      // 1. Which tree a root's rail draws is `hereRail`'s, proven by its unit test.
+      await page.click(itemSel(firstRoot))
       await page
         .waitForFunction(
           `(${RAIL_MESSAGES})() === ${messagesIn(firstRoot)}`,
@@ -1262,28 +1344,28 @@ async function run(check: Checks["check"]): Promise<void> {
         )
         .catch(() => null)
 
-      // 2. A root someone else starts opens no tab here (ADR-0030).
+      // 2. A root someone else starts is not added to your list (ADR-0030).
       const api = await join(host, "tabs", "browser")
       await api.request({ kind: "name", name: "Bea" })
       const third = await api.chat("a third thread", ROOT, { mode: "branch" })
       const thirdRoot = third.kind === "appended" ? third.id : entryId("")
       await countIsHosts(page)
       check(
-        "a root another writer starts opens no tab, and the page stays where it is",
+        "a root another writer starts is not added to your list, and the page stays where it is",
         thirdRoot !== "" &&
-          (await page.locator(tabSel(thirdRoot)).count()) === 0 &&
+          (await page.locator(itemSel(thirdRoot)).count()) === 0 &&
           (await selectedRoot(page)) === firstRoot,
       )
-      // Any root can be archived: another tab's ⋯ shows while it is hovered.
+      // Any root can be moved on the board: another item's ⋯ shows while it is hovered.
       const otherMenu = page.locator(
-        `${tabSel(downRoot)} ~ .tab-more .tab-menu`,
+        `${itemSel(downRoot)} ~ .open-more .open-menu`,
       )
       const hiddenAtRest = !(await otherMenu.isVisible())
-      await page.hover(tabSel(downRoot))
+      await page.hover(itemSel(downRoot))
       const shownOnHover = await otherMenu.isVisible()
       await page.mouse.move(0, 0)
       check(
-        "another root's tab shows its ⋯ on hover, and not at rest",
+        "another root in your list shows its ⋯ on hover, and not at rest",
         hiddenAtRest && shownOnHover,
         `${hiddenAtRest}, ${shownOnHover}`,
       )
@@ -1306,8 +1388,8 @@ async function run(check: Checks["check"]): Promise<void> {
       const typedHere = readTyping(host.presence).some(([w]) => w === ME)
       const rendersOf = (name: string) => typed.filter(r => r.name === name)
       const outside = [
-        "Header",
-        "TabBar",
+        "Footer",
+        "OpenList",
         "Column",
         "MessageListView",
         "MessageView",
@@ -1336,7 +1418,7 @@ async function run(check: Checks["check"]): Promise<void> {
         )
       const readRenders = await componentRenders(page)
       const readColumns = readRenders.filter(r =>
-        ["Column", "Header", "TabBar"].includes(r.name),
+        ["Column", "Footer", "OpenList"].includes(r.name),
       )
       check(
         "another person following this thread shows in its header and redraws no column",
@@ -1347,10 +1429,16 @@ async function run(check: Checks["check"]): Promise<void> {
       await page
         .waitForSelector(beaHere, { state: "detached", timeout: 15_000 })
         .catch(() => null)
-      // A message in a thread this tab does not show redraws none of its messages.
+      // A message in a thread this tab does not show redraws none of its
+      // messages. It is in a root of your list, which this tab holds, so the
+      // tree changes and every column's list draws again: only the messages'
+      // own memo keeps them (S59).
       await componentRenders(page)
-      await api.chat("meanwhile, elsewhere", atEntry(entryId(thirdRoot)))
+      await api.chat("meanwhile, elsewhere", atEntry(entryId(downRoot)), {
+        mode: "branch",
+      })
       await countIsHosts(page)
+      await waitFor(() => false, 500)
       const elsewhere = (await componentRenders(page)).filter(
         r => r.name === "MessageView",
       )
@@ -1360,8 +1448,8 @@ async function run(check: Checks["check"]): Promise<void> {
         `${elsewhere.length}`,
       )
 
-      // 3. Closing a tab is yours: × writes nothing, and reopening brings its columns back.
-      await page.click(tabSel(downRoot))
+      // 3. Closing a root is yours: × writes nothing shared, and reopening brings its columns back.
+      await page.click(itemSel(downRoot))
       await page.waitForFunction(
         () => document.querySelectorAll(".column").length >= 2,
         undefined,
@@ -1370,24 +1458,21 @@ async function run(check: Checks["check"]): Promise<void> {
       const downKeys = await page.$$eval(".column", cs =>
         cs.map(c => c.getAttribute("data-key") ?? ""),
       )
-      // × closes the tab for you and writes nothing (`planIntent`'s unit test).
-      await page.click(`${tabSel(downRoot)} ~ .tab-close`)
+      // × closes the root for you and writes nothing shared (`planIntent`'s unit test).
+      // × shows while its item is hovered or focused.
+      await page.hover(itemSel(downRoot))
+      await page.click(`${itemSel(downRoot)} ~ .open-close`)
       await page
         .waitForFunction(
-          r => document.querySelector(`#tabs .tab[data-root="${r}"]`) === null,
+          r =>
+            document.querySelector(
+              `#open-list .open-root[data-root="${r}"]`,
+            ) === null,
           downRoot,
           { timeout: 15_000 },
         )
         .catch(() => null)
-      const openFromArchive = async (p: Page, r: string) => {
-        await p.click("#tabs .tab-archive")
-        await p.click(`.archive-row[data-root="${r}"]`)
-        await p.click(".archive-preview .read-only-action")
-        await p.waitForSelector(`${tabSel(r)}[aria-selected="true"]`, {
-          timeout: 15_000,
-        })
-      }
-      await openFromArchive(page, downRoot)
+      await openFromBoard(page, downRoot)
       await page
         .waitForFunction(
           n => document.querySelectorAll(".column").length === n,
@@ -1398,10 +1483,10 @@ async function run(check: Checks["check"]): Promise<void> {
       await page.$$eval(".column", cs =>
         cs.map(c => c.getAttribute("data-key") ?? ""),
       )
-      await page.click(tabSel(firstRoot))
+      await page.click(itemSel(firstRoot))
 
-      // 4. Another window, another person: the header shows them, never
-      // yourself, and takes you to them.
+      // 4. Another window, another person: the board shows them on the root
+      // they read, never yourself, and takes you to them.
       const myWriter = ME
       const tb = await browser.newPage()
       await asPerson(tb, "tabs-b@browser.test", "Tabby")
@@ -1415,37 +1500,32 @@ async function run(check: Checks["check"]): Promise<void> {
           "a browser that knows who you are connects without asking",
           knownHere && (await tb.locator("#identity").count()) === 0,
         )
-        await tb
-          .waitForSelector('#tabs .tab-archive[aria-selected="true"]', {
-            timeout: 20_000,
-          })
-          .then(
-            () => true,
-            () => false,
-          )
-        await openFromArchive(tb, thirdRoot)
+        // A window with nothing in its list opens on the board.
+        await tb.waitForSelector("#board", { timeout: 20_000 }).then(
+          () => true,
+          () => false,
+        )
+        await openFromBoard(tb, thirdRoot)
+        await openBoard(page)
+        const reader = `#board ${boardSel(thirdRoot)} .reader-trigger`
         const avatar = await page
-          .waitForSelector("#top .here-person .here-trigger", {
-            timeout: 15_000,
-          })
+          .waitForSelector(reader, { timeout: 15_000 })
           .then(
             () => true,
             () => false,
           )
         check(
-          "another window shows in the header, and you never do",
+          "another window shows on its root's board item, and you never do",
           avatar &&
             (await page
-              .locator(`#top .avatar[data-writer="${myWriter}"]`)
+              .locator(
+                `#board .avatar[data-writer="${myWriter}"], #bottom .avatar[data-writer="${myWriter}"]`,
+              )
               .count()) === 0,
         )
-        const toThem = await chooseFromMenu(
-          page,
-          "#top .here-person .here-trigger",
-          ".here-thread",
-        )
+        const toThem = await chooseFromMenu(page, reader, ".here-thread")
         const followed = await page
-          .waitForSelector(`${tabSel(thirdRoot)}[aria-selected="true"]`, {
+          .waitForSelector(`${itemSel(thirdRoot)}[aria-current="true"]`, {
             timeout: 15_000,
           })
           .then(
@@ -1453,24 +1533,24 @@ async function run(check: Checks["check"]): Promise<void> {
             () => false,
           )
         check(
-          "choosing a person's thread in the header opens it as your tab",
+          "choosing a reader's thread on a board item opens it in your list",
           toThem && followed && (await shows("a third thread")),
         )
         const onThird = await page
-          .waitForSelector(`${tabSel(thirdRoot)} .avatar`, { timeout: 15_000 })
+          .waitForSelector(`${itemSel(thirdRoot)} .avatar`, { timeout: 15_000 })
           .then(
             () => true,
             () => false,
           )
-        await openFromArchive(tb, firstRoot)
+        await openFromBoard(tb, firstRoot)
         const moved = await page
           .waitForFunction(
             ([from, to]) =>
               document.querySelector(
-                `#tabs .tab[data-root="${from}"] .avatar`,
+                `#open-list .open-root[data-root="${from}"] .avatar`,
               ) === null &&
               document.querySelector(
-                `#tabs .tab[data-root="${to}"] .avatar`,
+                `#open-list .open-root[data-root="${to}"] .avatar`,
               ) !== null,
             [thirdRoot, firstRoot] as const,
             { timeout: 15_000 },
@@ -1480,21 +1560,21 @@ async function run(check: Checks["check"]): Promise<void> {
             () => false,
           )
         check(
-          "another window shows on the tab it is on, and leaves it when it switches",
+          "another window shows on the root it is on in your list, and leaves it when it switches",
           onThird && moved,
         )
 
         // 4b. Rename (ADR-0045): a title is the root's label for everyone, the
-        // Archive search finds it, Escape keeps the old one, and clearing it
-        // brings back the first line. The page is on the third root.
+        // board shows it, Escape keeps the old one, and clearing it brings
+        // back the first line. The page is on the third root.
         const tabLabel = (p: Page, r: string) =>
-          p.textContent(`${tabSel(r)} .tab-label`).catch(() => null)
+          p.textContent(`${itemSel(r)} .open-label`).catch(() => null)
         const labelIs = (p: Page, r: string, want: string) =>
           p
             .waitForFunction(
               ([sel, text]) =>
                 document.querySelector(sel)?.textContent === text,
-              [`${tabSel(r)} .tab-label`, want] as const,
+              [`${itemSel(r)} .open-label`, want] as const,
               { timeout: 15_000 },
             )
             .then(
@@ -1504,9 +1584,9 @@ async function run(check: Checks["check"]): Promise<void> {
         const rename = async (text: string, key: "Enter" | "Escape") => {
           const chosen = await chooseFromMenu(page, OWN_MENU, ".rename-root")
           if (!chosen) return false
-          await page.waitForSelector(".tab-title-input", { timeout: 15_000 })
-          await page.fill(".tab-title-input", text)
-          await page.press(".tab-title-input", key)
+          await page.waitForSelector(".open-title-input", { timeout: 15_000 })
+          await page.fill(".open-title-input", text)
+          await page.press(".open-title-input", key)
           return chosen
         }
         const TITLE = "Palette of tabs"
@@ -1519,40 +1599,27 @@ async function run(check: Checks["check"]): Promise<void> {
         )
         const theirs = await labelIs(tb, thirdRoot, TITLE)
         check(
-          "Rename in a tab's ⋯ titles its root, for everyone, and gives the tab focus back",
+          "Rename in a root's ⋯ titles it, for everyone, and gives its item focus back",
           renamed && mine && theirs && refocused,
           `"${firstLine}" → "${await tabLabel(tb, thirdRoot)}"`,
         )
-        await tb.click("#tabs .tab-archive")
-        await tb.fill(".archive-search", "palette")
+        await openBoard(tb)
         await tb
           .waitForFunction(
-            r => {
-              const rows = [...document.querySelectorAll(".archive-row")]
-              return (
-                rows.length === 1 &&
-                rows[0]?.getAttribute("data-root") === r &&
-                rows[0]?.querySelector(".archive-label")?.textContent ===
-                  "Palette of tabs"
-              )
-            },
-            thirdRoot,
+            ([sel, text]) => document.querySelector(sel)?.textContent === text,
+            [`#board ${boardSel(thirdRoot)} .board-label`, TITLE] as const,
             { timeout: 15_000 },
           )
-          .then(
-            () => true,
-            () => false,
-          )
-        await tb.fill(".archive-search", "")
-        await tb.click(tabSel(firstRoot))
+          .catch(() => null)
+        await tb.click(itemSel(firstRoot))
         const setAt = rootRecordsOf(host, readMarks).get(thirdRoot)?.at
         await rename("not this", "Escape")
         // Long enough for a rename sent by mistake to come back.
         await waitFor(() => false, 1_000)
         check(
-          "Escape leaves a tab's title as it was, and sends nothing",
+          "Escape leaves a root's title as it was, and sends nothing",
           (await labelIs(page, thirdRoot, TITLE)) &&
-            (await page.locator(".tab-title-input").count()) === 0 &&
+            (await page.locator(".open-title-input").count()) === 0 &&
             rootRecordsOf(host, readMarks).get(thirdRoot)?.at === setAt,
         )
         await rename("", "Enter")
@@ -1565,15 +1632,48 @@ async function run(check: Checks["check"]): Promise<void> {
           (await chooseFromMenu(page, OWN_MENU, ".retitle-root")) &&
           (await labelIs(page, thirdRoot, auto))
         check(
-          "Auto-update title in a tab's ⋯ titles its root from the model",
+          "Auto-update title in a root's ⋯ titles it from the model",
           retitled,
           `"${await tabLabel(page, thirdRoot)}"`,
         )
         await rename("", "Enter")
 
-        // 5. The add menu, by keyboard; an unsent new tab closes without a trace.
+        // 4d. The board (ADR-0085): a root dragged to another state moves
+        // there for everyone, and the other window's board shows it.
+        {
+          const workflow = readWorkflow(host.session)
+          const doing = workflow?.open[1]?.id ?? ""
+          const column = `#board .board-column[data-state="${doing}"]`
+          await openBoard(page)
+          await openBoard(tb)
+          await page
+            .dragAndDrop(`#board ${boardSel(firstRoot)} .board-open`, column)
+            .catch(() => null)
+          const theirs = await tb
+            .waitForSelector(`${column} ${boardSel(firstRoot)}`, {
+              timeout: 15_000,
+            })
+            .then(
+              () => true,
+              () => false,
+            )
+          const id = [...readRoots(host.session).values()].find(
+            r => r.entry === firstRoot,
+          )?.root
+          check(
+            "dragging a board item to another state moves it for the other window",
+            theirs &&
+              id !== undefined &&
+              readBoardPlaces(host.session).get(id)?.state === doing,
+            `${theirs}`,
+          )
+          await page.click("#bottom .board-toggle")
+          await tb.click("#bottom .board-toggle")
+        }
 
-        await page.focus("#tabs .add-menu")
+        // 5. ＋'s menu, by keyboard; an unsent new tab closes without a trace.
+
+        await page.focus("#open-list .add-menu")
         await page.keyboard.press("ArrowDown")
         const focused = await page
           .waitForFunction(
@@ -1590,18 +1690,20 @@ async function run(check: Checks["check"]): Promise<void> {
         await page.waitForSelector(`${col(0)} .composer`, { timeout: 15_000 })
         const convo = await label(0)
         check(
-          "the add menu's conversation, chosen by keyboard, opens a new tab that only sends",
+          "＋'s conversation, chosen by keyboard, opens a new tab that only sends",
           focused &&
             convo === TO_NOBODY &&
-            (await page.textContent('#tabs .tab-new[aria-selected="true"]')) ===
-              "new conversation",
+            (await page.textContent(
+              '#open-list .open-new[aria-current="true"]',
+            )) === "new conversation",
           `"${convo}"`,
         )
         await page.fill(`${col(0)} .composer .input`, "never sent")
-        await page.click("#tabs .tab-new ~ .tab-close")
+        await page.hover("#open-list .open-new")
+        await page.click("#open-list .open-new ~ .open-close")
         await page
           .waitForFunction(
-            () => document.querySelector("#tabs .tab-new") === null,
+            () => document.querySelector("#open-list .open-new") === null,
           )
           .catch(() => null)
 
@@ -1610,7 +1712,7 @@ async function run(check: Checks["check"]): Promise<void> {
         // no offers, so the badge is the unseen mentions alone.
         const unseen = () =>
           page
-            .$eval("#top .activity-badge", n =>
+            .$eval("#bottom .activity-badge", n =>
               Number(n.getAttribute("data-needs-you")),
             )
             .catch(() => 0)
@@ -1627,7 +1729,7 @@ async function run(check: Checks["check"]): Promise<void> {
             n =>
               Number(
                 document
-                  .querySelector("#top .activity-badge")
+                  .querySelector("#bottom .activity-badge")
                   ?.getAttribute("data-needs-you") ?? 0,
               ) === n,
             before + 1,
@@ -1639,7 +1741,7 @@ async function run(check: Checks["check"]): Promise<void> {
           )
         const picked = await chooseFromMenu(
           page,
-          "#top .activity-trigger",
+          "#bottom .activity-trigger",
           `.inbox-row[data-entry="${mentionId}"]`,
         )
         const drawn = await page
@@ -1652,7 +1754,7 @@ async function run(check: Checks["check"]): Promise<void> {
           )
         await page
           .waitForFunction(
-            () => document.querySelector("#top .activity-badge") === null,
+            () => document.querySelector("#bottom .activity-badge") === null,
             undefined,
             { timeout: 15_000 },
           )
@@ -1672,8 +1774,10 @@ async function run(check: Checks["check"]): Promise<void> {
           (await page.$eval(msg(`${handle} and here`), n =>
             n.getAttribute("data-entry"),
           )) ?? ""
-        await page.click("#top .activity-trigger")
-        await page.waitForSelector("#top .activity .menu", { timeout: 15_000 })
+        await page.click("#bottom .activity-trigger")
+        await page.waitForSelector("#bottom .activity .menu", {
+          timeout: 15_000,
+        })
         await page.evaluate(() => {
           const w = window as { columnScrolls?: number }
           w.columnScrolls = 0
@@ -1706,17 +1810,17 @@ async function run(check: Checks["check"]): Promise<void> {
         )
         check(
           "an open menu stays open while an entry arrives and its column scrolls to follow it",
-          columnScrolls > 0 && (await page.$("#top .activity .menu")) !== null,
+          columnScrolls > 0 &&
+            (await page.$("#bottom .activity .menu")) !== null,
           `${columnScrolls} scrolls`,
         )
         await page.keyboard.press("Escape")
         // Seen is kept per device: across a reload, and a mention made meanwhile counts.
-        await page.click(tabSel(firstRoot))
-        const rootTabs = (p: Page) =>
-          p.$$eval("#tabs .tab-root", ts =>
-            ts.map(t => t.getAttribute("data-root") ?? ""),
-          )
-        const tabsBefore = await rootTabs(page)
+        // The reload keeps the root you were on and its columns (ADR-0027).
+        await page.click(itemSel(firstRoot))
+        const keysOf = () =>
+          page.$$eval(".column", cs => cs.map(c => c.getAttribute("data-key")))
+        const columnsBefore = await keysOf()
         const reloading = page.reload({ waitUntil: "domcontentloaded" })
         await api.chat(
           `${handle} while you were away`,
@@ -1727,7 +1831,7 @@ async function run(check: Checks["check"]): Promise<void> {
           .waitForFunction(
             () =>
               document
-                .querySelector("#top .activity-badge")
+                .querySelector("#bottom .activity-badge")
                 ?.getAttribute("data-needs-you") === "1",
             undefined,
             { timeout: 20_000 },
@@ -1740,11 +1844,25 @@ async function run(check: Checks["check"]): Promise<void> {
           "after a reload, what was seen stays seen, and a mention made meanwhile counts",
           afterReload,
         )
-        const tabsAfter = await rootTabs(page)
+        const columnsBack = await page
+          .waitForFunction(
+            keys =>
+              [...document.querySelectorAll(".column")]
+                .map(c => c.getAttribute("data-key"))
+                .join() === keys,
+            columnsBefore.join(),
+            { timeout: 15_000 },
+          )
+          .then(
+            () => true,
+            () => false,
+          )
         check(
-          "a reload keeps your tabs, in order",
-          tabsBefore.length >= 3 && tabsAfter.join() === tabsBefore.join(),
-          `${tabsAfter.length} of ${tabsBefore.length}`,
+          "a reload keeps the root you were on, and its open columns, in order",
+          columnsBefore.length >= 1 &&
+            columnsBack &&
+            (await selectedRoot(page)) === firstRoot,
+          `${(await keysOf()).length} of ${columnsBefore.length}`,
         )
         // Two tabs of one device share it: mark all seen in one clears the other.
         const sibling = await page.context().newPage()
@@ -1752,17 +1870,17 @@ async function run(check: Checks["check"]): Promise<void> {
           await sibling.goto(host.httpUrl, { waitUntil: "domcontentloaded" })
           // A second tab of the device is the same person (ADR-0037), so its
           // mentions are the page's.
-          await sibling.waitForSelector("#top .activity-badge", {
+          await sibling.waitForSelector("#bottom .activity-badge", {
             timeout: 20_000,
           })
           await chooseFromMenu(
             sibling,
-            "#top .activity-trigger",
+            "#bottom .activity-trigger",
             ".inbox-all-seen",
           )
           const cleared = await page
             .waitForFunction(
-              () => document.querySelector("#top .activity-badge") === null,
+              () => document.querySelector("#bottom .activity-badge") === null,
               undefined,
               { timeout: 15_000 },
             )
@@ -1778,24 +1896,22 @@ async function run(check: Checks["check"]): Promise<void> {
           await sibling.close().catch(() => {})
         }
 
-        // 7. Archived, a root leaves every tab bar: the window that archives
-        // it closes its tab, and the page someone else is on reads it.
-        await page.click(tabSel(thirdRoot))
+        // 7. Moved to Done, a root is archived and leaves every list: the
+        // window that moved it closes it, and the page someone else is on
+        // reads it (ADR-0085).
+        await page.click(itemSel(thirdRoot))
         await page.waitForSelector(`${col(0)} .composer .send`, {
           timeout: 15_000,
         })
-        // tb opens the third root again, so it has a tab there to lose, and
-        // archives it from there.
-        await openFromArchive(tb, thirdRoot)
+        // tb opens the third root again, so it has an item there to lose, and
+        // moves it to Done from there.
+        await openFromBoard(tb, thirdRoot)
         await page.fill(`${col(0)} .composer .input`, "typed, not sent")
         const menuSeen =
-          (await seeInMenu(page, OWN_MENU, ".archive-root")) !== null
+          (await seeInMenu(page, OWN_MENU, ".move-to.closes")) !== null
         await page.keyboard.press("Escape")
-        check(
-          "a tab's ⋯ opens a menu drawn in full below the tab bar",
-          menuSeen,
-        )
-        await chooseFromMenu(tb, OWN_MENU, ".archive-root")
+        check("a root's ⋯ in your list opens a menu drawn in full", menuSeen)
+        await chooseFromMenu(tb, OWN_MENU, ".move-to.closes")
         await page
           .waitForSelector(`${col(0)} .read-only`, { timeout: 15_000 })
           .catch(() => null)
@@ -1821,7 +1937,9 @@ async function run(check: Checks["check"]): Promise<void> {
         const leftTb = await tb
           .waitForFunction(
             r =>
-              document.querySelector(`#tabs .tab[data-root="${r}"]`) === null,
+              document.querySelector(
+                `#open-list .open-root[data-root="${r}"]`,
+              ) === null,
             thirdRoot,
             { timeout: 15_000 },
           )
@@ -1830,7 +1948,7 @@ async function run(check: Checks["check"]): Promise<void> {
             () => false,
           )
         check(
-          "archiving closes the tab of the window that archived it, and the page someone else is on reads it",
+          "moving a root to Done closes it for the window that moved it, and the page someone else is on reads it",
           banner.startsWith("archived by Tabby") &&
             kept === "typed, not sent" &&
             frozen &&
@@ -1845,18 +1963,20 @@ async function run(check: Checks["check"]): Promise<void> {
           .catch(() => null)
         await waitFor(() => false, 1_000)
         check(
-          "restoring it in place brings back the composer with its text, and opens no tab for the other window",
+          "restoring it in place brings back the composer with its text, and adds it to no other window's list",
           (await page.inputValue(input)) === "typed, not sent" &&
-            (await tb.locator(tabSel(thirdRoot)).count()) === 0,
+            (await tb.locator(itemSel(thirdRoot)).count()) === 0,
         )
 
-        // Archived again, here, its tab goes; the Archive tab brings it back.
+        // Moved to Done again, here, it leaves your list; the board brings it back.
         await page.fill(input, "")
-        await chooseFromMenu(page, OWN_MENU, ".archive-root")
+        await chooseFromMenu(page, OWN_MENU, ".move-to.closes")
         await page
           .waitForFunction(
             r =>
-              document.querySelector(`#tabs .tab[data-root="${r}"]`) === null,
+              document.querySelector(
+                `#open-list .open-root[data-root="${r}"]`,
+              ) === null,
             thirdRoot,
             { timeout: 15_000 },
           )
@@ -1864,56 +1984,50 @@ async function run(check: Checks["check"]): Promise<void> {
             () => true,
             () => false,
           )
-        await page.click("#tabs .tab-archive")
-        const rowOf = (r: string) => `.archive-row[data-root="${r}"]`
-        await page.waitForSelector(rowOf(thirdRoot), { timeout: 15_000 })
-        await page.$$eval(".archive-row", rs =>
-          rs.map(r => r.getAttribute("data-state")),
+        await openBoard(page)
+        await page.waitForSelector(
+          `#board .board-closed ${boardSel(thirdRoot)}`,
+          { timeout: 15_000 },
         )
-        await page.click(rowOf(thirdRoot))
-        await page.waitForSelector(".archive-preview .column .msg", {
-          timeout: 15_000,
-        })
-        await page.hover(".archive-preview .column .msg")
-        const previewWrites = await page
+        await openFromBoard(page, thirdRoot)
+        await page.waitForSelector(`${col(0)} .msg`, { timeout: 15_000 })
+        await page.hover(`${col(0)} .msg`)
+        const openedWrites = await page
           .locator(
-            ".archive-preview .composer .send, .archive-preview .msg .tools button:not(.copy)",
+            `${col(0)} .composer .send, ${col(0)} .msg .tools button:not(.copy)`,
           )
           .count()
-        const previewCopy = await page
-          .locator(".archive-preview .column .msg")
+        const openedCopy = await page
+          .locator(`${col(0)} .msg`)
           .first()
           .locator(":scope > .tools > .copy")
           .count()
         check(
-          "the archived root's preview draws its rail and column, with nothing that writes, and copy",
-          previewWrites === 0 &&
-            previewCopy === 1 &&
-            (await page.locator(".archive-preview .rail-dot").count()) >= 1,
-          `${previewWrites}, ${previewCopy}`,
+          "an archived root opened from the board draws its rail and column, with nothing that writes, and copy",
+          openedWrites === 0 &&
+            openedCopy === 1 &&
+            (await page.locator(".rail .rail-dot").count()) >= 1,
+          `${openedWrites}, ${openedCopy}`,
         )
-        await page.click(".archive-preview .read-only-action")
+        await page.click(`${col(0)} .read-only-action`)
         const restored = await page
-          .waitForFunction(
-            r =>
-              document
-                .querySelector(`#tabs .tab[data-root="${r}"]`)
-                ?.getAttribute("aria-selected") === "true",
-            thirdRoot,
-            { timeout: 15_000 },
-          )
+          .waitForSelector(`${col(0)} .composer .send`, { timeout: 15_000 })
           .then(
             () => true,
             () => false,
           )
         await waitFor(() => false, 1_000)
         check(
-          "Restore in the Archive tab opens it as a tab for the page that restored it, and not for the other window",
-          restored && (await tb.locator(tabSel(thirdRoot)).count()) === 0,
+          "Restore on an archived root you opened keeps it in your list, and not in the other window's",
+          restored &&
+            (await page.locator(itemSel(thirdRoot)).count()) === 1 &&
+            (await tb.locator(itemSel(thirdRoot)).count()) === 0,
         )
-        // The Archive tab reports no thread: the other window leaves nothing
+        // The other window, on nothing, reports no thread: it leaves nothing
         // behind, once its deletions have reached this page.
-        await tb.click("#tabs .tab-archive")
+        await tb.$$eval("#open-list .open-close", bs => {
+          for (const b of bs) (b as HTMLButtonElement).click()
+        })
         await page
           .waitForFunction(
             () =>
@@ -1977,7 +2091,7 @@ async function run(check: Checks["check"]): Promise<void> {
           const longRoot = ids[0] ?? ""
           const forkId = ids.at(-2) ?? ""
           await lp.goto(host.httpUrl, { waitUntil: "domcontentloaded" })
-          await openFromArchive(lp, longRoot)
+          await openFromBoard(lp, longRoot)
           await lp.waitForSelector(
             `${col(0)} .msg[data-entry="${ids.at(-1)}"]`,
             {
@@ -1994,11 +2108,8 @@ async function run(check: Checks["check"]): Promise<void> {
           await lp.waitForSelector(`${fork} .open-branch`, { timeout: 15_000 })
           await lp.click(`${fork} .open-branch`)
           await lp.waitForSelector(`${col(1)} .msg`, { timeout: 15_000 })
-          await lp.click("#tabs .tab-archive")
-          await lp.waitForSelector('#tabs .tab-archive[aria-selected="true"]', {
-            timeout: 15_000,
-          })
-          await lp.click(tabSel(longRoot))
+          await stepAway(lp)
+          await stepBack(lp, longRoot)
           await lp.waitForSelector(`${col(1)} .msg`, { timeout: 15_000 })
           await twoFrames(lp)
           const returned = await lp.evaluate(
@@ -2038,15 +2149,15 @@ async function run(check: Checks["check"]): Promise<void> {
             `${returned?.depth ?? "?"}px down, ${returned?.screen ?? "?"}px shown`,
           )
           check(
-            "a branch column is level with its fork point after a return to its tab",
+            "a branch column is level with its fork point after a return to its root",
             returned !== null &&
               returned.drift <= 4 &&
               returned.inView &&
               returned.spacer < returned.height,
             `off by ${returned?.drift.toFixed(1) ?? "?"}px, in view ${returned?.inView ?? "?"}, spacer ${Math.round(returned?.spacer ?? -1)}px of ${returned?.height ?? "?"}px`,
           )
-          // ↓ new below, across a tab switch: column 1 is unmounted while the
-          // Archive tab shows, and its thread grows meanwhile. Shown again, it is
+          // ↓ new below, across a switch: column 1 is unmounted while a new
+          // tab shows, and its thread grows meanwhile. Shown again, it is
           // placed level with its fork, short of its new end. Which of the two
           // paths column 1 shows is read from the page: column 0 opened at the
           // root, and follows its newest leaf.
@@ -2058,13 +2169,7 @@ async function run(check: Checks["check"]): Promise<void> {
               .locator(`${col(1)} .msg[data-entry]`)
               .last()
               .getAttribute("data-entry")
-            await lp.click("#tabs .tab-archive")
-            await lp.waitForSelector(
-              '#tabs .tab-archive[aria-selected="true"]',
-              {
-                timeout: 15_000,
-              },
-            )
+            await stepAway(lp)
             let at = tip ?? forkId
             const kinds: string[] = []
             for (let n = 0; n < 10; n++) {
@@ -2075,7 +2180,7 @@ async function run(check: Checks["check"]): Promise<void> {
               kinds.push(r.kind)
               if (r.kind === "appended") at = r.id
             }
-            await lp.click(tabSel(longRoot))
+            await stepBack(lp, longRoot)
             const arrived = await lp
               .waitForSelector(`${col(1)} .msg[data-entry="${at}"]`, {
                 timeout: 15_000,
@@ -2321,14 +2426,8 @@ async function run(check: Checks["check"]): Promise<void> {
                 null as string | null,
               )
             const left = await where()
-            await lp.click("#tabs .tab-archive")
-            await lp.waitForSelector(
-              '#tabs .tab-archive[aria-selected="true"]',
-              {
-                timeout: 15_000,
-              },
-            )
-            await lp.click(tabSel(longRoot))
+            await stepAway(lp)
+            await stepBack(lp, longRoot)
             await lp.waitForSelector(`${col(0)} .msg`, { timeout: 15_000 })
             await twoFrames(lp)
             const back =
@@ -2354,8 +2453,10 @@ async function run(check: Checks["check"]): Promise<void> {
               `left ${left?.id ?? "?"} at ${Math.round(left?.offset ?? 0)}px, ${Math.round(left?.gap ?? 0)}px above the end; back at ${back === null ? "?" : Math.round(back)}px`,
             )
           }
-          // The Archive tab reports no thread: Lee leaves no presence behind.
-          await lp.click("#tabs .tab-archive")
+          // On nothing, Lee reports no thread, and leaves no presence behind.
+          await lp.$$eval("#open-list .open-close", bs => {
+            for (const b of bs) (b as HTMLButtonElement).click()
+          })
           await page
             .waitForFunction(
               () => document.querySelector(".avatar") === null,
@@ -2405,10 +2506,11 @@ async function run(check: Checks["check"]): Promise<void> {
           waitUntil: "domcontentloaded",
           timeout: 20_000,
         })
-        // It opens on the Archive tab, and follows Ada from her avatar. Others
-        // who joined earlier may still be shown until their presence decays,
-        // so the avatar is found by her writer id.
-        const adaTrigger = `#top .here-person .here-trigger:has(.avatar[data-writer="${ME}"])`
+        // It opens on the board, with nothing in its list, and follows Ada from
+        // her avatar on the root she reads. Others who joined earlier may still
+        // be shown until their presence decays, so the avatar is found by her
+        // writer id.
+        const adaTrigger = `#board .reader-trigger:has(.avatar[data-writer="${ME}"])`
         await second
           .waitForSelector(adaTrigger, {
             timeout: 20_000,
@@ -2426,7 +2528,7 @@ async function run(check: Checks["check"]): Promise<void> {
             () => false,
           )
         check(
-          "a joining window follows Ada's thread from her avatar in the header",
+          "a joining window follows Ada's thread from her avatar on the board",
           followedAda && rendered,
         )
         // Presence: the second window's open column rings its thread's end on the
@@ -2489,7 +2591,7 @@ async function run(check: Checks["check"]): Promise<void> {
         // cards below look for the column's last message in A's window.
         await countIsHosts(page)
         const shownRoot = await page
-          .$eval('#tabs .tab[aria-selected="true"]', n =>
+          .$eval('#open-list [aria-current="true"]', n =>
             n.getAttribute("data-root"),
           )
           .catch(() => null)
@@ -2547,23 +2649,23 @@ async function run(check: Checks["check"]): Promise<void> {
         )
         const here =
           (await page.getAttribute(
-            '#tabs .tab[aria-selected="true"]',
+            '#open-list [aria-current="true"]',
             "data-root",
           )) ?? ""
-        await page.click(tabSel(downRoot))
-        await page.click(tabSel(here))
+        await page.click(itemSel(downRoot))
+        await page.click(itemSel(here))
         check(
           "what you type is still there after switching tabs",
           await hasValue(page, box, "Together: from B"),
           `${await boxValue(page, box)}`,
         )
         // A card in another root, typed before this one's last word.
-        await page.click(tabSel(downRoot))
+        await page.click(itemSel(downRoot))
         await page.click(box)
         await page.keyboard.press("End")
         await page.keyboard.type(" elsewhere")
         const elsewhere = await boxValue(page, box)
-        await page.click(tabSel(here))
+        await page.click(itemSel(here))
         // Undo is the card's (Kyneta's stack): your typing, never the other's.
         // A word typed after a space starts a step, so Cmd+Z takes back "more",
         // a run of four keystrokes, which redo puts back in order (S64).
@@ -2581,7 +2683,7 @@ async function run(check: Checks["check"]): Promise<void> {
         )
         // Cmd+Z in the other root's box undoes its card, though this root's
         // typing is newer (ADR-0052).
-        await page.click(tabSel(downRoot))
+        await page.click(itemSel(downRoot))
         await page.focus(box)
         await page.keyboard.press("ControlOrMeta+z")
         const thereUndone = await page
@@ -2600,7 +2702,7 @@ async function run(check: Checks["check"]): Promise<void> {
         const thereNow = await boxValue(page, box)
         // And its first keystroke, so its card is gone.
         await page.keyboard.press("ControlOrMeta+z")
-        await page.click(tabSel(here))
+        await page.click(itemSel(here))
         check(
           "Cmd+Z in a card undoes only that card, never a newer step in another root",
           elsewhere.endsWith(" elsewhere") &&
@@ -2619,8 +2721,8 @@ async function run(check: Checks["check"]): Promise<void> {
           .$eval(`${sentCard} .role`, n => n.textContent ?? "")
           .catch(() => "")
         const emptied = await hasValue(page, box, "")
-        await page.click(tabSel(downRoot))
-        await page.click(tabSel(here))
+        await page.click(itemSel(downRoot))
+        await page.click(itemSel(here))
         check(
           "a sent card leaves the box empty, and a tab switch does not bring it back",
           emptied && (await hasValue(page, box, "")),
@@ -2674,8 +2776,8 @@ async function run(check: Checks["check"]): Promise<void> {
         await page.keyboard.press("End")
         await page.keyboard.type("a fresh thought")
         const freshText = await boxValue(page, freshBox)
-        await page.click(tabSel(downRoot))
-        await page.click(tabSel(here))
+        await page.click(itemSel(downRoot))
+        await page.click(itemSel(here))
         const freshKept = await hasValue(page, freshBox, freshText)
         check(
           "a new branch's text is kept across a tab switch",
@@ -2725,11 +2827,11 @@ async function run(check: Checks["check"]): Promise<void> {
             )
         await page.click(box)
         await page.keyboard.type("where was I")
-        await page.click(tabSel(downRoot))
-        const tabMarked = await pipIn(page, tabSel(here))
+        await page.click(itemSel(downRoot))
+        const tabMarked = await pipIn(page, itemSel(here))
         const otherBare =
-          (await page.locator(`${tabSel(downRoot)} .card-pip`).count()) === 0
-        await page.click(tabSel(here))
+          (await page.locator(`${itemSel(downRoot)} .card-pip`).count()) === 0
+        await page.click(itemSel(here))
         const markedEnd = await page
           .locator(`${col(0)} .msg[data-entry]`)
           .last()
@@ -2737,7 +2839,7 @@ async function run(check: Checks["check"]): Promise<void> {
         const railDot = `.rail-dot[data-entry="${markedEnd}"]`
         const railMarked = await pipIn(page, railDot)
         check(
-          "a card of yours with text marks its root's tab and its thread's end on the rail",
+          "a card of yours with text marks its root's item in your list and its thread's end on the rail",
           tabMarked && otherBare && railMarked,
           `tab ${tabMarked}, other tab bare ${otherBare}, rail ${railMarked}`,
         )
@@ -2749,21 +2851,22 @@ async function run(check: Checks["check"]): Promise<void> {
         await page.keyboard.press("ControlOrMeta+a")
         await page.keyboard.press("Backspace")
         const unmarked =
-          (await pipGone(page, tabSel(here))) && (await pipGone(page, railDot))
+          (await pipGone(page, itemSel(here))) && (await pipGone(page, railDot))
         check(
           "a card emptied marks nothing, though its record stays",
           unmarked && readPlaces(host.places).length === records,
           `${unmarked}; ${readPlaces(host.places).length} records, ${records} before`,
         )
-        // A root whose tab you closed is marked in the Archive tab and its row.
+        // A root you closed is marked on ▦ and on its board item (ADR-0085).
         await page.keyboard.type("back tomorrow")
-        await pipIn(page, tabSel(here))
+        await pipIn(page, itemSel(here))
         const columnsHere = await page.locator(".column").count()
-        await page.click(`${tabSel(here)} ~ .tab-close`)
-        const archiveMarked = await pipIn(page, "#tabs .tab-archive")
-        await page.click("#tabs .tab-archive")
-        const rowMarked = await pipIn(page, `.archive-row[data-root="${here}"]`)
-        await openFromArchive(page, here)
+        await page.hover(itemSel(here))
+        await page.click(`${itemSel(here)} ~ .open-close`)
+        const archiveMarked = await pipIn(page, "#bottom .board-toggle")
+        await openBoard(page)
+        const rowMarked = await pipIn(page, `#board ${boardSel(here)}`)
+        await openFromBoard(page, here)
         const columnsBack = await page
           .waitForFunction(
             n => document.querySelectorAll(".column").length === n,
@@ -2775,44 +2878,51 @@ async function run(check: Checks["check"]): Promise<void> {
             () => false,
           )
         check(
-          "a closed root holding your card marks the Archive tab and its row, and comes back as it was",
+          "a closed root holding your card marks ▦ and its board item, and comes back as it was",
           archiveMarked && rowMarked && columnsBack,
-          `tab ${archiveMarked}, row ${rowMarked}, columns ${columnsBack}`,
+          `▦ ${archiveMarked}, item ${rowMarked}, columns ${columnsBack}`,
         )
-        // An archived root's work is done: its card lights its own row, never
-        // the Archive tab. Restored after, for what follows.
-        await chooseFromMenu(page, OWN_MENU, ".archive-root")
+        // An archived root's work is done: its card lights its own item on
+        // the board, never ▦. Restored after, for what follows.
+        await chooseFromMenu(page, OWN_MENU, ".move-to.closes")
         await page.waitForFunction(
-          r => document.querySelector(`#tabs .tab[data-root="${r}"]`) === null,
+          r =>
+            document.querySelector(
+              `#open-list .open-root[data-root="${r}"]`,
+            ) === null,
           here,
           { timeout: 15_000 },
         )
-        // The tab leaving and the Archive tab's pip are one render's facts.
+        // The item leaving and ▦'s pip are one render's facts.
         const archiveBare =
-          (await page.locator("#tabs .tab-archive .card-pip").count()) === 0
-        await page.click("#tabs .tab-archive")
+          (await page.locator("#bottom .board-toggle .card-pip").count()) === 0
+        await openBoard(page)
         const archivedRow = await pipIn(
           page,
-          `.archive-row[data-root="${here}"]`,
+          `#board .board-closed ${boardSel(here)}`,
         )
-        await openFromArchive(page, here)
+        await openFromBoard(page, here)
+        await page.click(`${col(0)} .read-only-action`)
+        await page.waitForSelector(`${col(0)} .composer .send`, {
+          timeout: 15_000,
+        })
         check(
-          "an archived root holding your card marks its row, not the Archive tab",
+          "an archived root holding your card marks its board item, not ▦",
           archiveBare && archivedRow,
-          `tab bare ${archiveBare}, row ${archivedRow}`,
+          `▦ bare ${archiveBare}, item ${archivedRow}`,
         )
         // Empty again, so what follows starts from an empty box.
         await page.focus(box)
         await page.keyboard.press("ControlOrMeta+a")
         await page.keyboard.press("Backspace")
-        await pipGone(page, tabSel(here))
+        await pipGone(page, itemSel(here))
       } finally {
         await second.close().catch(() => {})
       }
 
       // Your inventory (ADR-0048 step 4), in the DOWN thread's tab: its agent
       // thread and the conversation below it.
-      await page.click(tabSel(downRoot))
+      await page.click(itemSel(downRoot))
       await page.waitForFunction(
         () => document.querySelectorAll(".column").length >= 2,
         undefined,
@@ -2841,7 +2951,7 @@ async function run(check: Checks["check"]): Promise<void> {
           () => true,
           () => false,
         )
-      await page.click("#top .inventory-toggle")
+      await page.click("#bottom .inventory-toggle")
       await page.waitForSelector(".inventory", { timeout: 5_000 })
       // Take into the inventory: Ctrl+Shift+I in a composer's box takes its card.
       const downBox = `${col(1)} .composer .input`
@@ -3149,7 +3259,7 @@ async function run(check: Checks["check"]): Promise<void> {
       )
       await waitFor(() => placeOf(traced)?.kind === "drafting", 5_000)
       const tracedFrom = placeOf(traced)
-      await page.click("#tabs .tab-archive")
+      await stepAway(page)
       await waitFor(
         () => !readReading(host.presence).some(([w]) => w === ME),
         5_000,
@@ -3160,7 +3270,7 @@ async function run(check: Checks["check"]): Promise<void> {
           { card: traced, from: keyOf(tracedFrom), to: pinTo },
           { actedAt: { kind: "column", key: "k-api" }, slot: null },
         )
-      await page.click(tabSel(downRoot))
+      await stepBack(page, downRoot)
       const traceRow = `${col(1)} .trace`
       const drawnTrace = await appears(traceRow)
       const traceText = (await page.textContent(traceRow).catch(() => "")) ?? ""
@@ -3170,7 +3280,7 @@ async function run(check: Checks["check"]): Promise<void> {
       )
       // The inventory, left open in the middle of the screen, would cover it.
       if ((await page.locator(".inventory").count()) > 0)
-        await page.click("#top .inventory-toggle")
+        await page.click("#bottom .inventory-toggle")
       const clickError = await page
         .click(
           `${col(1)} .pinned-strip .card-editor:has(textarea[data-card="${traced}"]) .card-history-trigger`,
@@ -3205,7 +3315,7 @@ async function run(check: Checks["check"]): Promise<void> {
         `trace ${drawnTrace} (${traceText}), leads ${leads}, history ${historyNames}${clickError === "" ? "" : `: ${clickError}`}`,
       )
 
-      // A reload keeps the tab you are on, and its open columns (ADR-0027).
+      // What a new tab of this device opens is the layout last saved (ADR-0027).
       const columnKeys = (p: typeof page) =>
         p.$$eval(".column", cs => cs.map(c => c.getAttribute("data-key") ?? ""))
       const openKeys = await columnKeys(page)
@@ -3224,7 +3334,7 @@ async function run(check: Checks["check"]): Promise<void> {
         .waitForFunction(
           n =>
             document
-              .querySelector("#top .me-trigger")
+              .querySelector("#bottom .me-trigger")
               ?.getAttribute("title") === n,
           myName,
           { timeout: 10_000 },
@@ -3243,18 +3353,12 @@ async function run(check: Checks["check"]): Promise<void> {
       // The document has arrived (the name shows); give the prune after settling
       // time to run before comparing.
       await waitFor(() => false, 1_000)
-      const reopened = await columnKeys(page)
       const focusedBox = await page.evaluate(
         () => document.activeElement?.closest(".composer") != null,
       )
       check(
         "a reload focuses no box: only a column you open takes focus",
         !focusedBox,
-      )
-      check(
-        "a reload keeps the tab's open columns, in order",
-        openKeys.length >= 2 && reopened.join() === openKeys.join(),
-        `${reopened.length} of ${openKeys.length}`,
       )
       const typedBack = await page
         .waitForFunction(
@@ -3270,14 +3374,14 @@ async function run(check: Checks["check"]): Promise<void> {
         )
       check("what you type is still there after a reload", typedBack)
       // Your inventory is kept as you left it: the kept card in slot 5.
-      await page.click("#top .inventory-toggle")
+      await page.click("#bottom .inventory-toggle")
       const stillInSlot = await appears(
         `.inventory .slot[data-slot="5"][data-card="${thought}"]`,
       )
       check("a reload keeps your inventory's cards in their slots", stillInSlot)
       await page.click(`.inventory .slot[data-card="${thought}"]`)
       await page.click(".inventory .remove")
-      await page.click("#top .inventory-toggle")
+      await page.click("#bottom .inventory-toggle")
       await page.fill(`${col(0)} .composer .input`, "")
       // A new tab shares the device's storage (same context; every
       // `browser.newPage()` makes a new one) and opens the layout last saved.
@@ -3305,25 +3409,23 @@ async function run(check: Checks["check"]): Promise<void> {
         await newTab.close().catch(() => {})
       }
 
-      // Archived by someone else before a reload, the tab you were on gives way
-      // to the newest open root.
+      // Archived by someone else before a reload, the root you were on gives
+      // way to the last of your list.
       check(
-        "a reload keeps the tab you were on",
+        "a reload keeps the root you were on",
         (await selectedRoot(page)) === downRoot,
       )
-      await api.request({
-        kind: "archive",
-        action: "archive",
-        root: entryId(downRoot),
-      })
+      await moveRootTo(api, entryId(downRoot), "closed")
       await page.reload({ waitUntil: "domcontentloaded" })
       await page
         .waitForFunction(
-          r =>
-            document
-              .querySelector('#tabs .tab[aria-selected="true"]')
-              ?.getAttribute("data-root") === r,
-          thirdRoot,
+          r => {
+            const on = document
+              .querySelector('#open-list [aria-current="true"]')
+              ?.getAttribute("data-root")
+            return on != null && on !== r
+          },
+          downRoot,
           { timeout: 20_000 },
         )
         .then(

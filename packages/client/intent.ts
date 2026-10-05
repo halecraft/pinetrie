@@ -7,8 +7,6 @@
 // a message's acts (`MessageAct`) are among them.
 
 import {
-  type ArchiveAction,
-  type ArchiveRecord,
   type AskIndex,
   type CardCommand,
   type CardId,
@@ -26,6 +24,8 @@ import {
   type RootId,
   type TraceRecord,
   type TreeIndex,
+  type WorkflowEdit,
+  type WorkflowStateId,
   type WriterId,
 } from "@pineta/core"
 import type { Outcome } from "@pineta/protocol/codec"
@@ -58,7 +58,7 @@ import {
 import type { Pending, Prefill, ReaderAction } from "./columns.ts"
 import type { Identity, NameStep } from "./identity.ts"
 import {
-  type ActiveTab,
+  type Here,
   type Layout,
   type LayoutAction,
   planOpen,
@@ -148,16 +148,40 @@ export type Intent =
       readonly key: string
       readonly act: ColumnAct
     }
-  | { readonly kind: "show"; readonly tab: ActiveTab }
+  /** Show a root, opening it in your list, or a new tab, or nothing. */
+  | { readonly kind: "show"; readonly here: Here }
   | {
       readonly kind: "newTab"
       readonly asksAgent: boolean
       readonly prefill?: Prefill
+      /** The workflow state its root lands in: the board column it came from (ADR-0085). */
+      readonly state?: WorkflowStateId
     }
-  /** Close a tab for you: nothing is written. */
-  | { readonly kind: "closeTab"; readonly tab: ActiveTab }
-  | { readonly kind: "archive"; readonly root: EntryId }
-  | { readonly kind: "restore"; readonly root: EntryId }
+  /** Close a root of your list, or a new tab, for you: nothing shared is written. */
+  | { readonly kind: "close"; readonly here: Here }
+  /** Move a root of your list before `before`, or to its end (ADR-0085). */
+  | {
+      readonly kind: "moveInList"
+      readonly root: EntryId
+      readonly before: EntryId | null
+    }
+  /**
+   * Move a root on the board (ADR-0085). Into the closed state it is archived,
+   * and closed for you once the host accepts; out of it, restored.
+   */
+  | {
+      readonly kind: "moveRoot"
+      readonly root: RootId
+      readonly from: WorkflowStateId
+      readonly to: WorkflowStateId
+      readonly before: RootId | null
+      /** `to` is the closed state. */
+      readonly closes: boolean
+    }
+  /** Change the board's workflow states (ADR-0085). */
+  | { readonly kind: "editWorkflow"; readonly edit: WorkflowEdit }
+  /** Open or close the board. */
+  | { readonly kind: "board"; readonly open: boolean }
   | {
       readonly kind: "rename"
       readonly root: EntryId
@@ -188,7 +212,7 @@ export type Intent =
   /** Select an inventory slot. */
   | { readonly kind: "selectSlot"; readonly slot: number }
   /**
-   * Undo or redo your newest move in the tab you are on, or, with the
+   * Undo or redo your newest move in the root you are on, or, with the
    * inventory panel focused, your newest swap (ADR-0066).
    */
   | {
@@ -211,11 +235,16 @@ export type Effect =
     }
   /** Ask the host for something that moves no card (`HostRequest`). */
   | { readonly kind: "request"; readonly intent: HostRequest }
-  /** Archive or restore `root`; `afterArchive` plans the answer. */
+  /** Change your list, in your own document (`openList`, ADR-0085). */
+  | { readonly kind: "list"; readonly act: ListAct }
+  /**
+   * Move a root on the board; `afterRootMove` decides from its answer
+   * whether `moved` runs.
+   */
   | {
-      readonly kind: "archive"
-      readonly action: ArchiveAction
-      readonly root: EntryId
+      readonly kind: "moveRoot"
+      readonly move: Extract<HostRequest, { kind: "move-root" }>
+      readonly moved: readonly Effect[]
     }
   | {
       readonly kind: "mark"
@@ -279,8 +308,6 @@ export type Effect =
   | { readonly kind: "reveal"; readonly entry: EntryId }
   /** Open ask `ask`'s fold, so what is revealed in it is drawn (ADR-0056). */
   | { readonly kind: "openFold"; readonly ask: EntryId }
-  /** Select `root` in the Archive tab, which previews it. */
-  | { readonly kind: "pickArchived"; readonly root: EntryId }
   /** The column keyed `key` takes focus when it mounts (`claimFocus`). */
   | { readonly kind: "armFocus"; readonly key: string }
   | { readonly kind: "storeIdentity"; readonly identity: Identity }
@@ -290,10 +317,20 @@ export type Effect =
 /** A column action on one root's columns, as `LayoutAction` carries it. */
 type RootColumnAction = Extract<LayoutAction, { kind: "columns" }>["action"]
 
+/** A change to your list, by root id: your document's key (ADR-0085). */
+export type ListAct =
+  /** At its end, unless it is in your list already. */
+  | { readonly kind: "ensure"; readonly root: RootId }
+  | {
+      readonly kind: "place"
+      readonly root: RootId
+      readonly before: RootId | null
+    }
+  | { readonly kind: "close"; readonly root: RootId }
+
 export interface IntentState {
   readonly layout: Layout
   readonly index: TreeIndex
-  readonly archive: ReadonlyMap<EntryId, ArchiveRecord>
   /** Every ask (`indexAsks`): a pick into one's work opens its fold. */
   readonly asks: AskIndex
   readonly cards: CardFacts
@@ -302,6 +339,8 @@ export interface IntentState {
    * undo names its tab's root, and a fresh column reopens in its root's tab.
    */
   readonly rootEntries: ReadonlyMap<RootId, EntryId>
+  /** Each root's id, by its root entry: your list's key. */
+  readonly rootIds: ReadonlyMap<EntryId, RootId>
 }
 
 /** What the card intents decide from (ADR-0048 step 4). */
@@ -321,8 +360,24 @@ export interface CardFacts {
 }
 
 const layout = (action: LayoutAction): Effect => ({ kind: "layout", action })
-const showRoot = (root: EntryId): Effect =>
-  layout({ kind: "show", tab: { kind: "root", root } })
+const list = (act: ListAct): Effect => ({ kind: "list", act })
+
+/** Show `here`; a root shown is opened in your list, at its end if it was not there. */
+export function show(
+  here: Here,
+  state: Pick<IntentState, "rootIds">,
+): readonly Effect[] {
+  const shown = layout({ kind: "show", here })
+  if (here.kind !== "root") return [shown]
+  const id = state.rootIds.get(here.root)
+  return id === undefined
+    ? [shown]
+    : [shown, list({ kind: "ensure", root: id })]
+}
+const showRoot = (
+  root: EntryId,
+  state: Pick<IntentState, "rootIds">,
+): readonly Effect[] => show({ kind: "root", root }, state)
 
 /**
  * The effects of `intent`. `fresh` is a new column key from the shell, as
@@ -347,7 +402,7 @@ export function planIntent(
         newRoot,
       )
     case "show":
-      return [layout({ kind: "show", tab: intent.tab })]
+      return show(intent.here, state)
     case "newTab":
       return [
         { kind: "armFocus", key: fresh },
@@ -357,22 +412,55 @@ export function planIntent(
           root: newRoot,
           asksAgent: intent.asksAgent,
           ...(intent.prefill === undefined ? {} : { prefill: intent.prefill }),
+          ...(intent.state === undefined ? {} : { state: intent.state }),
         }),
       ]
-    case "closeTab":
-      switch (intent.tab.kind) {
+    case "close":
+      switch (intent.here.kind) {
         case "root":
-          return [layout({ kind: "closeRoot", root: intent.tab.root })]
+          return closeRoot(intent.here.root, state)
         case "new":
-          return [layout({ kind: "closeNewTab", key: intent.tab.key })]
-        case "archive":
+          return [layout({ kind: "closeNewTab", key: intent.here.key })]
+        case "nothing":
           return []
       }
       return []
-    case "archive":
-      return [{ kind: "archive", action: "archive", root: intent.root }]
-    case "restore":
-      return [{ kind: "archive", action: "restore", root: intent.root }]
+    case "moveInList": {
+      const root = state.rootIds.get(intent.root)
+      if (root === undefined) return []
+      const before =
+        intent.before === null
+          ? null
+          : (state.rootIds.get(intent.before) ?? null)
+      return [list({ kind: "place", root, before })]
+    }
+    case "moveRoot": {
+      // Into the closed state: it leaves your list once the host accepts.
+      const entry = state.rootEntries.get(intent.root)
+      return [
+        {
+          kind: "moveRoot",
+          move: {
+            kind: "move-root",
+            root: intent.root,
+            from: intent.from,
+            to: intent.to,
+            before: intent.before,
+          },
+          moved: !intent.closes
+            ? []
+            : entry === undefined
+              ? [list({ kind: "close", root: intent.root })]
+              : closeRoot(entry, state),
+        },
+      ]
+    }
+    case "editWorkflow":
+      return [
+        { kind: "request", intent: { kind: "workflow", edit: intent.edit } },
+      ]
+    case "board":
+      return [layout({ kind: "board", open: intent.open })]
     case "rename":
       return [{ kind: "mark", root: intent.root, title: intent.title }]
     case "retitle":
@@ -403,9 +491,8 @@ export function planIntent(
 }
 
 /**
- * Show entry `id` (`planOpen`): in view in the column that shows it, in a new
- * column beside the one sharing most of its path, or, in an archived root,
- * in the Archive tab's preview. An entry of an ask's work opens the ask's
+ * Show entry `id` (`planOpen`): in view in the column that shows it, or in a
+ * new column beside the one sharing most of its path. An entry of an ask's work opens the ask's
  * fold first, whatever the column's density, so it is drawn to be revealed
  * (ADR-0056): forks, branch starts and people's messages are never in one.
  */
@@ -414,36 +501,35 @@ export function planOpenAt(
   state: IntentState,
   fresh: string,
 ): readonly Effect[] {
-  const plan = planOpen(state.layout, state.index, state.archive, id)
+  const plan = planOpen(state.layout, state.index, id)
   if (plan === null) return []
   const ask = state.asks.askOf.get(id)
   const fold: readonly Effect[] =
     ask === undefined ? [] : [{ kind: "openFold", ask }]
   switch (plan.kind) {
     case "scroll":
-      return [...fold, { kind: "reveal", entry: id }, showRoot(plan.root)]
+      return [
+        ...fold,
+        { kind: "reveal", entry: id },
+        ...showRoot(plan.root, state),
+      ]
     case "open":
       return [
         ...fold,
         { kind: "reveal", entry: id },
-        showRoot(plan.root),
+        ...showRoot(plan.root, state),
         layout({
           kind: "columns",
           root: plan.root,
           action: { kind: "open", key: fresh, after: plan.after, anchor: id },
         }),
       ]
-    case "preview":
-      return [
-        { kind: "pickArchived", root: plan.root },
-        layout({ kind: "show", tab: { kind: "archive" } }),
-      ]
   }
 }
 
 /**
  * The column action a reader's setting is, for column `key`; null for any
- * other act. `planColumn` and the Archive preview both apply it.
+ * other act. `planColumn` applies it.
  */
 export function readerAction(act: ColumnAct, key: string): ReaderAction | null {
   switch (act.kind) {
@@ -593,11 +679,10 @@ function planColumn(
 
 /**
  * Show `entry`, in the root whose root entry is `root` (ADR-0063). One this
- * tab holds opens as `planOpenAt`. Else an archived root is previewed, and
- * any other root's tab is shown, which holds it, and the entry is shown once
- * it has arrived.
+ * tab holds opens as `planOpenAt`. Else the root is shown, which holds it,
+ * archived or not, and the entry is shown once it has arrived.
  */
-export function planOpenIn(
+function planOpenIn(
   entry: EntryId,
   root: EntryId,
   state: IntentState,
@@ -605,48 +690,35 @@ export function planOpenIn(
 ): readonly Effect[] {
   if (state.index.entries[entry] !== undefined)
     return planOpenAt(entry, state, fresh)
-  if (state.archive.get(root)?.state === "archived")
-    return [
-      { kind: "pickArchived", root },
-      layout({ kind: "show", tab: { kind: "archive" } }),
-    ]
-  return [showRoot(root), { kind: "openWhenHeld", entry }]
+  return [...showRoot(root, state), { kind: "openWhenHeld", entry }]
 }
 
 /** A column opened with `key` takes focus; nothing opened, nothing armed. */
 const opened = (key: string, effects: readonly Effect[]): readonly Effect[] =>
   effects.length === 0 ? [] : [{ kind: "armFocus", key }, ...effects]
 
-/**
- * The entry `intent` asks to see, from the page or from a column (a closed
- * branch's button), or null.
- */
-export const entryShown = (intent: Intent): EntryId | null =>
-  intent.kind === "openAt"
-    ? intent.entry
-    : intent.kind === "column" && intent.act.kind === "openAt"
-      ? intent.act.entry
-      : null
+/** `root` leaves your list, and if you are on it, its neighbour is shown. */
+function closeRoot(
+  root: EntryId,
+  state: Pick<IntentState, "rootIds">,
+): readonly Effect[] {
+  const id = state.rootIds.get(root)
+  return [
+    ...(id === undefined ? [] : [list({ kind: "close", root: id })]),
+    layout({ kind: "closeRoot", root }),
+  ]
+}
 
 /**
- * After an archive or a restore is answered. Archiving a root closes its tab
- * for you, the one you are on too: only a root someone else archives stays
- * while you are on it (`resolveLayout`). A restored root is shown. A refusal
- * changes no tab.
+ * After a move on the board is answered (ADR-0085): `moved` runs only once
+ * the host accepts. A root you move into the closed state leaves your list,
+ * the one you are on too; only a root someone else archives stays while you
+ * are on it (`resolveLayout`). A refusal changes nothing.
  */
-export function afterArchive(
+export const afterRootMove = (
   outcome: Outcome,
-  root: EntryId,
-): readonly Effect[] {
-  switch (outcome.kind) {
-    case "archived":
-      return [layout({ kind: "closeRoot", root })]
-    case "restored":
-      return [showRoot(root)]
-    default:
-      return []
-  }
-}
+  moved: readonly Effect[],
+): readonly Effect[] => (outcome.kind === "moved-root" ? moved : [])
 
 /** `reconcileName`'s step, as effects. */
 export function nameEffects(step: NameStep | null): readonly Effect[] {

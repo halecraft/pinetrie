@@ -46,13 +46,14 @@ import {
   launchBrowser,
   msg,
   OWN_MENU,
-  openFromArchive,
+  openFromBoard,
   railCount,
   readRaw,
   recordFrames,
   seeInMenu,
+  stepAway,
+  stepBack,
   TO_AGENT,
-  tabSel,
   twoFrames,
 } from "./page.ts"
 
@@ -84,7 +85,7 @@ async function run(
       await asPerson(ap, "asa@browser.test", "Asa")
       try {
         await ap.goto(askHost.httpUrl, { waitUntil: "domcontentloaded" })
-        await ap.click("#tabs .add-agent")
+        await ap.click("#open-list .add-agent")
         const say = async (text: string) => {
           await ap.fill(`${col(0)} .composer .input`, text)
           await ap.click(`${col(0)} .composer .send`)
@@ -391,7 +392,7 @@ async function run(
       await asPerson(tp, "tools@browser.test", "Tess")
       try {
         await tp.goto(toolHost.httpUrl, { waitUntil: "domcontentloaded" })
-        await tp.click("#tabs .add-agent")
+        await tp.click("#open-list .add-agent")
         const say = async (text: string) => {
           await tp.fill(`${col(0)} .composer .input`, text)
           await tp.click(`${col(0)} .composer .send`)
@@ -736,18 +737,12 @@ async function run(
           )
           const root =
             (await tp.getAttribute(
-              '#tabs .tab-root[aria-selected="true"]',
+              '#open-list .open-root[aria-current="true"]',
               "data-root",
             )) ?? ""
-          /** Away to the Archive tab and back, recording every bash row's state as it mounts and changes. */
+          /** Away to a new tab and back, recording every bash row's state as it mounts and changes. */
           const away = async () => {
-            await tp.click("#tabs .tab-archive")
-            await tp.waitForSelector(
-              '#tabs .tab-archive[aria-selected="true"]',
-              {
-                timeout: 15_000,
-              },
-            )
+            await stepAway(tp)
             await tp.evaluate(() => {
               const w = window as unknown as {
                 __rows: string[]
@@ -779,7 +774,7 @@ async function run(
                 attributeFilter: ["open", "data-size", "data-revealed"],
               })
             })
-            await tp.click(tabSel(root))
+            await stepBack(tp, root)
             await tp.waitForSelector(`${col(0)} .tool[data-tool="bash"]`, {
               timeout: 15_000,
             })
@@ -1659,7 +1654,7 @@ async function run(
         // header's activity counts its thread, choosing the thread
         // opens it, and that root cannot be archived until the agent is done.
         await tp
-          .$eval('#tabs .tab[aria-selected="true"]', n =>
+          .$eval('#open-list [aria-current="true"]', n =>
             n.getAttribute("data-root"),
           )
           .catch(() => null)
@@ -1670,17 +1665,17 @@ async function run(
             mode: "branch",
           })
           const newRoot = treeOf(toolHost).roots.at(-1) ?? ""
-          await appears("#top .activity .activity-working")
+          await appears("#bottom .activity .activity-working")
 
           await chooseFromMenu(
             tp,
-            "#top .activity .activity-trigger",
+            "#bottom .activity .activity-trigger",
             ".here-thread",
           )
           await appears(
-            `#tabs .tab[data-root="${newRoot}"][aria-selected="true"]`,
+            `#open-list .open-root[data-root="${newRoot}"][aria-current="true"]`,
           )
-          await seeInMenu(tp, OWN_MENU, ".archive-root")
+          await seeInMenu(tp, OWN_MENU, ".move-to.closes")
 
           await toolIdle()
         } finally {
@@ -1689,7 +1684,7 @@ async function run(
 
         // ── the rail draws a long loop as one capsule (ADR-0031) ─────────────
         await tp.keyboard.press("Escape")
-        await tp.click("#tabs .add-agent")
+        await tp.click("#open-list .add-agent")
         script.use([
           ...Array.from({ length: 30 }, () => ({
             tool: "read",
@@ -1773,8 +1768,8 @@ async function run(
           const aside = trunk === null ? null : await chain(trunk, "Aside", 1)
           const railRoot =
             start.kind === "appended" ? start.id : entryId("none")
-          // Another writer's root opens no tab (ADR-0030): open it from Archive.
-          await openFromArchive(tp, railRoot)
+          // Another writer's root is not in your list (ADR-0030): open it from the board.
+          await openFromBoard(tp, railRoot)
           await tp.waitForSelector(
             `${col(0)} .msg[data-entry="${aside ?? "none"}"]`,
             { timeout: 15_000 },
@@ -1865,26 +1860,6 @@ async function run(
             "a click lower on a capsule shows the message that far through its run",
             members.length > 20 && deepShown && firstGone,
             `${members.length} messages; ${deepShown}, ${firstGone}`,
-          )
-
-          // The Archive tab's preview does the same with its one column, which
-          // opens at the newest leaf's end and moves to what is picked.
-          const preview = ".archive-preview"
-          await tp.click("#tabs .tab-archive")
-          await tp.click(`.archive-row[data-root="${railRoot}"]`)
-          await tp.waitForSelector(`${preview} .column .msg`, {
-            timeout: 15_000,
-          })
-          await clickRun(preview, 0.02)
-          await tp.waitForSelector(`${preview} .msg[data-entry="${target}"]`, {
-            timeout: 15_000,
-          })
-          await frame()
-          await nudge()
-          const previewed = await inView(preview)
-          check(
-            "a capsule in the Archive tab's preview shows its first message, and keeps it in view",
-            previewed,
           )
         } finally {
           await railer.close()

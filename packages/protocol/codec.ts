@@ -11,8 +11,6 @@
 // a malformed command is refused is decided in exactly one function.
 
 import {
-  ARCHIVE_ACTIONS,
-  type ArchiveAction,
   atEntry,
   CARD_COMMANDS,
   type CardCommand,
@@ -29,6 +27,7 @@ import {
   type Intent,
   isLaneName,
   isRootId,
+  isWorkflowStateId,
   keyOfFields,
   LINE_ACTIONS,
   type LineAction,
@@ -50,10 +49,14 @@ import {
   placeFields,
   type Refusal,
   ROOT,
+  type RootId,
   type RunId,
   refused,
   runId,
   type SentCard,
+  WORKFLOW_ACTIONS,
+  type WorkflowAction,
+  type WorkflowStateId,
   type WorkSetting,
   type WriterId,
 } from "@pineta/core"
@@ -94,9 +97,13 @@ export type Outcome =
   | { readonly kind: "conflict"; readonly by: WriterId | null }
   | { readonly kind: "named" }
   | { readonly kind: "stopped" }
-  /** A root is archived, or restored (ADR-0029); also when it already was. */
-  | { readonly kind: "archived" }
-  | { readonly kind: "restored" }
+  /**
+   * A root moved on the board, or already there (ADR-0085): into the closed
+   * state it is archived, and out of it restored.
+   */
+  | { readonly kind: "moved-root" }
+  /** The workflow's states changed, or already were as asked (ADR-0085). */
+  | { readonly kind: "workflow-changed" }
   /** An entry's title is set or cleared (ADR-0045); also when it already was. */
   | { readonly kind: "marked" }
   /** A model is asked for a root's title, which arrives as its mark (ADR-0074). */
@@ -185,6 +192,9 @@ export function decodeCommand(
     const pinned = pinnedFromWire(text(wire?.pinned))
     if (pinned === undefined)
       return refused(ERR.UNKNOWN_TARGET, "malformed pinned cards")
+    const stateText = text(wire?.state)
+    if (stateText !== "" && !isWorkflowStateId(stateText))
+      return refused(ERR.UNKNOWN_STATE, `not a workflow state: ${stateText}`)
     const rootText = text(wire?.root)
     // A thread at the root starts a root, under the id its tab minted.
     const root =
@@ -209,6 +219,7 @@ export function decodeCommand(
       pinned,
       reserved: reservedLane,
       base: base === "" ? null : base,
+      state: stateText === "" ? null : (stateText as WorkflowStateId),
     }
   }
   if (kind === "line") {
@@ -279,14 +290,37 @@ export function decodeCommand(
         )
       : { kind, lane, action, to: to === "" ? null : to, seen }
   }
-  if (kind === "archive") {
+  if (kind === "move-root") {
+    const root = text(wire?.root)
+    if (!isRootId(root))
+      return refused(ERR.UNKNOWN_TARGET, `not a root: ${root}`)
+    const move = rootMoveFromWire(text(wire?.text))
+    return move === null
+      ? refused(ERR.UNKNOWN_STATE, "a move on the board names its states")
+      : { kind: "move-root", root, ...move }
+  }
+  if (kind === "workflow") {
     const action = text(wire?.mode)
-    if (!isArchiveAction(action))
-      return refused(ERR.UNKNOWN_KIND, `unknown archive action: ${action}`)
-    const root = text(wire?.targetId)
-    return root === ""
-      ? refused(ERR.UNKNOWN_TARGET, "an archive action must name its root")
-      : { kind: "archive", action, root: entryId(root) }
+    if (!isWorkflowAction(action))
+      return refused(ERR.UNKNOWN_KIND, `unknown workflow action: ${action}`)
+    const state = text(wire?.targetId)
+    const before = text(wire?.parentId)
+    if (
+      (state !== "" && !isWorkflowStateId(state)) ||
+      (before !== "" && !isWorkflowStateId(before))
+    )
+      return refused(ERR.UNKNOWN_STATE, "not a workflow state")
+    if (action !== "add" && state === "")
+      return refused(ERR.UNKNOWN_STATE, `a ${action} names its state`)
+    return {
+      kind: "workflow",
+      edit: {
+        action,
+        state: state === "" ? null : (state as WorkflowStateId),
+        name: text(wire?.text),
+        before: before === "" ? null : (before as WorkflowStateId),
+      },
+    }
   }
   if (kind === "mark") {
     const entry = text(wire?.targetId)
@@ -518,8 +552,27 @@ const isOfferAction = (a: string): a is OfferAction =>
 const isLineAction = (a: string): a is LineAction =>
   (LINE_ACTIONS as readonly string[]).includes(a)
 
-const isArchiveAction = (a: string): a is ArchiveAction =>
-  (ARCHIVE_ACTIONS as readonly string[]).includes(a)
+const isWorkflowAction = (a: string): a is WorkflowAction =>
+  (WORKFLOW_ACTIONS as readonly string[]).includes(a)
+
+/**
+ * A move on the board's states, as the wire carries it in `text`: JSON
+ * `{ from, to, before }`, `before` a root or null. Null when malformed.
+ */
+export function rootMoveFromWire(s: string): {
+  readonly from: WorkflowStateId
+  readonly to: WorkflowStateId
+  readonly before: RootId | null
+} | null {
+  const raw = parsed(s)
+  if (typeof raw !== "object" || raw === null) return null
+  const { from, to, before } = raw as Record<string, unknown>
+  if (typeof from !== "string" || !isWorkflowStateId(from)) return null
+  if (typeof to !== "string" || !isWorkflowStateId(to)) return null
+  if (before !== null && (typeof before !== "string" || !isRootId(before)))
+    return null
+  return { from, to, before }
+}
 
 const isChatMode = (mode: string): mode is ChatMode =>
   (CHAT_MODES as readonly string[]).includes(mode)
@@ -561,18 +614,32 @@ export function encodeIntent(id: string, intent: Intent): Command {
         pinned: pinnedToWire(intent.pinned),
         reserved: intent.reserved ?? "",
         base: intent.base ?? "",
+        state: intent.state ?? "",
       })
     case "name":
       return command({ id, kind: "name", text: intent.name })
     case "stop":
     case "carry-on":
       return command({ id, kind: intent.kind, lane: intent.lane })
-    case "archive":
+    case "move-root":
       return command({
         id,
-        kind: "archive",
-        mode: intent.action,
-        targetId: intent.root,
+        kind: "move-root",
+        root: intent.root,
+        text: JSON.stringify({
+          from: intent.from,
+          to: intent.to,
+          before: intent.before,
+        }),
+      })
+    case "workflow":
+      return command({
+        id,
+        kind: "workflow",
+        mode: intent.edit.action,
+        targetId: intent.edit.state ?? "",
+        text: intent.edit.name,
+        parentId: intent.edit.before ?? "",
       })
     case "mark":
       return command({
@@ -648,10 +715,10 @@ function outcomeToWire(id: string, outcome: Outcome): Reply {
       return reply({ id, outcome: "named" })
     case "stopped":
       return reply({ id, outcome: "stopped" })
-    case "archived":
-      return reply({ id, outcome: "archived" })
-    case "restored":
-      return reply({ id, outcome: "restored" })
+    case "moved-root":
+      return reply({ id, outcome: "moved-root" })
+    case "workflow-changed":
+      return reply({ id, outcome: "workflow-changed" })
     case "marked":
       return reply({ id, outcome: "marked" })
     case "retitling":
@@ -716,10 +783,10 @@ export function decodeReply(wire: Reply): Outcome {
       return { kind: "named" }
     case "stopped":
       return { kind: "stopped" }
-    case "archived":
-      return { kind: "archived" }
-    case "restored":
-      return { kind: "restored" }
+    case "moved-root":
+      return { kind: "moved-root" }
+    case "workflow-changed":
+      return { kind: "workflow-changed" }
     case "marked":
       return { kind: "marked" }
     case "retitling":

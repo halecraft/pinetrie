@@ -31,15 +31,7 @@ test("planLoads: every root but the archived ones, a root with no message among 
     ),
   )
   const archive = new Map([
-    [
-      entryId("eb"),
-      {
-        root: entryId("eb"),
-        state: "archived" as const,
-        by: writerId("x@y.z"),
-        at: 1,
-      },
-    ],
+    [rootIdFor("b"), { root: rootIdFor("b"), by: writerId("x@y.z"), at: 1 }],
   ])
   expect(planLoads(roots, archive)).toEqual([rootIdFor("a"), rootIdFor("c")])
   expect(planLoads(roots, new Map())).toEqual([

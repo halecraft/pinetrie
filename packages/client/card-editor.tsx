@@ -647,13 +647,17 @@ export function CardEditor(p: {
       {pins ? null : readOnly !== null ? (
         <div className="read-only">
           <span className="read-only-label">{readOnly.label}</span>
-          <button
-            className="read-only-action"
-            onClick={() => p.onIntent(readOnly.action.intent)}
-            type="button"
-          >
-            {readOnly.action.title}
-          </button>
+          {readOnly.action !== null && (
+            <button
+              className="read-only-action"
+              onClick={() => {
+                if (readOnly.action !== null) p.onIntent(readOnly.action.intent)
+              }}
+              type="button"
+            >
+              {readOnly.action.title}
+            </button>
+          )}
         </div>
       ) : (
         <div className="compose-row">

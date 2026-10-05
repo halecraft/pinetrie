@@ -211,8 +211,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an archived root is unloaded at startup",
     file: "apps/pineta/host/docs.ts",
-    from: '    .filter(r => r.entry === null || archive.get(r.entry)?.state !== "archived")',
-    to: '    .filter(r => r.entry === null || archive.get(r.entry)?.state === "archived")',
+    from: "  return [...roots.keys()].filter(r => !archived.has(r))",
+    to: "  return [...roots.keys()].filter(r => archived.has(r))",
     command: unit,
     expect:
       "planLoads: every root but the archived ones, a root with no message among them (ADR-0063)",
@@ -509,8 +509,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the dispatcher skips the archive gate",
     file: "apps/pineta/host/commands/index.ts",
-    from: "  if (archive.size === 0) return null",
-    to: "  if (archive.size >= 0) return null",
+    from: "  if (archived.size === 0) return null",
+    to: "  if (archived.size >= 0) return null",
     command: unit,
     expect: "a chat in an archived root is refused",
   },
@@ -616,12 +616,12 @@ export const mutations: readonly Mutation[] = [
     expect: "your working copy's paths are stored as the lane sees them",
   },
   {
-    name: "archiving ignores the plan's refusal",
-    file: "apps/pineta/host/commands/archive.ts",
-    from: '  if (planned.kind === "refused") return { kind: "done", outcome: planned }\n',
-    to: '  if (planned.kind === "refused") {\n    await agent.writeValues([setRecord(ARCHIVE, { root: intent.root, state: "archived", by: writer, at: 0 })])\n    return { kind: "done", outcome: planned }\n  }\n',
+    name: "a move into Done ignores the crossing's refusal",
+    file: "apps/pineta/host/commands/board.ts",
+    from: '  if (crossed.kind === "refused") return done(crossed)\n',
+    to: '  if (crossed.kind === "refused") {\n    await deps.agent.writeValues(writes)\n    return done(crossed)\n  }\n',
     command: unit,
-    expect: "a root the agent works in is not archived",
+    expect: "a root the agent works in is not closed",
   },
   {
     name: "stop does nothing",
@@ -1289,28 +1289,31 @@ export const mutations: readonly Mutation[] = [
       "a chat completes while an offer integration is held open on your repo's owner",
   },
   {
-    name: "an archive's teardown holds the documents' keeper",
-    file: "apps/pineta/host/commands/archive.ts",
+    name: "a close's teardown holds the documents' keeper",
+    file: "apps/pineta/host/commands/board.ts",
     from: "  await deps.keeper.track(deps.work.teardown(recorded.teardown))",
     to: "  await deps.keeper.run(() => deps.work.teardown(recorded.teardown))",
     command: unit,
-    expect: "an archive holds the keeper only for its record and its unload",
+    expect:
+      "a move into Done holds the keeper only for its place and its unload",
   },
   {
-    name: "an archive answers before its teardown",
-    file: "apps/pineta/host/commands/archive.ts",
+    name: "a move into Done answers before its teardown",
+    file: "apps/pineta/host/commands/board.ts",
     from: "  await deps.keeper.track(deps.work.teardown(recorded.teardown))",
     to: "  void deps.keeper.track(deps.work.teardown(recorded.teardown))",
     command: unit,
-    expect: "an archive holds the keeper only for its record and its unload",
+    expect:
+      "a move into Done holds the keeper only for its place and its unload",
   },
   {
     name: "an archived root stays loaded",
-    file: "apps/pineta/host/commands/archive.ts",
+    file: "apps/pineta/host/commands/board.ts",
     from: "  if (unload !== null)",
     to: "  if (false)",
     command: unit,
-    expect: "an archive holds the keeper only for its record and its unload",
+    expect:
+      "a move into Done holds the keeper only for its place and its unload",
   },
   {
     name: "an unasked title is written over a mark written meanwhile",
@@ -1332,8 +1335,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an archived root takes a title",
     file: "apps/pineta/host/titles.ts",
-    from: "          archivedIn([root], readRoots(session), readArchive(session)) !== null",
-    to: "          false",
+    from: "        if (archivedIn([root], readArchived(session)) !== null) return",
+    to: "        if (false) return",
     command: unit,
     expect:
       "a reply that is not a title, or a root archived meanwhile, writes nothing",

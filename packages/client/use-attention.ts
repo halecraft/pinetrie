@@ -26,21 +26,21 @@ import {
   arrivals,
   attentionOf,
   doneRoots,
-  highest,
   type Item,
   type Level,
   type Moments,
+  markOf,
   rootStatus,
   type Status,
   threadWriters,
 } from "./attention.ts"
-import { type Layout, untabbed } from "./layout.ts"
+import { type Layout, unlisted } from "./layout.ts"
 
 export interface AttentionView {
   /** Everything raised for you (`attentionOf`). */
   readonly items: readonly Item[]
   readonly status: ReadonlyMap<EntryId, Status>
-  /** The Archive tab's: the highest status of roots with no tab. */
+  /** ▦'s: the highest status of roots not in your list (`markOf`). */
   readonly elsewhere: Level | null
   readonly arrivals: Moments
 }
@@ -114,13 +114,7 @@ export function useAttention(input: {
     [items, input.work, input.verdicts, input.laneRoots],
   )
   const elsewhere = useMemo(
-    () =>
-      highest(
-        untabbed(input.layout, input.archived, status.keys()).map(r => {
-          const s = status.get(r)
-          return s === undefined || s.kind === "working" ? null : s.kind
-        }),
-      ),
+    () => markOf(status, unlisted(input.layout, input.archived, status.keys())),
     [input.layout, input.archived, status],
   )
   return {

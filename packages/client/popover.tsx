@@ -29,9 +29,9 @@ export interface PopoverApi {
   readonly headingId: string | undefined
 }
 
-type Placement =
-  | { readonly top: number; readonly right: number }
-  | { readonly bottom: number; readonly right: number }
+/** Where the box goes: from its trigger's foot or top, and its left or right edge. */
+type Placement = ({ readonly top: number } | { readonly bottom: number }) &
+  ({ readonly right: number } | { readonly left: number })
 
 export function Popover({
   className,
@@ -78,7 +78,10 @@ export function Popover({
   children: (api: PopoverApi) => ReactNode
 }) {
   // Below its trigger; above it when the trigger is in the window's lower
-  // half (a composer's), or the box would open past the window's foot.
+  // half (a composer's, the footer's), or the box would open past the
+  // window's foot. Its right edge at the trigger's; its left edge at the
+  // trigger's when the trigger is in the window's left half (your list's, your
+  // profile's), or the box would open past the window's left.
   const [at, setAt] = useState<Placement | null>(null)
   const open = at !== null
   const wrapper = useRef<HTMLSpanElement>(null)
@@ -91,11 +94,14 @@ export function Popover({
   const show = () => {
     const r = button.current?.getBoundingClientRect()
     if (r === undefined) return
-    const right = window.innerWidth - r.right
+    const side =
+      r.left < window.innerWidth / 2
+        ? { left: r.left }
+        : { right: window.innerWidth - r.right }
     setAt(
       r.bottom > window.innerHeight / 2
-        ? { bottom: window.innerHeight - r.top, right }
-        : { top: r.bottom, right },
+        ? { bottom: window.innerHeight - r.top, ...side }
+        : { top: r.bottom, ...side },
     )
   }
   const close = (refocus: boolean) => {
@@ -169,6 +175,7 @@ export function Popover({
     style: {
       position: "fixed" as const,
       ...("bottom" in at ? { top: "auto" } : {}),
+      ...("left" in at ? { right: "auto" } : {}),
       ...at,
     },
   })

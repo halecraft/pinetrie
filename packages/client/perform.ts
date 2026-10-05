@@ -5,7 +5,7 @@ import type { CardId, EntryId } from "@pineta/core"
 import type { AttentionStore, SessionClient } from "@pineta/session"
 import { afterKeep } from "./card-intents.ts"
 import type { Identity } from "./identity.ts"
-import { afterArchive, type Effect, type Intent } from "./intent.ts"
+import { afterRootMove, type Effect, type Intent } from "./intent.ts"
 import type { LayoutAction } from "./layout.ts"
 
 export interface AppPorts {
@@ -23,6 +23,7 @@ export interface AppPorts {
     | "swapSlots"
     | "undoSwap"
     | "refuse"
+    | "openList"
   >
   /** Your attention document: what "not needed" marks (ADR-0077). */
   readonly attention: Pick<AttentionStore, "dismiss" | "dismissOffer">
@@ -41,8 +42,6 @@ export interface AppPorts {
   readonly reveal: (entry: string) => void
   /** Open an ask's fold (`FoldMemory`). */
   readonly openFold: (ask: string) => void
-  /** Select a root in the Archive tab. */
-  readonly pickArchived: (root: EntryId) => void
   /** The column keyed `key` takes focus when it mounts. */
   readonly arm: (key: string) => void
   readonly identity: {
@@ -67,10 +66,18 @@ function performOne(effect: Effect, ports: AppPorts): void {
     case "offer":
       void ports.session.offer(effect.lane, effect.action, effect.to)
       return
-    case "archive":
+    case "list": {
+      const { openList } = ports.session
+      const { act } = effect
+      if (act.kind === "ensure") openList.ensure(act.root)
+      else if (act.kind === "place") openList.open(act.root, act.before)
+      else openList.close(act.root)
+      return
+    }
+    case "moveRoot":
       void ports.session
-        .request({ kind: "archive", action: effect.action, root: effect.root })
-        .then(outcome => perform(afterArchive(outcome, effect.root), ports))
+        .request(effect.move)
+        .then(outcome => perform(afterRootMove(outcome, effect.moved), ports))
       return
     case "mark":
       void ports.session.mark(effect.root, effect.title)
@@ -125,9 +132,6 @@ function performOne(effect: Effect, ports: AppPorts): void {
       return
     case "openWhenHeld":
       ports.openWhenHeld(effect.entry)
-      return
-    case "pickArchived":
-      ports.pickArchived(effect.root)
       return
     case "armFocus":
       ports.arm(effect.key)

@@ -19,6 +19,7 @@ import {
   follows,
   highest,
   levelOf,
+  markOf,
   needsYouCount,
   rootStatus,
   type Status,
@@ -317,4 +318,23 @@ test("needsYouCount: what needs you, an offer of a thread you follow among it, o
   )
   expect(items).toHaveLength(3)
   expect(needsYouCount(items)).toBe(2)
+})
+
+test("markOf: the highest level among the roots it covers; working raises nothing", () => {
+  const item = (level: "needsYou" | "worthARead") => ({
+    lane: laneNameForThread("m"),
+    root: entryId("r"),
+    end: entryId("e"),
+    level,
+    raised: { kind: "offer" as const, source: "c" },
+  })
+  const status = new Map<EntryId, Status>([
+    [entryId("a"), { kind: "working" }],
+    [entryId("b"), { kind: "worthARead", item: item("worthARead") }],
+    [entryId("c"), { kind: "needsYou", item: item("needsYou") }],
+  ])
+  expect(markOf(status, [entryId("a")])).toBeNull()
+  expect(markOf(status, [entryId("a"), entryId("b")])).toBe("worthARead")
+  expect(markOf(status, [entryId("b"), entryId("c")])).toBe("needsYou")
+  expect(markOf(status, [])).toBeNull()
 })

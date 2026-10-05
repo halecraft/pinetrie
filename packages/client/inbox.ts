@@ -102,7 +102,7 @@ export function markAllSeen(inbox: Inbox, items: readonly InboxItem[]): Inbox {
     : { since: newest, seen: [] }
 }
 
-/** The unseen mentions drawn in the tab you are on: `shown` is its columns' paths. */
+/** The unseen mentions drawn in the root you are on: `shown` is its columns' paths. */
 export function seenOnScreen(
   inbox: Inbox,
   items: readonly InboxItem[],
@@ -114,7 +114,7 @@ export function seenOnScreen(
 }
 
 /**
- * The inbox once the mentions drawn in the tab you are on are seen, or null
+ * The inbox once the mentions drawn in the root you are on are seen, or null
  * when none of them is new: then nothing is written.
  */
 export function seenNow(

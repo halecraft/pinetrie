@@ -267,24 +267,22 @@ export const afterKeep = (
 ): readonly Effect[] => (answer.kind === "accepted" ? close : [])
 
 /**
- * The root an undo of moves acts in: the root of the tab you are on, or the
- * one a new tab minted as it opened (ADR-0066). None in the Archive tab, or
- * a root the directory does not name yet.
+ * The root an undo of moves acts in: the root you are on, or the one a new
+ * tab minted as it opened (ADR-0066). None on nothing, or for a root the
+ * directory does not name yet.
  */
 function rootOfTab(state: IntentState): RootId | null {
   const active = state.layout.active
-  if (active === null || active.kind === "archive") return null
+  if (active === null || active.kind === "nothing") return null
   if (active.kind === "new")
     return (
       state.layout.newTabs.find(c => c.key === active.key)?.fresh?.root ?? null
     )
-  for (const [root, entry] of state.rootEntries)
-    if (entry === active.root) return root
-  return null
+  return state.rootIds.get(active.root) ?? null
 }
 
 /**
- * Undo or redo your newest move in the tab you are on, which the host does
+ * Undo or redo your newest move in the root you are on, which the host does
  * whole or refuses (ADR-0066); with the inventory panel focused, this tab's
  * newest swap.
  */

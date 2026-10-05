@@ -1,5 +1,5 @@
 import {
-  type ArchiveRecord,
+  type ArchivedRoot,
   atEntry,
   cardId,
   commitId,
@@ -13,24 +13,16 @@ import {
   type RevisionRecord,
   ROOT,
   type RootId,
-  type RootRecord,
   rootIdFor,
   snapshotId,
+  workflowStateIdFor,
   writerId,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
-import {
-  ARCHIVE,
-  archivedAt,
-  archivedIn,
-  planArchive,
-  writesIn,
-} from "./archive.ts"
-import { recordsOf, setRecord } from "./records.ts"
+import { archivedIn, planArchive, writesIn } from "./archive.ts"
 
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
-const ADA = writerId("p-ada")
 const BEA = writerId("p-bea")
 
 const entry = (id: string, parentId: string | null): EntryLike => ({
@@ -54,10 +46,7 @@ const index = indexTree(
   ),
 )
 
-const record = (
-  root: string,
-  state: ArchiveRecord["state"] = "archived",
-): ArchiveRecord => ({ root: entryId(root), state, by: BEA, at: 1 })
+const archived = (root: RootId): ArchivedRoot => ({ root, by: BEA, at: 1 })
 
 const lane = (tip: string, over: Partial<LaneView> = {}): LaneView => ({
   name: laneNameForThread(tip),
@@ -73,44 +62,19 @@ const plan = (
   over: Partial<Parameters<typeof planArchive>[0]> = {},
 ): ReturnType<typeof planArchive> =>
   planArchive({
-    action: "archive",
+    crossing: "close",
     root: entryId("r1"),
-    by: ADA,
-    now: 5,
     index,
     lanes: [],
-    archive: new Map(),
     own: [],
     revisions: new Map(),
     ...over,
   })
 
-describe("the record", () => {
-  test("round-trips, and a malformed value is dropped", () => {
-    const r = record("r1")
-    const contents = ARCHIVE.encode(r) as object
-    expect(ARCHIVE.decode(contents, r.root)).toEqual(r)
-    expect(
-      ARCHIVE.decode({ ...contents, state: "gone" }, r.root),
-    ).toBeUndefined()
-    expect(ARCHIVE.decode(contents, "")).toBeUndefined()
-    expect(ARCHIVE.decode("r1", r.root)).toBeUndefined()
-  })
-  test("records are keyed by their root; a bad one is skipped", () => {
-    const map = recordsOf(ARCHIVE, [
-      setRecord(ARCHIVE, record("r1")),
-      { key: "r3", value: { nope: true } },
-      setRecord(ARCHIVE, record("r2", "restored")),
-    ])
-    expect([...map.keys()]).toEqual(["r1", "r2"])
-  })
-})
-
 describe("planArchive", () => {
-  test("writes the record, by the sender, at now", () => {
+  test("a close tears down and unloads", () => {
     expect(plan()).toEqual({
-      kind: "write",
-      record: { root: "r1", state: "archived", by: ADA, at: 5 },
+      kind: "cross",
       teardown: { forget: [], refs: [], snapshots: [] },
       unload: true,
     })
@@ -134,15 +98,11 @@ describe("planArchive", () => {
       message: "cards are queued here",
     })
   })
-  test("work in another root does not stop it, and restoring is never busy", () => {
-    expect(plan({ lanes: [lane("c", { running: true })] }).kind).toBe("write")
+  test("work in another root does not stop it, and reopening is never busy", () => {
+    expect(plan({ lanes: [lane("c", { running: true })] }).kind).toBe("cross")
     expect(
-      plan({
-        action: "restore",
-        lanes: [lane("b", { running: true })],
-        archive: new Map([[entryId("r1"), record("r1")]]),
-      }),
-    ).toMatchObject({ kind: "write", record: { state: "restored" } })
+      plan({ crossing: "reopen", lanes: [lane("b", { running: true })] }),
+    ).toMatchObject({ kind: "cross", unload: false })
   })
   describe("what follows the record, off the documents' keeper (ADR-0065)", () => {
     const [A, B] = [laneNameForThread("la"), laneNameForThread("lb")]
@@ -188,8 +148,7 @@ describe("planArchive", () => {
     test("restore: each lane's ref back at its tip's nearest revision; none without a tip; nothing forgotten or deleted, nor unloaded", () => {
       expect(
         plan({
-          action: "restore",
-          archive: new Map([[entryId("r1"), record("r1")]]),
+          crossing: "reopen",
           own: [
             { lane: A, tip: entryId("b") },
             { lane: B, tip: null },
@@ -205,14 +164,6 @@ describe("planArchive", () => {
         unload: false,
       })
     })
-  })
-  test("the state it already has is unchanged", () => {
-    expect(plan({ archive: new Map([[entryId("r1"), record("r1")]]) })).toEqual(
-      {
-        kind: "unchanged",
-      },
-    )
-    expect(plan({ action: "restore" })).toEqual({ kind: "unchanged" })
   })
 })
 
@@ -240,6 +191,7 @@ describe("writesIn: the root a command writes in (ADR-0063)", () => {
         pinned: [],
         reserved: null,
         base: null,
+        state: null,
       }),
       [TEST_ROOT],
     ],
@@ -259,6 +211,7 @@ describe("writesIn: the root a command writes in (ADR-0063)", () => {
         pinned: [],
         reserved: null,
         base: null,
+        state: null,
       }),
       [],
     ],
@@ -271,8 +224,22 @@ describe("writesIn: the root a command writes in (ADR-0063)", () => {
     ],
     ["a reservation", { kind: "reserve", lane: laneNameForThread("x") }, []],
     [
-      "an archive action",
-      { kind: "archive", action: "archive", root: entryId("r1") },
+      "a move on the board",
+      {
+        kind: "move-root",
+        root: TEST_ROOT,
+        from: workflowStateIdFor("a"),
+        to: workflowStateIdFor("b"),
+        before: null,
+      },
+      [],
+    ],
+    [
+      "a change to the workflow",
+      {
+        kind: "workflow",
+        edit: { action: "add", state: null, name: "Review", before: null },
+      },
       [],
     ],
     [
@@ -379,54 +346,15 @@ describe("writesIn: the root a command writes in (ADR-0063)", () => {
   })
 })
 
-describe("archivedAt", () => {
-  const archive = new Map([
-    [entryId("r1"), record("r1")],
-    [entryId("r2"), record("r2", "restored")],
-    [entryId("o"), record("o")],
-  ])
-  test("an entry in an archived root is refused, by its record", () => {
-    expect(archivedAt(index, archive, entryId("b"))).toEqual(record("r1"))
-  })
-  test("a restored root, a root with no record, and no entry are allowed", () => {
-    expect(archivedAt(index, archive, entryId("c"))).toBeNull()
-    expect(archivedAt(index, new Map(), entryId("b"))).toBeNull()
-    expect(archivedAt(index, archive, null)).toBeNull()
-  })
-  test("an orphan's tree is judged by the orphan's record", () => {
-    expect(archivedAt(index, archive, entryId("d"))).toEqual(record("o"))
-  })
-})
-
-describe("archivedIn: a root's archive record, found by its root entry", () => {
-  const archive = new Map([
-    [entryId("r1"), record("r1")],
-    [entryId("r2"), record("r2", "restored")],
-  ])
-  const dir = (root: RootId, entry: string): [RootId, RootRecord] => [
-    root,
-    {
-      root,
-      entry: entryId(entry),
-      first: entryId(entry),
-      firstLine: entry,
-      title: null,
-      messages: 1,
-      newest: entryId(entry),
-      writers: [],
-      threads: {},
-      mentions: [],
-      images: [],
-    },
-  ]
-  const roots = new Map([dir(TEST_ROOT, "r1"), dir(OTHER_ROOT, "r2")])
-  test("an archived root refuses; a restored one, an unknown one and none do not", () => {
-    expect(archivedIn([TEST_ROOT], roots, archive)).toEqual(record("r1"))
-    expect(archivedIn([OTHER_ROOT, TEST_ROOT], roots, archive)).toEqual(
-      record("r1"),
+describe("archivedIn", () => {
+  const archive = new Map([[TEST_ROOT, archived(TEST_ROOT)]])
+  test("a written root that is archived refuses, by who archived it", () => {
+    expect(archivedIn([OTHER_ROOT, TEST_ROOT], archive)).toEqual(
+      archived(TEST_ROOT),
     )
-    expect(archivedIn([OTHER_ROOT], roots, archive)).toBeNull()
-    expect(archivedIn([rootIdFor("gone")], roots, archive)).toBeNull()
-    expect(archivedIn([], roots, archive)).toBeNull()
+  })
+  test("roots not archived, and none, do not", () => {
+    expect(archivedIn([OTHER_ROOT], archive)).toBeNull()
+    expect(archivedIn([], archive)).toBeNull()
   })
 })

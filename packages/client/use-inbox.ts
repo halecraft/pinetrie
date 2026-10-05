@@ -58,7 +58,7 @@ export function useInbox({
     [attention],
   )
 
-  // A mention drawn in a column of the tab you are on is seen.
+  // A mention drawn in a column of the root you are on is seen.
   useEffect(() => {
     if (inbox === null) return
     const next = seenNow(inbox, items, shown)

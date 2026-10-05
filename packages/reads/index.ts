@@ -20,11 +20,12 @@ import {
   type Above,
   type AgentMessageLike,
   type AgentRun,
-  type ArchiveRecord,
+  type ArchivedRoot,
   agentActivity,
   ancestry,
   type BannerRecord,
   type BaseRecord,
+  type BoardPlace,
   type CardHistoryRecord,
   type CardId,
   type CardRecord,
@@ -62,15 +63,17 @@ import {
   type TraceRecord,
   type TreeIndex,
   type VerdictRecord,
+  type Workflow,
   type WorkSetting,
   type WriterId,
   workFor,
   writersOf,
 } from "@pineta/core"
 import {
-  ARCHIVE,
+  archivedOf,
   BANNER,
   BASE,
+  BOARD,
   CARD_HISTORY,
   COMMANDS,
   COMMANDS_KEY,
@@ -101,6 +104,8 @@ import {
   STOP,
   TRACE,
   VERDICT,
+  WORKFLOW,
+  WORKFLOW_KEY,
 } from "@pineta/rules"
 import {
   type LiveDocHandle,
@@ -526,10 +531,35 @@ export function readPlaces(places: PlacesDocHandle): readonly CardRecord[] {
 /** The places document's `rev`: raised with every write (ADR-0059). */
 export const readPlacesRev = (places: PlacesDocHandle): number => places.rev()
 
-/** Every root's archive record (`pineta.archive`, ADR-0029), keyed by root. */
-export const readArchive = (
+/** The session's workflow (`pineta.workflow`, ADR-0085), or null before a host wrote it. */
+export const readWorkflow = (doc: SessionDocHandle): Workflow | null =>
+  readRecords(doc, WORKFLOW).get(WORKFLOW_KEY) ?? null
+
+/** Each root's place on the board (`pineta.board`, ADR-0085), by its id. */
+export const readBoardPlaces = (
   doc: SessionDocHandle,
-): ReadonlyMap<EntryId, ArchiveRecord> => readRecords(doc, ARCHIVE)
+): ReadonlyMap<RootId, BoardPlace> => readRecords(doc, BOARD)
+
+/**
+ * The roots in the closed workflow state, archived (ADR-0029, ADR-0085), by
+ * id; none before a host wrote the workflow. The same map while the same
+ * roots are archived by the same writers at the same times: every write to
+ * the session's values wakes it, the directory's included.
+ */
+export const readArchived = keptWhileSame(
+  (doc: SessionDocHandle): ReadonlyMap<RootId, ArchivedRoot> => {
+    const workflow = readWorkflow(doc)
+    return workflow === null
+      ? new Map()
+      : archivedOf(workflow, readBoardPlaces(doc))
+  },
+  (a, b) =>
+    a.size === b.size &&
+    [...a].every(([k, v]) => {
+      const w = b.get(k)
+      return w !== undefined && w.by === v.by && w.at === v.at
+    }),
+)
 
 /** Every entry's mark (`pineta.mark`, ADR-0045), keyed by entry: a root's titles its tab. */
 export const readMarks = (

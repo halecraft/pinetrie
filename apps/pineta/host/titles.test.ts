@@ -3,12 +3,13 @@ import {
   laneNameForThread,
   ROOT,
   THE_AGENT,
+  workflowStateIdFor,
   writerId,
 } from "@pineta/core"
 import { createKeeper } from "@pineta/keeper"
 import type { Agent } from "@pineta/pi"
 import { readMarks } from "@pineta/reads"
-import { ARCHIVE, MARK, setRecord } from "@pineta/rules"
+import { BOARD, MARK, setRecord, WORKFLOW } from "@pineta/rules"
 import { writeEntry } from "@pineta/schema"
 import { expect, test } from "vitest"
 import {
@@ -122,6 +123,8 @@ test("asked, with no message yet: refused, and nothing asked", async () => {
   expect(agent.calls).toEqual([])
 })
 
+const DONE = workflowStateIdFor("x")
+
 test("a reply that is not a title, or a root archived meanwhile, writes nothing", async () => {
   const wordy = setUp({ reply: "Here is a title for the thread: Rail" })
   writeEntry(wordy.b.root, row(E1, null))
@@ -136,7 +139,14 @@ test("a reply that is not a title, or a root archived meanwhile, writes nothing"
   await archived.keeper.run(() => archived.titles.asked(ROOT_ID, ADA))
   putValue(
     archived.b,
-    setRecord(ARCHIVE, { root: E1, state: "archived", by: ADA, at: 1 }),
+    setRecord(BOARD, { root: ROOT_ID, state: DONE, rank: "a", by: ADA, at: 1 }),
+  )
+  putValue(
+    archived.b,
+    setRecord(WORKFLOW, {
+      open: [{ id: workflowStateIdFor("d"), name: "Doing" }],
+      closed: { id: DONE, name: "Done" },
+    }),
   )
   archived.reply.resolve("Rail layout")
   await archived.keeper.idle()

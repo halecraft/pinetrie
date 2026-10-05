@@ -56,9 +56,9 @@ const freshF1 = {
 const onR1: Layout = resolveLayout(
   layoutReducer(initialLayout(), {
     kind: "show",
-    tab: { kind: "root", root: R1 },
+    here: { kind: "root", root: R1 },
   }),
-  { index, lanes: [], archive: new Map() },
+  { index, lanes: [], archived: new Set(), list: [R1] },
 )
 const withFresh: Layout = layoutReducer(onR1, {
   kind: "columns",
@@ -94,10 +94,10 @@ const state = (
 ): IntentState => ({
   layout,
   index,
-  archive: new Map(),
   asks: indexAsks(index),
   cards: facts(cards),
   rootEntries: new Map([[TEST_ROOT, R1]]),
+  rootIds: new Map([[R1, TEST_ROOT]]),
 })
 const plan = (intent: Intent, s: IntentState) =>
   planIntent(intent, s, "new-k", NEW_ROOT)
@@ -341,15 +341,13 @@ describe("undo and redo of moves (ADR-0066)", () => {
     ])
   })
 
-  test("in the Archive tab, or a root the directory does not name: nothing", () => {
-    const archiveTab = layoutReducer(onR1, {
+  test("on nothing, or a root the directory does not name: nothing", () => {
+    const nothing = layoutReducer(onR1, {
       kind: "show",
-      tab: { kind: "archive" },
+      here: { kind: "nothing" },
     })
-    expect(plan(undo, state({}, archiveTab))).toEqual([])
-    expect(plan(undo, { ...state({}, onR1), rootEntries: new Map() })).toEqual(
-      [],
-    )
+    expect(plan(undo, state({}, nothing))).toEqual([])
+    expect(plan(undo, { ...state({}, onR1), rootIds: new Map() })).toEqual([])
   })
 })
 
@@ -375,7 +373,7 @@ describe("afterUndo: what an undo's answer brings into view (ADR-0052)", () => {
     ).toEqual([{ kind: "showInventory", brief: false }])
   })
 
-  test("back in a fresh column the layout holds: that column's tab, once for a keep's cards", () => {
+  test("back in a fresh column the layout holds: its root shown, once for a keep's cards", () => {
     expect(
       answered(
         {
@@ -390,19 +388,21 @@ describe("afterUndo: what an undo's answer brings into view (ADR-0052)", () => {
     ).toEqual([
       {
         kind: "layout",
-        action: { kind: "show", tab: { kind: "root", root: R1 } },
+        action: { kind: "show", here: { kind: "root", root: R1 } },
       },
+      { kind: "list", act: { kind: "ensure", root: TEST_ROOT } },
     ])
   })
 
-  test("back in a fresh column it no longer holds: opened again at the end of its root's tab", () => {
+  test("back in a fresh column it no longer holds: opened again at the end of its root's columns", () => {
     expect(
       answered({ kind: "undone", cards: [{ card: C1, place: freshF1 }] }),
     ).toEqual([
       {
         kind: "layout",
-        action: { kind: "show", tab: { kind: "root", root: R1 } },
+        action: { kind: "show", here: { kind: "root", root: R1 } },
       },
+      { kind: "list", act: { kind: "ensure", root: TEST_ROOT } },
       {
         kind: "layout",
         action: {

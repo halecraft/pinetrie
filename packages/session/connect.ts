@@ -50,7 +50,13 @@ import {
   SESSION_DOC_ID,
 } from "@pineta/protocol/messages"
 import { personDocId, writersPolicy } from "@pineta/protocol/writers"
-import { readOffers, readPlaces, readPlacesRev, readRoots } from "@pineta/reads"
+import {
+  readArchived,
+  readOffers,
+  readPlaces,
+  readPlacesRev,
+  readRoots,
+} from "@pineta/reads"
 import { offerSeen } from "@pineta/rules"
 import {
   asSessionDoc,
@@ -97,10 +103,11 @@ import {
   stampSeen,
 } from "./card-moves.ts"
 import { cardTexts } from "./card-texts.ts"
-import { type ChatHow, planChatRequest } from "./chat.ts"
+import { type ChatHow, planChatRequest, startsRoot } from "./chat.ts"
 import { hostLine } from "./host-line.ts"
 import { heldBy, type Slots, swapWrites } from "./inventory.ts"
 import { inventorySlots } from "./inventory-slots.ts"
+import { type OpenList, openList } from "./open-list.ts"
 import { presenceSeat } from "./presence-seat.ts"
 import { NO_ROOT, rootDocs } from "./root-docs.ts"
 import { type Readable, readable, select, snapshotStore } from "./store.ts"
@@ -272,6 +279,12 @@ export interface SessionClient {
    */
   readonly attention: AttentionStore
   /**
+   * Your list: the roots you have open, in your order, on every device of
+   * yours (ADR-0085). A root moved to the closed state leaves it, but the one
+   * the page reports it shows (`here`).
+   */
+  readonly openList: OpenList
+  /**
    * Title the entry `entry`, or clear its title with null (ADR-0045), in
    * the held root that has it.
    */
@@ -387,6 +400,11 @@ export async function connectSession(
       ? startOf(readRoots(session).values())
       : null,
   )
+  const open = openList(exchange, me, host.peerId, () => {
+    const archived = readArchived(session)
+    return new Set(archived.keys())
+  })
+  const unsubscribeSession = subscribe(session, () => open.repair())
   const step = (event: LocalEvent) => {
     local.set(localStep(local.current(), event, me))
     inventory.repair()
@@ -527,6 +545,7 @@ export async function connectSession(
     moves,
     slots: inventory.slots,
     attention,
+    openList: open,
     cardText: texts.text,
     undoFor(id) {
       const docs = [cardDocId(id)]
@@ -559,7 +578,11 @@ export async function connectSession(
         plan.pending === null
           ? line.request(plan.intent, plan.id)
           : tracked(plan.intent, [plan.pending], null)
-      return sent.then(r => r.outcome)
+      return sent.then(({ outcome }) => {
+        // A root you start is in your list (ADR-0085).
+        if (startsRoot(at, outcome)) open.ensure(root)
+        return outcome
+      })
     },
     request: send,
     mark: (entry, title) =>
@@ -652,6 +675,8 @@ export async function connectSession(
         unsubscribePeers,
         inventory.dispose,
         attention.dispose,
+        open.dispose,
+        unsubscribeSession,
         texts.dispose,
         () => undo.dispose(),
         () => swaps.dispose(),

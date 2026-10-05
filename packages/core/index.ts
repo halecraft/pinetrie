@@ -147,6 +147,24 @@ export const isRootId = (s: string): s is RootId =>
 export const parseNewRoot = (s: string): RootId | undefined =>
   NEW_ROOT.test(s) ? (s as RootId) : undefined
 
+declare const workflowStateIdBrand: unique symbol
+/**
+ * A workflow state's id (ADR-0085): `w-` and an id the host mints as the
+ * state is added. A state is named apart from its id, so a rename keeps
+ * every root's place.
+ */
+export type WorkflowStateId = string & { readonly [workflowStateIdBrand]: true }
+
+const STATE_PREFIX = "w-"
+
+/** A new workflow state's id, from a fresh id. */
+export const workflowStateIdFor = (id: string): WorkflowStateId =>
+  `${STATE_PREFIX}${id}` as WorkflowStateId
+
+/** Whether text names a workflow state: the check wherever one is read. */
+export const isWorkflowStateId = (s: string): s is WorkflowStateId =>
+  s.startsWith(STATE_PREFIX) && s.length > STATE_PREFIX.length
+
 const ROOT_DOC_PREFIX = "root:"
 
 /** The id of a root's document, which holds its pi storage (ADR-0063). */
@@ -258,10 +276,28 @@ export const ERR = {
   NO_ANCHOR: "no_anchor",
   /** A display name is empty or too long. */
   INVALID_NAME: "invalid_name",
-  /** A write in a root someone archived (ADR-0029). The message names them. */
+  /**
+   * A write in a root in the closed workflow state (ADR-0029, ADR-0085). The
+   * message names who moved it there.
+   */
   ARCHIVED: "archived",
-  /** Archiving a root where the agent is working or cards are queued. */
+  /** Moving a root into the closed state while its agent works or cards are queued. */
   ROOT_BUSY: "root_busy",
+  /**
+   * Moving a root from a state it has left (ADR-0085). The message names who
+   * moved it, and where.
+   */
+  ROOT_MOVED: "root_moved",
+  /** A workflow state the session's workflow does not hold (ADR-0085). */
+  UNKNOWN_STATE: "unknown_state",
+  /** Removing a workflow state that still holds a root (ADR-0085). */
+  STATE_NOT_EMPTY: "state_not_empty",
+  /** Moving or removing the closed workflow state (ADR-0085). */
+  STATE_CLOSED: "state_closed",
+  /** A workflow state named with nothing but spaces (ADR-0085). */
+  EMPTY_NAME: "empty_name",
+  /** Removing the only open workflow state: a new root needs one to land in. */
+  LAST_STATE: "last_state",
   /** A lane pi holds an operation open on: after a crash, until it resumes. */
   BUSY: "busy",
   /** Landing a lane that has no copy of its own: it works directly. */
@@ -432,6 +468,11 @@ export type Intent =
        * line (ADR-0060). Read only when the message creates a lane.
        */
       readonly base: string | null
+      /**
+       * The workflow state a root this message starts lands in, at its end;
+       * null for the first open state (ADR-0085). Read only when it starts one.
+       */
+      readonly state: WorkflowStateId | null
     }
   /** Name a thread before its lane exists (ADR-0057). */
   | { readonly kind: "reserve"; readonly lane: LaneName }
@@ -441,12 +482,20 @@ export type Intent =
   | { readonly kind: "stop"; readonly lane: LaneName }
   /** Start a new turn on a thread whose last ask was stopped (ADR-0082). */
   | { readonly kind: "carry-on"; readonly lane: LaneName }
-  /** Hide a root for everyone, or bring it back (ADR-0029). */
+  /**
+   * Move a root on the board (ADR-0085): from the state its sender saw it in,
+   * to `to`, before `before` there, or at its end. Into the closed state it
+   * archives the root, and out of it restores the root.
+   */
   | {
-      readonly kind: "archive"
-      readonly action: ArchiveAction
-      readonly root: EntryId
+      readonly kind: "move-root"
+      readonly root: RootId
+      readonly from: WorkflowStateId
+      readonly to: WorkflowStateId
+      readonly before: RootId | null
     }
+  /** Change the session's workflow states (ADR-0085). */
+  | { readonly kind: "workflow"; readonly edit: WorkflowEdit }
   /** Title an entry, or clear its title with null (ADR-0045). */
   | {
       readonly kind: "mark"
@@ -522,27 +571,72 @@ export const LINE_ACTIONS: readonly LineAction[] = [
   "publish",
 ]
 
-// --- the archive (ADR-0029) --------------------------------------------------
+// --- the board (ADR-0085) ---------------------------------------------------
 
-export type ArchiveAction = "archive" | "restore"
-export const ARCHIVE_ACTIONS: readonly ArchiveAction[] = ["archive", "restore"]
+/** A workflow state: a column of the board. */
+export interface WorkflowState {
+  readonly id: WorkflowStateId
+  readonly name: string
+}
 
 /**
- * A root's archive record: a host-written `pineta.archive` value keyed by the
- * root's entry id. Archiving deletes nothing; a restored root keeps its record.
+ * The session's workflow: a host-written `pineta.workflow` singleton. The
+ * open states in board order, then the one closed state, which is always
+ * there and always last: a root in it is archived (ADR-0029).
  */
-export interface ArchiveRecord {
-  readonly root: EntryId
-  readonly state: "archived" | "restored"
+export interface Workflow {
+  readonly open: readonly WorkflowState[]
+  readonly closed: WorkflowState
+}
+
+/**
+ * A change to the workflow. `state` names the state acted on (null to add
+ * one); `name` is the new name (add, rename); `before` is where a moved or
+ * added open state goes, null for after every open state.
+ */
+export interface WorkflowEdit {
+  readonly action: WorkflowAction
+  readonly state: WorkflowStateId | null
+  readonly name: string
+  readonly before: WorkflowStateId | null
+}
+export type WorkflowAction = "add" | "rename" | "move" | "remove"
+export const WORKFLOW_ACTIONS: readonly WorkflowAction[] = [
+  "add",
+  "rename",
+  "move",
+  "remove",
+]
+
+/**
+ * A root's place on the board: a host-written `pineta.board` value keyed by
+ * its `RootId`. A root has one, written as it starts and as it moves.
+ */
+export interface BoardPlace {
+  readonly root: RootId
+  readonly state: WorkflowStateId
+  /** Its order within the state: an order key (S69). */
+  readonly rank: string
+  /** Who moved it there, and when, in ms since the epoch. */
   readonly by: WriterId
-  /** When it last changed, in ms since the epoch. */
+  readonly at: number
+}
+
+/**
+ * A root in the closed state, derived from its place and never stored: who
+ * moved it there, and when. Its readers ask only whether a root is archived,
+ * and by whom.
+ */
+export interface ArchivedRoot {
+  readonly root: RootId
+  readonly by: WriterId
   readonly at: number
 }
 
 // --- the directory of roots (ADR-0063) --------------------------------------
 
 /**
- * A root as the tabs, the Archive tab, the inbox and the header see it,
+ * A root as your list, the board, the inbox and the activity menu see it,
  * without its document: a host-written `pineta.root` value in the session,
  * keyed by the root's id, refreshed whenever the root's document changes.
  */

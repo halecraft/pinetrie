@@ -1,4 +1,4 @@
-# Interface: a tab per root, columns for reading, a rail for shape
+# Interface: your list down the left, columns for reading, a rail for shape, a board for everyone
 
 The backend can now hold a conversation as a tree, with people and an agent in
 it (ADR-0018). The first interface drew that tree as a chat list: one path, with
@@ -22,7 +22,8 @@ This document fixes the design before any code. It draws E and T directly.
    one level. Pineta needs it at any depth.
 3. **No thread is special.** The data has no "main thread"; the interface should
    not invent one. Whatever you put first is what reads as the trunk. Roots
-   are peers too: you open the ones you work in, as tabs (ADR-0030).
+   are peers too: you open the ones you work in, in your list (ADR-0030,
+   ADR-0085).
 4. **Show context, don't describe it.** What the agent will read is a path: the
    column shows it, and marks where the agent joined.
 5. **Say the effect, not a mode name.** "send to agent" says what
@@ -34,53 +35,122 @@ This document fixes the design before any code. It draws E and T directly.
 ## Layout
 
 ```
- Archive ┌ Fix the sync bug ◉ ⋯ × ┐ Release notes ·Bea  Q3 planning  ＋ agent ▾  (B)(C) (✦ 2) (A)
-━━━━━━━━━┛                        ┗━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-┌ rail ┐┌ column 1 ──────────────┐┌ column 2 ─────────────┐┌ column 3 ──────────┐
-│ ●    ││ Ada                    ││▌from Ada: "Say…" (blue)││▌from agent (green)  │
-│ │    ││ Say exactly: OK  ●blue ││ Bea                   ││ Ada                │
-│ ├──● ││ agent: OK              ││ an aside              ││ aside of aside     │
-│ │  │ ││ Ada                    ││ agent: …      ●green  ││ agent: …           │
-│ │  ● ││ just a note            ││ Bea                   ││                    │
-│ ●    ││ Ada: @Bea have a look →││   what about X?       ││   agent: …         │
-│ ◉    ││ Ada: @agent … ◉replying││                       ││                    │
-│      ││ ┌──────────────────────┐││ ┌───────────────────┐││ ┌────────────────┐ │
-│      ││ │ send to agent…  send │││ │ reply in thread…  │││ │ …              │ │
-│      ││ └──────────────────────┘││ └───────────────────┘││ └────────────────┘ │
-└──────┘└────────────────────────┘└───────────────────────┘└────────────────────┘
+┌ your list ───┐┌ rail ┐┌ column 1 ──────────────┐┌ column 2 ─────────────┐
+│▎Fix the sync ││ ●    ││ Ada                    ││▌from Ada: "Say…" (blue)│
+│▎bug ◉ (B)    ││ │    ││ Say exactly: OK  ●blue ││ Bea                   │
+│ Release notes││ ├──● ││ agent: OK              ││ an aside              │
+│ Q3 planning ·││ │  │ ││ Ada                    ││ agent: …      ●green  │
+│              ││ │  ● ││ Ada: @Bea have a look →││ Bea                   │
+│ ＋ agent ▾   ││ ◉    ││ Ada: @agent … ◉replying││   what about X?       │
+│              ││      ││ ┌──────────────────────┐││ ┌───────────────────┐ │
+│              ││      ││ │ send to agent…  send │││ │ reply in thread…  │ │
+│              ││      ││ └──────────────────────┘││ └───────────────────┘ │
+├──────────────┤└──────┘└────────────────────────┘└───────────────────────┘
+│ (A) inventory│ ▦ Board · Backlog 3 · Doing 3 (B)(C) · Done 41    ✦2  ◆ project
+└──────────────┴──────────────────────────────────────────────────────────────
 ```
 
-### The header: your tabs, who is here, and what needs you (ADR-0030, ADR-0069, ADR-0077, ADR-0081)
+There is no header: the columns start at the top of the window. The page's
+one row of chrome is the footer, and it splits where your list's edge does:
+under your list, what is yours; to the right, what is everyone's (ADR-0085).
 
-The header is one row: your tabs on the left (below), and at its right end
-what is happening in the rest of the session, from live data only, as a
-document editor shows the people in it. Too narrow for both, the right end
-goes on a row above the tabs. It is darker than the page, and the tab you
-are on is the page's colour and opens into it, so the columns below read as
-that tab's. While the page syncs, "syncing…" leads the right end.
+### Your list: the roots you have open (ADR-0030, ADR-0045, ADR-0077, ADR-0085)
 
-- **People here:** an avatar per person with a live presence entry, in their
-  colour. Hovering names them and the thread they are in; a click opens that
-  thread as your tab, with a column on their path. You are never shown among
-  them.
+Down the left edge: the roots you have open, in your order, then new tabs,
+then ＋. It is darker than the page, and the root you are on is the page's
+colour, with a light edge on its left, and opens into the rail and columns
+beside it (ADR-0081, turned sideways).
+
+- **The root you are on shows one root's tree**: its rail, and its columns.
+  Every column there shares the root.
+- **Your list is yours, on every device of yours**: your own document, which
+  only your tabs write. Top to bottom is your order. Opening a root adds it at
+  the bottom; drag an item, or its `⋯`'s **Move up** and **Move down**, to
+  reorder. **×** closes a root for you and writes nothing shared; opening it
+  again brings its columns back. A root you start joins your list; a root
+  someone else starts does not, and reaches you through the board, a
+  mention, or the activity menu.
+- **An item's label** is the root's title, else its first message's first
+  line, wrapped to two lines before it is cut; a root only people have
+  written in, untitled, is **Chat**. When the agent is first asked in a root
+  with no title, a model titles it in one to three words (ADR-0074).
+  **Rename** in the item's `⋯` turns the label into a field: Enter or
+  leaving it saves the title for everyone, Escape cancels, and an empty title
+  brings back the first line. **Auto-update title**, beside it, asks the
+  model again from what was said in the thread, and replaces the title for
+  everyone. A title is a mark on the root (ADR-0045), and names the root
+  wherever it is shown: your list, the board, the activity menu, the inbox.
+- **An item shows what happens in its root while you are elsewhere**
+  (ADR-0077), before its label: a still blue ring while the agent works
+  there or is finishing its summary, which needs nothing from you; a filled
+  amber dot when something there needs you, which pulses three times as it
+  arrives and then stays still; a dim amber dot when something is worth a
+  read; and, when a run you follow ends with nothing to do, a ✓ that fades.
+  Its title says why ("needs you: asks whether to drop the v1 table").
+  Reading the thread to its end, on any device of yours, clears it; work
+  ready to add clears when it is added, or with **Not needed** in the item's
+  `⋯`. A page that loads draws every mark still: only a change you see
+  moves. After the label, small avatars of the others reading there, and a
+  small dot in your colour when the root holds something you typed and have
+  not sent.
+- **Move to ▸** in an item's `⋯` moves the root on the board, for everyone
+  (below). Moved to the closed state, it is archived: the item says so
+  ("archive: read-only for everyone until moved out"), is disabled while
+  the agent works in that root or cards are queued there, with the reason,
+  and names the threads whose offers it withdraws from your repo ("work not
+  added to the project goes: amber-fox"); moving it out builds them again
+  (ADR-0061). **×** is for putting a root away yourself.
+- **Archiving closes it for you** once the host accepts it, as **×** does,
+  showing its neighbour below, else above, else nothing.
+- **If someone else archives the root you are on**, it stays while you are
+  there, read-only, saying who archived it, with **Restore**. It leaves your
+  list when you switch away.
+- **`⋯` and ×** show while an item is hovered or focused, the one you are on
+  too, over the label's end.
+- **＋ agent**, at the foot of your list, is a split button with
+  **conversation** in its menu: a conversation at the root is the rarer
+  start, so it is the one behind the menu. What each does is under
+  "Starting" below. A board column has its own ＋, which lands the new root
+  in that column's state.
+
+### The footer: you, the board, and what needs you (ADR-0069, ADR-0077, ADR-0085)
+
+One row along the bottom. Its own cell, under your list and as wide, is
+yours: your avatar and your inventory. To the right is everyone's, from
+live data only: the board's strip, then what needs you and the project.
+While the page syncs, "syncing…" leads its right end.
+
+- **You:** your avatar opens your profile (ADR-0037): your name, and the
+  handle it gives you as you type it; your email; and **Not you? Sign in as
+  someone else**, which forgets who this device says you are and asks
+  again. A rename is sent on Enter or **save**, and Escape or a click
+  elsewhere discards it. A name no mention could reach is refused before it
+  is sent.
+- **Your inventory** (below), beside you.
+- **The board's strip**: ▦ **Board**, then each workflow state's name and
+  count, avatars of the people reading in its roots, and an amber dot when a
+  root there needs you. ▦ carries the highest mark of the roots not in your
+  list, and a dot in your colour when one of them holds something you typed;
+  its title is the session's message count, "2 in the threads this tab has
+  loaded, of 4 in the session": the messages in the roots this browser tab
+  holds, of every root's.
 - **Activity** (ADR-0069, ADR-0077): one menu of what needs you, its
   trigger a ✦. Its amber badge counts what the threads you follow need from
   you (a run that ended asking something, failing, or that no one could
   tell; work ready to add) plus the mentions you have not seen; the page's
-  title carries the same count, before the tab you are on: "(2) Fix the
-  sync bug · Pineta". While the agent works, a
-  steady count of its threads stands beside the ✦, never in the badge. Its
-  sections, each shown only with rows: **Needs you** (each thread's reason,
-  in amber), **Ready to add** (every thread with an open offer, those you
-  follow marked and counted), **Worth a read** (listed, not counted),
-  **Mentions of you** (the inbox, below; shown once anyone has mentioned
-  you) and **The agent is working in** (its threads in every root). Each
-  row opens its thread; under each of yours, **not needed** clears it on
-  every device of yours, until the next run's end or new work. You follow
-  a thread once you have written on it; threads you do not follow raise
-  nothing for you. With nothing in it, the menu is not shown. Nothing in
-  the header animates: the tab, the column and the rail show where the
-  agent works.
+  title carries the same count, before the root you are on: "(2) Fix the
+  sync bug · Pineta". While the agent works, a steady count of its threads
+  stands beside the ✦, never in the badge. Its sections, each shown only
+  with rows: **Needs you** (each thread's reason, in amber), **Ready to
+  add** (every thread with an open offer, those you follow marked and
+  counted), **Worth a read** (listed, not counted), **Mentions of you**
+  (the inbox, below; shown once anyone has mentioned you) and **The agent
+  is working in** (its threads in every root). Each row opens its thread;
+  under each of yours, **not needed** clears it on every device of yours,
+  until the next run's end or new work. You follow a thread once you have
+  written on it; threads you do not follow raise nothing for you. With
+  nothing in it, the menu is not shown. Nothing in the footer animates:
+  your list, the column and the rail show where the agent works.
 - **The project** (ADR-0060, ADR-0061, ADR-0076): a menu for the
   integration line, "◆ project", where finished work is added; its
   bookmark is in its title. While the project has commits not yet on `main`
@@ -105,7 +175,7 @@ that tab's. While the page syncs, "syncing…" leads the right end.
     files it changes, that your work stays on top, and the jj command that
     shows the diff); **add my work to the project (N commits)**, which moves
     the line forward to your `@-`; and, when your files have conflicts,
-    **resolve with the agent**, which opens a new agent tab working in your
+    **resolve with the agent**, which opens a new agent thread working in your
     files, its box holding the `resolve-conflicts` skill and the files, for
     you to send. With no commit in common with the project, it says to
     rebase in jj.
@@ -115,120 +185,66 @@ that tab's. While the page syncs, "syncing…" leads the right end.
   "publishing the project…") and offers nothing else; refused, it says "not
   done:" and why; failed, "it failed, and may be part done:" and why. That
   stays, menu closed or open, until your next command there.
-- **A menu you opened stays open until you close it.** The header's avatars
-  and counts come from live data, but when what one stands for goes while
-  its menu is open (a person leaves, the agent finishes, the last offer is
-  integrated), the menu says so ("The agent has finished") and its trigger stays
-  until you close it (principle 6).
-- **The inbox**, activity's mentions: the messages that mention you, newest first, each
-  with who, the thread, and the start of the message. A row opens that thread
-  as your tab, with a column on the message; a message in an archived root
-  opens that root's preview in the Archive tab. The badge counts the mentions you
-  have not seen. One is seen when you open it from the inbox, when it is drawn
-  in a column of the tab you are on, or when you **mark all seen**. A seen
-  mention stays in the inbox; a filter shows only the unseen.
+- **A menu you opened stays open until you close it.** The footer's and the
+  board's avatars and counts come from live data, but when what one stands
+  for goes while its menu is open (a person leaves, the agent finishes, the
+  last offer is integrated), the menu says so ("The agent has finished") and
+  its trigger stays until you close it (principle 6).
+- **The inbox**, activity's mentions: the messages that mention you, newest
+  first, each with who, the thread, and the start of the message. A row
+  opens that thread in your list, with a column on the message, archived or
+  not. The badge counts the mentions you have not seen. One is seen when you
+  open it from the inbox, when it is drawn in a column of the root you are
+  on, or when you **mark all seen**. A seen mention stays in the inbox; a
+  filter shows only the unseen.
 - **The inbox is yours**, the same on every device of yours (ADR-0077). You
   start from your first load, with no backlog.
-- **Your inventory** (below) and **you**, at the far right, apart from the
-  rest.
-- **You:** your avatar, last, opens your profile (ADR-0037): your
-  name, and the handle it gives you as you type it; your email; and **Not
-  you? Sign in as someone else**, which forgets who this device says you are
-  and asks again. A rename is sent on Enter or **save**, and Escape or a click
-  elsewhere discards it. A name no mention could reach is refused before it
-  is sent.
-- **Nothing opens a tab by itself.** A mention is a notification: you choose to
-  open it.
+- **Nothing opens a root by itself.** A mention is a notification: you
+  choose to open it.
 
-### Root tabs: the roots you have open (ADR-0029, ADR-0030, ADR-0045, ADR-0077)
+### The board: where everyone's work stands (ADR-0085)
 
-A conversation's context is its path to its root, so nothing in one root is
-ever in the context of another. That is where the screen splits.
+▦, or a state in the strip, opens the board over the columns, from the
+footer's edge: it moves none of them. ▦ again, or Escape, closes it, and so
+does choosing something to work in. Whether it is open is this browser
+tab's; with nothing in your list and nothing you are on, it opens by itself.
 
-- **A root tab shows one root's tree**: its rail, and its columns. Every column
-  in a tab shares the root.
-- **Your tabs are yours:** the roots you have open, in the order you opened
-  them. **×** closes one for you and writes nothing; opening it again brings
-  its columns back. A root you start opens as your tab; a root someone else
-  starts does not, and reaches you through the header, a mention, or the
-  Archive tab.
-- **A tab's label** is its title, else its first message's first line, cut
-  short; a root only people have written in, untitled, is **Chat**. When the
-  agent is first asked in a root with no title, a model titles it in one to
-  three words (ADR-0074). **Rename** in the tab's `⋯` turns the label into a
-  field: Enter or leaving it saves the title for everyone, Escape cancels,
-  and an empty title brings back the first line. **Auto-update title**, beside
-  it, asks the model again from what was said in the thread, and replaces the
-  title for everyone. A title is a mark on the root (ADR-0045), and names the
-  root wherever it is shown: the header, the inbox, the Archive tab.
-- **A tab shows what happens in it while you are elsewhere** (ADR-0077),
-  before its label: a still blue ring while the agent works there or is
-  finishing its summary, which needs nothing from you; a filled amber dot
-  when something there needs you, which pulses three times as it arrives
-  and then stays still; a dim amber dot when something is worth a read; and,
-  when a run you follow ends with nothing to do, a ✓ that fades. Its title
-  says why ("needs you: asks whether to drop the v1 table"). Reading the
-  thread to its end, on any device of yours, clears it; work ready to add
-  clears when it is added, or with **Not needed** in the tab's `⋯`. A page
-  that loads draws every mark still: only a change you see moves. The
-  Archive tab carries the highest mark of the roots with no tab of yours.
-  After the label, small avatars of the others reading there, and a small
-  dot in your colour when the tab holds something you typed and have not
-  sent. For the roots you have not opened, the header shows the same.
-- **Archive is in a tab's `⋯` menu**, saying what it does: "hide for
-  everyone; restore from Archive". The `⋯` shows on the tab you are on, and on
-  any other root tab while it is hovered or focused. Archive is for work that
-  is done; **×** is for putting a tab away yourself. The Archive item is
-  disabled while the agent works in that root or cards are queued there, with
-  the reason. Archiving
-  writes a record, and takes the root out of every tab bar; no message
-  changes. It withdraws the root's threads' offers from your repo, and the
-  item names them first ("work not added to the project goes: amber-fox");
-  restoring builds them again (ADR-0061).
-- **Archiving closes the tab for you** once the host accepts it, as **×**
-  does, showing its right neighbour, else its left; a refusal leaves it open.
-- **If someone else archives the tab you are on**, it stays while you are there,
-  read-only, saying who archived it, with **Restore**. It leaves the bar when
-  you switch away.
-- **The tab you are on** has no edge below it and a light one above, and its
-  label is bright and bold, shown up to 32rem. The other tabs have no box
-  until hovered, and their labels keep their colour; their ⋯ and × show over
-  the label's end on hover.
-- **With many tabs**, the other tabs shrink to a floor, then the bar
-  scrolls; Archive and ＋ stay put, and the tab you choose scrolls into view.
-
-### The Archive tab
-
-The leftmost tab. It finds roots, so it is a list, not a rail with columns.
-
-- **A row per root, open or archived:** its label, last activity, who wrote in
-  it, its messages, and its state. Filters: archived, open, mine.
-  Search over each root's label, so its title, and its message text.
-- **Selecting a row previews it:** that root's rail, and one read-only column
-  that a pick on the rail moves. Its composer is disabled, and none of the tools that
-  write are there: edit, branch, mark. Copy stays, since it writes nothing. In place of sending it offers
-  **Restore** for an archived root, and **Open** for an open one. Taking a
-  copy of a message into your inventory is not offered here yet, though it
-  writes nothing in the root; it is offered wherever you can write.
-- **Messages, M of N** heads the list, and is the Archive tab's tooltip on
-  every tab: M is the messages in the threads this browser tab has loaded
-  (your open tabs, and the Archive tab's preview), N every thread's,
-  archived or not. Opening or closing a tab moves M; archiving a thread
-  moves neither, unless its tab was open.
-- **Restore** opens the root as your tab and switches to it; for everyone
-  else it is simply no longer archived. **Open** opens an open root as your
-  tab. Restoring is the only way to write in an archived root; the host
-  refuses anything else there.
-
-### The add tab
-
-The rightmost tab, drawn as an empty tab: a split button, **＋ agent**, with
-**conversation** in its menu. A conversation at the root is the rarer start,
-so it is the one behind the menu. What each does is under "Starting" below.
+- **Every root is in one workflow state.** Each open state is a column of
+  the board, in order; the closed state is last. A new session has
+  **Backlog**, **Doing** and **Done**.
+- **A board item** shows its root's label, its status (as in your list), a
+  dot in your colour when it holds something you typed, who wrote in it,
+  and the others reading there: each reader's avatar is a menu of the
+  threads they read there, a row of which opens that thread in your list.
+  Selecting the item opens the root in your list and shows it.
+- **Anyone moves a root, for everyone**: drag an item to another column, or
+  before another item, or use its `⋯`'s **Move to ▸**, **Move up** and
+  **Move down**. Dropped on your
+  list, it opens there. Nothing moves a root by itself: an offer ready, or a
+  run that needs you, is a mark, never a move. A move from a state the root
+  has left is refused, naming who moved it and where ("not moved: Bea moved
+  it to Doing first").
+- **The closed state archives** (ADR-0029): a root there is read-only for
+  everyone until it is moved out, the host lets go of it, and its threads'
+  offers leave your repo. It shows as a count, a search over labels (not
+  every message, which would load every root, ADR-0063), **mine** (the roots
+  you wrote in), and its most recent roots. An archived root opened from it
+  is read-only, with **Restore** in its composer's place, which moves it to
+  the first open state; it leaves your list when you switch away unless you
+  restore it.
+- **Anyone edits the states**: a state's name is a button that turns into a
+  field (Enter or leaving it saves; Escape keeps the old name); its `⋯`
+  moves it left or right, or removes it, which is refused, with the reason,
+  while it holds a root or is the only open state; **＋ state** adds one
+  after the open states. The closed state can be renamed, never moved or
+  removed.
+- **A backlog item is a conversation root**: an idea not started is a root
+  with no agent (ADR-0021); people discuss it below its first message, and
+  asking `@agent` in it starts the work.
 
 ### Columns: a path each
 
-- **A column is one path through its tab's tree**, from the root to a leaf,
+- **A column is one path through its root's tree**, from the root to a leaf,
   read top to bottom. Its composer sends at its last message.
 - **Opening a branch adds a column to the right**, starting after the fork. An
   aside of an aside opens a third column.
@@ -276,8 +292,8 @@ so it is the one behind the menu. What each does is under "Starting" below.
   each header, and is the keyboard's way to do the same: ←/→ move a column one
   place, and Home/End move it to either end.
 - **Closing a column** removes it from the view, never from the document. Its
-  branch is still in the rail. A root tab's only column has no close, since
-  the tab would show that path again; a new tab's closes the new tab. The
+  branch is still in the rail. A root's only column has no close, since the
+  root would show that path again; a new tab's closes the new tab. The
   cards at a thread's end stay with the thread.
 - Each column's composer sits at its foot. The rail scrolls on its own, and
   follows the column you move (below).
@@ -432,7 +448,7 @@ the tree.
 
 ### The rail: a root's tree, compactly
 
-- A strip at the left edge draws every branch in the tab's root as a line,
+- A strip beside your list draws every branch in the root you are on as a line,
   and every message as a dot, except for uneventful stretches (below). A row
   is a depth, not a turn in one order: a branch starts on the row under its
   fork, beside the messages it diverged from, in the leftmost place free for
@@ -512,28 +528,30 @@ The rail is E; the column is T. Seeing both at once is the product.
     alone;
   - the **composer** says "Bea is typing…".
 
-  Presence is thread-level: every column in the tab you are on reports the
-  thread it shows. Columns in other tabs report nothing, so a tab's avatars
-  are the people looking at it now.
+  Presence is thread-level: every column of the root you are on reports the
+  thread it shows. Columns of other roots report nothing, so a root's
+  avatars, in your list and on the board, are the people looking at it now.
   Which message someone has on screen waits until thread-level proves too
   coarse.
 
 ### Starting, branching, and stepping down
 
 - **At the root, two ways to start**, because there is no context yet: a person
-  declares a purpose. Both are on the add tab. **＋ agent** opens a new tab
-  whose column asks the agent unless a message names someone, so its first
-  message creates the lane. **Conversation**, in its menu, opens a new tab
-  whose column is a conversation.
+  declares a purpose. Both are on ＋, at the foot of your list and on each
+  board column. **＋ agent** opens a new tab whose column asks the agent
+  unless a message names someone, so its first message creates the lane.
+  **Conversation**, in its menu, opens a new tab whose column is a
+  conversation.
 - **A new tab is yours until its first send**, as any fresh column is. It sits
-  beside ＋, labelled "new agent" or "new conversation", and closing it leaves
-  no trace. Its first send makes the root, and the tab becomes that root's
-  tab. Others find the root in the Archive tab, and see you in it from the
-  header.
-- **An empty session** shows only the Archive tab and ＋, and points at ＋.
-- **A page with nothing stored** (a new browser, or a first visit) opens on
-  the Archive tab, which lists every root to open: nothing opens a tab by
-  itself (ADR-0030).
+  at the end of your list, labelled "new agent" or "new conversation", and
+  closing it leaves no trace. Its first send makes the root, which joins
+  your list and the board: at the end of the first open state from your
+  list's ＋, of its own state from a board column's (ADR-0085). Others find
+  it on the board, and see you in it there.
+- **An empty session** shows the board, with nothing in it, and ＋.
+- **A page with nothing in your list** (a first visit, or a list you
+  emptied) opens on the board, which shows every root to open: nothing opens
+  a root by itself (ADR-0030).
 - **`→` in a message's right margin opens a branch** as a column to its right,
   empty until something is sent there. What it opens appears to the right, so
   the button sits on that side. A branch starts as a conversation; `@agent`
@@ -584,7 +602,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   command that has run for half a second is still running, its row is
   outlined instead, and the line hides: the wait is the machine's, not the
   model's. A quicker command changes neither.
-- **A tab shown again draws its tool rows as they were left** (ADR-0049):
+- **A root shown again draws its tool rows as they were left** (ADR-0049):
   a running command's row open, a row you opened or closed the same way.
 - **Pasting an image into a composer puts it in the message** (ADR-0042).
   It is uploaded as it is pasted, and its markdown, `![name](/blob/…)`, goes
@@ -623,7 +641,7 @@ The rail is E; the column is T. Seeing both at once is the product.
 
 - **What you type in a composer is a card on its thread.** The first
   keystroke worth keeping (anything but a branch's `@agent `) makes it. It
-  belongs to the thread, not the column: switching tabs, reloading, closing
+  belongs to the thread, not the column: switching roots, reloading, closing
   and reopening the column, or the host restarting, you find it where you
   left it, and it follows the thread as the thread grows. A new tab's or a
   new branch's card belongs to its column until its first message is sent.
@@ -632,10 +650,10 @@ The rail is E; the column is T. Seeing both at once is the product.
   send it. A card sent by someone other than its owner is the sender's
   message, "with" the others who wrote in it.
 - **Marks say where you left something unsent** (ADR-0048): a small dot in
-  your colour on its tab, and on the rail at its thread's end, whether or not
-  that thread's column is open. A root whose tab you closed is marked on the
-  Archive tab and its row; an archived root only on its row, since its work
-  is done. Only your own cards count, and only while they
+  your colour on its root's item in your list, and on the rail at its
+  thread's end, whether or not that thread's column is open. A root you
+  closed is marked on ▦ and its board item; an archived root only on its
+  board item, since its work is done. Only your own cards count, and only while they
   hold text: emptied, sent or discarded, the dot goes. A bare `@agent ` is
   nothing typed.
 - **Sending spends the card.** The box stays as it was until the host
@@ -698,7 +716,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   no longer apply, quietly: the branch's column shows nothing for that. To
   keep a direction, take a copy of the card into your inventory and pin it
   in the branch.
-- **Pinned cards are not unsent work:** they mark no tab and no rail dot.
+- **Pinned cards are not unsent work:** they mark no item in your list and no rail dot.
 
 ### History and traces (ADR-0048 step 6)
 
@@ -718,10 +736,10 @@ The rail is E; the column is T. Seeing both at once is the product.
 ### Your inventory (ADR-0048 step 4)
 
 - **A panel of your own, floating over the columns**, opened and closed by
-  **inventory** in the header (which counts your cards). It sits in the
+  **inventory** in the footer (which counts your cards). It sits in the
   middle of the screen by default; drag its top bar and it settles left,
   centre or right, and this device remembers where. Only you see it, on
-  every tab and device; nobody else can move a card into or out of it.
+  every root and device; nobody else can move a card into or out of it.
 - **A fixed 3 × 6 grid.** Each slot shows its card's first line in its
   author's colour; the first nine are numbered 1–9. Click a slot, or move
   with the arrow keys or `hjkl` while the panel has focus, to select it; the
@@ -738,7 +756,7 @@ The rail is E; the column is T. Seeing both at once is the product.
 - **Put** moves the selected card below the line at the end of the column
   you were last in: Ctrl+Shift+O, the panel's **put** button, or a drag out
   of the panel onto a column's composer or the cards above it. Held over a
-  root's tab, a drag opens it. Put where you have no card, it becomes your
+  root in your list, a drag opens it. Put where you have no card, it becomes your
   composer; where you have one, it is shown above it. **Remove** deletes the
   selected card for good.
 - **Undo a move** with Cmd+Z (Ctrl+Z elsewhere) while no box has focus;
@@ -746,7 +764,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   newest move in the root you are on, from any of your tabs, after a reload
   or a restart too. As it acts it shows where the card went back: the
   panel, the thread's column, or a branch you closed since, opened again at
-  the end of its tab. If anyone moved the card since, it is refused, saying
+  the end of its root's columns. If anyone moved the card since, it is refused, saying
   who, and nothing moves. A keep of a branch's cards is undone whole. Sends,
   discards and copies are final; so is a keep that closed a new tab, whose
   cards you take back from the panel. An archived root's moves cannot be
@@ -766,11 +784,12 @@ The rail is E; the column is T. Seeing both at once is the product.
 | "make this a conversation" in a bar | nothing: a thread's mode is whether the agent works in it (ADR-0021) |
 | "⑂ 1 branch · 2 messages" with a hidden list | the rail, and a coloured fork dot in the column |
 | "switch to this path" (`navigate`) | nothing: sending attaches where you are reading |
-| every tree in one rail, one after another | a tab per root, each with its own rail (ADR-0029) |
-| a column on another root, with no stripe and no fork dot | nothing: a tab's columns share its root |
-| the rail's `+`, and Start Chat and Start Agent in place of a composer | the add tab: ＋ agent, or conversation |
-| a tab bar shared by everyone, with no close for yourself | your tabs, with **×** (ADR-0030) |
-| a new root by anyone appearing as a tab | the header's avatars and activity; you open it |
+| every tree in one rail, one after another | one root at a time, with its own rail (ADR-0029) |
+| a column on another root, with no stripe and no fork dot | nothing: the columns you see share their root |
+| the rail's `+`, and Start Chat and Start Agent in place of a composer | ＋: agent, or conversation |
+| a tab bar shared by everyone, with no close for yourself | your list, yours on every device, with **×** (ADR-0030, ADR-0085) |
+| a new root by anyone appearing as a tab | the board shows it, and who is in it; you open it (ADR-0085) |
+| the Archive tab, and the header's people | the board: every root in a workflow state, Done the archive (ADR-0085) |
 
 The last row mattered for `PLAN-2026-09-26-thread-lanes`: with no control moving
 a lane, the `navigate` command had no caller and was deleted with `prompt` and
@@ -779,7 +798,7 @@ a lane, the `navigate` command had no caller and was deleted with `prompt` and
 ## Data
 
 Every part of this is a read of what the document already holds, except the
-archive record (ADR-0029); a card's text is its own document (ADR-0048).
+board's records (ADR-0085); a card's text is its own document (ADR-0048).
 
 - **A column** is a client-local anchor entry. Its path is `projectTranscript`
   of `followTip(anchor)`, or, once it is bound to a lane, of the lane's tip;
@@ -788,31 +807,35 @@ archive record (ADR-0029); a card's text is its own document (ADR-0048).
   creation order (uuidv7).
 - **A thread's mode** is its lane; **names** are `pineta.participant` values.
 - **A root** is a root of the tree index (an orphan counts as one). **Your
-  tabs** are the roots in your layout's open list that have no `archived`
-  record, plus the root you are on.
-- **The header** reads presence (people, and the thread each is in) and the
-  lanes (the agent's running threads). **Mentions of you** are the chats whose
+  list** is your own document (`open:<you>`, ADR-0085), each root's id to an
+  order key, written only by your tabs: the roots in it that are not
+  archived, plus the root you are on.
+- **The board and the footer** read presence (people, and the thread each
+  is in) and the lanes (the agent's running threads). **Mentions of you** are the chats whose
   mentions `address` resolves to you. **What you have seen** is kept in your
   attention document (`attention:<you>`, ADR-0077), on every device of
   yours: an entry id (`mentionsSince`), at or before which every mention is
   seen, and the ids of later ones you have seen.
-- **The archive** is a host-written `pineta.archive` value per root: its state
-  (`archived` or `restored`), who changed it and when (ADR-0029). The host
-  refuses commands that would write in an archived root.
-- **Which tab you are on, your open roots and each root's columns** are view
-  state, kept in the browser per browser tab, with the device's latest for a
-  new one, and never in the document (ADR-0027, amended by ADR-0029 and
-  ADR-0030).
+- **The board** is two host-written records (ADR-0085): the workflow
+  (`pineta.workflow`, the open states in order and the closed one) and each
+  root's place (`pineta.board`, by its id: its state, its rank there, who
+  moved it and when). A root in the closed state is archived; the host
+  refuses commands that would write in it (ADR-0029).
+- **Which root you are on, each root's columns, new tabs and whether the
+  board is open** are view state, kept in the browser per browser tab, with
+  the device's latest for a new one, and never in the document (ADR-0027,
+  amended by ADR-0029, ADR-0030 and ADR-0085).
 
 ## Deferred, but designed for
 
-- **Narrow screens**: the stacked sequence described above, with the tab bar as
-  a switcher above it; built after the wide layout works. The column's pane
-  is its first step (ADR-0078): over a narrow window it covers the page,
-  and ← goes back to the thread. The header's indicators going on a row
-  above the tabs, below 56rem, is another (ADR-0081).
+- **Narrow screens**: the stacked sequence described above, with your list
+  collapsed to each root's banner (ADR-0050, ADR-0053) and the footer to ▦,
+  what needs you and you (ADR-0085); built after the wide layout works. The
+  column's pane is its first step (ADR-0078): over a narrow window it covers
+  the page, and ← goes back to the thread. Below 56rem your list narrows and
+  the strip shows its first states only.
 - **What's new since you looked** (ADR-0030 defers it): a last-read position
-  per root gives unread marks on tabs, a "3 new" count in the header, and a
+  per root gives unread marks on your list's items, a "3 new" count on ▦, and a
   "what's happening" panel listing roots by activity. It can reuse the
   inbox's storage and its rule for "seen".
 - **The inbox, grown:** **done** to take a handled mention off it; other kinds

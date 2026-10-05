@@ -17,6 +17,7 @@ import {
   rootIdFor,
   runId,
   THE_AGENT,
+  workflowStateIdFor,
   writerId,
 } from "@pineta/core"
 import { test } from "vitest"
@@ -155,6 +156,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       pinned: [],
       reserved: NEW_LANE,
       base: "wip/search",
+      state: workflowStateIdFor("doing"),
     },
     {
       kind: "chat",
@@ -173,6 +175,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       ],
       reserved: null,
       base: null,
+      state: null,
     },
     {
       kind: "chat",
@@ -188,12 +191,38 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       pinned: [],
       reserved: null,
       base: null,
+      state: null,
     },
     { kind: "name", name: "Alice" },
     { kind: "stop", lane: laneNameForThread("abc") },
     { kind: "carry-on", lane: laneNameForThread("abc") },
-    { kind: "archive", action: "archive", root: entryId("e-1") },
-    { kind: "archive", action: "restore", root: entryId("e-1") },
+    {
+      kind: "move-root",
+      root: TEST_ROOT,
+      from: workflowStateIdFor("a"),
+      to: workflowStateIdFor("b"),
+      before: null,
+    },
+    {
+      kind: "move-root",
+      root: TEST_ROOT,
+      from: workflowStateIdFor("a"),
+      to: workflowStateIdFor("a"),
+      before: NEW_ROOT,
+    },
+    {
+      kind: "workflow",
+      edit: { action: "add", state: null, name: "Review", before: null },
+    },
+    {
+      kind: "workflow",
+      edit: {
+        action: "move",
+        state: workflowStateIdFor("a"),
+        name: "",
+        before: workflowStateIdFor("b"),
+      },
+    },
     {
       kind: "mark",
       root: TEST_ROOT,
@@ -362,8 +391,8 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
     { kind: "appended", id: entryId("e-1") },
     { kind: "named" },
     { kind: "stopped" },
-    { kind: "archived" },
-    { kind: "restored" },
+    { kind: "moved-root" },
+    { kind: "workflow-changed" },
     { kind: "marked" },
     { kind: "retitling" },
     { kind: "integrated" },
@@ -526,19 +555,42 @@ test("decode: a chat's card is its id and its text's version, or none", () => {
   assert.equal(card(chat("  ")), null)
 })
 
-test("an archive action must be known, and name its root", () => {
+test("a move on the board names its root and its states; a workflow change, a known action and its state", () => {
+  const move = (text: string, root: string = TEST_ROOT) =>
+    refusalCode(decodeCommand({ kind: "move-root", root, text }))
+  const states = { from: workflowStateIdFor("a"), to: workflowStateIdFor("b") }
   assert.equal(
-    refusalCode(
-      decodeCommand({ kind: "archive", mode: "delete", targetId: "e-1" }),
-    ),
-    ERR.UNKNOWN_KIND,
-  )
-  assert.equal(
-    refusalCode(
-      decodeCommand({ kind: "archive", mode: "archive", targetId: " " }),
-    ),
+    move(JSON.stringify({ ...states, before: null }), "e-1"),
     ERR.UNKNOWN_TARGET,
   )
+  for (const bad of [
+    "",
+    "{",
+    JSON.stringify({ from: "a", to: states.to, before: null }),
+    JSON.stringify({ ...states, before: "e-1" }),
+    JSON.stringify({ ...states }),
+  ])
+    assert.equal(move(bad), ERR.UNKNOWN_STATE, bad)
+  const workflow = (mode: string, targetId = "") =>
+    refusalCode(decodeCommand({ kind: "workflow", mode, targetId, text: "x" }))
+  assert.equal(workflow("delete"), ERR.UNKNOWN_KIND)
+  assert.equal(workflow("rename"), ERR.UNKNOWN_STATE)
+  assert.equal(workflow("rename", "doing"), ERR.UNKNOWN_STATE)
+})
+
+test("a chat's workflow state must be one", () => {
+  const chat = (state: string) =>
+    decodeCommand({
+      ...EMPTY_COMMAND,
+      kind: "chat",
+      text: "hi",
+      parentId: "",
+      root: NEW_ROOT,
+      mode: "branch",
+      state,
+    })
+  assert.equal(refusalCode(chat("doing")), ERR.UNKNOWN_STATE)
+  assert.equal(refusalCode(chat("")), "not refused: chat")
 })
 
 test("a mark names its entry; its title is trimmed, blank clears, and a line break or 81 characters is refused", () => {

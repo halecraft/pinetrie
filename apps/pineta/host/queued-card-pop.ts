@@ -97,6 +97,7 @@ export const chatOfPoppedQueuedCard = (popped: PoppedQueuedCard): Chat => ({
   pinned: [],
   reserved: null,
   base: null,
+  state: null,
 })
 
 export interface QueuedCardPopDeps {

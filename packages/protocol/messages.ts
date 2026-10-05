@@ -43,8 +43,13 @@ export const HOST_PRINCIPAL = "pineta-host"
  *   - `stop` ends the running turn of the thread whose lane is `lane`.
  *   - `carry-on` starts a new turn on that thread after a stop, its prompt
  *     the host's carry-on message (ADR-0082).
- *   - `archive` hides the root `targetId` for everyone, or restores it
- *     (ADR-0029); `mode` names the action, `archive` or `restore`.
+ *   - `move-root` moves the root `root` on the board (ADR-0085): `text` is
+ *     JSON `{ from, to, before }`, the state its sender saw it in, the state
+ *     it goes to, and the root it goes before there, or null for the end.
+ *   - `workflow` changes the board's states (ADR-0085): `mode` names the
+ *     action (`add`, `rename`, `move`, `remove`), `targetId` the state (`""`
+ *     to add), `text` its name, and `parentId` the state it goes before
+ *     (`""` for after every open state).
  *   - `mark` titles the entry `targetId` with `text` (ADR-0045); `""`
  *     clears its title.
  *   - `retitle` asks a model for the root `root`'s title (ADR-0074).
@@ -72,7 +77,8 @@ export const COMMAND_KINDS = [
   "name",
   "stop",
   "carry-on",
-  "archive",
+  "move-root",
+  "workflow",
   "mark",
   "retitle",
   "offer",
@@ -100,7 +106,8 @@ export interface Command {
   readonly text: string
   /**
    * An entry: where the sender was reading, or the branch point. `""` is the
-   * root. Only `codec.ts` interprets this; nothing past it sees `""`.
+   * root. `workflow`: the state a moved or added state goes before, `""` for
+   * the end. Only `codec.ts` interprets this; nothing past it sees `""`.
    */
   readonly parentId: string
   /**
@@ -110,7 +117,7 @@ export interface Command {
    */
   readonly root: string
   /**
-   * `chat`: `reply` or `branch`; `archive` and `offer`: the action;
+   * `chat`: `reply` or `branch`; `offer` and `workflow`: the action;
    * `set-command`: the command; `undo-move`: `undo` or `redo`; `""`
    * otherwise.
    */
@@ -126,8 +133,9 @@ export interface Command {
   readonly workKind: string
   readonly workDir: string
   /**
-   * `archive`: the root; `mark`: the entry; `offer` `integrate`: the destination
-   * bookmark, `""` for the default. Separate from `parentId` on purpose.
+   * `mark`: the entry; `offer` `integrate`: the destination bookmark, `""`
+   * for the default; `workflow`: the state. Separate from `parentId` on
+   * purpose.
    */
   readonly targetId: string
   /** `chat`: the card its text was sent from, or `""` (ADR-0048); `move`, `set-command`: the card. */
@@ -160,6 +168,11 @@ export interface Command {
    * line (ADR-0060).
    */
   readonly base: string
+  /**
+   * `chat`: the workflow state a root it starts lands in, or `""` for the
+   * first open state (ADR-0085).
+   */
+  readonly state: string
 }
 
 /**
@@ -173,8 +186,8 @@ export const OUTCOME_KINDS = [
   "conflict",
   "named",
   "stopped",
-  "archived",
-  "restored",
+  "moved-root",
+  "workflow-changed",
   "marked",
   "retitling",
   "integrated",
@@ -244,6 +257,7 @@ export const EMPTY_COMMAND: Command = Object.freeze({
   seen: "",
   moves: "",
   pinned: "",
+  state: "",
 })
 
 export const EMPTY_REPLY: Reply = Object.freeze({

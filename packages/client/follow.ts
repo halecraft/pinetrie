@@ -15,7 +15,7 @@
 // The floor is at most FLOOR_MAX of the view: past that the scroller shrinks,
 // and two thirds of it still show content.
 //
-// A scroller that is unmounted and mounted again (a column of a root tab
+// A scroller that is unmounted and mounted again (a column of a root
 // shown again) starts from a `SeenEnd`: whether it had moved past what its
 // reader saw. A placement short of the end keeps that, so ↓ new below shows.
 //

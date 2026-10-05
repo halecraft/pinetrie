@@ -16,7 +16,7 @@ import {
 } from "@pineta/protocol/messages"
 import {
   planSweep,
-  readArchive,
+  readArchived,
   readPlaces,
   readReferencedBlobs,
   readRoots,
@@ -107,7 +107,7 @@ export async function sweepHistories(input: {
   const retired = planHistorySweep({
     stored,
     roots: readRoots(session),
-    archive: readArchive(session),
+    archived: readArchived(session),
     now: now(),
     startup: input.startup,
   })

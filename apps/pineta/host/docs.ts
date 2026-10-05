@@ -4,7 +4,7 @@
 
 import type { Exchange } from "@kyneta/exchange"
 import {
-  type ArchiveRecord,
+  type ArchivedRoot,
   type EntryId,
   type LaneName,
   type RootId,
@@ -65,16 +65,15 @@ export const openedWords = (opened: number, total: number): string => {
 
 /**
  * The roots a starting host opens: every root in the directory that is not
- * archived. A busy root cannot be archived (`planArchive`), so these hold
- * every lane a crash could have interrupted. Pure.
+ * archived, in the closed workflow state. A busy root cannot be closed
+ * (`planArchive`), so these hold every lane a crash could have interrupted.
+ * Pure.
  */
 export function planLoads(
   roots: ReadonlyMap<RootId, RootRecord>,
-  archive: ReadonlyMap<EntryId, ArchiveRecord>,
+  archived: ReadonlyMap<RootId, ArchivedRoot>,
 ): readonly RootId[] {
-  return [...roots.values()]
-    .filter(r => r.entry === null || archive.get(r.entry)?.state !== "archived")
-    .map(r => r.root)
+  return [...roots.keys()].filter(r => !archived.has(r))
 }
 
 export function hostDocuments(input: {

@@ -9,7 +9,7 @@
 // (`seat.ts`).
 
 import {
-  type ArchiveRecord,
+  type ArchivedRoot,
   atEntry,
   CARD_COMMANDS,
   type CardCarries,
@@ -43,6 +43,7 @@ import {
 import { Type } from "typebox"
 import { decodeWith } from "./decode.ts"
 import { decodeOfferFact, encodeOfferFact } from "./fact.ts"
+import { orderAfter } from "./order.ts"
 
 /**
  * A card as the places document stores it: flat strings, "" for none. The
@@ -269,33 +270,6 @@ export function queuedOn(
     .filter(isQueued)
     .filter(c => c.place.lane === lane)
     .sort(byOrder)
-}
-
-/**
- * Order keys are fixed-width base-36 integers, so string order is numeric
- * order. The first starts in the middle, and each next one a step on, which
- * leaves room before and between for reordering.
- */
-const ORDER_WIDTH = 10
-const ORDER_START = 36 ** ORDER_WIDTH / 2
-const ORDER_STEP = 2 ** 20
-
-const orderKey = (n: number): string =>
-  Math.min(Math.max(0, n), 36 ** ORDER_WIDTH - 1)
-    .toString(36)
-    .padStart(ORDER_WIDTH, "0")
-
-/** An order key after every card in `ordered`: a lane's queue, or every pinned card. */
-export function orderAfter(
-  ordered: readonly { readonly place: { readonly order: string } }[],
-): string {
-  const last = ordered
-    .map(c => Number.parseInt(c.place.order, 36))
-    .filter(n => Number.isFinite(n))
-    .reduce((a, b) => Math.max(a, b), Number.NEGATIVE_INFINITY)
-  return orderKey(
-    last === Number.NEGATIVE_INFINITY ? ORDER_START : last + ORDER_STEP,
-  )
 }
 
 /** What an idle lane's queue gives up next. */
@@ -662,20 +636,17 @@ const ARCHIVED_HISTORY_MS = 7 * 24 * 60 * 60 * 1000
 export function planHistorySweep(input: {
   readonly stored: readonly string[]
   readonly roots: ReadonlyMap<RootId, RootRecord>
-  readonly archive: ReadonlyMap<EntryId, ArchiveRecord>
+  readonly archived: ReadonlyMap<RootId, ArchivedRoot>
   readonly now: number
   readonly startup: boolean
 }): readonly string[] {
   return input.stored.filter(docId => {
     const of = movesOfDocId(docId)
     if (of === undefined) return false
-    const known = input.roots.get(of.root)
-    if (known === undefined) return input.startup
-    const record =
-      known.entry === null ? undefined : input.archive.get(known.entry)
+    if (!input.roots.has(of.root)) return input.startup
+    const archived = input.archived.get(of.root)
     return (
-      record?.state === "archived" &&
-      input.now - record.at >= ARCHIVED_HISTORY_MS
+      archived !== undefined && input.now - archived.at >= ARCHIVED_HISTORY_MS
     )
   })
 }

@@ -1,12 +1,13 @@
-// client/header — the right end of the header, beside the tabs (ADR-0081):
-// "syncing…" while the document is pending, who is here, one menu of what
-// needs you (`activity.ts`, ADR-0069, ADR-0077), the project (ADR-0060, ADR-0061), and
-// then your inventory and you (`profile.tsx`). Your tabs are your view; this
-// is the rest of the session. People and the agent come from live data
-// (presence, the running lanes), the inbox from the tree and this device's
-// seen state. Nothing here opens a tab until you choose, and nothing closes a
-// menu you opened: a trigger whose live data has gone stays until you close
-// its menu (`Popover`'s `gone`).
+// client/footer — the page's one row of chrome, along its bottom (ADR-0085).
+// It splits where your list's edge does: below your list, what is yours (you,
+// whose avatar opens your profile, `profile.tsx`, and your inventory); to the
+// right, what is everyone's: the board's strip (`board.tsx`), then one menu
+// of what needs you (`activity.ts`, ADR-0069, ADR-0077), the project
+// (ADR-0060, ADR-0061), and "syncing…" while the document is pending. The
+// agent comes from live data (the running lanes), the inbox from the tree
+// and your attention document. Nothing here opens a root until you choose,
+// and nothing closes a menu you opened: a trigger whose live data has gone
+// stays until you close its menu (`Popover`'s `gone`).
 
 import {
   type EntryId,
@@ -18,7 +19,7 @@ import {
   type WriterId,
 } from "@pineta/core"
 import type { SessionClient } from "@pineta/session"
-import { useMemo, useState, useSyncExternalStore } from "react"
+import { type ReactNode, useState, useSyncExternalStore } from "react"
 import {
   type ActivitySection,
   type ActivityView,
@@ -34,13 +35,7 @@ import {
 } from "./attention.ts"
 import { INVENTORY } from "./card-words.ts"
 import { AGENT_MARK } from "./column-view.ts"
-import {
-  type OpenMenus,
-  peopleHere,
-  type RunHere,
-  toggleOpenMenu,
-  withOpenMenus,
-} from "./here.ts"
+import type { RunHere } from "./here.ts"
 import type { InboxItem } from "./inbox.ts"
 import type { Intent } from "./intent.ts"
 import {
@@ -51,15 +46,44 @@ import {
   resolveIntent,
 } from "./line-view.ts"
 import { Menu, type MenuItem } from "./menu.tsx"
-import { Avatar, nameFor } from "./presence.tsx"
+import { nameFor } from "./presence.tsx"
 import { type Me, Profile } from "./profile.tsx"
 import type { InboxView } from "./use-inbox.ts"
-import { useReadingAt, useReadingRoots } from "./use-presence.ts"
 
-export function Header({
+/**
+ * A thread as a menu row: its lane's name when it has one, its root's label,
+ * and the start of the message at `end`; choosing it opens it (`onOpen`).
+ */
+export function threadRow(input: {
+  readonly index: TreeIndex
+  readonly labelOf: (root: EntryId) => string
+  readonly onOpen: (id: EntryId, root: EntryId) => void
+}) {
+  return (
+    key: string,
+    end: EntryId,
+    root: EntryId,
+    name?: string,
+    at: string = firstLine(messageText(input.index.entries[end]?.message), 48),
+  ): MenuItem => ({
+    key,
+    className: "here-thread",
+    data: { entry: end },
+    label: (
+      <>
+        {name !== undefined && <span className="here-name">{name}</span>}
+        <span className="here-root">{input.labelOf(root)}</span>
+        <span className="here-at">{at}</span>
+      </>
+    ),
+    onChoose: () => input.onOpen(end, root),
+  })
+}
+
+export function Footer({
   syncing,
+  strip,
   session,
-  order,
   runs,
   index,
   labelOf,
@@ -79,9 +103,9 @@ export function Header({
 }: {
   /** The document's status is "pending" (`useDocStatus`). */
   syncing: boolean
+  /** The board's strip (`BoardStrip`): everyone's, after what is yours. */
+  strip: ReactNode
   session: SessionClient
-  /** Everyone, in the order every window agrees on (`writerOrder`). */
-  order: readonly WriterId[]
   /** The agent's running lanes, in any root (`runsHere`). */
   runs: readonly RunHere[]
   index: TreeIndex
@@ -100,7 +124,7 @@ export function Header({
   project: ProjectRecord | null
   /** Each lane's name: a thread's row leads with it (ADR-0039). */
   names: ReadonlyMap<string, string>
-  /** Open an entry as your tab (`planOpen`). */
+  /** Open an entry in your list (`planOpen`). */
   onOpen: (id: EntryId, root: EntryId) => void
   /** Where the project menu's "resolve with the agent" goes. */
   onIntent: (intent: Intent) => void
@@ -112,29 +136,7 @@ export function Header({
   }
   me: Me
 }) {
-  /**
-   * A thread as a row: its lane's name when it has one, its root's label, and
-   * the start of the message at `end`.
-   */
-  const thread = (
-    key: string,
-    end: EntryId,
-    root: EntryId,
-    name?: string,
-    at: string = firstLine(messageText(index.entries[end]?.message), 48),
-  ): MenuItem => ({
-    key,
-    className: "here-thread",
-    data: { entry: end },
-    label: (
-      <>
-        {name !== undefined && <span className="here-name">{name}</span>}
-        <span className="here-root">{labelOf(root)}</span>
-        <span className="here-at">{at}</span>
-      </>
-    ),
-    onChoose: () => onOpen(end, root),
-  })
+  const thread = threadRow({ index, labelOf, onOpen })
   /** A raised item's rows: its thread, with its reason, and "not needed". */
   const raised = (item: Item): MenuItem[] => [
     {
@@ -182,42 +184,9 @@ export function Header({
     worthARead: verdictsAt("worthARead"),
   }
   return (
-    <div className="header-right">
-      {syncing && <span className="sync-note">syncing…</span>}
-      <div className="here">
-        <People
-          colorOf={colorOf}
-          index={index}
-          nameOf={nameOf}
-          order={order}
-          session={session}
-          thread={thread}
-        />
-      </div>
-      <ActivityMenu
-        inbox={inbox}
-        labelOf={labelOf}
-        mentions={mentions}
-        nameOf={nameOf}
-        counts={counts}
-        needsYou={verdicts("needsYou")}
-        offers={offers.flatMap(o => {
-          const yours = yourOffers.get(o.lane)
-          return yours === undefined
-            ? [thread(o.lane, o.end, o.root, names.get(o.lane))]
-            : raised(yours)
-        })}
-        worthARead={verdicts("worthARead")}
-        onOpen={onOpen}
-        runs={runs.map(r => thread(r.lane, r.end, r.root, names.get(r.lane)))}
-      />
-      <LineMenu
-        line={line}
-        onIntent={onIntent}
-        project={project}
-        session={session}
-      />
-      <div className="header-tools">
+    <footer id="bottom">
+      <div className="footer-you">
+        <Profile {...me} colorOf={colorOf} nameOf={nameOf} />
         <button
           aria-pressed={inventory.open}
           className="inventory-toggle"
@@ -227,63 +196,36 @@ export function Header({
         >
           {INVENTORY} {inventory.count}
         </button>
-        <Profile {...me} colorOf={colorOf} nameOf={nameOf} />
       </div>
-    </div>
+      {strip}
+      <div className="footer-right">
+        {syncing && <span className="sync-note">syncing…</span>}
+        <ActivityMenu
+          inbox={inbox}
+          labelOf={labelOf}
+          mentions={mentions}
+          nameOf={nameOf}
+          counts={counts}
+          needsYou={verdicts("needsYou")}
+          offers={offers.flatMap(o => {
+            const yours = yourOffers.get(o.lane)
+            return yours === undefined
+              ? [thread(o.lane, o.end, o.root, names.get(o.lane))]
+              : raised(yours)
+          })}
+          worthARead={verdicts("worthARead")}
+          onOpen={onOpen}
+          runs={runs.map(r => thread(r.lane, r.end, r.root, names.get(r.lane)))}
+        />
+        <LineMenu
+          line={line}
+          onIntent={onIntent}
+          project={project}
+          session={session}
+        />
+      </div>
+    </footer>
   )
-}
-
-/**
- * Who else is here, a person each, with the threads they are reading. It reads
- * presence itself, so a presence write redraws this and not the header. A
- * person who leaves while you have their menu open stays, marked gone, until
- * you close it (`withOpenMenus`).
- */
-function People({
-  session,
-  index,
-  order,
-  nameOf,
-  colorOf,
-  thread,
-}: {
-  session: SessionClient
-  index: TreeIndex
-  order: readonly WriterId[]
-  nameOf: ReadonlyMap<WriterId, string>
-  colorOf: (writer: WriterId) => string
-  thread: (key: string, end: EntryId, root: EntryId) => MenuItem
-}) {
-  const [openMenus, setOpenMenus] = useState<OpenMenus>(new Map())
-  const reading = useReadingAt(session.presence, session.writer)
-  const reportedRoots = useReadingRoots(session.presence)
-  const people = useMemo(
-    () => peopleHere(reading, index, order, reportedRoots),
-    [reading, index, order, reportedRoots],
-  )
-  return withOpenMenus(people, openMenus).map(({ person: p, gone }, at) => (
-    <Menu
-      className="here-person"
-      gone={gone}
-      sections={[
-        {
-          key: "threads",
-          heading: gone
-            ? `${nameFor(nameOf, p.writer)} has left`
-            : `${nameFor(nameOf, p.writer)} is in`,
-          items: p.threads.map(t => thread(t.end, t.end, t.root)),
-        },
-      ]}
-      key={p.writer}
-      label={`${nameFor(nameOf, p.writer)}: where they are`}
-      onToggle={open =>
-        setOpenMenus(m => toggleOpenMenu(m, p.writer, at, open))
-      }
-      title={nameFor(nameOf, p.writer)}
-      trigger={<Avatar colorOf={colorOf} nameOf={nameOf} writer={p.writer} />}
-      triggerClassName="here-trigger"
-    />
-  ))
 }
 
 /**

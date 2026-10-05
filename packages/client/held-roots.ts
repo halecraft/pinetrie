@@ -1,9 +1,9 @@
 // client/held-roots — which roots this tab asks its session to hold
 // (ADR-0063). Pure.
 //
-// A tab loads only what it shows: the roots of your open tabs, the one you
-// are on, and the root the Archive tab previews. Every other root is read
-// from the directory alone. What holding them opens and lets go is
+// A tab loads only what it shows: the roots of your list and the one you are
+// on, archived or not. Every other root is read from the directory alone,
+// the board's included. What holding them opens and lets go is
 // `planHold` (`root-hold.ts`).
 
 import type { EntryId, RootId, RootRecord } from "@pineta/core"
@@ -19,10 +19,9 @@ export const rootEntriesOf = (
     ),
   )
 
-/** The roots to hold, for `layout` and the Archive tab's `preview`. */
+/** The roots to hold, for `layout`. */
 export function planHeldRoots(input: {
   readonly layout: Pick<Layout, "open" | "active">
-  readonly preview: EntryId | null
   readonly directory: ReadonlyMap<RootId, RootRecord>
 }): ReadonlySet<RootId> {
   const ids = new Map(
@@ -32,9 +31,6 @@ export function planHeldRoots(input: {
   const entries = [
     ...input.layout.open,
     ...(active?.kind === "root" ? [active.root] : []),
-    ...(active?.kind === "archive" && input.preview !== null
-      ? [input.preview]
-      : []),
   ]
   return new Set(
     entries.flatMap(entry => {

@@ -40,6 +40,7 @@ import {
   idleNow,
   join,
   lanesOf,
+  moveRootTo,
   rootRecordsOf,
   setUpLine,
   startSuiteHost,
@@ -1121,12 +1122,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
             "commit_id",
           ) !== "",
       )
-    if (rootOne !== null)
-      await wu.request({
-        kind: "archive",
-        action: "archive",
-        root: entryId(rootOne),
-      })
+    if (rootOne !== null) await moveRootTo(wu, entryId(rootOne), "closed")
     await wh.quiet()
     const kept = before.filter(r =>
       existsSync(path.join(snapshots, `${r.snapshot}.img`)),
@@ -1152,12 +1148,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
         offeredInRootOne.every(lane => !readOffers(wh.session).has(lane)),
       `${JSON.stringify({ offered: offeredInRootOne, left: offerBookmarks() })}`,
     )
-    if (rootOne !== null)
-      await wu.request({
-        kind: "archive",
-        action: "restore",
-        root: entryId(rootOne),
-      })
+    if (rootOne !== null) await moveRootTo(wu, entryId(rootOne), "open")
     const rebuilt = await waitFor(
       () =>
         offeredInRootOne.length > 0 &&

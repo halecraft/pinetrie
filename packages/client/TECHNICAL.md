@@ -1,32 +1,32 @@
 # `@pineta/client` — technical notes
 
-The browser interface: a tab per root, each a rail beside a strip of columns
-(`docs/06-interface.md`, ADR-0029). Its connection to the host is
+The browser interface: your list of roots down the left, the root you are on
+as a rail beside a strip of columns, and the board in the footer
+(`docs/06-interface.md`, ADR-0085). Its connection to the host is
 `@pineta/session` (`packages/session/TECHNICAL.md`), which declares no React:
 this package draws and words, and decides what the page asks the session for. Everything drawn is a read of the session
-document through `@pineta/reads` and `projection.ts`; the only state kept here
-is the layout (which tab you are on, and each root's columns), kept per
-browser tab. What is typed is a card (ADR-0048): a document of its own,
+document through `@pineta/reads` and `projection.ts`, and of your own
+documents through the session; the only state kept here is the layout
+(which root you are on, each root's columns, new tabs, whether the board is
+open), kept per browser tab. What is typed is a card (ADR-0048): a document of its own,
 written by this client, and kept on its thread.
 
 ## The roots a tab holds (ADR-0063)
 
 - **A tab holds the roots it shows** (`planHeldRoots`, `held-roots.ts`): the
-  roots of your open tabs, the one you are on, and the Archive tab's
-  preview. `SessionClient.holdRoots` opens what is new and `destroy`s what
+  roots of your list, and the one you are on, archived or not. `SessionClient.holdRoots` opens what is new and `destroy`s what
   is not, which leaves the host's copy (S86). A root this client starts is
   held from its first send until the page asks for it, and after that only
   while the page does. What opens and goes, and why every other root is
   declined, is the session's (`planHold`, `root-hold.ts`, and `rootDocs`,
   `packages/session/TECHNICAL.md`).
-- **Every cross-root fact comes from the directory** (`readRoots`): the tab
-  bar's labels and summaries (`summariesOf`, `firstLinesOf`, `labelsOf`), the
-  Archive tab's rows, `prune`'s known roots, the inbox's mentions, the
-  header's count (`messageCount`: the held roots' messages, of every root's), the participants (`participantsIn`), the
-  roots of the header's runs and offers (`runsHere`, `laneRootsOf`), and the
+- **Every cross-root fact comes from the directory** (`readRoots`): your
+  list's labels and summaries (`summariesOf`, `firstLinesOf`, `labelsOf`), the
+  board's items, `prune`'s known roots, the inbox's mentions, ▦'s count (`messageCount`: the held roots' messages, of every root's), the participants (`participantsIn`), the
+  roots of the activity menu's runs and offers (`runsHere`, `laneRootsOf`), and the
   root of a card drafted in a root not held (`cardMarks`'s `rootEntries`).
-  The Archive tab searches labels: a search of every message would hold
-  every root.
+  The board's closed state searches labels: a search of every message would
+  hold every root.
 - **A directory write wakes every read of the session's records**:
   `readValues` reads the whole `values` map. So `readParticipantNames`
   keeps its map while the names are the same, since every message compares
@@ -36,9 +36,9 @@ written by this client, and kept on its thread.
   below works as it did over one document, for the roots held. A root's
   columns sync only while it is held; `prune` waits for the stored tabs'
   roots to settle, and drops only what the directory lacks.
-- **What the header opens may be in a root not held** (`openIn`): one held
-  opens as `openAt`; an archived one is previewed; any other root's tab is
-  shown, which holds it, and `openWhenHeld` shows the entry once the index
+- **What the footer and the board open may be in a root not held**
+  (`openIn`): one held opens as `openAt`; any other root is shown, archived
+  or not, which holds it, and `openWhenHeld` shows the entry once the index
   has it.
 - **A write names its root**: `chat` and `mark` find it from the held
   document with the entry (`rootOf`), and a send at the root mints one
@@ -65,7 +65,7 @@ lanes and the archive together.
 as an `EntryId`, and every lane as a `LaneName` (`packages/reads/TECHNICAL.md`),
 so the client never mints one but where an id comes back in from elsewhere:
 its stored form (`layout.ts`'s `decodeLayout`), your attention document
-(`readAttention`, in `@pineta/schema`), and ids read back from the page (`use-ask-bar.ts`, from `data-ask-of`).
+(`readAttention`, in `@pineta/schema`), and ids read back from the page (`use-ask-bar.ts`, from `data-ask-of`; `root-target.ts`, from a root's drag and its drop marks).
 `biome.json` refuses an `entryId` or `runId` import anywhere else in the
 client; tests build entries and trees through `fixtures.ts`, which mints.
 
@@ -89,7 +89,7 @@ about 55 ms (S59).
   | field | read by |
   |---|---|
   | `typing` | `TypingLine` (`composer.tsx`) |
-  | `reading` | `SeenBy` (a column's header), `LiveRail` (rings, and which rail items stay), `People` (`header.tsx`), `Readers` (`tabs.tsx`) |
+  | `reading` | `SeenBy` (a column's header), `LiveRail` (rings, and which rail items stay), `Readers` and `ReaderMenus` (`root-signals.tsx`) |
 
   Each read keeps its array while the field's entries are the same, so the
   refresh's render reuses the memos below it. `App` still writes your
@@ -176,7 +176,7 @@ function is proven by a unit test in a second.
 - **A component draws a view.** It branches only on a view's `kind` or its
   flags, and draws the view's strings. It compares no document fact, builds
   no label, and chooses nothing that is offered. The views are `appView`
-  (`app-view.ts`), `tabsView`, `columnView`, `messageTools`, `railItems`,
+  (`app-view.ts`), `openListView`, `boardView`, `columnView`, `messageTools`, `railItems`,
   `toolBody` and `callStatus`, `editorState` and `startText`. What stays in
   components and `use-*.ts` is what needs a browser: measuring, focus and
   the caret, scrolling, observers, subscriptions.
@@ -190,11 +190,11 @@ function is proven by a unit test in a second.
   does: which root a column act belongs to, that × closes a tab and writes
   nothing, that a column you open takes focus (`armFocus`). Fresh column
   keys come from the shell as an argument, as `columnsReducer` takes them.
-  `afterArchive` plans an archive's or a restore's answer, and `nameEffects` the settle's
+  `afterRootMove` plans a move on the board's answer, and `nameEffects` the settle's
   name step (`reconcileName`).
 - **`perform` carries the effects out** (`perform.ts`), one port call each,
   through `AppPorts`: the reducer's `dispatch`, the session's writes,
-  `reveal`, the Archive tab's pick, focus, the identity store and
+  `reveal`, your list (`openList`), focus, the identity store and
   `reload`. A request the session does not track is one `request` effect
   carrying the `HostRequest` itself, so a new kind of request adds no effect
   and no case. What the session tracks keeps a method of its own: a chat
@@ -206,81 +206,80 @@ function is proven by a unit test in a second.
   own `useMemo`s, and their results come in. One tree rebuilt each render
   would give every memoised child new props (S54, S59). `appView` gives the
   workspace (`connecting`, `archive`, a root's or a new tab's columns as
-  `ColumnSlot`s), the read-only words, and the header's open offers. A slot
+  `ColumnSlot`s), the read-only words, and the activity menu's open offers. A slot
   is new each render; `Column` is not memoised, so this costs nothing, and
   a slot must never reach a memoised component by identity.
 - **`main.tsx` boots the page:** it builds the device's stores, asks who you
   are, connects, and mounts `App({ session, stores })`. `app.tsx` touches no
   browser global as it loads.
 
-## Root tabs and the layout (`layout.ts`, ADR-0029, ADR-0030)
+## Your list and the layout (`layout.ts`, ADR-0029, ADR-0030, ADR-0085)
 
-The layout is `{ active, open, roots, newTabs }`, and `layoutReducer` is pure.
-A root tab's key is its root entry's id: a thread started at the root is
-rooted at its first message (S30). `open` is your tabs: the roots you opened,
-in that order. `tabBar(layout)` is Archive, `open`, then new tabs.
-`summarizeRoots` and `rootWork` (`packages/core/roots.ts`)
-give the roots and each tab's signals.
+The stored layout is `{ active, roots, newTabs, board }`, and
+`layoutReducer` is pure. `active` is a `Here`: a root (by its root entry: a
+thread started at the root is rooted at its first message, S30), a new tab,
+or nothing. Your list is not the layout's: it is your own document
+(`openList`, `@pineta/session`), keyed by `RootId`, which `App` maps to root
+entries through the directory and passes in as `LayoutFacts.list`.
+`summarizeRoots` and `rootWork` (`packages/core/roots.ts`) give the roots
+and each item's signals.
 
+- **`Layout.open` is drawn, never stored** (`drawnList`): your list, less
+  the archived roots but the one you are on, and the root you are on
+  wherever the list lacks it. Another device's repair may have taken it
+  out of your document; the screen you are on does not lose it.
+- **Who writes your list.** `show` of a root ensures it in your document
+  (`intent.ts`'s `show`, a `list` effect), so every way of opening goes
+  through it: the board, the activity menu, the inbox, `openAt`. A root you
+  start joins it in the session, as its send is answered (`startsRoot`). ×
+  is a `list` close and a `closeRoot`, which moves you on only if you were
+  on it: `afterClosing`'s choice, your list's next item below, else above,
+  else nothing. `moveInList` places a root before another, or at the end.
+  The session's repair deletes archived roots but the one the page reports
+  it is on (`openList.here`), so a restore brings a root back only for
+  whoever restores it.
 - **A root's label is `labelsOf`'s** (`root-label.ts`, ADR-0045, ADR-0074):
   its title; else `CHAT_LABEL` for a root no lane works in, read from the
   session's lane records, so a root only people wrote in needs no field of
   its own; else its first line (`firstLinesOf`), from its directory record
-  (ADR-0063). `App` builds both maps once per directory change, and every place that names a root looks one up: the tabs,
-  the header, the inbox, and the Archive tab, whose search reads labels, so
-  it finds a title without knowing about marks. The first lines are also
-  the rename field's placeholder: what clearing a title brings back.
-- **Renaming is `TabBar`'s state, never the layout's.** `planTitle` is the
+  (ADR-0063). `App` builds both maps once per directory change, and every
+  place that names a root looks one up: your list, the board, the activity
+  menu, the inbox. The first lines are also the rename field's placeholder:
+  what clearing a title brings back.
+- **Renaming is `OpenList`'s state, never the layout's.** `planTitle` is the
   field's submit, over `parseTitle`, the rule the codec decides by too, and
   `renameKey` what Enter and Escape do.
-- **What the bar shows and offers is `tabsView`'s** (`tabs-view.ts`), over
-  `tabBar`'s order: each tab's label, pip, ⋯ items and the intents it
-  sends. `TabBar` draws it; the `Readers` on each tab read presence
-  themselves (S59). Every tab has a `label`, Archive's `ARCHIVE_LABEL`.
-  `selected` is the tab you are on, decided there once: `App` titles the
-  window from it (`pageTitle`) and `TabBar` scrolls it into view, keyed by
-  `tabKey`, which is also each tab's React key.
-- **The tab bar is the header** (ADR-0081): `#top` holds `TabBar`, then
-  `Header` (`.header-right`, pushed right by `margin-left: auto`, so
-  nothing stands in for a `TabBar` not yet drawn). Every tab, Archive
-  included, is a `.tab-wrap` around its `.tab` button, ⋯ and ×; the wrap is
-  what is drawn as the tab. The selected wrap carries `data-selected`,
-  set from `TabView.selected`, so it holds even while its button is the
-  rename field; it is filled with `--page`, and the bar is `--chrome`. The session's message count is
-  the Archive tab's (`TabView.messages`): its title and `data-messages`,
-  and `.archive-count` in its list.
-
-- **Only you put a root in `open`.** `show` of a root opens it, so every way of
-  opening goes through `show`: `planOpen`, the Archive tab's Open and Restore,
-  the header. `sync` adds only the root of a new tab whose first message is
-  written. A root someone else starts opens no tab.
-- **`closeRoot` takes a root out of `open` and keeps its columns**, so opening
-  it again brings them back. So `roots` keeps the columns of every root you
-  have opened, bounded by the roots you visit. Closing the tab you are on
-  shows `afterClosing`'s choice: its right neighbour, else its left, else
-  Archive; closing an unsent new tab does the same.
-- **`resolveLayout` takes archived roots out of `open`, except the one you are
-  on.** It runs every render, so an archived root you are on leaves when you
-  do. Removing it, not hiding it,
-  means a restore opens it again only for whoever restores it.
-- **`active` is null only before the first `prune`.** A browser tab with
-  nothing stored has not chosen a tab, and the document has not arrived.
-  `App` draws "connecting…" meanwhile. `prune`, once after `whenSettled`,
-  drops roots the document lacks, takes archived roots out of `open`, and
-  replaces a null, gone or archived active tab with your last open tab, else
-  Archive. With nothing stored, that is Archive: nothing opens a tab by
-  itself. No action sets `active` back to null.
-- **A landed new tab moves left of any unsent ones**: its root joins `open` at
-  the end, and new tabs are drawn after `open`.
-- **Archiving closes the root's tab once the host answers `archived`**
-  (`afterArchive`), not when it is asked: a refusal leaves the tab open.
-- **An archived active root stays active** until you switch or reload, and
-  keeps its place in the bar (`resolveLayout` keeps it). Its columns are drawn with `readOnly`: the
-  composer stays mounted, disabled, so what was typed survives; Restore brings
-  it back in place.
-- **`tabOfColumn` is the one lookup from a column's key to its tab**: a new
-  tab's, or a root's whether or not that root is open. The card marks place a
-  fresh card with it.
+- **What your list shows and offers is `openListView`'s**
+  (`open-list-view.ts`), over `listOf`'s order: each item's label, pip,
+  `⋯` items (Not needed, Rename, Auto-update title, Move up, Move down,
+  Move to ▸ each other state) and the intents they send. `OpenList`
+  (`open-list.tsx`) draws it; each item's `Readers` read presence
+  themselves (S59, `root-signals.tsx`). `selected` is the item you are on,
+  decided there once: `App` titles the window from it (`pageTitle`) and
+  `OpenList` scrolls it into view, keyed by `listKey`.
+- **The chrome is your list, then the footer** (ADR-0085): the body is a
+  grid, `--side` wide on the left, the workspace beside it, and `#bottom`
+  under both. `#open-list` holds `.open-item` wraps, each around its
+  `.open-root` (or `.open-new`) button, ⋯ and ×; the selected wrap carries
+  `data-selected`, set from `ItemView.selected`, and is filled with
+  `--page`, the list `--chrome`. The footer (`footer.tsx`) holds
+  `.footer-you` (your profile and inventory), the board's strip
+  (`BoardStrip`), then `.footer-right` (activity, project, sync note).
+- **`resolveLayout` keeps an archived root you are on** in your list as
+  drawn, read-only, until you leave it. `prune`, once after `whenSettled`,
+  drops columns of roots the document lacks, and replaces a gone or
+  archived root you were on with your list's last, else nothing; with
+  nothing, the board opens: nothing opens a root by itself. No action sets
+  `active` back to null.
+- **Choosing a root or a new tab closes the board** (`show`, `newTab`): it
+  lay over what you chose.
+- **Moving a root on the board** is a `moveRoot` effect: the host's
+  `move-root`, and, into the closed state, the effects that close it for you
+  (`moved`), which `afterRootMove` runs only once the host answers
+  `moved-root`, as `afterKeep` does for a keep.
+- **`hereOfColumn` is the one lookup from a column's key to where it is**: a
+  new tab's, or a root's whether or not that root is in your list. The card
+  marks place a fresh card with it.
 - **`columnsOf` is the one place a root gets its first column**
   (`first-<root>`, anchored at the root). `columnsReducer` may leave a root
   with none; the layout then deletes the entry.
@@ -291,7 +290,9 @@ give the roots and each tab's signals.
   the rule that a key's parts are its colons.
 - **New tabs** are fresh columns at the root (`anchor: null`), local until
   their first send. `sync` moves one whose message is written to
-  `roots[rootOf(anchor)]`, keeping its key, and keeps it active.
+  `roots[rootOf(anchor)]`, keeping its key, and keeps it what you are on. A
+  new tab opened from a board column keeps that column's state
+  (`fresh.state`), which its first send carries (`ChatHow.state`).
 - **A new tab mints its root's id as it opens** (`fresh.root`, ADR-0066),
   from the shell, beside its key (`planIntent`'s `newRoot`), as a column
   reserves its lane's id. Its cards' fresh places name it, the host keeps
@@ -301,32 +302,55 @@ give the roots and each tab's signals.
 - **`sync` runs on every root's columns**, not only the active one's: an anchor
   left behind can later follow a newer branch below it (ADR-0027).
 - **The layout drawn is `resolveLayout(stored, facts)`, computed in render**
-  (ADR-0044): `sync`, then the archived roots leave `open`. An effect stores
-  it with `resolve`, the same function, so an action reduces from it: React
-  runs pending effects before it handles the next event. `App` draws
-  `layout`, never `stored`.
+  (ADR-0044): `sync`, then your list drawn. An effect stores it with
+  `resolve`, the same function, so an action reduces from it: React runs
+  pending effects before it handles the next event. `App` draws `layout`,
+  never `stored`.
 - **No effect dispatches from document facts,** except `prune`, once at
   settle. An effect runs a render after the facts it reads. When the layout
   was synced that way, a slow render painted new entries under the old
   anchor: a `⑂ 0 messages` chip and a row stuck at `…` (S35).
 - **`planOpen` is the deduplication `App` used to do**, pure: scroll to an
-  entry a column of its root already shows, open a column beside the deepest
-  sharer (`openBeside`), or preview an archived root in the Archive tab. The
-  rail and fork dots go through it, as an `openAt`
-  intent: `planIntent` turns its plan into effects, and `perform` carries
-  them out.
-- **Columns of other tabs are unmounted.** Alignment forgets their keys, so a
-  tab shown again places its columns as if opened, left to right: each at
+  entry a column of its root already shows, or open a column beside the
+  deepest sharer (`openBeside`). An archived root opens as any other; its
+  columns are read-only (`appView`). The rail and fork dots go through it,
+  as an `openAt` intent: `planIntent` turns its plan into effects, and
+  `perform` carries them out.
+- **Columns of other roots are unmounted.** Alignment forgets their keys, so a
+  root shown again places its columns as if opened, left to right: each at
   the spot it was left (A column's view, below), else aligned, the first at
   its end (Layout, below). Each keeps what it knew of its end
   (`SeenEnd`, Following a column's end), and each tool row what it decided
   (`RowMemory`, Tools and live work).
-- **The Archive tab** is `archive.tsx` over `archiveIndex`
-  (`archive-rows.ts`, a client-only read like `projection.ts`). Its filter,
-  search, selection and preview anchor are component state, never stored. The
-  preview is a `Rail` and one `Column` with `readOnly`: Restore for an
-  archived root, Open for an open one. Its column's reader settings
-  (density, details) are its own state, never stored.
+
+## The board (`board-view.ts`, `board.tsx`, ADR-0085)
+
+- **What the board shows is `boardView`'s**, over `boardOf` (`@pineta/rules`):
+  the strip (each state's name, count, roots and `markOf`), each open state
+  as a column of items, and the closed state's `closedRows`. An item's
+  `moves` are its `⋯`'s Move to ▸, one per other state, with the busy reason
+  into the closed state; `up` and `down` its Move up and Move down within
+  its state, so the keyboard reaches every move a drag makes. Its words
+  are worded beside it, one function each (`removeWords`, `closedWords`).
+- **The closed state searches labels** (`closedRows`), newest first, "mine"
+  being the roots `RootSummary.writers` holds you in; with no query, its
+  `CLOSED_RECENT` newest.
+- **One landing rule for a root's drag** (`root-target.ts`), as
+  `put-target.ts` is for a card's: `rootDropProps` marks a column, an item
+  or your list (`data-root-state`, `data-root-before`, `data-list-before`),
+  `rootTargetOfElement` reads it, and `planRootDrop` gives the same intent
+  the keyboard's moves send. A root's drag carries `ROOT_MIME`, never a
+  card's; `App`'s card handlers ignore it, and its root handlers ignore
+  `CARD_MIME`.
+- **`markOf` is the one rule for a mark over several roots** (`attention.ts`):
+  a board column's, a strip state's and ▦'s (the roots not in your list,
+  `unlisted`).
+- **Readers' avatars read presence themselves** (`root-signals.tsx`):
+  `Readers` for your list's items and the strip's states, `ReaderMenus` (a
+  menu of each reader's threads there, `peopleIn`) for a board item, so a
+  presence write redraws them and not `App` (S59).
+- **The board is `#board`, absolutely placed in `#workspace`** from its
+  foot: it covers the columns and moves none of them.
 
 ## The column model (`columns.ts`)
 
@@ -398,21 +422,24 @@ with ANY column to its left, so a shared stretch of paths is drawn once, in the
 leftmost column that shows it. Anything looking for a message on screen (the
 rail's scroll-to, the alignment) must search every column.
 
-## Who is here, and your inbox (ADR-0030)
+## Who is here, and your inbox (ADR-0030, ADR-0085)
 
-The header's right end (`header.tsx`, beside the tabs in `#top`) is the
-rest of the session, from live data; nothing in it opens a tab until you
-choose. It leads with "syncing…" (`.sync-note`) while the document's status
-is pending.
+The footer (`footer.tsx`, `#bottom`) is you, then the rest of the session,
+from live data; nothing in it opens a root until you choose. Its right end
+leads with "syncing…" (`.sync-note`) while the document's status is
+pending.
 
 - **People:** `peopleHere` (`here.ts`) groups `readingAt` by
   person, in `writerOrder`. An end's root is found in the index, else in
   the root its column reported (`readingRoot`, `readReadingRoots`), so a
   person in a root this tab does not hold is shown, and opens it. "Never you" is `readingAt`'s rule, not
-  repeated here. Each avatar (`Avatar`, the same circle the tabs and columns
-  draw) is a `Menu` of the threads that person is in.
-- **You** are the last thing in the header: your profile (`profile.tsx`,
-  below, under Who you are).
+  repeated here. There is no group of people of its own (ADR-0085): a board
+  item's readers are those people in its root (`peopleIn`), each avatar
+  (`Avatar`) a `Menu` of the threads that person reads there
+  (`ReaderMenus`); your list's items and the strip's states show avatars
+  only (`Readers`).
+- **You** are first in the footer, under your list: your profile
+  (`profile.tsx`, below, under Who you are), then your inventory.
 - **The agent:** `runsHere` is its running lanes in every root: a held
   lane's run at its tip (`activity`), any other at its root entry, from the
   lane's record (`running`) and the directory.
@@ -454,7 +481,7 @@ is pending.
   they share your mentions; a mention resolves to your display name, so
   renaming yourself still changes which mentions are yours.
 - **`Popover`** (`popover.tsx`) is a trigger and the box it opens. It wraps
-  both in a span that gains `open` while open, which keeps `.tab-more.open`
+  both in a span that gains `open` while open, which keeps `.open-more.open`
   visible; the box is `position: fixed` from the trigger's rect. Escape, a
   scroll of an element holding the trigger, a resize or a click elsewhere
   closes it. Escape is one document listener while open, taken with focus in
@@ -463,13 +490,13 @@ is pending.
   and a menu's list does.
 - **A trigger from live data is `gone`, not unmounted.** Unmounting a
   `Popover` takes its open box with it, so a change in the session would
-  close a menu you opened. The header keeps its activity menu
+  close a menu you opened. The footer keeps its activity menu
   mounted with `gone` when there is nothing to list (no trigger drawn unless
   open), and keeps a person who leaves while their menu is open
   (`withOpenMenus`, told by `onToggle`) until you close it.
 - **`Menu`** (`menu.tsx`) is a `Popover` whose box is a `role="menu"` list,
-  in sections (`MenuSection`): the header's people, activity and
-  project, the tab's `⋯`, the add tab's menu and the composer's where line.
+  in sections (`MenuSection`): a board item's readers, activity and
+  project, your list's items' `⋯`, ＋'s menu and the composer's where line.
   The first section's heading is drawn above the list, not in it, since a
   menu holds only menu items, and names it (`aria-labelledby`); each later
   section is a `<fieldset>` (role `group`, which Biome asks for as the
@@ -483,8 +510,8 @@ is pending.
   suite counts people by `.avatar`, and proves you are never among them by
   it. So your profile's trigger (`.me`), the agent's mark (`.agent-mark`)
   and the "+n" of `Avatars` (`.more`) are `.initial` and never `.avatar`.
-  The circle's shape is `.initial`'s rule; `.avatar` has none. `#top` holds
-  the tabs too (ADR-0081), so `#top .avatar` also matches a tab's readers,
+  The circle's shape is `.initial`'s rule; `.avatar` has none. Your list's
+  items and the board's hold readers' avatars too, so `.avatar` anywhere matches them,
   who never include you either.
 
 ## What needs you (`attention.ts`, `use-attention.ts`, ADR-0077)
@@ -499,8 +526,9 @@ is pending.
   done for whoever stopped it. `LEVELS` orders the levels once; `highest`
   reads it.
 - **`rootStatus`** is each tab's mark: working while a lane of its root is
-  busy or its verdict pending, else its highest item. `untabbed`
-  (`layout.ts`) gives the Archive tab's, as it gives `cardMarks.elsewhere`.
+  busy or its verdict pending, else its highest item. `markOf` folds it
+  over several roots: `unlisted` (`layout.ts`) gives ▦'s, as it gives
+  `cardMarks.elsewhere`.
 - **Motion is a change you saw, never a state.** `arrivals` compares two
   statuses, and `useArrivals` takes the first status after the session has
   settled and your `since` is known as the baseline, so a load moves
@@ -513,7 +541,7 @@ is pending.
   the window title's. `pageTitle` (`tabs-view.ts`) puts it before the
   selected tab's label.
 - **Words:** `attentionWords` words each item's reason, `LEVEL_WORDS` and
-  `LEVEL_CLASS` a level's name and class. Selectors: `.tab-status`
+  `LEVEL_CLASS` a level's name and class. Selectors: `.root-status`
   (`.working`, `.needs-you`, `.worth-a-read`, `.done`, `data-arrived`),
   `.here-thread.raised`, `.not-needed`.
 
@@ -548,7 +576,8 @@ error.
   shape: a TypeBox schema, then a build step field by field. A layout decodes
   whole or not at all, and `v` rejects an older one: a `v: 2` layout (before
   your tabs were yours, ADR-0030) is dropped once and overwritten by the first
-  save, and the page opens on the Archive tab. A lane that is not a lane name
+  save; so is a `v: 4` one (before your list was your own document,
+  ADR-0085), and the page opens on your list's last root, else the board. A lane that is not a lane name
   is left off; `sync` binds the column again.
 - **`reserved` is stored** (ADR-0057), and decoded only in the shape the host
   accepts (`parseNewLane`), so a reload keeps the thread's name. The device
@@ -666,8 +695,7 @@ the columns read one. `segmentPath` (core) decides what a column folds;
 - **Both are `ReaderAction`s, by the column's key** (`readerAction`,
   `intent.ts`), as `sent` and `reserve` are: `planColumn` sends them
   through `onColumn`, so a new tab's one column takes them
-  (`newTabColumn`), and the Archive preview reduces its own column with
-  `columnsReducer`, keeping them only while it shows.
+  (`newTabColumn`).
 - **What `askView` decides:** what its work holds (`work`, `workWords`
   over `askStats`), the outcome's words, the live line while it runs, the
   last word outline hides (none in the column's last ended ask,
@@ -713,8 +741,7 @@ the columns read one. `segmentPath` (core) decides what a column folds;
 ## Revealing a picked message (`use-reveal.ts`, S33)
 
 `useReveal(container)` returns `reveal(id)`, which `openAt` calls for a pick
-that scrolls and for one that opens a column, and the Archive preview for its
-picks.
+that scrolls and for one that opens a column.
 
 - **It tries at once.** Picking a message a column on the tab you are on
   already draws changes no layout state: `show` for the same tab returns the
@@ -725,8 +752,9 @@ picks.
   fork point is already level with it, and centring it would undo that.
 - **It dispatches `PLACED`.** A column scrolled down, from 0 or from a shorter
   path, has not moved up, so it is still following, and the next resize would
-  take it to its end (S33, answer 6). The Archive preview shows it: the pick
-  changes its path, and the new content resizes it.
+  take it to its end (S33, answer 6). Since the Archive preview went, every
+  column it scrolls was placed by `App`'s alignment first, so this is
+  defensive: no suite check reaches it (ADR-0085).
 - **It is declared after the alignment effect in `App`,** so a pick the
   alignment left out of view is scrolled to in the same commit.
 
@@ -862,7 +890,7 @@ became of its files (`strip`).
   - with no line set up, `catchUpOf` is `current`, so the menu says
     "already caught up with the project" where the project is not set up.
     The host refuses the catch-up (`no_line`).
-- **The header's project menu** (`LineMenu`, `lineView`, `lineWords`)
+- **The footer's project menu** (`LineMenu`, `lineView`, `lineWords`)
   offers "set up the project", showing the config text it writes
   (`immutable_heads()` and `revsets.log`); then notes of where your files
   stand, from the line's record: conflicts first, then what the project has
@@ -959,14 +987,16 @@ change of wording then touches the words function, its one test, and
 
 ## The page's colours (`index.html`, ADR-0081)
 
-`:root` names them: `--page` (the paper the columns and the tab you are on
-are drawn on), `--chrome` (the bar), `--edge` (its line and the selected
-tab's sides) and `--on` (the selected tab's top edge). No page-colour
-literal is left in the stylesheet. `--surface` is the colour behind a
-thing, set by context: `--page` by default, `--chrome` in `#top`, the hover
-fill on a hovered tab, `--page` on the selected one. A ring that must read
-as a gap around a dot (`.tab-status.needs-you`, `.card-pip`) is drawn in
-`--surface`, so it matches whatever the dot sits on.
+`:root` names them: `--page` (the paper the columns and the root you are on
+are drawn on), `--chrome` (your list and the footer), `--edge` (their lines
+and the selected item's sides), `--on` (the selected item's left edge) and
+`--side` (your list's width, which the footer's own cell shares). No
+page-colour literal is left in the stylesheet. `--surface` is the colour
+behind a thing, set by context: `--page` by default, `--chrome` in
+`#open-list` and `#bottom`, the hover fill on a hovered item, `--page` on
+the selected one and on a board item. A ring that must read as a gap around
+a dot (`.root-status.needs-you`, `.card-pip`) is drawn in `--surface`, so
+it matches whatever the dot sits on.
 
 ## Colour carries the link, not geometry
 
@@ -1055,10 +1085,6 @@ serves the rail's outline and the column's spot.
   places the column, when the spot's message is not drawn (in a closed
   fold) or the content fits the view: only alignment sets the spacer that
   lines a short branch up with its fork point.
-- **The Archive preview keeps no spot** (`spots={undefined}`): it shows a
-  root's newest path, and its spot, saved as you go back to the tab, would
-  replace the tab's columns' own. Its column still measures, and its rail
-  draws its outline.
 - **Selectors:** `.rail-view[data-key][data-track]`, one per band, and
   `.rail-tick[data-key][data-track]`, keyed by their column. The browser suite tests "around a dot" over every outline of
   a column: a column's view can lie on two branches.
@@ -1424,10 +1450,10 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
 - **"Needs you" comes from the tree** (ADR-0080): the strip's `needs_you`
   is the thread's newest `ask_about_conflict` (`conflictAskedAt`) when it is
   newer than the offer's record.
-- **The page header counts offers open** in your repo ("work ready to add to
+- **The footer's activity menu counts offers open** in your repo ("work ready to add to
   the project"), as it counts mentions, and the agent's running threads;
-  each row leads with the thread's name and opens its thread. Archive in a
-  tab's `⋯` names the threads whose offers it withdraws (`offeredByRoot`,
+  each row leads with the thread's name and opens its thread. Move to Done
+  in an item's `⋯` names the threads whose offers it withdraws (`offeredByRoot`,
   `dropsWords`). Both read `openOffers`, which keeps only `offerStatus`'s
   `open` (ADR-0067): one the line already holds (`held`) has nothing to
   add, so it is neither counted nor named, as the strip says.
@@ -1584,10 +1610,10 @@ pipeline keeps the tree a pure function, testable without a DOM.
   deletes the key of a column no longer reported (`planReading`,
   `presence-report.ts`, decides both), and refreshes all of them
   every 10 s while `document.visibilityState` is `visible` (a
-  `visibilitychange` listener refreshes on return). Switching tabs therefore
-  clears the last tab's keys, through that same deletion. The Archive tab
-  reports nothing. Typing is written at most once a second (`typingDue`).
-- **A tab's avatars** are `readersByRoot(peopleHere(…))` (`here.ts`): the
+  `visibilitychange` listener refreshes on return). Switching roots therefore
+  clears the last root's keys, through that same deletion. On nothing, a
+  page reports nothing. Typing is written at most once a second (`typingDue`).
+- **A root's avatars in your list** are `readersByRoot(peopleHere(…))` (`here.ts`): the
   header's people turned around, each tab's `Readers` taking its root's.
 - **`core/presence.ts` decides everything shown**, from one field's read
   (`readReading` and `readTyping` in `@pineta/reads`) and the
@@ -1770,8 +1796,8 @@ stays in view; the strip scrolls past 30vh.
   `tracesAt` keeps yours whose place resolves to this end (`placeEnd`, as a
   card there would), `traceGroups` makes one line per person and verb
   (`verbOf`), and `traceWords` words it ("Bea queued this", "3 cards moved
-  by Bea"). Only a column that can be written draws them: the Archive
-  preview is a glance.
+  by Bea"). Only a column that can be written draws them: an archived
+  root's is a glance.
 - **A click is `openTrace`** (`planOpenTrace`, `card-intents.ts`): the card's
   place now, as an undo's answer shows it (`revealOf`); a sent card's
   message; nothing for a card in someone else's inventory.
@@ -1786,11 +1812,10 @@ stays in view; the strip scrolls past 30vh.
 ## Marks for your cards (ADR-0048, step 2)
 
 A pip in your colour (`CardPip`, `.card-pip`, the one selector the suites
-use) marks where an unsent card of yours holds text: its root's tab or its
-new tab, the rail dot at a drafting card's thread end, and, for a root with no
-tab in your bar, the root's row in the Archive tab. The Archive tab itself is
-marked only for a root whose tab you closed: an archived root's work is done,
-so it never lights the tab (`elsewhere`).
+use) marks where an unsent card of yours holds text: its root's item in your
+list or its new tab, the rail dot at a drafting card's thread end, and the
+root's item on the board. ▦ itself is marked only for a root not in your
+list: an archived root's work is done, so it never lights ▦ (`elsewhere`).
 
 - **`cardMarks` (`card-marks.ts`) decides, purely,** from your cards, the
   ones holding text, the layout, the lanes and the index. A drafting card is
@@ -1838,9 +1863,8 @@ state, never stored.
 - **The history of moves is the host's** (ADR-0066): one per person and
   root, which the host chooses for each move (`historyOf`). The page keeps
   none, and names no history when it moves a card. `undoMove` names the
-  root of the tab you are on (`planUndoMove`: its `RootId` from the
-  directory, `IntentState.rootEntries`, or a new tab's `fresh.root`); the
-  Archive tab has none. The session sends `undo-move` and answers once its
+  root you are on (`planUndoMove`: its `RootId` from the directory,
+  `IntentState.rootIds`, or a new tab's `fresh.root`); nothing has none. The session sends `undo-move` and answers once its
   copy of the places reaches the reply's `rev` (`whenRev`).
 - **The answer is planned afresh** (`undoAnswered`, `afterUndo`): each place
   a card went back to, once, brought into view (`revealOf`, `reveal.ts`):
@@ -1877,10 +1901,11 @@ state, never stored.
   (`moveCards`), which the host accepts or refuses whole, `full` among its
   refusals, and closes the column once accepted (`afterKeep`).
 - **Drag** is HTML drag and drop, not the column drag's pointer events: it
-  crosses elements and tabs. A card's drag carries its id under
+  crosses elements and roots. A card's drag carries its id under
   `CARD_MIME`; its handle is its take button (`TakeIntoInventoryButton`), or a slot. `App` listens on
-  the document for `dragover` and `drop`; a drag held over a root's tab for
-  `TAB_HOVER_MS` opens it. `NOT_A_HANDLE` includes `[draggable='true']`, so
+  the document for `dragover` and `drop`; a drag held over a root in your
+  list for `ITEM_HOVER_MS` opens it. A root's drag is not a card's
+  (`ROOT_MIME`, The board, above). `NOT_A_HANDLE` includes `[draggable='true']`, so
   a card's drag never starts a column's.
 - **Keys** (`inventory-keys.ts`, `keyAct`): one table, read by one
   `keydown` listener in `App` that decides nothing. Ctrl+Shift+I takes the
@@ -1895,7 +1920,7 @@ state, never stored.
   panel is closed opens it briefly.
 - **Selectors for the browser suite:** `.inventory` (the panel),
   `.inventory .slot[data-slot][data-card]` and `.slot-line`, `.inventory
-  .put`, `.inventory .remove`, `#top .inventory-toggle`, a card's
+  .put`, `.inventory .remove`, `#bottom .inventory-toggle`, a card's
   `.take-into-inventory`, a message's `.take-copy-into-inventory`, and a
   fresh column's `.close-keep`,
   `.close-discard` and `.close-cancel`.
@@ -1980,41 +2005,42 @@ shown by their email's part before the `@`. Each rendered chat carries its
   effects.** `useFollow`'s first scroll to its end comes in its
   ResizeObserver callback, a step later. Anything a layout effect measures
   against another column (alignment does) must place that column first.
-- **A renamed root's tab is an `<input class="tab-title-input">`, not a
-  `.tab`**: an input inside a button is invalid HTML, so while the field is
-  open, `.tab[data-root]` is gone. Enter, Escape and blur all go through one
-  `finish` that acts once: removing a focused field can fire a blur after
-  Enter or Escape, which would save again, or save a cancel. Only Enter and
-  Escape give the tab focus back; a blur leaves focus where the person put
-  it.
-- **A root tab's `⋯` and a tab's × are always rendered, hidden with
-  `visibility`** except on the tab you are on, while hovered or focused, or
-  (the `⋯`) while its menu is open (`Menu`'s wrapper, `.tab-more`, gains
+- **A renamed root's item is an `<input class="open-title-input">`, not a
+  `.open-root`**: an input inside a button is invalid HTML, so while the
+  field is open, `.open-root[data-root]` is gone. Enter, Escape and blur all
+  go through one `finish` that acts once: removing a focused field can fire
+  a blur after Enter or Escape, which would save again, or save a cancel.
+  Only Enter and Escape give the item focus back; a blur leaves focus where
+  the person put it.
+- **An item's `⋯` and × are always rendered, hidden with `visibility`**,
+  shown while it is hovered or focused, the one you are on too, or (the
+  `⋯`) while its menu is open (`Menu`'s wrapper, `.open-more`, gains
   `open`). The menu is its child, so hiding the `⋯` would hide an open menu
-  too. On a tab you are not on, both are absolutely placed over the label's
-  end, so they take no width from a shrunk label. A browser check clicks a
-  × on the tab you are on, or hovers first: Playwright waits on a hidden
+  too. Both are absolutely placed over the label's end, so they take no
+  width from the label. A browser check hovers first (`seeInMenu` does for
+  every menu in your list or on the board): Playwright waits on a hidden
   target until it times out.
-- **The bar's bottom line is an inset shadow on `#top`**, which the selected
-  tab's fill covers: a descendant's background paints over an ancestor's
-  inset shadow. A negative bottom margin on the tab could not do it, since
-  `.tab-list` scrolls sideways and so clips what hangs below it ("Anything
-  that pops out of the tab bar", below).
+- **Your list's right edge is an inset shadow on `#open-list`**, which the
+  selected item's fill covers: a descendant's background paints over an
+  ancestor's inset shadow. The item reaches the list's right edge (the list
+  has no right padding), so it meets the rail.
 - **A column's × (`.close`) is `closable`** (`ColumnSlot`, `appView`):
-  hidden on a root tab's only column (`columnsOf` would give it back) and in
-  the Archive tab's preview.
-- **A popover opens above its trigger in the window's lower half.** A
-  composer's `▾` is at the window's foot, so a list below it would be out of
-  sight; and since `.popover` sets a `top` in the stylesheet, the upward box
-  sets `top: auto` too, or `top` wins over `bottom`.
-- **Anything that pops out of the tab bar is `position: fixed`.** `.tab-list`
-  scrolls sideways, and `overflow-x: auto` makes its vertical overflow `auto`
-  too, so a menu positioned inside it is clipped below the bar. `Popover`
+  hidden on a root's only column (`columnsOf` would give it back).
+- **A popover opens above its trigger in the window's lower half, and from
+  its left edge in the left half.** A composer's `▾`, and the footer, are at
+  the window's foot, so a list below would be out of sight; your list's `⋯`
+  and your profile are at its left, so a box anchored by its right edge
+  would open past it. Since `.popover` sets a `top` and a `right` in the
+  stylesheet, an upward box sets `top: auto`, and a leftward one `right:
+  auto`, or the stylesheet's wins.
+- **Anything that pops out of a scrolling list is `position: fixed`.** Your
+  list and the board scroll, so a menu positioned inside either is clipped
+  by it. `Popover`
   places its box from its trigger's rect when opened, and closes on a
   resize or a scroll of an element holding the trigger, since a fixed box
   would drift from its trigger. Not on any scroll outside the box: a column
   following its end scrolls whenever an entry arrives, which closed every
-  open menu (the header's @ among them) without the person doing anything.
+  open menu (the activity menu among them) without the person doing anything.
 - **Playwright clicks what a person cannot see.** It scrolls a clipped element
   into view before clicking, so a check that a popup can be clicked does not
   show it is visible. Check what `elementFromPoint` finds at its centre: the
@@ -2022,27 +2048,32 @@ shown by their email's part before the `@`. Each rendered chat carries its
   disabled item: it returns false, so the check expecting the item fails and
   the suite goes on.
 
-- **Selectors for root tabs:** a root's tab is `#tabs .tab[data-root="…"]`,
-  the one you are on has `aria-selected="true"` and its wrap
-  `data-selected`, its × is the `.tab-close`
-  after it, its `⋯` holds `.rename-root` and `.archive-root`, a root being
-  renamed is `.tab-title-input`, Archive is `.tab-archive`, new tabs are
-  `.tab-new`, and the add tab's buttons are `.add-agent`, `.add-menu` and
-  `.add-conversation`. The Archive tab's `data-messages` is the session's
-  message count; the browser suite's `countIsHosts` waits on it, and
-  `connected` (`page.ts`) waits for `#tabs .tab-archive` with no
-  `.sync-note`. In the header: `#top .here-person .here-trigger` per
-  person, `.here-agent`, and `.inbox-trigger` with
-  `.inbox-count[data-unseen]`; menu rows are `.here-thread` and `.inbox-row`,
-  each with `data-entry`. You are
-  `#top .me-trigger` (its `title` your name), opening `#profile`, with
+- **Selectors for your list and the board:** a root in your list is
+  `#open-list .open-root[data-root="…"]`, the one you are on has
+  `aria-current="true"` and its wrap `data-selected`, its × is the
+  `.open-close` after it, its `⋯` (`.open-menu`) holds `.rename-root`,
+  `.retitle-root`, `.move-up`, `.move-down` and `.move-to` (`.closes` for
+  the closed state), a root being renamed is `.open-title-input`, new tabs
+  are `.open-new`, and ＋'s buttons are `.add-agent`, `.add-menu` and
+  `.add-conversation`. The board is `#board`: a `.board-column[data-state]`
+  per open state and `.board-closed` for the closed one, each item a
+  `.board-item[data-root][data-entry]` with `.board-open`, `.board-label`,
+  `.reader-trigger` per reader and `.item-menu`; `.closed-search`,
+  `.add-state`, `.state-name`. The footer is `#bottom`: ▦ is
+  `.board-toggle`, whose `data-messages` is the session's message count
+  (the browser suite's `countIsHosts` waits on it), each state
+  `.strip-state[data-state]`; `connected` (`page.ts`) waits for
+  `#open-list .add-agent` with no `.sync-note`. Menu rows are `.here-thread`
+  and `.inbox-row`, each with `data-entry`. You are
+  `#bottom .me-trigger` (its `title` your name), opening `#profile`, with
   `input[name="name"]`, `.name-handle`, `.name-problem[data-problem]`,
   `.profile-email` and `.not-you`. The identification screen's email problem
   is `.identity-problem`.
-- **A page with nothing stored opens on the Archive tab**, so a browser check
-  that opens a second page opens its thread from there, or from a person in
-  the header. The rail is `.rail`, not `#rail`: the
-  Archive tab's preview draws a second one.
+- **A page with nothing in your list opens on the board**, so a browser check
+  that opens a second page opens its thread from there (`openFromBoard`), or
+  from a reader on a board item. To step away from a root so its columns
+  unmount, a check opens a new tab and closes it again (`stepAway`,
+  `stepBack`).
 - **`.column` must stay `#strip`'s direct child**: `use-column-drag.ts`
   queries `:scope > .column`. A column's `.column-body` is inside
   `.column-thread`.

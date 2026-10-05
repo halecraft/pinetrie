@@ -11,6 +11,8 @@ ADR-0059 (the inventory is one of a family of person documents), ADR-0063
 "Worth a read"), ADR-0071 (a short ask's end costs a request again, for
 its verdict) and ADR-0075 (the final digest request carries the verdict).
 Builds on ADR-0076, in flight.
+Amended by ADR-0085: your open roots are a third person document (`open:`),
+and ▦ carries the mark the Archive tab did.
 
 **Context.** With several agents at work, Duane could not tell which tab
 needed him:

@@ -134,7 +134,7 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "page",
     expect:
-      "a branch column is level with its fork point after a return to its tab",
+      "a branch column is level with its fork point after a return to its root",
   },
   {
     name: "a fork dot takes another track's colour",
@@ -293,8 +293,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "startup does not compact",
     file: "apps/pineta/host/index.ts",
-    from: "    settle,\n    cards: cardPort,\n    provenance,\n    ensureNames: names.ensure,\n  })",
-    to: "    settle: lanes =>\n      keeper.run(async () => {\n        for (const l of lanes) await drain(l)\n      }),\n    cards: cardPort,\n    provenance,\n    ensureNames: names.ensure,\n  })",
+    from: "    settle,\n    cards: cardPort,\n    provenance,\n    ensureNames: names.ensure,\n    carryOver,\n  })",
+    to: "    settle: lanes =>\n      keeper.run(async () => {\n        for (const l of lanes) await drain(l)\n      }),\n    cards: cardPort,\n    provenance,\n    ensureNames: names.ensure,\n    carryOver,\n  })",
     suite: "host",
     scenario: "tools",
     expect: "a starting host compacts the session it opened",
@@ -306,7 +306,7 @@ export const mutations: readonly Mutation[] = [
     to: '  return useMemo(() => readingAt(reading, "w-nobody" as never), [reading, me])',
     suite: "browser",
     scenario: "page",
-    expect: "another window shows in the header, and you never do",
+    expect: "another window shows on its root's board item, and you never do",
   },
   {
     name: "the browser suite runs against production React",
@@ -430,18 +430,20 @@ export const mutations: readonly Mutation[] = [
     to: "    initialLayout,",
     suite: "browser",
     scenario: "page",
-    expect: "a reload keeps your tabs, in order",
+    expect:
+      "a reload keeps the root you were on, and its open columns, in order",
   },
   {
     name: "restored columns are pruned before the document settles",
     file: "packages/client/app.tsx",
-    from: '    if (settled)\n      dispatch({ kind: "prune", index, archive, known: new Set(labels.keys()) })',
-    to: '    dispatch({ kind: "prune", index, archive, known: new Set(labels.keys()) })',
+    from: '    if (settled)\n      dispatch({\n        kind: "prune",',
+    to: '    dispatch({\n        kind: "prune",',
     suite: "browser",
     scenario: "page",
-    // Pruned before the document arrives, a reload drops the tabs and columns
-    // whose roots have not arrived yet.
-    expect: "a reload keeps your tabs, in order",
+    // Pruned before the document arrives, a reload drops the columns whose
+    // roots have not arrived yet.
+    expect:
+      "a reload keeps the root you were on, and its open columns, in order",
   },
   {
     name: "the column observes only its viewport",
@@ -484,22 +486,22 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a new root takes the page to it",
     file: "packages/client/app.tsx",
-    from: "  }, [layout, stored, index, lanes, archive])",
-    to: '  }, [layout, stored, index, lanes, archive])\n  useEffect(() => {\n    const newest = index.roots.at(-1)\n    if (newest !== undefined) dispatch({ kind: "show", tab: { kind: "root", root: newest } })\n  }, [index])',
+    from: "  }, [layout, stored, index, lanes, archivedRoots, list])",
+    to: '  }, [layout, stored, index, lanes, archivedRoots, list])\n  const othersRoots = [...directory.values()].filter(r => r.entry !== null && !r.writers.includes(session.writer)).length\n  useEffect(() => {\n    const newest = [...directory.values()].flatMap(r => (r.entry === null || r.writers.includes(session.writer) ? [] : [r.entry])).at(-1)\n    if (newest !== undefined) dispatch({ kind: "show", here: { kind: "root", root: newest } })\n  }, [othersRoots])',
     suite: "browser",
     scenario: "page",
     expect:
-      "a root another writer starts opens no tab, and the page stays where it is",
+      "a root another writer starts is not added to your list, and the page stays where it is",
   },
   {
-    name: "the tab menu is drawn inside the tab list, which clips it",
+    name: "a root's menu is drawn inside your list, which clips it",
     file: "packages/client/popover.tsx",
     from: '      position: "fixed" as const,',
     to: '      position: "absolute" as const,',
     suite: "browser",
     scenario: "page",
     expect:
-      "Rename in a tab's ⋯ titles its root, for everyone, and gives the tab focus back",
+      "Rename in a root's ⋯ titles it, for everyone, and gives its item focus back",
   },
   {
     name: "any scroll outside a popover closes it",
@@ -529,27 +531,57 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "page",
     expect:
-      "the header's activity and the thread's tab are still while the agent works",
+      "the footer's activity and the thread's item are still while the agent works",
+  },
+  // ── the board and your list (ADR-0085) ──
+  {
+    name: "the board opens in the flow, before the columns",
+    file: "packages/client/index.html",
+    from: "      #board { position: absolute; z-index: 3; left: 0; right: 0; bottom: 0; max-height: 70%;",
+    to: "      #board { position: relative; order: -1; z-index: 3; left: 0; right: 0; bottom: 0; max-height: 70%;",
+    suite: "browser",
+    scenario: "page",
+    expect: "the board opens over the columns and moves none of them",
   },
   {
-    name: "the tab you are on is the bar's colour",
-    file: "packages/client/index.html",
-    from: "        background: var(--page); --surface: var(--page); border-color: var(--edge);",
-    to: "        background: var(--chrome); --surface: var(--page); border-color: var(--edge);",
+    name: "a root's drag lands nowhere",
+    file: "packages/client/app.tsx",
+    from: "      if (carriesRoot(e) && targetOf(e) !== null) e.preventDefault()",
+    to: "      if (carriesRoot(e) && targetOf(e) === undefined) e.preventDefault()",
     suite: "browser",
     scenario: "page",
     expect:
-      "the tab you are on is the page's colour, the bar is not, and the tab meets the page",
+      "dragging a board item to another state moves it for the other window",
   },
   {
-    name: "a tab pulses while its agent works",
-    file: "packages/client/index.html",
-    from: "      .tab-status.working { border: 1.5px solid #9ecbff; }",
-    to: "      .tab-status.working { border: 1.5px solid #9ecbff; animation: pulse 1s ease-in-out infinite; }",
+    name: "the host neither stores nor relays your list",
+    file: "apps/pineta/host/index.ts",
+    from: '        case "open":\n          return Interpret(OpenDoc)\n',
+    to: "",
     suite: "browser",
     scenario: "page",
     expect:
-      "the header's activity and the thread's tab are still while the agent works",
+      "your list is your own: another device of yours has it, in your order",
+  },
+  {
+    name: "the root you are on is your list's colour",
+    file: "packages/client/index.html",
+    from: "      .open-item[data-selected] { background: var(--page); --surface: var(--page);",
+    to: "      .open-item[data-selected] { background: var(--chrome); --surface: var(--page);",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "the root you are on is the page's colour, your list is not, and it meets the page",
+  },
+  {
+    name: "a root's mark pulses while its agent works",
+    file: "packages/client/index.html",
+    from: "      .root-status.working { border: 1.5px solid #9ecbff; }",
+    to: "      .root-status.working { border: 1.5px solid #9ecbff; animation: pulse 1s ease-in-out infinite; }",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "the footer's activity and the thread's item are still while the agent works",
   },
   {
     name: "Escape leaves a popover open once its focused item has gone",
@@ -560,16 +592,6 @@ export const mutations: readonly Mutation[] = [
     scenario: "page",
     expect:
       "an activity menu open when the agent finishes stays open and says so, and the trigger leaves once you close it",
-  },
-  {
-    name: "a revealed column still follows its end",
-    file: "packages/client/use-reveal.ts",
-    from: "  body.dispatchEvent(new Event(PLACED))",
-    to: "  void PLACED",
-    suite: "browser",
-    scenario: "tools",
-    expect:
-      "a capsule in the Archive tab's preview shows its first message, and keeps it in view",
   },
   {
     name: "a capsule ignores where it is clicked",
@@ -593,7 +615,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the activity badge never hears of unseen mentions",
-    file: "packages/client/header.tsx",
+    file: "packages/client/footer.tsx",
     from: "    unseen: inbox.unseen,",
     to: "    unseen: 0,",
     suite: "browser",
@@ -658,7 +680,7 @@ export const mutations: readonly Mutation[] = [
     to: '          className="avatar"',
     suite: "browser",
     scenario: "page",
-    expect: "another window shows in the header, and you never do",
+    expect: "another window shows on its root's board item, and you never do",
   },
   {
     name: "this device's name and the session's agree only once, at settle",
@@ -752,7 +774,7 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "page",
     expect:
-      "archiving closes the tab of the window that archived it, and the page someone else is on reads it",
+      "moving a root to Done closes it for the window that moved it, and the page someone else is on reads it",
   },
   {
     name: "a paste of images keeps the browser's default",
@@ -807,8 +829,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the layout drawn is the stored one, a render behind the document",
     file: "packages/client/app.tsx",
-    from: '  const layout = useMemo(\n    () => resolveLayout(stored, { index, lanes, archive }),\n    [stored, index, lanes, archive],\n  )\n  useEffect(() => {\n    if (layout !== stored) dispatch({ kind: "resolve", index, lanes, archive })\n  }, [layout, stored, index, lanes, archive])',
-    to: '  const layout = stored\n  useEffect(\n    () => dispatch({ kind: "resolve", index, lanes, archive }),\n    [index, lanes, archive],\n  )',
+    from: '  const layout = useMemo(\n    () =>\n      resolveLayout(stored, { index, lanes, archived: archivedRoots, list }),\n    [stored, index, lanes, archivedRoots, list],\n  )\n  useEffect(() => {\n    if (layout !== stored)\n      dispatch({ kind: "resolve", index, lanes, archived: archivedRoots, list })\n  }, [layout, stored, index, lanes, archivedRoots, list])',
+    to: '  const layout = stored\n  useEffect(\n    () => dispatch({ kind: "resolve", index, lanes, archived: archivedRoots, list }),\n    [index, lanes, archivedRoots, list],\n  )',
     suite: "browser",
     scenario: "tools",
     expect: "no branch chip is painted in the agent's column while it works",
@@ -1146,17 +1168,37 @@ export const mutations: readonly Mutation[] = [
     to: "        archived: new Set(),\n        lanes,",
     suite: "browser",
     scenario: "page",
-    expect:
-      "an archived root holding your card marks its row, not the Archive tab",
+    expect: "an archived root holding your card marks its board item, not ▦",
   },
   {
-    name: "the dispatcher answers archive without archiving",
+    name: "the dispatcher answers a move on the board without moving",
     file: "apps/pineta/host/commands/index.ts",
-    from: "        return settled(await handleArchive(deps, writer, intent))",
-    to: '        return settled({ kind: "archived" })',
+    from: "        return settled(await handleRootMove(deps, writer, intent))",
+    to: '        return settled({ kind: "moved-root" })',
     suite: "host",
-    scenario: "archive",
-    expect: "a root is archived, by its archiver, and another client sees it",
+    scenario: "board",
+    expect:
+      "a root moved to Done is archived for another client, and a chat into it is refused naming the mover",
+  },
+  {
+    name: "a started root is never placed",
+    file: "apps/pineta/host/commands/index.ts",
+    from: '        if (intent.at.kind === "root" && spendsCard(sent))',
+    to: '        if (intent.at.kind === "root" && spendsCard(sent) && false)',
+    suite: "host",
+    scenario: "board",
+    expect:
+      "a new root lands in the state its chat names, else the first open one",
+  },
+  {
+    name: "a root moved out of Done keeps its place there",
+    file: "apps/pineta/host/commands/board.ts",
+    from: "  // execute\n  await deps.agent.writeValues(writes)\n",
+    to: '  // execute\n  if (moved.transition === "close") await deps.agent.writeValues(writes)\n',
+    suite: "host",
+    scenario: "board",
+    expect:
+      "a move from a state the root has left is refused naming who moved it; moved out of Done, it takes writes again",
   },
   {
     name: "the dispatcher answers mark without titling",
@@ -1164,7 +1206,7 @@ export const mutations: readonly Mutation[] = [
     from: "        return settled(await handleMark(deps, writer, intent))",
     to: '        return settled({ kind: "marked" })',
     suite: "host",
-    scenario: "archive",
+    scenario: "board",
     expect: "a root is titled, by its writer",
   },
   {
@@ -1497,8 +1539,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a column leaving keeps no spot",
     file: "packages/client/column.tsx",
-    from: "      p.spots?.save(\n",
-    to: "      p.spots?.load(\n",
+    from: "      p.spots.save(\n",
+    to: "      p.spots.load(\n",
     suite: "browser",
     scenario: "page",
     expect: "a column shown again is where its reader left it",
@@ -1699,13 +1741,13 @@ export const mutations: readonly Mutation[] = [
       "Auto-update title replaces a person's title with one from the thread's messages",
   },
   {
-    name: "Auto-update title in a tab's ⋯ sends nothing",
-    file: "packages/client/tabs.tsx",
-    from: '                                  label: "Auto-update title",\n                                  onChoose: () => onIntent(item.intent),',
-    to: '                                  label: "Auto-update title",\n                                  onChoose: () => {},',
+    name: "Auto-update title in a root's ⋯ sends nothing",
+    file: "packages/client/open-list.tsx",
+    from: '        label: "Auto-update title",\n        onChoose: () => onIntent(item.intent),',
+    to: '        label: "Auto-update title",\n        onChoose: () => {},',
     suite: "browser",
     scenario: "page",
-    expect: "Auto-update title in a tab's ⋯ titles its root from the model",
+    expect: "Auto-update title in a root's ⋯ titles it from the model",
   },
   {
     name: "startHost runs read no pinned cards",

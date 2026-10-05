@@ -616,6 +616,7 @@ export function rowRetainedTail(row: StoredEntryRow): readonly unknown[] {
 
 export * from "./attention.ts"
 export * from "./inventory.ts"
+export * from "./open.ts"
 export * from "./places.ts"
 export * from "./presence.ts"
 export * from "./text.ts"

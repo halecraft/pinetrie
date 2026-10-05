@@ -13,13 +13,14 @@ import {
   type Sha256,
   snapshotId,
   type ThreadName,
+  workflowStateIdFor,
   writerId,
 } from "@pineta/core"
 import { describe, expect, test } from "vitest"
 import {
-  ARCHIVE,
   BANNER,
   BASE,
+  BOARD,
   CARD_HISTORY,
   COMMANDS,
   DIGEST,
@@ -41,6 +42,7 @@ import {
   setRecord,
   TRACE,
   VERDICT,
+  WORKFLOW,
 } from "./index.ts"
 
 const ADA = writerId("ada@x.io")
@@ -104,9 +106,24 @@ const rootRecord: RootRecord = {
 
 const SAMPLES: readonly Sample[] = [
   sample(
-    "archive",
-    ARCHIVE,
-    { root: E, state: "archived", by: ADA, at: 1 },
+    "workflow",
+    WORKFLOW,
+    {
+      open: [{ id: workflowStateIdFor("1"), name: "Doing" }],
+      closed: { id: workflowStateIdFor("2"), name: "Done" },
+    },
+    null,
+  ),
+  sample(
+    "board",
+    BOARD,
+    {
+      root: TEST_ROOT,
+      state: workflowStateIdFor("1"),
+      rank: "0a",
+      by: ADA,
+      at: 1,
+    },
     "root",
   ),
   sample("mark", MARK, { entry: E, title: "Plans", by: ADA, at: 1 }, "entry"),
@@ -330,7 +347,8 @@ test("each record lives where it is read (ADR-0063): across roots in the session
     SAMPLES.map(([name, spec]) => [name, spec.home]),
   )
   expect(homes).toEqual({
-    archive: "session",
+    workflow: "session",
+    board: "session",
     mark: "root",
     stop: "root",
     digest: "root",

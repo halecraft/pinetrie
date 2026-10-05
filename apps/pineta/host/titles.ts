@@ -20,10 +20,9 @@ import type { Keeper } from "@pineta/keeper"
 import type { Agent } from "@pineta/pi"
 import type { Outcome } from "@pineta/protocol/codec"
 import {
-  readArchive,
+  readArchived,
   readLaneRecords,
   readMarks,
-  readRoots,
   readTreeIndex,
 } from "@pineta/reads"
 import {
@@ -154,10 +153,7 @@ export function createTitles(deps: {
       },
       settle: async ({ entry, title }) => {
         // An archived root takes no writes (ADR-0029).
-        if (
-          archivedIn([root], readRoots(session), readArchive(session)) !== null
-        )
-          return
+        if (archivedIn([root], readArchived(session)) !== null) return
         const marks = readMarks(doc)
         if (!titleStillWanted(marks.get(entry), by)) return
         const planned = planMark({
