@@ -739,14 +739,17 @@ const cloneFile = (from: string, to: string): LaneStep[] => [
   onHost("/bin/mv", "-f", `${to}.tmp`, to),
 ]
 
-/** A volume made from a snapshot: created, then its image replaced by a clone. */
-const restoreVolume = (
+/**
+ * A volume made from a disk image: created, then its image replaced by a
+ * clone of `source`, a snapshot's file or another volume's image.
+ */
+export const restoreVolume = (
   paths: DiskPaths,
-  id: SnapshotId,
+  source: string,
   volume: string,
 ): LaneStep[] => [
   createVolume(volume),
-  ...cloneFile(snapshotFile(paths, id), volumeImage(paths, volume)),
+  ...cloneFile(source, volumeImage(paths, volume)),
 ]
 
 /**
@@ -890,8 +893,8 @@ export function planJoins(
 }
 
 /**
- * The lane steps that make a disk a fork: a change of its own, before
- * anything else runs there (S42 item 2), the lane's bookmark at its base, and
+ * The lane steps that make a disk a fork: a change of its own, before any
+ * other jj command runs there (S42 item 2), the lane's bookmark at its base, and
  * inherited history made immutable. Without it, the fork's first turn reuses
  * its parent's change id, and your repo sees a divergent change. A base with
  * several parents is committed once, empty, so the bookmark names one commit.
@@ -925,6 +928,9 @@ export function planForkSetup(
       ? `"$(jj --ignore-working-copy log --no-graph -r @- -T commit_id)"`
       : shellWord(start.commits[0] ?? "")
   return [
+    // pre-rename: before any jj command, which would snapshot it into the
+    // working copy the clone carries (`OLD_LANE_CONFIG_DIR`).
+    laneShell(`rm -rf ${OLD_LANE_CONFIG_DIR}`),
     ...base,
     inLane(
       "jj",
@@ -960,9 +966,82 @@ export const planDisk = (input: {
 }): LaneStep[] => [
   ...(input.from === null
     ? [createVolume(input.spec.volume)]
-    : restoreVolume(input.paths, input.from, input.spec.volume)),
+    : restoreVolume(
+        input.paths,
+        snapshotFile(input.paths, input.from),
+        input.spec.volume,
+      )),
   planStart(input.spec, input.env),
 ]
+
+/**
+ * pre-rename: the lane's jj config folder before b05e2252. Snapshots taken
+ * of lanes made before then still hold it, and `laneIgnores` does not list
+ * it, so a turn would commit it. Remove with `planOldNamesOnDisk` once no
+ * such snapshot remains.
+ */
+export const OLD_LANE_CONFIG_DIR = `${WORKSPACE_ROOT}/.pineta-lane`
+/** pre-rename: the prefix of the lane's bookmarks before b05e2252. */
+const OLD_BOOKMARK_PREFIX = "pineta/"
+
+/** pre-rename: what of the names before the rename is on a lane's disk. */
+export interface OldNamesOnDisk {
+  readonly configDir: { readonly old: boolean; readonly current: boolean }
+  /** Every bookmark in the lane's repo. */
+  readonly bookmarks: readonly string[]
+}
+
+/**
+ * pre-rename: the steps that give a disk cloned from a snapshot taken before
+ * the rename the names the host reads now. Pure; empty when nothing is old.
+ * The config folder moves first, so the jj steps after it run under the
+ * lane's own config: jj ignores a `JJ_CONFIG` naming no file. Bookmarks of
+ * other lanes, a fork's inherited ones, are never read and are left alone.
+ */
+export function planOldNamesOnDisk(
+  facts: OldNamesOnDisk,
+  lane: LaneName,
+): LaneStep[] {
+  const { configDir, bookmarks } = facts
+  const has = new Set(bookmarks)
+  // `-R`, so the steps need no working directory: the migration runs them
+  // through `container exec`.
+  const bookmark = (...args: string[]) =>
+    inLane(
+      "jj",
+      "-R",
+      WORKSPACE_ROOT,
+      "--ignore-working-copy",
+      "bookmark",
+      ...args,
+    )
+  const folder = !configDir.old
+    ? []
+    : [
+        laneShell(
+          configDir.current
+            ? `rm -rf ${OLD_LANE_CONFIG_DIR}`
+            : `mv ${OLD_LANE_CONFIG_DIR} ${LANE_CONFIG_DIR}`,
+        ),
+      ]
+  const pairs: readonly (readonly [string, string])[] = [
+    [`${OLD_BOOKMARK_PREFIX}${lane}`, bookmarkName(lane)],
+    [`${OLD_BOOKMARK_PREFIX}${lane}-stack`, stackBookmark(lane)],
+  ]
+  const renames = pairs
+    .filter(([old]) => has.has(old))
+    .map(([old, now]) =>
+      has.has(now) ? bookmark("delete", old) : bookmark("rename", old, now),
+    )
+  const fetched = bookmarks.filter(b =>
+    b.startsWith(`${OLD_BOOKMARK_PREFIX}fetched/`),
+  )
+  return [
+    ...folder,
+    ...renames,
+    ...(fetched.length === 0 ? [] : [bookmark("delete", ...fetched)]),
+  ]
+}
 
 /** A fork: its disk cloned from the fork point's snapshot, then `planForkSetup`. */
 export const planFork = (input: {

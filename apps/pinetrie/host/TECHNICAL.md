@@ -664,12 +664,12 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 |---|---|
 | `setup.ts` | `Setup`: the project, lane configs and shared directories, the owner of your repo (`Setup.owner`, made from the project root once the line's names are read, before anything else reads your repo), the default-image check, the images and runtime (`ready`), `specOf`, the granted host paths (planned at its start, from the commands pi's setup loaded), and the base snapshot's refreshes. The project is found before it (`findProject`, its rule `projectOf`), since pi's setup loads from its root |
 | `registry.ts` | `LaneRegistry`: each lane's handle, its jj, its record, whether it is a lane of its own; the only module that touches the handles |
-| `containers.ts` | `access`, a container's start (`planContainer`, `planStartFrom`), `beforeRun`, `runEnded` |
+| `containers.ts` | `access`, a container's start (`planContainer`, `planStartFrom`; after a restore from a snapshot, `planOldNamesOnDisk`, `pre-rename:`), `beforeRun`, `runEnded` |
 | `fetch.ts` | a lane's history into your repo: the bundle on the lane's queue, the import an owner command (`importLane`) |
 | `turns.ts` | pi's `turnDone`: the turn's revision, snapshot and fetch; the turn records still being written (`pendingRecords`). A lane is fetched into your repo only after a turn that commits, so a lane that never changed a file has no `tip@pinetrie-<lane>`, no refresh and no `pinetrie.base` until it catches up (a clean merge is fetched) |
 | `create.ts` | a new lane: `checkDirectory`, its record and name, its fork (`forkFacts` waits for `pendingRecords`) |
 | `update.ts` | an update (`withLaneStarted`, then one queued step, `planSettle` and `applySettle`); `catchUpInRun`, the agent's `catch_up`; `askedAboutConflict`, which asks jj for conflicts in the lane's copy |
-| `split.ts` | a split's prompt, and its end (`finishSplit`) |
+| `split.ts` | a split's prompt, and its end (`finishSplit`, which moves the lane back to its tip even when a step before it throws: left on the stack, the lane refuses every catch-up) |
 | `archive.ts` | a close's or a reopen's teardown (`planArchive`'s), off the documents' keeper |
 | `disk.ts` | the snapshot on a lane's queue, and the lockfile's hash |
 

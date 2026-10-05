@@ -4,6 +4,7 @@ import {
   mkdtemp,
   readFile,
   realpath,
+  rename,
   rm,
   writeFile,
 } from "node:fs/promises"
@@ -38,6 +39,7 @@ import {
   conflictContent,
   conflictedFilesAt,
   conflictsIn,
+  copyFacts,
   DEFAULT_LINE,
   executeOrThrow,
   fetchById,
@@ -54,11 +56,13 @@ import {
   mergeUpdate,
   newestBase,
   offerBookmark,
+  oldNamesOnDisk,
   parseIntegratedOfferCommits,
   planBaseRefresh,
   planBundle,
   planForkSetup,
   planMerge,
+  planOldNamesOnDisk,
   planWipCopy,
   type Runner,
   type Runners,
@@ -2505,6 +2509,152 @@ describe("a lane's repo, with jj", () => {
       base: await laneBase(rig.ops, tip, rig.line),
     })
   }, 60_000)
+
+  describe("pre-rename: a lane's disk and history from before the rename", () => {
+    /** `dir`'s lane runner: `/workspace` there, as a container's is. */
+    const laneRunnerAt =
+      (dir: string): Runner =>
+      argv =>
+        hostRunner(dir)(
+          onHost([{ in: "lane", argv }], { "/workspace": dir })[0]?.argv ?? [],
+        )
+    /** The lane's disk as a snapshot from before the rename holds it. */
+    const makeOld = async (jj: Runner, dir: string) => {
+      await jj(["bookmark", "rename", bookmarkName(LANE), `pineta/${LANE}`])
+      await jj(["bookmark", "create", "pineta/fetched/0", "-r", "@-"])
+      await rename(
+        path.join(dir, ".pinetrie-lane"),
+        path.join(dir, ".pineta-lane"),
+      )
+    }
+
+    test("the old names on a disk: no bookmark, until planOldNamesOnDisk renames them; then nothing is left to plan", async () => {
+      const { laneDir, laneJj, inLane, first } = await turnRig("old-disk")
+      await makeOld(laneJj, laneDir)
+      expect((await copyFacts(laneJj, LANE)).bookmark).toBeNull()
+      const lane = laneRunnerAt(laneDir)
+      await inLane(planOldNamesOnDisk(await oldNamesOnDisk(lane), LANE))
+      expect(await copyFacts(laneJj, LANE)).toEqual({
+        parents: [first],
+        bookmark: first,
+        descends: false,
+      })
+      expect(
+        await readFile(path.join(laneDir, ".pinetrie-lane", "jj.toml"), "utf8"),
+      ).toContain("immutable_heads()")
+      expect(await commitsOf(laneJj, 'bookmarks(glob:"pineta/*")')).toEqual([])
+      expect(planOldNamesOnDisk(await oldNamesOnDisk(lane), LANE)).toEqual([])
+    }, 60_000)
+
+    test("a fork of a disk holding the old config folder commits nothing of it", async () => {
+      const { laneDir, inLane, edit, first } = await turnRig("old-fork")
+      const forkDir = path.join(top, "old-fork-fork")
+      await mkdir(path.join(laneDir, ".pineta-lane"), { recursive: true })
+      await writeFile(path.join(laneDir, ".pineta-lane", "jj.toml"), "# old\n")
+      await cp(laneDir, forkDir, { recursive: true, verbatimSymlinks: true })
+      await inLane(
+        planForkSetup(FORK, { kind: "commits", commits: [first] }),
+        forkDir,
+      )
+      const forkJj = laneJjAt(forkDir)
+      await edit(forkDir, "f.txt", "f\n")
+      const turned = await turnOn(forkJj, {
+        ...TURN,
+        lane: FORK,
+        entry: entryId("e-f"),
+      })
+      if (turned === null) throw new Error("the fork's turn committed nothing")
+      expect(await changedPaths(forkJj, first, turned)).toEqual(["f.txt"])
+      expect(await commitsOf(forkJj, 'files(root:".pineta-lane")')).toEqual([])
+    }, 60_000)
+
+    test("an old lane on the line: its Pineta-Base on pineta-onto reads as the line, the batched read and the separate reads alike; its offer starts above what it had integrated", async () => {
+      const rig = await offerRig("old-base")
+      const { yoursDir, yoursJj, laneDir, laneJj, ops, line, inLane, edit } =
+        rig
+      await edit(yoursDir, "base.txt", "base\n")
+      await yoursJj(["commit", "-m", "your base"])
+      await rig.setUpLine()
+      const onLine = await rig.lineNow()
+      await inLane(
+        planBaseRefresh({
+          base: null,
+          yours: [onLine],
+          lock: null,
+          install: null,
+        }),
+      )
+      await inLane(planForkSetup(LANE, { kind: "commits", commits: [onLine] }))
+      // The base as the host wrote it before the rename.
+      await laneJj([
+        "new",
+        "-m",
+        `update: pineta-onto\n\nPineta-Base: pineta-onto@${onLine}\n`,
+      ])
+      await laneJj(["new"])
+      await laneJj([
+        "bookmark",
+        "set",
+        "--allow-backwards",
+        bookmarkName(LANE),
+        "-r",
+        "@-",
+      ])
+      await edit(laneDir, "a.txt", "a\n")
+      const t1 = await rig.turn()
+      await rig.fetch([onLine])
+      const tip = await laneTipIn(ops, LANE)
+      if (tip === null) throw new Error("no tip")
+      expect(await laneBase(ops, tip, line)).toEqual({
+        base: { kind: "line" },
+        start: onLine,
+        source: onLine,
+      })
+      await rig.agrees()
+
+      // An offer integrated before the rename, as it was written then.
+      await rig.build([
+        {
+          commit: t1,
+          description: `WIP\n\nPineta-Thread: ${NAME}\nPineta-Lane: ${LANE}\nPineta-Entry: e\nPineta-Source: ${t1}\nPineta-Start: ${onLine}\n`,
+        },
+      ])
+      const [integrated] = await commitsOf(
+        ops,
+        bookmarkRevset(offerBookmark(NAME)),
+      )
+      if (integrated === undefined) throw new Error("no offer")
+      expect(
+        (
+          await ops([
+            "log",
+            "--no-graph",
+            "-r",
+            integrated,
+            "-T",
+            "description",
+          ])
+        ).stdout,
+      ).toContain("Pineta-Source")
+      await executeRepo(
+        yoursDir,
+        planOfferIntegrationSteps({
+          bookmark: offerBookmark(NAME),
+          top: integrated,
+          destination: line.onto,
+        }),
+      )
+      // You edit what it brought, on the line: an offer that started below
+      // it would put the lane's a.txt back over yours (S81).
+      await yoursJj(["new", line.onto])
+      await edit(yoursDir, "a.txt", "a, then yours\n")
+      await yoursJj(["commit", "-m", "yours: a.txt"])
+      await yoursJj(["bookmark", "move", line.onto, "--to", "@-"])
+      await edit(laneDir, "b.txt", "b\n")
+      await rig.turn()
+      expect((await rig.offer([t1])).files).toEqual(["b.txt"])
+    }, 60_000)
+  })
 
   test("a base refreshes after your @- was rewritten, not built on (S74)", async () => {
     const yoursDir = path.join(top, "rewritten-yours")

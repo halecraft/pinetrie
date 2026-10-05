@@ -80,7 +80,7 @@ describe("offers (ADR-0038)", () => {
   })
   test("integratedOfferCommitsRevset: integrated sources above the commit the base holds, never a WIP's copy (S81)", () => {
     const integrated =
-      'description(regex:"(?m)^(Pinetrie-Source|Pinetrie-Thread): ")'
+      'description(regex:"(?m)^(Pine(?:trie|ta)-Source|Pine(?:trie|ta)-Thread): ")'
     expect(
       integratedOfferCommitsRevset({
         line: DEFAULT_LINE,

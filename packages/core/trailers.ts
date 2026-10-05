@@ -1,5 +1,6 @@
 // core/trailers — the commit-message format: every trailer pinetrie writes into
-// a commit, and its readers.
+// a commit, and its readers, which also read the names written before the
+// rename (`READ`).
 //
 // A format or type that lanes or repo must read, write or name lives in core
 // too, since neither can declare @pinetrie/rules. This file holds the
@@ -38,33 +39,67 @@ export const TRAILERS = {
 /** A trailer, by its name in `TRAILERS`. */
 export type TrailerKey = keyof typeof TRAILERS
 
+const WRITTEN = "Pinetrie-"
+
+/**
+ * pre-rename: a trailer's name as the readers match it, in jj's regex and
+ * JavaScript's alike. Commits made before b05e2252 carry `Pineta-<Key>`, and
+ * are immutable. Remove `|ta` once no lane from before the rename has work
+ * to offer.
+ */
+const READ = "Pine(?:trie|ta)-"
+
+/** `key`'s name as the readers match it: `READ` then its suffix. */
+const readName = (key: TrailerKey): string =>
+  `${READ}${TRAILERS[key].slice(WRITTEN.length)}`
+
+/** A line `<key>: <value>` of each key, under any name `READ` matches. */
+const LINE = Object.fromEntries(
+  (Object.keys(TRAILERS) as TrailerKey[]).map(k => [
+    k,
+    new RegExp(`^${readName(k)}: (.*)$`),
+  ]),
+) as Record<TrailerKey, RegExp>
+
+/** What follows `<key>: ` on `line`, as written; undefined when `line` is not that trailer. */
+const valueOn = (line: string, key: TrailerKey): string | undefined =>
+  LINE[key].exec(line)?.[1]
+
+/**
+ * pre-rename: a base on the line as the host wrote it before the rename.
+ * The line's bookmark was `pineta-onto` then; it is `pinetrie-onto` now, so
+ * the readers that compare a base's bookmark with the line's would take such
+ * a base for a WIP that no longer exists. Read as no base, the lane falls
+ * back to the newest line commit in its history (`laneBase`), which is the
+ * line. A WIP's base keeps its name, and is read.
+ */
+const OLD_LINE_BASE = "Pineta-Base: pineta-onto@"
+
 /**
  * Every value of trailer `key` in a message, from every paragraph, in order.
  * A squash of two commits keeps both messages, so a message can hold two
  * trailer paragraphs; jj's `trailers` template reads only the last (S77).
  */
-export function trailerValues(
-  message: string,
-  key: (typeof TRAILERS)[TrailerKey],
-): string[] {
-  const prefix = `${key}: `
+export function trailerValues(message: string, key: TrailerKey): string[] {
   return message
     .split("\n")
-    .filter(line => line.startsWith(prefix))
-    .map(line => line.slice(prefix.length).trim())
+    .filter(line => !(key === "base" && line.startsWith(OLD_LINE_BASE)))
+    .flatMap(line => valueOn(line, key)?.trim() ?? [])
     .filter(v => v !== "")
 }
 
 /**
  * Commits whose message has a line `<key>: <value>`, or, with no value, any
  * line `<key>: ` of one of `keys`. `value` is inserted into jj's regex as it
- * is, so it holds no regex character: a thread's name (`word-word`).
+ * is, so it holds no regex character: a thread's name (`word-word`). A base
+ * on the old line is found, and `baseOf` reads it as none: it is still the
+ * newest base, so an older WIP base below it is not taken for the lane's.
  */
 export function trailerRevset(
   keys: readonly TrailerKey[],
   value?: string,
 ): string {
-  const names = keys.map(k => TRAILERS[k])
+  const names = keys.map(readName)
   const key = names.length === 1 ? names[0] : `(${names.join("|")})`
   return `description(regex:"(?m)^${key}: ${value === undefined ? "" : `${value}$`}")`
 }
@@ -74,8 +109,7 @@ export const hasTrailer = (
   message: string,
   key: TrailerKey,
   value: string,
-): boolean =>
-  message.split("\n").some(line => line === `${TRAILERS[key]}: ${value}`)
+): boolean => message.split("\n").some(line => valueOn(line, key) === value)
 
 /**
  * The index of the last paragraph's blank line, when every line of that
@@ -85,11 +119,11 @@ export const hasTrailer = (
 function ourLastParagraph(text: string): number | null {
   const cut = text.lastIndexOf("\n\n")
   if (cut < 0) return null
-  const ours = Object.values(TRAILERS).map(t => `${t}: `)
+  const ours = Object.values(LINE)
   return text
     .slice(cut + 2)
     .split("\n")
-    .every(line => ours.some(t => line.startsWith(t)))
+    .every(line => ours.some(t => t.test(line)))
     ? cut
     : null
 }
@@ -109,7 +143,7 @@ export const revisionMessage = (input: {
  * here, from a commit message, so this one reader mints it.
  */
 export function entryOfMessage(description: string): EntryId | null {
-  const [entry] = trailerValues(description, TRAILERS.entry)
+  const [entry] = trailerValues(description, "entry")
   return entry === undefined ? null : entryId(entry)
 }
 
@@ -125,7 +159,7 @@ export const baseMessage = (
   base: { readonly bookmark: string; readonly commit: CommitId },
 ): string => `${title}\n\n${TRAILERS.base}: ${base.bookmark}@${base.commit}\n`
 
-/** `<bookmark>@<commit>`, a `Pinetrie-Base` value, read back; null if malformed. */
+/** `<bookmark>@<commit>`, a base trailer's value, read back; null if malformed. */
 function parseBase(
   value: string,
 ): { readonly bookmark: string; readonly commit: CommitId } | null {
@@ -134,11 +168,14 @@ function parseBase(
   return { bookmark: value.slice(0, at), commit: commitId(value.slice(at + 1)) }
 }
 
-/** The newest `Pinetrie-Base` a message carries, parsed; null for none, or a malformed one. */
+/**
+ * The newest base a message carries, parsed; null for none, a malformed one,
+ * or one on the old line (`OLD_LINE_BASE`).
+ */
 export function baseOf(
   message: string,
 ): { readonly bookmark: string; readonly commit: CommitId } | null {
-  const value = trailerValues(message, TRAILERS.base).at(-1)
+  const value = trailerValues(message, "base").at(-1)
   return value === undefined ? null : parseBase(value)
 }
 
@@ -222,11 +259,11 @@ export function withoutTrailers(message: string): string {
 export function offerLedger(message: string): OfferLedger | null {
   const paragraph = message
     .split("\n\n")
-    .filter(p => trailerValues(p, TRAILERS.source).length > 0)
+    .filter(p => trailerValues(p, "source").length > 0)
     .at(-1)
   if (paragraph === undefined) return null
-  const source = trailerValues(paragraph, TRAILERS.source).at(-1)
-  const start = trailerValues(paragraph, TRAILERS.start)
+  const source = trailerValues(paragraph, "source").at(-1)
+  const start = trailerValues(paragraph, "start")
   if (source === undefined || start.length === 0) return null
   return { source: commitId(source), start: start.map(commitId) }
 }
@@ -239,7 +276,7 @@ export function offerLedger(message: string): OfferLedger | null {
  * ledgers (S77 item 6).
  */
 export const sourcesOf = (message: string): CommitId[] =>
-  [...new Set(trailerValues(message, TRAILERS.source))].map(commitId)
+  [...new Set(trailerValues(message, "source"))].map(commitId)
 
 /**
  * The lanes a message's integrated offers name with no source (S97): each
@@ -254,9 +291,9 @@ export function untracedLanes(message: string): LaneName[] {
     .split("\n\n")
     .filter(
       p =>
-        trailerValues(p, TRAILERS.thread).length > 0 &&
-        trailerValues(p, TRAILERS.source).length === 0,
+        trailerValues(p, "thread").length > 0 &&
+        trailerValues(p, "source").length === 0,
     )
-    .flatMap(p => trailerValues(p, TRAILERS.lane))
+    .flatMap(p => trailerValues(p, "lane"))
     .filter(isLaneName)
 }

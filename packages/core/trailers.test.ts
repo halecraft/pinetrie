@@ -39,8 +39,8 @@ test("trailerValues reads a trailer from every paragraph, as a squash leaves two
     "Pinetrie-Source: bbbb",
     "",
   ].join("\n")
-  expect(trailerValues(squashed, TRAILERS.source)).toEqual(["aaaa", "bbbb"])
-  expect(trailerValues(squashed, TRAILERS.base)).toEqual([])
+  expect(trailerValues(squashed, "source")).toEqual(["aaaa", "bbbb"])
+  expect(trailerValues(squashed, "base")).toEqual([])
 })
 
 test("offerLedger reads the newest paragraph that names a source; none without one (ADR-0060)", () => {
@@ -129,9 +129,9 @@ describe("what is written reads back", () => {
       ledger,
     })
     expect(m.split("\n\n")).toHaveLength(3)
-    expect(trailerValues(m, TRAILERS.thread)).toEqual([NAME])
-    expect(trailerValues(m, TRAILERS.lane)).toEqual([LANE])
-    expect(trailerValues(m, TRAILERS.entry)).toEqual(["e9"])
+    expect(trailerValues(m, "thread")).toEqual([NAME])
+    expect(trailerValues(m, "lane")).toEqual([LANE])
+    expect(trailerValues(m, "entry")).toEqual(["e9"])
     expect(offerLedger(m)).toEqual(ledger)
     expect(hasTrailer(m, "thread", NAME)).toBe(true)
     expect(withoutTrailers(m)).toBe("feat: x\n\nwhy")
@@ -177,8 +177,8 @@ describe("withLedger (ADR-0060)", () => {
       ledger,
     )
     expect(m.split("\n\n")).toHaveLength(2)
-    expect(trailerValues(m, TRAILERS.source)).toEqual(["t1"])
-    expect(trailerValues(m, TRAILERS.start)).toEqual(["s1", "s2"])
+    expect(trailerValues(m, "source")).toEqual(["t1"])
+    expect(trailerValues(m, "start")).toEqual(["s1", "s2"])
     expect(withoutTrailers(m)).toBe("feat: x")
   })
   test("a message with no trailers, or ending in yours, gets a paragraph of its own", () => {
@@ -193,14 +193,15 @@ describe("withLedger (ADR-0060)", () => {
 
 test("trailerRevset names what hasTrailer matches", () => {
   expect(trailerRevset(["base"])).toBe(
-    'description(regex:"(?m)^Pinetrie-Base: ")',
+    'description(regex:"(?m)^Pine(?:trie|ta)-Base: ")',
   )
   expect(trailerRevset(["source", "thread"])).toBe(
-    'description(regex:"(?m)^(Pinetrie-Source|Pinetrie-Thread): ")',
+    'description(regex:"(?m)^(Pine(?:trie|ta)-Source|Pine(?:trie|ta)-Thread): ")',
   )
   expect(trailerRevset(["thread"], NAME)).toBe(
-    'description(regex:"(?m)^Pinetrie-Thread: amber-fox$")',
+    'description(regex:"(?m)^Pine(?:trie|ta)-Thread: amber-fox$")',
   )
+  expect(hasTrailer(`x\n\nPineta-Thread: ${NAME}\n`, "thread", NAME)).toBe(true)
   expect(hasTrailer(`x\n\nPinetrie-Thread: ${NAME}\n`, "thread", NAME)).toBe(
     true,
   )
@@ -208,4 +209,65 @@ test("trailerRevset names what hasTrailer matches", () => {
     false,
   )
   expect(hasTrailer(`Pinetrie-Lane: ${NAME}\n`, "thread", NAME)).toBe(false)
+})
+
+describe("pre-rename: what the host wrote as Pineta is read", () => {
+  const offer = [
+    "feat: x",
+    "",
+    "Pineta-Thread: amber-fox",
+    `Pineta-Lane: ${LANE}`,
+    "Pineta-Entry: e1",
+    "Pineta-Source: aaaa",
+    "Pineta-Start: s1",
+    "",
+  ].join("\n")
+
+  test("an offer's trailers and ledger, and the message without them", () => {
+    expect(hasTrailer(offer, "thread", NAME)).toBe(true)
+    expect(offerLedger(offer)).toEqual({
+      source: commitId("aaaa"),
+      start: [commitId("s1")],
+    })
+    expect(sourcesOf(offer)).toEqual([commitId("aaaa")])
+    expect(withoutTrailers(offer)).toBe("feat: x")
+    expect(
+      entryOfMessage(`turn\n\nPineta-Entry: e2\nPineta-Lane: ${LANE}\n`),
+    ).toBe("e2")
+    expect(
+      untracedLanes(
+        `feat: x\n\nPineta-Thread: amber-fox\nPineta-Lane: ${LANE}\n`,
+      ),
+    ).toEqual([LANE])
+  })
+
+  test("a base on a WIP is read; a base on the old line, pineta-onto, reads as none", () => {
+    expect(baseOf("copy of wip/a\n\nPineta-Base: wip/a@c1\n")).toEqual({
+      bookmark: "wip/a",
+      commit: C1,
+    })
+    expect(
+      baseOf("update: pineta-onto\n\nPineta-Base: pineta-onto@c1\n"),
+    ).toBeNull()
+    expect(trailerValues("x\n\nPineta-Base: pineta-onto@c1\n", "base")).toEqual(
+      [],
+    )
+  })
+
+  test("the writers write Pinetrie only", () => {
+    const written = [
+      offerMessage("feat: x", {
+        lane: LANE,
+        name: NAME,
+        entry: "e1",
+        ledger: { source: C1, start: [C1] },
+      }),
+      revisionMessage({ title: "t", entry: entryId("e1"), lane: LANE }),
+      baseMessage("b", { bookmark: "onto", commit: C1 }),
+    ].join("\n")
+    expect(written).not.toContain("Pineta-")
+    expect(Object.values(TRAILERS).every(t => t.startsWith("Pinetrie-"))).toBe(
+      true,
+    )
+  })
 })

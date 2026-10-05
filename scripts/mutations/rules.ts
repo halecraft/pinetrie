@@ -135,6 +135,14 @@ export const mutations: readonly Mutation[] = [
     expect: "refused: two calls in its turn",
   },
   {
+    name: "a copy with no bookmark reads as off its line",
+    file: "packages/rules/agent-commands.ts",
+    from: '  if (copy.bookmark === null) return "no-bookmark"\n',
+    to: '  if (copy.bookmark === null) return "off-line"\n',
+    command: unit,
+    expect: "with no bookmark: refused as that, not as off the line (S114)",
+  },
+  {
     name: "the agent's own commit is off its line",
     file: "packages/rules/agent-commands.ts",
     from: "    (parent === copy.bookmark || copy.descends)",

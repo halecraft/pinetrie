@@ -145,7 +145,7 @@ export const lineProposal = (
  * (about 100 ms, S44 item 8). As the host, so the operation is
  * `pinetrie-host`'s (S87 item 7).
  */
-const IMPORT: RepoStep = host("git", "import")
+export const IMPORT: RepoStep = host("git", "import")
 
 /**
  * A lane's bundle (`planBundle`, made in the lane) into your repo, as its

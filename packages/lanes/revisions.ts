@@ -16,8 +16,13 @@ import {
   revisionMessage,
 } from "@pinetrie/core"
 import { bookmarkOf, setBookmark } from "./bookmarks.ts"
-import { planTurnCommit } from "./plan.ts"
-import { describeFailure, lines, type Runner } from "./run.ts"
+import {
+  LANE_CONFIG_DIR,
+  OLD_LANE_CONFIG_DIR,
+  type OldNamesOnDisk,
+  planTurnCommit,
+} from "./plan.ts"
+import { describeFailure, laneJj, lines, type Runner } from "./run.ts"
 
 /** The commit ids a revset names, in jj's order. */
 export async function commitsOf(
@@ -178,6 +183,36 @@ export async function copyFacts(
       ? await isAncestor(jj, bookmark, parent)
       : false
   return { parents, bookmark, descends }
+}
+
+/**
+ * pre-rename: what `planOldNamesOnDisk` plans from, read through the lane's
+ * runner: which config folders exist, and every bookmark. Neither read
+ * snapshots the working copy.
+ */
+export async function oldNamesOnDisk(lane: Runner): Promise<OldNamesOnDisk> {
+  const dirs = await lane([
+    "sh",
+    "-c",
+    `test -d ${OLD_LANE_CONFIG_DIR} && echo old; test -d ${LANE_CONFIG_DIR} && echo current; true`,
+  ])
+  if (!dirs.ok) throw new Error(describeFailure("test -d", dirs))
+  const found = lines(dirs.stdout)
+  const listed = await laneJj(lane)([
+    "--ignore-working-copy",
+    "bookmark",
+    "list",
+    "-T",
+    'name ++ "\n"',
+  ])
+  if (!listed.ok) throw new Error(describeFailure("jj bookmark list", listed))
+  return {
+    configDir: {
+      old: found.includes("old"),
+      current: found.includes("current"),
+    },
+    bookmarks: [...new Set(lines(listed.stdout))],
+  }
 }
 
 /**

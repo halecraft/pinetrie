@@ -39,8 +39,10 @@ export type CatchUpRefusal =
   | "nothing-new"
   /** The thread works in the person's files, or in no lane: there is no copy to merge into. */
   | "no-copy"
-  /** The working copy is not on the thread's own line: a split's stack. */
+  /** The working copy is not on the thread's own line: a split's stack, or a merge. */
   | "off-line"
+  /** The lane's repo has no bookmark of the lane's: nothing to say where its line is. */
+  | "no-bookmark"
   /** The thread did not branch from another thread's copy. */
   | "no-parent"
   /** The thread it branched from is working: its copy moves with every turn. */
@@ -60,6 +62,8 @@ export function catchUpRefusal(code: CatchUpRefusal): string {
       return "This thread has no copy of its own to merge into."
     case "off-line":
       return "Not caught up: your working copy is not on this thread's own line (a split's stack?). Return to this thread's tip first."
+    case "no-bookmark":
+      return "Not caught up: this thread's copy has lost its bookmark."
     case "no-parent":
       return "This thread did not branch from another thread's copy."
     case "parent-running":
@@ -104,15 +108,19 @@ export function planCatchUpCall(input: {
  * Whether the lane's copy may take a merge (ADR-0080): `@` on the thread's
  * own line, its one parent the lane's bookmark or the agent's own commit on
  * it (`planTurnCommit`'s rule). Otherwise the merge would land beside where
- * the agent works, as while a split's stack is the working copy. Conflicts
- * do not refuse it: catching up is how a conflict the copy came with is
- * settled (ADR-0072). Pure.
+ * the agent works, as while a split's stack is the working copy. A repo
+ * with no bookmark of the lane's has no line to be on, and is refused as
+ * that, not as off it: a split is not the cause (S114). Conflicts do not
+ * refuse it: catching up is how a conflict the copy came with is settled
+ * (ADR-0072). Pure.
  */
-export const planCopyReady = (copy: CopyFacts): "ready" | "off-line" => {
+export const planCopyReady = (
+  copy: CopyFacts,
+): "ready" | "off-line" | "no-bookmark" => {
+  if (copy.bookmark === null) return "no-bookmark"
   const [parent, ...more] = copy.parents
   return parent !== undefined &&
     more.length === 0 &&
-    copy.bookmark !== null &&
     (parent === copy.bookmark || copy.descends)
     ? "ready"
     : "off-line"

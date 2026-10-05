@@ -13,9 +13,11 @@ import {
   executeOrThrow,
   LANE_NOTE,
   NO_GRANTS,
+  oldNamesOnDisk,
   PINETRIE_MOUNT,
   planContainer,
   planDisk,
+  planOldNamesOnDisk,
   planStart,
   planStartFrom,
   RUNTIME_BIN,
@@ -45,7 +47,8 @@ export interface Containers {
   /**
    * Start a lane's container, as `planContainer` decides. A container made
    * from another spec (image, mounts, grants) is recreated on the same
-   * volume. A missing one starts from what `planStartFrom` decides.
+   * volume. A missing one starts from what `planStartFrom` decides; a disk
+   * restored from a snapshot then gets the names the host reads now.
    */
   startContainer(lane: LaneName): Promise<void>
   /** Stop every running lane's container. */
@@ -107,6 +110,13 @@ export function createContainers(deps: {
         case "snapshot":
           await executeOrThrow(
             planDisk({ paths, spec, env: process.env, from: from.from }),
+            handle.runners,
+          )
+          // pre-rename: a snapshot of a lane made before the rename holds
+          // the old names. A volume needs no such step: the one-off
+          // migration renamed those (S114).
+          await executeOrThrow(
+            planOldNamesOnDisk(await oldNamesOnDisk(handle.runners.lane), lane),
             handle.runners,
           )
           break

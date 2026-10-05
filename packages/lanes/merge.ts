@@ -197,9 +197,11 @@ async function markBase(
 
 /**
  * A lane's base as its history says it (ADR-0060): the newest commit in
- * `::rev` whose message carries `Pinetrie-Base`, read with `jj` (the lane's,
+ * `::rev` whose message carries a base trailer, read with `jj` (the lane's,
  * or your repo's on the lane's tip). Its value names the bookmark and the
- * commit it pointed at; null for a lane with none, one from before the line.
+ * commit it pointed at; null for a lane with none, one from before the line,
+ * or one whose newest base is on the line as it was named before the rename
+ * (`baseOf`).
  */
 export async function newestBase(
   jj: Runner,

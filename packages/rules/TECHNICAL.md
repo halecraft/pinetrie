@@ -1100,7 +1100,9 @@ the tip it must match, and the bookmark to leave on it.
   anything is queued: a lane of its own, the only call in its turn, and new
   work (`brings`, or `unknown`, which the merge's own read decides). The
   parent only when it is ahead and idle. `planCopyReady` refuses a working
-  copy off its lane's line (`off-line`), for every catch-up. Each refusal
+  copy off its lane's line (`off-line`), and a repo with no bookmark of the
+  lane's (`no-bookmark`), for every catch-up. The two are worded apart: the
+  missing bookmark was the rename's, not a split's (S114). Each refusal
   says what to do (`catchUpRefusal`); `catchUpAnswer` is the tool's result,
   whose `details.merged` the turn's record reads.
 - **`planSplitCall`** queues a split card, or refuses: no offer open, a

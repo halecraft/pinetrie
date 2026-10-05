@@ -252,6 +252,12 @@ operation is read once and kept until the head moves.**
   nothing you have. A squash of two integrated offers keeps both trailer
   paragraphs, and `trailerValues` reads every one; jj's `trailers` template
   reads only the last (S77 item 6).
+- **Every trailer revset also matches `Pineta-*`** (`pre-rename:`, core's
+  `trailers.ts`): offers integrated before the rename carry `Pineta-Source`,
+  and an old lane's next offer would otherwise start below them and put
+  their files back over yours (`repo.test.ts`, pre-rename). A `Pineta-Base`
+  on `pineta-onto`, the line's name then, reads as no base, so such a lane
+  falls back to the newest line commit in its history: the base start above.
 - **A source integrated below the base's source is not part of the start**
   (S81). `LaneBase.source` is the commit of yours the lane merged whole:
   the one its `Pinetrie-Base` names (the WIP's commit, never the copy, which

@@ -168,9 +168,6 @@ export type Prepared =
 
 const refused = (reason: string): Prepared => ({ kind: "refused", reason })
 
-/** Why a catch-up into a copy off its own line is refused (`planCopyReady`). */
-const OFF_LINE = catchUpRefusal("off-line")
-
 /**
  * What follows an update (ADR-0080): a run whatever it comes to, as after a
  * quiet catch-up before a person's message; or the card's text, whose send
@@ -470,11 +467,16 @@ export function createUpdates(deps: {
             readonly from: BaseMerge
             readonly facts: SettleFacts
           }
+        | {
+            /** The copy cannot take a merge: each caller words it its own way. */
+            readonly kind: "copy"
+            readonly why: Exclude<ReturnType<typeof planCopyReady>, "ready">
+          }
       > => {
         // A merge lands at the lane's bookmark: a working copy off its line
         // (a split's stack) would be left beside it (ADR-0080).
-        if (planCopyReady(await copyFacts(jj, lane)) === "off-line")
-          return refused(OFF_LINE)
+        const ready = planCopyReady(await copyFacts(jj, lane))
+        if (ready !== "ready") return { kind: "copy", why: ready }
         const from =
           command === "catch-up-with-parent"
             ? await parentOf(lane).then(p => planParentUpdate(p.now, p.running))
@@ -575,10 +577,8 @@ export function createUpdates(deps: {
         call.command,
         await resolutionOf(""),
       )
-      if (done.kind === "refused")
-        return refusedAnswer(
-          done.reason === OFF_LINE ? "off-line" : { reason: done.reason },
-        )
+      if (done.kind === "copy") return refusedAnswer(done.why)
+      if (done.kind === "refused") return refusedAnswer({ reason: done.reason })
       if (done.kind !== "merged") return catchUpAnswer({ kind: "nothing" })
       const settle = planSettle(done.facts, {
         lane,
@@ -614,6 +614,7 @@ export function createUpdates(deps: {
             command,
             await resolutionOf(intent),
           )
+          if (done.kind === "copy") return refused(catchUpRefusal(done.why))
           if (done.kind !== "merged") return done
           const { from, facts } = done
           const doc = await docs.laneDoc(lane)

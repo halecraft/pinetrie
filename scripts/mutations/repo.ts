@@ -17,6 +17,23 @@ const offersRefresh = [
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "pre-rename: an old integrated offer's trailers are not read",
+    file: "packages/core/trailers.ts",
+    from: 'const READ = "Pine(?:trie|ta)-"',
+    to: 'const READ = "Pinetrie-"',
+    command: repoTest,
+    expect: "its offer starts above what it had integrated",
+  },
+  {
+    name: "pre-rename: a base on the old line reads as a WIP",
+    file: "packages/core/trailers.ts",
+    from: '    .filter(line => !(key === "base" && line.startsWith(OLD_LINE_BASE)))\n',
+    to: "",
+    command: repoTest,
+    expect:
+      "its Pineta-Base on pineta-onto reads as the line, the batched read and the separate reads alike",
+  },
+  {
     name: "a publish's catch-up moves only @'s line",
     file: "packages/repo/plan.ts",
     from: '}): RepoStep[] => [you("rebase", "-b", "@", "-d", revsetName(input.onto))]',

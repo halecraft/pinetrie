@@ -57,7 +57,8 @@ containers, disks and the helper.
   half-written. GNU `cp` has no `-c`.
 - **The image swap is unsupported.** A volume made from a snapshot is
   created by `container`, then has its `volume.img` replaced by a clone
-  (`planDisk`). `container` 1.4.1 does not promise that works: a volume is
+  (`restoreVolume`, from any image path: `planDisk` passes a snapshot's
+  file). `container` 1.4.1 does not promise that works: a volume is
   its `entity.json` and an image read by path (S40). `e2e:lanes` runs a small
   soak on every upgrade: twenty clones taken mid-write, each checked with
   `e2fsck` and for every record the writer had `fsync`ed. Its mutation drops
@@ -86,7 +87,11 @@ containers, disks and the helper.
 - **The base snapshot is the line's commit** (`refreshBase`), and
   refreshes after an offer integration or a land. A fork from it first waits for a
   refresh (`baseAtLine`): the line may have been set up or moved since.
-- **`jj new` runs first in a fork** (`planForkSetup`). A clone carries its
+- **`jj new` runs first in a fork** (`planForkSetup`), after one step that
+  removes `/workspace/.pineta-lane` (`OLD_LANE_CONFIG_DIR`, tagged
+  `pre-rename:`). A snapshot of a lane made before the rename holds that
+  folder, `laneIgnores` does not list it, and `jj new` would snapshot it
+  into the working copy the clone carries. A clone carries its
   parent's working-copy change. Without `jj new`, the fork's first turn reuses
   that change's id, and your repo sees a divergent change (S42 item 2).
   `repo.test.ts` (`@pinetrie/repo`) forks a lane's repo and checks that your repo has no
@@ -203,6 +208,16 @@ containers, disks and the helper.
   A container made anew starts from what `planStartFrom` decides: its
   volume; else its newest snapshot (a restored root); else nothing, and the
   lane predates lane containers. Both decisions are in `plan.ts`.
+- **A disk restored from a snapshot gets the current names**
+  (`pre-rename:`). A snapshot of a lane made before b05e2252 holds
+  `pineta/<lane>` and `.pineta-lane/` (S114): `bookmarkOf` would find no
+  bookmark, and jj ignores a `JJ_CONFIG` that names no file (exit 0), so
+  `immutable_heads()` would be the builtin. After the restore,
+  `startContainer` reads what is there (`oldNamesOnDisk`), plans
+  (`planOldNamesOnDisk`: the folder moved first, then the lane's two
+  bookmarks renamed, `pineta/fetched/*` deleted) and runs the plan. A start
+  from the lane's own volume does none of it: the one-off migration renamed
+  those. Remove both once no snapshot from before the rename remains.
 - **A lane's container is stopped after every run** (`runEnded` in the
   host's `work/containers.ts`), and its disk trimmed. The next run starts it again.
   Processes the agent started, dev servers included, end with the run. The
@@ -310,6 +325,15 @@ containers, disks and the helper.
   offer's, and the revset that finds commits by one (`trailerRevset`, here
   in `newestBase`). A format lanes or repo must read or write lives in
   core.
+  - **The readers also read `Pineta-*`** (`READ`, `pre-rename:`): commits
+    made before the rename are immutable. Writers write `Pinetrie-*` only.
+  - **A `Pineta-Base` on `pineta-onto` reads as no base** (`OLD_LINE_BASE`).
+    The line's bookmark was `pineta-onto` then, and `planLaneRead` and
+    `laneBase` compare a base's bookmark with `line.onto`: read whole, it
+    would make the lane a WIP's whose WIP is gone. `trailerRevset` still
+    finds the commit, so it stays the newest base, and the lane falls back
+    to the newest line commit in its history, which is the line. Remove both
+    once no lane from before the rename has work to offer.
 - **Decide from exit status, never from printed text.** Output a program
   reads comes from a `-T` template. `execFile` reads all of it: jj exits 3 on
   a broken pipe.

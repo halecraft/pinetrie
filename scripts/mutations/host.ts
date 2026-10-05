@@ -106,11 +106,19 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a copy off its line takes the merge",
     file: "apps/pinetrie/host/work/update.ts",
-    from: '        if (planCopyReady(await copyFacts(jj, lane)) === "off-line")',
-    to: '        if (planCopyReady(await copyFacts(jj, lane)) === "off-line" && false)',
+    from: '        if (ready !== "ready") return { kind: "copy", why: ready }',
+    to: '        if (ready !== "ready" && false) return { kind: "copy", why: ready }',
     command: unit,
     expect:
       "a copy off its own line is refused before any edit is committed or merged",
+  },
+  {
+    name: "a split's end that throws leaves the lane on the stack",
+    file: "apps/pinetrie/host/work/split.ts",
+    from: "  } finally {\n    await ports.backToTip(lane)\n  }\n",
+    to: "  } finally {\n  }\n  await ports.backToTip(lane)\n",
+    command: unit,
+    expect: "a split's end that throws still moves the lane back to its tip",
   },
   {
     name: "a quiet catch-up loops",

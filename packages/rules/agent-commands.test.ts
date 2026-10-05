@@ -111,6 +111,9 @@ describe("planCatchUpCall (ADR-0080)", () => {
   test("each refusal says what to do", () => {
     expect(catchUpRefusal("alone")).toContain("alone in its turn")
     expect(catchUpRefusal("off-line")).toContain("Return to this thread's tip")
+    expect(catchUpRefusal("no-bookmark")).toBe(
+      "Not caught up: this thread's copy has lost its bookmark.",
+    )
     expect(catchUpRefusal({ reason: "set up the line first" })).toBe(
       "Not caught up: set up the line first.",
     )
@@ -140,9 +143,9 @@ describe("planCopyReady (ADR-0080)", () => {
       "off-line",
     ],
     [
-      "with no bookmark",
+      "with no bookmark: refused as that, not as off the line (S114)",
       { parents: [B], bookmark: null, descends: false },
-      "off-line",
+      "no-bookmark",
     ],
   ] as const)("%s", (_, copy, ready) => {
     expect(planCopyReady(copy)).toBe(ready)

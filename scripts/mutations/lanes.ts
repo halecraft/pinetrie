@@ -8,6 +8,34 @@ const plan = "packages/lanes/plan.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "pre-rename: the old config folder moves after the bookmarks",
+    file: plan,
+    from: "  return [\n    ...folder,\n    ...renames,\n",
+    to: "  return [\n    ...renames,\n    ...folder,\n",
+    command: unit,
+    expect:
+      "the config folder moves, first; the lane's bookmarks are renamed; fetched ones are deleted; another lane's stay",
+  },
+  {
+    name: "pre-rename: a fork keeps the old config folder",
+    file: plan,
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "    laneShell(`rm -rf ${OLD_LANE_CONFIG_DIR}`),\n    ...base,\n",
+    to: "    ...base,\n",
+    command: ["pnpm", "exec", "vitest", "run", "packages/repo/repo.test.ts"],
+    expect:
+      "a fork of a disk holding the old config folder commits nothing of it",
+  },
+  {
+    name: "pre-rename: the lane's old bookmarks are not renamed",
+    file: plan,
+    from: "    .filter(([old]) => has.has(old))\n",
+    to: "    .filter(() => false)\n",
+    command: ["pnpm", "exec", "vitest", "run", "packages/repo/repo.test.ts"],
+    expect:
+      "the old names on a disk: no bookmark, until planOldNamesOnDisk renames them",
+  },
+  {
     name: "an integrated-offer commit naming no source the lane holds is joined",
     file: plan,
     from: "    return ours.length === 0\n      ? []",

@@ -36,6 +36,7 @@ import {
   planLinks,
   planMerge,
   planMounts,
+  planOldNamesOnDisk,
   planProjectDir,
   planRoot,
   planRun,
@@ -432,8 +433,8 @@ describe("immutable heads", () => {
 test("planForkSetup: a base with several parents is committed once, so the bookmark names one", () => {
   expect(
     argvs(planForkSetup(LANE, { kind: "commits", commits: [C1, C2] })).slice(
-      1,
-      4,
+      2,
+      5,
     ),
   ).toEqual([
     "lane: jj new c1 c2",
@@ -446,7 +447,7 @@ test("planForkSetup: on the line, an empty commit naming it; its id read for the
   const steps = argvs(
     planForkSetup(LANE, { kind: "line", onto: "pinetrie-onto", commit: C1 }),
   )
-  expect(steps.slice(1, 3)).toEqual([
+  expect(steps.slice(2, 4)).toEqual([
     "lane: jj new c1",
     `lane: jj commit -m ${baseMessage("base: pinetrie-onto", { bookmark: "pinetrie-onto", commit: C1 })}`,
   ])
@@ -464,8 +465,8 @@ test("planForkSetup: a WIP's copy on the line commit under it, never the WIP's o
       "pnpm i",
     ),
   )
-  expect(steps[0]).toBe(`lane: ${fetchById([W, C1]).argv.join(" ")}`)
-  expect(steps.slice(1, 4)).toEqual([
+  expect(steps[1]).toBe(`lane: ${fetchById([W, C1]).argv.join(" ")}`)
+  expect(steps.slice(2, 5)).toEqual([
     "lane: jj new c1",
     "lane: jj restore --from w1",
     `lane: jj commit -m ${baseMessage("copy of wip/x", { bookmark: "wip/x", commit: W })}`,
@@ -588,7 +589,7 @@ test("fetchById: skipped when every commit is on the disk, else onto branches", 
 const argvs = (steps: readonly LaneStep[]) =>
   steps.map(s => `${s.in}: ${s.argv.join(" ")}`)
 
-test("planFork: the clone, the container, then jj new before anything else, then the config", () => {
+test("planFork: the clone, the container, the old config folder gone, then jj new before any other jj command, then the config", () => {
   const steps = planFork({
     point: {
       snapshot: snapshotId("e1"),
@@ -603,6 +604,7 @@ test("planFork: the clone, the container, then jj new before anything else, then
     "host: /bin/cp -c /p/.pinetrie/snapshots/e1.img /v/pinetrie-t-1/volume.img.tmp",
     "host: /bin/mv -f /v/pinetrie-t-1/volume.img.tmp /v/pinetrie-t-1/volume.img",
     `host: container ${planRun(spec, {}).join(" ")}`,
+    "lane: sh -c rm -rf /workspace/.pineta-lane",
     `lane: ${fetchById([C1]).argv.join(" ")}`,
     "lane: jj new c1",
     `lane: jj bookmark set --allow-backwards pinetrie/${LANE} -r @-`,
@@ -897,5 +899,45 @@ describe("planTurnCommit: the turn's revision (S56)", () => {
   })
   test("nothing, when the lane has no bookmark", () => {
     expect(planTurnCommit({ ...at, bookmark: null })).toEqual({ kind: "none" })
+  })
+})
+
+describe("pre-rename: planOldNamesOnDisk, for a disk cloned from a snapshot taken before the rename", () => {
+  const STACK = `pineta/${LANE}-stack`
+  const facts = (
+    configDir: { old: boolean; current: boolean },
+    bookmarks: string[],
+  ) => argvs(planOldNamesOnDisk({ configDir, bookmarks }, LANE))
+  test("the config folder moves, first; the lane's bookmarks are renamed; fetched ones are deleted; another lane's stay", () => {
+    expect(
+      facts({ old: true, current: false }, [
+        `pineta/${LANE}`,
+        STACK,
+        "pineta/fetched/0",
+        "pineta/fetched/1",
+        "pineta/t-parent",
+      ]),
+    ).toEqual([
+      "lane: sh -c mv /workspace/.pineta-lane /workspace/.pinetrie-lane",
+      `lane: jj -R /workspace --ignore-working-copy bookmark rename pineta/${LANE} pinetrie/${LANE}`,
+      `lane: jj -R /workspace --ignore-working-copy bookmark rename ${STACK} pinetrie/${LANE}-stack`,
+      "lane: jj -R /workspace --ignore-working-copy bookmark delete pineta/fetched/0 pineta/fetched/1",
+    ])
+  })
+  test("where the current name is already there, the old one is removed instead", () => {
+    expect(
+      facts({ old: true, current: true }, [
+        `pineta/${LANE}`,
+        `pinetrie/${LANE}`,
+      ]),
+    ).toEqual([
+      "lane: sh -c rm -rf /workspace/.pineta-lane",
+      `lane: jj -R /workspace --ignore-working-copy bookmark delete pineta/${LANE}`,
+    ])
+  })
+  test("a disk with nothing old has no steps", () => {
+    expect(facts({ old: false, current: true }, [`pinetrie/${LANE}`])).toEqual(
+      [],
+    )
   })
 })

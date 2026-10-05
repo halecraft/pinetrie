@@ -42,6 +42,28 @@ test("a split's end fetches the stack before stackEnded, then moves the lane bac
   ])
 })
 
+test("a split's end that throws still moves the lane back to its tip", async () => {
+  const lane = laneNameForThread("0123456789abcdef")
+  const order: string[] = []
+  const ports = record<Parameters<typeof finishSplit>[0]>({
+    fetchLane: async () => {},
+    stackTop: async () => commitId("cccc0000"),
+    stackEnded: async () => {
+      throw new Error("the stack's files differ")
+    },
+    backToTip: async () => {
+      order.push("back")
+    },
+  })
+  await expect(
+    finishSplit(ports.port, lane, {
+      start: [commitId("aaaa0000")],
+      tip: commitId("bbbb0000"),
+    }),
+  ).rejects.toThrow("the stack's files differ")
+  expect(order).toEqual(["back"])
+})
+
 test("a split whose skill read fails starts no container", async () => {
   const lane = laneNameForThread("0123456789abcdef")
   const started: string[] = []

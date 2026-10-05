@@ -27,9 +27,10 @@ import type { LaneRegistry } from "./registry.ts"
 
 /**
  * A split's run ended, in order: its stack fetched into your repo, its top
- * read there, the offer replaced by it if `stackEnded` accepts it, and the
- * lane moved back to its own tip, which it goes on from rather than the
- * stack's. Returns why the stack was refused, or null.
+ * read there, and the offer replaced by it if `stackEnded` accepts it. Then,
+ * whether or not any of those threw, the lane moved back to its own tip,
+ * which it goes on from rather than the stack's: a lane left on the stack
+ * refuses every catch-up. Returns why the stack was refused, or null.
  */
 export async function finishSplit(
   ports: {
@@ -41,11 +42,13 @@ export async function finishSplit(
   lane: LaneName,
   stack: { readonly start: readonly CommitId[]; readonly tip: CommitId },
 ): Promise<string | null> {
-  await ports.fetchLane(lane, [stack.tip, ...stack.start], true)
-  const top = await ports.stackTop(lane)
-  const refused = await ports.stackEnded(lane, { ...stack, top })
-  await ports.backToTip(lane)
-  return refused
+  try {
+    await ports.fetchLane(lane, [stack.tip, ...stack.start], true)
+    const top = await ports.stackTop(lane)
+    return await ports.stackEnded(lane, { ...stack, top })
+  } finally {
+    await ports.backToTip(lane)
+  }
 }
 
 export interface Splits {

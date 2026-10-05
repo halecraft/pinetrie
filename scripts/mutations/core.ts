@@ -106,16 +106,16 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a paragraph with any trailer of ours counts as ours",
     file: trailers,
-    from: "    .every(line => ours.some(t => line.startsWith(t)))",
-    to: "    .some(line => ours.some(t => line.startsWith(t)))",
+    from: "    .every(line => ours.some(t => t.test(line)))",
+    to: "    .some(line => ours.some(t => t.test(line)))",
     command: unit,
     expect: "withoutTrailers undoes withTrailers, and keeps your own",
   },
   {
     name: "a squash's sources are read from its last paragraph only",
     file: trailers,
-    from: "  [...new Set(trailerValues(message, TRAILERS.source))].map(commitId)",
-    to: "  [...new Set(trailerValues(message, TRAILERS.source).slice(-1))].map(commitId)",
+    from: '  [...new Set(trailerValues(message, "source"))].map(commitId)',
+    to: '  [...new Set(trailerValues(message, "source").slice(-1))].map(commitId)',
     command: unit,
     expect: "sourcesOf reads every paragraph of a squash",
   },
@@ -130,7 +130,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an integrated-offer commit that names a source reads as untraced",
     file: trailers,
-    from: "        trailerValues(p, TRAILERS.source).length === 0,\n",
+    from: '        trailerValues(p, "source").length === 0,\n',
     to: "        true,\n",
     command: unit,
     expect:
@@ -139,7 +139,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a turn reads as an untraced integrated-offer commit",
     file: trailers,
-    from: "        trailerValues(p, TRAILERS.thread).length > 0 &&\n",
+    from: '        trailerValues(p, "thread").length > 0 &&\n',
     to: "        true &&\n",
     command: unit,
     expect:
@@ -173,18 +173,35 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an offer's ledger is read from its oldest paragraph",
     file: trailers,
-    from: "    .filter(p => trailerValues(p, TRAILERS.source).length > 0)\n    .at(-1)",
-    to: "    .filter(p => trailerValues(p, TRAILERS.source).length > 0)\n    .at(0)",
+    from: '    .filter(p => trailerValues(p, "source").length > 0)\n    .at(-1)',
+    to: '    .filter(p => trailerValues(p, "source").length > 0)\n    .at(0)',
     command: unit,
     expect: "offerLedger reads the newest paragraph that names a source",
   },
   {
     name: "a trailer is read from the last paragraph only",
     file: trailers,
-    from: "    .filter(line => line.startsWith(prefix))",
-    to: "    .filter(line => line.startsWith(prefix))\n    .slice(-1)",
+    from: "    .flatMap(line => valueOn(line, key)?.trim() ?? [])",
+    to: "    .flatMap(line => valueOn(line, key)?.trim() ?? [])\n    .slice(-1)",
     command: unit,
     expect: "trailerValues reads a trailer from every paragraph",
+  },
+  {
+    name: "pre-rename: a Pineta trailer is not read",
+    file: trailers,
+    from: 'const READ = "Pine(?:trie|ta)-"',
+    to: 'const READ = "Pinetrie-"',
+    command: unit,
+    expect: "an offer's trailers and ledger, and the message without them",
+  },
+  {
+    name: "pre-rename: a base on the old line is read",
+    file: trailers,
+    from: '    .filter(line => !(key === "base" && line.startsWith(OLD_LINE_BASE)))\n',
+    to: "",
+    command: unit,
+    expect:
+      "a base on a WIP is read; a base on the old line, pineta-onto, reads as none",
   },
   {
     name: "the youngest child continues the parent's track",
