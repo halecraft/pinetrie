@@ -96,10 +96,10 @@ export function refusalWords(refusal: CardRefusal, reader: Reader): string {
     case "gone":
       if (!refusal.fromQueue) return "not moved: it was sent or removed first"
       return by === null
-        ? "already sent: it was sent before you unqueued it"
+        ? "already sent before you unqueued it"
         : by === reader.me
-          ? "already sent as your message: it was sent before you unqueued it"
-          : `already sent as ${displayName(by, reader.nameOf.get(by))}'s message: it was sent before you unqueued it`
+          ? "already sent as your message, before you unqueued it"
+          : `already sent as ${displayName(by, reader.nameOf.get(by))}'s message, before you unqueued it`
     case "moved":
       return by === null
         ? "not moved: someone moved it first"
@@ -123,7 +123,7 @@ export const cardStatus = (status: string, unsent: string | null): string =>
 
 /** The inventory panel's name, and its button in the header. */
 export const INVENTORY = "inventory"
-/** A card's button that takes it into your inventory; its drag handle too. The page says "take". */
+/** A card's button that takes it into your inventory; its drag handle too. */
 export const TAKE_INTO_INVENTORY = "take"
 export const TAKE_INTO_INVENTORY_TITLE =
   "take into your inventory (Ctrl+Shift+I) · drag to move"
@@ -206,7 +206,7 @@ export const retiredWords = (line: string): string =>
 export const HISTORY = "history"
 export const HISTORY_TITLE = "where this card has been, and who moved it"
 
-/** A verb as it reads after "by": "queued by Bea", "taken by Carl" (into an inventory). */
+/** A verb as it reads after "by": "queued by Bea", "taken by Carl". */
 const PARTICIPLE: Readonly<Record<Verb, string>> = {
   created: "created",
   sent: "sent",

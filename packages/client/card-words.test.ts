@@ -108,12 +108,12 @@ describe("card words", () => {
     [
       "refusalWords, an unqueue the pop beat, yours",
       refusalWords(refusal({ by: ME }), READER),
-      "already sent as your message: it was sent before you unqueued it",
+      "already sent as your message, before you unqueued it",
     ],
     [
       "refusalWords, an unqueue the pop beat, Bea's",
       refusalWords(refusal({ by: BEA }), READER),
-      "already sent as Bea's message: it was sent before you unqueued it",
+      "already sent as Bea's message, before you unqueued it",
     ],
     [
       "refusalWords, gone from a drafting place",

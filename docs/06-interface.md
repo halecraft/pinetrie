@@ -629,8 +629,8 @@ The rail is E; the column is T. Seeing both at once is the product.
   what its command does first when it has one, and **unqueue**. Anyone here
   can edit it until the host pops it to send it, when the lane is free, in
   order. An unqueued card goes back below the line. Unqueue a card the host
-  had already popped and your column says "already sent as Bea's message:
-  it was sent before you unqueued it". A move someone else made first is undone on your
+  had already popped and your column says "already sent as Bea's message,
+  before you unqueued it". A move someone else made first is undone on your
   screen, saying "not moved: Bea moved it first". A card the host could not
   send is back below the line saying "not sent: …" until it is queued again.
 - **Cmd+Z in a box undoes only that box's card**, never anything in another

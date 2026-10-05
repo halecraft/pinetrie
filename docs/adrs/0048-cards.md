@@ -12,7 +12,7 @@ take/unqueue race, implemented by `PLAN-2026-10-01-queued-cards`: it
 supersedes ADR-0026 (queued notes become queued cards), with ADR-0055, and
 amends ADR-0020 (nothing waits in `pineta.outbox`, which is gone). Probe 2
 is answered by S69, probes 1 and 4, for the inventory, by S75 and S76,
-and probe 5 by S92; S102 found a real model acts on the pinned cards it
+and probe 5 by S92; S107 found a real model acts on the pinned cards it
 reads, a retired one included. A later step would amend ADR-0046 (a fixed line about
 pinned cards in the prompt). Amended in place (2026-10-02): a queued card is
 *unqueued*, not stopped; "stop" is a run's word (ADR-0056). Amended in
