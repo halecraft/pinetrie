@@ -1,4 +1,4 @@
-import { entryId } from "@pinetrie/core"
+import { entryId, streamId } from "@pinetrie/core"
 import {
   messageTools,
   projectColumns,
@@ -79,16 +79,16 @@ test("a change to what a message shows, or a new handler, draws again", () => {
   ).toBe(false)
   expect(sameMessageProps(was, props("hello", { onAct: () => {} }))).toBe(false)
   // One of its own calls starts streaming.
-  expect(sameMessageProps(was, props("hello", { streams: { c1: "s1" } }))).toBe(
-    false,
-  )
+  expect(
+    sameMessageProps(was, props("hello", { streams: { c1: streamId("s1") } })),
+  ).toBe(false)
 })
 
 test("its calls' streams, rebuilt unchanged, draw the same", () => {
   expect(
     sameMessageProps(
-      props("hello", { streams: { c1: "s1" } }),
-      props("hello", { streams: { c1: "s1" } }),
+      props("hello", { streams: { c1: streamId("s1") } }),
+      props("hello", { streams: { c1: streamId("s1") } }),
     ),
   ).toBe(true)
 })

@@ -21,15 +21,6 @@ export const mutations: readonly Mutation[] = [
     expect: "one source: the budget is the harness's keepRecentTokens",
   },
   {
-    name: "every write goes to the first target's document",
-    file: "packages/pi/scribe.ts",
-    from: "    const key = keyOf(w.target)",
-    to: '    const key = ""',
-    command: unit,
-    expect:
-      "writes sets and deletes in one call, each in the document its target names (ADR-0063)",
-  },
-  {
     name: "every lane runs in one root's session",
     file: "packages/pi/agent.ts",
     from: "  async function ofLane(name: LaneName): Promise<Stack | undefined> {\n    const root = documents.rootOfLane(name)\n    return root === null ? undefined : ofRoot(root)",
@@ -387,7 +378,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a value prefix runs on into a longer namespace",
-    file: "packages/schema/index.ts",
+    file: "packages/schema/pi-layout.ts",
     from: "  physicalKey(namespace, keyPrefix)\n",
     to: "  namespace + keyPrefix\n",
     command: unit,
@@ -682,20 +673,12 @@ export const mutations: readonly Mutation[] = [
     expect: "release closes what was built over a session, then the session",
   },
   {
-    name: "planWrites lets pi's namespaces through",
-    file: "packages/pi/scribe.ts",
-    from: '  const foreign = writes.find(w => !w.namespace.startsWith("pinetrie."))',
-    to: "  const foreign = writes.find(() => false)",
-    command: unit,
-    expect: "planWrites refuses a namespace not the host's",
-  },
-  {
-    name: "a closed scribe takes writes",
+    name: "a closed scribe takes appends",
     file: "packages/pi/scribe.ts",
     from: '    if (closed) throw new Error("the scribe is closed")\n',
     to: "",
     command: unit,
-    expect: "a closed scribe refuses every write",
+    expect: "a closed scribe refuses every append",
   },
   {
     name: "open answers undefined for a stranger",

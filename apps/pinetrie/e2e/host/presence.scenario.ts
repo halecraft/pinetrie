@@ -78,13 +78,13 @@ async function run(check: Checks["check"]): Promise<void> {
     // write throws before it is made.
     const refused = refusedWrite(() =>
       batch(bea.session, d =>
-        d.values.set("forged", { value: "bea is the host" }),
+        d.records.set("forged", { forged: "bea is the host" }),
       ),
     )
     await sleep(500)
     check(
       "a client cannot write the session: its write is refused before it is made, and the host's copy is unchanged",
-      refused && ph.session.values.get("forged") === undefined,
+      refused && ph.session.records.get("forged") === undefined,
       `refused ${refused}`,
     )
     await bea.close()

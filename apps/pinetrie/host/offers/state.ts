@@ -17,7 +17,7 @@ import {
   wipDescription,
 } from "@pinetrie/core"
 import type { LineConfig } from "@pinetrie/lanes"
-import type { PiSetup, Scribe } from "@pinetrie/pi"
+import type { PiSetup } from "@pinetrie/pi"
 import {
   readArchived,
   readBases,
@@ -37,6 +37,7 @@ import {
 } from "@pinetrie/rules"
 import { readLaneTip } from "@pinetrie/schema"
 import type { Basics } from "../basics.ts"
+import type { Records } from "../records.ts"
 
 /** What the documents say of a lane, for what your repo cannot say. */
 export interface OfferDocs {
@@ -86,7 +87,7 @@ export function createOfferDeps(input: {
   readonly owner: RepoOwner
   readonly line: LineConfig
   readonly basics: Basics
-  readonly scribe: Pick<Scribe, "writeValues">
+  readonly records: Pick<Records, "writeValues">
   readonly piSetup: Pick<PiSetup, "skill" | "complete">
   readonly running: (lane: LaneName) => boolean
   /** A lane's base record changed. */
@@ -95,7 +96,7 @@ export function createOfferDeps(input: {
   const { basics, line } = input
   const { session: doc, docs } = basics
   const writeValues = (writes: readonly ValueWrite[]) =>
-    writes.length === 0 ? Promise.resolve() : input.scribe.writeValues(writes)
+    writes.length === 0 ? Promise.resolve() : input.records.writeValues(writes)
   const nameOf = (lane: LaneName) => readNames(doc).get(lane)
   const offerDocs: OfferDocs = {
     nameOf,

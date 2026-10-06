@@ -6,14 +6,19 @@
 // tip. A tool's stream is drawn by its call's row, which stops drawing it once
 // the row has a result.
 
-import type { AgentRun, ToolCallView } from "@pinetrie/core"
-import { isCurrentReply, type StreamRecord } from "@pinetrie/schema"
+import type {
+  AgentRun,
+  StreamId,
+  StreamRecord,
+  ToolCallView,
+} from "@pinetrie/core"
+import { isCurrentReply } from "@pinetrie/rules"
 
 export interface LiveWork {
   /** Each running lane's current reply: at most one per lane. */
   readonly replies: ReadonlyMap<string, StreamRecord>
   /** Each tool stream of a running lane, its id by its call's id. */
-  readonly tools: ReadonlyMap<string, string>
+  readonly tools: ReadonlyMap<string, StreamId>
 }
 
 export function liveWork(
@@ -22,7 +27,7 @@ export function liveWork(
 ): LiveWork {
   const tips = new Map(running.map(r => [r.lane as string, r.tip]))
   const replies = new Map<string, StreamRecord>()
-  const tools = new Map<string, string>()
+  const tools = new Map<string, StreamId>()
   for (const s of streams) {
     const tip = tips.get(s.lane)
     if (tip === undefined) continue
@@ -40,8 +45,8 @@ export function liveWork(
 export function callStreams(
   calls: readonly ToolCallView[] | undefined,
   tools: LiveWork["tools"],
-): Readonly<Record<string, string>> {
-  const out: Record<string, string> = {}
+): Readonly<Record<string, StreamId>> {
+  const out: Record<string, StreamId> = {}
   for (const call of calls ?? []) {
     const stream = tools.get(call.id)
     if (stream !== undefined) out[call.id] = stream

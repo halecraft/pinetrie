@@ -288,10 +288,11 @@ files.
 
 **ADR-0062 — each host record is one spec** (built). A `RecordSpec` in
 `@pinetrie/rules` names a record's namespace, key, encoding and decoding; the host
-builds `ValueWrite`s with `setRecord` and `deleteRecord`, and pi's
-scribe (`Scribe.writeValues`, ADR-0092) carries them in one commit, refusing any namespace outside
-`pinetrie.`. The address holds a record's key and the contents never repeat
-it; old values with a copy still decode. A seat is keyed by its peer.
+builds `ValueWrite`s with `setRecord` and `deleteRecord`, and the host
+writes them itself into each document's `records` (`Records.writeValues`,
+ADR-0095), one batch per document. The address holds a record's key and the
+contents never repeat it; old values with a copy still decode. A seat is
+keyed by its peer.
 
 **ADR-0063 — a root is a document; what is streaming is another** (built).
 The one session document had grown to 124 M characters, and each run's end
@@ -536,7 +537,27 @@ one-off requests, banners, commands and skills) and the agent (lanes, made
 last, with lane work's hooks), and every host module is given values. The
 agent's harness is built over the scribe's session for its root, never one
 of its own: two over one document drift apart (S113). The scribe ends every
-session, and shutdown closes it after the agent.
+session, and shutdown closes it after the agent. Since ADR-0095 the scribe
+carries a thread's appends only.
+
+**ADR-0095 — the host's records live apart from pi's values** (built).
+They had been pi values, wrapped and written through a pi session that
+nothing read, found by scanning every value, and the session's document
+wore pi's whole storage shape. Now each document has `records`, namespace
+then key then contents, which the host writes itself (`Records.writeValues`,
+`applyRecordWrites`); the session's document is `SessionDoc`, `records`
+alone, and a root's is `RootDoc`, pi's storage plus `records`. A read is
+one lookup, cached while its namespace is unchanged (S120).
+`@pinetrie/schema` holds shapes and the storage edge, and plans nothing: a
+stream event's and a run's changes are `@pinetrie/rules`' (`live.ts`).
+
+**ADR-0096 — a starting host checks each stored schema first** (built). A
+document opened under a changed schema loses a dropped field's data at the
+next compaction (S120), and the host compacts at start. So `startHost`
+reads every stored document's schema hash before it opens any, runs the
+migrations registered from it (`apps/pinetrie/host/migrations/`), after a
+backup and before any write if a record failed to load, or refuses to
+start. A migration is deleted once Duane's store has passed it.
 
 **ADR-0019 — a lane is a line of work, not a unit of parallelism.** A person's
 lane is a *conversation lane* and never touches disk. A *work lane* carries

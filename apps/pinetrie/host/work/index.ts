@@ -13,11 +13,12 @@
 import type { LaneName, ProjectRecord } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
 import { DEFAULT_LINE } from "@pinetrie/lanes"
-import type { LaneHooks, PiSetup, Scribe } from "@pinetrie/pi"
+import type { LaneHooks, PiSetup } from "@pinetrie/pi"
 import { readRunning } from "@pinetrie/reads"
 import type { RepoOwner } from "@pinetrie/repo"
 import type { Basics } from "../basics.ts"
 import { type Offers, startOffers } from "../offers/index.ts"
+import type { Records } from "../records.ts"
 import { type Archive, createArchive } from "./archive.ts"
 import { type Containers, createContainers } from "./containers.ts"
 import { createNewLanes, type NewLanes } from "./create.ts"
@@ -74,7 +75,7 @@ export async function startLaneWork(input: {
   /** The user's config, as read at startup (ADR-0035): its file, for logs. */
   readonly userConfig: { readonly file: string; readonly json: unknown }
   /** Where lane work writes its records (ADR-0062). */
-  readonly scribe: Pick<Scribe, "writeValues">
+  readonly records: Pick<Records, "writeValues">
   /** The person's pi setup: the commands' roots lanes are granted, the skills updates and splits ask for, and descriptions. */
   readonly piSetup: Pick<
     PiSetup,
@@ -112,7 +113,7 @@ export async function startLaneWork(input: {
           basics,
           line: lineConfig,
           lineCommands: input.lineCommands,
-          writeValues: writes => input.scribe.writeValues(writes),
+          writeValues: writes => input.records.writeValues(writes),
         })
   // The base snapshot follows the line, however it moved: setup, an accept,
   // a publish, or jj outside pine·trie (ADR-0090).
@@ -127,7 +128,7 @@ export async function startLaneWork(input: {
           owner,
           line: lineConfig,
           basics,
-          scribe: input.scribe,
+          records: input.records,
           piSetup: input.piSetup,
           running: lane => readRunning(basics.live, lane),
           baseChanged: lane => {
@@ -154,7 +155,7 @@ export async function startLaneWork(input: {
     setup,
     registry,
     keeper,
-    scribe: input.scribe,
+    records: input.records,
     fetchLane,
   })
   const newLanes = createNewLanes({
@@ -162,7 +163,7 @@ export async function startLaneWork(input: {
     setup,
     registry,
     keeper,
-    scribe: input.scribe,
+    records: input.records,
     ensureNames: input.ensureNames,
     pendingRecords: turns.pendingRecords,
   })

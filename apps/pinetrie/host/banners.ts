@@ -10,7 +10,7 @@ import {
   type StoredImage,
 } from "@pinetrie/core"
 import type { Keeper } from "@pinetrie/keeper"
-import type { PiSetup, Scribe } from "@pinetrie/pi"
+import type { PiSetup } from "@pinetrie/pi"
 import { readBanners, readNames } from "@pinetrie/reads"
 import {
   answerOf,
@@ -26,6 +26,7 @@ import {
 } from "@pinetrie/rules"
 import type { Basics } from "./basics.ts"
 import { requestOutside } from "./outside.ts"
+import type { Records } from "./records.ts"
 
 export interface Banners {
   /** A lane was named, or its run ended: make its banner if it has none. */
@@ -38,7 +39,7 @@ export function createBanners(deps: {
   readonly basics: Pick<Basics, "session" | "log" | "now">
   readonly keeper: Keeper
   readonly blobs: Pick<BlobStore, "put" | "ref">
-  readonly scribe: Pick<Scribe, "writeValues">
+  readonly records: Pick<Records, "writeValues">
   /** The image model, and the banner's skill. */
   readonly piSetup: Pick<PiSetup, "canDrawBanners" | "drawBanner" | "skill">
 }): Banners {
@@ -48,7 +49,7 @@ export function createBanners(deps: {
   const generating = new Set<LaneName>()
 
   const write = (lane: LaneName, sha: Sha256) =>
-    deps.scribe.writeValues([
+    deps.records.writeValues([
       setRecord(BANNER, { lane, sha, at: basics.now() }),
     ])
 

@@ -22,7 +22,7 @@ import {
   type PromptBudget,
   setRecord,
 } from "@pinetrie/rules"
-import { newRootDoc, writeEntry, writeLaneTip } from "@pinetrie/schema"
+import { newRootDoc, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
 import { basics, putLane, putValue, record, row } from "../fakes.ts"
 import {

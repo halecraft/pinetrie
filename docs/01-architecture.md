@@ -259,11 +259,11 @@ branches from the op log. Our mapping is exact. (ADR-0008)
 ### Documents (ADR-0063)
 
 ```
-pinetrie:session   StorageDoc, no entries   session-wide host records:
+pinetrie:session   SessionDoc               session-wide host records:
                                           the directory of roots (pinetrie.root),
                                           every lane's record (pinetrie.lane),
                                           the board, names, offers, banners
-root:<RootId>    StorageDoc, one a root   that root's pi storage (entries,
+root:<RootId>    RootDoc, one a root      that root's pi storage (entries,
                                           values, lists) and the records keyed
                                           by its entries (revision, mark, stop)
 pinetrie:live      LiveDoc                  streams and active runs: compacted
@@ -284,12 +284,12 @@ The host holds the session, `live`, the places and every root not archived
 (not in the board's closed state, ADR-0085).
 A client holds the session, `live`, the places and only the roots its tabs
 show; it reads every other root through its directory record. pi runs one
-session and one harness per document.
+session and one harness per root (ADR-0092, ADR-0095).
 
 ### Document shape (entries: settled by S7; rest sketch)
 
-The shape of a `StorageDoc`: a root's document has all of it, the session's
-no entries.
+The shape of a `RootDoc`: pi's storage and the host's `records`. A
+`SessionDoc` holds `records` alone (ADR-0095).
 
 - **entries** — `Schema.record(Schema.struct.json({...}))`: a dynamic-key map
   keyed by UUIDv7, values opaque immutable blobs. **Not** `Schema.list` (not
@@ -309,8 +309,12 @@ no entries.
   > error**.
 
   Fields: `{id, parentId, fromId?, seq?, timestamp, type, …}`
-- **values** — LWW map over `(namespace, key)`. Carries `pi.branch.tip`,
-  `pi.lane.*`, `pi.op.*`, labels.
+- **values** — LWW map over `(namespace, key)`: pi's own. Carries
+  `pi.branch.tip`, `pi.lane.*`, `pi.op.*`.
+- **records** — the host's records (`pinetrie.*`, ADR-0062, ADR-0095: the
+  directory, lanes, offers, marks, digests, verdicts, seats…), a record per
+  namespace then key, written by the host directly. The session's document
+  holds only these.
 
   > **Three registers are keyed by LANE NAME** (`values.js:62-65`):
   > `pi.branch.tip`, `pi.lane.state`, `pi.lane.config`. They are safe **only**

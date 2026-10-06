@@ -60,7 +60,6 @@ import {
 } from "@pinetrie/reads"
 import { offerSeen } from "@pinetrie/rules"
 import {
-  asSessionDoc,
   cardDocId,
   cardIdOfDoc,
   LiveDoc,
@@ -71,8 +70,8 @@ import {
   type PresenceDecay,
   type PresenceDocHandle,
   type RootDocHandle,
+  SessionDoc,
   type SessionDocHandle,
-  StorageDoc,
   type TextDocHandle,
   textVersion,
 } from "@pinetrie/schema"
@@ -386,7 +385,7 @@ export async function connectSession(
     "the host did not introduce itself",
   )
 
-  const session = asSessionDoc(exchange.get(SESSION_DOC_ID, StorageDoc))
+  const session = exchange.get(SESSION_DOC_ID, SessionDoc)
   const live = exchange.get(LIVE_DOC_ID, LiveDoc)
   const roots = rootDocs(exchange)
   // Never written here: `cards` is how the page reads it (ADR-0059).

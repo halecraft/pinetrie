@@ -1,12 +1,8 @@
 import { createInMemoryStore, Exchange } from "@kyneta/exchange"
 import { batch, createDocAs, exportEntirety, merge } from "@kyneta/schema"
 import { cardId } from "@pinetrie/core"
-import {
-  cardDocId,
-  newSessionDoc,
-  TextDoc,
-  textVersion,
-} from "@pinetrie/schema"
+import { cardDocId, TextDoc, textVersion } from "@pinetrie/schema"
+import { newSessionDoc } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import { startCards } from "./cards.ts"
 

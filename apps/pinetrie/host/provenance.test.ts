@@ -8,7 +8,8 @@ import {
   rootIdFor,
   writerId,
 } from "@pinetrie/core"
-import { newPresenceDoc, writeEntry, writeLaneTip } from "@pinetrie/schema"
+import { newPresenceDoc } from "@pinetrie/schema"
+import { writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import { applyWrites, basics, ROOT_ID, row } from "./fakes.ts"
 import { applyPlaceSteps } from "./places.ts"
@@ -51,7 +52,7 @@ test("before: a shared card's thread end in a loaded root; none for a root not l
   const provenance = createProvenance({
     basics: b,
     presence: newPresenceDoc(),
-    scribe: { writeValues: async w => applyWrites(b, w) },
+    records: { writeValues: async w => applyWrites(b, w) },
   })
   expect([...provenance.before().ends]).toEqual([[cardId("here"), E1]])
 })

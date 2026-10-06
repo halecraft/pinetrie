@@ -3,7 +3,7 @@
 // what the reader asks as a `MessageAct`.
 
 import { useSelector } from "@kyneta/react"
-import type { ToolCallView, TranscriptMessage } from "@pinetrie/core"
+import type { StreamId, ToolCallView, TranscriptMessage } from "@pinetrie/core"
 import {
   CALL_MARK,
   callStatus,
@@ -307,7 +307,7 @@ function ToolRow({
   rows,
 }: {
   call: ToolCallView
-  stream: string | undefined
+  stream: StreamId | undefined
   doc: LiveDocHandle
   rows: ScreenMemory<RowMemory>
 }) {
@@ -408,7 +408,7 @@ function ToolOutput({
   result,
 }: {
   doc: LiveDocHandle
-  stream: string | undefined
+  stream: StreamId | undefined
   result: string | undefined
 }) {
   const streamed = useSelector(

@@ -4,7 +4,9 @@
 `PLAN-2026-10-05-pi-in-three`. Amends ADR-0062 (the scribe carries the
 host's writes, not the agent) and ADR-0063 (a root is released through the
 scribe, which closes the agent's harness over it). Sits beside ADR-0003:
-no pi type crosses `packages/pi/index.ts`.
+no pi type crosses `packages/pi/index.ts`. Amended by ADR-0095: the scribe
+has no `writeValues` and no session over the session's document; the host
+writes its records directly.
 
 **Context.** `Agent` (`packages/pi/agent.ts`) was the host's one door into
 pi, and it did three jobs that need different things:

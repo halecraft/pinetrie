@@ -664,7 +664,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
     // the offer is the same commit, not built anew.
     const lostAt = offerNow()
     if (two !== undefined)
-      await wh.scribe.writeValues([deleteRecord(OFFER, two.name)])
+      await wh.records.writeValues([deleteRecord(OFFER, two.name)])
     const poke = `${DEFAULT_LINE.wipPrefix}e2e-poke`
     jj(project, "bookmark", "create", poke, "-r", "@-")
     const rewritten = await waitFor(

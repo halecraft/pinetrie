@@ -22,7 +22,6 @@ import {
   removeLane,
   revsetName,
 } from "@pinetrie/lanes"
-import type { Scribe } from "@pinetrie/pi"
 import { type RootView, readRevisions, readTreeIndex } from "@pinetrie/reads"
 import { beginFacts, type RepoOwner } from "@pinetrie/repo"
 import {
@@ -33,6 +32,7 @@ import {
   setRecord,
 } from "@pinetrie/rules"
 import { type Basics, failed } from "../basics.ts"
+import type { Records } from "../records.ts"
 import { lockHashAt } from "./disk.ts"
 import type { LaneRegistry } from "./registry.ts"
 import type { Setup } from "./setup.ts"
@@ -98,7 +98,7 @@ export function createNewLanes(deps: {
   readonly registry: LaneRegistry
   /** Work nobody awaits: `quiet` waits for it. */
   readonly keeper: Keeper
-  readonly scribe: Pick<Scribe, "writeValues">
+  readonly records: Pick<Records, "writeValues">
   readonly ensureNames: () => Promise<void>
   readonly pendingRecords: Turns["pendingRecords"]
 }): NewLanes {
@@ -154,7 +154,7 @@ export function createNewLanes(deps: {
 
     async prepareLane(view, lane, work, at, by, base) {
       const { doc } = view
-      await deps.scribe.writeValues([
+      await deps.records.writeValues([
         setRecord(LANE, {
           lane,
           root: view.root,

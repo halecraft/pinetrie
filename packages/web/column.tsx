@@ -21,6 +21,7 @@ import {
   ROOT,
   type SeatRecord,
   type StopRecord,
+  type StreamRecord,
   type ThreadLane,
   type TraceRecord,
   type TreeIndex,
@@ -103,11 +104,7 @@ import {
   queuedOn,
   yourCard,
 } from "@pinetrie/rules"
-import {
-  type LiveDocHandle,
-  readStreamText,
-  type StreamRecord,
-} from "@pinetrie/schema"
+import { type LiveDocHandle, readStreamText } from "@pinetrie/schema"
 import type { AttentionStore } from "@pinetrie/session"
 import {
   drawnPlace,

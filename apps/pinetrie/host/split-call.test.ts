@@ -2,12 +2,8 @@ import { entryId, laneNameForThread, runId, writerId } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
 import { readCardHistories, readPlaces } from "@pinetrie/reads"
 import { OFFER, SPLIT_QUEUED, setRecord, splitRefusal } from "@pinetrie/rules"
-import {
-  beginRun,
-  newPresenceDoc,
-  writeEntry,
-  writeLaneTip,
-} from "@pinetrie/schema"
+import { newPresenceDoc } from "@pinetrie/schema"
+import { beginRun, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import type { HostKey } from "./basics.ts"
 import { applyWrites, basics, putLane, putValue, row } from "./fakes.ts"
@@ -57,7 +53,7 @@ test("split_offer queues a split card by the person behind the run, once (ADR-00
     provenance: createProvenance({
       basics: b,
       presence: newPresenceDoc(),
-      scribe: { writeValues: async w => applyWrites(b, w) },
+      records: { writeValues: async w => applyWrites(b, w) },
     }),
   })
   expect(await askSplit(LANE)).toEqual({
@@ -93,7 +89,7 @@ test("a split asked as its run is stopped is popped by the run's end: its step c
     provenance: createProvenance({
       basics: b,
       presence: newPresenceDoc(),
-      scribe: { writeValues: async w => applyWrites(b, w) },
+      records: { writeValues: async w => applyWrites(b, w) },
     }),
   })
   // The tool's call queues its step; a Stop ends the run before it runs,

@@ -15,6 +15,8 @@ tab's search over labels is the closed state's.
 Amended by ADR-0092: a root is released through the scribe, which closes
 the agent's harness over the root's one pi session, then the session; the
 session document has a session and no harness.
+Amended by ADR-0095: the session's document has its own schema, `SessionDoc`
+(the host's records alone), and a root's is pi's storage plus `records`.
 
 **Context.** The session was one Kyneta document, `pinetrie:session`: pi's
 storage for every root ever started, the host's records, and what is

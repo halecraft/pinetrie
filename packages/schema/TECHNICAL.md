@@ -1,12 +1,24 @@
 # `@pinetrie/schema` — technical notes
 
-The Kyneta document shape. Imports Kyneta only, never pi. That pi-free property
+Each document's Kyneta shape, and the reads and writes at the storage edge
+(ADR-0095). It makes no decisions: what a stream event does, how a run
+ends, what a record says, are `@pinetrie/rules`', over types in
+`@pinetrie/core`. It imports Kyneta and core, never pi. That pi-free property
 is what let spikes S7, S8 and S12 test convergence with no harness in the
 picture, and it is worth protecting.
 
+| file | holds |
+|---|---|
+| `storage.ts` | `RootDoc` and `SessionDoc`, their handles, and the host's records: `readNamespace`, `applyRecordWrites` |
+| `live.ts` | `LiveDoc`: the stream row's codec, `applyLiveOps` (its one writer), and its readers |
+| `pi-layout.ts` | how pi's data is laid out in a root: the entry row, `physicalKey`, `StoredValueRecord`, a lane's tip, `rowMessage`, `rowRetainedTail` |
+| `places.ts`, `text.ts`, `presence.ts`, `inventory.ts`, `attention.ts`, `open.ts` | one document each, below |
+| `fixtures.ts` | `@pinetrie/schema/fixtures`: documents written as pi and the host write them, for tests only |
+| `index.ts` | re-exports, and nothing else |
+
 ## The entry row (ADR-0015)
 
-`entries` is a `Schema.record` of `Schema.struct.json({...})`: six typed columns
+`entries` is a `Schema.record` of `Schema.struct.json({...})`: five typed columns
 plus one sealed `payload`.
 
 | column | why it is typed |
@@ -75,13 +87,15 @@ names `seq` in `NEVER_IN_PAYLOAD` for exactly this reason. A unit test caught
 this during implementation; it is not hypothetical.
 
 **`usageRows`, `values` and `lists` are still `Schema.any()`.** They are pi's
-bookkeeping for its `Storage` port, not pine·trie's domain model, and nothing of
-ours traverses them. The asymmetry with `entries` is deliberate.
+bookkeeping for its `Storage` port, not pine·trie's domain model. Of them, ours
+reads only a lane's tip in `values`. The asymmetry with `entries` is
+deliberate. The host's records are in `records`, also `any` at the leaf: each
+`RecordSpec` decodes its contents (ADR-0095).
 
 ## `pinetrie:live`: what is streaming now (ADR-0063)
 
 `LiveDoc` holds `streams`, `streamText` and `activeRuns`, apart from pi's
-storage. No restarted host needs them (`clearStreams`), and they churn with
+storage. No restarted host needs them (`planClear`), and they churn with
 every token and tool update, so compacting them at a run's end rewrites only
 what is running. Every stream and run function below takes a
 `LiveDocHandle`. A reply's `under` is still compared with the lane's tip,
@@ -93,7 +107,7 @@ a store written with them opens under the schema without them (S86).
 ## `activeRuns`: one stream per lane
 
 `activeRuns: Schema.record(Schema.string())` maps a lane name to the run it is
-streaming. A **missing key means idle**; `endRun` deletes the key rather than
+streaming. A **missing key means idle**; a run's `end` deletes the key rather than
 setting `""`, so no sentinel survives inside the structure. It replaced a single
 `activeRunId` register, which allowed only one stream in the whole document.
 
@@ -119,33 +133,41 @@ one text per run. Keys are fresh uuidv7s (ADR-0016), written only by the host.
 - A tool stream opens with the tool. Its output arrives as whole snapshots of
   a tail-kept view and is written with `tailEdit` (`@pinetrie/core`).
 - **Nothing happens when a message or a tool ends.** A stream stays until its
-  entry is written, so a reader never sees neither. `closeStreams` is the one
-  way a stream is deleted, and each caller knows the entry is written:
+  entry is written, so a reader never sees neither. A `close` is the one
+  way a stream is deleted, and each plan that makes one knows the entry is
+  written:
   - a reply opening closes its lane's streams: a message's tool results are
     written before the next request (S55);
   - a tool opening closes its lane's replies that are no longer current: a
     message's entry is written before its tools start (S55);
-  - `endRun` closes the lane's streams with its `activeRuns` key: a run's
+  - `planEndRun` closes the lane's streams with its `activeRuns` key: a run's
     entries are written before it ends, a stopped reply's partial message
     included (S55);
-  - `clearStreams`, at a host's start, closes every stream and every text.
+  - `planClear`, at a host's start, closes every stream and every text.
 - So a lane has at most one reply stream at a time.
-- `planStream` is the pure decision per event, and `applyStreamOps` the one
-  writer (`applyOps` inside a caller's batch). `readStreamRecords` is the one
-  parser of the row, and reads no text: a `useTracked` over it does not re-run
-  on a delta (S55). `readStreams` adds each text, and `readStreamText` reads
-  one.
-- `under` is the storage shape's `""` for a tool or a tipless lane, and
-  `StreamRecord` is a union. The row is inside a `Schema.record`, so adding
-  `under` was not migratable (Gotchas). A store written before it still opened
-  (S55), since a starting host clears every stream.
+- **Planned in `@pinetrie/rules`, written here.** `planStream`, `planEndRun`
+  and `planClear` (`packages/rules/live.ts`) are pure, and return `LiveOp`s
+  (`@pinetrie/core`). `applyLiveOps` is the one writer of `pinetrie:live`, in
+  one batch. The host gathers, plans and applies: `streamInto` and `endRun`
+  in `apps/pinetrie/host/runs.ts`, and the clear in `recover`.
+- **The row's codec is here**, beside `LiveDoc` (`encodeStream`,
+  `decodeStream`): the applier and the readers both need it, and this package
+  cannot depend on `@pinetrie/rules`. `readStreamRecords` is the one reader
+  of the row, and reads no text: a `useTracked` over it does not re-run on a
+  delta (S55). `readStreams` adds each text, and `readStreamText` reads one.
+  Both take a lane, so the host's gather for one event reads only its lane.
+- **`under` and `callId` are nullable**: null for a tool's tip, a tipless
+  lane's, and a reply's call. `StreamRecord` is a union. The row is inside a
+  `Schema.record`, so a change to it cannot be migrated (Gotchas); a
+  starting host clears every stream, so none needs to be.
 - `activeRuns` keeps one meaning: this lane is running.
 - `checkpointText` holds pi's tool-output checkpoints' text, keyed by
   `physicalKey`, written by `KynetaStorage` (`packages/pi/TECHNICAL.md`).
 
-This package depends on `@pinetrie/core` (for `tailEdit` and `StreamEvent`), which
-the dependency direction `core → schema → pi → app` allows. It still imports no
-pi.
+This package depends on `@pinetrie/core` (for `LiveOp`, `StreamRecord` and
+`ValueWrite`), which the dependency direction `core → schema → pi → app`
+allows. It cannot depend on `@pinetrie/rules`, so a codec its own writer and
+readers need, as the stream row's, lives here. It still imports no pi.
 
 ## Presence (`presence.ts`, ADR-0024)
 
@@ -303,28 +325,31 @@ panel draws a slot whose card is not held as empty.
 
 `OpenDoc` is the roots the person has open, their list (ADR-0085): each
 root's `RootId` to an order key, read by `readOpenKeys` (a key that is no
-root is left out) and ordered by `orderOpen` (by key, then id). A record,
+root is left out) and ordered by `orderOpen` (by key, then id, in
+`packages/session/open-repair.ts`). A record,
 not a list: two devices reordering at once merge per root, and a list could
 hold a root twice.
 
 ## A document per root (ADR-0063)
 
-A session is a document per root, the session's own, and `pinetrie:live`. The
-root and the session share one schema, `StorageDoc`, pi's storage, so
-`KynetaStorage` and pi's `setValue` serve both unchanged.
+A session is a document per root, the session's own, and `pinetrie:live`.
 
-| document | id | holds |
-|---|---|---|
-| a root's | `root:<RootId>` (`rootDocId`, core) | its entries, usage rows, pi's values and lists for its lanes, checkpoints, and the host records keyed by its entries (revision, mark, stop, digest) |
-| the session's | `pinetrie:session` | the records read across roots: the directory (`pinetrie.root`), every lane's record (`pinetrie.lane`, naming its root), names, offers, banners, bases, the board (`pinetrie.workflow`, `pinetrie.board`), seats, participants and the singletons. No entries |
-| what streams | `pinetrie:live` (`LiveDoc`) | streams, their text, active runs |
+| document | id | schema | holds |
+|---|---|---|---|
+| a root's | `root:<RootId>` (`rootDocId`, core) | `RootDoc` | its entries, usage rows, pi's values and lists for its lanes, checkpoints, and in `records` the host's records keyed by its entries (revision, mark, stop, digest) |
+| the session's | `pinetrie:session` | `SessionDoc` | in `records`, the records read across roots: the directory (`pinetrie.root`), every lane's record (`pinetrie.lane`, naming its root), names, offers, banners, bases, the board (`pinetrie.workflow`, `pinetrie.board`), seats, participants and the singletons |
+| what streams | `pinetrie:live` | `LiveDoc` | streams, their text, active runs |
 
-- **Brands keep the two storage documents apart.** `RootDocHandle` and
-  `SessionDocHandle` are `StorageDocHandle` with a phantom brand, so a read
-  of a root's records cannot be handed the session's document, though both
-  have one shape. `asRootDoc` and `asSessionDoc` are the only casts, where a
-  document is opened; `newRootDoc` and `newSessionDoc` make one for a test.
-  The readers below take a `RootDocHandle`: a root's entries and lanes.
+- **Two schemas, two handle types** (ADR-0095). `RootDocHandle` and
+  `SessionDocHandle` are their documents' own types, so a read of a root's
+  records cannot be handed the session's document. `RecordsDocHandle` is
+  either, for what reads or writes `records` alone. `newRootDoc` and
+  `newSessionDoc` (`@pinetrie/schema/fixtures`) make one for a test.
+- **`records` is namespace, then key, then contents.** `applyRecordWrites` is
+  its one writer, in one batch per document: a namespace's first write
+  creates it, and its last delete removes it. `readNamespace` reads one
+  namespace, the same object while nothing in it changes (S120), which is
+  what `readRecords` (`@pinetrie/reads`) caches by.
 - **A root's id is a `RootId`, not its root entry's** (`r-<uuidv7>`): Start
   Agent creates a lane at the root before pi writes the first entry. The
   directory record maps one to the other.
@@ -338,7 +363,7 @@ root and the session share one schema, `StorageDoc`, pi's storage, so
 The host keeps the session in a Kyneta exchange store: `@kyneta/sqlite-store`
 over `node:sqlite`, `.pinetrie/pinetrie.db` by default. It holds every document the
 host serves, one append-only record stream per document: each root's
-`StorageDoc`, which is also pi's storage, the session's, `pinetrie:live`, each
+`RootDoc`, which is also pi's storage, the session's, `pinetrie:live`, each
 live card's text, the places document, each person's history of moves per
 root (`moves:<writer>:<RootId>`, ADR-0066), and each connected client's
 command Line. A tab's undo stack is never stored here: the host rejects it
@@ -359,16 +384,21 @@ command Line. A tab's undo stack is never stored here: the host rejects it
   client keeps no store and does not reconnect, so the host destroys a
   departed seat's Line, and deletes every stored one when it starts.
 
-**A root schema change cannot open an existing store**: Kyneta refuses a schema
-that cannot read what is stored. Migrate (root fields are migratable, S17), or
-move the file aside. A Loro store from before ADR-0023 cannot be opened at all.
+**A changed schema opens an existing store without complaint** (S120). Kyneta
+rewrites the document's recorded schema hash, an added field reads as empty,
+and a dropped field's data stays in the store only until the next compaction,
+which deletes it. The host compacts at startup, so a starting host checks
+each stored document's schema hash before it opens any, and migrates or
+refuses (ADR-0096, `apps/pinetrie/host/TECHNICAL.md`, "The stored schemas").
+A change to any schema here comes with a migration in
+`apps/pinetrie/host/migrations/`. A retyped field has not been tried. A Loro store from before ADR-0023 cannot be opened at all.
 A store from before ADR-0063, the session as one document, does not open. Its
 one-off migration, `scripts/split-session.ts`, was deleted once it had run:
 restore it from the revision before its deletion (ADR-0063).
 
 ## Authoritative JSON, compacted (ADR-0023)
 
-`StorageDoc` is `json.bind`: plain JSON, serialized writes, one writer (the
+`RootDoc` and `SessionDoc` are `json.bind`: plain JSON, serialized writes, one writer (the
 host). No replica writes it, so it needs no CRDT merging, and the browser loads
 no Loro and no wasm. Its in-memory op log grows with every edit until
 compacted (S25), so the host compacts it between runs (`apps/pinetrie/host/settle.ts`:
@@ -405,8 +435,7 @@ value as pi does, for tests and fixtures; in the host, only pi writes it.
 ## Lane names, tips and runs are branded here
 
 The lane and run functions take and give `LaneName`, `EntryId` and `RunId`
-(`@pinetrie/core`), so `endRun(doc, lane, run)` cannot take its two ids
-swapped. The readers mint them: `readLaneTip` an `EntryId`, `readActiveRun` a
+(`@pinetrie/core`), so a `begin` cannot take its lane and run swapped. The readers mint them: `readLaneTip` an `EntryId`, `readActiveRun` a
 `RunId`, and `readStoredLanes` the lane names.
 
 - **`readStoredLanes` sets aside a stored name that fails `isLaneName`**, in
@@ -415,13 +444,15 @@ swapped. The readers mint them: `readLaneTip` an `EntryId`, `readActiveRun` a
   bookmark's name. The host logs the malformed ones at startup (`recover`).
   Every lane name in a measured store passed (S95).
 - **`readStreamRecords` drops a stream whose lane fails `isLaneName`.** Only
-  the host writes streams, and `clearStreams` deletes them all at startup.
+  the host writes streams, and the clear at startup (`planClear` over
+  `readStreamIds`, which reads the raw keys) deletes them all.
 
 ## Never race a child container (S18)
 
-Moot for the session since ADR-0023: it has one writer, so two replicas never
-create a container concurrently. The rule stands for any collaborative (Yjs)
-document, and keeping the session's keys unique costs nothing.
+Moot for a root's and the session's documents since ADR-0023: each has one
+writer, so two replicas never create a container concurrently. That is what
+lets `records` nest a namespace's child record (ADR-0095). The rule stands
+for any collaborative (Yjs) document.
 
 A child container created lazily under a record key LOSES one writer's contents
 when two replicas create it concurrently: nested `values[ns][key]` kept both
@@ -435,7 +466,7 @@ keyed by a globally unique id and only the host replica writes. **Do not key a
 lazily created container by anything two replicas could share**: a namespace, a
 lane name, a user id. See `docs/findings/S18-nested-values.md`. The rule is ADR-0016.
 
-`values` therefore stays flat, one leaf register per address, keyed by
+pi's `values` stays flat, one leaf register per address, keyed by
 `physicalKey(namespace, key)`. The (namespace, key) address is pi's; folding it
 into one key with a NUL is ours, mirroring pi's reference storage. The key is
 an identity, never parsed: readers use each stored value's own `namespace` and

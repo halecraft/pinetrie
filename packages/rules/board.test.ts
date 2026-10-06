@@ -16,9 +16,12 @@ import {
   placeStarted,
   planRootMove,
   planWorkflowEdit,
+  planWorkflowSeed,
   transitionOf,
+  WORKFLOW as WORKFLOW_SPEC,
 } from "./board.ts"
 import { orderKey } from "./order.ts"
+import { setRecord } from "./records.ts"
 
 const ADA = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
@@ -304,4 +307,13 @@ test("defaultWorkflow: Backlog and Doing, then Done, closed", () => {
   expect(w.open.map(s => s.name)).toEqual(["Backlog", "Doing"])
   expect(w.closed.name).toBe("Done")
   expect(new Set([...w.open.map(s => s.id), w.closed.id]).size).toBe(3)
+})
+
+test("planWorkflowSeed: a store with no workflow gets the default one, and one with a workflow nothing", () => {
+  let n = 0
+  const newId = () => `${n++}`
+  const seed = planWorkflowSeed(null, newId)
+  n = 0
+  expect(seed).toEqual([setRecord(WORKFLOW_SPEC, defaultWorkflow(newId))])
+  expect(planWorkflowSeed(defaultWorkflow(newId), newId)).toEqual([])
 })

@@ -13,7 +13,8 @@ import type { WireCommand } from "@pinetrie/protocol/codec"
 import type { Reply } from "@pinetrie/protocol/messages"
 import { readPlaces } from "@pinetrie/reads"
 import { BOARD, setRecord, WORKFLOW } from "@pinetrie/rules"
-import { newPresenceDoc, writeEntry } from "@pinetrie/schema"
+import { newPresenceDoc } from "@pinetrie/schema"
+import { writeEntry } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import type { HostKey } from "../basics.ts"
 import {
@@ -69,9 +70,13 @@ function setUp(
   writeEntry(b.root, row(ROOT_ENTRY, null))
   writeDirectory(b)
   placeRoot(b, DOING)
-  // The agent, the scribe and the setup in one record, so the order of their calls shows.
+  // The agent, the scribe, the records and the setup in one record, so the
+  // order of their calls shows.
   const pi = record<
-    CommandDeps["agent"] & CommandDeps["scribe"] & CommandDeps["piSetup"]
+    CommandDeps["agent"] &
+      CommandDeps["scribe"] &
+      CommandDeps["records"] &
+      CommandDeps["piSetup"]
   >({
     appendToTree: async () => ({ kind: "appended", id: entryId("e-2") }),
     ...(writes ? { writeValues: async w => applyWrites(b, w) } : {}),
@@ -80,6 +85,7 @@ function setUp(
     basics: b,
     agent: pi.port,
     scribe: pi.port,
+    records: pi.port,
     piSetup: pi.port,
     work: record<CommandDeps["work"]>(work).port,
     blobs: record<CommandDeps["blobs"]>({ ref: () => undefined }).port,
@@ -97,7 +103,7 @@ function setUp(
     provenance: createProvenance({
       basics: b,
       presence: newPresenceDoc(),
-      scribe: { writeValues: async w => applyWrites(b, w) },
+      records: { writeValues: async w => applyWrites(b, w) },
     }),
     titles: titles.port,
     keeper,

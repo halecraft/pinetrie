@@ -1,6 +1,6 @@
-// pi/scribe — the host's writes into the documents, through pi (ADR-0092):
-// its records (ADR-0062) and a conversation thread's messages (S21). The
-// scribe writes what the host decided, and decides nothing.
+// pi/scribe — the host's writes into a root's tree, through pi (ADR-0092): a
+// conversation thread's messages (S21). The host writes its records itself
+// (ADR-0095). The scribe writes what the host decided, and decides nothing.
 //
 // It holds one pi session per document, and nothing else may open one: two
 // sessions over one document drift apart, since each indexes only its own
@@ -10,22 +10,12 @@
 
 import {
   BACKGROUND_CONTEXT,
-  deleteValue,
   StorageBackedSession,
-  setValue,
-  value,
 } from "@earendil-works/pi-agent-core"
 import { insertEntry } from "@earendil-works/pi-agent-core/harness/session"
-import {
-  type BlobStore,
-  entryId,
-  type RootId,
-  type Spot,
-  type Target,
-  type ValueWrite,
-} from "@pinetrie/core"
+import { type BlobStore, entryId, type RootId, type Spot } from "@pinetrie/core"
 import type { ChatMessage } from "@pinetrie/rules"
-import type { StorageDocHandle } from "@pinetrie/schema"
+import type { RootDocHandle } from "@pinetrie/schema"
 import type { AgentDocuments, Stack } from "./agent.ts"
 import { sealed } from "./inside.ts"
 import { KynetaStorage } from "./storage.ts"
@@ -35,13 +25,6 @@ const CTX = BACKGROUND_CONTEXT
 
 /** Every member is a closure: it may be passed on its own. */
 export interface Scribe {
-  /**
-   * Write the host's records (ADR-0062): each document's writes in one
-   * commit, by their target (ADR-0063). A value can be written while a lane
-   * runs: it does not go through the lane (S70). Throws, writing nothing, for
-   * a namespace that is not the host's.
-   */
-  writeValues(writes: readonly ValueWrite[]): Promise<void>
   /**
    * Append at exactly `spot`, with no lane: a conversation thread (S21 Q1).
    * The host's serial executor guarantees nothing was written there since it
@@ -75,52 +58,6 @@ export interface ScribeInside {
 
 export const scribeInside = sealed<Scribe, ScribeInside>("createScribe")
 
-/** What `writeValues` does with `writes`, decided before anything is written. */
-export type WritePlan =
-  | { readonly kind: "refused"; readonly namespace: string }
-  | {
-      readonly kind: "groups"
-      readonly groups: readonly (readonly [Target, readonly ValueWrite[]])[]
-    }
-
-/**
- * Writes grouped by the document they go to, in the order each target first
- * appears. Pure.
- */
-function byTarget(
-  writes: readonly ValueWrite[],
-): readonly (readonly [Target, readonly ValueWrite[]])[] {
-  const groups = new Map<string, [Target, ValueWrite[]]>()
-  for (const w of writes) {
-    const key = keyOf(w.target)
-    const group = groups.get(key)
-    if (group === undefined) groups.set(key, [w.target, [w]])
-    else group[1].push(w)
-  }
-  return [...groups.values()]
-}
-
-/**
- * Refused, naming the first namespace that is not the host's; else the
- * writes by document. A type rule cannot do this: type stripping does not
- * check `HostNamespace` (ADR-0062). Pure.
- */
-export function planWrites(writes: readonly ValueWrite[]): WritePlan {
-  const foreign = writes.find(w => !w.namespace.startsWith("pinetrie."))
-  return foreign === undefined
-    ? { kind: "groups", groups: byTarget(writes) }
-    : { kind: "refused", namespace: foreign.namespace }
-}
-
-/** A host write as pi's: set or delete the value at its address. */
-const toPiWrite = (w: ValueWrite) =>
-  w.kind === "set"
-    ? setValue(value(w.namespace, w.key), w.value as never)
-    : deleteValue(value(w.namespace, w.key))
-
-const keyOf = (target: Target): string =>
-  target.kind === "session" ? "" : target.root
-
 /** A document's one session, and the stack built over it, if any. */
 interface Held {
   readonly session: Promise<StorageBackedSession>
@@ -128,7 +65,7 @@ interface Held {
 }
 
 export function createScribe(options: {
-  readonly documents: Pick<AgentDocuments, "session" | "root">
+  readonly documents: Pick<AgentDocuments, "root">
   /**
    * This PROCESS's replica id, used by storage for write tokens. It is not a
    * writer's identity: writers are people, identified by the transport.
@@ -144,10 +81,10 @@ export function createScribe(options: {
   const held = new Map<string, Held>()
   let closed = false
 
-  function sessionOver(doc: StorageDocHandle, key: string) {
+  function sessionOver(doc: RootDocHandle, root: RootId) {
     return new StorageBackedSession(
       {
-        id: `pinetrie-${replicaId}-${key === "" ? "session" : key}`,
+        id: `pinetrie-${replicaId}-${root}`,
         createdAt: Date.now(),
         storageVersion: 1,
       },
@@ -160,21 +97,16 @@ export function createScribe(options: {
     )
   }
 
-  /** The target's entry, made on first use: the promise is held, so two callers share one session. */
-  function heldOf(target: Target): Held {
+  /** The root's entry, made on first use: the promise is held, so two callers share one session. */
+  function heldOf(root: RootId): Held {
     if (closed) throw new Error("the scribe is closed")
-    const key = keyOf(target)
-    const known = held.get(key)
+    const known = held.get(root)
     if (known !== undefined) return known
-    const doc: Promise<StorageDocHandle> =
-      target.kind === "session"
-        ? Promise.resolve(documents.session)
-        : documents.root(target.root)
     const made: Held = {
-      session: doc.then(d => sessionOver(d, key)),
+      session: documents.root(root).then(d => sessionOver(d, root)),
       built: undefined,
     }
-    held.set(key, made)
+    held.set(root, made)
     return made
   }
 
@@ -189,21 +121,8 @@ export function createScribe(options: {
   }
 
   const scribe: Scribe = {
-    async writeValues(writes) {
-      if (writes.length === 0) return
-      const plan = planWrites(writes)
-      if (plan.kind === "refused")
-        throw new Error(
-          `writeValues: ${plan.namespace} is not the host's to write`,
-        )
-      for (const [target, group] of plan.groups) {
-        const session = await heldOf(target).session
-        await session.mutate(m => m.commit(group.map(toPiWrite), CTX), CTX)
-      }
-    },
-
     async appendToTree(message, spot) {
-      const session = await heldOf({ kind: "root", root: spot.root }).session
+      const session = await heldOf(spot.root).session
       const id = session.idGenerator.next()
       await session.mutate(
         m =>
@@ -241,7 +160,7 @@ export function createScribe(options: {
 
   return scribeInside.seal(scribe, {
     over(root, build) {
-      const entry = heldOf({ kind: "root", root })
+      const entry = heldOf(root)
       if (entry.built === undefined) entry.built = entry.session.then(build)
       return entry.built
     },

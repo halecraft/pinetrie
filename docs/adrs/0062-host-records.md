@@ -5,7 +5,9 @@
 imports pi) and ADR-0016 (a value's physical key is an identity, never
 parsed). Amended by ADR-0092: the scribe (`Scribe.writeValues`) carries
 the writes, not the agent; what is written, and the guard on its
-namespace, do not change.
+namespace, do not change. Amended by ADR-0095: a record is stored in
+`records` (namespace, then key), not as a pi value, and the host writes it
+directly; pi carries no host write, and the namespace guard is structural.
 
 **Context.** The host keeps its own records as pi values under `pinetrie.`
 namespaces: a root's archive state, an entry's mark, a lane's offer, the

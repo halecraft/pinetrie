@@ -10,7 +10,6 @@ import {
   type RootId,
   type WriterId,
 } from "@pinetrie/core"
-import type { Scribe } from "@pinetrie/pi"
 import {
   decodeCommand,
   encodeOutcome,
@@ -35,6 +34,7 @@ import {
 import { type Basics, failed, type HostKeeper } from "../basics.ts"
 import type { ControlSender } from "../control.ts"
 import type { Names } from "../names.ts"
+import type { Records } from "../records.ts"
 import type { Titles } from "../titles.ts"
 import { type BoardDeps, handleRootMove, handleWorkflow } from "./board.ts"
 import {
@@ -57,11 +57,11 @@ import { handleMark, type MarkDeps } from "./mark.ts"
 export interface CommandDeps {
   readonly basics: ChatDeps["basics"]
   readonly agent: ChatDeps["agent"] & LaneDeps["agent"]
-  readonly scribe: ChatDeps["scribe"] &
-    BoardDeps["scribe"] &
-    MarkDeps["scribe"] &
-    LaneDeps["scribe"] &
-    Pick<Scribe, "writeValues">
+  readonly scribe: ChatDeps["scribe"]
+  readonly records: BoardDeps["records"] &
+    MarkDeps["records"] &
+    LaneDeps["records"] &
+    Pick<Records, "writeValues">
   readonly piSetup: ChatDeps["piSetup"]
   readonly work: ChatDeps["work"] & BoardDeps["work"] & LaneDeps["work"]
   readonly blobs: ChatDeps["blobs"]
@@ -120,7 +120,7 @@ export interface Commands {
 }
 
 export function createCommands(deps: CommandDeps): Commands {
-  const { scribe } = deps
+  const { records } = deps
   const { newId } = deps.basics
   const cardCommands = createCardCommands(deps)
 
@@ -217,7 +217,7 @@ export function createCommands(deps: CommandDeps): Commands {
       case "traces-seen":
         return cardCommands.tracesSeen(writer, intent.traces)
       case "name":
-        await scribe.writeValues([
+        await records.writeValues([
           setRecord(PARTICIPANT, { writer, name: intent.name }),
         ])
         return settled({ kind: "named" })
@@ -265,14 +265,14 @@ export function createCommands(deps: CommandDeps): Commands {
 
 /** A root a chat started, put at the end of the state its sender chose (ADR-0085). */
 async function placeNewRoot(
-  deps: Pick<CommandDeps, "basics" | "scribe">,
+  deps: Pick<CommandDeps, "basics" | "records">,
   writer: WriterId,
   chat: Chat,
 ): Promise<void> {
   const { session, now } = deps.basics
   const workflow = readWorkflow(session)
   if (workflow === null) return
-  await deps.scribe.writeValues([
+  await deps.records.writeValues([
     setRecord(
       BOARD,
       placeStarted({

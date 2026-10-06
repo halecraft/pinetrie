@@ -10,7 +10,6 @@ import {
   type RootId,
   rootDocId,
 } from "@pinetrie/core"
-import type { Scribe } from "@pinetrie/pi"
 import {
   LIVE_DOC_ID,
   PLACES_DOC_ID,
@@ -34,6 +33,7 @@ import {
 import type { Basics } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
 import type { MoveHistories } from "./move-history.ts"
+import type { Records } from "./records.ts"
 
 /**
  * The documents a compaction replaces with what they hold now: `roots`',
@@ -134,7 +134,7 @@ export async function sweepHistories(input: {
  */
 export async function sweepHolds(input: {
   readonly basics: Pick<Basics, "session" | "log">
-  readonly scribe: Pick<Scribe, "writeValues">
+  readonly records: Pick<Records, "writeValues">
 }): Promise<void> {
   const { session, log } = input.basics
   // gather
@@ -148,7 +148,7 @@ export async function sweepHolds(input: {
   })
   // execute
   if (swept.length === 0) return
-  await input.scribe.writeValues(
+  await input.records.writeValues(
     swept.map(lane => deleteRecord(QUEUE_HOLD, lane)),
   )
   log(`[host] swept ${swept.length} hold(s) on queues nobody can use`)

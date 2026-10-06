@@ -1,57 +1,35 @@
-// Mutations for @pinetrie/schema's streams. Run: pnpm mutate scripts/mutations/schema.ts
+// Mutations for @pinetrie/schema. Run: pnpm mutate scripts/mutations/schema.ts
 import type { Mutation } from "../mutate.ts"
 
 const unit = ["pnpm", "exec", "vitest", "run", "packages/schema"]
-const file = "packages/schema/index.ts"
+const live = "packages/schema/live.ts"
+const piLayout = "packages/schema/pi-layout.ts"
+const storage = "packages/schema/storage.ts"
 
 export const mutations: readonly Mutation[] = [
   {
-    name: "every reply is current: a second message appends to the first",
-    file: file,
-    from: '  s.kind === "reply" && s.under === tip',
-    to: '  s.kind === "reply"',
-    command: unit,
-    expect: "the next text opens a new one",
-  },
-  {
-    name: "a tool opening closes nothing",
-    file: file,
-    from: '          mine.filter(s => s.kind === "reply" && !isCurrentReply(s, tip)),',
-    to: "          [],",
-    command: unit,
-    expect: "closes the reply its entry replaced",
-  },
-  {
-    name: "a reply opening keeps its lane's tools",
-    file: file,
-    from: "        ...closeStreams(mine),",
-    to: '        ...closeStreams(mine.filter(s => s.kind === "reply")),',
-    command: unit,
-    expect: "a reply opening closes its lane's tools",
-  },
-  {
-    name: "endRun keeps the lane's streams",
-    file: file,
-    from: "    applyOps(d, closing)\n  })\n}\n\n/** A stream as stored",
-    to: "    void closing\n  })\n}\n\n/** A stream as stored",
-    command: unit,
-    expect: "endRun deletes the lane's streams",
-  },
-  {
-    name: "tool output is written whole, not as tail edits",
-    file: file,
-    from: "      const edits = tailEdit(tool.text, event.text)",
-    to: "      const edits = [{ at: 0, remove: tool.text.length, insert: event.text }]",
-    command: unit,
-    expect: "a front cut and an append",
-  },
-  {
     name: "closing a stream leaves its record",
-    file: file,
-    from: "        d.streams.delete(op.id)",
-    to: "        void op.id",
+    file: live,
+    from: "          d.streams.delete(op.id)",
+    to: "          void op.id",
     command: unit,
-    expect: "a tool opening closes the reply its entry replaced",
+    expect: "close deletes a stream's record and its text",
+  },
+  {
+    name: "ending a run keeps the lane's key",
+    file: live,
+    from: "          d.activeRuns.delete(op.lane)",
+    to: "          void op.lane",
+    command: unit,
+    expect: "begin marks a lane running, and end deletes its key",
+  },
+  {
+    name: "a stream's null tip is stored as a string",
+    file: live,
+    from: '    ? { lane: s.lane, kind: "reply", callId: null, under: s.under }',
+    to: '    ? { lane: s.lane, kind: "reply", callId: null, under: s.under ?? "" }',
+    command: unit,
+    expect: "a reply and a tool round-trip, null fields included",
   },
   {
     name: "seatOf hashes the principal, not the seat",
@@ -94,10 +72,42 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "stored lane names are not checked",
-    file: file,
-    from: "    if (isLaneName(key)) lanes.push(key)\n    else malformed.push(key)",
+    file: piLayout,
+    from: '    if (isLaneName(key) && (value === null || typeof value === "string"))\n      lanes.push(key)\n    else malformed.push(key)',
     to: "    lanes.push(key as LaneName)",
     command: unit,
     expect: "readStoredLanes gives a thread's lanes",
+  },
+  {
+    name: "a lane whose tip is no entry id reads as one at the root",
+    file: piLayout,
+    from: '    if (isLaneName(key) && (value === null || typeof value === "string"))',
+    to: "    if (isLaneName(key))",
+    command: unit,
+    expect: "readStoredLanes sets aside a lane whose tip is no entry id",
+  },
+  {
+    name: "stored lanes come in the order they were stored",
+    file: piLayout,
+    from: "  return { lanes: lanes.toSorted(), malformed: malformed.toSorted() }",
+    to: "  return { lanes, malformed }",
+    command: unit,
+    expect: "orders the rest by name",
+  },
+  {
+    name: "a namespace's last delete leaves it",
+    file: storage,
+    from: "        if (held.keys().length === 0) d.records.delete(w.namespace)\n",
+    to: "",
+    command: unit,
+    expect: "its last delete removes it",
+  },
+  {
+    name: "every write to a namespace replaces it whole",
+    file: storage,
+    from: "        if (held === undefined) d.records.set(w.namespace, { [w.key]: w.value })\n        else held.set(w.key, w.value)",
+    to: "        d.records.set(w.namespace, { [w.key]: w.value })",
+    command: unit,
+    expect: "later ones set a key",
   },
 ]

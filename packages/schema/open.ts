@@ -35,13 +35,3 @@ export const readOpenKeys = (doc: OpenDocHandle): ReadonlyMap<RootId, string> =>
       isRootId(root) ? [[root, key] as const] : [],
     ),
   )
-
-/** The open roots, in order: by key, then by id. */
-export const orderOpen = (
-  keys: ReadonlyMap<RootId, string>,
-): readonly RootId[] =>
-  [...keys]
-    .toSorted(([a, ka], [b, kb]) =>
-      ka !== kb ? (ka < kb ? -1 : 1) : a < b ? -1 : a > b ? 1 : 0,
-    )
-    .map(([root]) => root)

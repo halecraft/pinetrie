@@ -22,7 +22,7 @@ import {
   type RootId,
 } from "@pinetrie/core"
 import type { Keeper } from "@pinetrie/keeper"
-import type { PiSetup, Scribe } from "@pinetrie/pi"
+import type { PiSetup } from "@pinetrie/pi"
 import {
   readDigests,
   readReading,
@@ -49,6 +49,7 @@ import {
 import type { PresenceDocHandle } from "@pinetrie/schema"
 import type { Basics } from "./basics.ts"
 import { requestOutside } from "./outside.ts"
+import type { Records } from "./records.ts"
 
 /**
  * A digest request's size: the skill aside, the ask, its newest work, its
@@ -83,7 +84,7 @@ export function createDigests(deps: {
   readonly keeper: Keeper
   /** Who is reading which thread (ADR-0024): a live digest waits for a reader. */
   readonly presence: PresenceDocHandle
-  readonly scribe: Pick<Scribe, "writeValues">
+  readonly records: Pick<Records, "writeValues">
   /** The model a digest is asked of, and its skill. */
   readonly piSetup: Pick<PiSetup, "complete" | "skill">
   /** The user config's `digests` (`decodeDigestConfig`): off, a run's end asks for its verdict alone. */
@@ -172,7 +173,7 @@ export function createDigests(deps: {
               at: basics.now(),
             })
             if (record !== null)
-              await deps.scribe.writeValues([setRecord(DIGEST, record, root)])
+              await deps.records.writeValues([setRecord(DIGEST, record, root)])
           },
         })
       })
@@ -216,7 +217,7 @@ export function createDigests(deps: {
             : null,
         })
         if (plan.verdict !== null)
-          await deps.scribe.writeValues([
+          await deps.records.writeValues([
             setRecord(VERDICT, {
               lane,
               ask: prompt,
@@ -259,7 +260,7 @@ export function createDigests(deps: {
               reply,
               at: basics.now(),
             })
-            if (writes.length > 0) await deps.scribe.writeValues(writes)
+            if (writes.length > 0) await deps.records.writeValues(writes)
           },
         })
       })
@@ -271,7 +272,7 @@ export function createDigests(deps: {
       const doc = basics.docs.docOfLane(lane)
       if (doc === null) return
       const end = indexAsks(readTreeIndex(doc)).last.get(prompt) ?? prompt
-      await deps.scribe.writeValues([
+      await deps.records.writeValues([
         setRecord(VERDICT, pendingVerdict(lane, prompt, end)),
       ])
     },

@@ -19,6 +19,7 @@ import {
   type Refusal,
   type RootId,
   refused,
+  type ValueWrite,
   type Workflow,
   type WorkflowEdit,
   type WorkflowState,
@@ -30,7 +31,7 @@ import { Type } from "typebox"
 import { decodeAt, fixedKey, rootKey } from "./decode.ts"
 import { keyAfter, orderBetween, orderKeys } from "./order.ts"
 import { displayName } from "./participant.ts"
-import type { RecordSpec } from "./records.ts"
+import { type RecordSpec, setRecord } from "./records.ts"
 
 export const WORKFLOW_KEY = "workflow"
 
@@ -95,6 +96,17 @@ export const defaultWorkflow = (newId: () => string): Workflow => ({
   ],
   closed: { id: workflowStateIdFor(newId()), name: "Done" },
 })
+
+/**
+ * A store with no workflow gets the default one: a new store's first start
+ * (ADR-0085). Nothing else writes the first workflow, and a root started
+ * before there is one gets no place. Pure.
+ */
+export const planWorkflowSeed = (
+  workflow: Workflow | null,
+  newId: () => string,
+): readonly ValueWrite[] =>
+  workflow === null ? [setRecord(WORKFLOW, defaultWorkflow(newId))] : []
 
 /** Every state, open then closed: the board's columns. */
 export const statesOf = (w: Workflow): readonly WorkflowState[] => [

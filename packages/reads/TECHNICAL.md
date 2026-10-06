@@ -18,7 +18,8 @@ What the session document says, read once, by the host and the client alike.
   `workAt` and `worksOwn`. `readLanes` and `readAgentActivity` take its
   `doc` and `live`.
 - **`readRecords(doc, spec)` takes the document the spec's home names**
-  (`HomeDoc<H>`), so a session record cannot be read from a root.
+  (`HomeDoc<H>`), so a session record cannot be read from a root: the two
+  documents have their own schemas (ADR-0095).
 - **A page reads several roots as one** (`readHeldIndex`, `readHeld`): one
   index over the entries of the roots it holds, kept while none changes.
 
@@ -73,7 +74,11 @@ through its card port). `planSweep` decides which
 stored images to delete from it.
 
 **Each record reader is `readRecords(doc, SPEC)`** (ADR-0062): the
-record's values decoded by its spec in `@pinetrie/rules` and keyed by their address.
+record's namespace (`readNamespace`, one lookup, ADR-0095) decoded by its
+spec in `@pinetrie/rules` and keyed by its address. The decoded map is
+cached by the stored namespace object, which keeps its identity while the
+namespace is unchanged (S120): a write decodes only its own namespace again,
+and every other reader returns the same map.
 A reader keeps its own name and return type, and shapes the map only where
 its readers want something else: `readSeats` and `readLandings` sort,
 `readNames` and `readParticipantNames` give the name alone, and the

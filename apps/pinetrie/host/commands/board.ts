@@ -19,7 +19,6 @@ import {
   refused,
   type WriterId,
 } from "@pinetrie/core"
-import type { Scribe } from "@pinetrie/pi"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import {
   readBoardPlaces,
@@ -46,6 +45,7 @@ import {
 } from "@pinetrie/rules"
 import { readLaneTip, type SessionDocHandle } from "@pinetrie/schema"
 import type { Basics, HostKeeper } from "../basics.ts"
+import type { Records } from "../records.ts"
 import type { LaneWork } from "../work/index.ts"
 
 export interface BoardDeps {
@@ -53,7 +53,7 @@ export interface BoardDeps {
     Basics,
     "session" | "docs" | "live" | "places" | "now" | "newId"
   >
-  readonly scribe: Pick<Scribe, "writeValues">
+  readonly records: Pick<Records, "writeValues">
   readonly work: Pick<LaneWork, "teardown" | "offers">
   readonly keeper: Pick<HostKeeper, "run" | "track">
 }
@@ -125,7 +125,7 @@ async function record(
   if (moved.kind === "unchanged") return done(MOVED)
   const writes = moved.places.map(p => setRecord(BOARD, p))
   if (moved.transition === "within") {
-    await deps.scribe.writeValues(writes)
+    await deps.records.writeValues(writes)
     return done(MOVED)
   }
   // gather what crossing the closed state's edge needs, and plan it (pure)
@@ -134,7 +134,7 @@ async function record(
   const crossed = await planCrossing(deps, intent.root, entry, moved.transition)
   if (crossed.kind === "refused") return done(crossed)
   // execute
-  await deps.scribe.writeValues(writes)
+  await deps.records.writeValues(writes)
   return {
     kind: "follow",
     outcome: MOVED,
@@ -182,7 +182,7 @@ const done = (outcome: Outcome): Recorded => ({ kind: "done", outcome })
  * documents' keeper, which the dispatcher runs it in (`placeOfCommand`).
  */
 export async function handleWorkflow(
-  deps: Pick<BoardDeps, "basics" | "scribe">,
+  deps: Pick<BoardDeps, "basics" | "records">,
   intent: Extract<Intent, { kind: "workflow" }>,
 ): Promise<Outcome> {
   const { session, newId } = deps.basics
@@ -193,6 +193,6 @@ export async function handleWorkflow(
   const planned = planWorkflowEdit(workflow, board, intent.edit, newId)
   if (planned.kind === "refused") return planned
   if (planned.kind === "write")
-    await deps.scribe.writeValues([setRecord(WORKFLOW, planned.workflow)])
+    await deps.records.writeValues([setRecord(WORKFLOW, planned.workflow)])
   return { kind: "workflow-changed" }
 }

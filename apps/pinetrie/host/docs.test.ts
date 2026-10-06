@@ -7,7 +7,8 @@ import {
   rootIdFor,
   writerId,
 } from "@pinetrie/core"
-import { newLiveDoc, newPlacesDoc, newSessionDoc } from "@pinetrie/schema"
+import { newLiveDoc, newPlacesDoc } from "@pinetrie/schema"
+import { newSessionDoc } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import { hostDocuments, planLoads, rootsOpenedWords } from "./docs.ts"
 

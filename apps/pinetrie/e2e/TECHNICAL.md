@@ -111,7 +111,7 @@ They share `checks.ts` (recording a check, and stopping at one),
   what the pop makes (a message, a resolution's prompt) before it waits
   for idle.
 - **A card queued for the restart in `host/tools` is queued under a run
-  that is only the document's record** (`beginRun`). Queued on an idle lane,
+  that is only the document's record** (`beginRun`, `@pinetrie/schema/fixtures`). Queued on an idle lane,
   the move's drain would pop it before the restart; the record is what a
   stopping host leaves, and the next host's startup clears it, then pops
   the card.

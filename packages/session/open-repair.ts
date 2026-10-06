@@ -3,7 +3,6 @@
 
 import type { RootId } from "@pinetrie/core"
 import { keyAfter, orderBetween, orderKeys } from "@pinetrie/rules"
-import { orderOpen } from "@pinetrie/schema"
 
 /** Keys to set, by root, and roots to delete: one batch to your document. */
 export interface OpenWrites {
@@ -12,6 +11,16 @@ export interface OpenWrites {
 }
 
 const NO_OPEN_WRITES: OpenWrites = { set: new Map(), delete: [] }
+
+/** The open roots, in order: by key, then by id. */
+export const orderOpen = (
+  keys: ReadonlyMap<RootId, string>,
+): readonly RootId[] =>
+  [...keys]
+    .toSorted(([a, ka], [b, kb]) =>
+      ka !== kb ? (ka < kb ? -1 : 1) : a < b ? -1 : a > b ? 1 : 0,
+    )
+    .map(([root]) => root)
 
 /**
  * `root` put before `before` in your list, or at its end for null or a root

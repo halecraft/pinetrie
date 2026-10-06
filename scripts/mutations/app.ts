@@ -302,8 +302,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "startup does not compact",
     file: "apps/pinetrie/host/index.ts",
-    from: "    settle,\n    cards: cardPort,\n    provenance,\n    ensureNames: names.ensure,\n    carryOver,\n  })",
-    to: "    settle: lanes =>\n      keeper.run(async () => {\n        for (const l of lanes) await drain(l)\n      }),\n    cards: cardPort,\n    provenance,\n    ensureNames: names.ensure,\n    carryOver,\n  })",
+    from: "    settle,\n    cards: cardPort,\n    provenance,\n    ensureNames: names.ensure,\n  })",
+    to: "    settle: lanes =>\n      keeper.run(async () => {\n        for (const l of lanes) await drain(l)\n      }),\n    cards: cardPort,\n    provenance,\n    ensureNames: names.ensure,\n  })",
     suite: "host",
     scenario: "tools",
     expect: "a starting host compacts the session it opened",
@@ -576,8 +576,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the host neither stores nor relays your list",
     file: "apps/pinetrie/host/index.ts",
-    from: '        case "open":\n          return Interpret(OpenDoc)\n',
-    to: "",
+    from: "      return kind === undefined ? undefined : Interpret(SCHEMA_OF[kind])",
+    to: '      return kind === undefined || kind === "open"\n        ? undefined\n        : Interpret(SCHEMA_OF[kind])',
     suite: "browser",
     scenario: "page",
     expect:
@@ -1145,8 +1145,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the host resolves no card a client creates",
     file: "apps/pinetrie/host/index.ts",
-    from: '        case "text":\n          return Interpret(TextDoc)',
-    to: '        case "text":\n          return undefined',
+    from: "      return kind === undefined ? undefined : Interpret(SCHEMA_OF[kind])",
+    to: '      return kind === undefined || kind === "text"\n        ? undefined\n        : Interpret(SCHEMA_OF[kind])',
     suite: "host",
     scenario: "cards",
     expect:
@@ -1155,7 +1155,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the host writes no seat records",
     file: "apps/pinetrie/host/seats.ts",
-    from: "      await scribe.writeValues(seats.map(seat => setRecord(SEAT, seat)))",
+    from: "      await records.writeValues(seats.map(seat => setRecord(SEAT, seat)))",
     to: "      void seats",
     suite: "host",
     scenario: "cards",
@@ -1243,8 +1243,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a root moved out of Done keeps its place there",
     file: "apps/pinetrie/host/commands/board.ts",
-    from: "  // execute\n  await deps.scribe.writeValues(writes)\n",
-    to: '  // execute\n  if (moved.transition === "close") await deps.scribe.writeValues(writes)\n',
+    from: "  // execute\n  await deps.records.writeValues(writes)\n",
+    to: '  // execute\n  if (moved.transition === "close") await deps.records.writeValues(writes)\n',
     suite: "host",
     scenario: "board",
     expect:
@@ -1375,8 +1375,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "images are kept in memory, not the store's file",
     file: "apps/pinetrie/host/store.ts",
-    from: "  return { store, blobs: sqliteBlobs(db) }",
-    to: '  return { store, blobs: sqliteBlobs(new DatabaseSync(":memory:")) }',
+    from: "  return { store, blobs: sqliteBlobs(db), backup }",
+    to: '  return { store, blobs: sqliteBlobs(new DatabaseSync(":memory:")), backup }',
     suite: "host",
     scenario: "images",
     expect:
@@ -1697,8 +1697,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the host neither stores nor relays an inventory",
     file: "apps/pinetrie/host/index.ts",
-    from: "          return Interpret(InventoryDoc)",
-    to: "          return undefined",
+    from: "      return kind === undefined ? undefined : Interpret(SCHEMA_OF[kind])",
+    to: '      return kind === undefined || kind === "inventory"\n        ? undefined\n        : Interpret(SCHEMA_OF[kind])',
     suite: "browser",
     scenario: "page",
     expect: "a reload keeps your inventory's cards in their slots",

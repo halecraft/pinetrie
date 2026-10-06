@@ -16,7 +16,7 @@ then:
 
 | facade | made by | what it is | it needs |
 |---|---|---|---|
-| `Scribe` | `createScribe` (`scribe.ts`) | the host's writes into the documents: `writeValues`, `appendToTree`; and every session's end: `release`, `close` | the documents, a replica id, the image store |
+| `Scribe` | `createScribe` (`scribe.ts`) | a thread's appends into its root: `appendToTree`; and every session's end: `release`, `close`. The host writes its own records (ADR-0095) | a root's document, a replica id, the image store |
 | `PiSetup` | `loadPiSetup` (`pi-setup.ts`) | the person's pi setup, loaded: `complete`, `skill`, `commands`, `refusedCommands`, `expand`, `canDrawBanners`, `drawBanner`, `agentDir`, the model's label and origin | the model choice, the project's root, the user config; no document |
 | `Agent` | `createAgent` (`agent.ts`) | the agent at work in threads' lanes: `createThreadLane`, `lane`, `interrupted`, `close` | the scribe, the setup, lane work's `access` and `hooks`, `set_banner`'s asks |
 
@@ -29,14 +29,15 @@ module-private map from each facade to its inside, which throws for an
 object its factory did not make. `index.ts` exports neither the maps nor
 `inside.ts`.
 
-### One pi session per document (ADR-0063, S113)
+### One pi session per root (ADR-0063, ADR-0095, S113)
 
-The host gives the scribe and the agent its `AgentDocuments`: the session's
-document, a root's by its `RootId`, and the root a lane works in (its `LANE`
-record).
+The host gives the scribe and the agent its `AgentDocuments`: a root's
+document by its `RootId`, and the root a lane works in (its `LANE` record).
+The session's document has no pi session: the host writes its records
+itself (ADR-0095).
 
-- **The scribe holds each document's one `KynetaStorage` and
-  `StorageBackedSession`**, made the first time a write or the agent asks,
+- **The scribe holds each root's one `KynetaStorage` and
+  `StorageBackedSession`**, made the first time an append or the agent asks,
   the promise held so two callers share one. Nothing else opens a session:
   two over one document drift apart, since `KynetaStorage` indexes its own
   commits and reconciles only `replay` changes, so after its first read
@@ -45,16 +46,15 @@ record).
   (`scribeInside.over(root, build)`): over that root's session, once, and
   the scribe holds it beside the session. The agent keeps no map of its own.
   A root's harness is made at the first lane call there, not at its first
-  write; making one writes nothing (S113 case B). The session document has a
-  session and no harness. One setup, tool list, system prompt and hook set
-  serve every harness.
+  write; making one writes nothing (S113 case B). One setup, tool list,
+  system prompt and hook set serve every harness.
 - **The scribe ends every session.** A harness closes the session it was
   given, and both closes are idempotent. `release(root)`, before the host
   lets the document go, forgets the root's entry, closes its harness, then
   the session, which also ends a root written to and never run; the next
   call opens the document again (S113 case G). `close()` closes every
-  harness, then every session, and refuses every later write, in a document
-  it never opened too. `Agent.close()` closes the harnesses alone
+  harness, then every session, and refuses every later append, in a root it
+  never opened too. `Agent.close()` closes the harnesses alone
   (`closeBuilt`), which ends running runs; the host's shutdown closes the
   scribe after it.
 - **Routing.** `createThreadLane(spot, lane)` acts in `spot.root`'s
@@ -62,11 +62,8 @@ record).
   root when it is made: a lane is created, then its record written, then it
   runs. `interrupted(roots)` asks the roots the host opened. `recordTurn`
   reads the tip from the lane's root.
-- **The scribe's writes.** `planWrites` (pure) refuses the first namespace
-  outside `pinetrie.`, else groups the writes by their `target`
-  (`byTarget`), in first-seen order; `writeValues` throws for a refusal,
-  writing nothing, else commits each group to its document's session.
-  `appendToTree` writes an entry with no lane into its root's session.
+- **The scribe's writes.** `appendToTree` writes an entry with no lane into
+  its root's session.
 - **Roots never wait on one another**: pi serializes commits per session.
 - `one-root.ts` is the documents of a session with one root, for tests;
   `start-pi.ts`'s `startPi` makes the three facades over them in the host's
@@ -83,12 +80,12 @@ record).
 | `banner.ts` | `set_banner`, and drawing a banner (`Banners`) |
 | `config.ts` | the model, its setup (`loadModelSetup`), and `complete` |
 | `pi-setup.ts` | the person's pi setup, loaded (`PiSetup`) |
-| `scribe.ts` | the host's writes and every session's life (`Scribe`, `planWrites`) |
+| `scribe.ts` | a thread's appends and every session's life (`Scribe`) |
 | `inside.ts` | a facade's inside, reachable only in this package (`sealed`) |
 
 The decisions in them are pure and tested without a harness:
 `activeToolNames`, `toolsChanged`, `toolContextOf`, `streamEventOf`,
-`expandCommand`, `skillOf`, `planWrites`, and the search tools' `grepArgs`, `findArgs`,
+`expandCommand`, `skillOf`, and the search tools' `grepArgs`, `findArgs`,
 `searchOutcome` and `searchText`.
 
 ## `storage.ts` — our implementation of pi's `Storage` port
@@ -248,7 +245,7 @@ it (S35).
 The harness's tool events are `tool_start`, `tool_update` and `tool_end`. The
 `tool_execution_*` events in pi's types belong to its older agent loop, and the
 harness never emits them (S22). What each event does to the document is
-`planStream`'s decision, in `@pinetrie/schema`.
+`planStream`'s decision, in `@pinetrie/rules`.
 
 ### What the model reads: a chat's images (ADR-0042)
 
@@ -634,16 +631,11 @@ as an entry is. The replay test in `storage.test.ts` relies on this.
 
 ### Values
 
-`Scribe.writeValues(writes)` writes the host's records (ADR-0062): the
-`ValueWrite`s that `setRecord` and `deleteRecord` (`@pinetrie/rules`) build, in one
-`session.mutate` commit of pi's `setValue` and `deleteValue` writes. That is
-the path `Session.setValue` takes for one write, so conformance covers the
-storage shape. A value can be written while a lane runs (S70): it does not
-go through the lane. A write to a namespace outside `pinetrie.` throws before
-anything is written: pi's own values (a lane's tip, a checkpoint) are never
-the host's, and type stripping does not check `HostNamespace`. This package
-imports no record namespace or encoder: what a record is lives in
-`@pinetrie/rules`.
+`values` holds pi's own values (a lane's tip, its config, a checkpoint).
+The host's records are in the document's `records` field, which the host
+writes itself (ADR-0095); `KynetaStorage` never reads it, and `dirtyFrom`
+ignores its changes. This package imports no record namespace or encoder:
+what a record is lives in `@pinetrie/rules`.
 
 ### `seq` is derived, not stored
 

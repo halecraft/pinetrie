@@ -34,13 +34,13 @@ import {
   validateCommittedWrites,
   value,
 } from "@earendil-works/pi-agent-core"
-import { batch, subscribe } from "@kyneta/schema"
+import { batch, createDoc, subscribe } from "@kyneta/schema"
 import { type BlobStore, type ImageRef, tailEdit } from "@pinetrie/core"
 import {
   applyTextEdits,
-  newStorageDoc,
   physicalKey,
-  type StorageDocHandle,
+  RootDoc,
+  type RootDocHandle,
   type StoredValueRecord,
   valuePrefix,
 } from "@pinetrie/schema"
@@ -80,7 +80,7 @@ const makeToken = (peer: string): string =>
   `${peer}-${(tokenCounter++).toString(36)}-${Math.random().toString(36).slice(2, 8)}`
 
 /** Store one planned operation. The only code that writes the document on commit. */
-function writeOp(d: StorageDocHandle, op: DocOp): void {
+function writeOp(d: RootDocHandle, op: DocOp): void {
   switch (op.kind) {
     case "entry":
       d.entries.set(op.row.id, op.row)
@@ -121,7 +121,7 @@ function writeOp(d: StorageDocHandle, op: DocOp): void {
 }
 
 export interface KynetaStorageOptions {
-  readonly doc?: StorageDocHandle
+  readonly doc?: RootDocHandle
   readonly peerId?: string
   readonly now?: () => number
   /**
@@ -137,7 +137,7 @@ export interface KynetaStorageOptions {
  * conformance suite runs.
  */
 export class KynetaStorage implements Storage {
-  readonly #doc: StorageDocHandle
+  readonly #doc: RootDocHandle
   readonly #blobs: Pick<BlobStore, "get" | "ref"> | undefined
   readonly #now: () => number
   readonly #peer: string
@@ -152,7 +152,7 @@ export class KynetaStorage implements Storage {
   constructor(options: KynetaStorageOptions = {}) {
     this.#now = options.now ?? Date.now
     this.#peer = options.peerId ?? "p"
-    this.#doc = options.doc ?? newStorageDoc()
+    this.#doc = options.doc ?? createDoc(RootDoc)
     this.#blobs = options.blobs
 
     // Only state no writer on this replica made (`replay: true`: a merge, a

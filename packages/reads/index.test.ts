@@ -9,14 +9,13 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { encodePinned } from "@pinetrie/rules"
+import { newLiveDoc, type StoredEntryRow } from "@pinetrie/schema"
 import {
   beginRun,
-  newLiveDoc,
   newRootDoc,
-  type StoredEntryRow,
   writeEntry,
   writeLaneTip,
-} from "@pinetrie/schema"
+} from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import { readLanes, readTreeIndex } from "./index.ts"
 

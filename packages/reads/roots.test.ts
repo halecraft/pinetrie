@@ -6,28 +6,44 @@ import {
   laneNameForThread,
   NOBODY,
   rootIdFor,
+  SESSION_TARGET,
   type Sha256,
   writerId,
 } from "@pinetrie/core"
-import { encodeChat, MARK, setRecord } from "@pinetrie/rules"
+import { encodeChat, MARK, PARTICIPANT, setRecord } from "@pinetrie/rules"
+import {
+  applyRecordWrites,
+  type RecordsDocHandle,
+  type RootDocHandle,
+  type StoredEntryRow,
+} from "@pinetrie/schema"
 import {
   newRootDoc,
   newSessionDoc,
-  physicalKey,
-  type RootDocHandle,
-  type StoredEntryRow,
   writeEntry,
   writeLaneTip,
-} from "@pinetrie/schema"
+} from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   readHeldIndex,
   readParticipantNames,
   readParticipants,
+  readRecords,
   readReferencedBlobs,
   readRootRecord,
   readTreeIndex,
 } from "./index.ts"
+
+/** A host record at its address, as the host writes one. */
+const put = (
+  doc: RecordsDocHandle,
+  namespace: `pinetrie.${string}`,
+  key: string,
+  value: unknown,
+) =>
+  applyRecordWrites(doc, [
+    { kind: "set", target: SESSION_TARGET, namespace, key, value },
+  ])
 
 const ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const ADA = writerId("ada@x.io")
@@ -102,11 +118,7 @@ describe("readRootRecord", () => {
       ROOT,
     )
     if (w.kind !== "set") throw new Error("a set")
-    doc.values.set(physicalKey(w.namespace, w.key), {
-      namespace: w.namespace,
-      key: w.key,
-      value: w.value,
-    })
+    put(doc, w.namespace, w.key, w.value)
     expect(readRootRecord(ROOT, doc).title).toBe("Plans")
   })
 
@@ -144,14 +156,10 @@ describe("readRootRecord", () => {
 
 test("readReferencedBlobs: every root's images from its record, without its document", () => {
   const session = newSessionDoc()
-  session.values.set(physicalKey("pinetrie.root", ROOT), {
-    namespace: "pinetrie.root",
-    key: ROOT,
-    value: {
-      ...readRootRecord(ROOT, newRootDoc()),
-      root: undefined,
-      images: [SHA],
-    },
+  put(session, "pinetrie.root", ROOT, {
+    ...readRootRecord(ROOT, newRootDoc()),
+    root: undefined,
+    images: [SHA],
   })
   expect([...readReferencedBlobs(session, [])]).toEqual([SHA])
 })
@@ -170,14 +178,10 @@ test("readHeldIndex: several roots read as one tree, kept while none changes", (
 test("readParticipants: a writer only in a root not held still counts, from its record", () => {
   const session = newSessionDoc()
   const bea = writerId("bea@x.io")
-  session.values.set(physicalKey("pinetrie.root", ROOT), {
-    namespace: "pinetrie.root",
-    key: ROOT,
-    value: {
-      ...readRootRecord(ROOT, newRootDoc()),
-      root: undefined,
-      writers: [bea],
-    },
+  put(session, "pinetrie.root", ROOT, {
+    ...readRootRecord(ROOT, newRootDoc()),
+    root: undefined,
+    writers: [bea],
   })
   expect(readParticipants(session, readTreeIndex(newRootDoc()))).toEqual([
     "bea",
@@ -187,20 +191,30 @@ test("readParticipants: a writer only in a root not held still counts, from its 
 test("readParticipantNames keeps its map while the names are the same, whatever else the session writes", () => {
   const session = newSessionDoc()
   const name = (writer: string, n: string) =>
-    session.values.set(physicalKey("pinetrie.participant", writer), {
-      namespace: "pinetrie.participant",
-      key: writer,
-      value: n,
-    })
+    put(session, "pinetrie.participant", writer, n)
   name(ADA, "Ada")
   const first = readParticipantNames(session)
   expect(first.get(ADA)).toBe("Ada")
-  session.values.set(physicalKey("pinetrie.root", ROOT), {
-    namespace: "pinetrie.root",
-    key: ROOT,
-    value: { ...readRootRecord(ROOT, newRootDoc()), root: undefined },
+  put(session, "pinetrie.root", ROOT, {
+    ...readRootRecord(ROOT, newRootDoc()),
+    root: undefined,
   })
   expect(readParticipantNames(session)).toBe(first)
   name(ADA, "Ada L")
   expect(readParticipantNames(session).get(ADA)).toBe("Ada L")
+})
+
+test("readRecords keeps its map while its namespace is unchanged, and decodes again once it changes", () => {
+  const session = newSessionDoc()
+  put(session, "pinetrie.participant", ADA, "Ada")
+  const first = readRecords(session, PARTICIPANT)
+  put(session, "pinetrie.root", ROOT, {
+    ...readRootRecord(ROOT, newRootDoc()),
+    root: undefined,
+  })
+  expect(readRecords(session, PARTICIPANT)).toBe(first)
+  put(session, "pinetrie.participant", ADA, "Ada L.")
+  const second = readRecords(session, PARTICIPANT)
+  expect(second).not.toBe(first)
+  expect([...second.values()].map(r => r.name)).toEqual(["Ada L."])
 })

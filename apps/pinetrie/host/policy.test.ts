@@ -6,14 +6,31 @@ import {
   writerId,
 } from "@pinetrie/core"
 import {
+  LIVE_DOC_ID,
   PLACES_DOC_ID,
   PRESENCE_DOC_ID,
   SESSION_DOC_ID,
 } from "@pinetrie/protocol/messages"
 import { personDocId } from "@pinetrie/protocol/writers"
-import { cardDocId } from "@pinetrie/schema"
+import {
+  AttentionDoc,
+  cardDocId,
+  InventoryDoc,
+  LiveDoc,
+  OpenDoc,
+  PlacesDoc,
+  RootDoc,
+  SessionDoc,
+  TextDoc,
+} from "@pinetrie/schema"
 import { expect, test } from "vitest"
-import { acceptsWrite, hostPolicy, resolveDoc } from "./policy.ts"
+import {
+  acceptsWrite,
+  hostPolicy,
+  resolveDoc,
+  SCHEMA_OF,
+  storedKind,
+} from "./policy.ts"
 
 const CARD = cardDocId(cardId("c-1"))
 const UNDO = "undo:seat-a"
@@ -108,4 +125,29 @@ test("a stack of moves is the host's: shared with no one, taken from no one, and
     hostPolicy.canAccept?.(MOVES, peer),
     resolveDoc(MOVES, () => true),
   ]).toEqual([false, false, "reject"])
+})
+
+test("storedKind: each stored document's kind, by which its schema is checked at start (ADR-0096)", () => {
+  const OPEN = personDocId("open", writerId("ada@x.io"))
+  const kinds = [
+    [SESSION_DOC_ID, "session", SessionDoc],
+    [LIVE_DOC_ID, "live", LiveDoc],
+    [PLACES_DOC_ID, "places", PlacesDoc],
+    [rootDocId(KNOWN), "root", RootDoc],
+    [CARD, "text", TextDoc],
+    [INVENTORY, "inventory", InventoryDoc],
+    [ATTENTION, "attention", AttentionDoc],
+    [OPEN, "open", OpenDoc],
+  ] as const
+  for (const [id, kind, schema] of kinds) {
+    expect(storedKind(id)).toBe(kind)
+    expect(SCHEMA_OF[kind]).toBe(schema)
+  }
+  expect(storedKind(movesDocId(writerId("ada@x.io"), KNOWN))).toBe("kyneta")
+  for (const other of [
+    "pinetrie:cards",
+    "line:pinetrie.control:a→host",
+    PRESENCE_DOC_ID,
+  ])
+    expect(storedKind(other)).toBeUndefined()
 })

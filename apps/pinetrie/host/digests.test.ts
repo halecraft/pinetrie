@@ -4,7 +4,6 @@ import {
   type PiSetup,
   SCRIPTED_DESCRIPTION,
   SCRIPTED_VERDICT,
-  type Scribe,
 } from "@pinetrie/pi"
 import { readVerdicts } from "@pinetrie/reads"
 import {
@@ -15,15 +14,8 @@ import {
   setRecord,
   VERDICT,
 } from "@pinetrie/rules"
-import {
-  beginRun,
-  endRun,
-  newPresenceDoc,
-  readingKey,
-  seatKey,
-  writeEntry,
-  writeLaneTip,
-} from "@pinetrie/schema"
+import { newPresenceDoc, readingKey, seatKey } from "@pinetrie/schema"
+import { beginRun, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import { createDigests } from "./digests.ts"
 import {
@@ -35,6 +27,8 @@ import {
   row,
   writesOf,
 } from "./fakes.ts"
+import type { Records } from "./records.ts"
+import { endRun } from "./runs.ts"
 
 const lane = laneNameForThread("0123456789abcdef")
 /** A failure in a test is the test's failure. */
@@ -76,7 +70,7 @@ function running(
   const presence = newPresenceDoc()
   // The setup and the scribe in one record, so the order of their calls shows.
   const pi = record<
-    Pick<PiSetup, "complete" | "skill"> & Pick<Scribe, "writeValues">
+    Pick<PiSetup, "complete" | "skill"> & Pick<Records, "writeValues">
   >({
     skill: async () => ({ path: "SKILL.md", content: "Summarize.", hash: "h" }),
     complete: async () => answer,
@@ -87,7 +81,7 @@ function running(
     basics: b,
     keeper,
     presence,
-    scribe: pi.port,
+    records: pi.port,
     piSetup: pi.port,
     enabled,
   })

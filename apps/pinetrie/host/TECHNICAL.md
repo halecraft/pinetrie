@@ -12,7 +12,7 @@ wires them.
 |---|---|
 | `server.ts`, `invocation.ts` | `pnpm host [folder]` (ADR-0086): `planInvocation` (the folder), `storeChoice` (the session's file, and whether `PINETRIE_STORE` named it), `refusalText` (a refusal's words); `server.ts` carries them out |
 | `startup-lines.ts` | the words of what a starting host logs about its inputs: the project, the store, the user config, the agent's model and where it came from, the URL and invites |
-| `index.ts` | `startHost`: the store, the Exchange (with its `resolve` for the documents clients create, `resolveDoc`), the documents, then pi's scribe and setup, lane work and the agent, in that order (§ Startup), then the wiring below |
+| `index.ts` | `startHost`: the store and the check of its schemas (`migrations/`), the Exchange (with its `resolve` for the documents clients create, `resolveDoc`), the documents and the records, then pi's scribe and setup, lane work and the agent, in that order (§ Startup), then the wiring below |
 | `basics.ts` | `Basics` (the session, `pinetrie:live`, the documents, the places, log, ids, clock) and how a failure is logged (`failed`, which words the error with core's `errorText`) |
 | `places.ts` | `applyPlaceSteps`: the one writer of the places document (ADR-0059), which writes its records in one batch, in an undo step when given one, then raises its `rev` in a batch of its own (`raiseRev`) |
 | `move-history.ts` | each person's history of moves per root (ADR-0066): `MoveHistories`, a shell over Kyneta's undo stacks |
@@ -26,7 +26,9 @@ wires them.
 | `settle.ts` | what happens between runs: drains, then the compaction and sweep as upkeep (the keeper's `later`) |
 | `housekeeping.ts` | which documents a run's end compacts (`planCompaction`: its roots, the session, the places, `pinetrie:live`), deleting images nothing shows, retiring histories of moves (`sweepHistories`), and deleting holds on queues nobody can use (`sweepHolds`, ADR-0048 step 7) |
 | `docs.ts` | `HostDocuments`: every document the host holds, a root's opened as it is asked for, `onOpened`, which replays the roots already held to a listener that joins late, and `onReleasing`, whose listeners `unload` awaits, in order, before it lets a root go; `planLoads` |
-| `directory.ts` | each root's directory record, refreshed as its document changes: `startDirectory`, started with the scribe |
+| `records.ts` | the host's writes of its records (ADR-0095): `createRecords`, whose `writeValues` writes each document's in one batch; every module that writes a record takes it |
+| `migrations/` | each stored document's schema, checked before anything opens it, and the migrations from a stored hash (§ The stored schemas, ADR-0096) |
+| `directory.ts` | each root's directory record, refreshed as its document changes: `startDirectory`, started with the records |
 | `cards.ts` | the card port (ADR-0048), about texts only: who wrote in a card, destroying one, loading and reading texts for the queue's pops and a run's pinned cards, waiting until a text holds a version (`whenHolds`, which an `AbortSignal` gives up), and the texts of given cards gathered for the sweeps; where the shell opens card documents |
 | `seats.ts` | each connected seat's person, written once as a `pinetrie.seat` record (started after `recover`), and unloading the histories of moves of a person with no seat left |
 | `startup.ts` | `recover`: what a starting host does before it takes a command |
@@ -43,7 +45,7 @@ wires them.
 | `banners.ts` | each thread's column banner (ADR-0050, ADR-0053): made as the thread is named, at reservation or creation, set by `set_banner` |
 | `digests.ts` | each ask's digest (ADR-0056), unless the user config turns them off (ADR-0071) |
 | `outside.ts` | `requestOutside`: a model request outside a keeper, its answer written in a step of its own |
-| `fakes.ts` | test support: `record<T>()`, `fakeLane`, `row`, `putValue` and `applyWrites` (each write to the document its target names), `writesOf`, `basics` (one root, `ROOT_ID`, in `fakeDocuments`), `putLane`, `writeDirectory` |
+| `fakes.ts` | test support: `record<T>()`, `fakeLane`, `row`, `putValue` and `applyWrites` (each write to the document its target names, through the real `applyRecordWrites`), `writesOf`, `basics` (one root, `ROOT_ID`, in `fakeDocuments`), `putLane`, `writeDirectory` |
 
 ## The documents' keeper
 
@@ -113,7 +115,8 @@ wires them.
   without cards. A resume reads nothing: its prompt and entry were written
   when it began.
 - **The wait is a window in which pi's `abort` reaches nothing**: the run is
-  begun (`beginRun`, so the lane is busy and the suites count it running),
+  begun (its `begin` is written, so the lane is busy and the suites count
+  it running),
   but pi has no run yet. `Runs.cancel(lane)` aborts a chat's wait; the run
   then appends the chat, as a refused run does, and ends. `handleStop`
   cancels first and asks pi to abort only when nothing was cancelled. A
@@ -165,9 +168,7 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
 - **A starting host opens the roots `planLoads` names**: every root in the
   directory that is not archived, before `recover`. A busy root cannot be
   archived, so these hold every lane a crash could have interrupted. Which
-  roots are archived is the board's (`readArchived`), or, for a store from
-  before the board, the carry-over's, planned before the roots are opened
-  and written in `recover` (ADR-0085).
+  roots are archived is the board's (`readArchived`, ADR-0085).
   Archiving `unload`s a root (`work/archive.ts`); restoring opens it.
   `unload` first runs its `onReleasing` listeners: the scribe's `release`
   closes the agent's harness over the root, then the root's pi session
@@ -180,10 +181,10 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
   `resolveDoc` interprets a `root:` id the directory names, as an archived
   root a client previews, and rejects any other: only the host makes roots.
 - **The directory follows each root's document** (`directory.ts`): a change
-  to its entries or values queues one refresh, the keeper's `once`
-  (`root:<id>`), absorbed by one already queued, which writes
-  `readRootRecord` with `setIfChanged`. It starts once the scribe exists,
-  since a refresh writes through it, and follows every root through
+  to its entries, pi's values or its records queues one refresh, the
+  keeper's `once` (`root:<id>`), absorbed by one already queued, which writes
+  `readRootRecord` with `setIfChanged`. It starts once the records port
+  exists, since a refresh writes through it, and follows every root through
   `onOpened`: the roots `startHost` opened before it, then each opened
   later. It refreshes each as it starts to follow it, so a record stored
   before a field was added (ADR-0077) is rewritten at startup. A settle's compaction is `later`, so
@@ -194,6 +195,34 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
   writes in it, and a chat at the root starts it, under the id the sender's
   tab minted, refused `root_id_in_use` when the directory holds it already.
 
+## The stored schemas (`migrations/`, ADR-0096)
+
+A document opened under a changed schema keeps a dropped field's data only
+until the next compaction (S120), and the host compacts at startup. So
+`startHost` checks every stored document's schema before its first `get`:
+
+- **`readStored`** reads each document's stored schema hash through the
+  `Store` (`listDocIds`, `currentMeta`), after the stored command Lines are
+  deleted. **`planStoredOpen`** compares each with the hash of the schema its
+  kind opens with (`storedKind` and `SCHEMA_OF`, `policy.ts`, which `resolve`
+  uses too): open as it is, run the migrations registered from a stored
+  hash, or refuse to start, naming the document and both hashes. An id no
+  schema of ours opens (a stack of moves, which has Kyneta's own schema; a
+  `pinetrie:cards` from before ADR-0059) is logged and left alone.
+- **`migrate`** runs the plan on the host's Exchange: every migration's reads
+  first, then, if every stored record loaded, its writes; then it compacts
+  and unloads what it opened. Before a migration that moves data it copies
+  a file store (`backup`, `VACUUM INTO` on the store's connection, to
+  `<file>.before-<migration>`). Kyneta reports a record it could not load
+  only as a `console.warn`, so `migrate` watches for that warning while it
+  reads; one stops it before it writes. A read-only open leaves a stored
+  hash as it was (S120), so a stopped migration leaves the store to be
+  planned the same way next time.
+- **One file per migration**, deleted once Duane's store has passed it; a
+  store still on its hash is then refused. A change that moves no data
+  (`0001-live-row.ts`) is a migration with no `run`: registering it is the
+  acknowledgement.
+
 ## Startup
 
 After `recover`, `sweepHistories` retires the histories of moves no one will undo again (§
@@ -201,9 +230,8 @@ Moves' history), and `sweepHolds` deletes the holds on queues whose lane no
 root holds or whose root is archived (ADR-0048 step 7). Both run again after
 each run's end, in `settle`'s sweep.
 
-`recover` runs, in order: `clearStreams` (no stream survives a process), the
-carry-over's writes from before the board, if `planCarryOver` planned any
-(`carryOverWrites`, ADR-0085), a
+`recover` runs, in order: the clear of `pinetrie:live` (`planClear`: no
+stream survives a process), a
 log of the stored lane names, in the roots opened, that fail `isLaneName`
 (`readStoredLanes`: no reader is given them, so the log is where one shows;
 it never throws, and nothing is deleted), `ensureNames` (ADR-0039),
@@ -243,14 +271,15 @@ any refresh they queued.
 - **pi is made in three parts, each when what it needs exists**
   (ADR-0092, `packages/pi/TECHNICAL.md`), and every module is given values,
   never a function that returns one:
-  1. the documents, then the scribe, which every module that writes a
-     record takes (`Pick<Scribe, "writeValues">`);
+  1. the documents, then the host's records (`createRecords`, ADR-0095),
+     which every module that writes a record takes
+     (`Pick<Records, "writeValues">`), then the scribe;
   2. the project (`findProject`), then pi's setup (`loadPiSetup`), which
      loads from its root and reads no document; the title-model and banner
      logs follow it;
   3. the documents' keeper, the roots `planLoads` names, the directory,
      banners, digests, titles, names, provenance and the split call, each
-     with the scribe and the setup;
+     with the records and the setup;
   4. lane work, with them;
   5. the agent, last, with lane work's `access` and `hooks`, banners'
      `request` and digests' `step`; then base news, which steers its lanes
@@ -472,7 +501,7 @@ rejects `shutdown()`.
   to stop (`typing`, `untilNotTyped`, which watches presence; a decay
   reaches the host's subscribers, S28). A wait is given up when its card
   leaves the queue (`givenUp`), and its end drains the lane again. `runs.start` marks a lane
-  running at once (`beginRun`), so a drain behind a started run pops
+  running at once (a `begin`), so a drain behind a started run pops
   nothing.
 - **`executeChat` still checks a new lane's directory and asks pi for the
   lane.** Both are ports that may refuse, not facts to gather. The directory
@@ -830,14 +859,17 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   naming itself, so a module that touches an undeclared port fails at once.
   `fakeLane` holds a run open until the test finishes it. `row` and
   `writeEntry` put entries in the document, `putValue` a host record
-  (`putValue(doc, setRecord(MARK, mark))`), and `writeLaneTip` a lane's tip; a
-  running lane is `beginRun`. Both of those are `@pinetrie/schema`'s.
+  (`putValue(doc, setRecord(MARK, mark))`, through the real writer,
+  `applyRecordWrites`), and `writeLaneTip` a lane's tip; a
+  running lane is `beginRun`. `writeEntry`, `writeLaneTip` and `beginRun` are
+  `@pinetrie/schema/fixtures`'.
 - **A port's writes are values.** Every record goes through one
-  `writeValues` (ADR-0062), so a test asserts what was written:
-  `expect(writesOf(scribe.calls)).toEqual([deleteRecord(MARK, entry)])`.
-  A test that needs the order of calls across the scribe, pi's setup and the
-  agent gives one `record` as each of them.
-  `applyWrites` is a fake `writeValues` that applies them to the document.
+  `Records.writeValues` (ADR-0062, ADR-0095), so a test asserts what was
+  written: `expect(writesOf(records.calls)).toEqual([deleteRecord(MARK, entry)])`.
+  A test that needs the order of calls across the records, the scribe, pi's
+  setup and the agent gives one `record` as each of them. `applyWrites`
+  applies writes to the test's documents through the real writer, as
+  `createRecords` does.
 - **Admission is two pure plans**, `planRequest` and `planUpgrade`
   (`routes.ts`): every admission rule is a unit test there, and `http.ts`
   only carries them out.

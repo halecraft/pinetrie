@@ -1,7 +1,12 @@
 // web/message-props — what a message is drawn from, and how each of its
 // props is compared: `React.memo`'s rule for `Message` (`sameProps`), kept pure.
 
-import type { BranchSummary, SpineNode, WriterId } from "@pinetrie/core"
+import type {
+  BranchSummary,
+  SpineNode,
+  StreamId,
+  WriterId,
+} from "@pinetrie/core"
 import type {
   LaneJoin,
   MessageAct,
@@ -20,7 +25,7 @@ export interface MessageProps {
    * (`liveWork`): its own calls' only, so a stream elsewhere redraws nothing
    * here.
    */
-  streams: Readonly<Record<string, string>>
+  streams: Readonly<Record<string, StreamId>>
   /** Where a running call's output is read. */
   live: LiveDocHandle
   /** Each tool row's state, by call id, across unmounts. */

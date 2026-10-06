@@ -1,9 +1,10 @@
 import { laneNameForThread, runId, writerId } from "@pinetrie/core"
 import { LANE, setRecord } from "@pinetrie/rules"
-import { beginRun, endRun } from "@pinetrie/schema"
+import { beginRun } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import { basics, putValue, ROOT_ID } from "./fakes.ts"
 import { hotReload, isHeld } from "./hot-reload.ts"
+import { endRun } from "./runs.ts"
 
 // Paths that do not exist, so each is its own real path.
 const PINETRIE = "/nowhere/pinetrie"

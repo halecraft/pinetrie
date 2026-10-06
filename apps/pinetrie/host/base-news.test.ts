@@ -1,10 +1,11 @@
 import { commitId, entryId, laneNameForThread, runId } from "@pinetrie/core"
 import type { ThreadLaneHandle } from "@pinetrie/pi"
 import { BASE, LINE, setRecord } from "@pinetrie/rules"
-import { beginRun, endRun, writeEntry, writeLaneTip } from "@pinetrie/schema"
+import { beginRun, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
 import { createBaseNews } from "./base-news.ts"
 import { basics, putLane, putValue, record, row } from "./fakes.ts"
+import { endRun } from "./runs.ts"
 
 const LANE = laneNameForThread("0123456789abcdef")
 

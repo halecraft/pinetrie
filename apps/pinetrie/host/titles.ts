@@ -17,7 +17,7 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import type { Keeper } from "@pinetrie/keeper"
-import type { PiSetup, Scribe } from "@pinetrie/pi"
+import type { PiSetup } from "@pinetrie/pi"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import {
   readArchived,
@@ -39,6 +39,7 @@ import {
 import type { RootDocHandle } from "@pinetrie/schema"
 import { type Basics, failed } from "./basics.ts"
 import { requestOutside } from "./outside.ts"
+import type { Records } from "./records.ts"
 
 /** A title request's size: the skill aside, the first message and the newest. */
 const TITLE_BUDGET = 6_000
@@ -91,7 +92,7 @@ export function createTitles(deps: {
   readonly keeper: Pick<Keeper, "run" | "track">
   /** The user config's `titles.enabled`: whether a root is titled unasked. */
   readonly enabled: boolean
-  readonly scribe: Pick<Scribe, "writeValues">
+  readonly records: Pick<Records, "writeValues">
   /** The title model, and its skill. */
   readonly piSetup: Pick<PiSetup, "complete" | "skill">
   /** How long an unasked title waits for its root's first entry; tests shorten it. */
@@ -164,7 +165,9 @@ export function createTitles(deps: {
           marks,
         })
         if (planned.kind === "write")
-          await deps.scribe.writeValues([setRecord(MARK, planned.record, root)])
+          await deps.records.writeValues([
+            setRecord(MARK, planned.record, root),
+          ])
       },
     })
     return null

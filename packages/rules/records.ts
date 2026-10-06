@@ -41,6 +41,23 @@ export interface RecordSpec<R, K extends string, H extends Home = Home> {
 type SetWrite = Extract<ValueWrite, { kind: "set" }>
 type DeleteWrite = Extract<ValueWrite, { kind: "delete" }>
 
+/**
+ * Writes grouped by the document they go to, in the order each target first
+ * appears. Pure.
+ */
+export function byTarget(
+  writes: readonly ValueWrite[],
+): readonly (readonly [Target, readonly ValueWrite[]])[] {
+  const groups = new Map<string, [Target, ValueWrite[]]>()
+  for (const w of writes) {
+    const key = w.target.kind === "session" ? "" : w.target.root
+    const group = groups.get(key)
+    if (group === undefined) groups.set(key, [w.target, [w]])
+    else group[1].push(w)
+  }
+  return [...groups.values()]
+}
+
 /** Where a write goes: the session, or the root the overloads below demand. */
 const targetOf = (root: RootId | undefined): Target =>
   root === undefined ? SESSION_TARGET : { kind: "root", root }
@@ -102,6 +119,16 @@ export function recordsOf<R, K extends string>(
   }
   return out
 }
+
+/** A namespace as stored (`records[namespace]`, ADR-0095) -> its records. */
+export const recordsIn = <R, K extends string>(
+  spec: RecordSpec<R, K>,
+  namespace: Readonly<Record<string, unknown>>,
+): ReadonlyMap<K, R> =>
+  recordsOf(
+    spec,
+    Object.entries(namespace).map(([key, value]) => ({ key, value })),
+  )
 
 /** Plain JSON with every object's keys sorted, so key order never counts. */
 const sorted = (v: unknown): unknown =>

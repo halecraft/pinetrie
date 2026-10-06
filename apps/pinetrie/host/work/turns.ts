@@ -22,10 +22,11 @@ import {
   commitTurn,
   conflictedFilesAt,
 } from "@pinetrie/lanes"
-import type { LaneHooks, Scribe } from "@pinetrie/pi"
+import type { LaneHooks } from "@pinetrie/pi"
 import { readTreeIndex } from "@pinetrie/reads"
 import { planTurnRecord, REVISION, setRecord } from "@pinetrie/rules"
 import { type Basics, failed } from "../basics.ts"
+import type { Records } from "../records.ts"
 import { snapshotOnQueue } from "./disk.ts"
 import type { Fetches } from "./fetch.ts"
 import type { LaneRegistry } from "./registry.ts"
@@ -63,7 +64,7 @@ export function createTurns(deps: {
   readonly registry: LaneRegistry
   /** Work nobody awaits: `quiet` waits for it. */
   readonly keeper: Keeper
-  readonly scribe: Pick<Scribe, "writeValues">
+  readonly records: Pick<Records, "writeValues">
   readonly fetchLane: Fetches["fetchLane"]
 }): Turns {
   const { basics, setup, registry, keeper } = deps
@@ -74,7 +75,7 @@ export function createTurns(deps: {
   const writeRevision = async (record: RevisionRecord) => {
     const root = docs.rootOfLane(record.lane)
     if (root === null) throw new Error(`${record.lane} is in no root`)
-    await deps.scribe.writeValues([setRecord(REVISION, record, root)])
+    await deps.records.writeValues([setRecord(REVISION, record, root)])
   }
 
   return {

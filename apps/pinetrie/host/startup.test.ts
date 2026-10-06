@@ -7,7 +7,7 @@ import {
   type ProjectRecord,
   rootIdFor,
   runId,
-  workflowStateIdFor,
+  type ValueWrite,
   writerId,
 } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
@@ -21,7 +21,8 @@ import {
   setRecord,
   VERDICT,
 } from "@pinetrie/rules"
-import { newPlacesDoc, writeLaneTip } from "@pinetrie/schema"
+import { newPlacesDoc } from "@pinetrie/schema"
+import { writeLaneTip } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import { basics, putValue, ROOT_ID, record, writesOf } from "./fakes.ts"
 import { recover, type StartupDeps } from "./startup.ts"
@@ -30,7 +31,7 @@ const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
 /** The agent, the scribe and the setup in one record, so the order of their calls shows. */
 type FakePi = StartupDeps["agent"] &
-  StartupDeps["scribe"] &
+  StartupDeps["records"] &
   StartupDeps["piSetup"]
 
 const fakePi = (impl: Partial<FakePi> = {}) =>
@@ -45,7 +46,7 @@ const fakePi = (impl: Partial<FakePi> = {}) =>
 /** One fake as all three of `recover`'s pi ports. */
 const ports = ({ port }: ReturnType<typeof fakePi>) => ({
   agent: port,
-  scribe: port,
+  records: port,
   piSetup: port,
 })
 
@@ -65,7 +66,6 @@ const deps = (over: Partial<StartupDeps> = {}): StartupDeps => ({
     destroyDocs: async () => {},
   }).port,
   provenance: { sweep: async () => {} },
-  carryOver: null,
   ...over,
 })
 
@@ -133,7 +133,7 @@ test("recover logs a stored lane whose name is not a thread's, and only such a l
   writeLaneTip(b.root, "main" as LaneName, null)
   await recover(deps({ basics: b }))
   expect(b.lines.filter(l => l.includes("ignoring"))).toEqual([
-    "[host] ignoring lanes whose names are not a thread's: main",
+    "[host] ignoring stored lanes that are no thread's: main",
   ])
 })
 
@@ -153,8 +153,13 @@ test("recover writes the project record only when it changed, in one write", asy
       }),
     )
     await new Promise(r => setTimeout(r, 0))
+    // A new store's workflow is written too, by itself (`planWorkflowSeed`).
     return agent.calls.filter(
-      c => c.method === "writeValues" && (c.args[0] as unknown[]).length > 0,
+      c =>
+        c.method === "writeValues" &&
+        (c.args[0] as ValueWrite[]).some(
+          w => w.namespace !== "pinetrie.workflow",
+        ),
     )
   }
   const fresh = await run(basics())
@@ -233,12 +238,8 @@ test("recover sweeps empty cards, texts no record names, and seats no text names
   ).toEqual([[deleteRecord(SEAT, "p-22"), deleteRecord(SEAT, "p-33")]])
 })
 
-test("recover writes a carry-over from before the board first, before it resumes anything (ADR-0085)", async () => {
+test("recover gives a new store the default workflow first, before it names lanes (ADR-0085)", async () => {
   const events: string[] = []
-  const workflow = {
-    open: [{ id: workflowStateIdFor("d"), name: "Doing" }],
-    closed: { id: workflowStateIdFor("x"), name: "Done" },
-  }
   await recover(
     deps({
       ...ports(
@@ -251,23 +252,7 @@ test("recover writes a carry-over from before the board first, before it resumes
       ensureNames: async () => {
         events.push("names")
       },
-      carryOver: {
-        workflow,
-        places: [
-          {
-            root: ROOT_ID,
-            state: workflow.closed.id,
-            rank: "a",
-            by: writerId("ada@x.io"),
-            at: 1,
-          },
-        ],
-        old: [entryId("e-1")],
-      },
     }),
   )
-  expect(events.slice(0, 2)).toEqual([
-    "set pinetrie.workflow, set pinetrie.board, delete pinetrie.archive",
-    "names",
-  ])
+  expect(events.slice(0, 2)).toEqual(["set pinetrie.workflow", "names"])
 })

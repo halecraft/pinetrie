@@ -8,27 +8,29 @@ import {
   type LaneName,
   type RootId,
   rootIdFor,
+  type Target,
   type ValueWrite,
   writerId,
 } from "@pinetrie/core"
 import type { ThreadLaneHandle, WriteOutcome } from "@pinetrie/pi"
 import { readLaneRecords, readRootRecord, readRoots } from "@pinetrie/reads"
-import { LANE, ROOT, setRecord } from "@pinetrie/rules"
+import { byTarget, LANE, ROOT, setRecord } from "@pinetrie/rules"
 import {
+  applyRecordWrites,
   type LiveDocHandle,
   newLiveDoc,
   newPlacesDoc,
-  newRootDoc,
-  newSessionDoc,
   type PlacesDocHandle,
-  physicalKey,
+  type RecordsDocHandle,
   type RootDocHandle,
   type SessionDocHandle,
-  type StorageDocHandle,
   type StoredEntryRow,
-  type StoredValueRecord,
-  writeLaneTip,
 } from "@pinetrie/schema"
+import {
+  newRootDoc,
+  newSessionDoc,
+  writeLaneTip,
+} from "@pinetrie/schema/fixtures"
 import type { Basics } from "./basics.ts"
 import type { HostDocuments } from "./docs.ts"
 
@@ -124,31 +126,25 @@ export const row = (
 /** The documents a write may go to: the session's, and the test's root. */
 export type WriteDocs = Pick<FakeBasics, "session" | "root">
 
-/** The document `write`'s target names, among `docs`. */
-const docOf = (docs: WriteDocs, write: ValueWrite): StorageDocHandle =>
-  write.target.kind === "session" ? docs.session : docs.root
+/** The document `target` names, among `docs`. */
+const docOf = (docs: WriteDocs, target: Target): RecordsDocHandle =>
+  target.kind === "session" ? docs.session : docs.root
 
-/**
- * One pi value, as pi stores it, in the document its target names: a `set`
- * write, as `setRecord` makes one.
- */
+/** One host record, in the document its target names, by the real writer. */
 export function putValue(
   docs: WriteDocs,
   write: Extract<ValueWrite, { kind: "set" }>,
 ): void {
-  const { namespace, key, value } = write
-  const record: StoredValueRecord = { namespace, key, value }
-  docOf(docs, write).values.set(physicalKey(namespace, key), record)
+  applyRecordWrites(docOf(docs, write.target), [write])
 }
 
-/** `writes` applied to the documents they name, as pi's sessions would: a fake `writeValues`. */
+/** `writes` applied to the documents they name, as the host's `Records` does. */
 export function applyWrites(
   docs: WriteDocs,
   writes: readonly ValueWrite[],
 ): void {
-  for (const w of writes)
-    if (w.kind === "set") putValue(docs, w)
-    else docOf(docs, w).values.delete(physicalKey(w.namespace, w.key))
+  for (const [target, group] of byTarget(writes))
+    applyRecordWrites(docOf(docs, target), group)
 }
 
 /** Every write a port's `writeValues` calls were given, in order. */

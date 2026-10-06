@@ -28,11 +28,7 @@ import {
   chatImageShas,
   withChatImages,
 } from "@pinetrie/rules"
-import {
-  type RootDocHandle,
-  readLaneTip,
-  type SessionDocHandle,
-} from "@pinetrie/schema"
+import { type RootDocHandle, readLaneTip } from "@pinetrie/schema"
 import { PINETRIE_COMPACTION } from "./compaction.ts"
 import { createAgentHarness } from "./deep.ts"
 import {
@@ -73,7 +69,6 @@ export const newId = (): string => uuidv7()
  * each root's, a pi session of its own.
  */
 export interface AgentDocuments {
-  readonly session: SessionDocHandle
   /** A root's document, held and loaded: opened if it is not. */
   root(root: RootId): Promise<RootDocHandle>
   /** The root a lane works in, from its record; null for a lane no root holds. */

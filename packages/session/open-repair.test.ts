@@ -1,8 +1,8 @@
 import { rootIdFor } from "@pinetrie/core"
 import { orderKeys } from "@pinetrie/rules"
-import { newOpenDoc, orderOpen, readOpenKeys } from "@pinetrie/schema"
+import { newOpenDoc, readOpenKeys } from "@pinetrie/schema"
 import { expect, test } from "vitest"
-import { placeInList, planOpenRepair } from "./open-repair.ts"
+import { orderOpen, placeInList, planOpenRepair } from "./open-repair.ts"
 
 const R = (n: number) =>
   rootIdFor(`01a0ffd2-0000-7000-8000-${String(n).padStart(12, "0")}`)

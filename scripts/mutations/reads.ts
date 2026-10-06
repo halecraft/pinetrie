@@ -175,4 +175,12 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "each thread's writers are those on its path",
   },
+  {
+    name: "readRecords decodes on every read",
+    file: "packages/reads/index.ts",
+    from: "  const known = bySpec.get(namespace)\n",
+    to: "  const known = undefined\n",
+    command: unit,
+    expect: "readRecords keeps its map while its namespace is unchanged",
+  },
 ]

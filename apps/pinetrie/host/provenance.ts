@@ -15,7 +15,6 @@ import type {
   TreeIndex,
   WriterId,
 } from "@pinetrie/core"
-import type { Scribe } from "@pinetrie/pi"
 import {
   readCardHistories,
   readLanes,
@@ -38,6 +37,7 @@ import {
 } from "@pinetrie/rules"
 import type { PresenceDocHandle } from "@pinetrie/schema"
 import type { Basics } from "./basics.ts"
+import type { Records } from "./records.ts"
 
 /** The places as a step found them, and each shared card's thread end then. */
 export interface Before {
@@ -63,7 +63,7 @@ export interface ProvenanceDeps {
     "docs" | "live" | "places" | "session" | "now" | "newId"
   >
   readonly presence: PresenceDocHandle
-  readonly scribe: Pick<Scribe, "writeValues">
+  readonly records: Pick<Records, "writeValues">
 }
 
 /**
@@ -104,7 +104,7 @@ export function createProvenance(deps: ProvenanceDeps): Provenance {
           : deleteRecord(TRACE, s.key),
       ),
     ]
-    if (writes.length > 0) await deps.scribe.writeValues(writes)
+    if (writes.length > 0) await deps.records.writeValues(writes)
   }
 
   return {

@@ -16,7 +16,8 @@ import {
 import { scriptedModel } from "@pinetrie/pi"
 import { SESSION_DOC_ID } from "@pinetrie/protocol/messages"
 import { readParticipantNames, readPlaces, readStops } from "@pinetrie/reads"
-import { beginRun, readStreams } from "@pinetrie/schema"
+import { readStreams } from "@pinetrie/schema"
+import { beginRun } from "@pinetrie/schema/fixtures"
 import { openStore } from "../../host/store.ts"
 import type { Checks } from "../checks.ts"
 import {
@@ -39,8 +40,8 @@ import {
   at,
   idOfIn,
   LATE_LOAD_MS,
+  rootBytes,
   START_AGENT,
-  sessionBytes,
   sleep,
   slowToLoad,
   storedLines,
@@ -168,11 +169,11 @@ async function run(check: Checks["check"]): Promise<void> {
       ranIn === null
         ? { records: Number.POSITIVE_INFINITY, bytes: 0 }
         : await storedRecords(stored, rootDocId(ranIn))
-    const rootBytes = ranDoc == null ? 0 : sessionBytes(ranDoc)
+    const ranBytes = ranDoc == null ? 0 : rootBytes(ranDoc)
     check(
       "after the run, the store holds the compacted session",
-      compacted.records <= 3 && compacted.bytes <= 2 * rootBytes,
-      `${compacted.records} records, ${Math.round(compacted.bytes / 1024)} KB for a ${Math.round(rootBytes / 1024)} KB root (${Math.round(printed / 1024)} KB printed)`,
+      compacted.records <= 3 && compacted.bytes <= 2 * ranBytes,
+      `${compacted.records} records, ${Math.round(compacted.bytes / 1024)} KB for a ${Math.round(ranBytes / 1024)} KB root (${Math.round(printed / 1024)} KB printed)`,
     )
 
     // 4. Two assistant messages in one run: two reply streams, one at a time.
@@ -266,7 +267,7 @@ async function run(check: Checks["check"]): Promise<void> {
     // 6. Restart over the same store: everything is there, and a card queued
     // while the lane ran is popped by the new host's startup, since no run's
     // end will. The run is the document's record alone, which a stopping
-    // host leaves and a starting one clears (`clearStreams`).
+    // host leaves and a starting one clears (`planClear`).
     const before = {
       entries: Object.keys(entriesOf(th)).length,
       lanes: lanesOf(th, ttree(), readPlaces(th.places)).map(

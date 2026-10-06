@@ -13,7 +13,7 @@ import {
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import { CONTROL_TOPIC, SESSION_DOC_ID } from "@pinetrie/protocol/messages"
-import type { StorageDocHandle } from "@pinetrie/schema"
+import type { RootDocHandle } from "@pinetrie/schema"
 import { lineDocPrefix } from "../../host/lines.ts"
 import { treeOf } from "../harness.ts"
 
@@ -91,13 +91,14 @@ export const slowToLoad = (store: Store, docId: string, ms: number): Store => {
     },
   })
 }
-/** A session's size as it stands: what a compacted store should hold. */
-export const sessionBytes = (doc: StorageDocHandle): number =>
+/** A root's size as it stands: what a compacted store should hold. */
+export const rootBytes = (doc: RootDocHandle): number =>
   JSON.stringify({
     entries: doc.entries(),
     usageRows: doc.usageRows(),
     values: doc.values(),
     lists: doc.lists(),
+    records: doc.records(),
   }).length
 /** In `doc`, the id of the message whose text is exactly `text`. */
 export const idOfIn = (

@@ -1,6 +1,6 @@
 import { entryId, toolLabel } from "@pinetrie/core"
 import { readTreeIndex } from "@pinetrie/reads"
-import { newRootDoc, writeEntry } from "@pinetrie/schema"
+import { newRootDoc, writeEntry } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import { row } from "../fakes.ts"
 import { titleOf } from "./turns.ts"

@@ -8,8 +8,13 @@ import type { Exchange } from "@kyneta/exchange"
 import { batch } from "@kyneta/schema"
 import type { RootId, WriterId } from "@pinetrie/core"
 import { personDocId } from "@pinetrie/protocol/writers"
-import { OpenDoc, orderOpen, readOpenKeys } from "@pinetrie/schema"
-import { type OpenWrites, placeInList, planOpenRepair } from "./open-repair.ts"
+import { OpenDoc, readOpenKeys } from "@pinetrie/schema"
+import {
+  type OpenWrites,
+  orderOpen,
+  placeInList,
+  planOpenRepair,
+} from "./open-repair.ts"
 import { personDoc } from "./person-doc.ts"
 import type { Readable } from "./store.ts"
 

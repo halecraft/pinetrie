@@ -13,7 +13,7 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { encodeChat } from "@pinetrie/rules"
-import { newRootDoc } from "@pinetrie/schema"
+import { newRootDoc } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import { newId } from "./agent.ts"
 import { prepareImage, readImageProcessor, sha256Of } from "./images.ts"

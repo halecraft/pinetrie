@@ -21,6 +21,7 @@ import {
   BANNER,
   BASE,
   BOARD,
+  byTarget,
   CARD_HISTORY,
   COMMANDS,
   DIGEST,
@@ -33,6 +34,7 @@ import {
   PARTICIPANT,
   PROJECT,
   QUEUE_HOLD,
+  RECORD_SPECS,
   REVISION,
   type RecordSpec,
   ROOT,
@@ -408,5 +410,42 @@ describe("setIfChanged", () => {
       Object.entries(offer).reverse(),
     ) as unknown as OfferRecord
     expect(setIfChanged(OFFER, offer, reordered)).toEqual([])
+  })
+})
+
+describe("every spec, and writes by document", () => {
+  test("RECORD_SPECS holds every spec this package exports, one per namespace", async () => {
+    const exported = Object.values(await import("./index.ts")).filter(
+      v =>
+        typeof v === "object" &&
+        v !== null &&
+        "namespace" in v &&
+        "decode" in v &&
+        "keyOf" in v,
+    )
+    expect(new Set(RECORD_SPECS)).toEqual(new Set(exported))
+    const namespaces = RECORD_SPECS.map(s => s.namespace)
+    expect(new Set(namespaces).size).toBe(namespaces.length)
+  })
+
+  test("byTarget groups writes by their document, in the order each first appears", () => {
+    const root = rootIdFor("r-1")
+    const name = setRecord(NAME, {
+      lane: laneNameForThread("t-1"),
+      name: "amber-fox" as ThreadName,
+      at: 1,
+    })
+    const mark = {
+      entry: entryId("e-1"),
+      title: "Plans",
+      by: writerId("a"),
+      at: 1,
+    }
+    const marked = setRecord(MARK, mark, root)
+    const unmarked = deleteRecord(MARK, entryId("e-1"), root)
+    expect(byTarget([marked, name, unmarked])).toEqual([
+      [{ kind: "root", root }, [marked, unmarked]],
+      [{ kind: "session" }, [name]],
+    ])
   })
 })

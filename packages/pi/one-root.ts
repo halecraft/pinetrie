@@ -3,14 +3,13 @@
 // (ADR-0063). Every lane is in it unless its record names another.
 
 import { type LaneName, type RootId, rootIdFor } from "@pinetrie/core"
-import { LANE, recordsOf } from "@pinetrie/rules"
+import { LANE, recordsIn } from "@pinetrie/rules"
 import {
-  newRootDoc,
-  newSessionDoc,
   type RootDocHandle,
-  readValues,
+  readNamespace,
   type SessionDocHandle,
 } from "@pinetrie/schema"
+import { newRootDoc, newSessionDoc } from "@pinetrie/schema/fixtures"
 import type { AgentDocuments } from "./agent.ts"
 
 /** The root a test's lanes and entries are in. */
@@ -24,7 +23,6 @@ export function oneRoot(
 ): AgentDocuments {
   const roots = new Map<RootId, RootDocHandle>([[ONE_ROOT, root]])
   return {
-    session,
     async root(id) {
       const known = roots.get(id)
       if (known !== undefined) return known
@@ -33,7 +31,7 @@ export function oneRoot(
       return made
     },
     rootOfLane: (lane: LaneName) =>
-      recordsOf(LANE, readValues(session, LANE.namespace)).get(lane)?.root ??
+      recordsIn(LANE, readNamespace(session, LANE.namespace)).get(lane)?.root ??
       ONE_ROOT,
   }
 }

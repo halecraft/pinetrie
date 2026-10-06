@@ -20,15 +20,16 @@ import {
   CHAT_TYPE,
   type PinnedMessage,
   type PromptMessage,
+  planEndRun,
+  planStream,
   settleRun,
 } from "@pinetrie/rules"
 import {
-  applyStreamOps,
-  beginRun,
-  endRun,
-  planStream,
+  applyLiveOps,
+  type LiveDocHandle,
   readActiveRun,
   readLaneTip,
+  readStreamRecords,
   readStreams,
 } from "@pinetrie/schema"
 import type { BaseNews } from "./base-news.ts"
@@ -111,17 +112,29 @@ export const streamInto =
   (event: StreamEvent): void => {
     const { docs, live, newId } = basics
     const doc = docs.docOfLane(event.lane)
-    applyStreamOps(
+    applyLiveOps(
       live,
       planStream({
         event,
-        streams: readStreams(live),
+        streams: readStreams(live, event.lane),
         tip: doc === null ? null : readLaneTip(doc, event.lane),
         running: readActiveRun(live, event.lane) !== undefined,
         newId,
       }),
     )
   }
+
+/** `lane`'s run `run` ended: gather, plan (`planEndRun`), write. */
+export const endRun = (live: LiveDocHandle, lane: LaneName, run: RunId): void =>
+  applyLiveOps(
+    live,
+    planEndRun({
+      lane,
+      run,
+      running: readActiveRun(live, lane),
+      streams: readStreamRecords(live, lane),
+    }),
+  )
 
 export function createRuns(deps: {
   readonly basics: Basics
@@ -182,7 +195,7 @@ export function createRuns(deps: {
   return {
     start(lane, start) {
       const id = runId(basics.newId())
-      beginRun(live, lane, id)
+      applyLiveOps(live, [{ kind: "begin", lane, run: id }])
       const handle = agent.lane(lane)
       // A chat's message, which is kept if its run never happens.
       const chat =

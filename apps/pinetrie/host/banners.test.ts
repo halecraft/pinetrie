@@ -1,6 +1,6 @@
 import { laneNameForThread, type Sha256, type ThreadName } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
-import { type Drawn, type PiSetup, type Scribe, sha256Of } from "@pinetrie/pi"
+import { type Drawn, type PiSetup, sha256Of } from "@pinetrie/pi"
 import { readBanners } from "@pinetrie/reads"
 import { type BannerAsk, NAME as NAME_RECORD, setRecord } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
@@ -14,6 +14,7 @@ import {
   putValue,
   record,
 } from "./fakes.ts"
+import type { Records } from "./records.ts"
 
 const LANE = laneNameForThread("1")
 const NAME = "clear-zebra" as ThreadName
@@ -26,7 +27,7 @@ const DRAWN: Drawn = {
 
 /** The setup and the scribe in one record, so the order of their calls shows. */
 type FakePi = Pick<PiSetup, "canDrawBanners" | "drawBanner" | "skill"> &
-  Pick<Scribe, "writeValues">
+  Pick<Records, "writeValues">
 
 function setUp(pi: Partial<FakePi> = {}, named = true) {
   const b = basics()
@@ -49,7 +50,7 @@ function setUp(pi: Partial<FakePi> = {}, named = true) {
     basics: b,
     keeper,
     blobs,
-    scribe: fake.port,
+    records: fake.port,
     piSetup: fake.port,
   })
   return { b, keeper, blobs, fake, banners }

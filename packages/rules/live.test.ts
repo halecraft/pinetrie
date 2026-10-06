@@ -2,21 +2,15 @@ import {
   type EntryId,
   entryId,
   type LaneName,
+  type LiveOp,
   laneNameForThread,
   runId,
+  type Stream,
   type StreamEvent,
+  streamId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
-import {
-  applyStreamOps,
-  beginRun,
-  clearStreams,
-  endRun,
-  newLiveDoc,
-  planStream,
-  readStreams,
-  type Stream,
-} from "./index.ts"
+import { planClear, planEndRun, planStream } from "./live.ts"
 
 const L = laneNameForThread("lane")
 const M = laneNameForThread("other")
@@ -26,6 +20,32 @@ const newId = () => {
   return `s-${n.toString().padStart(3, "0")}`
 }
 
+/** The streams after `ops`, as `applyLiveOps` leaves them, in id order. */
+function fold(streams: readonly Stream[], ops: readonly LiveOp[]): Stream[] {
+  let out = [...streams]
+  for (const op of ops)
+    switch (op.kind) {
+      case "open":
+        out.push({ ...op.stream, text: "" })
+        break
+      case "edit":
+        out = out.map(s => {
+          if (s.id !== op.id) return s
+          let text = s.text
+          for (const e of op.edits)
+            text = text.slice(0, e.at) + e.insert + text.slice(e.at + e.remove)
+          return { ...s, text }
+        })
+        break
+      case "close":
+        out = out.filter(s => s.id !== op.id)
+        break
+      default:
+        break
+    }
+  return out.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+}
+
 /** An entry written on `lane`: its tip moves, as pi's commit moves it. */
 interface Commit {
   readonly commit: string
@@ -33,35 +53,33 @@ interface Commit {
 }
 
 /**
- * Run events through gather → plan → apply on a real document, as the host
- * does. A `Commit` step moves a lane's tip, standing for the entry pi writes.
+ * Run events through gather, plan and apply, as the host does, with `fold`
+ * for the document. A `Commit` step moves a lane's tip, standing for the
+ * entry pi writes.
  */
-function drive(
-  steps: readonly (StreamEvent | Commit)[],
-  running = true,
-  doc = newLiveDoc(),
-) {
+function drive(steps: readonly (StreamEvent | Commit)[], running = true) {
   const tips = new Map<LaneName, EntryId | null>([
     [L, entryId("p")],
     [M, entryId("q")],
   ])
+  let streams: Stream[] = []
   const seen: (readonly Stream[])[] = []
   for (const step of steps) {
     if ("commit" in step) tips.set(step.lane ?? L, entryId(step.commit))
     else
-      applyStreamOps(
-        doc,
+      streams = fold(
+        streams,
         planStream({
           event: step,
-          streams: readStreams(doc),
+          streams: streams.filter(s => s.lane === step.lane),
           tip: tips.get(step.lane) ?? null,
           running,
           newId,
         }),
       )
-    seen.push(readStreams(doc))
+    seen.push(streams)
   }
-  return { doc, seen }
+  return seen
 }
 
 const replies = (s: readonly Stream[] | undefined) =>
@@ -69,7 +87,7 @@ const replies = (s: readonly Stream[] | undefined) =>
 
 describe("planStream: replies and tools are streams of edits", () => {
   test("a reply opens under the lane's tip on its first text, and appends while the tip stays", () => {
-    const { seen } = drive([
+    const seen = drive([
       { kind: "text", lane: L, delta: "Hel" },
       { kind: "text", lane: L, delta: "lo" },
     ])
@@ -79,7 +97,7 @@ describe("planStream: replies and tools are streams of edits", () => {
   })
 
   test("a message's end changes nothing: its reply stays until its entry moves the tip, and the next text opens a new one", () => {
-    const { seen } = drive([
+    const seen = drive([
       { kind: "text", lane: L, delta: "First." },
       { commit: "a1" },
       { kind: "text", lane: L, delta: "Next." },
@@ -96,17 +114,17 @@ describe("planStream: replies and tools are streams of edits", () => {
       { kind: "text", lane: L, delta: "Let me run it." },
       { commit: "a1" },
       { kind: "toolStart", lane: L, callId: "c1" },
-    ]).seen[2]
+    ])[2]
     expect(replaced?.map(s => s.kind)).toEqual(["tool"])
     const current = drive([
       { kind: "text", lane: L, delta: "still going" },
       { kind: "toolStart", lane: L, callId: "c1" },
-    ]).seen[1]
+    ])[1]
     expect(current?.map(s => s.kind)).toEqual(["reply", "tool"])
   })
 
   test("a reply opening closes its lane's tools, whose results are written, and no other lane's", () => {
-    const { seen } = drive([
+    const seen = drive([
       { kind: "toolStart", lane: M, callId: "m1" },
       { kind: "toolStart", lane: L, callId: "c1" },
       { kind: "toolStart", lane: L, callId: "c2" },
@@ -121,7 +139,7 @@ describe("planStream: replies and tools are streams of edits", () => {
   })
 
   test("a lane has at most one reply at every step of a turn", () => {
-    const { seen } = drive([
+    const seen = drive([
       { kind: "text", lane: L, delta: "Now the tests." },
       { commit: "a1" },
       { kind: "toolStart", lane: L, callId: "c1" },
@@ -141,7 +159,7 @@ describe("planStream: replies and tools are streams of edits", () => {
         { length: to - from + 1 },
         (_, k) => `line ${from + k}\n`,
       ).join("")
-    const { seen } = drive([
+    const seen = drive([
       { kind: "toolStart", lane: L, callId: "c1" },
       { kind: "toolOutput", lane: L, callId: "c1", text: view(1, 5) },
       { kind: "toolOutput", lane: L, callId: "c1", text: view(3, 9) },
@@ -152,7 +170,7 @@ describe("planStream: replies and tools are streams of edits", () => {
       text: view(3, 9),
     })
     const tool: Stream = {
-      id: "t",
+      id: streamId("t"),
       lane: L,
       kind: "tool",
       callId: "c",
@@ -178,47 +196,50 @@ describe("planStream: replies and tools are streams of edits", () => {
   })
 
   test("an event for a lane that is not running changes nothing", () => {
-    expect(
-      drive([{ kind: "text", lane: L, delta: "late" }], false).seen[0],
-    ).toEqual([])
+    expect(drive([{ kind: "text", lane: L, delta: "late" }], false)[0]).toEqual(
+      [],
+    )
   })
 })
 
-describe("the end of a run", () => {
-  test("endRun deletes the lane's streams with its key, and leaves other lanes' alone", () => {
-    const doc = newLiveDoc()
-    beginRun(doc, L, runId("r-1"))
-    beginRun(doc, M, runId("r-2"))
-    drive(
-      [
-        { kind: "text", lane: L, delta: "half" },
-        { kind: "toolStart", lane: M, callId: "m" },
-      ],
-      true,
-      doc,
-    )
-    endRun(doc, L, runId("r-other"))
-    expect(readStreams(doc).length).toBe(2)
-    endRun(doc, L, runId("r-1"))
-    expect([
-      readStreams(doc).map(s => s.lane),
-      Object.keys(doc.activeRuns()),
-    ]).toEqual([[M], [M]])
+describe("the end of a run, and a clear at start", () => {
+  const streams = [
+    { id: streamId("s-1"), lane: L, kind: "reply", under: null },
+    { id: streamId("s-2"), lane: M, kind: "tool", callId: "m" },
+  ] as const
+
+  test("planEndRun closes the lane's streams and ends it, and leaves other lanes' alone", () => {
+    expect(
+      planEndRun({
+        lane: L,
+        run: runId("r-1"),
+        running: runId("r-1"),
+        streams,
+      }),
+    ).toEqual([
+      { kind: "close", id: "s-1" },
+      { kind: "end", lane: L },
+    ])
   })
 
-  test("clearStreams leaves no stream, no text and no running lane", () => {
-    const { doc } = drive([
-      { kind: "text", lane: L, delta: "half" },
-      { kind: "toolStart", lane: L, callId: "c" },
+  test("planEndRun of a run that is no longer the lane's changes nothing", () => {
+    for (const running of [runId("r-2"), undefined])
+      expect(
+        planEndRun({ lane: L, run: runId("r-1"), running, streams }),
+      ).toEqual([])
+  })
+
+  test("planClear closes every stream, text only included, and ends every running lane", () => {
+    expect(
+      planClear({
+        streams: [streamId("s-1"), streamId("orphan")],
+        running: [L, M],
+      }),
+    ).toEqual([
+      { kind: "close", id: "s-1" },
+      { kind: "close", id: "orphan" },
+      { kind: "end", lane: L },
+      { kind: "end", lane: M },
     ])
-    doc.activeRuns.set(L, runId("r-1"))
-    // A text whose record is gone.
-    doc.streamText.set("orphan", "left over")
-    clearStreams(doc)
-    expect([
-      readStreams(doc),
-      Object.keys(doc.streamText()),
-      Object.keys(doc.activeRuns()),
-    ]).toEqual([[], [], []])
   })
 })

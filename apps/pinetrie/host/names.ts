@@ -4,7 +4,6 @@
 
 import type { LaneName, NameRecord } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
-import type { Scribe } from "@pinetrie/pi"
 import { readLaneRecords, readNames } from "@pinetrie/reads"
 import {
   NAME,
@@ -14,6 +13,7 @@ import {
   setRecord,
 } from "@pinetrie/rules"
 import type { Basics } from "./basics.ts"
+import type { Records } from "./records.ts"
 
 export interface Names {
   /** Name every lane pi holds that has none: at start, and for a new lane. */
@@ -29,13 +29,13 @@ export interface Names {
  */
 export function createNames(deps: {
   readonly basics: Pick<Basics, "session" | "now">
-  readonly scribe: Pick<Scribe, "writeValues">
+  readonly records: Pick<Records, "writeValues">
   readonly onNamed: (lane: LaneName) => void
 }): Names {
   const { session, now } = deps.basics
   const keeper = createKeeper()
   const write = async (record: NameRecord) => {
-    await deps.scribe.writeValues([setRecord(NAME, record)])
+    await deps.records.writeValues([setRecord(NAME, record)])
     deps.onNamed(record.lane)
   }
   return {

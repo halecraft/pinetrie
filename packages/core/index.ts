@@ -370,6 +370,9 @@ export const refused = (code: ErrCode, message: string): Refusal => ({
 
 /** A namespace of the host's own records. pi's are `pi.`, and never the host's to write. */
 export type HostNamespace = `pinetrie.${string}`
+export const isHostNamespace = (
+  namespace: string,
+): namespace is HostNamespace => namespace.startsWith("pinetrie.")
 
 /**
  * Which document a host record is written to (ADR-0063): the session's, or a
@@ -2009,30 +2012,6 @@ export function normalizeName(name: string): string | undefined {
     : n
 }
 
-// --- streams ----------------------------------------------------------------
-
-/**
- * What a running turn streams, in pinetrie's own words (ADR-0003: no pi type
- * crosses). `packages/pi` maps pi's harness events onto it; `planStream` in
- * `@pinetrie/schema` decides what each does to the document. There is no end
- * event: a stream stays until the entry that replaces it is written.
- */
-export type StreamEvent =
-  /** Text the model is writing, as a delta. */
-  | { readonly kind: "text"; readonly lane: LaneName; readonly delta: string }
-  | {
-      readonly kind: "toolStart"
-      readonly lane: LaneName
-      readonly callId: string
-    }
-  /** The tool's output so far: a whole snapshot, not a delta. */
-  | {
-      readonly kind: "toolOutput"
-      readonly lane: LaneName
-      readonly callId: string
-      readonly text: string
-    }
-
 // --- wire hygiene (ADR-0013) ------------------------------------------------
 
 /**
@@ -2139,6 +2118,7 @@ export * from "./asks.ts"
 export * from "./edits.ts"
 export * from "./errors.ts"
 export * from "./images.ts"
+export * from "./live.ts"
 export * from "./offers.ts"
 export * from "./paths.ts"
 export * from "./roots.ts"

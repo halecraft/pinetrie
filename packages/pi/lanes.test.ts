@@ -23,7 +23,8 @@ import {
   encodeChat,
   PINNED_RULE,
 } from "@pinetrie/rules"
-import { newRootDoc, readEntries, rowMessage } from "@pinetrie/schema"
+import { readEntries, rowMessage } from "@pinetrie/schema"
+import { newRootDoc } from "@pinetrie/schema/fixtures"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
 import { newId } from "./agent.ts"
 import { type LaneChannel, openChannel } from "./lane-env.ts"

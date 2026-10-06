@@ -5,11 +5,12 @@ import {
   type OfferRecord,
 } from "@pinetrie/core"
 import { DEFAULT_LINE } from "@pinetrie/lanes"
-import type { PiSetup, Scribe } from "@pinetrie/pi"
+import type { PiSetup } from "@pinetrie/pi"
 import { readBases, readOffers } from "@pinetrie/reads"
 import type { RepoOwner } from "@pinetrie/repo"
 import { expect, test } from "vitest"
 import { applyWrites, basics, record } from "../fakes.ts"
+import type { Records } from "../records.ts"
 import { createOfferDeps } from "./state.ts"
 
 const LANE = laneNameForThread("1")
@@ -41,7 +42,7 @@ const OFFER: OfferRecord = {
 
 test("the records the host writes from your repo: only what changed, and only a record that is there is removed", async () => {
   const b = basics()
-  const scribe = record<Scribe>({
+  const scribe = record<Records>({
     writeValues: async writes => applyWrites(b, writes),
   })
   const changed: string[] = []
@@ -49,7 +50,7 @@ test("the records the host writes from your repo: only what changed, and only a 
     owner: record<RepoOwner>({}).port,
     line: DEFAULT_LINE,
     basics: b,
-    scribe: scribe.port,
+    records: scribe.port,
     piSetup: record<PiSetup>({}).port,
     running: () => false,
     baseChanged: lane => changed.push(lane),

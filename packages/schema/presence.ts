@@ -65,7 +65,7 @@ export const PresenceDoc = presenceDoc()
 
 export const newPresenceDoc = () => createDoc(PresenceDoc)
 
-/** A live handle on the presence document, derived as `StorageDocHandle` is. */
+/** A live handle on the presence document. */
 export type PresenceDocHandle = ReturnType<typeof newPresenceDoc>
 
 /**

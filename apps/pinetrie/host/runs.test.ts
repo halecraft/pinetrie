@@ -14,12 +14,8 @@ import {
   encodePinned,
   planStack,
 } from "@pinetrie/rules"
-import {
-  readActiveRun,
-  readStreams,
-  writeEntry,
-  writeLaneTip,
-} from "@pinetrie/schema"
+import { readActiveRun, readStreams } from "@pinetrie/schema"
+import { writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
 import type { BaseNews } from "./base-news.ts"
 import { basics, deferred, fakeLane, methods, record, row } from "./fakes.ts"

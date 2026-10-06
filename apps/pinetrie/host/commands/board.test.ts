@@ -9,7 +9,7 @@ import {
 } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
 import { BOARD, setRecord, WORKFLOW } from "@pinetrie/rules"
-import { beginRun, writeEntry, writeLaneTip } from "@pinetrie/schema"
+import { beginRun, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import {
   basics,
@@ -48,18 +48,18 @@ function setUp() {
       at: 0,
     }),
   )
-  const scribe = record<BoardDeps["scribe"]>({ writeValues: async () => {} })
+  const records = record<BoardDeps["records"]>({ writeValues: async () => {} })
   const work = record<BoardDeps["work"]>({
     offers: null,
     teardown: async () => {},
   })
   const deps: BoardDeps = {
     basics: b,
-    scribe: scribe.port,
+    records: records.port,
     work: work.port,
     keeper: createKeeper(),
   }
-  return { b, root, scribe, work, deps }
+  return { b, root, records, work, deps }
 }
 
 const toDone = {
@@ -71,28 +71,28 @@ const toDone = {
 } as const
 
 test("a root the agent works in is not closed, and nothing is written", async () => {
-  const { b, root, scribe, deps } = setUp()
+  const { b, root, records, deps } = setUp()
   const lane = laneNameForThread("0123456789abcdef")
   putLane(b, lane, root)
   writeLaneTip(b.root, lane, root)
   beginRun(b.live, lane, runId("r-1"))
   const out = await handleRootMove(deps, ADA, toDone)
   expect(out).toMatchObject({ kind: "refused", code: ERR.ROOT_BUSY })
-  expect(scribe.calls).toEqual([])
+  expect(records.calls).toEqual([])
 })
 
 test("an idle root moved to Done: its place written, then torn down and unloaded", async () => {
-  const { scribe, work, deps } = setUp()
+  const { records, work, deps } = setUp()
   const out = await handleRootMove(deps, ADA, toDone)
   expect(out).toEqual({ kind: "moved-root" })
-  expect(writesOf(scribe.calls)).toMatchObject([
+  expect(writesOf(records.calls)).toMatchObject([
     { namespace: "pinetrie.board", key: ROOT_ID, value: { state: DONE } },
   ])
   expect(methods(work.calls)).toEqual(["teardown"])
 })
 
 test("a move within open states writes only the place, and opens no root", async () => {
-  const { b, scribe, work, deps } = setUp()
+  const { b, records, work, deps } = setUp()
   const review = workflowStateIdFor("r")
   putValue(
     b,
@@ -103,26 +103,26 @@ test("a move within open states writes only the place, and opens no root", async
   )
   const out = await handleRootMove(deps, ADA, { ...toDone, to: review })
   expect(out).toEqual({ kind: "moved-root" })
-  expect(writesOf(scribe.calls)).toHaveLength(1)
+  expect(writesOf(records.calls)).toHaveLength(1)
   expect(work.calls).toEqual([])
 })
 
 test("a workflow edit writes the workflow; a refusal writes nothing", async () => {
-  const { scribe, deps } = setUp()
+  const { records, deps } = setUp()
   expect(
     await handleWorkflow(deps, {
       kind: "workflow",
       edit: { action: "remove", state: DOING, name: "", before: null },
     }),
   ).toMatchObject({ kind: "refused", code: ERR.STATE_NOT_EMPTY })
-  expect(scribe.calls).toEqual([])
+  expect(records.calls).toEqual([])
   expect(
     await handleWorkflow(deps, {
       kind: "workflow",
       edit: { action: "rename", state: DONE, name: "Shipped", before: null },
     }),
   ).toEqual({ kind: "workflow-changed" })
-  expect(writesOf(scribe.calls)).toMatchObject([
+  expect(writesOf(records.calls)).toMatchObject([
     { namespace: "pinetrie.workflow", value: { closed: { name: "Shipped" } } },
   ])
 })

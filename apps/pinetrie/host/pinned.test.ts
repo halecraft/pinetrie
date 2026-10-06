@@ -14,7 +14,7 @@ import {
   PARTICIPANT,
   setRecord,
 } from "@pinetrie/rules"
-import { writeEntry } from "@pinetrie/schema"
+import { writeEntry } from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
 import type { CardPort } from "./cards.ts"
 import { basics, putLane, putValue, ROOT_ID, record, row } from "./fakes.ts"

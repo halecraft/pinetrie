@@ -75,11 +75,11 @@ page's (`storage-keys.ts`, `tab-state.ts`, `same-props.ts`, `colors.ts`).
   root of a card drafted in a root not held (`cardMarks`'s `rootEntries`).
   The board's closed state searches labels: a search of every message would
   hold every root.
-- **A directory write wakes every read of the session's records**:
-  `readValues` reads the whole `values` map. So `readParticipantNames`
-  keeps its map while the names are the same, since every message compares
-  it by identity (the browser suite's "a message in another thread redraws
-  none of this tab's messages").
+- **A record's read keeps its map while its namespace is unchanged**
+  (`readRecords`, ADR-0095), so a directory write wakes no read of names.
+  `readParticipantNames` also keeps its map while the names are the same,
+  since every message compares it by identity (the browser suite's "a
+  message in another thread redraws none of this tab's messages").
 - **The held roots read as one tree** (`readHeldIndex`), so every projection
   below works as it did over one document, for the roots held. A root's
   columns sync only while it is held; `prune` waits for the stored tabs'

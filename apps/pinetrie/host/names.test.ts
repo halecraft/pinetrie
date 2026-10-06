@@ -1,14 +1,14 @@
 import { laneNameForThread } from "@pinetrie/core"
-import type { Scribe } from "@pinetrie/pi"
 import { expect, test } from "vitest"
 import { applyWrites, basics, putLane, record, writesOf } from "./fakes.ts"
 import { createNames } from "./names.ts"
+import type { Records } from "./records.ts"
 
 test("two ensures called together write each lane's name once, and no two lanes get one name", async () => {
   const b = basics()
   const lanes = [laneNameForThread("a"), laneNameForThread("b")]
   for (const lane of lanes) putLane(b, lane)
-  const scribe = record<Pick<Scribe, "writeValues">>({
+  const scribe = record<Pick<Records, "writeValues">>({
     // Written a moment later, as the scribe's session does: a second plan made
     // meanwhile would not see it.
     writeValues: async writes => {
@@ -19,7 +19,7 @@ test("two ensures called together write each lane's name once, and no two lanes 
   const named: string[] = []
   const names = createNames({
     basics: b,
-    scribe: scribe.port,
+    records: scribe.port,
     onNamed: lane => named.push(lane),
   })
   await Promise.all([names.ensure(), names.ensure()])
@@ -37,7 +37,7 @@ test("a reservation is named on the same queue as new lanes, and starts its bann
   const lane = laneNameForThread("a")
   const reserved = laneNameForThread("r")
   putLane(b, lane)
-  const scribe = record<Pick<Scribe, "writeValues">>({
+  const scribe = record<Pick<Records, "writeValues">>({
     writeValues: async writes => {
       await new Promise(done => setTimeout(done, 5))
       applyWrites(b, writes)
@@ -46,7 +46,7 @@ test("a reservation is named on the same queue as new lanes, and starts its bann
   const named: string[] = []
   const names = createNames({
     basics: b,
-    scribe: scribe.port,
+    records: scribe.port,
     onNamed: l => named.push(l),
   })
   const [, first, again, held] = await Promise.all([

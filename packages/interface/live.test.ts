@@ -3,8 +3,9 @@ import {
   entryId,
   type LaneName,
   laneNameForThread,
+  type StreamRecord,
+  streamId,
 } from "@pinetrie/core"
-import type { StreamRecord } from "@pinetrie/schema"
 import { describe, expect, test } from "vitest"
 import { callStreams, liveWork } from "./live.ts"
 
@@ -15,13 +16,13 @@ const run = (lane: typeof L, tip: string): AgentRun => ({
   tip: entryId(tip),
 })
 const reply = (id: string, lane: LaneName, under: string): StreamRecord => ({
-  id,
+  id: streamId(id),
   lane,
   kind: "reply",
   under: entryId(under),
 })
 const tool = (id: string, lane: LaneName, callId: string): StreamRecord => ({
-  id,
+  id: streamId(id),
   lane,
   kind: "tool",
   callId,
@@ -59,8 +60,8 @@ describe("callStreams", () => {
   test("a message gets only its own calls' streams, equal by value when nothing of its own changed", () => {
     const call = (id: string) => ({ id, name: "bash", label: "bash x" })
     const tools = new Map([
-      ["c1", "s1"],
-      ["c9", "s9"],
+      ["c1", streamId("s1")],
+      ["c9", streamId("s9")],
     ])
     expect(callStreams([call("c1"), call("c2")], tools)).toEqual({ c1: "s1" })
     expect(callStreams([call("c2")], tools)).toEqual({})

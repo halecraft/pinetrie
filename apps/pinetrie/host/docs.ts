@@ -14,12 +14,11 @@ import {
 import type { RootView } from "@pinetrie/reads"
 import { readLaneRecords, readRoots } from "@pinetrie/reads"
 import {
-  asRootDoc,
   type LiveDocHandle,
   type PlacesDocHandle,
+  RootDoc,
   type RootDocHandle,
   type SessionDocHandle,
-  StorageDoc,
 } from "@pinetrie/schema"
 
 export interface HostDocuments {
@@ -108,7 +107,7 @@ export function hostDocuments(input: {
       const pending = loading.get(root)
       if (pending !== undefined) return pending
       const id = rootDocId(root)
-      const doc = asRootDoc(exchange.get(id, StorageDoc))
+      const doc = exchange.get(id, RootDoc)
       const ready = exchange.whenHydrated(id).then(() => {
         loading.delete(root)
         held.set(root, doc)

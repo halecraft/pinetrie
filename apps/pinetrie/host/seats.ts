@@ -10,12 +10,12 @@
 import type { Exchange } from "@kyneta/exchange"
 import type { WriterId } from "@pinetrie/core"
 import type { Keeper } from "@pinetrie/keeper"
-import type { Scribe } from "@pinetrie/pi"
 import { readSeats } from "@pinetrie/reads"
 import { planSeats, SEAT, setRecord } from "@pinetrie/rules"
 import { seatOf } from "@pinetrie/schema"
 import type { Basics } from "./basics.ts"
 import type { MoveHistories } from "./move-history.ts"
+import type { Records } from "./records.ts"
 
 /** The writers with stacks of moves loaded and no seat connected. Pure. */
 export const idleWriters = (
@@ -35,10 +35,10 @@ export function startSeats(input: {
   }
   readonly basics: Pick<Basics, "session" | "now">
   readonly keeper: Keeper
-  readonly scribe: Pick<Scribe, "writeValues">
+  readonly records: Pick<Records, "writeValues">
   readonly histories: Pick<MoveHistories, "loaded" | "unloadWriters">
 }): { stop(): void } {
-  const { exchange, keeper, scribe, histories } = input
+  const { exchange, keeper, records, histories } = input
   const { session: doc, now } = input.basics
   const step = () =>
     keeper.run(async () => {
@@ -53,7 +53,7 @@ export function startSeats(input: {
         histories.loaded(),
         connected.map(s => s.writer),
       )
-      await scribe.writeValues(seats.map(seat => setRecord(SEAT, seat)))
+      await records.writeValues(seats.map(seat => setRecord(SEAT, seat)))
       await histories.unloadWriters(idle)
     })
   void step()

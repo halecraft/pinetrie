@@ -13,12 +13,7 @@ import {
 } from "@kyneta/exchange"
 import { Interpret, Reject } from "@kyneta/schema"
 import { WebsocketServerTransport } from "@kyneta/websocket-transport/server"
-import {
-  type BlobStore,
-  type CardId,
-  type LaneName,
-  writerId,
-} from "@pinetrie/core"
+import type { BlobStore, CardId, LaneName } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
 import { configJson, readConfigFile, userConfigFile } from "@pinetrie/lanes"
 import {
@@ -27,7 +22,6 @@ import {
   loadPiSetup,
   type ModelChoice,
   newId,
-  type Scribe,
 } from "@pinetrie/pi"
 import { Control } from "@pinetrie/protocol/line"
 import {
@@ -41,38 +35,29 @@ import {
 import { writersPolicy } from "@pinetrie/protocol/writers"
 import {
   readArchived,
-  readRecords,
   readRoots,
   readRunning,
   readThreadName,
-  readWorkflow,
 } from "@pinetrie/reads"
 import {
-  ARCHIVE,
-  archivedOf,
   decodeBannerConfig,
   decodeCommandRenames,
   decodeDigestConfig,
   decodeTitleConfig,
-  planCarryOver,
   type QueuedCard,
 } from "@pinetrie/rules"
 import {
-  AttentionDoc,
-  asSessionDoc,
   cardDocId,
-  InventoryDoc,
   LiveDoc,
   type LiveDocHandle,
-  OpenDoc,
   PlacesDoc,
   type PlacesDocHandle,
   PRESENCE_DECAY,
   type PresenceDecay,
   type PresenceDocHandle,
   presenceDoc,
+  SessionDoc,
   type SessionDocHandle,
-  StorageDoc,
   TextDoc,
 } from "@pinetrie/schema"
 import { DEFAULT_BIND, isLoopback, newKey } from "./admission.ts"
@@ -106,10 +91,16 @@ import {
 } from "./housekeeping.ts"
 import { startHttp } from "./http.ts"
 import { lineDocPrefix } from "./lines.ts"
+import {
+  migrate,
+  planStoredOpen,
+  readStored,
+  refusalLine,
+} from "./migrations/index.ts"
 import { createMoveHistories } from "./move-history.ts"
 import { createNames } from "./names.ts"
 import { createPinned } from "./pinned.ts"
-import { hostPolicy, resolveDoc } from "./policy.ts"
+import { hostPolicy, resolveDoc, SCHEMA_OF } from "./policy.ts"
 import { createProvenance } from "./provenance.ts"
 import {
   chatOfPoppedQueuedCard,
@@ -117,6 +108,7 @@ import {
   drain as drainQueue,
   untilNotTyped,
 } from "./queued-card-pop.ts"
+import { createRecords, type Records } from "./records.ts"
 import { createRuns, streamInto } from "./runs.ts"
 import { startSeats } from "./seats.ts"
 import { createSettle } from "./settle.ts"
@@ -214,8 +206,8 @@ export interface RunningHost {
   readonly places: PlacesDocHandle
   /** A card's text as the host holds it: for the suites. */
   cardText(id: CardId): string
-  /** The host's writes (ADR-0062): for a suite to write a record as the host would. */
-  readonly scribe: Scribe
+  /** The host's records (ADR-0095): for a suite to write one as the host would. */
+  readonly records: Records
   /** The invite key, or null on loopback. */
   readonly key: string | null
   /** Links a collaborator can open, key included; the local URL on loopback. */
@@ -256,12 +248,21 @@ export async function startHost({
       : {
           store: storeFile ?? createInMemoryStore(),
           blobs: givenBlobs ?? memoryBlobs(),
+          backup: null,
         }
   const { store, blobs } = opened
   // Every stored command Line belongs to a client seat that cannot return: a
   // client keeps no store and does not reconnect (host/lines.ts).
   for await (const id of store.listDocIds(lineDocPrefix(CONTROL_TOPIC)))
     await store.delete(id)
+  // Each stored document's schema, checked before anything opens one: opened
+  // under a changed schema, a dropped field's data goes at the next
+  // compaction (S120, ADR-0096).
+  const openPlan = planStoredOpen(await readStored(store))
+  if (openPlan.kind === "refuse") {
+    await store.close()
+    throw new Error(refusalLine(openPlan))
+  }
   // Clients find the host by its principal and address their Lines to the
   // seat Kyneta issues it (ADR-0037). The host has no WRITER identity:
   // writers are the connected clients, named by their principals, and they
@@ -279,28 +280,21 @@ export async function startHost({
     // opened itself would be neither stored nor relayed (S58). The host never
     // writes a person's document.
     resolve: docId => {
-      switch (resolveDoc(docId, root => readRoots(session).has(root))) {
-        case "text":
-          return Interpret(TextDoc)
-        case "inventory":
-          return Interpret(InventoryDoc)
-        case "attention":
-          return Interpret(AttentionDoc)
-        case "open":
-          return Interpret(OpenDoc)
-        case "root":
-          return Interpret(StorageDoc)
-        case "reject":
-          return Reject()
-        case undefined:
-          return undefined
-      }
+      const kind = resolveDoc(docId, root => readRoots(session).has(root))
+      if (kind === "reject") return Reject()
+      return kind === undefined ? undefined : Interpret(SCHEMA_OF[kind])
     },
   })
 
+  await migrate({
+    plan: openPlan,
+    exchange,
+    backup: opened.backup,
+    log,
+  })
   // The session's records, the directory of roots among them (ADR-0063).
   // Each root's document is opened through `docs`, below.
-  const session = asSessionDoc(exchange.get(SESSION_DOC_ID, StorageDoc))
+  const session = exchange.get(SESSION_DOC_ID, SessionDoc)
   // The host is every document's authority: no peer is upstream of it. So
   // Kyneta loads a root it let go again when a client asks for it (S86).
   exchange.register({ name: "pinetrie.authority", authority: "self" })
@@ -333,9 +327,13 @@ export async function startHost({
     now: Date.now,
   }
 
+  // The host writes its own records (ADR-0095); every module that writes one
+  // takes this.
+  const records = createRecords(docs)
+
   // --- pi: the scribe and the person's pi setup (ADR-0092) -----------------
-  // The host's writes go through the scribe, which holds each document's one
-  // pi session; the agent, made last, builds its harnesses over them.
+  // A thread's appends go through the scribe, which holds each root's one pi
+  // session; the agent, made last, builds its harnesses over them.
   const scribe = createScribe({ documents: docs, replicaId: newId(), blobs })
   // Before a root's document goes, what holds it lets go: the scribe closes
   // the agent's harness over it, then its session (ADR-0063).
@@ -377,47 +375,29 @@ export async function startHost({
     onError: failed(basics, "step"),
     onSlow: slow(basics),
   })
-  // A store from before the board is carried over (ADR-0085): planned here,
-  // since it says which roots are archived, and written in `recover`.
   const directoryNow = readRoots(session)
-  const carryOver = planCarryOver({
-    workflow: readWorkflow(session),
-    roots: directoryNow,
-    archive: readRecords(session, ARCHIVE),
-    host: writerId(HOST_PRINCIPAL),
-    now: basics.now(),
-    newId: basics.newId,
-  })
   // The roots that are not archived, opened before anything reads one: every
   // lane that could be running is in one of them (`planLoads`).
-  const roots = planLoads(
-    directoryNow,
-    carryOver === null
-      ? readArchived(session)
-      : archivedOf(
-          carryOver.workflow,
-          new Map(carryOver.places.map(p => [p.root, p])),
-        ),
-  )
+  const roots = planLoads(directoryNow, readArchived(session))
   for (const root of roots) await docs.root(root)
   log(
     `[host] ${rootsOpenedWords({ opened: roots.length, total: directoryNow.size })}`,
   )
   // The directory follows the roots opened above as well as those opened
   // later (`onOpened`).
-  startDirectory({ basics, keeper, scribe })
+  startDirectory({ basics, keeper, records })
   // Each thread's column banner, when the user config turns banners on.
   const banners =
     bannerConfig === null
       ? null
-      : createBanners({ basics, keeper, blobs, scribe, piSetup })
+      : createBanners({ basics, keeper, blobs, records, piSetup })
   // Each run's verdict (ADR-0077), and each ask's digest unless the user
   // config turns digests off (ADR-0071).
   const digests = createDigests({
     basics,
     keeper,
     presence,
-    scribe,
+    records,
     piSetup,
     enabled: decodeDigestConfig(userJson),
   })
@@ -429,19 +409,19 @@ export async function startHost({
     basics,
     keeper,
     enabled: titleConfig.enabled,
-    scribe,
+    records,
     piSetup,
   })
   // Every thread's name (ADR-0039, ADR-0057). A thread's banner is drawn
   // from its name, so it starts as the name is written.
   const names = createNames({
     basics,
-    scribe,
+    records,
     onNamed: lane => {
       banners?.due(lane).catch(failed(basics, "banner"))
     },
   })
-  const provenance = createProvenance({ basics, presence, scribe })
+  const provenance = createProvenance({ basics, presence, records })
   // `split_offer`: a split card queued on the agent's lane (ADR-0080), which
   // its run's end pops.
   const askSplit = createSplitCall({ basics, keeper, provenance })
@@ -451,7 +431,7 @@ export async function startHost({
     basics,
     found,
     userConfig: { file: userConfig, json: userJson },
-    scribe,
+    records,
     piSetup,
     ensureNames: names.ensure,
     lineCommands: key === null,
@@ -518,6 +498,7 @@ export async function startHost({
     basics,
     agent,
     scribe,
+    records,
     piSetup,
     work,
     blobs,
@@ -573,7 +554,7 @@ export async function startHost({
         texts: cardPort.texts,
       })
       await sweepHistories({ basics, store, histories, startup: false })
-      await sweepHolds({ basics, scribe })
+      await sweepHolds({ basics, records })
       await provenance.sweep()
     },
   })
@@ -613,7 +594,7 @@ export async function startHost({
     basics,
     roots,
     agent,
-    scribe,
+    records,
     piSetup,
     work,
     keeper,
@@ -622,11 +603,10 @@ export async function startHost({
     cards: cardPort,
     provenance,
     ensureNames: names.ensure,
-    carryOver,
   })
   await sweepHistories({ basics, store, histories, startup: true })
-  await sweepHolds({ basics, scribe })
-  const seats = startSeats({ exchange, basics, keeper, scribe, histories })
+  await sweepHolds({ basics, records })
+  const seats = startSeats({ exchange, basics, keeper, records, histories })
   const control = startControl({
     exchange,
     listener,
@@ -696,7 +676,7 @@ export async function startHost({
     presence,
     places,
     cardText: (id: CardId) => exchange.get(cardDocId(id), TextDoc).text(),
-    scribe,
+    records,
     key,
     invites: server.invites,
     quiet,

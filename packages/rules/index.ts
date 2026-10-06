@@ -57,6 +57,7 @@ export {
   placeStarted,
   planRootMove,
   planWorkflowEdit,
+  planWorkflowSeed,
   type RootMovePlan,
   stateIn,
   statesOf,
@@ -108,13 +109,6 @@ export {
   type Verb,
   verbOf,
 } from "./card-history.ts"
-export {
-  ARCHIVE,
-  type CarryOver,
-  carryOverWrites,
-  type OldArchiveRecord,
-  planCarryOver,
-} from "./carry-over.ts"
 export {
   addressChat,
   agentByDefault,
@@ -213,6 +207,13 @@ export {
   publishWork,
   type UpdateRefusal,
 } from "./line.ts"
+export {
+  closeStreams,
+  isCurrentReply,
+  planClear,
+  planEndRun,
+  planStream,
+} from "./live.ts"
 export { MARK, planMark } from "./mark.ts"
 export {
   NAME,
@@ -262,9 +263,11 @@ export {
   QUEUE_HOLD,
 } from "./queue-hold.ts"
 export {
+  byTarget,
   deleteRecord,
   type Home,
   type RecordSpec,
+  recordsIn,
   recordsOf,
   setIfChanged,
   setRecord,
@@ -283,6 +286,7 @@ export {
 } from "./review.ts"
 export { ROOT } from "./roots.ts"
 export { planSeatSweep, planSeats, SEAT, writersOfClients } from "./seat.ts"
+export { type AnyRecordSpec, RECORD_SPECS } from "./specs.ts"
 export { planStartup } from "./startup.ts"
 export {
   type CarryOnMessage,

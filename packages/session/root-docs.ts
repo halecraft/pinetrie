@@ -16,7 +16,7 @@ import {
   rootOfDocId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
-import { asRootDoc, type RootDocHandle, StorageDoc } from "@pinetrie/schema"
+import { RootDoc, type RootDocHandle } from "@pinetrie/schema"
 import { newRootId } from "./ids.ts"
 import { planHold } from "./root-hold.ts"
 import { type Readable, readable, snapshotStore } from "./store.ts"
@@ -67,7 +67,7 @@ export function rootDocs(exchange: Exchange): RootDocs {
     wanted = plan.want
     const next = new Map([...now].filter(([root]) => plan.want.has(root)))
     for (const root of plan.open)
-      next.set(root, asRootDoc(exchange.get(rootDocId(root), StorageDoc)))
+      next.set(root, exchange.get(rootDocId(root), RootDoc))
     roots.set(next)
     // `destroy` lets go of this client's copy; the host keeps its own.
     for (const root of plan.drop) void exchange.destroy(rootDocId(root))

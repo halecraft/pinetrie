@@ -19,12 +19,8 @@ import {
   DEFAULT_BANNER,
   encodeChat,
 } from "@pinetrie/rules"
-import {
-  newRootDoc,
-  type RootDocHandle,
-  readEntries,
-  rowMessage,
-} from "@pinetrie/schema"
+import { type RootDocHandle, readEntries, rowMessage } from "@pinetrie/schema"
+import { newRootDoc } from "@pinetrie/schema/fixtures"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
 import { newId } from "./agent.ts"
 import {

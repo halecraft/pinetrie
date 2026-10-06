@@ -18,14 +18,8 @@ import {
   readTraces,
 } from "@pinetrie/reads"
 import type { UndoResult } from "@pinetrie/rules"
-import {
-  beginRun,
-  newPresenceDoc,
-  readingKey,
-  seatKey,
-  writeEntry,
-  writeLaneTip,
-} from "@pinetrie/schema"
+import { newPresenceDoc, readingKey, seatKey } from "@pinetrie/schema"
+import { beginRun, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
 import { applyWrites, basics, record, row } from "../fakes.ts"
 import { applyPlaceSteps } from "../places.ts"
@@ -85,7 +79,7 @@ function setUp() {
   const provenance = createProvenance({
     basics: b,
     presence,
-    scribe: { writeValues: async writes => applyWrites(b, writes) },
+    records: { writeValues: async writes => applyWrites(b, writes) },
   })
   const commands = createCardCommands({
     basics: b,

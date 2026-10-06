@@ -9,7 +9,7 @@ import {
   setValue,
 } from "@earendil-works/pi-agent-core"
 import type { BlobStore, ImageRef, Sha256, StoredImage } from "@pinetrie/core"
-import { newRootDoc } from "@pinetrie/schema"
+import { newRootDoc } from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
 import { sha256Of } from "./images.ts"
 import { KynetaStorage } from "./storage.ts"

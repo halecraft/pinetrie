@@ -101,7 +101,7 @@ import {
   REVISION,
   type RecordSpec,
   ROOT,
-  recordsOf,
+  recordsIn,
   renderableMessage,
   SEAT,
   STOP,
@@ -121,7 +121,7 @@ import {
   readEntryMessage,
   readLaneNames,
   readLaneTip,
-  readValues,
+  readNamespace,
   rowMessage,
   rowRetainedTail,
   type SessionDocHandle,
@@ -353,14 +353,33 @@ export type HomeDoc<H extends Home> = H extends "root"
   ? RootDocHandle
   : SessionDocHandle
 
+/** Each spec's records, by the stored namespace they were decoded from. */
+const decoded = new WeakMap<
+  object,
+  WeakMap<object, ReadonlyMap<string, unknown>>
+>()
+
 /**
  * Every record `spec` describes, by its address (ADR-0062), from the
  * document its home names. Each named reader below is this, for one record.
+ * The same map while its namespace is unchanged: the stored namespace keeps
+ * its identity across writes to others (S120), so a write decodes only its
+ * own namespace's records again.
  */
-export const readRecords = <R, K extends string, H extends Home>(
+export function readRecords<R, K extends string, H extends Home>(
   doc: HomeDoc<H>,
   spec: RecordSpec<R, K, H>,
-): ReadonlyMap<K, R> => recordsOf(spec, readValues(doc, spec.namespace))
+): ReadonlyMap<K, R> {
+  const namespace = readNamespace(doc, spec.namespace)
+  const bySpec = decoded.get(spec) ?? new WeakMap()
+  decoded.set(spec, bySpec)
+  const known = bySpec.get(namespace)
+  // Cached by this spec alone, so the map holds its own records.
+  if (known !== undefined) return known as ReadonlyMap<K, R>
+  const records = recordsIn(spec, namespace)
+  bySpec.set(namespace, records)
+  return records
+}
 
 /** Every root's directory record (`pinetrie.root`, ADR-0063), by its id. */
 export const readRoots = (

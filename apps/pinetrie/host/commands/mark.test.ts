@@ -1,6 +1,6 @@
 import { entryId, writerId } from "@pinetrie/core"
 import { deleteRecord, MARK, setRecord } from "@pinetrie/rules"
-import { writeEntry } from "@pinetrie/schema"
+import { writeEntry } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import { basics, putValue, ROOT_ID, record, row, writesOf } from "../fakes.ts"
 import { handleMark, type MarkDeps } from "./mark.ts"
@@ -14,8 +14,8 @@ test("clearing a root's title removes its mark", async () => {
     b,
     setRecord(MARK, { entry: root, title: "Plans", by: ada, at: 1 }, ROOT_ID),
   )
-  const scribe = record<MarkDeps["scribe"]>({ writeValues: async () => {} })
-  const out = await handleMark({ basics: b, scribe: scribe.port }, ada, {
+  const scribe = record<MarkDeps["records"]>({ writeValues: async () => {} })
+  const out = await handleMark({ basics: b, records: scribe.port }, ada, {
     kind: "mark",
     root: ROOT_ID,
     entry: root,

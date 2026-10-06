@@ -7,7 +7,7 @@ import {
   runId,
   writerId,
 } from "@pinetrie/core"
-import type { Agent, Scribe } from "@pinetrie/pi"
+import type { Agent } from "@pinetrie/pi"
 import { readCardHistories, readPlaces } from "@pinetrie/reads"
 import {
   deleteRecord,
@@ -17,12 +17,8 @@ import {
   STOP,
   setRecord,
 } from "@pinetrie/rules"
-import {
-  beginRun,
-  newPresenceDoc,
-  writeEntry,
-  writeLaneTip,
-} from "@pinetrie/schema"
+import { newPresenceDoc } from "@pinetrie/schema"
+import { beginRun, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import {
   applyWrites,
@@ -36,6 +32,7 @@ import {
   row,
 } from "../fakes.ts"
 import { createProvenance } from "../provenance.ts"
+import type { Records } from "../records.ts"
 import type { RunStart } from "../runs.ts"
 import {
   handleCarryOn,
@@ -60,7 +57,7 @@ function running() {
   beginRun(b.live, lane, runId("r-1"))
   const handle = fakeLane(lane, { abort: async () => {} })
   // The agent and the scribe in one record, so the order of their calls shows.
-  const pi = record<Pick<Agent, "lane"> & Pick<Scribe, "writeValues">>({
+  const pi = record<Pick<Agent, "lane"> & Pick<Records, "writeValues">>({
     lane: () => handle.lane,
     writeValues: async () => {},
   })
@@ -71,7 +68,7 @@ test("stopping a running lane records who stopped its ask, then aborts its run",
   const { b, lane, handle, pi } = running()
   expect(
     await handleStop(
-      { basics: b, agent: pi.port, scribe: pi.port, cancel: () => false },
+      { basics: b, agent: pi.port, records: pi.port, cancel: () => false },
       lane,
       ada,
     ),
@@ -101,7 +98,7 @@ test("a second stop of the same ask records nothing more", async () => {
     setRecord(STOP, { prompt: entryId("e-1"), by: bea, at: 1 }, ROOT_ID),
   )
   await handleStop(
-    { basics: b, agent: pi.port, scribe: pi.port, cancel: () => false },
+    { basics: b, agent: pi.port, records: pi.port, cancel: () => false },
     lane,
     ada,
   )
@@ -116,7 +113,7 @@ test("a stop while a chat's run waits for its pinned cards cancels it there, and
     {
       basics: b,
       agent: pi.port,
-      scribe: pi.port,
+      records: pi.port,
       cancel: l => {
         cancelled.push(l)
         return true
@@ -152,7 +149,7 @@ test("a stop with a message card queued holds the queue in the same write as its
     }),
   )
   await handleStop(
-    { basics: b, agent: pi.port, scribe: pi.port, cancel: () => false },
+    { basics: b, agent: pi.port, records: pi.port, cancel: () => false },
     lane,
     ada,
   )
@@ -178,8 +175,8 @@ test("a hold is written once, its release deleted and the lane drained, each ans
   const drained: string[] = []
   const deps = {
     basics: b,
-    scribe: {
-      writeValues: async (w: Parameters<Scribe["writeValues"]>[0]) => {
+    records: {
+      writeValues: async (w: Parameters<Records["writeValues"]>[0]) => {
         writes.push(w)
         applyWrites(b, w)
       },
@@ -228,7 +225,7 @@ test("an offer's fact is queued as a card at the thread's end, after the cards t
       provenance: createProvenance({
         basics: b,
         presence: newPresenceDoc(),
-        scribe: { writeValues: async w => applyWrites(b, w) },
+        records: { writeValues: async w => applyWrites(b, w) },
       }),
     },
     fact,

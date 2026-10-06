@@ -23,7 +23,7 @@ import type {
   WriterId,
 } from "@pinetrie/core"
 import type { LineConfig } from "@pinetrie/lanes"
-import type { PiSetup, Scribe } from "@pinetrie/pi"
+import type { PiSetup } from "@pinetrie/pi"
 import { readNames, readOffers, readRevisions } from "@pinetrie/reads"
 import {
   fileDiff,
@@ -42,6 +42,7 @@ import {
   planYourEdits,
 } from "@pinetrie/rules"
 import { type Basics, failed } from "../basics.ts"
+import type { Records } from "../records.ts"
 import type { Line } from "../work/line.ts"
 import { act } from "./act.ts"
 import { describe } from "./describe.ts"
@@ -109,7 +110,7 @@ export function startOffers(input: {
   /** The integration line's names (ADR-0060). */
   readonly line: LineConfig
   readonly basics: Basics
-  readonly scribe: Pick<Scribe, "writeValues">
+  readonly records: Pick<Records, "writeValues">
   /** What a description asks of the model. */
   readonly piSetup: Pick<PiSetup, "skill" | "complete">
   /** Whether a lane is running now: an offer is described once it stops. */

@@ -7,10 +7,10 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
-import type { PiSetup, Scribe } from "@pinetrie/pi"
+import type { PiSetup } from "@pinetrie/pi"
 import { readMarks } from "@pinetrie/reads"
 import { BOARD, MARK, setRecord, WORKFLOW } from "@pinetrie/rules"
-import { writeEntry } from "@pinetrie/schema"
+import { writeEntry } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import {
   applyWrites,
@@ -23,6 +23,7 @@ import {
   row,
   writeDirectory,
 } from "./fakes.ts"
+import type { Records } from "./records.ts"
 import { createTitles } from "./titles.ts"
 
 const ADA = writerId("ada@example.com")
@@ -43,7 +44,7 @@ function setUp(
   const reply = deferred<string | null>()
   // The setup and the scribe in one record, so the order of their calls shows.
   const pi = record<
-    Pick<PiSetup, "complete" | "skill"> & Pick<Scribe, "writeValues">
+    Pick<PiSetup, "complete" | "skill"> & Pick<Records, "writeValues">
   >({
     skill: async () => ({ path: "SKILL.md", content: "Title it.", hash: "h" }),
     complete: async () =>
@@ -55,7 +56,7 @@ function setUp(
     basics: b,
     keeper,
     enabled: over.enabled ?? true,
-    scribe: pi.port,
+    records: pi.port,
     piSetup: pi.port,
     rootedWait: 50,
   })

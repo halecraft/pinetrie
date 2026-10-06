@@ -22,12 +22,8 @@ import {
   QUEUE_HOLD,
   setRecord,
 } from "@pinetrie/rules"
-import {
-  beginRun,
-  newPlacesDoc,
-  newPresenceDoc,
-  seatKey,
-} from "@pinetrie/schema"
+import { newPlacesDoc, newPresenceDoc, seatKey } from "@pinetrie/schema"
+import { beginRun } from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
 import type { CardPort } from "./cards.ts"
 import { applyWrites, basics, putValue, record } from "./fakes.ts"
@@ -270,7 +266,7 @@ function setUp(
     provenance: createProvenance({
       basics: b,
       presence,
-      scribe: { writeValues: async w => applyWrites(b, w) },
+      records: { writeValues: async w => applyWrites(b, w) },
     }),
   }
   return { b, events, deps, appended, presence }

@@ -25,20 +25,20 @@ import {
   encodePinned,
   LANE,
   PINNED_TYPE,
-  recordsOf,
+  recordsIn,
   setRecord,
 } from "@pinetrie/rules"
 import {
-  newRootDoc,
-  newSessionDoc,
+  applyRecordWrites,
   type RootDocHandle,
   readEntries,
   readLaneNames,
-  readValues,
+  readNamespace,
   rowMessage,
   rowRetainedTail,
   type SessionDocHandle,
 } from "@pinetrie/schema"
+import { newRootDoc, newSessionDoc } from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
 import { newId } from "./agent.ts"
 import { ONE_ROOT, oneRoot } from "./one-root.ts"
@@ -155,7 +155,7 @@ describe("a pi session per root (ADR-0063)", () => {
       return known
     },
     rootOfLane: (lane: LaneName) =>
-      recordsOf(LANE, readValues(session, LANE.namespace)).get(lane)?.root ??
+      recordsIn(LANE, readNamespace(session, LANE.namespace)).get(lane)?.root ??
       null,
   })
 
@@ -180,7 +180,7 @@ describe("a pi session per root (ADR-0063)", () => {
         kind: "created",
         lane,
       })
-      await first.scribe.writeValues([
+      applyRecordWrites(session, [
         setRecord(LANE, {
           lane,
           root,

@@ -2,7 +2,7 @@
 
 Each shape pine·trie stores, and every pure rule about it: the host's
 decisions, the prompts built from it, and what the page reads of it, one
-topic per module. A shape is a host record (a pi value, `records.ts`), a pi
+topic per module. A shape is a host record (`records.ts`, ADR-0095), a pi
 custom message (chat, land, update, stack, pinned cards), or a card's record
 in the places document. pine·trie types each one here, and is its single
 authority. Nothing here does I/O or reads the clock: the host gathers, these
@@ -33,7 +33,8 @@ are core's (`trailers.ts`, `offers.ts`), since `@pinetrie/repo` reads them.
 `index.ts` exports, by name, only what another package imports; its groups
 follow this list. A name only this package uses is imported from its module.
 
-- `records.ts`, `decode.ts`: `RecordSpec` and the writes it builds; the
+- `records.ts`, `specs.ts`, `decode.ts`: `RecordSpec`, the writes it builds
+  and every spec (`RECORD_SPECS`); the
   total decoders and key readers every module uses.
 - `config.ts`: reading the user config. `request.ts`: what fits a model
   request's budget.
@@ -45,12 +46,14 @@ follow this list. A name only this package uses is imported from its module.
 - `fact.ts`, `behind.ts`, `agent-commands.ts`: what a command on an offer
   did, as a fact in the thread; the base's new work, told or caught up; the
   agent's `catch_up` and `split_offer` (ADR-0080).
+- `live.ts`: what each stream event, and a run's end and a host's start, do
+  to `pinetrie:live`, as `LiveOp`s `@pinetrie/schema`'s `applyLiveOps` writes
+  (`packages/schema/TECHNICAL.md`, Streams).
 - `card.ts`, `queue-hold.ts`, `seat.ts`, `startup.ts`: cards and their
   moves, a held queue, who wrote in a text, what a starting host resumes.
-- `board.ts`, `archive.ts`, `carry-over.ts`, `order.ts`: the board's
-  workflow states and each root's place, what crossing the closed state's
-  edge does, a store from before the board carried over, and order keys
-  (a queue's, the pinned cards' and the board's).
+- `board.ts`, `archive.ts`, `order.ts`: the board's workflow states and
+  each root's place, what crossing the closed state's edge does, and order
+  keys (a queue's, the pinned cards' and the board's).
 - `roots.ts`, `mark.ts`, `title.ts`, `stop.ts`, `digest.ts`, `verdict.ts`:
   the directory of roots, titles, who stopped a run and carrying on after
   it, an ask's digest, and how a thread's last run ended.
@@ -65,8 +68,8 @@ follow this list. A name only this package uses is imported from its module.
   host's decisions about it, the page's view of it, and the review's wire.
 
 Every module decodes through `decodeWith` (`decode.ts`), which is
-total: a malformed value is dropped, never thrown. `recordsOf` does it for a
-namespace's stored values (`records.ts`, below).
+total: a malformed value is dropped, never thrown. `recordsOf` and
+`recordsIn` do it for a namespace's stored records (`records.ts`, below).
 
 A decoder brands the ids it reads, and its `build` may refuse a value too.
 **Every lane is checked with `isLaneName`**: on a record's address for a
@@ -115,10 +118,13 @@ cannot reach the wrong document and needs no guard at run time.
 Each host record is one `RecordSpec<R, K>`: its `namespace`, `keyOf`,
 `encode` and `decode`, exported beside its type (`MARK` in `mark.ts`,
 `OFFER` in `offer.ts`). Everything else goes through the spec:
-`setRecord` and `deleteRecord` build the `ValueWrite`s the host hands
-`Scribe.writeValues`; `recordsOf` decodes a namespace's values, which
-`readRecords` in `@pinetrie/reads` reads from the document; `setIfChanged`
-writes only a record that changed.
+`setRecord` and `deleteRecord` build the `ValueWrite`s the host writes
+(`Records.writeValues`, ADR-0095), grouped by document with `byTarget`;
+`recordsIn` decodes a namespace as stored, which `readRecords` in
+`@pinetrie/reads` reads from the document; `setIfChanged` writes only a
+record that changed. `RECORD_SPECS` (`specs.ts`) lists every spec, its
+address and decoder, for a check over every record, as a migration's
+(ADR-0096); a test fails when a spec is left out of it.
 
 - **The address holds the key; the contents never repeat it.** `encode`
   leaves the key field out (`entry`, `root`, `lane`, `id`, `prompt`,
@@ -255,7 +261,7 @@ are the only code that builds or reads the shape.
   lane with cards queued for it, since no run's end will. A verdict left
   pending lost its request with the last host and is `unclassified`, unless
   its lane is resumed. What does not survive a process (runs and streams)
-  is cleared first, by `clearStreams` in `@pinetrie/schema`.
+  is cleared first (`planClear`, `live.ts`).
 
 # Cards (`card.ts`, ADR-0048, ADR-0059, ADR-0066)
 
@@ -504,11 +510,6 @@ it, and when.
 - **Order keys are `order.ts`'s**, shared with cards' queues and pins:
   fixed-width base-36, so string order is numeric order; `keyAfter`,
   `orderBetween` (null with no room), `orderKeys`.
-- **The carry-over** (`carry-over.ts`): a store with no workflow gets the
-  default one, every root a place (an old `pinetrie.archive` `archived`
-  record's root in the closed state, by who archived it, when; every other
-  root in Doing, by its first writer), and the old records deleted. It keeps
-  `ARCHIVE` itself, so both go together once it has run on Duane's store.
 
 # The archive (`archive.ts`, ADR-0029, ADR-0085)
 

@@ -7,7 +7,7 @@ import {
 } from "@pinetrie/protocol/messages"
 import { readRootRecord } from "@pinetrie/reads"
 import { ROOT, setRecord } from "@pinetrie/rules"
-import { newRootDoc } from "@pinetrie/schema"
+import { newRootDoc } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import { memoryBlobs } from "./blobs.ts"
 import { basics, putValue } from "./fakes.ts"

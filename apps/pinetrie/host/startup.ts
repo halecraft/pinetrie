@@ -2,7 +2,7 @@
 
 import type { LaneName, RootId } from "@pinetrie/core"
 import type { Keeper } from "@pinetrie/keeper"
-import type { Agent, PiSetup, Scribe } from "@pinetrie/pi"
+import type { Agent, PiSetup } from "@pinetrie/pi"
 import {
   readPlaces,
   readProject,
@@ -10,36 +10,47 @@ import {
   readSeats,
   readThreadName,
   readVerdicts,
+  readWorkflow,
 } from "@pinetrie/reads"
 import {
-  type CarryOver,
   COMMANDS,
   COMMANDS_KEY,
-  carryOverWrites,
   deleteRecord,
   PROJECT,
   planCardSweep,
+  planClear,
   planSeatSweep,
   planStartup,
+  planWorkflowSeed,
   SEAT,
   setIfChanged,
   setRecord,
   VERDICT,
 } from "@pinetrie/rules"
-import { cardIdOfDoc, clearStreams, readStoredLanes } from "@pinetrie/schema"
+import {
+  applyLiveOps,
+  cardIdOfDoc,
+  readActiveLanes,
+  readStoredLanes,
+  readStreamIds,
+} from "@pinetrie/schema"
 import type { Basics } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
 import { applyPlaceSteps } from "./places.ts"
 import type { Provenance } from "./provenance.ts"
+import type { Records } from "./records.ts"
 import type { Runs } from "./runs.ts"
 import type { LaneWork } from "./work/index.ts"
 
 export interface StartupDeps {
-  readonly basics: Pick<Basics, "session" | "docs" | "live" | "places" | "log">
+  readonly basics: Pick<
+    Basics,
+    "session" | "docs" | "live" | "places" | "log" | "newId"
+  >
   /** The roots this host opened at its start (`planLoads`): every lane that could be running. */
   readonly roots: readonly RootId[]
   readonly agent: Pick<Agent, "interrupted">
-  readonly scribe: Pick<Scribe, "writeValues">
+  readonly records: Pick<Records, "writeValues">
   /** The commands pi loaded, written as a record, and those it refused, logged. */
   readonly piSetup: Pick<PiSetup, "commands" | "refusedCommands">
   readonly work: Pick<LaneWork, "project">
@@ -51,17 +62,11 @@ export interface StartupDeps {
   readonly cards: Pick<CardPort, "texts" | "stored" | "destroyDocs">
   /** Each card's history and traces (ADR-0048 step 6), swept with the cards. */
   readonly provenance: Pick<Provenance, "sweep">
-  /**
-   * A store from before the board, carried over (ADR-0085): planned before
-   * the roots were opened, since it says which are archived, and written
-   * here, first. Null when the store has a workflow.
-   */
-  readonly carryOver: CarryOver | null
 }
 
 /**
- * In order: no stream survives a process, so clear them; write a carry-over
- * from before the board (ADR-0085); log the stored lane
+ * In order: no stream survives a process, so clear them; give a new store
+ * the default workflow (`planWorkflowSeed`); log the stored lane
  * names that are not a thread's, which no reader is given; name every lane
  * that has none (ADR-0039); resume each lane a crash interrupted, in its own
  * directory (`planStartup`); write what the host found, the commands its
@@ -72,22 +77,20 @@ export interface StartupDeps {
  * clearing the streams needs no keeper step.
  */
 export async function recover(deps: StartupDeps): Promise<void> {
-  const { agent, scribe, piSetup, work, keeper, settle } = deps
-  const { session: doc, docs, live, places, log } = deps.basics
-  clearStreams(live)
-  const { carryOver } = deps
-  if (carryOver !== null) {
-    await keeper.run(() => scribe.writeValues(carryOverWrites(carryOver)))
-    log(
-      `[host] carried the store over to the board: ${carryOver.places.length} root(s), ${carryOver.old.length} archive record(s) replaced`,
-    )
-  }
+  const { agent, records, piSetup, work, keeper, settle } = deps
+  const { session: doc, docs, live, places, log, newId } = deps.basics
+  applyLiveOps(
+    live,
+    planClear({ streams: readStreamIds(live), running: readActiveLanes(live) }),
+  )
+  const seed = planWorkflowSeed(readWorkflow(doc), newId)
+  if (seed.length > 0) await keeper.run(() => records.writeValues(seed))
   const malformed: string[] = []
   for (const root of deps.roots)
     malformed.push(...readStoredLanes(await docs.root(root)).malformed)
   if (malformed.length > 0)
     log(
-      `[host] ignoring lanes whose names are not a thread's: ${malformed.join(", ")}`,
+      `[host] ignoring stored lanes that are no thread's: ${malformed.join(", ")}`,
     )
   await deps.ensureNames()
   const planned = planStartup({
@@ -119,7 +122,7 @@ export async function recover(deps: StartupDeps): Promise<void> {
       readRecords(doc, COMMANDS).get(COMMANDS_KEY),
     ),
   ]
-  if (changed.length > 0) await keeper.run(() => scribe.writeValues(changed))
+  if (changed.length > 0) await keeper.run(() => records.writeValues(changed))
   for (const r of piSetup.refusedCommands())
     log(`[host] command ${r.name} is refused: ${r.reason}`)
   await sweepTexts(deps)
@@ -134,7 +137,7 @@ export async function recover(deps: StartupDeps): Promise<void> {
  * records are read with no await between them.
  */
 async function sweepTexts(deps: StartupDeps): Promise<void> {
-  const { scribe, cards } = deps
+  const { cards } = deps
   const { session: doc, places, log } = deps.basics
   // gather
   const texts = await cards.texts(readPlaces(places).map(c => c.id))
@@ -158,7 +161,9 @@ async function sweepTexts(deps: StartupDeps): Promise<void> {
     swept.records.map(id => ({ kind: "remove", id })),
   )
   await cards.destroyDocs(swept.docs)
-  await scribe.writeValues(staleSeats.map(s => deleteRecord(SEAT, s.peer)))
+  await deps.records.writeValues(
+    staleSeats.map(s => deleteRecord(SEAT, s.peer)),
+  )
   // The swept cards' histories, and traces too old to keep.
   await deps.provenance.sweep()
   if (swept.records.length + swept.docs.length + staleSeats.length > 0)

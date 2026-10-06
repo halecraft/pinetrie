@@ -26,7 +26,7 @@ import {
   PROJECT,
   setRecord,
 } from "@pinetrie/rules"
-import { beginRun, writeEntry, writeLaneTip } from "@pinetrie/schema"
+import { beginRun, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   basics,

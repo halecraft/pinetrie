@@ -10,8 +10,7 @@ import { queuedOn } from "./card.ts"
  * it is drained, since no run's end will. A verdict left pending lost its
  * request with the last host, and is `unclassified`, unless its lane is
  * resumed, whose run's end writes another (ADR-0077). What does not survive
- * a process (runs, streams) is cleared first, by `clearStreams` in
- * `@pinetrie/schema`.
+ * a process (runs, streams) is cleared first (`planClear`, `live.ts`).
  */
 export function planStartup(input: {
   readonly cards: readonly CardRecord[]
