@@ -5,7 +5,7 @@ import { defineConfig } from "vite"
 // `target: esnext` because the client connects with a top-level `await`
 // (`main.tsx`), which a modern browser supports natively.
 export default defineConfig({
-  // This file lives in the client package, so that directory is Vite's root.
+  // This file lives in the page's package, so that directory is Vite's root.
   root: fileURLToPath(new URL(".", import.meta.url)),
   plugins: [react()],
   // One dependency cache per React build (`pnpm run host` is production,

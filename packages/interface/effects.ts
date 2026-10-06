@@ -179,8 +179,12 @@ export interface CardFacts {
   readonly composers: ComposerPlaces
 }
 
-const layout = (action: LayoutAction): Effect => ({ kind: "layout", action })
-const list = (act: ListAct): Effect => ({ kind: "list", act })
+/** An effect on the layout, and one on your list: the constructors the planners share. */
+export const layout = (action: LayoutAction): Effect => ({
+  kind: "layout",
+  action,
+})
+export const list = (act: ListAct): Effect => ({ kind: "list", act })
 
 /** Show `here`; a root shown is opened in your list, at its end if it was not there. */
 export function show(

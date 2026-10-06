@@ -47,7 +47,8 @@ import type { Pending, Prefill, ReaderAction } from "./columns.ts"
 import {
   type Effect,
   type IntentState,
-  type ListAct,
+  layout,
+  list,
   planOpenAt,
   show,
   showRoot,
@@ -239,9 +240,6 @@ export type Intent =
 
 /** A column action on one root's columns, as `LayoutAction` carries it. */
 type RootColumnAction = Extract<LayoutAction, { kind: "columns" }>["action"]
-
-const layout = (action: LayoutAction): Effect => ({ kind: "layout", action })
-const list = (act: ListAct): Effect => ({ kind: "list", act })
 
 /**
  * The effects of `intent`. `fresh` is a new column key from the shell, as

@@ -76,14 +76,6 @@ export function rootWork(
   return work
 }
 
-const UUIDV7 = /^([0-9a-f]{8})-([0-9a-f]{4})-7[0-9a-f]{3}-/i
-
-/** A uuidv7's creation time in ms since the epoch: its first 48 bits. Null for any other id. */
-export function idTime(id: string): number | null {
-  const m = UUIDV7.exec(id)
-  return m === null ? null : Number.parseInt(`${m[1]}${m[2]}`, 16)
-}
-
 /** A root whose first message has no text, or no message yet, is called this. */
 export const NO_TEXT = "(no text)"
 

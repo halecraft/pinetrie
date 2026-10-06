@@ -1,6 +1,6 @@
-// core/fixtures — test support for core's unit tests: entries and trees,
-// their ids minted with `entryId`. Production code never imports it, and the
-// package does not export it.
+// core/fixtures — test support: entries and trees, their ids minted with
+// `entryId`. Core's tests use it, and other packages' tests as
+// `@pinetrie/core/fixtures`; production code never imports it.
 
 import { type EntryId, entryId } from "./index.ts"
 import type { AgentMessageLike, EntryLike } from "./tree.ts"

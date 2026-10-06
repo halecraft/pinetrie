@@ -2,7 +2,6 @@ import { describe, expect, test } from "vitest"
 import { entriesOf, entry } from "./fixtures.ts"
 import {
   entryId,
-  idTime,
   indexTree,
   type LaneView,
   laneNameForThread,
@@ -77,13 +76,5 @@ describe("rootWork", () => {
     expect([
       ...rootWork(index, [lane("2-a"), lane(null, { running: true })]),
     ]).toEqual([])
-  })
-})
-
-describe("idTime", () => {
-  test("a uuidv7's first 48 bits are its time; any other id has none", () => {
-    expect(idTime("01a0e436-221e-72f4-9ff0-6da939708915")).toBe(0x01a0e436221e)
-    expect(idTime("1-r1")).toBeNull()
-    expect(idTime("01a0e436-221e-42f4-9ff0-6da939708915")).toBeNull()
   })
 })
