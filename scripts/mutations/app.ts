@@ -40,7 +40,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a column draws no traces",
-    file: "packages/client/column.tsx",
+    file: "packages/web/column.tsx",
     from: "  const watches = writable && threadEnd !== null",
     to: "  const watches = false",
     suite: "browser",
@@ -60,7 +60,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the add button integrates nowhere",
-    file: "packages/client/column.tsx",
+    file: "packages/web/column.tsx",
     from: "          ? destinations[0]\n",
     to: "          ? destinations[1]\n",
     suite: "browser",
@@ -70,7 +70,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a column you open does not take focus",
-    file: "packages/client/card-editor.tsx",
+    file: "packages/web/card-editor.tsx",
     from: "    if (p.takeFocus?.() === true) box.current?.focus()",
     to: "    p.takeFocus?.()",
     suite: "browser",
@@ -80,7 +80,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a focused box puts the caret before its prefill",
-    file: "packages/client/card-editor.tsx",
+    file: "packages/web/card-editor.tsx",
     from: "          const end = e.currentTarget.value.length",
     to: "          const end = 0",
     suite: "browser",
@@ -119,7 +119,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a new column is not aligned with its fork point",
-    file: "packages/client/app.tsx",
+    file: "packages/web/app.tsx",
     from: "        alignOnOpen(el, column.key, views[i]?.forkFrom ?? null)",
     to: "        void i",
     suite: "browser",
@@ -128,7 +128,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the first column is placed after its branches are aligned",
-    file: "packages/client/app.tsx",
+    file: "packages/web/app.tsx",
     from: "      const spot = spotFor(spots.load(), ids)",
     to: "      if (i === 0) continue\n      const spot = spotFor(spots.load(), ids)",
     suite: "browser",
@@ -138,7 +138,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a fork dot takes another track's colour",
-    file: "packages/client/message.tsx",
+    file: "packages/web/message.tsx",
     from: "            style={colors.style(t)}",
     to: "            style={colors.style(t + 1)}",
     suite: "browser",
@@ -148,7 +148,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a first column keeps its alignment spacer",
-    file: "packages/client/column.tsx",
+    file: "packages/web/column.tsx",
     from: '      spacer.current.style.height = "0px"',
     to: "      void 0",
     suite: "browser",
@@ -158,7 +158,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a drag marks no gap to land in",
-    file: "packages/client/use-column-drag.ts",
+    file: "packages/web/use-column-drag.ts",
     from: '      if (before !== undefined) before.dataset.drop = "before"',
     to: "      if (before !== undefined) void before",
     suite: "browser",
@@ -168,7 +168,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a drop moves nothing",
-    file: "packages/client/use-column-drag.ts",
+    file: "packages/web/use-column-drag.ts",
     from: "      if (to !== null) move(from, to)",
     to: "      void to",
     suite: "browser",
@@ -177,7 +177,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "Escape does not cancel a drag",
-    file: "packages/client/use-column-drag.ts",
+    file: "packages/web/use-column-drag.ts",
     from: '      if (k.key !== "Escape" || drag === null) return',
     to: "      if (k.key === k.key) return",
     suite: "browser",
@@ -186,7 +186,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a column moved by its grip's keys is left out of view",
-    file: "packages/client/column.tsx",
+    file: "packages/web/column.tsx",
     from: '      ?.scrollIntoView({ block: "nearest", inline: "nearest" })',
     to: "      ?.getAttribute('data-key')",
     suite: "browser",
@@ -272,7 +272,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "an opened tool row shows its cut label and the whole one",
-    file: "packages/client/index.html",
+    file: "packages/web/index.html",
     from: "      .tool[open] > summary:has(.tool-label-whole) .tool-label { display: none; }",
     to: "      .tool[open] > summary:has(.tool-label-whole) .tool-label { }",
     suite: "browser",
@@ -282,7 +282,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a tool row never shows its whole label",
-    file: "packages/client/message.tsx",
+    file: "packages/web/message.tsx",
     from: "        {call.wholeLabel !== undefined && (",
     to: "        {call.wholeLabel === null && (",
     suite: "browser",
@@ -310,7 +310,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the screen shows me as someone else",
-    file: "packages/client/use-presence.ts",
+    file: "packages/web/use-presence.ts",
     from: "  return useMemo(() => readingAt(reading, me), [reading, me])",
     to: '  return useMemo(() => readingAt(reading, "w-nobody" as never), [reading, me])',
     suite: "browser",
@@ -329,7 +329,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "App reads typing presence again",
-    file: "packages/client/app.tsx",
+    file: "packages/web/app.tsx",
     from: "    session.cards.current,\n  )",
     to: "    session.cards.current,\n  )\n  useSelector(session.presence, d => d.typing())",
     suite: "browser",
@@ -338,7 +338,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "App reads reading presence again",
-    file: "packages/client/app.tsx",
+    file: "packages/web/app.tsx",
     from: "    session.cards.current,\n  )",
     to: "    session.cards.current,\n  )\n  useSelector(session.presence, d => d.reading())",
     suite: "browser",
@@ -348,7 +348,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a column's list is not memoised",
-    file: "packages/client/message-list.tsx",
+    file: "packages/web/message-list.tsx",
     from: "export const MessageList = memo(MessageListView, sameMessageListProps)",
     to: "export const MessageList = MessageListView",
     suite: "browser",
@@ -357,7 +357,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a new tab's rail is not styled as a rail, so the columns move",
-    file: "packages/client/rail.tsx",
+    file: "packages/web/rail.tsx",
     from: '    <nav aria-label="this thread\'s tree" className="rail">\n      <div\n        className="rail-tree"',
     to: '    <nav aria-label="this thread\'s tree" className="rail-new">\n      <div\n        className="rail-tree"',
     suite: "browser",
@@ -367,7 +367,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the rail's tree sits against its left edge",
-    file: "packages/client/index.html",
+    file: "packages/web/index.html",
     from: "      .rail-tree { position: relative; width: fit-content; margin: 0 auto; isolation: isolate; }",
     to: "      .rail-tree { position: relative; width: fit-content; isolation: isolate; }",
     suite: "browser",
@@ -376,7 +376,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a column grows to its widest line",
-    file: "packages/client/index.html",
+    file: "packages/web/index.html",
     from: "      .column-thread { flex: 0 0 28rem; width: 28rem; min-width: 0; display: flex;",
     to: "      .column-thread { flex: 0 0 28rem; display: flex;",
     suite: "browser",
@@ -386,7 +386,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a long tool label runs out of its column",
-    file: "packages/client/index.html",
+    file: "packages/web/index.html",
     from: "      .tool-label { font-family: ui-monospace, monospace; overflow-wrap: anywhere; }",
     to: "      .tool-label { font-family: ui-monospace, monospace; }",
     suite: "browser",
@@ -396,7 +396,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the column's padding does not hover its message",
-    file: "packages/client/index.html",
+    file: "packages/web/index.html",
     from: "      .msg::before { left: 100%; width: 1.75rem; }",
     to: "      .msg::before { left: 100%; width: 0; }",
     suite: "browser",
@@ -405,7 +405,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the stored identity is ignored: every load asks again",
-    file: "packages/client/main.tsx",
+    file: "packages/web/main.tsx",
     from: "  stores.identity.load() ?? stores.identity.save(await askIdentity(root))",
     to: "  stores.identity.save(await askIdentity(root))",
     suite: "browser",
@@ -424,7 +424,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a soft break is not shown",
-    file: "packages/client/index.html",
+    file: "packages/web/index.html",
     from: "      .text { white-space: pre-line;",
     to: "      .text { white-space: normal;",
     suite: "browser",
@@ -434,7 +434,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the columns are not restored",
-    file: "packages/client/app.tsx",
+    file: "packages/web/app.tsx",
     from: "    () => stores.layout.load() ?? initialLayout(),",
     to: "    initialLayout,",
     suite: "browser",
@@ -444,7 +444,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "restored columns are pruned before the document settles",
-    file: "packages/client/app.tsx",
+    file: "packages/web/app.tsx",
     from: '    if (settled)\n      dispatch({\n        kind: "prune",',
     to: '    dispatch({\n        kind: "prune",',
     suite: "browser",
@@ -456,7 +456,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the column observes only its viewport",
-    file: "packages/client/use-follow.ts",
+    file: "packages/web/use-follow.ts",
     from: "    resized.observe(inner)\n",
     to: "",
     suite: "browser",
@@ -465,7 +465,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a send does not follow",
-    file: "packages/client/column.tsx",
+    file: "packages/web/column.tsx",
     from: "    end.follow()\n    if (!fresh) return undefined\n",
     to: "    if (!fresh) return undefined\n",
     suite: "browser",
@@ -474,7 +474,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "↓ new below does nothing",
-    file: "packages/client/column.tsx",
+    file: "packages/web/column.tsx",
     from: "onClick={end.follow}",
     to: "onClick={() => {}}",
     suite: "browser",
@@ -484,7 +484,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a placement on mounting does not settle the follow",
-    file: "packages/client/app.tsx",
+    file: "packages/web/app.tsx",
     from: "const settle = (body: HTMLElement) => body.dispatchEvent(new Event(PLACED))",
     to: "const settle = (body: HTMLElement) => void body",
     suite: "browser",
@@ -494,7 +494,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a new root takes the page to it",
-    file: "packages/client/app.tsx",
+    file: "packages/web/app.tsx",
     from: "  }, [layout, stored, index, lanes, archivedRoots, list])",
     to: '  }, [layout, stored, index, lanes, archivedRoots, list])\n  const othersRoots = [...directory.values()].filter(r => r.entry !== null && !r.writers.includes(session.writer)).length\n  useEffect(() => {\n    const newest = [...directory.values()].flatMap(r => (r.entry === null || r.writers.includes(session.writer) ? [] : [r.entry])).at(-1)\n    if (newest !== undefined) dispatch({ kind: "show", here: { kind: "root", root: newest } })\n  }, [othersRoots])',
     suite: "browser",
@@ -504,7 +504,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a root's menu is drawn inside your list, which clips it",
-    file: "packages/client/popover.tsx",
+    file: "packages/web/popover.tsx",
     from: '      position: "fixed" as const,',
     to: '      position: "absolute" as const,',
     suite: "browser",
@@ -514,7 +514,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "any scroll outside a popover closes it",
-    file: "packages/client/popover.tsx",
+    file: "packages/web/popover.tsx",
     from: "        e.target.contains(trigger)\n",
     to: "        !(box.current?.contains(e.target) ?? false)\n",
     suite: "browser",
@@ -524,7 +524,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a trigger whose live data has gone takes its open menu with it",
-    file: "packages/client/popover.tsx",
+    file: "packages/web/popover.tsx",
     from: "  if (gone && !open) return null",
     to: "  if (gone) return null",
     suite: "browser",
@@ -534,7 +534,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the strip's working count pulses",
-    file: "packages/client/index.html",
+    file: "packages/web/index.html",
     from: "      .strip-working, .strip-ready { font-size: .75rem; color: #8b93a1; }",
     to: "      .strip-working, .strip-ready { font-size: .75rem; color: #8b93a1; animation: pulse 1s ease-in-out infinite; }",
     suite: "browser",
@@ -545,7 +545,7 @@ export const mutations: readonly Mutation[] = [
   // ── the board and your list (ADR-0085) ──
   {
     name: "the board opens in the flow, before the columns",
-    file: "packages/client/index.html",
+    file: "packages/web/index.html",
     from: "      #board { position: absolute; z-index: 3; left: 0; right: 0; bottom: 0; max-height: 70%;",
     to: "      #board { position: relative; order: -1; z-index: 3; left: 0; right: 0; bottom: 0; max-height: 70%;",
     suite: "browser",
@@ -555,7 +555,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a click outside the board leaves it open",
-    file: "packages/client/board.tsx",
+    file: "packages/web/board.tsx",
     from: "      if (clickClosesBoard(press, side(e.target))) close()",
     to: "      if (clickClosesBoard(press, side(e.target)) && false) close()",
     suite: "browser",
@@ -565,7 +565,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a root's drag lands nowhere",
-    file: "packages/client/use-root-drag.ts",
+    file: "packages/web/use-root-drag.ts",
     from: "      if (closed === null || landing === null) return mark(null)\n      e.preventDefault()\n",
     to: "      if (closed === null || landing === null) return mark(null)\n",
     suite: "browser",
@@ -585,7 +585,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the root you are on is your list's colour",
-    file: "packages/client/index.html",
+    file: "packages/web/index.html",
     from: "      .open-item[data-selected] { background: var(--page); --surface: var(--page);",
     to: "      .open-item[data-selected] { background: var(--chrome); --surface: var(--page);",
     suite: "browser",
@@ -595,7 +595,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a root's mark pulses while its agent works",
-    file: "packages/client/index.html",
+    file: "packages/web/index.html",
     from: "      .root-status.working { border: 1.5px solid #9ecbff; }",
     to: "      .root-status.working { border: 1.5px solid #9ecbff; animation: pulse 1s ease-in-out infinite; }",
     suite: "browser",
@@ -605,7 +605,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "Escape closes the board under a menu open on it",
-    file: "packages/client/board.tsx",
+    file: "packages/web/board.tsx",
     from: '      if (e.key === "Escape" && self.current?.querySelector(".open") == null)',
     to: '      if (e.key === "Escape")',
     suite: "browser",
@@ -615,7 +615,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "Escape leaves a popover open once its focused item has gone",
-    file: "packages/client/popover.tsx",
+    file: "packages/web/popover.tsx",
     from: "        at !== document.body &&",
     to: "        true &&",
     suite: "browser",
@@ -625,7 +625,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a capsule ignores where it is clicked",
-    file: "packages/client/rail.tsx",
+    file: "packages/web/rail.tsx",
     from: "        p.onPick(pickAt(stretch.ids, at))",
     to: "        p.onPick(pickAt(stretch.ids, at === null ? null : 0))",
     suite: "browser",
@@ -635,7 +635,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a stretch is drawn as one dot",
-    file: "packages/client/rail.tsx",
+    file: "packages/web/rail.tsx",
     from: "      data-count={stretch.ids.length}",
     to: "      data-count={1}",
     suite: "browser",
@@ -645,7 +645,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the inbox badge never hears of unseen mentions",
-    file: "packages/client/app.tsx",
+    file: "packages/web/app.tsx",
     from: "  const needsYou = inboxCount(attention.items, inbox.unseen)",
     to: "  const needsYou = inboxCount(attention.items, 0)",
     suite: "browser",
@@ -655,7 +655,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "seen mentions are never written to your attention document",
-    file: "packages/client/use-inbox.ts",
+    file: "packages/web/use-inbox.ts",
     from: "      if (next !== from) attention.setInbox(next)",
     to: "      if (next !== from) return",
     suite: "browser",
@@ -665,7 +665,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the chip hides its choice",
-    file: "packages/client/card-editor.tsx",
+    file: "packages/web/card-editor.tsx",
     from: '            {whereWords(\n              p.work,\n              p.project,\n              p.work.kind === "own" ? p.base : null,\n            )}\n',
     to: "",
     suite: "browser",
@@ -673,10 +673,10 @@ export const mutations: readonly Mutation[] = [
     expect:
       "the chip says where the new thread's agent works, and the menu changes it",
   },
-  // ── your profile (packages/client/profile.tsx, ADR-0037) ──────────────
+  // ── your profile (packages/web/profile.tsx, ADR-0037) ──────────────
   {
     name: "the handle hint is never shown",
-    file: "packages/client/name-input.tsx",
+    file: "packages/web/name-input.tsx",
     from: "  const hint = nameHint(value)",
     to: '  const hint = nameHint("")',
     suite: "browser",
@@ -685,7 +685,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the profile closes on a refused name, saying nothing",
-    file: "packages/client/profile.tsx",
+    file: "packages/web/profile.tsx",
     from: '              if (plan.kind === "refuse") {',
     to: '              if (plan.kind === "refuse" && draft === "") {',
     suite: "browser",
@@ -695,7 +695,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the profile's save closes without renaming",
-    file: "packages/client/profile.tsx",
+    file: "packages/web/profile.tsx",
     from: "                const problem = renameProblem(await rename(plan.name))",
     to: '                const problem = renameProblem({ kind: "named" })',
     suite: "browser",
@@ -705,7 +705,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "your avatar is drawn as a person",
-    file: "packages/client/profile.tsx",
+    file: "packages/web/profile.tsx",
     from: '          className="me"',
     to: '          className="avatar"',
     suite: "browser",
@@ -714,7 +714,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "this device's name and the session's agree only once, at settle",
-    file: "packages/client/app.tsx",
+    file: "packages/web/app.tsx",
     from: "  }, [settled, myName, session, stores, run])",
     to: "  }, [settled, session, stores, run])",
     suite: "browser",
@@ -723,7 +723,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the origin row goes nowhere",
-    file: "packages/client/column.tsx",
+    file: "packages/web/column.tsx",
     from: "      onClick={() => onOpen(origin.at)}",
     to: "      onClick={() => {}}",
     suite: "browser",
@@ -732,7 +732,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a new column's header ignores its composer",
-    file: "packages/client/card-editor.tsx",
+    file: "packages/web/card-editor.tsx",
     from: "    () => onCreatesLane?.(plan.createsLane),",
     to: "    () => onCreatesLane?.(false),",
     suite: "browser",
@@ -742,7 +742,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the hover outline is the text colour",
-    file: "packages/client/index.html",
+    file: "packages/web/index.html",
     from: "        outline: 2px solid var(--track); outline-offset: 2px; }",
     to: "        outline: 2px solid currentColor; outline-offset: 2px; }",
     suite: "browser",
@@ -753,7 +753,7 @@ export const mutations: readonly Mutation[] = [
   // ── a message's tools (ADR-0043) ──
   {
     name: "→ sits a line below the other tools",
-    file: "packages/client/index.html",
+    file: "packages/web/index.html",
     from: "      .tools .branch { color: #9ecbff; }",
     to: "      .tools .branch { color: #9ecbff; position: relative; top: 1.1rem; }",
     suite: "browser",
@@ -762,7 +762,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the row has no copy",
-    file: "packages/client/message.tsx",
+    file: "packages/web/message.tsx",
     from: "      {tools.copy && <CopyButton node={node} />}",
     to: "",
     suite: "browser",
@@ -771,7 +771,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "copy puts the drawn text on the clipboard",
-    file: "packages/client/message.tsx",
+    file: "packages/web/message.tsx",
     from: "        copy(copyText(node), [",
     to: '        copy(e.currentTarget.closest(".msg")?.querySelector(":scope > .text")?.textContent ?? "", [',
     suite: "browser",
@@ -780,7 +780,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "copy leaves out a message's tool calls",
-    file: "packages/client/message.tsx",
+    file: "packages/web/message.tsx",
     from: "        copy(copyText(node), [",
     to: "        copy(node.text, [",
     suite: "browser",
@@ -789,7 +789,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "with no clipboard, copy does nothing",
-    file: "packages/client/copy.ts",
+    file: "packages/web/copy.ts",
     from: "    if (clipboard?.writeText === undefined) return selectContents(fallback)",
     to: "    if (clipboard?.writeText === undefined) return",
     suite: "browser",
@@ -798,7 +798,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a row holding only copy is not drawn",
-    file: "packages/client/message.tsx",
+    file: "packages/web/message.tsx",
     from: "  if (!tools.copy && edit === undefined && branch === undefined) return null",
     to: "  if (edit === undefined && branch === undefined) return null",
     suite: "browser",
@@ -808,7 +808,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a paste of images keeps the browser's default",
-    file: "packages/client/card-editor.tsx",
+    file: "packages/web/card-editor.tsx",
     from: "          if (files.length === 0) return\n          e.preventDefault()",
     to: "          if (files.length === 0) return\n          void e",
     suite: "browser",
@@ -818,7 +818,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a click on a blob image opens a new tab",
-    file: "packages/client/blob-image.tsx",
+    file: "packages/web/blob-image.tsx",
     from: '        if (imageClick(e) === "tab") {',
     to: "        if (true) {",
     suite: "browser",
@@ -828,7 +828,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the pane is sized against the window",
-    file: "packages/client/index.html",
+    file: "packages/web/index.html",
     from: "width: clamp(40rem, 100cqw - 28rem - 1px, 64rem);",
     to: "width: clamp(40rem, 100vw - 36rem, 64rem);",
     suite: "browser",
@@ -838,7 +838,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "folding the list leaves its width",
-    file: "packages/client/index.html",
+    file: "packages/web/index.html",
     from: '      :root[data-list="icons"] { --side: 3rem; }',
     to: "",
     suite: "browser",
@@ -848,7 +848,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a table's header row scrolls away in the pane",
-    file: "packages/client/index.html",
+    file: "packages/web/index.html",
     from: "      .pane-table thead th { position: sticky; top: 0;",
     to: "      .pane-table thead th { top: 0;",
     suite: "browser",
@@ -858,7 +858,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the pane is never narrow",
-    file: "packages/client/use-narrow.ts",
+    file: "packages/web/use-narrow.ts",
     from: "    const measure = () => setNarrow(narrowStrip(el.clientWidth, remPx()))",
     to: "    const measure = () => setNarrow(false)",
     suite: "browser",
@@ -868,7 +868,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the column does not know who you are",
-    file: "packages/client/column.tsx",
+    file: "packages/web/column.tsx",
     from: "            reader={{ me: p.session.writer, nameOf: p.nameOf }}\n            prefill={p.column.fresh?.prefill}",
     to: '            reader={{ me: "w-nobody" as WriterId, nameOf: p.nameOf }}\n            prefill={p.column.fresh?.prefill}',
     suite: "browser",
@@ -878,7 +878,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the layout drawn is the stored one, a render behind the document",
-    file: "packages/client/app.tsx",
+    file: "packages/web/app.tsx",
     from: '  const layout = useMemo(\n    () =>\n      resolveLayout(stored, { index, lanes, archived: archivedRoots, list }),\n    [stored, index, lanes, archivedRoots, list],\n  )\n  useEffect(() => {\n    if (layout !== stored)\n      dispatch({ kind: "resolve", index, lanes, archived: archivedRoots, list })\n  }, [layout, stored, index, lanes, archivedRoots, list])',
     to: '  const layout = stored\n  useEffect(\n    () => dispatch({ kind: "resolve", index, lanes, archived: archivedRoots, list }),\n    [index, lanes, archivedRoots, list],\n  )',
     suite: "browser",
@@ -887,7 +887,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "live work is drawn a render behind the document",
-    file: "packages/client/app.tsx",
+    file: "packages/web/app.tsx",
     from: "  const shared = {\n    activity,\n    asks,\n    folds,\n    stops,\n    live,\n",
     // A frame behind, not a render: a render's passive effect can be
     // flushed before paint by a later update in the same frame.
@@ -899,7 +899,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a following column has no floor",
-    file: "packages/client/column.tsx",
+    file: "packages/web/column.tsx",
     from: "    { floor, holding: streamingLanes.length > 0 },",
     to: "    undefined,",
     suite: "browser",
@@ -909,7 +909,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a row never reveals itself",
-    file: "packages/client/message.tsx",
+    file: "packages/web/message.tsx",
     from: "      () => setMemory(m => ({ ...m, revealed: true })),",
     to: "      () => {},",
     suite: "browser",
@@ -919,7 +919,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a row mounted again forgets how it was left",
-    file: "packages/client/message.tsx",
+    file: "packages/web/message.tsx",
     from: "  const [memory, setState] = useState(() => rows.get(id) ?? NO_MEMORY)",
     to: "  const [memory, setState] = useState(() => NO_MEMORY)",
     suite: "browser",
@@ -929,7 +929,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a column's mark never pulses",
-    file: "packages/client/column.tsx",
+    file: "packages/web/column.tsx",
     from: "                running={running}\n                working={working}",
     to: "                running={false}\n                working={working}",
     suite: "browser",
@@ -939,7 +939,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the working line takes height",
-    file: "packages/client/index.html",
+    file: "packages/web/index.html",
     from: "      .working-line { height: 0; width: 3rem;",
     to: "      .working-line { height: 2px; width: 3rem;",
     suite: "browser",
@@ -949,7 +949,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the line hides for any running row",
-    file: "packages/client/index.html",
+    file: "packages/web/index.html",
     from: "      .column-content:has(.tool.live[data-revealed]) .working-line {",
     to: "      .column-content:has(.tool.live) .working-line {",
     suite: "browser",
@@ -959,7 +959,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a revealed row is never marked revealed",
-    file: "packages/client/message.tsx",
+    file: "packages/web/message.tsx",
     from: "      data-revealed={revealed || undefined}",
     to: "      data-revealed={undefined}",
     suite: "browser",
@@ -969,7 +969,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a running row's ring hugs the row, off-centre in its column",
-    file: "packages/client/index.html",
+    file: "packages/web/index.html",
     from: "        inset: -4px calc(-1rem - 4px) -4px -4px; border: 1px solid transparent;",
     to: "        inset: -4px; border: 1px solid transparent;",
     suite: "browser",
@@ -979,7 +979,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the result is a new element",
-    file: "packages/client/message.tsx",
+    file: "packages/web/message.tsx",
     from: "        <ToolOutput doc={doc} result={call.result?.text} stream={live} />",
     to: '        <ToolOutput doc={doc} key={call.result === undefined ? "live" : "result"} result={call.result?.text} stream={live} />',
     suite: "browser",
@@ -989,7 +989,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a capped row is uncapped",
-    file: "packages/client/index.html",
+    file: "packages/web/index.html",
     from: '      .tool[data-size="capped"] .tool-output { max-height: 10rem; }',
     to: '      .tool[data-size="capped"] .tool-output { }',
     suite: "browser",
@@ -999,7 +999,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the summary toggles natively",
-    file: "packages/client/message.tsx",
+    file: "packages/web/message.tsx",
     from: "          e.preventDefault()\n",
     to: "",
     suite: "browser",
@@ -1009,7 +1009,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a column forgets its end on unmount",
-    file: "packages/client/use-follow.ts",
+    file: "packages/web/use-follow.ts",
     from: '      window.removeEventListener("pagehide", left)\n      left()\n',
     to: '      window.removeEventListener("pagehide", left)\n',
     suite: "browser",
@@ -1019,7 +1019,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "App re-reads its facts on every render",
-    file: "packages/client/app.tsx",
+    file: "packages/web/app.tsx",
     from: "  } = useSelector(heldView, readSessionFacts)",
     to: "  } = useSelector(heldView, v => readSessionFacts(v))",
     suite: "browser",
@@ -1028,7 +1028,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "nameOf re-read on every render",
-    file: "packages/client/app.tsx",
+    file: "packages/web/app.tsx",
     from: "  const nameOf = useSelector(doc, readParticipantNames)",
     to: "  const nameOf = useSelector(doc, d => readParticipantNames(d))",
     suite: "browser",
@@ -1037,7 +1037,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "Message is not memoised",
-    file: "packages/client/message.tsx",
+    file: "packages/web/message.tsx",
     from: "export const Message = memo(MessageView, sameMessageProps)",
     to: "export const Message = MessageView",
     suite: "browser",
@@ -1046,7 +1046,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a file's head scrolls away",
-    file: "packages/client/index.html",
+    file: "packages/web/index.html",
     from: "      .review-file-head { position: sticky; top: 0; z-index: 1;",
     to: "      .review-file-head { z-index: 1;",
     suite: "browser",
@@ -1056,7 +1056,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "typing redraws the review",
-    file: "packages/client/review-pane.tsx",
+    file: "packages/web/review-pane.tsx",
     from: "  sameProps<ReviewPaneProps>(REVIEW_PANE_PROPS),",
     to: "  () => false,",
     suite: "browser",
@@ -1095,7 +1095,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a column's header draws no banner",
-    file: "packages/client/column.tsx",
+    file: "packages/web/column.tsx",
     from: "                banner={shows.banner}\n                detailsId",
     to: "                banner={null}\n                detailsId",
     suite: "browser",
@@ -1105,7 +1105,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the star shows under a banner",
-    file: "packages/client/column.tsx",
+    file: "packages/web/column.tsx",
     from: '      <span className="thread-star" data-gone={loaded || !fade || undefined}>',
     to: '      <span className="thread-star">',
     suite: "browser",
@@ -1115,7 +1115,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the thread's mark is only as big as its star",
-    file: "packages/client/index.html",
+    file: "packages/web/index.html",
     from: "      .thread-mark { position: relative; flex: 0 0 auto; width: 1.5rem; height: 1.5rem;",
     to: "      .thread-mark { position: relative; flex: 0 0 auto;",
     suite: "browser",
@@ -1135,7 +1135,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a tool row draws its caption, not its image",
-    file: "packages/client/message.tsx",
+    file: "packages/web/message.tsx",
     from: '      {size === "closed" ? null : body.kind === "images" ? (',
     to: '      {size === "closed" ? null : body.kind === "never" ? (',
     suite: "browser",
@@ -1204,7 +1204,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the marks read each card's text once",
-    file: "packages/client/use-filled-cards.ts",
+    file: "packages/web/use-filled-cards.ts",
     from: "      return subscribe(doc, read)",
     to: "      return () => {}",
     suite: "browser",
@@ -1213,7 +1213,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the marks are given no archived roots",
-    file: "packages/client/app.tsx",
+    file: "packages/web/app.tsx",
     from: "        archived: archivedRoots,\n        lanes,",
     to: "        archived: new Set(),\n        lanes,",
     suite: "browser",
@@ -1412,7 +1412,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a column never asks the host to name its reservation",
-    file: "packages/client/column.tsx",
+    file: "packages/web/column.tsx",
     from: '      void p.session.request({ kind: "reserve", lane: step.lane })',
     to: "      void step.lane",
     suite: "browser",
@@ -1451,7 +1451,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the ask bar takes room",
-    file: "packages/client/index.html",
+    file: "packages/web/index.html",
     from: "      .ask-bar-slot { position: sticky; top: -.75rem; height: 0; z-index: 2; }",
     to: "      .ask-bar-slot { position: sticky; top: -.75rem; height: 1.5rem; z-index: 2; }",
     suite: "browser",
@@ -1460,7 +1460,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a hidden page leaves no mark where its threads were",
-    file: "packages/client/use-follow.ts",
+    file: "packages/web/use-follow.ts",
     from: '    document.addEventListener("visibilitychange", hidden)\n',
     to: "",
     suite: "browser",
@@ -1470,7 +1470,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the column passes its asks no last ended one",
-    file: "packages/client/message-list.tsx",
+    file: "packages/web/message-list.tsx",
     from: "          lastEnded,\n",
     to: "          lastEnded: null,\n",
     suite: "browser",
@@ -1480,7 +1480,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "an ask's work never folds",
-    file: "packages/client/ask-work.tsx",
+    file: "packages/web/ask-work.tsx",
     from: "  const open = foldOpen({",
     to: "  const open = true || foldOpen({",
     suite: "browser",
@@ -1520,7 +1520,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "queued cards are not drawn",
-    file: "packages/client/column.tsx",
+    file: "packages/web/column.tsx",
     from: "              {queued.map((c, n) =>",
     to: "              {queued.slice(0, 0).map((c, n) =>",
     suite: "browser",
@@ -1540,7 +1540,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a column's outline does not move as the column scrolls",
-    file: "packages/client/use-viewport.ts",
+    file: "packages/web/use-viewport.ts",
     from: '    el.addEventListener("scroll", schedule, { passive: true })',
     to: "    void schedule",
     suite: "browser",
@@ -1550,7 +1550,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the rail does not follow a column's outline",
-    file: "packages/client/rail.tsx",
+    file: "packages/web/rail.tsx",
     from: "    rail.scrollTop = to\n",
     to: "    void to\n",
     suite: "browser",
@@ -1559,7 +1559,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the rail follows a column's outline under the pointer",
-    file: "packages/client/rail.tsx",
+    file: "packages/web/rail.tsx",
     from: "    const since = over.current ? 0 : performance.now() - reader.current",
     to: "    const since = performance.now() - reader.current",
     suite: "browser",
@@ -1568,7 +1568,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the rail draws no tick",
-    file: "packages/client/rail.tsx",
+    file: "packages/web/rail.tsx",
     from: "      {ticks.map(t => (",
     to: "      {ticks.slice(0, 0).map(t => (",
     suite: "browser",
@@ -1578,7 +1578,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a tick is drawn as a block down its capsule",
-    file: "packages/client/rail.tsx",
+    file: "packages/web/rail.tsx",
     from: "  const height = Math.max(2, (t.to - t.from) * length)",
     to: "  const height = Math.max(2, length / 2)",
     suite: "browser",
@@ -1588,7 +1588,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a column leaving keeps no spot",
-    file: "packages/client/column.tsx",
+    file: "packages/web/column.tsx",
     from: "      p.spots.save(\n",
     to: "      p.spots.load(\n",
     suite: "browser",
@@ -1648,7 +1648,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the page hears no keys",
-    file: "packages/client/app.tsx",
+    file: "packages/web/app.tsx",
     from: '    document.addEventListener("keydown", onKey)\n',
     to: "",
     suite: "browser",
@@ -1658,7 +1658,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a column publishes no composer place",
-    file: "packages/client/column.tsx",
+    file: "packages/web/column.tsx",
     from: "    composers.set(key, writable ? (place ?? null) : null)",
     to: "    composers.set(key, null)",
     suite: "browser",
@@ -1668,7 +1668,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the page undoes no move",
-    file: "packages/client/app.tsx",
+    file: "packages/web/app.tsx",
     from: "            composers: composers.current(),\n          },\n          rootEntries,",
     to: "            composers: composers.current(),\n          },\n          rootEntries: new Map(),",
     suite: "browser",
@@ -1678,7 +1678,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a drop asks for nothing",
-    file: "packages/client/app.tsx",
+    file: "packages/web/app.tsx",
     from: '      onIntent({ kind: "put", card: cardId(card), target })',
     to: "",
     suite: "browser",
@@ -1687,7 +1687,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "keep in inventory only closes",
-    file: "packages/client/column.tsx",
+    file: "packages/web/column.tsx",
     from: '                  act({ kind: "keep", cards: askClose })',
     to: '                  act({ kind: "close", discard: [] })',
     suite: "browser",
@@ -1792,7 +1792,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "Auto-update title in a root's ⋯ sends nothing",
-    file: "packages/client/open-list.tsx",
+    file: "packages/web/open-list.tsx",
     from: '        label: "Auto-update title",\n        onChoose: () => onIntent(item.intent),',
     to: '        label: "Auto-update title",\n        onChoose: () => {},',
     suite: "browser",
@@ -1820,7 +1820,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the pinned strip is drawn at the column's foot",
-    file: "packages/client/index.html",
+    file: "packages/web/index.html",
     from: "      .pinned-strip { max-height: 30vh;",
     to: "      .pinned-strip { position: absolute; bottom: 0; max-height: 30vh;",
     suite: "browser",
@@ -1830,7 +1830,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "+ card leaves focus on its button",
-    file: "packages/client/card-editor.tsx",
+    file: "packages/web/card-editor.tsx",
     from: '    setStatus("")\n    box.current?.focus()',
     to: '    setStatus("")',
     suite: "browser",
@@ -1840,7 +1840,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "Enter in a + pin box sends",
-    file: "packages/client/card-editor.tsx",
+    file: "packages/web/card-editor.tsx",
     from: '            if (e.key !== "Escape") return\n',
     to: '            if (e.key === "Enter") return void submit()\n            if (e.key !== "Escape") return\n',
     suite: "browser",
@@ -1850,7 +1850,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a run's prompt draws no marker of the pinned cards it read",
-    file: "packages/client/message-list.tsx",
+    file: "packages/web/message-list.tsx",
     from: "        pinned={markers.get(node.id)}",
     to: "        pinned={undefined}",
     suite: "browser",
@@ -1881,7 +1881,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a queued card's box is keyed by its place in line",
-    file: "packages/client/column.tsx",
+    file: "packages/web/column.tsx",
     from: "                    among={queued}\n                    card={c}\n                    key={c.id}\n",
     to: "                    among={queued}\n                    card={c}\n                    key={n}\n",
     suite: "browser",
@@ -1891,7 +1891,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "unqueue all does nothing on the page",
-    file: "packages/client/column.tsx",
+    file: "packages/web/column.tsx",
     from: '          onClick={() => p.onAct({ kind: "unqueueAll", lane })}',
     to: "          onClick={() => {}}",
     suite: "browser",

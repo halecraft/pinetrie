@@ -18,9 +18,10 @@ Where a rule lives, as `@pinetrie/core` and `@pinetrie/repo` state it too:
 > write or name lives in core too, since neither can declare
 > `@pinetrie/rules`. What a stored shape says, and how the host changes it,
 > is `@pinetrie/rules`', whoever reads it. One client's own in-flight state
-> (its moves, held roots, slot repair, commands out) is its session's
-> (`connectSession`, in `@pinetrie/client` for now). What the page draws,
-> and its words, is `@pinetrie/client`'s.
+> (its moves, held roots, slot repair, commands out) is
+> `@pinetrie/session`'s. What a person sees and can do, and its words, is
+> `@pinetrie/interface`'s, for any client; how the page draws it is
+> `@pinetrie/web`'s (ADR-0093).
 
 So `planStop` is here beside `STOP`, and `agentByDefault` beside
 `addressChat`; `address`, `parseMentions` and `moveOf`, which know no
@@ -166,7 +167,7 @@ are the only code that builds or reads the shape.
 - **`addressChat` is the one rule for who a chat is for:** `address` with
   `agentByDefault`, and a command for the agent whoever else it names
   (ADR-0036), keeping the people it names. `planChat` runs it on the host, and
-  the composer's `planSend` (`packages/client/send.ts`) runs it before a send,
+  the composer's `planSend` (`packages/interface/send.ts`) runs it before a send,
   so the button's promise and the host's decision cannot drift apart.
 - **`planChat` decides what a message does** (ADR-0020), over the thread
   `threadOf` gives, and names exactly where to write:
@@ -614,7 +615,7 @@ headline is a digest with nothing to draw. No agent reads it.
   `reading`) and `DIGEST_EVERY` has passed; at the end, once, for the
   final one.
 - **`planDigest`** is the decision and the request's parts: a long ask only
-  (`isLongAsk`, core, the rail's capsule rule), then `digestDue`, then the
+  (`isLongAsk`, core's `LONG_ASK`, which the rail draws as a capsule of its own), then `digestDue`, then the
   ask's message as one line, its run's messages walked up from the run's
   last entry (`AskIndex.last`) and kept to the ask's own, and its last word
   (`lastWord`) apart from them as `shown`, since the reader sees it after
@@ -851,7 +852,7 @@ commit-message request `request.ts` (`describeRequest`).
   are made from (`OfferFacts`: files, size, conflicts, bookmark, held, the
   base as `effectiveBase` gives it, the catch-up, untraced, …). It writes
   no words: the line and the button labels are the client's (`offerWords`,
-  `@pinetrie/client`, ADR-0040). A resolution that asked for you counts only
+  `@pinetrie/interface`, ADR-0040). A resolution that asked for you counts only
   when newer than the offer. A held offer is `nothing`, with no
   destinations. When catching up `brings`, or the thread is untraced,
   catching up moves from the menu to the buttons; when it is `current` or

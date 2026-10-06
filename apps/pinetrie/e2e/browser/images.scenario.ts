@@ -2,7 +2,7 @@
 // in the column's pane, as a table is (ADR-0078), and a tool's image, drawn
 // in its row, which opens capped (ADR-0051).
 
-import { UPLOADING } from "@pinetrie/client/send"
+import { UPLOADING } from "@pinetrie/interface"
 import { scriptedModel, sha256Of } from "@pinetrie/pi"
 import type { Page } from "@playwright/test"
 import type { Checks } from "../checks.ts"

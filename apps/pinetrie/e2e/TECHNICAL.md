@@ -52,7 +52,7 @@ They share `checks.ts` (recording a check, and stopping at one),
   stack's (pi, Kyneta, the store, a restart, a websocket, `startHost`'s
   wiring), or the browser's (focus and the caret, geometry, CSS, scrolling,
   render counts, the device's storage, a reload). A rule decided in a pure
-  function is proven by its unit test (`packages/client/TECHNICAL.md`,
+  function is proven by its unit test (`packages/interface/TECHNICAL.md`,
   "Views decide, intents act"), and its suite check is deleted. To tell
   which: write the deliberate bug, and run it `--against` the unit tests
   (`AGENTS.md`, Gates).
@@ -78,7 +78,7 @@ They share `checks.ts` (recording a check, and stopping at one),
 - **A browser check stays only while it proves what only a browser shows:**
   focus and the caret, geometry, CSS, scrolling, render counts, a real
   Kyneta round trip, the device's storage. A rule decided in a pure
-  function is proven by its unit test (`packages/client/TECHNICAL.md`,
+  function is proven by its unit test (`packages/interface/TECHNICAL.md`,
   "Views decide, intents act"), and the browser check for it is deleted. Keep
   the actions a later step depends on, and the waits that let it start.
 

@@ -58,7 +58,7 @@ export type OfferActivity =
 /**
  * One state of a lane's offer, what can be done in it (ADR-0038's table), and
  * the facts its words are made from. The words are the client's
- * (`offerWords`, `@pinetrie/client`).
+ * (`offerWords`, `@pinetrie/interface`).
  */
 export interface OfferView {
   readonly state:

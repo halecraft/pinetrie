@@ -9,7 +9,7 @@
 // The composer promises "send" or "queue" from the same facts the host then
 // decides from. If the two read those facts separately, the promise holds only
 // while two copies stay in step, which is the drift this project keeps
-// meeting. So both read here. `packages/client/projection.ts` gathers these
+// meeting. So both read here. `packages/interface/projection.ts` gathers these
 // for the page; a stream's text is `readStreams`, in `@pinetrie/schema`.
 //
 // Pure reads of a document handle: no subscription and no pi. The only caches

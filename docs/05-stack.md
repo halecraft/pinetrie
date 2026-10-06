@@ -123,7 +123,7 @@ error, and a modern browser needs no TLA rewrite (`target: esnext` instead).
 
 ### D4 — React + `@kyneta/react` ✅ recommend
 
-**DONE.** `packages/client/app.tsx` is a React tree; the `innerHTML` rebuild is gone.
+**DONE.** `packages/web/app.tsx` is a React tree; the `innerHTML` rebuild is gone.
 It renders from the SAME Exchange `connectSession` owns, handed to
 `ExchangeProvider`, so Node and browser share one connection story.
 
@@ -290,7 +290,7 @@ Three consequences, all now handled:
 | D1 | TypeScript | ✅ **done** — all `.ts`/`.tsx`, 0 `.mjs` source, `tsc --noEmit` clean (WS2) |
 | D2 | pnpm, standalone | ✅ **done** — `link:` deps, `relink.sh` deleted, pi pinned 0.87.1 |
 | D3 | Vite | ✅ **done** — middleware mode on the shared server; `/ws` guard verified; esbuild + MIME map + wasm-copy deleted |
-| D4 | React + `@kyneta/react` | ✅ **done** — `packages/client/app.tsx`; `useText` still unused (roadmap step 5) |
+| D4 | React + `@kyneta/react` | ✅ **done** — `packages/web/app.tsx`; `useText` still unused (roadmap step 5) |
 | D5 | Vitest | ✅ **done** — replaced `node --test` |
 | D6 | Biome | ✅ **done** — Kyneta's settings; caught a real lint bug on day one |
 | D8 | `verify` cascade | ✅ **done** — `lint → check → sanity → test → conformance → e2e` |

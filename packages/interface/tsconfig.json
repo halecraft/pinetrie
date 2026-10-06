@@ -1,0 +1,10 @@
+{
+  // The interface draws nothing, so it is type-checked without the DOM: a
+  // `window`, a `document` or a DOM member here fails (ADR-0093, S115). The
+  // root's config, which includes the DOM, checks it as well; this one is
+  // run beside it by `pnpm run typecheck`.
+  "extends": "../../tsconfig.json",
+  "compilerOptions": { "lib": ["ESNext"] },
+  "include": ["."],
+  "exclude": ["node_modules"]
+}

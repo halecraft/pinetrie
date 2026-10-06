@@ -4,7 +4,7 @@
 // says which slot holds each. Your tabs write that document at once, so each
 // repairs it from the host's record, writing only what differs (S76). One
 // rule, `settleSlots`, says what the slots should be: the repair writes it,
-// the page's panel draws it (`inventoryView`, `@pinetrie/client`), and a take
+// the page's panel draws it (`inventoryView`, `@pinetrie/interface`), and a take
 // into the inventory lands by the same `firstEmpty`, so what is drawn and
 // what is written cannot differ. A take into the inventory this tab has in
 // flight is an intent: drawn in the slot it chose, and left alone by the

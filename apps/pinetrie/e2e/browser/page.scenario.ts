@@ -2,10 +2,6 @@
 // branches and their columns, moving them, tabs, the header and the inbox,
 // the composer and cards, a second window, and a reload.
 
-import { COPIED } from "@pinetrie/client/copy"
-import { readerHeading } from "@pinetrie/client/here"
-import { IDENTITY_KEY, identityCodec } from "@pinetrie/client/identity"
-import { type ButtonWords, queueWords } from "@pinetrie/client/send"
 import {
   atEntry,
   cardId,
@@ -18,6 +14,12 @@ import {
   ROOT,
   writerId,
 } from "@pinetrie/core"
+import {
+  type ButtonWords,
+  identityCodec,
+  queueWords,
+  readerHeading,
+} from "@pinetrie/interface"
 import { SCRIPTED_DESCRIPTION } from "@pinetrie/pi"
 import {
   readBoardPlaces,
@@ -32,6 +34,8 @@ import {
   readWorkflow,
 } from "@pinetrie/reads"
 import { titleOf } from "@pinetrie/rules"
+import { COPIED } from "@pinetrie/web/copy"
+import { IDENTITY_KEY } from "@pinetrie/web/storage-keys"
 import type { Page } from "@playwright/test"
 import type { Checks } from "../checks.ts"
 import {

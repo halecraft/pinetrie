@@ -7,7 +7,6 @@
 import { execFileSync } from "node:child_process"
 import { existsSync, rmSync } from "node:fs"
 import path from "node:path"
-import { workingWords } from "@pinetrie/client/column-view"
 import {
   atEntry,
   entryId,
@@ -17,6 +16,7 @@ import {
   type ThreadName,
   toolLabel,
 } from "@pinetrie/core"
+import { workingWords } from "@pinetrie/interface"
 import { scriptedModel } from "@pinetrie/pi"
 import {
   readLaneRecords,

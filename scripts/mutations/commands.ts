@@ -72,10 +72,10 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "completion matches only the package",
-    file: "packages/client/commands.ts",
+    file: "packages/interface/commands.ts",
     from: "    return wanted.every(w => parts.some(p => p.includes(w)))",
     to: '    return wanted.every(w => (parts[0] ?? "").includes(w))',
-    command: vitest("packages/client/commands.test.ts"),
+    command: vitest("packages/interface/commands.test.ts"),
     expect: "a name typed alone finds it in every package",
   },
   {

@@ -6,9 +6,8 @@
 // it runs (S21), so nothing a person wrote sits inside a run: only the
 // host's news is steered in (`steered`, ADR-0080).
 //
-// The column folds each ask's work (`segmentPath`), and the rail compacts the
-// same stretches (`compactRail`): both draw `railLandmarks` apart, so a fold
-// never hides what the rail draws on its own.
+// What a column folds of each ask's work, and the rail's capsules, are the
+// interface's (`segmentPath`, `compactRail`, `@pinetrie/interface`).
 
 import {
   atEntry,
@@ -20,12 +19,9 @@ import {
 } from "./index.ts"
 import {
   type EntryLike,
-  MIN_STRETCH,
   messageText,
   startsRun,
-  statsOf,
   type TreeIndex,
-  type WorkStats,
 } from "./tree.ts"
 import { nearestRevision } from "./work.ts"
 
@@ -62,17 +58,6 @@ export type AskOutcome =
    */
   | { readonly kind: "stopped"; readonly by: WriterId | null }
   | { readonly kind: "failed"; readonly error: string }
-
-/** What a column draws, in order: an entry as itself, or part of an ask's work folded. */
-export type Segment =
-  | { readonly kind: "entry"; readonly id: EntryId }
-  | {
-      readonly kind: "fold"
-      readonly ask: EntryId
-      readonly ids: readonly [EntryId, ...EntryId[]]
-      /** The ask's first fold on this path: where its digest is drawn. */
-      readonly first: boolean
-    }
 
 const isWork = (entry: EntryLike | undefined): boolean => {
   const role = entry?.message?.role
@@ -144,12 +129,15 @@ export function indexAsks(index: TreeIndex): AskIndex {
 }
 
 /**
- * A long ask: its run holds `MIN_STRETCH` agent messages or more. The rail
- * draws it as a dot and a capsule of its own (`compactRail`), and only it is
- * given a digest (ADR-0075).
+ * The agent messages a run holds from which its ask is long. The host's
+ * rule, not the rail's geometry: only a long ask is given a digest
+ * (ADR-0075), and the rail draws it as a dot and a capsule of its own.
  */
+export const LONG_ASK = 3
+
+/** A long ask: its run holds `LONG_ASK` agent messages or more. */
 export const isLongAsk = (asks: AskIndex, prompt: EntryId): boolean =>
-  (asks.work.get(prompt)?.length ?? 0) >= MIN_STRETCH
+  (asks.work.get(prompt)?.length ?? 0) >= LONG_ASK
 
 /**
  * How `prompt`'s run ended, from its last entries (S70): an assistant
@@ -201,65 +189,6 @@ export function lastWord(
   return (
     asks.work.get(prompt)?.findLast(id => hasWords(index.entries[id])) ?? null
   )
-}
-
-/**
- * A column's messages, `ids` in path order, as the column draws them: each
- * ask's work folded, except its last word and any of `landmarks`
- * (`railLandmarks`), which split the fold around them. A prompt, a message
- * no run wrote, and a landmark are drawn as themselves.
- *
- * So a column's segment edges are the landmarks and every ask's edges, and
- * the rail's stretch edges are the landmarks and long asks' edges: every
- * edge the rail draws is one here.
- */
-export function segmentPath(
-  index: TreeIndex,
-  asks: AskIndex,
-  ids: readonly EntryId[],
-  landmarks: ReadonlySet<EntryId>,
-): readonly Segment[] {
-  const out: Segment[] = []
-  const words = new Map<EntryId, EntryId | null>()
-  const wordOf = (prompt: EntryId) => {
-    if (!words.has(prompt)) words.set(prompt, lastWord(index, asks, prompt))
-    return words.get(prompt)
-  }
-  const folded = new Set<EntryId>()
-  for (const id of ids) {
-    const ask = asks.askOf.get(id)
-    if (ask === undefined || landmarks.has(id) || wordOf(ask) === id) {
-      out.push({ kind: "entry", id })
-      continue
-    }
-    const before = out.at(-1)
-    if (before?.kind === "fold" && before.ask === ask) {
-      out[out.length - 1] = { ...before, ids: [...before.ids, id] }
-      continue
-    }
-    out.push({ kind: "fold", ask, ids: [id], first: !folded.has(ask) })
-    folded.add(ask)
-  }
-  return out
-}
-
-/**
- * What an ask's work holds (`statsOf`): every agent message and tool result
- * its run wrote, wherever its column shows them. A long ask's capsule counts
- * the same messages (`compactRail`).
- */
-export function askStats(
-  index: TreeIndex,
-  asks: AskIndex,
-  prompt: EntryId,
-  revisions: ReadonlyMap<EntryId, RevisionRecord>,
-): WorkStats {
-  const work = asks.work.get(prompt) ?? []
-  const mine = new Set<EntryId>(work)
-  const results = [...asks.askOf]
-    .filter(([id, ask]) => ask === prompt && !mine.has(id))
-    .map(([id]) => id)
-  return statsOf(index, work, results, revisions)
 }
 
 /**

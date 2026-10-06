@@ -19,9 +19,10 @@ host connects the two. The rule all three packages keep:
 > or name lives in core too, since neither can declare @pinetrie/rules.
 > What a stored shape says, and how the host changes it, is
 > @pinetrie/rules', whoever reads it. One client's own in-flight state
-> (its moves, held roots, slot repair, commands out) is its session's
-> (connectSession, in @pinetrie/client for now). What the page draws, and
-> its words, is @pinetrie/client's.
+> (its moves, held roots, slot repair, commands out) is
+> @pinetrie/session's. What a person sees and can do, and its words, is
+> @pinetrie/interface's, for any client; how the page draws it is
+> @pinetrie/web's (ADR-0093).
 
 `index.ts` names its exports: only what other packages use. The separate
 reads, the one-read path and the step planners stay inside, so the host

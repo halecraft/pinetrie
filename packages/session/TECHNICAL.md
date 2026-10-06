@@ -1,9 +1,9 @@
 # `@pinetrie/session`: technical notes
 
 One client's connection to a host: the documents it syncs and the requests
-it sends, deciding nothing about what the page draws. `connectSession`
+it sends, deciding nothing about what is shown. `connectSession`
 (`connect.ts`) opens a Kyneta `Exchange` over a WebSocket, finds the host's
-seat, and returns a `SessionClient`. The page (`@pinetrie/client`'s
+seat, and returns a `SessionClient`. The page (`@pinetrie/web`'s
 `main.tsx`) and the e2e suites (`join` in `apps/pinetrie/e2e/harness.ts`) use
 the same code.
 
@@ -21,8 +21,9 @@ Where a rule lives, as `packages/rules/TECHNICAL.md` and
 > `@pinetrie/rules`. What a stored shape says, and how the host changes it,
 > is `@pinetrie/rules`', whoever reads it. One client's own in-flight state
 > (its moves, held roots, slot repair, commands out) is
-> `@pinetrie/session`'s. What the page draws, and its words, is
-> `@pinetrie/client`'s.
+> `@pinetrie/session`'s. What a person sees and can do, and its words, is
+> `@pinetrie/interface`'s, for any client; how the page draws it is
+> `@pinetrie/web`'s (ADR-0093).
 
 So `answerOf`, `withPending`, `settleSlots` and `nextActing` are here, while
 the host's command rules (`planChat`, `planMove`, `planStop`) are
@@ -91,7 +92,7 @@ it.
 
 - **`SessionClient.holdRoots` opens what is new and `destroy`s what is
   not**, which leaves the host's copy (S86). Which roots the page asks for
-  is the page's (`planHeldRoots`, `@pinetrie/client`). A root this client
+  is the interface's (`planHeldRoots`, `@pinetrie/interface`). A root this client
   starts is held from its first send until the page asks for it, and after
   that only while the page does. `planHold` (pure) decides what opens and
   goes; `rootDocs` carries it out.
@@ -185,7 +186,7 @@ session or someone else's inventory throws before it is made.
   session opens it and repairs it on every change (`repairStep`:
   `steadiness`, then `planSlots`).
 - **`settleSlots` is the one slot rule**: the page's panel draws it
-  (`inventoryView`, `@pinetrie/client`), the repair writes towards it, and a
+  (`inventoryView`, `@pinetrie/interface`), the repair writes towards it, and a
   take into the inventory lands by the same `firstEmpty`: the selected slot if empty, else the
   first empty.
 - **The repair waits for a card to be steady** (`steadiness`, S79): it

@@ -30,7 +30,7 @@ export function startOf(roots: Iterable<RootRecord>): string {
 
 /**
  * The mentions you have seen, as the page's inbox decides them
- * (`@pinetrie/client`'s `inbox.ts`): every one at or before `since`, and
+ * (`@pinetrie/interface`'s `inbox.ts`): every one at or before `since`, and
  * `seen` above it.
  */
 export interface SeenMentions {

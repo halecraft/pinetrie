@@ -1,9 +1,9 @@
 // e2e/browser/page — what the browser scenarios share: the send button's
 // words, menus, frames and render counts, a page made a person, and selectors.
 
-import { IDENTITY_KEY, identityCodec } from "@pinetrie/client/identity"
-import { recipientWords } from "@pinetrie/client/send"
 import { errorText, NOBODY, THE_AGENT } from "@pinetrie/core"
+import { identityCodec, recipientWords } from "@pinetrie/interface"
+import { IDENTITY_KEY } from "@pinetrie/web/storage-keys"
 import type { Browser } from "@playwright/test"
 import { chromium, type Page } from "@playwright/test"
 
@@ -22,7 +22,7 @@ export const OWN_MENU =
  * Open the menu behind `trigger`, and find `item` in it if a person could see
  * it: Playwright scrolls a clipped element into view and clicks it, so a menu
  * check proves it can be seen by what `elementFromPoint` finds at the item's
- * centre (`packages/client/TECHNICAL.md`, Gotchas). Null when not seen.
+ * centre (`packages/web/TECHNICAL.md`, Gotchas). Null when not seen.
  */
 export async function seeInMenu(p: Page, trigger: string, item: string) {
   // A ⋯ in your list or on the board shows only while its item is hovered.

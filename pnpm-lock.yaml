@@ -47,12 +47,12 @@ importers:
       '@kyneta/websocket-transport':
         specifier: link:../../../kyneta/workspace/pineta/packages/exchange/transports/websocket
         version: link:../../../kyneta/workspace/pineta/packages/exchange/transports/websocket
-      '@pinetrie/client':
-        specifier: workspace:*
-        version: link:../../packages/client
       '@pinetrie/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@pinetrie/interface':
+        specifier: workspace:*
+        version: link:../../packages/interface
       '@pinetrie/keeper':
         specifier: workspace:*
         version: link:../../packages/keeper
@@ -80,6 +80,9 @@ importers:
       '@pinetrie/session':
         specifier: workspace:*
         version: link:../../packages/session
+      '@pinetrie/web':
+        specifier: workspace:*
+        version: link:../../packages/web
       vite:
         specifier: 7.1.11
         version: 7.1.11(@types/node@24.10.1)(jiti@2.7.0)(yaml@2.9.0)
@@ -94,23 +97,10 @@ importers:
         specifier: 8.18.1
         version: 8.18.1
 
-  packages/client:
+  packages/core: {}
+
+  packages/interface:
     dependencies:
-      '@kyneta/changefeed':
-        specifier: link:../../../kyneta/workspace/pineta/packages/changefeed
-        version: link:../../../kyneta/workspace/pineta/packages/changefeed
-      '@kyneta/exchange':
-        specifier: link:../../../kyneta/workspace/pineta/packages/exchange
-        version: link:../../../kyneta/workspace/pineta/packages/exchange
-      '@kyneta/react':
-        specifier: link:../../../kyneta/workspace/pineta/packages/react
-        version: link:../../../kyneta/workspace/pineta/packages/react
-      '@kyneta/reactive':
-        specifier: link:../../../kyneta/workspace/pineta/packages/reactive
-        version: link:../../../kyneta/workspace/pineta/packages/reactive
-      '@kyneta/schema':
-        specifier: link:../../../kyneta/workspace/pineta/packages/schema
-        version: link:../../../kyneta/workspace/pineta/packages/schema
       '@pinetrie/core':
         specifier: workspace:*
         version: link:../core
@@ -129,51 +119,9 @@ importers:
       '@pinetrie/session':
         specifier: workspace:*
         version: link:../session
-      hast-util-to-jsx-runtime:
-        specifier: 2.3.6
-        version: 2.3.6
-      react:
-        specifier: 19.2.0
-        version: 19.2.0
-      react-dom:
-        specifier: 19.2.0
-        version: 19.2.0(react@19.2.0)
-      remark-gfm:
-        specifier: 4.0.1
-        version: 4.0.1
-      remark-parse:
-        specifier: 11.0.0
-        version: 11.0.0
-      remark-rehype:
-        specifier: 11.1.2
-        version: 11.1.2
-      remend:
-        specifier: 1.3.1
-        version: 1.3.1
       typebox:
         specifier: 1.3.27
         version: 1.3.27
-      unified:
-        specifier: 11.0.5
-        version: 11.0.5
-    devDependencies:
-      '@types/hast':
-        specifier: 3.0.5
-        version: 3.0.5
-      '@types/react':
-        specifier: 19.2.2
-        version: 19.2.2
-      '@types/react-dom':
-        specifier: 19.2.1
-        version: 19.2.1(@types/react@19.2.2)
-      '@vitejs/plugin-react':
-        specifier: 5.0.4
-        version: 5.0.4(vite@7.1.11(@types/node@24.10.1)(jiti@2.7.0)(yaml@2.9.0))
-      vite:
-        specifier: 7.1.11
-        version: 7.1.11(@types/node@24.10.1)(jiti@2.7.0)(yaml@2.9.0)
-
-  packages/core: {}
 
   packages/keeper: {}
 
@@ -311,6 +259,88 @@ importers:
       '@pinetrie/schema':
         specifier: workspace:*
         version: link:../schema
+
+  packages/web:
+    dependencies:
+      '@kyneta/changefeed':
+        specifier: link:../../../kyneta/workspace/pineta/packages/changefeed
+        version: link:../../../kyneta/workspace/pineta/packages/changefeed
+      '@kyneta/exchange':
+        specifier: link:../../../kyneta/workspace/pineta/packages/exchange
+        version: link:../../../kyneta/workspace/pineta/packages/exchange
+      '@kyneta/react':
+        specifier: link:../../../kyneta/workspace/pineta/packages/react
+        version: link:../../../kyneta/workspace/pineta/packages/react
+      '@kyneta/reactive':
+        specifier: link:../../../kyneta/workspace/pineta/packages/reactive
+        version: link:../../../kyneta/workspace/pineta/packages/reactive
+      '@kyneta/schema':
+        specifier: link:../../../kyneta/workspace/pineta/packages/schema
+        version: link:../../../kyneta/workspace/pineta/packages/schema
+      '@pinetrie/core':
+        specifier: workspace:*
+        version: link:../core
+      '@pinetrie/interface':
+        specifier: workspace:*
+        version: link:../interface
+      '@pinetrie/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@pinetrie/reads':
+        specifier: workspace:*
+        version: link:../reads
+      '@pinetrie/rules':
+        specifier: workspace:*
+        version: link:../rules
+      '@pinetrie/schema':
+        specifier: workspace:*
+        version: link:../schema
+      '@pinetrie/session':
+        specifier: workspace:*
+        version: link:../session
+      hast-util-to-jsx-runtime:
+        specifier: 2.3.6
+        version: 2.3.6
+      react:
+        specifier: 19.2.0
+        version: 19.2.0
+      react-dom:
+        specifier: 19.2.0
+        version: 19.2.0(react@19.2.0)
+      remark-gfm:
+        specifier: 4.0.1
+        version: 4.0.1
+      remark-parse:
+        specifier: 11.0.0
+        version: 11.0.0
+      remark-rehype:
+        specifier: 11.1.2
+        version: 11.1.2
+      remend:
+        specifier: 1.3.1
+        version: 1.3.1
+      typebox:
+        specifier: 1.3.27
+        version: 1.3.27
+      unified:
+        specifier: 11.0.5
+        version: 11.0.5
+    devDependencies:
+      '@types/hast':
+        specifier: 3.0.5
+        version: 3.0.5
+      '@types/react':
+        specifier: 19.2.2
+        version: 19.2.2
+      '@types/react-dom':
+        specifier: 19.2.1
+        version: 19.2.1(@types/react@19.2.2)
+      '@vitejs/plugin-react':
+        specifier: 5.0.4
+        version: 5.0.4(vite@7.1.11(@types/node@24.10.1)(jiti@2.7.0)(yaml@2.9.0))
+      vite:
+        specifier: 7.1.11
+        version: 7.1.11(@types/node@24.10.1)(jiti@2.7.0)(yaml@2.9.0)
 
 packages:
 

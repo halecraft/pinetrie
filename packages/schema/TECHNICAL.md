@@ -281,7 +281,7 @@ person's tabs.
 
 `InventoryDoc` is a document of slot index ("0"–"17") to card id. The host's
 places say whose inventory a card is in; this says which slot holds it, and
-each tab repairs it from the host's record (`planSlots`, `packages/client`).
+each tab repairs it from the host's record (`planSlots`, `@pinetrie/session`).
 A slot naming a card that is gone stays until written over: the repair
 clears only a slot whose card it has seen not held for a while, and the
 panel draws a slot whose card is not held as empty.
@@ -292,7 +292,7 @@ panel draws a slot whose card is not held as empty.
 - `since`: where they started, set once by the first write and never moved:
   a verdict that ended, or a mention written, at or before it is not new to
   them. "" until then, which nothing is raised against.
-- `mentionsSince` and `seen`: the inbox (`packages/client/inbox.ts`). The
+- `mentionsSince` and `seen`: the inbox (`packages/interface/inbox.ts`). The
   inbox's watermark moves as mentions are seen, so it is a field of its own:
   verdicts read only `since`.
 - `read`: per lane, the furthest entry read, which only moves forward

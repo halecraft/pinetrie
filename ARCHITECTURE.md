@@ -34,5 +34,7 @@ browser ──commands (Kyneta Line)──▶ host ──▶ pi agent core
 | `rules` | each stored shape and the pure rules about it |
 | `reads` | document reads shared by host and client |
 | `lanes` | containers, disks, jj and git |
-| `client` | the browser UI |
+| `session` | one client's connection to a host, its own documents and what it has in flight |
+| `interface` | what a person sees and can do, decided, for any client: no React, no DOM (ADR-0093) |
+| `web` | the browser page: React and the DOM, drawing what `interface` decides |
 | `apps/pinetrie` | the host; its shell is split by responsibility (`apps/pinetrie/host/TECHNICAL.md`) |

@@ -78,7 +78,7 @@ export async function startHttp(input: {
   // Locate the client through module RESOLUTION, not a relative path: it is a
   // package this app depends on, and where it sits on disk is its business.
   const clientDir = path.dirname(
-    createRequire(import.meta.url).resolve("@pinetrie/client/package.json"),
+    createRequire(import.meta.url).resolve("@pinetrie/web/package.json"),
   )
   const vite = await createViteServer({
     root: clientDir,

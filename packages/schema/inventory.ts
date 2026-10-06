@@ -4,7 +4,7 @@
 // The host's places document says whose inventory a card is in; this says
 // where in the grid it sits. Only your own tabs arrange it, and they may do
 // so at once, so it merges; each tab then repairs it from the host's record
-// (`planSlots` in @pinetrie/client). The host stores and relays it, shared with
+// (`planSlots` in @pinetrie/session). The host stores and relays it, shared with
 // its person only (host/policy.ts), and never writes it; its id and who may
 // write it are the protocol's (`@pinetrie/protocol/writers`).
 

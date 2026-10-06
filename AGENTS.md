@@ -31,7 +31,7 @@ reasons are the ADRs, one file each in `docs/adrs/`. Each package has a
 - Precise types inside; awkward representations only at the edges (wire,
   storage, pi).
 - Decide a label as a value; word it in one function
-  (`packages/client/TECHNICAL.md`, "Words come from values").
+  (`packages/interface/TECHNICAL.md`, "Words come from values").
 - Only `packages/pi` imports pi (ADR-0003). Package boundaries are enforced by
   resolution; `workspace.test.ts` checks the manifests.
 - Verify, don't assume: read the source of pi and Kyneta, or measure with a

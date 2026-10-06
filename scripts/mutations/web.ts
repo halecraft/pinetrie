@@ -1,0 +1,290 @@
+// Mutations for @pinetrie/web, the page. Run: pnpm mutate scripts/mutations/web.ts
+import type { Mutation } from "../mutate.ts"
+
+const unit = ["pnpm", "exec", "vitest", "run", "packages/web"]
+const markdown = "packages/web/markdown.ts"
+const tabState = "packages/web/tab-state.ts"
+
+export const mutations: readonly Mutation[] = [
+  {
+    name: "everyone present has the first colour",
+    file: "packages/web/presence.tsx",
+    from: "    return (i === undefined ? undefined : FIRST[i]) ?? hashed(writer)",
+    to: "    return (i === undefined ? undefined : FIRST[0]) ?? hashed(writer)",
+    command: unit,
+    expect: "each have their own colour",
+  },
+  // ── markdown (markdown.ts): what is drawn ──
+  {
+    name: "block whitespace isn't dropped",
+    file: markdown,
+    from: "        child.position === undefined &&",
+    to: "        false &&",
+    command: unit,
+    expect: "no whitespace between blocks",
+  },
+  {
+    name: "committed text goes through remend",
+    file: markdown,
+    from: '  const text = mode === "streaming" ? remend(source, REMEND) : source',
+    to: "  const text = remend(source, REMEND)",
+    command: unit,
+    expect: "committed text never goes through remend",
+  },
+  {
+    name: "remend runs with its defaults",
+    file: markdown,
+    from: "? remend(source, REMEND) : source",
+    to: "? remend(source) : source",
+    command: unit,
+    expect: "renders the same streaming as committed",
+  },
+  {
+    name: "raw HTML is dropped instead of shown",
+    file: markdown,
+    from: '    } else if (child.type === "text" || child.type === "raw") {',
+    to: '    } else if (child.type === "text") {',
+    command: unit,
+    expect: "raw HTML is text",
+  },
+  {
+    name: "safeUrl keeps every protocol",
+    file: markdown,
+    from: "const SAFE_PROTOCOL = /^(https?|mailto)$/i",
+    to: "const SAFE_PROTOCOL = /^/",
+    command: unit,
+    expect: "only http, https, mailto",
+  },
+  {
+    name: "the tab's slot is read after the device's",
+    file: tabState,
+    from: "      readStored(tab.getItem(key), codec.decode) ??\n      readStored(device.getItem(key), codec.decode),",
+    to: "      readStored(device.getItem(key), codec.decode) ??\n      readStored(tab.getItem(key), codec.decode),",
+    command: unit,
+    expect: "the tab's own value wins",
+  },
+  {
+    name: "a save writes only the tab's slot",
+    file: tabState,
+    from: "      for (const slot of [tab, device]) writeSlot(slot, key, raw)",
+    to: "      for (const slot of [tab]) writeSlot(slot, key, raw)",
+    command: unit,
+    expect: "a new tab loads the device's latest",
+  },
+  {
+    name: "a malformed tab slot hides the device's",
+    file: tabState,
+    from: "      readStored(tab.getItem(key), codec.decode) ??\n      readStored(device.getItem(key), codec.decode),",
+    to: "      tab.getItem(key) === null\n        ? readStored(device.getItem(key), codec.decode)\n        : readStored(tab.getItem(key), codec.decode),",
+    command: unit,
+    expect: "falls back to the device",
+  },
+  {
+    name: "one failed write stops the other",
+    file: tabState,
+    from: "  try {\n    slot.setItem(key, raw)\n  } catch {}",
+    to: "  slot.setItem(key, raw)",
+    command: unit,
+    expect: "the other slot is still written",
+  },
+  // ── a message's tools (message-tools.ts) ──
+  {
+    name: "finish leaves blob images unsized",
+    file: "packages/web/markdown.ts",
+    from: '      if (child.tagName === "img") sizeImage(child, images)',
+    to: '      if (child.tagName === "none") sizeImage(child, images)',
+    command: unit,
+    expect: "a /blob/ image the message holds gets its stored size",
+  },
+  {
+    name: "sameMessageProps compares a message's node by identity",
+    file: "packages/web/message-props.ts",
+    from: '  node: "value",',
+    to: '  node: "identity",',
+    command: unit,
+    expect: "props rebuilt from an unchanged message draw the same",
+  },
+  {
+    name: "sameMessageProps ignores a message's text",
+    file: "packages/interface/same-data.ts",
+    from: "  if (Object.is(a, b)) return true",
+    to: '  if (typeof a === "string" || Object.is(a, b)) return true',
+    command: unit,
+    expect: "a change to what a message shows",
+  },
+  {
+    name: "sameMessageProps ignores props compared by identity",
+    file: "packages/web/same-props.ts",
+    from: '      rules[k] === "value" ? sameData(a[k], b[k]) : Object.is(a[k], b[k]),',
+    to: '      rules[k] === "value" ? sameData(a[k], b[k]) : true,',
+    command: unit,
+    expect: "a change to what a message shows",
+  },
+  {
+    name: "a map is equal only to itself",
+    file: "packages/interface/same-data.ts",
+    from: "  if (a instanceof Map || b instanceof Map) {",
+    to: "  if (a instanceof Map || b instanceof Map) {\n    return false",
+    command: unit,
+    expect:
+      "a column's list draws the same from a lane and joins rebuilt unchanged",
+  },
+  {
+    name: "a column's list compares joins by identity",
+    file: "packages/web/message-list-props.ts",
+    from: '  joins: "value",',
+    to: '  joins: "identity",',
+    command: unit,
+    expect:
+      "a column's list draws the same from a lane and joins rebuilt unchanged",
+  },
+  {
+    name: "a column's list compares its lane by identity",
+    file: "packages/web/message-list-props.ts",
+    from: '  lane: "value",',
+    to: '  lane: "identity",',
+    command: unit,
+    expect:
+      "a column's list draws the same from a lane and joins rebuilt unchanged",
+  },
+  {
+    name: "a message redraws on equal props",
+    file: "packages/web/same-props.ts",
+    from: '      rules[k] === "value" ? sameData(a[k], b[k]) : Object.is(a[k], b[k]),',
+    to: "      Object.is(a[k], b[k]),",
+    command: unit,
+    expect: "props rebuilt from an unchanged message draw the same",
+  },
+  {
+    name: "a modified click opens the image in the pane too",
+    file: "packages/web/image-click.ts",
+    from: '  return e.metaKey || e.ctrlKey ? "tab" : "pane"',
+    to: '  return "pane"',
+    command: unit,
+    expect: "a Cmd- or Ctrl-click opens the image in a new tab",
+  },
+  {
+    name: "opening what the pane shows replaces it",
+    file: "packages/web/pane.ts",
+    from: "(shown !== null && samePane(shown, next) ? null : next)",
+    to: "next",
+    command: unit,
+    expect: "opening what is shown closes it",
+  },
+  {
+    name: "the pane names a table by its message alone",
+    file: "packages/web/pane.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "      return `table:${subject.entry}:${subject.nth}`",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
+    to: "      return `table:${subject.entry}`",
+    command: unit,
+    expect: "anything else replaces it: another kind, table or message",
+  },
+  {
+    name: "the pane draws a table its column no longer draws",
+    file: "packages/web/pane.ts",
+    from: "      const node = facts.nodes.find(n => n.id === subject.entry)\n      if (node === undefined) return null",
+    to: "      const node = facts.nodes.find(n => n.id === subject.entry) ?? facts.nodes[0]\n      if (node === undefined) return null",
+    command: unit,
+    expect:
+      "a table closes when its message is not drawn, or has no such table",
+  },
+  {
+    name: "the pane keeps the offer's review when the strip has none",
+    file: "packages/web/pane.ts",
+    from: '      return facts.offer === null ? null : { kind: "review", ...facts.offer }',
+    to: '      return { kind: "review", target: facts.offer?.target ?? { lane: "x", spans: [], conflicts: [], yourEdits: [] }, line: "" } as PaneView',
+    command: unit,
+    expect: "the offer draws the strip's review, and closes without one",
+  },
+  {
+    name: "an ask's review drops its title",
+    file: "packages/web/pane.ts",
+    from: "    ...(title === null ? {} : { title }),",
+    to: "",
+    command: unit,
+    expect: "the ask's range, titled with its line",
+  },
+  {
+    name: "the pane parses its table's message on every render",
+    file: "packages/web/pane.ts",
+    from: "  if (known !== undefined) return known\n",
+    to: "",
+    command: unit,
+    expect: "the same node gives the same table, so the pane draws it once",
+  },
+  {
+    name: "a table in a list item is not numbered",
+    file: markdown,
+    from: '    if (child.tagName === "table") yield child\n    yield* tables(child)',
+    to: '    if (child.tagName === "table") yield child\n    else if (child.tagName !== "ul") yield* tables(child)',
+    command: unit,
+    expect:
+      "each table is numbered in document order, one in a list item included",
+  },
+  {
+    name: "the narrow line moves without the pane's width",
+    file: "packages/web/pane.ts",
+    from: "export const THREAD_REM = 28",
+    to: "export const THREAD_REM = 27",
+    command: unit,
+    expect: "index.html sizes the pane and the thread by pane.ts's numbers",
+  },
+  // ── track colours (ADR-0089, S110) ──
+  {
+    name: "a track colour is the attention amber",
+    file: "packages/web/colors.ts",
+    from: '  "#c0a320",',
+    to: '  "#e0c080",',
+    command: unit,
+    expect: "is apart from the colours that already mean something",
+  },
+  {
+    name: "a slot has no hover pair",
+    file: "packages/web/index.html",
+    from: '      #strip:has(.fork-dot[data-color="11"]:hover) .column-head[data-color="11"]',
+    to: '      #strip:has(.fork-dot[data-color="10"]:hover) .column-head[data-color="10"]',
+    command: unit,
+    expect:
+      "index.html links a header and its fork dots on hover, for every slot",
+  },
+  {
+    name: "the hash moved with a new multiplier",
+    file: "packages/interface/palette.ts",
+    from: "    h = (Math.imul(h, 31) + s.charCodeAt(i)) >>> 0",
+    to: "    h = (Math.imul(h, 33) + s.charCodeAt(i)) >>> 0",
+    command: unit,
+    expect: "a later person's colour comes from their id",
+  },
+  // ── your list folded to icons (ADR-0088) ──
+  {
+    name: "a stored wrap is dropped",
+    file: "packages/web/review-prefs.ts",
+    from: "      ? { wrap: raw.wrap, listFolded: raw.listFolded }",
+    to: "      ? { wrap: false, listFolded: raw.listFolded }",
+    command: unit,
+    expect: "decodes what it encodes",
+  },
+  {
+    name: "the narrow line forgets the thread",
+    file: "packages/web/pane.ts",
+    from: "  width < (THREAD_REM + PANE_MIN_REM) * rem + COLUMN_EDGE_PX",
+    to: "  width < PANE_MIN_REM * rem + COLUMN_EDGE_PX",
+    command: unit,
+    expect: "a pixel short of the thread and the narrowest pane",
+  },
+  {
+    name: "a shown table's ⤢ says it opens",
+    file: "packages/web/pane.ts",
+    from: '      return { label: "close the table", title: "close the table" }',
+    to: '      return { label: "open the table beside the thread", title: "open beside the thread" }',
+    command: unit,
+    expect: "tableOpenWords(shown)",
+  },
+  // ── your inventory (ADR-0048 step 4) ──
+  // ── attention (ADR-0077) ──
+  // ── the publish button (ADR-0076, ADR-0090) ──
+  // ── queue control (ADR-0048 step 7) ──
+  // ── your list and the board (ADR-0085) ──
+]

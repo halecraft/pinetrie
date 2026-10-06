@@ -7,7 +7,7 @@ import { hotReload, isHeld } from "./hot-reload.ts"
 
 // Paths that do not exist, so each is its own real path.
 const PINETRIE = "/nowhere/pinetrie"
-const CLIENT_FILE = `${PINETRIE}/packages/client/src/App.tsx`
+const CLIENT_FILE = `${PINETRIE}/packages/web/src/App.tsx`
 const OTHER = "/nowhere/my-project"
 const LANE_1 = laneNameForThread("01a0f9eb-86e1-77ad-a822-2a306786223f")
 const RUN = runId("r-1")

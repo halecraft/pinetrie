@@ -120,7 +120,8 @@ packages/     libraries; their boundaries are enforced by resolution
   keeper/        @pinetrie/keeper       declares NOTHING; one step at a time on a resource (TECHNICAL.md)
   repo/          @pinetrie/repo         your repo: reads, steps, the owner; offers, the line, lanes' refs (TECHNICAL.md)
   session/       @pinetrie/session      one client's connection to a host; no React (TECHNICAL.md)
-  client/        @pinetrie/client       browser UI; owns its Vite build
+  interface/     @pinetrie/interface    what a person sees and does, for any client; no React, no DOM (ADR-0093)
+  web/           @pinetrie/web          the browser page: React and the DOM; owns its Vite build
 
 (root)        a bare workspace: development tooling only, no dependencies
 ```

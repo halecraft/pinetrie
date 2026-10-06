@@ -104,6 +104,27 @@ test("session declares only Kyneta's exchange and WebSocket transport, core, pro
   ])
 })
 
+test("interface declares only core, protocol, reads, rules, schema, session and TypeBox: no React, no DOM", () => {
+  // What any client shows and does (ADR-0093): a TTY must be able to take
+  // it without a browser. `packages/interface/tsconfig.json` checks the DOM.
+  assert.deepEqual(deps(read("packages/interface")).sort(), [
+    "@pinetrie/core",
+    "@pinetrie/protocol",
+    "@pinetrie/reads",
+    "@pinetrie/rules",
+    "@pinetrie/schema",
+    "@pinetrie/session",
+    "typebox",
+  ])
+})
+
+test("only the page and the app depend on interface: nothing below it does", () => {
+  const declaring = WORKSPACE.filter(dir =>
+    allDeps(read(dir)).includes("@pinetrie/interface"),
+  ).sort()
+  assert.deepEqual(declaring, ["apps/pinetrie", "packages/web"])
+})
+
 test("lanes declares only core: it runs container, jj and git, never pi or the document", () => {
   assert.deepEqual(deps(read("packages/lanes")), ["@pinetrie/core"])
 })
@@ -120,8 +141,8 @@ test("keeper declares nothing", () => {
   assert.deepEqual(allDeps(read("packages/keeper")), [])
 })
 
-test("the client declares no server package and no app", () => {
-  const client = deps(read("packages/client"))
+test("the page declares no server package and no app", () => {
+  const web = deps(read("packages/web"))
   for (const forbidden of [
     "ws",
     "vite",
@@ -131,8 +152,8 @@ test("the client declares no server package and no app", () => {
     "@pinetrie/repo",
   ]) {
     assert.ok(
-      !client.includes(forbidden),
-      `client must not depend on ${forbidden}`,
+      !web.includes(forbidden),
+      `the page must not depend on ${forbidden}`,
     )
   }
 })

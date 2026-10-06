@@ -49,8 +49,8 @@ where lanes work (ADR-0032, ADR-0034): `readLaneRecords`, `readRevisions`, `read
 at an entry would work, and the commit and snapshot it would start from: the
 composer shows it, and the host creates the lane by it, and decides by it
 whether a sent message's paths are stored under `/mnt/host-working-copy`. The board's items are a
-client-only read, in `packages/client/board-view.ts`. Live streams are read with `readStreams` in
-`@pinetrie/schema`; an entry count stays in `packages/client/projection.ts`.
+client-only read, in `packages/interface/board-view.ts`. Live streams are read with `readStreams` in
+`@pinetrie/schema`; an entry count stays in `packages/interface/projection.ts`.
 
 ## Where entry ids are branded
 

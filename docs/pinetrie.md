@@ -122,11 +122,12 @@ packages/lanes/        @pinetrie/lanes        a lane's container and disk, and j
 packages/keeper/       @pinetrie/keeper       declares NOTHING; one step at a time on a resource
 packages/repo/         @pinetrie/repo         your repo: reads, steps, the owner (ADR-0038, 0060, 0065)
 packages/session/      @pinetrie/session      one client's connection to a host; no React
-packages/client/       @pinetrie/client       browser UI; owns its Vite build
+packages/interface/    @pinetrie/interface    what a person sees and does, for any client; no React, no DOM (ADR-0093)
+packages/web/          @pinetrie/web          the browser page: React and the DOM; owns its Vite build
 (root)                                      development tooling only
 ```
 
-Dependency direction is physical: **core → schema, protocol → pi, session → client → app**.
+Dependency direction is physical: **core → schema, protocol → pi, session → interface → web → app**.
 The root declares only tooling, so a package can import only what it declares.
 
 ---
@@ -693,7 +694,7 @@ parameter properties, or decorators.
 
 ## 6. What to do next
 
-**The stack is complete.** `packages/client/app.tsx` is React, rendering from the same
+**The stack is complete.** `packages/web/app.tsx` is React, rendering from the same
 Exchange `connectSession` (`@pinetrie/session`) already owns (handed to `ExchangeProvider`), so Node
 and browser still share one connection story and `e2e` drives the real thing.
 Hook names, verified against source: **`useTracked(thunk)`** for a derived
@@ -702,7 +703,7 @@ string union `"pending" | "empty" | "populated"`, not an object.
 
 **The interface is your list of roots down the left, and the root you are
 on, a rail beside columns** (`docs/06-interface.md`,
-`packages/client/TECHNICAL.md`, ADR-0029, ADR-0085), over a footer showing
+`packages/interface/TECHNICAL.md`, ADR-0029, ADR-0085), over a footer showing
 who is here, what needs you and the board, which slides up over the columns
 with every root in its workflow state: each
 column is one path on its own scroll, a branch opens beside its parent in its
@@ -711,13 +712,13 @@ stretch drawn as one capsule (ADR-0031), a long ask's work a capsule of its
 own (ADR-0056).
 Views are pure functions over one `indexTree` (`packages/core/tree.ts`,
 `roots.ts`); which root you are on and each root's columns are a reducer in
-`packages/client/layout.ts`, your list is your `open:` document
+`packages/interface/layout.ts`, your list is your `open:` document
 (`packages/session/open-list.ts`), and the inbox is
-`packages/client/inbox.ts`.
+`packages/interface/inbox.ts`.
 
 The composer is your drafting card (ADR-0048), the text people edit
 together: one uncontrolled textarea, bound with Kyneta's `attach` to the
-card's text from the keystroke that creates it (`packages/client/card-editor.tsx`).
+card's text from the keystroke that creates it (`packages/web/card-editor.tsx`).
 
 **An image pasted into a composer reaches the agent** (ADR-0042): uploaded
 to `POST /blob`, kept by SHA-256 in `pinetrie_blobs` beside the session in
@@ -783,7 +784,7 @@ needed", and the mentions you have seen.
 **The rail outlines what each column shows** (ADR-0058), in the column's
 colour, and scrolls to keep the outline of the column you move in view. A
 column of a tab shown again comes back where you left it, by message: the
-same measurement (`packages/client/viewport.ts`). Spots last the page's
+same measurement (`packages/interface/viewport.ts`). Spots last the page's
 life; keeping them for a person across devices is the next step.
 
 **Steps 1–5 are done** (ADR-0018). Now continue thickening (`docs/04-roadmap.md`), each step

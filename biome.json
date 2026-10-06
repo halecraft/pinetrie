@@ -58,16 +58,17 @@
     {
       "includes": [
         "packages/core/**",
-        "packages/client/**",
+        "packages/interface/**",
+        "packages/web/**",
         "!**/*.test.ts",
         "!**/*.test.tsx",
         "!packages/core/fixtures.ts",
         "!packages/core/trailers.ts",
-        "!packages/client/fixtures.ts",
+        "!packages/interface/fixtures.ts",
         "!apps/pinetrie/host/fakes.ts",
-        "!packages/client/layout.ts",
-        "!packages/client/use-ask-bar.ts",
-        "!packages/client/root-target.ts"
+        "!packages/interface/layout.ts",
+        "!packages/web/use-ask-bar.ts",
+        "!packages/interface/root-target.ts"
       ],
       "linter": {
         "rules": {
@@ -97,7 +98,7 @@
         "!**/*.test.ts",
         "!**/*.test.tsx",
         "!packages/core/fixtures.ts",
-        "!packages/client/fixtures.ts",
+        "!packages/interface/fixtures.ts",
         "!apps/pinetrie/host/fakes.ts"
       ],
       "linter": {
