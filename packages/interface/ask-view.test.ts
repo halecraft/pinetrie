@@ -1,8 +1,10 @@
 import {
+  commitId,
   type EntryId,
   type EntryLike,
   entryId,
   indexAsks,
+  laneNameForThread,
   type RevisionRecord,
   writerId,
 } from "@pinetrie/core"
@@ -164,6 +166,33 @@ describe("askView", () => {
         ]),
       }),
     ).toMatchObject({ headline: "Fixing it", points: [] })
+  })
+  test("its files count only with a span for their review", () => {
+    const rev = (
+      at: string,
+      commit: string | null,
+      paths: readonly string[] = [],
+    ): [EntryId, RevisionRecord] => [
+      entryId(at),
+      {
+        entry: entryId(at),
+        lane: laneNameForThread("x"),
+        commit: commit === null ? null : commitId(commit),
+        snapshot: null,
+        paths,
+        conflicts: [],
+      },
+    ]
+    const files = (prompt: string | null) =>
+      view({
+        revisions: new Map([
+          rev("1-p", prompt),
+          rev("3-a", "a1", ["a.ts", "b.ts"]),
+        ]),
+      }).files
+    expect(files("a0")).toBe(2)
+    // A prompt with no commit to start from has no span.
+    expect(files(null)).toBe(0)
   })
   test("outline keeps the last word of the column's last ended ask", () => {
     expect(view({ lastEnded: entryId("1-p") }).outlineHides).toBeNull()

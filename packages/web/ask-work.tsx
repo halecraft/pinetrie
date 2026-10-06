@@ -1,17 +1,15 @@
-// web/ask-work — one ask's work in a column, folded or open (ADR-0056).
-// It reads the reader's choice for its own ask (`FoldMemory`), so opening or
-// closing one redraws it alone, as a tool row does (ADR-0049).
+// web/ask-work — one ask's work in a column, folded or open (ADR-0056), laid
+// out from `planAskWork`, which decides every row and word. It reads the
+// reader's choice for its own ask (`FoldMemory`), so opening or closing one
+// redraws it alone, as a tool row does (ADR-0049).
 
 import type { EntryId } from "@pinetrie/core"
 import {
   type AskView,
   type Density,
-  digestApart,
   type FoldMemory,
   type FoldPart,
-  foldOpen,
-  foldWords,
-  plural,
+  planAskWork,
   type Segment,
   toggled,
 } from "@pinetrie/interface"
@@ -64,95 +62,80 @@ export function AskWork({
     folds.subscribe,
     useCallback(() => folds.get(ask) ?? null, [folds, ask]),
   )
-  const open = foldOpen({
-    choice,
-    density,
-    running: view.running,
-    endedWhileAway: view.endedWhileAway,
-  })
+  const draw = planAskWork(view, parts, { choice, density })
+  const { open } = draw
   const toggle = () => folds.set(ask, toggled(open))
-  const outline = density === "outline"
-  const hasFold = parts.some(s => s.kind === "fold")
-  const digest = (withHeadline: boolean) => {
-    const headline = withHeadline ? view.headline : null
-    if (headline === null && view.points.length === 0) return null
-    return (
-      <div className="ask-digest" key="digest">
-        {headline !== null && (
-          <p>
-            <Headline text={headline} />
-          </p>
-        )}
-        {view.points.length > 0 && (
-          <MessageText mode="committed" text={pointsText(view.points)} />
-        )}
-      </div>
-    )
-  }
-  // One flat list of children, each message keyed by its entry: a message
-  // that moves into a fold as its run goes on keeps its element, and a tool
-  // row its output's scroll (ADR-0044).
+  const title = open ? "fold this ask's work" : "show this ask's work"
+  // One flat list of children in `draw`'s order, each message keyed by its
+  // entry: a message that moves into a fold as its run goes on keeps its
+  // element, and a tool row its output's scroll (ADR-0044).
   const drawn: ReactNode[] = []
-  if (outline)
+  if (draw.line !== null)
     drawn.push(
       <button
         aria-expanded={open}
         className={view.running ? "ask-line running" : "ask-line"}
         key="line"
         onClick={toggle}
-        title={open ? "fold this ask's work" : "show this ask's work"}
+        title={title}
         type="button"
       >
-        <FoldLine parts={foldWords(view, "line")} />
+        <FoldLine parts={draw.line} />
       </button>,
     )
-  const apart = digestApart({ density, open, hasFold })
-  if (apart) drawn.push(digest(true))
-  for (const s of parts) {
-    if (s.kind === "entry") {
-      // Outline keeps what the rail draws apart, and folds the rest.
-      if (!(outline && !open && s.id === view.outlineHides))
-        drawn.push(message(s.id))
-      continue
+  for (const row of draw.rows)
+    switch (row.kind) {
+      case "message":
+        drawn.push(message(row.id))
+        break
+      case "fold":
+        drawn.push(
+          <div className="ask-fold-head" key={`fold-${row.ids[0]}`}>
+            <button
+              aria-expanded={open}
+              className="ask-fold"
+              data-first={row.first || undefined}
+              onClick={toggle}
+              title={title}
+              type="button"
+            >
+              <FoldLine parts={row.parts} />
+            </button>
+            {row.files !== null && pane !== null && (
+              <button
+                className="ask-files"
+                onClick={() => pane.open({ kind: "ask", ask })}
+                title="review what this ask changed"
+                type="button"
+              >
+                {row.files}
+              </button>
+            )}
+          </div>,
+        )
+        break
+      case "digest":
+        drawn.push(
+          <div className="ask-digest" key="digest">
+            {row.headline !== null && (
+              <p>
+                <Headline text={row.headline} />
+              </p>
+            )}
+            {row.points.length > 0 && (
+              <MessageText mode="committed" text={pointsText(row.points)} />
+            )}
+          </div>,
+        )
+        break
+      case "outcome":
+        drawn.push(
+          <div className="ask-outcome" key="outcome">
+            {row.text}
+          </div>,
+        )
+        break
     }
-    if (outline && !open) continue
-    drawn.push(
-      <div className="ask-fold-head" key={`fold-${s.ids[0]}`}>
-        <button
-          aria-expanded={open}
-          className="ask-fold"
-          data-first={s.first || undefined}
-          onClick={toggle}
-          title={open ? "fold this ask's work" : "show this ask's work"}
-          type="button"
-        >
-          {s.first ? (
-            <FoldLine parts={foldWords(view, "fold")} />
-          ) : (
-            plural(s.ids.length, "step")
-          )}
-        </button>
-        {s.first && view.span !== null && view.files > 0 && pane !== null && (
-          <button
-            className="ask-files"
-            onClick={() => pane.open({ kind: "ask", ask })}
-            title="review what this ask changed"
-            type="button"
-          >
-            {plural(view.files, "file")}
-          </button>
-        )}
-      </div>,
-    )
-    if (s.first && !apart) drawn.push(digest(false))
-    if (open) for (const id of s.ids) drawn.push(message(id))
-  }
-  if (!outline && !hasFold && view.outcome !== null)
-    drawn.push(
-      <div className="ask-outcome" key="outcome">
-        {view.outcome}
-      </div>,
-    )
   return (
     <div className="ask-work" data-ask-of={ask} data-open={open || undefined}>
       {drawn}

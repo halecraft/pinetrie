@@ -51,7 +51,7 @@ paragraph under the ask's fold line. In use:
   as a model's words (a ✦, and "written by a model" as its title), which is
   how it is now told apart from the agent's words.
 - **In outline, the digest is drawn under the ask's line,** headline and
-  points together (`digestApart`), as the summary was before this ADR. The
+  points together (`planAskWork`), as the summary was before this ADR. The
   line itself is one line cut to the column's width, and says what the run
   is doing now or how it ended, so a headline in it would be hidden while
   the run lasts, which is when a reader coming back most needs it.

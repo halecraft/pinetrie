@@ -628,11 +628,12 @@ else reads those rows (tab summaries, archive search, `branchColors`).
 An ask is a message that started a run, with that run (`indexAsks`, core,
 kept per index). `readSessionFacts` reads it with the index, so the rail and
 the columns read one. `segmentPath` (`ask-segments.ts`) decides what a column folds;
-`columnRows` (`ask-view.ts`) groups each ask's segments, and `AskWork`
-(`ask-work.tsx`) draws one ask's work.
+`columnRows` (`ask-view.ts`) groups each ask's segments, `planAskWork`
+(`ask-fold.ts`) decides what one ask's work draws, and `AskWork`
+(`ask-work.tsx`) lays that out.
 
-- **`AskWork` is `ToolRow`'s twin.** `foldOpen` (`ask-fold.ts`) is the
-  rule, as `rowSize` is; the reader's choice is kept in a `FoldMemory` by
+- **`AskWork` is `ToolRow`'s twin.** `foldOpen` (`ask-fold.ts`, called in
+  `planAskWork`) is the rule, as `rowSize` is; the reader's choice is kept in a `FoldMemory` by
   the ask's prompt, made once in `App`, as tool rows' are. Each `AskWork`
   reads its own key with `useSyncExternalStore`, so opening one redraws it
   alone and `MessageList` gets no new prop. Its messages are drawn only
@@ -663,19 +664,34 @@ the columns read one. `segmentPath` (`ask-segments.ts`) decides what a column fo
   over `askStats`), the outcome's words, the live line while it runs, the
   last word outline hides (none in the column's last ended ask,
   `lastEndedAsk`, ADR-0070), its digest's headline and, once final, its
-  points (ADR-0075), and the span its files open in a review (`askSpan`).
+  points (ADR-0075), and how many files a review of it shows: none when
+  it has no span (`askSpan`), so its fold offers no review. The pane
+  reads the span itself (`askReviewTarget`, `packages/web/pane.ts`).
   `askWords` says an ask the same everywhere: the bar, the working mark's
   title, the rail's tooltip, outline.
-- **`foldWords` orders an ask's line** (`line`, outline's) and first fold
-  (`fold`, story's) as parts, a model's headline marked as one, so
-  `AskWork` only lays them out and wraps the headline in `.ask-headline`.
-  Outline's line holds no headline: it is cut to one line, and while the
-  run lasts it says what the run does now.
-- **`digestApart` decides where a digest goes** (`ask-fold.ts`): whole in
-  `.ask-digest`, headline above points, where no fold head carries the
-  headline (outline's closed line, or an ask with no fold); else the
-  headline in the first fold's head and the points under it. The points
-  are one `MessageText` over `pointsText`.
+- **An ask's summary is said once** (`planAskWork`). Its summary
+  (`foldWords`: what its work holds, how it ended, and in story its
+  headline, a model's marked as one) is built once and given to one place,
+  `SummaryAt`: outline's line, the head of its first fold, or nowhere when
+  it has no fold, which then draws an `.ask-outcome`. Every other fold
+  head's words are its step count, made in the same helper. Worded apart,
+  an opened outline ask said its work on its line and its first fold.
+- **Every row carries its finished words** (`AskDraw`): fold heads, the
+  digest's headline and points, the outcome, and the files label. `AskWork`
+  reads only `view.ask` and `view.running`, and a test reads the plan as a
+  reader would (`ask-fold.test.ts`, "the summary is said once").
+  **Gotcha:** words go into a row only in `planAskWork`. A row that took
+  them from `AskView` in the shell would bring the duplicate back, unseen
+  by that test.
+- **The digest goes where the summary does not carry its headline:** whole
+  in `.ask-digest`, headline above points, in outline (open or closed: the
+  line is cut to one line, and while the run lasts it says what the run
+  does now) and with no fold; else the headline leads the first fold's head
+  and the points, one `MessageText` over `pointsText`, are under it. A
+  digest with neither is no row.
+- **The first fold is `Segment.first`, not the first fold in `parts`:**
+  `segmentPath` sets it across the path, so an ask drawn as two rows would
+  still give its summary and its files to one fold.
 - **`openFold`:** `planIntent`'s `openAt` puts it before the reveal when
   the entry is in an ask's work. `perform` sets the fold's memory and
   renders `App` once, so `useReveal`'s wait finds the message drawn.

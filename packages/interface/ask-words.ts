@@ -73,21 +73,25 @@ export interface FoldPart {
   readonly byModel: boolean
 }
 
+/** Where an ask's summary is drawn: outline's line, or story's first fold. */
+export type SummaryAt = "line" | "fold"
+
 /**
- * An ask's fold line, in order, the parts drawn with " · " between them.
- * `line` is outline's: while its run lasts, what it does now and what its
- * work holds; once ended, how it ended and what its work holds. Its
- * headline is drawn under it, with the points (`digestApart`), since the
- * line is one line cut to the column's width. `fold` is story's first
- * fold: the headline, what its work holds, and how it ended.
+ * An ask's summary, in order, the parts drawn with " · " between them.
+ * `planAskWork` (`ask-fold.ts`) is its only caller. `line` is outline's:
+ * while its run lasts, what it does now and what its work holds; once
+ * ended, how it ended and what its work holds. It holds no headline, since
+ * it is one line cut to the column's width: the digest is drawn whole under
+ * it. `fold` is story's first fold: the headline, what its work holds, and
+ * how it ended.
  */
 export function foldWords(
   view: Pick<AskView, "running" | "headline" | "work" | "outcome" | "live">,
-  where: "line" | "fold",
+  at: SummaryAt,
 ): readonly FoldPart[] {
   const part = (text: string | null, byModel = false) =>
     text === null || text === "" ? [] : [{ text, byModel }]
-  if (where === "fold")
+  if (at === "fold")
     return [
       ...part(view.headline, true),
       ...part(view.work),

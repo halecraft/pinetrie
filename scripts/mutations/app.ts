@@ -1481,8 +1481,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an ask's work never folds",
     file: "packages/web/ask-work.tsx",
-    from: "  const open = foldOpen({",
-    to: "  const open = true || foldOpen({",
+    from: "  const draw = planAskWork(view, parts, { choice, density })",
+    to: '  const draw = planAskWork(view, parts, { choice: "open", density })',
     suite: "browser",
     scenario: "tools",
     expect:

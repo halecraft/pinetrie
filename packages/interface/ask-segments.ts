@@ -20,7 +20,7 @@ export type Segment =
       readonly kind: "fold"
       readonly ask: EntryId
       readonly ids: readonly [EntryId, ...EntryId[]]
-      /** The ask's first fold on this path: where its digest is drawn. */
+      /** The ask's first fold on this path: where story draws its summary and its files. */
       readonly first: boolean
     }
 

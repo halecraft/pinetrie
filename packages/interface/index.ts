@@ -18,10 +18,13 @@ export {
   type WorkBox,
 } from "./ask-bar.ts"
 export {
-  digestApart,
+  type AskDraw,
+  type AskRow,
+  type FoldFacts,
   type FoldMemory,
+  type FoldRow,
   foldMemory,
-  foldOpen,
+  planAskWork,
   toggled,
 } from "./ask-fold.ts"
 export {
@@ -41,7 +44,6 @@ export {
   type Density,
   densityWords,
   type FoldPart,
-  foldWords,
   LEFT_WORDS,
   workWords,
 } from "./ask-words.ts"

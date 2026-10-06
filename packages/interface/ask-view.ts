@@ -8,7 +8,6 @@ import {
   type AskIndex,
   askOutcome,
   askSpan,
-  type DiffSpan,
   type DigestRecord,
   type EntryId,
   firstLine,
@@ -72,7 +71,10 @@ export function lastEndedAsk(
   return row?.kind === "ask" ? row.ask : null
 }
 
-/** What an ask's work is drawn with. */
+/**
+ * What an ask's work is drawn with. Its words are drawn only through
+ * `planAskWork` (`ask-fold.ts`), which says each once.
+ */
 export interface AskView {
   readonly ask: EntryId
   readonly running: boolean
@@ -93,9 +95,8 @@ export interface AskView {
   readonly headline: string | null
   /** Its final digest's points; none while its digest is live, since those change each time. */
   readonly points: readonly string[]
-  /** How many files its turns changed, and the span a review of them reads. */
+  /** How many files its turns changed, for a review: none without a span to read (`askSpan`). */
   readonly files: number
-  readonly span: DiffSpan | null
 }
 
 /** How long a live line is shown. */
@@ -163,7 +164,9 @@ export function askView(input: {
     outlineHides: input.lastEnded === ask ? null : lastWord(index, asks, ask),
     headline: digest?.headline ?? null,
     points: digest?.final === true ? digest.points : [],
-    files: stats.files.length,
-    span: askSpan(index, asks, ask, input.revisions),
+    files:
+      askSpan(index, asks, ask, input.revisions) === null
+        ? 0
+        : stats.files.length,
   }
 }

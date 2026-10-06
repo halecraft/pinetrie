@@ -70,6 +70,11 @@ about 55 ms (S59).
   context change redraws only `MessageTable`, `BlobImage` and `AskWork`,
   which read it, and React records no such render, since their props are
   the same. So `MessageList` takes no handler for an ask's review.
+- **`AskWork` decides nothing:** it lays out `planAskWork`'s rows
+  (`@pinetrie/interface`), and reads only `view.ask` and `view.running`
+  besides. A word drawn from `AskView` here would escape the test that an
+  ask's summary is said once (`packages/interface/TECHNICAL.md`, "Asks,
+  densities and folds").
 - **A message is given only its own calls' streams** (`callStreams`), never
   `liveWork`'s map: the map is new whenever the facts are, and would redraw
   every message.
