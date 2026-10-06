@@ -219,9 +219,10 @@ until the next compaction (S120), and the host compacts at startup. So
   hash as it was (S120), so a stopped migration leaves the store to be
   planned the same way next time.
 - **One file per migration**, deleted once Duane's store has passed it; a
-  store still on its hash is then refused. A change that moves no data
-  (`0001-live-row.ts`) is a migration with no `run`: registering it is the
-  acknowledgement.
+  store still on its hash is then refused. A change that moves no data is a
+  migration with no `run`: registering it is the acknowledgement. None is
+  registered now: `0001-live-row` and `0002-records` (ADR-0095) ran, and
+  were deleted.
 
 ## Startup
 

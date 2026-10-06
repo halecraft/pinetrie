@@ -370,10 +370,6 @@ export const refused = (code: ErrCode, message: string): Refusal => ({
 
 /** A namespace of the host's own records. pi's are `pi.`, and never the host's to write. */
 export type HostNamespace = `pinetrie.${string}`
-export const isHostNamespace = (
-  namespace: string,
-): namespace is HostNamespace => namespace.startsWith("pinetrie.")
-
 /**
  * Which document a host record is written to (ADR-0063): the session's, or a
  * root's.

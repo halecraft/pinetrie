@@ -1720,22 +1720,6 @@ export const mutations: readonly Mutation[] = [
     expect: "writes sets and deletes, each in the document its target names",
   },
   {
-    name: "a move that loses a record is let through",
-    file: "apps/pinetrie/host/migrations/0002-records.ts",
-    from: "  return RECORD_SPECS.filter(\n    s =>",
-    to: "  return RECORD_SPECS.filter(\n    () => false,\n    (s: (typeof RECORD_SPECS)[number]) =>",
-    command: unit,
-    expect: "a move that drops a record is a loss",
-  },
-  {
-    name: "a root's moved values stay among pi's",
-    file: "apps/pinetrie/host/migrations/0002-records.ts",
-    from: "          for (const pkey of move.moved) d.values.delete(pkey)\n",
-    to: "",
-    command: unit,
-    expect: "is migrated on start",
-  },
-  {
     name: "a stack of moves is reported as unknown",
     file: "apps/pinetrie/host/migrations/index.ts",
     from: '    if (kind === "kyneta") continue\n',

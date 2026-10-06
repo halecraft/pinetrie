@@ -11,8 +11,6 @@
 import type { Exchange, Store } from "@kyneta/exchange"
 import { PRODUCT_NAME } from "@pinetrie/core"
 import { SCHEMA_OF, type StoredKind, storedKind } from "../policy.ts"
-import { liveRow } from "./0001-live-row.ts"
-import { rootRecords, sessionRecords } from "./0002-records.ts"
 
 /** What a migration reads with, and writes with once every read loaded. */
 export interface MigrationRun {
@@ -40,12 +38,12 @@ export interface Migration {
   readonly run?: (input: MigrationRun) => Promise<() => Promise<void>>
 }
 
-/** Every migration this build carries, oldest first. */
-export const MIGRATIONS: readonly Migration[] = [
-  liveRow,
-  sessionRecords,
-  rootRecords,
-]
+/**
+ * Every migration this build carries, oldest first. Empty: 0001-live-row and
+ * 0002-records (ADR-0095) ran on Duane's store and were deleted; restore one
+ * from the revision that deleted it for a store still on its hash.
+ */
+export const MIGRATIONS: readonly Migration[] = []
 
 /** Each stored document's id and the hash of the schema it was written under. */
 export async function readStored(
