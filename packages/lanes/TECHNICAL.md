@@ -1,7 +1,11 @@
 # `@pinetrie/lanes`: technical notes
 
-This package covers a lane's Linux container and its disk, and jj and git in
-it (ADR-0032 to ADR-0034). Your repo is `@pinetrie/repo`'s
+This package's one job is what a lane is and what runs in it: the
+container's shape, mounts, grants, lane config, jj and git in a lane, forks,
+turns, bundles, the base, the queue and the handle (ADR-0032 to ADR-0034).
+It defines the `LaneRuntime` port and implements no runtime (ADR-0103):
+`@pinetrie/docker` and `@pinetrie/container` do, and the app picks one
+(`apps/pinetrie/host/work/runtime.ts`). Your repo is `@pinetrie/repo`'s
 (`packages/repo/TECHNICAL.md`), which builds on this package: what a lane
 also runs, through a `Runner` it is given, is here (`laneBase`,
 `REVISION_READ`, `commitsOf`), and so are the names both sides use
@@ -12,7 +16,32 @@ pi (ADR-0003): the channel into a lane is `packages/pi`'s, and the host hands
 it in as an `OpenLink`.
 
 The evidence is in `docs/findings/`: S36 for the jj rules, S39 to S44 for
-containers, disks and the helper.
+containers, disks and the helper, S122 to S131 for Docker and the lane VM.
+
+## The runtime port (`runtime-port.ts`)
+
+- **A lane's container is decided once, as a value** (`planShape`): a
+  `ContainerShape` holds its name, its lane (its disk, at `/workspace`), the
+  image, memory, mounts (`planMounts`), environment, ssh and `nested`, and no
+  runtime's flags. A runtime renders it (`runArgs`); the hash of those
+  arguments is its spec label (`specHashOf`).
+- **Planners return values; a runtime turns them into commands.** A plan is a
+  list of `Step`s: a `LaneStep` (a command in the lane, through its channel)
+  or a `RuntimeOp` (a `DiskOp`, or a container made from a shape), carried
+  out by `execute` through `Runners.runtime`. A list of lane steps alone
+  needs no runtime, so `@pinetrie/repo` never has one.
+- **What any runtime must do:**
+  - a snapshot that holds what the lane wrote, after the `sync` before it
+    (`planSnapshot`), and a restore from it into a new disk;
+  - a disposable container on the lane's disk, made from its shape;
+  - `exec -i` that carries stdin's end to the helper (`execArgv`);
+  - the base kept as a snapshot like any other (`BASE_SNAPSHOT`), per
+    project;
+  - images built from a Containerfile, and a throwaway container's stdout as
+    bytes (`runInImage`), from which the lane runtime is extracted.
+- **Who implements it:** `@pinetrie/docker` (`dockerRuntime`, the Mac's lane
+  VM and Linux) and `@pinetrie/container` (Apple's `container`, deleted by
+  `PLAN-2026-10-07-containers-only`). Neither imports the other.
 
 ## Where things are
 
@@ -42,38 +71,22 @@ containers, disks and the helper.
 - `image.ts`, `runtime.ts`: the image and the lane runtime. `image.ts`
   gathers what `planImages` needs and builds what it plans.
 - `runtime-port.ts`: `LaneRuntime`, every call the host makes to a
-  runtime, and `DiskOp`. `container/`: Apple's `container` as a
-  `LaneRuntime` (`containerRuntime`), with its disks, snapshots and trim.
+  runtime, and `DiskOp`. This package implements no runtime: Apple's
+  `container` is `@pinetrie/container`'s (`containerRuntime`).
   `lane.ts`: the container, the queue, and the handle. `base.ts`: the base snapshot, and a lane's base as its
   history names it (`laneBase`), read from the lane's repo or yours.
 
 ## Disks and snapshots
 
-- **Every volume is journaled** (`--opt journal=ordered`, `createVolume`).
-  With no journal, a clone taken while the lane writes is corrupt: 0 of 70
-  were consistent in S41. With `ordered`, 687 of 687 were. `container`'s
-  default volume has no journal.
+- **Every disk operation is a `DiskOp`** (`runtime-port.ts`), carried out by
+  the runtime the host hands in: create, restore from a snapshot, snapshot,
+  delete, and delete snapshots. `@pinetrie/container` keeps disks as volumes
+  and snapshots as APFS clones (`packages/container/TECHNICAL.md`).
 - **`sync` comes before every snapshot** (`planSnapshot`). Otherwise files the
-  lane wrote but had not flushed come out empty in the clone (S41 item 1).
-- **A snapshot is `/bin/cp -c` of the volume's `volume.img`,** cloned to
-  `<name>.tmp` and renamed into place, so no snapshot file is ever
-  half-written. GNU `cp` has no `-c`.
-- **The image swap is unsupported.** A volume made from a snapshot is
-  created by `container`, then has its `volume.img` replaced by a clone
-  (`restoreVolume`, from any image path: `planDisk` passes a snapshot's
-  file). `container` 1.4.1 does not promise that works: a volume is
-  its `entity.json` and an image read by path (S40). `e2e:lanes` runs a small
-  soak on every upgrade: twenty clones taken mid-write, each checked with
-  `e2fsck` and for every record the writer had `fsync`ed. Its mutation drops
-  the journal.
-- **Deleting a clone takes about 280 ms** (S40 item 4), so
-  a `deleteSnapshots` op deletes one after another, in the background.
-- **Trimming**: after a run the host trims the stopped disk, so it gives
-  back the space the lane deleted: `container`'s `stop` runs a short-lived container with
-  `CAP_SYS_ADMIN`; a lane's own container never has that capability.
-- **Clone time rises with a disk's fragmentation, not its size**: 5–9 ms on
-  a fresh disk, up to 0.6 s on one churned for minutes (S43 item 6, S40).
-  Not isolated.
+  lane wrote but had not flushed come out empty in the snapshot (S41 item 1).
+- **The base is a snapshot like any other** (`BASE_SNAPSHOT`), which each
+  runtime keeps per project. `base.json`, what it holds, stays on the host
+  in the project's `.pinetrie/snapshots/`.
 
 ## Forks
 
@@ -163,9 +176,13 @@ containers, disks and the helper.
 ## The channel into a lane
 
 - **One channel per running lane is the only way in**: tools, the host's jj
-  and git, `sync` and bundles. It is pi's `openChannel` over
-  `container exec -i <lane> …`, and a call takes 0.3–1 ms. A `container exec`
-  per call would take 50–70 ms (S39, S43).
+  and git, `sync` and bundles. It is pi's `openChannel` over the runtime's
+  `exec -i` (`helperCommand`), and a call takes 0.3–1 ms. An `exec` per
+  call would take 25–70 ms (S39, S43, S128).
+- **The lane runtime is on the host**, in `.pinetrie/runtime/<image tag>/`
+  (`ensureRuntime`), extracted as a tar on a throwaway container's stdout
+  (`EXTRACT`, `runInImage`): every runtime has that way out, and a slot of
+  the lane VM shares it read-only like any other directory.
 - **The helper runs on the lane runtime** (`runtimeNode`):
   `/pinetrie-runtime/node/ld-linux-aarch64.so.1 --library-path … node …`. The
   runtime is copied out of pine·trie's default image into
@@ -201,15 +218,15 @@ containers, disks and the helper.
 ## Containers
 
 - **A container is disposable; the disk is the lane.** Each lane's container
-  is labelled `pinetrie.spec=<hash>` (`SPEC_LABEL`), a hash of its
-  `container run` arguments. `planContainer` decides at each start:
+  is labelled `pinetrie.spec=<hash>` (`SPEC_LABEL`), a hash of the runtime's
+  arguments for its shape (`specHashOf`). `planContainer` decides at each start:
   - missing: create it;
-  - its label differs, or it has none: recreate it on the same volume;
+  - its label differs, or it has none: recreate it on the same disk;
   - stopped: start it;
   - running with the same label: nothing to do.
 
   A container made anew starts from what `planStartFrom` decides: its
-  volume; else its newest snapshot (a restored root); else nothing, and the
+  disk; else its newest snapshot (a restored root); else nothing, and the
   lane predates lane containers. Both decisions are in `plan.ts`.
 - **A disk restored from a snapshot gets the current names**
   (`pre-rename:`). A snapshot of a lane made before b05e2252 holds
@@ -222,7 +239,8 @@ containers, disks and the helper.
   from the lane's own volume does none of it: the one-off migration renamed
   those. Remove both once no snapshot from before the rename remains.
 - **A lane's container is stopped after every run** (`runEnded` in the
-  host's `work/containers.ts`), and its disk trimmed. The next run starts it again.
+  host's `work/containers.ts`): `container`'s runtime then trims its disk,
+  Docker's does nothing more. The next run starts it again.
   Processes the agent started, dev servers included, end with the run. The
   agent is told so (ADR-0046).
 - **What reaches existing lanes this way:** a rebuilt image, changed grants,
@@ -274,11 +292,11 @@ containers, disks and the helper.
 - **Every mount is one `Mount { source, target, readonly }`**, in one list
   from `planMounts`: your working copy, pine·trie's install and runtime, the
   ignore file's directory, links, grants, shared directories and granted
-  host paths. `container`'s `renderRun` renders each with `mountArgs`, and does not know what
-  a mount is for.
-- **`mountArgs`:** `--mount` separates its fields with commas and `-v` with
-  colons, so a path with a comma takes `-v`, and one with both cannot be
-  mounted at all (S46 item 4).
+  host paths, in a `ContainerShape`. A runtime renders each, and does not
+  know what a mount is for.
+- **A path with both a comma and a colon is refused** (`planHostMounts`):
+  `container`'s `--mount` separates its fields with commas and `-v` with
+  colons, so it cannot mount one (S46 item 4).
 - **Granted host paths** (`planHostMounts`) are the roots of the commands pi
   loaded, read-only at `/mnt/host` and their host path (`hostPathInLane`), so
   none can shadow a directory of the image's (S46). Nested roots collapse. A
@@ -468,21 +486,21 @@ containers, disks and the helper.
   tells it about itself and that the note it names is there (ADR-0046). It
   has five scenarios (`apps/pinetrie/e2e/lanes/`), `main`, `images`,
   `shared`, `commands` and `contract`, and `PINETRIE_SCENARIO` picks some.
-  Without `container`, each reports SKIP with the host's own reason.
+  It runs under the runtime `PINETRIE_E2E_RUNTIME` names (`docker`, the
+  default, or `container`), and where that runtime cannot run, each scenario
+  reports SKIP with the host's own reason (`runtimeProblem`).
   Its hosts pass their own `userConfig`, so the person's own lane config
   never applies. Each
-  suite-level mutation in `scripts/mutations/lanes.ts` and `repo.ts` runs only the scenario
-  its check is in, and stops at that check. Each on `plan.ts` proves a fact
-  about a real lane that a unit test cannot: the journal, `sync`, a
+  suite-level mutation in `scripts/mutations/lanes.ts`, `repo.ts`,
+  `container.ts` and `docker.ts` runs only the scenario its check is in, and
+  stops at that check. Each on `plan.ts` proves a fact about a real lane
+  that a unit test cannot: `sync`, a
   read-only mount, a shared mount seen both ways, the git ignore variables,
   jj's config scope, an agent's own commit, the image's browser and python3,
   the runtime's rg.
   `planContainer`'s and `planStartFrom`'s rules are unit mutations. These
   are all that `e2e:lanes` proves by mutation: the host's lane work and offers
   are proven by unit tests (`apps/pinetrie/host/TECHNICAL.md`).
-- **The contract test takes about 7 s:**
-  - its volume is 4 GiB, since `e2fsck -f` walks every block group however
-    little a volume holds;
-  - its writer runs only while the clones are taken;
-  - the clones are checked four at a time, in `pinetrie-fsck:1`, an Alpine
-    image with `e2fsprogs` that it builds once and keeps.
+- **The `contract` scenario is each runtime's own:** under `container`, the
+  soak of journaled volumes (`packages/container/TECHNICAL.md`); under
+  Docker, the checks in `packages/docker/TECHNICAL.md`.

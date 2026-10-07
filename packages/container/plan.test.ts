@@ -1,4 +1,5 @@
 import { BASE_SNAPSHOT, laneNameForThread, snapshotId } from "@pinetrie/core"
+import { type LaneSpec, planMounts, planShape } from "@pinetrie/lanes"
 import { describe, expect, test } from "vitest"
 import {
   labelled,
@@ -8,8 +9,7 @@ import {
   planContainerHost,
   planDiskCommands,
   renderRun,
-} from "./container/plan.ts"
-import { type LaneSpec, planMounts, planShape } from "./plan.ts"
+} from "./plan.ts"
 
 const LANE = laneNameForThread("1")
 const HOME = "/Users/ada"
@@ -30,7 +30,7 @@ const spec: LaneSpec = {
     shared: [],
     hostPaths: [],
   }),
-  grants: { ssh: false, env: [] },
+  grants: { ssh: false, nested: false, env: [] },
   identity: { name: "agent", email: "agent@pinetrie" },
   memory: "2G",
 }
@@ -86,7 +86,12 @@ describe("renderRun: a lane's shape as `container run`", () => {
     expect(argv.join(" ")).not.toContain(HOME)
     expect(argv).not.toContain("--ssh")
     expect(
-      renderRun(planShape({ ...spec, grants: { ssh: true, env: [] } }, {})),
+      renderRun(
+        planShape(
+          { ...spec, grants: { ssh: true, nested: false, env: [] } },
+          {},
+        ),
+      ),
     ).toContain("--ssh")
   })
   test("the label goes after `run`", () => {

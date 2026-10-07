@@ -19,6 +19,7 @@ import {
   PRODUCT_NAME,
   projectTranscript,
   ROOT,
+  type SnapshotId,
 } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
 import { readLaneRecords, readPlaces } from "@pinetrie/reads"
@@ -26,6 +27,7 @@ import { rowMessage } from "@pinetrie/schema"
 import type { SessionClient } from "@pinetrie/session"
 import {
   committedProject,
+  E2E_RUNTIME,
   entriesOf,
   idleNow,
   join,
@@ -97,54 +99,78 @@ export const jj = (dir: string, ...args: string[]): string =>
     stdio: "pipe",
   }).toString()
 
-export const container = (lane: LaneName) => `pinetrie-${lane}`
+import {
+  cli,
+  container,
+  dockerDisks,
+  inDisks,
+  isRunning,
+  ownForInnerLanes,
+  removeLane,
+  snapshotFile,
+} from "../lane-runtime.ts"
+
+export {
+  cli,
+  container,
+  containerExists,
+  deleteSnapshot,
+  dockerDisks,
+  inDisks,
+  isRunning,
+  removeLane,
+  runtimeCli,
+  snapshotExists,
+} from "../lane-runtime.ts"
+
+/** The names in `dir` of snapshot `id`'s disk. */
+export function snapshotListing(
+  root: string,
+  id: SnapshotId,
+  dir: string,
+): string {
+  if (E2E_RUNTIME === "docker")
+    return inDisks('ls -a "$1"', `${dockerDisks(root).snapshot(id)}/${dir}`)
+  ensureFsckImage()
+  return sh(
+    `container run --rm --mount type=bind,source=${path.dirname(snapshotFile(root, id))},target=/s,readonly ${FSCK_IMAGE} debugfs -R "ls /${dir}" /s/${id}.img 2>/dev/null || true`,
+  )
+}
+
 /**
  * `script` run in a lane's container, as root, between runs: the container
  * is started for it and stopped after, as the host would.
  */
 export function inLane(lane: LaneName, script: string): string {
   const name = container(lane)
-  const state = sh(
-    `container inspect ${name} | grep -o '"state" *: *"[a-z]*"' || true`,
-  )
-  const wasRunning = state.includes("running")
-  if (!wasRunning) sh(`container start ${name} >/dev/null`)
+  const wasRunning = isRunning(name)
+  if (!wasRunning) cli(["start", name])
   try {
-    return execFileSync(
-      "container",
-      ["exec", name, "sh", "-c", `cd /workspace && ${script}`],
-      { stdio: "pipe" },
-    ).toString()
+    return cli(["exec", name, "sh", "-c", `cd /workspace && ${script}`])
   } catch (error) {
     // A command that fails is a check's to judge, from what it printed.
     const e = error as { stdout?: Buffer; stderr?: Buffer }
     return `${e.stdout?.toString() ?? ""}${e.stderr?.toString() ?? ""}`
   } finally {
-    if (!wasRunning) sh(`container stop ${name} >/dev/null`)
+    if (!wasRunning) cli(["stop", name])
   }
 }
 
 /** `inLane` for a lane that is running now; empty if it is not. */
 export function inLaneQuiet(lane: LaneName, script: string): string {
   try {
-    return execFileSync(
-      "container",
-      ["exec", container(lane), "sh", "-c", script],
-      { stdio: "pipe" },
-    ).toString()
+    return cli(["exec", container(lane), "sh", "-c", script])
   } catch {
     return ""
   }
 }
-/** Remove every container and volume of a host's lanes, then its project. */
+/** Remove every container and disk of a host's lanes, then its project. */
 export function cleanUp(
   doc: Parameters<typeof readLaneRecords>[0],
   dir: string,
 ) {
   for (const lane of readLaneRecords(doc).keys())
-    sh(
-      `container rm -f ${container(lane as LaneName)} >/dev/null 2>&1; container volume rm ${container(lane as LaneName)} >/dev/null 2>&1; true`,
-    )
+    removeLane(dir, lane as LaneName)
   rmSync(dir, { recursive: true, force: true })
 }
 export const jjFails = (dir: string, ...args: string[]): boolean => {
@@ -183,6 +209,8 @@ export async function sectionHost(input: {
       if (process.env.PINETRIE_E2E_LOG === "1") console.log(m)
     },
   })
+  // After the host made the shared directories it was given.
+  ownForInnerLanes(dir)
   const user = await join(
     host,
     `u${Math.random().toString(36).slice(2, 10)}`,

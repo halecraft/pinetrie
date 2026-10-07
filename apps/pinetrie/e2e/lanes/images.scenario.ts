@@ -5,12 +5,12 @@ import { ROOT } from "@pinetrie/core"
 import { PINETRIE_MOUNT } from "@pinetrie/lanes"
 import { readRevisions } from "@pinetrie/reads"
 import type { Checks } from "../checks.ts"
-import { containerProblem, rootRecordsOf } from "../harness.ts"
+import { rootRecordsOf, runtimeProblem } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
 import { imageHost, START_AGENT, sectionHost } from "./support.ts"
 
 export const scenario: Scenario = {
-  needs: containerProblem,
+  needs: runtimeProblem,
   run: ({ check }) => imagesSection(check),
 }
 

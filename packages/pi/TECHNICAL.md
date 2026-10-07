@@ -424,11 +424,13 @@ item 18, and in `lanes.test.ts` against the harness.
     turn's disk is cloned, and no tool touches the disk until the clone is
     done.
 - **The channel** (`openChannel`) is one long-lived process: the helper,
-  started by `container exec -i`, speaking `lane-protocol.ts`, one JSON line
-  per message.
+  started by the lane runtime's `execArgv` (`helperCommand`: `docker exec -i`
+  or `container exec -i`), speaking `lane-protocol.ts`, one JSON line per
+  message. Its input's end must reach the helper: through the lane VM's
+  launcher it does, as a half-close (S128).
   - Requests are answered concurrently: pi runs a turn's calls in parallel.
-  - The host closes the channel by ending the helper's input. Killing
-    `container exec` does not reach the guest (S43 item 2).
+  - The host closes the channel by ending the helper's input. Killing the
+    `exec` process does not reach the guest (S43 item 2).
   - A helper that exits fails every waiting call with its stderr.
   - `laneRunner(channel)` gives the host's own jj and git a `run` request:
     exit status, stdout and stderr apart, and bytes for a bundle. pi's `exec`

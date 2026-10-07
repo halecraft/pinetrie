@@ -47,9 +47,15 @@ importers:
       '@kyneta/websocket-transport':
         specifier: link:../../../kyneta/workspace/pineta/packages/exchange/transports/websocket
         version: link:../../../kyneta/workspace/pineta/packages/exchange/transports/websocket
+      '@pinetrie/container':
+        specifier: workspace:*
+        version: link:../../packages/container
       '@pinetrie/core':
         specifier: workspace:*
         version: link:../../packages/core
+      '@pinetrie/docker':
+        specifier: workspace:*
+        version: link:../../packages/docker
       '@pinetrie/interface':
         specifier: workspace:*
         version: link:../../packages/interface
@@ -80,6 +86,9 @@ importers:
       '@pinetrie/session':
         specifier: workspace:*
         version: link:../../packages/session
+      '@pinetrie/vm':
+        specifier: workspace:*
+        version: link:../../packages/vm
       '@pinetrie/web':
         specifier: workspace:*
         version: link:../../packages/web
@@ -97,7 +106,25 @@ importers:
         specifier: 8.18.1
         version: 8.18.1
 
+  packages/container:
+    dependencies:
+      '@pinetrie/core':
+        specifier: workspace:*
+        version: link:../core
+      '@pinetrie/lanes':
+        specifier: workspace:*
+        version: link:../lanes
+
   packages/core: {}
+
+  packages/docker:
+    dependencies:
+      '@pinetrie/core':
+        specifier: workspace:*
+        version: link:../core
+      '@pinetrie/lanes':
+        specifier: workspace:*
+        version: link:../lanes
 
   packages/interface:
     dependencies:
@@ -259,6 +286,12 @@ importers:
       '@pinetrie/schema':
         specifier: workspace:*
         version: link:../schema
+
+  packages/vm:
+    dependencies:
+      '@pinetrie/core':
+        specifier: workspace:*
+        version: link:../core
 
   packages/web:
     dependencies:

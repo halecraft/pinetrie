@@ -167,16 +167,6 @@ export const mutations: readonly Mutation[] = [
     expect: "the gate opens only after a turn's snapshot finishes",
   },
   {
-    name: "volumes are created without the journal",
-    file: "packages/lanes/container/plan.ts",
-    from: '  "--opt",\n  "journal=ordered",\n',
-    to: "",
-    suite: "lanes",
-    scenario: "contract",
-    expect:
-      "every clone of a journaled volume taken mid-write checks clean and holds every fsynced record",
-  },
-  {
     name: "a turn's snapshot skips sync",
     file: plan,
     from: '  inLane("sync"),\n',
@@ -407,22 +397,6 @@ export const mutations: readonly Mutation[] = [
     to: "): string => specHash([shape.name])",
     command: unit,
     expect: "specHashOf: the hash of the runtime's arguments",
-  },
-  {
-    name: "container restores a volume without the snapshot's file",
-    file: "packages/lanes/container/plan.ts",
-    from: "          createVolume(volume),\n          ...cloneFile(\n            snapshotFile(paths, op.from),\n            volumeImage(paths, volume),\n          ),\n",
-    to: "          createVolume(volume),\n",
-    command: unit,
-    expect: "a restore creates the volume, then clones the snapshot's file",
-  },
-  {
-    name: "container fails a delete of a volume that is not there",
-    file: "packages/lanes/container/plan.ts",
-    from: "        ignoreFailure: true,\n",
-    to: "        ignoreFailure: false,\n",
-    command: unit,
-    expect: "deletes succeed when there is nothing to delete",
   },
   {
     name: "a runtime with jj alone is taken as complete",

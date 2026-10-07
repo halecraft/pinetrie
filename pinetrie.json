@@ -1,1 +1,1 @@
-{ "publish": { "catchUp": true } }
+{ "publish": { "catchUp": true }, "lanes": { "nested": true } }

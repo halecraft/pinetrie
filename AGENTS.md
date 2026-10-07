@@ -11,7 +11,11 @@ reasons are the ADRs, one file each in `docs/adrs/`. Each package has a
 ## Tools and environment
 
 - **pnpm only** (`pnpm@10.18.0`). Read `pnpm install`'s output rather than
-  trusting a quiet exit.
+  trusting a quiet exit. In a lane, never let pnpm rewrite `pnpm-lock.yaml`:
+  the lane's store has only Linux packages, and a rewrite drops every
+  macOS one (`@rollup/rollup-darwin-arm64` among them). Install with
+  `--frozen-lockfile`; for a new workspace package, add its importer and
+  links to the lockfile by hand.
 - **Node 24, native type stripping.** TypeScript runs as-is: there is no build
   step for it, and a type error does not stop a run, so check with
   `npx tsc --noEmit`.
@@ -47,7 +51,7 @@ reasons are the ADRs, one file each in `docs/adrs/`. Each package has a
 | unit, conformance, e2e | `pnpm run verify` |
 | with a real model | `pnpm run e2e:live` (the `live` scenario alone; needs a model key) |
 | in a real browser | `pnpm run e2e:browser` (without `container`, its offer and review checks report SKIP; on the Mac, `pnpm --filter @pinetrie/app exec playwright install chromium-headless-shell` once) |
-| lanes of their own, in containers | `pnpm run e2e:lanes` (needs Apple's `container` running, outside the sandbox; without it every scenario reports SKIP) |
+| lanes of their own, in containers | `pnpm run e2e:lanes` under Docker: in a lane whose project grants `lanes.nested` (pine·trie's does), on the Mac the lane VM (`pnpm vm:build` first), on Linux Docker with a btrfs lanes directory. `PINETRIE_E2E_RUNTIME=container` runs it under Apple's `container`, outside the sandbox. Where the runtime cannot run, every scenario reports SKIP with why |
 | deliberate bugs | `pnpm mutate scripts/mutations/<list>.ts [name]` |
 
 A check without a proof it can fail is not yet a check. A new check comes with a

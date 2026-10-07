@@ -35,7 +35,7 @@ import { rowMessage } from "@pinetrie/schema"
 import type { Checks } from "../checks.ts"
 import {
   committedProject,
-  containerProblem,
+  E2E_RUNTIME,
   entriesOf,
   entryMessageIn,
   idleNow,
@@ -43,6 +43,7 @@ import {
   lanesOf,
   moveRootTo,
   rootRecordsOf,
+  runtimeProblem,
   setUpAccepted,
   startSuiteHost,
   treeOf,
@@ -55,22 +56,28 @@ import {
   bringUpToDate,
   cleanUp,
   container,
+  containerExists,
+  deleteSnapshot,
   inLane,
   inLaneQuiet,
   jj,
   jjFails,
   queueCommand,
+  removeLane,
   START_AGENT,
-  sh,
+  snapshotExists,
 } from "./support.ts"
 
 export const scenario: Scenario = {
-  needs: containerProblem,
-  run: ({ check }) => mainSection(check),
+  needs: runtimeProblem,
+  run: ({ check, skip }) => mainSection(check, skip),
 }
 
 // ── the main section: one host, checks 1–8 ────────────────────────────
-async function mainSection(check: Checks["check"]): Promise<void> {
+async function mainSection(
+  check: Checks["check"],
+  skip: Checks["skip"],
+): Promise<void> {
   const home = homedir()
   const marker = path.join(home, `.pinetrie-e2e-marker-${process.pid}`)
   writeFileSync(marker, "visible only on the host\n")
@@ -216,11 +223,22 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       bash?.includes("No such file or directory") === true &&
         bash.includes("/mnt/host-working-copy/shared.txt"),
     )
-    check(
-      "with ssh granted, the lane has SSH_AUTH_SOCK",
-      /ssh: \S+/.test(bash ?? ""),
-      `${bash?.match(/ssh: .*/)?.[0] ?? "none"}`,
+    // On Linux, Docker forwards the host's own agent, and a host may have none.
+    if (
+      E2E_RUNTIME === "docker" &&
+      process.platform !== "darwin" &&
+      process.env.SSH_AUTH_SOCK === undefined
     )
+      skip(
+        "with ssh granted, the lane has SSH_AUTH_SOCK",
+        "this host has no ssh agent to forward",
+      )
+    else
+      check(
+        "with ssh granted, the lane has SSH_AUTH_SOCK",
+        /ssh: \S+/.test(bash ?? ""),
+        `${bash?.match(/ssh: .*/)?.[0] ?? "none"}`,
+      )
 
     // ── revisions: in the document, and in your repo by bundle ─────────────
     // Lane one's first run committed who.txt; its prompt and that message each
@@ -1073,7 +1091,6 @@ async function mainSection(check: Checks["check"]): Promise<void> {
     )
 
     // ── 7. Archiving keeps each lane's newest snapshot; restoring runs again ─
-    const snapshots = path.join(project, ".pinetrie", "snapshots")
     const rootOne =
       one?.tip === undefined || one.tip === null
         ? null
@@ -1114,8 +1131,8 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       )
     if (rootOne !== null) await moveRootTo(wu, entryId(rootOne), "closed")
     await wh.quiet()
-    const kept = before.filter(r =>
-      existsSync(path.join(snapshots, `${r.snapshot}.img`)),
+    const kept = before.filter(
+      r => r.snapshot !== null && snapshotExists(project, r.snapshot),
     )
     const lanesInRoot = new Set(before.map(r => r.lane))
     const newestKept = [...lanesInRoot].every(lane => {
@@ -1128,7 +1145,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       kept.length === lanesInRoot.size &&
         newestKept &&
         one !== undefined &&
-        !sh(`container list -a --quiet`).includes(container(one.name)),
+        !containerExists(container(one.name)),
       `${before.length} → ${kept.length}`,
     )
     check(
@@ -1166,12 +1183,10 @@ async function mainSection(check: Checks["check"]): Promise<void> {
     // containers: its tools say so, and name what to do.
     if (two !== undefined) {
       await wh.quiet()
-      sh(
-        `container rm -f ${container(two.name)} >/dev/null 2>&1; container volume rm ${container(two.name)} >/dev/null 2>&1; true`,
-      )
+      removeLane(project, two.name)
       for (const r of rootRecordsOf(wh, readRevisions).values())
         if (r.lane === two.name && r.snapshot !== null)
-          rmSync(path.join(snapshots, `${r.snapshot}.img`), { force: true })
+          deleteSnapshot(project, r.snapshot)
     }
     script.use([
       { tool: "bash", args: { command: "echo still" } },

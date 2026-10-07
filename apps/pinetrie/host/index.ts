@@ -15,7 +15,12 @@ import { Interpret, Reject } from "@kyneta/schema"
 import { WebsocketServerTransport } from "@kyneta/websocket-transport/server"
 import type { BlobStore, CardId, LaneName } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
-import { configJson, readConfigFile, userConfigFile } from "@pinetrie/lanes"
+import {
+  configJson,
+  decodeLaneConfig,
+  readConfigFile,
+  userConfigFile,
+} from "@pinetrie/lanes"
 import {
   createAgent,
   createScribe,
@@ -150,9 +155,16 @@ export interface StartHostOptions {
   readonly lanes?: boolean
   /**
    * Whether lanes may have containers at all. False makes the project work
-   * directly without asking `container`: a suite that must run anywhere.
+   * directly without asking a runtime: a suite that must run anywhere.
    */
   readonly containers?: boolean
+  /**
+   * When the chosen runtime cannot run lanes here: `stop`, the default,
+   * throws `RuntimeRefused` and the host does not start (`server.ts` prints
+   * why); `direct` makes the project work directly, its reason the
+   * runtime's words, as a suite's host must where no runtime runs.
+   */
+  readonly runtimeRefused?: "stop" | "direct"
   /**
    * The user's lane config (ADR-0035), by default
    * `$XDG_CONFIG_HOME/pinetrie/config.json`. A suite passes its own file rather
@@ -230,6 +242,7 @@ export async function startHost({
   project = null,
   lanes = true,
   containers = true,
+  runtimeRefused = "stop",
   userConfig = userConfigFile(),
   agentDir,
   store: storeFile = null,
@@ -351,6 +364,9 @@ export async function startHost({
     dir: toolsIn,
     defaultDirect: !lanes,
     containers,
+    runtimeRefused,
+    machine: decodeLaneConfig(userJson, toolsIn ?? "/", false).machine,
+    log,
   })
   const projectRoot = found?.project.root ?? project?.dir ?? null
   const bannerConfig = decodeBannerConfig(userJson)
@@ -592,7 +608,7 @@ export async function startHost({
    */
   async function quiet(): Promise<void> {
     await keeper.idle()
-    // Lanes' own queues: snapshots, fetches, stops and trims after a run.
+    // Lanes' own queues: snapshots, fetches and stops after a run.
     await work.quiet()
     await exchange.flush()
   }

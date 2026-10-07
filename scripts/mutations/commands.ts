@@ -55,14 +55,6 @@ export const mutations: readonly Mutation[] = [
     expect: "never your home directory, / or pi's agent directory",
   },
   {
-    name: "mountArgs always uses --mount",
-    file: "packages/lanes/container/plan.ts",
-    from: '  if (!paths.includes(","))',
-    to: "  if (true)",
-    command: vitest("packages/lanes"),
-    expect: "mountArgs: --mount; -v for a path with a comma",
-  },
-  {
     name: "commands pi dropped for their names are not gathered",
     file: "packages/pi/commands.ts",
     from: "  for (const s of lostSkills) if (s !== null) await skill(s, true)\n",

@@ -15,20 +15,18 @@ import path from "node:path"
 import { atEntry, entryId, ROOT } from "@pinetrie/core"
 import { readRevisions } from "@pinetrie/reads"
 import type { Checks } from "../checks.ts"
-import { containerProblem, rootRecordsOf, SUITE_CONFIG } from "../harness.ts"
+import { rootRecordsOf, runtimeProblem, SUITE_CONFIG } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
 import {
   BRANCH,
-  ensureFsckImage,
-  FSCK_IMAGE,
   jj,
   START_AGENT,
   sectionHost,
-  sh,
+  snapshotListing,
 } from "./support.ts"
 
 export const scenario: Scenario = {
-  needs: containerProblem,
+  needs: runtimeProblem,
   run: ({ check }) => sharedSection(check),
 }
 
@@ -42,7 +40,10 @@ async function sharedSection(check: Checks["check"]): Promise<void> {
   const userConfig = path.join(path.dirname(store), "config.json")
   writeFileSync(
     userConfig,
-    JSON.stringify({ ...SUITE_CONFIG, lanes: { shared: [".plans", ".jj/x"] } }),
+    JSON.stringify({
+      ...SUITE_CONFIG,
+      lanes: { ...SUITE_CONFIG.lanes, shared: [".plans", ".jj/x"] },
+    }),
   )
   let h = await sectionHost({
     files: { "shared.txt": "one\n" },
@@ -90,11 +91,10 @@ async function sharedSection(check: Checks["check"]): Promise<void> {
     const newest = [...rootRecordsOf(h.host, readRevisions).values()]
       .filter(r => r.lane === writer?.name && r.snapshot !== null)
       .sort((a, b) => (a.entry < b.entry ? 1 : -1))[0]
-    const snapshots = path.join(dir, ".pinetrie", "snapshots")
-    ensureFsckImage()
-    const inSnapshot = sh(
-      `container run --rm --mount type=bind,source=${snapshots},target=/s,readonly ${FSCK_IMAGE} debugfs -R "ls /.plans" /s/${newest?.snapshot}.img 2>/dev/null || true`,
-    )
+    const inSnapshot =
+      newest?.snapshot === null || newest === undefined
+        ? ""
+        : snapshotListing(dir, newest.snapshot, ".plans")
     // A branch at that turn: its .plans is the live mount, not the snapshot's.
     writeFileSync(path.join(dir, ".plans", "later.md"), "after the fork\n")
     h.script.use([

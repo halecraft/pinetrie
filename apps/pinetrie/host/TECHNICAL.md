@@ -275,9 +275,9 @@ any refresh they queued.
   1. the documents, then the host's records (`createRecords`, ADR-0095),
      which every module that writes a record takes
      (`Pick<Records, "writeValues">`), then the scribe;
-  2. the project (`findProject`), then pi's setup (`loadPiSetup`), which
-     loads from its root and reads no document; the title-model and banner
-     logs follow it;
+  2. the project and its lanes' runtime (`findProject`, `work/runtime.ts`),
+     then pi's setup (`loadPiSetup`), which loads from its root and reads no
+     document; the title-model and banner logs follow it;
   3. the documents' keeper, the roots `planLoads` names, the directory,
      banners, digests, titles, names, provenance and the split call, each
      with the records and the setup;
@@ -293,11 +293,31 @@ any refresh they queued.
   for a drain, a drain sends through the commands), as closures that run
   only once both exist.
 
+- **The runtime is chosen at startup** (`work/runtime.ts`, ADR-0103) from
+  the user config's `lanes.runtime` (`machineConfig`): `container`, or
+  Docker, which is the lane VM's on the Mac and the host's own on Linux
+  (`planRuntime`).
+  - **A runtime that cannot run lanes stops startup** (`RuntimeRefused`):
+    `server.ts` prints its words, each with its fix, and exits 1. The
+    refusals: no docker CLI or daemon, no buildx, a lanes directory not on
+    btrfs with `user_subvol_rm_allowed` (Linux), and on the Mac the VM's
+    (no image, no Xcode tools, not Apple silicon or older than macOS 13, a
+    full VM). A folder with no jj repo still works directly.
+  - **On the Mac the host takes a lease** on a slot of the user's lane VM
+    (`leaseVm`), starting the VM if need be, then removes every container
+    labelled with its slot (`sweepSlot`): a host that died holding the slot
+    left them. The slot is filled once setup knows every directory a lane
+    mounts (`Found.ready`, before the base's refresh, the first lane), and
+    never replaced while the host runs: a changed grant or shared directory
+    takes a restart, as ADR-0035 has it.
+  - **Docker's startup sweep** (`sweepProjects`, after the fill) removes the
+    containers and disks of every project whose folder is gone.
+
 ## Shutdown
 
 `planShutdown` (`shutdown.ts`) returns the order, and `shutdown()` carries
 it out, each step but `server` in its own `try`: `intake` (seats, control), `close` (the documents' keeper and the owner of your repo, which stops its watch), `quiet`, `agent` (every harness),
-`scribe` (every pi session, so a later write is refused in any document), `work` (the containers), `exchange`, `server`. Only a failure in `server`
+`scribe` (every pi session, so a later write is refused in any document), `work` (the containers, then, on the Mac, the lease: its slot empties, and the VM outlives the host until no lease is left for 10 minutes), `exchange`, `server`. Only a failure in `server`
 rejects `shutdown()`.
 
 - **`shutdown()` runs once.** A later call returns the first call's
@@ -680,7 +700,8 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 | `update.ts` | an update (`withLaneStarted`, then one queued step, `planSettle` and `applySettle`); `catchUpInRun`, the agent's `catch_up`; `askedAboutConflict`, which asks jj for conflicts in the lane's copy |
 | `split.ts` | a split's prompt, and its end (`finishSplit`, which moves the lane back to its tip even when a step before it throws: left on the stack, the lane refuses every catch-up) |
 | `archive.ts` | a close's or a reopen's teardown (`planArchive`'s), off the documents' keeper |
-| `runtime.ts` | the composition root for lanes' runtime: `findProject`, and the `LaneRuntime` lanes of their own get (`Setup.runtime`) |
+| `runtime.ts` | the composition root, the one place that picks the runtime: gathers, plans (`planRuntime`, `planBuilder` for `pnpm vm:build`), and builds the `LaneRuntime` lanes of their own get (`Setup.runtime`), wiring `@pinetrie/vm`'s lease to `@pinetrie/docker` on the Mac |
+| `convert.ts` | pre-docker: a lane made under `container` moved to Docker at its first start there, its disk piped as a tar from a `container` into Docker's disks helper; the one module that holds both runtimes |
 | `disk.ts` | the snapshot on a lane's queue, and the lockfile's hash |
 
 - **State lives where it changes.** What startup found is `Setup`'s, fixed

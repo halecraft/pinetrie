@@ -1,8 +1,8 @@
 // pi/lane-helper — the guest side of a lane's channel (ADR-0034, S43, S44).
 //
-// The host starts this once per running lane, as
-// `container exec -i <lane> <runtime loader> … node /pinetrie/packages/pi/lane-helper.ts`,
-// and speaks `lane-protocol.ts` over its stdin and stdout. It serves:
+// The host starts this once per running lane, through its runtime's
+// `exec -i` (`docker exec -i` or `container exec -i`, `helperCommand`):
+// `<runtime loader> … node /pinetrie/packages/pi/lane-helper.ts`. It speaks `lane-protocol.ts` over its stdin and stdout. It serves:
 // - pi's own `NodeExecutionEnv`, so pi's tools run in the lane unchanged;
 // - `run` requests, the host's own jj and git, by `execFile` with no shell.
 // Requests are handled concurrently: pi runs a turn's tool calls in parallel
@@ -10,8 +10,8 @@
 //
 // It runs on the lane runtime's Node through its bundled loader, so
 // `process.execPath` is the loader, not Node (S44 item 2): nothing here may
-// re-execute it. The host closes the channel by ending stdin: killing
-// `container exec` does not reach the guest (S43 item 2).
+// re-execute it. The host closes the channel by ending stdin: killing the
+// `exec` process does not reach the guest (S43 item 2).
 
 import { execFile } from "node:child_process"
 import readline from "node:readline"

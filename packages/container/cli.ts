@@ -1,9 +1,14 @@
-// lanes/container/cli — the `container` commands a lane runtime runs.
+// container/cli — the `container` commands a lane runtime runs.
 
 import path from "node:path"
-import type { ImagePlan } from "../plan.ts"
-import { describeFailure, hostBytesRunner, type Ran, run } from "../run.ts"
-import type { DiskOp } from "../runtime-port.ts"
+import {
+  type DiskOp,
+  describeFailure,
+  hostBytesRunner,
+  type ImagePlan,
+  type Ran,
+  run,
+} from "@pinetrie/lanes"
 import { containerFacts } from "./facts.ts"
 import { type DiskPaths, parseImagePath, planDiskCommands } from "./plan.ts"
 

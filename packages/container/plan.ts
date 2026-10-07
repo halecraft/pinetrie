@@ -1,4 +1,4 @@
-// lanes/container/plan — Apple's `container` as a lane runtime: every
+// container/plan — Apple's `container` as a lane runtime: every
 // decision, pure (ADR-0034). A lane's disk is a volume of its own, an ext4
 // image, and a snapshot is an APFS clone of that image under the project's
 // `.pinetrie/snapshots/` (S40, S41).
@@ -10,12 +10,13 @@ import {
   WORKSPACE_ROOT,
 } from "@pinetrie/core"
 import {
+  type ContainerFacts,
   type ContainerShape,
+  type DiskOp,
   laneContainer,
   type Mount,
   type ProjectRoot,
-} from "../plan.ts"
-import type { ContainerFacts, DiskOp } from "../runtime-port.ts"
+} from "@pinetrie/lanes"
 
 /** A new volume's size. The image is sparse: only written blocks take space. */
 const DISK_SIZE = "64G"

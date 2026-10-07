@@ -13,7 +13,8 @@
       "!!**/.pnpm-store",
       "!!sandbox",
       "!!.pinetrie",
-      "!!.plans"
+      "!!.plans",
+      "!!packages/docker/seccomp-*.json"
     ]
   },
   "formatter": {

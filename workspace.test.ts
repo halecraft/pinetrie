@@ -125,8 +125,33 @@ test("only the page and the app depend on interface: nothing below it does", () 
   assert.deepEqual(declaring, ["apps/pinetrie", "packages/web"])
 })
 
-test("lanes declares only core: it runs container, jj and git, never pi or the document", () => {
+test("lanes declares only core: it runs jj and git in a lane, on a runtime it is handed, never pi or the document", () => {
   assert.deepEqual(deps(read("packages/lanes")), ["@pinetrie/core"])
+})
+
+/** The packages that run lanes, each a `LaneRuntime` (ADR-0103). */
+const RUNTIMES = ["@pinetrie/container", "@pinetrie/docker", "@pinetrie/vm"]
+
+test("a runtime declares only core, and lanes when it runs lanes; never another runtime", () => {
+  for (const dir of WORKSPACE) {
+    const m = read(dir)
+    if (m.name === undefined || !RUNTIMES.includes(m.name)) continue
+    const extra = deps(m).filter(
+      d => d !== "@pinetrie/core" && d !== "@pinetrie/lanes",
+    )
+    assert.deepEqual(extra, [], `${m.name} declares ${extra.join(", ")}`)
+  }
+})
+
+test("vm declares only core: it knows nothing of lanes", () => {
+  assert.deepEqual(deps(read("packages/vm")), ["@pinetrie/core"])
+})
+
+test("only the app declares a runtime: it is the one place that picks one", () => {
+  const declaring = WORKSPACE.filter(dir =>
+    allDeps(read(dir)).some(d => RUNTIMES.includes(d)),
+  ).sort()
+  assert.deepEqual(declaring, ["apps/pinetrie"])
 })
 
 test("repo declares only core, keeper and lanes: it runs jj and git on your repo, never pi or the document", () => {

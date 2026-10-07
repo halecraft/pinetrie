@@ -62,18 +62,22 @@ export function createContainers(deps: {
   const { basics, setup, registry, keeper, offers } = deps
   const { session, docs, log } = basics
 
+  /** The snapshots of `lane`'s own records, newest first. */
+  async function ownSnapshots(lane: LaneName): Promise<SnapshotId[]> {
+    const doc = await docs.laneDoc(lane)
+    if (doc === null) return []
+    return [...readRevisions(doc).values()]
+      .filter(r => r.lane === lane)
+      .sort((a, b) => (a.entry < b.entry ? 1 : -1))
+      .flatMap(r => (r.snapshot === null ? [] : [r.snapshot]))
+  }
+
   /** The newest snapshot of `lane`'s own records that is still there. */
   async function newestSnapshot(lane: LaneName): Promise<SnapshotId | null> {
     const { runtime } = setup
     if (runtime === null) return null
-    const doc = await docs.laneDoc(lane)
-    if (doc === null) return null
-    const own = [...readRevisions(doc).values()]
-      .filter(r => r.lane === lane && r.snapshot !== null)
-      .sort((a, b) => (a.entry < b.entry ? 1 : -1))
-    for (const r of own)
-      if (r.snapshot !== null && (await runtime.snapshotExists(r.snapshot)))
-        return r.snapshot
+    for (const id of await ownSnapshots(lane))
+      if (await runtime.snapshotExists(id)) return id
     return null
   }
 
@@ -94,7 +98,11 @@ export function createContainers(deps: {
       await runtime.remove(container)
     }
     if (decided === "create" || decided === "recreate") {
-      const disk = await runtime.diskExists(lane)
+      // pre-docker: a lane made under `container` has its disk moved first.
+      const disk =
+        (await runtime.diskExists(lane)) ||
+        (setup.convert !== null &&
+          (await setup.convert(lane, await ownSnapshots(lane))))
       const newest = disk ? null : await newestSnapshot(lane)
       const from = planStartFrom({ disk, newest })
       switch (from.kind) {

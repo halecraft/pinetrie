@@ -19,12 +19,12 @@ import { rowMessage } from "@pinetrie/schema"
 import type { Checks } from "../checks.ts"
 import {
   committedProject,
-  containerProblem,
   entriesOf,
   idleNow,
   join,
   lanesOf,
   rootRecordsOf,
+  runtimeProblem,
   setUpAccepted,
   startSuiteHost,
   treeOf,
@@ -34,7 +34,7 @@ import type { Scenario } from "../scenario.ts"
 import { at, BRANCH, cleanUp, jj, START_AGENT } from "./support.ts"
 
 export const scenario: Scenario = {
-  needs: containerProblem,
+  needs: runtimeProblem,
   run: ({ check }) => catchUpSection(check),
 }
 

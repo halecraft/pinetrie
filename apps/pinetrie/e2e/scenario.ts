@@ -13,7 +13,7 @@ import { type Checks, createChecks, isStop } from "./checks.ts"
 export interface Scenario {
   /**
    * Why it cannot run in this environment, or null: `container` missing
-   * (`containerProblem`, `harness.ts`), or `PINETRIE_LIVE` unset.
+   * (`runtimeProblem`, `harness.ts`), or `PINETRIE_LIVE` unset.
    */
   readonly needs?: () => Promise<string | null>
   run(checks: Checks): Promise<void>

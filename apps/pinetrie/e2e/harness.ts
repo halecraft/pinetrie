@@ -1,14 +1,14 @@
 // e2e/harness — what the end-to-end suites share besides their checks
 // (checks.ts) and scenarios (scenario.ts): waiting, throwaway projects,
-// joining a host, a host for a body (`withHost`), why `container` is unusable
-// here (`containerProblem`), and their model.
+// joining a host, a host for a body (`withHost`), why the suites' runtime
+// cannot give lanes their own here (`runtimeProblem`), and their model.
 //
 // Deliberately not in core/: core is pure domain logic and imports nothing.
 // A test harness is neither.
 
 import { execFileSync } from "node:child_process"
 import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
-import { tmpdir } from "node:os"
+import { homedir, tmpdir } from "node:os"
 import path from "node:path"
 import { NotAWriterError } from "@kyneta/exchange"
 import { subscribe } from "@kyneta/schema"
@@ -17,6 +17,7 @@ import {
   type CardRecord,
   draftingOf,
   type EntryId,
+  errorText,
   type LaneName,
   type LaneView,
   moveOf,
@@ -25,7 +26,8 @@ import {
   type RootId,
   type TreeIndex,
 } from "@pinetrie/core"
-import { prepareContainerHost } from "@pinetrie/lanes"
+import { dockerWords } from "@pinetrie/docker"
+import type { RuntimeChoice } from "@pinetrie/lanes"
 import { scriptedModel } from "@pinetrie/pi"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import {
@@ -56,11 +58,13 @@ import {
   connectSession,
   type SessionClient,
 } from "@pinetrie/session"
+import { vmProblem, vmStateDir } from "@pinetrie/vm"
 import {
   type RunningHost,
   type StartHostOptions,
   startHost,
 } from "../host/index.ts"
+import { findProject, RuntimeRefused } from "../host/work/runtime.ts"
 
 /**
  * Poll until `pred` holds. Resolves with the elapsed milliseconds, or -1 on
@@ -218,11 +222,22 @@ export const suiteModel = () =>
   scriptedModel({ tokensPerSecond: 400, answer: { text: SUITE_REPLY } })
 
 /**
+ * The runtime the suites' hosts give lanes of their own (ADR-0103):
+ * `PINETRIE_E2E_RUNTIME`, `docker` (the default) or `container`, through
+ * each host's user config, so one suite runs under either.
+ */
+export const E2E_RUNTIME: RuntimeChoice =
+  process.env.PINETRIE_E2E_RUNTIME === "container" ? "container" : "docker"
+
+/**
  * The suites' user config: titles off, so a tab keeps its first line and no
  * request is made that a scenario did not ask for (ADR-0074). A scenario
  * that writes a config of its own spreads this into it.
  */
-export const SUITE_CONFIG = { titles: { enabled: false } } as const
+export const SUITE_CONFIG = {
+  titles: { enabled: false },
+  lanes: { runtime: E2E_RUNTIME },
+} as const
 
 let suiteConfig: string | undefined
 
@@ -238,12 +253,18 @@ function suiteConfigFile(): string {
 
 /**
  * `startHost` with `SUITE_CONFIG` unless the scenario names its own file,
- * so no suite reads the person's `~/.config/pinetrie/config.json`.
+ * so no suite reads the person's `~/.config/pinetrie/config.json`. Where the
+ * suites' runtime cannot run, its project works directly with the runtime's
+ * words, and a scenario that needs lanes was skipped by `runtimeProblem`.
  */
 export const startSuiteHost = (
   options: StartHostOptions,
 ): Promise<RunningHost> =>
-  startHost({ userConfig: suiteConfigFile(), ...options })
+  startHost({
+    userConfig: suiteConfigFile(),
+    runtimeRefused: "direct",
+    ...options,
+  })
 
 /** Start a host, give it to `body`, and shut it down however `body` ends. */
 export async function withHost<T>(
@@ -259,21 +280,61 @@ export async function withHost<T>(
 }
 
 /**
- * Why lanes cannot have containers of their own here, or null: the reason the
- * host itself would give (`prepareContainerHost`, `planContainerHost`), on a
- * throwaway project. A scenario that needs `container` gives this as its
- * `needs`.
+ * Why the suites' runtime (`E2E_RUNTIME`) cannot give lanes their own here,
+ * or null: the reason the host itself would give (`findProject`), on a
+ * throwaway project. A scenario that needs lanes of their own gives this as
+ * its `needs`. On the Mac under Docker it takes no lease: a lease would
+ * start the person's VM, with whatever launcher this checkout holds (a
+ * mutant's, in a mutation run), and leave it running for 10 minutes.
  */
-export async function containerProblem(): Promise<string | null> {
-  const dir = committedProject("pinetrie-container-", {
-    "README.md": "probe\n",
-  })
+export async function runtimeProblem(): Promise<string | null> {
+  if (E2E_RUNTIME === "docker" && process.platform === "darwin")
+    return macDockerProblem()
+  const dir = committedProject("pinetrie-runtime-", { "README.md": "probe\n" })
   try {
-    const { project } = await prepareContainerHost(dir)
-    return project.kind === "direct" ? project.reason : null
+    const found = await findProject({
+      dir,
+      defaultDirect: false,
+      containers: true,
+      machine: { runtime: E2E_RUNTIME, slots: null },
+      log: () => {},
+    })
+    try {
+      return found === null || found.project.kind === "direct"
+        ? found?.project.kind === "direct"
+          ? found.project.reason
+          : "no project"
+        : null
+    } finally {
+      await found?.close()
+    }
+  } catch (error) {
+    return error instanceof RuntimeRefused ? error.message : errorText(error)
   } finally {
     rmSync(dir, { recursive: true, force: true })
   }
+}
+
+/** The lane VM's refusal, else the docker CLI's or buildx's, asked locally. */
+async function macDockerProblem(): Promise<string | null> {
+  const vm = await vmProblem(vmStateDir(process.env, homedir()))
+  if (vm !== null) return vm
+  const answers = (args: readonly string[]) => {
+    try {
+      execFileSync("docker", [...args], { stdio: "pipe" })
+      return null
+    } catch (error) {
+      const e = error as { stderr?: Buffer }
+      return e.stderr?.toString().trim().split("\n")[0] ?? ""
+    }
+  }
+  const cli = answers(["--version"])
+  if (cli !== null)
+    return dockerWords({ kind: "no-docker", platform: "darwin", said: cli })
+  const buildx = answers(["buildx", "version"])
+  return buildx === null
+    ? null
+    : dockerWords({ kind: "no-buildx", platform: "darwin", said: buildx })
 }
 
 /**

@@ -1,0 +1,46 @@
+{
+  "alpine": "3.23",
+  "arch": "aarch64",
+  "packages": {
+    "alpine-base": "3.23.6-r0",
+    "linux-virt": "6.18.55-r0",
+    "docker-engine": "29.5.2-r0",
+    "btrfs-progs": "6.17.1-r0",
+    "iproute2": "6.17.0-r0",
+    "socat": "1.8.1.3-r0",
+    "kmod": "34.2-r1",
+    "busybox-static": "1.37.0-r30"
+  },
+  "stage1": ["virtio_blk", "erofs", "overlay"],
+  "modules": [
+    "virtio_net",
+    "virtio_rng",
+    "vsock",
+    "vmw_vsock_virtio_transport",
+    "virtiofs",
+    "overlay",
+    "btrfs",
+    "bridge",
+    "veth",
+    "br_netfilter",
+    "tun"
+  ],
+  "trim": [
+    "sound",
+    "drivers/gpu",
+    "drivers/usb",
+    "drivers/hid",
+    "drivers/scsi",
+    "drivers/ata",
+    "drivers/nvme",
+    "drivers/mtd",
+    "drivers/md",
+    "drivers/video",
+    "drivers/i2c",
+    "drivers/target",
+    "drivers/vhost",
+    "drivers/media",
+    "drivers/input",
+    "drivers/staging"
+  ]
+}

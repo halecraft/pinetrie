@@ -45,6 +45,7 @@ import type { PiSetup } from "@pinetrie/pi"
 import { type RepoOwner, renameAccepted, startRepoOwner } from "@pinetrie/repo"
 import { type Basics, failed, slow } from "../basics.ts"
 import { brokenConfigLine } from "../startup-lines.ts"
+import type { Convert } from "./convert.ts"
 import { lockHashAt } from "./disk.ts"
 import { openLinkOf } from "./registry.ts"
 import type { Found } from "./runtime.ts"
@@ -86,6 +87,8 @@ export interface Setup {
   readonly owner: RepoOwner | null
   /** What lanes of their own run on; null when they work directly. */
   readonly runtime: LaneRuntime | null
+  /** pre-docker: converts a lane made under `container` (`work/convert.ts`); null where none can be. */
+  readonly convert: Convert | null
   readonly lanes: PreparedLanes | null
   /**
    * Whether lanes run pinetrie's default image, with its browser (ADR-0041) and
@@ -204,7 +207,7 @@ export async function startSetup(input: {
         shared: base ? [] : (lanes?.shared ?? []),
         hostPaths: base ? [] : hostPaths,
       }),
-      grants: { ssh: grants.ssh, env: grants.env },
+      grants: { ssh: grants.ssh, nested: grants.nested, env: grants.env },
       identity: r.identity,
       memory: LANE_MEMORY,
     }
@@ -253,13 +256,14 @@ export async function startSetup(input: {
     root === null || runtime === null
       ? null
       : keeper.track(
-          prepare(
-            root,
+          prepare({
+            at: root,
             runtime,
-            found?.defaultImage ?? (() => {}),
+            runtimeReady: found?.ready ?? (async () => {}),
+            mountsOf: r => specOf(BASE_LANE, r).mounts,
             refreshBaseNow,
             log,
-          ),
+          }),
         )
   ready?.catch(error =>
     log(`[host] lanes of their own cannot start: ${errorText(error)}`),
@@ -283,6 +287,7 @@ export async function startSetup(input: {
     root,
     owner,
     runtime,
+    convert: found?.convert ?? null,
     lanes,
     defaultImage,
     ready,
@@ -332,17 +337,31 @@ async function prepareLanes(
   return { config, repoConfig: names, ...sharing }
 }
 
-/** The images, the lane runtime, links and identity; then the base snapshot. */
-async function prepare(
-  at: string,
-  runtime: LaneRuntime,
-  defaultImage: Found["defaultImage"],
-  refreshBaseNow: (on: LaneRuntime, at: string, r: Ready) => Promise<void>,
-  log: (m: string) => void,
-): Promise<Ready> {
-  const images = prepareImages(runtime, at, playwrightVersion(), log)
-  defaultImage(images.then(i => i.runtimeFrom))
-  const { lane, runtimeFrom } = await images
+/**
+ * The images, the lane runtime, links and identity; then the runtime told
+ * the default image and every mount, before the base snapshot, the first
+ * lane to start.
+ */
+async function prepare(input: {
+  readonly at: string
+  readonly runtime: LaneRuntime
+  readonly runtimeReady: Found["ready"]
+  /** Every host path a lane of this host mounts. */
+  readonly mountsOf: (r: Ready) => readonly Mount[]
+  readonly refreshBaseNow: (
+    on: LaneRuntime,
+    at: string,
+    r: Ready,
+  ) => Promise<void>
+  readonly log: (m: string) => void
+}): Promise<Ready> {
+  const { at, runtime, log } = input
+  const { lane, runtimeFrom } = await prepareImages(
+    runtime,
+    at,
+    playwrightVersion(),
+    log,
+  )
   const refused = await checkImage(runtime, lane)
   if (refused !== null) throw new Error(refused)
   const programs = await ensureRuntime(
@@ -365,7 +384,11 @@ async function prepare(
       email: await config("user.email", "agent@pinetrie.invalid"),
     },
   }
-  await refreshBaseNow(runtime, at, result)
+  await input.runtimeReady({
+    defaultImage: runtimeFrom,
+    mounts: input.mountsOf(result),
+  })
+  await input.refreshBaseNow(runtime, at, result)
   log("[host] lanes of their own are ready")
   return result
 }

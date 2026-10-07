@@ -1,7 +1,7 @@
 // pi/lane-env — the host side of a lane's channel (ADR-0034, S43).
 //
 // One helper process per running lane, reached through one long-lived
-// stream: `container exec -i` in production, a local process in tests. Over
+// stream: the lane runtime's `exec -i` in production, a local process in tests. Over
 // it, the host gets:
 // - `laneEnv`: an `ExecutionEnv` whose every call runs in the lane, so pi's
 //   tools work there unchanged. Each call first waits on the lane's gate, the

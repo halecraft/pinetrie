@@ -93,6 +93,8 @@ export const laneContainer = (lane: LaneName): string => `pinetrie-${lane}`
 /** What a project lets cross a lane's boundary (ADR-0034), from `pinetrie.json`. */
 export interface LaneGrants {
   readonly ssh: boolean
+  /** Lanes of their own inside each lane: rootless Docker (ADR-0103). */
+  readonly nested: boolean
   /** Environment variable names passed from the host. */
   readonly env: readonly string[]
   /** Further read-only mounts. */
@@ -106,7 +108,12 @@ export interface Mount {
   readonly readonly: boolean
 }
 
-export const NO_GRANTS: LaneGrants = { ssh: false, env: [], mounts: [] }
+export const NO_GRANTS: LaneGrants = {
+  ssh: false,
+  nested: false,
+  env: [],
+  mounts: [],
+}
 
 /** How the base snapshot installs a project's dependencies. */
 export interface Install {
@@ -123,8 +130,8 @@ export interface LaneSpec {
   readonly imagePath: string
   /** Every host path the lane sees, from `planMounts`. */
   readonly mounts: readonly Mount[]
-  /** The grants that are not mounts: your ssh agent, named variables. */
-  readonly grants: Pick<LaneGrants, "ssh" | "env">
+  /** The grants that are not mounts: your ssh agent, lanes inside, named variables. */
+  readonly grants: Pick<LaneGrants, "ssh" | "nested" | "env">
   readonly identity: { readonly name: string; readonly email: string }
   readonly memory: string
 }
@@ -238,6 +245,8 @@ export interface ContainerShape {
   readonly env: Readonly<Record<string, string>>
   /** Your ssh agent, forwarded. */
   readonly ssh: boolean
+  /** Lanes of its own inside it: rootless Docker (ADR-0103). */
+  readonly nested: boolean
 }
 
 /**
@@ -261,6 +270,7 @@ export function planShape(
     memory: spec.memory,
     mounts: spec.mounts,
     ssh: spec.grants.ssh,
+    nested: spec.grants.nested,
     env: Object.fromEntries([
       ...passed,
       ["JJ_USER", spec.identity.name],
@@ -327,7 +337,17 @@ export interface LaneConfig {
   readonly shared: readonly string[]
   /** How pine·trie uses your repo, as written (`repoConfig` decides). */
   readonly repo: WrittenRepo
+  /** The machine's lane settings, as written; only the user's apply (`machineConfig`). */
+  readonly machine: WrittenMachine
 }
+
+/** `lanes.runtime` and `lanes.vm.slots` as written: null where absent. */
+export interface WrittenMachine {
+  readonly runtime: string | { readonly invalid: string } | null
+  readonly slots: number | { readonly invalid: string } | null
+}
+
+const NO_MACHINE: WrittenMachine = { runtime: null, slots: null }
 
 /**
  * The `accepted`, `wip` and `publish` keys' values (ADR-0100), as written:
@@ -386,7 +406,29 @@ export function decodeLaneConfig(
     ? { command: "pnpm install --frozen-lockfile", lockfile: "pnpm-lock.yaml" }
     : null
   if (!isRecord(lanes))
-    return { grants: NO_GRANTS, install: pnpm, shared: [], repo }
+    return {
+      grants: NO_GRANTS,
+      install: pnpm,
+      shared: [],
+      repo,
+      machine: NO_MACHINE,
+    }
+  const invalid = (v: unknown) => ({ invalid: JSON.stringify(v) ?? String(v) })
+  const vm = isRecord(lanes.vm) ? lanes.vm : {}
+  const machine: WrittenMachine = {
+    runtime:
+      lanes.runtime === undefined
+        ? null
+        : typeof lanes.runtime === "string"
+          ? lanes.runtime
+          : invalid(lanes.runtime),
+    slots:
+      vm.slots === undefined
+        ? null
+        : typeof vm.slots === "number"
+          ? vm.slots
+          : invalid(vm.slots),
+  }
   const mounts = Array.isArray(lanes.mounts)
     ? lanes.mounts.flatMap(m =>
         isRecord(m) &&
@@ -414,13 +456,64 @@ export function decodeLaneConfig(
   return {
     grants: {
       ssh: lanes.ssh === true,
+      nested: lanes.nested === true,
       env: strings(lanes.env).filter(n => /^[A-Za-z_][A-Za-z0-9_]*$/.test(n)),
       mounts,
     },
     install,
     shared: strings(lanes.shared),
     repo,
+    machine,
   }
+}
+
+/** Where lanes run: Apple's `container`, or Docker (ADR-0103). */
+export type RuntimeChoice = "container" | "docker"
+
+/** The runtime when the user config names none. */
+export const DEFAULT_RUNTIME: RuntimeChoice = "docker"
+/** The slots a lane VM boots with when the user config names none. */
+export const DEFAULT_VM_SLOTS = 16
+/** A VM boots with 20 share devices alongside its others, and not 24 (S131). */
+export const MAX_VM_SLOTS = 20
+
+/** This machine's lane settings, from the user's config; each bad value refused, naming why. */
+export interface MachineConfig {
+  readonly runtime: RuntimeChoice
+  readonly slots: number
+}
+
+/**
+ * The runtime and the VM's slots, from the user's config only: they are a
+ * person's machine settings, not a project's. A value that cannot be used is
+ * refused, with why, and the default holds.
+ */
+export function machineConfig(user: WrittenMachine): {
+  readonly machine: MachineConfig
+  readonly refused: readonly string[]
+} {
+  const refused: string[] = []
+  let runtime = DEFAULT_RUNTIME
+  if (user.runtime === "container" || user.runtime === "docker")
+    runtime = user.runtime
+  else if (user.runtime !== null)
+    refused.push(
+      `lanes.runtime ${typeof user.runtime === "string" ? JSON.stringify(user.runtime) : user.runtime.invalid} is not "container" or "docker"; using "${DEFAULT_RUNTIME}"`,
+    )
+  let slots = DEFAULT_VM_SLOTS
+  const n = user.slots
+  if (
+    typeof n === "number" &&
+    Number.isInteger(n) &&
+    n >= 1 &&
+    n <= MAX_VM_SLOTS
+  )
+    slots = n
+  else if (n !== null)
+    refused.push(
+      `lanes.vm.slots ${typeof n === "number" ? n : n.invalid} is not a whole number from 1 to ${MAX_VM_SLOTS}: a VM boots with at most ${MAX_VM_SLOTS} share devices beside its others; using ${DEFAULT_VM_SLOTS}`,
+    )
+  return { machine: { runtime, slots }, refused }
 }
 
 /**
@@ -975,8 +1068,7 @@ export function planOldNamesOnDisk(
 ): LaneStep[] {
   const { configDir, bookmarks } = facts
   const has = new Set(bookmarks)
-  // `-R`, so the steps need no working directory: the migration runs them
-  // through `container exec`.
+  // `-R`, so the steps need no working directory.
   const bookmark = (...args: string[]) =>
     inLane(
       "jj",

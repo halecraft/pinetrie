@@ -10,6 +10,8 @@
 #   would not run on a musl image.
 # - Chromium's headless shell and its libraries, at the build pinetrie's
 #   Playwright drives (`PLAYWRIGHT_VERSION`).
+# - Rootless Docker, the docker CLI and buildx, for a lane granted lanes of
+#   its own (`lanes.nested`, ADR-0103); unused otherwise.
 # A project's own `pinetrie.Containerfile` replaces it. The lane runtime is
 # copied out of this image (`runtime.ts`).
 FROM docker.io/library/node:24-trixie-slim
@@ -33,3 +35,37 @@ ARG PLAYWRIGHT_VERSION
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 RUN npx -y "playwright@${PLAYWRIGHT_VERSION}" install --with-deps chromium-headless-shell \
  && rm -rf /var/lib/apt/lists/* /root/.npm
+# Lanes inside a lane (ADR-0103, S125): rootless Docker, from Docker's static
+# bundles, which a lane granted `lanes.nested` starts as `rootless` (uid 1000)
+# on its inner lanes' btrfs subvolume (`pinetrie-inner-docker`). runc's
+# NoNewKeyring is its default: Docker's seccomp profile refuses `keyctl`. The
+# docker CLI and buildx are for a pine·trie host running in the lane.
+ARG DOCKER_VERSION=29.8.2
+ARG BUILDX_VERSION=0.37.2
+RUN apt-get update -qq \
+ && apt-get install -y -qq --no-install-recommends btrfs-progs uidmap slirp4netns iptables \
+ && rm -rf /var/lib/apt/lists/* \
+ && curl -fsSL "https://download.docker.com/linux/static/stable/aarch64/docker-${DOCKER_VERSION}.tgz" \
+    | tar -xz -C /usr/local/bin --strip-components=1 \
+ && curl -fsSL "https://download.docker.com/linux/static/stable/aarch64/docker-rootless-extras-${DOCKER_VERSION}.tgz" \
+    | tar -xz -C /usr/local/bin --strip-components=1 \
+ && mkdir -p /usr/local/lib/docker/cli-plugins \
+ && curl -fsSL -o /usr/local/lib/docker/cli-plugins/docker-buildx \
+    "https://github.com/docker/buildx/releases/download/v${BUILDX_VERSION}/buildx-v${BUILDX_VERSION}.linux-arm64" \
+ && chmod +x /usr/local/lib/docker/cli-plugins/docker-buildx \
+ && groupmod -n rootless node \
+ && usermod -l rootless -d /home/rootless -m node \
+ && echo "rootless:100000:65536" > /etc/subuid \
+ && echo "rootless:100000:65536" > /etc/subgid \
+ && mkdir -p /home/rootless/.config/docker \
+ && echo '{"default-runtime":"nokeyring","runtimes":{"nokeyring":{"runtimeType":"io.containerd.runc.v2","options":{"NoNewKeyring":true}}}}' \
+    > /home/rootless/.config/docker/daemon.json \
+ && chown -R rootless:rootless /home/rootless \
+ && printf '%s\n' \
+    '#!/bin/sh' \
+    '# A nested lane'"'"'s inner Docker: rootless, as uid 1000, on its inner lanes'"'"' subvolume.' \
+    '[ -d /var/lib/pinetrie-lanes ] || exit 0' \
+    'mkdir -p /run/user/1000 && chown 1000:1000 /run/user/1000 && chmod 700 /run/user/1000' \
+    'exec setpriv --reuid=1000 --regid=1000 --init-groups env HOME=/home/rootless XDG_RUNTIME_DIR=/run/user/1000 PATH=/usr/local/bin:/usr/bin:/bin dockerd-rootless.sh --data-root /var/lib/pinetrie-lanes/docker > /tmp/inner-docker.log 2>&1' \
+    > /usr/local/bin/pinetrie-inner-docker \
+ && chmod +x /usr/local/bin/pinetrie-inner-docker

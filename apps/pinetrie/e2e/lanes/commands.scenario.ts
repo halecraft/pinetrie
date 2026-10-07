@@ -4,12 +4,12 @@
 import path from "node:path"
 import { atEntry, entryId, ROOT } from "@pinetrie/core"
 import type { Checks } from "../checks.ts"
-import { containerProblem } from "../harness.ts"
+import { runtimeProblem } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
 import { inLane, START_AGENT, sectionHost } from "./support.ts"
 
 export const scenario: Scenario = {
-  needs: containerProblem,
+  needs: runtimeProblem,
   run: ({ check }) => commandsSection(check),
 }
 

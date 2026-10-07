@@ -36,6 +36,7 @@ import {
   treeOf,
   waitFor,
 } from "../harness.ts"
+import { removeLane } from "../lane-runtime.ts"
 import type { Scenario } from "../scenario.ts"
 
 import {
@@ -381,8 +382,9 @@ async function run(
         ),
         log: () => {},
       })
-      // Lanes have containers of their own only where `container` runs; the
-      // host's project record says so, with its reason where they do not.
+      // Lanes have containers of their own only where the suites' runtime
+      // runs; the host's project record says so, with its reason where they
+      // do not.
       const project = readProject(toolHost.session)
       const noContainers = project?.kind === "direct" ? project.reason : null
       // A new thread of its own starts at accepted work (ADR-0060).
@@ -1871,13 +1873,7 @@ async function run(
         await toolHost.shutdown().catch(() => {})
         // Its threads' agents worked in containers: remove them, and their disks.
         for (const lane of readLaneRecords(toolHost.session).keys())
-          for (const args of [
-            ["rm", "-f", `pinetrie-${lane}`],
-            ["volume", "rm", `pinetrie-${lane}`],
-          ])
-            try {
-              execFileSync("container", args, { stdio: "ignore" })
-            } catch {}
+          removeLane(work, lane)
         rmSync(work, { recursive: true, force: true })
       }
     }

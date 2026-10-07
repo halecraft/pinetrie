@@ -1,8 +1,7 @@
-// lanes/container/runtime — Apple's `container` as a `LaneRuntime`: the
+// container/runtime — Apple's `container` as a `LaneRuntime`: the
 // facts, plan and CLI modules composed, deciding nothing here.
 
-import { SPEC_LABEL, specHash } from "../plan.ts"
-import type { LaneRuntime } from "../runtime-port.ts"
+import { type LaneRuntime, SPEC_LABEL, specHash } from "@pinetrie/lanes"
 import {
   buildImage,
   imageExists,

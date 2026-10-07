@@ -1,0 +1,88 @@
+#!/bin/sh
+# PID 1 of pine·trie's lane VM (S128), on the system image stage 1 switched to.
+# It loads the drivers, mounts the data disk and each host's slot, and starts
+# Docker on vsock 2375, each slot's ssh agent, and a sync on vsock 2377. No
+# shell listens on any port. Every stage logs a `T+` line, the guest's uptime, to the console.
+#
+# The kernel's command line: lane.slots=<n>, the share devices `slot0` …
+# `slot<n-1>` the launcher made.
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+mountpoint -q /proc || mount -t proc proc /proc
+mountpoint -q /sys || mount -t sysfs sys /sys
+mountpoint -q /dev || mount -t devtmpfs dev /dev
+t() { echo "T+$(cut -d' ' -f1 /proc/uptime) $*" > /dev/hvc0; }
+arg() { sed -n "s/.*$1=\([^ ]*\).*/\1/p" /proc/cmdline; }
+exec > /dev/hvc0 2>&1
+t "init started"
+
+mkdir -p /dev/pts /dev/shm /run/pinetrie /tmp /var/lib/lanehost /mnt/host-shares
+mount -t devpts devpts /dev/pts
+mount -t tmpfs tmpfs /dev/shm
+mount -t tmpfs tmpfs /run
+mkdir -p /run/pinetrie
+mount -t tmpfs tmpfs /tmp
+mount -t cgroup2 cgroup2 /sys/fs/cgroup
+
+# Every device's driver, then the manifest's modules (`build.sh` writes them
+# to /etc/pinetrie/modules). Alpine's own module index: no udev here.
+for f in /sys/bus/*/devices/*/modalias; do modprobe -q "$(cat "$f")" 2>/dev/null; done
+modprobe -a $(cat /etc/pinetrie/modules)
+# The kernel makes /dev/net/tun 0600; udev would make it 0666, which rootless
+# Docker in a lane needs for its network (S127).
+chmod 666 /dev/net/tun
+t "drivers loaded"
+
+# The data disk: Docker's store and the lanes' subvolumes. An unprivileged
+# container deletes subvolumes only with user_subvol_rm_allowed (S125).
+if ! mount -t btrfs -o user_subvol_rm_allowed /dev/vdb /var/lib/lanehost 2>/dev/null; then
+  mkfs.btrfs -q -f /dev/vdb && mount -t btrfs -o user_subvol_rm_allowed /dev/vdb /var/lib/lanehost
+  t "data disk formatted (first boot)"
+fi
+mkdir -p /var/lib/lanehost/docker
+t "data disk mounted"
+
+# Each host's slot: a share device of its own, an empty directory until its
+# host fills it. A mount of a slot's root survives the slot being filled
+# (S130, S131).
+slots=$(arg lane.slots)
+i=0
+while [ "$i" -lt "${slots:-0}" ]; do
+  mkdir -p "/mnt/host-shares/$i"
+  mount -t virtiofs "slot$i" "/mnt/host-shares/$i" || t "slot $i not mounted"
+  i=$((i + 1))
+done
+t "$i slots mounted"
+
+hostname lanes
+ip link set lo up
+ip link set eth0 up
+# The network before Docker: a pull Docker answers before DHCP has written
+# /etc/resolv.conf asks [::1]:53 and fails. With no answer in 10 s, Docker
+# starts anyway, for what it holds.
+if udhcpc -i eth0 -q -f -n -t 10 -T 1 >/dev/null 2>&1; then
+  t "network up: $(ip -4 -br addr show eth0)"
+else
+  t "network: no DHCP answer in 10 s; Docker starts without it"
+fi
+
+dockerd --host unix:///var/run/docker.sock --data-root /var/lib/lanehost/docker > /run/dockerd.log 2>&1 &
+# -t: after one side ends, wait an hour for the other, not socat's 0.5 s, so
+# `docker run -i` keeps its output after its input ends (S128, S129).
+socat -t 3600 VSOCK-LISTEN:2375,reuseaddr,fork UNIX-CONNECT:/var/run/docker.sock &
+# Each slot's ssh agent: a socket lanes bind, connected to the launcher's
+# vsock port for that slot, which reaches its host's agent.
+i=0
+while [ "$i" -lt "${slots:-0}" ]; do
+  socat -t 3600 "UNIX-LISTEN:/run/pinetrie/ssh-$i.sock,fork,mode=666" "VSOCK-CONNECT:2:$((2400 + i))" &
+  i=$((i + 1))
+done
+
+# The launcher's sync before it stops the VM: `sync`, and nothing else, on
+# vsock 2377. Only the launcher reaches it: a lane cannot open a vsock socket
+# (S128).
+socat VSOCK-LISTEN:2377,reuseaddr,fork SYSTEM:'sync && echo synced' &
+
+ping_docker() { printf 'GET /_ping HTTP/1.0\r\n\r\n' | socat -t 2 - UNIX-CONNECT:/var/run/docker.sock 2>/dev/null | grep -q OK; }
+until [ -S /var/run/docker.sock ] && ping_docker; do sleep 0.05; done
+t "docker ready"
+while :; do sleep 3600; done

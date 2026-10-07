@@ -110,7 +110,10 @@ changes pine·trie can keep this note true. You can skip them.
   you name that directory as their `path`. <!-- packages/pi/search.ts grepTool -->
   <!-- packages/pi/search.ts findTool -->
 - A lane has 4 GiB of memory. <!-- apps/pinetrie/host/work/setup.ts LANE_MEMORY -->
-- There is no container runtime (`container`, `docker`) and no `gh`.
+- There is no `gh`, and no container runtime unless the project grants its
+  lanes lanes of their own (`lanes.nested` in `pinetrie.json`): then a
+  rootless Docker answers at `$DOCKER_HOST`.
+  <!-- packages/lanes/plan.ts LaneGrants -->
 - There is no model key: pi's `auth.json` is not in the lane.
 - There are no credentials: the person's home directory is not mounted. A
   project grants its lanes an ssh agent, named environment variables, or

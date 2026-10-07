@@ -19,6 +19,7 @@ import {
   type LaneSpec,
   type LaneStep,
   laneIgnores,
+  machineConfig,
   NO_GRANTS,
   planBaseRefresh,
   planBundle,
@@ -68,7 +69,7 @@ const spec: LaneSpec = {
   image: "pinetrie-lane:abc",
   imagePath: "/usr/local/bin:/usr/bin:/bin",
   mounts: planMounts(parts),
-  grants: { ssh: false, env: [] },
+  grants: { ssh: false, nested: false, env: [] },
   identity: { name: "agent", email: "agent@pinetrie" },
   memory: "2G",
 }
@@ -181,7 +182,10 @@ describe("planShape: a lane's container, as any runtime would make it", () => {
   })
   test("each grant applies", () => {
     const granted = planShape(
-      { ...spec, grants: { ssh: true, env: ["GITHUB_TOKEN", "MISSING"] } },
+      {
+        ...spec,
+        grants: { ssh: true, nested: false, env: ["GITHUB_TOKEN", "MISSING"] },
+      },
       { GITHUB_TOKEN: "t" },
     )
     expect(granted.ssh).toBe(true)
@@ -208,6 +212,31 @@ test("specHashOf: the hash of the runtime's arguments, changed when they change"
   expect(
     specHashOf(runtime, { ...shape, image: "pinetrie-lane:def" }),
   ).not.toBe(specHashOf(runtime, shape))
+})
+
+describe("machineConfig: the runtime and the VM's slots, each bad value refused", () => {
+  test("defaults: Docker, 16 slots", () => {
+    expect(machineConfig({ runtime: null, slots: null })).toEqual({
+      machine: { runtime: "docker", slots: 16 },
+      refused: [],
+    })
+  })
+  test("what the user wrote, when it can be used", () => {
+    expect(machineConfig({ runtime: "container", slots: 20 }).machine).toEqual({
+      runtime: "container",
+      slots: 20,
+    })
+  })
+  test("another runtime, or more than 20 slots, refused with why; the default holds", () => {
+    const { machine, refused } = machineConfig({ runtime: "podman", slots: 24 })
+    expect(machine).toEqual({ runtime: "docker", slots: 16 })
+    expect(refused).toEqual([
+      'lanes.runtime "podman" is not "container" or "docker"; using "docker"',
+      "lanes.vm.slots 24 is not a whole number from 1 to 20: a VM boots with at most 20 share devices beside its others; using 16",
+    ])
+    expect(machineConfig({ runtime: null, slots: 2.5 }).refused).toHaveLength(1)
+    expect(machineConfig({ runtime: null, slots: 0 }).refused).toHaveLength(1)
+  })
 })
 
 describe("repoConfig: the project's values win, and a bad one falls back (ADR-0100)", () => {
@@ -308,12 +337,14 @@ describe("decodeLaneConfig: grants, the install and shared directories, total", 
           catchUp: null,
           offers: false,
         },
+        machine: { runtime: null, slots: null },
       })
     expect(
       decodeLaneConfig(
         {
           lanes: {
             ssh: "yes",
+            nested: "yes",
             env: ["OK_1", 4, "no-dash", "A=B"],
             mounts: [{ source: "d" }, { source: "d", target: "rel" }],
             shared: [".plans", 3, null],
@@ -323,7 +354,7 @@ describe("decodeLaneConfig: grants, the install and shared directories, total", 
         false,
       ),
     ).toEqual({
-      grants: { ssh: false, env: ["OK_1"], mounts: [] },
+      grants: { ssh: false, nested: false, env: ["OK_1"], mounts: [] },
       install: null,
       shared: [".plans"],
       repo: {
@@ -333,6 +364,26 @@ describe("decodeLaneConfig: grants, the install and shared directories, total", 
         catchUp: null,
         offers: false,
       },
+      machine: { runtime: null, slots: null },
+    })
+  })
+  test("lanes.nested grants lanes inside a lane, only when true", () => {
+    const nested = (v: unknown) =>
+      decodeLaneConfig({ lanes: { nested: v } }, "/p", false).grants.nested
+    expect(nested(true)).toBe(true)
+    expect(nested("true")).toBe(false)
+    expect(nested(undefined)).toBe(false)
+  })
+  test("lanes.runtime and lanes.vm.slots: the machine's settings, as written", () => {
+    const machine = (lanes: unknown) =>
+      decodeLaneConfig({ lanes }, "/p", false).machine
+    expect(machine({ runtime: "docker", vm: { slots: 4 } })).toEqual({
+      runtime: "docker",
+      slots: 4,
+    })
+    expect(machine({ runtime: 3, vm: { slots: "4" } })).toEqual({
+      runtime: { invalid: "3" },
+      slots: { invalid: '"4"' },
     })
   })
   test("accepted, wip and publish: how pine·trie uses your repo, as written", () => {
@@ -381,6 +432,7 @@ describe("decodeLaneConfig: grants, the install and shared directories, total", 
       ).grants,
     ).toEqual({
       ssh: true,
+      nested: false,
       env: [],
       mounts: [{ source: "/p/d", target: "/d", readonly: true }],
     })

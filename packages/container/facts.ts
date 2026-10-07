@@ -1,13 +1,17 @@
-// lanes/container/facts — what `container` and the disk it clones on say,
+// container/facts — what `container` and the disk it clones on say,
 // gathered at startup and for each lane.
 
 import { lstat, mkdir, rm, stat, writeFile } from "node:fs/promises"
 import path from "node:path"
 import type { ProjectRecord, SnapshotId } from "@pinetrie/core"
-import { prepareProjectDir } from "../host.ts"
-import { pinetrieDir, planRoot, SPEC_LABEL } from "../plan.ts"
-import { run } from "../run.ts"
-import type { ContainerFacts } from "../runtime-port.ts"
+import {
+  type ContainerFacts,
+  pinetrieDir,
+  planRoot,
+  prepareProjectDir,
+  run,
+  SPEC_LABEL,
+} from "@pinetrie/lanes"
 import {
   type ContainerHostFacts,
   type DiskPaths,

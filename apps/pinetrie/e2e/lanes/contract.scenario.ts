@@ -1,26 +1,65 @@
-// e2e/lanes/contract — `container` does not promise that a clone written into
-// a volume it made works, so every upgrade reruns a small soak.
+// e2e/lanes/contract — what each runtime must hold that no unit test can
+// show (ADR-0103).
+// - `container` does not promise that a clone written into a volume it made
+//   works, so every upgrade reruns a small soak.
+// - Docker: snapshots under writes, the working copy read-only on the Mac's
+//   side, a half-close through the launcher, no vsock from a lane, two hosts'
+//   slots apart, and what a lane's start and a snapshot cost. On the Mac it
+//   runs a VM of its own, from this checkout's launcher and the built image,
+//   so a change to the launcher is what runs, and the person's hosts are
+//   untouched.
 
 import { execFile, execFileSync } from "node:child_process"
 import {
   existsSync,
+  mkdirSync,
   mkdtempSync,
   readFileSync,
   realpathSync,
   rmSync,
+  symlinkSync,
   writeFileSync,
 } from "node:fs"
-import { tmpdir } from "node:os"
+import { homedir, tmpdir } from "node:os"
 import path from "node:path"
-import { createVolume, describeFailure, run } from "@pinetrie/lanes"
+import { createVolume } from "@pinetrie/container"
+import {
+  type LaneName,
+  laneNameForThread,
+  type SnapshotId,
+  snapshotId,
+} from "@pinetrie/core"
+import {
+  describeFailure,
+  executeOrThrow,
+  laneContainer,
+  planSnapshot,
+  run,
+} from "@pinetrie/lanes"
+import { vmStateDir } from "@pinetrie/vm"
+import { findProject } from "../../host/work/runtime.ts"
 import type { Checks } from "../checks.ts"
-import { containerProblem, waitFor } from "../harness.ts"
+import {
+  committedProject,
+  E2E_RUNTIME,
+  runtimeProblem,
+  waitFor,
+} from "../harness.ts"
+import { ownForInnerLanes } from "../lane-runtime.ts"
 import type { Scenario } from "../scenario.ts"
-import { ensureFsckImage, FSCK_IMAGE, sh } from "./support.ts"
+import {
+  cli,
+  dockerDisks,
+  ensureFsckImage,
+  FSCK_IMAGE,
+  inDisks,
+  sh,
+} from "./support.ts"
 
 export const scenario: Scenario = {
-  needs: containerProblem,
-  run: ({ check }) => contractSection(check),
+  needs: runtimeProblem,
+  run: ({ check }) =>
+    E2E_RUNTIME === "docker" ? dockerContract(check) : contractSection(check),
 }
 
 /** Clones the contract checks. */
@@ -140,5 +179,365 @@ rm -rf $w
     sh(`container rm -f ${writer} >/dev/null 2>&1 || true`)
     sh(`container volume rm ${volume} >/dev/null 2>&1 || true`)
     rmSync(probe, { recursive: true, force: true })
+  }
+}
+
+// ── Docker ────────────────────────────────────────────────────────────────
+
+/** Snapshots the Docker contract takes while a lane writes. */
+const SNAPSHOTS = 20
+
+/** Records appended without fsync, the count published as it goes. */
+const WRITER = `const fs = require("fs")
+const fd = fs.openSync("/workspace/log.bin", "a")
+let n = 0
+while (!fs.existsSync("/probe/stop")) {
+  fs.writeSync(fd, "rec " + String(n).padStart(8, "0") + " " + "x".repeat(40) + "\\n")
+  n++
+  if (n % 10 === 0) fs.writeFileSync("/probe/written", String(n))
+}
+`
+
+/**
+ * A VM of the contract's own on the Mac: a state directory sharing the
+ * built images and launchers, and a data disk of its own kept between runs
+ * (`contract-data.img`), so a cold start formats it only the first time and
+ * Docker keeps what it pulled, and a MAC address of its own
+ * (`contract-mac`), so each boot does not take another DHCP lease. Its launcher stops 2 s after its last lease.
+ * Returns how to put the environment back.
+ */
+function ownVm(): { readonly state: string; restore(): void } | null {
+  if (process.platform !== "darwin") return null
+  const real = vmStateDir(process.env, homedir())
+  const state = realpathSync(mkdtempSync("/tmp/pc-"))
+  const vm = path.join(state, "pinetrie", "vm")
+  mkdirSync(vm, { recursive: true })
+  for (const d of ["images", "bin"]) {
+    mkdirSync(path.join(real, d), { recursive: true })
+    symlinkSync(path.join(real, d), path.join(vm, d))
+  }
+  symlinkSync(path.join(real, "contract-data.img"), path.join(vm, "data.img"))
+  symlinkSync(path.join(real, "contract-mac"), path.join(vm, "mac"))
+  const saved = {
+    XDG_STATE_HOME: process.env.XDG_STATE_HOME,
+    LAUNCHER_IDLE_SECONDS: process.env.LAUNCHER_IDLE_SECONDS,
+  }
+  process.env.XDG_STATE_HOME = state
+  process.env.LAUNCHER_IDLE_SECONDS = "2"
+  return {
+    state,
+    restore() {
+      for (const [k, v] of Object.entries(saved))
+        if (v === undefined) delete process.env[k]
+        else process.env[k] = v
+    },
+  }
+}
+
+const median = (xs: readonly number[]) =>
+  [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)] ?? 0
+
+async function dockerContract(check: Checks["check"]): Promise<void> {
+  const own = ownVm()
+  const logs: string[] = []
+  const log = (l: string) => {
+    logs.push(l)
+    if (process.env.PINETRIE_E2E_LOG === "1") console.log(l)
+  }
+  const machine = { runtime: "docker", slots: null } as const
+  const projA = committedProject("pinetrie-contract-a-", { "README.md": "a\n" })
+  const projB = committedProject("pinetrie-contract-b-", { "README.md": "b\n" })
+  mkdirSync(path.join(projA, ".plans"))
+  const probe = realpathSync(
+    mkdtempSync(path.join(tmpdir(), "pinetrie-probe-")),
+  )
+  writeFileSync(path.join(probe, "writer.js"), WRITER)
+  ownForInnerLanes(probe)
+  ownForInnerLanes(projA)
+  const a = await findProject({
+    dir: projA,
+    defaultDirect: false,
+    containers: true,
+    machine,
+    log,
+  })
+  const runtime = a?.runtime ?? null
+  if (a === null || runtime === null)
+    throw new Error(`no Docker runtime: ${JSON.stringify(a?.project)}`)
+  const cold = /Docker answered (\d+) ms after the launcher started/.exec(
+    logs.join("\n"),
+  )?.[1]
+  const lanes: LaneName[] = []
+  const snapshots: SnapshotId[] = []
+  /** A lane of host A's, on a new disk, with the working copy, a shared directory and the probe. */
+  const lane = async (image: string): Promise<LaneName> => {
+    const name = laneNameForThread(`contract-${process.pid}-${lanes.length}`)
+    lanes.push(name)
+    await runtime.disk({ kind: "create", lane: name })
+    const started = Date.now()
+    await runtime.run({
+      name: laneContainer(name),
+      lane: name,
+      image,
+      memory: "1g",
+      mounts: [
+        { source: projA, target: "/mnt/host-working-copy", readonly: true },
+        {
+          source: path.join(projA, ".plans"),
+          target: "/workspace/.plans",
+          readonly: false,
+        },
+        { source: probe, target: "/probe", readonly: false },
+      ],
+      env: {},
+      ssh: false,
+      nested: false,
+    })
+    runMs.push(Date.now() - started)
+    return name
+  }
+  const runMs: number[] = []
+  const exec = (name: LaneName, script: string) => {
+    const [p = "docker", ...rest] = runtime.execArgv(laneContainer(name), [
+      "sh",
+      "-c",
+      script,
+    ])
+    return run(p, rest)
+  }
+  try {
+    // ── a half-close: first, before anything streams through the bridge
+    // (the slot's fill sweeps through the disks helper's exec), so a broken
+    // bridge fails here and not in a check after it. Only API calls come
+    // before it: Docker's version, the slot's sweep, the pull. ──
+    const echoed = quietCli(["run", "--rm", "-i", ALPINE_IMAGE, "cat"], "hi\n")
+    check(
+      "echo hi | docker run -i … cat returns hi: stdin's end reaches the lane, and its output comes back",
+      echoed.trim() === "hi",
+      JSON.stringify(echoed),
+    )
+
+    await a.ready({
+      defaultImage: "",
+      mounts: [
+        { source: projA, target: "/mnt/host-working-copy", readonly: true },
+        {
+          source: path.join(projA, ".plans"),
+          target: "/workspace/.plans",
+          readonly: false,
+        },
+        { source: probe, target: "/probe", readonly: false },
+      ],
+    })
+    for (const image of [NODE_IMAGE, PYTHON_IMAGE, ALPINE_IMAGE])
+      await runtime.runInImage(image, ["true"])
+
+    // ── snapshots under writes ──
+    const writerLane = await lane(NODE_IMAGE)
+    const [wp = "docker", ...wrest] = runtime.execArgv(
+      laneContainer(writerLane),
+      ["node", "/probe/writer.js"],
+    )
+    const writing = new Promise<void>(resolve =>
+      execFile(wp, wrest, () => resolve()),
+    )
+    const written = () =>
+      Number(
+        existsSync(path.join(probe, "written"))
+          ? readFileSync(path.join(probe, "written"), "utf8").trim() || "0"
+          : "0",
+      )
+    await waitFor(() => written() >= 100, 30_000)
+    const snapMs: number[] = []
+    const timed: typeof runtime = {
+      ...runtime,
+      disk: async op => {
+        const t = Date.now()
+        await runtime.disk(op)
+        snapMs.push(Date.now() - t)
+      },
+    }
+    const runners = {
+      runtime: timed,
+      lane: (argv: readonly string[]) => {
+        const [p = "docker", ...rest] = runtime.execArgv(
+          laneContainer(writerLane),
+          argv,
+        )
+        return run(p, rest)
+      },
+      laneBytes: async () => {
+        throw new Error("no bytes here")
+      },
+    }
+    const promised: [SnapshotId, number][] = []
+    for (let i = 0; i < SNAPSHOTS; i++) {
+      const id = snapshotId(`contract-${process.pid}-${i}`)
+      const count = written()
+      snapshots.push(id)
+      await executeOrThrow(
+        planSnapshot({ lane: writerLane, snapshot: id }),
+        runners,
+      )
+      promised.push([id, count])
+      await new Promise(r => setTimeout(r, 20 + Math.random() * 80))
+    }
+    writeFileSync(path.join(probe, "stop"), "")
+    await writing
+    const disks = dockerDisks(projA)
+    const holding = promised.filter(([id, count]) => {
+      const out = inDisks(
+        'head -n "$2" "$1/log.bin" | awk \'!/^rec [0-9]{8} x{40}$/ { b++ } END { print b + 0 }\'; wc -l < "$1/log.bin"',
+        disks.snapshot(id),
+        String(count),
+      )
+      const [bad, have] = out.trim().split(/\s+/).map(Number)
+      return bad === 0 && (have ?? 0) >= count
+    })
+    check(
+      "every snapshot taken while a lane writes holds every record written before it",
+      holding.length === SNAPSHOTS,
+      `${holding.length} of ${SNAPSHOTS}`,
+    )
+
+    // ── the working copy ──
+    const wc = await exec(
+      writerLane,
+      "touch /mnt/host-working-copy/from-lane 2>&1; echo done",
+    )
+    let capped = "not on the Mac"
+    if (process.platform === "darwin") {
+      // The working copy's source in the VM, as the lane binds it.
+      const source = cli([
+        "inspect",
+        "-f",
+        '{{range .Mounts}}{{if eq .Destination "/mnt/host-working-copy"}}{{.Source}}{{end}}{{end}}',
+        laneContainer(writerLane),
+      ]).trim()
+      capped = quietCli([
+        "run",
+        "--rm",
+        "--cap-add",
+        "SYS_ADMIN",
+        "--mount",
+        `type=bind,source=${source},target=/w`,
+        ALPINE_IMAGE,
+        "sh",
+        "-c",
+        "mount -o remount,rw /w 2>&1; touch /w/from-capped 2>&1; echo done",
+      ])
+    }
+    check(
+      "the working copy cannot be written from a lane, nor on the Mac from a container with CAP_SYS_ADMIN",
+      !existsSync(path.join(projA, "from-lane")) &&
+        !existsSync(path.join(projA, "from-capped")),
+      `${wc.stdout.trim()} | ${capped.trim()}`,
+    )
+
+    // ── vsock ──
+    const pyLane = await lane(PYTHON_IMAGE)
+    const vsock = await exec(
+      pyLane,
+      `python3 -c 'import socket; socket.socket(socket.AF_VSOCK, socket.SOCK_STREAM); print("opened")' 2>&1`,
+    )
+    // A failure's traceback quotes the source line, which says "opened" too.
+    check(
+      "a lane cannot open a vsock socket",
+      !vsock.stdout.split("\n").some(l => l.trim() === "opened"),
+      vsock.stdout.trim().split("\n").at(-1) ?? "",
+    )
+
+    // ── two hosts' slots ──
+    const b = await findProject({
+      dir: projB,
+      defaultDirect: false,
+      containers: true,
+      machine,
+      log,
+    })
+    if (b?.runtime !== null && b !== null) {
+      await b.ready({
+        defaultImage: "",
+        mounts: [
+          { source: projB, target: "/mnt/host-working-copy", readonly: true },
+        ],
+      })
+      await b.close()
+    }
+    const after = await exec(
+      writerLane,
+      "cat /mnt/host-working-copy/README.md && echo from-a > /workspace/.plans/after.md && echo ok",
+    )
+    check(
+      "a second host started and stopped beside the first leaves the first's lane reading its working copy and writing its shared directory",
+      after.stdout.includes("a\nok") &&
+        existsSync(path.join(projA, ".plans", "after.md")),
+      after.stdout.trim().replace(/\n/g, " ") + after.stderr.trim(),
+    )
+
+    // ── costs ──
+    await lane(ALPINE_IMAGE)
+    const runCost = median(runMs.slice(1))
+    const snapCost = median(snapMs)
+    // A first boot formats the data disk: not the cold start lanes see.
+    const formatted =
+      own !== null &&
+      quietSh(
+        `grep -c 'data disk formatted' '${path.join(own.state, "pinetrie", "vm", "console.log")}' || true`,
+      ).trim() !== "0"
+    const coldMs = cold === undefined || formatted ? null : Number(cold)
+    const files =
+      own === null
+        ? "n/a"
+        : quietSh(
+            `lsof -p "$(pgrep -f 'launcher-.* ${own.state}' | head -1)" 2>/dev/null | wc -l`,
+          ).trim()
+    check(
+      "a lane's docker run -d takes under 150 ms, a snapshot under 50 ms, and a cold VM answers in under 2 s",
+      runCost < 150 && snapCost < 50 && (coldMs === null || coldMs < 2000),
+      `run -d ${runCost} ms, snapshot ${snapCost} ms, cold start ${formatted ? `${cold} ms, not held: the data disk's first format` : coldMs === null ? "n/a" : `${coldMs} ms on a formatted data disk`}, the launcher's open files ${files}`,
+    )
+  } finally {
+    for (const l of lanes) {
+      await runtime.remove(laneContainer(l)).catch(() => {})
+      await runtime.disk({ kind: "delete", lane: l }).catch(() => {})
+    }
+    await runtime
+      .disk({ kind: "deleteSnapshots", ids: snapshots })
+      .catch(() => {})
+    await a.close()
+    if (own !== null) {
+      // The contract's VM stops once its last lease ends.
+      await waitFor(
+        () => quietSh(`pgrep -f '${own.state}' || true`).trim() === "",
+        60_000,
+      ).catch(() => {})
+      own.restore()
+      rmSync(own.state, { recursive: true, force: true })
+    }
+    for (const d of [projA, projB, probe])
+      rmSync(d, { recursive: true, force: true })
+  }
+}
+
+const NODE_IMAGE = "docker.io/library/node:24-alpine"
+const PYTHON_IMAGE = "docker.io/library/python:3-alpine"
+const ALPINE_IMAGE = "docker.io/library/alpine:3.23"
+
+/** The runtime's CLI with a failure as its output. */
+function quietCli(args: readonly string[], input?: string): string {
+  try {
+    return cli(args, input)
+  } catch (error) {
+    const e = error as { stdout?: Buffer; stderr?: Buffer }
+    return `${e.stdout?.toString() ?? ""}${e.stderr?.toString() ?? ""}`
+  }
+}
+
+function quietSh(command: string): string {
+  try {
+    return sh(command)
+  } catch {
+    return ""
   }
 }

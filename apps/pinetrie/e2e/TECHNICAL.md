@@ -11,17 +11,30 @@ The end-to-end suites, each a directory of scenarios:
 They share `checks.ts` (recording a check, and stopping at one),
 `scenario.ts` (choosing, skipping and running scenarios) and `harness.ts`
 (waiting, `idleNow`, throwaway projects, joining a host through `@pinetrie/session`'s
-`connectSession`, `withHost`, the scripted model,
-`containerProblem`). A suite's own helpers are beside its scenarios:
-`host/support.ts`, `lanes/support.ts`, `browser/page.ts`.
+`connectSession`, `withHost`, the scripted model, `E2E_RUNTIME`,
+`runtimeProblem`) and `lane-runtime.ts` (the suites' runtime's CLI, and a
+lane's container and disks read and removed as that runtime keeps them). A
+suite's own helpers are beside its scenarios: `host/support.ts`,
+`lanes/support.ts`, `browser/page.ts`.
 
 ## Scenarios
 
 - **A host reads the suites' user config, not the person's.**
   `startSuiteHost` (`harness.ts`) passes `SUITE_CONFIG`, which turns the
-  automatic title off (ADR-0074), unless a scenario names its own file; one
-  that writes its own spreads `SUITE_CONFIG` into it. `startHost` without a
-  `userConfig` would read `~/.config/pinetrie/config.json`.
+  automatic title off (ADR-0074) and names the lanes' runtime, unless a
+  scenario names its own file; one that writes its own spreads
+  `SUITE_CONFIG` into it, and `SUITE_CONFIG.lanes` into its `lanes`.
+  `startHost` without a `userConfig` would read
+  `~/.config/pinetrie/config.json`.
+- **One suite runs under either runtime** (ADR-0103):
+  `PINETRIE_E2E_RUNTIME` puts `lanes.runtime` in every host's user config:
+  `docker`, the default, or `container`. Under Docker, `e2e:lanes` runs on
+  the Mac against the lane VM, on Linux against the host's Docker, and
+  inside a pine·trie lane granted `lanes.nested` against the lane's
+  rootless Docker, its lanes in `/var/lib/pinetrie-lanes`.
+- **A suite's host works directly where its runtime cannot run**
+  (`runtimeRefused: "direct"`, `startSuiteHost`): the project's reason is
+  the runtime's words. A host started by `server.ts` stops instead.
 
 - **A scenario is one file, and one run against its own host.** It depends
   on no other scenario: what it needs it makes, through the session (`join`)
@@ -31,8 +44,10 @@ They share `checks.ts` (recording a check, and stopping at one),
   exits 2. A suite mutation sets it (`scripts/mutate.ts`, `SUITES`), so a
   mutant runs one scenario, and stops at its check (`PINETRIE_STOP_AT`).
 - **A scenario that cannot run here says why, and is skipped** (`needs`):
-  `containerProblem()` gives the host's own reason `container` is unusable
-  (`prepareContainerHost`, `planContainerHost`), and `live` needs `PINETRIE_LIVE`. Inside the
+  `runtimeProblem()` gives the host's own reason the suites' runtime cannot
+  give lanes their own here (`findProject` on a throwaway project: a
+  `RuntimeRefused`, or a project that works directly), and `live` needs
+  `PINETRIE_LIVE`. Inside the
   browser's `tools`, the offer and review checks are each `skip`ped with the
   host's project record's reason when its lanes work directly. A skip is
   neither a pass nor a fail.

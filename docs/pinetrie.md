@@ -118,7 +118,10 @@ packages/pi/           @pinetrie/pi           THE pi boundary
 packages/protocol/     @pinetrie/protocol     the wire contract and its codec
 packages/rules/        @pinetrie/rules        each stored shape and the pure rules about it
 packages/reads/        @pinetrie/reads        document reads shared by host and client
-packages/lanes/        @pinetrie/lanes        a lane's container and disk, and jj and git in it (ADR-0032–0034)
+packages/lanes/        @pinetrie/lanes        what a lane is and runs; the LaneRuntime port, no runtime (ADR-0032–0034, 0103)
+packages/docker/       @pinetrie/docker       lanes on Docker, on btrfs subvolumes (ADR-0103)
+packages/vm/           @pinetrie/vm           the Mac's lane VM: image, launcher, a host's lease on a slot (ADR-0103)
+packages/container/    @pinetrie/container    lanes on Apple's `container`, until its removal
 packages/keeper/       @pinetrie/keeper       declares NOTHING; one step at a time on a resource
 packages/repo/         @pinetrie/repo         your repo: reads, steps, the owner (ADR-0038, 0060, 0065)
 packages/session/      @pinetrie/session      one client's connection to a host; no React
@@ -540,6 +543,23 @@ a base's trailer names accepted work by kind, so any older name reads as it;
 the config is `accepted`, `wip` and `publish` in place of `offers`; and a
 starting host deletes records no spec declares. A thread's history keeps its
 stored forms (an acceptance's fact as `integrated`), mapped at the edge.
+
+**ADR-0103 — lanes run on Docker on btrfs snapshots** (built; Docker is
+the default, and `lanes.runtime: "container"` keeps Apple's until
+`PLAN-2026-10-07-containers-only` removes it; proven on the Mac, S134). A lane was a VM of its own
+under Apple's `container`, and no lane could run lanes. Now
+`@pinetrie/lanes` decides a lane's container as a value (`ContainerShape`)
+and asks a `LaneRuntime` port for everything else; `@pinetrie/docker`
+implements it over the docker CLI, each lane's disk a btrfs subvolume and a
+snapshot a btrfs snapshot, made by an unprivileged helper container. On the
+Mac, Docker runs in one Linux VM per user (`@pinetrie/vm`): an Alpine image
+of pine·trie's own (`pnpm vm:build`) booted by a launcher of its own on
+Virtualization.framework, which gives each host a slot of shared
+directories, filled once and never replaced while it runs, and carries a
+half-close to Docker. On Linux Docker runs on the host, and a lane granted
+`lanes.nested` runs rootless Docker, so `e2e:lanes` can run in a lane. The
+app picks the runtime (`host/work/runtime.ts`), and lanes made under
+`container` move over at their first start (`pre-docker:`).
 
 **ADR-0091 — your inbox sits by your avatar** (built). The activity menu
 sat on everyone's side of the footer while its badge counted only what is

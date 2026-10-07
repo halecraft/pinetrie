@@ -206,7 +206,11 @@ export async function startLaneWork(input: {
       await keeper.idle()
       await owner?.idle()
     },
-    close: containers.close,
+    async close() {
+      await containers.close()
+      // After the lanes stop: on the Mac, the lease ends and the slot empties.
+      await input.found?.close()
+    },
     onBaseChanged(listener) {
       baseListeners.push(listener)
     },

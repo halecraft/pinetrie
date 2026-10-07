@@ -44,6 +44,7 @@ import {
   projectLine,
   storeLine,
 } from "./startup-lines.ts"
+import { RuntimeRefused } from "./work/runtime.ts"
 
 const env = process.env
 function refuse(refusal: Refusal): never {
@@ -77,6 +78,13 @@ const host = await startHost({
   project: { dir: root, tools: env.PINETRIE_TOOLS !== "0" },
   lanes: env.PINETRIE_LANES !== "0",
   store: store.file,
+}).catch(error => {
+  // The chosen runtime cannot run lanes here: its words say how to fix it.
+  if (error instanceof RuntimeRefused) {
+    console.error(`[host] lanes cannot start: ${error.message}`)
+    process.exit(1)
+  }
+  throw error
 })
 
 console.log(listeningLine(host.httpUrl))
