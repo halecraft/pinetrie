@@ -782,9 +782,8 @@ became of its files (`strip`).
   With no revisions at all (a host without a project), every asked message
   falls back, and the whole path reads as the column's lane.
 - **What a catch-up merges is worded by `catchUpName` alone**
-  (`@pinetrie/rules`, ADR-0061, ADR-0072, ADR-0090): the line is "accepted
-  work", a
-  WIP its bookmark, the thread a thread branched from its name. The words
+  (`@pinetrie/rules`, ADR-0061, ADR-0072, ADR-0090, ADR-0100): accepted
+  work is "accepted work", a WIP its bookmark, the thread a thread branched from its name. The words
   take core's `CatchUpFrom`, never a bookmark string, and accepted work's
   bookmark goes only in titles: `offerWords`' button titles ("moves
   pinetrie-accepted forward to pinetrie-offer/amber-fox"), `behindMark`'s,

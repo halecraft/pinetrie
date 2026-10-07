@@ -327,13 +327,12 @@ containers, disks and the helper.
   core.
   - **The readers also read `Pineta-*`** (`READ`, `pre-rename:`): commits
     made before the rename are immutable. Writers write `Pinetrie-*` only.
-  - **A `Pineta-Base` on `pineta-onto` reads as no base** (`OLD_LINE_BASE`).
-    The line's bookmark was `pineta-onto` then, and `planLaneRead` and
-    `laneBase` compare a base's bookmark with `line.onto`: read whole, it
-    would make the lane a WIP's whose WIP is gone. `trailerRevset` still
-    finds the commit, so it stays the newest base, and the lane falls back
-    to the newest accepted commit in its history, which is accepted work. Remove both
-    once no lane from before the rename has work to offer.
+  - **A base is read by kind, never by accepted work's bookmark**
+    (`baseOf`, ADR-0100): a name with the WIP prefix is that WIP, any other
+    is accepted work. New bases write `accepted@<commit>`; one written as
+    `pinetrie-onto@` or `pineta-onto@` reads as accepted work too, with no
+    special case, and so would one under any later name of the bookmark.
+    `planLaneRead` and `laneBase` take the kind from it.
 - **Decide from exit status, never from printed text.** Output a program
   reads comes from a `-T` template. `execFile` reads all of it: jj exits 3 on
   a broken pipe.

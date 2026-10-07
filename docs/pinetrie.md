@@ -523,11 +523,23 @@ page, an offer's button is **accept**, and threads and your files both
 (built). Publish rebased your files only on a host bound to loopback, and
 setup was refused anywhere else, so a daily button behaved by a variable
 nobody sees in the page, and protected nothing the invite link does not
-already grant. Now `offers.catchUp` (default off; the project's
+already grant. Now `offers.catchUp` (`publish.catchUp` since ADR-0100; default off; the project's
 `pinetrie.json` over the user's config) decides whether a publish catches
 your files up and accepts your commits, on any host, and anyone admitted
 may set up the line. The bind and the invite key decide who gets in, and
 nothing past that.
+
+**ADR-0100 — one vocabulary: accepted work, accept, publish, catch up**
+(built). One concept had five names (the integration line, the line, the
+project, `onto`, accepted work) and one act four (take, land, integrate,
+accept), and the page, the agent, the code and the docs each used
+different ones. Now the page's words are the only words, from the page to
+what is stored and sent (`docs/glossary.md`); the bookmark is
+`pinetrie-accepted`, renamed from `pinetrie-onto` by a starting host, once;
+a base's trailer names accepted work by kind, so any older name reads as it;
+the config is `accepted`, `wip` and `publish` in place of `offers`; and a
+starting host deletes records no spec declares. A thread's history keeps its
+stored forms (an acceptance's fact as `integrated`), mapped at the edge.
 
 **ADR-0091 — your inbox sits by your avatar** (built). The activity menu
 sat on everyone's side of the footer while its badge counted only what is
@@ -964,27 +976,28 @@ context.**
   branch. A project can share a directory for everyone in `pinetrie.json`'s
   `lanes.shared`. A changed config reaches existing threads at their next
   run, after a host restart.
-- **Bringing a thread's work back** (ADR-0038 to ADR-0040, ADR-0047): each
-  thread has a two-word name, shown in its column's header from before its
-  first message (ADR-0057), and keeps an
-  offer in your repo, one commit on your `@-` under the bookmark
+- **Accepting a thread's work** (ADR-0038 to ADR-0040, ADR-0047, ADR-0100;
+  the words are `docs/glossary.md`): each thread has a two-word name, shown
+  in its column's header from before its first message (ADR-0057), and
+  keeps an **offer** in your repo, on the thread's base, under the bookmark
   `pinetrie-offer/<name>`. While the thread works, the offer reads
   `WIP (<name>): <its first message>` and grows in place; when a run ends,
-  an agent writes its commit message. Before you add it, press the offer's
-  line in the work strip: the column's pane shows its message, its files
-  (flagging those that conflict with your committed work, and those you are
-  editing) and every file's diff. Or find its bookmark, which a press
-  copies, in jj or jjui. **add to the project** (or **add to wip/…**), in
-  the work strip at its column's foot, integrates it: that bookmark moves
-  forward to it, and your `@` stays where it is (ADR-0060). Reword, squash
-  or split the offer like any commit of yours before then; the host then
-  leaves it alone. **split into a stack** has the agent rewrite it as reviewable
-  revisions, in a run of its own: while the thread works it waits in the
-  queue, and the agent can ask for one too (ADR-0080). The thread is told
-  what you did to its offer, an integration included, and when the project
-  has new work: the agent can catch up itself (`catch_up`). Set the bookmark
-  `pinetrie-onto` to have offers land on another commit instead, such as a
-  branch you are not on; each integration moves it up.
+  an agent writes its commit message. Before you accept it, press the
+  offer's line in the work strip: the column's pane shows its message, its
+  files (flagging those that conflict with your committed work, and those
+  you are editing) and every file's diff. Or find its bookmark, which a
+  press copies, in jj or jjui. **accept** (or **accept into wip/…**), in the
+  work strip at its column's foot, moves **accepted work**
+  (`pinetrie-accepted`) or the WIP forward to it, and your `@` stays where
+  it is (ADR-0060). Reword, squash or split the offer like any commit of
+  yours before then; the host then leaves it alone. **split into a stack**
+  has the agent rewrite it as reviewable revisions, in a run of its own:
+  while the thread works it waits in the queue, and the agent can ask for
+  one too (ADR-0080). The thread is told what you did to its offer, an
+  acceptance included, and when accepted work has moved on: the agent can
+  catch up itself (`catch_up`). **publish** moves `main` forward to
+  accepted work (ADR-0090, ADR-0099). Set `accepted.bookmark` in
+  `pinetrie.json` to have offers land on another bookmark instead;
   `jj git push --all` would push it: push by name.
 - **Sending your work to a thread:** the work strip's `⋯` offers **update
   from my work**: your `@`, uncommitted edits included, merged into the

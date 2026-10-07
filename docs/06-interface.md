@@ -186,8 +186,8 @@ While the page syncs, "syncing…" leads its right end.
   root's. Nothing in the footer animates: your list, the column, the rail
   and the board show where the agent works.
 - **Publish** (ADR-0060, ADR-0076, ADR-0090, ADR-0099): one button, no
-  menu. The integration line is **accepted work**, where finished work
-  goes; its bookmark (`offers.onto`) is in titles only. Before the line
+  menu. **Accepted work** is where finished work goes (ADR-0100,
+  `docs/glossary.md`); its bookmark (`accepted.bookmark`) is in titles only. Before accepted work
   exists, any host shows **set up**, which opens what it writes: the
   bookmark it makes at your `@-` and the exact `immutable_heads()` and
   `revsets.log` text for your repo's config (the log, so jj and jjui show
@@ -195,9 +195,9 @@ While the page syncs, "syncing…" leads its right end.
   (`docs/the-jujutsu-repo.md`), done only when you choose it. After,
   **publish** shows only while there is something to publish, and does it
   in one act, the same whoever presses it and wherever the host listens:
-  - with `offers.catchUp` on, your files catch up with accepted work
-    (`jj rebase -b @ -d <onto>`, as you) when they are behind; your
-    commits below `@` are accepted; then `main` (`offers.publish`) moves
+  - with `publish.catchUp` on, your files catch up with accepted work
+    (`jj rebase -b @ -d <accepted>`, as you) when they are behind; your
+    commits below `@` are accepted; then `main` (`publish.bookmark`) moves
     forward to accepted work. Your commits and `main` move together in one
     jj operation;
   - with it off, the default, only `main` moves, as the host. No one's
@@ -206,7 +206,7 @@ While the page syncs, "syncing…" leads its right end.
   Its title says what it will do, with how many files catching up
   changes and any other line of your work that moves with it, or, with
   the setting off and your files behind or commits waiting, that your
-  files do not move (`offers.catchUp` is off), then the jj commands. It
+  files do not move (`publish.catchUp` is off), then the jj commands. It
   does not push. What can be checked first is (`main` holding commits
   accepted work lacks; with the setting on, your files' conflicts and what
   catching up would conflict), and the title leads with why it would be
@@ -359,7 +359,7 @@ tab's; with nothing in your list and nothing you are on, it opens by itself.
   button names a WIP the work goes into (ADR-0060, ADR-0090): "accept", or
   "accept into wip/search" for a thread on a WIP, whose menu also offers
   "accept, with your 2 commits beneath it" into accepted work; its title
-  names the bookmark it moves. Accepting the offer (an *integration*,
+  names the bookmark it moves. Accepting the offer (an *acceptance*,
   ADR-0083) moves that bookmark forward to the offer and never touches your
   working copy. From the click to the host's
   answer the strip says what your command is doing ("accepting…",
@@ -368,7 +368,7 @@ tab's; with nothing in your list and nothing you are on, it opens by itself.
   wait. A command refused or failed says so there, as the publish toast does
   ("not done: …", "it failed, and may be part done: …"), until your next
   one on that thread; one carried out says nothing, as the offer then shows
-  it. An integration adds the offer the strip showed: if it now brings other work
+  it. An acceptance adds the offer the strip showed: if it now brings other work
   (the lane moved on), or conflicts where it did not, it is not done ("not
   done: the offer changed since you looked at it: review it again"), and
   the strip shows the new offer. A rebase onto moved accepted work, or your
@@ -413,7 +413,7 @@ tab's; with nothing in your list and nothing you are on, it opens by itself.
   and send"; what you write is what the agent should do with the new work
   (ADR-0055).
 - **The thread hears what was done to its work** (ADR-0080). An
-  integration, a rewrite of the description, a squash and a refresh each add a line to
+  acceptance, a rewrite of the description, a squash and a refresh each add a line to
   the thread: "✓ accepted as k1a2b3c4", "✎ a new description
   was asked for", "⇣ the stack was squashed into one revision", "↻ the
   offer was rebuilt from this thread's work". While the agent works, the
@@ -660,11 +660,11 @@ The rail is E; the column is T. Seeing both at once is the product.
   the column. While the agent works, the mark before the thread's name in the
   header (its `✦`, or its banner, ADR-0053) pulses, titled with the ask it
   works on, "the agent is working on Ada: "Fix the rail…"" (ADR-0056). In
-  outline, the running ask's own line pulses instead of the line below. A
+  outline, the running ask's own line pulses instead of accepted work below. A
   short line pulses at the
   end of the column, centred, where its next text will appear. While a
   command that has run for half a second is still running, its row is
-  outlined instead, and the line hides: the wait is the machine's, not the
+  outlined instead, and accepted work hides: the wait is the machine's, not the
   model's. A quicker command changes neither.
 - **A root shown again draws its tool rows as they were left** (ADR-0049):
   a running command's row open, a row you opened or closed the same way.
@@ -777,7 +777,7 @@ The rail is E; the column is T. Seeing both at once is the product.
 - **Pin** a card below the line with its **pin** button, or drop a card on
   the strip: while you drag a card, a thread with no pinned card shows "drop
   a card here to pin it for the agent" there. **Unpin** puts it back below
-  the line; **take** moves it into your inventory. Both pin and unpin are
+  accepted work; **take** moves it into your inventory. Both pin and unpin are
   moves the undo key outside a box undoes.
 - **"+ pin" writes a new pinned card**: in the column's header while the
   thread has none, at the end of the strip once it has one. The box it

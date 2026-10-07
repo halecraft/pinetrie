@@ -2,7 +2,9 @@
 
 pine·trie is a collaborative agentic harness: pi's agent core over a Kyneta CRDT
 document, where the conversation is a tree. Start with `docs/pinetrie.md` (the
-handoff) and `docs/README.md` (the map of the docs). Decisions and their
+handoff) and `docs/README.md` (the map of the docs). The words for the work
+in your repo (accepted work, accept, offer, WIP, publish, catch up) are
+`docs/glossary.md`: use them, and no others. Decisions and their
 reasons are the ADRs, one file each in `docs/adrs/`. Each package has a
 `TECHNICAL.md` with its gotchas: read the one nearest the code you change.
 

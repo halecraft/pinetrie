@@ -256,8 +256,16 @@ operation is read once and kept until the head moves.**
   `trailers.ts`): offers accepted before the rename carry `Pineta-Source`,
   and an old lane's next offer would otherwise start below them and put
   their files back over yours (`repo.test.ts`, pre-rename). A `Pineta-Base`
-  on `pineta-onto`, the line's name then, reads as no base, so such a lane
-  falls back to the newest accepted commit in its history: the base start above.
+  on `pineta-onto` reads as accepted work, as any base off the WIP prefix
+  does (`baseOf`, ADR-0100).
+- **`pre-accepted:` renames `pinetrie-onto` to `pinetrie-accepted`, once**
+  (`pre-accepted.ts`, ADR-0100, S121): the first command a starting host
+  puts on the owner (`startSetup`). The bookmark is renamed when the old one
+  is there and the new one is not; setup's `immutable_heads()` text is
+  rewritten when your config ends with it; each from its own fact, so a
+  start that stopped between them finishes the other. A config that names
+  its own `accepted.bookmark` is left alone. Delete it once Duane's repo has
+  passed it.
 - **A source accepted below the base's source is not part of the start**
   (S81). `LaneBase.source` is the commit of yours the lane merged whole:
   the one its `Pinetrie-Base` names (the WIP's commit, never the copy, which

@@ -4,7 +4,7 @@ The host serves one jj repo: the project's working copy on the machine the
 host runs on. This page is for someone who works in that repo with jj or
 jjui beside pine·trie. It says what pine·trie puts there, what it expects, and
 what to configure. Why each piece is shaped as it is: ADR-0038 (offers),
-ADR-0039 (thread names), ADR-0060 (the integration line and the ledger),
+ADR-0039 (thread names), ADR-0060 (accepted work and the ledger),
 ADR-0076 and ADR-0090 (publishing).
 
 Two parties act on the repo. **The host** runs its jj commands as the
@@ -13,61 +13,75 @@ host, and works in the repo with jj directly. People in a session never
 touch the repo: their threads' agents work in lanes of their own, and their
 work reaches the repo as offers.
 
-The page names these things by what they are for, not by their jj names
-(ADR-0061, ADR-0090): the line is **accepted work**, integrating an offer is
-**accept**, bringing a thread or your files up to date is **catch up**, and
-moving `main` (with your own work, on the owner's machine) is **publish**.
-The jj names are in the page's titles.
+pine·trie names these things by what they are for, one word each, in the
+page, the code and here (ADR-0100, `docs/glossary.md`): **accepted work**,
+**accept**, **offer**, **WIP**, **catch up**, and **publish**. The jj names
+are in the page's titles.
 
 ## Bookmarks
 
 | bookmark | whose | what it is |
 |---|---|---|
-| `pinetrie-onto` | the owner's, moved by the host on an offer integration, and by a publish of the owner's commits | **The integration line**, "accepted work" on the page: where finished work lands. It only moves forward. Immutable once set up. |
-| `pinetrie-offer/<name>` | the host's | **An offer**: a thread's work as one revision, or a stack, on the thread's base. Immutable while it sits on the line. `<name>` is the thread's two-word name. |
-| `main` | the owner's, moved on a publish | **Where the project is published**: moved forward to `pinetrie-onto`, with it, never anywhere else. |
-| `wip/*` | the owner's | **A work in progress** a thread may start from, chosen at its first message. Never touched by the host, except an offer integration into it. |
+| `pinetrie-accepted` | the owner's, moved by the host on an acceptance, and by a publish of the owner's commits | **Accepted work**: where finished work lands. It only moves forward. Immutable once set up. Named `pinetrie-onto` before ADR-0100; a starting host renames it, once. |
+| `pinetrie-offer/<name>` | the host's | **An offer**: a thread's work as one revision, or a stack, on the thread's base. Immutable while it sits on accepted work. `<name>` is the thread's two-word name. |
+| `main` | the owner's, moved on a publish | **Where the project is published**: moved forward to `pinetrie-accepted`, with it, never anywhere else. |
+| `wip/*` | the owner's | **A work in progress** a thread may start from, chosen at its first message. Never touched by the host, except an acceptance into it. |
 | `tip@pinetrie-<lane>` | the host's | **A lane's history**, fetched from the lane. A remote bookmark, untracked, so jj treats it as immutable and leaves it out of the default log. Archiving a thread deletes its lane's, and abandons its offer; restoring brings both back. |
 
-The names `pinetrie-onto`, `main` and `wip/` are the defaults. A project sets its own
-in `pinetrie.json`, or a person in `$XDG_CONFIG_HOME/pinetrie/config.json`; the
-project's wins. `catchUp` (default `false`) makes a publish catch your files
-up and accept your commits first (ADR-0099):
+The names `pinetrie-accepted`, `main` and `wip/` are the defaults. A project
+sets its own in `pinetrie.json`, or a person in
+`$XDG_CONFIG_HOME/pinetrie/config.json`; the project's wins.
+`publish.catchUp` (default `false`) makes a publish catch your files up and
+accept your commits first (ADR-0099):
 
 ```json
-{ "offers": { "onto": "trunk", "wipPrefix": "wip/", "publish": "master", "catchUp": true } }
+{ "accepted": { "bookmark": "trunk" },
+  "wip": { "prefix": "wip/" },
+  "publish": { "bookmark": "master", "catchUp": true } }
 ```
 
-**An offer integration** moves one bookmark forward to an offer:
-`pinetrie-onto`, or the thread's `wip/` bookmark. It never rebases, and never
-touches `@`. jj itself refuses a move that is not forward, so a stale
-integration fails instead of dropping commits. Only an offer with no
-conflicts can be integrated into the line. The commit it leaves there is an
-**integrated-offer commit** (ADR-0083).
+A config that still has `offers`, the key these replaced, is not read for
+it, and the host says so at startup.
 
-**Publish**, the page's one button for the line (ADR-0090), shows only while
-there is something to publish. With `offers.catchUp` on, it is up to three
+**The rename from `pinetrie-onto`** (ADR-0100, S121) is the first thing a
+starting host does in your repo, when the config names no bookmark of its
+own: `jj bookmark rename pinetrie-onto pinetrie-accepted`, as the host, which
+`jj op revert` undoes; and, when your `immutable_heads()` ends with what
+setup wrote for `pinetrie-onto`, that text rewritten to name
+`pinetrie-accepted` (`jj config set --repo`, a file write, which the op log
+does not show). A jjui revset of your own that names `pinetrie-onto` needs
+the same edit by hand.
+
+**An acceptance** moves one bookmark forward to an offer:
+`pinetrie-accepted`, or the thread's `wip/` bookmark. It never rebases, and never
+touches `@`. jj itself refuses a move that is not forward, so a stale
+acceptance fails instead of dropping commits. Only an offer with no
+conflicts can be accepted into accepted work. The commit it leaves there is an
+**accepted-offer commit** (ADR-0083).
+
+**Publish**, the page's one button for accepted work (ADR-0090), shows only while
+there is something to publish. With `publish.catchUp` on, it is up to three
 steps, as one act:
 
-1. When the owner's files are behind the line, `jj rebase -b @ -d
-   pinetrie-onto`, run as the owner: the owner's work above the line, and
-   every head on it besides `@`, moves onto the line. Before it, the
+1. When the owner's files are behind accepted work, `jj rebase -b @ -d
+   pinetrie-accepted`, run as the owner: the owner's work above accepted work, and
+   every head on it besides `@`, moves onto accepted work. Before it, the
    button's title says what this does, from a preview made with `git
    merge-tree`, which writes nothing jj or jjui shows: how many files
    change, and the other heads that move.
-2. and 3. `jj bookmark move pinetrie-onto main --to @-`, run as the owner,
-   when the owner has commits below `@` the line lacks: the line accepts
-   them, and `main` moves with it, in one operation. Without such commits,
-   `jj bookmark move main --to pinetrie-onto`, as `pinetrie-host`.
+2. and 3. `jj bookmark move pinetrie-accepted main --to @-`, run as the owner,
+   when the owner has commits below `@` accepted work lacks: they are
+   accepted, and `main` moves with them, in one operation. Without such commits,
+   `jj bookmark move main --to pinetrie-accepted`, as `pinetrie-host`.
 
-With `offers.catchUp` off, the default, a publish is the last move alone,
+With `publish.catchUp` off, the default, a publish is the last move alone,
 as `pinetrie-host`, and changes no file. Either way anyone admitted may
 publish, and the host does the same whoever presses it and wherever it
 listens (ADR-0099). It does not push.
 
-Publishing is refused before its first step when `main` has commits the
-line lacks (someone pushed to it outside pine·trie), which must be brought
-into the line first; and, with `offers.catchUp` on, when the owner's files
+Publishing is refused before its first step when `main` has commits
+accepted work lacks (someone pushed to it outside pine·trie), which must be brought
+into accepted work first; and, with `publish.catchUp` on, when the owner's files
 have conflicts or the preview says catching up would conflict. When the rebase leaves one of the
 owner's commits conflicted (one that `@`'s own tree resolves, so the
 preview could not see it), or the move fails, the host reverts the rebase's
@@ -78,19 +92,19 @@ with the agent", which opens a thread working in the owner's files with the
 `resolve-conflicts` skill, which resolves at the lowest conflicted commit
 (`jj new`, resolve, `jj squash`).
 
-The host watches `main` as it watches the line, so moving it in jj updates
-what the publish button says. Moving the line or `main` by hand is the same
-act as the host's: `jj bookmark move pinetrie-onto main --to @-`.
+The host watches `main` as it watches accepted work, so moving it in jj updates
+what the publish button says. Moving accepted work or `main` by hand is the same
+act as the host's: `jj bookmark move pinetrie-accepted main --to @-`.
 
 ## Config the host writes
 
-"Set up", the page's button before the line exists, writes two settings to the
+"Set up", the page's button before accepted work exists, writes two settings to the
 repo's own config (`jj config set --repo`), shown in full before anything
 is written, and only when chosen:
 
 ```toml
 [revset-aliases]
-"immutable_heads()" = 'builtin_immutable_heads() | present("pinetrie-onto") | (bookmarks(glob:"pinetrie-offer/*") & children(present("pinetrie-onto")))'
+"immutable_heads()" = 'builtin_immutable_heads() | present("pinetrie-accepted") | (bookmarks(glob:"pinetrie-offer/*") & children(present("pinetrie-accepted")))'
 
 [revsets]
 log = 'builtin_log() | bookmarks(glob:"pinetrie-offer/*")'
@@ -100,26 +114,26 @@ Each is added to the repo's current definition, not put in its place: a
 repo that defines its own `immutable_heads()` or `revsets.log` keeps it,
 with pine·trie's terms joined on.
 
-- **`present()` is required.** Without it, a repo with no `pinetrie-onto`
+- **`present()` is required.** Without it, a repo with no `pinetrie-accepted`
   fails every jj command (S77 item 3).
 - **The log setting is needed because the offers are immutable.** jj's
   default log, `builtin_log()`, shows mutable commits and their near
-  ancestors. An offer on the line is an immutable commit with nothing
+  ancestors. An offer on accepted work is an immutable commit with nothing
   mutable above it, so the default log leaves it out (S77 item 8).
 
 ## jjui
 
 jjui's own `[revisions] revset`, in `~/.config/jjui/config.toml`, replaces
 `revsets.log` for jjui, so the setting above does not reach it. A revset
-built like jj's default hides every offer on the line. Add the offers to it:
+built like jj's default hides every offer on accepted work. Add the offers to it:
 
 ```toml
 [revisions]
   revset = '(present(@) | ancestors(immutable_heads().., 2) | ancestors(@, 5) | present(trunk())) | bookmarks(glob:"pinetrie-offer/*")'
 ```
 
-The line and the offers on it show as immutable (◆). The owner's commits
-above the line stay mutable.
+Accepted work and the offers on it show as immutable (◆). The owner's commits
+above accepted work stay mutable.
 
 ## Trailers
 
@@ -129,8 +143,8 @@ and jj's `trailers` template reads only the last.
 
 | trailer | on | says |
 |---|---|---|
-| `Pinetrie-Base: <bookmark>@<commit>` | a lane's start, and each update | the thread's base: the line, or a `wip/` bookmark, at that commit |
-| `Pinetrie-Source: <commit>` | every revision of an offer | the lane tip the offer holds; on the line, that work has been integrated |
+| `Pinetrie-Base: accepted@<commit>`, `Pinetrie-Base: <wip>@<commit>` | a lane's start (`base: accepted work`, `copy of <wip>`), and each catch-up (`catch up: accepted work`) | the thread's base: accepted work, or a `wip/` bookmark, at that commit. A name with the WIP prefix is that WIP; any other, `pinetrie-onto` in older commits included, is accepted work |
+| `Pinetrie-Source: <commit>` | every revision of an offer | the lane tip the offer holds; on accepted work, that work has been accepted |
 | `Pinetrie-Start: <commit>` | every revision of an offer | where the offer starts |
 | `Pinetrie-Thread`, `Pinetrie-Lane`, `Pinetrie-Entry` | every revision of an offer | the thread, its lane, and the newest entry its work came from |
 
@@ -139,15 +153,15 @@ believes:
 
 - **A squash that keeps one message** (`jj squash -u`, or a message written
   by hand) drops the other commit's `Pinetrie-Source`. pine·trie then reads that
-  work as not integrated, and offers it again.
+  work as not accepted, and offers it again.
 - **An offer's message rewritten without `Pinetrie-Thread`** still has its
   top found by its bookmark, but a stack's lower revisions are no longer
   recognised as the offer's, so the offer reads as edited.
 
 ## Rewriting under pine·trie
 
-- **The line is immutable on purpose.** Rewriting it takes
-  `--ignore-immutable`, which is the point: integrated work is final unless it
+- **Accepted work is immutable on purpose.** Rewriting it takes
+  `--ignore-immutable`, which is the point: accepted work is final unless it
   is rewritten deliberately.
 - **Rewording or rewriting a commit under an offer is safe.** jj rebases
   the offer as part of that operation. The host sees a version it did not
@@ -157,11 +171,11 @@ believes:
   host never touches that offer again. The evolog says who made each
   version, so this holds across a host restart.
 - **Abandoning an offer, or deleting its bookmark,** discards it: the host
-  builds a new one when the thread has work not integrated. To be rid of a
+  builds a new one when the thread has work not accepted. To be rid of a
   thread's offer, archive the thread: the host abandons the offer, and
   builds it again if the thread is restored.
 - **A `wip/` bookmark** is the owner's to rebase, amend or move. A thread
-  started from it is brought up to date with a fresh copy of it. Once the
-  WIP's commits are on the line, its threads move to the line; if the
-  bookmark is deleted without landing, their updates stop until "continue
-  from accepted work".
+  started from it catches up with a fresh copy of it. Once the WIP's
+  commits are on accepted work, its threads move to accepted work; if the
+  bookmark is deleted before then, their catch-ups stop until "continue on
+  accepted work".
