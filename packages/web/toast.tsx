@@ -1,5 +1,5 @@
 // web/toast — a note fixed above the footer until you dismiss it: what a
-// line command refused or failed says, with no menu open to say it
+// setup or publish command refused or failed says, with no menu open to say it
 // (ADR-0090).
 
 export function Toast({

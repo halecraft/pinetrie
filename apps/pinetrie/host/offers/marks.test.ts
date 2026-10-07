@@ -21,8 +21,8 @@ describe("planMarks: what a move the owner observed refreshes", () => {
   const archived = new Set([D])
   const moved = (over: Partial<Moved> = {}): Moved => ({
     all: false,
-    onto: false,
-    line: false,
+    acceptedBookmark: false,
+    published: false,
     yours: false,
     lanes: new Set(),
     offers: new Set(),
@@ -30,9 +30,9 @@ describe("planMarks: what a move the owner observed refreshes", () => {
   })
   const marks = (m: Moved, open: readonly LaneName[] = [C]) =>
     planMarks({ moved: m, names, archived, open })
-  test("everything moved marks the line, every named lane not archived and every open record", () => {
+  test("everything moved marks accepted work, every named lane not archived and every open record", () => {
     expect(marks(moved({ all: true, yours: true }))).toEqual({
-      line: true,
+      accepted: true,
       shared: false,
       lanes: [A, B, C],
     })
@@ -44,23 +44,23 @@ describe("planMarks: what a move the owner observed refreshes", () => {
     ).toEqual([D])
     expect(marks(moved({ all: true }), [D]).lanes).toEqual([A, B, D])
   })
-  test("the publish bookmark marks the line's record, and no lane (ADR-0076)", () => {
-    expect(marks(moved({ line: true }))).toEqual({
-      line: true,
+  test("the publish bookmark marks accepted work's record, and no lane (ADR-0076)", () => {
+    expect(marks(moved({ published: true }))).toEqual({
+      accepted: true,
       shared: false,
       lanes: [],
     })
   })
-  test("your @ alone marks no lane: one shared read rewrites your edits and the line's record", () => {
+  test("your @ alone marks no lane: one shared read rewrites your edits and accepted work's record", () => {
     expect(marks(moved({ yours: true }))).toEqual({
-      line: false,
+      accepted: false,
       shared: true,
       lanes: [],
     })
   })
-  test("a lane's ref marks that lane alone, and not the line", () => {
+  test("a lane's ref marks that lane alone, and not accepted work", () => {
     expect(marks(moved({ lanes: new Set([B]) }))).toEqual({
-      line: false,
+      accepted: false,
       shared: false,
       lanes: [B],
     })
@@ -72,9 +72,13 @@ describe("planMarks: what a move the owner observed refreshes", () => {
           offers: new Set(["amber-fox", "nobody-here"] as ThreadName[]),
         }),
       ),
-    ).toEqual({ line: false, shared: false, lanes: [A] })
+    ).toEqual({ accepted: false, shared: false, lanes: [A] })
   })
   test("nothing moved marks nothing", () => {
-    expect(marks(moved())).toEqual({ line: false, shared: false, lanes: [] })
+    expect(marks(moved())).toEqual({
+      accepted: false,
+      shared: false,
+      lanes: [],
+    })
   })
 })

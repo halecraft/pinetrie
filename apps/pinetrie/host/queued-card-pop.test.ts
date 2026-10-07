@@ -630,7 +630,7 @@ describe("drain: a fact (ADR-0080)", () => {
       by: ADA,
       as: "kabcdefgh",
       bookmark: "pinetrie-onto",
-      to: { kind: "line" },
+      to: { kind: "accepted" },
     } as const
     b.places.cards.set(
       "c-1",

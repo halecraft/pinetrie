@@ -1,6 +1,6 @@
 // host/startup — what a starting host does before it accepts a command.
 
-import type { LaneName, RootId } from "@pinetrie/core"
+import { type LaneName, type RootId, SESSION_TARGET } from "@pinetrie/core"
 import type { Keeper } from "@pinetrie/keeper"
 import type { Agent, PiSetup } from "@pinetrie/pi"
 import {
@@ -21,8 +21,10 @@ import {
   planClear,
   planSeatSweep,
   planStartup,
+  planUndeclaredSweep,
   planWorkflowSeed,
   SEAT,
+  type StoredRecords,
   setIfChanged,
   setRecord,
   VERDICT,
@@ -32,6 +34,7 @@ import {
   cardIdOfDoc,
   readActiveLanes,
   readStoredLanes,
+  readStoredRecordKeys,
   readStreamIds,
 } from "@pinetrie/schema"
 import type { Basics } from "./basics.ts"
@@ -66,7 +69,9 @@ export interface StartupDeps {
 
 /**
  * In order: no stream survives a process, so clear them; give a new store
- * the default workflow (`planWorkflowSeed`); log the stored lane
+ * the default workflow (`planWorkflowSeed`); delete the records of a type
+ * no spec declares, in the session and the roots opened
+ * (`planUndeclaredSweep`, ADR-0100); log the stored lane
  * names that are not a thread's, which no reader is given; name every lane
  * that has none (ADR-0039); resume each lane a crash interrupted, in its own
  * directory (`planStartup`); write what the host found, the commands its
@@ -86,8 +91,24 @@ export async function recover(deps: StartupDeps): Promise<void> {
   const seed = planWorkflowSeed(readWorkflow(doc), newId)
   if (seed.length > 0) await keeper.run(() => records.writeValues(seed))
   const malformed: string[] = []
-  for (const root of deps.roots)
-    malformed.push(...readStoredLanes(await docs.root(root)).malformed)
+  const stored: StoredRecords[] = [
+    { target: SESSION_TARGET, namespaces: readStoredRecordKeys(doc) },
+  ]
+  for (const root of deps.roots) {
+    const rootDoc = await docs.root(root)
+    malformed.push(...readStoredLanes(rootDoc).malformed)
+    stored.push({
+      target: { kind: "root", root },
+      namespaces: readStoredRecordKeys(rootDoc),
+    })
+  }
+  const undeclared = planUndeclaredSweep(stored)
+  if (undeclared.length > 0) {
+    log(
+      `[host] deleting ${undeclared.length} stored records of types no longer kept: ${[...new Set(undeclared.map(w => w.namespace))].join(", ")}`,
+    )
+    await keeper.run(() => records.writeValues(undeclared))
+  }
   if (malformed.length > 0)
     log(
       `[host] ignoring stored lanes that are no thread's: ${malformed.join(", ")}`,

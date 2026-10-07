@@ -8,7 +8,7 @@ lane also runs, through a `Runner` it is given, stays in `lanes`
 (`laneBase`, `REVISION_READ`, `commitsOf`), and this package calls it. The
 client may not depend on it.
 
-What an offer or a `line` command means is decided in
+What an offer or a setup or publish means is decided in
 `@pinetrie/rules`, which this package cannot declare: it returns
 each decision as a value typed in `@pinetrie/core` (`core/offers.ts`), this
 package reads the facts it is made from and turns it into steps, and the
@@ -35,8 +35,8 @@ translates to.
 - `observe.ts`: what an outside change moved, pure: the fingerprint
   (`fingerprintRead`, `parseFingerprint`) and `planObserve`.
 - `step.ts`: `RepoStep`, one command on your repo as data.
-- `plan.ts`: the steps, pure: the line's setup (`lineProposal`,
-  `planLineSetup`), a publish's catch-up, move and undo
+- `plan.ts`: the steps, pure: accepted work's setup (`setupProposal`,
+  `planSetup`), a publish's catch-up, move and undo
   (`planPublishCatchUp`, `planPublishMove`, `planCatchUpUndo`, ADR-0090),
   an offer's build, rebuild, refresh, repair
   and acceptance, lanes' refs (`laneRefSteps`), a bundle's import
@@ -51,16 +51,16 @@ translates to.
   (`gatherOffer`, `gatherPlace`, `gatherRefresh`, `gatherOfferAcceptance`,
   `gatherStack`, `gatherDescribe`), each returning core's facts. Where an
   offer sits is decided here, once, as an `OfferPlace`, and so is the read
-  path: a refresh of a lane on the line takes the one read, every other
+  path: a refresh of a lane on accepted work takes the one read, every other
   gather the separate reads.
 - `offer-steps.ts`: a decision into steps, pure (`offerEffects`,
   `rebuildEffects`, `offerAcceptanceEffects`, `describeEffects`), with what the host
   does after (`OfferEffects.after`).
 - `offer-repair.ts`: `repairOffer`, the one offer step that reads between
   its steps.
-- `line.ts`: the line's facts, a new lane's begin, a WIP's state
+- `accepted.ts`: accepted work's facts, a new lane's begin, a WIP's state
   (`wipState`, `readWipState`).
-- `shared.ts`: the facts every lane and the line share, per operation.
+- `shared.ts`: the facts every lane and accepted work share, per operation.
 - `lane-read.ts`: one lane's refresh facts in one `jj log` (`gatherLane`).
 
 ## The owner (`owner.ts`, ADR-0065)
@@ -89,13 +89,13 @@ everything else reads at the head it last saw.**
 - **Observation** (`later("observe")`, or inline after a write): `jj op log
   --no-graph -n 1 -T id`, which merges divergent heads and names the result
   (S87 item 4). The same id ends it. Else one `jj log`, pinned to that id,
-  reads the fingerprint: the line's bookmark, the WIP bookmarks, the
+  reads the fingerprint: accepted work's bookmark, the WIP bookmarks, the
   publish bookmark (`main`, ADR-0076), the offers' bookmarks, the lanes'
   `pinetrie-*` remote bookmarks, each with its commit (a conflicted one with
   all its targets), and `@`'s commit. A bookmark of yours outside those is
   not read, so moving it moves nothing. The publish bookmark moving is
   `Moved.line`, not `all`: no offer depends on it, so it refreshes the
-  line's record alone (`planMarks`). The line's bookmark moving is also
+  line's record alone (`planMarks`). Accepted work's bookmark moving is also
   `Moved.onto`, which the host's base snapshot follows (ADR-0090), wherever
   the move came from. `planObserve` says what moved; the listeners hear it, and the fingerprint
   advances. The first observation reports `all`, and not `onto`, since
@@ -118,8 +118,8 @@ operation is read once and kept until the head moves.**
   `gatherRefresh`: one that never committed was never fetched. No
   `pinetrie.base` is written for it, and the page reads catching up as
   `unknown` (`catchUpOf`, `@pinetrie/rules`), never as caught up.
-- **`SharedFacts`**, per operation (`RepoOps.shared()`): the line's facts
-  (`lineFacts`, for the line's record), the accepted-offer commits on the
+- **`SharedFacts`**, per operation (`RepoOps.shared()`): accepted work's facts
+  (`acceptedFacts`, for accepted work's record), the accepted-offer commits on the
   line (`ACCEPTED_OFFER_COMMITS`: a `Pinetrie-Source` or `Pinetrie-Thread`
   trailer), split into those naming sources (`acceptedOfferCommits`) and
   those that name none for some lane (`untraced`,
@@ -130,8 +130,8 @@ operation is read once and kept until the head moves.**
 - **`yourEdits` is `files ∩ editing`**, decided in `offerRecord`
   (`@pinetrie/rules`): no lane reads `@`. `@` alone moving rewrites every open
   record's from one shared read (`planYourEdits`).
-- **A lane on the line is read in one `jj log`** (`laneRead`): its tip, the
-  newest commit carrying `Pinetrie-Base`, the newest line commit in its
+- **A lane on accepted work is read in one `jj log`** (`laneRead`): its tip, the
+  newest commit carrying `Pinetrie-Base`, the newest accepted commit in its
   history, the offer's region (`::<bookmark> ~ ::<line>`), and the
   accepted-offer commits and this lane's untraced ones not under its base; each row with
   its parents, its flags (`contained_in` each revset: tip, bookmark, region,
@@ -140,7 +140,7 @@ operation is read once and kept until the head moves.**
   `planLaneRead` (pure) says the base, the start and the offer from them: an
   untraced accepted-offer commit above the base makes the start `untraced`. "Under the base" stands for
   `acceptedOfferCommitsRevset`'s `~ ::present(<base source>)`: the base commit merged that
-  source, and an accepted-offer commit is a line commit.
+  source, and an accepted-offer commit is a accepted commit.
 - **What the rows cannot say is read only when needed:** the start, when a
   accepted source above the base names more (`offerStart`); a stack's files,
   and the top's conflicted files when it conflicts, with the files
@@ -150,7 +150,7 @@ operation is read once and kept until the head moves.**
   (`sinceHost`) is always read, and whether the lane's work changes any
   file (`workChanges`) unless the start is untraced. The second is asked of
   the lane's own work, never read from the offer's files: those are a diff
-  against the target, empty once the line holds the lane's work, which
+  against the target, empty once accepted work holds the lane's work, which
   still changes files. Read from them, such an offer was withdrawn and built
   again on every observation, without end (S89).
 - **What catching up would change** (`readCatchUp`) is read only once the
@@ -210,11 +210,11 @@ operation is read once and kept until the head moves.**
   and so is a publish's move of the publish bookmark alone
   (`planPublishMove`, ADR-0076), which changes no file and is anyone's
   command.
-  A publish's catch-up (`planPublishCatchUp`: `jj rebase -b @ -d <onto>`) is
+  A publish's catch-up (`planPublishCatchUp`: `jj rebase -b @ -d <accepted>`) is
   one exception, since it changes your files; an accepting move is the
-  other: `jj bookmark move <onto> <publish> --to @-` moves the line to your
+  other: `jj bookmark move <accepted> <publish> --to @-` moves accepted work to your
   commits, your act, so it runs as you (`as: "you"`, ADR-0090), and its
-  undo (`planCatchUpUndo`) too. The line's config is set as you too: `jj
+  undo (`planCatchUpUndo`) too. Accepted work's config is set as you too: `jj
   config set` is not an operation.
 - **A publish's undo is `jj op revert` of the catch-up's operation, never
   `jj op restore`** (S111): a restore to the operation before deletes from
@@ -224,8 +224,8 @@ operation is read once and kept until the head moves.**
   observed it. Two bookmarks in one `jj bookmark move` move in one
   operation, and a refusal of either moves neither (S111), so the move
   itself needs no undo.
-- **The line is immutable** (`immutableHeads`, written to the repo's config
-  only by the `line` command's setup): `present(<onto>)`, and the offers on
+- **Accepted work is immutable** (`immutableHeads`, written to the repo's config
+  only by setup): `present(<accepted>)`, and the offers on
   it, joined to the repo's own definition. `present()`, or a repo without
   the bookmark fails every jj command (S77 item 3). The host's rewrites of an
   offer pass `--ignore-immutable` (`rewrite`); a bookmark move rewrites
@@ -244,9 +244,9 @@ operation is read once and kept until the head moves.**
 - **Where an offer starts is read from the repo** (`startOfOffer`,
   `offerStart`, ADR-0060): `heads(::tip & (<base start> | ::(<sources>)))`.
   The base start is the commit the lane's newest `Pinetrie-Base` names
-  (`laneBase`); for a lane with none, from before the line, the newest line
+  (`laneBase`); for a lane with none, from before accepted work, the newest line
   commit in the tip's history. The sources are the lane commits that
-  accepted offers' `Pinetrie-Source` trailers name, in `::<onto>` and in `::<wip>`
+  accepted offers' `Pinetrie-Source` trailers name, in `::<accepted>` and in `::<wip>`
   for a lane on a WIP, minus `::present(<base source>)` (`acceptedOfferCommitsRevset`,
   read by `acceptedOfferCommitFacts` with the lane's untraced ones), each `present()`: one never fetched here names
   nothing you have. A squash of two accepted offers keeps both trailer
@@ -257,14 +257,14 @@ operation is read once and kept until the head moves.**
   and an old lane's next offer would otherwise start below them and put
   their files back over yours (`repo.test.ts`, pre-rename). A `Pineta-Base`
   on `pineta-onto`, the line's name then, reads as no base, so such a lane
-  falls back to the newest line commit in its history: the base start above.
+  falls back to the newest accepted commit in its history: the base start above.
 - **A source accepted below the base's source is not part of the start**
   (S81). `LaneBase.source` is the commit of yours the lane merged whole:
   the one its `Pinetrie-Base` names (the WIP's commit, never the copy, which
   descends from no accepted-offer commit), else `start`. An offer keeps the diff from
   its start's merge to the tip, so a start the target holds as another
   commit is subtracted from the target. An accepted-offer commit and a
-  later catch-up are both heads, and their merge conflicts wherever the line
+  later catch-up are both heads, and their merge conflicts wherever accepted work
   changed the accepted lines since: an offer conflicted where its lane had nothing left to
   resolve. `present()` around the base's source keeps a commit lost to
   `jj util gc` from failing every refresh; it then excludes nothing.
@@ -274,20 +274,20 @@ operation is read once and kept until the head moves.**
   paragraph, on its WIP line and kept through a description. The source is
   the lane tip the whole offer holds, a stack's revisions included:
   accepted, it says you have that tip.
-- **`lineFacts` previews catching your files up** (`yours.catchUp`, S80):
-  `git merge-tree --write-tree --name-only --merge-base=<fork point> <onto>
+- **`acceptedFacts` previews catching your files up** (`yours.catchUp`, S80):
+  `git merge-tree --write-tree --name-only --merge-base=<fork point> <accepted>
   <@>` exits 1 on conflicts and prints the merged tree, the conflicting
   paths, a blank line, then its messages; the tree against `@`'s names the
   files that change. It writes only a tree object. It reads `@` as last
   snapshotted: the host never snapshots your files. Null when nothing is
-  behind, or `@` shares no commit with the line but the root. `-b @`
+  behind, or `@` shares no commit with accepted work but the root. `-b @`
   moves every head on your work, which the preview counts: `-r` would
   strip them of the commits under them. `yours.conflicts` counts your
-  conflicted commits above the line, and lists `@`'s conflicted files; a
+  conflicted commits above accepted work, and lists `@`'s conflicted files; a
   publish's second round reads it again after the catch-up, since a commit
   of yours that `@`'s tree resolves can conflict where the preview of `@`
-  says nothing. `yours.ahead` is `::@- ~ ::<onto>`, whether or not `@-`
-  descends from the line: what a publish accepts once caught up.
+  says nothing. `yours.ahead` is `::@- ~ ::<accepted>`, whether or not `@-`
+  descends from accepted work: what a publish accepts once caught up.
 - **`workChanges`** says whether a lane's work since its start changes any
   file: `none`, `some` or `unknown` (ADR-0067). From one start, `jj diff
   --from <start> --to <tip>`: the diff a build restores, so the two always
@@ -316,7 +316,7 @@ operation is read once and kept until the head moves.**
   the base does (`jj diff --from <tip> --to <to>`). A three-way merge from
   the start changes no other file. For a WIP, `to` is the WIP's commit: the
   copy the update makes has its files. `repo.test.ts` holds it against
-  `mergeUpdate`'s files on the line and on a WIP, and against your own
+  `mergeUpdate`'s files on accepted work and on a WIP, and against your own
   acceptance (none).
 - **`startOfOffer` is the one path to a start**, or to `untraced`. Every
   gather reaches it, the one read included (`gatherLane`'s `offerStart`

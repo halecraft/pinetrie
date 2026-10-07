@@ -45,7 +45,7 @@ import {
 } from "./cards.ts"
 import { type Chat, type ChatDeps, sendChat, spendsCard } from "./chat.ts"
 import {
-  actOnLine,
+  actOnAccepted,
   actOnOffer,
   handleCarryOn,
   handleQueueHold,
@@ -80,7 +80,7 @@ export interface CommandDeps {
 }
 
 /**
- * Where a command runs (ADR-0065). An offer action and a `line` command act
+ * Where a command runs (ADR-0065). An offer action and a setup or publish act
  * on your repo only: they go straight to its owner, and hold no other
  * command. A move on the board is up to three parts (`handleRootMove`).
  * Everything else is one step on the documents' keeper.
@@ -88,7 +88,8 @@ export interface CommandDeps {
 export function placeOfCommand(intent: Intent): "documents" | "repo" | "board" {
   switch (intent.kind) {
     case "offer":
-    case "line":
+    case "setup":
+    case "publish":
       return "repo"
     case "move-root":
       return "board"
@@ -239,8 +240,9 @@ export function createCommands(deps: CommandDeps): Commands {
         return settled(await deps.titles.asked(intent.root, writer))
       case "offer":
         return settled(await actOnOffer(deps, intent, writer))
-      case "line":
-        return settled(await actOnLine(deps, intent.action))
+      case "setup":
+      case "publish":
+        return settled(await actOnAccepted(deps, intent.kind))
       case "reserve":
         return settled(
           (await deps.names.reserve(intent.lane)) === "held"

@@ -1,4 +1,5 @@
 import {
+  type AcceptedRecord,
   type AgentMessageLike,
   atEntry,
   type BaseRecord,
@@ -11,7 +12,6 @@ import {
   type LaneName,
   type LaneRecord,
   type LaneView,
-  type LineRecord,
   laneNameForThread,
   type OfferRecord,
   type PinnedView,
@@ -179,13 +179,13 @@ const work = (over: Partial<WorkFacts> = {}): WorkFacts => ({
   offers: new Map(),
   names: new Map(),
   banners: new Map(),
-  line: null,
+  accepted: null,
   bases: new Map(),
   ...over,
 })
-/** The line, one commit past the lane's base: `base` read what catching up brings. */
-const LINE = {
-  onto: "pinetrie-onto",
+/** Accepted work, one commit past the lane's base: `base` read what catching up brings. */
+const ACCEPTED = {
+  acceptedBookmark: "pinetrie-onto",
   wipPrefix: "wip/",
   publish: "main",
   published: { commit: null, behind: 0, ahead: 0 },
@@ -200,10 +200,10 @@ const LINE = {
     conflicts: { commits: 0, files: [] },
   },
   catchUp: true,
-} satisfies LineRecord
+} satisfies AcceptedRecord
 const BASE: BaseRecord = {
   lane: laneNameForThread("1"),
-  base: { kind: "line" as const },
+  base: { kind: "accepted" as const },
   start: commitId("aaaaaaaaaaaa"),
   state: "ok" as const,
   catchUp: {
@@ -530,7 +530,7 @@ describe("columnView: the work strip", () => {
     const shows = columnView(
       own({
         work: work({
-          line: LINE,
+          accepted: ACCEPTED,
           lanes: new Map([[B, record(B, { kind: "own" })]]),
         }),
       }),
@@ -702,11 +702,11 @@ describe("offerWords", () => {
     ledger: null,
     at: 10,
   }
-  const LINE_BASE = { base: { kind: "line" }, state: "ok" } as const
+  const ACCEPTED_BASE = { base: { kind: "accepted" }, state: "ok" } as const
   const words = (
     o: OfferRecord | undefined,
     activity: "idle" | "turn" | "resolution" = "idle",
-    base: Parameters<typeof offerView>[0]["base"] = LINE_BASE,
+    base: Parameters<typeof offerView>[0]["base"] = ACCEPTED_BASE,
     catching: {
       catchUp?: CatchUpNow
       untraced?: boolean
@@ -722,7 +722,7 @@ describe("offerWords", () => {
         activity,
         asked: null,
         base,
-        onto: "pinetrie-onto",
+        acceptedBookmark: "pinetrie-onto",
         wipAhead: 2,
         catchUp: catching.catchUp ?? { kind: "current" },
         untraced: catching.untraced ?? false,
@@ -793,7 +793,7 @@ describe("offerWords", () => {
   test("the labels follow the state, and name where an acceptance adds the work", () => {
     const labels = (
       o: OfferRecord,
-      base = LINE_BASE as Parameters<typeof words>[2],
+      base = ACCEPTED_BASE as Parameters<typeof words>[2],
     ) => words(o, "idle", base).buttons.map(b => b.label)
     expect(labels(offer)).toEqual(["accept", "split into a stack"])
     expect(labels({ ...offer, size: 3 })).toEqual([
@@ -814,13 +814,13 @@ describe("offerWords", () => {
     ])
   })
   const MOVE = {
-    base: { kind: "line" },
+    base: { kind: "accepted" },
     bookmark: "pinetrie-onto",
     from: commitId("a"),
     to: commitId("b"),
   } as const
   test("the jj facts are titles: which bookmark an acceptance moves, and what catching up merges", () => {
-    const w = words(offer, "idle", LINE_BASE, {
+    const w = words(offer, "idle", ACCEPTED_BASE, {
       catchUp: { kind: "unknown" },
     })
     expect(w.buttons[0]?.title).toBe(
@@ -835,14 +835,14 @@ describe("offerWords", () => {
   })
   const brings = { catchUp: { kind: "brings", move: MOVE, files: 3 } } as const
   test("behind its base, the strip says so and offers catching up beside the offer", () => {
-    const behind = words(offer, "idle", LINE_BASE, brings)
+    const behind = words(offer, "idle", ACCEPTED_BASE, brings)
     expect(behind.line).toBe("2 files ready · accepted work has moved on")
     expect(behind.buttons.find(b => b.button === "update")).toEqual({
       button: "update",
       label: "catch up with accepted work",
       title: "merges pinetrie-onto into this thread's copy · changes 3 files",
     })
-    expect(words(undefined, "idle", LINE_BASE, brings).line).toBe(
+    expect(words(undefined, "idle", ACCEPTED_BASE, brings).line).toBe(
       "accepted work has moved on since this thread started",
     )
     expect(words(undefined, "idle", WIP_BASE, brings).line).toBe(
@@ -851,7 +851,7 @@ describe("offerWords", () => {
   })
   test("catching up that would change nothing is disabled, and says why; one not yet read is not (S97)", () => {
     const update = (catchUp: CatchUpNow) =>
-      words(offer, "idle", LINE_BASE, { catchUp }).menu.find(
+      words(offer, "idle", ACCEPTED_BASE, { catchUp }).menu.find(
         b => b.button === "update",
       )
     expect(update({ kind: "current" })).toEqual({
@@ -874,13 +874,13 @@ describe("offerWords", () => {
     })
     // Nothing new is no "new work" either.
     expect(
-      words(offer, "idle", LINE_BASE, {
+      words(offer, "idle", ACCEPTED_BASE, {
         catchUp: { kind: "nothing-new" },
       }).line,
     ).toBe("2 files ready")
   })
   test("an untraced thread says why nothing is offered, and offers catching up (S97)", () => {
-    const w = words(undefined, "idle", LINE_BASE, { untraced: true })
+    const w = words(undefined, "idle", ACCEPTED_BASE, { untraced: true })
     expect(w.line).toBe(
       "an earlier accept of this thread can't be traced: catch up with accepted work to offer what's new",
     )
@@ -890,10 +890,11 @@ describe("offerWords", () => {
   })
   test("a queued catch-up is the offer's activity: the strip says it is catching up", () => {
     expect(
-      words(offer, "idle", LINE_BASE, { queued: ["bring-up-to-date"] }).line,
+      words(offer, "idle", ACCEPTED_BASE, { queued: ["bring-up-to-date"] })
+        .line,
     ).toBe("catching up with accepted work…")
   })
-  test("only a clean offer lands on the line: a conflicted one on the line is caught up and resolved, on a WIP added anyway to it", () => {
+  test("only a clean offer lands on accepted work: a conflicted one on accepted work is caught up and resolved, on a WIP added anyway to it", () => {
     const conflicted = { ...offer, conflicts: ["a.txt"] }
     expect(words(conflicted).buttons.map(b => b.label)).toEqual([
       "catch up with accepted work and resolve",
@@ -922,14 +923,14 @@ describe("offerWords", () => {
       conflicts: ["a.txt"],
       startConflicts: ["a.txt"],
     }
-    const resolved = words(fromStart, "idle", LINE_BASE, { parent })
+    const resolved = words(fromStart, "idle", ACCEPTED_BASE, { parent })
     expect(resolved.line).toBe(
       "began from a copy with an unresolved conflict in 1 file · copper-owl has resolved it",
     )
     expect(resolved.buttons.map(b => b.label)).toEqual([
       "catch up with copper-owl",
     ])
-    const unresolved = words(fromStart, "idle", LINE_BASE, {
+    const unresolved = words(fromStart, "idle", ACCEPTED_BASE, {
       parent: { ...parent, conflicts: ["a.txt"] },
     })
     expect(unresolved.line).toBe(
@@ -938,7 +939,7 @@ describe("offerWords", () => {
     expect(unresolved.buttons.map(b => b.label)).toEqual([
       "catch up with accepted work and resolve",
     ])
-    const running = words(offer, "idle", LINE_BASE, {
+    const running = words(offer, "idle", ACCEPTED_BASE, {
       parent,
       parentRunning: true,
     }).menu.find(b => b.button === "catch-up-parent")
@@ -962,8 +963,13 @@ describe("offerWords", () => {
     to: string | null = null,
   ): OfferActing => ({ kind: "sent", id: "s1", action, to })
   test.each([
-    ["nothing out", LINE_BASE, null, null],
-    ["an acceptance into the line", LINE_BASE, sent("accept"), "accepting…"],
+    ["nothing out", ACCEPTED_BASE, null, null],
+    [
+      "an acceptance into accepted work",
+      ACCEPTED_BASE,
+      sent("accept"),
+      "accepting…",
+    ],
     [
       "an acceptance into its WIP",
       WIP_BASE,
@@ -971,17 +977,22 @@ describe("offerWords", () => {
       "accepting into wip/search…",
     ],
     [
-      "an acceptance from a WIP into the line",
+      "an acceptance from a WIP into accepted work",
       WIP_BASE,
       sent("accept", "pinetrie-onto"),
       "accepting…",
     ],
-    ["a squash", LINE_BASE, sent("squash"), "squashing to one…"],
-    ["a describe", LINE_BASE, sent("describe"), "rewriting the description…"],
-    ["a refresh", LINE_BASE, sent("refresh"), "refreshing…"],
+    ["a squash", ACCEPTED_BASE, sent("squash"), "squashing to one…"],
+    [
+      "a describe",
+      ACCEPTED_BASE,
+      sent("describe"),
+      "rewriting the description…",
+    ],
+    ["a refresh", ACCEPTED_BASE, sent("refresh"), "refreshing…"],
     [
       "a refusal",
-      LINE_BASE,
+      ACCEPTED_BASE,
       {
         kind: "refused",
         code: "refused",
@@ -992,7 +1003,7 @@ describe("offerWords", () => {
     ],
     [
       "a failure",
-      LINE_BASE,
+      ACCEPTED_BASE,
       { kind: "failed", action: "squash", message: "jj said no" },
       "it failed, and may be part done: jj said no",
     ],
@@ -1011,7 +1022,7 @@ describe("offerWords", () => {
 
 describe("behindMark: the header's mark for a base that moved on", () => {
   test("worded as the project, with the files catching up changes, the bookmark and both commits in its title", () => {
-    expect(behindMark(BASE, LINE)).toEqual({
+    expect(behindMark(BASE, ACCEPTED)).toEqual({
       mark: "↓",
       title:
         "accepted work has moved on since this thread started, in 2 files · pinetrie-onto: aaaaaaaa → bbbbbbbb",
@@ -1021,23 +1032,27 @@ describe("behindMark: the header's mark for a base that moved on", () => {
     const shows = columnView(
       facts(1, {
         lane: onLane(laneView(B, "b2")),
-        work: work({ names: NAMES, line: LINE, bases: new Map([[B, BASE]]) }),
+        work: work({
+          names: NAMES,
+          accepted: ACCEPTED,
+          bases: new Map([[B, BASE]]),
+        }),
       }),
     )
     expect(shows.identity).toMatchObject({
-      details: { behind: behindMark(BASE, LINE)?.title },
+      details: { behind: behindMark(BASE, ACCEPTED)?.title },
     })
-    expect(shows.behind?.title).toBe(behindMark(BASE, LINE)?.title)
+    expect(shows.behind?.title).toBe(behindMark(BASE, ACCEPTED)?.title)
   })
   test("none once caught up, before the host read the base, or when catching up would change nothing or is not yet read (S97)", () => {
-    expect(behindMark({ ...BASE, start: LINE.commit }, LINE)).toBe(null)
-    expect(behindMark(undefined, LINE)).toBe(null)
+    expect(behindMark({ ...BASE, start: ACCEPTED.commit }, ACCEPTED)).toBe(null)
+    expect(behindMark(undefined, ACCEPTED)).toBe(null)
     const read = BASE.catchUp
     if (read === null) throw new Error("no read")
-    expect(behindMark({ ...BASE, catchUp: { ...read, files: [] } }, LINE)).toBe(
-      null,
-    )
-    expect(behindMark({ ...BASE, catchUp: null }, LINE)).toBe(null)
+    expect(
+      behindMark({ ...BASE, catchUp: { ...read, files: [] } }, ACCEPTED),
+    ).toBe(null)
+    expect(behindMark({ ...BASE, catchUp: null }, ACCEPTED)).toBe(null)
   })
 })
 

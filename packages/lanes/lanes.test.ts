@@ -160,7 +160,7 @@ test("copyFacts (S103, ADR-0080): the copy on its bookmark, on the merge whose t
       bookmark: merge,
       descends: false,
     })
-    // The agent's own commit on the line descends from the bookmark.
+    // The agent's own commit on accepted work descends from the bookmark.
     await writeFile(path.join(dir, "mine.txt"), "mine\n")
     await jj(["commit", "-m", "mine"])
     const mine = await head("@-")

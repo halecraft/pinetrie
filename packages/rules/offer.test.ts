@@ -20,10 +20,10 @@ import {
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
+  ACCEPTED,
   BASE as BASE_RECORD,
   decodeStack,
   encodeUpdate,
-  LINE,
   OFFER,
   offerRecord,
   planDescribeAgain,
@@ -98,7 +98,7 @@ describe("planRefresh", () => {
   const placed = (tip: CommitId, start: readonly CommitId[]): Placed => ({
     kind: "placed",
     tip,
-    base: { base: { kind: "line" }, start: BASE, source: BASE },
+    base: { base: { kind: "accepted" }, start: BASE, source: BASE },
     state: "ok",
     target: commitId("l0"),
     start,
@@ -256,7 +256,7 @@ describe("isWipLine, offerMoved, describeWanted", () => {
           place: {
             kind: "placed",
             tip: TIP,
-            base: { base: { kind: "line" }, start: BASE, source: BASE },
+            base: { base: { kind: "accepted" }, start: BASE, source: BASE },
             state: "ok",
             target: T2,
             start: [BASE],
@@ -265,7 +265,7 @@ describe("isWipLine, offerMoved, describeWanted", () => {
           offer,
           base: {
             lane: LANE,
-            base: { kind: "line" },
+            base: { kind: "accepted" },
             start: BASE,
             state: "ok",
             catchUp: null,
@@ -287,13 +287,13 @@ describe("isWipLine, offerMoved, describeWanted", () => {
 })
 
 describe("records", () => {
-  test("an offer, the line and a base round-trip (ADR-0060)", () => {
+  test("an offer, accepted work and a base round-trip (ADR-0060)", () => {
     const o = setRecord(OFFER, offer)
     expect([o.namespace, o.key]).toEqual(["pinetrie.offer", LANE])
     expect(OFFER.decode(structuredClone(o.value), LANE)).toEqual(offer)
     expect(OFFER.decode({ ...offer, size: 0 }, LANE)).toBeUndefined()
     const line = {
-      onto: "pinetrie-onto",
+      acceptedBookmark: "pinetrie-onto",
       wipPrefix: "wip/",
       publish: "main",
       published: { commit: null, behind: 0, ahead: 0 },
@@ -309,9 +309,9 @@ describe("records", () => {
       },
       catchUp: true,
     }
-    const l = setRecord(LINE, line)
-    expect([l.namespace, l.key]).toEqual(["pinetrie.line", "line"])
-    expect(LINE.decode(structuredClone(l.value), "line")).toEqual(line)
+    const l = setRecord(ACCEPTED, line)
+    expect([l.namespace, l.key]).toEqual(["pinetrie.accepted", "accepted"])
+    expect(ACCEPTED.decode(structuredClone(l.value), "accepted")).toEqual(line)
     const base: BaseRecord = {
       lane: LANE,
       base: { kind: "wip", bookmark: "wip/x" },
@@ -342,7 +342,7 @@ describe("records", () => {
 describe("the update and stack messages", () => {
   const details = {
     lane: LANE,
-    from: { kind: "line" as const },
+    from: { kind: "accepted" as const },
     bookmark: "pinetrie-onto",
     merged: COPY,
     commits: ["feat: yours"],
@@ -421,7 +421,7 @@ describe("the update and stack messages", () => {
 })
 
 describe("offerAcceptanceDestinations (ADR-0060)", () => {
-  const line = { kind: "line" } as const
+  const line = { kind: "accepted" } as const
   const wip = { kind: "wip", bookmark: "wip/x" } as const
   const of = (
     over: Partial<Parameters<typeof offerAcceptanceDestinations>[0]> = {},
@@ -429,25 +429,25 @@ describe("offerAcceptanceDestinations (ADR-0060)", () => {
     offerAcceptanceDestinations({
       base: line,
       state: "ok",
-      onto: "pinetrie-onto",
+      acceptedBookmark: "pinetrie-onto",
       conflicted: false,
       wipAhead: 2,
       ...over,
     }).map(d => [d.bookmark, d.bringsAlong, d.final])
-  test("a line thread: the line, final", () => {
+  test("a thread on accepted work: accepted work, final", () => {
     expect(of()).toEqual([["pinetrie-onto", 0, true]])
   })
-  test("a WIP thread: its WIP first, then the line with the WIP's commits", () => {
+  test("a WIP thread: its WIP first, then accepted work with the WIP's commits", () => {
     expect(of({ base: wip })).toEqual([
       ["wip/x", 0, false],
       ["pinetrie-onto", 2, true],
     ])
   })
-  test("a conflicted offer never lands on the line: only into a WIP", () => {
+  test("a conflicted offer never lands on accepted work: only into a WIP", () => {
     expect(of({ conflicted: true })).toEqual([])
     expect(of({ base: wip, conflicted: true })).toEqual([["wip/x", 0, false]])
   })
-  test("a landed WIP is the line's; a gone one has none", () => {
+  test("a landed WIP is accepted work's; a gone one has none", () => {
     expect(of({ base: wip, state: "landed" })).toEqual([
       ["pinetrie-onto", 0, true],
     ])
@@ -461,15 +461,15 @@ describe("the offer's policy over a gather (ADR-0038, ADR-0060)", () => {
   const START = commitId("s0")
   const NEW_TIP = commitId("t9")
   const NOW_COMMIT = commitId("c5")
-  const LINE_BASE = {
-    base: { kind: "line" },
+  const ACCEPTED_BASE = {
+    base: { kind: "accepted" },
     start: START,
     source: START,
   } as const
   const at = (over: Partial<Placed> = {}): Placed => ({
     kind: "placed",
     tip: TIP,
-    base: LINE_BASE,
+    base: ACCEPTED_BASE,
     state: "ok",
     target: commitId("l1"),
     start: [START],
@@ -492,7 +492,7 @@ describe("the offer's policy over a gather (ADR-0038, ADR-0060)", () => {
   })
   const baseRecord: BaseRecord = {
     lane: LANE,
-    base: { kind: "line" },
+    base: { kind: "accepted" },
     start: START,
     state: "ok",
     catchUp: null,
@@ -630,7 +630,7 @@ describe("the offer's policy over a gather (ADR-0038, ADR-0060)", () => {
         seen: over.seen === undefined ? SHOWN : over.seen,
         acceptance: { wipAhead: 2, below: over.below ?? BOTH },
         editing: new Set(),
-        onto: "pinetrie-onto",
+        acceptedBookmark: "pinetrie-onto",
         to: over.to ?? null,
         now: 9,
       })
@@ -686,7 +686,7 @@ describe("the offer's policy over a gather (ADR-0038, ADR-0060)", () => {
         ERR.BAD_DESTINATION,
       )
     })
-    test("a conflicted offer never goes to the line; an untraced place is accepted where it sits", () => {
+    test("a conflicted offer never goes to accepted work; an untraced place is accepted where it sits", () => {
       const conflicted = { ...o, conflicts: ["a.txt"] }
       const shown = { ledger: o.ledger, conflicted: true }
       expect(outcome(accept({ offer: conflicted, seen: shown }))).toBe("wip/x")
@@ -699,7 +699,7 @@ describe("the offer's policy over a gather (ADR-0038, ADR-0060)", () => {
         place: {
           kind: "untraced",
           tip: TIP,
-          base: LINE_BASE,
+          base: ACCEPTED_BASE,
           state: "ok",
           target: commitId("l1"),
         },
@@ -827,17 +827,17 @@ describe("the offer's policy over a gather (ADR-0038, ADR-0060)", () => {
         why(
           stack(
             undefined,
-            gather({ place: { kind: "gone", tip: TIP, base: LINE_BASE } }),
+            gather({ place: { kind: "gone", tip: TIP, base: ACCEPTED_BASE } }),
           ),
         ),
-      ).toBe("the thread's base is gone: continue it on the line")
+      ).toBe("the thread's base is gone: continue it on accepted work")
     })
     test("an untraced place accepts a stack: it brings its own start", () => {
       const untraced = gather({
         place: {
           kind: "untraced",
           tip: TIP,
-          base: LINE_BASE,
+          base: ACCEPTED_BASE,
           state: "ok",
           target: commitId("l1"),
         },
@@ -858,7 +858,7 @@ describe("the offer's policy over a gather (ADR-0038, ADR-0060)", () => {
       })
       expect(
         planRebuild(
-          gather({ place: { kind: "gone", tip: TIP, base: LINE_BASE } }),
+          gather({ place: { kind: "gone", tip: TIP, base: ACCEPTED_BASE } }),
           "",
         ),
       ).toEqual({ kind: "refused", why: ERR.BAD_DESTINATION })
@@ -868,7 +868,7 @@ describe("the offer's policy over a gather (ADR-0038, ADR-0060)", () => {
             place: {
               kind: "untraced",
               tip: TIP,
-              base: LINE_BASE,
+              base: ACCEPTED_BASE,
               state: "ok",
               target: commitId("l1"),
             },

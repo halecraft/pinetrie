@@ -43,9 +43,9 @@ export async function commitsOf(
 }
 
 /**
- * An accepted-offer commit on the line as `ACCEPTED_OFFER_COMMIT_ROW`
+ * An accepted-offer commit on accepted work as `ACCEPTED_OFFER_COMMIT_ROW`
  * prints it: its commit, and its message whole. Your repo reads the
- * accepted-offer commits on the line with it (`@pinetrie/repo`), and a lane
+ * accepted-offer commits on accepted work with it (`@pinetrie/repo`), and a lane
  * those it lacks before it catches up (`acceptedOfferCommitsAbove`).
  */
 export interface AcceptedOfferCommitRow {

@@ -26,7 +26,7 @@ const ACCEPTED: OfferFact = {
   by: ADA,
   as: "kabcdefghij",
   bookmark: "pinetrie-onto",
-  to: { kind: "line" },
+  to: { kind: "accepted" },
 }
 const FACTS: readonly OfferFact[] = [
   ACCEPTED,
@@ -58,7 +58,8 @@ describe("a fact (ADR-0080)", () => {
   test("an acceptance is stored under the kind facts began with, which a thread's history holds", () => {
     expect(encodeFact(ACCEPTED, "Ada", 1).details.kind).toBe("integrated")
     expect(JSON.parse(encodeOfferFact(ACCEPTED)).kind).toBe("integrated")
-    const stored = { ...ACCEPTED, kind: "integrated" }
+    const stored = { ...ACCEPTED, kind: "integrated", to: { kind: "line" } }
+    expect(JSON.parse(encodeOfferFact(ACCEPTED)).to).toEqual({ kind: "line" })
     expect(decodeOfferFact(JSON.stringify(stored))).toEqual(ACCEPTED)
   })
 
@@ -86,7 +87,7 @@ describe("a fact (ADR-0080)", () => {
     })
   })
 
-  test("acceptedFact: the bookmark moved, the line or a WIP as the thread knows it", () => {
+  test("acceptedFact: the bookmark moved, accepted work or a WIP as the thread knows it", () => {
     const decision = {
       kind: "accept",
       name: "amber-fox" as ThreadName,
@@ -96,14 +97,19 @@ describe("a fact (ADR-0080)", () => {
       accepted: {} as OfferRecord,
     } as const
     expect(
-      acceptedFact({ lane: LANE, by: ADA, decision, onto: "pinetrie-onto" }),
+      acceptedFact({
+        lane: LANE,
+        by: ADA,
+        decision,
+        acceptedBookmark: "pinetrie-onto",
+      }),
     ).toEqual(ACCEPTED)
     expect(
       acceptedFact({
         lane: LANE,
         by: ADA,
         decision: { ...decision, destination: "wip/search" },
-        onto: "pinetrie-onto",
+        acceptedBookmark: "pinetrie-onto",
       }),
     ).toMatchObject({ to: { kind: "wip", bookmark: "wip/search" } })
     expect(actionFact("squash", LANE, ADA)).toEqual(FACTS[3])

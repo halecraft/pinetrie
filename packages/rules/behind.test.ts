@@ -1,8 +1,8 @@
 import {
+  type AcceptedRecord,
   type BaseRecord,
   type BehindView,
   commitId,
-  type LineRecord,
   laneNameForThread,
   type OfferRecord,
 } from "@pinetrie/core"
@@ -19,8 +19,8 @@ import {
 const LANE = laneNameForThread("1")
 const [L1, L2] = [commitId("l1"), commitId("l2")]
 
-const line = (commit = L2): LineRecord => ({
-  onto: "pinetrie-onto",
+const line = (commit = L2): AcceptedRecord => ({
+  acceptedBookmark: "pinetrie-onto",
   wipPrefix: "wip/",
   publish: "main",
   published: { commit: null, behind: 0, ahead: 0 },
@@ -37,10 +37,10 @@ const line = (commit = L2): LineRecord => ({
   catchUp: true,
 })
 
-/** A lane on the line from L1, whose catch-up to L2 brings `files`. */
+/** A lane on accepted work from L1, whose catch-up to L2 brings `files`. */
 const base = (over: Partial<BaseRecord> = {}): BaseRecord => ({
   lane: LANE,
-  base: { kind: "line" },
+  base: { kind: "accepted" },
   start: L1,
   state: "ok",
   catchUp: { tip: commitId("t"), to: L2, files: ["a.ts", "b.ts"] },
@@ -55,7 +55,7 @@ const offer = {
 } as unknown as OfferRecord
 
 const VIEW: BehindView = {
-  from: { kind: "line" },
+  from: { kind: "accepted" },
   to: L2,
   files: ["a.ts", "b.ts"],
   overlap: ["a.ts"],
@@ -69,7 +69,7 @@ describe("planBaseNews (ADR-0080)", () => {
     planBaseNews({
       own: true,
       base: base(),
-      line: line(),
+      accepted: line(),
       offer,
       known: null,
       told: null,
@@ -89,7 +89,7 @@ describe("planBaseNews (ADR-0080)", () => {
   test.each([
     ["no copy of its own", { own: false }],
     ["no base record", { base: undefined }],
-    ["a base that has not moved", { line: line(L1) }],
+    ["a base that has not moved", { accepted: line(L1) }],
     ["a move not yet read", { base: base({ catchUp: null }) }],
     [
       "a move that changes no file",

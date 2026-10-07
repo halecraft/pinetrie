@@ -1319,7 +1319,7 @@ export function App({
             onOpen: openIn,
             onIntent,
           }}
-          line={workFacts.line}
+          accepted={workFacts.accepted}
           project={workFacts.project}
           onIntent={onIntent}
           me={{ writer: session.writer, email: session.principal }}

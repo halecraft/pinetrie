@@ -357,9 +357,9 @@ export interface LaneConfig {
   readonly install: Install | null
   /** Relative paths, as written; `planShared` decides which apply. */
   readonly shared: readonly string[]
-  /** The `offers` key's values, as written; null where absent (`lineConfig`). */
+  /** The `offers` key's values, as written; null where absent (`repoConfig`). */
   readonly offers: {
-    readonly onto: string | null
+    readonly acceptedBookmark: string | null
     readonly wipPrefix: string | null
     readonly publish: string | null
     readonly catchUp: WrittenFlag
@@ -397,12 +397,12 @@ export function decodeLaneConfig(
   const named = (v: unknown) => (typeof v === "string" ? v : null)
   const offers = isRecord(offersKey)
     ? {
-        onto: named(offersKey.onto),
+        acceptedBookmark: named(offersKey.onto),
         wipPrefix: named(offersKey.wipPrefix),
         publish: named(offersKey.publish),
         catchUp: writtenFlag(offersKey.catchUp),
       }
-    : { onto: null, wipPrefix: null, publish: null, catchUp: null }
+    : { acceptedBookmark: null, wipPrefix: null, publish: null, catchUp: null }
   const pnpm: Install | null = pnpmLock
     ? { command: "pnpm install --frozen-lockfile", lockfile: "pnpm-lock.yaml" }
     : null
@@ -446,18 +446,18 @@ export function decodeLaneConfig(
 
 /**
  * Accepted work's bookmark, the WIP bookmarks' prefix (ADR-0060), the
- * bookmark publishing moves to the line (ADR-0076), and whether a publish
+ * bookmark publishing moves to accepted work (ADR-0076), and whether a publish
  * catches your files up and accepts your commits first (ADR-0099).
  */
-export interface LineConfig {
-  readonly onto: string
+export interface RepoConfig {
+  readonly acceptedBookmark: string
   readonly wipPrefix: string
   readonly publish: string
   readonly catchUp: boolean
 }
 
-export const DEFAULT_LINE: LineConfig = {
-  onto: "pinetrie-onto",
+export const DEFAULT_REPO: RepoConfig = {
+  acceptedBookmark: "pinetrie-onto",
   wipPrefix: "wip/",
   publish: "main",
   catchUp: false,
@@ -482,38 +482,38 @@ export const isBookmarkName = (name: string): boolean =>
   !name.endsWith(".lock")
 
 /**
- * The line's config from the user's and the project's: the project's value
+ * Accepted work's config from the user's and the project's: the project's value
  * wins, since the bookmark belongs to the repo. A name that is not a bookmark,
  * or a `catchUp` that is not a boolean, falls back to the default, with why.
  * The WIP prefix is checked as the start of a name (`<prefix>x`).
  */
-export function lineConfig(
+export function repoConfig(
   user: LaneConfig["offers"],
   project: LaneConfig["offers"],
-): { readonly line: LineConfig; readonly refused: readonly string[] } {
+): { readonly repoConfig: RepoConfig; readonly refused: readonly string[] } {
   const refused: string[] = []
   const pick = (
-    key: "onto" | "wipPrefix" | "publish",
+    key: "acceptedBookmark" | "wipPrefix" | "publish",
     valid: (v: string) => boolean,
   ): string => {
     const value = project[key] ?? user[key]
-    if (value === null) return DEFAULT_LINE[key]
+    if (value === null) return DEFAULT_REPO[key]
     if (valid(value)) return value
     refused.push(
-      `offers.${key} "${value}" is not a bookmark name; using "${DEFAULT_LINE[key]}"`,
+      `offers.${key} "${value}" is not a bookmark name; using "${DEFAULT_REPO[key]}"`,
     )
-    return DEFAULT_LINE[key]
+    return DEFAULT_REPO[key]
   }
   const flag = project.catchUp ?? user.catchUp
-  let catchUp = DEFAULT_LINE.catchUp
+  let catchUp = DEFAULT_REPO.catchUp
   if (typeof flag === "boolean") catchUp = flag
   else if (flag !== null)
     refused.push(
-      `offers.catchUp ${flag.invalid} is not true or false; using ${DEFAULT_LINE.catchUp}`,
+      `offers.catchUp ${flag.invalid} is not true or false; using ${DEFAULT_REPO.catchUp}`,
     )
   return {
-    line: {
-      onto: pick("onto", isBookmarkName),
+    repoConfig: {
+      acceptedBookmark: pick("acceptedBookmark", isBookmarkName),
       wipPrefix: pick("wipPrefix", v => isBookmarkName(`${v}x`)),
       publish: pick("publish", isBookmarkName),
       catchUp,
@@ -779,17 +779,23 @@ export const restoreVolume = (
 ]
 
 /**
- * The lane steps that start a lane on the line: an empty commit on the line's
- * commit naming it, left as `@-`. Its trailer says the thread is on the line.
+ * The lane steps that start a lane on accepted work: an empty commit on accepted work's
+ * commit naming it, left as `@-`. Its trailer says the thread is on accepted work.
  */
-export const planLineStart = (onto: string, commit: CommitId): LaneStep[] => [
+export const planAcceptedStart = (
+  acceptedBookmark: string,
+  commit: CommitId,
+): LaneStep[] => [
   fetchById([commit]),
   inLane("jj", "new", commit),
   inLane(
     "jj",
     "commit",
     "-m",
-    baseMessage(`base: ${onto}`, { bookmark: onto, commit }),
+    baseMessage(`base: ${acceptedBookmark}`, {
+      bookmark: acceptedBookmark,
+      commit,
+    }),
   ),
 ]
 
@@ -819,15 +825,15 @@ export const planWipCopy = (
 /** What an update runs in a lane before its merge, and what it merges (`mergeUpdate`). */
 export interface MergePlan {
   /**
-   * A fetch of the line's commit; or a fetch of the WIP's commit and its copy
+   * A fetch of accepted work's commit; or a fetch of the WIP's commit and its copy
    * on the lane's previous copy, left as `@-`.
    */
   readonly steps: readonly LaneStep[]
   /** The commit to merge, or the copy the steps leave as `@-`. */
   readonly source: CommitId | "copy"
-  /** The line's names the base (`Pinetrie-Base`); a WIP's copy names its own; a parent's none (ADR-0072). */
+  /** Accepted work's names the base (`Pinetrie-Base`); a WIP's copy names its own; a parent's none (ADR-0072). */
   readonly message: string
-  /** With nothing to merge, a commit still names the line (`BaseMerge`). */
+  /** With nothing to merge, a commit still names accepted work (`BaseMerge`). */
   readonly mark: boolean
   /**
    * The commits whose titles the update lists, `<from>..<to>` without the
@@ -839,16 +845,16 @@ export interface MergePlan {
 /**
  * An update's steps (ADR-0060). A WIP's copy fetches only the WIP's commit:
  * the copy's parent is the lane's own. The thread it branched from is merged
- * as the line's commit is, with no `Pinetrie-Base`: it is no base, and what
+ * as accepted work's commit is, with no `Pinetrie-Base`: it is no base, and what
  * the lane holds of it is its history (ADR-0072).
  */
 export function planMerge(from: BaseMerge): MergePlan {
-  if (from.kind === "line")
+  if (from.kind === "accepted")
     return {
       steps: [fetchById([from.commit])],
       source: from.commit,
-      message: baseMessage(`update: ${from.onto}`, {
-        bookmark: from.onto,
+      message: baseMessage(`update: ${from.acceptedBookmark}`, {
+        bookmark: from.acceptedBookmark,
         commit: from.commit,
       }),
       mark: from.mark,
@@ -871,7 +877,7 @@ export function planMerge(from: BaseMerge): MergePlan {
   }
 }
 
-/** An accepted-offer commit on the line the lane lacks, and the sources its message names (`sourcesOf`). */
+/** An accepted-offer commit on accepted work the lane lacks, and the sources its message names (`sourcesOf`). */
 export interface AcceptedOfferCommitAbove {
   readonly acceptedOfferCommit: CommitId
   readonly sources: readonly CommitId[]
@@ -894,9 +900,9 @@ export interface Join {
  * The accepted-offer commits an update joins to their sources before it
  * merges (S102, ADR-0079), oldest first as they come: each that names a
  * source the lane holds. An accepted-offer commit is a copy of the lane's
- * work on the line, and the join says so in history, so the merge does not
+ * work on accepted work, and the join says so in history, so the merge does not
  * bring that work in twice. One naming a source the lane lacks too, a
- * squash's, is joined all the same: the rest of it is the line's. Each join
+ * squash's, is joined all the same: the rest of it is accepted work's. Each join
  * is made on the one before, so a later one's base holds the earlier ones.
  * Pure.
  */
@@ -924,9 +930,9 @@ export function planJoins(
  * inherited history made immutable. Without it, the fork's first turn reuses
  * its parent's change id, and your repo sees a divergent change. A base with
  * several parents is committed once, empty, so the bookmark names one commit.
- * A lane starting on the line or a WIP's copy is based on the commit that
+ * A lane starting on accepted work or a WIP's copy is based on the commit that
  * names it (ADR-0060), installing dependencies when a WIP's lockfile differs
- * from the base disk's, which is the line's (`install`).
+ * from the base disk's, which is accepted work's (`install`).
  */
 export function planForkSetup(
   lane: LaneName,
@@ -934,8 +940,8 @@ export function planForkSetup(
   install: string | null = null,
 ): LaneStep[] {
   const base: LaneStep[] =
-    start.kind === "line"
-      ? planLineStart(start.onto, start.commit)
+    start.kind === "accepted"
+      ? planAcceptedStart(start.acceptedBookmark, start.commit)
       : start.kind === "wip"
         ? [
             fetchById([start.commit, start.under]),
@@ -1166,7 +1172,7 @@ export interface BaseFacts {
  * Making or refreshing the base snapshot, run in a scratch lane. A new base
  * is `git init` and `jj git init --colocate`, not `jj git clone`: a fresh
  * volume holds `lost+found`, which `jj git clone` refuses (S44 item 6). It then
- * takes the line's commit (`yours`) by id and installs. A refresh fetches and
+ * takes accepted work's commit (`yours`) by id and installs. A refresh fetches and
  * moves only when that commit moved, and installs only when the lockfile
  * changed.
  *

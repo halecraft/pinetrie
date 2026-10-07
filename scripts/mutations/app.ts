@@ -15,7 +15,7 @@ export const mutations: readonly Mutation[] = [
     suite: "lanes",
     scenario: "catch-up",
     expect:
-      "a catch_up mid-run merges the line, and a branch at its turn has the line's file",
+      "a catch_up mid-run merges accepted work, and a branch at its turn has accepted work's file",
   },
   {
     // Needs `container`: run on the Mac.
@@ -66,7 +66,7 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "tools",
     expect:
-      "the column's foot shows the thread's offer in words, its bookmark apart, and its add button moves the line to it, leaving your working copy",
+      "the column's foot shows the thread's offer in words, its bookmark apart, and its add button moves accepted work to it, leaving your working copy",
   },
   {
     name: "a column you open does not take focus",
@@ -1518,7 +1518,7 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "tools",
     expect:
-      "a thread left while the page was hidden marks what came since, and the line takes no room",
+      "a thread left while the page was hidden marks what came since, and accepted work takes no room",
   },
   {
     name: "the column passes its asks no last ended one",

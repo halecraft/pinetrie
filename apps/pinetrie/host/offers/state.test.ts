@@ -4,7 +4,7 @@ import {
   laneNameForThread,
   type OfferRecord,
 } from "@pinetrie/core"
-import { DEFAULT_LINE } from "@pinetrie/lanes"
+import { DEFAULT_REPO } from "@pinetrie/lanes"
 import type { PiSetup } from "@pinetrie/pi"
 import { readBases, readOffers } from "@pinetrie/reads"
 import type { RepoOwner } from "@pinetrie/repo"
@@ -16,7 +16,7 @@ import { createOfferDeps } from "./state.ts"
 const LANE = laneNameForThread("1")
 const BASE: BaseRecord = {
   lane: LANE,
-  base: { kind: "line" },
+  base: { kind: "accepted" },
   start: commitId("s1"),
   state: "ok",
   catchUp: null,
@@ -48,7 +48,7 @@ test("the records the host writes from your repo: only what changed, and only a 
   const changed: string[] = []
   const { records } = createOfferDeps({
     owner: record<RepoOwner>({}).port,
-    line: DEFAULT_LINE,
+    repoConfig: DEFAULT_REPO,
     basics: b,
     records: scribe.port,
     piSetup: record<PiSetup>({}).port,

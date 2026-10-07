@@ -32,7 +32,7 @@ import {
   lanesOf,
   queueCard,
   rootAt,
-  setUpLine,
+  setUpAccepted,
   startSuiteHost,
   treeOf,
   waitFor,
@@ -188,7 +188,7 @@ export async function sectionHost(input: {
     `u${Math.random().toString(36).slice(2, 10)}`,
     `section-${process.pid}`,
   )
-  await setUpLine(host.session, user)
+  await setUpAccepted(host.session, user)
   const idle = async () => {
     await waitFor(() => idleNow(host), 300_000)
     await host.quiet()

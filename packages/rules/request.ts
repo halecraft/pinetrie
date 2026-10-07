@@ -54,7 +54,7 @@ export function fitNewest(
 /** Room for `leftOut`'s line. */
 export const LEFT_OUT_NOTE = 32
 
-/** The line saying how many older lines `fitNewest` left out; empty for none. */
+/** Accepted work saying how many older lines `fitNewest` left out; empty for none. */
 export const leftOut = (dropped: number): string =>
   dropped > 0 ? `- (${dropped} earlier left out)\n` : ""
 
@@ -75,7 +75,7 @@ export function describeRequest(input: {
   const head = `Recent commit messages in this repository:\n${recent || "- (none)"}\n\n`
   let room = Math.max(0, input.budget - head.length)
   // The diff is kept whole when it fits; the messages share what is left,
-  // less room for the line saying how many were left out.
+  // less room for accepted work saying how many were left out.
   const { text, dropped } = fitNewest(
     input.messages,
     Math.max(0, room - Math.min(input.diff.length, room) - LEFT_OUT_NOTE),

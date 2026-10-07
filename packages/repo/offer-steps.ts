@@ -41,7 +41,7 @@ export interface OfferAt {
 
 /** What a build needs besides: the WIP line, and a fresh nonce its commits are named by (`nonceRevset`). */
 export interface BuildAt extends OfferAt {
-  /** The line an offer carries until an agent describes it (`wipDescription`). */
+  /** Accepted work an offer carries until an agent describes it (`wipDescription`). */
   readonly wip: string
   /** `pinetrie-offer-<uuid>`, fresh for each build: the host makes it. */
   readonly nonce: string

@@ -10,6 +10,7 @@ import {
   type OfferRecord,
   type RootRecord,
   rootIdFor,
+  SESSION_TARGET,
   type Sha256,
   snapshotId,
   type ThreadName,
@@ -18,6 +19,7 @@ import {
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
+  ACCEPTED,
   BANNER,
   BASE,
   BOARD,
@@ -27,13 +29,13 @@ import {
   DIGEST,
   deleteRecord,
   LANE,
-  LINE,
   MARK,
   NAME,
   OFFER,
   PARTICIPANT,
   PICTURE,
   PROJECT,
+  planUndeclaredSweep,
   QUEUE_HOLD,
   RECORD_SPECS,
   REVISION,
@@ -178,9 +180,9 @@ const SAMPLES: readonly Sample[] = [
   ),
   sample(
     "line",
-    LINE,
+    ACCEPTED,
     {
-      onto: "pinetrie-onto",
+      acceptedBookmark: "pinetrie-onto",
       wipPrefix: "wip/",
       publish: "main",
       published: { commit: C, behind: 1, ahead: 0 },
@@ -203,7 +205,7 @@ const SAMPLES: readonly Sample[] = [
     BASE,
     {
       lane: L,
-      base: { kind: "line" },
+      base: { kind: "accepted" },
       start: C,
       state: "ok",
       catchUp: { tip: C, to: C, files: ["a.txt"] },
@@ -434,6 +436,51 @@ describe("every spec, and writes by document", () => {
     expect(new Set(RECORD_SPECS)).toEqual(new Set(exported))
     const namespaces = RECORD_SPECS.map(s => s.namespace)
     expect(new Set(namespaces).size).toBe(namespaces.length)
+  })
+
+  test("planUndeclaredSweep deletes every record of a namespace no spec declares, where it is (ADR-0100)", () => {
+    const root = rootIdFor("r-1")
+    const writes = planUndeclaredSweep([
+      {
+        target: SESSION_TARGET,
+        namespaces: new Map([
+          ["pinetrie.line", ["line"]],
+          ["pinetrie.offer", ["t-1"]],
+        ]),
+      },
+      {
+        target: { kind: "root", root },
+        namespaces: new Map([["pinetrie.gone", ["a", "b"]]]),
+      },
+    ])
+    expect(writes).toEqual([
+      {
+        kind: "delete",
+        target: SESSION_TARGET,
+        namespace: "pinetrie.line",
+        key: "line",
+      },
+      {
+        kind: "delete",
+        target: { kind: "root", root },
+        namespace: "pinetrie.gone",
+        key: "a",
+      },
+      {
+        kind: "delete",
+        target: { kind: "root", root },
+        namespace: "pinetrie.gone",
+        key: "b",
+      },
+    ])
+    expect(
+      planUndeclaredSweep(
+        RECORD_SPECS.map(spec => ({
+          target: SESSION_TARGET,
+          namespaces: new Map([[spec.namespace, ["k"]]]),
+        })),
+      ),
+    ).toEqual([])
   })
 
   test("byTarget groups writes by their document, in the order each first appears", () => {

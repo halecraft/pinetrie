@@ -17,11 +17,11 @@ import {
 import type { ThreadLaneHandle } from "@pinetrie/pi"
 import { readTreeIndex } from "@pinetrie/reads"
 import {
+  ACCEPTED,
   BASE,
   CHAT_TYPE,
   type ChatDetails,
   type ChatMessage,
-  LINE,
   PARTICIPANT,
   PROJECT,
   setRecord,
@@ -312,7 +312,7 @@ describe("sendChat", () => {
   })
 
   describe("a lane with no work of its own is caught up before its run (ADR-0080)", () => {
-    /** A lane at E1 whose base, the line, moved to L2 bringing a file, its work `work`. */
+    /** A lane at E1 whose base, accepted work, moved to L2 bringing a file, its work `work`. */
     const behindLane = (
       b: ReturnType<typeof basics>,
       work: "none" | "some",
@@ -323,7 +323,7 @@ describe("sendChat", () => {
         b,
         setRecord(BASE, {
           lane: LANE,
-          base: { kind: "line" },
+          base: { kind: "accepted" },
           start: commitId("l1"),
           state: "ok",
           catchUp: { tip: commitId("t"), to: commitId("l2"), files: ["a.ts"] },
@@ -333,8 +333,8 @@ describe("sendChat", () => {
       )
       putValue(
         b,
-        setRecord(LINE, {
-          onto: "pinetrie-onto",
+        setRecord(ACCEPTED, {
+          acceptedBookmark: "pinetrie-onto",
           wipPrefix: "wip/",
           publish: "main",
           published: { commit: null, behind: 0, ahead: 0 },

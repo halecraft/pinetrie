@@ -36,7 +36,7 @@ import type { OfferDeps } from "./state.ts"
 export async function act(
   deps: Pick<
     OfferDeps,
-    "owner" | "line" | "basics" | "docs" | "piSetup" | "running"
+    "owner" | "repoConfig" | "basics" | "docs" | "piSetup" | "running"
   > & { readonly describing: Set<LaneName> },
   refresh: Pick<Refresh, "rebuild" | "ports">,
   lane: LaneName,
@@ -48,7 +48,7 @@ export async function act(
   | { readonly kind: "refused"; readonly code: ErrCode }
   | { readonly kind: "done"; readonly fact: OfferFact }
 > {
-  const { owner, line, basics, docs } = deps
+  const { owner, repoConfig, basics, docs } = deps
   const done = await owner.command(ops => carry(ops))
   // After the command, so the description reads what it wrote. Tracked, and
   // logged on failure, by `requestOutside`.
@@ -83,7 +83,7 @@ export async function act(
       const acceptance =
         gathered === null
           ? null
-          : await gatherOfferAcceptance(ops, gathered, line)
+          : await gatherOfferAcceptance(ops, gathered, repoConfig)
       const { editing } = await ops.shared()
       // plan
       const planned = planOfferAcceptance({
@@ -92,7 +92,7 @@ export async function act(
         seen,
         acceptance,
         editing,
-        onto: line.onto,
+        acceptedBookmark: repoConfig.acceptedBookmark,
         to,
         now: basics.now(),
       })
@@ -112,7 +112,12 @@ export async function act(
       return {
         code: null,
         describe: null,
-        fact: acceptedFact({ lane, by, decision: planned, onto: line.onto }),
+        fact: acceptedFact({
+          lane,
+          by,
+          decision: planned,
+          acceptedBookmark: repoConfig.acceptedBookmark,
+        }),
       }
     }
     // squash and refresh: the offer rebuilt from the lane's tip, as one.

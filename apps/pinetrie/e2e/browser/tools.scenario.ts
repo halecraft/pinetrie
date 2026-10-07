@@ -31,7 +31,7 @@ import {
   idleNow,
   join,
   lanesOf,
-  setUpLine,
+  setUpAccepted,
   startSuiteHost,
   treeOf,
   waitFor,
@@ -319,7 +319,7 @@ async function run(
             () => null,
           )
         check(
-          "a thread left while the page was hidden marks what came since, and the line takes no room",
+          "a thread left while the page was hidden marks what came since, and accepted work takes no room",
           line !== null &&
             line.height === 0 &&
             line.next.includes("anything new?"),
@@ -388,7 +388,7 @@ async function run(
       // A new thread of its own starts at accepted work (ADR-0060).
       if (noContainers === null) {
         const owner = await join(toolHost, "owner", "tools")
-        await setUpLine(toolHost.session, owner)
+        await setUpAccepted(toolHost.session, owner)
         await owner.close()
       }
       const tp = await browser.newPage({ viewport: PANE_VIEWPORT })
@@ -417,7 +417,7 @@ async function run(
         }
 
         // ── where the agent will work, said before sending (ADR-0032) ───────
-        // The button says what the send does; the line beside it, where the new
+        // The button says what the send does; accepted work beside it, where the new
         // thread's agent works and what that does to your files.
         const send = `${col(0)} .composer .send`
         const chip = `${col(0)} .where-trigger`
@@ -833,7 +833,7 @@ async function run(
         }
 
         // While the lane runs, its header's mark pulses and a line at the
-        // column's end says more is coming. The line takes no height, whether
+        // column's end says more is coming. Accepted work takes no height, whether
         // it is the content's last child or sits above a queued card.
         {
           const thinking = script.pause("think a while")
@@ -847,7 +847,7 @@ async function run(
               title: s.getAttribute("title"),
             }))
             .catch(() => null)
-          /** Where the line is, and what the content's height is with and without it. */
+          /** Where accepted work is, and what the content's height is with and without it. */
           const lineShows = () =>
             tp.$eval(`${col(0)} .column-content`, c => {
               const line = c.querySelector(".working-line")
@@ -884,7 +884,7 @@ async function run(
           await twoFrames(tp)
           const last = await lineShows()
           // A message sent now is a card queued behind the paused run, below
-          // the line.
+          // accepted work.
           await say("wait behind it")
           await appears(`${col(0)} .card-editor.queued`, 10_000)
           await twoFrames(tp)
@@ -1287,7 +1287,7 @@ async function run(
             "the offer's line opens its review beside the thread, which keeps its 28rem: a row per file, and a file's diff",
             "typing beside an open review redraws none of it",
             "a file's head stays pinned while its diff scrolls, and the list brings a file to the top",
-            "the column's foot shows the thread's offer in words, its bookmark apart, and its add button moves the line to it, leaving your working copy",
+            "the column's foot shows the thread's offer in words, its bookmark apart, and its add button moves accepted work to it, leaving your working copy",
             "the review closes, and after the acceptance there is none to open",
           ])
             skip(label, noContainers)
@@ -1392,8 +1392,8 @@ async function run(
             .catch(() => {})
           const closed = await appears(`${col(0)}:not(:has(.review))`, 5_000)
           if (acceptShown) await tp.click(`${col(0)} .work .offer-accept`)
-          // The acceptance moves the line forward to the offer (ADR-0060).
-          const onLine = () => {
+          // The acceptance moves accepted work forward to the offer (ADR-0060).
+          const onAccepted = () => {
             try {
               return execFileSync(
                 "jj",
@@ -1413,10 +1413,10 @@ async function run(
             }
           }
           const accepted =
-            (await waitFor(onLine, 10_000)) >= 0 &&
+            (await waitFor(onAccepted, 10_000)) >= 0 &&
             !existsSync(path.join(work, "from-lane.txt"))
           check(
-            "the column's foot shows the thread's offer in words, its bookmark apart, and its add button moves the line to it, leaving your working copy",
+            "the column's foot shows the thread's offer in words, its bookmark apart, and its add button moves accepted work to it, leaving your working copy",
             acceptShown &&
               bookmark.startsWith("pinetrie-offer/") &&
               !line.includes("`") &&

@@ -1,6 +1,6 @@
 import { commitId, entryId, laneNameForThread, runId } from "@pinetrie/core"
 import type { ThreadLaneHandle } from "@pinetrie/pi"
-import { BASE, LINE, setRecord } from "@pinetrie/rules"
+import { ACCEPTED, BASE, setRecord } from "@pinetrie/rules"
 import { beginRun, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
 import { createBaseNews } from "./base-news.ts"
@@ -9,7 +9,7 @@ import { endRun } from "./runs.ts"
 
 const LANE = laneNameForThread("0123456789abcdef")
 
-/** A lane with work of its own whose base, the line, moved to `to`. */
+/** A lane with work of its own whose base, accepted work, moved to `to`. */
 function behind(to = "l2") {
   const b = basics()
   putLane(b, LANE, entryId("p-1"))
@@ -19,7 +19,7 @@ function behind(to = "l2") {
     b,
     setRecord(BASE, {
       lane: LANE,
-      base: { kind: "line" },
+      base: { kind: "accepted" },
       start: commitId("l1"),
       state: "ok",
       catchUp: { tip: commitId("t"), to: commitId(to), files: ["a.ts"] },
@@ -29,8 +29,8 @@ function behind(to = "l2") {
   )
   putValue(
     b,
-    setRecord(LINE, {
-      onto: "pinetrie-onto",
+    setRecord(ACCEPTED, {
+      acceptedBookmark: "pinetrie-onto",
       wipPrefix: "wip/",
       publish: "main",
       published: { commit: null, behind: 0, ahead: 0 },

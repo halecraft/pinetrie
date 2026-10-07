@@ -226,34 +226,41 @@ function acceptStack(input: {
  */
 export interface OfferAcceptanceDestination {
   readonly bookmark: string
-  readonly kind: "line" | "wip"
-  /** Commits of yours that land with the offer: the WIP's, onto the line. */
+  readonly kind: "accepted" | "wip"
+  /** Commits of yours that land with the offer: the WIP's, onto accepted work. */
   readonly bringsAlong: number
-  /** What moves is immutable after: the line. */
+  /** What moves is immutable after: accepted work. */
   readonly final: boolean
 }
 
 /**
  * The bookmarks an acceptance may move to the offer, the default first (ADR-0060):
- * the one the lane is based on, and, for a WIP, the line too, landing the
- * WIP's commits with it. Only a clean offer lands on the line: the line is
+ * the one the lane is based on, and, for a WIP, accepted work too, landing the
+ * WIP's commits with it. Only a clean offer lands on accepted work: accepted work is
  * immutable, and a conflict accepted into it would stay in its history. A WIP
- * gone without landing has none; one that landed is the line's. Pure.
+ * gone without landing has none; one that landed is accepted work's. Pure.
  */
 export function offerAcceptanceDestinations(input: {
   readonly base: ThreadBase
   readonly state: "ok" | "landed" | "gone"
-  readonly onto: string
+  readonly acceptedBookmark: string
   readonly conflicted: boolean
-  /** The WIP's commits above the line, for a WIP base. */
+  /** The WIP's commits above accepted work, for a WIP base. */
   readonly wipAhead: number
 }): readonly OfferAcceptanceDestination[] {
   const line = (bringsAlong: number): OfferAcceptanceDestination[] =>
     input.conflicted
       ? []
-      : [{ bookmark: input.onto, kind: "line", bringsAlong, final: true }]
+      : [
+          {
+            bookmark: input.acceptedBookmark,
+            kind: "accepted",
+            bringsAlong,
+            final: true,
+          },
+        ]
   if (input.state === "gone") return []
-  if (input.base.kind === "line" || input.state === "landed") return line(0)
+  if (input.base.kind === "accepted" || input.state === "landed") return line(0)
   return [
     {
       bookmark: input.base.bookmark,
@@ -270,7 +277,7 @@ export function offerAcceptanceDestinations(input: {
  * reader of the page switches on this, never on the record's fields.
  * - `none`: no record;
  * - `accepted`: accepted, as the change `as`;
- * - `held`: open, but it brings no file: the line already holds its work,
+ * - `held`: open, but it brings no file: accepted work already holds its work,
  *   by a route the ledger does not record (S89), so there is nothing to add;
  * - `open`: work to add. One you edited is open whatever its files: it is
  *   yours.
@@ -395,8 +402,8 @@ export function planOfferAcceptance(input: {
   readonly acceptance: OfferAcceptanceFacts | null
   /** Files `@` changes, for the accepted record's `yourEdits`. */
   readonly editing: ReadonlySet<string>
-  /** The line's bookmark. */
-  readonly onto: string
+  /** Accepted work's bookmark. */
+  readonly acceptedBookmark: string
   readonly to: string | null
   readonly now: number
 }): OfferAcceptanceDecision {
@@ -417,7 +424,7 @@ export function planOfferAcceptance(input: {
   const destinations = offerAcceptanceDestinations({
     base: place.base.base,
     state: place.state,
-    onto: input.onto,
+    acceptedBookmark: input.acceptedBookmark,
     conflicted: offer.conflicts.length > 0,
     wipAhead: acceptance.wipAhead,
   })
@@ -483,7 +490,7 @@ export function planStackEnded(input: {
   const { place, name, offer } = gathered
   if (name === undefined) return refused("the thread has no name yet")
   if (place.kind === "gone")
-    return refused("the thread's base is gone: continue it on the line")
+    return refused("the thread's base is gone: continue it on accepted work")
   return {
     kind: "rebuild",
     name,

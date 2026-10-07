@@ -7,9 +7,9 @@
 // record, the page's cache, from the repo (`refresh.ts`). The host decides
 // nothing from a record (ADR-0060).
 // What marks a lane: a move the owner observes (`planMarks`: the lane's ref
-// after a fetch, its offer bookmark, the line, a WIP, your `@`), a run's end,
-// and a root archived or restored (`moveLanes`); the line's record
-// (`work/line.ts`) is rewritten on the same moves. Commands (an offer action,
+// after a fetch, its offer bookmark, accepted work, a WIP, your `@`), a run's end,
+// and a root archived or restored (`moveLanes`); accepted work's record
+// (`work/accepted.ts`) is rewritten on the same moves. Commands (an offer action,
 // a split's span and end) are owner commands, ahead of every refresh
 // waiting. The reads a page asks for (`read`, ADR-0047) are pinned
 // reads, which wait on nothing.
@@ -22,7 +22,7 @@ import type {
   OfferSeen,
   WriterId,
 } from "@pinetrie/core"
-import type { LineConfig } from "@pinetrie/lanes"
+import type { RepoConfig } from "@pinetrie/lanes"
 import type { PiSetup } from "@pinetrie/pi"
 import { readNames, readOffers, readRevisions } from "@pinetrie/reads"
 import {
@@ -43,7 +43,7 @@ import {
 } from "@pinetrie/rules"
 import { type Basics, failed } from "../basics.ts"
 import type { Records } from "../records.ts"
-import type { Line } from "../work/line.ts"
+import type { AcceptedWork } from "../work/accepted.ts"
 import { act } from "./act.ts"
 import { describe } from "./describe.ts"
 import { planMarks } from "./marks.ts"
@@ -108,7 +108,7 @@ export interface Offers {
 export function startOffers(input: {
   readonly owner: RepoOwner
   /** Accepted work's names (ADR-0060). */
-  readonly line: LineConfig
+  readonly repoConfig: RepoConfig
   readonly basics: Basics
   readonly records: Pick<Records, "writeValues">
   /** What a description asks of the model. */
@@ -117,8 +117,8 @@ export function startOffers(input: {
   readonly running: (lane: LaneName) => boolean
   /** A lane's base record changed: lane work announces it (`onBaseChanged`). */
   readonly baseChanged: (lane: LaneName) => void
-  /** The line's record and commands (`host/work/line.ts`): its record is rewritten when the owner observes the line or your `@` move. */
-  readonly lineWork: Line
+  /** Accepted work's record and commands (`host/work/accepted.ts`): its record is rewritten when the owner observes accepted work or your `@` move. */
+  readonly acceptedWork: AcceptedWork
 }): Offers {
   const deps = { ...createOfferDeps(input), describing: new Set<LaneName>() }
   const { owner, basics, records } = deps
@@ -150,19 +150,19 @@ export function startOffers(input: {
         void describe(deps, refresh, lane, false)
     })
 
-  const line = input.lineWork
-  const markLine = () =>
-    void line.refresh().catch(failed(basics, "reading the line"))
+  const acceptedWork = input.acceptedWork
+  const markAccepted = () =>
+    void acceptedWork.refresh().catch(failed(basics, "reading accepted work"))
   /**
    * Only `@` moved (jjui, an editor): one shared read rewrites each open
-   * record's `yourEdits` and the line's record, with no lane's jj
+   * record's `yourEdits` and accepted work's record, with no lane's jj
    * (ADR-0065).
    */
   const markShared = () =>
     void owner
       .later("shared", async ops => {
         const { editing } = await ops.shared()
-        await line.record(ops)
+        await acceptedWork.record(ops)
         for (const record of planYourEdits(
           readOffers(basics.session).values(),
           editing,
@@ -180,7 +180,7 @@ export function startOffers(input: {
         .filter(o => isNotYetAccepted(offerStatus(o)))
         .map(o => o.lane),
     })
-    if (planned.line) markLine()
+    if (planned.accepted) markAccepted()
     if (planned.shared) markShared()
     for (const lane of planned.lanes) touch(lane)
   })

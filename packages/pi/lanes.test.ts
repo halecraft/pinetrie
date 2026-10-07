@@ -609,7 +609,7 @@ describe("lanes in a harness", () => {
     ])
     const news = encodeBehind(
       {
-        from: { kind: "line" },
+        from: { kind: "accepted" },
         to: commitId("l2"),
         files: ["a.ts"],
         overlap: [],

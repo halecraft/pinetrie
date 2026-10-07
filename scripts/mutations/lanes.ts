@@ -62,7 +62,7 @@ export const mutations: readonly Mutation[] = [
     suite: "lanes",
     scenario: "main",
     expect:
-      "accepting the offer moves the line to it, on your landed commit; your working copy is untouched",
+      "accepting the offer moves accepted work to it, on your landed commit; your working copy is untouched",
   },
   {
     name: "the user's line name wins over the project's",
@@ -248,7 +248,7 @@ export const mutations: readonly Mutation[] = [
     from: '  inLane("jj", "new", on),',
     to: '  inLane("jj", "new", wip.commit),',
     command: unit,
-    expect: "planForkSetup: a WIP's copy on the line commit under it",
+    expect: "planForkSetup: a WIP's copy on accepted commit under it",
   },
   {
     name: "the image ignores pinetrie's Playwright version",
@@ -376,14 +376,14 @@ export const mutations: readonly Mutation[] = [
     expect: "a WIP's copy fetches only the WIP's commit",
   },
   {
-    name: "the line's merge names no base",
+    name: "accepted work's merge names no base",
     file: plan,
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "      message: baseMessage(`update: ${from.onto}`, {",
+    from: "      message: baseMessage(`update: ${from.acceptedBookmark}`, {",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
-    to: "      message: ((title: string, _: unknown) => title)(`update: ${from.onto}`, {",
+    to: "      message: ((title: string, _: unknown) => title)(`update: ${from.acceptedBookmark}`, {",
     command: unit,
-    expect: "the line's merge names its base",
+    expect: "accepted work's merge names its base",
   },
   {
     name: "a runtime with jj alone is taken as complete",

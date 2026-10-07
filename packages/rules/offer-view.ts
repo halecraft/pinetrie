@@ -1,6 +1,6 @@
 // offer-view — a lane's offer as the page shows it (ADR-0038): its state,
 // its buttons and menu, and the facts its words are made from
-// (`offerView`), from the record (`offerStatus`), the line's and the base's
+// (`offerView`), from the record (`offerStatus`), accepted work's and the base's
 // records (`catchUpOf`, `line.ts`) and the thread it branched from
 // (ADR-0072). It writes no words: they are the client's (`offerWords`,
 // ADR-0040).
@@ -20,7 +20,7 @@ import {
   effectiveBase,
   type ParentNow,
   parentAhead,
-} from "./line.ts"
+} from "./accepted.ts"
 import {
   type OfferAcceptanceDestination,
   type OfferStatus,
@@ -29,13 +29,13 @@ import {
 
 /**
  * A button beside the offer, or in its menu. `accept` accepts it into
- * its default destination; `accept-into-line` into the line, from a WIP
+ * its default destination; `accept-into-accepted` into accepted work, from a WIP
  * thread; `continue`
- * moves a thread whose WIP is gone to the line (ADR-0060).
+ * moves a thread whose WIP is gone to accepted work (ADR-0060).
  */
 export type OfferButton =
   | "accept"
-  | "accept-into-line"
+  | "accept-into-accepted"
   | "continue"
   | "split"
   | "squash"
@@ -78,7 +78,7 @@ export interface OfferView {
   readonly menu: readonly OfferButton[]
   /** Of those, the ones that would change nothing now: drawn, but disabled. */
   readonly quiet: readonly OfferButton[]
-  /** Where `accept` (the first) and `accept-into-line` (the line, from a WIP) go. */
+  /** Where `accept` (the first) and `accept-into-accepted` (accepted work, from a WIP) go. */
   readonly destinations: readonly OfferAcceptanceDestination[]
   readonly facts: OfferFacts
 }
@@ -96,17 +96,17 @@ interface OfferFacts {
   readonly touchesYourEdits: boolean
   /** Its bookmark, to find it in jj; null with no offer not yet accepted. */
   readonly bookmark: string | null
-  /** An offer not yet accepted whose work the line already holds (`held`). */
+  /** An offer not yet accepted whose work accepted work already holds (`held`). */
   readonly held: boolean
   /** The change id it was accepted as, or null. */
   readonly acceptedAs: string | null
   /**
    * The thread's base, as it is brought up to date and accepted into (ADR-0060): its
-   * WIP, or the line once the WIP landed or for a line thread.
+   * WIP, or accepted work once the WIP landed or for a thread on accepted work.
    */
   readonly base: ThreadBase
-  /** The line's bookmark, for titles. */
-  readonly onto: string
+  /** Accepted work's bookmark, for titles. */
+  readonly acceptedBookmark: string
   /** What catching up would do (`catchUpOf`). */
   readonly catchUp: CatchUpNow
   /** An accepted-offer commit of this thread names no source: nothing is offered until it catches up (S97). */
@@ -137,8 +137,8 @@ export function conflictCause(
  * The offer's state and buttons. `asked` is when the agent last asked about
  * a conflict on the thread's path (`conflictAskedAt`, ADR-0080); it asks for
  * you only when newer than the offer. `base` is the lane's
- * (`pinetrie.base`), null before the host read it, as the line; `onto` and
- * `wipAhead` come from the line's record. An acceptance is offered only with a
+ * (`pinetrie.base`), null before the host read it, as accepted work; `acceptedBookmark` and
+ * `wipAhead` come from accepted work's record. An acceptance is offered only with a
  * destination (`offerAcceptanceDestinations`).
  */
 export function offerView(input: {
@@ -146,7 +146,7 @@ export function offerView(input: {
   readonly activity: Exclude<OfferActivity, "catch-up">
   readonly asked: number | null
   readonly base: Pick<BaseRecord, "base" | "state"> | null
-  readonly onto: string
+  readonly acceptedBookmark: string
   readonly wipAhead: number
   /** What catching up would do (`catchUpOf`). */
   readonly catchUp: CatchUpNow
@@ -186,7 +186,7 @@ export function offerView(input: {
     held: offer.kind === "held",
     acceptedAs: offer.kind === "accepted" ? offer.as : null,
     base: effectiveBase(input.base),
-    onto: input.onto,
+    acceptedBookmark: input.acceptedBookmark,
     catchUp: input.catchUp,
     untraced: input.untraced,
     conflictCause: cause,
@@ -197,9 +197,9 @@ export function offerView(input: {
     open === undefined
       ? []
       : offerAcceptanceDestinations({
-          base: input.base?.base ?? { kind: "line" },
+          base: input.base?.base ?? { kind: "accepted" },
           state: input.base?.state ?? "ok",
-          onto: input.onto,
+          acceptedBookmark: input.acceptedBookmark,
           conflicted: open.conflicts.length > 0,
           wipAhead: input.wipAhead,
         })
@@ -214,13 +214,13 @@ export function offerView(input: {
     listed: readonly OfferButton[],
   ): OfferView => {
     // A thread whose WIP is gone is brought up to date only by moving it to
-    // the line.
-    const toLine = (bs: readonly OfferButton[]) =>
+    // accepted work.
+    const toAccepted = (bs: readonly OfferButton[]) =>
       gone ? bs.map(b => (b === "update" ? "continue" : b)) : bs
     // While the parent is ahead, catching up with it is listed, unless it
     // already stands beside the offer (ADR-0072).
     const menu = [
-      ...toLine(listed),
+      ...toAccepted(listed),
       ...(ahead !== null && !buttons.includes("catch-up-parent")
         ? (["catch-up-parent"] as const)
         : []),
@@ -251,10 +251,10 @@ export function offerView(input: {
       !input.untraced || (b !== "refresh" && b !== "squash" && b !== "split")
     return {
       state,
-      buttons: integrable(toLine(shown.buttons)).filter(rebuilds),
+      buttons: integrable(toAccepted(shown.buttons)).filter(rebuilds),
       menu: [
         ...shown.menu.filter(rebuilds),
-        ...(destinations.length > 1 ? (["accept-into-line"] as const) : []),
+        ...(destinations.length > 1 ? (["accept-into-accepted"] as const) : []),
       ],
       quiet,
       destinations,

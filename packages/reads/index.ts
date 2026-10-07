@@ -18,6 +18,7 @@
 
 import {
   type Above,
+  type AcceptedRecord,
   type AgentMessageLike,
   type AgentRun,
   type ArchivedRoot,
@@ -40,7 +41,6 @@ import {
   type LaneName,
   type LaneRecord,
   type LaneView,
-  type LineRecord,
   type MarkRecord,
   messageImages,
   messageText,
@@ -72,6 +72,8 @@ import {
   writersOf,
 } from "@pinetrie/core"
 import {
+  ACCEPTED,
+  ACCEPTED_KEY,
   archivedOf,
   BANNER,
   BASE,
@@ -85,8 +87,6 @@ import {
   decodePinned,
   type Home,
   LANE,
-  LINE,
-  LINE_KEY,
   MARK,
   NAME,
   OFFER,
@@ -676,8 +676,8 @@ export const readOffers = (
 ): ReadonlyMap<LaneName, OfferRecord> => readRecords(doc, OFFER)
 
 /** Accepted work as the host last read it (ADR-0060); null before it wrote one. */
-export const readLine = (doc: SessionDocHandle): LineRecord | null =>
-  readRecords(doc, LINE).get(LINE_KEY) ?? null
+export const readAccepted = (doc: SessionDocHandle): AcceptedRecord | null =>
+  readRecords(doc, ACCEPTED).get(ACCEPTED_KEY) ?? null
 
 /** Each lane's base as its history says it (ADR-0060), by lane. */
 export const readBases = (

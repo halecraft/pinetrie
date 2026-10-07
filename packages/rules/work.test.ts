@@ -210,8 +210,8 @@ describe("planTurnRecord: every prompt, and every turn with tool calls", () => {
 describe("forkPoint: a snapshot to clone, and what to start on", () => {
   const S = snapshotId("e")
   const begin = {
-    kind: "line",
-    onto: "pinetrie-onto",
+    kind: "accepted",
+    acceptedBookmark: "pinetrie-onto",
     commit: commitId("l1"),
   } as const
   test("from a turn: its snapshot and the commit above", () => {

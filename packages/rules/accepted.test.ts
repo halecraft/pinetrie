@@ -1,4 +1,6 @@
 import {
+  ACCEPTED_ACTIONS,
+  type AcceptedRecord,
   type CommitId,
   commitId,
   type EntryLike,
@@ -6,22 +8,20 @@ import {
   entryId,
   indexTree,
   type LaneBase,
-  LINE_ACTIONS,
-  type LineRecord,
   laneNameForThread,
   type RevisionRecord,
   type ThreadName,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
-  lineActionState,
-  lineRefusal,
-  movedOnLine,
+  acceptedActionState,
+  acceptedRefusal,
+  baseMovedOn,
   nothingToPublish,
   parentNow,
+  planAcceptedAction,
+  planAcceptedRecord,
   planBegin,
-  planLineAction,
-  planLineRecord,
   planParentUpdate,
   planPublishFinish,
   planUpdateFrom,
@@ -29,7 +29,7 @@ import {
   publishWork,
 } from "./index.ts"
 
-describe("the line (ADR-0060)", () => {
+describe("accepted work (ADR-0060)", () => {
   const facts = {
     commit: null,
     heads: "trunk()",
@@ -44,11 +44,11 @@ describe("the line (ADR-0060)", () => {
     },
   } as const
   const proposed = { heads: "trunk() | present(pinetrie-onto)", log: "logged" }
-  const record = (over: Partial<LineRecord> = {}): LineRecord => ({
-    ...planLineRecord({
+  const record = (over: Partial<AcceptedRecord> = {}): AcceptedRecord => ({
+    ...planAcceptedRecord({
       facts,
-      line: {
-        onto: "pinetrie-onto",
+      repoConfig: {
+        acceptedBookmark: "pinetrie-onto",
         wipPrefix: "wip/",
         publish: "main",
         catchUp: true,
@@ -64,37 +64,37 @@ describe("the line (ADR-0060)", () => {
     })
     expect(record().log).toEqual({ current: null, proposed: "logged" })
     expect([
-      record().onto,
+      record().acceptedBookmark,
       record().wipPrefix,
       record().publish,
       record().catchUp,
     ]).toEqual(["pinetrie-onto", "wip/", "main", true])
   })
   test("setup writes the bookmark at your @- and exactly the proposed heads and log", () => {
-    expect(planLineAction("setup", record())).toEqual({
+    expect(planAcceptedAction("setup", record())).toEqual({
       kind: "setup",
-      onto: "pinetrie-onto",
+      acceptedBookmark: "pinetrie-onto",
       heads: proposed.heads,
       log: "logged",
     })
   })
   test("setup runs whatever offers.catchUp says; a set line refuses it", () => {
-    expect(planLineAction("setup", record({ catchUp: false })).kind).toBe(
+    expect(planAcceptedAction("setup", record({ catchUp: false })).kind).toBe(
       "setup",
     )
     expect(
-      planLineAction("setup", record({ commit: commitId("c1") })).kind,
+      planAcceptedAction("setup", record({ commit: commitId("c1") })).kind,
     ).toBe("refused")
   })
-  test("land and follow are no line command (ADR-0090)", () => {
-    expect(LINE_ACTIONS).toEqual(["setup", "publish"])
+  test("land and follow are no setup or publish command (ADR-0090)", () => {
+    expect(ACCEPTED_ACTIONS).toEqual(["setup", "publish"])
   })
 
   describe("publish (ADR-0076, ADR-0090)", () => {
     const main = commitId("m1")
     const yours = (
-      over: Partial<LineRecord["yours"]> = {},
-    ): LineRecord["yours"] => ({
+      over: Partial<AcceptedRecord["yours"]> = {},
+    ): AcceptedRecord["yours"] => ({
       behind: 0,
       ahead: 0,
       catchUp: null,
@@ -102,14 +102,14 @@ describe("the line (ADR-0060)", () => {
       ...over,
     })
     const at = (
-      published: LineRecord["published"],
-      over: Partial<LineRecord> = {},
+      published: AcceptedRecord["published"],
+      over: Partial<AcceptedRecord> = {},
     ) => record({ commit: commitId("c1"), published, ...over })
     const unpublished = { commit: main, behind: 2, ahead: 0 }
     const published = { commit: main, behind: 0, ahead: 0 }
     const preview = { changes: 4, conflicts: [], heads: 1 }
-    const code = (r: LineRecord) => {
-      const s = lineActionState("publish", r)
+    const code = (r: AcceptedRecord) => {
+      const s = acceptedActionState("publish", r)
       return s.kind === "refused" ? s.code : null
     }
     test("with offers.catchUp off it moves the publish bookmark alone, whatever your files", () => {
@@ -121,27 +121,35 @@ describe("the line (ADR-0060)", () => {
           conflicts: { commits: 1, files: ["a"] },
         }),
       })
-      expect(planLineAction("publish", r)).toEqual({
+      expect(planAcceptedAction("publish", r)).toEqual({
         kind: "publish",
-        onto: "pinetrie-onto",
+        acceptedBookmark: "pinetrie-onto",
         publish: "main",
         catchUp: false,
         accept: false,
       })
-      expect(publishWork(r)).toEqual({ accepted: 2, yours: 0, catchUp: false })
+      expect(publishWork(r)).toEqual({
+        acceptedCommits: 2,
+        yours: 0,
+        catchUp: false,
+      })
     })
     test("with offers.catchUp on it catches your files up and accepts your commits", () => {
       const r = at(unpublished, {
         yours: yours({ behind: 2, ahead: 1, catchUp: preview }),
       })
-      expect(planLineAction("publish", r)).toEqual({
+      expect(planAcceptedAction("publish", r)).toEqual({
         kind: "publish",
-        onto: "pinetrie-onto",
+        acceptedBookmark: "pinetrie-onto",
         publish: "main",
         catchUp: true,
         accept: true,
       })
-      expect(publishWork(r)).toEqual({ accepted: 2, yours: 1, catchUp: true })
+      expect(publishWork(r)).toEqual({
+        acceptedCommits: 2,
+        yours: 1,
+        catchUp: true,
+      })
     })
     test("with nothing unpublished, your commits or files behind are still work", () => {
       expect(code(at(published, { yours: yours({ ahead: 1 }) }))).toBeNull()
@@ -150,7 +158,7 @@ describe("the line (ADR-0060)", () => {
       ).toBeNull()
     })
     test("refused, in order: no line, no bookmark, main ahead, your conflicts, no shared commit, nothing to do", () => {
-      expect(code(record())).toBe(ERR.NO_LINE)
+      expect(code(record())).toBe(ERR.NOT_SET_UP)
       expect(code(at({ commit: null, behind: 0, ahead: 0 }))).toBe(
         ERR.NO_PUBLISH,
       )
@@ -186,15 +194,17 @@ describe("the line (ADR-0060)", () => {
     })
     test("lineRefusal words each refusal once, naming the bookmark, the counts and the files", () => {
       const r = at({ commit: main, behind: 3, ahead: 2 })
-      expect(lineRefusal("publish", ERR.NOT_FAST_FORWARD, r)).toBe(
+      expect(acceptedRefusal("publish", ERR.NOT_FAST_FORWARD, r)).toBe(
         "main has 2 commits accepted work doesn't: bring them into accepted work in jj first",
       )
-      expect(lineRefusal("publish", ERR.NO_PUBLISH, r)).toBe(
+      expect(acceptedRefusal("publish", ERR.NO_PUBLISH, r)).toBe(
         "this repo has no main bookmark to publish to",
       )
-      expect(lineRefusal("publish", ERR.REFUSED, r)).toBe("nothing to publish")
+      expect(acceptedRefusal("publish", ERR.REFUSED, r)).toBe(
+        "nothing to publish",
+      )
       expect(
-        lineRefusal(
+        acceptedRefusal(
           "publish",
           ERR.YOURS_CONFLICT,
           at(unpublished, {
@@ -205,7 +215,7 @@ describe("the line (ADR-0060)", () => {
         ),
       ).toBe("your files have conflicts in a, b, c and 2 more")
       expect(
-        lineRefusal(
+        acceptedRefusal(
           "publish",
           ERR.YOURS_CONFLICT,
           at(unpublished, {
@@ -218,15 +228,15 @@ describe("the line (ADR-0060)", () => {
       ).toBe("catching your files up would conflict in x.ts")
     })
 
-    describe("planPublishFinish: the second round, from the line read after the catch-up", () => {
+    describe("planPublishFinish: the second round, from accepted work read after the catch-up", () => {
       const decision = {
         kind: "publish",
-        onto: "pinetrie-onto",
+        acceptedBookmark: "pinetrie-onto",
         publish: "main",
         catchUp: true,
         accept: false,
       } as const
-      const after = (over: Partial<LineRecord["yours"]> = {}, ahead = 0) =>
+      const after = (over: Partial<AcceptedRecord["yours"]> = {}, ahead = 0) =>
         at({ commit: main, behind: 2, ahead }, { yours: yours(over) })
       test.each([
         [
@@ -238,7 +248,7 @@ describe("the line (ADR-0060)", () => {
           },
           {
             kind: "move",
-            onto: "pinetrie-onto",
+            acceptedBookmark: "pinetrie-onto",
             publish: "main",
             accept: true,
           },
@@ -258,11 +268,11 @@ describe("the line (ADR-0060)", () => {
           { kind: "undo", op: "op1", code: ERR.NOT_FAST_FORWARD },
         ],
         [
-          "your commits, read after the catch-up, move with the line",
+          "your commits, read after the catch-up, move with accepted work",
           { decision, after: after({ ahead: 2 }), op: "op1" },
           {
             kind: "move",
-            onto: "pinetrie-onto",
+            acceptedBookmark: "pinetrie-onto",
             publish: "main",
             accept: true,
           },
@@ -276,7 +286,7 @@ describe("the line (ADR-0060)", () => {
           },
           {
             kind: "move",
-            onto: "pinetrie-onto",
+            acceptedBookmark: "pinetrie-onto",
             publish: "main",
             accept: false,
           },
@@ -302,42 +312,50 @@ describe("the line (ADR-0060)", () => {
       "catching your files up would leave 2 commits of yours with conflicts",
     )
     expect(publishUndone(ERR.NOT_FAST_FORWARD, after)).toBe(
-      lineRefusal("publish", ERR.NOT_FAST_FORWARD, after),
+      acceptedRefusal("publish", ERR.NOT_FAST_FORWARD, after),
     )
   })
   test("movedOnLine names the base as catchUpName does", () => {
-    expect(movedOnLine({ kind: "line" })).toBe("accepted work has moved on")
-    expect(movedOnLine({ kind: "wip", bookmark: "wip/search" })).toBe(
+    expect(baseMovedOn({ kind: "accepted" })).toBe("accepted work has moved on")
+    expect(baseMovedOn({ kind: "wip", bookmark: "wip/search" })).toBe(
       "wip/search has moved on",
     )
   })
 })
 
-describe("planBegin: the line, or a WIP's copy (ADR-0060)", () => {
+describe("planBegin: accepted work, or a WIP's copy (ADR-0060)", () => {
   const L = commitId("l1")
   const wip = { commit: commitId("w1"), under: commitId("l0") }
   const begin = (
     base: string | null,
     facts: Parameters<typeof planBegin>[0]["facts"],
-  ) => planBegin({ base, onto: "pinetrie-onto", wipPrefix: "wip/", facts })
-  test("the line's commit by default", () => {
-    expect(begin(null, { line: L, wip: null })).toEqual({
-      kind: "line",
-      onto: "pinetrie-onto",
+  ) =>
+    planBegin({
+      base,
+      acceptedBookmark: "pinetrie-onto",
+      wipPrefix: "wip/",
+      facts,
+    })
+  test("accepted work's commit by default", () => {
+    expect(begin(null, { acceptedCommit: L, wip: null })).toEqual({
+      kind: "accepted",
+      acceptedBookmark: "pinetrie-onto",
       commit: L,
     })
   })
-  test("a WIP above the line: its copy on the line commit under it", () => {
-    expect(begin("wip/x", { line: L, wip })).toEqual({
+  test("a WIP above accepted work: its copy on accepted commit under it", () => {
+    expect(begin("wip/x", { acceptedCommit: L, wip })).toEqual({
       kind: "wip",
       bookmark: "wip/x",
       ...wip,
     })
   })
-  test("no line: no_line; a base that is no WIP above the line: bad_base", () => {
-    expect(begin(null, { line: null, wip: null })).toBe(ERR.NO_LINE)
-    expect(begin("main", { line: L, wip })).toBe(ERR.BAD_BASE)
-    expect(begin("wip/x", { line: L, wip: null })).toBe(ERR.BAD_BASE)
+  test("no line: not_set_up; a base that is no WIP above accepted work: bad_base", () => {
+    expect(begin(null, { acceptedCommit: null, wip: null })).toBe(
+      ERR.NOT_SET_UP,
+    )
+    expect(begin("main", { acceptedCommit: L, wip })).toBe(ERR.BAD_BASE)
+    expect(begin("wip/x", { acceptedCommit: L, wip: null })).toBe(ERR.BAD_BASE)
   })
 })
 
@@ -459,21 +477,25 @@ describe("planUpdateFrom: always the base the thread follows (ADR-0060)", () => 
     start: COPY,
     source: W,
   }
-  const lineBase: LaneBase = { base: { kind: "line" }, start: L, source: L }
+  const acceptedBase: LaneBase = {
+    base: { kind: "accepted" },
+    start: L,
+    source: L,
+  }
   const now = { commit: commitId("w2"), under: commitId("l0") }
   const from = (over: Partial<Parameters<typeof planUpdateFrom>[0]> = {}) =>
     planUpdateFrom({
-      onto: "pinetrie-onto",
+      acceptedBookmark: "pinetrie-onto",
       base: wipBase,
       state: "ok",
-      toLine: false,
-      line: L,
+      toAccepted: false,
+      acceptedCommit: L,
       wipNow: now,
       ...over,
     })
   const line = (mark: boolean) => ({
-    kind: "line",
-    onto: "pinetrie-onto",
+    kind: "accepted",
+    acceptedBookmark: "pinetrie-onto",
     commit: L,
     mark,
   })
@@ -484,26 +506,26 @@ describe("planUpdateFrom: always the base the thread follows (ADR-0060)", () => 
   test("a WIP's copy is made on the lane's last copy", () => {
     expect(from()).toEqual({ kind: "wip", bookmark: "wip/x", ...now, on: COPY })
   })
-  test("a line thread, a lane with no base, and a landed WIP merge the line, marking no move", () => {
-    expect(from({ base: lineBase, wipNow: null })).toEqual(line(false))
+  test("a thread on accepted work, a lane with no base, and a landed WIP merge accepted work, marking no move", () => {
+    expect(from({ base: acceptedBase, wipNow: null })).toEqual(line(false))
     expect(from({ base: null, wipNow: null })).toEqual(line(false))
     expect(from({ state: "landed", wipNow: null })).toEqual(line(false))
   })
-  test("continue on the line marks a move from a WIP, and from no other base", () => {
-    expect(from({ toLine: true })).toEqual(line(true))
-    expect(from({ toLine: true, state: "landed" })).toEqual(line(true))
-    expect(from({ toLine: true, base: lineBase, wipNow: null })).toEqual(
-      line(false),
-    )
-    expect(from({ toLine: true, base: null, wipNow: null })).toEqual(
+  test("continue on accepted work marks a move from a WIP, and from no other base", () => {
+    expect(from({ toAccepted: true })).toEqual(line(true))
+    expect(from({ toAccepted: true, state: "landed" })).toEqual(line(true))
+    expect(
+      from({ toAccepted: true, base: acceptedBase, wipNow: null }),
+    ).toEqual(line(false))
+    expect(from({ toAccepted: true, base: null, wipNow: null })).toEqual(
       line(false),
     )
   })
-  test("a gone WIP refuses until continued on the line; no line refuses", () => {
+  test("a gone WIP refuses until continued on accepted work; no line refuses", () => {
     expect(from({ state: "gone", wipNow: null })).toBe(ERR.BASE_GONE)
-    expect(from({ state: "gone", wipNow: null, toLine: true })).toEqual(
+    expect(from({ state: "gone", wipNow: null, toAccepted: true })).toEqual(
       line(true),
     )
-    expect(from({ line: null })).toBe(ERR.NO_LINE)
+    expect(from({ acceptedCommit: null })).toBe(ERR.NOT_SET_UP)
   })
 })

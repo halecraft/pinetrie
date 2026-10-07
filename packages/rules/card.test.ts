@@ -99,7 +99,7 @@ const ACCEPTED: OfferFact = {
   by: ADA,
   as: "kabcdefg",
   bookmark: "pinetrie-onto",
-  to: { kind: "line" },
+  to: { kind: "accepted" },
 }
 
 describe("planCarry (ADR-0080)", () => {

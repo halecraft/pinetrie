@@ -4,10 +4,10 @@
 // `card-editor.tsx` draws them.
 
 import {
+  type AcceptedRecord,
   type Address,
   type CardCommand,
   type ChatMode,
-  type LineRecord,
   type ProjectRecord,
   parseMentions,
   sendWaits,
@@ -288,7 +288,7 @@ export function commandSendWords(
   const verb =
     command.command === "split"
       ? "split"
-      : command.command === "continue-on-line"
+      : command.command === "continue-on-accepted"
         ? "continue"
         : "catch up"
   return {
@@ -406,14 +406,14 @@ export interface WhereChoice {
 
 /**
  * The where menu's first section, in order: its own copy, your files, each
- * directory another lane works in, and another directory. `onto` is the
- * line's bookmark, for its own copy's title; null before the line is read.
+ * directory another lane works in, and another directory. `acceptedBookmark` is the
+ * line's bookmark, for its own copy's title; null before accepted work is read.
  */
 export function whereChoices(
   project: ProjectRecord,
   usedDirs: readonly string[],
   work: WorkSetting,
-  onto: string | null = null,
+  acceptedBookmark: string | null = null,
 ): readonly WhereChoice[] {
   const chosen = (setting: WorkSetting) =>
     setting.kind === work.kind &&
@@ -433,9 +433,9 @@ export function whereChoices(
       title:
         project.kind === "direct"
           ? project.reason
-          : onto === null
+          : acceptedBookmark === null
             ? undefined
-            : `a lane of its own, cloned from ${onto}; its work comes back as pinetrie-offer/<thread>`,
+            : `a lane of its own, cloned from ${acceptedBookmark}; its work comes back as pinetrie-offer/<thread>`,
     },
     {
       key: "yours",
@@ -480,7 +480,7 @@ export function whereChoices(
 /** A row of the where menu that picks a new lane's base. */
 export interface BaseChoice {
   readonly key: string
-  /** The WIP bookmark it picks; null for the line. */
+  /** The WIP bookmark it picks; null for accepted work. */
   readonly base: string | null
   readonly row: string
   readonly detail: string | null
@@ -496,10 +496,15 @@ export interface BaseChoice {
  * choosing.
  */
 export function baseChoices(
-  line: LineRecord | null,
+  accepted: AcceptedRecord | null,
   chosen: string | null,
 ): readonly BaseChoice[] {
-  if (line === null || line.commit === null || line.wips.length === 0) return []
+  if (
+    accepted === null ||
+    accepted.commit === null ||
+    accepted.wips.length === 0
+  )
+    return []
   const behind = (n: number) =>
     n === 0
       ? "your unfinished work"
@@ -511,9 +516,9 @@ export function baseChoices(
       row: "accepted work",
       detail: null,
       chosen: chosen === null,
-      title: `${line.onto} at ${line.commit.slice(0, 8)}`,
+      title: `${accepted.acceptedBookmark} at ${accepted.commit.slice(0, 8)}`,
     },
-    ...line.wips.map(w => ({
+    ...accepted.wips.map(w => ({
       key: `base:${w.bookmark}`,
       base: w.bookmark,
       row: w.bookmark,

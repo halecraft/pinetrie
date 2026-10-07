@@ -1,7 +1,7 @@
 import {
+  type AcceptedRecord,
   commitId,
   ERR,
-  type LineRecord,
   laneNameForThread,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
@@ -15,8 +15,8 @@ import {
 import { baseChoices } from "./send.ts"
 
 const yours = (
-  over: Partial<LineRecord["yours"]> = {},
-): LineRecord["yours"] => ({
+  over: Partial<AcceptedRecord["yours"]> = {},
+): AcceptedRecord["yours"] => ({
   behind: 0,
   ahead: 0,
   catchUp: null,
@@ -24,8 +24,8 @@ const yours = (
   ...over,
 })
 
-const record = (over: Partial<LineRecord> = {}): LineRecord => ({
-  onto: "pinetrie-onto",
+const record = (over: Partial<AcceptedRecord> = {}): AcceptedRecord => ({
+  acceptedBookmark: "pinetrie-onto",
   wipPrefix: "wip/",
   publish: "main",
   published: { commit: commitId("m0"), behind: 0, ahead: 0 },
@@ -43,7 +43,7 @@ const unpublished = (behind: number, ahead = 0) => ({
 })
 
 /** The words of a view that draws a button. */
-const words = (r: LineRecord) => {
+const words = (r: AcceptedRecord) => {
   const view = publishView(r)
   if (view.kind === "absent" || view.kind === "hidden")
     throw new Error(`no button: ${view.kind}`)
@@ -88,7 +88,7 @@ describe("publishWords: what the button says it will do (ADR-0090)", () => {
     )
   })
   test("with offers.catchUp off, the title says your files do not move, naming the setting", () => {
-    const off = (y: Partial<LineRecord["yours"]>) =>
+    const off = (y: Partial<AcceptedRecord["yours"]>) =>
       words(record({ ...unpublished(2), catchUp: false, yours: yours(y) }))
         .title
     expect(off({ behind: 1, ahead: 1 })).toBe(
@@ -228,11 +228,11 @@ describe("the thread's base in its header, and the bases a new lane may start fr
       untraced: [],
       work: "some",
     }) as const
-  test("baseWords: a WIP while it is one, gone when gone, nothing on the line", () => {
+  test("baseWords: a WIP while it is one, gone when gone, nothing on accepted work", () => {
     expect(baseWords(base("ok"))).toBe("on wip/search")
     expect(baseWords(base("gone"))).toBe("wip/search is gone")
     expect(baseWords(base("landed"))).toBeNull()
-    expect(baseWords({ ...base("ok"), base: { kind: "line" } })).toBeNull()
+    expect(baseWords({ ...base("ok"), base: { kind: "accepted" } })).toBeNull()
     expect(baseWords(undefined)).toBeNull()
   })
   test("baseChoices: accepted work first, then each WIP with how far behind it is; none with no line, or no WIP", () => {

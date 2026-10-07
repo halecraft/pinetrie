@@ -99,7 +99,8 @@ export const COMMAND_KINDS = [
   "queue-hold",
   "unqueue-all",
   "set-command",
-  "line",
+  "setup",
+  "publish",
   "undo-move",
   "traces-seen",
 ] as const
@@ -210,7 +211,7 @@ export const OUTCOME_KINDS = [
   "offered",
   "reserved",
   "seen",
-  "line-moved",
+  "accepted-moved",
   "moved",
   "held",
   "released",

@@ -40,7 +40,7 @@ wires them.
 | `hot-reload.ts` | Vite's hot updates: one to a file inside a running direct lane's directory is held until a run's end (`isHeld`); the project does not come into it |
 | `admission.ts`, `policy.ts`, `lines.ts`, `blobs.ts`, `store.ts` | the invite key and links, the write policy, departed seats, the image store, the SQLite store |
 | `work/` | lane containers and disks (§ Lane work) |
-| `offers/` | each lane's offer in your repo, on the owner of your repo (§ Offers); the line's record and commands are `work/line.ts`'s |
+| `offers/` | each lane's offer in your repo, on the owner of your repo (§ Offers); accepted work's record and commands are `work/accepted.ts`'s |
 | `names.ts` | every thread's name (ADR-0039): `ensure` for the lanes pi holds, `reserve` for a lane id a column reserved before its lane exists (ADR-0057), on one queue |
 | `banners.ts` | each thread's column banner (ADR-0050, ADR-0053): made as the thread is named, at reservation or creation, set by `set_banner` |
 | `digests.ts` | each ask's digest (ADR-0056), unless the user config turns them off (ADR-0071) |
@@ -53,7 +53,7 @@ wires them.
   drain (`@pinetrie/keeper`, `packages/keeper/TECHNICAL.md`, keyed by
   `HostKey` in `basics.ts`). Where a command runs is decided, pure, by
   `placeOfCommand` (`commands/index.ts`, ADR-0065): an offer action but a
-  split, and a `line` command, go straight to the owner of your repo after
+  split, and a setup or publish, go straight to the owner of your repo after
   the archive gate (a synchronous read), and hold no other command; a move
   on the board is up to three parts (`commands/board.ts`): its place on the
   keeper, and, when it crosses the closed state's edge, its teardown
@@ -671,7 +671,7 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 
 | module | owns |
 |---|---|
-| `setup.ts` | `Setup`: the project, lane configs and shared directories, the owner of your repo (`Setup.owner`, made from the project root once the line's names are read, before anything else reads your repo), the default-image check, the images and runtime (`ready`), `specOf`, the granted host paths (planned at its start, from the commands pi's setup loaded), and the base snapshot's refreshes. The project is found before it (`findProject`, its rule `projectOf`), since pi's setup loads from its root |
+| `setup.ts` | `Setup`: the project, lane configs and shared directories, the owner of your repo (`Setup.owner`, made from the project root once accepted work's names are read, before anything else reads your repo), the default-image check, the images and runtime (`ready`), `specOf`, the granted host paths (planned at its start, from the commands pi's setup loaded), and the base snapshot's refreshes. The project is found before it (`findProject`, its rule `projectOf`), since pi's setup loads from its root |
 | `registry.ts` | `LaneRegistry`: each lane's handle, its jj, its record, whether it is a lane of its own; the only module that touches the handles |
 | `containers.ts` | `access`, a container's start (`planContainer`, `planStartFrom`; after a restore from a snapshot, `planOldNamesOnDisk`, `pre-rename:`), `beforeRun`, `runEnded` |
 | `fetch.ts` | a lane's history into your repo: the bundle on the lane's queue, the import an owner command (`importLane`) |
@@ -700,7 +700,7 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   snapshot's line, a split's stack) is a pinned read (`owner.read`), which
   waits on no queue.
 - **An update is one step on the lane's `LaneQueue`** (`updateOnQueue`):
-  the lane's base from its own history, the line and the WIP from your
+  the lane's base from its own history, accepted work and the WIP from your
   repo (pinned), `planUpdateFrom`, the edits committed and `mergeUpdate`
   (which first joins each accepted-offer commit the lane holds to its source, ADR-0079), so nothing
   changes the lane between what is read and what is merged. Before the
@@ -711,7 +711,7 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   later catch-up merges again (S106). Then
   `planSettle`, pure, decides what the thread gets, the land message
   included, and `applySettle` writes it. `Settle.fetch` alone decides
-  what is fetched: a clean merge, and a move to the line with nothing to
+  what is fetched: a clean merge, and a move to accepted work with nothing to
   merge, whose mark your repo would otherwise learn of only at a later
   fetch. Its list is `fetchLane`'s `have`: commits your repo may hold,
   which the bundle leaves out.
@@ -719,7 +719,7 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   same step: the card's command picks the rule. Its facts come from the
   lane's root document, not your repo (`parentNow`, with whether the
   parent's lane runs from `pinetrie:live`), and `planParentUpdate` decides;
-  the parent's newest commit is fetched by id into the lane like the line's.
+  the parent's newest commit is fetched by id into the lane like accepted work's.
   A resolution's prompt names the incoming side as that thread's work.
 - **An update stops the lane it started** (`withLaneStarted`), whatever it
   comes to, unless a run follows: a resolution, or the chat a quiet
@@ -746,18 +746,18 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 - **Every offer step runs on the owner of your repo** (`@pinetrie/repo`,
   `packages/repo/TECHNICAL.md`, ADR-0065). An offer action, a `line`
   command, a split's span and its end, and moving lanes' refs are owner
-  commands; a refresh is upkeep, `later("refresh:<lane>")`, and the line's
+  commands; a refresh is upkeep, `later("refresh:<lane>")`, and accepted work's
   record `later("line")`. So a command waits for at most the one step
   running, however many refreshes are marked, and a lane marked many times
   before its refresh starts refreshes once.
 - **What marks a lane** (`planMarks`, `marks.ts`, pure, from the owner's `onMoved`): a
-  move of the line or a WIP, or the first observation (`all`), marks the
+  move of accepted work or a WIP, or the first observation (`all`), marks the
   line's record, every named lane whose root is not archived, and every
   open record; your `@` alone
   (`yours`, jjui and your editor) marks no lane: one `later("shared")` step
   rewrites each open record's `yourEdits` (its files that `@` changes,
   `planYourEdits`) and
-  the line's record from the shared facts; a lane's
+  accepted work's record from the shared facts; a lane's
   ref (a fetch's import) marks that lane; an offer bookmark the lane its
   thread names. A run's end marks its lane, then describes it. A refresh
   that wrote is observed, and refreshes the lanes it moved once more: that
@@ -765,7 +765,7 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   is only a hint of where to look: it is how an offer you abandoned by hand
   is built again. A bookmark of yours that no offer depends on moves
   nothing. Every named lane, not only those with an offer, so each lane's
-  `pinetrie.base` follows the line, and with it what catching up would
+  `pinetrie.base` follows accepted work, and with it what catching up would
   change. Not an archived root's lanes: they have no base to follow
   (`gatherRefresh` gives them none), and their refresh only withdraws an
   offer. What could still hold one marks such a lane anyway: its ref or its
@@ -830,12 +830,12 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   at or below the offer's bottom's parent, read in the same command
   (`gatherOfferAcceptance`). jj's
   refusal of a backwards move is the second guard (S77 item 1).
-- **The `line` command** (`work/line.ts`, created by `startLaneWork` beside
-  the offers, which rewrite its record when the owner observes the line or
-  your `@` move): decided by `@pinetrie/rules` (`planLineAction`), its steps
-  `@pinetrie/repo`'s. `setup` creates the line's bookmark at your `@-` and
+- **Setup and publish** (`work/accepted.ts`, created by `startLaneWork` beside
+  the offers, which rewrite its record when the owner observes accepted work or
+  your `@` move): decided by `@pinetrie/rules` (`planAcceptedAction`), its steps
+  `@pinetrie/repo`'s. `setup` creates accepted work's bookmark at your `@-` and
   writes `immutable_heads()` and `revsets.log` to the repo's config, the
-  text the publish button's setup showed (`planLineSetup`). A publish
+  text the publish button's setup showed (`planSetup`). A publish
   (ADR-0090) is two rounds of gather, plan and execute in one command: the
   catch-up (`planPublishCatchUp`, as you, only with `offers.catchUp` on
   and only when your files are behind), then the record read again, with
@@ -845,13 +845,13 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   catch-up runs the undo and rethrows: the one branch that is not a plan's
   value. The record's preview runs `git merge-tree` on your repo (the
   step's `git`). Setup and publish are anyone's, on any host: what a
-  publish does is `offers.catchUp` (`LineConfig`, carried on the record),
+  publish does is `offers.catchUp` (`RepoConfig`, carried on the record),
   never the bind or the invite key (ADR-0099).
-- **The base snapshot follows the line** (`work/index.ts`): the owner's
+- **The base snapshot follows accepted work** (`work/index.ts`): the owner's
   `Moved.onto` refreshes it (`refreshBaseSoon`), so setup, an accept, an
   accepting publish and a move made in jj outside pine·trie all reach it
   by one path. An acceptance into a WIP does not, since the snapshot is
-  the line's.
+  accepted work's.
 - **Shutdown closes the owner** (`LaneWork.owner`, the `close` step): it
   refuses every step from then on and stops its watch; `quiet` waits for
   what it holds (`LaneWork.quiet`).

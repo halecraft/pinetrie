@@ -19,10 +19,10 @@ import {
   ROOT,
   rootOf,
 } from "@pinetrie/core"
-import { DEFAULT_LINE, laneBase, type Runner, run } from "@pinetrie/lanes"
+import { DEFAULT_REPO, laneBase, type Runner, run } from "@pinetrie/lanes"
 import { scriptedModel } from "@pinetrie/pi"
 import {
-  readLine,
+  readAccepted,
   readNames,
   readOffers,
   readPlaces,
@@ -43,7 +43,7 @@ import {
   lanesOf,
   moveRootTo,
   rootRecordsOf,
-  setUpLine,
+  setUpAccepted,
   startSuiteHost,
   treeOf,
   waitFor,
@@ -141,7 +141,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
     )
     // Threads start at accepted work (ADR-0060): set it up at the
     // project's commit, as the footer's set up button does.
-    await setUpLine(wh.session, wu)
+    await setUpAccepted(wh.session, wu)
 
     // ── 1. Two lanes at once: the same file, the same port, their own ──────
     const serve =
@@ -594,7 +594,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
     )
     writeFileSync(path.join(project, "shared.txt"), "one\ntwo (you)\nthree\n")
     jj(project, "commit", "-m", "you edit line two")
-    const landed = await wu.line("publish")
+    const landed = await wu.actOnAccepted("publish")
     writeFileSync(path.join(project, "still-editing.txt"), "wip\n")
     const conflicted = await waitFor(
       () => offerOf()?.conflicts.includes("shared.txt") === true,
@@ -602,10 +602,10 @@ async function mainSection(check: Checks["check"]): Promise<void> {
     )
     check(
       "the offer is rebuilt on accepted work when you publish your commit, and says it conflicts with it",
-      landed.kind === "line-moved" && conflicted >= 0,
+      landed.kind === "accepted-moved" && conflicted >= 0,
       `${JSON.stringify({ landed, conflicts: offerOf()?.conflicts })}`,
     )
-    // You reword the line's commit under the offer, which is immutable
+    // You reword accepted work's commit under the offer, which is immutable
     // until you say otherwise: jj rebases the offer, not the host, whose next
     // trigger plans `none` and writes nothing to your repo. The record's
     // `commits` names the offer as it is now, which is what a review reads
@@ -665,7 +665,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
     const lostAt = offerNow()
     if (two !== undefined)
       await wh.records.writeValues([deleteRecord(OFFER, two.name)])
-    const poke = `${DEFAULT_LINE.wipPrefix}e2e-poke`
+    const poke = `${DEFAULT_REPO.wipPrefix}e2e-poke`
     jj(project, "bookmark", "create", poke, "-r", "@-")
     const rewritten = await waitFor(
       () => JSON.stringify(offerOf()?.commits) === JSON.stringify([lostAt]),
@@ -754,7 +754,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
         history.length % 2 === 0,
       `${JSON.stringify(history)}`,
     )
-    // Accept: the line moves forward to the offer, which stays one commit on
+    // Accept: accepted work moves forward to the offer, which stays one commit on
     // your landed one; your working copy is untouched (ADR-0060).
     const atBefore = jj(
       project,
@@ -769,7 +769,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       two === undefined
         ? null
         : await wu.offer(two.name, "accept", "pinetrie-onto")
-    const lineLog = jj(
+    const acceptedLog = jj(
       project,
       "log",
       "--no-graph",
@@ -779,16 +779,16 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       'description.first_line() ++ "\n"',
     )
     check(
-      "accepting the offer moves the line to it, on your landed commit; your working copy is untouched",
+      "accepting the offer moves accepted work to it, on your landed commit; your working copy is untouched",
       accepted?.kind === "accepted" &&
-        lineLog === "offer: scripted\nyou edit line two\n" &&
+        acceptedLog === "offer: scripted\nyou edit line two\n" &&
         jj(project, "log", "--no-graph", "-r", "@", "-T", "commit_id") ===
           atBefore &&
         readFileSync(path.join(project, "shared.txt"), "utf8") ===
           "one\ntwo (you)\nthree\n" &&
         readFileSync(path.join(project, "still-editing.txt"), "utf8") ===
           "wip\n",
-      `${JSON.stringify(accepted)}, line: ${lineLog}`,
+      `${JSON.stringify(accepted)}, line: ${acceptedLog}`,
     )
     // The next turn's offer holds only what came after.
     script.use([
@@ -816,17 +816,17 @@ async function mainSection(check: Checks["check"]): Promise<void> {
     )
     // A clean update: a fact in the thread, then the card's text, sent. Your
     // work goes in accepted work first: a publish catches it up with what you
-    // accepted, as you, after the line's record previews it, then accepts it
+    // accepted, as you, after accepted work's record previews it, then accepts it
     // and moves main (ADR-0090).
     writeFileSync(path.join(project, "yours.txt"), "yours\n")
     jj(project, "commit", "-m", "you add yours.txt")
     const previewed = await waitFor(
-      () => (readLine(wh.session)?.yours.catchUp ?? null) !== null,
+      () => (readAccepted(wh.session)?.yours.catchUp ?? null) !== null,
       30_000,
     )
-    const preview = readLine(wh.session)?.yours.catchUp
-    const unpublished = readLine(wh.session)?.published.behind ?? 0
-    const published = await wu.line("publish")
+    const preview = readAccepted(wh.session)?.yours.catchUp
+    const unpublished = readAccepted(wh.session)?.published.behind ?? 0
+    const published = await wu.actOnAccepted("publish")
     /** Who ran the newest rebase in your op log: the catch-up. */
     const caughtUpBy =
       jj(
@@ -846,7 +846,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       "publish previews catching your files up, then rebases your work onto accepted work as you, and accepts it",
       previewed >= 0 &&
         preview?.conflicts.length === 0 &&
-        published.kind === "line-moved" &&
+        published.kind === "accepted-moved" &&
         commitAt("pinetrie-onto") === commitAt("@-") &&
         existsSync(path.join(project, "yours.txt")) &&
         caughtUpBy !== "" &&
@@ -854,7 +854,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       `${JSON.stringify({ preview, published, caughtUpBy })}`,
     )
     const caughtUp = await waitFor(
-      () => readLine(wh.session)?.published.behind === 0,
+      () => readAccepted(wh.session)?.published.behind === 0,
       30_000,
     )
     check(
@@ -862,7 +862,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       unpublished > 0 &&
         caughtUp >= 0 &&
         commitAt("main") === commitAt("pinetrie-onto"),
-      `${JSON.stringify({ unpublished, line: readLine(wh.session)?.published })}`,
+      `${JSON.stringify({ unpublished, line: readAccepted(wh.session)?.published })}`,
     )
     script.use([{ text: "it fits" }])
     if (two !== undefined)
@@ -903,14 +903,14 @@ async function mainSection(check: Checks["check"]): Promise<void> {
     // Your own reads, as you would run them: never snapshotting your files.
     const yours: Runner = args =>
       run("jj", ["-R", project, "--ignore-working-copy", ...args])
-    const base = await laneBase(yours, tipCommit, DEFAULT_LINE)
+    const base = await laneBase(yours, tipCommit, DEFAULT_REPO)
     const read =
       base === null || lane2 === undefined
         ? null
         : await startOfOffer(yours, {
             tip: tipCommit,
             base,
-            line: DEFAULT_LINE,
+            repoConfig: DEFAULT_REPO,
             lane: lane2,
           })
     const start = read?.kind === "known" ? read.start.join(" ") : ""
@@ -944,15 +944,15 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       `${JSON.stringify({ split, size: offerOf()?.size })}`,
     )
 
-    // A new root thread starts at the line: what you landed, not what you
+    // A new root thread starts at accepted work: what you landed, not what you
     // committed and have not landed, nor your working copy (ADR-0060).
     writeFileSync(path.join(project, "unlanded.txt"), "not landed\n")
-    const aheadBefore = readLine(wh.session)?.yours.ahead ?? 0
+    const aheadBefore = readAccepted(wh.session)?.yours.ahead ?? 0
     jj(project, "commit", "-m", "you add unlanded.txt")
     // The host has seen your commit (its line record counts it), so its
     // reads, pinned to the head it observed, have it too (ADR-0065).
     await waitFor(
-      () => (readLine(wh.session)?.yours.ahead ?? 0) > aheadBefore,
+      () => (readAccepted(wh.session)?.yours.ahead ?? 0) > aheadBefore,
       10_000,
     )
     writeFileSync(path.join(project, "unsaved.txt"), "not committed\n")
@@ -967,7 +967,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
     await idle()
     const seenUnsaved = toolResults(laneWith("read my files")?.name)
     check(
-      "a new root thread starts at the line: it has what you landed, and not what you have not",
+      "a new root thread starts at accepted work: it has what you landed, and not what you have not",
       seenUnsaved.some(
         t =>
           t.includes("yours") &&

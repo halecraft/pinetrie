@@ -39,14 +39,14 @@ const AFTER = offer("a1")
 const PLACE: Placed = {
   kind: "placed",
   tip: commitId("22222222"),
-  base: { base: { kind: "line" }, start: TIP, source: TIP },
+  base: { base: { kind: "accepted" }, start: TIP, source: TIP },
   state: "ok",
   target: commitId("33333333"),
   start: [TIP],
 }
 const BASE: BaseRecord = {
   lane: LANE,
-  base: { kind: "line" },
+  base: { kind: "accepted" },
   start: TIP,
   state: "ok",
   catchUp: null,

@@ -28,7 +28,7 @@ export const LAND_TYPE = "pinetrie.land"
 
 const LandDetailsSchema = Type.Object({
   lane: Type.String({ minLength: 1 }),
-  /** The base's commit that was merged: the line's, or a WIP's copy (ADR-0060). */
+  /** The base's commit that was merged: accepted work's, or a WIP's copy (ADR-0060). */
   yours: Type.Array(CommitSchema),
   /** The files that conflicted when it merged. */
   files: Type.Array(Type.String()),

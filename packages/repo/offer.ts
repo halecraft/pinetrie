@@ -5,7 +5,7 @@
 // `startOfOffer`, `laneTipIn`, `workChanges`, `readCatchUp`), what a review
 // shows of a commit (`revisionRead`, `fileDiff`), and which of a divergent
 // revision's commits the host made (`hostCommitIn`, from `evologOf`). The
-// gathers in `offer-gather.ts` call them, or read a lane on the line in one
+// gathers in `offer-gather.ts` call them, or read a lane on accepted work in one
 // `jj log` instead (`lane-read.ts`). What the facts mean is decided in
 // `@pinetrie/rules`' `offer.ts`, and its decisions become steps in
 // `offer-steps.ts`. A lane's base is read by `@pinetrie/lanes`' `laneBase`,
@@ -36,12 +36,12 @@ import {
   commitsOf,
   conflictedFilesAt,
   describeFailure,
-  type LineConfig,
   laneTipName,
   lines,
   offerBookmark,
   parseAcceptedOfferCommits,
   REVISION_READ,
+  type RepoConfig,
   type Runner,
 } from "@pinetrie/lanes"
 import {
@@ -99,7 +99,7 @@ export async function laneTipIn(
 async function acceptedOfferCommitFacts(
   jj: Runner,
   input: {
-    readonly line: LineConfig
+    readonly repoConfig: RepoConfig
     readonly base: LaneBase
     readonly lane: LaneName
   },
@@ -136,7 +136,7 @@ export async function startOfOffer(
   input: {
     readonly tip: CommitId
     readonly base: LaneBase
-    readonly line: LineConfig
+    readonly repoConfig: RepoConfig
     readonly lane: LaneName
   },
 ): Promise<StartRead> {

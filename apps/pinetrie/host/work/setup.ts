@@ -18,7 +18,7 @@ import {
   checkImage,
   commitsOf,
   configJson,
-  DEFAULT_LINE,
+  DEFAULT_REPO,
   type DiskPaths,
   decodeLaneConfig,
   ensureRuntime,
@@ -27,7 +27,6 @@ import {
   jjIn,
   type LaneSpec,
   laneContainer,
-  lineConfig,
   type Mount,
   NO_GRANTS,
   normalShared,
@@ -42,6 +41,7 @@ import {
   projectContainerfile,
   readConfigFile,
   refreshBase,
+  repoConfig,
   revsetName,
 } from "@pinetrie/lanes"
 import type { PiSetup } from "@pinetrie/pi"
@@ -106,11 +106,11 @@ export interface Setup {
   /** Refresh the base snapshot after the refreshes queued before, in the background. */
   refreshBaseSoon(): void
   /**
-   * The base snapshot at the line's commit now, after the refreshes queued
-   * before: a fork from it waits for this, since the line may have been set
+   * The base snapshot at accepted work's commit now, after the refreshes queued
+   * before: a fork from it waits for this, since accepted work may have been set
    * up or moved since the last refresh (ADR-0060).
    */
-  baseAtLine(): Promise<void>
+  baseAtAccepted(): Promise<void>
 }
 
 /** What the host found where it runs: the project, and the disks' paths when lanes have their own. */
@@ -190,14 +190,14 @@ export async function startSetup(input: {
   // Before the rest, since a run's prompt names the shared directories.
   const lanes =
     root === null ? null : await prepareLanes(root, input.userConfig, log)
-  // Made here, from the project root and the line's names, before anything
+  // Made here, from the project root and accepted work's names, before anything
   // else reads your repo: the reads below, lane work's and the offers'.
   const owner =
     root === null
       ? null
       : startRepoOwner({
           root,
-          line: lanes?.line ?? DEFAULT_LINE,
+          repoConfig: lanes?.repoConfig ?? DEFAULT_REPO,
           onError: failed(basics, "your repo"),
           onSlow: slow(basics, "your repo"),
         })
@@ -248,24 +248,26 @@ export async function startSetup(input: {
   }
 
   /**
-   * The base snapshot at the line's commit (ADR-0060): every lane starts
-   * from the line, or from a WIP's copy on it. Nothing to do before the line
+   * The base snapshot at accepted work's commit (ADR-0060): every lane starts
+   * from accepted work, or from a WIP's copy on it. Nothing to do before accepted work
    * is set up.
    */
   async function refreshBaseNow(disk: DiskPaths, r: Ready) {
     if (owner === null) return
-    const onto = revsetName((lanes?.line ?? DEFAULT_LINE).onto)
+    const acceptedBookmark = revsetName(
+      (lanes?.repoConfig ?? DEFAULT_REPO).acceptedBookmark,
+    )
     const install = lanes?.config.install ?? null
     const read = await owner.read(async ({ jj }) => {
-      const yours = await commitsOf(jj, `present(${onto})`)
-      const [line] = yours
-      if (line === undefined) return null
+      const yours = await commitsOf(jj, `present(${acceptedBookmark})`)
+      const [commit] = yours
+      if (commit === undefined) return null
       const lock =
-        install === null ? null : await lockHashAt(jj, line, install.lockfile)
-      return { yours, line, lock }
+        install === null ? null : await lockHashAt(jj, commit, install.lockfile)
+      return { yours, commit, lock }
     })
     if (read === null) return
-    const { yours, line, lock } = read
+    const { yours, commit, lock } = read
     const made = await refreshBase({
       paths: disk,
       // Nothing in the base should see a shared directory.
@@ -277,7 +279,9 @@ export async function startSetup(input: {
       open: openLink,
     })
     if (made)
-      log(`[host] the base snapshot is at the line (${line.slice(0, 8)})`)
+      log(
+        `[host] the base snapshot is at accepted work (${commit.slice(0, 8)})`,
+      )
   }
 
   // --- the images, runtime and base snapshot, in the background ----------
@@ -291,14 +295,14 @@ export async function startSetup(input: {
 
   /** The base snapshot's refreshes, one at a time. */
   const base = createKeeper()
-  async function baseAtLine(): Promise<void> {
+  async function baseAtAccepted(): Promise<void> {
     if (ready === null || paths === null) return
     const disk = paths
     await base.run(async () => refreshBaseNow(disk, await ready))
   }
   function refreshBaseSoon(): void {
     void keeper.track(
-      baseAtLine().catch(failed(basics, "refreshing the base snapshot")),
+      baseAtAccepted().catch(failed(basics, "refreshing the base snapshot")),
     )
   }
 
@@ -313,7 +317,7 @@ export async function startSetup(input: {
     hostPaths,
     specOf,
     refreshBaseSoon,
-    baseAtLine,
+    baseAtAccepted,
   }
 }
 
@@ -351,9 +355,9 @@ async function prepareLanes(
   }
   for (const r of sharing.refused)
     log(`[host] ${r.path} is not shared: ${r.reason}`)
-  const { line, refused } = lineConfig(user.offers, config.offers)
+  const { repoConfig: names, refused } = repoConfig(user.offers, config.offers)
   for (const r of refused) log(`[host] ${r}`)
-  return { config, line, ...sharing }
+  return { config, repoConfig: names, ...sharing }
 }
 
 /** The images, the lane runtime, links and identity; then the base snapshot. */

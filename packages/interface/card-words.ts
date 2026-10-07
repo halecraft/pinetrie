@@ -32,7 +32,7 @@ export interface CatchUps {
 
 /**
  * What a command merges: the base for `bring-up-to-date`, accepted work for
- * `continue-on-line` (ADR-0060), the thread it branched from for
+ * `continue-on-accepted` (ADR-0060), the thread it branched from for
  * `catch-up-with-parent` (ADR-0072). Null for that one without a parent.
  */
 const commandFrom = (
@@ -42,8 +42,8 @@ const commandFrom = (
   switch (command) {
     case "bring-up-to-date":
       return base
-    case "continue-on-line":
-      return { kind: "line" }
+    case "continue-on-accepted":
+      return { kind: "accepted" }
     case "catch-up-with-parent":
       return parent
   }
@@ -59,7 +59,7 @@ const fromName = (from: CatchUpFrom | null) =>
 export const commandWords = (command: CardCommand, at: CatchUps): string =>
   command === "split"
     ? SPLIT
-    : command === "continue-on-line"
+    : command === "continue-on-accepted"
       ? "continue from accepted work"
       : `catch up with ${fromName(commandFrom(command, at))}`
 
@@ -70,7 +70,7 @@ export const commandWords = (command: CardCommand, at: CatchUps): string =>
 export const commandNote = (command: CardCommand, at: CatchUps): string =>
   command === "split"
     ? "⇶ splits the offer into a stack, with what you write as its brief"
-    : command === "continue-on-line"
+    : command === "continue-on-accepted"
       ? "↓ continues from accepted work first, then sends what you write"
       : `↓ catches up with ${fromName(commandFrom(command, at))} first, then sends what you write`
 

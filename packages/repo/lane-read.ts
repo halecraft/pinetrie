@@ -28,10 +28,10 @@ import {
   commitsOf,
   conflictedFilesAt,
   describeFailure,
-  type LineConfig,
   laneTipName,
   lines,
   offerBookmark,
+  type RepoConfig,
   type Runner,
   revsetName,
 } from "@pinetrie/lanes"
@@ -54,12 +54,12 @@ export interface LaneRow {
   readonly tip: boolean
   /** The offer's bookmark points here. */
   readonly bookmark: boolean
-  /** Under the offer's bookmark and not under the line: where its revisions are. */
+  /** Under the offer's bookmark and not under accepted work: where its revisions are. */
   readonly region: boolean
   /** The newest commit of the lane's carrying a `Pinetrie-Base` trailer. */
   readonly base: boolean
-  /** The newest line commit in the lane's history. */
-  readonly line: boolean
+  /** The newest accepted commit in the lane's history. */
+  readonly newestAccepted: boolean
   /** In the history of that `base` commit: an accepted source here is the base's already. */
   readonly underBase: boolean
   /** One of the accepted-offer commits the shared facts list. */
@@ -77,20 +77,20 @@ export interface LaneRow {
 function laneRead(input: {
   readonly lane: LaneName
   readonly name: ThreadName | undefined
-  readonly line: LineConfig
+  readonly repoConfig: RepoConfig
   readonly acceptedOfferCommits: readonly CommitId[]
   /** The accepted-offer commits of this lane that name no source. */
   readonly untraced: readonly CommitId[]
 }): readonly string[] {
   const tip = `present(${laneTipName(input.lane)})`
-  const onto = `present(${revsetName(input.line.onto)})`
+  const acceptedBookmark = `present(${revsetName(input.repoConfig.acceptedBookmark)})`
   const based = `latest(heads(::${tip} & ${trailerRevset(["base"])}))`
-  const line = `latest(heads(::${tip} & ::${onto}))`
+  const line = `latest(heads(::${tip} & ::${acceptedBookmark}))`
   const bookmark =
     input.name === undefined
       ? "none()"
       : `present(${bookmarkRevset(offerBookmark(input.name))})`
-  const region = `(::${bookmark} ~ ::${onto})`
+  const region = `(::${bookmark} ~ ::${acceptedBookmark})`
   const accepted =
     input.acceptedOfferCommits.length === 0
       ? "none()"
@@ -141,7 +141,7 @@ function parseLaneRows(stdout: string): LaneRow[] {
       bookmark: flags.includes("O"),
       region: flags.includes("R"),
       base: flags.includes("B"),
-      line: flags.includes("L"),
+      newestAccepted: flags.includes("L"),
       underBase: flags.includes("U"),
       accepted: flags.includes("K"),
       untraced: flags.includes("X"),
@@ -155,12 +155,12 @@ function parseLaneRows(stdout: string): LaneRow[] {
 
 /** What one lane's read says, before the reads it may still need. */
 export type LanePlan =
-  /** No tip, or no line commit in its history: nothing moves. */
+  /** No tip, or no accepted commit in its history: nothing moves. */
   | { readonly kind: "none" }
   /** On a WIP: the separate reads. */
   | { readonly kind: "wip" }
   | {
-      readonly kind: "line"
+      readonly kind: "accepted"
       readonly tip: CommitId
       readonly base: LaneBase
       /**
@@ -186,7 +186,7 @@ export type LanePlan =
             }[]
             readonly chained: boolean
             readonly placed: boolean
-            /** The bottom's parents: on the target, it is the line's commit alone. */
+            /** The bottom's parents: on the target, it is accepted work's commit alone. */
             readonly bottomParents: readonly CommitId[]
             /** The top's files; a stack's are read across it. */
             readonly files: readonly string[] | null
@@ -201,7 +201,7 @@ export function planLaneRead(
   rows: readonly LaneRow[],
   input: {
     readonly name: ThreadName | undefined
-    readonly line: LineConfig
+    readonly repoConfig: RepoConfig
     readonly acceptedOfferCommits: SharedFacts["acceptedOfferCommits"]
   },
 ): LanePlan {
@@ -211,16 +211,21 @@ export function planLaneRead(
   const parsed = based === undefined ? null : baseOf(based.description)
   let base: LaneBase
   if (based !== undefined && parsed !== null) {
-    if (parsed.bookmark !== input.line.onto) return { kind: "wip" }
+    if (parsed.bookmark !== input.repoConfig.acceptedBookmark)
+      return { kind: "wip" }
     base = {
-      base: { kind: "line" },
+      base: { kind: "accepted" },
       start: parsed.commit,
       source: parsed.commit,
     }
   } else {
-    const line = rows.find(r => r.line)
+    const line = rows.find(r => r.newestAccepted)
     if (line === undefined) return { kind: "none" }
-    base = { base: { kind: "line" }, start: line.commit, source: line.commit }
+    base = {
+      base: { kind: "accepted" },
+      start: line.commit,
+      source: line.commit,
+    }
   }
   const untraced = rows.filter(r => r.untraced && !r.underBase)
   const applying = new Set(
@@ -243,7 +248,7 @@ export function planLaneRead(
         ? { kind: "known" as const, start: [base.start] }
         : { kind: "read" as const, sources }
   return {
-    kind: "line",
+    kind: "accepted",
     tip: tip.commit,
     base,
     start,
@@ -254,7 +259,7 @@ export function planLaneRead(
 function offerOf(
   rows: readonly LaneRow[],
   name: ThreadName | undefined,
-): Extract<LanePlan, { kind: "line" }>["offer"] {
+): Extract<LanePlan, { kind: "accepted" }>["offer"] {
   if (name === undefined) return { kind: "none" }
   const heads = rows.filter(r => r.bookmark)
   const found = rows
@@ -282,7 +287,7 @@ function offerOf(
     bookmark: offerBookmark(name),
     revisions: found.map(r => ({ commit: r.commit, change: r.change })),
     chained,
-    // Its parents are under the line: none is a commit between the line and it.
+    // Its parents are under accepted work: none is a commit between accepted work and it.
     placed: bottom.parents.every(p => !region.has(p)),
     bottomParents: bottom.parents,
     files: found.length === 1 ? top.files : null,
@@ -291,16 +296,16 @@ function offerOf(
   }
 }
 
-/** What a refresh plans from, for a lane on the line, as `gatherLane` reads it. */
+/** What a refresh plans from, for a lane on accepted work, as `gatherLane` reads it. */
 export interface LaneGather {
   readonly tip: CommitId
   readonly base: LaneBase
-  /** Where the line is: the offer's target. */
+  /** Where accepted work is: the offer's target. */
   readonly target: CommitId
   readonly start: StartRead
   readonly offer: OfferInRepo | null
   readonly work: WorkChanges
-  /** What catching up with the line would change (`readCatchUp`). */
+  /** What catching up with accepted work would change (`readCatchUp`). */
   readonly catchUp: CatchUpRead | null
 }
 
@@ -309,28 +314,28 @@ export interface LaneGather {
  * (`sinceHost`), and only when the rows cannot say it, where the offer
  * starts (accepted sources above its base), a stack's files, and the top's
  * conflicted files; whether the lane's work changes any file, unless its
- * start is untraced; and, once the line has moved past its base, what
+ * start is untraced; and, once accepted work has moved past its base, what
  * catching up would change, unless `known` says it at the same tip and line.
- * "none" or "wip" for a lane not on the line: read it the separate way.
+ * "none" or "wip" for a lane not on accepted work: read it the separate way.
  */
 export async function gatherLane(
   jj: Runner,
   input: {
     readonly lane: LaneName
     readonly name: ThreadName | undefined
-    readonly line: LineConfig
+    readonly repoConfig: RepoConfig
     readonly shared: SharedFacts
     /** What catching up would change, as last read: kept at the same tip and line. */
     readonly known: CatchUpRead | null
   },
 ): Promise<LaneGather | "none" | "wip"> {
-  const onto = input.shared.line.commit
-  if (onto === null) return "none"
+  const acceptedBookmark = input.shared.accepted.commit
+  if (acceptedBookmark === null) return "none"
   const ran = await jj(
     laneRead({
       lane: input.lane,
       name: input.name,
-      line: input.line,
+      repoConfig: input.repoConfig,
       acceptedOfferCommits: input.shared.acceptedOfferCommits.map(
         t => t.commit,
       ),
@@ -342,10 +347,10 @@ export async function gatherLane(
   if (!ran.ok) throw new Error(describeFailure("jj log", ran))
   const planned = planLaneRead(parseLaneRows(ran.stdout), {
     name: input.name,
-    line: input.line,
+    repoConfig: input.repoConfig,
     acceptedOfferCommits: input.shared.acceptedOfferCommits,
   })
-  if (planned.kind !== "line") return planned.kind
+  if (planned.kind !== "accepted") return planned.kind
   const { tip, base } = planned
   const start: StartRead =
     planned.start.kind === "read"
@@ -354,19 +359,19 @@ export async function gatherLane(
           start: await startFrom(jj, tip, base.start, planned.start.sources),
         }
       : planned.start
-  const offer = await offerFrom(jj, planned.offer, onto)
+  const offer = await offerFrom(jj, planned.offer, acceptedBookmark)
   // Asked of the lane's own work, never read from the offer's files: those
-  // are its diff against the target, empty once the line holds the lane's
+  // are its diff against the target, empty once accepted work holds the lane's
   // work, while the work itself still changes files. Read from the offer, an
   // empty one was withdrawn and then built again, without end (S89).
   const work = await workChanges(jj, { start, tip })
   const catchUp = await readCatchUp(jj, {
     start: base.start,
-    to: onto,
+    to: acceptedBookmark,
     tip,
     known: input.known,
   })
-  return { tip, base, target: onto, start, offer, work, catchUp }
+  return { tip, base, target: acceptedBookmark, start, offer, work, catchUp }
 }
 
 const startFrom = (
@@ -378,8 +383,8 @@ const startFrom = (
 
 async function offerFrom(
   jj: Runner,
-  read: Extract<LanePlan, { kind: "line" }>["offer"],
-  onto: CommitId,
+  read: Extract<LanePlan, { kind: "accepted" }>["offer"],
+  acceptedBookmark: CommitId,
 ): Promise<OfferInRepo | null> {
   if (read.kind === "none") return null
   if (read.kind === "divergent") return read
@@ -403,7 +408,7 @@ async function offerFrom(
     ledger,
     firstLine: read.description.split("\n")[0] ?? "",
     placed: read.placed,
-    onTarget: parents.length === 1 && parents[0] === onto,
+    onTarget: parents.length === 1 && parents[0] === acceptedBookmark,
     files,
     conflicts,
     startConflicts: await startConflictsOf(jj, ledger, conflicts),

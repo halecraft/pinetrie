@@ -1,6 +1,6 @@
 import { expect, test } from "vitest"
 import { commitId, laneNameForThread } from "../packages/core/index.ts"
-import { DEFAULT_LINE } from "../packages/lanes/index.ts"
+import { DEFAULT_REPO } from "../packages/lanes/index.ts"
 import type { RepoStep } from "../packages/repo/step.ts"
 import {
   planFolder,
@@ -91,7 +91,7 @@ test("planRepo: a lane's old refs moved, stack included, the old ones deleted, t
             { ref: "refs/remotes/origin/main", commit: C2 },
           ],
         },
-        DEFAULT_LINE,
+        DEFAULT_REPO,
       ),
     ),
   ).toEqual([
@@ -108,7 +108,7 @@ test("planRepo: a lane's old refs moved, stack included, the old ones deleted, t
           ...NONE,
           refs: [{ ref: `refs/remotes/pineta-${LANE}/stack`, commit: C2 }],
         },
-        DEFAULT_LINE,
+        DEFAULT_REPO,
       ),
     ),
   ).toEqual([
@@ -132,7 +132,7 @@ test("planRepo: the config's old clauses dropped and the current one added once;
           log: 'builtin_log() | bookmarks(glob:"pineta-offer/*")',
         },
       },
-      DEFAULT_LINE,
+      DEFAULT_REPO,
     ),
   )
   expect(steps).toEqual([
@@ -156,7 +156,7 @@ test("planRepo: a second plan over what the first left is empty", () => {
           log: 'builtin_log() | bookmarks(glob:"pinetrie-offer/*")',
         },
       },
-      DEFAULT_LINE,
+      DEFAULT_REPO,
     ),
   ).toEqual([])
 })

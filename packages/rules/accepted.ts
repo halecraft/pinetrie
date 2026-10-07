@@ -1,17 +1,21 @@
-// line — accepted work and a thread's base on it (ADR-0060,
-// ADR-0061, ADR-0072, ADR-0076, ADR-0090): the line's and each lane's base's
-// records (`pinetrie.line`, `pinetrie.base`), the line's record from what the
-// host read (`planLineRecord`), whether a `line` command may run
-// (`lineActionState`) and why not (`lineRefusal`), what a publish would do
-// (`publishWork`), the command (`planLineAction`) and a publish's second
+// accepted — accepted work and a thread's base on it (ADR-0060,
+// ADR-0061, ADR-0072, ADR-0076, ADR-0090): accepted work's and each lane's base's
+// records (`pinetrie.accepted`, `pinetrie.base`), accepted work's record from what the
+// host read (`planAcceptedRecord`), whether a setup or publish may run
+// (`acceptedActionState`) and why not (`acceptedRefusal`), what a publish would do
+// (`publishWork`), the command (`planAcceptedAction`) and a publish's second
 // round (`planPublishFinish`), where a new lane begins (`planBegin`), the
 // base a thread follows (`effectiveBase`), what catching up with it would do
 // (`catchUpOf`) and merge (`planUpdateFrom`), and the thread a lane branched
 // from (`parentNow`, `planParentUpdate`).
-// A `line` command's steps are `@pinetrie/repo`'s (`planLineSetup`,
+// A setup or publish's steps are `@pinetrie/repo`'s (`planSetup`,
 // `planPublishCatchUp`, `planPublishMove`, `planCatchUpUndo`).
 
 import {
+  type AcceptedAction,
+  type AcceptedDecision,
+  type AcceptedFacts,
+  type AcceptedRecord,
   ancestry,
   type BaseMerge,
   type BaseRecord,
@@ -27,10 +31,6 @@ import {
   forkParent,
   type LaneBase,
   type LaneName,
-  type LineAction,
-  type LineDecision,
-  type LineFacts,
-  type LineRecord,
   nearestRevision,
   type ParentThread,
   type PublishDecision,
@@ -44,11 +44,11 @@ import { Type } from "typebox"
 import { CommitSchema, decodeAt, fixedKey, laneKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
-/** The one `pinetrie.line` value's key: a host follows one line. */
-export const LINE_KEY = "line"
+/** The one `pinetrie.accepted` value's key: a host has one repo. */
+export const ACCEPTED_KEY = "accepted"
 
-const LineRecordSchema = Type.Object({
-  onto: Type.String({ minLength: 1 }),
+const AcceptedRecordSchema = Type.Object({
+  acceptedBookmark: Type.String({ minLength: 1 }),
   wipPrefix: Type.String({ minLength: 1 }),
   publish: Type.String({ minLength: 1 }),
   commit: Type.Union([CommitSchema, Type.Null()]),
@@ -94,7 +94,7 @@ const LineRecordSchema = Type.Object({
 
 const BaseRecordSchema = Type.Object({
   base: Type.Union([
-    Type.Object({ kind: Type.Literal("line") }),
+    Type.Object({ kind: Type.Literal("accepted") }),
     Type.Object({
       kind: Type.Literal("wip"),
       bookmark: Type.String({ minLength: 1 }),
@@ -123,10 +123,14 @@ const BaseRecordSchema = Type.Object({
 })
 
 /** Accepted work, at its one key. */
-export const LINE: RecordSpec<LineRecord, typeof LINE_KEY, "session"> = {
-  namespace: "pinetrie.line",
+export const ACCEPTED: RecordSpec<
+  AcceptedRecord,
+  typeof ACCEPTED_KEY,
+  "session"
+> = {
+  namespace: "pinetrie.accepted",
   home: "session",
-  keyOf: () => LINE_KEY,
+  keyOf: () => ACCEPTED_KEY,
   encode: r => ({
     ...r,
     heads: { ...r.heads },
@@ -149,16 +153,21 @@ export const LINE: RecordSpec<LineRecord, typeof LINE_KEY, "session"> = {
     },
   }),
   decode: (contents, key) =>
-    decodeAt(LineRecordSchema, contents, fixedKey(LINE_KEY, key), r => ({
-      ...r,
-      commit: r.commit === null ? null : commitId(r.commit),
-      wips: r.wips.map(w => ({ ...w, commit: commitId(w.commit) })),
-      published: {
-        ...r.published,
-        commit:
-          r.published.commit === null ? null : commitId(r.published.commit),
-      },
-    })),
+    decodeAt(
+      AcceptedRecordSchema,
+      contents,
+      fixedKey(ACCEPTED_KEY, key),
+      r => ({
+        ...r,
+        commit: r.commit === null ? null : commitId(r.commit),
+        wips: r.wips.map(w => ({ ...w, commit: commitId(w.commit) })),
+        published: {
+          ...r.published,
+          commit:
+            r.published.commit === null ? null : commitId(r.published.commit),
+        },
+      }),
+    ),
 }
 
 /** Each lane's base, as its history says it, at the lane. */
@@ -195,25 +204,25 @@ export const BASE: RecordSpec<BaseRecord, LaneName, "session"> = {
 }
 
 /**
- * The line's record, the page's cache, from what the host read of it
+ * Accepted work's record, the page's cache, from what the host read of it
  * (ADR-0060): what setting it up would write to your repo's config
- * (`proposed`, `lineProposal`), and whether a publish catches your files up
+ * (`proposed`, `setupProposal`), and whether a publish catches your files up
  * (`offers.catchUp`, ADR-0099).
  */
-export function planLineRecord(input: {
-  readonly facts: LineFacts
-  /** The line's bookmark, the WIP prefix, the publish bookmark and `catchUp`. */
-  readonly line: {
-    readonly onto: string
+export function planAcceptedRecord(input: {
+  readonly facts: AcceptedFacts
+  /** Accepted work's bookmark, the WIP prefix, the publish bookmark and `catchUp`. */
+  readonly repoConfig: {
+    readonly acceptedBookmark: string
     readonly wipPrefix: string
     readonly publish: string
     readonly catchUp: boolean
   }
   readonly proposed: { readonly heads: string; readonly log: string }
-}): LineRecord {
-  const { facts, line, proposed } = input
+}): AcceptedRecord {
+  const { facts, repoConfig: line, proposed } = input
   return {
-    onto: line.onto,
+    acceptedBookmark: line.acceptedBookmark,
     wipPrefix: line.wipPrefix,
     publish: line.publish,
     commit: facts.commit,
@@ -226,18 +235,21 @@ export function planLineRecord(input: {
   }
 }
 
-/** Whether a `line` command may run now, and if not, why. */
-export type LineActionState =
+/** Whether a setup or a publish may run now, and if not, why. */
+export type AcceptedActionState =
   | { readonly kind: "ok" }
   | { readonly kind: "refused"; readonly code: ErrCode }
 
-const OK: LineActionState = { kind: "ok" }
-const refused = (code: ErrCode): LineActionState => ({ kind: "refused", code })
+const OK: AcceptedActionState = { kind: "ok" }
+const refused = (code: ErrCode): AcceptedActionState => ({
+  kind: "refused",
+  code,
+})
 
 /** What a publish would do (ADR-0090): what the button counts and its title says. */
 export interface PublishWork {
   /** Line commits the publish bookmark lacks. */
-  readonly accepted: number
+  readonly acceptedCommits: number
   /** Your commits below `@` it accepts: 0 with `offers.catchUp` off. */
   readonly yours: number
   /** Whether your files catch up first: never with `offers.catchUp` off. */
@@ -249,11 +261,11 @@ export interface PublishWork {
  * bookmark alone, so your files and commits count for nothing.
  */
 export function publishWork(
-  record: Pick<LineRecord, "catchUp" | "published" | "yours">,
+  record: Pick<AcceptedRecord, "catchUp" | "published" | "yours">,
 ): PublishWork {
   const { catchUp, published, yours } = record
   return {
-    accepted: published.commit === null ? 0 : published.behind,
+    acceptedCommits: published.commit === null ? 0 : published.behind,
     yours: catchUp ? yours.ahead : 0,
     catchUp: catchUp && yours.behind > 0,
   }
@@ -261,22 +273,22 @@ export function publishWork(
 
 /** Nothing for a publish to do: the page hides its button, and the host refuses it. */
 export const nothingToPublish = (work: PublishWork): boolean =>
-  work.accepted === 0 && work.yours === 0 && !work.catchUp
+  work.acceptedCommits === 0 && work.yours === 0 && !work.catchUp
 
 /**
- * Whether `action` may run on the line as `record` has it: the one rule the
- * host's `planLineAction` and the page's button both read. Anyone admitted
+ * Whether `action` may run on accepted work as `record` has it: the one rule the
+ * host's `planAcceptedAction` and the page's button both read. Anyone admitted
  * may set up or publish (ADR-0099). A publish is refused before its first
  * step for whatever can be checked then (ADR-0090): with `offers.catchUp` on,
  * your files' conflicts and the catch-up's preview among them.
  */
-export function lineActionState(
-  action: LineAction,
-  record: LineRecord,
-): LineActionState {
+export function acceptedActionState(
+  action: AcceptedAction,
+  record: AcceptedRecord,
+): AcceptedActionState {
   if (action === "setup")
     return record.commit === null ? OK : refused(ERR.REFUSED)
-  if (record.commit === null) return refused(ERR.NO_LINE)
+  if (record.commit === null) return refused(ERR.NOT_SET_UP)
   const { published, yours } = record
   if (published.commit === null) return refused(ERR.NO_PUBLISH)
   if (published.ahead > 0) return refused(ERR.NOT_FAST_FORWARD)
@@ -294,28 +306,28 @@ export function lineActionState(
 }
 
 /**
- * A `line` command, decided from the record read in its own step
- * (`lineActionState`). Setting up writes exactly the immutable heads and log
+ * A setup or publish, decided from the record read in its own step
+ * (`acceptedActionState`). Setting up writes exactly the immutable heads and log
  * the record proposed, the text you were shown.
  */
-export function planLineAction(
-  action: LineAction,
-  record: LineRecord,
-): LineDecision {
-  const state = lineActionState(action, record)
+export function planAcceptedAction(
+  action: AcceptedAction,
+  record: AcceptedRecord,
+): AcceptedDecision {
+  const state = acceptedActionState(action, record)
   if (state.kind === "refused") return state
-  const { onto } = record
+  const { acceptedBookmark } = record
   if (action === "setup")
     return {
       kind: "setup",
-      onto,
+      acceptedBookmark,
       heads: record.heads.proposed,
       log: record.log.proposed,
     }
   const work = publishWork(record)
   return {
     kind: "publish",
-    onto,
+    acceptedBookmark,
     publish: record.publish,
     catchUp: work.catchUp,
     accept: work.yours > 0,
@@ -323,24 +335,24 @@ export function planLineAction(
 }
 
 /**
- * A publish's second round (ADR-0090), from the line's record as read again
+ * A publish's second round (ADR-0090), from accepted work's record as read again
  * after the catch-up (`after`), and the operation the catch-up wrote. Without
  * a catch-up there is nothing to undo, and every check ran before the first
  * step. After one, the catch-up's operation is reverted when your commits are
  * now conflicted, which the preview of `@` alone cannot show, or the publish
- * bookmark moved meanwhile. Whether your commits move with the line is read
+ * bookmark moved meanwhile. Whether your commits move with accepted work is read
  * from `after`. Pure.
  */
 export function planPublishFinish(input: {
   readonly decision: PublishDecision
-  readonly after: LineRecord
+  readonly after: AcceptedRecord
   /** The catch-up's operation; null without a catch-up. */
   readonly op: string | null
 }): PublishFinish {
   const { decision, after, op } = input
   const move = {
     kind: "move",
-    onto: decision.onto,
+    acceptedBookmark: decision.acceptedBookmark,
     publish: decision.publish,
   } as const
   if (op === null) return { ...move, accept: decision.accept }
@@ -360,18 +372,18 @@ export const named = (files: readonly string[]): string =>
 const commits = (n: number) => (n === 1 ? "1 commit" : `${n} commits`)
 
 /**
- * Why a `line` command was refused, worded once: the host's answer, and the
+ * Why a setup or publish was refused, worded once: the host's answer, and the
  * publish button's title for a publish it would refuse. `record` names the
  * bookmarks, counts and files.
  */
-export function lineRefusal(
-  action: LineAction,
+export function acceptedRefusal(
+  action: AcceptedAction,
   code: ErrCode,
-  record: LineRecord,
+  record: AcceptedRecord,
 ): string {
   const { publish, published, yours } = record
   switch (code) {
-    case ERR.NO_LINE:
+    case ERR.NOT_SET_UP:
       return "set up first"
     case ERR.NO_PUBLISH:
       return `this repo has no ${publish} bookmark to publish to`
@@ -400,30 +412,31 @@ export function lineRefusal(
  */
 export function publishUndone(
   code: Extract<PublishFinish, { readonly kind: "undo" }>["code"],
-  after: LineRecord,
+  after: AcceptedRecord,
 ): string {
-  if (code !== ERR.YOURS_CONFLICT) return lineRefusal("publish", code, after)
+  if (code !== ERR.YOURS_CONFLICT)
+    return acceptedRefusal("publish", code, after)
   const n = after.yours.conflicts.commits
   return `catching your files up would leave ${commits(n)} of yours with conflicts`
 }
 
 /**
  * The base a thread is brought up to date with and accepted into (ADR-0060): its
- * WIP while the WIP is there, else the line: for a line thread, a WIP that
- * landed, and one gone (which only "continue on the line" moves). Null, the
- * lane's base not yet read, is the line.
+ * WIP while the WIP is there, else accepted work: for a thread on accepted work, a WIP that
+ * landed, and one gone (which only "continue on accepted work" moves). Null, the
+ * lane's base not yet read, is accepted work.
  */
 export const effectiveBase = (
   base: Pick<BaseRecord, "base" | "state"> | null,
 ): ThreadBase =>
   base?.base.kind === "wip" && base.state === "ok"
     ? base.base
-    : { kind: "line" }
+    : { kind: "accepted" }
 
 /** Where a thread's base moved since its lane last caught up with it (`baseMoved`). */
 interface BaseMove {
   readonly base: ThreadBase
-  /** The base's bookmark: the line's, or the WIP's. */
+  /** The base's bookmark: accepted work's, or the WIP's. */
   readonly bookmark: string
   /** The commit the lane's newest `Pinetrie-Base` names, and the base's now. */
   readonly from: CommitId
@@ -433,22 +446,22 @@ interface BaseMove {
 /**
  * How a thread's base has moved on since its lane last forked from it or
  * caught up (ADR-0060), or null: the commit its newest `Pinetrie-Base` names
- * (`start`) against where the base is now, the line's `commit` or the WIP's.
- * Never for a WIP gone, which only "continue on the line" moves. Commits
+ * (`start`) against where the base is now, accepted work's `commit` or the WIP's.
+ * Never for a WIP gone, which only "continue on accepted work" moves. Commits
  * only: whether catching up would change a file is `catchUpOf`'s, which
  * also decides what a missing record or line means.
  */
 function baseMoved(
   base: BaseRecord,
-  line: LineRecord,
+  accepted: AcceptedRecord,
   commit: CommitId,
 ): BaseMove | null {
   if (base.state === "gone") return null
   const thread = effectiveBase(base)
   const now =
-    thread.kind === "line"
-      ? { bookmark: line.onto, commit }
-      : line.wips.find(w => w.bookmark === thread.bookmark)
+    thread.kind === "accepted"
+      ? { bookmark: accepted.acceptedBookmark, commit }
+      : accepted.wips.find(w => w.bookmark === thread.bookmark)
   return now === undefined || now.commit === base.start
     ? null
     : { base: thread, bookmark: now.bookmark, from: base.start, to: now.commit }
@@ -477,7 +490,7 @@ export type CatchUpNow =
     }
 
 /**
- * `CatchUpNow` from the lane's base record and the line's. With no line set
+ * `CatchUpNow` from the lane's base record and accepted work's. With no line set
  * up there is nothing to catch up with. With no record, the host has not read
  * the lane, so nothing is claimed. The host's read (`BaseRecord.catchUp`)
  * counts only when it was made at the commit the base is at now; else what
@@ -485,11 +498,11 @@ export type CatchUpNow =
  */
 export function catchUpOf(
   base: BaseRecord | undefined,
-  line: LineRecord | null,
+  accepted: AcceptedRecord | null,
 ): CatchUpNow {
-  if (line === null || line.commit === null) return { kind: "current" }
+  if (accepted === null || accepted.commit === null) return { kind: "current" }
   if (base === undefined) return { kind: "unknown" }
-  const move = baseMoved(base, line, line.commit)
+  const move = baseMoved(base, accepted, accepted.commit)
   if (move === null) return { kind: "current" }
   const read = base.catchUp
   if (read === null || read.to !== move.to) return { kind: "unknown" }
@@ -498,32 +511,39 @@ export function catchUpOf(
     : { kind: "brings", move, files: read.files.length }
 }
 
-/** Where agent work begins when nothing is above: the line, or a WIP's copy. */
-export type ForkBegin = Extract<ForkStart, { readonly kind: "line" | "wip" }>
+/** Where agent work begins when nothing is above: accepted work, or a WIP's copy. */
+export type ForkBegin = Extract<
+  ForkStart,
+  { readonly kind: "accepted" | "wip" }
+>
 
 /**
  * Where a new lane begins when it has no agent work to inherit (ADR-0060),
- * from the thread's base and what the host read of your repo: the line's
- * commit, or a copy of the WIP on the line commit under it. Refused with no
- * line (`no_line`), and for a base that is not a WIP bookmark above the line
+ * from the thread's base and what the host read of your repo: accepted work's
+ * commit, or a copy of the WIP on accepted commit under it. Refused with no
+ * line (`not_set_up`), and for a base that is not a WIP bookmark above accepted work
  * (`bad_base`). Pure.
  */
 export function planBegin(input: {
-  /** The WIP bookmark chosen at the first message; null for the line. */
+  /** The WIP bookmark chosen at the first message; null for accepted work. */
   readonly base: string | null
-  readonly onto: string
+  readonly acceptedBookmark: string
   readonly wipPrefix: string
   readonly facts: {
-    /** The line's commit; null before it is set up. */
-    readonly line: CommitId | null
-    /** The WIP's commit and the line commit under it; null when it is no WIP above the line. */
+    /** Accepted work's commit; null before it is set up. */
+    readonly acceptedCommit: CommitId | null
+    /** The WIP's commit and accepted commit under it; null when it is no WIP above accepted work. */
     readonly wip: { readonly commit: CommitId; readonly under: CommitId } | null
   }
 }): ForkBegin | ErrCode {
   const { base, facts } = input
-  if (facts.line === null) return ERR.NO_LINE
+  if (facts.acceptedCommit === null) return ERR.NOT_SET_UP
   if (base === null)
-    return { kind: "line", onto: input.onto, commit: facts.line }
+    return {
+      kind: "accepted",
+      acceptedBookmark: input.acceptedBookmark,
+      commit: facts.acceptedCommit,
+    }
   if (!base.startsWith(input.wipPrefix) || facts.wip === null)
     return ERR.BAD_BASE
   return { kind: "wip", bookmark: base, ...facts.wip }
@@ -540,7 +560,7 @@ type UpdateFrom =
  * catch-up with the parent, none, or its agent running (ADR-0072).
  */
 export type UpdateRefusal =
-  | typeof ERR.NO_LINE
+  | typeof ERR.NOT_SET_UP
   | typeof ERR.BASE_GONE
   | typeof ERR.NO_PARENT
   | typeof ERR.PARENT_RUNNING
@@ -550,38 +570,38 @@ export type UpdateRefusal =
  * follows (`effectiveBase`), so the button that names it names what is
  * merged. A WIP thread merges a fresh copy of its WIP, on the lane's
  * previous copy, unless the lane's base already names the WIP's commit now. A
- * line thread, a lane with no base, and a landed WIP merge the line's commit.
+ * thread on accepted work, a lane with no base, and a landed WIP merge accepted work's commit.
  * A WIP gone without landing refuses (`base_gone`) until `toLine` ("continue
- * on the line") moves the thread to the line, marking the move even when
- * nothing is merged. With no line, refused (`no_line`). Pure.
+ * on accepted work") moves the thread to accepted work, marking the move even when
+ * nothing is merged. With no line, refused (`not_set_up`). Pure.
  */
 export function planUpdateFrom(input: {
-  readonly onto: string
-  /** The lane's base, from its own history; null for a lane with none, on the line. */
+  readonly acceptedBookmark: string
+  /** The lane's base, from its own history; null for a lane with none, on accepted work. */
   readonly base: LaneBase | null
-  /** `wipState` of a WIP base (`@pinetrie/repo`); "ok" for the line. */
+  /** `wipState` of a WIP base (`@pinetrie/repo`); "ok" for accepted work. */
   readonly state: BaseRecord["state"]
-  /** "continue on the line": the thread moves to the line, whatever its base. */
-  readonly toLine: boolean
-  readonly line: CommitId | null
-  /** For a WIP base: its commit now and the line commit under it (`beginFacts`). */
+  /** "continue on accepted work": the thread moves to accepted work, whatever its base. */
+  readonly toAccepted: boolean
+  readonly acceptedCommit: CommitId | null
+  /** For a WIP base: its commit now and accepted commit under it (`beginFacts`). */
   readonly wipNow: {
     readonly commit: CommitId
     readonly under: CommitId
   } | null
 }): UpdateFrom | UpdateRefusal {
   const { base, state, wipNow } = input
-  if (input.line === null) return ERR.NO_LINE
-  if (!input.toLine && state === "gone") return ERR.BASE_GONE
-  const followed: ThreadBase = input.toLine
-    ? { kind: "line" }
-    : effectiveBase({ base: base?.base ?? { kind: "line" }, state })
-  if (followed.kind === "line")
+  if (input.acceptedCommit === null) return ERR.NOT_SET_UP
+  if (!input.toAccepted && state === "gone") return ERR.BASE_GONE
+  const followed: ThreadBase = input.toAccepted
+    ? { kind: "accepted" }
+    : effectiveBase({ base: base?.base ?? { kind: "accepted" }, state })
+  if (followed.kind === "accepted")
     return {
-      kind: "line",
-      onto: input.onto,
-      commit: input.line,
-      mark: input.toLine && base?.base.kind === "wip",
+      kind: "accepted",
+      acceptedBookmark: input.acceptedBookmark,
+      commit: input.acceptedCommit,
+      mark: input.toAccepted && base?.base.kind === "wip",
     }
   if (base === null || wipNow === null) return ERR.BASE_GONE
   return wipNow.commit === base.source
@@ -682,8 +702,8 @@ export function planParentUpdate(
 
 /** What a merge planned for an update merges, as `catchUpName` words it. */
 export const mergedFrom = (merge: BaseMerge): CatchUpFrom =>
-  merge.kind === "line"
-    ? { kind: "line" }
+  merge.kind === "accepted"
+    ? { kind: "accepted" }
     : merge.kind === "wip"
       ? { kind: "wip", bookmark: merge.bookmark }
       : { kind: "parent", lane: merge.lane, name: merge.name }
@@ -692,17 +712,17 @@ export const mergedFrom = (merge: BaseMerge): CatchUpFrom =>
  * What a catch-up merges, as people read it: accepted work is
  * "accepted work", whatever its bookmark is called (ADR-0090); a WIP is its
  * bookmark; the thread a thread branched from is its name (ADR-0072). The
- * one place it is worded: the bookmark of the line goes in titles only.
+ * one place it is worded: the bookmark of accepted work goes in titles only.
  */
 export const catchUpName = (from: CatchUpFrom): string =>
-  from.kind === "line"
+  from.kind === "accepted"
     ? "accepted work"
     : from.kind === "wip"
       ? from.bookmark
       : from.name
 
 /** That a thread's base has work the thread lacks, with the base named by `catchUpName`. */
-export const movedOnLine = (from: CatchUpFrom): string =>
+export const baseMovedOn = (from: CatchUpFrom): string =>
   `${catchUpName(from)} has moved on`
 
 /** The parent's newest commit is not the one the lane last caught up with (`ParentNow`). */

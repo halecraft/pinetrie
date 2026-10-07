@@ -2,7 +2,7 @@ import { mkdtemp, readdir, realpath, rm, writeFile } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import { NO_EDITOR } from "@pinetrie/core"
-import { DEFAULT_LINE, run } from "@pinetrie/lanes"
+import { DEFAULT_REPO, run } from "@pinetrie/lanes"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
 import type { Moved } from "./observe.ts"
 import { headsDir, type RepoOwner, startRepoOwner } from "./owner.ts"
@@ -19,7 +19,7 @@ afterAll(async () => {
   await rm(top, { recursive: true, force: true })
 })
 
-/** A repo with one commit and the line on it, and jj in it as you. */
+/** A repo with one commit and accepted work on it, and jj in it as you. */
 async function repo(name: string) {
   const dir = path.join(top, name)
   await run("mkdir", ["-p", dir])
@@ -28,7 +28,7 @@ async function repo(name: string) {
     run("jj", ["-R", dir, ...args], { env: NO_EDITOR })
   await writeFile(path.join(dir, "a.txt"), "a\n")
   await jj("commit", "-m", "base")
-  await jj("bookmark", "create", DEFAULT_LINE.onto, "-r", "@-")
+  await jj("bookmark", "create", DEFAULT_REPO.acceptedBookmark, "-r", "@-")
   const heads = async () =>
     (await readdir(await headsDir(dir))).filter(h => /^[0-9a-f]+$/.test(h))
   /**
@@ -50,7 +50,7 @@ function own(dir: string, backstopMs = 60_000) {
   const moves: Moved[] = []
   const owner = startRepoOwner({
     root: dir,
-    line: DEFAULT_LINE,
+    repoConfig: DEFAULT_REPO,
     slowMs: -1,
     onSlow: s => steps.push(s.key),
     backstopMs,
@@ -95,7 +95,7 @@ describe("the owner of your repo", () => {
     await owner.idle()
     const order: string[] = []
     const held = Promise.withResolvers<void>()
-    void owner.later("line", async () => {
+    void owner.later("accepted", async () => {
       await held.promise
       order.push("line")
     })
@@ -108,14 +108,14 @@ describe("the owner of your repo", () => {
     close(owner)
   })
 
-  test("a move of the publish bookmark is observed as the line's alone (ADR-0076)", async () => {
+  test("a move of the publish bookmark is observed as accepted work's alone (ADR-0076)", async () => {
     const { dir, jj } = await repo("publish")
     // A commit nothing else the owner watches points at: main alone reads it.
     await jj("new", "root()", "-m", "side")
     const side = (
       await jj("log", "--no-graph", "-r", "@", "-T", "commit_id")
     ).stdout.trim()
-    await jj("new", DEFAULT_LINE.onto)
+    await jj("new", DEFAULT_REPO.acceptedBookmark)
     const { owner, moves } = own(dir)
     await owner.idle()
     await owner.command(ops =>
@@ -124,8 +124,8 @@ describe("the owner of your repo", () => {
     await owner.idle()
     expect(moves.at(-1)).toEqual({
       all: false,
-      onto: false,
-      line: true,
+      acceptedBookmark: false,
+      published: true,
       yours: false,
       lanes: new Set(),
       offers: new Set(),
@@ -152,8 +152,8 @@ describe("the owner of your repo", () => {
     await owner.idle()
     expect(moves.at(-1)).toEqual({
       all: false,
-      onto: false,
-      line: false,
+      acceptedBookmark: false,
+      published: false,
       yours: false,
       lanes: new Set(),
       offers: new Set(["amber-fox"]),

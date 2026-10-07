@@ -55,7 +55,7 @@ it.
 | `openList` (`open-list.ts`) | your list: the roots you have open, in your order (ADR-0085) | `placeInList`, `planOpenRepair` (`open-repair.ts`) |
 | `presenceSeat` (`presence-seat.ts`) | this seat's reading and typing | none |
 | `hostLine` (`host-line.ts`) | the requests waiting for their replies | `encodeIntent`, `decodeReply` |
-| one `snapshotStore<ActingState>` | your offer and line commands out | `nextActing` (`acting.ts`) |
+| one `snapshotStore<ActingState>` | your offer and setup and publish commands out | `nextActing` (`acting.ts`) |
 | `chat` | what a chat asks the host, and what it draws | `planChatRequest` (`chat.ts`) |
 
 - **Order matters to Kyneta.** `writersPolicy` is registered before the
@@ -250,18 +250,18 @@ the two merge (S101), so a writer asks `ready()` first.
 - **`placeInList` renumbers** when `orderBetween` finds no room between a
   root's neighbours, as the board does.
 
-## Your offer and line commands (`acting.ts`)
+## Your offer and setup and publish commands (`acting.ts`)
 
 `SessionClient.offer` and `.line` go through `sendActing`, which marks the
 command `sent` in the `acting` store at once and records the answer when it
 comes; `nextActing` decides. A refusal or failure stays until your next
-command on that lane (or the line); an answer that carried it out clears
+command on that lane (or accepted work); an answer that carried it out clears
 it, since the record then says how things stand. An acceptance names the offer
 this tab's record shows as it sends (`offerSeen`, ADR-0065). A split is
 no offer command: it is a card's command, queued (ADR-0080).
 A refusal keeps its code (`Unsuccessful.code`), so a view can act on why:
 the page's publish toast offers "resolve with the agent" only for
-`yours_conflict` (ADR-0090). A line command's refusal or failure is shown by
+`yours_conflict` (ADR-0090). A setup or publish's refusal or failure is shown by
 that toast, not a menu.
 
 ## Presence (`presence-seat.ts`, ADR-0024)

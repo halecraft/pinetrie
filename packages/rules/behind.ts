@@ -9,19 +9,25 @@
 // own is told, one with none is caught up before its run, never both.
 
 import {
+  type AcceptedRecord,
   type BaseRecord,
   type BehindView,
   CATCH_UP_TOOL,
   type CommitId,
   commitId,
   isLaneName,
-  type LineRecord,
   type OfferRecord,
   type ThreadName,
 } from "@pinetrie/core"
 import { type Static, Type } from "typebox"
+import { baseMovedOn, catchUpOf } from "./accepted.ts"
 import { CommitSchema, decodeWith } from "./decode.ts"
-import { catchUpOf, movedOnLine } from "./line.ts"
+import {
+  fromStoredFrom,
+  type StoredFrom,
+  StoredFromSchema,
+  toStoredFrom,
+} from "./stored-from.ts"
 
 export const BEHIND_TYPE = "pinetrie.behind"
 
@@ -29,15 +35,7 @@ export const BEHIND_TYPE = "pinetrie.behind"
 const NAMED_FILES = 20
 
 const BehindDetailsSchema = Type.Object({
-  from: Type.Union([
-    Type.Object({ kind: Type.Literal("line") }),
-    Type.Object({ kind: Type.Literal("wip"), bookmark: Type.String() }),
-    Type.Object({
-      kind: Type.Literal("parent"),
-      lane: Type.String({ minLength: 1 }),
-      name: Type.String({ minLength: 1 }),
-    }),
-  ]),
+  from: StoredFromSchema,
   to: CommitSchema,
   files: Type.Array(Type.String()),
   overlap: Type.Array(Type.String()),
@@ -56,7 +54,8 @@ export interface BehindMessage {
   readonly customType: typeof BEHIND_TYPE
   readonly content: string
   readonly display: true
-  readonly details: BehindView
+  /** The view as stored (`toStoredFrom`); `decodeBehind` reads it back. */
+  readonly details: Omit<BehindView, "from"> & { readonly from: StoredFrom }
   readonly timestamp: number
 }
 
@@ -70,17 +69,8 @@ const fromStored = (
     overlap: d.overlap,
     conflicts: d.conflicts,
   }
-  if (from.kind !== "parent") return { from, ...rest }
-  return isLaneName(from.lane)
-    ? {
-        from: {
-          kind: "parent",
-          lane: from.lane,
-          name: from.name as ThreadName,
-        },
-        ...rest,
-      }
-    : undefined
+  const known = fromStoredFrom(from)
+  return known === undefined ? undefined : { from: known, ...rest }
 }
 
 /** A stored message -> what it told, or undefined if it is not one. */
@@ -92,7 +82,7 @@ const plural = (n: number, one: string, many: string) =>
 
 /** The one line a column shows for a base's news. */
 export const behindLine = (v: BehindView): string =>
-  `↓ ${movedOnLine(v.from)}: ${plural(v.files.length, "file", "files")}${v.overlap.length === 0 ? "" : `, ${v.overlap.length} this thread changed too`}`
+  `↓ ${baseMovedOn(v.from)}: ${plural(v.files.length, "file", "files")}${v.overlap.length === 0 ? "" : `, ${v.overlap.length} this thread changed too`}`
 
 /** Some names, then how many more. */
 const named = (files: readonly string[]): string => {
@@ -112,7 +102,7 @@ export function behindContent(v: BehindView): string {
       ? ""
       : `\nThis thread's offer conflicts with it in:\n${named(v.conflicts)}`
   return (
-    `${movedOnLine(v.from)} since this thread's copy was made or last caught up. Catching up would change ${plural(v.files.length, "file", "files")}:\n${named(v.files)}\n` +
+    `${baseMovedOn(v.from)} since this thread's copy was made or last caught up. Catching up would change ${plural(v.files.length, "file", "files")}:\n${named(v.files)}\n` +
     `${overlap}${conflicts}\n` +
     `To merge it into this copy, call \`${CATCH_UP_TOOL}\`, alone in its turn. Nothing is merged until you do.`
   )
@@ -127,7 +117,7 @@ export const encodeBehind = (
   customType: BEHIND_TYPE,
   content: behindContent(view),
   display: true,
-  details: view,
+  details: { ...view, from: toStoredFrom(view.from) },
   timestamp,
 })
 
@@ -141,7 +131,7 @@ export type BaseNews =
 
 /**
  * Whether a thread's base has news for it, and what to do with it: from the
- * lane's base record and the line's (`catchUpOf`), its offer, the base
+ * lane's base record and accepted work's (`catchUpOf`), its offer, the base
  * commits it last heard of or merged (`baseKnown`), and the one the host
  * told it while it runs (`told`). Only a lane of its own has a base. `unknown`
  * work never acts (ADR-0067), nor a gone base. Pure.
@@ -149,7 +139,7 @@ export type BaseNews =
 export function planBaseNews(input: {
   readonly own: boolean
   readonly base: BaseRecord | undefined
-  readonly line: LineRecord | null
+  readonly accepted: AcceptedRecord | null
   readonly offer: OfferRecord | undefined
   readonly known: readonly CommitId[] | null
   readonly told: CommitId | null
@@ -157,7 +147,7 @@ export function planBaseNews(input: {
   const { base } = input
   if (!input.own || base === undefined || base.state === "gone")
     return { kind: "nothing" }
-  const now = catchUpOf(base, input.line)
+  const now = catchUpOf(base, input.accepted)
   if (now.kind !== "brings") return { kind: "nothing" }
   if (base.work === "none") return { kind: "catch-up" }
   const { to } = now.move

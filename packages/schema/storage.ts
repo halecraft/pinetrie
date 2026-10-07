@@ -70,6 +70,19 @@ export const readNamespace = (
   namespace: string,
 ): Readonly<Record<string, unknown>> => doc.records.get(namespace) ?? NO_RECORDS
 
+/** Every stored namespace in `doc`, with its records' keys. */
+export const readStoredRecordKeys = (
+  doc: RecordsDocHandle,
+): ReadonlyMap<string, readonly string[]> =>
+  new Map(
+    doc.records
+      .keys()
+      .map(namespace => [
+        namespace,
+        Object.keys(readNamespace(doc, namespace)),
+      ]),
+  )
+
 /**
  * The one writer of the host's records: `writes`, all to `doc`, in one batch.
  * A namespace's first write creates it, and its last delete removes it.

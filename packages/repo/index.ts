@@ -7,7 +7,7 @@
 // (`offer-gather.ts`), which picks the read path, so the separate reads and
 // the one-read path stay inside.
 
-export { beginFacts, readWipState } from "./line.ts"
+export { beginFacts, readWipState } from "./accepted.ts"
 export type { Moved } from "./observe.ts"
 export { fileDiff, readOffer, revisionRead, startOfOffer } from "./offer.ts"
 export {
@@ -35,10 +35,10 @@ export {
 } from "./owner.ts"
 export {
   laneRefSteps,
-  lineProposal,
   planCatchUpUndo,
-  planLineSetup,
   planPublishCatchUp,
   planPublishMove,
+  planSetup,
+  setupProposal,
 } from "./plan.ts"
 export type { RepoStep } from "./step.ts"

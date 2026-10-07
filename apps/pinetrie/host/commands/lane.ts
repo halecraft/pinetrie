@@ -4,6 +4,7 @@
 // (ADR-0080).
 
 import {
+  type AcceptedAction,
   atEntry,
   cardId,
   ERR,
@@ -12,7 +13,6 @@ import {
   indexAsks,
   type LaneName,
   type LaneView,
-  type LineAction,
   type OfferFact,
   type RootId,
   type TreeIndex,
@@ -51,7 +51,7 @@ export interface LaneDeps {
   readonly basics: Basics
   readonly agent: Pick<Agent, "lane">
   readonly records: Pick<Records, "writeValues">
-  readonly work: Pick<LaneWork, "offers" | "line">
+  readonly work: Pick<LaneWork, "offers" | "accepted">
   readonly start: Runs["start"]
   /** Stop a chat's run that has not reached pi yet (`Runs.cancel`). */
   readonly cancel: Runs["cancel"]
@@ -275,22 +275,22 @@ export function offerRefusal(code: ErrCode): string {
 }
 
 /**
- * A `line` command: set up accepted work (ADR-0060), or publish it
+ * A setup or publish: set up accepted work (ADR-0060), or publish it
  * (ADR-0076, ADR-0090).
  */
-export async function actOnLine(
+export async function actOnAccepted(
   deps: Pick<LaneDeps, "work">,
-  action: LineAction,
+  action: AcceptedAction,
 ): Promise<Outcome> {
-  const { line } = deps.work
-  if (line === null)
+  const { accepted } = deps.work
+  if (accepted === null)
     return {
       kind: "refused",
       code: ERR.NOT_OWN_COPY,
       message: "this host has no lanes of their own",
     }
-  const refused = await line.act(action)
+  const refused = await accepted.act(action)
   return refused === null
-    ? { kind: "line-moved" }
+    ? { kind: "accepted-moved" }
     : { kind: "refused", ...refused }
 }

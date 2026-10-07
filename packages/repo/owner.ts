@@ -23,7 +23,7 @@ import { readdir, readFile, stat } from "node:fs/promises"
 import path from "node:path"
 import type { LaneName } from "@pinetrie/core"
 import { createKeeper, type SlowStep } from "@pinetrie/keeper"
-import type { LineConfig, Runner } from "@pinetrie/lanes"
+import type { RepoConfig, Runner } from "@pinetrie/lanes"
 import {
   type Fingerprint,
   fingerprintRead,
@@ -46,7 +46,7 @@ export interface RepoOps {
   /** Carry out a repo plan's steps: the only way a `RepoStep` runs. */
   execute(steps: readonly RepoStep[]): Promise<void>
   /**
-   * What the line's record and every lane's refresh read, as the head is now
+   * What accepted work's record and every lane's refresh read, as the head is now
    * (`SharedFacts`): read once per operation, and again once the head moves,
    * a write of this step's included.
    */
@@ -57,7 +57,7 @@ export interface RepoOps {
 export type RepoReads = Pick<RepoOps, "jj" | "git">
 
 /** What the owner's upkeep is keyed by. */
-export type RepoKey = `refresh:${LaneName}` | "line" | "observe" | "shared"
+export type RepoKey = `refresh:${LaneName}` | "accepted" | "observe" | "shared"
 
 /** What a step on the owner may read and run: at the head, unpinned. */
 export type OwnedStep<T> = (ops: RepoOps) => Promise<T>
@@ -95,14 +95,14 @@ const isOpId = (name: string): boolean => /^[0-9a-f]{32,}$/.test(name)
 
 export function startRepoOwner(input: {
   readonly root: string
-  readonly line: LineConfig
+  readonly repoConfig: RepoConfig
   readonly onError?: (error: unknown) => void
   readonly onSlow?: (step: SlowStep) => void
   readonly slowMs?: number
   /** How often the heads are listed without an event; default 5 s. */
   readonly backstopMs?: number
 }): RepoOwner {
-  const { root, line } = input
+  const { root, repoConfig: line } = input
   const keeper = createKeeper<RepoKey>({
     ...(input.onError === undefined ? {} : { onError: input.onError }),
     ...(input.onSlow === undefined ? {} : { onSlow: input.onSlow }),
@@ -234,15 +234,15 @@ export function startRepoOwner(input: {
     onMoved(listener) {
       listeners.add(listener)
       // A listener that joins after the first observation hears it as one:
-      // everything moved, for it, but the line's bookmark, as on a first
+      // everything moved, for it, but accepted work's bookmark, as on a first
       // observation (`planObserve`).
       if (seen !== null)
         queueMicrotask(() => {
           if (listeners.has(listener))
             listener({
               all: true,
-              onto: false,
-              line: true,
+              acceptedBookmark: false,
+              published: true,
               yours: true,
               lanes: new Set(),
               offers: new Set(),

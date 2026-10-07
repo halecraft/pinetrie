@@ -25,7 +25,7 @@ import {
   join,
   lanesOf,
   rootRecordsOf,
-  setUpLine,
+  setUpAccepted,
   startSuiteHost,
   treeOf,
   waitFor,
@@ -87,7 +87,7 @@ async function catchUpSection(check: Checks["check"]): Promise<void> {
   }
 
   try {
-    await setUpLine(wh.session, wu)
+    await setUpAccepted(wh.session, wu)
     // A thread with work of its own.
     script.use([
       { tool: "bash", args: { command: "echo lane > lane.txt" } },
@@ -103,7 +103,7 @@ async function catchUpSection(check: Checks["check"]): Promise<void> {
     jj(project, "bookmark", "create", "main", "-r", "pinetrie-onto")
     writeFileSync(path.join(project, "landed.txt"), "landed\n")
     jj(project, "commit", "-m", "you land landed.txt")
-    await wu.line("publish")
+    await wu.actOnAccepted("publish")
     await wh.quiet()
 
     // The agent catches up in its run, alone in its turn, then reads the
@@ -142,7 +142,7 @@ async function catchUpSection(check: Checks["check"]): Promise<void> {
     await idle()
     const branched = laneWith("@agent branch at the catch-up")?.name
     check(
-      "a catch_up mid-run merges the line, and a branch at its turn has the line's file",
+      "a catch_up mid-run merges accepted work, and a branch at its turn has accepted work's file",
       results.some(r => r.includes("landed.txt")) &&
         results.at(-1)?.trim() === "landed" &&
         recorded?.commit !== null &&

@@ -120,17 +120,17 @@ describe("sendActing: the session's store, around one command", () => {
     )
     expect(store.current().offers.has(A)).toBe(false)
   })
-  test("the line's command is kept apart from every lane's", async () => {
+  test("accepted work's command is kept apart from every lane's", async () => {
     const store = snapshotStore<ActingState>(NO_ACTING)
     await sendActing(
       store,
-      { kind: "line", action: "publish" },
+      { kind: "accepted", action: "publish" },
       () => Promise.resolve({ kind: "failed", message: "jj said no" }),
       "1",
     )
     expect(store.current()).toEqual({
       offers: new Map(),
-      line: { kind: "failed", action: "publish", message: "jj said no" },
+      accepted: { kind: "failed", action: "publish", message: "jj said no" },
     })
   })
 })

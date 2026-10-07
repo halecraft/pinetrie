@@ -1,11 +1,16 @@
-// session/acting — your offer and line commands while they are out, and what
+// session/acting — your offer and setup and publish commands while they are out, and what
 // the host answered. An entry is `sent` from the click to the reply,
 // then the refusal or failure, until your next command there. An answer that
 // carried the command out clears the entry: the record then says how things
 // stand. `nextActing` decides, and `sendActing` is the one shell around it,
 // over the session's store.
 
-import type { ErrCode, LaneName, LineAction, OfferAction } from "@pinetrie/core"
+import type {
+  AcceptedAction,
+  ErrCode,
+  LaneName,
+  OfferAction,
+} from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import type { SnapshotStore } from "./store.ts"
 
@@ -36,8 +41,8 @@ export type Acting<A> =
 
 /** An offer command of yours on a lane. */
 export type OfferActing = Acting<OfferAction>
-/** A line command of yours: setting up, or publishing (ADR-0060, ADR-0090). */
-export type LineActing = Acting<LineAction>
+/** A setup or publish of yours: setting up, or publishing (ADR-0060, ADR-0090). */
+export type AcceptedActing = Acting<AcceptedAction>
 
 export type ActingEvent<A> =
   | {
@@ -75,27 +80,27 @@ export function nextActing<A>(
     : null
 }
 
-/** Every command of yours this tab has out or was refused: per lane, and the line. */
+/** Every command of yours this tab has out or was refused: per lane, and accepted work. */
 export interface ActingState {
   readonly offers: ReadonlyMap<LaneName, OfferActing>
-  readonly line: LineActing | null
+  readonly accepted: AcceptedActing | null
 }
 
-export const NO_ACTING: ActingState = { offers: new Map(), line: null }
+export const NO_ACTING: ActingState = { offers: new Map(), accepted: null }
 
-/** What a command is on: a lane's offer, or the line. */
+/** What a command is on: a lane's offer, or accepted work. */
 type ActingOn =
   | {
       readonly kind: "offer"
       readonly lane: LaneName
       readonly event: ActingEvent<OfferAction>
     }
-  | { readonly kind: "line"; readonly event: ActingEvent<LineAction> }
+  | { readonly kind: "accepted"; readonly event: ActingEvent<AcceptedAction> }
 
 /** Pure: the state after one event. */
 function actingStep(state: ActingState, on: ActingOn): ActingState {
-  if (on.kind === "line")
-    return { ...state, line: nextActing(state.line, on.event) }
+  if (on.kind === "accepted")
+    return { ...state, accepted: nextActing(state.accepted, on.event) }
   const next = nextActing(state.offers.get(on.lane) ?? null, on.event)
   const offers = new Map(state.offers)
   if (next === null) offers.delete(on.lane)
@@ -111,7 +116,7 @@ export type ActingCommand =
       readonly action: OfferAction
       readonly to: string | null
     }
-  | { readonly kind: "line"; readonly action: LineAction }
+  | { readonly kind: "accepted"; readonly action: AcceptedAction }
 
 /** Mark `command` sent in `store`, send it, and record the answer when it comes. */
 export function sendActing(
@@ -128,7 +133,7 @@ export function sendActing(
           event: { kind: "sent", id, action: command.action, to: command.to },
         }
       : {
-          kind: "line",
+          kind: "accepted",
           event: { kind: "sent", id, action: command.action, to: null },
         }
   store.set(actingStep(store.current(), sent))
@@ -137,7 +142,9 @@ export function sendActing(
     store.set(
       actingStep(
         store.current(),
-        sent.kind === "offer" ? { ...sent, event } : { kind: "line", event },
+        sent.kind === "offer"
+          ? { ...sent, event }
+          : { kind: "accepted", event },
       ),
     )
     return outcome

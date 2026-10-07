@@ -61,7 +61,7 @@ follow this list. A name only this package uses is imported from its module.
   record.
 - `work.ts`: where lanes work (`pinetrie.lane`, `pinetrie.revision`,
   `pinetrie.project`).
-- `line.ts`: accepted work and a thread's base (`pinetrie.line`,
+- `accepted.ts`: accepted work and a thread's base (`pinetrie.accepted`,
   `pinetrie.base`): where a lane begins, what catching up would do and merge,
   and the thread a lane branched from.
 - `offer.ts`, `offer-view.ts`, `review.ts`: an offer's record and the
@@ -146,8 +146,8 @@ address and decoder, for a check over every record, as a migration's
   unchanged record on every check. The host writes only a changed record: a
   write compacted with no client connected moves the document's base past
   what a new client reports.
-- **The singletons** (`LINE`, `PROJECT`, `COMMANDS`, `WORKFLOW`) have one
-  fixed key (`LINE_KEY`, `PROJECT_KEY`, `COMMANDS_KEY`, `WORKFLOW_KEY`), and
+- **The singletons** (`ACCEPTED`, `PROJECT`, `COMMANDS`, `WORKFLOW`) have one
+  fixed key (`ACCEPTED_KEY`, `PROJECT_KEY`, `COMMANDS_KEY`, `WORKFLOW_KEY`), and
   `decode` refuses any other.
 
 # Chat (`chat.ts`)
@@ -736,7 +736,7 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
     before decodes with none.
 - **`forkPoint`** is where a new lane of its own starts: the nearest snapshot
   above it, else the base snapshot; and the nearest commit, else the
-  thread's base (`planBegin`): the line's commit, or a WIP's copy on the line
+  thread's base (`planBegin`): accepted work's commit, or a WIP's copy on accepted work
   commit under it. The start is always named: a cloned disk carries its
   parent's working-copy change, and the fork must leave it.
 - **A project record of kind `workspaces` no longer decodes**; the host
@@ -806,15 +806,15 @@ commit-message request `request.ts` (`describeRequest`).
   each record not yet accepted has its `yourEdits` rewritten from one
   shared read.
 - **`planOfferAcceptance`** decides an acceptance from the offer
-  read in its own command and what only an acceptance reads (`OfferAcceptanceFacts`: the WIP's commits above the line,
+  read in its own command and what only an acceptance reads (`OfferAcceptanceFacts`: the WIP's commits above accepted work,
   and which bookmarks sit below the offer). Refused, in this order: no
   offer (`no_offer`), a WIP gone (`bad_destination`), nothing shown
   (`offer_changed`), a divergent offer (`no_offer`), other work than was
   shown or a new conflict (`offer_changed`, ADR-0065), and a destination
   that is not one of the offer's or not below it (`bad_destination`). Its
-  destinations are `offerAcceptanceDestinations`': the thread's WIP, then the line,
+  destinations are `offerAcceptanceDestinations`': the thread's WIP, then accepted work,
   with how many of the WIP's commits land along. A conflicted offer never
-  lands on the line: the line is immutable, and the conflict would stay in
+  lands on accepted work: accepted work is immutable, and the conflict would stay in
   its history. A gone WIP has none. An untraced place can be accepted: an
   acceptance moves a bookmark and needs no start.
 - **`planStackEnded`**: a split's stack replaces the offer only when its
@@ -845,14 +845,14 @@ commit-message request `request.ts` (`describeRequest`).
   `commits` are the revisions' commits at that read, what a review may
   read. A divergent offer is recorded only once repaired.
 
-## What the page reads (`offer-view.ts`, `line.ts`)
+## What the page reads (`offer-view.ts`, `accepted.ts`)
 
 - **`offerView`** is ADR-0038's state table as a decision, from an
   `OfferStatus`: the offer's state, its buttons, its menu, which of those
   are `quiet` (listed, but changing nothing now), and the facts its words
   are made from (`OfferFacts`: files, size, conflicts, bookmark, held, the
   base as `effectiveBase` gives it, the catch-up, untraced, …). It writes
-  no words: the line and the button labels are the client's (`offerWords`,
+  no words: accepted work and the button labels are the client's (`offerWords`,
   `@pinetrie/interface`, ADR-0040). A resolution that asked for you counts only
   when newer than the offer. A held offer is `nothing`, with no
   destinations. When catching up `brings`, or the thread is untraced,
@@ -869,7 +869,7 @@ commit-message request `request.ts` (`describeRequest`).
   when every file it conflicts in is in its `startConflicts`, the files
   conflicted where it starts, so the conflict came with the lane's copy;
   else `work` (ADR-0072).
-- **`parentNow`** (`line.ts`) is the thread a lane branched from, read from
+- **`parentNow`** (`accepted.ts`) is the thread a lane branched from, read from
   the document alone: `forkParent` (core) names it and the fork commit; its
   newest commit is the nearest above its thread's end; what the lane last
   caught up with (`caughtUpWith`) is the newest of the parent's commits that an update or land message
@@ -877,8 +877,8 @@ commit-message request `request.ts` (`describeRequest`).
   the fork commit. A lane's commits only move forward, so the parent is
   ahead when the two differ (`parentAhead`). `planParentUpdate` merges its
   newest commit, or nothing, or refuses `no_parent` and `parent_running`.
-- **`catchUpOf`** (`line.ts`) says what catching up would do, from `pinetrie.base` and
-  the line's record: `current` (the base has not moved since the lane last
+- **`catchUpOf`** (`accepted.ts`) says what catching up would do, from `pinetrie.base` and
+  accepted work's record: `current` (the base has not moved since the lane last
   caught up with it, or no line is set up), `unknown` (it moved, and the
   host's `catchUp` was not read at the commit it is at now; or there is no
   `pinetrie.base` at all: the host has never read the lane, as for a lane
@@ -887,8 +887,8 @@ commit-message request `request.ts` (`describeRequest`).
   or `brings`, with the file count and the move, the one kind that carries
   it. `catchUpOf` owns those checks; the commit comparison under them
   (`baseMoved`) is private to it.
-- **`catchUpName`** (`line.ts`) is the one wording of what a catch-up
-  merges (`CatchUpFrom`): "accepted work" for the line (ADR-0090), the
+- **`catchUpName`** (`accepted.ts`) is the one wording of what a catch-up
+  merges (`CatchUpFrom`): "accepted work" for accepted work (ADR-0090), the
   bookmark for a WIP (ADR-0061), the thread's name for the thread a thread branched from
   (ADR-0072). `updateLine` uses it through the update's `from`, decoded
   from the stored `parent`, else `base` and its `line` flag; an update
@@ -917,23 +917,23 @@ commit-message request `request.ts` (`describeRequest`).
     `answerReview` and `answerDiff` settle what was read: 502 when the
     read failed, 413 past `MAX_DIFF_BYTES`.
 
-# The line and a thread's base (`line.ts`, ADR-0060, ADR-0061, ADR-0072)
+# Accepted work and a thread's base (`accepted.ts`, ADR-0060, ADR-0061, ADR-0072)
 
 | record | namespace | key | written |
 |---|---|---|---|
-| accepted work: its commit, the WIP bookmarks above it, the publish bookmark and your work against it (`yours.ahead`, `yours.catchUp`), and `offers.catchUp` (`catchUp`) | `pinetrie.line` | `line` | when your repo's operation head moves |
+| accepted work: its commit, the WIP bookmarks above it, the publish bookmark and your work against it (`yours.ahead`, `yours.catchUp`), and `offers.catchUp` (`catchUp`) | `pinetrie.accepted` | `line` | when your repo's operation head moves |
 | a lane's base, as its newest `Pinetrie-Base` says it, whether a WIP base landed or is gone, what catching up would change and where that was read, and its untraced accepted-offer commits (S97) | `pinetrie.base` | the lane | when a refresh reads the lane |
 
-- **`planLineRecord`** is the line's record from what the host read
-  (`LineFacts`), beside what setting the line up would write to your
-  repo's config, which `@pinetrie/repo` words (`lineProposal`: jj's config
-  text), and `offers.catchUp` from the line's config (ADR-0099).
-- **`planLineAction`** decides a `line` command from the record read in
-  its own step (`LineDecision`): setup writes exactly the heads and log the
+- **`planAcceptedRecord`** is accepted work's record from what the host read
+  (`AcceptedFacts`), beside what setting accepted work up would write to your
+  repo's config, which `@pinetrie/repo` words (`setupProposal`: jj's config
+  text), and `offers.catchUp` from accepted work's config (ADR-0099).
+- **`planAcceptedAction`** decides a setup or publish from the record read in
+  its own step (`AcceptedDecision`): setup writes exactly the heads and log the
   record proposed, the text you were shown; a publish (`PublishDecision`,
   ADR-0090) says whether your files catch up first (`catchUp`) and whether
-  your commits move with the line (`accept`), both false with
-  `offers.catchUp` off. `@pinetrie/repo` turns it into steps (`planLineSetup`,
+  your commits move with accepted work (`accept`), both false with
+  `offers.catchUp` off. `@pinetrie/repo` turns it into steps (`planSetup`,
   `planPublishCatchUp`, `planPublishMove`).
 - **`planPublishFinish` is a publish's second round** (ADR-0090): from the
   record read again after the catch-up, the move, or the catch-up's
@@ -942,28 +942,28 @@ commit-message request `request.ts` (`describeRequest`).
   or the publish bookmark moved meanwhile. `accept` is read from the
   record after, not the decision. `publishUndone` words an undo from that
   record: the conflicts the catch-up would have left, since the revert took
-  them away, so `lineRefusal`'s "your commits have conflicts" would be
+  them away, so `acceptedRefusal`'s "your commits have conflicts" would be
   untrue. It lives here, not beside the steps,
   because `@pinetrie/repo` does not import this package.
 - **`effectiveBase`**, **`catchUpOf`**, **`parentNow`**, **`catchUpName`**
-  (the line is "accepted work", ADR-0090) and **`movedOnLine`** (a base
+  (accepted work is "accepted work", ADR-0090) and **`baseMovedOn`** (a base
   that moved, worded once) are here too. How the page reads them is under Offers,
   "What the page reads".
-- **`lineActionState` is the one rule for a `line` command** (ADR-0076,
-  ADR-0090): the host's `planLineAction` decides from it, and the page's
+- **`acceptedActionState` is the one rule for a setup or publish** (ADR-0076,
+  ADR-0090): the host's `planAcceptedAction` decides from it, and the page's
   publish button reads it. Setup and publishing are anyone's, on any host
-  (ADR-0099); setup is refused only once the line exists. A publish is
+  (ADR-0099); setup is refused only once accepted work exists. A publish is
   refused, in order: `no_line`, `no_publish`, `not_fast_forward`; with
   `offers.catchUp` on,
   `yours_conflict` (conflicted commits or files, or a preview that would
   conflict) and `refused` for files behind with no commit in common; then
   `refused` when `nothingToPublish(publishWork(record))`, the one "nothing
-  to do", which the page's hidden button reads too. `lineRefusal` words
+  to do", which the page's hidden button reads too. `acceptedRefusal` words
   each refusal once, naming files with `named`, for the host's answer and
   the button's title.
-- **`pinetrie.line` and `pinetrie.base` are caches** (ADR-0060): the repo is
+- **`pinetrie.accepted` and `pinetrie.base` are caches** (ADR-0060): the repo is
   the ledger, and the host rewrites each from it. A lost one costs a read.
-  A `pinetrie.line` from before `publish` and `published` (ADR-0076), or
+  A `pinetrie.accepted` from before `publish` and `published` (ADR-0076), or
   before `yours.catchUp` and a numeric `yours.ahead` (ADR-0090), does not
   decode, and is read as unknown until the host writes it again.
   A `pinetrie.base` from before `catchUp` and `untraced` does not decode, and
@@ -971,7 +971,7 @@ commit-message request `request.ts` (`describeRequest`).
   host writes it again. `catchUp` names the lane tip and base commit it was
   read at; the host keeps it while both stay, so it is read once per move.
 - **`planBegin`** refuses a lane with no line (`no_line`), and a base that
-  is not a bookmark with the WIP prefix above the line (`bad_base`). The
+  is not a bookmark with the WIP prefix above accepted work (`bad_base`). The
   host checks it before the lane is created, so a refused send creates
   nothing.
 - **What became of a WIP base** (`ok`, `landed` or `gone`, S77 item 2) is
@@ -981,7 +981,7 @@ commit-message request `request.ts` (`describeRequest`).
   the thread follows by `effectiveBase`, the rule the
   page's button words itself from, so the button names what is merged. A
   WIP's copy is made `on` the lane's previous copy (`LaneBase.start`);
-  nothing when the lane already holds the WIP's commit. The line once a WIP
+  nothing when the lane already holds the WIP's commit. Accepted work once a WIP
   landed; refused (`base_gone`) for a gone WIP until "continue on the
   line", which `mark`s the move even with nothing to merge; refused
   (`no_line`) with no line. Only those two codes (`UpdateRefusal`).
@@ -1079,7 +1079,7 @@ the tip it must match, and the bookmark to leave on it.
   role `fact`): `content` is what the model reads, `details` the
   `OfferFact`, which the column words as one line (`factLine`). Each offer
   action has one: an acceptance (`acceptedFact`: the change, the
-  bookmark, and that bookmark as the thread knows it, the line or a WIP),
+  bookmark, and that bookmark as the thread knows it, accepted work or a WIP),
   and a description asked for again, a squash, a refresh (`actionFact`).
 - **A fact always reaches the thread through a queued card**
   (`planFactCard`, at the thread's end, after the cards there), popped in

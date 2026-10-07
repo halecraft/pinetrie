@@ -11,7 +11,7 @@
 // a menu you opened: an open menu keeps a section whose rows have gone, and
 // says so.
 
-import type { LineRecord, ProjectRecord, WriterId } from "@pinetrie/core"
+import type { AcceptedRecord, ProjectRecord, WriterId } from "@pinetrie/core"
 import {
   type Intent,
   publishToast,
@@ -19,7 +19,7 @@ import {
   publishWords,
   resolveIntent,
 } from "@pinetrie/interface"
-import type { LineActing, SessionClient } from "@pinetrie/session"
+import type { AcceptedActing, SessionClient } from "@pinetrie/session"
 import { type ReactNode, useState, useSyncExternalStore } from "react"
 import { AccountMenu, type Me } from "./account-menu.tsx"
 import { InboxMenu, type InboxMenuProps } from "./inbox-menu.tsx"
@@ -37,7 +37,7 @@ export function Footer({
   nameOf,
   colorOf,
   inbox,
-  line,
+  accepted: line,
   project,
   onIntent,
   inventory,
@@ -54,7 +54,7 @@ export function Footer({
   /** What your inbox draws from: in the corner, or folded, in the account menu. */
   inbox: InboxMenuProps
   /** Accepted work (ADR-0060), as the host last read it. */
-  line: LineRecord | null
+  accepted: AcceptedRecord | null
   /** Where the host runs: "resolve with the agent" works in its root. */
   project: ProjectRecord | null
   /** Where the account menu and the publish toast's "resolve with the agent" go. */
@@ -92,7 +92,7 @@ export function Footer({
       <div className="footer-right">
         {syncing && <span className="sync-note">syncing…</span>}
         <PublishButton
-          line={line}
+          accepted={line}
           onIntent={onIntent}
           project={project}
           session={session}
@@ -103,28 +103,28 @@ export function Footer({
 }
 
 /**
- * The publish button (ADR-0090, ADR-0099): set up before the line exists;
+ * The publish button (ADR-0090, ADR-0099): set up before accepted work exists;
  * then publish, only while there is something to publish. A
  * refusal or failure of your last command here is a toast until you dismiss
  * it or send another.
  */
 function PublishButton({
-  line,
+  accepted: line,
   project,
   session,
   onIntent,
 }: {
-  line: LineRecord | null
+  accepted: AcceptedRecord | null
   project: ProjectRecord | null
-  session: Pick<SessionClient, "line" | "acting">
+  session: Pick<SessionClient, "actOnAccepted" | "acting">
   onIntent: (intent: Intent) => void
 }) {
   // Your last command here, kept by the session until your next.
   const acting = useSyncExternalStore(
     session.acting.subscribe,
     session.acting.current,
-  ).line
-  const [dismissed, setDismissed] = useState<LineActing | null>(null)
+  ).accepted
+  const [dismissed, setDismissed] = useState<AcceptedActing | null>(null)
   const view = publishView(line)
   const said = acting === dismissed ? null : publishToast(acting)
   const resolve = said?.resolve === true ? resolveIntent(project, line) : null
@@ -153,7 +153,7 @@ function PublishButton({
           className="publish-button"
           data-refused={words.refused || undefined}
           disabled={waiting}
-          onClick={() => void session.line("publish")}
+          onClick={() => void session.actOnAccepted("publish")}
           title={words.title}
           type="button"
         >
@@ -174,7 +174,7 @@ function PublishButton({
                   className: "setup-action",
                   label: "set up",
                   disabled: waiting,
-                  onChoose: () => void session.line("setup"),
+                  onChoose: () => void session.actOnAccepted("setup"),
                 },
               ],
             },

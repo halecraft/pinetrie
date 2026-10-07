@@ -470,18 +470,18 @@ pending.
   no record; `setup`, before setup on any host, whose `Menu` shows what it
   writes; `hidden` when
   `@pinetrie/rules`' `nothingToPublish` says so, the same function the host
-  refuses by; else `publish`, carrying `lineActionState`. `publishWords`
+  refuses by; else `publish`, carrying `acceptedActionState`. `publishWords`
   words it: "publish", or "publishing…" while out, and a title that says
   what it does from `publishWork` and the catch-up's preview (files it
   changes, other lines of your work that move), "your files do not move
   (offers.catchUp is off)" when the setting leaves your files behind or
   your commits unaccepted, then the jj, led by
-  `lineRefusal` when the host would refuse (`PublishWords.refused`, the
+  `acceptedRefusal` when the host would refuse (`PublishWords.refused`, the
   button's `data-refused`). The button still sends then: the
   host's refusal is the toast, so there is one path and one source of words.
-  `publishToast` is the line's one place for a refusal or failure
+  `publishToast` is accepted work's one place for a refusal or failure
   (`outcomeWords`), from the session's `acting` store, until dismissed or
-  your next line command; `resolve` is set only by a refusal's
+  your next setup or publish command; `resolve` is set only by a refusal's
   `yours_conflict` code (`Unsuccessful.code`), and opens `resolveIntent`.
 - **The inbox** (`inbox.ts`, pure): `mentionsOf` is every chat, from each
   root's directory record (`RootRecord.mentions`), whose mentions
@@ -785,13 +785,13 @@ became of its files (`strip`).
   (`@pinetrie/rules`, ADR-0061, ADR-0072, ADR-0090): the line is "accepted
   work", a
   WIP its bookmark, the thread a thread branched from its name. The words
-  take core's `CatchUpFrom`, never a bookmark string, and the line's
+  take core's `CatchUpFrom`, never a bookmark string, and accepted work's
   bookmark goes only in titles: `offerWords`' button titles ("moves
   pinetrie-onto forward to pinetrie-offer/amber-fox"), `behindMark`'s,
   `baseChoices`'. A card's command is worded from `CatchUps` (the thread's
   base and its parent), which `Column` keeps as one object while it says
   the same, since the composer is memoised. A base that moved is worded by
-  `movedOnLine` beside it ("accepted work has moved on"), never as "has new
+  `baseMovedOn` beside it ("accepted work has moved on"), never as "has new
   work".
 - **The thread a thread branched from** (`parentNow`, ADR-0072) is read
   from the column's tree, the revisions and each lane's thread end, with no
@@ -812,10 +812,10 @@ became of its files (`strip`).
   the strip was drawn from, and sends `offerSeen` of it (its ledger, and
   whether it conflicted). The host refuses the acceptance `offer_changed` when the
   offer now brings other work.
-- **Your offer and line commands are tracked per tab** (`acting.ts`,
+- **Your offer and setup and publish commands are tracked per tab** (`acting.ts`,
   `@pinetrie/session`): `SessionClient.offer` and `.line` mark the command
   `sent` at once and record the answer when it comes. A refusal or failure
-  stays until your next command on that lane (or the line); an answer that
+  stays until your next command on that lane (or accepted work); an answer that
   carried it out (`accepted`, `offered`, a split's `started`, `line-moved`)
   clears it, since the record then says how things stand. Each send has an
   id, so the answer to a send since replaced changes nothing. The page's
@@ -841,7 +841,7 @@ became of its files (`strip`).
   work",
   and has no review.
 - **What catching up would do** (`catchUpOf`, from `pinetrie.base`'s `start`
-  and `catchUp` against `pinetrie.line`'s commits, S97): when it `brings`
+  and `catchUp` against `pinetrie.accepted`'s commits, S97): when it `brings`
   files, the strip's line adds "· accepted work has moved on", or is that
   alone with nothing to accept, catching up moves from the `⋯` menu to the
   buttons, its title counts the files, and the header shows `behindMark`'s
@@ -858,13 +858,13 @@ became of its files (`strip`).
   queued on the lane: a catch-up among them is `offerView`'s `catch-up`
   activity ("catching up with accepted work…"); a split only quiets the
   split button (ADR-0080).
-- **A thread's base** shows in its header only when it is not the line
+- **A thread's base** shows in its header only when it is not accepted work
   (`baseWords`): "on wip/search", or "wip/search is gone", when the menu's
   update becomes "continue from accepted work" and no acceptance is
   offered.
   Catching up says its base: "catch up with wip/search". Two known limits,
   both in words only:
-  - until a lane has a base record, the page names the line as its base
+  - until a lane has a base record, the page names accepted work as its base
     (`effectiveBase(null)`), so a WIP thread that never changed a file says
     "catch up with accepted work". The host merges the WIP, read from the
     lane's own history;
@@ -874,7 +874,7 @@ became of its files (`strip`).
 - **The footer's publish button** (`PublishButton`, `footer.tsx`,
   ADR-0090): a plain button for a publish, a one-section `Menu` for setting
   up (the config text it writes: `immutable_heads()` and `revsets.log`),
-  disabled while a line command is out. A refusal or failure is a `Toast`
+  disabled while a setup or publish is out. A refusal or failure is a `Toast`
   above the footer, which keeps the `acting` entry you dismissed so the
   same one does not come back. "Resolve with the agent" is no `line`
   command: `resolveIntent` opens a new agent tab whose `Prefill` carries its

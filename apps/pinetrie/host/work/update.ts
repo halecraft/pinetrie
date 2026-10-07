@@ -30,7 +30,7 @@ import {
   commitTurn,
   conflictsIn,
   copyFacts,
-  DEFAULT_LINE,
+  DEFAULT_REPO,
   laneBase,
   type Merged,
   type MergePlan,
@@ -41,8 +41,8 @@ import {
 } from "@pinetrie/lanes"
 import { LAND_BUDGET, type PiSetup, type ThreadLaneHandle } from "@pinetrie/pi"
 import {
+  readAccepted,
   readBases,
-  readLine,
   readNames,
   readRevisions,
   readRunAuthor,
@@ -86,10 +86,10 @@ import type { Turns } from "./turns.ts"
 /** Why an update was refused, worded once (ADR-0060). */
 function updateRefusal(code: UpdateRefusal): string {
   switch (code) {
-    case ERR.NO_LINE:
-      return "set up the line first"
+    case ERR.NOT_SET_UP:
+      return "set up accepted work first"
     case ERR.BASE_GONE:
-      return "this thread's WIP bookmark is gone: continue it on the line"
+      return "this thread's WIP bookmark is gone: continue it on accepted work"
     case ERR.NO_PARENT:
       return "this thread did not branch from another thread's copy"
     case ERR.PARENT_RUNNING:
@@ -224,7 +224,7 @@ const touching = (revisions: readonly TouchedRevision[], path: string) =>
 
 /**
  * What a merge comes to (ADR-0060, ADR-0033). Clean: the update, written in
- * the thread, and the merge fetched. Nothing: a mark naming the line, when
+ * the thread, and the merge fetched. Nothing: a mark naming accepted work, when
  * one was made, fetched. Conflicted: the resolution's prompt, within the
  * floor's budget, each file with why each side changed it, and the card's
  * text after; nothing is fetched: the resolution's turns fetch the lane as
@@ -243,8 +243,8 @@ export function planSettle(
   const { lane, by, from } = ctx
   const caughtUp = mergedFrom(from)
   const bookmark =
-    from.kind === "line"
-      ? from.onto
+    from.kind === "accepted"
+      ? from.acceptedBookmark
       : from.kind === "wip"
         ? from.bookmark
         : null
@@ -334,12 +334,12 @@ export interface Updates {
   /**
    * Merge what `command` names into the lane `handle` names, whose handle the
    * caller holds: the thread's base (ADR-0060),
-   * the line's commit or a fresh copy of its WIP; with `continue-on-line`,
-   * the line, moving the thread there; with `catch-up-with-parent`, the
+   * accepted work's commit or a fresh copy of its WIP; with `continue-on-accepted`,
+   * accepted work, moving the thread there; with `catch-up-with-parent`, the
    * newest commit of the thread it branched from (ADR-0072).
    * Clean: the update is appended to the thread, through `handle`. Conflicted: the land
    * message for the resolution run, with `intent` (the card's text) after
-   * the conflicts. Nothing new: nothing to do, but a move to the line is
+   * the conflicts. Nothing new: nothing to do, but a move to accepted work is
    * fetched. Refused, with the lane untouched, when even the smallest
    * resolution prompt would not fit (ADR-0084). The lane is stopped after,
    * unless a run follows (`follows`).
@@ -378,7 +378,7 @@ export function createUpdates(deps: {
 }): Updates {
   const { basics, setup, registry, containers } = deps
   const { docs } = basics
-  const line = setup.lanes?.line ?? DEFAULT_LINE
+  const repoConfig = setup.lanes?.repoConfig ?? DEFAULT_REPO
 
   /**
    * The update's entry recorded as a revision, the merge its commit, with a
@@ -446,7 +446,7 @@ export function createUpdates(deps: {
   /**
    * One step on the lane's queue, so nothing changes the lane between what
    * is read and what is merged: what the command merges (the lane's base
-   * from its own history, the line and the WIP from your repo, a pinned
+   * from its own history, accepted work and the WIP from your repo, a pinned
    * read; or the parent, from the document), the plan with the floor its
    * resolution's prompt must fit (`planCatchUp`), and, unless it is refused
    * or has nothing to merge, the edits committed and the merge.
@@ -480,7 +480,7 @@ export function createUpdates(deps: {
         const from =
           command === "catch-up-with-parent"
             ? await parentOf(lane).then(p => planParentUpdate(p.now, p.running))
-            : await baseUpdate(command === "continue-on-line")
+            : await baseUpdate(command === "continue-on-accepted")
         if (typeof from === "string") return refused(updateRefusal(from))
         if (from.kind === "nothing") return { kind: "nothing" }
         const catchUp = planCatchUp(from, resolution)
@@ -497,23 +497,27 @@ export function createUpdates(deps: {
     )
 
     /** What catching up with the base merges (`planUpdateFrom`). */
-    async function baseUpdate(toLine: boolean) {
-      const base = await laneBase(jj, bookmarkRevset(bookmarkName(lane)), line)
+    async function baseUpdate(toAccepted: boolean) {
+      const base = await laneBase(
+        jj,
+        bookmarkRevset(bookmarkName(lane)),
+        repoConfig,
+      )
       // Your repo, pinned to the head its owner last observed.
       const { state, begin } = await owner.read(async ({ jj: yours }) => ({
-        state: await readWipState(yours, line, base),
+        state: await readWipState(yours, repoConfig, base),
         begin: await beginFacts(
           yours,
-          line,
+          repoConfig,
           base?.base.kind === "wip" ? base.base.bookmark : null,
         ),
       }))
       return planUpdateFrom({
-        onto: line.onto,
+        acceptedBookmark: repoConfig.acceptedBookmark,
         base,
         state,
-        toLine,
-        line: begin.line,
+        toAccepted,
+        acceptedCommit: begin.acceptedCommit,
         wipNow: begin.wip,
       })
     }
@@ -564,7 +568,7 @@ export function createUpdates(deps: {
             : toolCallsOf(index.entries[turnEntry(index, tip)]?.message).length,
         base: catchUpOf(
           readBases(docs.session).get(lane),
-          readLine(docs.session),
+          readAccepted(docs.session),
         ),
         parent: parent?.now ?? null,
         parentRunning: parent?.running ?? false,

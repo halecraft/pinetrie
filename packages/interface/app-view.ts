@@ -177,7 +177,7 @@ function workspaceOf(input: AppViewInput): Workspace {
 
 /**
  * The offers with work to add (`offerStatus`'s `open`; not one accepted, nor
- * one the line already holds), each in a root with an entry. A lane this
+ * one accepted work already holds), each in a root with an entry. A lane this
  * tab holds opens at its tip, and one with none yet is left out; any other
  * lane opens at its root entry (ADR-0063).
  */

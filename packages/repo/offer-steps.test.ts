@@ -48,7 +48,7 @@ const OFFER: OfferNow = {
 const PLACE: Placed = {
   kind: "placed",
   tip: NEW_TIP,
-  base: { base: { kind: "line" }, start: START, source: START },
+  base: { base: { kind: "accepted" }, start: START, source: START },
   state: "ok",
   target: TARGET,
   start: [START],

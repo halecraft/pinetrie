@@ -52,7 +52,7 @@ test("offerSeen: what an acceptance was shown is the record's ledger and whether
 
 describe("offerView: ADR-0038's table", () => {
   const MOVE = {
-    base: { kind: "line" },
+    base: { kind: "accepted" },
     bookmark: "pinetrie-onto",
     from: commitId("l1"),
     to: commitId("l2"),
@@ -74,7 +74,7 @@ describe("offerView: ADR-0038's table", () => {
       activity,
       asked,
       base: null,
-      onto: "pinetrie-onto",
+      acceptedBookmark: "pinetrie-onto",
       wipAhead: 0,
       catchUp: catching.catchUp ?? { kind: "current" },
       untraced: catching.untraced ?? false,
@@ -98,7 +98,7 @@ describe("offerView: ADR-0038's table", () => {
       ["accept", "split"],
       ["describe", "update"],
     ])
-    // Only a clean offer lands on the line (ADR-0060): no acceptance on a line thread.
+    // Only a clean offer lands on accepted work (ADR-0060): no acceptance on a thread on accepted work.
     expect(at(view({ ...offer, conflicts: ["a.txt"] }))).toEqual([
       "conflicts",
       ["update"],
@@ -144,8 +144,8 @@ describe("offerView: ADR-0038's table", () => {
       bookmark: "pinetrie-offer/t-1",
       held: false,
       acceptedAs: null,
-      base: { kind: "line" },
-      onto: "pinetrie-onto",
+      base: { kind: "accepted" },
+      acceptedBookmark: "pinetrie-onto",
       catchUp: { kind: "current" },
       untraced: false,
       conflictCause: "work",
@@ -210,7 +210,7 @@ describe("offerView: ADR-0038's table", () => {
     expect(quiet({ kind: "nothing-new" })).toEqual(["update"])
     expect(quiet({ kind: "unknown" })).toEqual([])
     expect(quiet({ kind: "brings", move: MOVE, files: 1 })).toEqual([])
-    // A thread whose WIP is gone continues on the line: never quiet.
+    // A thread whose WIP is gone continues on accepted work: never quiet.
     const gone = offerView({
       offer: offerStatus(undefined),
       activity: "idle",
@@ -218,7 +218,7 @@ describe("offerView: ADR-0038's table", () => {
       base: { base: { kind: "wip", bookmark: "wip/a" }, state: "gone" },
       parent: null,
       parentRunning: false,
-      onto: "pinetrie-onto",
+      acceptedBookmark: "pinetrie-onto",
       wipAhead: 0,
       catchUp: { kind: "current" },
       untraced: false,
@@ -270,7 +270,7 @@ describe("offerView: ADR-0038's table", () => {
       commit: typeof L1 | null,
       wips = [] as { bookmark: string; commit: typeof L1 }[],
     ) => ({
-      onto: "pinetrie-onto",
+      acceptedBookmark: "pinetrie-onto",
       wipPrefix: "wip/",
       publish: "main",
       published: { commit: null, behind: 0, ahead: 0 },
@@ -286,9 +286,9 @@ describe("offerView: ADR-0038's table", () => {
       },
       catchUp: true,
     })
-    const onLine: BaseRecord = {
+    const onAccepted: BaseRecord = {
       lane: LANE,
-      base: { kind: "line" as const },
+      base: { kind: "accepted" as const },
       start: L1,
       state: "ok" as const,
       catchUp: null,
@@ -304,9 +304,9 @@ describe("offerView: ADR-0038's table", () => {
       untraced: [],
       work: "some",
     }
-    expect(moved(onLine, line(L1))).toBe(false)
-    expect(moved(onLine, line(L2))).toBe(true)
-    expect(moved(onLine, line(null))).toBe(false)
+    expect(moved(onAccepted, line(L1))).toBe(false)
+    expect(moved(onAccepted, line(L2))).toBe(true)
+    expect(moved(onAccepted, line(null))).toBe(false)
     // A lane the host never read (no record): nothing is claimed, unless
     // there is no line to catch up with.
     expect(catchUpOf(undefined, line(L2))).toEqual({ kind: "unknown" })
@@ -317,10 +317,10 @@ describe("offerView: ADR-0038's table", () => {
     expect(
       moved(onWip, line(L2, [{ bookmark: "wip/a", commit: commitId("w2") }])),
     ).toBe(true)
-    // Landed: on the line now, and caught up with it only once merged.
+    // Landed: on accepted work now, and caught up with it only once merged.
     expect(moved({ ...onWip, state: "landed" }, line(L2))).toBe(true)
     expect(moved({ ...onWip, state: "gone" }, line(L2))).toBe(false)
-    expect(catchUpOf(onLine, line(L2))).toEqual({ kind: "unknown" })
+    expect(catchUpOf(onAccepted, line(L2))).toEqual({ kind: "unknown" })
     expect(
       catchUpOf(
         {
@@ -332,13 +332,13 @@ describe("offerView: ADR-0038's table", () => {
     ).toMatchObject({ move: { bookmark: "wip/a", from: W1, to: "w2" } })
     // The host's read counts only at the commit the base is at now.
     const read = (to: typeof L1, files: string[]): BaseRecord => ({
-      ...onLine,
+      ...onAccepted,
       catchUp: { tip: commitId("t"), to, files },
     })
     expect(catchUpOf(read(L2, []), line(L2))).toEqual({ kind: "nothing-new" })
     // Only what brings files says the move: the header's ↓ names it.
     const move = {
-      base: { kind: "line" },
+      base: { kind: "accepted" },
       bookmark: "pinetrie-onto",
       from: L1,
       to: L2,
@@ -376,7 +376,7 @@ describe("a conflict that came with the copy, and the thread it branched from (A
       activity: "idle",
       asked: null,
       base: null,
-      onto: "pinetrie-onto",
+      acceptedBookmark: "pinetrie-onto",
       wipAhead: 0,
       catchUp: { kind: "current" },
       untraced: false,

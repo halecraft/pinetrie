@@ -6,7 +6,7 @@ const unit = ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host"]
 export const mutations: readonly Mutation[] = [
   {
     name: "a move jj refuses after a publish's catch-up leaves it",
-    file: "apps/pinetrie/host/work/line.ts",
+    file: "apps/pinetrie/host/work/accepted.ts",
     from: "      if (op !== null) await ops.execute(planCatchUpUndo(op))\n",
     to: "",
     command: unit,
@@ -14,7 +14,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a publish's refused second round reverts nothing",
-    file: "apps/pinetrie/host/work/line.ts",
+    file: "apps/pinetrie/host/work/accepted.ts",
     from: "      await ops.execute(planCatchUpUndo(finish.op))\n",
     to: "",
     command: unit,
@@ -251,7 +251,7 @@ export const mutations: readonly Mutation[] = [
       "planLoads: every root but the archived ones, a root with no message among them (ADR-0063)",
   },
   {
-    name: "the line's preview runs no git",
+    name: "accepted work's preview runs no git",
     file: "packages/repo/owner.ts",
     from: "      kept = await readShared(op, runnerFor(root, { at: op }), git, line)",
     to: '      kept = await readShared(op, runnerFor(root, { at: op }), async () => ({ ok: false, code: 1, stdout: "", stderr: "" }), line)',
@@ -1117,12 +1117,12 @@ export const mutations: readonly Mutation[] = [
       "with a run to follow, the lane is never stopped, whatever the update comes to (ADR-0080)",
   },
   {
-    name: "a move to the line is not fetched",
+    name: "a move to accepted work is not fetched",
     file: "apps/pinetrie/host/work/update.ts",
     from: "        fetch: facts.mark === null ? null : [facts.ours],",
     to: "        fetch: null,",
     command: unit,
-    expect: "a move to the line is fetched",
+    expect: "a move to accepted work is fetched",
   },
   {
     name: "a file's reasons are every revision on its side",
@@ -1228,12 +1228,21 @@ export const mutations: readonly Mutation[] = [
     expect: "your @ alone marks no lane",
   },
   {
+    name: "a starting host leaves records no spec declares",
+    file: "apps/pinetrie/host/startup.ts",
+    from: "    await keeper.run(() => records.writeValues(undeclared))\n",
+    to: "",
+    command: unit,
+    expect:
+      "recover deletes the records of a type no spec declares, in the session and each root opened",
+  },
+  {
     name: "a move of main refreshes nothing",
     file: "apps/pinetrie/host/offers/marks.ts",
-    from: "    line: every || moved.line,",
-    to: "    line: every,",
+    from: "    accepted: every || moved.published,",
+    to: "    accepted: every,",
     command: unit,
-    expect: "the publish bookmark marks the line's record, and no lane",
+    expect: "the publish bookmark marks accepted work's record, and no lane",
   },
   {
     name: "your @ moving rewrites nothing",
@@ -1258,7 +1267,7 @@ export const mutations: readonly Mutation[] = [
     to: "",
     command: unit,
     expect:
-      "everything moved marks the line, every named lane not archived and every open record",
+      "everything moved marks accepted work, every named lane not archived and every open record",
   },
   {
     name: "everything moving marks archived lanes",
@@ -1267,7 +1276,7 @@ export const mutations: readonly Mutation[] = [
     to: "          ...input.names.keys(),\n",
     command: unit,
     expect:
-      "everything moved marks the line, every named lane not archived and every open record",
+      "everything moved marks accepted work, every named lane not archived and every open record",
   },
   {
     name: "an archived lane's offer bookmark marks nothing",
@@ -1315,8 +1324,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an acceptance holds the documents' keeper",
     file: "apps/pinetrie/host/commands/index.ts",
-    from: '    case "offer":\n    case "line":\n      return "repo"',
-    to: '    case "line":\n      return "repo"',
+    from: '    case "offer":\n    case "setup":\n    case "publish":\n      return "repo"',
+    to: '    case "setup":\n    case "publish":\n      return "repo"',
     command: unit,
     expect:
       "a chat completes while an acceptance is held open on your repo's owner",

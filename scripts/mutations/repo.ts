@@ -36,30 +36,30 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a publish's catch-up moves only @'s line",
     file: "packages/repo/plan.ts",
-    from: '}): RepoStep[] => [you("rebase", "-b", "@", "-d", revsetName(input.onto))]',
-    to: '}): RepoStep[] => [you("rebase", "-r", "@", "-d", revsetName(input.onto))]',
+    from: '  you("rebase", "-b", "@", "-d", revsetName(input.acceptedBookmark)),',
+    to: '  you("rebase", "-r", "@", "-d", revsetName(input.acceptedBookmark)),',
     command: repoTest,
     expect:
-      "a publish's catch-up (S80, ADR-0090): a preview that writes nothing, then your work rebased onto the line, conflicts recorded",
+      "a publish's catch-up (S80, ADR-0090): a preview that writes nothing, then your work rebased onto accepted work, conflicts recorded",
   },
   {
     name: "the preview names no conflict",
-    file: "packages/repo/line.ts",
+    file: "packages/repo/accepted.ts",
     from: "  const conflicts = (blank < 0 ? rest : rest.slice(0, blank)).filter(",
     to: "  const conflicts = [].filter(",
     command: repoTest,
     expect:
-      "a publish's catch-up (S80, ADR-0090): a preview that writes nothing, then your work rebased onto the line, conflicts recorded",
+      "a publish's catch-up (S80, ADR-0090): a preview that writes nothing, then your work rebased onto accepted work, conflicts recorded",
   },
   {
     name: "the preview counts no other head",
-    file: "packages/repo/line.ts",
+    file: "packages/repo/accepted.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "    heads: await count(jj, `heads(roots(${onto}..@)::) ~ @`),",
+    from: "    heads: await count(jj, `heads(roots(${acceptedBookmark}..@)::) ~ @`),",
     to: "    heads: 0,",
     command: repoTest,
     expect:
-      "a publish's catch-up (S80, ADR-0090): a preview that writes nothing, then your work rebased onto the line, conflicts recorded",
+      "a publish's catch-up (S80, ADR-0090): a preview that writes nothing, then your work rebased onto accepted work, conflicts recorded",
   },
   {
     name: "a lane's work always changes a file",
@@ -86,7 +86,7 @@ export const mutations: readonly Mutation[] = [
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: "    `(::${bookmark} ~ ::(${input.target})) & ${bookmark}`,",
     command: unit,
-    expect: "an offer on the line (ADR-0060)",
+    expect: "an offer on accepted work (ADR-0060)",
   },
   {
     name: "an offer's revisions include what is already under its base",
@@ -96,15 +96,15 @@ export const mutations: readonly Mutation[] = [
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: "    `(::${bookmark}) & (${thread} | ${bookmark})`,",
     command: unit,
-    expect: "an offer on the line (ADR-0060)",
+    expect: "an offer on accepted work (ADR-0060)",
   },
   {
-    name: "setting up the line leaves your log as it was",
+    name: "setting up accepted work leaves your log as it was",
     file: "packages/repo/plan.ts",
     from: '  you("config", "set", "--repo", "revsets.log", input.log),',
     to: '  you("config", "set", "--repo", "revsets.log", "builtin_log()"),',
     command: unit,
-    expect: "an offer on the line (ADR-0060)",
+    expect: "an offer on accepted work (ADR-0060)",
   },
   {
     name: "the offers are added to your log again at each setup",
@@ -117,10 +117,10 @@ export const mutations: readonly Mutation[] = [
     expect: "added to jj's default when the repo defines none, and idempotent",
   },
   {
-    name: "an accepting publish leaves the line where it was",
+    name: "an accepting publish leaves accepted work where it was",
     file: "packages/repo/plan.ts",
-    from: '    ? moveForward("you", [input.onto, input.publish], "@-")',
-    to: '    ? moveForward("you", [input.onto, input.publish], "@--")',
+    from: '    ? moveForward("you", [input.acceptedBookmark, input.publish], "@-")',
+    to: '    ? moveForward("you", [input.acceptedBookmark, input.publish], "@--")',
     suite: "lanes",
     scenario: "main",
     expect:
@@ -129,8 +129,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an accepting publish moves its two bookmarks one at a time",
     file: "packages/repo/plan.ts",
-    from: '    ? moveForward("you", [input.onto, input.publish], "@-")',
-    to: '    ? moveForward("you", [input.onto], "@-") && moveForward("you", [input.publish], "@-")',
+    from: '    ? moveForward("you", [input.acceptedBookmark, input.publish], "@-")',
+    to: '    ? moveForward("you", [input.acceptedBookmark], "@-") && moveForward("you", [input.publish], "@-")',
     command: unit,
     expect: "a publish: your catch-up is yours",
   },
@@ -143,48 +143,48 @@ export const mutations: readonly Mutation[] = [
     expect: "its undo reverts, never restores",
   },
   {
-    name: "the line's record counts none of your commits conflicted",
-    file: "packages/repo/line.ts",
+    name: "accepted work's record counts none of your commits conflicted",
+    file: "packages/repo/accepted.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "        commits: await count(jj, `(::@ ~ ::${onto}) & conflicts()`),",
+    from: "        commits: await count(jj, `(::@ ~ ::${acceptedBookmark}) & conflicts()`),",
     to: "        commits: 0,",
     command: repoTest,
     expect:
       "a publish's second round reads your commits conflicted by the catch-up",
   },
   {
-    name: "a WIP's move is the line's for the base snapshot",
+    name: "a WIP's move is accepted work's for the base snapshot",
     file: "packages/repo/observe.ts",
-    from: "      if (name === line.onto && prev !== null) onto = true",
-    to: "      if (prev !== null) onto = true",
+    from: "      if (name === repoConfig.acceptedBookmark && prev !== null)",
+    to: "      if (prev !== null)",
     command: unit,
     expect: "a WIP moved",
   },
   {
     name: "the first observation refreshes the base snapshot again",
     file: "packages/repo/observe.ts",
-    from: "      if (name === line.onto && prev !== null) onto = true",
-    to: "      if (name === line.onto) onto = true",
+    from: "      if (name === repoConfig.acceptedBookmark && prev !== null)",
+    to: "      if (name === repoConfig.acceptedBookmark)",
     command: unit,
-    expect: "the first observation is not the line moving",
+    expect: "the first observation is not accepted work moving",
   },
   {
     name: "a new thread begins at your @-",
-    file: "packages/repo/line.ts",
+    file: "packages/repo/accepted.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "  const [lineCommit] = await commitsOf(jj, `present(${onto})`)",
-    to: '  const [lineCommit] = await commitsOf(jj, "@-")',
+    from: "  const [acceptedCommit] = await commitsOf(jj, `present(${acceptedBookmark})`)",
+    to: '  const [acceptedCommit] = await commitsOf(jj, "@-")',
     suite: "lanes",
     scenario: "main",
     expect:
-      "a new root thread starts at the line: it has what you landed, and not what you have not",
+      "a new root thread starts at accepted work: it has what you landed, and not what you have not",
   },
   {
-    name: "the line's heads fail a repo with no line",
+    name: "accepted work's heads fail a repo with no line",
     file: "packages/repo/plan.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "  const onto = `present(${revsetName(line.onto)})`",
-    to: "  const onto = revsetName(line.onto)",
+    from: "  const acceptedBookmark = `present(${revsetName(repoConfig.acceptedBookmark)})`",
+    to: "  const acceptedBookmark = revsetName(line.acceptedBookmark)",
     command: unit,
     expect: "added to jj's builtin when the repo defines none, with present()",
   },
@@ -207,7 +207,7 @@ export const mutations: readonly Mutation[] = [
     to: ") & ${ACCEPTED_OFFER_COMMITS}",
     command: unit,
     expect:
-      "an offer after a catch-up starts at the line it merged, not at what you accepted below it",
+      "an offer after a catch-up starts at accepted work it merged, not at what you accepted below it",
   },
   {
     name: "a WIP lane holds its copy",
@@ -221,7 +221,7 @@ export const mutations: readonly Mutation[] = [
       "acceptedOfferCommitsRevset: accepted sources above the commit the base holds",
   },
   {
-    name: "an acceptance may move the line backwards",
+    name: "an acceptance may move accepted work backwards",
     file: "packages/repo/plan.ts",
     from: '  (as === "host" ? host : you)("bookmark", "move", ...bookmarks, "--to", to)',
     to: '  (as === "host" ? host : you)("bookmark", "move", "--allow-backwards", ...bookmarks, "--to", to)',
@@ -232,8 +232,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a publish leaves main where it was",
     file: "packages/repo/plan.ts",
-    from: '    ? moveForward("you", [input.onto, input.publish], "@-")',
-    to: '    ? moveForward("you", [input.onto], "@-")',
+    from: '    ? moveForward("you", [input.acceptedBookmark, input.publish], "@-")',
+    to: '    ? moveForward("you", [input.acceptedBookmark], "@-")',
     suite: "lanes",
     scenario: "main",
     expect:
@@ -242,8 +242,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a publish moves main as you",
     file: "packages/repo/plan.ts",
-    from: '    : moveForward("host", [input.publish], revsetName(input.onto)),',
-    to: '    : moveForward("you", [input.publish], revsetName(input.onto)),',
+    from: '    : moveForward("host", [input.publish], revsetName(input.acceptedBookmark)),',
+    to: '    : moveForward("you", [input.publish], revsetName(input.acceptedBookmark)),',
     command: unit,
     expect: "a publish: your catch-up is yours",
   },
@@ -251,18 +251,19 @@ export const mutations: readonly Mutation[] = [
     name: "a move of main is not watched",
     file: "packages/repo/observe.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "    `present(${revsetName(line.publish)})`,\n",
+    from: "    `present(${revsetName(repoConfig.publish)})`,\n",
     to: "",
     command: unit,
-    expect: "a move of the publish bookmark is observed as the line's alone",
+    expect:
+      "a move of the publish bookmark is observed as accepted work's alone",
   },
   {
     name: "a move of main refreshes every offer",
     file: "packages/repo/observe.ts",
-    from: "    else if (name === line.publish) published = true\n",
+    from: "    else if (name === repoConfig.publish) published = true\n",
     to: "",
     command: unit,
-    expect: "the publish bookmark moved: the line's record alone",
+    expect: "the publish bookmark moved: accepted work's record alone",
   },
   {
     name: "accepted offers' sources are not read",
@@ -270,7 +271,7 @@ export const mutations: readonly Mutation[] = [
     from: "    sources: [...new Set(accepted.flatMap(t => sourcesOf(t.description)))],\n",
     to: "    sources: [] as CommitId[],\n",
     command: unit,
-    expect: "an offer on the line (ADR-0060)",
+    expect: "an offer on accepted work (ADR-0060)",
   },
   {
     name: "a stale base working copy is not recovered",
@@ -295,7 +296,7 @@ export const mutations: readonly Mutation[] = [
     from: "  user.startsWith(`${HOST_OPERATOR}@`)",
     to: "  false",
     command: unit,
-    expect: "an offer on the line (ADR-0060)",
+    expect: "an offer on accepted work (ADR-0060)",
   },
   {
     name: "a turn that changed nothing is committed",
@@ -312,7 +313,7 @@ export const mutations: readonly Mutation[] = [
     to: "  const parents = [ours, from]",
     command: repoTest,
     expect:
-      "your own acceptance, then your edit to it on the line: clean, and the accepted-offer commit is not listed as come in",
+      "your own acceptance, then your edit to it on accepted work: clean, and the accepted-offer commit is not listed as come in",
   },
   {
     name: "only the newest accepted-offer commit is joined",
@@ -340,7 +341,7 @@ export const mutations: readonly Mutation[] = [
     to: "  range",
     command: repoTest,
     expect:
-      "your own acceptance, then your edit to it on the line: clean, and the accepted-offer commit is not listed as come in",
+      "your own acceptance, then your edit to it on accepted work: clean, and the accepted-offer commit is not listed as come in",
   },
   {
     name: "an update's merge is left uncommitted",
@@ -411,7 +412,7 @@ export const mutations: readonly Mutation[] = [
     from: '    rewrite("rebase", "-s", change, ...input.start.flatMap(c => ["-o", c])),',
     to: '    rewrite("rebase", "-s", change, "-o", input.target),',
     command: repoTest,
-    expect: "an offer on the line (ADR-0060)",
+    expect: "an offer on accepted work (ADR-0060)",
   },
   {
     name: "the repair keeps the host's commit",
@@ -419,7 +420,7 @@ export const mutations: readonly Mutation[] = [
     from: '  rewrite("abandon", input.hosts),',
     to: '  rewrite("abandon", input.yours),',
     command: unit,
-    expect: "an offer on the line (ADR-0060)",
+    expect: "an offer on accepted work (ADR-0060)",
   },
   {
     name: "a lane's tip is fetched as a local bookmark",
@@ -493,7 +494,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a WIP moving is not noticed",
     file: "packages/repo/observe.ts",
-    from: "  name.startsWith(line.wipPrefix) ||\n",
+    from: "  name.startsWith(repoConfig.wipPrefix) ||\n",
     to: "",
     command: unit,
     expect: "a WIP moved",
@@ -594,7 +595,7 @@ export const mutations: readonly Mutation[] = [
     from: "    files: found.length === 1 ? top.files : null,",
     to: "    files: top.files,",
     command: repoTest,
-    expect: "an offer on the line (ADR-0060)",
+    expect: "an offer on accepted work (ADR-0060)",
   },
   {
     name: "the offer's own files say whether the lane's work changes any",
@@ -602,7 +603,7 @@ export const mutations: readonly Mutation[] = [
     from: "  const work = await workChanges(jj, { start, tip })\n",
     to: '  const work =\n    offer?.kind === "offer"\n      ? offer.files.length === 0\n        ? "none"\n        : "some"\n      : await workChanges(jj, { start, tip })\n',
     command: repoTest,
-    expect: "an offer the line already holds is empty",
+    expect: "an offer accepted work already holds is empty",
   },
   {
     name: "one start's work is read over its range",
@@ -750,16 +751,16 @@ export const mutations: readonly Mutation[] = [
     expect: "withdraw plans the abandon",
   },
   {
-    name: "a WIP squashed into the line is not landed",
-    file: "packages/repo/line.ts",
-    from: '  if (facts.bookmark !== null) return facts.bookmarkInLine ? "landed" : "ok"',
+    name: "a WIP squashed into accepted work is not landed",
+    file: "packages/repo/accepted.ts",
+    from: '  if (facts.bookmark !== null) return facts.bookmarkInAccepted ? "landed" : "ok"',
     to: '  if (facts.bookmark !== null) return "ok"',
     command: unit,
-    expect: "the bookmark on the line (landed, or squashed into it)",
+    expect: "the bookmark on accepted work (landed, or squashed into it)",
   },
   {
     name: "a line base is gone",
-    file: "packages/repo/line.ts",
+    file: "packages/repo/accepted.ts",
     from: '  if (facts === null) return "ok"',
     to: '  if (facts === null) return "gone"',
     command: unit,

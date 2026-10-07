@@ -9,7 +9,7 @@ import {
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
-  DEFAULT_LINE,
+  DEFAULT_REPO,
   decodeLaneConfig,
   FETCHED_REF,
   fetchById,
@@ -19,7 +19,6 @@ import {
   type LaneSpec,
   type LaneStep,
   laneIgnores,
-  lineConfig,
   mountArgs,
   NO_GRANTS,
   planBaseRefresh,
@@ -44,6 +43,7 @@ import {
   planSnapshot,
   planStartFrom,
   planTurnCommit,
+  repoConfig,
   SPEC_LABEL,
   specHashOf,
 } from "./index.ts"
@@ -256,49 +256,69 @@ describe("planRun: a lane's container", () => {
 })
 
 describe("lineConfig: the project's names win, and a bad one falls back", () => {
-  const none = { onto: null, wipPrefix: null, publish: null, catchUp: null }
+  const none = {
+    acceptedBookmark: null,
+    wipPrefix: null,
+    publish: null,
+    catchUp: null,
+  }
   test("defaults with nothing set", () => {
-    expect(lineConfig(none, none)).toEqual({ line: DEFAULT_LINE, refused: [] })
+    expect(repoConfig(none, none)).toEqual({
+      repoConfig: DEFAULT_REPO,
+      refused: [],
+    })
   })
   test("the project's name wins over the user's", () => {
     expect(
-      lineConfig(
-        { onto: "mine", wipPrefix: "draft/", publish: "master", catchUp: true },
-        { onto: "trunk", wipPrefix: null, publish: null, catchUp: null },
-      ).line,
+      repoConfig(
+        {
+          acceptedBookmark: "mine",
+          wipPrefix: "draft/",
+          publish: "master",
+          catchUp: true,
+        },
+        {
+          acceptedBookmark: "trunk",
+          wipPrefix: null,
+          publish: null,
+          catchUp: null,
+        },
+      ).repoConfig,
     ).toEqual({
-      onto: "trunk",
+      acceptedBookmark: "trunk",
       wipPrefix: "draft/",
       publish: "master",
       catchUp: true,
     })
   })
   test("catching up is off unless set, and the project's setting wins", () => {
-    expect(DEFAULT_LINE.catchUp).toBe(false)
+    expect(DEFAULT_REPO.catchUp).toBe(false)
     expect(
-      lineConfig({ ...none, catchUp: true }, { ...none, catchUp: false }).line
-        .catchUp,
+      repoConfig({ ...none, catchUp: true }, { ...none, catchUp: false })
+        .repoConfig.catchUp,
     ).toBe(false)
-    expect(lineConfig(none, { ...none, catchUp: true }).line.catchUp).toBe(true)
+    expect(
+      repoConfig(none, { ...none, catchUp: true }).repoConfig.catchUp,
+    ).toBe(true)
   })
   test("a catchUp that is not true or false falls back to off, saying why", () => {
-    const r = lineConfig(
+    const r = repoConfig(
       { ...none, catchUp: true },
       { ...none, catchUp: { invalid: '"yes"' } },
     )
-    expect(r.line.catchUp).toBe(false)
+    expect(r.repoConfig.catchUp).toBe(false)
     expect(r.refused).toEqual([
       'offers.catchUp "yes" is not true or false; using false',
     ])
   })
   test("a name that is no bookmark falls back, saying why", () => {
-    const r = lineConfig(none, {
-      onto: "has space",
+    const r = repoConfig(none, {
+      acceptedBookmark: "has space",
       wipPrefix: "a..b/",
       publish: "a:b",
       catchUp: null,
     })
-    expect(r.line).toEqual(DEFAULT_LINE)
+    expect(r.repoConfig).toEqual(DEFAULT_REPO)
     expect(r.refused).toHaveLength(3)
     expect(r.refused[0]).toContain("has space")
   })
@@ -318,7 +338,12 @@ describe("decodeLaneConfig: grants, the install and shared directories, total", 
         grants: NO_GRANTS,
         install: null,
         shared: [],
-        offers: { onto: null, wipPrefix: null, publish: null, catchUp: null },
+        offers: {
+          acceptedBookmark: null,
+          wipPrefix: null,
+          publish: null,
+          catchUp: null,
+        },
       })
     expect(
       decodeLaneConfig(
@@ -337,18 +362,29 @@ describe("decodeLaneConfig: grants, the install and shared directories, total", 
       grants: { ssh: false, env: ["OK_1"], mounts: [] },
       install: null,
       shared: [".plans"],
-      offers: { onto: null, wipPrefix: null, publish: null, catchUp: null },
+      offers: {
+        acceptedBookmark: null,
+        wipPrefix: null,
+        publish: null,
+        catchUp: null,
+      },
     })
   })
-  test("offers: the line's names, as written", () => {
+  test("offers: accepted work's names, as written", () => {
     expect(
       decodeLaneConfig(
-        { offers: { onto: "trunk", wipPrefix: 3, publish: "master" } },
+        {
+          offers: {
+            onto: "trunk",
+            wipPrefix: 3,
+            publish: "master",
+          },
+        },
         "/p",
         false,
       ).offers,
     ).toEqual({
-      onto: "trunk",
+      acceptedBookmark: "trunk",
       wipPrefix: null,
       publish: "master",
       catchUp: null,
@@ -481,9 +517,13 @@ test("planForkSetup: a base with several parents is committed once, so the bookm
   ])
 })
 
-test("planForkSetup: on the line, an empty commit naming it; its id read for the config (ADR-0060)", () => {
+test("planForkSetup: on accepted work, an empty commit naming it; its id read for the config (ADR-0060)", () => {
   const steps = argvs(
-    planForkSetup(LANE, { kind: "line", onto: "pinetrie-onto", commit: C1 }),
+    planForkSetup(LANE, {
+      kind: "accepted",
+      acceptedBookmark: "pinetrie-onto",
+      commit: C1,
+    }),
   )
   expect(steps.slice(2, 4)).toEqual([
     "lane: jj new c1",
@@ -494,7 +534,7 @@ test("planForkSetup: on the line, an empty commit naming it; its id read for the
   )
 })
 
-test("planForkSetup: a WIP's copy on the line commit under it, never the WIP's own commits (ADR-0060)", () => {
+test("planForkSetup: a WIP's copy on accepted commit under it, never the WIP's own commits (ADR-0060)", () => {
   const W = commitId("w1")
   const steps = argvs(
     planForkSetup(
@@ -556,11 +596,11 @@ describe("planJoins: the accepted-offer commits a lane holds, joined before it c
 describe("planMerge: an update's steps (ADR-0060)", () => {
   const W = commitId("w1")
   const COPY = commitId("copy1")
-  test("the line's merge names its base, and lists what came in since the lane", () => {
+  test("accepted work's merge names its base, and lists what came in since the lane", () => {
     expect(
       planMerge({
-        kind: "line",
-        onto: "pinetrie-onto",
+        kind: "accepted",
+        acceptedBookmark: "pinetrie-onto",
         commit: C1,
         mark: true,
       }),

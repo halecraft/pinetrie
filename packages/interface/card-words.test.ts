@@ -46,9 +46,9 @@ const refusal = (over: Partial<MoveRefused>): CardRefusal => ({
 describe("card words", () => {
   test.each([
     [
-      "commandWords, on the line",
+      "commandWords, on accepted work",
       commandWords("bring-up-to-date", {
-        base: { kind: "line" },
+        base: { kind: "accepted" },
         parent: null,
       }),
       "catch up with accepted work",
@@ -63,21 +63,24 @@ describe("card words", () => {
     ],
     [
       "commandWords, a WIP gone",
-      commandWords("continue-on-line", {
-        base: { kind: "line" },
+      commandWords("continue-on-accepted", {
+        base: { kind: "accepted" },
         parent: null,
       }),
       "continue from accepted work",
     ],
     [
       "commandNote",
-      commandNote("bring-up-to-date", { base: { kind: "line" }, parent: null }),
+      commandNote("bring-up-to-date", {
+        base: { kind: "accepted" },
+        parent: null,
+      }),
       "↓ catches up with accepted work first, then sends what you write",
     ],
     [
       "commandWords, the thread it branched from (ADR-0072)",
       commandWords("catch-up-with-parent", {
-        base: { kind: "line" },
+        base: { kind: "accepted" },
         parent: {
           kind: "parent",
           lane: laneNameForThread("p"),
@@ -89,7 +92,7 @@ describe("card words", () => {
     [
       "commandNote, the thread it branched from, unknown",
       commandNote("catch-up-with-parent", {
-        base: { kind: "line" },
+        base: { kind: "accepted" },
         parent: null,
       }),
       "↓ catches up with the thread this one branched from first, then sends what you write",

@@ -11,6 +11,8 @@
 // a malformed command is refused is decided in exactly one function.
 
 import {
+  ACCEPTED_ACTIONS,
+  type AcceptedAction,
   atEntry,
   CARD_COMMANDS,
   type CardCommand,
@@ -30,8 +32,6 @@ import {
   isSha256,
   isWorkflowStateId,
   keyOfFields,
-  LINE_ACTIONS,
-  type LineAction,
   MAX_TITLE,
   MOVE_DIRECTIONS,
   type Move,
@@ -116,7 +116,7 @@ export type Outcome =
   | { readonly kind: "marked" }
   /** A model is asked for a root's title, which arrives as its mark (ADR-0074). */
   | { readonly kind: "retitling" }
-  /** The lane's offer is accepted into the line or a WIP now (ADR-0060). */
+  /** The lane's offer is accepted into accepted work or a WIP now (ADR-0060). */
   | { readonly kind: "accepted" }
   /** An offer action was carried out (squash, describe, refresh). */
   | { readonly kind: "offered" }
@@ -125,7 +125,7 @@ export type Outcome =
   /** Traces the sender has seen are gone (ADR-0048). */
   | { readonly kind: "seen" }
   /** Accepted work was set up, or published (ADR-0060, ADR-0090). */
-  | { readonly kind: "line-moved" }
+  | { readonly kind: "accepted-moved" }
   | Refusal
   /**
    * The host failed carrying the command out, and may have done part of it:
@@ -252,12 +252,7 @@ export function decodeCommand(
       state: stateText === "" ? null : (stateText as WorkflowStateId),
     }
   }
-  if (kind === "line") {
-    const action = text(wire?.mode)
-    return isLineAction(action)
-      ? { kind, action }
-      : refused(ERR.UNKNOWN_KIND, `unknown line action: ${action}`)
-  }
+  if (kind === "setup" || kind === "publish") return { kind }
   if (kind === "move") {
     const moves = decodeMoves(text(wire?.moves))
     return typeof moves === "string"
@@ -616,9 +611,6 @@ const isMoveRefusal = (c: string): c is MoveRefusal =>
 const isOfferAction = (a: string): a is OfferAction =>
   (OFFER_ACTIONS as readonly string[]).includes(a)
 
-const isLineAction = (a: string): a is LineAction =>
-  (LINE_ACTIONS as readonly string[]).includes(a)
-
 const isWorkflowAction = (a: string): a is WorkflowAction =>
   (WORKFLOW_ACTIONS as readonly string[]).includes(a)
 
@@ -744,8 +736,9 @@ export function encodeIntent(id: string, intent: Intent): Command {
         targetId: intent.to ?? "",
         seen: offerSeenToWire(intent.seen),
       })
-    case "line":
-      return command({ id, kind: "line", mode: intent.action })
+    case "setup":
+    case "publish":
+      return command({ id, kind: intent.kind })
     case "reserve":
       return command({ id, kind: "reserve", lane: intent.lane })
     case "move":
@@ -817,8 +810,8 @@ function outcomeToWire(id: string, outcome: Outcome): Reply {
       return reply({ id, outcome: "reserved" })
     case "seen":
       return reply({ id, outcome: "seen" })
-    case "line-moved":
-      return reply({ id, outcome: "line-moved" })
+    case "accepted-moved":
+      return reply({ id, outcome: "accepted-moved" })
     case "queued":
       return reply({ id, outcome: "queued" })
     case "moved":
@@ -891,8 +884,8 @@ export function decodeReply(wire: Reply): Outcome {
       return { kind: "reserved" }
     case "seen":
       return { kind: "seen" }
-    case "line-moved":
-      return { kind: "line-moved" }
+    case "accepted-moved":
+      return { kind: "accepted-moved" }
     case "queued":
       return { kind: "queued" }
     case "moved":

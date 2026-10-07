@@ -79,7 +79,7 @@ describe("the review (ADR-0047)", () => {
     expect(status(offers, "ffff")).toBe(404)
     const accepted = new Map([[LANE, { ...open, acceptedAs: "t" }]])
     expect(status(accepted, C1)).toBe(404)
-    // One the line already holds brings nothing to review.
+    // One accepted work already holds brings nothing to review.
     const held = new Map([[LANE, { ...open, files: [] }]])
     expect(status(held, C1)).toBe(404)
     const path = (p: string) => {

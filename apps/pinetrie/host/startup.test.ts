@@ -7,6 +7,7 @@ import {
   type ProjectRecord,
   rootIdFor,
   runId,
+  SESSION_TARGET,
   type ValueWrite,
   writerId,
 } from "@pinetrie/core"
@@ -134,6 +135,43 @@ test("recover logs a stored lane whose name is not a thread's, and only such a l
   await recover(deps({ basics: b }))
   expect(b.lines.filter(l => l.includes("ignoring"))).toEqual([
     "[host] ignoring stored lanes that are no thread's: main",
+  ])
+})
+
+test("recover deletes the records of a type no spec declares, in the session and each root opened, and says so (ADR-0100)", async () => {
+  const b = basics()
+  putValue(b, {
+    kind: "set",
+    target: SESSION_TARGET,
+    namespace: "pinetrie.line",
+    key: "line",
+    value: {},
+  })
+  putValue(b, {
+    kind: "set",
+    target: { kind: "root", root: ROOT_ID },
+    namespace: "pinetrie.gone",
+    key: "k",
+    value: {},
+  })
+  const agent = fakePi()
+  await recover(deps({ basics: b, ...ports(agent) }))
+  expect(writesOf(agent.calls).filter(w => w.kind === "delete")).toEqual([
+    {
+      kind: "delete",
+      target: SESSION_TARGET,
+      namespace: "pinetrie.line",
+      key: "line",
+    },
+    {
+      kind: "delete",
+      target: { kind: "root", root: ROOT_ID },
+      namespace: "pinetrie.gone",
+      key: "k",
+    },
+  ])
+  expect(b.lines.filter(l => l.includes("no longer kept"))).toEqual([
+    "[host] deleting 2 stored records of types no longer kept: pinetrie.line, pinetrie.gone",
   ])
 })
 

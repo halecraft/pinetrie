@@ -9,12 +9,12 @@
 // imports the other.
 
 import type {
+  AcceptedRecord,
   BaseRecord,
   CommitId,
   ERR,
   ErrCode,
   LaneBase,
-  LineRecord,
   OfferRecord,
   ThreadName,
 } from "./index.ts"
@@ -131,9 +131,9 @@ export interface Placed {
   /** The lane's tip in your repo. */
   readonly tip: CommitId
   readonly base: LaneBase
-  /** A WIP base's state (`wipState`, `@pinetrie/repo`); "ok" for the line. */
+  /** A WIP base's state (`wipState`, `@pinetrie/repo`); "ok" for accepted work. */
   readonly state: "ok" | "landed"
-  /** Where the offer sits: the line's commit, or the WIP bookmark's. */
+  /** Where the offer sits: accepted work's commit, or the WIP bookmark's. */
   readonly target: CommitId
   /** Where it starts (`startOfOffer`). */
   readonly start: readonly CommitId[]
@@ -176,7 +176,7 @@ export interface OfferGather {
 
 /** What a refresh decides from (`planRefresh`). */
 export type RefreshFacts =
-  /** The thread's root is archived (ADR-0029): the offer alone, read against the line. */
+  /** The thread's root is archived (ADR-0029): the offer alone, read against accepted work. */
   | { readonly kind: "archived"; readonly offer: OfferInRepo | null }
   /** An accepted-offer commit of the lane names no source (S97). */
   | { readonly kind: "untraced"; readonly offer: OfferInRepo | null }
@@ -190,10 +190,10 @@ export type RefreshFacts =
 
 /** What only an acceptance reads; the rest is in its gather's place. */
 export interface OfferAcceptanceFacts {
-  /** The WIP's commits above the line; 0 for a lane on the line. */
+  /** The WIP's commits above accepted work; 0 for a lane on accepted work. */
   readonly wipAhead: number
   /**
-   * Of the line's bookmark and, on a WIP, the WIP's, those at or below the
+   * Of accepted work's bookmark and, on a WIP, the WIP's, those at or below the
    * offer's bottom's parent: a move to one is forward.
    */
   readonly below: ReadonlySet<string>
@@ -282,38 +282,38 @@ export interface DescribeDecision {
 // ── accepted work (ADR-0060, ADR-0061) ─────────────────────────────
 
 /**
- * What the host reads of the line, each time it looks (`lineFacts` in
+ * What the host reads of accepted work, each time it looks (`acceptedFacts` in
  * `@pinetrie/repo`): its commit, the WIPs above it and your work against it,
  * as its record holds them, and your repo's `immutable_heads()` and
  * `revsets.log` as jj resolves them (null for jj's own).
  */
-export interface LineFacts
-  extends Pick<LineRecord, "commit" | "wips" | "published" | "yours"> {
+export interface AcceptedFacts
+  extends Pick<AcceptedRecord, "commit" | "wips" | "published" | "yours"> {
   readonly heads: string | null
   readonly log: string | null
 }
 
 /**
  * A publish (ADR-0090), decided before its first step: on the host's own
- * machine, your files catch up with the line first (`catchUp`), and your
+ * machine, your files catch up with accepted work first (`catchUp`), and your
  * commits below `@` move onto it with the publish bookmark (`accept`).
  */
 export interface PublishDecision {
   readonly kind: "publish"
-  readonly onto: string
+  readonly acceptedBookmark: string
   readonly publish: string
-  /** Rebase `@` onto the line first, as you. */
+  /** Rebase `@` onto accepted work first, as you. */
   readonly catchUp: boolean
-  /** The line moves with the publish bookmark, to your `@-`. */
+  /** Accepted work moves with the publish bookmark, to your `@-`. */
   readonly accept: boolean
 }
 
-/** A `line` command (`planLineAction`): what it does, or why not. */
-export type LineDecision =
-  /** Set the line up, writing exactly the heads and log its record proposed. */
+/** A setup or publish (`planAcceptedAction`): what it does, or why not. */
+export type AcceptedDecision =
+  /** Set accepted work up, writing exactly the heads and log its record proposed. */
   | {
       readonly kind: "setup"
-      readonly onto: string
+      readonly acceptedBookmark: string
       readonly heads: string
       readonly log: string
     }
@@ -322,16 +322,16 @@ export type LineDecision =
 
 /**
  * The bookmark move that ends a publish (`planPublishMove`): the publish
- * bookmark to the line, or, with `accept`, both to your `@-`.
+ * bookmark to accepted work, or, with `accept`, both to your `@-`.
  */
 export interface PublishMove {
-  readonly onto: string
+  readonly acceptedBookmark: string
   readonly publish: string
   readonly accept: boolean
 }
 
 /**
- * A publish's second round (`planPublishFinish`), from the line as read after
+ * A publish's second round (`planPublishFinish`), from accepted work as read after
  * the catch-up: the move, or the catch-up's operation reverted (S111).
  */
 export type PublishFinish =

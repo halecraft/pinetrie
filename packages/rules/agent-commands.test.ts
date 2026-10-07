@@ -41,7 +41,7 @@ const LANE = laneNameForThread("1")
 const ADA = writerId("ada@x.io")
 const [B, C, D] = [commitId("b"), commitId("c"), commitId("d")]
 const MOVE = {
-  base: { kind: "line" },
+  base: { kind: "accepted" },
   bookmark: "pinetrie-onto",
   from: B,
   to: C,
@@ -114,8 +114,8 @@ describe("planCatchUpCall (ADR-0080)", () => {
     expect(catchUpRefusal("no-bookmark")).toBe(
       "Not caught up: this thread's copy has lost its bookmark.",
     )
-    expect(catchUpRefusal({ reason: "set up the line first" })).toBe(
-      "Not caught up: set up the line first.",
+    expect(catchUpRefusal({ reason: "set up accepted work first" })).toBe(
+      "Not caught up: set up accepted work first.",
     )
   })
 })
@@ -143,7 +143,7 @@ describe("planCopyReady (ADR-0080)", () => {
       "off-line",
     ],
     [
-      "with no bookmark: refused as that, not as off the line (S114)",
+      "with no bookmark: refused as that, not as off accepted work (S114)",
       { parents: [B], bookmark: null, descends: false },
       "no-bookmark",
     ],
@@ -157,7 +157,7 @@ describe("catchUpAnswer", () => {
     const update = encodeUpdate(
       {
         lane: LANE,
-        from: { kind: "line" },
+        from: { kind: "accepted" },
         bookmark: "pinetrie-onto",
         merged: C,
         commits: ["a change"],

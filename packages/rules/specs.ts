@@ -1,12 +1,15 @@
 // specs — every host record's spec (ADR-0062), in one list: what a check
-// over every record reads, as a migration's verification does (ADR-0096).
+// over every record reads, as a migration's verification does (ADR-0096),
+// and what a starting host keeps of the records it finds (ADR-0100).
 
+import type { HostNamespace, Target, ValueWrite } from "@pinetrie/core"
+
+import { ACCEPTED, BASE } from "./accepted.ts"
 import { BANNER } from "./banner.ts"
 import { BOARD, WORKFLOW } from "./board.ts"
 import { CARD_HISTORY, TRACE } from "./card-history.ts"
 import { COMMANDS } from "./commands.ts"
 import { DIGEST } from "./digest.ts"
-import { BASE, LINE } from "./line.ts"
 import { MARK } from "./mark.ts"
 import { NAME } from "./names.ts"
 import { OFFER } from "./offer.ts"
@@ -34,7 +37,7 @@ export const RECORD_SPECS: readonly AnyRecordSpec[] = [
   COMMANDS,
   DIGEST,
   LANE,
-  LINE,
+  ACCEPTED,
   MARK,
   NAME,
   OFFER,
@@ -50,3 +53,34 @@ export const RECORD_SPECS: readonly AnyRecordSpec[] = [
   VERDICT,
   WORKFLOW,
 ]
+
+const DECLARED: ReadonlySet<string> = new Set(
+  RECORD_SPECS.map(spec => spec.namespace),
+)
+
+/** The namespaces a document holds, with each one's keys, where it is. */
+export interface StoredRecords {
+  readonly target: Target
+  readonly namespaces: ReadonlyMap<string, readonly string[]>
+}
+
+/**
+ * Deletes for every record whose namespace no spec declares (ADR-0100): a
+ * renamed or retired record type leaves nothing behind once a host starts.
+ * Pure.
+ */
+export const planUndeclaredSweep = (
+  stored: readonly StoredRecords[],
+): ValueWrite[] =>
+  stored.flatMap(({ target, namespaces }) =>
+    [...namespaces].flatMap(([namespace, keys]) =>
+      DECLARED.has(namespace)
+        ? []
+        : keys.map(key => ({
+            kind: "delete" as const,
+            target,
+            namespace: namespace as HostNamespace,
+            key,
+          })),
+    ),
+  )

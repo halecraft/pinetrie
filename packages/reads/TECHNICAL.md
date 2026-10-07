@@ -82,7 +82,7 @@ and every other reader returns the same map.
 A reader keeps its own name and return type, and shapes the map only where
 its readers want something else: `readSeats` and `readLandings` sort,
 `readNames` and `readParticipantNames` give the name alone, and the
-singletons (`readLine`, `readProject`, `readCommands`) take their one key.
+singletons (`readAccepted`, `readProject`, `readCommands`) take their one key.
 
 It declares core, schema and rules only (`workspace.test.ts`), so it runs
 in the host and in the browser alike: no pi, no transport.

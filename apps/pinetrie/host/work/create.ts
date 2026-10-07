@@ -1,5 +1,5 @@
 // host/work/create — a new lane: where it works, its record and name, and,
-// for a lane of its own, its fork from where it branched, or from the line
+// for a lane of its own, its fork from where it branched, or from accepted work
 // or a WIP's copy where nothing is above (ADR-0032, ADR-0034, ADR-0060).
 
 import { stat } from "node:fs/promises"
@@ -16,7 +16,7 @@ import {
 } from "@pinetrie/core"
 import type { Keeper } from "@pinetrie/keeper"
 import {
-  DEFAULT_LINE,
+  DEFAULT_REPO,
   executeOrThrow,
   planFork,
   removeLane,
@@ -49,7 +49,7 @@ export async function checkDirectory(
 
 /**
  * What a fork is planned from: the revision nearest above where it branched,
- * and where agent work begins with none above (the line, or a WIP's copy).
+ * and where agent work begins with none above (accepted work, or a WIP's copy).
  * Read only once every turn record being written has been, so a branch at a
  * turn whose snapshot is still running gets that turn's disk.
  */
@@ -68,7 +68,7 @@ export interface NewLanes {
   checkDirectory: typeof checkDirectory
   /**
    * Whether a new lane of its own can begin at `at` from `base` (a WIP
-   * bookmark, null for the line), checked before the lane is made: null, or
+   * bookmark, null for accepted work), checked before the lane is made: null, or
    * why not (ADR-0060). A lane with agent work above inherits it, and needs
    * neither.
    */
@@ -104,11 +104,11 @@ export function createNewLanes(deps: {
 }): NewLanes {
   const { basics, setup, registry, keeper } = deps
 
-  const line = setup.lanes?.line ?? DEFAULT_LINE
+  const repoConfig = setup.lanes?.repoConfig ?? DEFAULT_REPO
 
   /**
    * The install to run in a fork from a WIP's copy: the base disk was
-   * installed at the line's commit, so a WIP whose lockfile differs from it
+   * installed at accepted work's commit, so a WIP whose lockfile differs from it
    * needs its own.
    */
   async function installIfLockMoved(
@@ -121,7 +121,7 @@ export function createNewLanes(deps: {
       (await lockHashAt(jj, start.commit, install.lockfile)) ===
       (await lockHashAt(
         jj,
-        `present(${revsetName(line.onto)})`,
+        `present(${revsetName(repoConfig.acceptedBookmark)})`,
         install.lockfile,
       ))
         ? null
@@ -133,9 +133,9 @@ export function createNewLanes(deps: {
   async function beginAt(owner: RepoOwner, base: string | null) {
     return planBegin({
       base,
-      onto: line.onto,
-      wipPrefix: line.wipPrefix,
-      facts: await owner.read(({ jj }) => beginFacts(jj, line, base)),
+      acceptedBookmark: repoConfig.acceptedBookmark,
+      wipPrefix: repoConfig.wipPrefix,
+      facts: await owner.read(({ jj }) => beginFacts(jj, repoConfig, base)),
     })
   }
 
@@ -184,7 +184,7 @@ export function createNewLanes(deps: {
               if (typeof facts === "string")
                 throw new Error(`the lane cannot begin: ${facts}`)
               const point = forkPoint(facts)
-              if (point.snapshot === BASE_SNAPSHOT) await setup.baseAtLine()
+              if (point.snapshot === BASE_SNAPSHOT) await setup.baseAtAccepted()
               await removeLane(handle.container)
               await executeOrThrow(
                 planFork({

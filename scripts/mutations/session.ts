@@ -31,7 +31,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the answer to an offer command is never recorded",
     file: "packages/session/acting.ts",
-    from: '        sent.kind === "offer" ? { ...sent, event } : { kind: "line", event },',
+    from: '        sent.kind === "offer"\n          ? { ...sent, event }\n          : { kind: "accepted", event },',
     to: "        sent,",
     command: unit,
     expect:

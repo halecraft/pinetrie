@@ -12,18 +12,18 @@
 
 import type { LaneName, ProjectRecord } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
-import { DEFAULT_LINE } from "@pinetrie/lanes"
+import { DEFAULT_REPO } from "@pinetrie/lanes"
 import type { LaneHooks, PiSetup } from "@pinetrie/pi"
 import { readRunning } from "@pinetrie/reads"
 import type { RepoOwner } from "@pinetrie/repo"
 import type { Basics } from "../basics.ts"
 import { type Offers, startOffers } from "../offers/index.ts"
 import type { Records } from "../records.ts"
+import { type AcceptedWork, createAcceptedWork } from "./accepted.ts"
 import { type Archive, createArchive } from "./archive.ts"
 import { type Containers, createContainers } from "./containers.ts"
 import { createNewLanes, type NewLanes } from "./create.ts"
 import { createFetches } from "./fetch.ts"
-import { createLine, type Line } from "./line.ts"
 import { createRegistry } from "./registry.ts"
 import { type Found, startSetup } from "./setup.ts"
 import { createSplits, type Splits } from "./split.ts"
@@ -49,7 +49,7 @@ export type LaneWork = Pick<
     /** Each lane's offer in your repo; null with no lanes of their own. */
     readonly offers: Offers | null
     /** Accepted work in your repo (ADR-0060); null with no lanes of their own. */
-    readonly line: Line | null
+    readonly accepted: AcceptedWork | null
     /** The one writer of your repo (ADR-0065); null with no lanes of their own. Shutdown closes it. */
     readonly owner: RepoOwner | null
     /**
@@ -98,29 +98,29 @@ export async function startLaneWork(input: {
   const baseListeners: ((lane: LaneName) => void)[] = []
   const { root, owner, paths } = setup
   const registry = createRegistry({ session, root })
-  const lineConfig = setup.lanes?.line ?? DEFAULT_LINE
+  const repoConfig = setup.lanes?.repoConfig ?? DEFAULT_REPO
   /** Accepted work in your repo (ADR-0060); none without lanes of their own. */
-  const line: Line | null =
+  const accepted: AcceptedWork | null =
     owner === null
       ? null
-      : createLine({
+      : createAcceptedWork({
           owner,
           basics,
-          line: lineConfig,
+          repoConfig: repoConfig,
           writeValues: writes => input.records.writeValues(writes),
         })
-  // The base snapshot follows the line, however it moved: setup, an accept,
+  // The base snapshot follows accepted work, however it moved: setup, an accept,
   // a publish, or jj outside pine·trie (ADR-0090).
   owner?.onMoved(moved => {
-    if (moved.onto) setup.refreshBaseSoon()
+    if (moved.acceptedBookmark) setup.refreshBaseSoon()
   })
   /** Each lane's offer in your repo (ADR-0038); none without lanes of their own. */
   const offers: Offers | null =
-    owner === null || line === null
+    owner === null || accepted === null
       ? null
       : startOffers({
           owner,
-          line: lineConfig,
+          repoConfig: repoConfig,
           basics,
           records: input.records,
           piSetup: input.piSetup,
@@ -128,7 +128,7 @@ export async function startLaneWork(input: {
           baseChanged: lane => {
             for (const listener of baseListeners) listener(lane)
           },
-          lineWork: line,
+          acceptedWork: accepted,
         })
   const containers = createContainers({
     basics,
@@ -199,7 +199,7 @@ export async function startLaneWork(input: {
     prepareSplit: splits.prepareSplit,
     splitEnded: splits.splitEnded,
     offers,
-    line,
+    accepted: accepted,
     owner,
     teardown: archive.teardown,
     async quiet() {

@@ -630,20 +630,20 @@ describe("planIntent", () => {
         plan(column({ kind: "offer", lane, action: "squash", to: null })),
       ).toEqual([{ kind: "offer", lane, action: "squash", to: null }])
     })
-    test("continue on the line queues its own command (ADR-0060)", () => {
+    test("continue on accepted work queues its own command (ADR-0060)", () => {
       expect(
         plan(
           column({
             kind: "queueCommand",
             create: fresh,
-            command: "continue-on-line",
+            command: "continue-on-accepted",
             lane,
             at: where,
           }),
         )[0],
       ).toMatchObject({
         kind: "createCard",
-        card: { carries: { kind: "message", command: "continue-on-line" } },
+        card: { carries: { kind: "message", command: "continue-on-accepted" } },
       })
     })
   })

@@ -538,7 +538,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   the project cannot have one. For its own copy, and only when there are
   WIP bookmarks, a second section lists where the thread starts from
   (`baseChoices`): accepted work, then each WIP with how far it is behind
-  accepted work; the line then names the WIP. The base is each editor's state, as
+  accepted work; accepted work then names the WIP. The base is each editor's state, as
   the work choice is, and is sent with the chat. The choice is
   the composer's state until sent, as `asksAgent` is; its default is
   `workFor`, the host's own decision. The chip's words are `.where-words`,
@@ -554,7 +554,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   buttons, and a `⋯` menu for the rest
   ("catch up with accepted work", "rewrite description"). What the lane runs
   now (`activityOf`: a turn, a resolution, or a split, from its latest
-  prompt's role) comes first: while it runs, the line counts files so far
+  prompt's role) comes first: while it runs, accepted work counts files so far
   and offers nothing. A lane that works directly says so ("edits your files
   directly"), and names other lanes running in the same directory now.
 - **Catching up and splitting are a card queued at once** (ADR-0055,
@@ -590,7 +590,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   opening it, and a board item's ⇡ for everyone (ADR-0091). Move to Done
   in an item's `⋯` names the threads whose offers it withdraws (`offeredByRoot`,
   `dropsWords`). All read `openOffers`, which keeps only `offerStatus`'s
-  `open` (ADR-0067): one the line already holds (`held`) has nothing to
+  `open` (ADR-0067): one accepted work already holds (`held`) has nothing to
   add, so it is neither counted nor named, as the strip says.
 - **Selectors in the browser suite:** a column's offer is `.work.offer`, with
   `data-state` (`ready`, `conflicts`, `stack`, and the rest of
@@ -610,7 +610,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   `.thread-details-icon[data-spin]` around their mark,
   `.thread-details-started`, `.thread-details-where`,
   `.thread-details-working`, `.thread-details-behind` and
-  `.thread-details-start`. The line is `.working-line`, and a row the work opened `.tool[data-revealed]`.
+  `.thread-details-start`. Accepted work is `.working-line`, and a row the work opened `.tool[data-revealed]`.
 - **The invite key** needs no client code: the host's redirect sets a cookie
   that same-origin requests and upgrades carry. `connectSession({ key })` is
   for Node clients.
@@ -689,7 +689,7 @@ offer's review, an ask's, a table from a message, or a stored image.
   the thread and 40rem, it is `dialog.pane`, modal, portalled to `body`:
   the top layer covers every stacking context and makes the page inert.
   `App` measures `#strip` with a `ResizeObserver`, so folding your list
-  crosses the line as a window resize does; crossing it remounts the pane.
+  crosses accepted work as a window resize does; crossing it remounts the pane.
   A media query could not: it reads the window, and your list's width
   varies. The strip comes and goes with what the workspace shows, so the
   hook checks on each render whether it still observes the element there.

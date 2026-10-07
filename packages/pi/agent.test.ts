@@ -301,7 +301,7 @@ describe("pinned cards: what the model reads (ADR-0048, S92)", () => {
     const pinned = cardsOf(lane, pad("ship the sync fix"))
     const behind = encodeBehind(
       {
-        from: { kind: "line" },
+        from: { kind: "accepted" },
         to: commitId("l2"),
         files: ["a.ts"],
         overlap: [],

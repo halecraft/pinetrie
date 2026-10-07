@@ -19,8 +19,8 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import { type Static, Type } from "typebox"
+import { catchUpName } from "./accepted.ts"
 import { CommitSchema, decodeWith } from "./decode.ts"
-import { catchUpName } from "./line.ts"
 
 const UPDATE_TYPE = "pinetrie.update"
 const STACK_TYPE = "pinetrie.stack"
@@ -28,12 +28,12 @@ const STACK_TYPE = "pinetrie.stack"
 const UpdateDetailsSchema = Type.Object({
   lane: Type.String({ minLength: 1 }),
   /**
-   * The bookmark the thread was brought up to date with: the line, or its
+   * The bookmark the thread was brought up to date with: accepted work, or its
    * WIP. Absent in updates stored before ADR-0060, which merged your `@`.
    */
   base: Type.Optional(Type.String({ minLength: 1 })),
   /**
-   * Whether `base` is the line. Absent in updates stored before it was
+   * Whether `base` is accepted work. Absent in updates stored before it was
    * written, whose base is named by its bookmark.
    */
   line: Type.Optional(Type.Boolean()),
@@ -44,7 +44,7 @@ const UpdateDetailsSchema = Type.Object({
       name: Type.String({ minLength: 1 }),
     }),
   ),
-  /** The commit merged: the line's, or the WIP's copy; `copy` before ADR-0060. */
+  /** The commit merged: accepted work's, or the WIP's copy; `copy` before ADR-0060. */
   copy: CommitSchema,
   /** The commits that came in, newest first: each one's first line. */
   commits: Type.Array(Type.String()),
@@ -64,7 +64,7 @@ interface UpdateDetails {
   readonly from: CatchUpFrom | null
   /** The base's bookmark, which the model reads; null for a parent. */
   readonly bookmark: string | null
-  /** The commit merged: the line's, or the WIP's copy. */
+  /** The commit merged: accepted work's, or the WIP's copy. */
   readonly merged: CommitId
   readonly commits: readonly string[]
   readonly files: readonly string[]
@@ -93,7 +93,9 @@ function storedFrom(d: Static<typeof UpdateDetailsSchema>): CatchUpFrom | null {
         }
       : null
   if (d.base === undefined) return null
-  return d.line === true ? { kind: "line" } : { kind: "wip", bookmark: d.base }
+  return d.line === true
+    ? { kind: "accepted" }
+    : { kind: "wip", bookmark: d.base }
 }
 
 const fromStoredUpdate = (
@@ -150,7 +152,7 @@ export function encodeUpdate(
         ? { parent: { lane: from.lane, name: from.name } }
         : from === null || details.bookmark === null
           ? {}
-          : { base: details.bookmark, line: from.kind === "line" }),
+          : { base: details.bookmark, line: from.kind === "accepted" }),
       copy: details.merged,
       commits: [...details.commits],
       files: [...details.files],

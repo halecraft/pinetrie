@@ -16,7 +16,7 @@ import {
   type ValueWrite,
   wipDescription,
 } from "@pinetrie/core"
-import type { LineConfig } from "@pinetrie/lanes"
+import type { RepoConfig } from "@pinetrie/lanes"
 import type { PiSetup } from "@pinetrie/pi"
 import {
   readArchived,
@@ -44,7 +44,7 @@ export interface OfferDocs {
   nameOf(lane: LaneName): ThreadName | undefined
   /** Read from the archive record, never from the lane's tip being missing: a tip missing for one import (S78) must not withdraw a live offer. */
   archived(lane: LaneName): boolean
-  /** A gather's input: the lane, its name, the line's names, and the last catch-up read, a memo `readCatchUp` keeps at the same tip and base commit. */
+  /** A gather's input: the lane, its name, accepted work's names, and the last catch-up read, a memo `readCatchUp` keeps at the same tip and base commit. */
   input(lane: LaneName): OfferInput
   /** The lane's tip entry, for `Pinetrie-Entry`; "" for none. */
   tipOf(lane: LaneName): string
@@ -73,7 +73,7 @@ export interface OfferDeps {
   /** The one writer of your repo: commands, refreshes as upkeep, pinned reads. */
   readonly owner: RepoOwner
   /** Accepted work's names (ADR-0060). */
-  readonly line: LineConfig
+  readonly repoConfig: RepoConfig
   readonly basics: Basics
   /** What a description asks of the model. */
   readonly piSetup: Pick<PiSetup, "skill" | "complete">
@@ -85,7 +85,7 @@ export interface OfferDeps {
 
 export function createOfferDeps(input: {
   readonly owner: RepoOwner
-  readonly line: LineConfig
+  readonly repoConfig: RepoConfig
   readonly basics: Basics
   readonly records: Pick<Records, "writeValues">
   readonly piSetup: Pick<PiSetup, "skill" | "complete">
@@ -93,7 +93,7 @@ export function createOfferDeps(input: {
   /** A lane's base record changed. */
   readonly baseChanged: (lane: LaneName) => void
 }): OfferDeps {
-  const { basics, line } = input
+  const { basics, repoConfig } = input
   const { session: doc, docs } = basics
   const writeValues = (writes: readonly ValueWrite[]) =>
     writes.length === 0 ? Promise.resolve() : input.records.writeValues(writes)
@@ -107,7 +107,7 @@ export function createOfferDeps(input: {
     input: lane => ({
       lane,
       name: nameOf(lane),
-      line,
+      repoConfig,
       known: readBases(doc).get(lane)?.catchUp ?? null,
     }),
     tipOf(lane) {
@@ -146,7 +146,7 @@ export function createOfferDeps(input: {
   }
   return {
     owner: input.owner,
-    line,
+    repoConfig,
     basics,
     piSetup: input.piSetup,
     running: input.running,

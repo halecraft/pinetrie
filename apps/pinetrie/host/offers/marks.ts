@@ -6,15 +6,15 @@ import type { LaneName, ThreadName } from "@pinetrie/core"
 import type { Moved } from "@pinetrie/repo"
 
 /**
- * What a move the owner observed marks for a refresh (ADR-0065): the line's
- * record, and each lane whose offer it may change. Everything, the line, a
+ * What a move the owner observed marks for a refresh (ADR-0065): accepted work's
+ * record, and each lane whose offer it may change. Everything, accepted work, a
  * WIP or the first observation (`all`), marks every named lane whose root is
  * not archived, and every open record. An archived lane's refresh only
  * withdraws an offer it still has, and what still holds one, its ref, its
  * offer bookmark or an open record, marks it anyway. The publish bookmark
- * (`line`) marks the line's record alone.
+ * (`line`) marks accepted work's record alone.
  * `@` alone (`yours`) marks no lane: it changes only each
- * record's `yourEdits` and the line's preview, which one shared read
+ * record's `yourEdits` and accepted work's preview, which one shared read
  * rewrites (`shared`). A lane's ref marks that lane, and an offer bookmark
  * the lane its thread names.
  */
@@ -26,8 +26,8 @@ export function planMarks(input: {
   /** Lanes with an open offer record: how an offer you abandoned is built again. */
   readonly open: readonly LaneName[]
 }): {
-  readonly line: boolean
-  /** Rewrite what `@` changes: each open record's `yourEdits`, and the line's record. */
+  readonly accepted: boolean
+  /** Rewrite what `@` changes: each open record's `yourEdits`, and accepted work's record. */
   readonly shared: boolean
   readonly lanes: readonly LaneName[]
 } {
@@ -48,7 +48,7 @@ export function planMarks(input: {
     }),
   ])
   return {
-    line: every || moved.line,
+    accepted: every || moved.published,
     shared: !every && moved.yours,
     lanes: [...lanes],
   }

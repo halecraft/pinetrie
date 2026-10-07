@@ -365,7 +365,7 @@ export const mutations: readonly Mutation[] = [
     expect: "your commits are accepted, then main moves",
   },
   {
-    name: "a line command's refusal is not said",
+    name: "a setup or publish's refusal is not said",
     file: "packages/interface/publish-view.ts",
     from: '  acting === null || acting.kind === "sent"',
     to: '  acting === null || acting.kind !== "failed"',
@@ -394,7 +394,7 @@ export const mutations: readonly Mutation[] = [
     from: "  const to = destinations.find(d => d.bookmark === acting.to) ?? destinations[0]",
     to: "  const to = destinations[0]",
     command: unit,
-    expect: "your last command: an acceptance from a WIP into the line",
+    expect: "your last command: an acceptance from a WIP into accepted work",
   },
   {
     name: "a prefill forgets where its agent works",
@@ -417,8 +417,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the bases are offered with no WIP to choose",
     file: "packages/interface/send.ts",
-    from: "  if (line === null || line.commit === null || line.wips.length === 0)",
-    to: "  if (line === null || line.commit === null)",
+    from: "    accepted.commit === null ||\n    accepted.wips.length === 0\n",
+    to: "    accepted.commit === null\n",
     command: unit,
     expect: "baseChoices: accepted work first, then each WIP",
   },
@@ -1785,13 +1785,13 @@ export const mutations: readonly Mutation[] = [
     expect: "switching tabs clears every column of the last tab",
   },
   {
-    name: "the header counts an offer the line already holds",
+    name: "the header counts an offer accepted work already holds",
     file: "packages/interface/app-view.ts",
     from: '    if (offerStatus(o).kind !== "open" || root === undefined) return []',
     to: "    if (o.acceptedAs !== null || root === undefined) return []",
     command: unit,
     expect:
-      "the header's offers are the open ones, never one the line already holds",
+      "the header's offers are the open ones, never one accepted work already holds",
   },
   {
     name: "a held offer reviews nothing, but the strip offers it",

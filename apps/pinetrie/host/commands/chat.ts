@@ -22,10 +22,10 @@ import type { Agent, PiSetup, Scribe } from "@pinetrie/pi"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import {
   type RootView,
+  readAccepted,
   readBases,
   readLaneRecords,
   readLanes,
-  readLine,
   readOffers,
   readParticipantNames,
   readParticipants,
@@ -91,7 +91,7 @@ export interface ChatContext {
   readonly writer: WriterId
   /** Where the send asked a new lane to work, if anywhere. */
   readonly work: WorkSetting | null
-  /** The WIP bookmark a new lane begins from; null for the line (ADR-0060). */
+  /** The WIP bookmark a new lane begins from; null for accepted work (ADR-0060). */
   readonly base: string | null
   /** The thread's pinned cards as the sender had them: a run waits for them. */
   readonly pinned: readonly SentCard[]
@@ -217,7 +217,7 @@ export async function sendChat(
       : planBaseNews({
           own: bases.has(lane),
           base: bases.get(lane),
-          line: readLine(session),
+          accepted: readAccepted(session),
           offer: readOffers(session).get(lane),
           known: baseKnown(
             index,
@@ -373,9 +373,9 @@ export async function executeChat(
           kind: "refused",
           code: begin,
           message:
-            begin === ERR.NO_LINE
-              ? "set up the line first: a new thread's lane starts from it"
-              : `${context.base ?? "that"} is no WIP bookmark above the line`,
+            begin === ERR.NOT_SET_UP
+              ? "set up accepted work first: a new thread's lane starts from it"
+              : `${context.base ?? "that"} is no WIP bookmark above accepted work`,
         }
       const created = await agent.createThreadLane(
         { root, at: planned.at },

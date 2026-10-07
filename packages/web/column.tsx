@@ -552,16 +552,16 @@ export function Column(p: ColumnProps) {
   // Catching up and splitting are a card with the command and no text,
   // queued at once (ADR-0055, ADR-0061, ADR-0080): the host pops it when
   // the lane is free. An acceptance names its destination: the default,
-  // or the line (ADR-0060).
+  // or accepted work (ADR-0060).
   const actOnOffer = (button: OfferButton) => {
     if (lane.kind !== "lane") return
-    if (button === "accept" || button === "accept-into-line") {
+    if (button === "accept" || button === "accept-into-accepted") {
       const destinations =
         shows.strip.kind === "offer" ? shows.strip.destinations : []
       const to =
         button === "accept"
           ? destinations[0]
-          : destinations.find(d => d.kind === "line")
+          : destinations.find(d => d.kind === "accepted")
       if (to === undefined) return
       return act({
         kind: "offer",
@@ -584,7 +584,7 @@ export function Column(p: ColumnProps) {
       kind: "queueCommand",
       command:
         button === "continue"
-          ? "continue-on-line"
+          ? "continue-on-accepted"
           : button === "catch-up-parent"
             ? "catch-up-with-parent"
             : button === "split"
@@ -1122,7 +1122,7 @@ export function Column(p: ColumnProps) {
             where={{
               defaultWork,
               project: p.work.project,
-              line: p.work.line,
+              accepted: p.work.accepted,
               forkConflicts: forkConflicts.length,
               usedDirs: [
                 ...new Set(

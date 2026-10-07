@@ -322,17 +322,17 @@ export const ERR = {
   LANE_ID_IN_USE: "lane_id_in_use",
   /** A new root's id that names a root the session already holds (ADR-0063). */
   ROOT_ID_IN_USE: "root_id_in_use",
-  /** An offer accepted, or a publish, before the line is set up (ADR-0060). */
-  NO_LINE: "no_line",
+  /** An offer accepted, or a publish, before accepted work is set up (ADR-0060). */
+  NOT_SET_UP: "not_set_up",
   /** Publishing in a repo with no publish bookmark (ADR-0076). */
   NO_PUBLISH: "no_publish",
-  /** Publishing while the publish bookmark has commits the line lacks (ADR-0076). */
+  /** Publishing while the publish bookmark has commits accepted work lacks (ADR-0076). */
   NOT_FAST_FORWARD: "not_fast_forward",
   /** Publishing while your files have conflicts, or catching them up would make some (ADR-0090). */
   YOURS_CONFLICT: "yours_conflict",
   /** An acceptance into a bookmark that is not one of the offer's destinations now. */
   BAD_DESTINATION: "bad_destination",
-  /** A new thread's base that is not a WIP bookmark above the line. */
+  /** A new thread's base that is not a WIP bookmark above accepted work. */
   BAD_BASE: "bad_base",
   /** Bringing a thread up to date with a WIP bookmark that is gone (ADR-0060). */
   BASE_GONE: "base_gone",
@@ -532,7 +532,7 @@ export type Intent =
       readonly seen: OfferSeen | null
     }
   /** Set up accepted work, or publish it (ADR-0060, ADR-0090). */
-  | { readonly kind: "line"; readonly action: LineAction }
+  | { readonly kind: AcceptedAction }
   /**
    * Move cards, create one, or remove one (ADR-0059): one move, or a keep's
    * several, accepted whole or refused. The host records it in a root's
@@ -563,7 +563,7 @@ export type Intent =
   | { readonly kind: "traces-seen"; readonly traces: readonly string[] }
 
 /**
- * What can be done with an offer: accept it into the line or a WIP
+ * What can be done with an offer: accept it into accepted work or a WIP
  * (ADR-0060, ADR-0083), squash a stack back to one revision, have the agent
  * write its description again, or rebuild it, discarding your edits
  * (ADR-0038). Splitting it is a card's command, `split`, popped when the
@@ -581,8 +581,8 @@ export const OFFER_ACTIONS: readonly OfferAction[] = [
  * What can be done with accepted work: set it up at your `@-`,
  * writing your repo's immutable heads (ADR-0060), or publish it (ADR-0090).
  */
-export type LineAction = "setup" | "publish"
-export const LINE_ACTIONS: readonly LineAction[] = ["setup", "publish"]
+export type AcceptedAction = "setup" | "publish"
+export const ACCEPTED_ACTIONS: readonly AcceptedAction[] = ["setup", "publish"]
 
 // --- the board (ADR-0085) ---------------------------------------------------
 
@@ -835,7 +835,7 @@ export const HOST_OPERATOR = "pinetrie-host"
  * accepted work, or a WIP bookmark you chose at its first message.
  */
 export type ThreadBase =
-  | { readonly kind: "line" }
+  | { readonly kind: "accepted" }
   | { readonly kind: "wip"; readonly bookmark: string }
 
 /** The thread a lane's copy was cloned from, by its lane and its name (ADR-0072). */
@@ -863,8 +863,8 @@ export type CatchUpFrom = ThreadBase | ParentThread
 export interface LaneBase {
   readonly base: ThreadBase
   /**
-   * Where the lane's own work begins: the line commit its base names, or the
-   * WIP's copy; for a lane with no `Pinetrie-Base`, the newest line commit in
+   * Where the lane's own work begins: accepted commit its base names, or the
+   * WIP's copy; for a lane with no `Pinetrie-Base`, the newest accepted commit in
    * its history.
    */
   readonly start: CommitId
@@ -950,7 +950,7 @@ declare const snapshotIdBrand: unique symbol
  */
 export type SnapshotId = string & { readonly [snapshotIdBrand]: true }
 export const snapshotId = (id: string): SnapshotId => id as SnapshotId
-/** The project's disk at the line's commit, which root lanes fork from (ADR-0060). */
+/** The project's disk at accepted work's commit, which root lanes fork from (ADR-0060). */
 export const BASE_SNAPSHOT = snapshotId("base")
 
 /** Where a lane's tools work: its own container and disk, or directly in a directory. */
@@ -1030,7 +1030,7 @@ export interface OfferRecord {
   readonly size: number
   /** The lane turned since the stack was made: it no longer holds all of it. */
   readonly stale: boolean
-  /** None when the line already holds its work (`offerStatus`'s `held`, S89). */
+  /** None when accepted work already holds its work (`offerStatus`'s `held`, S89). */
   readonly files: readonly string[]
   /** Files that conflict with your committed work (S48 item 3). */
   readonly conflicts: readonly string[]
@@ -1121,32 +1121,36 @@ export const spanKey = (s: DiffSpan): string =>
 
 /**
  * What a fork starts on (ADR-0060): a commit a lane recorded (a branch below
- * agent work), the line's commit, or a copy of a WIP bookmark made on the
- * line commit under it, so the lane freezes nothing of yours.
+ * agent work), accepted work's commit, or a copy of a WIP bookmark made on the
+ * accepted commit under it, so the lane freezes nothing of yours.
  */
 export type ForkStart =
   | { readonly kind: "commits"; readonly commits: readonly CommitId[] }
-  | { readonly kind: "line"; readonly onto: string; readonly commit: CommitId }
+  | {
+      readonly kind: "accepted"
+      readonly acceptedBookmark: string
+      readonly commit: CommitId
+    }
   | {
       readonly kind: "wip"
       readonly bookmark: string
       /** The WIP's commit: whose files the copy holds. */
       readonly commit: CommitId
-      /** The line commit under the WIP: the copy's parent. */
+      /** Accepted work commit under the WIP: the copy's parent. */
       readonly under: CommitId
     }
 
 /**
- * What bringing a thread up to date merges into its lane: the line's
+ * What bringing a thread up to date merges into its lane: accepted work's
  * commit, or a fresh copy of a WIP (ADR-0060); or the newest commit of the
  * thread it branched from (ADR-0072).
  */
 export type BaseMerge =
   | {
-      readonly kind: "line"
-      readonly onto: string
+      readonly kind: "accepted"
+      readonly acceptedBookmark: string
       readonly commit: CommitId
-      /** The thread moves to the line: with nothing to merge, a commit still names it. */
+      /** The thread moves to accepted work: with nothing to merge, a commit still names it. */
       readonly mark: boolean
     }
   | {
@@ -1154,7 +1158,7 @@ export type BaseMerge =
       readonly bookmark: string
       /** The WIP's commit: whose files the copy holds. */
       readonly commit: CommitId
-      /** The line commit under the WIP: where the commits that came in start. */
+      /** Accepted work commit under the WIP: where the commits that came in start. */
       readonly under: CommitId
       /**
        * The lane's previous copy (`LaneBase.start`): the new copy's parent,
@@ -1196,25 +1200,25 @@ export interface BannerRecord {
 
 /**
  * Accepted work in your repo, as the host last read it (ADR-0060): a
- * host-written `pinetrie.line` value, a cache the page reads. The repo is the
+ * host-written `pinetrie.accepted` value, a cache the page reads. The repo is the
  * truth; the host rewrites this whenever your repo's operation head moves.
  */
-export interface LineRecord {
-  /** The line's bookmark, and the prefix that makes a bookmark a WIP. */
-  readonly onto: string
+export interface AcceptedRecord {
+  /** Accepted work's bookmark, and the prefix that makes a bookmark a WIP. */
+  readonly acceptedBookmark: string
   readonly wipPrefix: string
-  /** The bookmark publishing moves forward to the line (ADR-0076). */
+  /** The bookmark publishing moves forward to accepted work (ADR-0076). */
   readonly publish: string
-  /** The line's commit; null before it is set up. */
+  /** Accepted work's commit; null before it is set up. */
   readonly commit: CommitId | null
   /**
    * Your repo's `immutable_heads()` now (null: jj's builtin), and what
-   * setting up the line writes. Equal once it is written.
+   * setting up accepted work writes. Equal once it is written.
    */
   readonly heads: { readonly current: string | null; readonly proposed: string }
   /**
    * Your repo's `revsets.log` now (null: jj's default), and what setting up
-   * the line writes: the offers added, since an immutable head is out of
+   * accepted work writes: the offers added, since an immutable head is out of
    * jj's default log (S77 item 8).
    */
   readonly log: { readonly current: string | null; readonly proposed: string }
@@ -1222,16 +1226,16 @@ export interface LineRecord {
   readonly wips: readonly {
     readonly bookmark: string
     readonly commit: CommitId
-    /** Line commits it lacks: how far it is behind the line. */
+    /** Line commits it lacks: how far it is behind accepted work. */
     readonly behind: number
-    /** Its commits not on the line: what lands with it. */
+    /** Its commits not on accepted work: what lands with it. */
     readonly ahead: number
   }[]
   /**
-   * The publish bookmark against the line (ADR-0076): its commit (null when
-   * the repo has none), the line commits it lacks (`behind`: what publishing
-   * moves it over) and its commits the line lacks (`ahead`: publishing is a
-   * fast-forward only at 0). Both 0 before the line is set up.
+   * The publish bookmark against accepted work (ADR-0076): its commit (null when
+   * the repo has none), accepted commits it lacks (`behind`: what publishing
+   * moves it over) and its commits accepted work lacks (`ahead`: publishing is a
+   * fast-forward only at 0). Both 0 before accepted work is set up.
    */
   readonly published: {
     readonly commit: CommitId | null
@@ -1239,13 +1243,13 @@ export interface LineRecord {
     readonly ahead: number
   }
   /**
-   * Your `@-` against the line: the line commits it lacks (`behind`), and
-   * your commits below `@` the line lacks (`ahead`, `::@- ~ ::<onto>`: what
+   * Your `@-` against accepted work: accepted commits it lacks (`behind`), and
+   * your commits below `@` accepted work lacks (`ahead`, `::@- ~ ::<accepted>`: what
    * a publish accepts, ADR-0090). `catchUp` is what catching your files
    * up would do (S80): how many files change, those that conflict, and your
    * other heads that move with `@`; null when nothing is behind, or `@`
-   * shares no commit with the line. `conflicts` are your conflicted commits
-   * above the line, `@` included, and the conflicted files in `@`.
+   * shares no commit with accepted work. `conflicts` are your conflicted commits
+   * above accepted work, `@` included, and the conflicted files in `@`.
    */
   readonly yours: {
     readonly behind: number
@@ -1270,14 +1274,14 @@ export interface LineRecord {
 /**
  * A thread's base as its lane's history says it (ADR-0060): a host-written
  * `pinetrie.base` value keyed by lane, a cache the page reads. `start` is the
- * commit the lane's newest `Pinetrie-Base` trailer names, or the line commit it
+ * commit the lane's newest `Pinetrie-Base` trailer names, or accepted commit it
  * forked from when it has none.
  */
 export interface BaseRecord {
   readonly lane: LaneName
   readonly base: ThreadBase
   readonly start: CommitId
-  /** A WIP base: on the line now (landed), gone without landing, or neither. */
+  /** A WIP base: on accepted work now (landed), gone without landing, or neither. */
   readonly state: "ok" | "landed" | "gone"
   /**
    * What catching up would change, read at the lane's tip and the base's
@@ -1286,7 +1290,7 @@ export interface BaseRecord {
    */
   readonly catchUp: CatchUpRead | null
   /**
-   * Accepted-offer commits of this thread on the line, above its base,
+   * Accepted-offer commits of this thread on accepted work, above its base,
    * that name no source (`untracedLanes`, S97): nothing is offered until it
    * catches up past them.
    */
@@ -1303,7 +1307,7 @@ export interface BaseRecord {
 /** What catching up would change in a lane (`catchUpFiles`), and what it was read at. */
 export interface CatchUpRead {
   readonly tip: CommitId
-  /** The base's commit: the line's, or the WIP's. */
+  /** The base's commit: accepted work's, or the WIP's. */
   readonly to: CommitId
   readonly files: readonly string[]
 }
@@ -1312,17 +1316,17 @@ export interface CatchUpRead {
 
 /**
  * The commands that catch a thread up (ADR-0055). The first two bring the
- * thread up to date with its base, `continue-on-line` moving a thread whose
- * WIP is gone to the line first (ADR-0060); `catch-up-with-parent` merges
+ * thread up to date with its base, `continue-on-accepted` moving a thread whose
+ * WIP is gone to accepted work first (ADR-0060); `catch-up-with-parent` merges
  * the thread it branched from (ADR-0072).
  */
 export type CatchUpCommand =
   | "bring-up-to-date"
-  | "continue-on-line"
+  | "continue-on-accepted"
   | "catch-up-with-parent"
 export const CATCH_UP_COMMANDS: readonly CatchUpCommand[] = [
   "bring-up-to-date",
-  "continue-on-line",
+  "continue-on-accepted",
   "catch-up-with-parent",
 ]
 

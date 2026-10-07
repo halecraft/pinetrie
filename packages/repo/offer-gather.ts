@@ -28,15 +28,15 @@ import type {
 } from "@pinetrie/core"
 import {
   commitsOf,
-  type LineConfig,
   laneBase,
   lines,
+  type RepoConfig,
   type Runner,
   revsetName,
   titlesOf,
 } from "@pinetrie/lanes"
+import { readWipState } from "./accepted.ts"
 import { gatherLane } from "./lane-read.ts"
-import { readWipState } from "./line.ts"
 import {
   laneTipIn,
   query,
@@ -52,7 +52,7 @@ export interface OfferInput {
   readonly lane: LaneName
   /** The thread's name: an offer is found by it. Undefined before it is named. */
   readonly name: ThreadName | undefined
-  readonly line: LineConfig
+  readonly repoConfig: RepoConfig
   /** What catching up would change, as the page's base record last said: kept at the same tip and base commit (`readCatchUp`). */
   readonly known: CatchUpRead | null
 }
@@ -136,9 +136,9 @@ const commitOf = async (jj: Runner, bookmark: string) =>
 
 /**
  * Where a lane's offer sits and starts, and its base record, by the separate
- * reads: its base from the lane's newest `Pinetrie-Base`, its target the line's
+ * reads: its base from the lane's newest `Pinetrie-Base`, its target accepted work's
  * commit or the WIP's, its start `startOfOffer`. Null before the lane has a
- * tip here, or a line commit in its history.
+ * tip here, or a accepted commit in its history.
  */
 async function placeOf(
   jj: Runner,
@@ -148,7 +148,7 @@ async function placeOf(
   readonly base: BaseRecord
   readonly work: WorkChanges
 } | null> {
-  const { line, lane } = input
+  const { repoConfig: line, lane } = input
   const tip = await laneTipIn(jj, lane)
   if (tip === null) return null
   const base = await laneBase(jj, tip, line)
@@ -159,8 +159,8 @@ async function placeOf(
       ? await commitOf(jj, base.base.bookmark)
       : state === "gone"
         ? null
-        : await commitOf(jj, line.onto)
-  const start = await startOfOffer(jj, { tip, base, line, lane })
+        : await commitOf(jj, line.acceptedBookmark)
+  const start = await startOfOffer(jj, { tip, base, repoConfig: line, lane })
   const catchUp =
     target === null
       ? null
@@ -210,7 +210,7 @@ export async function gatherOffer(
 /**
  * What a refresh plans from. An archived thread's offer is read against the
  * line: its lane's history is gone, and with it its base, and the thread's
- * trailer leaves a WIP's own commits out of the offer. A lane on the line is
+ * trailer leaves a WIP's own commits out of the offer. A lane on accepted work is
  * read in one `jj log` with the shared facts (ADR-0065); a lane on a WIP the
  * separate way, since its target and state need more of your repo.
  */
@@ -219,10 +219,10 @@ export async function gatherRefresh(
   input: OfferInput & { readonly archived: boolean },
 ): Promise<RefreshGather> {
   const { jj } = ops
-  const { lane, name, line } = input
+  const { lane, name, repoConfig: line } = input
   if (name === undefined) return { kind: "none" }
   if (input.archived) {
-    const target = `present(${revsetName(line.onto)})`
+    const target = `present(${revsetName(line.acceptedBookmark)})`
     const offer = await readOffer(jj, { name, target })
     return {
       kind: "plan",
@@ -234,7 +234,7 @@ export async function gatherRefresh(
   const gathered = await gatherLane(jj, {
     lane,
     name,
-    line,
+    repoConfig: line,
     shared: await ops.shared(),
     known: input.known,
   })
@@ -270,14 +270,14 @@ const factsOf = (
 
 /**
  * What an acceptance reads besides its gather: how many of the WIP's commits land
- * with it on the line, and which of the line's and the WIP's bookmarks sit
+ * with it on accepted work, and which of accepted work's and the WIP's bookmarks sit
  * at or below the offer's bottom's parent, so a move to one is forward. Null
  * without an offer to accept: none, divergent, or a WIP gone.
  */
 export async function gatherOfferAcceptance(
   ops: Pick<RepoOps, "jj">,
   gathered: OfferGather,
-  line: LineConfig,
+  repoConfig: RepoConfig,
 ): Promise<OfferAcceptanceFacts | null> {
   const { jj } = ops
   const { place, offer } = gathered
@@ -290,14 +290,14 @@ export async function gatherOfferAcceptance(
       ? (
           await commitsOf(
             jj,
-            `::present(${revsetName(base.bookmark)}) ~ ::present(${revsetName(line.onto)})`,
+            `::present(${revsetName(base.bookmark)}) ~ ::present(${revsetName(repoConfig.acceptedBookmark)})`,
           )
         ).length
       : 0
   const below = new Set<string>()
   for (const bookmark of [
     ...(base.kind === "wip" ? [base.bookmark] : []),
-    line.onto,
+    repoConfig.acceptedBookmark,
   ])
     if (
       (

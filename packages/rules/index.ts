@@ -4,6 +4,34 @@
 // use is not exported here: its tests import it from its module.
 
 export {
+  ACCEPTED,
+  ACCEPTED_KEY,
+  type AcceptedActionState,
+  acceptedActionState,
+  acceptedRefusal,
+  BASE,
+  baseMovedOn,
+  type CatchUpNow,
+  catchUpName,
+  catchUpOf,
+  effectiveBase,
+  type ForkBegin,
+  mergedFrom,
+  nothingToPublish,
+  type ParentNow,
+  type PublishWork,
+  parentNow,
+  planAcceptedAction,
+  planAcceptedRecord,
+  planBegin,
+  planParentUpdate,
+  planPublishFinish,
+  planUpdateFrom,
+  publishUndone,
+  publishWork,
+  type UpdateRefusal,
+} from "./accepted.ts"
+export {
   type CatchUpRefusal,
   catchUpAnswer,
   catchUpRefusal,
@@ -180,34 +208,6 @@ export {
   resolutionFloor,
 } from "./land.ts"
 export {
-  BASE,
-  type CatchUpNow,
-  catchUpName,
-  catchUpOf,
-  effectiveBase,
-  type ForkBegin,
-  LINE,
-  LINE_KEY,
-  type LineActionState,
-  lineActionState,
-  lineRefusal,
-  mergedFrom,
-  movedOnLine,
-  nothingToPublish,
-  type ParentNow,
-  type PublishWork,
-  parentNow,
-  planBegin,
-  planLineAction,
-  planLineRecord,
-  planParentUpdate,
-  planPublishFinish,
-  planUpdateFrom,
-  publishUndone,
-  publishWork,
-  type UpdateRefusal,
-} from "./line.ts"
-export {
   closeStreams,
   isCurrentReply,
   planClear,
@@ -294,7 +294,12 @@ export {
 } from "./review.ts"
 export { ROOT } from "./roots.ts"
 export { planSeatSweep, planSeats, SEAT, writersOfClients } from "./seat.ts"
-export { type AnyRecordSpec, RECORD_SPECS } from "./specs.ts"
+export {
+  type AnyRecordSpec,
+  planUndeclaredSweep,
+  RECORD_SPECS,
+  type StoredRecords,
+} from "./specs.ts"
 export { planStartup } from "./startup.ts"
 export {
   type CarryOnMessage,

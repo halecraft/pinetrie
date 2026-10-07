@@ -131,7 +131,7 @@ export type ColumnAct =
       readonly command: CardCommand | null
     }
   /**
-   * A command button: catching up, continuing on the line, or splitting the
+   * A command button: catching up, continuing on accepted work, or splitting the
    * offer (ADR-0060, ADR-0061, ADR-0080): a new card, `create`, made at the
    * thread's end with `command` and no text, and queued on `lane` at once,
    * so the host carries the command out when the lane is free. Your card in

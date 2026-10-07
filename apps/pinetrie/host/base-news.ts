@@ -11,8 +11,8 @@
 import { baseKnown, type CommitId, type LaneName } from "@pinetrie/core"
 import type { Agent } from "@pinetrie/pi"
 import {
+  readAccepted,
   readBases,
-  readLine,
   readOffers,
   readRunning,
   readTreeIndex,
@@ -52,7 +52,7 @@ export function createBaseNews(deps: {
     const news = planBaseNews({
       own: bases.has(lane),
       base: bases.get(lane),
-      line: readLine(session),
+      accepted: readAccepted(session),
       offer: readOffers(session).get(lane),
       known: baseKnown(readTreeIndex(doc), readLaneTip(doc, lane)),
       told: told.get(lane) ?? null,

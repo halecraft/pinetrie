@@ -1,11 +1,11 @@
-import { commitId, ERR, type LineFacts } from "@pinetrie/core"
-import { DEFAULT_LINE } from "@pinetrie/lanes"
+import { type AcceptedFacts, commitId, ERR } from "@pinetrie/core"
+import { DEFAULT_REPO } from "@pinetrie/lanes"
 import type { RepoOps, RepoOwner, RepoStep } from "@pinetrie/repo"
 import { describe, expect, test } from "vitest"
 import { applyWrites, basics, record } from "../fakes.ts"
-import { createLine } from "./line.ts"
+import { createAcceptedWork } from "./accepted.ts"
 
-const facts = (over: Partial<LineFacts["yours"]> = {}): LineFacts => ({
+const facts = (over: Partial<AcceptedFacts["yours"]> = {}): AcceptedFacts => ({
   commit: commitId("c1"),
   heads: null,
   log: null,
@@ -21,11 +21,11 @@ const facts = (over: Partial<LineFacts["yours"]> = {}): LineFacts => ({
 })
 
 /**
- * A publish on a fake owner: `facts()` is the line until the catch-up runs,
+ * A publish on a fake owner: `facts()` is accepted work until the catch-up runs,
  * `after` from then on; the move's step throws when `moveFails`.
  */
 function rig(
-  after: LineFacts,
+  after: AcceptedFacts,
   {
     moveFails = false,
     catchUp = true,
@@ -38,7 +38,7 @@ function rig(
   const ops = record<RepoOps>({
     shared: async () => ({
       op,
-      line: now,
+      accepted: now,
       acceptedOfferCommits: [],
       untraced: [],
       editing: new Set(),
@@ -57,14 +57,14 @@ function rig(
   const owner = record<Pick<RepoOwner, "later" | "command">>({
     command: async step => step(ops),
   }).port
-  const line = createLine({
+  const accepted = createAcceptedWork({
     owner,
     basics: b,
-    line: { ...DEFAULT_LINE, catchUp },
+    repoConfig: { ...DEFAULT_REPO, catchUp },
     writeValues: async w => applyWrites(b, w),
   })
   const argv = () => ran.map(steps => steps.map(s => s.args.join(" ")))
-  return { line, argv }
+  return { line: accepted, argv }
 }
 
 describe("a publish with offers.catchUp off moves main alone (ADR-0099)", () => {
@@ -76,7 +76,7 @@ describe("a publish with offers.catchUp off moves main alone (ADR-0099)", () => 
 })
 
 describe("a publish with offers.catchUp on, in two rounds (ADR-0090)", () => {
-  test("the catch-up, then the move, from the line read after it", async () => {
+  test("the catch-up, then the move, from accepted work read after it", async () => {
     const { line, argv } = rig(facts({ behind: 0, ahead: 0, catchUp: null }))
     expect(await line.act("publish")).toBeNull()
     expect(argv()).toEqual([

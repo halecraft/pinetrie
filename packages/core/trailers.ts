@@ -54,7 +54,7 @@ const readName = (key: TrailerKey): string =>
   `${READ}${TRAILERS[key].slice(WRITTEN.length)}`
 
 /** A line `<key>: <value>` of each key, under any name `READ` matches. */
-const LINE = Object.fromEntries(
+const ACCEPTED = Object.fromEntries(
   (Object.keys(TRAILERS) as TrailerKey[]).map(k => [
     k,
     new RegExp(`^${readName(k)}: (.*)$`),
@@ -63,14 +63,14 @@ const LINE = Object.fromEntries(
 
 /** What follows `<key>: ` on `line`, as written; undefined when `line` is not that trailer. */
 const valueOn = (line: string, key: TrailerKey): string | undefined =>
-  LINE[key].exec(line)?.[1]
+  ACCEPTED[key].exec(line)?.[1]
 
 /**
- * pre-rename: a base on the line as the host wrote it before the rename.
+ * pre-rename: a base on accepted work as the host wrote it before the rename.
  * The line's bookmark was `pineta-onto` then; it is `pinetrie-onto` now, so
- * the readers that compare a base's bookmark with the line's would take such
+ * the readers that compare a base's bookmark with accepted work's would take such
  * a base for a WIP that no longer exists. Read as no base, the lane falls
- * back to the newest line commit in its history (`laneBase`), which is the
+ * back to the newest accepted commit in its history (`laneBase`), which is the
  * line. A WIP's base keeps its name, and is read.
  */
 const OLD_LINE_BASE = "Pineta-Base: pineta-onto@"
@@ -119,7 +119,7 @@ export const hasTrailer = (
 function ourLastParagraph(text: string): number | null {
   const cut = text.lastIndexOf("\n\n")
   if (cut < 0) return null
-  const ours = Object.values(LINE)
+  const ours = Object.values(ACCEPTED)
   return text
     .slice(cut + 2)
     .split("\n")
@@ -150,7 +150,7 @@ export function entryOfMessage(description: string): EntryId | null {
 // ── a lane's base (ADR-0060) ──────────────────────────────────────────────
 
 /**
- * A commit's message that names a lane's base (ADR-0060): the line or a WIP
+ * A commit's message that names a lane's base (ADR-0060): accepted work or a WIP
  * bookmark, and the commit it pointed at. The newest such commit in a lane's
  * history is the thread's base (`laneBase`).
  */
@@ -268,7 +268,7 @@ export function offerLedger(message: string): OfferLedger | null {
   return { source: commitId(source), start: start.map(commitId) }
 }
 
-// ── an accepted-offer commit on the line (ADR-0060, S97) ────────────────
+// ── an accepted-offer commit on accepted work (ADR-0060, S97) ────────────────
 
 /**
  * Every `Pinetrie-Source` an accepted-offer commit's message names, from

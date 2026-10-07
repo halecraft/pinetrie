@@ -221,7 +221,7 @@ describe("a run's pinned cards (ADR-0048)", () => {
   test("a chat's run is told its base's news first, before its cards entry, which stays the prompt's parent (ADR-0080)", async () => {
     const behind = encodeBehind(
       {
-        from: { kind: "line" },
+        from: { kind: "accepted" },
         to: commitId("l2"),
         files: ["a.ts"],
         overlap: [],

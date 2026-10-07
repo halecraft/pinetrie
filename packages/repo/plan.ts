@@ -6,12 +6,12 @@
 // each rule below is tested without jj or git.
 
 import {
+  type AcceptedFacts,
   type CommitId,
   commitId,
   HOST_OPERATOR,
   type LaneBase,
   type LaneName,
-  type LineFacts,
   type OfferSource,
   type PublishMove,
   type ThreadName,
@@ -19,36 +19,36 @@ import {
 } from "@pinetrie/core"
 import {
   bookmarkName,
-  type LineConfig,
   laneStackRef,
   laneTipRef,
   OFFER_BOOKMARKS,
   offerBookmark,
+  type RepoConfig,
   revsetName,
   stackBookmark,
 } from "@pinetrie/lanes"
 import { git, host, type RepoStep, you } from "./step.ts"
 
 /**
- * Your repo's `immutable_heads()` with the line and the offers on it added
+ * Your repo's `immutable_heads()` with accepted work and the offers on it added
  * (ADR-0060): `current` is the definition the repo has, null for jj's
  * builtin. `present()`, or a repo with no line fails every jj command
- * (S77). An offer is immutable only while its parent is the line, so nothing
- * of yours above the line is frozen. Given its own output, it returns it.
+ * (S77). An offer is immutable only while its parent is accepted work, so nothing
+ * of yours above accepted work is frozen. Given its own output, it returns it.
  */
 export function immutableHeads(
-  line: LineConfig,
+  repoConfig: RepoConfig,
   current: string | null,
 ): string {
-  const onto = `present(${revsetName(line.onto)})`
-  const added = `${onto} | (${OFFER_BOOKMARKS} & children(${onto}))`
+  const acceptedBookmark = `present(${revsetName(repoConfig.acceptedBookmark)})`
+  const added = `${acceptedBookmark} | (${OFFER_BOOKMARKS} & children(${acceptedBookmark}))`
   const base = (current ?? "builtin_immutable_heads()").trim()
   return base.endsWith(added) ? base : `${base} | ${added}`
 }
 
 /**
  * Your repo's `revsets.log` with the offers added (ADR-0060): `current` is
- * the definition the repo has, null for jj's default. An offer on the line is
+ * the definition the repo has, null for jj's default. An offer on accepted work is
  * an immutable head, which `builtin_log()` leaves out, so jj and jjui would
  * not show it (S77 item 8). Given its own output, it returns it.
  */
@@ -63,12 +63,12 @@ export function logRevset(current: string | null): string {
  * host, then your repo's `immutable_heads()` (`immutableHeads`), written in
  * the repo's own config. Run only on your command, after you saw `heads`.
  */
-export const planLineSetup = (input: {
-  readonly onto: string
+export const planSetup = (input: {
+  readonly acceptedBookmark: string
   readonly heads: string
   readonly log: string
 }): RepoStep[] => [
-  host("bookmark", "create", input.onto, "-r", "@-"),
+  host("bookmark", "create", input.acceptedBookmark, "-r", "@-"),
   you(
     "config",
     "set",
@@ -94,26 +94,28 @@ export const moveForward = (
   (as === "host" ? host : you)("bookmark", "move", ...bookmarks, "--to", to)
 
 /**
- * A publish's catch-up (ADR-0090): your work above the line rebased onto it,
+ * A publish's catch-up (ADR-0090): your work above accepted work rebased onto it,
  * as you, since it changes your files; jj snapshots them first. `-b @` moves
  * every head on your work with `@` (S80 item 1); `-r` would strip them of the
  * commits under them. A conflict is recorded, not refused, and
  * `planPublishFinish` reads it.
  */
 export const planPublishCatchUp = (input: {
-  readonly onto: string
-}): RepoStep[] => [you("rebase", "-b", "@", "-d", revsetName(input.onto))]
+  readonly acceptedBookmark: string
+}): RepoStep[] => [
+  you("rebase", "-b", "@", "-d", revsetName(input.acceptedBookmark)),
+]
 
 /**
  * The move that ends a publish (ADR-0090): the publish bookmark forward to
- * the line, as the host, since it changes no file and anyone admitted may
- * (ADR-0076); or, accepting your commits, the line and the publish bookmark
+ * accepted work, as the host, since it changes no file and anyone admitted may
+ * (ADR-0076); or, accepting your commits, accepted work and the publish bookmark
  * together to your `@-`, as you, since it is your act.
  */
 export const planPublishMove = (input: PublishMove): RepoStep[] => [
   input.accept
-    ? moveForward("you", [input.onto, input.publish], "@-")
-    : moveForward("host", [input.publish], revsetName(input.onto)),
+    ? moveForward("you", [input.acceptedBookmark, input.publish], "@-")
+    : moveForward("host", [input.publish], revsetName(input.acceptedBookmark)),
 ]
 
 /**
@@ -125,15 +127,15 @@ export const planCatchUpUndo = (op: string): RepoStep[] => [
 ]
 
 /**
- * What setting the line up would write to your repo's config, from what jj
- * resolves now (`LineFacts`): its immutable heads and log, each with the
+ * What setting accepted work up would write to your repo's config, from what jj
+ * resolves now (`AcceptedFacts`): its immutable heads and log, each with the
  * line's own added (`immutableHeads`, `logRevset`). Its record shows them.
  */
-export const lineProposal = (
-  line: LineConfig,
-  facts: Pick<LineFacts, "heads" | "log">,
+export const setupProposal = (
+  repoConfig: RepoConfig,
+  facts: Pick<AcceptedFacts, "heads" | "log">,
 ): { readonly heads: string; readonly log: string } => ({
-  heads: immutableHeads(line, facts.heads),
+  heads: immutableHeads(repoConfig, facts.heads),
   log: logRevset(facts.log),
 })
 
@@ -199,7 +201,7 @@ export const ACCEPTED_OFFER_COMMITS = trailerRevset(["source", "thread"])
 /**
  * Where an offer starts, as a revset (ADR-0060): the newest ancestors of the
  * lane's tip you already have. That is the commit the lane's base names
- * (`start`: the line's commit, or the WIP's copy), and every lane commit a
+ * (`start`: accepted work's commit, or the WIP's copy), and every lane commit a
  * accepted offer's `Pinetrie-Source` names above what the base holds
  * (`acceptedOfferCommitsRevset`), with their history: a parent lane's work
  * accepted after this lane forked, or a branch of this lane accepted
@@ -220,20 +222,20 @@ export function offerStart(input: {
 /**
  * The accepted-offer commits `offerStart` reads, by their `Pinetrie-Source`
  * or `Pinetrie-Thread` trailers: an accepted offer's sources, or none for an
- * offer accepted before offers carried them (`untracedLanes`, S97). Those in `::<onto>`, and in `::<wip>` for a
+ * offer accepted before offers carried them (`untracedLanes`, S97). Those in `::<accepted>`, and in `::<wip>` for a
  * lane on a WIP, but not in the history of the base's `source` (S81). The lane merged that commit, so it holds
  * what was accepted below it. An offer keeps the diff from the merge of its
  * start to the tip, so a source the target holds as another commit would be
- * subtracted from the target, and conflict where the line changed it since.
+ * subtracted from the target, and conflict where accepted work changed it since.
  * The source is `present()`: a commit gone from your repo excludes nothing.
  */
 export function acceptedOfferCommitsRevset(input: {
-  readonly line: LineConfig
+  readonly repoConfig: RepoConfig
   readonly base: LaneBase
 }): string {
   const { base } = input.base
   const heads = [
-    `present(${revsetName(input.line.onto)})`,
+    `present(${revsetName(input.repoConfig.acceptedBookmark)})`,
     ...(base.kind === "wip" ? [`present(${revsetName(base.bookmark)})`] : []),
   ].join(" | ")
   return `(::(${heads}) ~ ::present(${input.base.source})) & ${ACCEPTED_OFFER_COMMITS}`
@@ -318,7 +320,7 @@ export function walkToHost(
 }
 
 /**
- * A host operation that rewrites an offer. An offer on the line is immutable
+ * A host operation that rewrites an offer. An offer on accepted work is immutable
  * (ADR-0060), so the host's own rewrites of it pass `--ignore-immutable`; a
  * bookmark move rewrites no commit and needs none (S77 item 7).
  */
@@ -455,7 +457,7 @@ export function planOfferAcceptanceSteps(input: {
   /** The offer's bookmark, as its record holds it. */
   readonly bookmark: string
   readonly top: string
-  /** The bookmark the acceptance moves: the line, or a WIP. */
+  /** The bookmark the acceptance moves: accepted work, or a WIP. */
   readonly destination: string
 }): RepoStep[] {
   return [

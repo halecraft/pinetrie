@@ -24,6 +24,7 @@ import {
 import { type CommitOptions, subscribe } from "@kyneta/schema"
 import { WebsocketClientTransport } from "@kyneta/websocket-transport/browser"
 import {
+  type AcceptedAction,
   type CardId,
   type CardRecord,
   commandOf,
@@ -31,7 +32,6 @@ import {
   type Intent,
   keyOf,
   type LaneName,
-  type LineAction,
   type Move,
   type MoveDirection,
   type OfferAction,
@@ -314,8 +314,8 @@ export interface SessionClient {
     to?: string | null,
   ): Promise<Outcome>
   /** Set up accepted work, or publish it (ADR-0060, ADR-0090). Tracked in `acting`. */
-  line(action: LineAction): Promise<Outcome>
-  /** Your offer and line commands out now, or refused or failed (`acting.ts`). */
+  actOnAccepted(action: AcceptedAction): Promise<Outcome>
+  /** Your offer, setup and publish commands out now, or refused or failed (`acting.ts`). */
   readonly acting: Readable<ActingState>
   /** Let go of every part, then shut the exchange down; rejects only when that fails. */
   close(): Promise<void>
@@ -324,8 +324,8 @@ export interface SessionClient {
 /**
  * What the host is asked for that is neither tracked nor needs a root found:
  * a chat, a move and a reorder are tracked in `moves`, an undo of moves
- * waits for this tab's copy of the places, an offer action and a line
- * action are tracked in `acting`, and a mark and a retitle need their
+ * waits for this tab's copy of the places, an offer action and set up or
+ * publish are tracked in `acting`, and a mark and a retitle need their
  * entry's root (`inRootOf`).
  */
 export type HostRequest = Exclude<
@@ -339,7 +339,8 @@ export type HostRequest = Exclude<
       | "mark"
       | "retitle"
       | "offer"
-      | "line"
+      | "setup"
+      | "publish"
   }
 >
 
@@ -691,9 +692,9 @@ export async function connectSession(
         send({ kind: "offer", lane, action, to, seen }),
       )
     },
-    line(action) {
-      return sendActing(acting, { kind: "line", action }, () =>
-        send({ kind: "line", action }),
+    actOnAccepted(action) {
+      return sendActing(acting, { kind: "accepted", action }, () =>
+        send({ kind: action }),
       )
     },
     acting: readable(acting),

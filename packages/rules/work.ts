@@ -24,6 +24,7 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
+import type { ForkBegin } from "./accepted.ts"
 import {
   CommitSchema,
   decodeAt,
@@ -31,7 +32,6 @@ import {
   fixedKey,
   laneKey,
 } from "./decode.ts"
-import type { ForkBegin } from "./line.ts"
 import type { RecordSpec } from "./records.ts"
 
 /** The one `pinetrie.project` value's key: a host has one project. */
@@ -206,7 +206,7 @@ export function planTurnRecord(input: {
  * Where a new lane of its own starts. With a revision above it: the nearest
  * snapshot above, else the base snapshot, and that revision's commit. With
  * none (a root thread, or a branch above any agent work): the base snapshot,
- * which is the line's, and `begin`: the line, or a WIP's copy (ADR-0060).
+ * which is accepted work's, and `begin`: accepted work, or a WIP's copy (ADR-0060).
  * Either way the fork starts on a commit of its own, because a cloned disk
  * carries its parent's working-copy change, which the fork must leave (S42
  * item 2).

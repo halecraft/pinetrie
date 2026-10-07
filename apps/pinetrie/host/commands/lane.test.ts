@@ -216,7 +216,7 @@ test("an offer's fact is queued as a card at the thread's end, after the cards t
     by: ada,
     as: "kabcdefgh",
     bookmark: "pinetrie-onto",
-    to: { kind: "line" },
+    to: { kind: "accepted" },
   } as const
   await recordFact(
     {

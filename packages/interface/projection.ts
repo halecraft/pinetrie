@@ -35,6 +35,7 @@ import {
   type Workflow,
 } from "@pinetrie/core"
 import {
+  readAccepted,
   readAgentActivity,
   readArchived,
   readBanners,
@@ -47,7 +48,6 @@ import {
   readHeldIndex,
   readLaneRecords,
   readLanes,
-  readLine,
   readMarks,
   readNames,
   readOffers,
@@ -190,7 +190,7 @@ function readFacts(view: HeldView): SessionFacts {
       offers: readOffers(doc),
       names: readNames(doc),
       banners: readBanners(doc),
-      line: readLine(doc),
+      accepted: readAccepted(doc),
       bases: readBases(doc),
     },
   }

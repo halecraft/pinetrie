@@ -29,12 +29,12 @@ import { prepareHost } from "@pinetrie/lanes"
 import { scriptedModel } from "@pinetrie/pi"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import {
+  readAccepted,
   readBoardPlaces,
   readHeld,
   readHeldIndex,
   readLaneRecords,
   readLanes,
-  readLine,
   readPlaces,
   readQueueHolds,
   readRoots,
@@ -190,18 +190,18 @@ export const lateFor = (docId: string, ms: number): typeof WebSocket => {
 /**
  * Set up accepted work at your `@-`, as the footer's set up button does
  * (ADR-0060): a new thread with no history of its own starts there. Waits for
- * the host's line record; does nothing when the line is set up already.
+ * the host's line record; does nothing when accepted work is set up already.
  */
-export async function setUpLine(
-  doc: Parameters<typeof readLine>[0],
-  user: Pick<SessionClient, "line">,
+export async function setUpAccepted(
+  doc: Parameters<typeof readAccepted>[0],
+  user: Pick<SessionClient, "actOnAccepted">,
 ): Promise<void> {
-  await waitFor(() => readLine(doc) !== null, 60_000)
-  if (readLine(doc)?.commit !== null) return
-  const done = await user.line("setup")
-  if (done.kind !== "line-moved")
-    throw new Error(`the line was not set up: ${JSON.stringify(done)}`)
-  await waitFor(() => readLine(doc)?.commit !== null, 30_000)
+  await waitFor(() => readAccepted(doc) !== null, 60_000)
+  if (readAccepted(doc)?.commit !== null) return
+  const done = await user.actOnAccepted("setup")
+  if (done.kind !== "accepted-moved")
+    throw new Error(`accepted work was not set up: ${JSON.stringify(done)}`)
+  await waitFor(() => readAccepted(doc)?.commit !== null, 30_000)
 }
 
 /** What the suites' agent says when nothing is scripted. */

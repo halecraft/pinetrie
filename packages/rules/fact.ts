@@ -18,25 +18,20 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import { type Static, Type } from "typebox"
+import { catchUpName } from "./accepted.ts"
 import { decodeWith } from "./decode.ts"
-import { catchUpName } from "./line.ts"
+import {
+  fromStoredFrom,
+  StoredFromSchema,
+  toStoredFrom,
+} from "./stored-from.ts"
 
 export const FACT_TYPE = "pinetrie.fact"
 
-const CatchUpFromSchema = Type.Union([
-  Type.Object({ kind: Type.Literal("line") }),
-  Type.Object({ kind: Type.Literal("wip"), bookmark: Type.String() }),
-  Type.Object({
-    kind: Type.Literal("parent"),
-    lane: Type.String({ minLength: 1 }),
-    name: Type.String({ minLength: 1 }),
-  }),
-])
-
 // A fact is stored in a thread's history, which nothing rewrites, so its
 // stored kinds keep the words of when facts began (ADR-0100): an acceptance
-// is stored as `integrated`, and read and written through `fromStored` and
-// `toStored`.
+// is stored as `integrated`, and accepted work as `line` (`stored-from.ts`),
+// read and written through `fromStored` and `toStored`.
 const OfferFactSchema = Type.Union([
   Type.Object({
     kind: Type.Literal("integrated"),
@@ -44,7 +39,7 @@ const OfferFactSchema = Type.Union([
     by: Type.String(),
     as: Type.String({ minLength: 1 }),
     bookmark: Type.String({ minLength: 1 }),
-    to: CatchUpFromSchema,
+    to: StoredFromSchema,
   }),
   Type.Object({
     kind: Type.Union([
@@ -76,15 +71,6 @@ export interface FactMessage {
 
 type StoredFact = Static<typeof OfferFactSchema>
 
-const storedTo = (
-  to: Static<typeof CatchUpFromSchema>,
-): CatchUpFrom | undefined =>
-  to.kind !== "parent"
-    ? to
-    : isLaneName(to.lane)
-      ? { kind: "parent", lane: to.lane, name: to.name as ThreadName }
-      : undefined
-
 /** A fact as stored -> the fact; undefined for one malformed. Total. */
 const fromStored = (
   d: Static<typeof OfferFactSchema>,
@@ -92,7 +78,7 @@ const fromStored = (
   if (!isLaneName(d.lane)) return undefined
   if (d.kind !== "integrated")
     return { kind: d.kind, lane: d.lane, by: d.by as WriterId }
-  const to = storedTo(d.to)
+  const to = fromStoredFrom(d.to)
   return to === undefined
     ? undefined
     : {
@@ -107,7 +93,9 @@ const fromStored = (
 
 /** A fact as stored: an acceptance under its stored kind. */
 const toStored = (fact: OfferFact): Static<typeof OfferFactSchema> =>
-  fact.kind === "accepted" ? { ...fact, kind: "integrated" } : fact
+  fact.kind === "accepted"
+    ? { ...fact, kind: "integrated", to: toStoredFrom(fact.to) }
+    : fact
 
 /** A fact as a card carries it, in the places document's flat strings. */
 export const encodeOfferFact = (fact: OfferFact): string =>
@@ -126,9 +114,9 @@ export function decodeOfferFact(stored: string): OfferFact | undefined {
 export const decodeFact = (message: unknown): OfferFact | undefined =>
   decodeWith(FactSchema, message, ({ details }) => fromStored(details))
 
-/** Where an acceptance went, after "accepted": nothing for the line, else a WIP's name. */
+/** Where an acceptance went, after "accepted": nothing for accepted work, else a WIP's name. */
 const into = (to: CatchUpFrom) =>
-  to.kind === "line" ? "" : ` into ${catchUpName(to)}`
+  to.kind === "accepted" ? "" : ` into ${catchUpName(to)}`
 
 /** The one line a column shows for a fact. */
 export function factLine(fact: OfferFact): string {
@@ -175,7 +163,7 @@ export const encodeFact = (
 /**
  * An acceptance's fact (ADR-0080), from the decision it carried out: the change it
  * added, the bookmark it moved, and that bookmark as the thread knows it,
- * the line or a WIP. Pure.
+ * accepted work or a WIP. Pure.
  */
 export const acceptedFact = (input: {
   readonly lane: LaneName
@@ -184,8 +172,8 @@ export const acceptedFact = (input: {
     OfferAcceptanceDecision,
     { readonly kind: "accept" }
   >
-  /** The line's bookmark. */
-  readonly onto: string
+  /** Accepted work's bookmark. */
+  readonly acceptedBookmark: string
 }): OfferFact => {
   const { destination, top } = input.decision
   return {
@@ -195,8 +183,8 @@ export const acceptedFact = (input: {
     as: top,
     bookmark: destination,
     to:
-      destination === input.onto
-        ? { kind: "line" }
+      destination === input.acceptedBookmark
+        ? { kind: "accepted" }
         : { kind: "wip", bookmark: destination },
   }
 }

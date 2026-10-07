@@ -3,6 +3,7 @@
 // facts, `columnView` decides, and `Column` draws what it returns.
 
 import {
+  type AcceptedRecord,
   type AskIndex,
   ancestry,
   type BannerRecord,
@@ -19,7 +20,6 @@ import {
   type LaneName,
   type LaneRecord,
   type LaneView,
-  type LineRecord,
   messageText,
   type OfferRecord,
   type PinnedCardRead,
@@ -36,12 +36,12 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import {
+  baseMovedOn,
   type CatchUpNow,
   carryOnState,
   catchUpName,
   catchUpOf,
   displayName,
-  movedOnLine,
   type OfferActivity,
   type OfferButton,
   type OfferView,
@@ -94,7 +94,7 @@ export interface WorkFacts {
   /** Each thread's column banner. */
   readonly banners: ReadonlyMap<LaneName, BannerRecord>
   /** Accepted work, as the host last read it (ADR-0060). */
-  readonly line: LineRecord | null
+  readonly accepted: AcceptedRecord | null
   /** Each lane's base, as its history says it (ADR-0060). */
   readonly bases: ReadonlyMap<LaneName, BaseRecord>
 }
@@ -264,7 +264,7 @@ export type WorkStrip =
       readonly waiting: boolean
       readonly bookmark: string | null
       readonly review: ReviewTarget | null
-      /** Where `accept` and `accept-into-line` go (ADR-0060). */
+      /** Where `accept` and `accept-into-accepted` go (ADR-0060). */
       readonly destinations: OfferView["destinations"]
     }
   | {
@@ -310,7 +310,7 @@ export interface ColumnShows {
   readonly strip: WorkStrip
   /** What `Column` does to have its thread named before it starts. */
   readonly reserve: ReserveStep
-  /** The thread's base when it is not the line (ADR-0060), worded; null otherwise. */
+  /** The thread's base when it is not accepted work (ADR-0060), worded; null otherwise. */
   readonly base: string | null
   /** Catching up would change files in the thread (`catchUpOf`'s `brings`). */
   readonly behind: { readonly mark: string; readonly title: string } | null
@@ -399,7 +399,7 @@ export function columnView(f: ColumnFacts): ColumnShows {
   const head = headLane(lane, f.createsLane, f.reserved)
   const behind = behindMark(
     head === null ? undefined : work.bases.get(head),
-    work.line,
+    work.accepted,
   )
   const parent =
     lane.kind === "lane" ? parentOfLane(index, work, f.lanes, lane.name) : null
@@ -430,14 +430,14 @@ export function columnView(f: ColumnFacts): ColumnShows {
  */
 export function behindMark(
   base: BaseRecord | undefined,
-  line: LineRecord | null,
+  accepted: AcceptedRecord | null,
 ): ColumnShows["behind"] {
-  const now = catchUpOf(base, line)
+  const now = catchUpOf(base, accepted)
   if (now.kind !== "brings") return null
   const { move } = now
   return {
     mark: "↓",
-    title: `${movedOnLine(move.base)} since this thread started, in ${count(now.files, "file", "files")} · ${move.bookmark}: ${move.from.slice(0, 8)} → ${move.to.slice(0, 8)}`,
+    title: `${baseMovedOn(move.base)} since this thread started, in ${count(now.files, "file", "files")} · ${move.bookmark}: ${move.from.slice(0, 8)} → ${move.to.slice(0, 8)}`,
   }
 }
 
@@ -471,7 +471,7 @@ const bannerOf = (
 
 /**
  * A thread's base in its header (ADR-0060): the WIP it is on, or that the
- * WIP is gone; nothing for the line, or a WIP that landed on it.
+ * WIP is gone; nothing for accepted work, or a WIP that landed on it.
  */
 export function baseWords(base: BaseRecord | undefined): string | null {
   if (base === undefined || base.base.kind !== "wip") return null
@@ -632,12 +632,12 @@ function workStrip(f: ColumnFacts, parent: ParentNow | null): WorkStrip {
     activity: activityOf(f.index, lane),
     asked: conflictAskedAt(f.index, lane.tip),
     base,
-    onto: work.line?.onto ?? "",
+    acceptedBookmark: work.accepted?.acceptedBookmark ?? "",
     wipAhead:
-      work.line?.wips.find(
+      work.accepted?.wips.find(
         w => base?.base.kind === "wip" && w.bookmark === base.base.bookmark,
       )?.ahead ?? 0,
-    catchUp: catchUpOf(base ?? undefined, work.line),
+    catchUp: catchUpOf(base ?? undefined, work.accepted),
     untraced: (base?.untraced.length ?? 0) > 0,
     queued: f.queued.flatMap(c => {
       const command = commandOf(c)
@@ -744,7 +744,11 @@ export function queueControlWords(
 const BUTTON_LABEL: Record<
   Exclude<
     OfferButton,
-    "accept" | "accept-into-line" | "update" | "continue" | "catch-up-parent"
+    | "accept"
+    | "accept-into-accepted"
+    | "update"
+    | "continue"
+    | "catch-up-parent"
   >,
   string
 > = {
@@ -774,7 +778,7 @@ function actingWords(
   if (acting.kind !== "sent") return outcomeWords(acting)
   if (acting.action !== "accept") return SENDING[acting.action]
   const to = destinations.find(d => d.bookmark === acting.to) ?? destinations[0]
-  return to === undefined || to.kind === "line"
+  return to === undefined || to.kind === "accepted"
     ? "accepting…"
     : `accepting into ${to.bookmark}…`
 }
@@ -799,7 +803,7 @@ export function offerWords(
         ? `began from a copy with an unresolved conflict in ${conflicted}${facts.parentResolves && parent !== null ? ` · ${parent} has resolved it` : ""}`
         : `conflicts with ${base} in ${conflicted}`
   const catchUps = { base: facts.base, parent: facts.parent }
-  const moved = `${movedOnLine(facts.base)} since this thread started`
+  const moved = `${baseMovedOn(facts.base)} since this thread started`
   const brings = facts.catchUp.kind === "brings"
   const said =
     state === "nothing"
@@ -835,10 +839,10 @@ export function offerWords(
                       : `${files} ready${yours}`
   const line =
     brings && state !== "nothing" && state !== "busy" && state !== "running"
-      ? `${said} · ${movedOnLine(facts.base)}`
+      ? `${said} · ${baseMovedOn(facts.base)}`
       : said
   const [first] = view.destinations
-  const toLine = view.destinations.find(d => d.kind === "line")
+  const toAccepted = view.destinations.find(d => d.kind === "accepted")
   /** The bookmark an acceptance moves, and to what: the jj facts, as a title. */
   const moves = (bookmark: string) =>
     facts.bookmark === null
@@ -846,7 +850,7 @@ export function offerWords(
       : `moves ${bookmark} forward to ${facts.bookmark}`
   const acceptLabel = (): string => {
     const where =
-      first === undefined || first.kind === "line"
+      first === undefined || first.kind === "accepted"
         ? ""
         : ` into ${first.bookmark}`
     return state === "stack"
@@ -858,7 +862,9 @@ export function offerWords(
           : `accept${where}`
   }
   const baseBookmark =
-    facts.base.kind === "line" ? facts.onto : facts.base.bookmark
+    facts.base.kind === "accepted"
+      ? facts.acceptedBookmark
+      : facts.base.bookmark
   const labelled = (button: OfferButton): LabelledButton => {
     switch (button) {
       case "accept":
@@ -867,14 +873,14 @@ export function offerWords(
           label: acceptLabel(),
           ...titled(first === undefined ? undefined : moves(first.bookmark)),
         }
-      case "accept-into-line":
+      case "accept-into-accepted":
         return {
           button,
           label:
-            toLine === undefined || toLine.bringsAlong === 0
+            toAccepted === undefined || toAccepted.bringsAlong === 0
               ? "accept"
-              : `accept, with your ${count(toLine.bringsAlong, "commit", "commits")} beneath it`,
-          ...titled(moves(facts.onto)),
+              : `accept, with your ${count(toAccepted.bringsAlong, "commit", "commits")} beneath it`,
+          ...titled(moves(facts.acceptedBookmark)),
         }
       case "update": {
         const label = commandWords("bring-up-to-date", catchUps)
@@ -889,8 +895,8 @@ export function offerWords(
       case "continue":
         return {
           button,
-          label: commandWords("continue-on-line", catchUps),
-          title: `merges ${facts.onto} into this thread's copy, its base from then on`,
+          label: commandWords("continue-on-accepted", catchUps),
+          title: `merges ${facts.acceptedBookmark} into this thread's copy, its base from then on`,
         }
       case "catch-up-parent":
         return {

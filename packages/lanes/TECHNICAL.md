@@ -5,7 +5,7 @@ it (ADR-0032 to ADR-0034). Your repo is `@pinetrie/repo`'s
 (`packages/repo/TECHNICAL.md`), which builds on this package: what a lane
 also runs, through a `Runner` it is given, is here (`laneBase`,
 `REVISION_READ`, `commitsOf`), and so are the names both sides use
-(`bookmarkName`, `laneTipName`, `offerBookmark`, `DEFAULT_LINE`). This
+(`bookmarkName`, `laneTipName`, `offerBookmark`, `DEFAULT_REPO`). This
 package never imports `@pinetrie/repo`. It declares only `@pinetrie/core`
 (`workspace.test.ts`), and the client may not depend on it. It never imports
 pi (ADR-0003): the channel into a lane is `packages/pi`'s, and the host hands
@@ -75,18 +75,18 @@ containers, disks and the helper.
 ## Forks
 
 - **A fork with no revision above it starts from its thread's base**
-  (`planForkSetup`, ADR-0060): on the line, an empty commit on the line's
-  commit (`planLineStart`); on a WIP, a copy of the WIP made in the lane
-  (`planWipCopy`): a commit on the line commit under the WIP, with the WIP's
+  (`planForkSetup`, ADR-0060): on accepted work, an empty commit on accepted work's
+  commit (`planAcceptedStart`); on a WIP, a copy of the WIP made in the lane
+  (`planWipCopy`): a commit on accepted commit under the WIP, with the WIP's
   files restored. Never the WIP's own commits: the lane's tip, a remote
   bookmark and immutable in your repo, would make them immutable too (S48
   item 11), and your WIP would freeze. Either commit carries
   `Pinetrie-Base: <bookmark>@<commit>` (`baseMessage`), the lane's ledger of
-  its base. The base disk is the line's, so a WIP whose lockfile differs
-  from the line's installs (`installIfLockMoved`).
-- **The base snapshot is the line's commit** (`refreshBase`), and
+  its base. The base disk is accepted work's, so a WIP whose lockfile differs
+  from accepted work's installs (`installIfLockMoved`).
+- **The base snapshot is accepted work's commit** (`refreshBase`), and
   refreshes after an acceptance or a land. A fork from it first waits for a
-  refresh (`baseAtLine`): the line may have been set up or moved since.
+  refresh (`baseAtAccepted`): accepted work may have been set up or moved since.
 - **`jj new` runs first in a fork** (`planForkSetup`), after one step that
   removes `/workspace/.pineta-lane` (`OLD_LANE_CONFIG_DIR`, tagged
   `pre-rename:`). A snapshot of a lane made before the rename holds that
@@ -260,7 +260,7 @@ containers, disks and the helper.
     every fork, and disks made before a directory was shared.
   - **Why not the lane repo's `.git/info/exclude`:** a line there works only
     if it is written before jj first snapshots with the mount present. A jj
-    command that ran first tracks the files, and adding the line later does
+    command that ran first tracks the files, and adding accepted work later does
     not untrack them (S45 item 4).
   - **In your repo,** a shared directory nothing already ignores is added to
     `.git/info/exclude`, as `/.pinetrie/` is. `git check-ignore` decides, so
@@ -332,7 +332,7 @@ containers, disks and the helper.
     `laneBase` compare a base's bookmark with `line.onto`: read whole, it
     would make the lane a WIP's whose WIP is gone. `trailerRevset` still
     finds the commit, so it stays the newest base, and the lane falls back
-    to the newest line commit in its history, which is the line. Remove both
+    to the newest accepted commit in its history, which is accepted work. Remove both
     once no lane from before the rename has work to offer.
 - **Decide from exit status, never from printed text.** Output a program
   reads comes from a `-T` template. `execFile` reads all of it: jj exits 3 on
@@ -371,7 +371,7 @@ containers, disks and the helper.
   off the lane's line.
 - **`commitToBookmark`** is the one tail of every commit the host makes in
   a lane: `jj commit`, read `@-`, move the lane's bookmark. `commitTurn`,
-  `mergeBase` and the mark of a move to the line all end with it.
+  `mergeBase` and the mark of a move to accepted work all end with it.
 - **`changedPaths`** is a turn's paths, from the bookmark before it to its
   commit, made or adopted, which its revision records (ADR-0056): `jj diff
   -T PATH_LINE`, `json(path)` a line, which is from the repo's root
@@ -388,18 +388,18 @@ containers, disks and the helper.
   line's commit, or a fresh copy of the WIP (`planWipCopy`) made on the
   lane's previous copy, so conflicts the lane already resolved do not come
   back. Or the newest commit of the thread it branched from (`planMerge`'s
-  `parent`, ADR-0072), merged as the line's commit is but with no
-  `Pinetrie-Base`: ancestry says what the lane holds of it. The line's merge carries `Pinetrie-Base`, a WIP's copy its own, and
+  `parent`, ADR-0072), merged as accepted work's commit is but with no
+  `Pinetrie-Base`: ancestry says what the lane holds of it. Accepted work's merge carries `Pinetrie-Base`, a WIP's copy its own, and
   `newestBase` reads the newest one in a lane's history: its base, and
   where its offers start. `laneBase` reads it in the lane's own repo too
   (`bookmarkRevset`), where a lane with none is null: that repo has no
   line bookmark to find a start on.
 - **An accepted-offer commit the lane holds is joined to its source
   first** (`planJoins`, `mergeBase`, S102, ADR-0079). An accepted-offer
-  commit is a copy of a lane's work on the line, naming the commit it
+  commit is a copy of a lane's work on accepted work, naming the commit it
   copies (`Pinetrie-Source`). Merged as history says, its base is that
   commit's `Pinetrie-Start`, from before that work, so the work came in
-  twice: any edit the line made to it since conflicted. So a join, a commit
+  twice: any edit accepted work made to it since conflicted. So a join, a commit
   merging the source with the accepted-offer commit (the same changes,
   so clean), goes first, and the update merges the lane, the last join and
   the base in one commit.
@@ -413,12 +413,12 @@ containers, disks and the helper.
   - **A join carries no trailer:** bases and accepted-offer commits are
     found by theirs.
   - **The update's titles and a conflict's `theirs` leave the accepted-offer commits out**
-    (`withoutAcceptedOfferCommits`), and keep the line's commits under them.
+    (`withoutAcceptedOfferCommits`), and keep accepted work's commits under them.
   - **A WIP's copy has no accepted-offer commit in its history,** so a WIP thread joins
     nothing.
 - **`mergeUpdate` is an update's whole run in a lane** after its edits,
-  on the lane's queue: `planMerge`'s steps (a fetch of the line's commit,
-  or of the WIP's commit and its copy), the merge, a mark naming the line
+  on the lane's queue: `planMerge`'s steps (a fetch of accepted work's commit,
+  or of the WIP's commit and its copy), the merge, a mark naming accepted work
   when a thread moves there with nothing to merge, then what the merge left:
   its files and the titles of what came in (`titlesOf`, one log), or each
   conflicted file's content and the revisions on each side that touched

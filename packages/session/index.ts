@@ -4,7 +4,7 @@
 // every name another package imports; a name only this package and its
 // tests use is not exported here.
 
-export type { LineActing, OfferActing, Unsuccessful } from "./acting.ts"
+export type { AcceptedActing, OfferActing, Unsuccessful } from "./acting.ts"
 export type { AttentionStore, SeenMentions } from "./attention-doc.ts"
 export {
   type ActedAt,

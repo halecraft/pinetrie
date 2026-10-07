@@ -13,12 +13,12 @@ import { createQueue, planMerge } from "@pinetrie/lanes"
 import { readTreeIndex } from "@pinetrie/reads"
 import type { RepoOwner } from "@pinetrie/repo"
 import {
+  ACCEPTED as ACCEPTED_RECORD,
   BASE,
   catchUpRefusal,
   encodeChat,
   encodeUpdate,
   type Floor,
-  LINE as LINE_RECORD,
   type PromptBudget,
   setRecord,
 } from "@pinetrie/rules"
@@ -74,20 +74,20 @@ describe("reasonOf", () => {
 })
 
 const ADA = writerId("ada@example.com")
-const LINE = commitId("11110000")
+const ACCEPTED = commitId("11110000")
 const OURS = commitId("22220000")
 const MERGE = commitId("33330000")
-const lineFrom: BaseMerge = {
-  kind: "line",
-  onto: "pinetrie-onto",
-  commit: LINE,
+const acceptedFrom: BaseMerge = {
+  kind: "accepted",
+  acceptedBookmark: "pinetrie-onto",
+  commit: ACCEPTED,
   mark: false,
 }
 const parentFrom: BaseMerge = {
   kind: "parent",
   lane: laneNameForThread("p"),
   name: "amber-fox" as ThreadName,
-  commit: LINE,
+  commit: ACCEPTED,
   caughtUpWith: OURS,
 }
 /** pi's estimate of a custom message: a token per four characters. */
@@ -109,7 +109,7 @@ function floorFor(from: BaseMerge, intent: string): Floor {
 
 describe("planCatchUp: whether a catch-up may merge (ADR-0084)", () => {
   test("refused, before the merge, when even the smallest prompt would not fit; it names what can be shortened", () => {
-    const planned = planCatchUp(lineFrom, {
+    const planned = planCatchUp(acceptedFrom, {
       budget: budgetOf(50),
       skill: null,
       intent: "x".repeat(400),
@@ -139,14 +139,14 @@ describe("planSettle: what a merge comes to (ADR-0060, ADR-0033)", () => {
   const ctx = {
     lane: LANE,
     by: ADA,
-    from: lineFrom,
+    from: acceptedFrom,
     index: readTreeIndex(newRootDoc()),
     now: 7,
   }
   test("clean: the update in the thread, naming its base, and the lane fetched", () => {
     const facts = {
       kind: "clean",
-      from: LINE,
+      from: ACCEPTED,
       ours: OURS,
       merge: MERGE,
       files: ["a.txt"],
@@ -157,9 +157,9 @@ describe("planSettle: what a merge comes to (ADR-0060, ADR-0033)", () => {
       message: encodeUpdate(
         {
           lane: LANE,
-          from: { kind: "line" },
+          from: { kind: "accepted" },
           bookmark: "pinetrie-onto",
-          merged: LINE,
+          merged: ACCEPTED,
           files: ["a.txt"],
           commits: ["yours one"],
           by: ADA,
@@ -167,12 +167,12 @@ describe("planSettle: what a merge comes to (ADR-0060, ADR-0033)", () => {
         7,
       ),
       merge: MERGE,
-      fetch: [OURS, LINE],
+      fetch: [OURS, ACCEPTED],
     })
     const wip: BaseMerge = {
       kind: "wip",
       bookmark: "wip/x",
-      commit: LINE,
+      commit: ACCEPTED,
       under: OURS,
       on: OURS,
     }
@@ -182,7 +182,7 @@ describe("planSettle: what a merge comes to (ADR-0060, ADR-0033)", () => {
           lane: LANE,
           from: { kind: "wip", bookmark: "wip/x" },
           bookmark: "wip/x",
-          merged: LINE,
+          merged: ACCEPTED,
           files: ["a.txt"],
           commits: ["yours one"],
           by: ADA,
@@ -191,7 +191,7 @@ describe("planSettle: what a merge comes to (ADR-0060, ADR-0033)", () => {
       ),
     })
   })
-  test("a move to the line is fetched; nothing else is", () => {
+  test("a move to accepted work is fetched; nothing else is", () => {
     expect(
       planSettle({ kind: "nothing", ours: OURS, mark: MERGE }, ctx),
     ).toEqual({ kind: "nothing", fetch: [OURS] })
@@ -213,7 +213,7 @@ describe("planSettle: what a merge comes to (ADR-0060, ADR-0033)", () => {
     const settled = planSettle(
       {
         kind: "conflicted",
-        from: LINE,
+        from: ACCEPTED,
         contents: [
           { path: "a.txt", content: "<<<<<<< a" },
           { path: "b.txt", content: "<<<<<<< b" },
@@ -226,7 +226,7 @@ describe("planSettle: what a merge comes to (ADR-0060, ADR-0033)", () => {
           { description: "yours a\n\nbody", paths: ["a.txt", "b.txt"] },
           { description: "yours b\n", paths: ["b.txt"] },
         ],
-        floor: floorFor(lineFrom, "keep both sides"),
+        floor: floorFor(acceptedFrom, "keep both sides"),
       },
       { ...ctx, index: readTreeIndex(doc) },
     )
@@ -234,7 +234,7 @@ describe("planSettle: what a merge comes to (ADR-0060, ADR-0033)", () => {
     expect(settled.fetch).toBeNull()
     expect(settled.message.details).toMatchObject({
       lane: LANE,
-      yours: [LINE],
+      yours: [ACCEPTED],
       by: ADA,
       files: ["a.txt", "b.txt"],
     })
@@ -253,7 +253,7 @@ describe("planSettle: what a merge comes to (ADR-0060, ADR-0033)", () => {
     const clean = planSettle(
       {
         kind: "clean",
-        from: LINE,
+        from: ACCEPTED,
         ours: OURS,
         merge: MERGE,
         files: ["a.txt"],
@@ -268,7 +268,7 @@ describe("planSettle: what a merge comes to (ADR-0060, ADR-0033)", () => {
     const conflicted = planSettle(
       {
         kind: "conflicted",
-        from: LINE,
+        from: ACCEPTED,
         contents: [{ path: "a.txt", content: "<<<<<<< a" }],
         ours: [],
         theirs: [],
@@ -307,9 +307,9 @@ describe("applySettle: a settle's writes", () => {
     message: encodeUpdate(
       {
         lane: LANE,
-        from: { kind: "line" },
+        from: { kind: "accepted" },
         bookmark: "pinetrie-onto",
-        merged: LINE,
+        merged: ACCEPTED,
         commits: [],
         files: ["a.txt"],
         by: ADA,
@@ -317,7 +317,7 @@ describe("applySettle: a settle's writes", () => {
       1,
     ),
     merge: MERGE,
-    fetch: [OURS, LINE],
+    fetch: [OURS, ACCEPTED],
   }
   test("a clean update appends its entry, records its revision, then fetches the lane, in that order", async () => {
     const calls: string[] = []
@@ -326,13 +326,16 @@ describe("applySettle: a settle's writes", () => {
     expect(calls).toEqual([
       "append pinetrie.update",
       "record e-9 33330000",
-      `fetch ${OURS},${LINE}`,
+      `fetch ${OURS},${ACCEPTED}`,
     ])
   })
   test("an entry not appended records no revision, and the lane is still fetched", async () => {
     const calls: string[] = []
     await applySettle(ports(calls, false).port, clean)
-    expect(calls).toEqual(["append pinetrie.update", `fetch ${OURS},${LINE}`])
+    expect(calls).toEqual([
+      "append pinetrie.update",
+      `fetch ${OURS},${ACCEPTED}`,
+    ])
   })
   test("nothing with no fetch writes nothing", async () => {
     const calls: string[] = []
@@ -493,7 +496,7 @@ describe("catchUpInRun (ADR-0080)", () => {
       b,
       setRecord(BASE, {
         lane: LANE,
-        base: { kind: "line" },
+        base: { kind: "accepted" },
         start: commitId("l1"),
         state: "ok",
         catchUp: { tip: commitId("t"), to: commitId("l2"), files: ["a.ts"] },
@@ -503,8 +506,8 @@ describe("catchUpInRun (ADR-0080)", () => {
     )
     putValue(
       b,
-      setRecord(LINE_RECORD, {
-        onto: "pinetrie-onto",
+      setRecord(ACCEPTED_RECORD, {
+        acceptedBookmark: "pinetrie-onto",
         wipPrefix: "wip/",
         publish: "main",
         published: { commit: null, behind: 0, ahead: 0 },

@@ -15,11 +15,11 @@
 import { attach } from "@kyneta/react"
 import { subscribe } from "@kyneta/schema"
 import type {
+  AcceptedRecord,
   CardId,
   CardPlace,
   CardRecord,
   CommandSummary,
-  LineRecord,
   PinnedView,
   Position,
   ProjectRecord,
@@ -124,7 +124,7 @@ export interface Where {
   /** Directories other lanes work in directly: offered again. */
   readonly usedDirs: readonly string[]
   /** Accepted work, for the bases a new lane may start from (ADR-0060). */
-  readonly line: LineRecord | null
+  readonly accepted: AcceptedRecord | null
   /** Files conflicted in the commit a new lane here would be cloned from (ADR-0072). */
   readonly forkConflicts: number
 }
@@ -242,7 +242,7 @@ export function CardEditor(p: {
   const [choice, setChoice] = useState<WorkSetting | null>(
     prefill?.work ?? null,
   )
-  /** The WIP a new lane of its own starts from; null for the line (ADR-0060). */
+  /** The WIP a new lane of its own starts from; null for accepted work (ADR-0060). */
   const [base, setBase] = useState<string | null>(null)
   const command = card === undefined ? null : commandOf(card)
   const plan = planSend({
@@ -674,7 +674,7 @@ export function CardEditor(p: {
                   usedDirs={p.where.usedDirs}
                   work={work}
                   choose={setChoice}
-                  line={p.where.line}
+                  accepted={p.where.accepted}
                   base={base}
                   chooseBase={setBase}
                 />
@@ -1031,7 +1031,7 @@ function WhereMenu(p: {
   usedDirs: readonly string[]
   work: WorkSetting
   choose: (work: WorkSetting) => void
-  line: LineRecord | null
+  accepted: AcceptedRecord | null
   base: string | null
   chooseBase: (base: string | null) => void
 }) {
@@ -1041,7 +1041,7 @@ function WhereMenu(p: {
       {detail !== null && <span className="where-detail">{detail}</span>}
     </>
   )
-  const bases = p.work.kind === "own" ? baseChoices(p.line, p.base) : []
+  const bases = p.work.kind === "own" ? baseChoices(p.accepted, p.base) : []
   return (
     <Menu
       className="where-menu"
@@ -1054,7 +1054,7 @@ function WhereMenu(p: {
             p.project,
             p.usedDirs,
             p.work,
-            p.line?.onto ?? null,
+            p.accepted?.acceptedBookmark ?? null,
           ).map(c => ({
             key: c.key,
             label: row(c.row, c.detail),

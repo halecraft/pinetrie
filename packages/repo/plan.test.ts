@@ -1,8 +1,8 @@
 import { commitId, laneNameForThread, type ThreadName } from "@pinetrie/core"
-import { DEFAULT_LINE } from "@pinetrie/lanes"
+import { DEFAULT_REPO } from "@pinetrie/lanes"
 import { describe, expect, test } from "vitest"
+import { wipState } from "./accepted.ts"
 import { type LaneRow, planLaneRead } from "./lane-read.ts"
-import { wipState } from "./line.ts"
 import { type Fingerprint, parseFingerprint, planObserve } from "./observe.ts"
 import {
   acceptedOfferCommitsRevset,
@@ -14,12 +14,12 @@ import {
   parseEvolog,
   planCatchUpUndo,
   planImport,
-  planLineSetup,
   planOffer,
   planOfferAcceptanceSteps,
   planPublishCatchUp,
   planPublishMove,
   planRebuildOffer,
+  planSetup,
   walkToHost,
 } from "./plan.ts"
 import { repoCommand } from "./run.ts"
@@ -49,22 +49,22 @@ describe("logRevset: the offers added to your log (S77 item 8)", () => {
   })
 })
 
-describe("immutableHeads: the line and its offers added to yours", () => {
+describe("immutableHeads: accepted work and its offers added to yours", () => {
   test("added to jj's builtin when the repo defines none, with present()", () => {
-    expect(immutableHeads(DEFAULT_LINE, null)).toBe(
+    expect(immutableHeads(DEFAULT_REPO, null)).toBe(
       'builtin_immutable_heads() | present("pinetrie-onto") | (bookmarks(glob:"pinetrie-offer/*") & children(present("pinetrie-onto")))',
     )
   })
   test("joined to your own definition, and idempotent", () => {
-    const once = immutableHeads(DEFAULT_LINE, "trunk() | tags()")
+    const once = immutableHeads(DEFAULT_REPO, "trunk() | tags()")
     expect(once.startsWith("trunk() | tags() | ")).toBe(true)
-    expect(immutableHeads(DEFAULT_LINE, once)).toBe(once)
+    expect(immutableHeads(DEFAULT_REPO, once)).toBe(once)
   })
 })
 
 describe("offers (ADR-0038)", () => {
   const op = (...args: string[]) => `jj as host: ${args.join(" ")}`
-  /** A rewrite of an offer, which may be immutable on the line (ADR-0060). */
+  /** A rewrite of an offer, which may be immutable on accepted work (ADR-0060). */
   const rw = (...args: string[]) => op("--ignore-immutable", ...args)
   test("offerStart: the base's commit, and the history of each accepted source (ADR-0060)", () => {
     expect(offerStart({ tip: C1, start: C2, sources: [] })).toBe(
@@ -83,15 +83,15 @@ describe("offers (ADR-0038)", () => {
       'description(regex:"(?m)^(Pine(?:trie|ta)-Source|Pine(?:trie|ta)-Thread): ")'
     expect(
       acceptedOfferCommitsRevset({
-        line: DEFAULT_LINE,
-        base: { base: { kind: "line" }, start: C1, source: C1 },
+        repoConfig: DEFAULT_REPO,
+        base: { base: { kind: "accepted" }, start: C1, source: C1 },
       }),
     ).toBe(`(::(present("pinetrie-onto")) ~ ::present(c1)) & ${accepted}`)
     // A WIP lane starts at its copy, which holds no accepted-offer commit: what it
     // holds is the WIP's commit the copy was made from.
     expect(
       acceptedOfferCommitsRevset({
-        line: DEFAULT_LINE,
+        repoConfig: DEFAULT_REPO,
         base: {
           base: { kind: "wip", bookmark: "wip/a" },
           start: C1,
@@ -199,9 +199,11 @@ describe("offers (ADR-0038)", () => {
       `git fetch -q /tmp/b.bundle +refs/heads/pinetrie/${LANE}-stack:refs/remotes/pinetrie-${LANE}/stack`,
     )
   })
-  test("the line's setup is the host's bookmark and your config (ADR-0060)", () => {
+  test("accepted work's setup is the host's bookmark and your config (ADR-0060)", () => {
     expect(
-      argvs(planLineSetup({ onto: "pinetrie-onto", heads: "H", log: "L" })),
+      argvs(
+        planSetup({ acceptedBookmark: "pinetrie-onto", heads: "H", log: "L" }),
+      ),
     ).toEqual([
       op("bookmark", "create", "pinetrie-onto", "-r", "@-"),
       'jj as you: config set --repo revset-aliases."immutable_heads()" H',
@@ -209,10 +211,10 @@ describe("offers (ADR-0038)", () => {
     ])
   })
   test("a publish: your catch-up is yours; the move is the host's, or yours in one step when it accepts your commits; its undo reverts, never restores (ADR-0090, S111)", () => {
-    expect(argvs(planPublishCatchUp({ onto: "pinetrie-onto" }))).toEqual([
-      'jj as you: rebase -b @ -d "pinetrie-onto"',
-    ])
-    const move = { onto: "pinetrie-onto", publish: "main" }
+    expect(
+      argvs(planPublishCatchUp({ acceptedBookmark: "pinetrie-onto" })),
+    ).toEqual(['jj as you: rebase -b @ -d "pinetrie-onto"'])
+    const move = { acceptedBookmark: "pinetrie-onto", publish: "main" }
     expect(argvs(planPublishMove({ ...move, accept: false }))).toEqual([
       op("bookmark", "move", "main", "--to", '"pinetrie-onto"'),
     ])
@@ -344,8 +346,8 @@ describe("planObserve: what moved between two fingerprints", () => {
   }
   const none = {
     all: false,
-    onto: false,
-    line: false,
+    acceptedBookmark: false,
+    published: false,
     yours: false,
     lanes: new Set(),
     offers: new Set(),
@@ -353,17 +355,17 @@ describe("planObserve: what moved between two fingerprints", () => {
   test.each([
     ["nothing moved", fp(base), none],
     [
-      "the line moved: the base snapshot follows it (ADR-0090)",
+      "accepted work moved: the base snapshot follows it (ADR-0090)",
       fp({ ...base, "pinetrie-onto": "c9" }),
-      { ...none, all: true, onto: true },
+      { ...none, all: true, acceptedBookmark: true },
     ],
     ["a WIP moved", fp({ ...base, "wip/a": "c9" }), { ...none, all: true }],
     ["a WIP appeared", fp({ ...base, "wip/b": "c9" }), { ...none, all: true }],
     ["@ alone moved", fp(base, "c-new"), { ...none, yours: true }],
     [
-      "the publish bookmark moved: the line's record alone (ADR-0076)",
+      "the publish bookmark moved: accepted work's record alone (ADR-0076)",
       fp({ ...base, main: "c1" }),
-      { ...none, line: true },
+      { ...none, published: true },
     ],
     [
       "a lane's ref moved",
@@ -391,20 +393,22 @@ describe("planObserve: what moved between two fingerprints", () => {
       { ...none, offers: new Set(["amber-fox"]) },
     ],
   ] as const)("%s", (_, next, moved) => {
-    expect(planObserve(fp(base), next, DEFAULT_LINE)).toEqual(moved)
+    expect(planObserve(fp(base), next, DEFAULT_REPO)).toEqual(moved)
   })
   test("the first observation is all, even with no line in the repo yet", () => {
-    expect(planObserve(null, fp({}), DEFAULT_LINE).all).toBe(true)
+    expect(planObserve(null, fp({}), DEFAULT_REPO).all).toBe(true)
   })
-  test("the first observation is not the line moving: startup reads the base itself", () => {
-    expect(planObserve(null, fp(base), DEFAULT_LINE).onto).toBe(false)
+  test("the first observation is not accepted work moving: startup reads the base itself", () => {
+    expect(planObserve(null, fp(base), DEFAULT_REPO).acceptedBookmark).toBe(
+      false,
+    )
   })
-  test("a bookmark of yours outside the line, the WIPs, the publish bookmark, the offers and the lanes' remotes is not read", () => {
+  test("a bookmark of yours outside accepted work, the WIPs, the publish bookmark, the offers and the lanes' remotes is not read", () => {
     const stdout = [
       "c1\t\tpinetrie-onto,main,feature\tmain@origin,pinetrie-onto@git",
       `c4\t@\t\ttip@pinetrie-${LANE}`,
     ].join("\n")
-    const read = parseFingerprint("op", stdout, DEFAULT_LINE)
+    const read = parseFingerprint("op", stdout, DEFAULT_REPO)
     expect(read.bookmarks).toEqual(
       new Map([
         ["pinetrie-onto", "c1"],
@@ -418,7 +422,7 @@ describe("planObserve: what moved between two fingerprints", () => {
     const read = parseFingerprint(
       "op",
       "c2\t\tpinetrie-onto\t\nc1\t\tpinetrie-onto\t",
-      DEFAULT_LINE,
+      DEFAULT_REPO,
     )
     expect(read.bookmarks.get("pinetrie-onto")).toBe("c1,c2")
   })
@@ -433,7 +437,7 @@ describe("planLaneRead: what one lane's rows say", () => {
     bookmark: false,
     region: false,
     base: false,
-    line: false,
+    newestAccepted: false,
     underBase: false,
     accepted: false,
     untraced: false,
@@ -461,7 +465,7 @@ describe("planLaneRead: what one lane's rows say", () => {
   ) =>
     planLaneRead(rows, {
       name: NAME,
-      line: DEFAULT_LINE,
+      repoConfig: DEFAULT_REPO,
       acceptedOfferCommits: accepted.map(t => ({
         commit: commitId(t.commit),
         sources: t.sources.map(commitId),
@@ -469,9 +473,9 @@ describe("planLaneRead: what one lane's rows say", () => {
     })
   test("its base from the newest Pinetrie-Base, its start that commit, and its offer", () => {
     expect(read([tip, based, offerRow])).toMatchObject({
-      kind: "line",
+      kind: "accepted",
       tip: "a1",
-      base: { base: { kind: "line" }, start: "c0", source: "c0" },
+      base: { base: { kind: "accepted" }, start: "c0", source: "c0" },
       start: { kind: "known", start: ["c0"] },
       offer: {
         kind: "offer",
@@ -533,23 +537,23 @@ describe("wipState: landed, gone, or ok (ADR-0060, S77 item 2)", () => {
   const W = commitId("w1")
   test.each([
     [
-      "the bookmark above the line",
-      { bookmark: W, bookmarkInLine: false, sourceInLine: false },
+      "the bookmark above accepted work",
+      { bookmark: W, bookmarkInAccepted: false, sourceInAccepted: false },
       "ok",
     ],
     [
-      "the bookmark on the line (landed, or squashed into it)",
-      { bookmark: W, bookmarkInLine: true, sourceInLine: false },
+      "the bookmark on accepted work (landed, or squashed into it)",
+      { bookmark: W, bookmarkInAccepted: true, sourceInAccepted: false },
       "landed",
     ],
     [
-      "the bookmark gone, its work on the line",
-      { bookmark: null, bookmarkInLine: false, sourceInLine: true },
+      "the bookmark gone, its work on accepted work",
+      { bookmark: null, bookmarkInAccepted: false, sourceInAccepted: true },
       "landed",
     ],
     [
       "the bookmark gone, its work not",
-      { bookmark: null, bookmarkInLine: false, sourceInLine: false },
+      { bookmark: null, bookmarkInAccepted: false, sourceInAccepted: false },
       "gone",
     ],
   ] as const)("%s: %s", (_, facts, state) => {

@@ -40,9 +40,7 @@ import {
   hostBytesRunner,
   hostRunner,
   LANE_JJ_CONFIG,
-  type LineConfig,
   laneStackRef,
-  lineConfig,
   lines,
   mountArgs,
   oldNamesOnDisk,
@@ -50,12 +48,14 @@ import {
   pinetrieDir,
   planOldNamesOnDisk,
   prepareHost,
+  type RepoConfig,
   RUNTIME_BIN,
   RUNTIME_MOUNT,
   type Runner,
   type Runners,
   readConfigFile,
   removeLane,
+  repoConfig,
   restoreVolume,
   revsetName,
   run,
@@ -178,7 +178,7 @@ export function withoutOldClauses(revset: string): string | null {
 }
 
 /** Your repo's steps: refs moved, config rewritten, then old offers dropped. */
-export function planRepo(facts: RepoFacts, line: LineConfig): RepoStep[] {
+export function planRepo(facts: RepoFacts, repoConfig: RepoConfig): RepoStep[] {
   const old = facts.refs.flatMap(r => {
     const m = OLD_REF.exec(r.ref)
     const lane = m?.[1]
@@ -210,7 +210,7 @@ export function planRepo(facts: RepoFacts, line: LineConfig): RepoStep[] {
             "set",
             "--repo",
             'revset-aliases."immutable_heads()"',
-            immutableHeads(line, withoutOldClauses(heads)),
+            immutableHeads(repoConfig, withoutOldClauses(heads)),
           ),
         ]
       : []),
@@ -342,7 +342,7 @@ async function fixDisk(
 async function gatherRepo(
   jj: Runner,
   gitRunner: Runner,
-  line: LineConfig,
+  repoConfig: RepoConfig,
 ): Promise<RepoFacts> {
   const refs = await gitRunner([
     "for-each-ref",
@@ -352,7 +352,7 @@ async function gatherRepo(
   if (!refs.ok) throw new Error(describeFailure("git for-each-ref", refs))
   const listed = await jj(["bookmark", "list", "-T", 'name ++ "\\n"'])
   if (!listed.ok) throw new Error(describeFailure("jj bookmark list", listed))
-  const onto = `present(${revsetName(line.onto)})`
+  const acceptedBookmark = `present(${revsetName(repoConfig.acceptedBookmark)})`
   const offers = await Promise.all(
     [...new Set(lines(listed.stdout))]
       .filter(b => b.startsWith(OLD_OFFER))
@@ -360,7 +360,7 @@ async function gatherRepo(
         bookmark,
         revisions: await commitsOf(
           jj,
-          `(::${bookmarkRevset(bookmark)} ~ ::${onto} ~ ::@) & mutable()`,
+          `(::${bookmarkRevset(bookmark)} ~ ::${acceptedBookmark} ~ ::@) & mutable()`,
         ),
       })),
   )
@@ -476,8 +476,8 @@ async function main(given: string | undefined): Promise<void> {
       root,
       false,
     )
-    const { line } = lineConfig(user.offers, own.offers)
-    const owner = startRepoOwner({ root, line })
+    const { repoConfig: line } = repoConfig(user.offers, own.offers)
+    const owner = startRepoOwner({ root, repoConfig: line })
     try {
       const steps = await owner.command(async ops => {
         const facts = await gatherRepo(ops.jj, ops.git, line)

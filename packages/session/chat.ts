@@ -42,7 +42,7 @@ export interface ChatHow {
   readonly reserved?: LaneName
   /** The root a new tab minted as it opened: where its first send starts (ADR-0066). */
   readonly root?: RootId
-  /** The WIP bookmark a lane this send creates starts from; absent, the line (ADR-0060). */
+  /** The WIP bookmark a lane this send creates starts from; absent, accepted work (ADR-0060). */
   readonly base?: string
   /**
    * The workflow state a root this send starts lands in; absent, the first

@@ -17,7 +17,7 @@ import {
   type ThreadName,
 } from "@pinetrie/core"
 import {
-  DEFAULT_LINE,
+  DEFAULT_REPO,
   laneTipRef,
   lines,
   offerBookmark,
@@ -42,7 +42,7 @@ afterAll(async () => {
   for (const d of dirs) await rm(d, { recursive: true, force: true })
 })
 
-/** A repo of yours, with the line at a first commit, and how to write to it. */
+/** A repo of yours, with accepted work at a first commit, and how to write to it. */
 async function yourRepo(tag: string) {
   const dir = await realpath(
     await mkdtemp(path.join(tmpdir(), `pinetrie-refresh-${tag}-`)),
@@ -69,8 +69,15 @@ async function yourRepo(tag: string) {
     await jj("commit", "-m", message)
     return parent()
   }
-  const moveLine = (to: CommitId) =>
-    jj("bookmark", "set", DEFAULT_LINE.onto, "-r", to, "--allow-backwards")
+  const moveAccepted = (to: CommitId) =>
+    jj(
+      "bookmark",
+      "set",
+      DEFAULT_REPO.acceptedBookmark,
+      "-r",
+      to,
+      "--allow-backwards",
+    )
   /** The lane's tip in your repo, as a fetch leaves it. */
   const setTip = async (lane: LaneName, tip: CommitId) => {
     await run("git", ["update-ref", laneTipRef(lane), tip], { cwd: dir })
@@ -79,8 +86,8 @@ async function yourRepo(tag: string) {
   await write("base.txt", "base\n")
   await jj("commit", "-m", "base")
   const base = await parent()
-  await moveLine(base)
-  return { dir, jj, commit, moveLine, setTip, base }
+  await moveAccepted(base)
+  return { dir, jj, commit, moveAccepted, setTip, base }
 }
 
 /**
@@ -93,11 +100,11 @@ async function settles(dir: string, lane: LaneName, name: ThreadName) {
   const scribe = record<Records>({
     writeValues: async writes => applyWrites(b, writes),
   })
-  const owner = startRepoOwner({ root: dir, line: DEFAULT_LINE })
+  const owner = startRepoOwner({ root: dir, repoConfig: DEFAULT_REPO })
   try {
     const deps = createOfferDeps({
       owner,
-      line: DEFAULT_LINE,
+      repoConfig: DEFAULT_REPO,
       basics: b,
       records: scribe.port,
       piSetup: record<PiSetup>({}).port,
@@ -158,14 +165,14 @@ test("a catch-up that merged your acceptance of the lane's work leaves nothing t
     { "lane.txt": "the lane's\n" },
     `feat: the lane's\n\nPinetrie-Thread: ${THREAD}\nPinetrie-Lane: ${LANE}\nPinetrie-Entry: e1\nPinetrie-Source: ${work}\nPinetrie-Start: ${you.base}\n`,
   )
-  await you.moveLine(accepted)
+  await you.moveAccepted(accepted)
   // The lane catches up: a merge of its work and your accepted-offer
   // commit. Its range from that commit has a gap, which jj refuses to diff.
   const merged = await you.commit(
     [work, accepted],
     {},
     baseMessage("update: pinetrie-onto", {
-      bookmark: DEFAULT_LINE.onto,
+      bookmark: DEFAULT_REPO.acceptedBookmark,
       commit: accepted,
     }),
   )
@@ -222,7 +229,7 @@ test("an accepted-offer commit of the lane with no Pinetrie-Source builds nothin
     `feat: the lane's\n\nPinetrie-Thread: ${THREAD}\nPinetrie-Lane: ${LANE}\nPinetrie-Entry: e1\n`,
   )
   const yours = await you.commit([accepted], { "a.txt": "yours\n" }, "yours")
-  await you.moveLine(yours)
+  await you.moveAccepted(yours)
   const more = await you.commit(
     [work],
     { "b.txt": "more\n" },
@@ -243,7 +250,7 @@ test("an accepted-offer commit of the lane with no Pinetrie-Source builds nothin
     [more, yours],
     { "a.txt": "yours\n" },
     baseMessage("update: pinetrie-onto", {
-      bookmark: DEFAULT_LINE.onto,
+      bookmark: DEFAULT_REPO.acceptedBookmark,
       commit: yours,
     }),
   )
@@ -271,8 +278,8 @@ test("work you landed yourself leaves the offer held: kept, with no files, and s
     { "a.txt": "a\n" },
     "you: the same a.txt",
   )
-  await you.moveLine(yours)
-  // The line moved by work the lane has: catching up would change nothing.
+  await you.moveAccepted(yours)
+  // Accepted work moved by work the lane has: catching up would change nothing.
   expect(await settles(you.dir, LANE, THREAD)).toMatchObject({
     files: [],
     record: { files: [], acceptedAs: null },

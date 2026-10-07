@@ -105,7 +105,7 @@ test("readOnlyWords offers no Restore before the board has states", () => {
   })
 })
 
-test("the header's offers are the open ones, never one the line already holds: a held lane's at its tip, if it has one; another's at its root (ADR-0063)", () => {
+test("the header's offers are the open ones, never one accepted work already holds: a held lane's at its tip, if it has one; another's at its root (ADR-0063)", () => {
   const A = laneNameForThread("a")
   const B = laneNameForThread("b")
   const C = laneNameForThread("c")

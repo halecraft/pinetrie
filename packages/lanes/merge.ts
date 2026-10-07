@@ -1,9 +1,9 @@
 // lanes/merge — a thread's base merged into its lane (ADR-0033, ADR-0060).
 //
-// The lane merges the line's commit, or a fresh copy of its WIP (`planMerge`),
+// The lane merges accepted work's commit, or a fresh copy of its WIP (`planMerge`),
 // into itself, in its own repo: jj records conflicts in the merge rather than
 // failing (S36 item 11), and the agent resolves them there, never in your
-// repo. An accepted-offer commit on the line is a copy of a lane's work, so
+// repo. An accepted-offer commit on accepted work is a copy of a lane's work, so
 // each one the lane holds a source of is first joined to it (`planJoins`,
 // S102): merged as history says, the lane's own work would come in twice.
 // The merge is committed at once, so it is a revision even when it merged
@@ -149,7 +149,7 @@ async function joinAcceptedOfferCommits(
 }
 
 /**
- * Merge `from` (the line's commit, a WIP's copy, or the parent's newest) into
+ * Merge `from` (accepted work's commit, a WIP's copy, or the parent's newest) into
  * the lane at its bookmark, described `message`, and commit the merge. `jj`
  * is the lane's, and must already hold `from`. Each accepted-offer commit in `from`'s history
  * that names a source the lane holds is first joined to it (`planJoins`,
@@ -184,7 +184,7 @@ export async function mergeBase(
 
 /**
  * An empty commit on the lane's bookmark, described `message`: a thread
- * moved to the line when the line has nothing the lane lacks still needs its
+ * moved to accepted work when accepted work has nothing the lane lacks still needs its
  * newest `Pinetrie-Base` to say so (ADR-0060). Returns it.
  */
 async function markBase(
@@ -199,8 +199,8 @@ async function markBase(
  * A lane's base as its history says it (ADR-0060): the newest commit in
  * `::rev` whose message carries a base trailer, read with `jj` (the lane's,
  * or your repo's on the lane's tip). Its value names the bookmark and the
- * commit it pointed at; null for a lane with none, one from before the line,
- * or one whose newest base is on the line as it was named before the rename
+ * commit it pointed at; null for a lane with none, one from before accepted work,
+ * or one whose newest base is on accepted work as it was named before the rename
  * (`baseOf`).
  */
 export async function newestBase(
@@ -325,7 +325,7 @@ export async function revisionsIn(
 /** What an update found in the lane after its merge (`mergeUpdate`). */
 export type Merged =
   /**
-   * Nothing to merge. `mark` is the commit naming the line, when the plan
+   * Nothing to merge. `mark` is the commit naming accepted work, when the plan
    * asked for one, made on `ours`.
    */
   | {
@@ -335,7 +335,7 @@ export type Merged =
     }
   | {
       readonly kind: "clean"
-      /** The commit merged: the line's, or the WIP's copy. */
+      /** The commit merged: accepted work's, or the WIP's copy. */
       readonly from: CommitId
       /** The lane's revision before the merge. */
       readonly ours: CommitId
@@ -363,7 +363,7 @@ export type Merged =
 
 /**
  * `range` without the accepted-offer commits an update joined: each is the
- * lane's own work, as a copy, so it did not come in. Only those commits go: the line's
+ * lane's own work, as a copy, so it did not come in. Only those commits go: accepted work's
  * commits under them did come in, which `(<ours> | <join>)..<to>` would also
  * drop (S102 item 9).
  */

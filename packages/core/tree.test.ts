@@ -780,7 +780,7 @@ describe("baseKnown (ADR-0080)", () => {
       role: "behind",
       content: "b",
       behind: {
-        from: { kind: "line" },
+        from: { kind: "accepted" },
         to: C("l2"),
         files: [],
         overlap: [],
