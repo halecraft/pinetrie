@@ -52,13 +52,8 @@ export interface Line {
 export function createLine(deps: {
   readonly owner: Pick<RepoOwner, "later" | "command">
   readonly basics: Pick<Basics, "session">
-  /** The integration line's names (ADR-0060). */
+  /** The integration line's names and `offers.catchUp` (ADR-0060, ADR-0099). */
   readonly line: LineConfig
-  /**
-   * Whether this host accepts the owner's `line` commands: it admits no one
-   * else. Moving the publish bookmark is anyone's (ADR-0076).
-   */
-  readonly lineCommands: boolean
   readonly writeValues: (writes: readonly ValueWrite[]) => Promise<void>
 }): Line {
   const { owner, line } = deps
@@ -70,7 +65,6 @@ export function createLine(deps: {
       facts,
       line,
       proposed: lineProposal(line, facts),
-      commands: deps.lineCommands,
     })
     const writes = setIfChanged(LINE, next, readLine(doc) ?? undefined)
     if (writes.length > 0) await deps.writeValues(writes)

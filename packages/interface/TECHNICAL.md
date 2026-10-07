@@ -466,14 +466,16 @@ pending.
   open offer (`offeredByRoot`, each named by `threadNameOf`, so one the host
   has not named yet still counts). Nothing lists the runs.
 - **The publish button and its toast** (`publish-view.ts`, `toast.tsx`,
-  ADR-0090): `publishView` decides the one button: `absent` with no record,
-  or before setup on a host that admits others; `setup`, before setup on the
-  host's own machine, whose `Menu` shows what it writes; `hidden` when
+  ADR-0090, ADR-0099): `publishView` decides the one button: `absent` with
+  no record; `setup`, before setup on any host, whose `Menu` shows what it
+  writes; `hidden` when
   `@pinetrie/rules`' `nothingToPublish` says so, the same function the host
   refuses by; else `publish`, carrying `lineActionState`. `publishWords`
   words it: "publish", or "publishing…" while out, and a title that says
   what it does from `publishWork` and the catch-up's preview (files it
-  changes, other lines of your work that move), then the jj, led by
+  changes, other lines of your work that move), "your files do not move
+  (offers.catchUp is off)" when the setting leaves your files behind or
+  your commits unaccepted, then the jj, led by
   `lineRefusal` when the host would refuse (`PublishWords.refused`, the
   button's `data-refused`). The button still sends then: the
   host's refusal is the toast, so there is one path and one source of words.

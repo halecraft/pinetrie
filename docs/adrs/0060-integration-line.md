@@ -280,6 +280,8 @@ work on the immutable line.
   host which connection a seat came over, so a host with an invite key
   (one that admits others) refuses setup and land (`not_yours`), and the
   page offers neither.
+  *Amended by ADR-0099: setup is anyone's, on any host;
+  `not_yours` goes.*
 - **The base is chosen per composer**, as the work choice is, and sent with
   the first message; nothing is kept on the column.
 - **A WIP thread's update copies onto the lane's previous copy**, not the

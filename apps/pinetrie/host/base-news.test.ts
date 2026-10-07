@@ -44,7 +44,7 @@ function behind(to = "l2") {
         catchUp: null,
         conflicts: { commits: 0, files: [] },
       },
-      commands: true,
+      catchUp: true,
     }),
   )
   const steered: unknown[] = []

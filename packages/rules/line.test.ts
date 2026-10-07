@@ -47,9 +47,13 @@ describe("the line (ADR-0060)", () => {
   const record = (over: Partial<LineRecord> = {}): LineRecord => ({
     ...planLineRecord({
       facts,
-      line: { onto: "pinetrie-onto", wipPrefix: "wip/", publish: "main" },
+      line: {
+        onto: "pinetrie-onto",
+        wipPrefix: "wip/",
+        publish: "main",
+        catchUp: true,
+      },
       proposed,
-      commands: true,
     }),
     ...over,
   })
@@ -63,7 +67,7 @@ describe("the line (ADR-0060)", () => {
       record().onto,
       record().wipPrefix,
       record().publish,
-      record().commands,
+      record().catchUp,
     ]).toEqual(["pinetrie-onto", "wip/", "main", true])
   })
   test("setup writes the bookmark at your @- and exactly the proposed heads and log", () => {
@@ -74,11 +78,10 @@ describe("the line (ADR-0060)", () => {
       log: "logged",
     })
   })
-  test("a host that admits others refuses setup; a set line refuses it", () => {
-    expect(planLineAction("setup", record({ commands: false }))).toEqual({
-      kind: "refused",
-      code: ERR.NOT_YOURS,
-    })
+  test("setup runs whatever offers.catchUp says; a set line refuses it", () => {
+    expect(planLineAction("setup", record({ catchUp: false })).kind).toBe(
+      "setup",
+    )
     expect(
       planLineAction("setup", record({ commit: commitId("c1") })).kind,
     ).toBe("refused")
@@ -109,9 +112,9 @@ describe("the line (ADR-0060)", () => {
       const s = lineActionState("publish", r)
       return s.kind === "refused" ? s.code : null
     }
-    test("on a host that admits others it moves the publish bookmark alone, whatever your files", () => {
+    test("with offers.catchUp off it moves the publish bookmark alone, whatever your files", () => {
       const r = at(unpublished, {
-        commands: false,
+        catchUp: false,
         yours: yours({
           behind: 2,
           ahead: 3,
@@ -127,7 +130,7 @@ describe("the line (ADR-0060)", () => {
       })
       expect(publishWork(r)).toEqual({ accepted: 2, yours: 0, catchUp: false })
     })
-    test("on the host's machine it catches your files up and integrates your commits", () => {
+    test("with offers.catchUp on it catches your files up and integrates your commits", () => {
       const r = at(unpublished, {
         yours: yours({ behind: 2, ahead: 1, catchUp: preview }),
       })
@@ -177,7 +180,7 @@ describe("the line (ADR-0060)", () => {
         at(published),
         at(unpublished),
         at(published, { yours: yours({ ahead: 1 }) }),
-        at(published, { commands: false, yours: yours({ ahead: 1 }) }),
+        at(published, { catchUp: false, yours: yours({ ahead: 1 }) }),
       ])
         expect(nothingToPublish(publishWork(r))).toBe(code(r) === ERR.REFUSED)
     })
@@ -213,9 +216,6 @@ describe("the line (ADR-0060)", () => {
           }),
         ),
       ).toBe("catching your files up would conflict in x.ts")
-      expect(lineRefusal("setup", ERR.NOT_YOURS, r)).toContain(
-        "use jj on its machine",
-      )
     })
 
     describe("planPublishFinish: the second round, from the line read after the catch-up", () => {

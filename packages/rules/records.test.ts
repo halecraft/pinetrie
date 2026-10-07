@@ -187,7 +187,7 @@ const SAMPLES: readonly Sample[] = [
         catchUp: null,
         conflicts: { commits: 0, files: [] },
       },
-      commands: true,
+      catchUp: true,
     },
     null,
   ),

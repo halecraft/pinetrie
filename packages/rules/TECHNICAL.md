@@ -921,19 +921,19 @@ commit-message request `request.ts` (`describeRequest`).
 
 | record | namespace | key | written |
 |---|---|---|---|
-| the integration line: its commit, the WIP bookmarks above it, the publish bookmark and your work against it (`yours.ahead`, `yours.catchUp`), and whether this host accepts `line` commands | `pinetrie.line` | `line` | when your repo's operation head moves |
+| the integration line: its commit, the WIP bookmarks above it, the publish bookmark and your work against it (`yours.ahead`, `yours.catchUp`), and `offers.catchUp` (`catchUp`) | `pinetrie.line` | `line` | when your repo's operation head moves |
 | a lane's base, as its newest `Pinetrie-Base` says it, whether a WIP base landed or is gone, what catching up would change and where that was read, and its untraced integrated-offer commits (S97) | `pinetrie.base` | the lane | when a refresh reads the lane |
 
 - **`planLineRecord`** is the line's record from what the host read
   (`LineFacts`), beside what setting the line up would write to your
   repo's config, which `@pinetrie/repo` words (`lineProposal`: jj's config
-  text), and whether this host accepts `line` commands.
+  text), and `offers.catchUp` from the line's config (ADR-0099).
 - **`planLineAction`** decides a `line` command from the record read in
   its own step (`LineDecision`): setup writes exactly the heads and log the
   record proposed, the text you were shown; a publish (`PublishDecision`,
   ADR-0090) says whether your files catch up first (`catchUp`) and whether
-  your commits move with the line (`integrate`), both false on a host that
-  admits others. `@pinetrie/repo` turns it into steps (`planLineSetup`,
+  your commits move with the line (`integrate`), both false with
+  `offers.catchUp` off. `@pinetrie/repo` turns it into steps (`planLineSetup`,
   `planPublishCatchUp`, `planPublishMove`).
 - **`planPublishFinish` is a publish's second round** (ADR-0090): from the
   record read again after the catch-up, the move, or the catch-up's
@@ -951,10 +951,10 @@ commit-message request `request.ts` (`describeRequest`).
   "What the page reads".
 - **`lineActionState` is the one rule for a `line` command** (ADR-0076,
   ADR-0090): the host's `planLineAction` decides from it, and the page's
-  publish button reads it. Setup acts on the repo as its owner, so a host
-  that admits others refuses it (`not_yours`); publishing is anyone's, and
-  there moves the publish bookmark alone. A publish is refused, in order:
-  `no_line`, `no_publish`, `not_fast_forward`; on the host's own machine,
+  publish button reads it. Setup and publishing are anyone's, on any host
+  (ADR-0099); setup is refused only once the line exists. A publish is
+  refused, in order: `no_line`, `no_publish`, `not_fast_forward`; with
+  `offers.catchUp` on,
   `yours_conflict` (conflicted commits or files, or a preview that would
   conflict) and `refused` for files behind with no commit in common; then
   `refused` when `nothingToPublish(publishWork(record))`, the one "nothing

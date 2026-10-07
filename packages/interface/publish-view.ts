@@ -20,11 +20,11 @@ import { outcomeWords } from "./outcome-words.ts"
 
 /** The publish button as the footer shows it. */
 export type PublishView =
-  /** No lanes of their own here, or not set up on a host that admits others. */
+  /** No lanes of their own here. */
   | { readonly kind: "absent" }
   /** Set up, with nothing to publish. */
   | { readonly kind: "hidden" }
-  /** No line yet, on the host's own machine: what setting it up writes. */
+  /** No line yet: what setting it up writes. */
   | {
       readonly kind: "setup"
       readonly onto: string
@@ -42,14 +42,12 @@ export type PublishView =
 export function publishView(record: LineRecord | null): PublishView {
   if (record === null) return { kind: "absent" }
   if (record.commit === null)
-    return record.commands
-      ? {
-          kind: "setup",
-          onto: record.onto,
-          heads: record.heads.proposed,
-          log: record.log.proposed,
-        }
-      : { kind: "absent" }
+    return {
+      kind: "setup",
+      onto: record.onto,
+      heads: record.heads.proposed,
+      log: record.log.proposed,
+    }
   const work = publishWork(record)
   if (nothingToPublish(work)) return { kind: "hidden" }
   return {
@@ -116,7 +114,14 @@ function publishSays(record: LineRecord, work: PublishWork): string {
     steps.length === 1
       ? steps.join("")
       : `${steps.slice(0, -1).join(", ")}, then ${steps.at(-1) ?? ""}`
-  return `${said} · ${jj.join("; ")}`
+  // With the setting off, your files behind or your commits below `@` would
+  // otherwise read as left out by mistake.
+  const { behind, ahead } = record.yours
+  const unmoved =
+    !record.catchUp && (behind > 0 || ahead > 0)
+      ? "; your files do not move (offers.catchUp is off)"
+      : ""
+  return `${said}${unmoved} · ${jj.join("; ")}`
 }
 
 /** What a line command in flight says on the button, until the host answers. */

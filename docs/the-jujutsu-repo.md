@@ -31,10 +31,11 @@ The jj names are in the page's titles.
 
 The names `pinetrie-onto`, `main` and `wip/` are the defaults. A project sets its own
 in `pinetrie.json`, or a person in `$XDG_CONFIG_HOME/pinetrie/config.json`; the
-project's wins:
+project's wins. `catchUp` (default `false`) makes a publish catch your files
+up and accept your commits first (ADR-0099):
 
 ```json
-{ "offers": { "onto": "trunk", "wipPrefix": "wip/", "publish": "master" } }
+{ "offers": { "onto": "trunk", "wipPrefix": "wip/", "publish": "master", "catchUp": true } }
 ```
 
 **An offer integration** moves one bookmark forward to an offer:
@@ -45,7 +46,7 @@ conflicts can be integrated into the line. The commit it leaves there is an
 **integrated-offer commit** (ADR-0083).
 
 **Publish**, the page's one button for the line (ADR-0090), shows only while
-there is something to publish. On the owner's machine it is up to three
+there is something to publish. With `offers.catchUp` on, it is up to three
 steps, as one act:
 
 1. When the owner's files are behind the line, `jj rebase -b @ -d
@@ -59,14 +60,15 @@ steps, as one act:
    them, and `main` moves with it, in one operation. Without such commits,
    `jj bookmark move main --to pinetrie-onto`, as `pinetrie-host`.
 
-On a host that admits others, a publish is the last move alone, as
-`pinetrie-host`: it changes no file, so anyone in the session may. It does
-not push.
+With `offers.catchUp` off, the default, a publish is the last move alone,
+as `pinetrie-host`, and changes no file. Either way anyone admitted may
+publish, and the host does the same whoever presses it and wherever it
+listens (ADR-0099). It does not push.
 
-Publishing is refused before its first step when the owner's files have
-conflicts, when the preview says catching up would conflict, or when `main`
-has commits the line lacks (someone pushed to it outside pine·trie): those
-must be brought into the line first. When the rebase leaves one of the
+Publishing is refused before its first step when `main` has commits the
+line lacks (someone pushed to it outside pine·trie), which must be brought
+into the line first; and, with `offers.catchUp` on, when the owner's files
+have conflicts or the preview says catching up would conflict. When the rebase leaves one of the
 owner's commits conflicted (one that `@`'s own tree resolves, so the
 preview could not see it), or the move fails, the host reverts the rebase's
 operation with `jj op revert`, as the owner, and the repo is as it was. It

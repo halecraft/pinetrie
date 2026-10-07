@@ -8,6 +8,8 @@ project's mark counts unpublished commits, not your files being behind).
 Amended by ADR-0090: the menu goes, for one publish button; on the host's
 own machine a publish also catches your files up and integrates your
 commits; a refusal is a toast.
+Amended by ADR-0099: a publish moves `main` alone when
+`offers.catchUp` is off, on any host, not because the host admits others.
 
 **Context.** The header's **◆ project** menu (ADR-0061) had grown confusing
 (Duane, 2026-10-04):

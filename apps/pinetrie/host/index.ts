@@ -434,7 +434,6 @@ export async function startHost({
     records,
     piSetup,
     ensureNames: names.ensure,
-    lineCommands: key === null,
   })
 
   // --- the agent, at work in threads' lanes ---------------------------------

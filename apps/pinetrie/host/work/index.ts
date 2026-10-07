@@ -83,11 +83,6 @@ export async function startLaneWork(input: {
   >
   /** Name every lane that has none (`host/names.ts`): a new lane, before its first run. */
   readonly ensureNames: () => Promise<void>
-  /**
-   * Whether `line` commands are accepted (ADR-0060): they act on the repo as its
-   * owner, so only on a host that admits no one but this machine.
-   */
-  readonly lineCommands: boolean
 }): Promise<LaneWork> {
   const { basics } = input
   const { session } = basics
@@ -112,7 +107,6 @@ export async function startLaneWork(input: {
           owner,
           basics,
           line: lineConfig,
-          lineCommands: input.lineCommands,
           writeValues: writes => input.records.writeValues(writes),
         })
   // The base snapshot follows the line, however it moved: setup, an accept,

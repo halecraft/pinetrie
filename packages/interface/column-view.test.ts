@@ -199,7 +199,7 @@ const LINE = {
     catchUp: null,
     conflicts: { commits: 0, files: [] },
   },
-  commands: true,
+  catchUp: true,
 } satisfies LineRecord
 const BASE: BaseRecord = {
   lane: laneNameForThread("1"),

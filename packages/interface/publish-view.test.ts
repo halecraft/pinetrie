@@ -34,7 +34,7 @@ const record = (over: Partial<LineRecord> = {}): LineRecord => ({
   log: { current: null, proposed: "builtin_log() | …" },
   wips: [],
   yours: yours(),
-  commands: true,
+  catchUp: true,
   ...over,
 })
 
@@ -63,9 +63,9 @@ describe("publishView: one button, only with something to do (ADR-0090)", () => 
     expect(w.notes[2]).toContain("builtin_log() | …")
     expect(w.notes[3]).toContain('bookmarks(glob:"pinetrie-offer/*")')
   })
-  test("a host that admits others, before setup: no button that does nothing", () => {
-    expect(publishView(record({ commit: null, commands: false })).kind).toBe(
-      "absent",
+  test("before setup, set up whatever offers.catchUp says", () => {
+    expect(publishView(record({ commit: null, catchUp: false })).kind).toBe(
+      "setup",
     )
   })
   test("nothing to publish: hidden; your files or commits alone are something", () => {
@@ -74,7 +74,7 @@ describe("publishView: one button, only with something to do (ADR-0090)", () => 
       "publish",
     )
     expect(
-      publishView(record({ commands: false, yours: yours({ ahead: 1 }) })).kind,
+      publishView(record({ catchUp: false, yours: yours({ ahead: 1 }) })).kind,
     ).toBe("hidden")
   })
 })
@@ -87,7 +87,18 @@ describe("publishWords: what the button says it will do (ADR-0090)", () => {
       "moves main forward over 2 accepted commits · jj bookmark move main --to pinetrie-onto",
     )
   })
-  test("on the host's machine: your files catch up, your commits are accepted, then main moves", () => {
+  test("with offers.catchUp off, the title says your files do not move, naming the setting", () => {
+    const off = (y: Partial<LineRecord["yours"]>) =>
+      words(record({ ...unpublished(2), catchUp: false, yours: yours(y) }))
+        .title
+    expect(off({ behind: 1, ahead: 1 })).toBe(
+      "moves main forward over 2 accepted commits; your files do not move (offers.catchUp is off) · jj bookmark move main --to pinetrie-onto",
+    )
+    expect(off({})).toBe(
+      "moves main forward over 2 accepted commits · jj bookmark move main --to pinetrie-onto",
+    )
+  })
+  test("with offers.catchUp on: your files catch up, your commits are accepted, then main moves", () => {
     const w = words(
       record({
         ...unpublished(1),

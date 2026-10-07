@@ -307,7 +307,7 @@ describe("records", () => {
         catchUp: null,
         conflicts: { commits: 0, files: [] },
       },
-      commands: true,
+      catchUp: true,
     }
     const l = setRecord(LINE, line)
     expect([l.namespace, l.key]).toEqual(["pinetrie.line", "line"])

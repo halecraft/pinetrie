@@ -89,7 +89,7 @@ const LineRecordSchema = Type.Object({
       files: Type.Array(Type.String()),
     }),
   }),
-  commands: Type.Boolean(),
+  catchUp: Type.Boolean(),
 })
 
 const BaseRecordSchema = Type.Object({
@@ -197,19 +197,19 @@ export const BASE: RecordSpec<BaseRecord, LaneName, "session"> = {
 /**
  * The line's record, the page's cache, from what the host read of it
  * (ADR-0060): what setting it up would write to your repo's config
- * (`proposed`, `lineProposal`), and whether this host accepts the `line`
- * commands that act on the repo as its owner.
+ * (`proposed`, `lineProposal`), and whether a publish catches your files up
+ * (`offers.catchUp`, ADR-0099).
  */
 export function planLineRecord(input: {
   readonly facts: LineFacts
-  /** The line's bookmark, the WIP prefix and the publish bookmark. */
+  /** The line's bookmark, the WIP prefix, the publish bookmark and `catchUp`. */
   readonly line: {
     readonly onto: string
     readonly wipPrefix: string
     readonly publish: string
+    readonly catchUp: boolean
   }
   readonly proposed: { readonly heads: string; readonly log: string }
-  readonly commands: boolean
 }): LineRecord {
   const { facts, line, proposed } = input
   return {
@@ -222,7 +222,7 @@ export function planLineRecord(input: {
     wips: facts.wips,
     published: facts.published,
     yours: facts.yours,
-    commands: input.commands,
+    catchUp: line.catchUp,
   }
 }
 
@@ -238,24 +238,24 @@ const refused = (code: ErrCode): LineActionState => ({ kind: "refused", code })
 export interface PublishWork {
   /** Line commits the publish bookmark lacks. */
   readonly accepted: number
-  /** Your commits below `@` it integrates: 0 on a host that admits others. */
+  /** Your commits below `@` it integrates: 0 with `offers.catchUp` off. */
   readonly yours: number
-  /** Whether your files catch up first: never on a host that admits others. */
+  /** Whether your files catch up first: never with `offers.catchUp` off. */
   readonly catchUp: boolean
 }
 
 /**
- * What a publish would do now. On a host that admits others it moves the
- * publish bookmark alone, so your files and commits count for nothing there.
+ * What a publish would do now. With `offers.catchUp` off it moves the publish
+ * bookmark alone, so your files and commits count for nothing.
  */
 export function publishWork(
-  record: Pick<LineRecord, "commands" | "published" | "yours">,
+  record: Pick<LineRecord, "catchUp" | "published" | "yours">,
 ): PublishWork {
-  const { commands, published, yours } = record
+  const { catchUp, published, yours } = record
   return {
     accepted: published.commit === null ? 0 : published.behind,
-    yours: commands ? yours.ahead : 0,
-    catchUp: commands && yours.behind > 0,
+    yours: catchUp ? yours.ahead : 0,
+    catchUp: catchUp && yours.behind > 0,
   }
 }
 
@@ -265,26 +265,22 @@ export const nothingToPublish = (work: PublishWork): boolean =>
 
 /**
  * Whether `action` may run on the line as `record` has it: the one rule the
- * host's `planLineAction` and the page's button both read. Setting up acts
- * on the repo as its owner, so a host that admits others refuses it; anyone
- * admitted may publish, which there moves only the publish bookmark
- * (ADR-0076). A publish is refused before its first step for whatever can be
- * checked then (ADR-0090): your files' conflicts and the catch-up's preview
- * among them.
+ * host's `planLineAction` and the page's button both read. Anyone admitted
+ * may set up or publish (ADR-0099). A publish is refused before its first
+ * step for whatever can be checked then (ADR-0090): with `offers.catchUp` on,
+ * your files' conflicts and the catch-up's preview among them.
  */
 export function lineActionState(
   action: LineAction,
   record: LineRecord,
 ): LineActionState {
-  if (action === "setup") {
-    if (!record.commands) return refused(ERR.NOT_YOURS)
+  if (action === "setup")
     return record.commit === null ? OK : refused(ERR.REFUSED)
-  }
   if (record.commit === null) return refused(ERR.NO_LINE)
   const { published, yours } = record
   if (published.commit === null) return refused(ERR.NO_PUBLISH)
   if (published.ahead > 0) return refused(ERR.NOT_FAST_FORWARD)
-  if (record.commands) {
+  if (record.catchUp) {
     if (
       yours.conflicts.commits > 0 ||
       yours.conflicts.files.length > 0 ||
@@ -375,8 +371,6 @@ export function lineRefusal(
 ): string {
   const { publish, published, yours } = record
   switch (code) {
-    case ERR.NOT_YOURS:
-      return "this host admits others, so it does not act on the repo as its owner: use jj on its machine"
     case ERR.NO_LINE:
       return "set up first"
     case ERR.NO_PUBLISH:
@@ -393,7 +387,7 @@ export function lineRefusal(
     }
     default:
       if (action === "setup") return "already set up"
-      return yours.behind > 0 && yours.catchUp === null && record.commands
+      return yours.behind > 0 && yours.catchUp === null && record.catchUp
         ? "your files share no commit with accepted work: rebase onto it in jj"
         : "nothing to publish"
   }

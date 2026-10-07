@@ -34,7 +34,7 @@ const line = (commit = L2): LineRecord => ({
     catchUp: null,
     conflicts: { commits: 0, files: [] },
   },
-  commands: true,
+  catchUp: true,
 })
 
 /** A lane on the line from L1, whose catch-up to L2 brings `files`. */

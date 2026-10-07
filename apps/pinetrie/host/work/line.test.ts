@@ -21,10 +21,16 @@ const facts = (over: Partial<LineFacts["yours"]> = {}): LineFacts => ({
 })
 
 /**
- * A publish on a fake owner: `before` is the line until the catch-up runs,
+ * A publish on a fake owner: `facts()` is the line until the catch-up runs,
  * `after` from then on; the move's step throws when `moveFails`.
  */
-function rig(after: LineFacts, moveFails = false) {
+function rig(
+  after: LineFacts,
+  {
+    moveFails = false,
+    catchUp = true,
+  }: { moveFails?: boolean; catchUp?: boolean } = {},
+) {
   const b = basics()
   const ran: RepoStep[][] = []
   let now = facts()
@@ -54,15 +60,22 @@ function rig(after: LineFacts, moveFails = false) {
   const line = createLine({
     owner,
     basics: b,
-    line: DEFAULT_LINE,
-    lineCommands: true,
+    line: { ...DEFAULT_LINE, catchUp },
     writeValues: async w => applyWrites(b, w),
   })
   const argv = () => ran.map(steps => steps.map(s => s.args.join(" ")))
   return { line, argv }
 }
 
-describe("a publish on the host's own machine, in two rounds (ADR-0090)", () => {
+describe("a publish with offers.catchUp off moves main alone (ADR-0099)", () => {
+  test("your files behind and your commits below @ stay where they are", async () => {
+    const { line, argv } = rig(facts(), { catchUp: false })
+    expect(await line.act("publish")).toBeNull()
+    expect(argv()).toEqual([['bookmark move main --to "pinetrie-onto"']])
+  })
+})
+
+describe("a publish with offers.catchUp on, in two rounds (ADR-0090)", () => {
   test("the catch-up, then the move, from the line read after it", async () => {
     const { line, argv } = rig(facts({ behind: 0, ahead: 0, catchUp: null }))
     expect(await line.act("publish")).toBeNull()
@@ -83,10 +96,9 @@ describe("a publish on the host's own machine, in two rounds (ADR-0090)", () => 
     ])
   })
   test("a move jj refuses after the catch-up reverts it, then fails", async () => {
-    const { line, argv } = rig(
-      facts({ behind: 0, ahead: 0, catchUp: null }),
-      true,
-    )
+    const { line, argv } = rig(facts({ behind: 0, ahead: 0, catchUp: null }), {
+      moveFails: true,
+    })
     await expect(line.act("publish")).rejects.toThrow("jj refused the move")
     expect(argv()).toEqual([
       ['rebase -b @ -d "pinetrie-onto"'],

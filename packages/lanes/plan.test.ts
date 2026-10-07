@@ -256,23 +256,47 @@ describe("planRun: a lane's container", () => {
 })
 
 describe("lineConfig: the project's names win, and a bad one falls back", () => {
-  const none = { onto: null, wipPrefix: null, publish: null }
+  const none = { onto: null, wipPrefix: null, publish: null, catchUp: null }
   test("defaults with nothing set", () => {
     expect(lineConfig(none, none)).toEqual({ line: DEFAULT_LINE, refused: [] })
   })
   test("the project's name wins over the user's", () => {
     expect(
       lineConfig(
-        { onto: "mine", wipPrefix: "draft/", publish: "master" },
-        { onto: "trunk", wipPrefix: null, publish: null },
+        { onto: "mine", wipPrefix: "draft/", publish: "master", catchUp: true },
+        { onto: "trunk", wipPrefix: null, publish: null, catchUp: null },
       ).line,
-    ).toEqual({ onto: "trunk", wipPrefix: "draft/", publish: "master" })
+    ).toEqual({
+      onto: "trunk",
+      wipPrefix: "draft/",
+      publish: "master",
+      catchUp: true,
+    })
+  })
+  test("catching up is off unless set, and the project's setting wins", () => {
+    expect(DEFAULT_LINE.catchUp).toBe(false)
+    expect(
+      lineConfig({ ...none, catchUp: true }, { ...none, catchUp: false }).line
+        .catchUp,
+    ).toBe(false)
+    expect(lineConfig(none, { ...none, catchUp: true }).line.catchUp).toBe(true)
+  })
+  test("a catchUp that is not true or false falls back to off, saying why", () => {
+    const r = lineConfig(
+      { ...none, catchUp: true },
+      { ...none, catchUp: { invalid: '"yes"' } },
+    )
+    expect(r.line.catchUp).toBe(false)
+    expect(r.refused).toEqual([
+      'offers.catchUp "yes" is not true or false; using false',
+    ])
   })
   test("a name that is no bookmark falls back, saying why", () => {
     const r = lineConfig(none, {
       onto: "has space",
       wipPrefix: "a..b/",
       publish: "a:b",
+      catchUp: null,
     })
     expect(r.line).toEqual(DEFAULT_LINE)
     expect(r.refused).toHaveLength(3)
@@ -294,7 +318,7 @@ describe("decodeLaneConfig: grants, the install and shared directories, total", 
         grants: NO_GRANTS,
         install: null,
         shared: [],
-        offers: { onto: null, wipPrefix: null, publish: null },
+        offers: { onto: null, wipPrefix: null, publish: null, catchUp: null },
       })
     expect(
       decodeLaneConfig(
@@ -313,7 +337,7 @@ describe("decodeLaneConfig: grants, the install and shared directories, total", 
       grants: { ssh: false, env: ["OK_1"], mounts: [] },
       install: null,
       shared: [".plans"],
-      offers: { onto: null, wipPrefix: null, publish: null },
+      offers: { onto: null, wipPrefix: null, publish: null, catchUp: null },
     })
   })
   test("offers: the line's names, as written", () => {
@@ -323,7 +347,21 @@ describe("decodeLaneConfig: grants, the install and shared directories, total", 
         "/p",
         false,
       ).offers,
-    ).toEqual({ onto: "trunk", wipPrefix: null, publish: "master" })
+    ).toEqual({
+      onto: "trunk",
+      wipPrefix: null,
+      publish: "master",
+      catchUp: null,
+    })
+  })
+  test("offers.catchUp: a boolean, else the text written", () => {
+    const flag = (catchUp: unknown) =>
+      decodeLaneConfig({ offers: { catchUp } }, "/p", false).offers.catchUp
+    expect(flag(true)).toBe(true)
+    expect(flag(false)).toBe(false)
+    expect(flag(undefined)).toBeNull()
+    expect(flag("yes")).toEqual({ invalid: '"yes"' })
+    expect(flag(null)).toEqual({ invalid: "null" })
   })
   test("mount sources are relative to the project", () => {
     expect(

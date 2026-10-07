@@ -185,29 +185,32 @@ While the page syncs, "syncing…" leads its right end.
   session": the messages in the roots this browser tab holds, of every
   root's. Nothing in the footer animates: your list, the column, the rail
   and the board show where the agent works.
-- **Publish** (ADR-0060, ADR-0076, ADR-0090): one button, no menu. The
-  integration line is **accepted work**, where finished work goes; its
-  bookmark (`offers.onto`) is in titles only. Before the line exists, the
-  host's own machine shows **set up**, which opens what it writes: the
+- **Publish** (ADR-0060, ADR-0076, ADR-0090, ADR-0099): one button, no
+  menu. The integration line is **accepted work**, where finished work
+  goes; its bookmark (`offers.onto`) is in titles only. Before the line
+  exists, any host shows **set up**, which opens what it writes: the
   bookmark it makes at your `@-` and the exact `immutable_heads()` and
   `revsets.log` text for your repo's config (the log, so jj and jjui show
   the offers), and what to add to a jjui revset of its own
-  (`docs/the-jujutsu-repo.md`), done only when you choose it. A host that
-  admits others shows nothing until it is set up. After, **publish** shows
-  only while there is something to publish, and does it in one act:
-  - on the host's own machine, your files catch up with accepted work
+  (`docs/the-jujutsu-repo.md`), done only when you choose it. After,
+  **publish** shows only while there is something to publish, and does it
+  in one act, the same whoever presses it and wherever the host listens:
+  - with `offers.catchUp` on, your files catch up with accepted work
     (`jj rebase -b @ -d <onto>`, as you) when they are behind; your
     commits below `@` are accepted; then `main` (`offers.publish`) moves
     forward to accepted work. Your commits and `main` move together in one
     jj operation;
-  - on a host that admits others, only `main` moves, as the host. No one's
+  - with it off, the default, only `main` moves, as the host. No one's
     files move.
 
   Its title says what it will do, with how many files catching up
-  changes and any other line of your work that moves with it, then the jj
-  commands. It does not push. What can be checked first is (your files'
-  conflicts, what catching up would conflict, `main` holding commits
-  accepted work lacks), and the title leads with why it would be refused.
+  changes and any other line of your work that moves with it, or, with
+  the setting off and your files behind or commits waiting, that your
+  files do not move (`offers.catchUp` is off), then the jj commands. It
+  does not push. What can be checked first is (`main` holding commits
+  accepted work lacks; with the setting on, your files' conflicts and what
+  catching up would conflict), and the title leads with why it would be
+  refused.
   If your commits come out of the catch-up conflicted, or the move fails,
   the catch-up is reverted (`jj op revert`): nothing is left half done.
 

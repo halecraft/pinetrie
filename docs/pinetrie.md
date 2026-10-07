@@ -514,9 +514,20 @@ has one **publish** button, shown only with something to publish. On the
 host's own machine it catches your files up with the line, accepts your
 commits below `@`, and moves `main`, in one act that is refused before its
 first step or undone after a failure (`jj op revert`, S111); elsewhere it
-moves `main` alone. A refusal is a toast. The line is "accepted work" on the
+moves `main` alone. (Since ADR-0099, `offers.catchUp` decides which, not
+the host.) A refusal is a toast. The line is "accepted work" on the
 page, an offer's button is **accept**, and threads and your files both
 **catch up**; `land` and `follow` are gone from the code.
+
+**ADR-0099 — config decides what the host does, not where it listens**
+(built). Publish rebased your files only on a host bound to loopback, and
+setup was refused anywhere else, so a daily button behaved by a variable
+nobody sees in the page, and protected nothing the invite link does not
+already grant. Now `offers.catchUp` (default off; the project's
+`pinetrie.json` over the user's config) decides whether a publish catches
+your files up and accepts your commits, on any host, and anyone admitted
+may set up the line. The bind and the invite key decide who gets in, and
+nothing past that.
 
 **ADR-0091 — your inbox sits by your avatar** (built). The activity menu
 sat on everyone's side of the footer while its badge counted only what is

@@ -357,13 +357,27 @@ export interface LaneConfig {
   readonly install: Install | null
   /** Relative paths, as written; `planShared` decides which apply. */
   readonly shared: readonly string[]
-  /** The `offers` key's names, as written; null where absent (`lineConfig`). */
+  /** The `offers` key's values, as written; null where absent (`lineConfig`). */
   readonly offers: {
     readonly onto: string | null
     readonly wipPrefix: string | null
     readonly publish: string | null
+    readonly catchUp: WrittenFlag
   }
 }
+
+/**
+ * A boolean config value as written: null where absent, and a non-boolean as
+ * its JSON text, for the refusal that names it.
+ */
+export type WrittenFlag = boolean | { readonly invalid: string } | null
+
+const writtenFlag = (v: unknown): WrittenFlag =>
+  v === undefined
+    ? null
+    : typeof v === "boolean"
+      ? v
+      : { invalid: JSON.stringify(v) ?? String(v) }
 
 /**
  * A parsed lane config, total: anything missing or malformed grants, installs
@@ -386,8 +400,9 @@ export function decodeLaneConfig(
         onto: named(offersKey.onto),
         wipPrefix: named(offersKey.wipPrefix),
         publish: named(offersKey.publish),
+        catchUp: writtenFlag(offersKey.catchUp),
       }
-    : { onto: null, wipPrefix: null, publish: null }
+    : { onto: null, wipPrefix: null, publish: null, catchUp: null }
   const pnpm: Install | null = pnpmLock
     ? { command: "pnpm install --frozen-lockfile", lockfile: "pnpm-lock.yaml" }
     : null
@@ -430,19 +445,22 @@ export function decodeLaneConfig(
 }
 
 /**
- * The integration line's bookmark, the WIP bookmarks' prefix (ADR-0060), and
- * the bookmark publishing moves to the line (ADR-0076).
+ * The integration line's bookmark, the WIP bookmarks' prefix (ADR-0060), the
+ * bookmark publishing moves to the line (ADR-0076), and whether a publish
+ * catches your files up and accepts your commits first (ADR-0099).
  */
 export interface LineConfig {
   readonly onto: string
   readonly wipPrefix: string
   readonly publish: string
+  readonly catchUp: boolean
 }
 
 export const DEFAULT_LINE: LineConfig = {
   onto: "pinetrie-onto",
   wipPrefix: "wip/",
   publish: "main",
+  catchUp: false,
 }
 
 /**
@@ -464,10 +482,10 @@ export const isBookmarkName = (name: string): boolean =>
   !name.endsWith(".lock")
 
 /**
- * The line's names from the user's config and the project's: the project's
- * value wins, since the bookmark belongs to the repo. A name that is not a
- * bookmark falls back to the default, with why. The WIP prefix is checked as
- * the start of a name (`<prefix>x`).
+ * The line's config from the user's and the project's: the project's value
+ * wins, since the bookmark belongs to the repo. A name that is not a bookmark,
+ * or a `catchUp` that is not a boolean, falls back to the default, with why.
+ * The WIP prefix is checked as the start of a name (`<prefix>x`).
  */
 export function lineConfig(
   user: LaneConfig["offers"],
@@ -475,7 +493,7 @@ export function lineConfig(
 ): { readonly line: LineConfig; readonly refused: readonly string[] } {
   const refused: string[] = []
   const pick = (
-    key: keyof LaneConfig["offers"],
+    key: "onto" | "wipPrefix" | "publish",
     valid: (v: string) => boolean,
   ): string => {
     const value = project[key] ?? user[key]
@@ -486,11 +504,19 @@ export function lineConfig(
     )
     return DEFAULT_LINE[key]
   }
+  const flag = project.catchUp ?? user.catchUp
+  let catchUp = DEFAULT_LINE.catchUp
+  if (typeof flag === "boolean") catchUp = flag
+  else if (flag !== null)
+    refused.push(
+      `offers.catchUp ${flag.invalid} is not true or false; using ${DEFAULT_LINE.catchUp}`,
+    )
   return {
     line: {
       onto: pick("onto", isBookmarkName),
       wipPrefix: pick("wipPrefix", v => isBookmarkName(`${v}x`)),
       publish: pick("publish", isBookmarkName),
+      catchUp,
     },
     refused,
   }

@@ -320,11 +320,6 @@ export const ERR = {
   LANE_ID_IN_USE: "lane_id_in_use",
   /** A new root's id that names a root the session already holds (ADR-0063). */
   ROOT_ID_IN_USE: "root_id_in_use",
-  /**
-   * A command that acts on the repo as its owner (set up the line) from a
-   * host that admits others: it has an invite key (ADR-0060).
-   */
-  NOT_YOURS: "not_yours",
   /** An offer integrated, or a publish, before the line is set up (ADR-0060). */
   NO_LINE: "no_line",
   /** Publishing in a repo with no publish bookmark (ADR-0076). */
@@ -1262,12 +1257,10 @@ export interface LineRecord {
     }
   }
   /**
-   * Whether this host accepts the `line` commands that act on the repo as its
-   * owner (setting up, and a publish's moves of your files and commits): only
-   * when it admits no one but this machine (no invite key). Moving the
-   * publish bookmark is anyone's (ADR-0076).
+   * `offers.catchUp` (ADR-0099): whether a publish catches your files up and
+   * accepts your commits below `@` before moving the publish bookmark.
    */
-  readonly commands: boolean
+  readonly catchUp: boolean
 }
 
 /**

@@ -103,8 +103,8 @@ export function Footer({
 }
 
 /**
- * The publish button (ADR-0090): set up before the line exists, on the host's
- * own machine; then publish, only while there is something to publish. A
+ * The publish button (ADR-0090, ADR-0099): set up before the line exists;
+ * then publish, only while there is something to publish. A
  * refusal or failure of your last command here is a toast until you dismiss
  * it or send another.
  */

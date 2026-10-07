@@ -284,7 +284,7 @@ describe("offerView: ADR-0038's table", () => {
         catchUp: null,
         conflicts: { commits: 0, files: [] },
       },
-      commands: true,
+      catchUp: true,
     })
     const onLine: BaseRecord = {
       lane: LANE,
