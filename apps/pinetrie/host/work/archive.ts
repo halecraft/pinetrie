@@ -6,12 +6,7 @@
 // snapshots no one will branch from deleted in the background.
 
 import type { Keeper } from "@pinetrie/keeper"
-import {
-  type DiskPaths,
-  laneContainer,
-  removeLane,
-  removeSnapshots,
-} from "@pinetrie/lanes"
+import { type LaneRuntime, removeLane } from "@pinetrie/lanes"
 import type { ArchiveTeardown } from "@pinetrie/rules"
 import { type Basics, failed } from "../basics.ts"
 import type { Offers } from "../offers/index.ts"
@@ -26,27 +21,28 @@ export function createArchive(deps: {
   readonly basics: Basics
   /** Your repo's offers when lanes have their own copies, else null. */
   readonly offers: Pick<Offers, "moveLanes"> | null
-  readonly paths: DiskPaths | null
+  /** What lanes of their own run on; null when they work directly. */
+  readonly runtime: LaneRuntime | null
   readonly registry: LaneRegistry
   /** Work nobody awaits: `quiet` waits for it. */
   readonly keeper: Keeper
 }): Archive {
-  const { basics, offers, paths, registry, keeper } = deps
+  const { basics, offers, runtime, registry, keeper } = deps
   return {
     async teardown({ forget, refs, snapshots }) {
       for (const lane of forget) {
         await registry.forget(lane)
-        await removeLane(laneContainer(lane))
+        if (runtime !== null) await removeLane(runtime, lane)
       }
       if (offers !== null && refs.length > 0)
         await offers
           .moveLanes(refs)
           .catch(failed(basics, "moving archived or restored lanes' history"))
-      if (paths !== null && snapshots.length > 0)
+      if (runtime !== null && snapshots.length > 0)
         void keeper.track(
-          removeSnapshots(paths, snapshots).catch(
-            failed(basics, "deleting snapshots"),
-          ),
+          runtime
+            .disk({ kind: "deleteSnapshots", ids: snapshots })
+            .catch(failed(basics, "deleting snapshots")),
         )
     },
   }

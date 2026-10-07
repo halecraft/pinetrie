@@ -426,7 +426,7 @@ describe("askedAboutConflict (ADR-0080)", () => {
     }
     const updates = createUpdates({
       basics: b,
-      setup: { root: null, owner: null, paths: null, lanes: null },
+      setup: { root: null, owner: null, lanes: null },
       registry: record<Parameters<typeof createUpdates>[0]["registry"]>({
         isOwn: () => own,
         laneJjOf: () => jj,
@@ -535,7 +535,6 @@ describe("catchUpInRun (ADR-0080)", () => {
       setup: {
         root: null,
         owner: record<RepoOwner>().port,
-        paths: null,
         lanes: null,
       },
       registry: record<Parameters<typeof createUpdates>[0]["registry"]>({

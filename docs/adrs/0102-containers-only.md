@@ -71,9 +71,8 @@ or directly in a directory, by default the host's working copy.
   - the host's `PINETRIE_LANES`, `containers` option and direct project;
   - hot reload's holding of updates under a direct lane's directory;
   - pi's direct tool access;
-  - the composer's work menu, the direct work strip, the publish toast's
-    "resolve with the agent", and `scripts/migrate-pineta.ts`'s direct
-    case.
+  - the composer's work menu, the direct work strip, and the publish
+    toast's "resolve with the agent".
 
   A lane recorded with direct work needs a store migration (ADR-0096).
 - **pine·trie no longer resolves conflicts in the working copy:** they are

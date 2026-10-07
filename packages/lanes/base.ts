@@ -4,8 +4,9 @@
 // Root lanes fork from it as other lanes fork from a turn's snapshot. It is
 // accepted work's commit, fetched by id, and its dependencies installed in Linux:
 // the only install; no lane ever installs. It is made and refreshed in a
-// scratch lane, then snapshotted back as `base.img` as a turn is, so a fork
-// never reads it half-written. `base.json` beside it says what it holds.
+// scratch lane, then snapshotted as `BASE_SNAPSHOT` as a turn is, so a fork
+// never reads it half-written. `base.json`, in the project's
+// `.pinetrie/snapshots/` on the host, says what it holds.
 //
 // Also a lane's base as its history names it (`laneBase`), read the same way
 // from the lane's own repo and from yours.
@@ -19,16 +20,15 @@ import {
   type LaneBase,
   laneNameForThread,
 } from "@pinetrie/core"
-import { snapshotExists } from "./disk.ts"
 import { executeOrThrow } from "./execute.ts"
 import { laneHandle, type OpenLink, removeLane } from "./lane.ts"
 import { newestBase } from "./merge.ts"
 import {
   type BaseFacts,
-  type DiskPaths,
   type Install,
   type LaneSpec,
   laneContainer,
+  pinetrieDir,
   planBaseRefresh,
   planDisk,
   planSnapshot,
@@ -37,18 +37,22 @@ import {
 } from "./plan.ts"
 import { commitsOf } from "./revisions.ts"
 import type { Runner } from "./run.ts"
+import type { LaneRuntime } from "./runtime-port.ts"
 
 /** The scratch lane a base is made in; never a thread's. */
 export const BASE_LANE = laneNameForThread("base-scratch")
 
-const factsFile = (paths: DiskPaths) =>
-  path.join(paths.snapshots, `${BASE_SNAPSHOT}.json`)
+const factsFile = (root: string) =>
+  path.join(pinetrieDir(root).snapshots, `${BASE_SNAPSHOT}.json`)
 
 /** What the base snapshot holds, or null when there is none. */
-async function readBase(paths: DiskPaths): Promise<BaseFacts | null> {
-  if (!(await snapshotExists(paths, BASE_SNAPSHOT))) return null
+async function readBase(
+  runtime: LaneRuntime,
+  root: string,
+): Promise<BaseFacts | null> {
+  if (!(await runtime.snapshotExists(BASE_SNAPSHOT))) return null
   try {
-    const raw = JSON.parse(await readFile(factsFile(paths), "utf8")) as {
+    const raw = JSON.parse(await readFile(factsFile(root), "utf8")) as {
       commits?: unknown
       lock?: unknown
     }
@@ -68,10 +72,12 @@ async function readBase(paths: DiskPaths): Promise<BaseFacts | null> {
 
 /**
  * Make or refresh the base snapshot at `yours`. Does nothing when it is
- * current. `spec` is the scratch lane's; its lane and volume are replaced.
+ * current. `spec` is the scratch lane's; its lane is replaced.
  */
 export async function refreshBase<C>(input: {
-  readonly paths: DiskPaths
+  readonly runtime: LaneRuntime
+  /** The project's root, whose `.pinetrie/snapshots/` holds `base.json`. */
+  readonly root: string
   readonly spec: LaneSpec
   readonly env: Readonly<Record<string, string | undefined>>
   readonly yours: readonly CommitId[]
@@ -80,8 +86,8 @@ export async function refreshBase<C>(input: {
   readonly install: Install | null
   readonly open: OpenLink<C>
 }): Promise<boolean> {
-  const { paths } = input
-  const base = await readBase(paths)
+  const { runtime, root } = input
+  const base = await readBase(runtime, root)
   const steps = planBaseRefresh({
     base,
     yours: input.yours,
@@ -89,29 +95,27 @@ export async function refreshBase<C>(input: {
     install: input.install,
   })
   if (steps.length === 0) return false
-  const container = laneContainer(BASE_LANE)
-  await removeLane(container)
-  const handle = laneHandle(container, input.open)
+  await removeLane(runtime, BASE_LANE)
+  const handle = laneHandle(runtime, laneContainer(BASE_LANE), input.open)
   try {
     await executeOrThrow(
       [
         ...planDisk({
-          paths,
-          spec: { ...input.spec, lane: BASE_LANE, volume: container },
+          spec: { ...input.spec, lane: BASE_LANE },
           env: input.env,
           from: base === null ? null : BASE_SNAPSHOT,
         }),
         ...steps,
-        ...planSnapshot({ volume: container, snapshot: BASE_SNAPSHOT, paths }),
+        ...planSnapshot({ lane: BASE_LANE, snapshot: BASE_SNAPSHOT }),
       ],
       handle.runners,
     )
     const facts: BaseFacts = { commits: input.yours, lock: input.lock }
-    await writeFile(factsFile(paths), `${JSON.stringify(facts)}\n`)
+    await writeFile(factsFile(root), `${JSON.stringify(facts)}\n`)
     return true
   } finally {
     await handle.stop().catch(() => {})
-    await removeLane(container)
+    await removeLane(runtime, BASE_LANE)
   }
 }
 

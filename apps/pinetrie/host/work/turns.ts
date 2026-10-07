@@ -30,7 +30,6 @@ import type { Records } from "../records.ts"
 import { snapshotOnQueue } from "./disk.ts"
 import type { Fetches } from "./fetch.ts"
 import type { LaneRegistry } from "./registry.ts"
-import type { Setup } from "./setup.ts"
 
 /** A revision's title: a message's first line, cut. */
 const TITLE_LENGTH = 72
@@ -60,14 +59,13 @@ export interface Turns {
 
 export function createTurns(deps: {
   readonly basics: Basics
-  readonly setup: Pick<Setup, "paths">
   readonly registry: LaneRegistry
   /** Work nobody awaits: `quiet` waits for it. */
   readonly keeper: Keeper
   readonly records: Pick<Records, "writeValues">
   readonly fetchLane: Fetches["fetchLane"]
 }): Turns {
-  const { basics, setup, registry, keeper } = deps
+  const { basics, registry, keeper } = deps
   const { docs } = basics
   const recording = new Set<Promise<unknown>>()
 
@@ -95,8 +93,7 @@ export function createTurns(deps: {
         // A `catch_up` in the turn moved the bookmark (ADR-0080): read from
         // the tree, so a restart before this record changes nothing.
         const merged = turnMerged(index, tip)
-        const paths = setup.paths
-        if (!registry.isOwn(lane) || paths === null) {
+        if (!registry.isOwn(lane)) {
           const revision = planTurnRecord({
             entry,
             lane,
@@ -167,7 +164,7 @@ export function createTurns(deps: {
         // The snapshot is queued and not awaited: the next tool call waits
         // for it, the next request does not.
         const recorded = keeper.track(
-          snapshotOnQueue(handle, paths, entry)
+          snapshotOnQueue(handle, lane, entry)
             .catch(error => {
               failed(basics, "the turn's snapshot", lane)(error)
               return false

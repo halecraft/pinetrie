@@ -1,5 +1,5 @@
 // host/work/containers — each lane's container: started before a run,
-// stopped and trimmed after it (ADR-0034), and where its tools run.
+// stopped after it (ADR-0034), and where its tools run.
 
 import {
   errorText,
@@ -9,7 +9,6 @@ import {
 } from "@pinetrie/core"
 import type { Keeper } from "@pinetrie/keeper"
 import {
-  containerFacts,
   executeOrThrow,
   LANE_NOTE,
   NO_GRANTS,
@@ -18,14 +17,11 @@ import {
   planContainer,
   planDisk,
   planOldNamesOnDisk,
+  planShape,
   planStart,
   planStartFrom,
   RUNTIME_BIN,
-  removeContainer,
-  snapshotExists,
   specHashOf,
-  trim,
-  volumeExists,
 } from "@pinetrie/lanes"
 import type { LaneAccess } from "@pinetrie/pi"
 import { readRevisions, readThreadName } from "@pinetrie/reads"
@@ -42,7 +38,7 @@ export interface Containers {
   access(lane: LaneName): LaneAccess
   /** Before any run: queue a lane of its own's container to start. */
   beforeRun(lane: LaneName): void
-  /** After a run: stop its container, trim its disk, and follow its offer. */
+  /** After a run: stop its container, and follow its offer. */
   runEnded(lane: LaneName): void
   /**
    * Start a lane's container, as `planContainer` decides. A container made
@@ -66,50 +62,48 @@ export function createContainers(deps: {
   const { basics, setup, registry, keeper, offers } = deps
   const { session, docs, log } = basics
 
-  /** The newest snapshot of `lane`'s own records whose file is still there. */
+  /** The newest snapshot of `lane`'s own records that is still there. */
   async function newestSnapshot(lane: LaneName): Promise<SnapshotId | null> {
-    if (setup.paths === null) return null
+    const { runtime } = setup
+    if (runtime === null) return null
     const doc = await docs.laneDoc(lane)
     if (doc === null) return null
     const own = [...readRevisions(doc).values()]
       .filter(r => r.lane === lane && r.snapshot !== null)
       .sort((a, b) => (a.entry < b.entry ? 1 : -1))
     for (const r of own)
-      if (
-        r.snapshot !== null &&
-        (await snapshotExists(setup.paths, r.snapshot))
-      )
+      if (r.snapshot !== null && (await runtime.snapshotExists(r.snapshot)))
         return r.snapshot
     return null
   }
 
   async function startContainer(lane: LaneName): Promise<void> {
-    const { ready, root, paths } = setup
-    if (ready === null || root === null || paths === null)
+    const { ready, root, runtime } = setup
+    if (ready === null || root === null || runtime === null)
       throw new Error("lanes of their own are off for this host")
     const r = await ready
     const handle = registry.handleOf(lane)
     const container = handle.container
     const spec = setup.specOf(lane, r)
     const decided = planContainer({
-      facts: await containerFacts(container),
-      want: specHashOf(spec, process.env),
+      facts: await runtime.containerFacts(container),
+      want: specHashOf(runtime, planShape(spec, process.env)),
     })
     if (decided === "recreate") {
       await handle.stop()
-      await removeContainer(container)
+      await runtime.remove(container)
     }
     if (decided === "create" || decided === "recreate") {
-      const volume = await volumeExists(container)
-      const newest = volume ? null : await newestSnapshot(lane)
-      const from = planStartFrom({ volume, newest })
+      const disk = await runtime.diskExists(lane)
+      const newest = disk ? null : await newestSnapshot(lane)
+      const from = planStartFrom({ disk, newest })
       switch (from.kind) {
-        case "volume":
+        case "disk":
           await executeOrThrow([planStart(spec, process.env)], handle.runners)
           break
         case "snapshot":
           await executeOrThrow(
-            planDisk({ paths, spec, env: process.env, from: from.from }),
+            planDisk({ spec, env: process.env, from: from.from }),
             handle.runners,
           )
           // pre-rename: a snapshot of a lane made before the rename holds
@@ -189,17 +183,13 @@ export function createContainers(deps: {
     },
 
     runEnded(lane) {
-      const { ready } = setup
-      if (!registry.isOwn(lane) || ready === null) return
+      if (!registry.isOwn(lane)) return
       offers?.runEnded(lane)
       const handle = registry.handleOf(lane)
       void keeper.track(
         handle.queue
-          .enqueue(async () => {
-            await handle.stop()
-            await trim(handle.container, (await ready).tools)
-          })
-          .catch(failed(basics, "stopping or trimming", lane)),
+          .enqueue(() => handle.stop())
+          .catch(failed(basics, "stopping", lane)),
       )
     },
 

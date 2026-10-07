@@ -8,7 +8,7 @@ import {
 } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { entryId, laneNameForThread } from "@pinetrie/core"
+import { entryId, laneNameForThread, snapshotId } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   bookmarkOf,
@@ -19,46 +19,92 @@ import {
   conflictedFilesAt,
   copyFacts,
   execute,
-  type LaneStep,
+  HELPER,
+  helperCommand,
+  type LaneRuntime,
   prepareProjectDir,
   type Ran,
   type Runner,
   readConfigFile,
   run,
+  runtimeNode,
+  type Step,
 } from "./index.ts"
 
 // What a lane runs against jj itself, in throwaway repos, with your repo in
 // it, is `@pinetrie/repo`'s `repo.test.ts`: every such test fetches into your
 // repo.
 
-const _LANE = laneNameForThread("1")
+const LANE = laneNameForThread("1")
+
+/** A runtime that records each call it is asked to make, and makes none. */
+function recordingRuntime(seen: string[]): LaneRuntime {
+  const no = () => {
+    throw new Error("not recorded")
+  }
+  return {
+    disk: async op => {
+      seen.push(`disk: ${op.kind}`)
+    },
+    run: async shape => {
+      seen.push(`run: ${shape.name}`)
+    },
+    execArgv: (container, argv) => ["exec", container, ...argv],
+    diskExists: no,
+    snapshotExists: no,
+    runArgs: no,
+    containerFacts: no,
+    start: no,
+    stop: no,
+    remove: no,
+    imageExists: no,
+    buildImage: no,
+    imagePath: no,
+    runInImage: no,
+  }
+}
 
 describe("execute", () => {
   const ok: Ran = { ok: true, code: 0, stdout: "", stderr: "" }
-  test("runs each step where it says, in order, and stops at the first that fails", async () => {
+  test("runs each step where it says, in order, and stops at the first lane step that fails", async () => {
     const seen: string[] = []
-    const runner =
-      (where: string, fail: string): Runner =>
-      async argv => {
-        seen.push(`${where}: ${argv.join(" ")}`)
-        return argv[0] === fail
-          ? { ok: false, code: 1, stdout: "", stderr: "no" }
-          : ok
-      }
-    const steps: LaneStep[] = [
+    const lane: Runner = async argv => {
+      seen.push(`lane: ${argv.join(" ")}`)
+      return argv[0] === "bad"
+        ? { ok: false, code: 1, stdout: "", stderr: "no" }
+        : ok
+    }
+    const steps: Step[] = [
+      { in: "runtime", op: { kind: "create", lane: LANE } },
       { in: "lane", argv: ["sync"] },
-      { in: "host", argv: ["cp"] },
+      {
+        in: "runtime",
+        op: { kind: "snapshot", lane: LANE, snapshot: snapshotId("s") },
+      },
       { in: "lane", argv: ["bad"] },
-      { in: "host", argv: ["never"] },
+      { in: "runtime", op: { kind: "delete", lane: LANE } },
     ]
     const done = await execute(steps, {
-      host: runner("host", ""),
-      lane: runner("lane", "bad"),
+      runtime: recordingRuntime(seen),
+      lane,
       laneBytes: async () => ({ ...ok, stdout: new Uint8Array() }),
     })
-    expect(seen).toEqual(["lane: sync", "host: cp", "lane: bad"])
-    expect(done).toMatchObject({ ok: false, step: steps[2] })
+    expect(seen).toEqual([
+      "disk: create",
+      "lane: sync",
+      "disk: snapshot",
+      "lane: bad",
+    ])
+    expect(done).toMatchObject({ ok: false, step: steps[3] })
   })
+})
+
+test("helperCommand: the runtime's exec of the helper on the lane runtime's Node", () => {
+  expect(helperCommand(recordingRuntime([]), "pinetrie-t-1")).toEqual([
+    "exec",
+    "pinetrie-t-1",
+    ...runtimeNode(HELPER),
+  ])
 })
 
 test("changedPaths: a path with a space and an accent comes back as it is named (S70), and a conflicted commit's paths are its files (S99)", async () => {

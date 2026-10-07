@@ -47,6 +47,7 @@ import {
   hostBytesRunner,
   hostRunner,
   LANE_JJ_CONFIG,
+  type LaneRunners,
   type LaneStep,
   laneBase,
   laneIgnores,
@@ -65,7 +66,6 @@ import {
   planWipCopy,
   type RepoConfig,
   type Runner,
-  type Runners,
   revisionsIn,
   revsetName,
   run,
@@ -167,7 +167,7 @@ const defaultLog = async (jj: Runner): Promise<string> =>
  * (`planBundle`), then imported by the host (`planImport`).
  */
 const fetchLane = async (
-  runners: Runners,
+  runners: LaneRunners,
   yours: string,
   input: {
     readonly lane: LaneName
@@ -262,7 +262,6 @@ describe("a lane's repo, with jj", () => {
     const yoursOps = hostOps(yoursDir)
     const laneJj = laneJjAt(laneDir)
     const runners = (dir: string) => ({
-      host: hostRunner(),
       lane: hostRunner(dir),
       laneBytes: hostBytesRunner(dir),
     })
@@ -604,7 +603,6 @@ describe("a lane's repo, with jj", () => {
     // The lane's runners as a lane has them: its root and your working copy
     // where the steps name them.
     const runners = {
-      host: hostRunner(),
       lane: (args: readonly string[]) =>
         hostRunner(laneDir)(
           onHost([{ in: "lane", argv: args }], dirs)[0]?.argv ?? args,
@@ -970,7 +968,6 @@ describe("a lane's repo, with jj", () => {
     const laneJj = laneJjAt(laneDir)
     const line = DEFAULT_REPO
     const runnersAt = (dir: string) => ({
-      host: hostRunner(),
       lane: hostRunner(dir),
       laneBytes: hostBytesRunner(dir),
     })
@@ -1601,7 +1598,6 @@ describe("a lane's repo, with jj", () => {
     )
     const forkJj = laneJjAt(forkDir)
     const forkRunners = {
-      host: hostRunner(),
       lane: hostRunner(forkDir),
       laneBytes: hostBytesRunner(forkDir),
     }
@@ -2746,7 +2742,6 @@ describe("a lane's repo, with jj", () => {
           "/workspace": baseDir,
         }),
         {
-          host: hostRunner(),
           lane: hostRunner(baseDir),
           laneBytes: hostBytesRunner(baseDir),
         },

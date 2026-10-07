@@ -164,9 +164,8 @@ export function createNewLanes(deps: {
       ])
       await deps.ensureNames()
       if (work === null) return
-      const { owner, paths, ready } = setup
-      if (work.kind !== "own" || owner === null || paths === null) return
-      const disk = paths
+      const { owner, runtime, ready } = setup
+      if (work.kind !== "own" || owner === null || runtime === null) return
       const handle = registry.handleOf(lane)
       void keeper.track(
         handle.queue
@@ -184,11 +183,10 @@ export function createNewLanes(deps: {
                 throw new Error(`the lane cannot begin: ${facts}`)
               const point = forkPoint(facts)
               if (point.snapshot === BASE_SNAPSHOT) await setup.baseAtAccepted()
-              await removeLane(handle.container)
+              await removeLane(runtime, lane)
               await executeOrThrow(
                 planFork({
                   point,
-                  paths: disk,
                   spec: setup.specOf(lane, r),
                   env: process.env,
                   install: await installIfLockMoved(owner, point.start),

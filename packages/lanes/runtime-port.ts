@@ -1,0 +1,63 @@
+// lanes/runtime-port — what a runtime does for lanes (ADR-0103). Planners
+// return values (`ContainerShape`, `DiskOp`); a runtime turns them into
+// commands. The host picks the runtime and hands it in.
+
+import type { LaneName, SnapshotId } from "@pinetrie/core"
+import type { ContainerShape, ImagePlan } from "./plan.ts"
+import type { Ran } from "./run.ts"
+
+/**
+ * A lane's disk, as the host asks of whichever runtime keeps it. `delete`
+ * and `deleteSnapshots` succeed when there is nothing to delete.
+ */
+export type DiskOp =
+  | { readonly kind: "create"; readonly lane: LaneName }
+  | {
+      readonly kind: "restore"
+      readonly lane: LaneName
+      readonly from: SnapshotId
+    }
+  | {
+      readonly kind: "snapshot"
+      readonly lane: LaneName
+      readonly snapshot: SnapshotId
+    }
+  | { readonly kind: "delete"; readonly lane: LaneName }
+  | { readonly kind: "deleteSnapshots"; readonly ids: readonly SnapshotId[] }
+
+/** What a step asks of the runtime: a disk operation, or a lane's container made and started. */
+export type RuntimeOp =
+  | DiskOp
+  | { readonly kind: "run"; readonly shape: ContainerShape }
+
+/** A container's state and spec label (`SPEC_LABEL`), as its runtime reports them. */
+export interface ContainerFacts {
+  readonly state: "running" | "stopped" | "missing"
+  /** Its spec label, or null when it has none. */
+  readonly label: string | null
+}
+
+/** Every call the host makes to a runtime. Each throws on failure, naming the command. */
+export interface LaneRuntime {
+  disk(op: DiskOp): Promise<void>
+  diskExists(lane: LaneName): Promise<boolean>
+  snapshotExists(id: SnapshotId): Promise<boolean>
+  /** The container's arguments, without its label: pure. Their hash is its spec label. */
+  runArgs(shape: ContainerShape): readonly string[]
+  /** Make the container from `shape`, labelled with its spec hash, and start it. */
+  run(shape: ContainerShape): Promise<void>
+  containerFacts(container: string): Promise<ContainerFacts>
+  start(container: string): Promise<void>
+  /** Stop it; `container` then trims its disk, Docker does nothing more. */
+  stop(container: string): Promise<void>
+  /** Delete the container, running or not; its disk stays. Succeeds when there is none. */
+  remove(container: string): Promise<void>
+  /** `argv` run in a running container with stdin attached (`exec -i`). */
+  execArgv(container: string, argv: readonly string[]): readonly string[]
+  imageExists(tag: string): Promise<boolean>
+  buildImage(plan: ImagePlan): Promise<void>
+  /** The image's own `PATH`. */
+  imagePath(tag: string): Promise<string>
+  /** `argv` in a throwaway container of `tag`; its stdout as bytes. */
+  runInImage(tag: string, argv: readonly string[]): Promise<Ran<Uint8Array>>
+}

@@ -14,11 +14,12 @@
 // Every lane mounts it read-only at `/pinetrie-runtime`. Only `bin/` goes on a
 // lane's `PATH`: pinetrie's `node` cannot start without its loader.
 
-import { mkdir, readdir, rename, rm } from "node:fs/promises"
+import { mkdir, readdir, rename, rm, writeFile } from "node:fs/promises"
 import path from "node:path"
 import { RUNTIME_PROGRAMS } from "@pinetrie/core"
 import { RUNTIME_MOUNT } from "./plan.ts"
 import { describeFailure, run } from "./run.ts"
+import type { LaneRuntime } from "./runtime-port.ts"
 
 export const LOADER = "ld-linux-aarch64.so.1"
 
@@ -32,9 +33,10 @@ export const runtimeNode = (script: string): readonly string[] => [
 ]
 
 /**
- * The script that copies the runtime out of the default image into `/out`.
- * A program the image lacks fails it, naming the program, so the host stops
- * at startup rather than give lanes a runtime without it.
+ * The script that copies the runtime out of the default image, as a tar on
+ * its stdout: a throwaway container's stdout is the one way out that every
+ * runtime has. A program the image lacks fails it, naming the program, so
+ * the host stops at startup rather than give lanes a runtime without it.
  */
 export const EXTRACT = [
   "set -e",
@@ -46,6 +48,7 @@ export const EXTRACT = [
     p =>
       `p=$(command -v ${p}) || { echo "the lane image has no ${p}" >&2; exit 1; }; cp "$p" /out/bin/${p}`,
   ),
+  "tar -C /out -cf - .",
 ].join("\n")
 
 /** Whether a runtime's `bin/` holds every program, given its entries' names. */
@@ -59,36 +62,43 @@ export const runtimeComplete = (binEntries: readonly string[]): boolean =>
  * tags are removed. Returns the directory.
  */
 export async function ensureRuntime(
+  runtime: LaneRuntime,
   dir: string,
   image: string,
 ): Promise<string> {
   const name = image.replace(/[^A-Za-z0-9._-]/g, "-")
   const final = path.join(dir, name)
   const bin = await readdir(path.join(final, "bin")).catch(() => [])
-  if (!runtimeComplete(bin)) await extract(final, image)
+  if (!runtimeComplete(bin)) await extract(runtime, final, image)
   for (const old of await readdir(dir))
     if (old !== name)
       await rm(path.join(dir, old), { recursive: true, force: true })
   return final
 }
 
-async function extract(final: string, image: string): Promise<void> {
+/** Unpacked into a scratch directory, renamed into place, so a half-copied runtime is never used. */
+async function extract(
+  runtime: LaneRuntime,
+  final: string,
+  image: string,
+): Promise<void> {
   const scratch = `${final}.tmp`
+  const tar = `${final}.tar`
   await rm(scratch, { recursive: true, force: true })
   await mkdir(scratch, { recursive: true })
-  const ran = await run("container", [
-    "run",
-    "--rm",
-    "-v",
-    `${scratch}:/out`,
-    image,
-    "sh",
-    "-c",
-    EXTRACT,
-  ])
-  if (!ran.ok) {
+  try {
+    const ran = await runtime.runInImage(image, ["sh", "-c", EXTRACT])
+    if (!ran.ok)
+      throw new Error(describeFailure("copying the lane runtime", ran))
+    await writeFile(tar, ran.stdout)
+    const unpacked = await run("tar", ["-xf", tar, "-C", scratch])
+    if (!unpacked.ok)
+      throw new Error(describeFailure("unpacking the lane runtime", unpacked))
+  } catch (error) {
     await rm(scratch, { recursive: true, force: true })
-    throw new Error(describeFailure("copying the lane runtime", ran))
+    throw error
+  } finally {
+    await rm(tar, { force: true })
   }
   await rm(final, { recursive: true, force: true })
   await rename(scratch, final)

@@ -19,7 +19,6 @@ import {
   type LaneSpec,
   type LaneStep,
   laneIgnores,
-  mountArgs,
   NO_GRANTS,
   planBaseRefresh,
   planBundle,
@@ -28,7 +27,6 @@ import {
   planExclude,
   planFork,
   planForkSetup,
-  planHost,
   planHostMounts,
   planImages,
   planJoins,
@@ -38,13 +36,14 @@ import {
   planOldNamesOnDisk,
   planProjectDir,
   planRoot,
-  planRun,
+  planShape,
   planShared,
   planSnapshot,
   planStartFrom,
   planTurnCommit,
   repoConfig,
-  SPEC_LABEL,
+  type Step,
+  specHash,
   specHashOf,
 } from "./index.ts"
 
@@ -52,7 +51,6 @@ const LANE = laneNameForThread("1")
 const C1 = commitId("c1")
 const C2 = commitId("c2")
 const HOME = "/Users/ada"
-const paths = { volumes: "/v", snapshots: "/p/.pinetrie/snapshots" }
 
 const parts = {
   hostWorkingCopy: "/p",
@@ -67,7 +65,6 @@ const parts = {
 
 const spec: LaneSpec = {
   lane: LANE,
-  volume: "pinetrie-t-1",
   image: "pinetrie-lane:abc",
   imagePath: "/usr/local/bin:/usr/bin:/bin",
   mounts: planMounts(parts),
@@ -75,10 +72,6 @@ const spec: LaneSpec = {
   identity: { name: "agent", email: "agent@pinetrie" },
   memory: "2G",
 }
-
-/** Each `--mount` value, and each `-e` value, from a `container run`. */
-const valuesOf = (argv: readonly string[], flag: string) =>
-  argv.flatMap((a, i) => (a === flag ? [argv[i + 1] ?? ""] : []))
 
 describe("planMounts: every host path a lane sees, in one list", () => {
   test("your working copy, pinetrie's own and the ignore file's directory, read-only", () => {
@@ -115,23 +108,6 @@ describe("planMounts: every host path a lane sees, in one list", () => {
       readonly: true,
     })
   })
-})
-
-test("mountArgs: --mount; -v for a path with a comma; neither for a comma and a colon", () => {
-  expect(mountArgs({ source: "/a b", target: "/t", readonly: true })).toEqual([
-    "--mount",
-    "type=bind,source=/a b,target=/t,readonly",
-  ])
-  expect(mountArgs({ source: "/a", target: "/t", readonly: false })).toEqual([
-    "--mount",
-    "type=bind,source=/a,target=/t",
-  ])
-  expect(
-    mountArgs({ source: "/a,b", target: "/t/a,b", readonly: true }),
-  ).toEqual(["-v", "/a,b:/t/a,b:ro"])
-  expect(() =>
-    mountArgs({ source: "/a,b:c", target: "/t", readonly: true }),
-  ).toThrow("both a comma and a colon")
 })
 
 describe("planHostMounts: granted host paths, and the ones never mounted", () => {
@@ -176,83 +152,62 @@ describe("planHostMounts: granted host paths, and the ones never mounted", () =>
   })
 })
 
-describe("planRun: a lane's container", () => {
-  const argv = planRun(spec, { HOME, SECRET: "s", GITHUB_TOKEN: "t" })
-  test("--init, the lane's disk at /workspace, and every mount planMounts gave", () => {
-    expect(argv.slice(0, 5)).toEqual([
-      "run",
-      "--label",
-      `${SPEC_LABEL}=${specHashOf(spec, { HOME, SECRET: "s", GITHUB_TOKEN: "t" })}`,
-      "-d",
-      "--init",
-    ])
-    expect(valuesOf(argv, "-v")).toEqual(["pinetrie-t-1:/workspace"])
-    expect(valuesOf(argv, "--mount")).toEqual(
-      spec.mounts.map(m => mountArgs(m)[1]),
-    )
+describe("planShape: a lane's container, as any runtime would make it", () => {
+  const shape = planShape(spec, { HOME, SECRET: "s", GITHUB_TOKEN: "t" })
+  test("named for the lane, on the lane's disk, with every mount planMounts gave", () => {
+    expect(shape).toMatchObject({
+      name: `pinetrie-${LANE}`,
+      lane: LANE,
+      image: "pinetrie-lane:abc",
+      memory: "2G",
+      mounts: spec.mounts,
+      ssh: false,
+    })
   })
   test("every repo in the lane ignores what the ignore file lists, through git's own variables", () => {
-    expect(valuesOf(argv, "-e")).toEqual(
-      expect.arrayContaining([
-        "GIT_CONFIG_COUNT=1",
-        "GIT_CONFIG_KEY_0=core.excludesFile",
-        "GIT_CONFIG_VALUE_0=/pinetrie-git/ignore",
-      ]),
-    )
+    expect(shape.env).toMatchObject({
+      GIT_CONFIG_COUNT: "1",
+      GIT_CONFIG_KEY_0: "core.excludesFile",
+      GIT_CONFIG_VALUE_0: "/pinetrie-git/ignore",
+    })
     expect(laneIgnores([".plans", "notes/shared"])).toBe(
       "/.pinetrie-lane/\n/lost+found/\n/.plans/\n/notes/shared/\n",
     )
   })
-  test("the spec label: stable, and changed by a mount or the image", () => {
-    const hash = specHashOf(spec, {})
-    expect(specHashOf(spec, {})).toBe(hash)
-    expect(
-      specHashOf(
-        {
-          ...spec,
-          mounts: planMounts({ ...parts, hostPaths: ["/opt/skills"] }),
-        },
-        {},
-      ),
-    ).not.toBe(hash)
-    expect(specHashOf({ ...spec, image: "pinetrie-lane:def" }, {})).not.toBe(
-      hash,
-    )
-  })
   test("never your home directory, and no variable no grant names", () => {
-    expect(argv.join(" ")).not.toContain(HOME)
-    expect(argv.join(" ")).not.toContain("SECRET")
-    expect(argv).not.toContain("--ssh")
+    expect(JSON.stringify(shape)).not.toContain(HOME)
+    expect(Object.keys(shape.env)).not.toContain("SECRET")
+    expect(Object.keys(shape.env)).not.toContain("GITHUB_TOKEN")
   })
   test("each grant applies", () => {
-    const granted = planRun(
+    const granted = planShape(
       { ...spec, grants: { ssh: true, env: ["GITHUB_TOKEN", "MISSING"] } },
       { GITHUB_TOKEN: "t" },
     )
-    expect(granted).toContain("--ssh")
-    expect(valuesOf(granted, "-e")).toContain("GITHUB_TOKEN=t")
-    expect(valuesOf(granted, "-e").some(e => e.startsWith("MISSING"))).toBe(
-      false,
-    )
+    expect(granted.ssh).toBe(true)
+    expect(granted.env.GITHUB_TOKEN).toBe("t")
+    expect(Object.keys(granted.env)).not.toContain("MISSING")
   })
   test("jj's identity and config, no editor, and the runtime's bin last on the PATH", () => {
-    const env = valuesOf(argv, "-e")
-    expect(env).toEqual(
-      expect.arrayContaining([
-        "JJ_USER=agent",
-        "JJ_EMAIL=agent@pinetrie",
-        "JJ_CONFIG=/workspace/.pinetrie-lane/jj.toml",
-        "JJ_EDITOR=false",
-        "PATH=/usr/local/bin:/usr/bin:/bin:/pinetrie-runtime/bin",
-      ]),
-    )
-    expect(argv.slice(-4)).toEqual([
-      "/workspace",
-      "pinetrie-lane:abc",
-      "sleep",
-      "infinity",
-    ])
+    expect(shape.env).toMatchObject({
+      JJ_USER: "agent",
+      JJ_EMAIL: "agent@pinetrie",
+      JJ_CONFIG: "/workspace/.pinetrie-lane/jj.toml",
+      JJ_EDITOR: "false",
+      PATH: "/usr/local/bin:/usr/bin:/bin:/pinetrie-runtime/bin",
+    })
   })
+})
+
+test("specHashOf: the hash of the runtime's arguments, changed when they change", () => {
+  const runtime = { runArgs: (s: { image: string }) => ["run", s.image] }
+  const shape = planShape(spec, {})
+  expect(specHashOf(runtime, shape)).toBe(
+    specHash(["run", "pinetrie-lane:abc"]),
+  )
+  expect(
+    specHashOf(runtime, { ...shape, image: "pinetrie-lane:def" }),
+  ).not.toBe(specHashOf(runtime, shape))
 })
 
 describe("repoConfig: the project's values win, and a bad one falls back (ADR-0100)", () => {
@@ -680,24 +635,27 @@ test("fetchById: skipped when every commit is on the disk, else onto branches", 
   )
 })
 
-const argvs = (steps: readonly LaneStep[]) =>
-  steps.map(s => `${s.in}: ${s.argv.join(" ")}`)
+const argvs = (steps: readonly (LaneStep | Step)[]) =>
+  steps.map(s =>
+    s.in === "lane"
+      ? `lane: ${s.argv.join(" ")}`
+      : s.op.kind === "run"
+        ? `runtime: run ${s.op.shape.name}`
+        : `runtime: ${JSON.stringify(s.op)}`,
+  )
 
-test("planFork: the clone, the container, the old config folder gone, then jj new before any other jj command, then the config", () => {
+test("planFork: the restore, the container, the old config folder gone, then jj new before any other jj command, then the config", () => {
   const steps = planFork({
     point: {
       snapshot: snapshotId("e1"),
       start: { kind: "commits", commits: [C1] },
     },
-    paths,
     spec,
     env: {},
   })
   expect(argvs(steps)).toEqual([
-    "host: container volume create --opt journal=ordered --opt size=64G pinetrie-t-1",
-    "host: /bin/cp -c /p/.pinetrie/snapshots/e1.img /v/pinetrie-t-1/volume.img.tmp",
-    "host: /bin/mv -f /v/pinetrie-t-1/volume.img.tmp /v/pinetrie-t-1/volume.img",
-    `host: container ${planRun(spec, {}).join(" ")}`,
+    `runtime: ${JSON.stringify({ kind: "restore", lane: LANE, from: "e1" })}`,
+    `runtime: run pinetrie-${LANE}`,
     "lane: sh -c rm -rf /workspace/.pineta-lane",
     `lane: ${fetchById([C1]).argv.join(" ")}`,
     "lane: jj new c1",
@@ -706,29 +664,26 @@ test("planFork: the clone, the container, the old config folder gone, then jj ne
   ])
 })
 
-test("planDisk: a new volume, or one cloned from a snapshot; then the container", () => {
+test("planDisk: a new disk, or one restored from a snapshot; then the container, from the spec's shape", () => {
   const disk = (from: typeof BASE_SNAPSHOT | null) =>
-    argvs(planDisk({ paths, spec, env: {}, from }))
+    planDisk({ spec, env: {}, from })
   expect(disk(null)).toEqual([
-    "host: container volume create --opt journal=ordered --opt size=64G pinetrie-t-1",
-    `host: container ${planRun(spec, {}).join(" ")}`,
+    { in: "runtime", op: { kind: "create", lane: LANE } },
+    { in: "runtime", op: { kind: "run", shape: planShape(spec, {}) } },
   ])
-  expect(disk(BASE_SNAPSHOT)[1]).toContain("/snapshots/base.img ")
+  expect(disk(BASE_SNAPSHOT)[0]).toEqual({
+    in: "runtime",
+    op: { kind: "restore", lane: LANE, from: BASE_SNAPSHOT },
+  })
 })
 
-test("planSnapshot: sync comes before the clone", () => {
-  expect(
-    argvs(
-      planSnapshot({
-        volume: "pinetrie-t-1",
-        snapshot: snapshotId("e2"),
-        paths,
-      }),
-    ),
-  ).toEqual([
-    "lane: sync",
-    "host: /bin/cp -c /v/pinetrie-t-1/volume.img /p/.pinetrie/snapshots/e2.img.tmp",
-    "host: /bin/mv -f /p/.pinetrie/snapshots/e2.img.tmp /p/.pinetrie/snapshots/e2.img",
+test("planSnapshot: sync comes before the snapshot", () => {
+  expect(planSnapshot({ lane: LANE, snapshot: snapshotId("e2") })).toEqual([
+    { in: "lane", argv: ["sync"] },
+    {
+      in: "runtime",
+      op: { kind: "snapshot", lane: LANE, snapshot: snapshotId("e2") },
+    },
   ])
 })
 
@@ -806,35 +761,7 @@ describe("planBaseRefresh: the base snapshot at your @-", () => {
   })
 })
 
-describe("the host: its root, then container, in order", () => {
-  const ok = { installed: true, running: true, kernel: true, clones: true }
-  const root = { ok: "/p" }
-  test("lanes when every check passes", () => {
-    expect(planHost({ root, ...ok })).toEqual({
-      kind: "lanes",
-      root: "/p",
-      rootDefault: "own",
-    })
-  })
-  test("the first failing check is the reason", () => {
-    const reason = (f: Partial<typeof ok>) => {
-      const r = planHost({ root, ...ok, ...f })
-      return r.kind === "direct" ? r.reason : ""
-    }
-    expect(reason({ installed: false, running: false })).toContain(
-      "not installed",
-    )
-    expect(reason({ running: false, kernel: false })).toContain("not running")
-    expect(reason({ kernel: false, clones: false })).toContain(
-      "kernel set --recommended",
-    )
-    expect(reason({ clones: false })).toContain("same APFS volume")
-  })
-  test("no repo: direct, before container is asked", () => {
-    expect(
-      planHost({ root: { direct: "/p", reason: "no jj" }, ...ok }),
-    ).toEqual({ kind: "direct", root: "/p", reason: "no jj" })
-  })
+describe("the host: its root", () => {
   test("planProjectDir: jj's root, else git's, else the folder; never missing, your home directory or /", () => {
     const facts = {
       dir: "/p/sub",
@@ -918,16 +845,16 @@ describe("the host: its root, then container, in order", () => {
     expect(decide("stopped", "h1")).toBe("start")
     expect(decide("running", "h1")).toBe("running")
   })
-  test("planStartFrom: a volume starts from it; none, from the newest snapshot; neither, retired", () => {
+  test("planStartFrom: a disk starts from it; none, from the newest snapshot; neither, retired", () => {
     const newest = snapshotId("e1")
-    expect(planStartFrom({ volume: true, newest: null })).toEqual({
-      kind: "volume",
+    expect(planStartFrom({ disk: true, newest: null })).toEqual({
+      kind: "disk",
     })
-    expect(planStartFrom({ volume: false, newest })).toEqual({
+    expect(planStartFrom({ disk: false, newest })).toEqual({
       kind: "snapshot",
       from: newest,
     })
-    expect(planStartFrom({ volume: false, newest: null })).toEqual({
+    expect(planStartFrom({ disk: false, newest: null })).toEqual({
       kind: "retired",
     })
   })

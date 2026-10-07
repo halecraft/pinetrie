@@ -1,6 +1,6 @@
 import type { ProjectRecord } from "@pinetrie/core"
 import { expect, test } from "vitest"
-import { projectOf } from "./setup.ts"
+import { projectOf } from "./runtime.ts"
 
 test("projectOf keeps a project's own copies, and turns its default direct only with PINETRIE_LANES=0", () => {
   const lanes: ProjectRecord = {

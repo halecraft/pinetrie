@@ -1689,7 +1689,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "projectOf ignores PINETRIE_LANES=0",
-    file: "apps/pinetrie/host/work/setup.ts",
+    file: "apps/pinetrie/host/work/runtime.ts",
     from: '  return project.kind === "lanes" && defaultDirect',
     to: '  return project.kind === "lanes" && defaultDirect && false',
     command: unit,

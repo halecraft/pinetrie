@@ -1,11 +1,10 @@
 // lanes/lane — a lane's container, the one way into it, and its queue
 // (ADR-0034).
 //
-// A container runs only while its lane runs: a VM keeps the most memory its
-// guest ever touched until it stops (S39 item 7). Stopping takes 0.3 s and
-// starting 0.7 s. The disk, a volume of its own, keeps everything, so a
+// A container runs only while its lane runs. The disk keeps everything, so a
 // container is disposable: one made from another spec is recreated on the
-// same disk (`planContainer`).
+// same disk (`planContainer`). Every call goes through the runtime the host
+// hands in (`LaneRuntime`).
 //
 // Everything that changes a lane's disk from outside a tool is queued, in
 // order, on one queue per lane: starting the container, a fork's setup, and
@@ -17,16 +16,12 @@
 // one and wraps it as runners.
 
 import path from "node:path"
+import type { LaneName } from "@pinetrie/core"
 import type { Runners } from "./execute.ts"
-import { PINETRIE_MOUNT, SPEC_LABEL } from "./plan.ts"
-import {
-  type BytesRunner,
-  describeFailure,
-  hostRunner,
-  type Runner,
-  run,
-} from "./run.ts"
+import { laneContainer, PINETRIE_MOUNT } from "./plan.ts"
+import type { BytesRunner, Runner } from "./run.ts"
 import { runtimeNode } from "./runtime.ts"
+import type { LaneRuntime } from "./runtime-port.ts"
 
 /** pinetrie's own install on the host, mounted read-only at `/pinetrie` in every lane. */
 export const PINETRIE_INSTALL = path.resolve(import.meta.dirname, "../..")
@@ -38,13 +33,10 @@ export const HELPER = `${PINETRIE_MOUNT}/packages/pi/lane-helper.ts`
 export const LANE_NOTE = `${PINETRIE_MOUNT}/packages/pi/lane.md`
 
 /** The command that opens a lane's channel: the helper on the runtime's Node. */
-export const helperCommand = (container: string): readonly string[] => [
-  "container",
-  "exec",
-  "-i",
-  container,
-  ...runtimeNode(HELPER),
-]
+export const helperCommand = (
+  runtime: Pick<LaneRuntime, "execArgv">,
+  container: string,
+): readonly string[] => runtime.execArgv(container, runtimeNode(HELPER))
 
 /** An open channel into a lane, as runners; `channel` is the host's own. */
 export interface LaneLink<C> {
@@ -102,40 +94,6 @@ export function createQueue(): LaneQueue {
   }
 }
 
-/** What `container inspect` says of a container. */
-export interface ContainerFacts {
-  readonly state: "running" | "stopped" | "missing"
-  /** Its spec label (`SPEC_LABEL`), or null when it has none. */
-  readonly label: string | null
-}
-
-/** A container's state and spec label; missing when it is not there. */
-export async function containerFacts(
-  container: string,
-): Promise<ContainerFacts> {
-  const missing: ContainerFacts = { state: "missing", label: null }
-  const ran = await run("container", ["inspect", container])
-  if (!ran.ok) return missing
-  try {
-    const [found] = JSON.parse(ran.stdout) as {
-      status?: { state?: string }
-      configuration?: { labels?: Record<string, unknown> }
-    }[]
-    if (found === undefined) return missing
-    const label = found.configuration?.labels?.[SPEC_LABEL]
-    return {
-      state: found.status?.state === "running" ? "running" : "stopped",
-      label: typeof label === "string" ? label : null,
-    }
-  } catch {
-    return missing
-  }
-}
-
-/** Whether a `container` volume exists. */
-export const volumeExists = async (volume: string): Promise<boolean> =>
-  (await run("container", ["volume", "inspect", volume])).ok
-
 /**
  * One lane's container, as the host holds it while the lane may run: its
  * queue, and its link once open. `runners` go through the link, opening it
@@ -155,6 +113,7 @@ export interface LaneHandle<C> {
 }
 
 export function laneHandle<C>(
+  runtime: LaneRuntime,
   container: string,
   open: OpenLink<C>,
 ): LaneHandle<C> {
@@ -166,40 +125,34 @@ export function laneHandle<C>(
     })
     return link
   }
-  const host = hostRunner()
   return {
     container,
     queue: createQueue(),
     runners: {
-      host,
+      runtime,
       lane: async argv => (await opened()).run(argv),
       laneBytes: async argv => (await opened()).bytes(argv),
     },
     link: opened,
     async start() {
-      if ((await containerFacts(container)).state !== "running") {
-        const started = await run("container", ["start", container])
-        if (!started.ok)
-          throw new Error(describeFailure("container start", started))
-      }
+      if ((await runtime.containerFacts(container)).state !== "running")
+        await runtime.start(container)
       return opened()
     },
     async stop() {
       const current = link
       link = null
       if (current !== null) await (await current.catch(() => null))?.close()
-      await run("container", ["stop", container])
+      await runtime.stop(container)
     },
   }
 }
 
-/** Delete a lane's container; its volume, the lane's disk, stays. */
-export async function removeContainer(container: string): Promise<void> {
-  await run("container", ["rm", "-f", container])
-}
-
-/** Delete a lane's container and its volume. */
-export async function removeLane(container: string): Promise<void> {
-  await removeContainer(container)
-  await run("container", ["volume", "rm", container])
+/** Delete a lane's container and its disk; either may be missing. */
+export async function removeLane(
+  runtime: LaneRuntime,
+  lane: LaneName,
+): Promise<void> {
+  await runtime.remove(laneContainer(lane))
+  await runtime.disk({ kind: "delete", lane })
 }

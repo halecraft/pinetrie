@@ -25,7 +25,8 @@ import { type Containers, createContainers } from "./containers.ts"
 import { createNewLanes, type NewLanes } from "./create.ts"
 import { createFetches } from "./fetch.ts"
 import { createRegistry } from "./registry.ts"
-import { type Found, startSetup } from "./setup.ts"
+import type { Found } from "./runtime.ts"
+import { startSetup } from "./setup.ts"
 import { createSplits, type Splits } from "./split.ts"
 import { createTurns } from "./turns.ts"
 import { createUpdates, type Updates } from "./update.ts"
@@ -96,8 +97,8 @@ export async function startLaneWork(input: {
     keeper,
   })
   const baseListeners: ((lane: LaneName) => void)[] = []
-  const { root, owner, paths } = setup
-  const registry = createRegistry({ session, root })
+  const { owner, runtime } = setup
+  const registry = createRegistry({ session, runtime })
   const repoConfig = setup.lanes?.repoConfig ?? DEFAULT_REPO
   /** Accepted work in your repo (ADR-0060); none without lanes of their own. */
   const accepted: AcceptedWork | null =
@@ -146,7 +147,6 @@ export async function startLaneWork(input: {
   })
   const turns = createTurns({
     basics,
-    setup,
     registry,
     keeper,
     records: input.records,
@@ -179,7 +179,7 @@ export async function startLaneWork(input: {
     beforeRun: containers.beforeRun,
     fetchLane,
   })
-  const archive = createArchive({ basics, offers, paths, registry, keeper })
+  const archive = createArchive({ basics, offers, runtime, registry, keeper })
 
   return {
     project: setup.project,

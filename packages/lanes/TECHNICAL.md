@@ -32,16 +32,19 @@ containers, disks and the helper.
   `@pinetrie/repo` runs jj on your repo": they only read, at startup, before
   the owner of your repo starts. Its one write there is a file, the exclude
   file. `prepareProjectDir` adds `/.pinetrie/` to it, once from `server.ts`
-  before the store opens and again in `prepareHost`, which then writes
+  before the store opens and again in `prepareContainerHost`, which then writes
   nothing (ADR-0086); `prepareShared` adds shared directories.
 - `planProjectDir` (`plan.ts`) decides a project's root from `RootFacts`,
   or refuses the folder (`ProjectDirRefusal`, worded by `projectDirWords`);
-  `planRoot` only maps its result for `planHost`. `pinetrieDir` is the layout
+  `planRoot` only maps its result for a runtime's startup planner
+  (`planContainerHost`). `pinetrieDir` is the layout
   of `.pinetrie/`: the store, snapshots, the runtime and `lane-git`.
 - `image.ts`, `runtime.ts`: the image and the lane runtime. `image.ts`
   gathers what `planImages` needs and builds what it plans.
-- `disk.ts`: snapshots, deletion, trim. `lane.ts`: the container, the queue,
-  and the handle. `base.ts`: the base snapshot, and a lane's base as its
+- `runtime-port.ts`: `LaneRuntime`, every call the host makes to a
+  runtime, and `DiskOp`. `container/`: Apple's `container` as a
+  `LaneRuntime` (`containerRuntime`), with its disks, snapshots and trim.
+  `lane.ts`: the container, the queue, and the handle. `base.ts`: the base snapshot, and a lane's base as its
   history names it (`laneBase`), read from the lane's repo or yours.
 
 ## Disks and snapshots
@@ -64,9 +67,9 @@ containers, disks and the helper.
   `e2fsck` and for every record the writer had `fsync`ed. Its mutation drops
   the journal.
 - **Deleting a clone takes about 280 ms** (S40 item 4), so
-  `removeSnapshots` deletes one after another, in the background.
+  a `deleteSnapshots` op deletes one after another, in the background.
 - **Trimming**: after a run the host trims the stopped disk, so it gives
-  back the space the lane deleted. `trim` runs a short-lived container with
+  back the space the lane deleted: `container`'s `stop` runs a short-lived container with
   `CAP_SYS_ADMIN`; a lane's own container never has that capability.
 - **Clone time rises with a disk's fragmentation, not its size**: 5–9 ms on
   a fresh disk, up to 0.6 s on one churned for minutes (S43 item 6, S40).
@@ -271,7 +274,7 @@ containers, disks and the helper.
 - **Every mount is one `Mount { source, target, readonly }`**, in one list
   from `planMounts`: your working copy, pine·trie's install and runtime, the
   ignore file's directory, links, grants, shared directories and granted
-  host paths. `planRun` renders each with `mountArgs`, and does not know what
+  host paths. `container`'s `renderRun` renders each with `mountArgs`, and does not know what
   a mount is for.
 - **`mountArgs`:** `--mount` separates its fields with commas and `-v` with
   colons, so a path with a comma takes `-v`, and one with both cannot be

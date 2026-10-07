@@ -19,14 +19,12 @@ import {
   commitsOf,
   configJson,
   DEFAULT_REPO,
-  type DiskPaths,
   decodeLaneConfig,
   ensureRuntime,
   gatherLinks,
-  imagePath,
   jjIn,
+  type LaneRuntime,
   type LaneSpec,
-  laneContainer,
   type Mount,
   NO_GRANTS,
   normalShared,
@@ -35,7 +33,6 @@ import {
   planHostMounts,
   planLinks,
   planMounts,
-  prepareHost,
   prepareImages,
   prepareShared,
   projectContainerfile,
@@ -49,9 +46,10 @@ import { type RepoOwner, renameAccepted, startRepoOwner } from "@pinetrie/repo"
 import { type Basics, failed, slow } from "../basics.ts"
 import { brokenConfigLine } from "../startup-lines.ts"
 import { lockHashAt } from "./disk.ts"
-import { openLink } from "./registry.ts"
+import { openLinkOf } from "./registry.ts"
+import type { Found } from "./runtime.ts"
 
-/** A running lane's memory ceiling. A VM holds only what its guest touched (S39 item 7). */
+/** A running lane's memory ceiling. */
 const LANE_MEMORY = "4G"
 
 /**
@@ -70,8 +68,7 @@ const playwrightVersion = (): string =>
 export interface Ready {
   readonly image: string
   readonly imagePath: string
-  /** pinetrie's default image: the runtime's source, and what trims disks. */
-  readonly tools: string
+  /** The lane runtime's directory on the host (`ensureRuntime`). */
   readonly runtime: string
   readonly links: readonly Mount[]
   readonly identity: { readonly name: string; readonly email: string }
@@ -87,7 +84,8 @@ export interface Setup {
   readonly root: string | null
   /** The one writer of your repo (ADR-0065); null when lanes have no copies here. */
   readonly owner: RepoOwner | null
-  readonly paths: DiskPaths | null
+  /** What lanes of their own run on; null when they work directly. */
+  readonly runtime: LaneRuntime | null
   readonly lanes: PreparedLanes | null
   /**
    * Whether lanes run pinetrie's default image, with its browser (ADR-0041) and
@@ -113,56 +111,6 @@ export interface Setup {
   baseAtAccepted(): Promise<void>
 }
 
-/** What the host found where it runs: the project, and the disks' paths when lanes have their own. */
-export interface Found {
-  readonly project: ProjectRecord
-  readonly paths: DiskPaths | null
-}
-
-/**
- * The project as the host keeps it. `PINETRIE_LANES=0` (`defaultDirect`)
- * changes a new root lane's default, never whether a lane may have its own
- * copy. Pure.
- */
-export function projectOf(
-  found: Pick<Found, "project"> | null,
-  defaultDirect: boolean,
-): ProjectRecord | null {
-  if (found === null) return null
-  const { project } = found
-  return project.kind === "lanes" && defaultDirect
-    ? { ...project, rootDefault: "direct" }
-    : project
-}
-
-/**
- * Find the project in `dir`, and whether its lanes can have their own copies:
- * `prepareHost` asks `container`, unless containers are off. Null with no
- * tools (`dir` null). Read before pi's setup, which loads from its root.
- */
-export async function findProject(input: {
-  /** The project's folder, whose root `prepareHost` finds; null with no tools. */
-  readonly dir: string | null
-  /** `PINETRIE_LANES=0`: a new root lane works directly by default. */
-  readonly defaultDirect: boolean
-  /** False: lanes never get containers here, and `container` is not asked. */
-  readonly containers: boolean
-}): Promise<Found | null> {
-  if (input.dir === null) return null
-  const found: Found = input.containers
-    ? await prepareHost(input.dir)
-    : {
-        project: {
-          kind: "direct",
-          root: input.dir,
-          reason: "lanes of their own are off for this host",
-        },
-        paths: null,
-      }
-  const project = projectOf(found, input.defaultDirect)
-  return project === null ? null : { ...found, project }
-}
-
 export async function startSetup(input: {
   readonly basics: Basics
   /** What `findProject` found; null with no tools. */
@@ -177,7 +125,7 @@ export async function startSetup(input: {
   const { basics, keeper, found } = input
   const { log } = basics
   const project = found?.project ?? null
-  const paths: DiskPaths | null = found?.paths ?? null
+  const runtime = found?.runtime ?? null
   const root = project?.kind === "lanes" ? project.root : null
   if (project !== null) {
     if (project.kind === "lanes")
@@ -244,7 +192,6 @@ export async function startSetup(input: {
     const grants = lanes?.config.grants ?? NO_GRANTS
     return {
       lane,
-      volume: laneContainer(lane),
       image: r.image,
       imagePath: r.imagePath,
       mounts: planMounts({
@@ -268,7 +215,7 @@ export async function startSetup(input: {
    * from accepted work, or from a WIP's copy on it. Nothing to do before accepted work
    * is set up.
    */
-  async function refreshBaseNow(disk: DiskPaths, r: Ready) {
+  async function refreshBaseNow(on: LaneRuntime, at: string, r: Ready) {
     if (owner === null) return
     const acceptedBookmark = revsetName(
       (lanes?.repoConfig ?? DEFAULT_REPO).acceptedBookmark,
@@ -285,14 +232,15 @@ export async function startSetup(input: {
     if (read === null) return
     const { yours, commit, lock } = read
     const made = await refreshBase({
-      paths: disk,
+      runtime: on,
+      root: at,
       // Nothing in the base should see a shared directory.
       spec: specOf(BASE_LANE, r, true),
       env: process.env,
       yours,
       lock,
       install,
-      open: openLink,
+      open: openLinkOf(on),
     })
     if (made)
       log(
@@ -302,9 +250,17 @@ export async function startSetup(input: {
 
   // --- the images, runtime and base snapshot, in the background ----------
   const ready: Promise<Ready> | null =
-    root === null || paths === null
+    root === null || runtime === null
       ? null
-      : keeper.track(prepare(root, paths, refreshBaseNow, log))
+      : keeper.track(
+          prepare(
+            root,
+            runtime,
+            found?.defaultImage ?? (() => {}),
+            refreshBaseNow,
+            log,
+          ),
+        )
   ready?.catch(error =>
     log(`[host] lanes of their own cannot start: ${errorText(error)}`),
   )
@@ -312,9 +268,9 @@ export async function startSetup(input: {
   /** The base snapshot's refreshes, one at a time. */
   const base = createKeeper()
   async function baseAtAccepted(): Promise<void> {
-    if (ready === null || paths === null) return
-    const disk = paths
-    await base.run(async () => refreshBaseNow(disk, await ready))
+    if (ready === null || runtime === null || root === null) return
+    const [on, at] = [runtime, root]
+    await base.run(async () => refreshBaseNow(on, at, await ready))
   }
   function refreshBaseSoon(): void {
     void keeper.track(
@@ -326,7 +282,7 @@ export async function startSetup(input: {
     project,
     root,
     owner,
-    paths,
+    runtime,
     lanes,
     defaultImage,
     ready,
@@ -379,16 +335,20 @@ async function prepareLanes(
 /** The images, the lane runtime, links and identity; then the base snapshot. */
 async function prepare(
   at: string,
-  disk: DiskPaths,
-  refreshBaseNow: (disk: DiskPaths, r: Ready) => Promise<void>,
+  runtime: LaneRuntime,
+  defaultImage: Found["defaultImage"],
+  refreshBaseNow: (on: LaneRuntime, at: string, r: Ready) => Promise<void>,
   log: (m: string) => void,
 ): Promise<Ready> {
-  const images = await prepareImages(at, playwrightVersion(), log)
-  const refused = await checkImage(images.lane)
+  const images = prepareImages(runtime, at, playwrightVersion(), log)
+  defaultImage(images.then(i => i.runtimeFrom))
+  const { lane, runtimeFrom } = await images
+  const refused = await checkImage(runtime, lane)
   if (refused !== null) throw new Error(refused)
-  const runtime = await ensureRuntime(
+  const programs = await ensureRuntime(
+    runtime,
     pinetrieDir(at).runtime,
-    images.runtimeFrom,
+    runtimeFrom,
   )
   // Your jj config, not your repo: asked from its root, as startup asks.
   const config = async (key: string, fallback: string) => {
@@ -396,17 +356,16 @@ async function prepare(
     return ran.ok && ran.stdout.trim() !== "" ? ran.stdout.trim() : fallback
   }
   const result: Ready = {
-    image: images.lane,
-    imagePath: await imagePath(images.lane),
-    tools: images.runtimeFrom,
-    runtime,
+    image: lane,
+    imagePath: await runtime.imagePath(lane),
+    runtime: programs,
     links: planLinks(at, await gatherLinks(at)),
     identity: {
       name: await config("user.name", `${PRODUCT_NAME} agent`),
       email: await config("user.email", "agent@pinetrie.invalid"),
     },
   }
-  await refreshBaseNow(disk, result)
+  await refreshBaseNow(runtime, at, result)
   log("[host] lanes of their own are ready")
   return result
 }

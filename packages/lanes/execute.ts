@@ -1,38 +1,68 @@
-// lanes/execute — carrying out a list of `LaneStep`s, in order.
+// lanes/execute — carrying out a list of steps, in order.
 
 import { writeFile } from "node:fs/promises"
-import type { LaneStep } from "./plan.ts"
+import type { LaneStep, Step } from "./plan.ts"
 import {
   type BytesRunner,
   describeFailure,
   type Ran,
   type Runner,
 } from "./run.ts"
+import type { LaneRuntime } from "./runtime-port.ts"
 
-/** Where steps run: the host, and the lane's helper channel. */
-export interface Runners {
-  readonly host: Runner
+/** Where lane steps run: the lane's helper channel. */
+export interface LaneRunners {
   readonly lane: Runner
   readonly laneBytes: BytesRunner
 }
+
+/** Where every step runs: the lane's channel, and the runtime that keeps it. */
+export interface Runners extends LaneRunners {
+  readonly runtime: LaneRuntime
+}
+
+/** The overloads' union: a list of lane steps needs no runtime. */
+type SomeRunners = LaneRunners & { readonly runtime?: LaneRuntime }
 
 export type Executed =
   | { readonly ok: true }
   | { readonly ok: false; readonly step: LaneStep; readonly ran: Ran<unknown> }
 
 /**
- * Run `steps` in order, each on the host or in the lane, and stop at the
- * first that fails. A lane step with `stdoutTo` writes its stdout, as bytes,
- * to that host file.
+ * Run `steps` in order and stop at the first lane step that fails; a runtime
+ * operation that fails throws. A lane step with `stdoutTo` writes its stdout,
+ * as bytes, to that host file.
  */
-export async function execute(
+export function execute(
   steps: readonly LaneStep[],
+  runners: LaneRunners,
+): Promise<Executed>
+export function execute(
+  steps: readonly Step[],
   runners: Runners,
+): Promise<Executed>
+export function execute(
+  steps: readonly Step[],
+  runners: SomeRunners,
+): Promise<Executed> {
+  return runSteps(steps, runners)
+}
+
+async function runSteps(
+  steps: readonly Step[],
+  runners: SomeRunners,
 ): Promise<Executed> {
   for (const step of steps) {
+    if (step.in === "runtime") {
+      const { runtime } = runners
+      if (runtime === undefined)
+        throw new Error("a runtime step with no runtime to run it")
+      if (step.op.kind === "run") await runtime.run(step.op.shape)
+      else await runtime.disk(step.op)
+      continue
+    }
     let ran: Ran<unknown>
-    if (step.in === "host") ran = await runners.host(step.argv)
-    else if (step.stdoutTo === undefined) ran = await runners.lane(step.argv)
+    if (step.stdoutTo === undefined) ran = await runners.lane(step.argv)
     else {
       const bytes = await runners.laneBytes(step.argv)
       if (bytes.ok) await writeFile(step.stdoutTo, bytes.stdout)
@@ -46,11 +76,19 @@ export async function execute(
 /** `execute`, throwing the first failure as an error naming its command. */
 export async function executeOrThrow(
   steps: readonly LaneStep[],
+  runners: LaneRunners,
+): Promise<void>
+export async function executeOrThrow(
+  steps: readonly Step[],
   runners: Runners,
+): Promise<void>
+export async function executeOrThrow(
+  steps: readonly Step[],
+  runners: SomeRunners,
 ): Promise<void> {
-  const done = await execute(steps, runners)
+  const done = await runSteps(steps, runners)
   if (!done.ok)
     throw new Error(
-      describeFailure(`${done.step.in}: ${done.step.argv.join(" ")}`, done.ran),
+      describeFailure(`lane: ${done.step.argv.join(" ")}`, done.ran),
     )
 }

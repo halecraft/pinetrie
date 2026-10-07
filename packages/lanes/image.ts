@@ -4,13 +4,13 @@
 // own `pinetrie.Containerfile` at its root replaces it for the project's lanes.
 // Either is built once per change of its content and build arguments: the
 // host's jj version for both, and the app's Playwright version for pinetrie's
-// (`planImages`). The builder holds 2 GiB while it runs (S42), so it is
-// stopped after a build.
+// (`planImages`). The runtime builds and runs them.
 
 import { readFile } from "node:fs/promises"
 import path from "node:path"
 import { type ImagePlan, imageRefusal, planImages } from "./plan.ts"
 import { describeFailure, run } from "./run.ts"
+import type { LaneRuntime } from "./runtime-port.ts"
 
 const DEFAULT_CONTAINERFILE = path.join(
   import.meta.dirname,
@@ -24,9 +24,6 @@ const DEFAULT_CONTAINERFILE = path.join(
  */
 export const projectContainerfile = (root: string): string =>
   path.join(root, "pinetrie.Containerfile")
-/** The `PATH` of an image that names none. */
-const STANDARD_PATH =
-  "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 
 /** The host's jj version, which the default image's jj is pinned to. */
 async function hostJjVersion(): Promise<string> {
@@ -37,38 +34,15 @@ async function hostJjVersion(): Promise<string> {
   return m[1]
 }
 
-/** Build `plan`'s image unless its tag exists, then stop the builder. */
+/** Build `plan`'s image unless its tag exists. */
 async function ensureImage(
+  runtime: LaneRuntime,
   plan: ImagePlan,
   log: (m: string) => void,
 ): Promise<void> {
-  if ((await run("container", ["image", "inspect", plan.tag])).ok) return
+  if (await runtime.imageExists(plan.tag)) return
   log(`[host] building the lane image ${plan.tag} from ${plan.file}`)
-  const built = await run("container", [
-    "build",
-    "-t",
-    plan.tag,
-    ...plan.buildArgs.flatMap(a => ["--build-arg", a]),
-    "-f",
-    plan.file,
-    path.dirname(plan.file),
-  ])
-  await run("container", ["builder", "stop"])
-  if (!built.ok) throw new Error(describeFailure("container build", built))
-}
-
-/** The image's own `PATH`, from its arm64 configuration; the standard one if it names none. */
-export async function imagePath(tag: string): Promise<string> {
-  const ran = await run("container", ["image", "inspect", tag])
-  if (!ran.ok) throw new Error(describeFailure("container image inspect", ran))
-  type Variant = {
-    config?: { architecture?: string; config?: { Env?: string[] } }
-  }
-  const [image] = JSON.parse(ran.stdout) as { variants?: Variant[] }[]
-  const variant = image?.variants?.find(v => v.config?.architecture === "arm64")
-  const env = variant?.config?.config?.Env ?? []
-  const found = env.find(e => e.startsWith("PATH="))
-  return found === undefined ? STANDARD_PATH : found.slice("PATH=".length)
+  await runtime.buildImage(plan)
 }
 
 /**
@@ -79,6 +53,7 @@ export async function imagePath(tag: string): Promise<string> {
  * lanes run.
  */
 export async function prepareImages(
+  runtime: LaneRuntime,
   root: string,
   playwrightVersion: string,
   log: (m: string) => void,
@@ -95,8 +70,8 @@ export async function prepareImages(
     jjVersion,
     playwrightVersion,
   })
-  await ensureImage(plans.pinetrie, log)
-  if (plans.project !== null) await ensureImage(plans.project, log)
+  await ensureImage(runtime, plans.pinetrie, log)
+  if (plans.project !== null) await ensureImage(runtime, plans.project, log)
   return {
     lane: (plans.project ?? plans.pinetrie).tag,
     runtimeFrom: plans.pinetrie.tag,
@@ -108,16 +83,16 @@ export async function prepareImages(
  * `sh` and git 2.41 or later: git launches its own helper programs, so it
  * cannot be carried in from outside the image as Node and jj are.
  */
-export async function checkImage(tag: string): Promise<string | null> {
-  const ran = await run("container", [
-    "run",
-    "--rm",
-    tag,
+export async function checkImage(
+  runtime: LaneRuntime,
+  tag: string,
+): Promise<string | null> {
+  const ran = await runtime.runInImage(tag, [
     "sh",
     "-c",
     "git --version 2>/dev/null || true",
   ])
   if (!ran.ok)
-    return `the lane's image cannot run \`sh\`: ${describeFailure("container run", ran)}`
-  return imageRefusal(ran.stdout)
+    return `the lane's image cannot run \`sh\`: ${describeFailure(`running ${tag}`, ran)}`
+  return imageRefusal(new TextDecoder().decode(ran.stdout))
 }

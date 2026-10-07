@@ -13,7 +13,6 @@ import {
   bookmarkOf,
   bookmarkRevset,
   commitsOf,
-  containerFacts,
   executeOrThrow,
   planBundle,
   stackBookmark,
@@ -73,7 +72,8 @@ export function createFetches(deps: {
       const handle = registry.handleOf(lane)
       const bundled = handle.queue.enqueue(async () => {
         const stopped =
-          (await containerFacts(handle.container)).state !== "running"
+          (await handle.runners.runtime.containerFacts(handle.container))
+            .state !== "running"
         if (stopped) await deps.startContainer(lane)
         try {
           const jj = registry.laneJjOf(lane)

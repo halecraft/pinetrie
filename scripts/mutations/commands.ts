@@ -56,7 +56,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "mountArgs always uses --mount",
-    file: "packages/lanes/plan.ts",
+    file: "packages/lanes/container/plan.ts",
     from: '  if (!paths.includes(","))',
     to: "  if (true)",
     command: vitest("packages/lanes"),

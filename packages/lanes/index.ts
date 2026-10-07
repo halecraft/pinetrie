@@ -5,7 +5,7 @@
 
 export * from "./base.ts"
 export * from "./bookmarks.ts"
-export * from "./disk.ts"
+export * from "./container/index.ts"
 export * from "./execute.ts"
 export * from "./host.ts"
 export * from "./image.ts"
@@ -15,3 +15,4 @@ export * from "./plan.ts"
 export * from "./revisions.ts"
 export * from "./run.ts"
 export * from "./runtime.ts"
+export * from "./runtime-port.ts"

@@ -19,7 +19,7 @@ import {
   sourcesOf,
   trailerRevset,
 } from "@pinetrie/core"
-import { executeOrThrow, type Runners } from "./execute.ts"
+import { executeOrThrow, type LaneRunners } from "./execute.ts"
 import {
   type AcceptedOfferCommitAbove,
   bookmarkName,
@@ -382,7 +382,7 @@ const withoutAcceptedOfferCommits = (
  */
 export async function mergeUpdate(
   jj: Runner,
-  runners: Runners,
+  runners: LaneRunners,
   lane: LaneName,
   plan: MergePlan,
 ): Promise<Merged> {

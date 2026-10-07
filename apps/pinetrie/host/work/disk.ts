@@ -1,9 +1,8 @@
 // host/work/disk — the steps two lane operations share.
 
 import { createHash } from "node:crypto"
-import { type EntryId, snapshotId } from "@pinetrie/core"
+import { type EntryId, type LaneName, snapshotId } from "@pinetrie/core"
 import {
-  type DiskPaths,
   executeOrThrow,
   type LaneHandle,
   planSnapshot,
@@ -12,22 +11,18 @@ import {
 import type { LaneChannel } from "@pinetrie/pi"
 
 /**
- * Snapshot a lane's volume as `entry`'s, on its queue: after the steps queued
+ * Snapshot `lane`'s disk as `entry`'s, on its queue: after the steps queued
  * before, so it never overlaps a turn's writes. Resolves true once taken;
  * rejects if it failed, which each caller handles its own way.
  */
 export const snapshotOnQueue = (
   handle: LaneHandle<LaneChannel>,
-  paths: DiskPaths,
+  lane: LaneName,
   entry: EntryId,
 ): Promise<true> =>
   handle.queue.enqueue(async () => {
     await executeOrThrow(
-      planSnapshot({
-        volume: handle.container,
-        snapshot: snapshotId(entry),
-        paths,
-      }),
+      planSnapshot({ lane, snapshot: snapshotId(entry) }),
       handle.runners,
     )
     return true as const

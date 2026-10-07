@@ -12,12 +12,7 @@ import {
 } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import {
-  createVolume,
-  executeOrThrow,
-  hostBytesRunner,
-  hostRunner,
-} from "@pinetrie/lanes"
+import { createVolume, describeFailure, run } from "@pinetrie/lanes"
 import type { Checks } from "../checks.ts"
 import { containerProblem, waitFor } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
@@ -74,11 +69,10 @@ rm -rf $w
   ensureFsckImage()
   // Small, so each check is quick: `e2fsck -f` walks every block group of a
   // volume, however little it holds. The journal is what is under test.
-  await executeOrThrow([createVolume(volume, "4G")], {
-    host: hostRunner(),
-    lane: hostRunner(),
-    laneBytes: hostBytesRunner(),
-  })
+  const [program = "", ...args] = createVolume(volume, "4G")
+  const created = await run(program, args)
+  if (!created.ok)
+    throw new Error(describeFailure("creating the volume", created))
   const writer = `pinetrie-contract-writer-${process.pid}`
   const fsynced = () =>
     Number(

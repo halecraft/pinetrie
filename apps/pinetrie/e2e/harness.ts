@@ -25,7 +25,7 @@ import {
   type RootId,
   type TreeIndex,
 } from "@pinetrie/core"
-import { prepareHost } from "@pinetrie/lanes"
+import { prepareContainerHost } from "@pinetrie/lanes"
 import { scriptedModel } from "@pinetrie/pi"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import {
@@ -260,7 +260,7 @@ export async function withHost<T>(
 
 /**
  * Why lanes cannot have containers of their own here, or null: the reason the
- * host itself would give (`prepareHost`, `planHost` in `@pinetrie/lanes`), on a
+ * host itself would give (`prepareContainerHost`, `planContainerHost`), on a
  * throwaway project. A scenario that needs `container` gives this as its
  * `needs`.
  */
@@ -269,7 +269,7 @@ export async function containerProblem(): Promise<string | null> {
     "README.md": "probe\n",
   })
   try {
-    const { project } = await prepareHost(dir)
+    const { project } = await prepareContainerHost(dir)
     return project.kind === "direct" ? project.reason : null
   } finally {
     rmSync(dir, { recursive: true, force: true })

@@ -21,7 +21,9 @@ function setUp(tips: readonly string[]) {
     container: "pinetrie-none",
     queue: createQueue(),
     runners: {
-      host: async () => ok(""),
+      runtime: {
+        containerFacts: async () => ({ state: "stopped", label: null }),
+      },
       lane: async () => ok(""),
       laneBytes: async () => {
         const tip = tips[made] ?? ""

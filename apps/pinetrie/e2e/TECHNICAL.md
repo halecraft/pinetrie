@@ -32,7 +32,7 @@ They share `checks.ts` (recording a check, and stopping at one),
   mutant runs one scenario, and stops at its check (`PINETRIE_STOP_AT`).
 - **A scenario that cannot run here says why, and is skipped** (`needs`):
   `containerProblem()` gives the host's own reason `container` is unusable
-  (`prepareHost`, `planHost`), and `live` needs `PINETRIE_LIVE`. Inside the
+  (`prepareContainerHost`, `planContainerHost`), and `live` needs `PINETRIE_LIVE`. Inside the
   browser's `tools`, the offer and review checks are each `skip`ped with the
   host's project record's reason when its lanes work directly. A skip is
   neither a pass nor a fail.

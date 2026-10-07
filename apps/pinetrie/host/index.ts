@@ -120,7 +120,7 @@ import { agentReadyLine, configLine } from "./startup-lines.ts"
 import { openStore } from "./store.ts"
 import { createTitles } from "./titles.ts"
 import { startLaneWork } from "./work/index.ts"
-import { findProject } from "./work/setup.ts"
+import { findProject } from "./work/runtime.ts"
 
 /** How long an unreferenced image is kept (ADR-0042). */
 const BLOB_GRACE_MS = 24 * 60 * 60 * 1000

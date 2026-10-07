@@ -367,7 +367,7 @@ export interface Updates {
 
 export function createUpdates(deps: {
   readonly basics: Basics
-  readonly setup: Pick<Setup, "root" | "owner" | "paths" | "lanes">
+  readonly setup: Pick<Setup, "root" | "owner" | "lanes">
   readonly registry: LaneRegistry
   readonly piSetup: Pick<PiSetup, "skill">
   readonly containers: Pick<Containers, "beforeRun" | "runEnded">
@@ -388,10 +388,9 @@ export function createUpdates(deps: {
     merge: CommitId,
   ): Promise<void> {
     const handle = registry.handleOf(lane)
-    const snapped =
-      setup.paths === null
-        ? false
-        : await snapshotOnQueue(handle, setup.paths, entry).catch(() => false)
+    const snapped = await snapshotOnQueue(handle, lane, entry).catch(
+      () => false,
+    )
     await deps.writeRevision({
       entry,
       lane,

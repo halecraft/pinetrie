@@ -395,12 +395,10 @@ A change to any schema here comes with a migration in
 A store from before ADR-0063, the session as one document, does not open. Its
 one-off migration, `scripts/split-session.ts`, was deleted once it had run:
 restore it from the revision before its deletion (ADR-0063).
-`scripts/migrate-pineta.ts` (S114) is not a schema migration, and is not
-one of ADR-0096's: it renames files, lanes' disks and your repo's refs, and
-leaves every document as it is. It moves a store kept as `.pineta/pineta.db`
-before the rename to `.pinetrie/pinetrie.db`, and runs by hand with the
-host stopped, since a host started first restores old lanes from their
-snapshots. It is deleted once it has run.
+`scripts/migrate-pineta.ts` (S114) was not a schema migration: it renamed
+files, lanes' disks and your repo's refs, and left every document as it
+was. It has been deleted; to run it, restore it from the revision before
+its deletion (S114).
 
 ## Authoritative JSON, compacted (ADR-0023)
 

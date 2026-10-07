@@ -69,6 +69,12 @@ would read as on a WIP that no longer exists, so a `Pineta-Base` on
 commit in its history.
 
 The script runs on the Mac, with the host stopped and before it first
-starts on the fix: `node scripts/migrate-pineta.ts <project root>`. What it
-reported is recorded here once it has run.
+starts on the fix: `node scripts/migrate-pineta.ts <project root>`.
+
+It was deleted on 2026-10-07 without having run on pine·trie's own repo,
+when ADR-0103's runtime port replaced the `container` calls it made. That
+repo still holds 17 `refs/remotes/pineta-<lane>/tip` refs and one
+`pineta-offer/*` bookmark, from lanes made between 29 September and 5
+October. To bring those lanes back, restore the script from the revision
+before its deletion and run it from a checkout of that revision.
 

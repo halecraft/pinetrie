@@ -1,6 +1,6 @@
 // lanes/host — what the host finds at startup, gathered, then planned by
-// `planProjectDir`, `planRoot`, `planHost` and `planShared` (ADR-0034,
-// ADR-0035, ADR-0086).
+// `planProjectDir` and `planShared` (ADR-0034, ADR-0035, ADR-0086). What a
+// runtime finds is the runtime's own.
 //
 // These are the one exception to "only `@pinetrie/repo` runs jj on your repo":
 // they only read it (`jjIn`, git from its root), at startup, before the owner
@@ -14,23 +14,19 @@
 // no code looks for `.jj` or `.git` itself.
 
 import {
-  lstat,
   mkdir,
   readdir,
   readFile,
   readlink,
-  rm,
   stat,
   writeFile,
 } from "node:fs/promises"
 import { homedir } from "node:os"
 import path from "node:path"
-import { errorText, type ProjectRecord } from "@pinetrie/core"
+import { errorText } from "@pinetrie/core"
 import {
   type ConfigRead,
-  type DiskPaths,
   EXCLUDE_LINE,
-  type HostFacts,
   IGNORE_FILE,
   type Link,
   laneIgnores,
@@ -38,9 +34,7 @@ import {
   type ProjectDir,
   pinetrieDir,
   planExclude,
-  planHost,
   planProjectDir,
-  planRoot,
   planShared,
   type RootFacts,
   type SharedDir,
@@ -77,95 +71,6 @@ export async function prepareProjectDir(dir: string): Promise<ProjectDir> {
         kind: "refused",
         refusal: { kind: "unexcludable", root: planned.root },
       }
-}
-
-/** `container`'s own directory, from its status; null when it is not running. */
-async function appRoot(): Promise<string | null> {
-  const status = await run("container", [
-    "system",
-    "status",
-    "--format",
-    "json",
-  ])
-  if (!status.ok) return null
-  try {
-    const parsed = JSON.parse(status.stdout) as {
-      status?: unknown
-      paths?: { appRoot?: unknown }
-    }
-    return parsed.status === "running" &&
-      typeof parsed.paths?.appRoot === "string"
-      ? parsed.paths.appRoot
-      : null
-  } catch {
-    return null
-  }
-}
-
-const exists = (p: string) =>
-  stat(p).then(
-    () => true,
-    () => false,
-  )
-
-/**
- * Whether a clone into `dir` shares blocks: `/bin/cp -c` of a small file
- * fails across APFS volumes, where it cannot clone.
- */
-async function probeClone(dir: string, near: string): Promise<boolean> {
-  await mkdir(dir, { recursive: true })
-  const a = path.join(near, ".pinetrie-clone-probe")
-  const b = path.join(dir, ".clone-probe")
-  try {
-    await writeFile(a, "probe")
-    return (await run("/bin/cp", ["-c", a, b])).ok
-  } catch {
-    return false
-  } finally {
-    await rm(a, { force: true })
-    await rm(b, { force: true })
-  }
-}
-
-/** Where lanes' disks and snapshots are, once `container` is known. */
-const diskPaths = (app: string, root: string): DiskPaths => ({
-  volumes: path.join(app, "volumes"),
-  snapshots: pinetrieDir(root).snapshots,
-})
-
-/**
- * What the host found, and where lanes' disks are when they have their own.
- * Any step that fails makes the project `direct`, naming the first failure.
- */
-export async function prepareHost(dir: string): Promise<{
-  readonly project: ProjectRecord
-  readonly paths: DiskPaths | null
-}> {
-  const root = planRoot(await prepareProjectDir(dir), dir)
-  const installed = (await run("container", ["--version"])).ok
-  const app = installed ? await appRoot() : null
-  const facts: HostFacts = {
-    root,
-    installed,
-    running: app !== null,
-    kernel:
-      app !== null &&
-      (await lstat(path.join(app, "kernels", "default.kernel-arm64")).then(
-        () => true,
-        () => false,
-      )),
-    clones:
-      app !== null &&
-      "ok" in root &&
-      (await exists(path.join(app, "volumes"))) &&
-      (await probeClone(
-        diskPaths(app, root.ok).snapshots,
-        path.join(app, "volumes"),
-      )),
-  }
-  const project = planHost(facts)
-  if (project.kind === "direct" || app === null) return { project, paths: null }
-  return { project, paths: diskPaths(app, project.root) }
 }
 
 /**

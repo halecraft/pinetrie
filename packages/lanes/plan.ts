@@ -1,9 +1,11 @@
 // lanes/plan — every decision about a lane's container and disk, as values
 // (ADR-0034).
 //
-// Each function here is pure. What runs is a list of `LaneStep`s, carried out
-// by `execute.ts`; what is gathered is gathered by `host.ts`, `disk.ts` and
-// the host. So each rule below is tested without `container`, jj or git.
+// Each function here is pure. What runs is a list of `Step`s, carried out by
+// `execute.ts`: commands in the lane, and `RuntimeOp`s a runtime turns into
+// its own commands (`runtime-port.ts`). What is gathered is gathered by
+// `host.ts` and the host. So each rule below is tested without a runtime, jj
+// or git.
 
 import { createHash } from "node:crypto"
 import path from "node:path"
@@ -17,12 +19,12 @@ import {
   isWithin,
   type LaneName,
   NO_EDITOR,
-  type ProjectRecord,
   type SnapshotId,
   shellWord,
   type ThreadName,
   WORKSPACE_ROOT,
 } from "@pinetrie/core"
+import type { LaneRuntime, RuntimeOp } from "./runtime-port.ts"
 
 /** pinetrie's own install, read-only: the helper's code and pi's. */
 export const PINETRIE_MOUNT = "/pinetrie"
@@ -40,8 +42,6 @@ export const LANE_JJ_CONFIG = `${LANE_CONFIG_DIR}/jj.toml`
 export const FETCHED_REF = "refs/heads/pinetrie/fetched"
 /** The directory the host keeps in a project's root (`pinetrieDir`). */
 export const PROJECT_DIR = ".pinetrie"
-/** A new volume's size. The image is sparse: only written blocks take space. */
-const DISK_SIZE = "64G"
 
 /** The bookmark that holds a lane's newest revision, in the lane's own repo. */
 export const bookmarkName = (lane: LaneName): string => `pinetrie/${lane}`
@@ -87,7 +87,7 @@ export const offerBookmark = (name: ThreadName): string =>
 /** Every offer's bookmark, as a revset. */
 export const OFFER_BOOKMARKS = `bookmarks(glob:${revsetName(`${OFFER_PREFIX}*`)})`
 
-/** The container and the volume of a lane share one name. */
+/** A lane's container's name. */
 export const laneContainer = (lane: LaneName): string => `pinetrie-${lane}`
 
 /** What a project lets cross a lane's boundary (ADR-0034), from `pinetrie.json`. */
@@ -118,7 +118,6 @@ export interface Install {
 
 export interface LaneSpec {
   readonly lane: LaneName
-  readonly volume: string
   readonly image: string
   /** The image's own `PATH`; the runtime's `bin` is added after it. */
   readonly imagePath: string
@@ -168,26 +167,6 @@ export function planMounts(parts: {
     })),
     ...parts.hostPaths.map(p => at(p, hostPathInLane(p))),
   ]
-}
-
-/**
- * A mount's `container run` arguments. `--mount` separates its fields with
- * commas, and `-v` with colons, so a path with a comma takes `-v`, and one
- * with both cannot be mounted (S46 item 4). `planHostMounts` refuses such
- * paths before they get here.
- */
-export function mountArgs(m: Mount): readonly string[] {
-  const paths = `${m.source}${m.target}`
-  if (!paths.includes(","))
-    return [
-      "--mount",
-      `type=bind,source=${m.source},target=${m.target}${m.readonly ? ",readonly" : ""}`,
-    ]
-  if (!paths.includes(":"))
-    return ["-v", `${m.source}:${m.target}${m.readonly ? ":ro" : ""}`]
-  throw new Error(
-    `${m.source} has both a comma and a colon: container cannot mount it`,
-  )
 }
 
 /**
@@ -246,82 +225,71 @@ export const IGNORE_FILE = "ignore"
 /** The label a container's spec hash is kept under. */
 export const SPEC_LABEL = "pinetrie.spec"
 
-const setEnv = (name: string, value: string): string[] => [
-  "-e",
-  `${name}=${value}`,
-]
-
-/**
- * `container run` arguments for a lane, labelled with their own hash
- * (`specHash`), so a container made from another spec can be told apart.
- *
- * It mounts what `planMounts` listed, each through `mountArgs`: nothing of
- * your home directory unless a grant or a skill's root names it, so
- * credentials stay out of reach (S43 item 7). `--init` reaps the processes a
- * timeout or an abort kills (S39 item 6). Only variables a grant names are
- * copied from `env`.
- */
-export function planRun(
-  spec: LaneSpec,
-  env: Readonly<Record<string, string | undefined>>,
-): readonly string[] {
-  const args = runArgs(spec, env)
-  const [first, ...rest] = args
-  return [first ?? "run", "--label", `${SPEC_LABEL}=${specHash(args)}`, ...rest]
+/** A lane's container, as any runtime would make it. */
+export interface ContainerShape {
+  /** `laneContainer(lane)`. */
+  readonly name: string
+  /** Its disk, at `/workspace`. */
+  readonly lane: LaneName
+  readonly image: string
+  readonly memory: string
+  /** Host paths, from `planMounts`. */
+  readonly mounts: readonly Mount[]
+  readonly env: Readonly<Record<string, string>>
+  /** Your ssh agent, forwarded. */
+  readonly ssh: boolean
 }
 
-/** The hash a lane's container is labelled with: of its arguments, without the label. */
+/**
+ * A lane's container. It mounts what `planMounts` listed: nothing of your
+ * home directory unless a grant or a skill's root names it, so credentials
+ * stay out of reach (S43 item 7). Only variables a grant names are copied
+ * from `env`, first, so pinetrie's own come after them.
+ */
+export function planShape(
+  spec: LaneSpec,
+  env: Readonly<Record<string, string | undefined>>,
+): ContainerShape {
+  const passed = spec.grants.env.flatMap(name => {
+    const value = env[name]
+    return value === undefined ? [] : [[name, value] as const]
+  })
+  return {
+    name: laneContainer(spec.lane),
+    lane: spec.lane,
+    image: spec.image,
+    memory: spec.memory,
+    mounts: spec.mounts,
+    ssh: spec.grants.ssh,
+    env: Object.fromEntries([
+      ...passed,
+      ["JJ_USER", spec.identity.name],
+      ["JJ_EMAIL", spec.identity.email],
+      ["JJ_CONFIG", LANE_JJ_CONFIG],
+      // Every repo in the lane ignores what the ignore file lists, from the
+      // container's first moment: git's own variables, which jj reads too
+      // (S45 item 7). An exclude line written by a step would come too late
+      // for a jj command that ran first (S45 item 4).
+      ["GIT_CONFIG_COUNT", "1"],
+      ["GIT_CONFIG_KEY_0", "core.excludesFile"],
+      ["GIT_CONFIG_VALUE_0", `${IGNORE_MOUNT}/${IGNORE_FILE}`],
+      ...Object.entries(NO_EDITOR),
+      // Last, so the image's own programs win: the runtime brings its
+      // programs for an image that has none, and never Node.
+      ["PATH", `${spec.imagePath}:${RUNTIME_BIN}`],
+    ]),
+  }
+}
+
+/** The hash a container is labelled with (`SPEC_LABEL`): of its arguments, without the label. */
 export const specHash = (args: readonly string[]): string =>
   createHash("sha256").update(args.join("\0")).digest("hex").slice(0, 16)
 
-/** The hash `planRun` labels a lane's container with. */
+/** The spec hash `runtime` labels `shape`'s container with. */
 export const specHashOf = (
-  spec: LaneSpec,
-  env: Readonly<Record<string, string | undefined>>,
-): string => specHash(runArgs(spec, env))
-
-function runArgs(
-  spec: LaneSpec,
-  env: Readonly<Record<string, string | undefined>>,
-): readonly string[] {
-  const passed = spec.grants.env.flatMap(name => {
-    const value = env[name]
-    return value === undefined ? [] : setEnv(name, value)
-  })
-  return [
-    "run",
-    "-d",
-    "--init",
-    "--name",
-    laneContainer(spec.lane),
-    "-m",
-    spec.memory,
-    "-v",
-    `${spec.volume}:${WORKSPACE_ROOT}`,
-    ...spec.mounts.flatMap(mountArgs),
-    ...(spec.grants.ssh ? ["--ssh"] : []),
-    ...passed,
-    ...setEnv("JJ_USER", spec.identity.name),
-    ...setEnv("JJ_EMAIL", spec.identity.email),
-    ...setEnv("JJ_CONFIG", LANE_JJ_CONFIG),
-    // Every repo in the lane ignores what the ignore file lists, from the
-    // container's first moment: git's own variables, which jj reads too
-    // (S45 item 7). An exclude line written by a step would come too late
-    // for a jj command that ran first (S45 item 4).
-    ...setEnv("GIT_CONFIG_COUNT", "1"),
-    ...setEnv("GIT_CONFIG_KEY_0", "core.excludesFile"),
-    ...setEnv("GIT_CONFIG_VALUE_0", `${IGNORE_MOUNT}/${IGNORE_FILE}`),
-    ...Object.entries(NO_EDITOR).flatMap(([k, v]) => setEnv(k, v)),
-    // Last, so the image's own programs win: the runtime brings its
-    // programs for an image that has none, and never Node.
-    ...setEnv("PATH", `${spec.imagePath}:${RUNTIME_BIN}`),
-    "-w",
-    WORKSPACE_ROOT,
-    spec.image,
-    "sleep",
-    "infinity",
-  ]
-}
+  runtime: Pick<LaneRuntime, "runArgs">,
+  shape: ContainerShape,
+): string => specHash(runtime.runArgs(shape))
 
 /**
  * The lane's ignore file: what no repo in a lane may track. pinetrie's own
@@ -629,7 +597,7 @@ export function pinetrieDir(root: string): {
   readonly dir: string
   /** The session's SQLite file, unless `PINETRIE_STORE` names another. */
   readonly store: string
-  /** Snapshots of lanes' disks (`DiskPaths.snapshots`). */
+  /** `base.json`, and `container`'s snapshots of lanes' disks. */
   readonly snapshots: string
   /** The lane runtime, one directory per image tag. */
   readonly runtime: string
@@ -720,18 +688,19 @@ export const forkConfig = (
  */
 const FORK_CONFIG_TEMPLATE = forkConfig("%s", ["%s" as CommitId])
 
-/** One command, as data. `lane` runs through the lane's runner, `host` on the host. */
-export type LaneStep =
-  | {
-      readonly in: "lane"
-      readonly argv: readonly string[]
-      /** A host file the command's stdout is written to, as bytes. */
-      readonly stdoutTo?: string
-    }
-  | { readonly in: "host"; readonly argv: readonly string[] }
+/** One command in a lane, as data, run through the lane's runner. */
+export interface LaneStep {
+  readonly in: "lane"
+  readonly argv: readonly string[]
+  /** A host file the command's stdout is written to, as bytes. */
+  readonly stdoutTo?: string
+}
+
+/** A lane command, or an operation of the runtime's. */
+export type Step = LaneStep | { readonly in: "runtime"; readonly op: RuntimeOp }
 
 const inLane = (...argv: string[]): LaneStep => ({ in: "lane", argv })
-const onHost = (...argv: string[]): LaneStep => ({ in: "host", argv })
+const onRuntime = (op: RuntimeOp): Step => ({ in: "runtime", op })
 const laneShell = (script: string): LaneStep => inLane("sh", "-c", script)
 
 /**
@@ -751,58 +720,6 @@ export function fetchById(
     `{ ${has}; } 2>/dev/null || { git fetch -q ${shellWord(from)} ${refs} && jj --ignore-working-copy git import --quiet; }`,
   )
 }
-
-/** Where a lane's disk and a snapshot's file are on the host. */
-export interface DiskPaths {
-  /** `container`'s volumes directory. */
-  readonly volumes: string
-  /** The project's `.pinetrie/snapshots/`. */
-  readonly snapshots: string
-}
-
-export const volumeImage = (paths: DiskPaths, volume: string): string =>
-  path.join(paths.volumes, volume, "volume.img")
-export const snapshotFile = (paths: DiskPaths, id: SnapshotId): string =>
-  path.join(paths.snapshots, `${id}.img`)
-
-/**
- * A journaled volume: mid-write clones of one without a journal are corrupt
- * (S41), and `container`'s default has none.
- */
-export const createVolume = (volume: string, size = DISK_SIZE): LaneStep =>
-  onHost(
-    "container",
-    "volume",
-    "create",
-    "--opt",
-    "journal=ordered",
-    "--opt",
-    `size=${size}`,
-    volume,
-  )
-
-/**
- * A copy-on-write clone to a temporary name, renamed into place, so the file
- * at `to` is never half-written. `/bin/cp -c` is macOS's clonefile; GNU `cp`
- * has no `-c` (S36).
- */
-const cloneFile = (from: string, to: string): LaneStep[] => [
-  onHost("/bin/cp", "-c", from, `${to}.tmp`),
-  onHost("/bin/mv", "-f", `${to}.tmp`, to),
-]
-
-/**
- * A volume made from a disk image: created, then its image replaced by a
- * clone of `source`, a snapshot's file or another volume's image.
- */
-export const restoreVolume = (
-  paths: DiskPaths,
-  source: string,
-  volume: string,
-): LaneStep[] => [
-  createVolume(volume),
-  ...cloneFile(source, volumeImage(paths, volume)),
-]
 
 /**
  * The lane steps that start a lane on accepted work: an empty commit on
@@ -1002,31 +919,31 @@ export function planForkSetup(
   ]
 }
 
-/** Start a lane's container on its existing volume. */
+/** Make and start a lane's container on its existing disk. */
 export const planStart = (
   spec: LaneSpec,
   env: Readonly<Record<string, string | undefined>>,
-): LaneStep => onHost("container", ...planRun(spec, env))
+): Step => onRuntime({ kind: "run", shape: planShape(spec, env) })
 
 /**
- * A lane's disk, then its container: a new volume, or one cloned from
+ * A lane's disk, then its container: a new disk, or one restored from
  * snapshot `from`.
  */
 export const planDisk = (input: {
-  readonly paths: DiskPaths
   readonly spec: LaneSpec
   readonly env: Readonly<Record<string, string | undefined>>
   readonly from: SnapshotId | null
-}): LaneStep[] => [
-  ...(input.from === null
-    ? [createVolume(input.spec.volume)]
-    : restoreVolume(
-        input.paths,
-        snapshotFile(input.paths, input.from),
-        input.spec.volume,
-      )),
-  planStart(input.spec, input.env),
-]
+}): Step[] => {
+  const { lane } = input.spec
+  return [
+    onRuntime(
+      input.from === null
+        ? { kind: "create", lane }
+        : { kind: "restore", lane, from: input.from },
+    ),
+    planStart(input.spec, input.env),
+  ]
+}
 
 /**
  * pre-rename: the lane's jj config folder before b05e2252. Snapshots taken
@@ -1103,12 +1020,11 @@ export const planFork = (input: {
     readonly snapshot: SnapshotId
     readonly start: ForkStart
   }
-  readonly paths: DiskPaths
   readonly spec: LaneSpec
   readonly env: Readonly<Record<string, string | undefined>>
   /** The install to run when your `@`'s lockfile differs from the base's. */
   readonly install?: string | null
-}): LaneStep[] => [
+}): Step[] => [
   ...planDisk({ ...input, from: input.point.snapshot }),
   ...planForkSetup(input.spec.lane, input.point.start, input.install ?? null),
 ]
@@ -1169,18 +1085,14 @@ export function planTurnCommit(facts: {
 
 /**
  * A turn's snapshot: `sync`, so what the tools wrote is on the disk (without
- * it, unflushed files clone empty, S41), then the clone.
+ * it, unflushed files clone empty, S41), then the snapshot.
  */
 export const planSnapshot = (input: {
-  readonly volume: string
+  readonly lane: LaneName
   readonly snapshot: SnapshotId
-  readonly paths: DiskPaths
-}): LaneStep[] => [
+}): Step[] => [
   inLane("sync"),
-  ...cloneFile(
-    volumeImage(input.paths, input.volume),
-    snapshotFile(input.paths, input.snapshot),
-  ),
+  onRuntime({ kind: "snapshot", lane: input.lane, snapshot: input.snapshot }),
 ]
 
 /** What the base snapshot was made from, kept beside it. */
@@ -1235,37 +1147,10 @@ export function planBaseRefresh(input: {
   ]
 }
 
-/** What the host finds about `container` and the disk it clones on. */
-export interface HostFacts {
-  /** The project's root, or why it has none. */
-  readonly root:
-    | { readonly ok: string }
-    | { readonly direct: string; readonly reason: string }
-  readonly installed: boolean
-  readonly running: boolean
-  readonly kernel: boolean
-  /** A clone of a small file into `.pinetrie/snapshots/` shared its blocks. */
-  readonly clones: boolean
-}
-
-/** Whether lanes can have their own containers here; else the first reason not. */
-export function planHost(f: HostFacts): ProjectRecord {
-  if ("direct" in f.root)
-    return { kind: "direct", root: f.root.direct, reason: f.root.reason }
-  const root = f.root.ok
-  const reason = !f.installed
-    ? "Apple's `container` is not installed (macOS 26 on Apple silicon)"
-    : !f.running
-      ? "`container` is not running: `container system start`"
-      : !f.kernel
-        ? "`container` has no kernel: `container system kernel set --recommended`"
-        : !f.clones
-          ? `${root}/.pinetrie/snapshots cannot clone copy-on-write: it must be on the same APFS volume as \`container\`'s data`
-          : null
-  return reason === null
-    ? { kind: "lanes", root, rootDefault: "own" }
-    : { kind: "direct", root, reason }
-}
+/** A project's root, or the folder lanes work directly in and why. */
+export type ProjectRoot =
+  | { readonly ok: string }
+  | { readonly direct: string; readonly reason: string }
 
 /** What the file system, jj and git say about a project's folder. */
 export interface RootFacts {
@@ -1333,7 +1218,7 @@ export function projectDirWords(r: ProjectDirRefusal): string {
  * failed. With no jj repo, lanes work directly: a lane's commits need jj on
  * both sides.
  */
-export function planRoot(d: ProjectDir, dir: string): HostFacts["root"] {
+export function planRoot(d: ProjectDir, dir: string): ProjectRoot {
   if (d.kind === "refused")
     return {
       direct: d.refusal.kind === "unexcludable" ? d.refusal.root : dir,
@@ -1387,18 +1272,18 @@ export function planContainer(input: {
 }
 
 /**
- * Where a lane's container, made anew, starts from: its volume if it has one;
+ * Where a lane's container, made anew, starts from: its disk if it has one;
  * else its newest snapshot (a restored root); else nothing, and the lane
  * predates lane containers.
  */
 export function planStartFrom(input: {
-  readonly volume: boolean
+  readonly disk: boolean
   readonly newest: SnapshotId | null
 }):
-  | { readonly kind: "volume" }
+  | { readonly kind: "disk" }
   | { readonly kind: "snapshot"; readonly from: SnapshotId }
   | { readonly kind: "retired" } {
-  if (input.volume) return { kind: "volume" }
+  if (input.disk) return { kind: "disk" }
   return input.newest === null
     ? { kind: "retired" }
     : { kind: "snapshot", from: input.newest }

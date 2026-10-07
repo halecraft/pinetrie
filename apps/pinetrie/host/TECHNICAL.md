@@ -259,7 +259,7 @@ any refresh they queued.
   `prepareProjectDir` (`@pinetrie/lanes`) finds its root and adds `/.pinetrie/`
   to its repo's exclude file, so the store, opened first in `startHost`, is
   never taken into your `@` (S108). A suite skips this: it gives its own
-  store, and `prepareHost` runs `prepareProjectDir` again for lanes, which
+  store, and `prepareContainerHost` runs `prepareProjectDir` again for lanes, which
   writes nothing the second time.
 - **The project is apart from tools** (`StartHostOptions.project`). pi's
   settings and `AGENTS.md` load from it with tools off too; lane work starts
@@ -680,6 +680,7 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 | `update.ts` | an update (`withLaneStarted`, then one queued step, `planSettle` and `applySettle`); `catchUpInRun`, the agent's `catch_up`; `askedAboutConflict`, which asks jj for conflicts in the lane's copy |
 | `split.ts` | a split's prompt, and its end (`finishSplit`, which moves the lane back to its tip even when a step before it throws: left on the stack, the lane refuses every catch-up) |
 | `archive.ts` | a close's or a reopen's teardown (`planArchive`'s), off the documents' keeper |
+| `runtime.ts` | the composition root for lanes' runtime: `findProject`, and the `LaneRuntime` lanes of their own get (`Setup.runtime`) |
 | `disk.ts` | the snapshot on a lane's queue, and the lockfile's hash |
 
 - **State lives where it changes.** What startup found is `Setup`'s, fixed
