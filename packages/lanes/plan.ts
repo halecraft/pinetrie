@@ -445,7 +445,7 @@ export function decodeLaneConfig(
 }
 
 /**
- * The integration line's bookmark, the WIP bookmarks' prefix (ADR-0060), the
+ * Accepted work's bookmark, the WIP bookmarks' prefix (ADR-0060), the
  * bookmark publishing moves to the line (ADR-0076), and whether a publish
  * catches your files up and accepts your commits first (ADR-0099).
  */
@@ -831,7 +831,7 @@ export interface MergePlan {
   readonly mark: boolean
   /**
    * The commits whose titles the update lists, `<from>..<to>` without the
-   * integrated-offer commits it joined (`mergeUpdate`); `from` null is the lane before the merge.
+   * accepted-offer commits it joined (`mergeUpdate`); `from` null is the lane before the merge.
    */
   readonly came: { readonly from: CommitId | null; readonly to: CommitId }
 }
@@ -871,29 +871,29 @@ export function planMerge(from: BaseMerge): MergePlan {
   }
 }
 
-/** An integrated-offer commit on the line the lane lacks, and the sources its message names (`sourcesOf`). */
-export interface IntegratedOfferCommitAbove {
-  readonly integratedOfferCommit: CommitId
+/** An accepted-offer commit on the line the lane lacks, and the sources its message names (`sourcesOf`). */
+export interface AcceptedOfferCommitAbove {
+  readonly acceptedOfferCommit: CommitId
   readonly sources: readonly CommitId[]
 }
 
-/** An integrated-offer commit to join to the sources the lane holds, before an update's merge (S102). */
+/** An accepted-offer commit to join to the sources the lane holds, before an update's merge (S102). */
 export interface Join {
-  readonly integratedOfferCommit: CommitId
+  readonly acceptedOfferCommit: CommitId
   /** Of its sources, those in the lane's history: a squash may name others (S77 item 6). */
   readonly sources: readonly CommitId[]
   /**
    * The join's message. It carries no trailer: the host finds bases and
-   * integrated-offer commits by their trailers (`newestBase`,
-   * `integratedOfferCommitsRevset`), and a join is neither.
+   * accepted-offer commits by their trailers (`newestBase`,
+   * `acceptedOfferCommitsRevset`), and a join is neither.
    */
   readonly message: string
 }
 
 /**
- * The integrated-offer commits an update joins to their sources before it
+ * The accepted-offer commits an update joins to their sources before it
  * merges (S102, ADR-0079), oldest first as they come: each that names a
- * source the lane holds. An integrated-offer commit is a copy of the lane's
+ * source the lane holds. An accepted-offer commit is a copy of the lane's
  * work on the line, and the join says so in history, so the merge does not
  * bring that work in twice. One naming a source the lane lacks too, a
  * squash's, is joined all the same: the rest of it is the line's. Each join
@@ -901,18 +901,18 @@ export interface Join {
  * Pure.
  */
 export function planJoins(
-  integrated: readonly IntegratedOfferCommitAbove[],
+  accepted: readonly AcceptedOfferCommitAbove[],
   held: ReadonlySet<CommitId>,
 ): readonly Join[] {
-  return integrated.flatMap(({ integratedOfferCommit, sources }) => {
+  return accepted.flatMap(({ acceptedOfferCommit, sources }) => {
     const ours = sources.filter(s => held.has(s))
     return ours.length === 0
       ? []
       : [
           {
-            integratedOfferCommit,
+            acceptedOfferCommit,
             sources: ours,
-            message: `join: ${integratedOfferCommit} holds ${ours.join(" ")}`,
+            message: `join: ${acceptedOfferCommit} holds ${ours.join(" ")}`,
           },
         ]
   })

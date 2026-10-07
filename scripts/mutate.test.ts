@@ -70,7 +70,7 @@ describe("choose: the mutations a filter names", () => {
     to: "b",
     command: ["true"],
   })
-  const list = [m("an integrated offer"), m("a huge diff")]
+  const list = [m("an accepted offer"), m("a huge diff")]
   test("every one without a filter; those whose name contains it with one", () => {
     expect(choose(list, undefined)).toEqual(list)
     expect(choose(list, "huge")).toEqual([list[1]])

@@ -129,7 +129,7 @@ const CONTROL = /[\u0000-\u001f\u007f]/
 
 /**
  * What a request may read, so it reaches nothing of your repo but what a
- * thread made: a revision an open offer holds now (what integrating it would bring),
+ * thread made: a revision an open offer holds now (what accepting it would bring),
  * or a range between two commits one lane's turns recorded (an ask's work,
  * ADR-0056). The commits read are the records', never the request's strings.
  */

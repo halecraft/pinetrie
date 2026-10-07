@@ -155,6 +155,7 @@ export {
   VERDICT_THEN_DIGEST,
 } from "./digest.ts"
 export {
+  acceptedFact,
   actionFact,
   decodeFact,
   decodeOfferFact,
@@ -164,7 +165,6 @@ export {
   type FactMessage,
   factContent,
   factLine,
-  integratedFact,
 } from "./fact.ts"
 export { pastedImages, planImages } from "./images.ts"
 export {
@@ -223,15 +223,15 @@ export {
   threadNameOf,
 } from "./names.ts"
 export {
-  isNotYetIntegrated,
+  isNotYetAccepted,
   OFFER,
-  type OfferIntegrationDestination,
+  type OfferAcceptanceDestination,
   offerRecord,
   offerStatus,
   planDescribeAgain,
   planDescribeAsk,
   planDescribeSettle,
-  planOfferIntegration,
+  planOfferAcceptance,
   planRebuild,
   planRefresh,
   planStackEnded,

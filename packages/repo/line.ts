@@ -1,4 +1,4 @@
-// repo/line — the integration line in your repo (ADR-0060): what it is now,
+// repo/line — accepted work in your repo (ADR-0060): what it is now,
 // read as values for the host to plan from, and what catching your files up
 // with it would do (S80). Reads only; the host's steps that set it up and
 // publish it are `planLineSetup`, `planPublishCatchUp`, `planPublishMove` and

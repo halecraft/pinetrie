@@ -6,7 +6,7 @@ import {
   type Placed,
   type ThreadName,
 } from "@pinetrie/core"
-import { offerEffects, offerIntegrationEffects } from "@pinetrie/repo"
+import { offerAcceptanceEffects, offerEffects } from "@pinetrie/repo"
 import { offerRecord } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import { methods, record } from "../fakes.ts"
@@ -69,7 +69,7 @@ const ports = () =>
     record: async () => {},
     repair: async () => {},
     remove: async () => {},
-    integrated: async () => {},
+    accepted: async () => {},
   })
 
 describe("executeOffer", () => {
@@ -131,8 +131,8 @@ describe("executeOffer", () => {
   })
 })
 
-test("an offer integration writes the lane's base record, runs its steps, then marks the offer integrated", async () => {
-  const integrated = {
+test("an acceptance writes the lane's base record, runs its steps, then marks the offer accepted", async () => {
+  const accepted = {
     ...offerRecord({
       lane: LANE,
       name: NAME,
@@ -141,19 +141,19 @@ test("an offer integration writes the lane's base record, runs its steps, then m
       editing: new Set(),
       now: 1,
     }),
-    integratedAs: "kxyz",
+    acceptedAs: "kxyz",
   }
   const p = ports()
-  const effects = offerIntegrationEffects({
-    kind: "integrate",
+  const effects = offerAcceptanceEffects({
+    kind: "accept",
     name: NAME,
-    bookmark: integrated.bookmark,
+    bookmark: accepted.bookmark,
     destination: "pinetrie-onto",
     top: "kxyz",
-    integrated,
+    accepted,
   })
   await executeOffer(p.port, { base: BASE, effects }, null)
-  expect(methods(p.calls)).toEqual(["writeBase", "run", "integrated"])
+  expect(methods(p.calls)).toEqual(["writeBase", "run", "accepted"])
   expect(p.calls[1]?.args[0]).toEqual(effects.steps)
-  expect(p.calls[2]?.args[0]).toBe(integrated)
+  expect(p.calls[2]?.args[0]).toBe(accepted)
 })

@@ -30,6 +30,7 @@ import {
   WORKSPACE_ROOT,
 } from "@pinetrie/core"
 import {
+  ACCEPTED_OFFER_COMMIT_ROW,
   bookmarkName,
   bookmarkOf,
   bookmarkRevset,
@@ -45,7 +46,6 @@ import {
   fetchById,
   hostBytesRunner,
   hostRunner,
-  INTEGRATED_OFFER_COMMIT_ROW,
   LANE_JJ_CONFIG,
   type LaneStep,
   type LineConfig,
@@ -57,7 +57,7 @@ import {
   newestBase,
   offerBookmark,
   oldNamesOnDisk,
-  parseIntegratedOfferCommits,
+  parseAcceptedOfferCommits,
   planBaseRefresh,
   planBundle,
   planForkSetup,
@@ -90,7 +90,7 @@ import {
 } from "./offer.ts"
 import {
   gatherOffer,
-  gatherOfferIntegration,
+  gatherOfferAcceptance,
   gatherPlace,
   gatherStack,
 } from "./offer-gather.ts"
@@ -105,7 +105,7 @@ import {
   planImport,
   planLineSetup,
   planOffer,
-  planOfferIntegrationSteps,
+  planOfferAcceptanceSteps,
   planPublishCatchUp,
   planPublishMove,
   planRebuildOffer,
@@ -1043,7 +1043,7 @@ describe("a lane's repo, with jj", () => {
     }
     /**
      * "Bring up to date" with the line as the host runs it, in the lane at
-     * `dir`: `planMerge`, then `mergeUpdate`, which joins the integrated-offer commits it holds
+     * `dir`: `planMerge`, then `mergeUpdate`, which joins the accepted-offer commits it holds
      * first (S102).
      */
     const catchUp = async (dir = laneDir, lane: LaneName = LANE) => {
@@ -1122,15 +1122,15 @@ describe("a lane's repo, with jj", () => {
         files: lines((await ops(["diff", "-r", commit, "--name-only"])).stdout),
       }
     }
-    /** Integrate `offered` into the line: its bookmark moved forward, as the host. */
-    const integrate = async (offered: {
+    /** Accept `offered` into the line: its bookmark moved forward, as the host. */
+    const accept = async (offered: {
       readonly built: { readonly changes: readonly string[] }
     }) => {
       const [change] = offered.built.changes
       if (change === undefined) throw new Error("no offer")
       await executeRepo(
         yoursDir,
-        planOfferIntegrationSteps({
+        planOfferAcceptanceSteps({
           bookmark: offerBookmark(NAME),
           top: change,
           destination: line.onto,
@@ -1156,7 +1156,7 @@ describe("a lane's repo, with jj", () => {
       update,
       catchUp,
       offer,
-      integrate,
+      accept,
     }
   }
 
@@ -1181,7 +1181,7 @@ describe("a lane's repo, with jj", () => {
     return { ...rig, base, first }
   }
 
-  test("an offer on the line (ADR-0060): built, immutable, refreshed, followed, integrated by a forward move, and the next one", async () => {
+  test("an offer on the line (ADR-0060): built, immutable, refreshed, followed, accepted by a forward move, and the next one", async () => {
     const {
       yoursDir,
       laneDir,
@@ -1193,7 +1193,7 @@ describe("a lane's repo, with jj", () => {
       edit,
       build,
       lineNow,
-      integrate,
+      accept,
       offer,
       base,
       agrees,
@@ -1321,32 +1321,32 @@ describe("a lane's repo, with jj", () => {
       c1,
       "-m",
       // As the host writes it: so the next offer's revisions are told
-      // from this one, integrated, by its base, not its trailer.
+      // from this one, accepted, by its base, not its trailer.
       `offer: lane\n\nPinetrie-Thread: ${NAME}\nPinetrie-Source: ${t1}\n`,
     ])
 
-    // Integrate: the line moved forward to the offer, as the host; your @ and
+    // Accept: the line moved forward to the offer, as the host; your @ and
     // your files untouched; the offer's bookmark gone.
     const atBefore = await commitsOf(yoursJj, "@")
-    await integrate({ built: one })
+    await accept({ built: one })
     expect(await commitsOf(yoursJj, "@")).toEqual(atBefore)
     expect(await readFile(path.join(yoursDir, "wip.txt"), "utf8")).toBe("wip\n")
     expect(await changeOf(ops, await lineNow())).toBe(c1)
     expect(
       await commitsOf(ops, `present(bookmarks(exact:"${bookmark}"))`),
     ).toEqual([])
-    // jj itself refuses an integration that is not forward (S77 item 1).
+    // jj itself refuses an acceptance that is not forward (S77 item 1).
     expect(
       (await ops(["bookmark", "move", line.onto, "--to", base[0] ?? ""])).ok,
     ).toBe(false)
 
-    // You land work of your own on the line, changing what you integrated.
+    // You land work of your own on the line, changing what you accepted.
     await yoursJj(["new", line.onto])
     await edit(yoursDir, "a.txt", "a, then yours\n")
     await yoursJj(["commit", "-m", "yours: a.txt"])
     await yoursJj(["bookmark", "move", line.onto, "--to", "@-"])
 
-    // The next turn: its offer starts at what the integrated-offer commit's Pinetrie-Source names,
+    // The next turn: its offer starts at what the accepted-offer commit's Pinetrie-Source names,
     // and holds only what came after; it does not bring a.txt back.
     await edit(laneDir, "b.txt", "b\n")
     const t2 = await turnOn(laneJj, { ...TURN, entry: entryId("e-2") })
@@ -1413,7 +1413,7 @@ describe("a lane's repo, with jj", () => {
     ])
     await fetch([t2])
     // Each revision names its thread, as the host writes it: found by that,
-    // above the integrated offer and your commit under it, which are on the line.
+    // above the accepted offer and your commit under it, which are on the line.
     const ours = `Pinetrie-Thread: ${NAME}\nPinetrie-Source: ${t2}`
     const stack = await build([
       { commit: s1, description: `s1: d.txt\n\n${ours}\n` },
@@ -1429,27 +1429,18 @@ describe("a lane's repo, with jj", () => {
     expect(per).toEqual([["b.txt", "d.txt"], ["e.txt"]])
   }, 60_000)
 
-  test("a squash of two integrated offers keeps both sources: the next offer starts above them (S77 item 6)", async () => {
-    const {
-      laneDir,
-      yoursJj,
-      ops,
-      edit,
-      offer,
-      integrate,
-      turn,
-      lineNow,
-      base,
-    } = await turnRig("squashed")
+  test("a squash of two accepted offers keeps both sources: the next offer starts above them (S77 item 6)", async () => {
+    const { laneDir, yoursJj, ops, edit, offer, accept, turn, lineNow, base } =
+      await turnRig("squashed")
     const first = await offer(base)
-    await integrate(first)
+    await accept(first)
     const t1 = await laneTipIn(ops, LANE)
     if (t1 === null) throw new Error("no tip")
     await edit(laneDir, "b.txt", "b\n")
     const t2 = await turn()
     const second = await offer([t1])
-    await integrate(second)
-    // You squash the two integrated offers, as jj's editor offers both messages.
+    await accept(second)
+    // You squash the two accepted offers, as jj's editor offers both messages.
     const line = await lineNow()
     const ran = await run(
       "jj",
@@ -1472,7 +1463,7 @@ describe("a lane's repo, with jj", () => {
     expect(await commitsOf(ops, "divergent()")).toEqual([])
   }, 60_000)
 
-  test("an offer after a catch-up starts at the line it merged, not at what you integrated below it (S51 item 3, S81)", async () => {
+  test("an offer after a catch-up starts at the line it merged, not at what you accepted below it (S51 item 3, S81)", async () => {
     const {
       laneDir,
       yoursDir,
@@ -1481,17 +1472,17 @@ describe("a lane's repo, with jj", () => {
       line,
       edit,
       offer,
-      integrate,
+      accept,
       turn,
       update,
       lineNow,
       base,
     } = await turnRig("caught-up")
-    await integrate(await offer(base))
+    await accept(await offer(base))
     const t1 = await laneTipIn(ops, LANE)
     if (t1 === null) throw new Error("no tip")
-    // You change the line you integrated into, then the lane catches up with
-    // it: the integrated-offer commit is joined to the lane's commit, so the merge is clean, and the
+    // You change the line you accepted into, then the lane catches up with
+    // it: the accepted-offer commit is joined to the lane's commit, so the merge is clean, and the
     // lane has your text (S102).
     await yoursJj(["new", line.onto])
     await edit(yoursDir, "a.txt", "a, then yours\n")
@@ -1503,7 +1494,7 @@ describe("a lane's repo, with jj", () => {
     )
     await edit(laneDir, "c.txt", "c\n")
     await turn()
-    // The integrated source is below the line the lane merged: the offer starts
+    // The accepted source is below the line the lane merged: the offer starts
     // there alone, and holds only what came after.
     const after = await offer([t1])
     expect([after.conflicted, after.files]).toEqual([false, ["c.txt"]])
@@ -1518,17 +1509,8 @@ describe("a lane's repo, with jj", () => {
 
   test("a branch cloned from a conflicted catch-up: its offer's conflict came with its copy, and catching up with its parent settles it (ADR-0072, S99)", async () => {
     const rig = await turnRig("parent")
-    const {
-      laneDir,
-      yoursDir,
-      yoursJj,
-      ops,
-      line,
-      edit,
-      offer,
-      integrate,
-      turn,
-    } = rig
+    const { laneDir, yoursDir, yoursJj, ops, line, edit, offer, accept, turn } =
+      rig
     const BRANCH = "copper-owl" as ThreadName
     // The parent changes base.txt; you change the same line on the line;
     // the parent catches up, and the merge stays conflicted.
@@ -1577,11 +1559,11 @@ describe("a lane's repo, with jj", () => {
         have,
         bundle: path.join(top, "parent-fork.bundle"),
       })
-    // Both resolve it the same way; the parent's is integrated.
+    // Both resolve it the same way; the parent's is accepted.
     const resolved = "base, yours, lane\n"
     await edit(laneDir, "base.txt", resolved)
     const parentResolved = await turn()
-    await integrate(await offer(rig.base))
+    await accept(await offer(rig.base))
     await edit(forkDir, "base.txt", resolved)
     const resolving = await commitTurn(forkJj, {
       title: "resolve",
@@ -1641,7 +1623,7 @@ describe("a lane's repo, with jj", () => {
       offer: { conflicts: ["base.txt"], startConflicts: ["base.txt"] },
     })
     // The parent catches up with the line after the fork, past its own
-    // integrated-offer commit;
+    // accepted-offer commit;
     // then the branch catches up with the parent's newest commit, fetched
     // from your repo, where only the parent's ref reaches it.
     const lineCommit = await rig.lineNow()
@@ -1687,9 +1669,9 @@ describe("a lane's repo, with jj", () => {
   }, 60_000)
 
   test("a lane's ref deleted and imported: the history under the line is kept (S78)", async () => {
-    const { yoursDir, yoursJj, ops, edit, offer, integrate, base } =
+    const { yoursDir, yoursJj, ops, edit, offer, accept, base } =
       await turnRig("refgone")
-    await integrate(await offer(base))
+    await accept(await offer(base))
     await edit(yoursDir, "mine.txt", "mine\n")
     await yoursJj(["commit", "-m", "mine on the line"])
     await yoursJj(["bookmark", "move", "pinetrie-onto", "--to", "@-"])
@@ -1798,7 +1780,7 @@ describe("a lane's repo, with jj", () => {
       planPublishMove({
         onto: line.onto,
         publish: line.publish,
-        integrate: false,
+        accept: false,
       }),
     )
     const after = await lineFacts(ops, git, line)
@@ -1826,7 +1808,7 @@ describe("a lane's repo, with jj", () => {
         planPublishMove({
           onto: line.onto,
           publish: line.publish,
-          integrate: false,
+          accept: false,
         }),
       ),
     ).rejects.toThrow()
@@ -1854,7 +1836,7 @@ describe("a lane's repo, with jj", () => {
       planPublishMove({
         onto: line.onto,
         publish: line.publish,
-        integrate: false,
+        accept: false,
       }),
     )
     const after = await lineFacts(ops, git, line)
@@ -1897,7 +1879,7 @@ describe("a lane's repo, with jj", () => {
       planPublishMove({
         onto: line.onto,
         publish: line.publish,
-        integrate: true,
+        accept: true,
       }),
     )
     const ops1 = await yoursJj(["op", "log", "--no-graph", "-T", 'id ++ "\\n"'])
@@ -2099,7 +2081,7 @@ describe("a lane's repo, with jj", () => {
     await agrees()
   }, 60_000)
 
-  test("an integrated-offer commit of the lane that names no source makes its start untraced, read either way, until it catches up past it (S97)", async () => {
+  test("an accepted-offer commit of the lane that names no source makes its start untraced, read either way, until it catches up past it (S97)", async () => {
     const {
       ops,
       laneDir,
@@ -2107,7 +2089,7 @@ describe("a lane's repo, with jj", () => {
       edit,
       fetch,
       build,
-      integrate,
+      accept,
       turn,
       update,
       agrees,
@@ -2117,14 +2099,14 @@ describe("a lane's repo, with jj", () => {
     await fetch(base)
     const t1 = await laneTipIn(ops, LANE)
     if (t1 === null) throw new Error("no tip")
-    // Integrated as offers were before they carried their ledger.
+    // Accepted as offers were before they carried their ledger.
     const built = await build([
       {
         commit: t1,
         description: `feat: a\n\nPinetrie-Thread: ${NAME}\nPinetrie-Lane: ${LANE}\n`,
       },
     ])
-    await integrate({ built })
+    await accept({ built })
     await edit(laneDir, "b.txt", "b\n")
     const t2 = await turn()
     await fetch([t1])
@@ -2133,7 +2115,7 @@ describe("a lane's repo, with jj", () => {
     if (b2 === null) throw new Error("no base")
     expect(
       await startOfOffer(ops, { tip: t2, base: b2, line, lane: LANE }),
-    ).toEqual({ kind: "untraced", integratedOfferCommits: [await lineNow()] })
+    ).toEqual({ kind: "untraced", acceptedOfferCommits: [await lineNow()] })
     const input = { lane: LANE, name: NAME, line, known: null }
     expect(await gatherPlace({ jj: ops }, input)).toEqual({
       kind: "untraced",
@@ -2143,7 +2125,7 @@ describe("a lane's repo, with jj", () => {
       target: await lineNow(),
     })
     // The revset that finds a thread's commits matches what hasTrailer does.
-    const all = parseIntegratedOfferCommits(
+    const all = parseAcceptedOfferCommits(
       (
         await ops([
           "log",
@@ -2151,7 +2133,7 @@ describe("a lane's repo, with jj", () => {
           "-r",
           "all()",
           "-T",
-          INTEGRATED_OFFER_COMMIT_ROW,
+          ACCEPTED_OFFER_COMMIT_ROW,
         ])
       ).stdout,
     )
@@ -2163,7 +2145,7 @@ describe("a lane's repo, with jj", () => {
         .map(c => c.commit)
         .sort(),
     ).toEqual([...found].sort())
-    // Caught up: the integrated-offer commit is under its base, and the start is the line.
+    // Caught up: the accepted-offer commit is under its base, and the start is the line.
     expect(await update()).toEqual([])
     await edit(laneDir, "c.txt", "c\n")
     await turn()
@@ -2183,10 +2165,10 @@ describe("a lane's repo, with jj", () => {
     })
   }, 60_000)
 
-  test("catching up with your own integration of the lane's work changes no file, as catchUpFiles says (S97)", async () => {
-    const { ops, laneJj, inLane, offer, integrate, lineNow, base } =
-      await turnRig("own-integration")
-    await integrate(await offer(base))
+  test("catching up with your own acceptance of the lane's work changes no file, as catchUpFiles says (S97)", async () => {
+    const { ops, laneJj, inLane, offer, accept, lineNow, base } =
+      await turnRig("own-acceptance")
+    await accept(await offer(base))
     const tip = await laneTipIn(ops, LANE)
     const [start] = base
     if (tip === null || start === undefined) throw new Error("no tip")
@@ -2204,21 +2186,21 @@ describe("a lane's repo, with jj", () => {
     ).toEqual([])
   }, 60_000)
 
-  describe("catching up past an integrated-offer commit of the lane's work (S102)", () => {
+  describe("catching up past an accepted-offer commit of the lane's work (S102)", () => {
     /** Six lines; `at` replaces line n (1-based). */
     const doc = (at: Record<number, string> = {}) =>
       `${[1, 2, 3, 4, 5, 6].map(n => at[n] ?? `line ${n}`).join("\n")}\n`
-    /** `turnRig`, with a turn writing `doc.txt`, its offer integrated into the line. */
-    const integratedOfferRig = async (tag: string) => {
+    /** `turnRig`, with a turn writing `doc.txt`, its offer accepted into the line. */
+    const acceptedOfferRig = async (tag: string) => {
       const rig = await turnRig(tag)
       await rig.edit(rig.laneDir, "doc.txt", doc())
       const t1 = await rig.turn()
-      await rig.integrate(await rig.offer(rig.base))
+      await rig.accept(await rig.offer(rig.base))
       return { ...rig, t1 }
     }
     /** You change `doc.txt` on the line, landing it. */
     const yoursOnLine = async (
-      rig: Awaited<ReturnType<typeof integratedOfferRig>>,
+      rig: Awaited<ReturnType<typeof acceptedOfferRig>>,
       text: string,
       title: string,
     ) => {
@@ -2230,8 +2212,8 @@ describe("a lane's repo, with jj", () => {
     const read = (dir: string, file: string) =>
       readFile(path.join(dir, file), "utf8")
 
-    test("your own integration, then your edit to it on the line: clean, and the integrated-offer commit is not listed as come in", async () => {
-      const rig = await integratedOfferRig("past-own")
+    test("your own acceptance, then your edit to it on the line: clean, and the accepted-offer commit is not listed as come in", async () => {
+      const rig = await acceptedOfferRig("past-own")
       await yoursOnLine(rig, doc({ 1: "yours" }), "yours: doc line 1")
       await rig.edit(rig.laneDir, "c.txt", "c\n")
       await rig.turn()
@@ -2246,8 +2228,8 @@ describe("a lane's repo, with jj", () => {
       expect([next.conflicted, next.files]).toEqual([false, ["c.txt"]])
     }, 60_000)
 
-    test("the lane re-edits its own integrated lines: clean, with both edits", async () => {
-      const rig = await integratedOfferRig("past-reedit")
+    test("the lane re-edits its own accepted lines: clean, with both edits", async () => {
+      const rig = await acceptedOfferRig("past-reedit")
       await yoursOnLine(rig, doc({ 1: "yours" }), "yours: doc line 1")
       await rig.edit(rig.laneDir, "doc.txt", doc({ 5: "lane again" }))
       await rig.turn()
@@ -2257,12 +2239,12 @@ describe("a lane's repo, with jj", () => {
       )
     }, 60_000)
 
-    test("two integrations, your edit to the first between them: clean (S102 item 7)", async () => {
-      const rig = await integratedOfferRig("past-two")
+    test("two acceptances, your edit to the first between them: clean (S102 item 7)", async () => {
+      const rig = await acceptedOfferRig("past-two")
       await yoursOnLine(rig, doc({ 1: "yours" }), "yours: doc line 1")
       await rig.edit(rig.laneDir, "doc.txt", doc({ 5: "lane" }))
       await rig.turn()
-      await rig.integrate(await rig.offer([rig.t1]))
+      await rig.accept(await rig.offer([rig.t1]))
       await yoursOnLine(
         rig,
         doc({ 1: "yours", 5: "yours" }),
@@ -2274,7 +2256,7 @@ describe("a lane's repo, with jj", () => {
       )
     }, 60_000)
 
-    test("a branch holding its parent's integrated work catches up clean (ADR-0072)", async () => {
+    test("a branch holding its parent's accepted work catches up clean (ADR-0072)", async () => {
       const rig = await turnRig("past-parent")
       await rig.edit(rig.laneDir, "doc.txt", doc())
       const t1 = await rig.turn()
@@ -2295,8 +2277,8 @@ describe("a lane's repo, with jj", () => {
         lane: FORK,
         bookmark: await bookmarkOf(laneJjAt(forkDir), FORK),
       })
-      // The parent's offer is integrated, and you edit it on the line.
-      await rig.integrate(await rig.offer(rig.base))
+      // The parent's offer is accepted, and you edit it on the line.
+      await rig.accept(await rig.offer(rig.base))
       await rig.yoursJj(["new", rig.line.onto])
       await rig.edit(rig.yoursDir, "doc.txt", doc({ 1: "yours" }))
       await rig.yoursJj(["commit", "-m", "yours: doc line 1"])
@@ -2306,8 +2288,8 @@ describe("a lane's repo, with jj", () => {
       expect(await read(forkDir, "k.txt")).toBe("k\n")
     }, 60_000)
 
-    test("a line both rewrote still conflicts, on that file alone, and the integrated-offer commit is not its side", async () => {
-      const rig = await integratedOfferRig("past-real")
+    test("a line both rewrote still conflicts, on that file alone, and the accepted-offer commit is not its side", async () => {
+      const rig = await acceptedOfferRig("past-real")
       await yoursOnLine(rig, doc({ 1: "yours" }), "yours: doc line 1")
       await rig.edit(rig.laneDir, "doc.txt", doc({ 1: "lane again" }))
       await rig.edit(rig.laneDir, "c.txt", "c\n")
@@ -2325,7 +2307,7 @@ describe("a lane's repo, with jj", () => {
       await rig.edit(rig.laneDir, "doc.txt", doc())
       await rig.turn()
       const offered = await rig.offer(rig.base)
-      // You reword the lane's first line in the offer, then integrate it.
+      // You reword the lane's first line in the offer, then accept it.
       const [top] = offered.built.commits
       if (top === undefined) throw new Error("no offer")
       await rig.yoursJj(["new", top])
@@ -2342,7 +2324,7 @@ describe("a lane's repo, with jj", () => {
           `${bookmarkRevset(offerBookmark(NAME))} & ${trailerRevset(["source"])}`,
         ),
       ).toHaveLength(1)
-      await rig.integrate(offered)
+      await rig.accept(offered)
       const merged = await rig.catchUp()
       // Merged as before the joins: no join is left in the lane's history.
       expect(merged.kind).toBe("conflicted")
@@ -2395,7 +2377,7 @@ describe("a lane's repo, with jj", () => {
     ).toBe("unknown")
     expect(
       await workChanges(ops, {
-        start: { kind: "untraced", integratedOfferCommits: [first] },
+        start: { kind: "untraced", acceptedOfferCommits: [first] },
         tip: undone,
       }),
     ).toBe("unknown")
@@ -2463,14 +2445,14 @@ describe("a lane's repo, with jj", () => {
     expect(
       lines((await rig.ops(["diff", "-r", o ?? "", "--name-only"])).stdout),
     ).toEqual(["tests.txt"])
-    // What an offer integration reads: the WIP's commit above the line lands with it on
+    // What an acceptance reads: the WIP's commit above the line lands with it on
     // the line, and both bookmarks sit below the offer.
     const input = { lane: LANE, name: NAME, line: rig.line, known: null }
     const gathered = await gatherOffer({ jj: rig.ops }, input)
     expect(gathered?.place).toMatchObject({ kind: "placed", target })
     if (gathered === null) throw new Error("no gather")
     expect(
-      await gatherOfferIntegration({ jj: rig.ops }, gathered, rig.line),
+      await gatherOfferAcceptance({ jj: rig.ops }, gathered, rig.line),
     ).toEqual({
       wipAhead: 1,
       below: new Set(["wip/search", rig.line.onto]),
@@ -2491,10 +2473,10 @@ describe("a lane's repo, with jj", () => {
     expect(
       await gatherStack({ jj: rig.ops }, { start: [line], tip, top: null }),
     ).toBe("no-top")
-    // Integrated into the WIP: a forward move; the WIP stays mutable.
+    // Accepted into the WIP: a forward move; the WIP stays mutable.
     await executeRepo(
       rig.yoursDir,
-      planOfferIntegrationSteps({
+      planOfferAcceptanceSteps({
         bookmark: offerBookmark(NAME),
         top: o ?? "",
         destination: "wip/search",
@@ -2568,7 +2550,7 @@ describe("a lane's repo, with jj", () => {
       expect(await commitsOf(forkJj, 'files(root:".pineta-lane")')).toEqual([])
     }, 60_000)
 
-    test("an old lane on the line: its Pineta-Base on pineta-onto reads as the line, the batched read and the separate reads alike; its offer starts above what it had integrated", async () => {
+    test("an old lane on the line: its Pineta-Base on pineta-onto reads as the line, the batched read and the separate reads alike; its offer starts above what it had accepted", async () => {
       const rig = await offerRig("old-base")
       const { yoursDir, yoursJj, laneDir, laneJj, ops, line, inLane, edit } =
         rig
@@ -2612,35 +2594,27 @@ describe("a lane's repo, with jj", () => {
       })
       await rig.agrees()
 
-      // An offer integrated before the rename, as it was written then.
+      // An offer accepted before the rename, as it was written then.
       await rig.build([
         {
           commit: t1,
           description: `WIP\n\nPineta-Thread: ${NAME}\nPineta-Lane: ${LANE}\nPineta-Entry: e\nPineta-Source: ${t1}\nPineta-Start: ${onLine}\n`,
         },
       ])
-      const [integrated] = await commitsOf(
+      const [accepted] = await commitsOf(
         ops,
         bookmarkRevset(offerBookmark(NAME)),
       )
-      if (integrated === undefined) throw new Error("no offer")
+      if (accepted === undefined) throw new Error("no offer")
       expect(
-        (
-          await ops([
-            "log",
-            "--no-graph",
-            "-r",
-            integrated,
-            "-T",
-            "description",
-          ])
-        ).stdout,
+        (await ops(["log", "--no-graph", "-r", accepted, "-T", "description"]))
+          .stdout,
       ).toContain("Pineta-Source")
       await executeRepo(
         yoursDir,
-        planOfferIntegrationSteps({
+        planOfferAcceptanceSteps({
           bookmark: offerBookmark(NAME),
-          top: integrated,
+          top: accepted,
           destination: line.onto,
         }),
       )

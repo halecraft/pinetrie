@@ -1,5 +1,5 @@
 // host/offers/execute — carrying out an offer step's effects
-// (`@pinetrie/repo`'s `offerEffects`, `offerIntegrationEffects`, `rebuildEffects`,
+// (`@pinetrie/repo`'s `offerEffects`, `offerAcceptanceEffects`, `rebuildEffects`,
 // `describeEffects`) over ports, so a test can check what each makes the
 // host write, and in what order.
 
@@ -23,8 +23,8 @@ export interface OfferPorts {
   /** Repair each divergent change (`repairOffer`). */
   repair(changes: readonly string[]): Promise<void>
   remove(): Promise<void>
-  /** Write the record marked integrated, then let the base snapshot follow the bookmark it moved. */
-  integrated(record: OfferRecord): Promise<void>
+  /** Write the record marked accepted, then let the base snapshot follow the bookmark it moved. */
+  accepted(record: OfferRecord): Promise<void>
 }
 
 /**
@@ -57,8 +57,8 @@ export async function executeOffer(
     case "remove":
       await ports.remove()
       break
-    case "integrated":
-      await ports.integrated(after.record)
+    case "accepted":
+      await ports.accepted(after.record)
       break
   }
   return effects.built ? "built" : "other"

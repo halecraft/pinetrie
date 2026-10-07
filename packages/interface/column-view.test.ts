@@ -555,7 +555,7 @@ describe("columnView: the work strip", () => {
     const sent = {
       kind: "sent",
       id: "s1",
-      action: "integrate",
+      action: "accept",
       to: null,
     } as const
     expect(columnView(own({ acting: sent })).strip).toMatchObject({
@@ -568,14 +568,14 @@ describe("columnView: the work strip", () => {
           acting: {
             kind: "refused",
             code: "refused",
-            action: "integrate",
+            action: "accept",
             message: "no",
           },
         }),
       ).strip,
     ).toMatchObject({ waiting: false, words: { note: "not done: no" } })
   })
-  test("an open offer with files can be reviewed, in every state; an integrated or empty one cannot", () => {
+  test("an open offer with files can be reviewed, in every state; an accepted or empty one cannot", () => {
     const open: OfferRecord = {
       lane: B,
       size: 1,
@@ -587,7 +587,7 @@ describe("columnView: the work strip", () => {
       described: true,
       edited: false,
       bookmark: "pinetrie-offer/copper-owl",
-      integratedAs: null,
+      acceptedAs: null,
       commits: [commitId("c1")],
       ledger: null,
       at: 1,
@@ -617,7 +617,7 @@ describe("columnView: the work strip", () => {
       state: "conflicts",
       review: { ...target, conflicts: ["a.txt"] },
     })
-    expect(strip({ ...open, integratedAs: "t1" })).toMatchObject({
+    expect(strip({ ...open, acceptedAs: "t1" })).toMatchObject({
       review: null,
     })
     expect(strip({ ...open, files: [] })).toMatchObject({ review: null })
@@ -697,7 +697,7 @@ describe("offerWords", () => {
     described: true,
     edited: false,
     bookmark: "pinetrie-offer/amber-fox",
-    integratedAs: null,
+    acceptedAs: null,
     commits: [commitId("w")],
     ledger: null,
     at: 10,
@@ -780,8 +780,8 @@ describe("offerWords", () => {
       "you edited this offer \u00b7 conflicts with accepted work in 2 files",
     ],
     [
-      "integrated",
-      { ...offer, integratedAs: "zz12345678ab" },
+      "accepted",
+      { ...offer, acceptedAs: "zz12345678ab" },
       "idle",
       "accepted as zz123456",
     ],
@@ -790,7 +790,7 @@ describe("offerWords", () => {
     expect(w.line).toBe(line)
     expect(w.line).not.toMatch(/`|pinetrie-offer/)
   })
-  test("the labels follow the state, and name where an integration adds the work", () => {
+  test("the labels follow the state, and name where an acceptance adds the work", () => {
     const labels = (
       o: OfferRecord,
       base = LINE_BASE as Parameters<typeof words>[2],
@@ -819,7 +819,7 @@ describe("offerWords", () => {
     from: commitId("a"),
     to: commitId("b"),
   } as const
-  test("the jj facts are titles: which bookmark an integration moves, and what catching up merges", () => {
+  test("the jj facts are titles: which bookmark an acceptance moves, and what catching up merges", () => {
     const w = words(offer, "idle", LINE_BASE, {
       catchUp: { kind: "unknown" },
     })
@@ -963,22 +963,17 @@ describe("offerWords", () => {
   ): OfferActing => ({ kind: "sent", id: "s1", action, to })
   test.each([
     ["nothing out", LINE_BASE, null, null],
+    ["an acceptance into the line", LINE_BASE, sent("accept"), "accepting…"],
     [
-      "an integration into the line",
-      LINE_BASE,
-      sent("integrate"),
-      "accepting…",
-    ],
-    [
-      "an integration into its WIP",
+      "an acceptance into its WIP",
       WIP_BASE,
-      sent("integrate"),
+      sent("accept"),
       "accepting into wip/search…",
     ],
     [
-      "an integration from a WIP into the line",
+      "an acceptance from a WIP into the line",
       WIP_BASE,
-      sent("integrate", "pinetrie-onto"),
+      sent("accept", "pinetrie-onto"),
       "accepting…",
     ],
     ["a squash", LINE_BASE, sent("squash"), "squashing to one…"],
@@ -990,10 +985,10 @@ describe("offerWords", () => {
       {
         kind: "refused",
         code: "refused",
-        action: "integrate",
-        message: "nothing to integrate",
+        action: "accept",
+        message: "nothing to accept",
       },
-      "not done: nothing to integrate",
+      "not done: nothing to accept",
     ],
     [
       "a failure",
@@ -1004,7 +999,7 @@ describe("offerWords", () => {
   ] as const)("your last command: %s", (_, base, acting, note) => {
     expect(words(offer, "idle", base, {}, acting).note).toBe(note)
   })
-  test("a WIP gone without landing offers no integration, and continuing from the project", () => {
+  test("a WIP gone without landing offers no acceptance, and continuing from the project", () => {
     const w = words(offer, "idle", { ...WIP_BASE, state: "gone" })
     expect(w.buttons.map(b => b.label)).toEqual(["split into a stack"])
     expect(w.menu.map(b => b.label)).toEqual([

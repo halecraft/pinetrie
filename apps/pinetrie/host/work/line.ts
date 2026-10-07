@@ -1,4 +1,4 @@
-// host/work/line — the integration line in your repo (ADR-0060, ADR-0090):
+// host/work/line — accepted work in your repo (ADR-0060, ADR-0090):
 // its record, read whenever the owner observes a move that changes it, and
 // the `line` commands. Gather (the shared facts' `lineFacts`), decide
 // (`planLineRecord`, `planLineAction`, `planPublishFinish`), translate
@@ -52,7 +52,7 @@ export interface Line {
 export function createLine(deps: {
   readonly owner: Pick<RepoOwner, "later" | "command">
   readonly basics: Pick<Basics, "session">
-  /** The integration line's names and `offers.catchUp` (ADR-0060, ADR-0099). */
+  /** Accepted work's names and `offers.catchUp` (ADR-0060, ADR-0099). */
   readonly line: LineConfig
   readonly writeValues: (writes: readonly ValueWrite[]) => Promise<void>
 }): Line {

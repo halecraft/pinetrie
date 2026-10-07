@@ -61,7 +61,7 @@ follow this list. A name only this package uses is imported from its module.
   record.
 - `work.ts`: where lanes work (`pinetrie.lane`, `pinetrie.revision`,
   `pinetrie.project`).
-- `line.ts`: the integration line and a thread's base (`pinetrie.line`,
+- `line.ts`: accepted work and a thread's base (`pinetrie.line`,
   `pinetrie.base`): where a lane begins, what catching up would do and merge,
   and the thread a lane branched from.
 - `offer.ts`, `offer-view.ts`, `review.ts`: an offer's record and the
@@ -755,7 +755,7 @@ repo. Its record is `OFFER` (`offer.ts`):
 
 | record | namespace | key | written |
 |---|---|---|---|
-| a lane's offer in your repo | `pinetrie.offer` | the lane | when a trigger changed it, or it was integrated |
+| a lane's offer in your repo | `pinetrie.offer` | the lane | when a trigger changed it, or it was accepted |
 
 What the host decides about it is `offer.ts`'s, from the facts
 `@pinetrie/repo` gathers, as decisions typed in `@pinetrie/core`
@@ -776,7 +776,7 @@ commit-message request `request.ts` (`describeRequest`).
   holds it (`OfferInRepo`); for an untraced start or a thread whose root is
   archived (ADR-0061), the offer alone. Each decision carries what its
   steps need: `build` (none: never built,
-  integrated, or gone), `rebuild` (the lane, or where the offer starts, moved under a single
+  accepted, or gone), `rebuild` (the lane, or where the offer starts, moved under a single
   offer: rebuilt in place, ADR-0039), `withdraw` (where it starts reached the
   tip, the lane's work changes no file, its start is untraced and the host
   made it, or the thread is archived, edited or not), `forget` (no offer and none to build: a record left from one
@@ -786,7 +786,7 @@ commit-message request `request.ts` (`describeRequest`).
   edited, or one divergent, which nothing touches until the lane catches up
   (a gap ADR-0067's untraced start leaves). Only work known to change a file, from a known
   start, is built (ADR-0067): one built from less would be empty, or bring
-  back what you integrated, and withdrawn after a build it would be built again on
+  back what you accepted, and withdrawn after a build it would be built again on
   the next poll. `unknown` keeps an offer that is there, and builds none. Where it starts is compared as a set
   (`sameStart`): a merge's parents come in any order. `rebuild` is not `update`, which is "update from
   my work" (`planUpdate`). An offer is edited (`offerEdited`) when its
@@ -803,20 +803,20 @@ commit-message request `request.ts` (`describeRequest`).
   `@` changes), described (its first line no longer the WIP line), edited,
   stale (a stack whose lane moved past its ledger), its bookmark (as the
   gather found it) and its commits. **`planYourEdits`**: only `@` moved, so
-  each record not yet integrated has its `yourEdits` rewritten from one
+  each record not yet accepted has its `yourEdits` rewritten from one
   shared read.
-- **`planOfferIntegration`** decides an offer integration from the offer
-  read in its own command and what only an integration reads (`OfferIntegrationFacts`: the WIP's commits above the line,
+- **`planOfferAcceptance`** decides an acceptance from the offer
+  read in its own command and what only an acceptance reads (`OfferAcceptanceFacts`: the WIP's commits above the line,
   and which bookmarks sit below the offer). Refused, in this order: no
   offer (`no_offer`), a WIP gone (`bad_destination`), nothing shown
   (`offer_changed`), a divergent offer (`no_offer`), other work than was
   shown or a new conflict (`offer_changed`, ADR-0065), and a destination
   that is not one of the offer's or not below it (`bad_destination`). Its
-  destinations are `offerIntegrationDestinations`': the thread's WIP, then the line,
+  destinations are `offerAcceptanceDestinations`': the thread's WIP, then the line,
   with how many of the WIP's commits land along. A conflicted offer never
   lands on the line: the line is immutable, and the conflict would stay in
-  its history. A gone WIP has none. An untraced place can be integrated: an
-  integration moves a bookmark and needs no start.
+  its history. A gone WIP has none. An untraced place can be accepted: an
+  acceptance moves a bookmark and needs no start.
 - **`planStackEnded`**: a split's stack replaces the offer only when its
   top has exactly the tip's files (`acceptStack`, private), built at the
   offer's place from the stack's own start and tip, which its ledger names;
@@ -831,14 +831,14 @@ commit-message request `request.ts` (`describeRequest`).
   without one). **`planDescribeAgain`** refuses `describe` without a named
   offer.
 - **`offerStatus`** decodes a `pinetrie.offer` record once (ADR-0067): `none`,
-  `integrated`, `held` or `open`. Every reader on the page switches on it, never
+  `accepted`, `held` or `open`. Every reader on the page switches on it, never
   on the record's fields: the strip, the header's activity badge and the tab's Archive
   item (`openOffers`, client), and the review read (`planOfferRead`). An
-  record not yet integrated, with no files, that you did not edit is `held`: its work is
+  record not yet accepted, with no files, that you did not edit is `held`: its work is
   already where it sits, by a route the ledger does not record (S89), so
-  nothing counts it, warns about it, reviews it or integrates it. One you edited
+  nothing counts it, warns about it, reviews it or accepts it. One you edited
   is `open` whatever its files.
-  The host's records not yet integrated, open or held, are `isNotYetIntegrated`: the lanes it
+  The host's records not yet accepted, open or held, are `isNotYetAccepted`: the lanes it
   marks on a full observation, and the records `@` rewrites.
 - **An offer's record is the page's cache** (ADR-0060): written from the
   repo after each of the host's steps, never read back to decide. Its
@@ -883,7 +883,7 @@ commit-message request `request.ts` (`describeRequest`).
   host's `catchUp` was not read at the commit it is at now; or there is no
   `pinetrie.base` at all: the host has never read the lane, as for a lane
   whose turns never committed, so never reached your repo), `nothing-new`
-  (it moved by work the lane holds, as after you integrated its own offer)
+  (it moved by work the lane holds, as after you accepted its own offer)
   or `brings`, with the file count and the move, the one kind that carries
   it. `catchUpOf` owns those checks; the commit comparison under them
   (`baseMoved`) is private to it.
@@ -921,8 +921,8 @@ commit-message request `request.ts` (`describeRequest`).
 
 | record | namespace | key | written |
 |---|---|---|---|
-| the integration line: its commit, the WIP bookmarks above it, the publish bookmark and your work against it (`yours.ahead`, `yours.catchUp`), and `offers.catchUp` (`catchUp`) | `pinetrie.line` | `line` | when your repo's operation head moves |
-| a lane's base, as its newest `Pinetrie-Base` says it, whether a WIP base landed or is gone, what catching up would change and where that was read, and its untraced integrated-offer commits (S97) | `pinetrie.base` | the lane | when a refresh reads the lane |
+| accepted work: its commit, the WIP bookmarks above it, the publish bookmark and your work against it (`yours.ahead`, `yours.catchUp`), and `offers.catchUp` (`catchUp`) | `pinetrie.line` | `line` | when your repo's operation head moves |
+| a lane's base, as its newest `Pinetrie-Base` says it, whether a WIP base landed or is gone, what catching up would change and where that was read, and its untraced accepted-offer commits (S97) | `pinetrie.base` | the lane | when a refresh reads the lane |
 
 - **`planLineRecord`** is the line's record from what the host read
   (`LineFacts`), beside what setting the line up would write to your
@@ -932,14 +932,14 @@ commit-message request `request.ts` (`describeRequest`).
   its own step (`LineDecision`): setup writes exactly the heads and log the
   record proposed, the text you were shown; a publish (`PublishDecision`,
   ADR-0090) says whether your files catch up first (`catchUp`) and whether
-  your commits move with the line (`integrate`), both false with
+  your commits move with the line (`accept`), both false with
   `offers.catchUp` off. `@pinetrie/repo` turns it into steps (`planLineSetup`,
   `planPublishCatchUp`, `planPublishMove`).
 - **`planPublishFinish` is a publish's second round** (ADR-0090): from the
   record read again after the catch-up, the move, or the catch-up's
   operation reverted (`undo`, S111) when your commits came out conflicted
   (`yours.conflicts.commits`, which the preview of `@` alone cannot show)
-  or the publish bookmark moved meanwhile. `integrate` is read from the
+  or the publish bookmark moved meanwhile. `accept` is read from the
   record after, not the decision. `publishUndone` words an undo from that
   record: the conflicts the catch-up would have left, since the revert took
   them away, so `lineRefusal`'s "your commits have conflicts" would be
@@ -1078,7 +1078,7 @@ the tip it must match, and the bookmark to leave on it.
 - **A fact is a `CustomMessage`** in `update.ts`'s pattern (`pinetrie.fact`,
   role `fact`): `content` is what the model reads, `details` the
   `OfferFact`, which the column words as one line (`factLine`). Each offer
-  action has one: an integration (`integratedFact`: the change, the
+  action has one: an acceptance (`acceptedFact`: the change, the
   bookmark, and that bookmark as the thread knows it, the line or a WIP),
   and a description asked for again, a squash, a refresh (`actionFact`).
 - **A fact always reaches the thread through a queued card**

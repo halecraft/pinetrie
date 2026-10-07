@@ -1287,13 +1287,13 @@ export const mutations: readonly Mutation[] = [
     expect: "the records the host writes from your repo",
   },
   {
-    name: "the base record leaves out the untraced integrated-offer commits",
+    name: "the base record leaves out the untraced accepted-offer commits",
     file: "packages/repo/offer-gather.ts",
-    from: '  untraced:\n    input.start.kind === "untraced" ? input.start.integratedOfferCommits : [],\n',
+    from: '  untraced:\n    input.start.kind === "untraced" ? input.start.acceptedOfferCommits : [],\n',
     to: "  untraced: [],\n",
     command: unit,
     expect:
-      "an integrated-offer commit of the lane with no Pinetrie-Source builds nothing until the lane catches up past it; then only what is new (S97)",
+      "an accepted-offer commit of the lane with no Pinetrie-Source builds nothing until the lane catches up past it; then only what is new (S97)",
   },
   {
     name: "the base record leaves out what catching up changes",
@@ -1313,13 +1313,13 @@ export const mutations: readonly Mutation[] = [
     expect: "a lane's fetch is imported by the owner of your repo",
   },
   {
-    name: "an offer integration holds the documents' keeper",
+    name: "an acceptance holds the documents' keeper",
     file: "apps/pinetrie/host/commands/index.ts",
     from: '    case "offer":\n    case "line":\n      return "repo"',
     to: '    case "line":\n      return "repo"',
     command: unit,
     expect:
-      "a chat completes while an offer integration is held open on your repo's owner",
+      "a chat completes while an acceptance is held open on your repo's owner",
   },
   {
     name: "a close's teardown holds the documents' keeper",

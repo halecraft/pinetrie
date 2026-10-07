@@ -16,6 +16,7 @@ import type { Outcome } from "@pinetrie/protocol/codec"
 import { readCardHistories, readPlaces, readPlacesRev } from "@pinetrie/reads"
 import {
   CARD_HISTORY,
+  decodeFact,
   deleteRecord,
   encodeCard,
   planStack,
@@ -624,7 +625,7 @@ describe("drain: a fact (ADR-0080)", () => {
   test("a queued fact is appended as the fact, its card gone, and the drain goes on", async () => {
     const { b, events, deps, appended } = setUp({ "c-2": "next" }, [])
     const fact = {
-      kind: "integrated",
+      kind: "accepted",
       lane: LANE,
       by: ADA,
       as: "kabcdefgh",
@@ -659,7 +660,7 @@ describe("drain: a fact (ADR-0080)", () => {
       "send c-2: next",
       "destroy c-2",
     ])
-    expect(appended).toMatchObject([{ details: fact }])
+    expect(appended.map(decodeFact)).toEqual([fact])
     expect(readPlaces(b.places)).toEqual([])
   })
 })

@@ -29,11 +29,11 @@ const C1 = commitId("c1")
 
 test("trailerValues reads a trailer from every paragraph, as a squash leaves two (S77)", () => {
   const squashed = [
-    "integrated one",
+    "accepted one",
     "",
     "Pinetrie-Source: aaaa",
     "",
-    "integrated two",
+    "accepted two",
     "",
     "Pinetrie-Lane: t-2",
     "Pinetrie-Source: bbbb",
@@ -59,7 +59,7 @@ test("offerLedger reads the newest paragraph that names a source; none without o
   expect(offerLedger("offer: x\n\nPinetrie-Source: aaaa\n")).toBeNull()
 })
 
-test("untracedLanes: an integrated offer's paragraph naming a thread and a lane but no source; never a turn's, nor a traced integrated offer's (S97)", () => {
+test("untracedLanes: an accepted offer's paragraph naming a thread and a lane but no source; never a turn's, nor a traced accepted offer's (S97)", () => {
   const old = `feat: x\n\nPinetrie-Thread: amber-fox\nPinetrie-Lane: ${LANE}\nPinetrie-Entry: e\n`
   expect(untracedLanes(old)).toEqual([LANE])
   expect(

@@ -1,5 +1,5 @@
 // e2e/lanes/catch-up — the agent catches its thread up in the middle of its
-// run (ADR-0080, S103), and an offer integration leaves a fact in the thread.
+// run (ADR-0080, S103), and an acceptance leaves a fact in the thread.
 
 import { writeFileSync } from "node:fs"
 import path from "node:path"
@@ -151,8 +151,8 @@ async function catchUpSection(check: Checks["check"]): Promise<void> {
       `${JSON.stringify({ results, recorded, branched: toolResults(branched) })}`,
     )
 
-    // An offer integration leaves a fact in the thread (ADR-0080).
-    const integrated = await wu.offer(lane, "integrate", "pinetrie-onto")
+    // An acceptance leaves a fact in the thread (ADR-0080).
+    const accepted = await wu.offer(lane, "accept", "pinetrie-onto")
     const fact = await waitFor(() => {
       const now = tree()
       return ancestry(now, laneTip(lane)).path.some(
@@ -160,9 +160,9 @@ async function catchUpSection(check: Checks["check"]): Promise<void> {
       )
     }, 30_000)
     check(
-      "an offer integration leaves a fact the thread shows",
-      integrated.kind === "integrated" && fact >= 0,
-      `${JSON.stringify({ integrated, fact })}`,
+      "an acceptance leaves a fact the thread shows",
+      accepted.kind === "accepted" && fact >= 0,
+      `${JSON.stringify({ accepted, fact })}`,
     )
   } finally {
     await wu.close().catch(() => {})

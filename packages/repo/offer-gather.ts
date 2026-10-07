@@ -15,9 +15,9 @@ import type {
   CommitId,
   LaneBase,
   LaneName,
+  OfferAcceptanceFacts,
   OfferGather,
   OfferInRepo,
-  OfferIntegrationFacts,
   OfferPlace,
   OfferSource,
   RefreshFacts,
@@ -96,7 +96,7 @@ const baseRecord = (
   state: input.state,
   catchUp: input.catchUp,
   untraced:
-    input.start.kind === "untraced" ? input.start.integratedOfferCommits : [],
+    input.start.kind === "untraced" ? input.start.acceptedOfferCommits : [],
   work: input.work,
 })
 
@@ -187,7 +187,7 @@ export const gatherPlace = (
   placeOf(ops.jj, input).then(read => read?.place ?? null)
 
 /**
- * The one gather an offer integration, a squash, a description and a split plan from:
+ * The one gather an acceptance, a squash, a description and a split plan from:
  * where the lane's offer sits, and the offer as your repo holds it there.
  * Null offer with no name yet, or a WIP gone. Null before the lane has a tip
  * here. Writes nothing, so it runs in a step or pinned.
@@ -269,16 +269,16 @@ const factsOf = (
     : { kind: "untraced", offer: read.offer }
 
 /**
- * What an offer integration reads besides its gather: how many of the WIP's commits land
+ * What an acceptance reads besides its gather: how many of the WIP's commits land
  * with it on the line, and which of the line's and the WIP's bookmarks sit
  * at or below the offer's bottom's parent, so a move to one is forward. Null
- * without an offer to integrate: none, divergent, or a WIP gone.
+ * without an offer to accept: none, divergent, or a WIP gone.
  */
-export async function gatherOfferIntegration(
+export async function gatherOfferAcceptance(
   ops: Pick<RepoOps, "jj">,
   gathered: OfferGather,
   line: LineConfig,
-): Promise<OfferIntegrationFacts | null> {
+): Promise<OfferAcceptanceFacts | null> {
   const { jj } = ops
   const { place, offer } = gathered
   if (place.kind === "gone" || offer?.kind !== "offer") return null

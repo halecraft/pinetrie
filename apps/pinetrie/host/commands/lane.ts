@@ -230,7 +230,7 @@ export async function actOnOffer(
   void deps.keeper
     .run(() => recordFact(deps, done.fact))
     .catch(failed(deps.basics, "an offer's fact", lane))
-  return action === "integrate" ? { kind: "integrated" } : { kind: "offered" }
+  return action === "accept" ? { kind: "accepted" } : { kind: "offered" }
 }
 
 /**
@@ -275,7 +275,7 @@ export function offerRefusal(code: ErrCode): string {
 }
 
 /**
- * A `line` command: set up the integration line (ADR-0060), or publish it
+ * A `line` command: set up accepted work (ADR-0060), or publish it
  * (ADR-0076, ADR-0090).
  */
 export async function actOnLine(

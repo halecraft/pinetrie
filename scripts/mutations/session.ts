@@ -35,7 +35,7 @@ export const mutations: readonly Mutation[] = [
     to: "        sent,",
     command: unit,
     expect:
-      "sent at once, the refusal on reply, per lane; an integration clears it",
+      "sent at once, the refusal on reply, per lane; an acceptance clears it",
   },
   {
     name: "hostLetGo counts a card the host never reached",

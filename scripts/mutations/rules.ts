@@ -208,7 +208,7 @@ export const mutations: readonly Mutation[] = [
       "a run on a lane whose news is catch-up catches it up first, once per send",
   },
   {
-    name: "an integration's line names no change",
+    name: "an acceptance's line names no change",
     file: "packages/rules/fact.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "      return `✓ accepted${into(fact.to)} as ${fact.as.slice(0, 8)}`",
@@ -218,12 +218,12 @@ export const mutations: readonly Mutation[] = [
     expect: "factLine",
   },
   {
-    name: "an integration into a WIP is told as the line",
+    name: "an acceptance into a WIP is told as the line",
     file: "packages/rules/fact.ts",
     from: "      destination === input.onto\n",
     to: "      true\n",
     command: unit,
-    expect: "integratedFact: the bookmark moved",
+    expect: "acceptedFact: the bookmark moved",
   },
   {
     name: "a fact jumps the queue",
@@ -283,7 +283,7 @@ export const mutations: readonly Mutation[] = [
     to: '      input.untraced && menu.includes("update")',
     command: unit,
     expect:
-      "behind its base, catching up stands beside the offer; with nothing to integrate, alone",
+      "behind its base, catching up stands beside the offer; with nothing to accept, alone",
   },
   {
     name: "a queued catch-up is no activity",
@@ -340,7 +340,7 @@ export const mutations: readonly Mutation[] = [
       "an update round-trips, shows one line, and tells the model what changed",
   },
   {
-    name: "an offer of no files can be integrated",
+    name: "an offer of no files can be accepted",
     file: "packages/rules/offer-view.ts",
     from: '  if (offer.kind === "held") return view("nothing", [], ["update"])\n',
     to: "",
@@ -348,22 +348,31 @@ export const mutations: readonly Mutation[] = [
     expect: "every state, with its buttons",
   },
   {
-    name: "an offer record from before ADR-0083 forgets its integration",
-    file: "packages/rules/offer.ts",
-    from: "        r.integratedAs !== undefined ? r.integratedAs : (r.taken ?? null),",
-    to: "        r.integratedAs !== undefined ? r.integratedAs : null,",
+    name: "an acceptance's fact is stored under its new kind",
+    file: "packages/rules/fact.ts",
+    from: '  fact.kind === "accepted" ? { ...fact, kind: "integrated" } : fact',
+    to: '  fact.kind === "accepted" ? { ...fact, kind: "integrated" as const } && (fact as never) : fact',
     command: unit,
     expect:
-      "an offer record written before ADR-0083 reads its `taken` as `integratedAs`",
+      "an acceptance is stored under the kind facts began with, which a thread's history holds",
   },
   {
-    name: "an old `taken` overrides an offer record's own null",
+    name: "an offer record from before ADR-0100 forgets its acceptance",
     file: "packages/rules/offer.ts",
-    from: "        r.integratedAs !== undefined ? r.integratedAs : (r.taken ?? null),",
-    to: "        r.integratedAs ?? r.taken ?? null,",
+    from: "        r.acceptedAs !== undefined ? r.acceptedAs : (r.integratedAs ?? null),",
+    to: "        r.acceptedAs !== undefined ? r.acceptedAs : null,",
     command: unit,
     expect:
-      "an offer record written before ADR-0083 reads its `taken` as `integratedAs`",
+      "an offer record written before ADR-0100 reads its `integratedAs` as `acceptedAs`",
+  },
+  {
+    name: "an old `integratedAs` overrides an offer record's own null",
+    file: "packages/rules/offer.ts",
+    from: "        r.acceptedAs !== undefined ? r.acceptedAs : (r.integratedAs ?? null),",
+    to: "        r.acceptedAs ?? r.integratedAs ?? null,",
+    command: unit,
+    expect:
+      "an offer record written before ADR-0100 reads its `integratedAs` as `acceptedAs`",
   },
   {
     name: "an offer of no files is open",
@@ -381,7 +390,7 @@ export const mutations: readonly Mutation[] = [
     to: "      true\n",
     command: unit,
     expect:
-      "an untraced thread's offer you edited can be integrated, never rebuilt (S97)",
+      "an untraced thread's offer you edited can be accepted, never rebuilt (S97)",
   },
   {
     name: "an untraced thread keeps catching up in the menu",
@@ -417,7 +426,7 @@ export const mutations: readonly Mutation[] = [
     to: '      ? { kind: "untouched" }\n      : { kind: "build", place }',
     command: unit,
     expect:
-      "no offer in your repo (never built, integrated, or gone): build, unless the lane holds nothing you lack, when a record left from one is forgotten",
+      "no offer in your repo (never built, accepted, or gone): build, unless the lane holds nothing you lack, when a record left from one is forgotten",
   },
   {
     name: "a lane whose work undoes itself is offered",
@@ -795,7 +804,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the bookmark is left out",
     file: "packages/rules/offer-view.ts",
-    from: "    bookmark: notYetIntegrated?.bookmark ?? null,",
+    from: "    bookmark: notYetAccepted?.bookmark ?? null,",
     to: "    bookmark: null,",
     command: unit,
     expect: "the facts",
@@ -857,7 +866,7 @@ export const mutations: readonly Mutation[] = [
     expect: "a mark: its root",
   },
   {
-    name: "an integrated offer's commit is read",
+    name: "an accepted offer's commit is read",
     file: "packages/rules/review.ts",
     from: '      .flatMap(o => (offerStatus(o).kind === "open" ? o.commits : []))',
     to: "      .flatMap(o => o.commits)",
@@ -868,7 +877,7 @@ export const mutations: readonly Mutation[] = [
     name: "a held offer's commit is read",
     file: "packages/rules/review.ts",
     from: '      .flatMap(o => (offerStatus(o).kind === "open" ? o.commits : []))',
-    to: "      .flatMap(o => (o.integratedAs === null ? o.commits : []))",
+    to: "      .flatMap(o => (o.acceptedAs === null ? o.commits : []))",
     command: unit,
     expect: "planOfferRead: only a commit an open offer holds now",
   },
@@ -1497,12 +1506,12 @@ export const mutations: readonly Mutation[] = [
       "a root archived 7 days and a second ago is retired; one archived 6 days ago",
   },
   {
-    name: "an offer integration is never shown a conflict",
+    name: "an acceptance is never shown a conflict",
     file: "packages/rules/offer-view.ts",
     from: "  conflicted: (record?.conflicts.length ?? 0) > 0,",
     to: "  conflicted: false,",
     command: ["pnpm", "exec", "vitest", "run", "packages/rules"],
-    expect: "offerSeen: what an offer integration was shown",
+    expect: "offerSeen: what an acceptance was shown",
   },
   {
     name: "an offer record's ledger is dropped as it is read",
@@ -1830,10 +1839,10 @@ export const mutations: readonly Mutation[] = [
     expect: "publishUndone",
   },
   {
-    name: "a publish's second round integrates as decided",
+    name: "a publish's second round accepts as decided",
     file: "packages/rules/line.ts",
-    from: "  return { ...move, integrate: after.yours.ahead > 0 }",
-    to: "  return { ...move, integrate: decision.integrate }",
+    from: "  return { ...move, accept: after.yours.ahead > 0 }",
+    to: "  return { ...move, accept: decision.accept }",
     command: unit,
     expect: "your commits, read after the catch-up, move with the line",
   },
@@ -1878,20 +1887,20 @@ export const mutations: readonly Mutation[] = [
     expect: "with offers.catchUp off it moves the publish bookmark alone",
   },
   {
-    name: "an offer integration moves a bookmark that is not below the offer",
+    name: "an acceptance moves a bookmark that is not below the offer",
     file: "packages/rules/offer.ts",
-    from: "  if (destination === undefined || !integration.below.has(destination.bookmark))",
+    from: "  if (destination === undefined || !acceptance.below.has(destination.bookmark))",
     to: "  if (destination === undefined)",
     command: unit,
     expect: "no such destination",
   },
   {
-    name: "an offer integration ignores what it was shown",
+    name: "an acceptance ignores what it was shown",
     file: "packages/rules/offer.ts",
     from: "  if (offerChanged(offer, seen)) return refused(ERR.OFFER_CHANGED)",
     to: "  if (false) return refused(ERR.OFFER_CHANGED)",
     command: unit,
-    expect: "an integration of the offer it was shown: another ledger",
+    expect: "an acceptance of the offer it was shown: another ledger",
   },
   {
     name: "a ledger's start is compared in order",
@@ -1900,15 +1909,15 @@ export const mutations: readonly Mutation[] = [
     to: "  a.length === b.length && a.every((c, i) => b[i] === c)",
     command: unit,
     expect:
-      "an integration of the offer it was shown: the same start, in another order",
+      "an acceptance of the offer it was shown: the same start, in another order",
   },
   {
-    name: "a newly conflicting offer is integrated",
+    name: "a newly conflicting offer is accepted",
     file: "packages/rules/offer.ts",
     from: "  (offer.conflicts.length > 0 && !seen.conflicted)",
     to: "  false",
     command: unit,
-    expect: "an integration of the offer it was shown: newly conflicting",
+    expect: "an acceptance of the offer it was shown: newly conflicting",
   },
   {
     name: "every file of an offer is your edit",
@@ -1919,7 +1928,7 @@ export const mutations: readonly Mutation[] = [
     expect: "your edits are its files that @ changes, and only those",
   },
   {
-    name: "a conflicted offer is integrated into the line",
+    name: "a conflicted offer is accepted into the line",
     file: "packages/rules/offer.ts",
     from: "    conflicted: offer.conflicts.length > 0,",
     to: "    conflicted: false,",
@@ -1935,7 +1944,7 @@ export const mutations: readonly Mutation[] = [
     expect: "planDescribeSettle: written only to the commit it was asked for",
   },
   {
-    name: "every file of an offer not yet integrated is your edit when @ moves",
+    name: "every file of an offer not yet accepted is your edit when @ moves",
     file: "packages/rules/offer.ts",
     from: "    .map(r => ({ ...r, yourEdits: r.files.filter(f => editing.has(f)) }))",
     to: "    .map(r => ({ ...r, yourEdits: r.files }))",
@@ -1943,9 +1952,9 @@ export const mutations: readonly Mutation[] = [
     expect: "planYourEdits",
   },
   {
-    name: "an integrated offer's record is rewritten when @ moves",
+    name: "an accepted offer's record is rewritten when @ moves",
     file: "packages/rules/offer.ts",
-    from: "    .filter(r => isNotYetIntegrated(offerStatus(r)))\n",
+    from: "    .filter(r => isNotYetAccepted(offerStatus(r)))\n",
     to: "",
     command: unit,
     expect: "planYourEdits",

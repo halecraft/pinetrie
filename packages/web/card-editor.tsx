@@ -123,7 +123,7 @@ export interface Where {
   readonly project: ProjectRecord | null
   /** Directories other lanes work in directly: offered again. */
   readonly usedDirs: readonly string[]
-  /** The integration line, for the bases a new lane may start from (ADR-0060). */
+  /** Accepted work, for the bases a new lane may start from (ADR-0060). */
   readonly line: LineRecord | null
   /** Files conflicted in the commit a new lane here would be cloned from (ADR-0072). */
   readonly forkConflicts: number

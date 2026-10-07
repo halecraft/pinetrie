@@ -675,7 +675,7 @@ export const readOffers = (
   doc: SessionDocHandle,
 ): ReadonlyMap<LaneName, OfferRecord> => readRecords(doc, OFFER)
 
-/** The integration line as the host last read it (ADR-0060); null before it wrote one. */
+/** Accepted work as the host last read it (ADR-0060); null before it wrote one. */
 export const readLine = (doc: SessionDocHandle): LineRecord | null =>
   readRecords(doc, LINE).get(LINE_KEY) ?? null
 

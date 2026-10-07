@@ -15,7 +15,7 @@ const A = laneNameForThread("a")
 const B = laneNameForThread("b")
 const sent = (
   id: string,
-  action: OfferAction = "integrate",
+  action: OfferAction = "accept",
 ): Acting<OfferAction> => ({
   kind: "sent",
   id,
@@ -24,7 +24,7 @@ const sent = (
 })
 const send = (
   id: string,
-  action: OfferAction = "integrate",
+  action: OfferAction = "accept",
 ): ActingEvent<OfferAction> => ({ kind: "sent", id, action, to: null })
 const answered = (id: string, outcome: Outcome): ActingEvent<OfferAction> => ({
   kind: "answered",
@@ -34,7 +34,7 @@ const answered = (id: string, outcome: Outcome): ActingEvent<OfferAction> => ({
 const REFUSED: Outcome = {
   kind: "refused",
   code: "refused",
-  message: "nothing to integrate",
+  message: "nothing to accept",
 }
 
 describe("nextActing: what is said of your last command on one thing", () => {
@@ -42,7 +42,7 @@ describe("nextActing: what is said of your last command on one thing", () => {
     ["a send is sent at once", null, send("1"), sent("1")],
     [
       "a send replaces a refusal",
-      { kind: "refused", code: "refused", action: "integrate", message: "x" },
+      { kind: "refused", code: "refused", action: "accept", message: "x" },
       send("2", "squash"),
       sent("2", "squash"),
     ],
@@ -53,20 +53,20 @@ describe("nextActing: what is said of your last command on one thing", () => {
       {
         kind: "refused",
         code: "refused",
-        action: "integrate",
-        message: "nothing to integrate",
+        action: "accept",
+        message: "nothing to accept",
       },
     ],
     [
       "a failure is kept, with its message",
       sent("1"),
       answered("1", { kind: "failed", message: "jj said no" }),
-      { kind: "failed", action: "integrate", message: "jj said no" },
+      { kind: "failed", action: "accept", message: "jj said no" },
     ],
     [
-      "integrated clears it",
+      "accepted clears it",
       sent("1"),
-      answered("1", { kind: "integrated" }),
+      answered("1", { kind: "accepted" }),
       null,
     ],
     ["offered clears it", sent("1"), answered("1", { kind: "offered" }), null],
@@ -88,19 +88,19 @@ describe("nextActing: what is said of your last command on one thing", () => {
 })
 
 describe("sendActing: the session's store, around one command", () => {
-  test("sent at once, the refusal on reply, per lane; an integration clears it", async () => {
+  test("sent at once, the refusal on reply, per lane; an acceptance clears it", async () => {
     const store = snapshotStore<ActingState>(NO_ACTING)
     let reply: (o: Outcome) => void = () => {}
     const out = sendActing(
       store,
-      { kind: "offer", lane: A, action: "integrate", to: "wip/x" },
+      { kind: "offer", lane: A, action: "accept", to: "wip/x" },
       () => new Promise(resolve => (reply = resolve)),
       "1",
     )
     expect(store.current().offers.get(A)).toEqual({
       kind: "sent",
       id: "1",
-      action: "integrate",
+      action: "accept",
       to: "wip/x",
     })
     expect(store.current().offers.has(B)).toBe(false)
@@ -109,13 +109,13 @@ describe("sendActing: the session's store, around one command", () => {
     expect(store.current().offers.get(A)).toEqual({
       kind: "refused",
       code: "refused",
-      action: "integrate",
-      message: "nothing to integrate",
+      action: "accept",
+      message: "nothing to accept",
     })
     await sendActing(
       store,
-      { kind: "offer", lane: A, action: "integrate", to: null },
-      () => Promise.resolve({ kind: "integrated" }),
+      { kind: "offer", lane: A, action: "accept", to: null },
+      () => Promise.resolve({ kind: "accepted" }),
       "2",
     )
     expect(store.current().offers.has(A)).toBe(false)

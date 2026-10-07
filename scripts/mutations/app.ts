@@ -19,13 +19,13 @@ export const mutations: readonly Mutation[] = [
   },
   {
     // Needs `container`: run on the Mac.
-    name: "an offer integration's fact is never written",
+    name: "an acceptance's fact is never written",
     file: "apps/pinetrie/host/commands/lane.ts",
     from: "    .run(() => recordFact(deps, done.fact))",
     to: "    .run(async () => {})",
     suite: "lanes",
     scenario: "catch-up",
-    expect: "an offer integration leaves a fact the thread shows",
+    expect: "an acceptance leaves a fact the thread shows",
   },
   // ── card history and traces (ADR-0048 step 6) ──
   {
@@ -59,7 +59,7 @@ export const mutations: readonly Mutation[] = [
       "a trace its placer has seen is deleted on the host, for every device",
   },
   {
-    name: "the add button integrates nowhere",
+    name: "the add button accepts nowhere",
     file: "packages/web/column.tsx",
     from: "          ? destinations[0]\n",
     to: "          ? destinations[1]\n",

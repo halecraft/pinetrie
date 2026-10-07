@@ -521,7 +521,7 @@ export function Column(p: ColumnProps) {
   // The column's pane (ADR-0078): what you opened beside the thread, kept
   // only while the column is mounted. One subject at a time, named, so
   // `paneView` can tell when it is gone: the offer's review after an
-  // integration or a withdrawal, a table or an image whose message this column no longer
+  // acceptance or a withdrawal, a table or an image whose message this column no longer
   // draws. The thread's next offer does not open it with nobody asking.
   const [pane, setPane] = useState<PaneSubject | null>(null)
   const openPane = useStable((subject: PaneSubject) =>
@@ -551,22 +551,22 @@ export function Column(p: ColumnProps) {
   const toggleReview = useStable(() => openPane({ kind: "offer" }))
   // Catching up and splitting are a card with the command and no text,
   // queued at once (ADR-0055, ADR-0061, ADR-0080): the host pops it when
-  // the lane is free. An integration names its destination: the default,
+  // the lane is free. An acceptance names its destination: the default,
   // or the line (ADR-0060).
   const actOnOffer = (button: OfferButton) => {
     if (lane.kind !== "lane") return
-    if (button === "integrate" || button === "integrate-into-line") {
+    if (button === "accept" || button === "accept-into-line") {
       const destinations =
         shows.strip.kind === "offer" ? shows.strip.destinations : []
       const to =
-        button === "integrate"
+        button === "accept"
           ? destinations[0]
           : destinations.find(d => d.kind === "line")
       if (to === undefined) return
       return act({
         kind: "offer",
         lane: lane.name,
-        action: "integrate",
+        action: "accept",
         to: to.bookmark,
       })
     }

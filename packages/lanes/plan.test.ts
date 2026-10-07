@@ -513,39 +513,39 @@ test("planForkSetup: a WIP's copy on the line commit under it, never the WIP's o
   expect(steps.at(-1)).toBe("lane: sh -c pnpm i")
 })
 
-describe("planJoins: the integrated-offer commits a lane holds, joined before it catches up (S102)", () => {
+describe("planJoins: the accepted-offer commits a lane holds, joined before it catches up (S102)", () => {
   const T1 = commitId("t1")
   const T2 = commitId("t2")
   const S1 = commitId("s1")
   const S2 = commitId("s2")
   const X = commitId("x1")
-  test("an integrated-offer commit whose sources the lane lacks is not joined", () => {
+  test("an accepted-offer commit whose sources the lane lacks is not joined", () => {
     expect(
-      planJoins([{ integratedOfferCommit: T1, sources: [X] }], new Set([S1])),
+      planJoins([{ acceptedOfferCommit: T1, sources: [X] }], new Set([S1])),
     ).toEqual([])
   })
   test("a squash naming one source held and one not is joined, with the held one alone (S77 item 6)", () => {
     expect(
       planJoins(
-        [{ integratedOfferCommit: T1, sources: [S1, X] }],
+        [{ acceptedOfferCommit: T1, sources: [S1, X] }],
         new Set([S1]),
-      ).map(j => [j.integratedOfferCommit, j.sources]),
+      ).map(j => [j.acceptedOfferCommit, j.sources]),
     ).toEqual([[T1, [S1]]])
   })
-  test("several integrated-offer commits keep their order, oldest first", () => {
+  test("several accepted-offer commits keep their order, oldest first", () => {
     expect(
       planJoins(
         [
-          { integratedOfferCommit: T1, sources: [S1] },
-          { integratedOfferCommit: T2, sources: [S2] },
+          { acceptedOfferCommit: T1, sources: [S1] },
+          { acceptedOfferCommit: T2, sources: [S2] },
         ],
         new Set([S1, S2]),
-      ).map(j => j.integratedOfferCommit),
+      ).map(j => j.acceptedOfferCommit),
     ).toEqual([T1, T2])
   })
-  test("a join's message names the integrated-offer commit and its sources, and carries no trailer", () => {
+  test("a join's message names the accepted-offer commit and its sources, and carries no trailer", () => {
     const [join] = planJoins(
-      [{ integratedOfferCommit: T1, sources: [S1] }],
+      [{ acceptedOfferCommit: T1, sources: [S1] }],
       new Set([S1]),
     )
     expect(join?.message).toBe("join: t1 holds s1")

@@ -322,7 +322,7 @@ export const ERR = {
   LANE_ID_IN_USE: "lane_id_in_use",
   /** A new root's id that names a root the session already holds (ADR-0063). */
   ROOT_ID_IN_USE: "root_id_in_use",
-  /** An offer integrated, or a publish, before the line is set up (ADR-0060). */
+  /** An offer accepted, or a publish, before the line is set up (ADR-0060). */
   NO_LINE: "no_line",
   /** Publishing in a repo with no publish bookmark (ADR-0076). */
   NO_PUBLISH: "no_publish",
@@ -330,7 +330,7 @@ export const ERR = {
   NOT_FAST_FORWARD: "not_fast_forward",
   /** Publishing while your files have conflicts, or catching them up would make some (ADR-0090). */
   YOURS_CONFLICT: "yours_conflict",
-  /** An offer integration into a bookmark that is not one of the offer's destinations now. */
+  /** An acceptance into a bookmark that is not one of the offer's destinations now. */
   BAD_DESTINATION: "bad_destination",
   /** A new thread's base that is not a WIP bookmark above the line. */
   BAD_BASE: "bad_base",
@@ -341,7 +341,7 @@ export const ERR = {
   /** Catching up with the thread it branched from while that thread's agent runs (ADR-0072). */
   PARENT_RUNNING: "parent_running",
   /**
-   * An offer integration that now brings other work than the one it was shown
+   * An acceptance that now brings other work than the one it was shown
    * (another ledger), or now conflicts where it did not (ADR-0065).
    */
   OFFER_CHANGED: "offer_changed",
@@ -520,7 +520,7 @@ export type Intent =
   /** Ask a model for a root's title, from its messages (ADR-0074). */
   | { readonly kind: "retitle"; readonly root: RootId }
   /**
-   * Act on a lane's offer in your repo (ADR-0038). An integration names its
+   * Act on a lane's offer in your repo (ADR-0038). An acceptance names its
    * destination bookmark, null for the default (ADR-0060), and what it was
    * shown (`seen`, ADR-0065); every other action, null.
    */
@@ -531,7 +531,7 @@ export type Intent =
       readonly to: string | null
       readonly seen: OfferSeen | null
     }
-  /** Set up the integration line, or publish it (ADR-0060, ADR-0090). */
+  /** Set up accepted work, or publish it (ADR-0060, ADR-0090). */
   | { readonly kind: "line"; readonly action: LineAction }
   /**
    * Move cards, create one, or remove one (ADR-0059): one move, or a keep's
@@ -563,22 +563,22 @@ export type Intent =
   | { readonly kind: "traces-seen"; readonly traces: readonly string[] }
 
 /**
- * What can be done with an offer: integrate it into the line or a WIP
+ * What can be done with an offer: accept it into the line or a WIP
  * (ADR-0060, ADR-0083), squash a stack back to one revision, have the agent
  * write its description again, or rebuild it, discarding your edits
  * (ADR-0038). Splitting it is a card's command, `split`, popped when the
  * thread is free (ADR-0080).
  */
-export type OfferAction = "integrate" | "squash" | "describe" | "refresh"
+export type OfferAction = "accept" | "squash" | "describe" | "refresh"
 export const OFFER_ACTIONS: readonly OfferAction[] = [
-  "integrate",
+  "accept",
   "squash",
   "describe",
   "refresh",
 ]
 
 /**
- * What can be done with the integration line: set it up at your `@-`,
+ * What can be done with accepted work: set it up at your `@-`,
  * writing your repo's immutable heads (ADR-0060), or publish it (ADR-0090).
  */
 export type LineAction = "setup" | "publish"
@@ -832,7 +832,7 @@ export const HOST_OPERATOR = "pinetrie-host"
 
 /**
  * Where a thread's lane starts and is brought up to date from (ADR-0060):
- * the integration line, or a WIP bookmark you chose at its first message.
+ * accepted work, or a WIP bookmark you chose at its first message.
  */
 export type ThreadBase =
   | { readonly kind: "line" }
@@ -1020,7 +1020,7 @@ export type ProjectRecord =
  * keyed by lane: the page's cache, written from the repo after each of the
  * host's steps (`offerRecord`, `@pinetrie/rules`). The host never decides from it: it reads the
  * offer from your repo (`OfferInRepo`), so a record lost or stale changes
- * nothing. What integrating it would bring, each revision's description,
+ * nothing. What accepting it would bring, each revision's description,
  * files and diffs, is not stored: the page reads it by commit when it asks
  * (`RevisionReview`, ADR-0047).
  */
@@ -1049,10 +1049,10 @@ export interface OfferRecord {
   /** Its bookmark in your repo, as jjui shows it. */
   readonly bookmark: string
   /**
-   * The change id its top became when you integrated it; null while it is
+   * The change id its top became when you accepted it; null while it is
    * open. Stored as `taken` before ADR-0083: `offerRecord` still reads that.
    */
-  readonly integratedAs: string | null
+  readonly acceptedAs: string | null
   /**
    * Each revision's commit as the host last read it, bottom first: what a
    * review may read. It follows a rebase jj made under the offer, and your
@@ -1061,7 +1061,7 @@ export interface OfferRecord {
   readonly commits: readonly CommitId[]
   /**
    * What it brings, as its top's message says (`offerLedger`): the lane tip
-   * it holds and where it starts. An integration names it (`OfferSeen`,
+   * it holds and where it starts. An acceptance names it (`OfferSeen`,
    * ADR-0065).
    * Null for an offer whose message carries none, and for a record written
    * before the field, until the owner's first observation writes it again.
@@ -1195,7 +1195,7 @@ export interface BannerRecord {
 }
 
 /**
- * The integration line in your repo, as the host last read it (ADR-0060): a
+ * Accepted work in your repo, as the host last read it (ADR-0060): a
  * host-written `pinetrie.line` value, a cache the page reads. The repo is the
  * truth; the host rewrites this whenever your repo's operation head moves.
  */
@@ -1241,7 +1241,7 @@ export interface LineRecord {
   /**
    * Your `@-` against the line: the line commits it lacks (`behind`), and
    * your commits below `@` the line lacks (`ahead`, `::@- ~ ::<onto>`: what
-   * a publish integrates, ADR-0090). `catchUp` is what catching your files
+   * a publish accepts, ADR-0090). `catchUp` is what catching your files
    * up would do (S80): how many files change, those that conflict, and your
    * other heads that move with `@`; null when nothing is behind, or `@`
    * shares no commit with the line. `conflicts` are your conflicted commits
@@ -1286,7 +1286,7 @@ export interface BaseRecord {
    */
   readonly catchUp: CatchUpRead | null
   /**
-   * Integrated-offer commits of this thread on the line, above its base,
+   * Accepted-offer commits of this thread on the line, above its base,
    * that name no source (`untracedLanes`, S97): nothing is offered until it
    * catches up past them.
    */
@@ -1343,13 +1343,13 @@ export const isCatchUp = (command: CardCommand): command is CatchUpCommand =>
 
 /**
  * What a command on a thread's offer did, as a fact in the thread
- * (ADR-0080): an integration, with the change it was added as, the bookmark it moved
+ * (ADR-0080): an acceptance, with the change it was added as, the bookmark it moved
  * and what that bookmark is to the thread; or a description asked for again,
  * a squash, a refresh. `by` is who asked.
  */
 export type OfferFact =
   | {
-      readonly kind: "integrated"
+      readonly kind: "accepted"
       readonly lane: LaneName
       readonly by: WriterId
       /** The change id the offer was added as. */

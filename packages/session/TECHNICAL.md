@@ -256,7 +256,7 @@ the two merge (S101), so a writer asks `ready()` first.
 command `sent` in the `acting` store at once and records the answer when it
 comes; `nextActing` decides. A refusal or failure stays until your next
 command on that lane (or the line); an answer that carried it out clears
-it, since the record then says how things stand. An offer integration names the offer
+it, since the record then says how things stand. An acceptance names the offer
 this tab's record shows as it sends (`offerSeen`, ADR-0065). A split is
 no offer command: it is a card's command, queued (ADR-0080).
 A refusal keeps its code (`Unsuccessful.code`), so a view can act on why:

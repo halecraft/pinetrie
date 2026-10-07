@@ -29,7 +29,7 @@ export type Acting<A> =
       /** Which send this is: an answer to one since replaced changes nothing. */
       readonly id: string
       readonly action: A
-      /** An integration's destination bookmark; null for the default, or no integration. */
+      /** An acceptance's destination bookmark; null for the default, or no acceptance. */
       readonly to: string | null
     }
   | (Unsuccessful & { readonly action: A })

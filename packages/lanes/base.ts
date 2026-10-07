@@ -1,4 +1,4 @@
-// lanes/base — the base snapshot: the project's disk at the integration
+// lanes/base — the base snapshot: the project's disk at the acceptance
 // line's commit (ADR-0034, ADR-0060).
 //
 // Root lanes fork from it as other lanes fork from a turn's snapshot. It is

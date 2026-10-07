@@ -126,11 +126,11 @@ describe("the line (ADR-0060)", () => {
         onto: "pinetrie-onto",
         publish: "main",
         catchUp: false,
-        integrate: false,
+        accept: false,
       })
       expect(publishWork(r)).toEqual({ accepted: 2, yours: 0, catchUp: false })
     })
-    test("with offers.catchUp on it catches your files up and integrates your commits", () => {
+    test("with offers.catchUp on it catches your files up and accepts your commits", () => {
       const r = at(unpublished, {
         yours: yours({ behind: 2, ahead: 1, catchUp: preview }),
       })
@@ -139,7 +139,7 @@ describe("the line (ADR-0060)", () => {
         onto: "pinetrie-onto",
         publish: "main",
         catchUp: true,
-        integrate: true,
+        accept: true,
       })
       expect(publishWork(r)).toEqual({ accepted: 2, yours: 1, catchUp: true })
     })
@@ -224,7 +224,7 @@ describe("the line (ADR-0060)", () => {
         onto: "pinetrie-onto",
         publish: "main",
         catchUp: true,
-        integrate: false,
+        accept: false,
       } as const
       const after = (over: Partial<LineRecord["yours"]> = {}, ahead = 0) =>
         at({ commit: main, behind: 2, ahead }, { yours: yours(over) })
@@ -232,7 +232,7 @@ describe("the line (ADR-0060)", () => {
         [
           "without a catch-up: the move as decided",
           {
-            decision: { ...decision, catchUp: false, integrate: true },
+            decision: { ...decision, catchUp: false, accept: true },
             after: after({ conflicts: { commits: 1, files: [] } }),
             op: null,
           },
@@ -240,7 +240,7 @@ describe("the line (ADR-0060)", () => {
             kind: "move",
             onto: "pinetrie-onto",
             publish: "main",
-            integrate: true,
+            accept: true,
           },
         ],
         [
@@ -264,13 +264,13 @@ describe("the line (ADR-0060)", () => {
             kind: "move",
             onto: "pinetrie-onto",
             publish: "main",
-            integrate: true,
+            accept: true,
           },
         ],
         [
           "none: the publish bookmark alone",
           {
-            decision: { ...decision, integrate: true },
+            decision: { ...decision, accept: true },
             after: after(),
             op: "op1",
           },
@@ -278,7 +278,7 @@ describe("the line (ADR-0060)", () => {
             kind: "move",
             onto: "pinetrie-onto",
             publish: "main",
-            integrate: false,
+            accept: false,
           },
         ],
       ] as const)("%s", (_, input, finish) => {

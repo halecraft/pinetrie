@@ -116,15 +116,15 @@ export type Outcome =
   | { readonly kind: "marked" }
   /** A model is asked for a root's title, which arrives as its mark (ADR-0074). */
   | { readonly kind: "retitling" }
-  /** The lane's offer is integrated into the line or a WIP now (ADR-0060). */
-  | { readonly kind: "integrated" }
+  /** The lane's offer is accepted into the line or a WIP now (ADR-0060). */
+  | { readonly kind: "accepted" }
   /** An offer action was carried out (squash, describe, refresh). */
   | { readonly kind: "offered" }
   /** A thread is named before its lane exists, or already was (ADR-0057). */
   | { readonly kind: "reserved" }
   /** Traces the sender has seen are gone (ADR-0048). */
   | { readonly kind: "seen" }
-  /** The integration line was set up, or published (ADR-0060, ADR-0090). */
+  /** Accepted work was set up, or published (ADR-0060, ADR-0090). */
   | { readonly kind: "line-moved" }
   | Refusal
   /**
@@ -310,14 +310,10 @@ export function decodeCommand(
     const to = text(wire?.targetId)
     if (!isOfferAction(action))
       return refused(ERR.UNKNOWN_KIND, `unknown offer action: ${action}`)
-    if (action !== "integrate")
-      return { kind, lane, action, to: null, seen: null }
+    if (action !== "accept") return { kind, lane, action, to: null, seen: null }
     const seen = offerSeenFromWire(text(wire?.seen))
     return seen === null
-      ? refused(
-          ERR.REFUSED,
-          "an offer integration must say which offer it was shown",
-        )
+      ? refused(ERR.REFUSED, "an acceptance must say which offer it was shown")
       : { kind, lane, action, to: to === "" ? null : to, seen }
   }
   if (kind === "move-root") {
@@ -384,14 +380,14 @@ export function decodeCommand(
 const notNewLane = (lane: string): Refusal =>
   refused(ERR.UNKNOWN_TARGET, `not a new thread's lane: ${lane}`)
 
-/** What an offer integration was shown, as the wire carries it in `seen`: JSON. */
+/** What an acceptance was shown, as the wire carries it in `seen`: JSON. */
 export const offerSeenToWire = (seen: OfferSeen | null): string =>
   seen === null ? "" : JSON.stringify(seen)
 
 const isCommit = (v: unknown): v is string =>
   typeof v === "string" && /^[0-9a-f]+$/.test(v)
 
-/** The wire's `seen` for an offer integration -> what it was shown; null when malformed. */
+/** The wire's `seen` for an acceptance -> what it was shown; null when malformed. */
 function offerSeenFromWire(wire: string): OfferSeen | null {
   let parsed: unknown
   try {
@@ -813,8 +809,8 @@ function outcomeToWire(id: string, outcome: Outcome): Reply {
       return reply({ id, outcome: "marked" })
     case "retitling":
       return reply({ id, outcome: "retitling" })
-    case "integrated":
-      return reply({ id, outcome: "integrated" })
+    case "accepted":
+      return reply({ id, outcome: "accepted" })
     case "offered":
       return reply({ id, outcome: "offered" })
     case "reserved":
@@ -887,8 +883,8 @@ export function decodeReply(wire: Reply): Outcome {
       return { kind: "marked" }
     case "retitling":
       return { kind: "retitling" }
-    case "integrated":
-      return { kind: "integrated" }
+    case "accepted":
+      return { kind: "accepted" }
     case "offered":
       return { kind: "offered" }
     case "reserved":

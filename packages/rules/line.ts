@@ -1,4 +1,4 @@
-// line — the integration line and a thread's base on it (ADR-0060,
+// line — accepted work and a thread's base on it (ADR-0060,
 // ADR-0061, ADR-0072, ADR-0076, ADR-0090): the line's and each lane's base's
 // records (`pinetrie.line`, `pinetrie.base`), the line's record from what the
 // host read (`planLineRecord`), whether a `line` command may run
@@ -122,7 +122,7 @@ const BaseRecordSchema = Type.Object({
   ]),
 })
 
-/** The integration line, at its one key. */
+/** Accepted work, at its one key. */
 export const LINE: RecordSpec<LineRecord, typeof LINE_KEY, "session"> = {
   namespace: "pinetrie.line",
   home: "session",
@@ -238,7 +238,7 @@ const refused = (code: ErrCode): LineActionState => ({ kind: "refused", code })
 export interface PublishWork {
   /** Line commits the publish bookmark lacks. */
   readonly accepted: number
-  /** Your commits below `@` it integrates: 0 with `offers.catchUp` off. */
+  /** Your commits below `@` it accepts: 0 with `offers.catchUp` off. */
   readonly yours: number
   /** Whether your files catch up first: never with `offers.catchUp` off. */
   readonly catchUp: boolean
@@ -318,7 +318,7 @@ export function planLineAction(
     onto,
     publish: record.publish,
     catchUp: work.catchUp,
-    integrate: work.yours > 0,
+    accept: work.yours > 0,
   }
 }
 
@@ -343,12 +343,12 @@ export function planPublishFinish(input: {
     onto: decision.onto,
     publish: decision.publish,
   } as const
-  if (op === null) return { ...move, integrate: decision.integrate }
+  if (op === null) return { ...move, accept: decision.accept }
   if (after.yours.conflicts.commits > 0)
     return { kind: "undo", op, code: ERR.YOURS_CONFLICT }
   if (after.published.ahead > 0)
     return { kind: "undo", op, code: ERR.NOT_FAST_FORWARD }
-  return { ...move, integrate: after.yours.ahead > 0 }
+  return { ...move, accept: after.yours.ahead > 0 }
 }
 
 /** Files named, the first three, then how many more. */
@@ -408,7 +408,7 @@ export function publishUndone(
 }
 
 /**
- * The base a thread is brought up to date with and integrated into (ADR-0060): its
+ * The base a thread is brought up to date with and accepted into (ADR-0060): its
  * WIP while the WIP is there, else the line: for a line thread, a WIP that
  * landed, and one gone (which only "continue on the line" moves). Null, the
  * lane's base not yet read, is the line.
@@ -462,7 +462,7 @@ function baseMoved(
  *   or the host has never read the lane at all (no `pinetrie.base`): a lane
  *   whose turns changed no file never reached your repo;
  * - `nothing-new`: it moved, but by work the lane already holds, as after
- *   you integrated its own offer: catching up changes no file;
+ *   you accepted its own offer: catching up changes no file;
  * - `brings`: catching up changes `files` files in the lane. Only this one
  *   says the move, for the header's ↓ (`behindMark`).
  */
@@ -689,7 +689,7 @@ export const mergedFrom = (merge: BaseMerge): CatchUpFrom =>
       : { kind: "parent", lane: merge.lane, name: merge.name }
 
 /**
- * What a catch-up merges, as people read it: the integration line is
+ * What a catch-up merges, as people read it: accepted work is
  * "accepted work", whatever its bookmark is called (ADR-0090); a WIP is its
  * bookmark; the thread a thread branched from is its name (ADR-0072). The
  * one place it is worded: the bookmark of the line goes in titles only.

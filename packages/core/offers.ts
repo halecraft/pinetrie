@@ -1,4 +1,4 @@
-// core/offers — an offer and the integration line in your repo: the facts
+// core/offers — an offer and accepted work in your repo: the facts
 // `@pinetrie/repo` reads, and the decisions it carries out (ADR-0038,
 // ADR-0060).
 //
@@ -49,8 +49,8 @@ export interface OfferLedger {
 }
 
 /**
- * What an offer integration was shown (ADR-0065): the offer's ledger, and
- * whether it conflicted. An integration whose offer now brings other work,
+ * What an acceptance was shown (ADR-0065): the offer's ledger, and
+ * whether it conflicted. An acceptance whose offer now brings other work,
  * or newly conflicts, is refused (`OFFER_CHANGED`).
  */
 export interface OfferSeen {
@@ -96,7 +96,7 @@ export type OfferInRepo =
 export type WorkChanges = "none" | "some" | "unknown"
 
 /**
- * Where a lane's offer starts (ADR-0060), or `untraced`: an integrated-offer
+ * Where a lane's offer starts (ADR-0060), or `untraced`: an accepted-offer
  * commit of this lane above its base names no source (`untracedLanes`), so
  * no start can leave out what it brought, and nothing is offered until the
  * lane catches up past it (ADR-0067).
@@ -105,7 +105,7 @@ export type StartRead =
   | { readonly kind: "known"; readonly start: readonly CommitId[] }
   | {
       readonly kind: "untraced"
-      readonly integratedOfferCommits: readonly CommitId[]
+      readonly acceptedOfferCommits: readonly CommitId[]
     }
 
 /** One revision of an offer: the lane commit whose files it has, and its message. */
@@ -147,9 +147,9 @@ export type OfferPlace =
   /** A WIP gone without landing: nothing sits anywhere, and nothing moves. */
   | { readonly kind: "gone"; readonly tip: CommitId; readonly base: LaneBase }
   /**
-   * An integrated-offer commit of the lane names no source (S97): nothing is
-   * built here, but an offer that is here can be integrated, since an
-   * integration moves a bookmark and needs no start.
+   * An accepted-offer commit of the lane names no source (S97): nothing is
+   * built here, but an offer that is here can be accepted, since an
+   * acceptance moves a bookmark and needs no start.
    */
   | {
       readonly kind: "untraced"
@@ -168,7 +168,7 @@ export interface OfferGather {
   readonly offer: OfferInRepo | null
   /**
    * The lane's base record as the repo says it now, what catching up would
-   * change and its untraced integrated-offer commits with it: the host writes it when it
+   * change and its untraced accepted-offer commits with it: the host writes it when it
    * differs from the page's (ADR-0060).
    */
   readonly base: BaseRecord
@@ -178,7 +178,7 @@ export interface OfferGather {
 export type RefreshFacts =
   /** The thread's root is archived (ADR-0029): the offer alone, read against the line. */
   | { readonly kind: "archived"; readonly offer: OfferInRepo | null }
-  /** An integrated-offer commit of the lane names no source (S97). */
+  /** An accepted-offer commit of the lane names no source (S97). */
   | { readonly kind: "untraced"; readonly offer: OfferInRepo | null }
   | {
       readonly kind: "placed"
@@ -188,8 +188,8 @@ export type RefreshFacts =
       readonly offer: OfferInRepo | null
     }
 
-/** What only an offer integration reads; the rest is in its gather's place. */
-export interface OfferIntegrationFacts {
+/** What only an acceptance reads; the rest is in its gather's place. */
+export interface OfferAcceptanceFacts {
   /** The WIP's commits above the line; 0 for a lane on the line. */
   readonly wipAhead: number
   /**
@@ -252,22 +252,22 @@ export type RefreshDecision =
   /**
    * Untraced, and divergent or yours: nothing runs, and the record stays as
    * it is. A gap ADR-0067's untraced start leaves: such an offer is neither
-   * repaired nor recorded until the lane catches up past the integrated-offer
+   * repaired nor recorded until the lane catches up past the accepted-offer
    * commit.
    */
   | { readonly kind: "untouched" }
 
-/** An offer integration (`planOfferIntegration`): the bookmark it moves and the revision it moves to, or why not. */
-export type OfferIntegrationDecision =
+/** An acceptance (`planOfferAcceptance`): the bookmark it moves and the revision it moves to, or why not. */
+export type OfferAcceptanceDecision =
   | {
-      readonly kind: "integrate"
+      readonly kind: "accept"
       readonly name: ThreadName
       readonly bookmark: string
       readonly destination: string
       /** The offer's top's change id. */
       readonly top: string
-      /** Its record, marked integrated. */
-      readonly integrated: OfferRecord
+      /** Its record, marked accepted. */
+      readonly accepted: OfferRecord
     }
   | { readonly kind: "refused"; readonly code: ErrCode }
 
@@ -279,7 +279,7 @@ export interface DescribeDecision {
   readonly ledger: OfferLedger
 }
 
-// ── the integration line (ADR-0060, ADR-0061) ─────────────────────────────
+// ── accepted work (ADR-0060, ADR-0061) ─────────────────────────────
 
 /**
  * What the host reads of the line, each time it looks (`lineFacts` in
@@ -296,7 +296,7 @@ export interface LineFacts
 /**
  * A publish (ADR-0090), decided before its first step: on the host's own
  * machine, your files catch up with the line first (`catchUp`), and your
- * commits below `@` move onto it with the publish bookmark (`integrate`).
+ * commits below `@` move onto it with the publish bookmark (`accept`).
  */
 export interface PublishDecision {
   readonly kind: "publish"
@@ -305,7 +305,7 @@ export interface PublishDecision {
   /** Rebase `@` onto the line first, as you. */
   readonly catchUp: boolean
   /** The line moves with the publish bookmark, to your `@-`. */
-  readonly integrate: boolean
+  readonly accept: boolean
 }
 
 /** A `line` command (`planLineAction`): what it does, or why not. */
@@ -322,12 +322,12 @@ export type LineDecision =
 
 /**
  * The bookmark move that ends a publish (`planPublishMove`): the publish
- * bookmark to the line, or, with `integrate`, both to your `@-`.
+ * bookmark to the line, or, with `accept`, both to your `@-`.
  */
 export interface PublishMove {
   readonly onto: string
   readonly publish: string
-  readonly integrate: boolean
+  readonly accept: boolean
 }
 
 /**

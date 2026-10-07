@@ -43,24 +43,24 @@ export async function commitsOf(
 }
 
 /**
- * An integrated-offer commit on the line as `INTEGRATED_OFFER_COMMIT_ROW`
+ * An accepted-offer commit on the line as `ACCEPTED_OFFER_COMMIT_ROW`
  * prints it: its commit, and its message whole. Your repo reads the
- * integrated-offer commits on the line with it (`@pinetrie/repo`), and a lane
- * those it lacks before it catches up (`integratedOfferCommitsAbove`).
+ * accepted-offer commits on the line with it (`@pinetrie/repo`), and a lane
+ * those it lacks before it catches up (`acceptedOfferCommitsAbove`).
  */
-export interface IntegratedOfferCommitRow {
+export interface AcceptedOfferCommitRow {
   readonly commit: CommitId
   readonly description: string
 }
 
-/** One integrated-offer commit a line: its commit, a tab, and its message as a JSON string. */
-export const INTEGRATED_OFFER_COMMIT_ROW =
+/** One accepted-offer commit a line: its commit, a tab, and its message as a JSON string. */
+export const ACCEPTED_OFFER_COMMIT_ROW =
   'commit_id ++ "\\t" ++ json(description) ++ "\\n"'
 
-/** `INTEGRATED_OFFER_COMMIT_ROW`'s output, read back. */
-export function parseIntegratedOfferCommits(
+/** `ACCEPTED_OFFER_COMMIT_ROW`'s output, read back. */
+export function parseAcceptedOfferCommits(
   stdout: string,
-): IntegratedOfferCommitRow[] {
+): AcceptedOfferCommitRow[] {
   return lines(stdout).map(row => {
     const tab = row.indexOf("\t")
     return {

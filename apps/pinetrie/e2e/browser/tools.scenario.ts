@@ -385,7 +385,7 @@ async function run(
       // host's project record says so, with its reason where they do not.
       const project = readProject(toolHost.session)
       const noContainers = project?.kind === "direct" ? project.reason : null
-      // A new thread of its own starts at the integration line (ADR-0060).
+      // A new thread of its own starts at accepted work (ADR-0060).
       if (noContainers === null) {
         const owner = await join(toolHost, "owner", "tools")
         await setUpLine(toolHost.session, owner)
@@ -1269,8 +1269,8 @@ async function run(
         ])
         await say("write two files")
         await toolIdle()
-        const integrateShown = await appears(
-          `${col(0)} .work.offer[data-state="ready"] .offer-integrate`,
+        const acceptShown = await appears(
+          `${col(0)} .work.offer[data-state="ready"] .offer-accept`,
         )
         const line =
           (await tp
@@ -1288,7 +1288,7 @@ async function run(
             "typing beside an open review redraws none of it",
             "a file's head stays pinned while its diff scrolls, and the list brings a file to the top",
             "the column's foot shows the thread's offer in words, its bookmark apart, and its add button moves the line to it, leaving your working copy",
-            "the review closes, and after the integration there is none to open",
+            "the review closes, and after the acceptance there is none to open",
           ])
             skip(label, noContainers)
         else {
@@ -1297,7 +1297,7 @@ async function run(
           await waitFor(
             () =>
               [...readOffers(toolHost.session).values()].some(
-                o => o.integratedAs === null && o.described,
+                o => o.acceptedAs === null && o.described,
               ),
             15_000,
           )
@@ -1391,8 +1391,8 @@ async function run(
             .click(`${col(0)} > .pane .pane-close`, { timeout: 5_000 })
             .catch(() => {})
           const closed = await appears(`${col(0)}:not(:has(.review))`, 5_000)
-          if (integrateShown) await tp.click(`${col(0)} .work .offer-integrate`)
-          // The integration moves the line forward to the offer (ADR-0060).
+          if (acceptShown) await tp.click(`${col(0)} .work .offer-accept`)
+          // The acceptance moves the line forward to the offer (ADR-0060).
           const onLine = () => {
             try {
               return execFileSync(
@@ -1412,15 +1412,15 @@ async function run(
               return false
             }
           }
-          const integrated =
+          const accepted =
             (await waitFor(onLine, 10_000)) >= 0 &&
             !existsSync(path.join(work, "from-lane.txt"))
           check(
             "the column's foot shows the thread's offer in words, its bookmark apart, and its add button moves the line to it, leaving your working copy",
-            integrateShown &&
+            acceptShown &&
               bookmark.startsWith("pinetrie-offer/") &&
               !line.includes("`") &&
-              integrated,
+              accepted,
             `${line} · ${bookmark}`,
           )
           const settled = await tp
@@ -1438,7 +1438,7 @@ async function run(
             )
           const noReview = (await tp.$(review)) === null
           check(
-            "the review closes, and after the integration there is none to open",
+            "the review closes, and after the acceptance there is none to open",
             closed && settled && noReview,
             `closed ${closed}, line not a button ${settled}, no review ${noReview}`,
           )

@@ -97,9 +97,9 @@ test.each<Row>([
     args: [{ kind: "name", name: "Ada" }],
   },
   {
-    effect: { kind: "offer", lane, action: "integrate", to: "wip/x" },
+    effect: { kind: "offer", lane, action: "accept", to: "wip/x" },
     port: p => p.session.offer,
-    args: [lane, "integrate", "wip/x"],
+    args: [lane, "accept", "wip/x"],
   },
   {
     effect: { kind: "mark", root, title: "T" },

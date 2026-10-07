@@ -60,10 +60,10 @@ export const HOST_PRINCIPAL = "pinetrie-host"
  *     clears its title.
  *   - `retitle` asks a model for the root `root`'s title (ADR-0074).
  *   - `offer` acts on that lane's offer in your repo; `mode` names the
- *     action: `integrate`, `split`, `squash`, `describe` or `refresh`. An
- *     integration names its destination bookmark in `targetId`, `""` for the default,
+ *     action: `accept`, `split`, `squash`, `describe` or `refresh`. An
+ *     acceptance names its destination bookmark in `targetId`, `""` for the default,
  *     and what it was shown in `seen`.
- *   - `line` sets up the integration line (`mode` `setup`) or lands your
+ *   - `line` sets up accepted work (`mode` `setup`) or lands your
  *     work on it (`land`), ADR-0060.
  *   - `reserve` asks the host to name the thread whose lane will be `lane`,
  *     a new id the sender's column made, before the lane exists (ADR-0057).
@@ -147,7 +147,7 @@ export interface Command {
   readonly workKind: string
   readonly workDir: string
   /**
-   * `mark`: the entry; `offer` `integrate`: the destination bookmark, `""`
+   * `mark`: the entry; `offer` `accept`: the destination bookmark, `""`
    * for the default; `workflow`: the state. Separate from `parentId` on
    * purpose.
    */
@@ -156,8 +156,8 @@ export interface Command {
   readonly cardId: string
   /**
    * `chat`: the card's text version as the sender had it (S96), or `""`.
-   * `offer` `integrate`: what the integration was shown (`OfferSeen`,
-   * ADR-0065), as JSON; an integration without it is refused.
+   * `offer` `accept`: what the acceptance was shown (`OfferSeen`,
+   * ADR-0065), as JSON; an acceptance without it is refused.
    */
   readonly seen: string
   /**
@@ -206,7 +206,7 @@ export const OUTCOME_KINDS = [
   "workflow-changed",
   "marked",
   "retitling",
-  "integrated",
+  "accepted",
   "offered",
   "reserved",
   "seen",

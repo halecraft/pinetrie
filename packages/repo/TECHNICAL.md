@@ -1,7 +1,7 @@
 # `@pinetrie/repo`: technical notes
 
 This package is your repo as the host reads and writes it: the offers, the
-integration line, and lanes' refs in it (ADR-0038, ADR-0060, ADR-0061), all
+accepted work, and lanes' refs in it (ADR-0038, ADR-0060, ADR-0061), all
 through one owner (ADR-0065). It declares `@pinetrie/core`, `@pinetrie/keeper`
 and `@pinetrie/lanes` (`workspace.test.ts`); `lanes` never imports it. What a
 lane also runs, through a `Runner` it is given, stays in `lanes`
@@ -39,22 +39,22 @@ translates to.
   `planLineSetup`), a publish's catch-up, move and undo
   (`planPublishCatchUp`, `planPublishMove`, `planCatchUpUndo`, ADR-0090),
   an offer's build, rebuild, refresh, repair
-  and integration, lanes' refs (`laneRefSteps`), a bundle's import
-  (`planImport`), where an offer starts (`offerStart`, `integratedOfferCommitsRevset`), the
-  integrated-offer commits' revset (`INTEGRATED_OFFER_COMMITS`, read with `@pinetrie/lanes`' `INTEGRATED_OFFER_COMMIT_ROW` and
-  `parseIntegratedOfferCommits`), and the evolog walk
+  and acceptance, lanes' refs (`laneRefSteps`), a bundle's import
+  (`planImport`), where an offer starts (`offerStart`, `acceptedOfferCommitsRevset`), the
+  accepted-offer commits' revset (`ACCEPTED_OFFER_COMMITS`, read with `@pinetrie/lanes`' `ACCEPTED_OFFER_COMMIT_ROW` and
+  `parseAcceptedOfferCommits`), and the evolog walk
   (`walkToHost`).
 - `run.ts`: the runner factory, private to the package.
 - `offer.ts`: the separate reads an offer's facts come from, and a
   review's.
 - `offer-gather.ts`: every read an offer step plans from, one per action
-  (`gatherOffer`, `gatherPlace`, `gatherRefresh`, `gatherOfferIntegration`,
+  (`gatherOffer`, `gatherPlace`, `gatherRefresh`, `gatherOfferAcceptance`,
   `gatherStack`, `gatherDescribe`), each returning core's facts. Where an
   offer sits is decided here, once, as an `OfferPlace`, and so is the read
   path: a refresh of a lane on the line takes the one read, every other
   gather the separate reads.
 - `offer-steps.ts`: a decision into steps, pure (`offerEffects`,
-  `rebuildEffects`, `offerIntegrationEffects`, `describeEffects`), with what the host
+  `rebuildEffects`, `offerAcceptanceEffects`, `describeEffects`), with what the host
   does after (`OfferEffects.after`).
 - `offer-repair.ts`: `repairOffer`, the one offer step that reads between
   its steps.
@@ -119,9 +119,9 @@ operation is read once and kept until the head moves.**
   `pinetrie.base` is written for it, and the page reads catching up as
   `unknown` (`catchUpOf`, `@pinetrie/rules`), never as caught up.
 - **`SharedFacts`**, per operation (`RepoOps.shared()`): the line's facts
-  (`lineFacts`, for the line's record), the integrated-offer commits on the
-  line (`INTEGRATED_OFFER_COMMITS`: a `Pinetrie-Source` or `Pinetrie-Thread`
-  trailer), split into those naming sources (`integratedOfferCommits`) and
+  (`lineFacts`, for the line's record), the accepted-offer commits on the
+  line (`ACCEPTED_OFFER_COMMITS`: a `Pinetrie-Source` or `Pinetrie-Thread`
+  trailer), split into those naming sources (`acceptedOfferCommits`) and
   those that name none for some lane (`untraced`,
   `untracedLanes`, S97), and the files `@` changes (`editing`). The owner keeps one set, keyed by the head as it
   is at the moment of reading: the one file in the heads directory; any
@@ -133,16 +133,16 @@ operation is read once and kept until the head moves.**
 - **A lane on the line is read in one `jj log`** (`laneRead`): its tip, the
   newest commit carrying `Pinetrie-Base`, the newest line commit in its
   history, the offer's region (`::<bookmark> ~ ::<line>`), and the
-  integrated-offer commits and this lane's untraced ones not under its base; each row with
+  accepted-offer commits and this lane's untraced ones not under its base; each row with
   its parents, its flags (`contained_in` each revset: tip, bookmark, region,
-  base, under the base, integrated, untraced), whether it is divergent or
+  base, under the base, accepted, untraced), whether it is divergent or
   conflicted, its files (in the region) and its description as JSON.
   `planLaneRead` (pure) says the base, the start and the offer from them: an
-  untraced integrated-offer commit above the base makes the start `untraced`. "Under the base" stands for
-  `integratedOfferCommitsRevset`'s `~ ::present(<base source>)`: the base commit merged that
-  source, and an integrated-offer commit is a line commit.
+  untraced accepted-offer commit above the base makes the start `untraced`. "Under the base" stands for
+  `acceptedOfferCommitsRevset`'s `~ ::present(<base source>)`: the base commit merged that
+  source, and an accepted-offer commit is a line commit.
 - **What the rows cannot say is read only when needed:** the start, when a
-  integrated source above the base names more (`offerStart`); a stack's files,
+  accepted source above the base names more (`offerStart`); a stack's files,
   and the top's conflicted files when it conflicts, with the files
   conflicted where its ledger says it starts (`startConflictsOf`,
   ADR-0072): `conflictCause` reads both. An unconflicted offer pays
@@ -161,7 +161,7 @@ operation is read once and kept until the head moves.**
   measured 18 before. A lane whose base moved runs two more, once per move.
 - **One rule decides both.** `repo.test.ts` holds `gatherLane` beside the
   separate reads (`laneTipIn`, `laneBase`, `startOfOffer`, `readOffer`,
-  `workChanges`, `readCatchUp`) at every offer it builds, integrates, follows, repairs and
+  `workChanges`, `readCatchUp`) at every offer it builds, accepts, follows, repairs and
   stacks, and expects the same values. A lane on a WIP reads the separate
   way (`wipFacts`): its target and state need more of your repo. Which way
   a lane is read is `gatherRefresh`'s choice; the host never makes it.
@@ -211,7 +211,7 @@ operation is read once and kept until the head moves.**
   (`planPublishMove`, ADR-0076), which changes no file and is anyone's
   command.
   A publish's catch-up (`planPublishCatchUp`: `jj rebase -b @ -d <onto>`) is
-  one exception, since it changes your files; an integrating move is the
+  one exception, since it changes your files; an accepting move is the
   other: `jj bookmark move <onto> <publish> --to @-` moves the line to your
   commits, your act, so it runs as you (`as: "you"`, ADR-0090), and its
   undo (`planCatchUpUndo`) too. The line's config is set as you too: `jj
@@ -246,26 +246,26 @@ operation is read once and kept until the head moves.**
   The base start is the commit the lane's newest `Pinetrie-Base` names
   (`laneBase`); for a lane with none, from before the line, the newest line
   commit in the tip's history. The sources are the lane commits that
-  integrated offers' `Pinetrie-Source` trailers name, in `::<onto>` and in `::<wip>`
-  for a lane on a WIP, minus `::present(<base source>)` (`integratedOfferCommitsRevset`,
-  read by `integratedOfferCommitFacts` with the lane's untraced ones), each `present()`: one never fetched here names
-  nothing you have. A squash of two integrated offers keeps both trailer
+  accepted offers' `Pinetrie-Source` trailers name, in `::<onto>` and in `::<wip>`
+  for a lane on a WIP, minus `::present(<base source>)` (`acceptedOfferCommitsRevset`,
+  read by `acceptedOfferCommitFacts` with the lane's untraced ones), each `present()`: one never fetched here names
+  nothing you have. A squash of two accepted offers keeps both trailer
   paragraphs, and `trailerValues` reads every one; jj's `trailers` template
   reads only the last (S77 item 6).
 - **Every trailer revset also matches `Pineta-*`** (`pre-rename:`, core's
-  `trailers.ts`): offers integrated before the rename carry `Pineta-Source`,
+  `trailers.ts`): offers accepted before the rename carry `Pineta-Source`,
   and an old lane's next offer would otherwise start below them and put
   their files back over yours (`repo.test.ts`, pre-rename). A `Pineta-Base`
   on `pineta-onto`, the line's name then, reads as no base, so such a lane
   falls back to the newest line commit in its history: the base start above.
-- **A source integrated below the base's source is not part of the start**
+- **A source accepted below the base's source is not part of the start**
   (S81). `LaneBase.source` is the commit of yours the lane merged whole:
   the one its `Pinetrie-Base` names (the WIP's commit, never the copy, which
-  descends from no integrated-offer commit), else `start`. An offer keeps the diff from
+  descends from no accepted-offer commit), else `start`. An offer keeps the diff from
   its start's merge to the tip, so a start the target holds as another
-  commit is subtracted from the target. An integrated-offer commit and a
+  commit is subtracted from the target. An accepted-offer commit and a
   later catch-up are both heads, and their merge conflicts wherever the line
-  changed the integrated lines since: an offer conflicted where its lane had nothing left to
+  changed the accepted lines since: an offer conflicted where its lane had nothing left to
   resolve. `present()` around the base's source keeps a commit lost to
   `jj util gc` from failing every refresh; it then excludes nothing.
 - **Every revision of an offer carries the host's trailers and its ledger**
@@ -273,7 +273,7 @@ operation is read once and kept until the head moves.**
   `Pinetrie-Entry`, then `Pinetrie-Source: <tip>` and `Pinetrie-Start`, in one
   paragraph, on its WIP line and kept through a description. The source is
   the lane tip the whole offer holds, a stack's revisions included:
-  integrated, it says you have that tip.
+  accepted, it says you have that tip.
 - **`lineFacts` previews catching your files up** (`yours.catchUp`, S80):
   `git merge-tree --write-tree --name-only --merge-base=<fork point> <onto>
   <@>` exits 1 on conflicts and prints the merged tree, the conflicting
@@ -293,21 +293,21 @@ operation is read once and kept until the head moves.**
   --from <start> --to <tip>`: the diff a build restores, so the two always
   agree. From several, `jj diff -r '(<start>)..<tip>'`, which diffs a range
   from its roots' parents, merged, to its tip. jj refuses a range with gaps,
-  as after a catch-up merged an integrated-offer commit (S97): the merge is in the range and
+  as after a catch-up merged an accepted-offer commit (S97): the merge is in the range and
   one of its parents is not. A refusal, or no start, is `unknown`, which
   never builds an offer.
-- **An untraced integrated-offer commit** is one whose paragraph names a
+- **An untraced accepted-offer commit** is one whose paragraph names a
   thread and a lane but no source (`untracedLanes`, core): an offer
-  integrated before offers carried their ledger. Above a lane's base, it makes the lane's start `untraced`
+  accepted before offers carried their ledger. Above a lane's base, it makes the lane's start `untraced`
   (`StartRead`), since no start can leave out what it brought: nothing is
   offered until the lane catches up past it, which puts it under the base.
   A turn's commit names no thread, so it is never one. Only the lane's own
-  integrated-offer commits are matched, by `Pinetrie-Lane`: an untraced one of
+  accepted-offer commits are matched, by `Pinetrie-Lane`: an untraced one of
   a lane it forked from is not found.
 - **An untraced place leaves a gap** (`untouched`, ADR-0067): on a lane
   whose start is untraced, a divergent offer is not repaired and an offer
   you edited is not recorded again; nothing runs, and its record stays as
-  it was, until the lane catches up past the integrated-offer commit. Only an offer the host
+  it was, until the lane catches up past the accepted-offer commit. Only an offer the host
   made is withdrawn there. `RefreshDecision` names it, so nothing reaches
   it by accident.
 - **`catchUpFiles`** says which files catching up would change in a lane:
@@ -317,7 +317,7 @@ operation is read once and kept until the head moves.**
   the start changes no other file. For a WIP, `to` is the WIP's commit: the
   copy the update makes has its files. `repo.test.ts` holds it against
   `mergeUpdate`'s files on the line and on a WIP, and against your own
-  integration (none).
+  acceptance (none).
 - **`startOfOffer` is the one path to a start**, or to `untraced`. Every
   gather reaches it, the one read included (`gatherLane`'s `offerStart`
   read): the host's refresh, its `squash` and `refresh` actions and
@@ -331,10 +331,10 @@ operation is read once and kept until the head moves.**
   under it. The change id and bookmark stay, and jj records no operation for
   a restore that changes nothing. `planOffer` and the rebuild both end with
   `planRefreshOffer`'s rebase.
-- **An offer integration is a forward bookmark move**
-  (`planOfferIntegrationSteps`, ADR-0060): `jj bookmark move <destination>
+- **An acceptance is a forward bookmark move**
+  (`planOfferAcceptanceSteps`, ADR-0060): `jj bookmark move <destination>
   --to <top>` as the host, then the offer's bookmark deleted. It never
-  rebases and never touches your `@`. An integration and a publish each move bookmarks with `moveForward`, which never
+  rebases and never touches your `@`. An acceptance and a publish each move bookmarks with `moveForward`, which never
   passes `--allow-backwards`: jj refuses a move that is not forward, so a
   stale move fails rather than drops commits (S77 item 1). A colocated
   repo's git ref follows a host move made with `--ignore-working-copy`
@@ -347,7 +347,7 @@ operation is read once and kept until the head moves.**
   <name>$") | <bookmark>)`. A conflicted offer's `startConflicts` are the
   files conflicted at each commit its `Pinetrie-Start` names
   (`startConflictsOf`, shared with `gatherLane`); a start your repo lacks
-  names none. An integrated offer below carries the same trailer, but
+  names none. An accepted offer below carries the same trailer, but
   is under the target; your commits carry none. The bookmark's own commit
   is always the top. A conflicted bookmark, or a change id naming two
   commits, reads as divergent, with only the change ids. Every read after
@@ -379,7 +379,7 @@ operation is read once and kept until the head moves.**
   the same order (`gitDiffCounts`). The two must list as many files, or the
   read fails. A range has no description. `fileDiff` reads a range with
   `--from --to`. A commit stays readable by id after it is abandoned, so a
-  lane's revisions can be read after an integration or a split.
+  lane's revisions can be read after an acceptance or a split.
 - **`hostCommitIn`** splits a divergent revision's commits by the user of
   each one's newest evolog operation (`evologOf` with a limit of 1,
   `isHostUser`): the host's is abandoned, yours kept.
@@ -410,23 +410,23 @@ operation is read once and kept until the head moves.**
   with jj and with git, reaching the offer and a branch at its turn, and an
   update merging on it, while a stack's commits are never adopted; an offer
   built, refreshed, left, rewritten by the host with its record lost (S73),
-  repaired, integrated under your edits and beside them, the next offer, and a
+  repaired, accepted under your edits and beside them, the next offer, and a
   stack; an offer following a moved tip, your conflicting commit and a moved
   start, each checked against a fresh build; an offer after you committed
-  your edits differently, after an integrated branch that holds the lane's
-  tip, from a branch whose parent was integrated after the fork (S72), and
-  from a lane after a branch of it was integrated before its update (S51,
-  S72); an untraced integrated-offer commit, read either way until the lane catches up past it, and what catching
+  your edits differently, after an accepted branch that holds the lane's
+  tip, from a branch whose parent was accepted after the fork (S72), and
+  from a lane after a branch of it was accepted before its update (S51,
+  S72); an untraced accepted-offer commit, read either way until the lane catches up past it, and what catching
   up changes against what the merge changed (S97); and a review of an
   offer's commit (its description, a rename, names with a space and a
   quote, and one file's diff, never a directory's). The gathers are held to
   it as well: each place kind (placed, untraced, a WIP gone), what an
-  integration reads on a WIP (`gatherOfferIntegration`), a split's stack bottom first
+  acceptance reads on a WIP (`gatherOfferAcceptance`), a split's stack bottom first
   (`gatherStack`), `repairOffer` on a divergent offer, and that
   `trailerRevset` finds exactly the commits `hasTrailer` matches. And a
-  catch-up past an integrated-offer commit of the lane's own work, of its
-  parent's, two of them, a conflict both sides made, and an integration of
-  an offer you edited (S102): the lane holds the integrated-offer commit's
+  catch-up past an accepted-offer commit of the lane's own work, of its
+  parent's, two of them, a conflict both sides made, and an acceptance of
+  an offer you edited (S102): the lane holds the accepted-offer commit's
   source, so that commit is joined to it and the update is clean.
 - **`offer-steps.test.ts`**: each decision's steps, as the planners make
   them, and that each `after` carries the decision's place.

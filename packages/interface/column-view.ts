@@ -93,7 +93,7 @@ export interface WorkFacts {
   readonly names: ReadonlyMap<LaneName, ThreadName>
   /** Each thread's column banner. */
   readonly banners: ReadonlyMap<LaneName, BannerRecord>
-  /** The integration line, as the host last read it (ADR-0060). */
+  /** Accepted work, as the host last read it (ADR-0060). */
   readonly line: LineRecord | null
   /** Each lane's base, as its history says it (ADR-0060). */
   readonly bases: ReadonlyMap<LaneName, BaseRecord>
@@ -264,7 +264,7 @@ export type WorkStrip =
       readonly waiting: boolean
       readonly bookmark: string | null
       readonly review: ReviewTarget | null
-      /** Where `integrate` and `integrate-into-line` go (ADR-0060). */
+      /** Where `accept` and `accept-into-line` go (ADR-0060). */
       readonly destinations: OfferView["destinations"]
     }
   | {
@@ -744,11 +744,7 @@ export function queueControlWords(
 const BUTTON_LABEL: Record<
   Exclude<
     OfferButton,
-    | "integrate"
-    | "integrate-into-line"
-    | "update"
-    | "continue"
-    | "catch-up-parent"
+    "accept" | "accept-into-line" | "update" | "continue" | "catch-up-parent"
   >,
   string
 > = {
@@ -759,14 +755,14 @@ const BUTTON_LABEL: Record<
 }
 
 /** What an offer command in flight says, until the host answers. */
-const SENDING: Record<Exclude<OfferActing["action"], "integrate">, string> = {
+const SENDING: Record<Exclude<OfferActing["action"], "accept">, string> = {
   squash: "squashing to one…",
   describe: "rewriting the description…",
   refresh: "refreshing…",
 }
 
 /**
- * Your last offer command, worded: an integration in flight names a WIP it
+ * Your last offer command, worded: an acceptance in flight names a WIP it
  * goes into ("accepting into wip/search…"), the rest their own words; a
  * refusal or a failure as every command's (`outcomeWords`).
  */
@@ -776,7 +772,7 @@ function actingWords(
 ): string | null {
   if (acting === null) return null
   if (acting.kind !== "sent") return outcomeWords(acting)
-  if (acting.action !== "integrate") return SENDING[acting.action]
+  if (acting.action !== "accept") return SENDING[acting.action]
   const to = destinations.find(d => d.bookmark === acting.to) ?? destinations[0]
   return to === undefined || to.kind === "line"
     ? "accepting…"
@@ -824,8 +820,8 @@ export function offerWords(
             : facts.activity === "resolution"
               ? `resolving what's new in ${base} into this thread`
               : "splitting the offer into a stack"
-          : state === "integrated"
-            ? `accepted as ${(facts.integratedAs ?? "").slice(0, 8)}`
+          : state === "accepted"
+            ? `accepted as ${(facts.acceptedAs ?? "").slice(0, 8)}`
             : state === "needs_you"
               ? "the agent has a question about your edits · see the thread"
               : state === "edited"
@@ -843,12 +839,12 @@ export function offerWords(
       : said
   const [first] = view.destinations
   const toLine = view.destinations.find(d => d.kind === "line")
-  /** The bookmark an integration moves, and to what: the jj facts, as a title. */
+  /** The bookmark an acceptance moves, and to what: the jj facts, as a title. */
   const moves = (bookmark: string) =>
     facts.bookmark === null
       ? undefined
       : `moves ${bookmark} forward to ${facts.bookmark}`
-  const integrateLabel = (): string => {
+  const acceptLabel = (): string => {
     const where =
       first === undefined || first.kind === "line"
         ? ""
@@ -865,13 +861,13 @@ export function offerWords(
     facts.base.kind === "line" ? facts.onto : facts.base.bookmark
   const labelled = (button: OfferButton): LabelledButton => {
     switch (button) {
-      case "integrate":
+      case "accept":
         return {
           button,
-          label: integrateLabel(),
+          label: acceptLabel(),
           ...titled(first === undefined ? undefined : moves(first.bookmark)),
         }
-      case "integrate-into-line":
+      case "accept-into-line":
         return {
           button,
           label:

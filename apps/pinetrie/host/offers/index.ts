@@ -34,7 +34,7 @@ import {
 import {
   answerDiff,
   answerReview,
-  isNotYetIntegrated,
+  isNotYetAccepted,
   type OfferAnswer,
   type OfferAsk,
   offerStatus,
@@ -66,13 +66,13 @@ export interface Offers {
   /** A run on `lane` ended: refresh its offer, then describe it if it is still a WIP. */
   runEnded(lane: LaneName): void
   /**
-   * An offer action other than a split; an integration names its destination, null
+   * An offer action other than a split; an acceptance names its destination, null
    * for the default, and what it was shown (ADR-0065). Carried out, it
    * answers with its fact, which the thread is told (ADR-0080).
    */
   act(
     lane: LaneName,
-    action: "integrate" | "squash" | "describe" | "refresh",
+    action: "accept" | "squash" | "describe" | "refresh",
     by: WriterId,
     to?: string | null,
     seen?: OfferSeen | null,
@@ -107,7 +107,7 @@ export interface Offers {
 
 export function startOffers(input: {
   readonly owner: RepoOwner
-  /** The integration line's names (ADR-0060). */
+  /** Accepted work's names (ADR-0060). */
   readonly line: LineConfig
   readonly basics: Basics
   readonly records: Pick<Records, "writeValues">
@@ -177,7 +177,7 @@ export function startOffers(input: {
       names,
       archived: new Set([...names.keys()].filter(l => deps.docs.archived(l))),
       open: [...readOffers(basics.session).values()]
-        .filter(o => isNotYetIntegrated(offerStatus(o)))
+        .filter(o => isNotYetAccepted(offerStatus(o)))
         .map(o => o.lane),
     })
     if (planned.line) markLine()

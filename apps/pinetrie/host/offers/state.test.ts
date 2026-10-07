@@ -34,7 +34,7 @@ const OFFER: OfferRecord = {
   described: false,
   edited: false,
   bookmark: "pinetrie-offer/amber-fox",
-  integratedAs: null,
+  acceptedAs: null,
   commits: [commitId("c1")],
   ledger: null,
   at: 1,
@@ -66,9 +66,9 @@ test("the records the host writes from your repo: only what changed, and only a 
   expect(readBases(b.session).get(LANE)).toEqual(BASE)
   // A base record that changed is announced, and one unchanged is not (ADR-0080).
   expect(changed).toEqual([LANE])
-  // An integrated offer's record is written whatever is there.
-  await records.writeIntegratedOffer({ ...OFFER, integratedAs: "kt" })
-  expect(readOffers(b.session).get(LANE)?.integratedAs).toBe("kt")
+  // An accepted offer's record is written whatever is there.
+  await records.writeAcceptedOffer({ ...OFFER, acceptedAs: "kt" })
+  expect(readOffers(b.session).get(LANE)?.acceptedAs).toBe("kt")
   await records.remove(LANE)
   expect(readOffers(b.session).has(LANE)).toBe(false)
   expect(scribe.calls).toHaveLength(4)

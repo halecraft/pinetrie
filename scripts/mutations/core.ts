@@ -128,22 +128,22 @@ export const mutations: readonly Mutation[] = [
     expect: "isLongAsk: a run of LONG_ASK agent messages, not one fewer",
   },
   {
-    name: "an integrated-offer commit that names a source reads as untraced",
+    name: "an accepted-offer commit that names a source reads as untraced",
     file: trailers,
     from: '        trailerValues(p, "source").length === 0,\n',
     to: "        true,\n",
     command: unit,
     expect:
-      "untracedLanes: an integrated offer's paragraph naming a thread and a lane but no source; never a turn's, nor a traced integrated offer's (S97)",
+      "untracedLanes: an accepted offer's paragraph naming a thread and a lane but no source; never a turn's, nor a traced accepted offer's (S97)",
   },
   {
-    name: "a turn reads as an untraced integrated-offer commit",
+    name: "a turn reads as an untraced accepted-offer commit",
     file: trailers,
     from: '        trailerValues(p, "thread").length > 0 &&\n',
     to: "        true &&\n",
     command: unit,
     expect:
-      "untracedLanes: an integrated offer's paragraph naming a thread and a lane but no source; never a turn's, nor a traced integrated offer's (S97)",
+      "untracedLanes: an accepted offer's paragraph naming a thread and a lane but no source; never a turn's, nor a traced accepted offer's (S97)",
   },
   {
     name: "a chat at the root may name any root",
@@ -641,13 +641,13 @@ export const mutations: readonly Mutation[] = [
     expect: "toolLabel names what the call touches",
   },
   {
-    name: "an offer integration need not say what it was shown",
+    name: "an acceptance need not say what it was shown",
     file: "packages/protocol/codec.ts",
     from: "    const seen = offerSeenFromWire(text(wire?.seen))\n",
     to: "    const seen = offerSeenFromWire(text(wire?.seen)) ?? { ledger: null, conflicted: false }\n",
     command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
     expect:
-      "an offer integration that does not say which offer it was shown, well formed, is refused",
+      "an acceptance that does not say which offer it was shown, well formed, is refused",
   },
   {
     name: "a retitle may name anything as its root",

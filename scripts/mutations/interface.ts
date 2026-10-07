@@ -389,12 +389,12 @@ export const mutations: readonly Mutation[] = [
     expect: "your offer command waits while it is out, and not once answered",
   },
   {
-    name: "an integration in flight names the default destination, not the one chosen",
+    name: "an acceptance in flight names the default destination, not the one chosen",
     file: "packages/interface/column-view.ts",
     from: "  const to = destinations.find(d => d.bookmark === acting.to) ?? destinations[0]",
     to: "  const to = destinations[0]",
     command: unit,
-    expect: "your last command: an integration from a WIP into the line",
+    expect: "your last command: an acceptance from a WIP into the line",
   },
   {
     name: "a prefill forgets where its agent works",
@@ -429,7 +429,7 @@ export const mutations: readonly Mutation[] = [
     to: '    case "unknown":\n      return ""\n',
     command: unit,
     expect:
-      "the jj facts are titles: which bookmark an integration moves, and what catching up merges",
+      "the jj facts are titles: which bookmark an acceptance moves, and what catching up merges",
   },
   {
     name: "an offer's line says nothing of its base moving on",
@@ -511,7 +511,7 @@ export const mutations: readonly Mutation[] = [
     expect: "no line yet: set up at your @-, showing the heads it writes",
   },
   {
-    name: "an integration does not say where it goes",
+    name: "an acceptance does not say where it goes",
     file: "packages/interface/column-view.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "        : ` into ${first.bookmark}`",
@@ -1788,7 +1788,7 @@ export const mutations: readonly Mutation[] = [
     name: "the header counts an offer the line already holds",
     file: "packages/interface/app-view.ts",
     from: '    if (offerStatus(o).kind !== "open" || root === undefined) return []',
-    to: "    if (o.integratedAs !== null || root === undefined) return []",
+    to: "    if (o.acceptedAs !== null || root === undefined) return []",
     command: unit,
     expect:
       "the header's offers are the open ones, never one the line already holds",
@@ -1797,10 +1797,10 @@ export const mutations: readonly Mutation[] = [
     name: "a held offer reviews nothing, but the strip offers it",
     file: "packages/interface/column-view.ts",
     from: '      offer.kind !== "open"\n        ? null',
-    to: '      offer.kind === "none" || offer.kind === "integrated"\n        ? null',
+    to: '      offer.kind === "none" || offer.kind === "accepted"\n        ? null',
     command: unit,
     expect:
-      "an open offer with files can be reviewed, in every state; an integrated or empty one cannot",
+      "an open offer with files can be reviewed, in every state; an accepted or empty one cannot",
   },
   {
     name: "a new tab has no rail",
@@ -2965,7 +2965,7 @@ export const mutations: readonly Mutation[] = [
     to: "      bs",
     command: unit,
     expect:
-      "a WIP gone without landing offers no integration, and continuing from the project",
+      "a WIP gone without landing offers no acceptance, and continuing from the project",
   },
   // ── pages and the account menu (ADR-0098) ──
   {

@@ -807,34 +807,34 @@ became of its files (`strip`).
   column whose next send creates a lane of its own, at a commit whose
   records carry conflicts (`conflictsAt` of `nearestRevision`'s commit),
   shows `.where-fork-conflict` under the where line.
-- **An offer integration names the offer this tab shows** (ADR-0065): `SessionClient.offer`
+- **An acceptance names the offer this tab shows** (ADR-0065): `SessionClient.offer`
   reads the lane's record from its session document as it sends, the one
   the strip was drawn from, and sends `offerSeen` of it (its ledger, and
-  whether it conflicted). The host refuses the integration `offer_changed` when the
+  whether it conflicted). The host refuses the acceptance `offer_changed` when the
   offer now brings other work.
 - **Your offer and line commands are tracked per tab** (`acting.ts`,
   `@pinetrie/session`): `SessionClient.offer` and `.line` mark the command
   `sent` at once and record the answer when it comes. A refusal or failure
   stays until your next command on that lane (or the line); an answer that
-  carried it out (`integrated`, `offered`, a split's `started`, `line-moved`)
+  carried it out (`accepted`, `offered`, a split's `started`, `line-moved`)
   clears it, since the record then says how things stand. Each send has an
   id, so the answer to a send since replaced changes nothing. The page's
   `offer` effect (`perform.ts`) only calls the session. `columnView` takes
   the lane's entry as `ColumnFacts.acting`: the strip's `waiting` disables
   its buttons and menu rows while it is `sent`, and `offerWords` words it
   as the strip's `note` (`.offer-note`, `role="status"`, `data-acting`
-  `sent` or `said`). An integration in flight names a WIP destination
+  `sent` or `said`). An acceptance in flight names a WIP destination
   ("accepting into wip/search…"); a refusal or failure is `outcomeWords`,
   shared with the publish toast.
 - **`offerView` (`@pinetrie/rules`) decides an offer; `offerWords`
   words it**: its line and each button's label and title, by state. An
   offer that conflicts says so even when it is `edited` (S73), and its
-  integrate button reads "accept anyway" whatever the state, as it does when
-  a resolution asked for you. Each integrate button names a WIP the work
+  accept button reads "accept anyway" whatever the state, as it does when
+  a resolution asked for you. Each accept button names a WIP the work
   goes into (ADR-0060, ADR-0083, ADR-0090): "accept", "accept into
   wip/search", and, from a WIP thread's menu, "accept, with your 2 commits
   beneath it". A conflicted offer on the
-  line offers "resolve in the thread", never an integration into it. The bookmark is
+  line offers "resolve in the thread", never an acceptance into it. The bookmark is
   a fact of its own, drawn apart (`.offer-bookmark`), never in the line.
   `workStrip` hands `offerView` the record decoded (`offerStatus`): a `held`
   offer says "nothing to accept: accepted work already has this thread's
@@ -860,7 +860,7 @@ became of its files (`strip`).
   split button (ADR-0080).
 - **A thread's base** shows in its header only when it is not the line
   (`baseWords`): "on wip/search", or "wip/search is gone", when the menu's
-  update becomes "continue from accepted work" and no integration is
+  update becomes "continue from accepted work" and no acceptance is
   offered.
   Catching up says its base: "catch up with wip/search". Two known limits,
   both in words only:

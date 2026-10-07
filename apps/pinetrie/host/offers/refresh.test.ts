@@ -146,27 +146,27 @@ async function settles(dir: string, lane: LaneName, name: ThreadName) {
   }
 }
 
-test("a catch-up that merged your integration of the lane's work leaves nothing to offer: an empty offer built before is withdrawn (S97)", async () => {
+test("a catch-up that merged your acceptance of the lane's work leaves nothing to offer: an empty offer built before is withdrawn (S97)", async () => {
   const you = await yourRepo("caught-up")
   const work = await you.commit(
     [you.base],
     { "lane.txt": "the lane's\n" },
     `turn\n\nPinetrie-Lane: ${LANE}\nPinetrie-Entry: e1\n`,
   )
-  const integrated = await you.commit(
+  const accepted = await you.commit(
     [you.base],
     { "lane.txt": "the lane's\n" },
     `feat: the lane's\n\nPinetrie-Thread: ${THREAD}\nPinetrie-Lane: ${LANE}\nPinetrie-Entry: e1\nPinetrie-Source: ${work}\nPinetrie-Start: ${you.base}\n`,
   )
-  await you.moveLine(integrated)
-  // The lane catches up: a merge of its work and your integrated-offer
+  await you.moveLine(accepted)
+  // The lane catches up: a merge of its work and your accepted-offer
   // commit. Its range from that commit has a gap, which jj refuses to diff.
   const merged = await you.commit(
-    [work, integrated],
+    [work, accepted],
     {},
     baseMessage("update: pinetrie-onto", {
       bookmark: DEFAULT_LINE.onto,
-      commit: integrated,
+      commit: accepted,
     }),
   )
   await you.setTip(LANE, merged)
@@ -179,9 +179,9 @@ test("a catch-up that merged your integration of the lane's work leaves nothing 
       "--config",
       `operation.username=${HOST_OPERATOR}`,
       "new",
-      integrated,
+      accepted,
       "-m",
-      `WIP (${THREAD}): x\n\nPinetrie-Thread: ${THREAD}\nPinetrie-Lane: ${LANE}\nPinetrie-Entry: e2\nPinetrie-Source: ${merged}\nPinetrie-Start: ${integrated}\n`,
+      `WIP (${THREAD}): x\n\nPinetrie-Thread: ${THREAD}\nPinetrie-Lane: ${LANE}\nPinetrie-Entry: e2\nPinetrie-Source: ${merged}\nPinetrie-Start: ${accepted}\n`,
     ],
     { env: ENV },
   )
@@ -208,20 +208,20 @@ test("a catch-up that merged your integration of the lane's work leaves nothing 
   })
 }, 60_000)
 
-test("an integrated-offer commit of the lane with no Pinetrie-Source builds nothing until the lane catches up past it; then only what is new (S97)", async () => {
+test("an accepted-offer commit of the lane with no Pinetrie-Source builds nothing until the lane catches up past it; then only what is new (S97)", async () => {
   const you = await yourRepo("untraced")
   const work = await you.commit(
     [you.base],
     { "a.txt": "the lane's\n" },
     `turn\n\nPinetrie-Lane: ${LANE}\nPinetrie-Entry: e1\n`,
   )
-  // Integrated before offers carried their ledger: no source, no start.
-  const integrated = await you.commit(
+  // Accepted before offers carried their ledger: no source, no start.
+  const accepted = await you.commit(
     [you.base],
     { "a.txt": "the lane's\n" },
     `feat: the lane's\n\nPinetrie-Thread: ${THREAD}\nPinetrie-Lane: ${LANE}\nPinetrie-Entry: e1\n`,
   )
-  const yours = await you.commit([integrated], { "a.txt": "yours\n" }, "yours")
+  const yours = await you.commit([accepted], { "a.txt": "yours\n" }, "yours")
   await you.moveLine(yours)
   const more = await you.commit(
     [work],
@@ -235,7 +235,7 @@ test("an integrated-offer commit of the lane with no Pinetrie-Source builds noth
     files: null,
     record: null,
     base: expect.objectContaining({
-      untraced: [integrated],
+      untraced: [accepted],
       catchUp: { tip: more, to: yours, files: ["a.txt"] },
     }),
   })
@@ -250,7 +250,7 @@ test("an integrated-offer commit of the lane with no Pinetrie-Source builds noth
   await you.setTip(LANE, merged)
   expect(await settles(you.dir, LANE, THREAD)).toMatchObject({
     files: ["b.txt"],
-    record: { files: ["b.txt"], integratedAs: null },
+    record: { files: ["b.txt"], acceptedAs: null },
     base: { untraced: [], catchUp: null },
   })
 }, 60_000)
@@ -275,7 +275,7 @@ test("work you landed yourself leaves the offer held: kept, with no files, and s
   // The line moved by work the lane has: catching up would change nothing.
   expect(await settles(you.dir, LANE, THREAD)).toMatchObject({
     files: [],
-    record: { files: [], integratedAs: null },
+    record: { files: [], acceptedAs: null },
     base: { catchUp: { tip: work, to: yours, files: [] } },
   })
 }, 60_000)

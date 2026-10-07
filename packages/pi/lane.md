@@ -63,10 +63,10 @@ changes pine·trie can keep this note true. You can skip them.
 
 ## What the person gets
 
-- Your work reaches the person as one commit on their integration line
+- Your work reaches the person as one commit on their accepted work
   (`pinetrie-onto`, unless they named it otherwise), or on the WIP bookmark
   this thread started from, bookmarked `pinetrie-offer/<thread name>`: the
-  offer. They take it when they choose. <!-- packages/lanes/plan.ts offerBookmark -->
+  offer. They accept it when they choose. <!-- packages/lanes/plan.ts offerBookmark -->
 - This thread started from that line, or from a copy of that WIP: the
   commit in your history whose message carries `Pinetrie-Base`. Leave it as it
   is. <!-- packages/core/trailers.ts baseMessage -->
@@ -129,7 +129,7 @@ changes pine·trie can keep this note true. You can skip them.
 - Several people may write in one thread. Each message you read begins with
   the name of the person who wrote it. <!-- packages/rules/chat.ts attributed -->
 - When someone brings this thread up to date, pine·trie merges the thread's
-  base into `/workspace`: the integration line's newest commit, or a fresh
+  base into `/workspace`: accepted work's newest commit, or a fresh
   copy of the WIP it started from. A note tells you what changed. What they
   want done with it comes after, as their message.
   <!-- packages/lanes/merge.ts mergeBase -->

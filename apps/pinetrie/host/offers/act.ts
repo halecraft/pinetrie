@@ -1,8 +1,8 @@
 // host/offers/act — an offer action other than a split (ADR-0038):
-// integrate, squash, refresh, or describe again. Each is one owner command:
-// gather (`gatherOffer`, and `gatherOfferIntegration` for an integration),
-// decide (`planOfferIntegration`, `planRebuild`), translate and execute. An
-// offer integration moves one bookmark forward to the offer (ADR-0060). An
+// accept, squash, refresh, or describe again. Each is one owner command:
+// gather (`gatherOffer`, and `gatherOfferAcceptance` for an acceptance),
+// decide (`planOfferAcceptance`, `planRebuild`), translate and execute. An
+// acceptance moves one bookmark forward to the offer (ADR-0060). An
 // action carried out answers with its fact, what the thread is told it did
 // (ADR-0080).
 
@@ -17,15 +17,15 @@ import {
 import { readThreadName } from "@pinetrie/reads"
 import {
   gatherOffer,
-  gatherOfferIntegration,
-  offerIntegrationEffects,
+  gatherOfferAcceptance,
+  offerAcceptanceEffects,
   type RepoOps,
 } from "@pinetrie/repo"
 import {
+  acceptedFact,
   actionFact,
-  integratedFact,
   planDescribeAgain,
-  planOfferIntegration,
+  planOfferAcceptance,
   planRebuild,
 } from "@pinetrie/rules"
 import { describe } from "./describe.ts"
@@ -40,7 +40,7 @@ export async function act(
   > & { readonly describing: Set<LaneName> },
   refresh: Pick<Refresh, "rebuild" | "ports">,
   lane: LaneName,
-  action: "integrate" | "squash" | "describe" | "refresh",
+  action: "accept" | "squash" | "describe" | "refresh",
   by: WriterId,
   to: string | null = null,
   seen: OfferSeen | null = null,
@@ -79,40 +79,40 @@ export async function act(
           }
         : code(refused)
     }
-    if (action === "integrate") {
-      const integration =
+    if (action === "accept") {
+      const acceptance =
         gathered === null
           ? null
-          : await gatherOfferIntegration(ops, gathered, line)
+          : await gatherOfferAcceptance(ops, gathered, line)
       const { editing } = await ops.shared()
       // plan
-      const planned = planOfferIntegration({
+      const planned = planOfferAcceptance({
         lane,
         gathered,
         seen,
-        integration,
+        acceptance,
         editing,
         onto: line.onto,
         to,
         now: basics.now(),
       })
       if (planned.kind === "refused") return code(planned.code)
-      // execute: the lane's base record first, as the integration found it.
+      // execute: the lane's base record first, as the acceptance found it.
       await executeOffer(
         refresh.ports(ops, lane, planned.name),
         {
           base: gathered?.base ?? null,
-          effects: offerIntegrationEffects(planned),
+          effects: offerAcceptanceEffects(planned),
         },
         null,
       )
       basics.log(
-        `[host] ${readThreadName(basics.session, lane)}: offer integrated by ${by} as ${planned.top.slice(0, 8)}`,
+        `[host] ${readThreadName(basics.session, lane)}: offer accepted by ${by} as ${planned.top.slice(0, 8)}`,
       )
       return {
         code: null,
         describe: null,
-        fact: integratedFact({ lane, by, decision: planned, onto: line.onto }),
+        fact: acceptedFact({ lane, by, decision: planned, onto: line.onto }),
       }
     }
     // squash and refresh: the offer rebuilt from the lane's tip, as one.

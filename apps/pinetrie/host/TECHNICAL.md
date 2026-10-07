@@ -702,7 +702,7 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 - **An update is one step on the lane's `LaneQueue`** (`updateOnQueue`):
   the lane's base from its own history, the line and the WIP from your
   repo (pinned), `planUpdateFrom`, the edits committed and `mergeUpdate`
-  (which first joins each integrated-offer commit the lane holds to its source, ADR-0079), so nothing
+  (which first joins each accepted-offer commit the lane holds to its source, ADR-0079), so nothing
   changes the lane between what is read and what is merged. Before the
   merge, `planCatchUp` settles the floor a resolution's prompt must fit
   (ADR-0084), from the resolve-conflicts skill, read before the step, and
@@ -771,17 +771,17 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   offer. What could still hold one marks such a lane anyway: its ref or its
   offer bookmark (the first observation reports every bookmark as moved),
   or an open record. That is safe because an untraced start, or what jj cannot say,
-  builds nothing (ADR-0067): a thread integrated before offers carried
+  builds nothing (ADR-0067): a thread accepted before offers carried
   `Pinetrie-Source` is not offered again (S97).
 - **Reads are pinned and never queued:** a page's review or diff
   (`Offers.read`), a description's gather, and lane work's reads of your
   repo run at the head the owner last observed (`owner.read`). An offer
-  integration gathers in its own command, unpinned, so it acts on the repo as it is.
+  acceptance gathers in its own command, unpinned, so it acts on the repo as it is.
 - **The host decides nothing and runs no jj on an offer.** Each step is a
-  gather (`@pinetrie/repo`: `gatherRefresh`, `gatherOffer`, `gatherOfferIntegration`,
+  gather (`@pinetrie/repo`: `gatherRefresh`, `gatherOffer`, `gatherOfferAcceptance`,
   `gatherStack`, `gatherDescribe`), a decision (`@pinetrie/rules`: `planRefresh`,
-  `planOfferIntegration`, `planRebuild`, `planStackEnded`, `planDescribeSettle`),
-  a translation into steps (`@pinetrie/repo`: `offerEffects`, `offerIntegrationEffects`,
+  `planOfferAcceptance`, `planRebuild`, `planStackEnded`, `planDescribeSettle`),
+  a translation into steps (`@pinetrie/repo`: `offerEffects`, `offerAcceptanceEffects`,
   `rebuildEffects`, `describeEffects`), and `executeOffer` (`execute.ts`),
   which carries out every action over ports: the lane's base record first,
   when it differs from the page's, then the steps, then what comes after
@@ -797,13 +797,13 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   Everything else is read from your repo (ADR-0060), and where an offer
   sits is decided once there (`OfferPlace`): a WIP gone moves nothing and
   writes only its base record; an untraced start builds nothing, so squash,
-  refresh, describe and a split's span refuse it, while an integration, a
-  bookmark move, can still integrate an offer you edited there.
+  refresh, describe and a split's span refuse it, while an acceptance, a
+  bookmark move, can still accept an offer you edited there.
 - **The records are written from the repo after each step**
   (`OfferRecords`): an offer's from the read made before planning when the
   step ran no steps (the common `none` reads nothing more), else from a new
-  read; `withdraw` and `forget` remove it; an integration writes it marked
-  integrated (`integratedAs`; a record from before ADR-0083 says `taken`,
+  read; `withdraw` and `forget` remove it; an acceptance writes it marked
+  accepted (`acceptedAs`; a record from before ADR-0083 says `taken`,
   read as the same).
   Each write is skipped when it changes nothing, and the records are read
   only for that. A base record that changed is reported (`baseChanged`), so a
@@ -819,16 +819,16 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   command** (`Offers.moveLanes`, called by `work/archive.ts`), then marks
   each lane: an archived thread's offer is withdrawn, a restored one's built
   again (ADR-0061).
-- **An offer integration names the offer it was shown** (`OfferSeen`, ADR-0065): the
+- **An acceptance names the offer it was shown** (`OfferSeen`, ADR-0065): the
   ledger its record carried, and whether it conflicted, which the page's
   session client reads from the record as it sends (`offerSeen`).
-  `planOfferIntegration` refuses `offer_changed` when the ledger now differs (its source, or its
+  `planOfferAcceptance` refuses `offer_changed` when the ledger now differs (its source, or its
   start as a set), or the offer conflicts now and did not then. A rebase
-  onto a moved target and your edit keep the ledger, and are integrated.
-- **An offer integration names its destination** (`planOfferIntegration`): one of
-  `offerIntegrationDestinations`, and refused (`bad_destination`) unless the bookmark is
+  onto a moved target and your edit keep the ledger, and are accepted.
+- **An acceptance names its destination** (`planOfferAcceptance`): one of
+  `offerAcceptanceDestinations`, and refused (`bad_destination`) unless the bookmark is
   at or below the offer's bottom's parent, read in the same command
-  (`gatherOfferIntegration`). jj's
+  (`gatherOfferAcceptance`). jj's
   refusal of a backwards move is the second guard (S77 item 1).
 - **The `line` command** (`work/line.ts`, created by `startLaneWork` beside
   the offers, which rewrite its record when the owner observes the line or
@@ -849,8 +849,8 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   never the bind or the invite key (ADR-0099).
 - **The base snapshot follows the line** (`work/index.ts`): the owner's
   `Moved.onto` refreshes it (`refreshBaseSoon`), so setup, an accept, an
-  integrating publish and a move made in jj outside pine·trie all reach it
-  by one path. An integration into a WIP does not, since the snapshot is
+  accepting publish and a move made in jj outside pine·trie all reach it
+  by one path. An acceptance into a WIP does not, since the snapshot is
   the line's.
 - **Shutdown closes the owner** (`LaneWork.owner`, the `close` step): it
   refuses every step from then on and stops its watch; `quiet` waits for
@@ -891,7 +891,7 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
     shows that pi's conversion sends `content`;
 - **Tests in subdirectories run**: `vitest.config.mjs` includes
   `apps/*/host/**/*.test.ts`.
-- **The integration is the suites'.** `e2e` and `e2e:browser` check the
+- **The acceptance is the suites'.** `e2e` and `e2e:browser` check the
   wiring; their mutations are in `scripts/mutations/app.ts`, and this
   directory's unit mutations in `scripts/mutations/host.ts`. The suites' own
   gotchas, and what their waits cost, are in `apps/pinetrie/e2e/TECHNICAL.md`.

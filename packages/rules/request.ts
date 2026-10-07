@@ -60,7 +60,7 @@ export const leftOut = (dropped: number): string =>
 
 /**
  * The commit-message request: the skill as the system text, then your repo's
- * recent descriptions, what the thread said since its last offer integration, and the
+ * recent descriptions, what the thread said since its last acceptance, and the
  * diff. Over `budget` characters, the thread's messages go first, oldest
  * first, then the diff is cut; the skill never is.
  */

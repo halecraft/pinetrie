@@ -59,8 +59,8 @@ export interface OfferDocs {
 export interface OfferRecords {
   /** An offer's record, when it changed. */
   write(record: OfferRecord): Promise<void>
-  /** An integrated offer's record, written whatever is there. */
-  writeIntegratedOffer(record: OfferRecord): Promise<void>
+  /** An accepted offer's record, written whatever is there. */
+  writeAcceptedOffer(record: OfferRecord): Promise<void>
   /** Remove an offer's record, when there is one. */
   remove(lane: LaneName): Promise<void>
   /** The lane's base record as the repo says it, when it differs from the page's; none for null. */
@@ -72,7 +72,7 @@ export interface OfferRecords {
 export interface OfferDeps {
   /** The one writer of your repo: commands, refreshes as upkeep, pinned reads. */
   readonly owner: RepoOwner
-  /** The integration line's names (ADR-0060). */
+  /** Accepted work's names (ADR-0060). */
   readonly line: LineConfig
   readonly basics: Basics
   /** What a description asks of the model. */
@@ -130,7 +130,7 @@ export function createOfferDeps(input: {
       writeValues(
         setIfChanged(OFFER, record, readOffers(doc).get(record.lane)),
       ),
-    writeIntegratedOffer: record => writeValues([setRecord(OFFER, record)]),
+    writeAcceptedOffer: record => writeValues([setRecord(OFFER, record)]),
     remove: lane =>
       readOffers(doc).has(lane)
         ? writeValues([deleteRecord(OFFER, lane)])

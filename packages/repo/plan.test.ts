@@ -5,8 +5,8 @@ import { type LaneRow, planLaneRead } from "./lane-read.ts"
 import { wipState } from "./line.ts"
 import { type Fingerprint, parseFingerprint, planObserve } from "./observe.ts"
 import {
+  acceptedOfferCommitsRevset,
   immutableHeads,
-  integratedOfferCommitsRevset,
   laneRefSteps,
   logRevset,
   nonceRevset,
@@ -16,7 +16,7 @@ import {
   planImport,
   planLineSetup,
   planOffer,
-  planOfferIntegrationSteps,
+  planOfferAcceptanceSteps,
   planPublishCatchUp,
   planPublishMove,
   planRebuildOffer,
@@ -66,7 +66,7 @@ describe("offers (ADR-0038)", () => {
   const op = (...args: string[]) => `jj as host: ${args.join(" ")}`
   /** A rewrite of an offer, which may be immutable on the line (ADR-0060). */
   const rw = (...args: string[]) => op("--ignore-immutable", ...args)
-  test("offerStart: the base's commit, and the history of each integrated source (ADR-0060)", () => {
+  test("offerStart: the base's commit, and the history of each accepted source (ADR-0060)", () => {
     expect(offerStart({ tip: C1, start: C2, sources: [] })).toBe(
       "heads(::c1 & (c2))",
     )
@@ -78,19 +78,19 @@ describe("offers (ADR-0038)", () => {
       }),
     ).toBe("heads(::c1 & (c2 | ::(present(t1) | present(t2))))")
   })
-  test("integratedOfferCommitsRevset: integrated sources above the commit the base holds, never a WIP's copy (S81)", () => {
-    const integrated =
+  test("acceptedOfferCommitsRevset: accepted sources above the commit the base holds, never a WIP's copy (S81)", () => {
+    const accepted =
       'description(regex:"(?m)^(Pine(?:trie|ta)-Source|Pine(?:trie|ta)-Thread): ")'
     expect(
-      integratedOfferCommitsRevset({
+      acceptedOfferCommitsRevset({
         line: DEFAULT_LINE,
         base: { base: { kind: "line" }, start: C1, source: C1 },
       }),
-    ).toBe(`(::(present("pinetrie-onto")) ~ ::present(c1)) & ${integrated}`)
-    // A WIP lane starts at its copy, which holds no integrated-offer commit: what it
+    ).toBe(`(::(present("pinetrie-onto")) ~ ::present(c1)) & ${accepted}`)
+    // A WIP lane starts at its copy, which holds no accepted-offer commit: what it
     // holds is the WIP's commit the copy was made from.
     expect(
-      integratedOfferCommitsRevset({
+      acceptedOfferCommitsRevset({
         line: DEFAULT_LINE,
         base: {
           base: { kind: "wip", bookmark: "wip/a" },
@@ -99,7 +99,7 @@ describe("offers (ADR-0038)", () => {
         },
       }),
     ).toBe(
-      `(::(present("pinetrie-onto") | present("wip/a")) ~ ::present(c2)) & ${integrated}`,
+      `(::(present("pinetrie-onto") | present("wip/a")) ~ ::present(c2)) & ${accepted}`,
     )
   })
   test("planOffer: a commit per source, by nonce; rebased, bookmarked, then described", () => {
@@ -155,10 +155,10 @@ describe("offers (ADR-0038)", () => {
       rw("describe", "-r", "ch", "-m", "WIP (amber-fox): x"),
     )
   })
-  test("planOfferIntegrationSteps: the destination moved forward to the top, as the host, never with --allow-backwards (ADR-0060)", () => {
+  test("planOfferAcceptanceSteps: the destination moved forward to the top, as the host, never with --allow-backwards (ADR-0060)", () => {
     expect(
       argvs(
-        planOfferIntegrationSteps({
+        planOfferAcceptanceSteps({
           bookmark: "pinetrie-offer/amber-fox",
           top: "t",
           destination: "pinetrie-onto",
@@ -208,15 +208,15 @@ describe("offers (ADR-0038)", () => {
       "jj as you: config set --repo revsets.log L",
     ])
   })
-  test("a publish: your catch-up is yours; the move is the host's, or yours in one step when it integrates your commits; its undo reverts, never restores (ADR-0090, S111)", () => {
+  test("a publish: your catch-up is yours; the move is the host's, or yours in one step when it accepts your commits; its undo reverts, never restores (ADR-0090, S111)", () => {
     expect(argvs(planPublishCatchUp({ onto: "pinetrie-onto" }))).toEqual([
       'jj as you: rebase -b @ -d "pinetrie-onto"',
     ])
     const move = { onto: "pinetrie-onto", publish: "main" }
-    expect(argvs(planPublishMove({ ...move, integrate: false }))).toEqual([
+    expect(argvs(planPublishMove({ ...move, accept: false }))).toEqual([
       op("bookmark", "move", "main", "--to", '"pinetrie-onto"'),
     ])
-    expect(argvs(planPublishMove({ ...move, integrate: true }))).toEqual([
+    expect(argvs(planPublishMove({ ...move, accept: true }))).toEqual([
       "jj as you: bookmark move pinetrie-onto main --to @-",
     ])
     expect(argvs(planCatchUpUndo("op1"))).toEqual(["jj as you: op revert op1"])
@@ -435,7 +435,7 @@ describe("planLaneRead: what one lane's rows say", () => {
     base: false,
     line: false,
     underBase: false,
-    integrated: false,
+    accepted: false,
     untraced: false,
     divergent: false,
     conflict: false,
@@ -457,12 +457,12 @@ describe("planLaneRead: what one lane's rows say", () => {
   })
   const read = (
     rows: LaneRow[],
-    integrated: { commit: string; sources: string[] }[] = [],
+    accepted: { commit: string; sources: string[] }[] = [],
   ) =>
     planLaneRead(rows, {
       name: NAME,
       line: DEFAULT_LINE,
-      integratedOfferCommits: integrated.map(t => ({
+      acceptedOfferCommits: accepted.map(t => ({
         commit: commitId(t.commit),
         sources: t.sources.map(commitId),
       })),
@@ -487,9 +487,9 @@ describe("planLaneRead: what one lane's rows say", () => {
       read([tip, { ...based, description: "s\n\nPinetrie-Base: wip/x@c9\n" }]),
     ).toEqual({ kind: "wip" })
   })
-  test("an integrated source above the base makes the start a read; one under it does not", () => {
-    const above = row("t1", { integrated: true })
-    const under = row("t2", { integrated: true, underBase: true })
+  test("an accepted source above the base makes the start a read; one under it does not", () => {
+    const above = row("t1", { accepted: true })
+    const under = row("t2", { accepted: true, underBase: true })
     expect(
       read(
         [tip, based, above, under],
@@ -503,17 +503,17 @@ describe("planLaneRead: what one lane's rows say", () => {
       read([tip, based, under], [{ commit: "t2", sources: ["s2"] }]),
     ).toMatchObject({ start: { kind: "known", start: ["c0"] } })
   })
-  test("an integrated-offer commit of the lane that names no source, above the base, makes the start untraced; one under it does not (S97)", () => {
+  test("an accepted-offer commit of the lane that names no source, above the base, makes the start untraced; one under it does not (S97)", () => {
     const above = row("u1", { untraced: true })
     const under = row("u2", { untraced: true, underBase: true })
-    const integrated = row("t1", { integrated: true })
+    const accepted = row("t1", { accepted: true })
     expect(
       read(
-        [tip, based, above, under, integrated],
+        [tip, based, above, under, accepted],
         [{ commit: "t1", sources: ["s1"] }],
       ),
     ).toMatchObject({
-      start: { kind: "untraced", integratedOfferCommits: ["u1"] },
+      start: { kind: "untraced", acceptedOfferCommits: ["u1"] },
     })
     expect(read([tip, based, under])).toMatchObject({
       start: { kind: "known", start: ["c0"] },

@@ -144,7 +144,7 @@ export type ColumnAct =
       readonly lane: LaneName
       readonly at: Position
     }
-  /** Act on the lane's offer in your repo; an integration names its destination (ADR-0060). */
+  /** Act on the lane's offer in your repo; an acceptance names its destination (ADR-0060). */
   | {
       readonly kind: "offer"
       readonly lane: LaneName

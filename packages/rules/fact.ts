@@ -1,5 +1,5 @@
 // fact — what a command on a thread's offer did, as a fact in the thread
-// (ADR-0080): an offer integration, a description asked for again, a
+// (ADR-0080): an acceptance, a description asked for again, a
 // squash, a refresh.
 //
 // A fact message is a pi `CustomMessage` in `update.ts`'s pattern: `content`
@@ -12,8 +12,8 @@ import {
   type CatchUpFrom,
   isLaneName,
   type LaneName,
+  type OfferAcceptanceDecision,
   type OfferFact,
-  type OfferIntegrationDecision,
   type ThreadName,
   type WriterId,
 } from "@pinetrie/core"
@@ -33,6 +33,10 @@ const CatchUpFromSchema = Type.Union([
   }),
 ])
 
+// A fact is stored in a thread's history, which nothing rewrites, so its
+// stored kinds keep the words of when facts began (ADR-0100): an acceptance
+// is stored as `integrated`, and read and written through `fromStored` and
+// `toStored`.
 const OfferFactSchema = Type.Union([
   Type.Object({
     kind: Type.Literal("integrated"),
@@ -65,9 +69,12 @@ export interface FactMessage {
   readonly customType: typeof FACT_TYPE
   readonly content: string
   readonly display: true
-  readonly details: OfferFact
+  /** The fact as stored (`toStored`); `decodeFact` reads it back. */
+  readonly details: StoredFact
   readonly timestamp: number
 }
+
+type StoredFact = Static<typeof OfferFactSchema>
 
 const storedTo = (
   to: Static<typeof CatchUpFromSchema>,
@@ -89,7 +96,7 @@ const fromStored = (
   return to === undefined
     ? undefined
     : {
-        kind: "integrated",
+        kind: "accepted",
         lane: d.lane,
         by: d.by as WriterId,
         as: d.as,
@@ -98,8 +105,13 @@ const fromStored = (
       }
 }
 
+/** A fact as stored: an acceptance under its stored kind. */
+const toStored = (fact: OfferFact): Static<typeof OfferFactSchema> =>
+  fact.kind === "accepted" ? { ...fact, kind: "integrated" } : fact
+
 /** A fact as a card carries it, in the places document's flat strings. */
-export const encodeOfferFact = (fact: OfferFact): string => JSON.stringify(fact)
+export const encodeOfferFact = (fact: OfferFact): string =>
+  JSON.stringify(toStored(fact))
 
 /** A card's stored fact -> the fact; undefined for one malformed. Total. */
 export function decodeOfferFact(stored: string): OfferFact | undefined {
@@ -114,14 +126,14 @@ export function decodeOfferFact(stored: string): OfferFact | undefined {
 export const decodeFact = (message: unknown): OfferFact | undefined =>
   decodeWith(FactSchema, message, ({ details }) => fromStored(details))
 
-/** Where an integration went, after "accepted": nothing for the line, else a WIP's name. */
+/** Where an acceptance went, after "accepted": nothing for the line, else a WIP's name. */
 const into = (to: CatchUpFrom) =>
   to.kind === "line" ? "" : ` into ${catchUpName(to)}`
 
 /** The one line a column shows for a fact. */
 export function factLine(fact: OfferFact): string {
   switch (fact.kind) {
-    case "integrated":
+    case "accepted":
       return `✓ accepted${into(fact.to)} as ${fact.as.slice(0, 8)}`
     case "described":
       return "✎ a new description was asked for"
@@ -135,7 +147,7 @@ export function factLine(fact: OfferFact): string {
 /** What the model reads of a fact: who did what to this thread's work. */
 export function factContent(fact: OfferFact, name: string): string {
   switch (fact.kind) {
-    case "integrated":
+    case "accepted":
       return `${name} accepted this thread's work${into(fact.to)}, as the change ${fact.as}: ${fact.bookmark} moved forward to it. That work is no longer offered; what you do next is offered on top of it.`
     case "described":
       return `${name} asked for a new description of this thread's offer.`
@@ -156,28 +168,28 @@ export const encodeFact = (
   customType: FACT_TYPE,
   content: factContent(fact, name),
   display: true,
-  details: fact,
+  details: toStored(fact),
   timestamp,
 })
 
 /**
- * An offer integration's fact (ADR-0080), from the decision it carried out: the change it
+ * An acceptance's fact (ADR-0080), from the decision it carried out: the change it
  * added, the bookmark it moved, and that bookmark as the thread knows it,
  * the line or a WIP. Pure.
  */
-export const integratedFact = (input: {
+export const acceptedFact = (input: {
   readonly lane: LaneName
   readonly by: WriterId
   readonly decision: Extract<
-    OfferIntegrationDecision,
-    { readonly kind: "integrate" }
+    OfferAcceptanceDecision,
+    { readonly kind: "accept" }
   >
   /** The line's bookmark. */
   readonly onto: string
 }): OfferFact => {
   const { destination, top } = input.decision
   return {
-    kind: "integrated",
+    kind: "accepted",
     lane: input.lane,
     by: input.by,
     as: top,
@@ -189,7 +201,7 @@ export const integratedFact = (input: {
   }
 }
 
-/** The fact of an offer action that is not an integration: what it did, and who asked. Pure. */
+/** The fact of an offer action that is not an acceptance: what it did, and who asked. Pure. */
 export const actionFact = (
   action: "describe" | "squash" | "refresh",
   lane: LaneName,

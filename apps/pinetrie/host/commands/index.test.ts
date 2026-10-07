@@ -137,7 +137,7 @@ function setUp(
 }
 
 test.each([
-  ["an offer integration", { kind: "offer", action: "integrate" }, "repo"],
+  ["an acceptance", { kind: "offer", action: "accept" }, "repo"],
   ["a squash", { kind: "offer", action: "squash" }, "repo"],
   ["a description again", { kind: "offer", action: "describe" }, "repo"],
   ["a line command", { kind: "line", action: "publish" }, "repo"],
@@ -150,17 +150,17 @@ test.each([
   expect(placeOfCommand(intent as Intent)).toBe(place)
 })
 
-test("a chat completes while an offer integration is held open on your repo's owner", async () => {
+test("a chat completes while an acceptance is held open on your repo's owner", async () => {
   const held =
     Promise.withResolvers<Awaited<ReturnType<NonNullable<Offers>["act"]>>>()
   const { commands, replies, sender, chat } = setUp({
     offers: record<NonNullable<Offers>>({ act: () => held.promise }).port,
   })
-  const integration = commands.handle(sender, ALICE, {
+  const acceptance = commands.handle(sender, ALICE, {
     id: "t-1",
     kind: "offer",
     lane: HELD,
-    mode: "integrate",
+    mode: "accept",
     seen: JSON.stringify({ ledger: null, conflicted: false }),
   })
   await commands.handle(sender, ALICE, chat("c-1"))
@@ -169,10 +169,10 @@ test("a chat completes while an offer integration is held open on your repo's ow
     kind: "done",
     fact: { kind: "squashed", lane: HELD, by: ALICE },
   })
-  await integration
+  await acceptance
   expect(replies.map(r => [r.id, r.outcome])).toEqual([
     ["c-1", "appended"],
-    ["t-1", "integrated"],
+    ["t-1", "accepted"],
   ])
 })
 

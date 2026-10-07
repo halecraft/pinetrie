@@ -7,6 +7,7 @@ import {
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
+  acceptedFact,
   actionFact,
   decodeFact,
   decodeOfferFact,
@@ -14,14 +15,13 @@ import {
   encodeOfferFact,
   factContent,
   factLine,
-  integratedFact,
   renderableMessage,
 } from "./index.ts"
 
 const LANE = laneNameForThread("1")
 const ADA = writerId("ada@x.io")
-const INTEGRATED: OfferFact = {
-  kind: "integrated",
+const ACCEPTED: OfferFact = {
+  kind: "accepted",
   lane: LANE,
   by: ADA,
   as: "kabcdefghij",
@@ -29,9 +29,9 @@ const INTEGRATED: OfferFact = {
   to: { kind: "line" },
 }
 const FACTS: readonly OfferFact[] = [
-  INTEGRATED,
+  ACCEPTED,
   {
-    ...INTEGRATED,
+    ...ACCEPTED,
     bookmark: "wip/search",
     to: { kind: "wip", bookmark: "wip/search" },
   },
@@ -48,15 +48,22 @@ describe("a fact (ADR-0080)", () => {
     }
     expect(decodeOfferFact("{")).toBeUndefined()
     expect(
-      decodeOfferFact(JSON.stringify({ ...INTEGRATED, lane: "main" })),
+      decodeOfferFact(JSON.stringify({ ...ACCEPTED, lane: "main" })),
     ).toBeUndefined()
     expect(
       decodeFact({ role: "custom", customType: "pinetrie.fact" }),
     ).toBeUndefined()
   })
 
+  test("an acceptance is stored under the kind facts began with, which a thread's history holds", () => {
+    expect(encodeFact(ACCEPTED, "Ada", 1).details.kind).toBe("integrated")
+    expect(JSON.parse(encodeOfferFact(ACCEPTED)).kind).toBe("integrated")
+    const stored = { ...ACCEPTED, kind: "integrated" }
+    expect(decodeOfferFact(JSON.stringify(stored))).toEqual(ACCEPTED)
+  })
+
   test.each([
-    [INTEGRATED, "✓ accepted as kabcdefg"],
+    [ACCEPTED, "✓ accepted as kabcdefg"],
     [FACTS[1], "✓ accepted into wip/search as kabcdefg"],
     [FACTS[2], "✎ a new description was asked for"],
     [FACTS[3], "⇣ the stack was squashed into one revision"],
@@ -65,34 +72,34 @@ describe("a fact (ADR-0080)", () => {
     expect(fact === undefined ? undefined : factLine(fact)).toBe(line)
   })
 
-  test("the model reads who did it, and an integration's change and bookmark", () => {
-    expect(factContent(INTEGRATED, "Ada")).toContain(
+  test("the model reads who did it, and an acceptance's change and bookmark", () => {
+    expect(factContent(ACCEPTED, "Ada")).toContain(
       "Ada accepted this thread's work, as the change kabcdefghij: pinetrie-onto moved forward to it.",
     )
     expect(factContent(FACTS[4] as OfferFact, "Ada")).toMatch(/^Ada rebuilt/)
   })
 
   test("the column draws it as its one line, role fact", () => {
-    expect(renderableMessage(encodeFact(INTEGRATED, "Ada", 1))).toEqual({
+    expect(renderableMessage(encodeFact(ACCEPTED, "Ada", 1))).toEqual({
       role: "fact",
       content: "✓ accepted as kabcdefg",
     })
   })
 
-  test("integratedFact: the bookmark moved, the line or a WIP as the thread knows it", () => {
+  test("acceptedFact: the bookmark moved, the line or a WIP as the thread knows it", () => {
     const decision = {
-      kind: "integrate",
+      kind: "accept",
       name: "amber-fox" as ThreadName,
       bookmark: "pinetrie-offer/amber-fox",
       destination: "pinetrie-onto",
       top: "kabcdefghij",
-      integrated: {} as OfferRecord,
+      accepted: {} as OfferRecord,
     } as const
     expect(
-      integratedFact({ lane: LANE, by: ADA, decision, onto: "pinetrie-onto" }),
-    ).toEqual(INTEGRATED)
+      acceptedFact({ lane: LANE, by: ADA, decision, onto: "pinetrie-onto" }),
+    ).toEqual(ACCEPTED)
     expect(
-      integratedFact({
+      acceptedFact({
         lane: LANE,
         by: ADA,
         decision: { ...decision, destination: "wip/search" },

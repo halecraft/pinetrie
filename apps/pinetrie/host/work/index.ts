@@ -8,7 +8,7 @@
 // (`Setup`), each lane's handle (`LaneRegistry`), and each coordination set in
 // the module that writes it (`turns`' pending records, `update`'s guidance
 // flag). Your repo is its owner's (`Setup.owner`, `@pinetrie/repo`); offers are
-// `host/offers/`'s, and the integration line `line.ts`'s.
+// `host/offers/`'s, and accepted work `line.ts`'s.
 
 import type { LaneName, ProjectRecord } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
@@ -48,7 +48,7 @@ export type LaneWork = Pick<
     readonly hooks: Omit<LaneHooks, "askSplit">
     /** Each lane's offer in your repo; null with no lanes of their own. */
     readonly offers: Offers | null
-    /** The integration line in your repo (ADR-0060); null with no lanes of their own. */
+    /** Accepted work in your repo (ADR-0060); null with no lanes of their own. */
     readonly line: Line | null
     /** The one writer of your repo (ADR-0065); null with no lanes of their own. Shutdown closes it. */
     readonly owner: RepoOwner | null
@@ -99,7 +99,7 @@ export async function startLaneWork(input: {
   const { root, owner, paths } = setup
   const registry = createRegistry({ session, root })
   const lineConfig = setup.lanes?.line ?? DEFAULT_LINE
-  /** The integration line in your repo (ADR-0060); none without lanes of their own. */
+  /** Accepted work in your repo (ADR-0060); none without lanes of their own. */
   const line: Line | null =
     owner === null
       ? null

@@ -211,7 +211,7 @@ test("an offer's fact is queued as a card at the thread's end, after the cards t
   writeLaneTip(b.root, lane, entryId("e-2"))
   const drained: string[] = []
   const fact = {
-    kind: "integrated",
+    kind: "accepted",
     lane,
     by: ada,
     as: "kabcdefgh",

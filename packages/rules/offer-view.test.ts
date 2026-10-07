@@ -34,13 +34,13 @@ const offer: OfferRecord = {
   described: true,
   edited: false,
   bookmark: "pinetrie-offer/t-1",
-  integratedAs: null,
+  acceptedAs: null,
   commits: [commitId("w1")],
   ledger: null,
   at: 10,
 }
 
-test("offerSeen: what an offer integration was shown is the record's ledger and whether it conflicted; no record shows none", () => {
+test("offerSeen: what an acceptance was shown is the record's ledger and whether it conflicted; no record shows none", () => {
   const ledger = { source: TIP, start: [BASE] }
   expect(offerSeen({ ...offer, ledger, conflicts: ["a.txt"] })).toEqual({
     ledger,
@@ -95,10 +95,10 @@ describe("offerView: ADR-0038's table", () => {
     expect(at(view(offer, "split"))).toEqual(["busy", [], []])
     expect(at(view(offer))).toEqual([
       "ready",
-      ["integrate", "split"],
+      ["accept", "split"],
       ["describe", "update"],
     ])
-    // Only a clean offer lands on the line (ADR-0060): no integration on a line thread.
+    // Only a clean offer lands on the line (ADR-0060): no acceptance on a line thread.
     expect(at(view({ ...offer, conflicts: ["a.txt"] }))).toEqual([
       "conflicts",
       ["update"],
@@ -106,21 +106,21 @@ describe("offerView: ADR-0038's table", () => {
     ])
     expect(at(view({ ...offer, size: 2 }))).toEqual([
       "stack",
-      ["integrate", "squash"],
+      ["accept", "squash"],
       ["update"],
     ])
     expect(at(view({ ...offer, size: 2, stale: true }))).toEqual([
       "stale",
-      ["split", "integrate"],
+      ["split", "accept"],
       ["update"],
     ])
     expect(at(view({ ...offer, edited: true }))).toEqual([
       "edited",
-      ["integrate", "refresh"],
+      ["accept", "refresh"],
       ["update"],
     ])
-    expect(at(view({ ...offer, integratedAs: "zz12345678" }))).toEqual([
-      "integrated",
+    expect(at(view({ ...offer, acceptedAs: "zz12345678" }))).toEqual([
+      "accepted",
       [],
       ["update"],
     ])
@@ -129,12 +129,12 @@ describe("offerView: ADR-0038's table", () => {
     const v = view({ ...offer, yourEdits: ["b.txt"] })
     expect([v.state, v.buttons, v.facts.touchesYourEdits]).toEqual([
       "ready",
-      ["integrate", "split"],
+      ["accept", "split"],
       true,
     ])
     expect(view(offer).facts.touchesYourEdits).toBe(false)
   })
-  test("the facts: an offer's bookmark, files and size, until it is integrated", () => {
+  test("the facts: an offer's bookmark, files and size, until it is accepted", () => {
     expect(view({ ...offer, size: 2 }).facts).toEqual({
       activity: "idle",
       files: 2,
@@ -143,7 +143,7 @@ describe("offerView: ADR-0038's table", () => {
       touchesYourEdits: false,
       bookmark: "pinetrie-offer/t-1",
       held: false,
-      integratedAs: null,
+      acceptedAs: null,
       base: { kind: "line" },
       onto: "pinetrie-onto",
       catchUp: { kind: "current" },
@@ -154,18 +154,18 @@ describe("offerView: ADR-0038's table", () => {
     })
     expect(view(offer, "turn").facts.files).toBe(2)
     const none = view(undefined).facts
-    expect([none.files, none.bookmark, none.integratedAs]).toEqual([
+    expect([none.files, none.bookmark, none.acceptedAs]).toEqual([
       0,
       null,
       null,
     ])
-    const integrated = view({ ...offer, integratedAs: "zz12345678" }).facts
-    expect([
-      integrated.files,
-      integrated.bookmark,
-      integrated.integratedAs,
-    ]).toEqual([0, null, "zz12345678"])
-    // Held: its bookmark is a fact in jj, and nothing in it is to integrate.
+    const accepted = view({ ...offer, acceptedAs: "zz12345678" }).facts
+    expect([accepted.files, accepted.bookmark, accepted.acceptedAs]).toEqual([
+      0,
+      null,
+      "zz12345678",
+    ])
+    // Held: its bookmark is a fact in jj, and nothing in it is to accept.
     const held = view({ ...offer, files: [] })
     expect([held.facts.held, held.facts.bookmark, held.destinations]).toEqual([
       true,
@@ -175,21 +175,21 @@ describe("offerView: ADR-0038's table", () => {
   })
   test("offerStatus: one decoding of a record, which every reader shares (ADR-0067)", () => {
     expect(offerStatus(undefined)).toEqual({ kind: "none" })
-    expect(offerStatus({ ...offer, integratedAs: "zz" })).toEqual({
-      kind: "integrated",
+    expect(offerStatus({ ...offer, acceptedAs: "zz" })).toEqual({
+      kind: "accepted",
       as: "zz",
     })
     expect(offerStatus({ ...offer, files: [] }).kind).toBe("held")
     expect(offerStatus({ ...offer, files: [], edited: true }).kind).toBe("open")
     expect(offerStatus(offer).kind).toBe("open")
   })
-  test("behind its base, catching up stands beside the offer; with nothing to integrate, alone", () => {
+  test("behind its base, catching up stands beside the offer; with nothing to accept, alone", () => {
     const behind = {
       catchUp: { kind: "brings", move: MOVE, files: 2 },
     } as const
     expect(at(view(offer, "idle", null, behind))).toEqual([
       "ready",
-      ["integrate", "split", "update"],
+      ["accept", "split", "update"],
       ["describe"],
     ])
     expect(at(view(undefined, "idle", null, behind))).toEqual([
@@ -226,11 +226,11 @@ describe("offerView: ADR-0038's table", () => {
     })
     expect([gone.menu, gone.quiet]).toEqual([["continue"], []])
   })
-  test("an untraced thread's offer you edited can be integrated, never rebuilt (S97)", () => {
+  test("an untraced thread's offer you edited can be accepted, never rebuilt (S97)", () => {
     const edited = view({ ...offer, edited: true }, "idle", null, {
       untraced: true,
     })
-    expect(at(edited)).toEqual(["edited", ["integrate", "update"], []])
+    expect(at(edited)).toEqual(["edited", ["accept", "update"], []])
   })
   test("an untraced thread offers nothing, and catching up beside it, never quiet (S97)", () => {
     const untraced = view(undefined, "idle", null, { untraced: true })

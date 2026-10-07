@@ -304,7 +304,7 @@ export interface SessionClient {
    */
   retitle(root: EntryId): Promise<Outcome>
   /**
-   * An offer action on a lane's offer in your repo; an integration names its
+   * An offer action on a lane's offer in your repo; an acceptance names its
    * destination bookmark, null for the default, and the offer as this tab's
    * record shows it (`offerSeen`). Tracked in `acting`.
    */
@@ -313,7 +313,7 @@ export interface SessionClient {
     action: OfferAction,
     to?: string | null,
   ): Promise<Outcome>
-  /** Set up the integration line, or publish it (ADR-0060, ADR-0090). Tracked in `acting`. */
+  /** Set up accepted work, or publish it (ADR-0060, ADR-0090). Tracked in `acting`. */
   line(action: LineAction): Promise<Outcome>
   /** Your offer and line commands out now, or refused or failed (`acting.ts`). */
   readonly acting: Readable<ActingState>
@@ -683,10 +683,10 @@ export async function connectSession(
       step({ kind: "refused", refusal })
     },
     offer(lane, action, to = null) {
-      // An integration names the offer this tab shows now: its record, as the strip
+      // An acceptance names the offer this tab shows now: its record, as the strip
       // drew it (ADR-0065).
       const seen =
-        action === "integrate" ? offerSeen(readOffers(session).get(lane)) : null
+        action === "accept" ? offerSeen(readOffers(session).get(lane)) : null
       return sendActing(acting, { kind: "offer", lane, action, to }, () =>
         send({ kind: "offer", lane, action, to, seen }),
       )

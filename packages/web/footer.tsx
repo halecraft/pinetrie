@@ -53,7 +53,7 @@ export function Footer({
   colorOf: (writer: WriterId) => string
   /** What your inbox draws from: in the corner, or folded, in the account menu. */
   inbox: InboxMenuProps
-  /** The integration line (ADR-0060), as the host last read it. */
+  /** Accepted work (ADR-0060), as the host last read it. */
   line: LineRecord | null
   /** Where the host runs: "resolve with the agent" works in its root. */
   project: ProjectRecord | null

@@ -188,7 +188,7 @@ export const lateFor = (docId: string, ms: number): typeof WebSocket => {
 }
 
 /**
- * Set up the integration line at your `@-`, as the footer's set up button does
+ * Set up accepted work at your `@-`, as the footer's set up button does
  * (ADR-0060): a new thread with no history of its own starts there. Waits for
  * the host's line record; does nothing when the line is set up already.
  */

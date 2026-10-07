@@ -65,8 +65,8 @@ export function createRefresh(
         )
       },
       remove: () => records.remove(lane),
-      async integrated(record) {
-        await records.writeIntegratedOffer(record)
+      async accepted(record) {
+        await records.writeAcceptedOffer(record)
       },
     }
   }

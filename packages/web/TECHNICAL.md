@@ -574,7 +574,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
 - **One-line messages** (`LINE_ROLES`, core) show as one line each, their
   speaker from one table (`ROLE_LABEL`, `message.tsx`): `land` ("catching
   up"), `update` ("caught up"), `stack`, `carry-on` ("resumed"), and the
-  host's facts, `fact` ("offer": what an integration, a squash, a refresh
+  host's facts, `fact` ("offer": what an acceptance, a squash, a refresh
   or a description asked for did, ADR-0080) and `behind` ("the base": its
   new work). Each line is its rule's words function (`updateLine`,
   `factLine`, `behindLine`, `@pinetrie/rules`); the update's names what it
@@ -597,7 +597,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   `offerView`'s states); its line is `.offer-line` (a button when the offer
   can be reviewed; its caret is CSS, so its text is the words alone), its
   bookmark `.offer-bookmark`, and each button `.offer-<button>`, the add
-  button being `.offer-integrate`. The review is `.review`, with `.review-list` (rows
+  button being `.offer-accept`. The review is `.review`, with `.review-list` (rows
   `.review-list-file`, titled with the display path) and `.review-diffs`;
   each file is `.review-file[data-key][data-letter][data-state]`, its head
   `.review-file-head`, its diff `.review-diff` of `[data-kind]` lines. The

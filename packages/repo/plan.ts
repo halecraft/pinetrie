@@ -59,7 +59,7 @@ export function logRevset(current: string | null): string {
 }
 
 /**
- * Set up the integration line (ADR-0060): its bookmark at your `@-`, as the
+ * Set up accepted work (ADR-0060): its bookmark at your `@-`, as the
  * host, then your repo's `immutable_heads()` (`immutableHeads`), written in
  * the repo's own config. Run only on your command, after you saw `heads`.
  */
@@ -80,7 +80,7 @@ export const planLineSetup = (input: {
 ]
 
 /**
- * `bookmarks` moved forward to `to`, in one operation: an offer integration
+ * `bookmarks` moved forward to `to`, in one operation: an acceptance
  * and a publish are each one. Never `--allow-backwards`: jj refuses a move
  * that is not forward, so a move planned on stale facts fails rather than
  * dropping commits (S77 item 1); with several bookmarks, a refusal of one
@@ -107,11 +107,11 @@ export const planPublishCatchUp = (input: {
 /**
  * The move that ends a publish (ADR-0090): the publish bookmark forward to
  * the line, as the host, since it changes no file and anyone admitted may
- * (ADR-0076); or, integrating your commits, the line and the publish bookmark
+ * (ADR-0076); or, accepting your commits, the line and the publish bookmark
  * together to your `@-`, as you, since it is your act.
  */
 export const planPublishMove = (input: PublishMove): RepoStep[] => [
-  input.integrate
+  input.accept
     ? moveForward("you", [input.onto, input.publish], "@-")
     : moveForward("host", [input.publish], revsetName(input.onto)),
 ]
@@ -193,16 +193,16 @@ export const laneRefSteps = (
         IMPORT,
       ]
 
-/** The commits an offer integration made: its offer's trailers name a source or a thread. */
-export const INTEGRATED_OFFER_COMMITS = trailerRevset(["source", "thread"])
+/** The commits an acceptance made: its offer's trailers name a source or a thread. */
+export const ACCEPTED_OFFER_COMMITS = trailerRevset(["source", "thread"])
 
 /**
  * Where an offer starts, as a revset (ADR-0060): the newest ancestors of the
  * lane's tip you already have. That is the commit the lane's base names
  * (`start`: the line's commit, or the WIP's copy), and every lane commit a
- * integrated offer's `Pinetrie-Source` names above what the base holds
- * (`integratedOfferCommitsRevset`), with their history: a parent lane's work
- * integrated after this lane forked, or a branch of this lane integrated
+ * accepted offer's `Pinetrie-Source` names above what the base holds
+ * (`acceptedOfferCommitsRevset`), with their history: a parent lane's work
+ * accepted after this lane forked, or a branch of this lane accepted
  * whole. Each source is
  * `present()`: one not fetched here names nothing you have. Several heads
  * start the offer from their merge.
@@ -218,16 +218,16 @@ export function offerStart(input: {
 }
 
 /**
- * The integrated-offer commits `offerStart` reads, by their `Pinetrie-Source`
- * or `Pinetrie-Thread` trailers: an integrated offer's sources, or none for an
- * offer integrated before offers carried them (`untracedLanes`, S97). Those in `::<onto>`, and in `::<wip>` for a
+ * The accepted-offer commits `offerStart` reads, by their `Pinetrie-Source`
+ * or `Pinetrie-Thread` trailers: an accepted offer's sources, or none for an
+ * offer accepted before offers carried them (`untracedLanes`, S97). Those in `::<onto>`, and in `::<wip>` for a
  * lane on a WIP, but not in the history of the base's `source` (S81). The lane merged that commit, so it holds
- * what was integrated below it. An offer keeps the diff from the merge of its
+ * what was accepted below it. An offer keeps the diff from the merge of its
  * start to the tip, so a source the target holds as another commit would be
  * subtracted from the target, and conflict where the line changed it since.
  * The source is `present()`: a commit gone from your repo excludes nothing.
  */
-export function integratedOfferCommitsRevset(input: {
+export function acceptedOfferCommitsRevset(input: {
   readonly line: LineConfig
   readonly base: LaneBase
 }): string {
@@ -236,7 +236,7 @@ export function integratedOfferCommitsRevset(input: {
     `present(${revsetName(input.line.onto)})`,
     ...(base.kind === "wip" ? [`present(${revsetName(base.bookmark)})`] : []),
   ].join(" | ")
-  return `(::(${heads}) ~ ::present(${input.base.source})) & ${INTEGRATED_OFFER_COMMITS}`
+  return `(::(${heads}) ~ ::present(${input.base.source})) & ${ACCEPTED_OFFER_COMMITS}`
 }
 
 /** One version of a commit in `jj evolog`: who made it, and from what. */
@@ -447,15 +447,15 @@ export const planRepair = (input: {
 ]
 
 /**
- * Integrate an offer (ADR-0060): its destination bookmark moved forward to its
+ * Accept an offer (ADR-0060): its destination bookmark moved forward to its
  * top (`moveForward`), as the host, then the offer's bookmark deleted. Never
  * a rebase, and never your `@`.
  */
-export function planOfferIntegrationSteps(input: {
+export function planOfferAcceptanceSteps(input: {
   /** The offer's bookmark, as its record holds it. */
   readonly bookmark: string
   readonly top: string
-  /** The bookmark the integration moves: the line, or a WIP. */
+  /** The bookmark the acceptance moves: the line, or a WIP. */
   readonly destination: string
 }): RepoStep[] {
   return [

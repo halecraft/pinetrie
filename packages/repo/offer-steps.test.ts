@@ -10,15 +10,15 @@ import {
 import { describe, expect, test } from "vitest"
 import {
   describeEffects,
+  offerAcceptanceEffects,
   offerEffects,
-  offerIntegrationEffects,
   rebuildEffects,
 } from "./offer-steps.ts"
 import {
   planAbandonOffer,
   planDescribe,
   planOffer,
-  planOfferIntegrationSteps,
+  planOfferAcceptanceSteps,
   planRebuildOffer,
   planRefreshOffer,
 } from "./plan.ts"
@@ -178,8 +178,8 @@ test("rebuildEffects: the old revisions abandoned, then each source on the start
   ])
 })
 
-test("offerIntegrationEffects and describeEffects: the integration's bookmark move, and the message with the offer's ledger", () => {
-  const integrated = {
+test("offerAcceptanceEffects and describeEffects: the acceptance's bookmark move, and the message with the offer's ledger", () => {
+  const accepted = {
     lane: LANE,
     size: 1,
     stale: false,
@@ -190,27 +190,27 @@ test("offerIntegrationEffects and describeEffects: the integration's bookmark mo
     described: false,
     edited: false,
     bookmark: `pinetrie-offer/${NAME}`,
-    integratedAs: "ktop",
+    acceptedAs: "ktop",
     commits: [],
     ledger: null,
     at: 1,
   }
   expect(
-    offerIntegrationEffects({
-      kind: "integrate",
+    offerAcceptanceEffects({
+      kind: "accept",
       name: NAME,
-      bookmark: integrated.bookmark,
+      bookmark: accepted.bookmark,
       destination: "pinetrie-onto",
       top: "ktop",
-      integrated,
+      accepted,
     }),
   ).toEqual({
-    steps: planOfferIntegrationSteps({
-      bookmark: integrated.bookmark,
+    steps: planOfferAcceptanceSteps({
+      bookmark: accepted.bookmark,
       top: "ktop",
       destination: "pinetrie-onto",
     }),
-    after: { kind: "integrated", record: integrated },
+    after: { kind: "accepted", record: accepted },
     built: false,
   })
   const ledger = { source: TIP, start: [START] }

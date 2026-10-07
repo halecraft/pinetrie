@@ -36,7 +36,7 @@ function runningWithOffer() {
       described: true,
       edited: false,
       bookmark: "pinetrie-offer/x",
-      integratedAs: null,
+      acceptedAs: null,
       commits: [],
       ledger: null,
       at: 1,

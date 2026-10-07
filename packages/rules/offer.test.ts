@@ -4,9 +4,9 @@ import {
   commitId,
   ERR,
   laneNameForThread,
+  type OfferAcceptanceDecision,
   type OfferGather,
   type OfferInRepo,
-  type OfferIntegrationDecision,
   type OfferNow,
   type OfferRecord,
   type OfferSeen,
@@ -29,7 +29,7 @@ import {
   planDescribeAgain,
   planDescribeAsk,
   planDescribeSettle,
-  planOfferIntegration,
+  planOfferAcceptance,
   planRebuild,
   planRefresh,
   planStack,
@@ -38,7 +38,7 @@ import {
   renderableMessage,
   setRecord,
 } from "./index.ts"
-import { offerIntegrationDestinations, offerMoved } from "./offer.ts"
+import { offerAcceptanceDestinations, offerMoved } from "./offer.ts"
 import { decodeUpdate } from "./update.ts"
 
 const LANE = laneNameForThread("1")
@@ -59,7 +59,7 @@ const offer: OfferRecord = {
   described: true,
   edited: false,
   bookmark: "pinetrie-offer/t-1",
-  integratedAs: null,
+  acceptedAs: null,
   commits: [commitId("w1")],
   ledger: null,
   at: 10,
@@ -105,7 +105,7 @@ describe("planRefresh", () => {
   })
   /** What `planRefresh` decides, by its kind. */
   const plan = (f: RefreshFacts) => planRefresh(f).kind
-  test("no offer in your repo (never built, integrated, or gone): build, unless the lane holds nothing you lack, when a record left from one is forgotten", () => {
+  test("no offer in your repo (never built, accepted, or gone): build, unless the lane holds nothing you lack, when a record left from one is forgotten", () => {
     expect(plan(facts(null))).toBe("build")
     expect(plan(facts(null, TIP, [TIP]))).toBe("forget")
   })
@@ -124,7 +124,7 @@ describe("planRefresh", () => {
   test("an untraced start builds nothing, withdraws an offer, and leaves one you edited, or one divergent, untouched (S97)", () => {
     const untraced: StartRead = {
       kind: "untraced",
-      integratedOfferCommits: [BASE],
+      acceptedOfferCommits: [BASE],
     }
     expect(plan(facts(null, TIP, untraced))).toBe("forget")
     expect(plan(facts(read(), TIP, untraced))).toBe("withdraw")
@@ -177,7 +177,7 @@ describe("planRefresh", () => {
     expect(plan(facts(read(), T2))).toBe("rebuild")
     expect(plan(facts(read({ revisions: [rev(), rev()] }), T2))).toBe("stale")
   })
-  test("where it starts moved (you integrated part of it): the same, or withdraw when nothing is left", () => {
+  test("where it starts moved (you accepted part of it): the same, or withdraw when nothing is left", () => {
     expect(plan(facts(read(), TIP, [T2]))).toBe("rebuild")
     expect(
       plan(
@@ -420,13 +420,13 @@ describe("the update and stack messages", () => {
   })
 })
 
-describe("offerIntegrationDestinations (ADR-0060)", () => {
+describe("offerAcceptanceDestinations (ADR-0060)", () => {
   const line = { kind: "line" } as const
   const wip = { kind: "wip", bookmark: "wip/x" } as const
   const of = (
-    over: Partial<Parameters<typeof offerIntegrationDestinations>[0]> = {},
+    over: Partial<Parameters<typeof offerAcceptanceDestinations>[0]> = {},
   ) =>
-    offerIntegrationDestinations({
+    offerAcceptanceDestinations({
       base: line,
       state: "ok",
       onto: "pinetrie-onto",
@@ -529,7 +529,7 @@ describe("the offer's policy over a gather (ADR-0038, ADR-0060)", () => {
         described: false,
         edited: false,
         bookmark: "pinetrie-offer/amber-fox",
-        integratedAs: null,
+        acceptedAs: null,
         commits: [NOW_COMMIT],
         ledger: { source: TIP, start: [START] },
         at: 7,
@@ -573,7 +573,7 @@ describe("the offer's policy over a gather (ADR-0038, ADR-0060)", () => {
     })
   })
 
-  test("planYourEdits: each record's files that @ changes, open and held alike, until it is integrated", () => {
+  test("planYourEdits: each record's files that @ changes, open and held alike, until it is accepted", () => {
     const open = { ...offer, files: ["a.txt", "b.txt"], yourEdits: [] }
     const held = {
       ...offer,
@@ -581,20 +581,20 @@ describe("the offer's policy over a gather (ADR-0038, ADR-0060)", () => {
       files: [],
       yourEdits: ["x"],
     }
-    const integrated = {
+    const accepted = {
       ...offer,
       lane: laneNameForThread("3"),
-      integratedAs: "kt",
+      acceptedAs: "kt",
     }
     expect(
-      planYourEdits([open, held, integrated], new Set(["b.txt", "c.txt"])),
+      planYourEdits([open, held, accepted], new Set(["b.txt", "c.txt"])),
     ).toEqual([
       { ...open, yourEdits: ["b.txt"] },
       { ...held, yourEdits: [] },
     ])
   })
 
-  describe("planOfferIntegration (ADR-0060, ADR-0065)", () => {
+  describe("planOfferAcceptance (ADR-0060, ADR-0065)", () => {
     const o = read({
       revisions: [
         { commit: commitId("b1"), change: "kbot", since: NOT_YOURS },
@@ -609,7 +609,7 @@ describe("the offer's policy over a gather (ADR-0038, ADR-0060)", () => {
     /** What the page drew: this offer's ledger, not conflicting. */
     const SHOWN = { ledger: o.ledger, conflicted: false }
     const BOTH = new Set(["wip/x", "pinetrie-onto"])
-    const integrate = (
+    const accept = (
       over: {
         readonly to?: string | null
         readonly below?: ReadonlySet<string>
@@ -618,7 +618,7 @@ describe("the offer's policy over a gather (ADR-0038, ADR-0060)", () => {
         readonly offer?: OfferInRepo
       } = {},
     ) =>
-      planOfferIntegration({
+      planOfferAcceptance({
         lane: LANE,
         gathered:
           over.gathered === undefined
@@ -628,15 +628,15 @@ describe("the offer's policy over a gather (ADR-0038, ADR-0060)", () => {
               })
             : over.gathered,
         seen: over.seen === undefined ? SHOWN : over.seen,
-        integration: { wipAhead: 2, below: over.below ?? BOTH },
+        acceptance: { wipAhead: 2, below: over.below ?? BOTH },
         editing: new Set(),
         onto: "pinetrie-onto",
         to: over.to ?? null,
         now: 9,
       })
-    const outcome = (t: OfferIntegrationDecision) =>
-      t.kind === "integrate" ? t.destination : t.code
-    test("the default destination is the WIP, the offer's top, and the record marked integrated", () => {
+    const outcome = (t: OfferAcceptanceDecision) =>
+      t.kind === "accept" ? t.destination : t.code
+    test("the default destination is the WIP, the offer's top, and the record marked accepted", () => {
       const record = offerRecord({
         lane: LANE,
         name: NAME,
@@ -645,24 +645,24 @@ describe("the offer's policy over a gather (ADR-0038, ADR-0060)", () => {
         editing: new Set(),
         now: 9,
       })
-      expect(integrate()).toEqual({
-        kind: "integrate",
+      expect(accept()).toEqual({
+        kind: "accept",
         name: NAME,
         bookmark: record.bookmark,
         destination: "wip/x",
         top: "ktop",
-        integrated: { ...record, integratedAs: "ktop", at: 9 },
+        accepted: { ...record, acceptedAs: "ktop", at: 9 },
       })
-      expect(outcome(integrate({ to: "pinetrie-onto" }))).toBe("pinetrie-onto")
+      expect(outcome(accept({ to: "pinetrie-onto" }))).toBe("pinetrie-onto")
     })
     test("refused in order: no offer, a WIP gone, nothing shown, divergent, other work, no such destination", () => {
-      expect(outcome(integrate({ gathered: null }))).toBe(ERR.NO_OFFER)
-      expect(outcome(integrate({ gathered: gather({ offer: null }) }))).toBe(
+      expect(outcome(accept({ gathered: null }))).toBe(ERR.NO_OFFER)
+      expect(outcome(accept({ gathered: gather({ offer: null }) }))).toBe(
         ERR.NO_OFFER,
       )
       expect(
         outcome(
-          integrate({
+          accept({
             gathered: gather({
               place: { kind: "gone", tip: TIP, base: WIP_BASE },
             }),
@@ -672,29 +672,27 @@ describe("the offer's policy over a gather (ADR-0038, ADR-0060)", () => {
       ).toBe(ERR.BAD_DESTINATION)
       expect(
         outcome(
-          integrate({
+          accept({
             seen: null,
             offer: { kind: "divergent", changes: ["k"] },
           }),
         ),
       ).toBe(ERR.OFFER_CHANGED)
       expect(
-        outcome(integrate({ offer: { kind: "divergent", changes: ["k"] } })),
+        outcome(accept({ offer: { kind: "divergent", changes: ["k"] } })),
       ).toBe(ERR.NO_OFFER)
-      expect(outcome(integrate({ to: "main" }))).toBe(ERR.BAD_DESTINATION)
-      expect(outcome(integrate({ below: new Set(["pinetrie-onto"]) }))).toBe(
+      expect(outcome(accept({ to: "main" }))).toBe(ERR.BAD_DESTINATION)
+      expect(outcome(accept({ below: new Set(["pinetrie-onto"]) }))).toBe(
         ERR.BAD_DESTINATION,
       )
     })
-    test("a conflicted offer never goes to the line; an untraced place is integrated where it sits", () => {
+    test("a conflicted offer never goes to the line; an untraced place is accepted where it sits", () => {
       const conflicted = { ...o, conflicts: ["a.txt"] }
       const shown = { ledger: o.ledger, conflicted: true }
-      expect(outcome(integrate({ offer: conflicted, seen: shown }))).toBe(
-        "wip/x",
-      )
+      expect(outcome(accept({ offer: conflicted, seen: shown }))).toBe("wip/x")
       expect(
         outcome(
-          integrate({ offer: conflicted, seen: shown, to: "pinetrie-onto" }),
+          accept({ offer: conflicted, seen: shown, to: "pinetrie-onto" }),
         ),
       ).toBe(ERR.BAD_DESTINATION)
       const untraced = gather({
@@ -707,7 +705,7 @@ describe("the offer's policy over a gather (ADR-0038, ADR-0060)", () => {
         },
         offer: o,
       })
-      expect(outcome(integrate({ gathered: untraced }))).toBe("pinetrie-onto")
+      expect(outcome(accept({ gathered: untraced }))).toBe("pinetrie-onto")
     })
     test.each([
       [
@@ -785,8 +783,8 @@ describe("the offer's policy over a gather (ADR-0038, ADR-0060)", () => {
         { seen: { ledger: null, conflicted: false } },
         ERR.OFFER_CHANGED,
       ],
-    ] as const)("an integration of the offer it was shown: %s", (_, over, expected) => {
-      expect(outcome(integrate(over))).toBe(expected)
+    ] as const)("an acceptance of the offer it was shown: %s", (_, over, expected) => {
+      expect(outcome(accept(over))).toBe(expected)
     })
   })
 

@@ -93,8 +93,8 @@ const queuedPlace = {
   by: ADA,
   seen: "",
 } as const
-const INTEGRATED: OfferFact = {
-  kind: "integrated",
+const ACCEPTED: OfferFact = {
+  kind: "accepted",
   lane: LANE,
   by: ADA,
   as: "kabcdefg",
@@ -108,9 +108,9 @@ describe("planCarry (ADR-0080)", () => {
   test.each([
     [
       "a fact",
-      queued({ kind: "fact", fact: INTEGRATED }),
+      queued({ kind: "fact", fact: ACCEPTED }),
       "",
-      { kind: "fact", fact: INTEGRATED },
+      { kind: "fact", fact: ACCEPTED },
     ],
     [
       "a catch-up with text",
@@ -137,7 +137,7 @@ describe("planCarry (ADR-0080)", () => {
   })
 
   test("nobody moves a fact, nor sets its command", () => {
-    const fact = queued({ kind: "fact", fact: INTEGRATED })
+    const fact = queued({ kind: "fact", fact: ACCEPTED })
     expect(
       planMove(
         [fact],
@@ -161,7 +161,7 @@ describe("planCarry (ADR-0080)", () => {
     const step = planFactCard({
       cards: [before],
       id: cardId("f-1"),
-      fact: INTEGRATED,
+      fact: ACCEPTED,
       root: TEST_ROOT,
       at: atEntry(E1),
     })
@@ -170,7 +170,7 @@ describe("planCarry (ADR-0080)", () => {
       owner: ADA,
       placer: ADA,
       place: { kind: "queued", lane: LANE, by: ADA, seen: "", at: atEntry(E1) },
-      carries: { kind: "fact", fact: INTEGRATED },
+      carries: { kind: "fact", fact: ACCEPTED },
     })
     expect(queuedOn([before, step.record], LANE).map(c => c.id)).toEqual([
       before.id,
@@ -179,7 +179,7 @@ describe("planCarry (ADR-0080)", () => {
   })
 
   test("the sweep keeps an empty fact card", () => {
-    const fact = queued({ kind: "fact", fact: INTEGRATED })
+    const fact = queued({ kind: "fact", fact: ACCEPTED })
     expect(
       planCardSweep({
         cards: [fact],
@@ -435,7 +435,7 @@ describe("the queue", () => {
     ).toEqual({ kind: "pop", card: top })
     const fact: QueuedCard = {
       ...queued("c-0", "0"),
-      carries: { kind: "fact", fact: INTEGRATED },
+      carries: { kind: "fact", fact: ACCEPTED },
     }
     expect(
       planNextQueuedCardPop([fact, ...cards], LANE, {
@@ -455,7 +455,7 @@ describe("the queue", () => {
   test("planUnqueueAll: every message card queued on the lane, back where it was queued, in order; a fact and another lane's stay", () => {
     const fact: QueuedCard = {
       ...queued("c-0", "0"),
-      carries: { kind: "fact", fact: INTEGRATED },
+      carries: { kind: "fact", fact: ACCEPTED },
     }
     const cards = [
       queued("c-2", "b"),
@@ -966,7 +966,7 @@ describe("planReorder (ADR-0048 step 7)", () => {
     ).toEqual({ kind: "refused", code: "gone", now: null })
     const fact: QueuedCard = {
       ...q("c-f", 150),
-      carries: { kind: "fact", fact: INTEGRATED },
+      carries: { kind: "fact", fact: ACCEPTED },
     }
     expect(
       planReorder([a, fact], { card: fact.id, at, after: null, before: a.id }),
@@ -1002,7 +1002,7 @@ describe("planReorder (ADR-0048 step 7)", () => {
     const [a, c] = [q("c-a", 100), q("c-c", 300)]
     const fact: QueuedCard = {
       ...q("c-f", 200),
-      carries: { kind: "fact", fact: INTEGRATED },
+      carries: { kind: "fact", fact: ACCEPTED },
     }
     expect(
       planReorder([a, fact, c], {
@@ -1102,7 +1102,7 @@ describe("storage", () => {
         unsent: "refused",
       }),
       card({ placer: BEA }),
-      card({ place: queuedPlace, carries: { kind: "fact", fact: INTEGRATED } }),
+      card({ place: queuedPlace, carries: { kind: "fact", fact: ACCEPTED } }),
     ])
       expect(
         decodeCard(c.id, JSON.parse(JSON.stringify(encodeCard(c)))),
@@ -1131,7 +1131,7 @@ describe("storage", () => {
       decodeCard("c", {
         ...ok,
         command: "bring-up-to-date",
-        fact: encodeCard(card({ carries: { kind: "fact", fact: INTEGRATED } }))
+        fact: encodeCard(card({ carries: { kind: "fact", fact: ACCEPTED } }))
           .fact,
       }),
     ).toBeUndefined()

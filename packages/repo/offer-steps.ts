@@ -1,7 +1,7 @@
 // repo/offer-steps — what a decision about an offer runs on your repo, and
 // what the host does after (ADR-0038, ADR-0060).
 //
-// `@pinetrie/rules` decides (`planRefresh`, `planOfferIntegration`, `planStackEnded`,
+// `@pinetrie/rules` decides (`planRefresh`, `planOfferAcceptance`, `planStackEnded`,
 // `planRebuild`, `planDescribeSettle`); these turn each decision into
 // `RepoStep`s, pure. Every decision carries the facts its steps need, so
 // each kind has exactly one translation, and none that runs nothing because
@@ -12,7 +12,7 @@ import {
   changesOf,
   type DescribeDecision,
   type LaneName,
-  type OfferIntegrationDecision,
+  type OfferAcceptanceDecision,
   type OfferRecord,
   type OfferSource,
   offerMessage,
@@ -25,7 +25,7 @@ import {
   planAbandonOffer,
   planDescribe,
   planOffer,
-  planOfferIntegrationSteps,
+  planOfferAcceptanceSteps,
   planRebuildOffer,
   planRefreshOffer,
 } from "./plan.ts"
@@ -61,8 +61,8 @@ export interface OfferEffects {
         readonly changes: readonly string[]
       }
     | { readonly kind: "remove" }
-    /** An offer integration: write the record marked integrated. */
-    | { readonly kind: "integrated"; readonly record: OfferRecord }
+    /** An acceptance: write the record marked accepted. */
+    | { readonly kind: "accepted"; readonly record: OfferRecord }
   /** The offer's content changed: it is described once the lane stops. */
   readonly built: boolean
 }
@@ -195,16 +195,16 @@ export function offerEffects(
   }
 }
 
-/** An offer integration (ADR-0060): the destination moved forward to the offer's top, the offer's bookmark deleted, then its record marked integrated. */
-export const offerIntegrationEffects = (
-  decision: Extract<OfferIntegrationDecision, { readonly kind: "integrate" }>,
+/** An acceptance (ADR-0060): the destination moved forward to the offer's top, the offer's bookmark deleted, then its record marked accepted. */
+export const offerAcceptanceEffects = (
+  decision: Extract<OfferAcceptanceDecision, { readonly kind: "accept" }>,
 ): OfferEffects => ({
-  steps: planOfferIntegrationSteps({
+  steps: planOfferAcceptanceSteps({
     bookmark: decision.bookmark,
     top: decision.top,
     destination: decision.destination,
   }),
-  after: { kind: "integrated", record: decision.integrated },
+  after: { kind: "accepted", record: decision.accepted },
   built: false,
 })
 
