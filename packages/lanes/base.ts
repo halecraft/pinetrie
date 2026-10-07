@@ -11,7 +11,7 @@
 // Also a lane's base as its history names it (`laneBase`), read the same way
 // from the lane's own repo and from yours.
 
-import { readFile, writeFile } from "node:fs/promises"
+import { mkdir, readFile, writeFile } from "node:fs/promises"
 import path from "node:path"
 import {
   BASE_SNAPSHOT,
@@ -111,6 +111,8 @@ export async function refreshBase<C>(input: {
       handle.runners,
     )
     const facts: BaseFacts = { commits: input.yours, lock: input.lock }
+    // Its directory is no runtime's to make: Docker keeps snapshots apart.
+    await mkdir(path.dirname(factsFile(root)), { recursive: true })
     await writeFile(factsFile(root), `${JSON.stringify(facts)}\n`)
     return true
   } finally {

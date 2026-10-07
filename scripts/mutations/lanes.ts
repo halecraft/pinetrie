@@ -461,4 +461,41 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "readConfigFile",
   },
+  {
+    name: "the inner Docker's PATH has no /usr/sbin",
+    file: "packages/lanes/image/Containerfile",
+    from: "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin dockerd-rootless.sh",
+    to: "PATH=/usr/local/bin:/usr/bin:/bin dockerd-rootless.sh",
+    command: unit,
+    expect: "the default image's inner Docker finds ip and sysctl",
+  },
+  {
+    name: "the inner Docker's runc makes session keyrings",
+    file: "packages/lanes/image/Containerfile",
+    from: ' then set -- "$@" --no-new-keyring; added=yes; fi',
+    to: " then added=yes; fi",
+    command: unit,
+    expect: "the default image's runc adds --no-new-keyring",
+  },
+  {
+    name: "lanes do not trust the working copy's .git, which a fetch reads",
+    file: plan,
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "  `[safe]\\n\\tdirectory = ${HOST_WORKING_COPY}\\n\\tdirectory = ${HOST_WORKING_COPY}/.git\\n`",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
+    to: "  `[safe]\\n\\tdirectory = ${HOST_WORKING_COPY}\\n`",
+    command: unit,
+    expect:
+      "every repo in the lane ignores what the ignore file lists, through git's own variables",
+  },
+  {
+    name: "(Linux) the base's facts are written into a directory nothing made",
+    file: "packages/lanes/base.ts",
+    from: "    await mkdir(path.dirname(factsFile(root)), { recursive: true })\n",
+    to: "",
+    suite: "lanes",
+    scenario: "catch-up",
+    expect:
+      "a catch_up mid-run merges accepted work, and a branch at its turn has accepted work's file",
+  },
 ]

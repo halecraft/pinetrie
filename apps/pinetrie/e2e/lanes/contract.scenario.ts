@@ -286,7 +286,7 @@ async function dockerContract(
   )
   writeFileSync(path.join(probe, "writer.js"), WRITER)
   ownForInnerLanes(probe)
-  ownForInnerLanes(projA)
+  ownForInnerLanes(path.join(projA, ".plans"))
   const a = await findProject({
     dir: projA,
     defaultDirect: false,

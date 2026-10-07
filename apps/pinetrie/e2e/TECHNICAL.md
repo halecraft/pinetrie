@@ -31,7 +31,14 @@ suite's own helpers are beside its scenarios: `host/support.ts`,
   `docker`, the default, or `container`. Under Docker, `e2e:lanes` runs on
   the Mac against the lane VM, on Linux against the host's Docker, and
   inside a pine·trie lane granted `lanes.nested` against the lane's
-  rootless Docker, its lanes in `/var/lib/pinetrie-lanes`.
+  rootless Docker, its lanes in `/var/lib/pinetrie-lanes`. In a lane it took
+  120 s (2026-10-08: 64 passed, the Mac's network checks and ssh skipped),
+  with pine·trie's default image already built in the inner Docker.
+- **In a nested lane, inner lanes write as uid 1000,** the rootless user:
+  each throwaway project is opened to others' search (`committedProject`),
+  and only the paths lanes write are handed to that user
+  (`ownForInnerLanes`), never a repository, which git then refuses to the
+  host. A lane's writes there are uid 1000's (`lanesWriteAs`).
 - **A suite's host works directly where its runtime cannot run**
   (`runtimeRefused: "direct"`, `startSuiteHost`): the project's reason is
   the runtime's words. A host started by `server.ts` stops instead.

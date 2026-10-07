@@ -7,7 +7,13 @@
 // A test harness is neither.
 
 import { execFileSync } from "node:child_process"
-import { mkdtempSync, realpathSync, rmSync, writeFileSync } from "node:fs"
+import {
+  chmodSync,
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs"
 import { homedir, tmpdir } from "node:os"
 import path from "node:path"
 import { NotAWriterError } from "@kyneta/exchange"
@@ -119,6 +125,9 @@ export function committedProject(
   files: Readonly<Record<string, string | Uint8Array>>,
 ): string {
   const dir = realpathSync(mkdtempSync(path.join(tmpdir(), prefix)))
+  // mkdtemp makes it 0700. A rootless Docker, in a lane granted lanes of
+  // its own, runs as another user, and must look inside to bind its paths.
+  chmodSync(dir, 0o755)
   const jj = (...args: string[]) =>
     execFileSync("jj", ["--no-pager", ...args], { cwd: dir, stdio: "pipe" })
   jj("git", "init", "--colocate")

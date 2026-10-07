@@ -16,6 +16,7 @@ import { atEntry, entryId, ROOT } from "@pinetrie/core"
 import { readRevisions } from "@pinetrie/reads"
 import type { Checks } from "../checks.ts"
 import { rootRecordsOf, runtimeProblem, SUITE_CONFIG } from "../harness.ts"
+import { lanesWriteAs } from "../lane-runtime.ts"
 import type { Scenario } from "../scenario.ts"
 import {
   BRANCH,
@@ -68,11 +69,13 @@ async function sharedSection(check: Checks["check"]): Promise<void> {
     await h.user.chat("write a plan", ROOT, START_AGENT)
     await h.idle()
     const plan = path.join(dir, ".plans", "a.md")
+    const owner = existsSync(plan) ? statSync(plan).uid : null
     check(
       "a plan a lane writes is in your working copy at once, and yours",
       existsSync(plan) &&
         readFileSync(plan, "utf8") === "the plan\n" &&
-        statSync(plan).uid === process.getuid?.(),
+        owner === lanesWriteAs(),
+      `owner ${owner}, expected ${lanesWriteAs()}`,
     )
     h.script.use([
       { tool: "bash", args: { command: "cat .plans/a.md" } },

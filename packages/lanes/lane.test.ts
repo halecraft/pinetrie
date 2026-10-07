@@ -1,4 +1,4 @@
-import { statSync } from "node:fs"
+import { readFileSync, statSync } from "node:fs"
 import path from "node:path"
 import { describe, expect, test } from "vitest"
 import {
@@ -77,4 +77,26 @@ describe("createQueue: one lane's steps, in order, and the gate", () => {
     await expect(queue.enqueue(async () => 2)).resolves.toBe(2)
     await expect(queue.idle()).resolves.toBeUndefined()
   })
+})
+
+test("the default image's inner Docker finds ip and sysctl, in /usr/sbin", () => {
+  const containerfile = readFileSync(
+    path.join(import.meta.dirname, "image", "Containerfile"),
+    "utf8",
+  )
+  const inner = containerfile
+    .split("\n")
+    .find(l => l.includes("dockerd-rootless.sh --data-root"))
+  expect(inner).toMatch(/PATH=[^ ]*\/usr\/sbin[: ]/)
+  expect(containerfile).toMatch(/--no-install-recommends[^\n]* iproute2/)
+})
+
+test("the default image's runc adds --no-new-keyring, for BuildKit's containers too", () => {
+  const containerfile = readFileSync(
+    path.join(import.meta.dirname, "image", "Containerfile"),
+    "utf8",
+  )
+  expect(containerfile).toContain("> /usr/local/sbin/runc")
+  expect(containerfile).toContain('set -- "$@" --no-new-keyring')
+  expect(containerfile).toContain("exec /usr/local/bin/runc")
 })

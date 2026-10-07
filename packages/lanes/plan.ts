@@ -232,6 +232,8 @@ export interface SharedDir {
 export const IGNORE_MOUNT = "/pinetrie-git"
 /** The ignore file's name, in `ignoreDir` on the host and `IGNORE_MOUNT` in a lane. */
 export const IGNORE_FILE = "ignore"
+/** Git's system config for every lane, beside the ignore file (`laneGitConfig`). */
+export const LANE_GITCONFIG = "gitconfig"
 /** The label a container's spec hash is kept under. */
 export const SPEC_LABEL = "pinetrie.spec"
 
@@ -289,6 +291,10 @@ export function planShape(
       ["GIT_CONFIG_COUNT", "1"],
       ["GIT_CONFIG_KEY_0", "core.excludesFile"],
       ["GIT_CONFIG_VALUE_0", `${IGNORE_MOUNT}/${IGNORE_FILE}`],
+      // Git's system config is the host's (`laneGitConfig`): it trusts your
+      // working copy, which a fetch reads through upload-pack, and git drops
+      // the variables above for that.
+      ["GIT_CONFIG_SYSTEM", `${IGNORE_MOUNT}/${LANE_GITCONFIG}`],
       ...Object.entries(NO_EDITOR),
       // Last, so the image's own programs win: the runtime brings its
       // programs for an image that has none, and never Node.
@@ -311,6 +317,16 @@ export const specHashOf = (
  * The lane's ignore file: what no repo in a lane may track. pinetrie's own
  * config, the file system's own directory, and each shared directory.
  */
+/**
+ * Git's system config in every lane. It trusts your working copy, which
+ * every lane fetches from: in a nested lane its owner is outside the lane's
+ * user namespace, and git refuses a repository another user owns ("dubious
+ * ownership"). Both paths: git in the work tree checks it, a fetch from it
+ * checks its `.git`. It replaces an image's own `/etc/gitconfig`.
+ */
+export const laneGitConfig = (): string =>
+  `[safe]\n\tdirectory = ${HOST_WORKING_COPY}\n\tdirectory = ${HOST_WORKING_COPY}/.git\n`
+
 export const laneIgnores = (shared: readonly string[]): string =>
   ["/.pinetrie-lane/", "/lost+found/", ...shared.map(p => `/${p}/`)]
     .map(l => `${l}\n`)

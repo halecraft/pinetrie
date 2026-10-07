@@ -38,12 +38,16 @@ RUN npx -y "playwright@${PLAYWRIGHT_VERSION}" install --with-deps chromium-headl
 # Lanes inside a lane (ADR-0103, S125): rootless Docker, from Docker's static
 # bundles, which a lane granted `lanes.nested` starts as `rootless` (uid 1000)
 # on its inner lanes' btrfs subvolume (`pinetrie-inner-docker`). runc's
-# NoNewKeyring is its default: Docker's seccomp profile refuses `keyctl`. The
+# NoNewKeyring is its default: Docker's seccomp profile refuses `keyctl`.
+# BuildKit starts runc itself, not through that default, so `runc` in
+# /usr/local/sbin, first on the inner Docker's PATH, adds --no-new-keyring. The
 # docker CLI and buildx are for a pine·trie host running in the lane.
 # newuidmap and newgidmap carry file capabilities, not setuid: setuid root,
 # they open uid_map as root, and writing it needs CAP_SYS_ADMIN over the new
 # namespace, which a lane lacks; as its owner (uid 1000) with CAP_SETUID they
-# may write it (S135). rootlesskit makes slirp4netns's tap device with `ip`.
+# may write it (S135). rootlesskit makes slirp4netns's tap device with `ip`,
+# and the inner Docker sets sysctls with `sysctl`: both in /usr/sbin, which
+# its PATH has.
 ARG DOCKER_VERSION=29.8.2
 ARG BUILDX_VERSION=0.37.2
 RUN apt-get update -qq \
@@ -73,6 +77,19 @@ RUN apt-get update -qq \
     '# A nested lane'"'"'s inner Docker: rootless, as uid 1000, on its inner lanes'"'"' subvolume.' \
     '[ -d /var/lib/pinetrie-lanes ] || exit 0' \
     'mkdir -p /run/user/1000 && chown 1000:1000 /run/user/1000 && chmod 700 /run/user/1000' \
-    'exec setpriv --reuid=1000 --regid=1000 --init-groups env HOME=/home/rootless XDG_RUNTIME_DIR=/run/user/1000 PATH=/usr/local/bin:/usr/bin:/bin dockerd-rootless.sh --data-root /var/lib/pinetrie-lanes/docker > /tmp/inner-docker.log 2>&1' \
+    'exec setpriv --reuid=1000 --regid=1000 --init-groups env HOME=/home/rootless XDG_RUNTIME_DIR=/run/user/1000 PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin dockerd-rootless.sh --data-root /var/lib/pinetrie-lanes/docker > /tmp/inner-docker.log 2>&1' \
     > /usr/local/bin/pinetrie-inner-docker \
- && chmod +x /usr/local/bin/pinetrie-inner-docker
+ && chmod +x /usr/local/bin/pinetrie-inner-docker \
+ && printf '%s\n' \
+    '#!/bin/sh' \
+    '# runc for the inner Docker of a nested lane: run and create get --no-new-keyring, for the containers of BuildKit as for those of Docker (S125).' \
+    'n=$#' \
+    'added=no' \
+    'for a in "$@"; do' \
+    '  set -- "$@" "$a"' \
+    '  if [ "$added" = no ] && { [ "$a" = run ] || [ "$a" = create ]; }; then set -- "$@" --no-new-keyring; added=yes; fi' \
+    'done' \
+    'shift "$n"' \
+    'exec /usr/local/bin/runc "$@"' \
+    > /usr/local/sbin/runc \
+ && chmod +x /usr/local/sbin/runc

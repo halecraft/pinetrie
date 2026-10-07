@@ -108,10 +108,20 @@ export function removeLane(root: string, lane: LaneName): void {
 }
 
 /**
+ * Whose a lane's writes in a shared directory are: the person's, the host's
+ * own user; in a lane granted lanes of its own, the rootless user's, whose
+ * root an inner lane's is, and whom the suites hand shared directories to.
+ */
+export const lanesWriteAs = (): number | undefined =>
+  E2E_RUNTIME === "docker" && existsSync(NESTED_MOUNT)
+    ? ROOTLESS_UID
+    : process.getuid?.()
+
+/**
  * Inside a lane granted lanes of its own, inner lanes write as the rootless
- * user (uid 1000): the throwaway project `dir` becomes theirs, so a shared
- * directory takes their writes. The host, root, still writes everywhere.
- * Elsewhere, nothing.
+ * user (uid 1000): a path they write (a shared directory, a probe's) becomes
+ * theirs. Never a repository: git refuses one another user owns, and the
+ * host, root, runs jj and git in it. Elsewhere, nothing.
  */
 export function ownForInnerLanes(dir: string): void {
   if (E2E_RUNTIME === "docker" && existsSync(NESTED_MOUNT))

@@ -18,6 +18,7 @@ import {
   isBookmarkName,
   type LaneSpec,
   type LaneStep,
+  laneGitConfig,
   laneIgnores,
   machineConfig,
   NO_GRANTS,
@@ -170,7 +171,11 @@ describe("planShape: a lane's container, as any runtime would make it", () => {
       GIT_CONFIG_COUNT: "1",
       GIT_CONFIG_KEY_0: "core.excludesFile",
       GIT_CONFIG_VALUE_0: "/pinetrie-git/ignore",
+      GIT_CONFIG_SYSTEM: "/pinetrie-git/gitconfig",
     })
+    expect(laneGitConfig()).toBe(
+      "[safe]\n\tdirectory = /mnt/host-working-copy\n\tdirectory = /mnt/host-working-copy/.git\n",
+    )
     expect(laneIgnores([".plans", "notes/shared"])).toBe(
       "/.pinetrie-lane/\n/lost+found/\n/.plans/\n/notes/shared/\n",
     )

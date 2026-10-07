@@ -198,6 +198,7 @@ export async function sectionHost(input: {
   const dir =
     input.dir ?? committedProject("pinetrie-section-", input.files ?? {})
   const script = scriptedModel()
+  const seen: string[] = []
   const host = await startSuiteHost({
     model: { kind: "scripted", script },
     project: { dir: dir, tools: true },
@@ -205,12 +206,16 @@ export async function sectionHost(input: {
     ...(input.userConfig === undefined ? {} : { userConfig: input.userConfig }),
     ...(input.agentDir === undefined ? {} : { agentDir: input.agentDir }),
     log: m => {
+      seen.push(m)
       input.logs?.push(m)
       if (process.env.PINETRIE_E2E_LOG === "1") console.log(m)
     },
   })
-  // After the host made the shared directories it was given.
-  ownForInnerLanes(dir)
+  // After the host made the shared directories it was given, as it logged.
+  for (const l of seen) {
+    const m = /\[host\] (.+)\/ is shared read-write with every lane/.exec(l)
+    if (m?.[1] !== undefined) ownForInnerLanes(path.join(dir, m[1]))
+  }
   const user = await join(
     host,
     `u${Math.random().toString(36).slice(2, 10)}`,

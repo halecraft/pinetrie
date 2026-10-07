@@ -28,7 +28,9 @@ import {
   type ConfigRead,
   EXCLUDE_LINE,
   IGNORE_FILE,
+  LANE_GITCONFIG,
   type Link,
+  laneGitConfig,
   laneIgnores,
   PROJECT_DIR,
   type ProjectDir,
@@ -185,6 +187,7 @@ export async function prepareShared(
     path.join(ignoreDir, IGNORE_FILE),
     laneIgnores(planned.shared),
   )
+  await writeFile(path.join(ignoreDir, LANE_GITCONFIG), laneGitConfig())
   return {
     shared: planned.shared.map(p => ({ path: p, source: path.join(root, p) })),
     refused: planned.refused,
