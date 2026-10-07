@@ -77,6 +77,7 @@ const at = (
   rootEntries: new Map([...ROOT_IDS].map(([e, r]) => [r, e] as const)),
   rootIds: ROOT_IDS,
   listWidth: "full",
+  page: null,
 })
 /** A root shown: the root you are on, and in your list, at its end if it was not. */
 const shown = (root: string, id: RootId): Effect[] => [
@@ -700,4 +701,49 @@ test("foldList asks for the width your list does not show", () => {
   expect(plan({ kind: "foldList" }, { ...R1, listWidth: "icons" })).toEqual([
     { kind: "listWidth", width: "full" },
   ])
+})
+
+describe("a page over the workspace (ADR-0098)", () => {
+  const onPage: IntentState = { ...R1, page: "profile" }
+  const leave: Effect = { kind: "page", to: null }
+  const r2: Intent = {
+    kind: "show",
+    here: { kind: "root", root: entryId("5-r2") },
+  }
+  test("opening and leaving a page are the page effect", () => {
+    expect(plan({ kind: "page", to: "profile" })).toEqual([
+      { kind: "page", to: "profile" },
+    ])
+    expect(plan({ kind: "page", to: null }, onPage)).toEqual([leave])
+  })
+  test("showing a root, a new tab or the board leaves the page first, once", () => {
+    expect(plan(r2, onPage)).toEqual([leave, ...plan(r2)])
+    const newTab: Intent = { kind: "newTab", asksAgent: true }
+    expect(plan(newTab, onPage)).toEqual([leave, ...plan(newTab)])
+    const fromColumn = column({
+      kind: "newTab",
+      prefill: { text: "again", blank: false },
+      asksAgent: false,
+    })
+    expect(plan(fromColumn, onPage)).toEqual([leave, ...plan(fromColumn)])
+    const board: Intent = { kind: "board", open: true }
+    expect(plan(board, onPage)).toEqual([leave, ...plan(board)])
+    const inbox: Intent = {
+      kind: "openIn",
+      entry: entryId("9-unheld"),
+      root: entryId("5-r2"),
+    }
+    expect(plan(inbox, onPage)[0]).toEqual(leave)
+  })
+  test("what shows nothing in the workspace leaves the page where it is", () => {
+    for (const intent of [
+      { kind: "board", open: false },
+      { kind: "foldList" },
+      { kind: "close", here: { kind: "new", key: "t" } },
+    ] satisfies Intent[])
+      expect(plan(intent, onPage)).toEqual(plan(intent))
+  })
+  test("with no page, nothing is added", () => {
+    expect(plan(r2)).not.toContainEqual(leave)
+  })
 })

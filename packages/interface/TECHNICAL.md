@@ -160,6 +160,12 @@ function is proven by a unit test in a second.
   `ColumnSlot`s), the read-only words, and the open offers your inbox and the board read. A slot
   is new each render; `Column` is not memoised, so this costs nothing, and
   a slot must never reach a memoised component by identity.
+- **A page over the workspace is a value too** (`page.ts`, ADR-0098): the
+  `page` intent and effect open or leave it through the `page` port, and
+  `planIntent` leaves it first whenever a plan shows something in the
+  workspace (`showsWorkspace`, `layout.ts`). Which hash names a page and
+  how leaving treats the browser's history (`planLeave`) are decided here;
+  `use-page.ts` carries them out (`packages/web/TECHNICAL.md`, "Pages").
 - **`main.tsx` boots the page:** it builds the device's stores, asks who you
   are, connects, and mounts `App({ session, stores })`. `app.tsx` touches no
   browser global as it loads.
@@ -214,9 +220,9 @@ and each item's signals.
   `.open-root` (or `.open-new`) button, ⋯ and ×; the selected wrap carries
   `data-selected`, set from `ItemView.selected`, and is filled with
   `--page`, the list `--chrome`. The footer (`footer.tsx`) holds
-  `.footer-you` (your profile, inbox and inventory; folded, your profile
-  alone, the inbox just past it), the board's strip (`BoardStrip`), then
-  `.footer-right` (sync note, publish).
+  `.footer-you` (your avatar and name, then your inbox and inventory as
+  icons; folded, your avatar alone, ADR-0098), the board's strip
+  (`BoardStrip`), then `.footer-right` (sync note, publish).
 - **Your list folds to icons** (ADR-0088). The width is a value
   (`ListWidth`, `list-width.ts`): your choice in this tab, else icons on a
   small window (`shownWidth`, `useSmallWindow`). Folding is an intent,
@@ -231,8 +237,8 @@ and each item's signals.
   else a new tab's hollow tile). The icon is the trigger of a `Menu` opened
   by `contextmenu` (`Popover`'s `opensOn`), whose click shows the root;
   the tooltip and the rename field are fixed to the window beside it, since
-  the list clips. The footer's corner then draws only `Profile`, which
-  draws `InventoryToggle` inside it.
+  the list clips. The footer's corner then draws only `AccountMenu`, whose
+  menu holds the inbox and the inventory (`accountView`, ADR-0098).
 - **`resolveLayout` keeps an archived root you are on** in your list as
   drawn, read-only, until you leave it. `prune`, once after `whenSettled`,
   drops columns of roots the document lacks, and replaces a gone or
@@ -429,18 +435,21 @@ pending.
   (`Avatar`) a `Menu` of the threads that person reads there
   (`ReaderMenus`); your list's items and the strip's states show avatars
   only (`Readers`).
-- **You** are first in the footer, under your list: your profile
-  (`profile.tsx`, below, under Who you are), your inbox, then your
-  inventory. While your list is folded the corner holds your profile alone,
-  and the inbox is drawn just past it, before the strip.
+- **You** are first in the footer, under your list (ADR-0098): your
+  avatar and name, opening the account menu (`account-menu.tsx`), then
+  your inbox and your inventory as icons. `accountView` (pure) decides the
+  menu's items and the badge on your avatar: folded, the corner holds your
+  avatar alone, carrying the inbox's badge, and the menu adds the inbox
+  and the inventory; `accountWords` and `inventoryWords` word them.
 - **Your inbox** (`inbox-view.ts`, pure, ADR-0091): what the threads you
   follow raise (`attentionOf`'s items) and your mentions, in one menu
-  (`InboxMenu`). `inboxView` groups the items into sections (a verdict
+  (`inbox-menu.tsx`). `inboxView` groups the items into sections (a verdict
   under its level, an offer under ready), so the inbox lists exactly what
   it counts; `inboxWords` words them. Its badge is `inboxCount`, given:
   `App` computes it once and the window's title shows the same number.
-  `InboxMenu` only turns each section's items into rows (`threadRow`, made
-  once by `App` and shared with the board) and "not needed". `kept` is the
+  `useInboxMenu` only turns each section's items into rows (`threadRow`,
+  made once by `App` and shared with the board) and "not needed", for the
+  corner's `InboxMenu` and, folded, the account menu alike. `kept` is the
   sections shown when the menu opened, set through `onToggle`, so an open
   menu keeps a section whose rows have gone and says so. The trigger is
   always drawn, quiet at zero. Its first section has a heading and no
@@ -510,8 +519,12 @@ pending.
   (`.open`), since both listen on the document and the board's listener,
   added first, hears it first.
 - **`Menu`** (`menu.tsx`) is a `Popover` whose box is a `role="menu"` list,
-  in sections (`MenuSection`): a board item's readers, your inbox, publish's
-  setup, your list's items' `⋯`, ＋'s menu and the composer's where line.
+  in sections (`MenuSection`): a board item's readers, your inbox, the
+  account menu, publish's setup, your list's items' `⋯`, ＋'s menu and the
+  composer's where line. A `lead` is drawn above the list, outside it (the
+  account menu's who you are), and a change of `focusKey` while open gives
+  the first item focus, as opening does (the account menu's swap to the
+  inbox).
   The first section's heading is drawn above the list, not in it, since a
   menu holds only menu items, and names it (`aria-labelledby`); each later
   section is a `<fieldset>` (role `group`, which Biome asks for as the
@@ -523,7 +536,7 @@ pending.
   both kinds.
 - **`.initial` is the circle; `.avatar` is a person shown here.** The browser
   suite counts people by `.avatar`, and proves you are never among them by
-  it. So your profile's trigger (`.me`) and the "+n" of `Avatars`
+  it. So your avatar in the corner and the account menu (`.me`) and the "+n" of `Avatars`
   (`.more`) are `.initial` and never `.avatar`.
   The circle's shape is `.initial`'s rule; `.avatar` has none. Your list's
   items and the board's hold readers' avatars too, so `.avatar` anywhere matches them,
@@ -989,7 +1002,7 @@ change of wording then touches the words function, its one test, and
 - **Failed.** A command the host threw on comes back `failed` with the
   error's message. The card keeps its text (`spent` is false), as for a
   refusal, but `failedWords` never says "not sent": the host may have written
-  the message before it failed. The profile form words a failed rename with
+  the message before it failed. The profile page words a failed rename with
   the same function, through `renameProblem` (`identity.ts`).
 - **Queued cards** (ADR-0048) are drawn after the thread's last message and
   its working line, above the line, in the order the host pops them
@@ -1217,8 +1230,8 @@ state, never stored.
   panel is closed opens it briefly.
 - **Selectors for the browser suite:** `.inventory` (the panel),
   `.inventory .slot[data-slot][data-card]` and `.slot-line`, `.inventory
-  .put`, `.inventory .remove`, `#bottom .inventory-toggle` (`#profile
-  .inventory-toggle` while your list is folded), a card's
+  .put`, `.inventory .remove`, `#bottom .inventory-toggle`
+  (`.account-inventory` in the account menu while your list is folded), a card's
   `.take-into-inventory`, a message's `.take-copy-into-inventory`, and a
   fresh column's `.close-keep`,
   `.close-discard` and `.close-cancel`.

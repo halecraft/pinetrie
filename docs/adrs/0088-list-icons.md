@@ -4,6 +4,9 @@
 Amends ADR-0085 (your list and the footer's corner
 have a second, narrow width, which answers its deferred narrow screens).
 Uses ADR-0089's root colour.
+Amended by ADR-0098 (proposed): folded, your avatar carries the inbox's
+badge and opens the account menu, which holds the inbox and the
+inventory's toggle.
 
 **Context.**
 

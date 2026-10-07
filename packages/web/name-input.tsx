@@ -1,5 +1,5 @@
 // web/name-input — the name field of the identification screen and of
-// your profile: one rule (`normalizeName`, through `identity.ts`) and one
+// your profile page: one rule (`normalizeName`, through `identity.ts`) and one
 // wording for both.
 
 import { MAX_NAME_LENGTH } from "@pinetrie/core"

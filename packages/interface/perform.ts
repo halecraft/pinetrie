@@ -9,6 +9,7 @@ import type { Identity } from "./identity.ts"
 import { afterRootMove, type Intent } from "./intent.ts"
 import type { LayoutAction } from "./layout.ts"
 import type { ListWidth } from "./list-width.ts"
+import type { PageName } from "./page.ts"
 
 export interface AppPorts {
   readonly dispatch: (action: LayoutAction) => void
@@ -54,6 +55,8 @@ export interface AppPorts {
   readonly reload: () => void
   /** Show your list at a width, and keep the choice for this tab (ADR-0088). */
   readonly listWidth: (width: ListWidth) => void
+  /** Show a page over the workspace, or, with null, the workspace (ADR-0098). */
+  readonly page: (to: PageName | null) => void
 }
 
 export function perform(effects: readonly Effect[], ports: AppPorts): void {
@@ -67,6 +70,9 @@ function performOne(effect: Effect, ports: AppPorts): void {
       return
     case "listWidth":
       ports.listWidth(effect.width)
+      return
+    case "page":
+      ports.page(effect.to)
       return
     case "request":
       void ports.session.request(effect.intent)

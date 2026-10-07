@@ -1,5 +1,5 @@
 // web/popover — a trigger button and the box it opens: every menu
-// (`menu.tsx`) and your profile (`profile.tsx`).
+// (`menu.tsx`) and a card's history (`card-history.tsx`).
 //
 // The box is `position: fixed`, placed under its trigger from the trigger's
 // rect when it opens (above it, for a trigger in the window's lower half): the
@@ -51,6 +51,7 @@ export function Popover({
   role,
   id,
   boxClassName,
+  lead,
   heading,
   onOpen,
   onToggle,
@@ -75,6 +76,8 @@ export function Popover({
   /** The box's id; one is made when none is given. */
   id?: string
   boxClassName: string
+  /** Drawn at the top of the box, before the heading: never a control. */
+  lead?: ReactNode
   /** Drawn at the top of the box. */
   heading?: string
   /** Called each time the box is drawn anew: where focus goes. */
@@ -99,7 +102,7 @@ export function Popover({
   // half (a composer's, the footer's), or the box would open past the
   // window's foot. Its right edge at the trigger's; its left edge at the
   // trigger's when the trigger is in the window's left half (your list's, your
-  // profile's), or the box would open past the window's left.
+  // avatar's), or the box would open past the window's left.
   const [at, setAt] = useState<Placement | null>(null)
   const open = at !== null
   const wrapper = useRef<HTMLSpanElement>(null)
@@ -199,6 +202,7 @@ export function Popover({
   })
   const body = (
     <>
+      {lead}
       {heading !== undefined && (
         <p className="menu-heading" id={headingId}>
           {heading}

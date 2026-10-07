@@ -127,11 +127,14 @@ import { Board, BoardStrip } from "./board.tsx"
 import { CardHistories } from "./card-history.tsx"
 import { CardPip } from "./card-pip.tsx"
 import { Column } from "./column.tsx"
-import { Footer, threadRow } from "./footer.tsx"
+import { Footer } from "./footer.tsx"
+import { threadRow } from "./inbox-menu.tsx"
 import { InventoryPanel } from "./inventory-panel.tsx"
 import { OpenList } from "./open-list.tsx"
+import { Page } from "./page.tsx"
 import { TrackSeed } from "./palette-context.ts"
 import { nameFor, presenceColors, writerOrder } from "./presence.tsx"
+import { ProfilePage } from "./profile-page.tsx"
 import { EmptyRail, LiveRail } from "./rail.tsx"
 import {
   NO_PREFS,
@@ -146,6 +149,7 @@ import { FLIGHT_MS, useFlight } from "./use-flight.ts"
 import { PLACED } from "./use-follow.ts"
 import { useInbox } from "./use-inbox.ts"
 import { NarrowContext, useStripNarrow } from "./use-narrow.ts"
+import { goTo, usePage } from "./use-page.ts"
 import { useReveal } from "./use-reveal.ts"
 import { useRootDrag } from "./use-root-drag.ts"
 import { useSmallWindow } from "./use-small-window.ts"
@@ -286,6 +290,8 @@ export function App({
 }) {
   const doc = session.session
   const status = useDocStatus(doc)
+  // The page over the workspace, from the URL's hash (ADR-0098).
+  const page = usePage()
   // The roots this tab holds (ADR-0063): the roots of your list and the one
   // you are on, set by the effect below. Every read of the tree reads them
   // as one.
@@ -724,7 +730,7 @@ export function App({
           rootIds,
           sprites,
         })
-  const title = pageTitle(needsYou, listView?.selected ?? null)
+  const title = pageTitle(needsYou, listView?.selected ?? null, page)
   // The closed state's search and "mine": never stored.
   const [boardQuery, setBoardQuery] = useState("")
   const [boardMine, setBoardMine] = useState(false)
@@ -900,6 +906,7 @@ export function App({
       setChosenWidth(width)
       stores.list.save(width)
     },
+    page: goTo,
     inventory: {
       // A take into the inventory while the panel is closed shows it for the
       // card's flight.
@@ -936,6 +943,7 @@ export function App({
           rootEntries,
           rootIds,
           listWidth,
+          page,
         },
         crypto.randomUUID(),
         newRootId(),
@@ -961,6 +969,7 @@ export function App({
         selected,
         selectedCard: slots[String(selected)] ?? null,
         column: lastColumn.current,
+        page: page !== null,
       })
       if (intent === null) return
       e.preventDefault()
@@ -968,7 +977,7 @@ export function App({
     }
     document.addEventListener("keydown", onKey)
     return () => document.removeEventListener("keydown", onKey)
-  }, [onIntent, selected, slots])
+  }, [onIntent, selected, slots, page])
   // Where focus last was in a column: its key.
   useEffect(() => {
     const onFocus = (e: FocusEvent) => {
@@ -1165,7 +1174,15 @@ export function App({
           slots={slots}
         />
       )}
-      <main id="workspace">
+      {/* Under a page the workspace stays mounted and laid out, only inert
+          (ADR-0098). Remounted, its columns would lose their scroll; with
+          `display: none`, `useStripNarrow` would measure the strip at 0 and
+          turn an open pane into a modal dialog over the page. */}
+      <main
+        aria-hidden={page !== null || undefined}
+        id="workspace"
+        inert={page !== null}
+      >
         {/* What the workspace's columns draw by (ADR-0087, ADR-0089): the
             root's colours, whether the pane covers the page, how you read a
             review. Each changes rarely, and only its readers redraw. */}
@@ -1253,6 +1270,18 @@ export function App({
           </NarrowContext>
         </TrackSeed>
       </main>
+      {page !== null && (
+        <Page onBack={() => onIntent({ kind: "page", to: null })} page={page}>
+          {page === "profile" && (
+            <ProfilePage
+              email={session.principal}
+              nameOf={nameOf}
+              rename={name => session.request({ kind: "name", name })}
+              writer={session.writer}
+            />
+          )}
+        </Page>
+      )}
       <Footer
         syncing={status === "pending"}
         strip={
@@ -1267,24 +1296,23 @@ export function App({
           />
         }
         colorOf={colorOf}
-        thread={thread}
-        labelOf={labelOf}
         nameOf={nameOf}
-        names={workFacts.names}
-        count={needsYou}
-        attention={attention.items}
-        mentions={mentions}
-        inbox={inbox}
+        inbox={{
+          attention: attention.items,
+          count: needsYou,
+          mentions,
+          inbox,
+          thread,
+          names: workFacts.names,
+          labelOf,
+          nameOf,
+          onOpen: openIn,
+          onIntent,
+        }}
         line={workFacts.line}
         project={workFacts.project}
         onIntent={onIntent}
-        me={{
-          writer: session.writer,
-          email: session.principal,
-          rename: name => session.request({ kind: "name", name }),
-          signOut: () => onIntent({ kind: "signOut" }),
-        }}
-        onOpen={openIn}
+        me={{ writer: session.writer, email: session.principal }}
         session={session}
         inventory={{
           open: inventoryOpen,

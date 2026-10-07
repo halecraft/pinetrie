@@ -36,6 +36,11 @@ export interface KeyFocus {
   readonly selectedCard: CardId | null
   /** The column that last held focus, by key: where a put lands. */
   readonly column: string | null
+  /**
+   * A page covers the workspace (ADR-0098): no key but the list's fold acts,
+   * since a take, a put or an undo would act on columns no one can see.
+   */
+  readonly page: boolean
 }
 
 const GRID: Readonly<Record<string, GridStep>> = {
@@ -54,6 +59,9 @@ export function keyAct(event: KeyLike, focus: KeyFocus): Intent | null {
   const key = event.key.toLowerCase()
   const chord =
     event.ctrlKey && event.shiftKey && !event.metaKey && !event.altKey
+  // Your list's width (ADR-0088), from anywhere, as the chords below.
+  if (chord && key === "l") return { kind: "foldList" }
+  if (focus.page) return null
   if (chord && key === "i")
     return focus.card === null
       ? null
@@ -66,8 +74,6 @@ export function keyAct(event: KeyLike, focus: KeyFocus): Intent | null {
           card: focus.selectedCard,
           target: { kind: "column", key: focus.column },
         }
-  // Your list's width (ADR-0088), from anywhere, as the chords above.
-  if (chord && key === "l") return { kind: "foldList" }
   if (focus.inText || event.altKey) return null
   const command = event.metaKey !== event.ctrlKey
   if (command && key === "z")

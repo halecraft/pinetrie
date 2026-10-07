@@ -1111,14 +1111,47 @@ async function run(check: Checks["check"]): Promise<void> {
       await idle()
       await other.close()
 
+      // ── a page over the workspace (ADR-0098): the browser's Back leaves it,
+      // and the columns under it kept their place. ──
+      const body = `${col(0)} .column-body`
+      const scrolled = await page
+        .$eval(body, n => {
+          const room = n.scrollHeight - n.clientHeight
+          n.scrollTop = Math.floor(room / 2)
+          return room > 100 ? n.scrollTop : null
+        })
+        .catch(() => null)
+      await waitFor(() => false, 300)
+      const covered = await openProfile(page)
+      await page.goBack()
+      const left = await page
+        .waitForFunction(
+          () => document.querySelector(".page") === null,
+          undefined,
+          {
+            timeout: 10_000,
+          },
+        )
+        .then(
+          () => true,
+          () => false,
+        )
+      const stayed = await page.$eval(body, n => n.scrollTop).catch(() => -1)
+      check(
+        "the profile page covers the workspace, and the browser's Back returns to the columns as they were",
+        scrolled !== null && covered && left && stayed === scrolled,
+        `scrollTop ${scrolled} → ${stayed}, covered ${covered}, left ${left}`,
+      )
+
       // ── your profile: a rename shows, and the name each message was sent ──
       // under stays; this device keeps the name you go by (ADR-0037).
       const profileSeen = await openProfile(page)
-      const nameField = '#profile input[name="name"]'
+      const profile = '.page[data-page="profile"]'
+      const nameField = `${profile} input[name="name"]`
       await page.fill(nameField, "agent")
       await page.press(nameField, "Enter")
       const refusedName = await page
-        .waitForSelector('#profile .name-problem[data-problem="name"]', {
+        .waitForSelector(`${profile} .name-problem[data-problem="name"]`, {
           timeout: 5_000,
         })
         .then(
@@ -1131,7 +1164,7 @@ async function run(check: Checks["check"]): Promise<void> {
       )
       await page.fill(nameField, "Ada Lovelace")
       const hint = await page
-        .textContent("#profile .name-handle", { timeout: 5_000 })
+        .textContent(`${profile} .name-handle`, { timeout: 5_000 })
         .catch(() => null)
       check(
         "your profile shows the handle the name you type gives you",
@@ -1855,6 +1888,55 @@ async function run(check: Checks["check"]): Promise<void> {
             () => true,
             () => false,
           )
+        // The corner at 11.5rem (ADR-0098): your name gives way, so it, your
+        // inbox with a two-digit badge and your inventory sit side by side.
+        const viewport = page.viewportSize()
+        const folded = async () =>
+          (await page.$(':root[data-list="icons"]')) !== null
+        const wasFolded = await folded()
+        await page.setViewportSize({
+          width: 860,
+          height: viewport?.height ?? 720,
+        })
+        if (await folded()) await page.click("#open-list .list-fold")
+        const corner = await page
+          .evaluate(() => {
+            const badge = document.querySelector(
+              "#bottom .footer-tools .inbox-badge",
+            )
+            const said = badge?.textContent ?? null
+            if (badge !== null) badge.textContent = "88"
+            const box = (sel: string) =>
+              document.querySelector(`#bottom ${sel}`)?.getBoundingClientRect()
+            const you = box(".footer-you")
+            const parts = [
+              ".me-name",
+              ".inbox-trigger",
+              ".inventory-toggle",
+            ].map(box)
+            if (badge !== null) badge.textContent = said
+            if (you === undefined || badge === null) return null
+            const inside = parts.every(
+              r =>
+                r !== undefined && r.left >= you.left && r.right <= you.right,
+            )
+            const apart = parts.every(
+              (r, i) =>
+                i === 0 ||
+                (r !== undefined &&
+                  (parts[i - 1]?.right ?? Infinity) <= r.left),
+            )
+            return { inside, apart, width: you.width }
+          })
+          .catch(() => null)
+        if (viewport !== null) await page.setViewportSize(viewport)
+        if (wasFolded !== (await folded()))
+          await page.click("#open-list .list-fold")
+        check(
+          "the corner holds you, your inbox and your inventory side by side at 11.5rem with a two-digit badge",
+          corner?.inside === true && corner.apart && corner.width < 200,
+          JSON.stringify(corner),
+        )
         const picked = await chooseFromMenu(
           page,
           "#bottom .inbox-trigger",
@@ -2166,9 +2248,13 @@ async function run(check: Checks["check"]): Promise<void> {
         await nv.fill('#identity input[name="email"]', "nobody@browser.test")
         await nv.fill('#identity input[name="name"]', "Nobody")
         await nv.click('#identity button[type="submit"]')
-        const nvSeen = await openProfile(nv)
-        const nvEmail = await nv.textContent("#profile .profile-email")
-        await nv.click("#profile .not-you")
+        // The menu's lead shows the email this device gave, above the item.
+        const notYou = await seeInMenu(nv, "#bottom .me-trigger", ".not-you")
+        const nvEmail = await nv
+          .textContent(".account .profile-email")
+          .catch(() => null)
+        const nvSeen = notYou !== null
+        await notYou?.click()
         const askedAgain = await nv
           .waitForSelector("#identity", { timeout: 20_000 })
           .then(

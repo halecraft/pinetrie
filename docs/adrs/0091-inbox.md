@@ -8,6 +8,8 @@ and the trigger is always drawn), ADR-0077 (an open offer is marked on the
 board for everyone, and listed and counted in your inbox for its
 followers) and ADR-0085 (the footer: the inbox under your list, the strip
 counts running work and work ready to accept). Builds on ADR-0090.
+Amended by ADR-0098 (proposed): the inbox is an icon button in the
+corner; folded, it is in the account menu.
 
 **Context.** The footer splits where your list's edge does: what is yours
 under your list, what is everyone's to the right (ADR-0085). The activity

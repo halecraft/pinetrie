@@ -2,6 +2,12 @@
 // client (ADR-0093). It exports by name only what another package imports;
 // a name only this package and its tests use is imported from its module.
 
+export {
+  type AccountItem,
+  accountView,
+  accountWords,
+  inventoryWords,
+} from "./account-view.ts"
 export { placement } from "./align.ts"
 export {
   appView,
@@ -224,6 +230,8 @@ export {
 } from "./inbox.ts"
 export {
   type InboxSection,
+  type InboxView,
+  type InboxWords,
   inboxCount,
   inboxView,
   inboxWords,
@@ -286,6 +294,16 @@ export {
   renameIntent,
   rootSprites,
 } from "./open-list-view.ts"
+export {
+  BACK,
+  hashOfPage,
+  PAGE_STATE,
+  type PageName,
+  pageOfHash,
+  pageWords,
+  planLeave,
+  profileWords,
+} from "./page.ts"
 export {
   type ColorSlot,
   rootSeed,

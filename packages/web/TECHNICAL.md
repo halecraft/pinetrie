@@ -958,19 +958,25 @@ the email is the only thing pine·trie chooses.
   `prune`. It does nothing when nothing is stored for your email, which is a
   tab about to reload. Under `StrictMode` a `send` can run twice on a first
   join; the same name written twice is the same value.
-- **Your profile** (`profile.tsx`) is your avatar at the header's right, a
-  `Popover` with `role="dialog"`, not a `Menu`: a `role="menu"` holds only
-  menu items, and this holds a text field. Its submit is `planRename`
-  (pure): refuse, unchanged, or send. A rename is sent on Enter or save, and
-  Escape or a click elsewhere discards it; saving on blur would race the
-  popover unmounting the field. The trigger's `title` is your name as shown
-  (`nameFor`), the one mentions resolve against.
+- **Your avatar and name open the account menu** (`account-menu.tsx`,
+  ADR-0098), a `Menu` whose `lead` (your avatar, name and email) is drawn
+  above its list, since a menu holds only menu items. What it lists is
+  `accountView`'s; folded, it holds the inbox, through the same
+  `useInboxMenu` as the corner's (`inbox-menu.tsx`), and swaps its sections
+  for the inbox's in place, bumping `focusKey` so the first item takes
+  focus. The trigger's `title` is your name as shown (`nameFor`), the one
+  mentions resolve against.
+- **Your profile is a page** (`profile-page.tsx`, Pages, below). Its submit
+  is `planRename` (pure): refuse, unchanged, or send. A rename is sent on
+  Enter or save, never on blur: a click on ← back or your list blurs the
+  field first. The draft starts from your name when the page mounts, so
+  another device's rename does not overwrite what you type.
 - **One name field** (`name-input.tsx`) serves the identification screen and
-  the profile: the rule is `normalizeName`, and the hint is `nameHint`, the
+  the profile page: the rule is `normalizeName`, and the hint is `nameHint`, the
   handle the typed name gives. The client's words for the rule are its own;
   the protocol's refusal (`INVALID_NAME`) words it differently, and the
   profile shows it, under its code, only for a rule the client does not know.
-- **Not you? Sign in as someone else**, in the profile, clears the stored
+- **Sign in as someone else**, in the account menu, clears the stored
   identity and reloads. Every tab subscribes to it, and reloads when another
   clears it or stores another email, so no tab goes on as the old person.
 - **Presence is per seat** (`presence-seat.ts`, `@pinetrie/session`), so
@@ -978,6 +984,38 @@ the email is the only thing pine·trie chooses.
   each person once, and never you.
 - **The host is found by principal** (`@pinetrie/session`): its seat is
   Kyneta's to issue.
+
+## Pages (`page.tsx`, `use-page.ts`, ADR-0098)
+
+A page covers the workspace: the profile is the first. Which page, and how
+leaving treats the history, are `page.ts`'s (`@pinetrie/interface`).
+
+- **The page is in the URL's hash** (`#profile`). `usePage` reads it with
+  `useSyncExternalStore`, hearing `popstate` (Back and Forward) and
+  `hashchange` (a typed URL). `goTo` is the `page` port: opening pushes an
+  entry carrying `PAGE_STATE`; leaving goes `history.back()` over an entry
+  this tab pushed, else replaces the page's entry with the bare URL
+  (`planLeave`), since Back from a page loaded by its URL would leave
+  pine·trie. `pushState` and `replaceState` fire no event, so `goTo` tells
+  the subscribers itself.
+- **The page is a sibling of `#workspace` in its grid cell**, after it in
+  the document and at the board's `z-index` (3), so it covers the board
+  too; the footer's menus (4) open over it.
+- **The workspace stays mounted, laid out and `inert`** (with
+  `aria-hidden`). Remounted, its columns would lose their scroll (the
+  browser suite's Back check, and its mutation keying `#workspace` by the
+  page). With `display: none`, `useStripNarrow` would measure the strip at
+  0 and turn an open pane into a modal dialog over the page.
+- **Showing anything in the workspace leaves the page**: `planIntent` puts
+  `{ kind: "page", to: null }` first when a plan shows a root, a new tab or
+  the board (`showsWorkspace`). The keys that act on cards or undo do
+  nothing while a page shows (`keyAct`'s `page`).
+- **A narrow pane is a modal dialog in the top layer.** Back or Forward onto
+  a page while one is open leaves the dialog over the page, and the page
+  inert under it. Opening a page from the menu cannot happen then: the
+  dialog makes the footer inert.
+- **The heading takes focus** when a page mounts (`tabIndex={-1}`): the
+  menu item that opened it is gone.
 
 ## Gotchas
 
@@ -1023,7 +1061,7 @@ the email is the only thing pine·trie chooses.
 - **A popover opens above its trigger in the window's lower half, and from
   its left edge in the left half.** A composer's `▾`, and the footer, are at
   the window's foot, so a list below would be out of sight; your list's `⋯`
-  and your profile are at its left, so a box anchored by its right edge
+  and your avatar are at its left, so a box anchored by its right edge
   would open past it. Since `.popover` sets a `top` and a `right` in the
   stylesheet, an upward box sets `top: auto`, and a leftward one `right:
   auto`, or the stylesheet's wins.
@@ -1053,7 +1091,7 @@ the email is the only thing pine·trie chooses.
   `.open-icon` (`.open-sprite`, `.open-initials` or `.open-fresh`), its
   menu ends in `.open-close-item`, its tooltip is `.open-tip` and its
   rename field sits in `.open-rename`; the fold control is `.list-fold`, and
-  the inventory toggle is `#profile .inventory-toggle`. The board is `#board`: a `.board-column[data-state]`
+  the inventory's toggle is the account menu's `.account-inventory`. The board is `#board`: a `.board-column[data-state]`
   per open state and `.board-closed` for the closed one, each item a
   `.board-item[data-root][data-entry]` with `.board-open`, `.board-label`,
   `.reader-trigger` per reader (its menu `.reader`, `.open` while open),
@@ -1063,14 +1101,20 @@ the email is the only thing pine·trie chooses.
   (the browser suite's `countIsHosts` waits on it), each state
   `.strip-state[data-state]`, with `.strip-working` and `.strip-ready`
   when nonzero; `connected` (`page.ts`) waits for
-  `#open-list .add-agent` with no `.sync-note`. Your inbox is `.inbox`,
-  its trigger `.inbox-trigger` and badge `.inbox-badge[data-needs-you]`.
-  Menu rows are `.here-thread`
+  `#open-list .add-agent` with no `.sync-note`. The corner is
+  `.footer-you`: its icons are in `.footer-tools`. Your inbox is `.inbox`,
+  its trigger `.inbox-trigger` and badge `.inbox-badge[data-needs-you]`
+  (folded, the same badge is on `.me-trigger`); your inventory's toggle is
+  `#bottom .inventory-toggle`. Menu rows are `.here-thread`
   and `.inbox-row`, each with `data-entry`. You are
-  `#bottom .me-trigger` (its `title` your name), opening `#profile`, with
+  `#bottom .me-trigger` (its `title` your name, its name `.me-name`),
+  opening `.account`, whose lead holds `.profile-email` and whose items are
+  `.account-inbox`, `.account-inventory`, `.account-profile`, `.not-you`
+  and, in the inbox, `.account-back`. A page is
+  `.page[data-page]`, with `.page-back`; the profile's holds
   `input[name="name"]`, `.name-handle`, `.name-problem[data-problem]`,
-  `.profile-email` and `.not-you`. The identification screen's email problem
-  is `.identity-problem`.
+  `.profile-save`, `.profile-saved` and `.profile-email`. The
+  identification screen's email problem is `.identity-problem`.
 - **A page with nothing in your list opens on the board**, so a browser check
   that opens a second page opens its thread from there (`openFromBoard`), or
   from a reader on a board item. To step away from a root so its columns

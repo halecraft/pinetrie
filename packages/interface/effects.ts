@@ -36,12 +36,15 @@ import {
   planOpen,
 } from "./layout.ts"
 import type { ListWidth } from "./list-width.ts"
+import type { PageName } from "./page.ts"
 import type { ComposerPlaces } from "./put-target.ts"
 
 export type Effect =
   | { readonly kind: "layout"; readonly action: LayoutAction }
   /** Show your list at `width`, and keep that choice for this tab. */
   | { readonly kind: "listWidth"; readonly width: ListWidth }
+  /** Show a page over the workspace, or, with null, the workspace (ADR-0098). */
+  | { readonly kind: "page"; readonly to: PageName | null }
   /** Mark what `lane` raised "not needed", in your attention document. */
   | {
       readonly kind: "notNeeded"
@@ -161,6 +164,8 @@ export interface IntentState {
   readonly rootIds: ReadonlyMap<EntryId, RootId>
   /** What your list shows now (`shownWidth`). */
   readonly listWidth: ListWidth
+  /** The page over the workspace, if any (ADR-0098). */
+  readonly page: PageName | null
 }
 
 /** What the card intents decide from (ADR-0048 step 4). */

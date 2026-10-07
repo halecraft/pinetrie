@@ -24,6 +24,7 @@ const focus = (over: Partial<KeyFocus> = {}): KeyFocus => ({
   selected: 7,
   selectedCard: C2,
   column: "k-1",
+  page: false,
   ...over,
 })
 const chord = { ctrlKey: true, shiftKey: true }
@@ -97,4 +98,15 @@ test("stepSlot moves through the 3 × 6 grid and stops at its edges", () => {
   expect(stepSlot(1, "down")).toBe(7)
   expect(stepSlot(13, "down")).toBe(13)
   expect(stepSlot(7, "up")).toBe(1)
+})
+
+test("while a page covers the workspace only the list's fold acts (ADR-0098)", () => {
+  const onPage = focus({ page: true, card: C1 })
+  expect(keyAct(key("L", chord), onPage)).toEqual({ kind: "foldList" })
+  expect(keyAct(key("I", chord), onPage)).toBeNull()
+  expect(keyAct(key("O", chord), onPage)).toBeNull()
+  expect(keyAct(key("z", { metaKey: true }), onPage)).toBeNull()
+  expect(
+    keyAct(key("ArrowLeft"), focus({ page: true, inPanel: true })),
+  ).toBeNull()
 })

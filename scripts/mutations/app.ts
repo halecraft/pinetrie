@@ -673,7 +673,7 @@ export const mutations: readonly Mutation[] = [
     expect:
       "the chip says where the new thread's agent works, and the menu changes it",
   },
-  // ── your profile (packages/web/profile.tsx, ADR-0037) ──────────────
+  // ── your profile (packages/web/profile-page.tsx, ADR-0037, ADR-0098) ──
   {
     name: "the handle hint is never shown",
     file: "packages/web/name-input.tsx",
@@ -685,9 +685,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the profile closes on a refused name, saying nothing",
-    file: "packages/web/profile.tsx",
-    from: '              if (plan.kind === "refuse") {',
-    to: '              if (plan.kind === "refuse" && draft === "") {',
+    file: "packages/web/profile-page.tsx",
+    from: '          if (plan.kind === "refuse") {',
+    to: '          if (plan.kind === "refuse" && draft === "") {',
     suite: "browser",
     scenario: "page",
     expect:
@@ -695,9 +695,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the profile's save closes without renaming",
-    file: "packages/web/profile.tsx",
-    from: "                const problem = renameProblem(await rename(plan.name))",
-    to: '                const problem = renameProblem({ kind: "named" })',
+    file: "packages/web/profile-page.tsx",
+    from: "            const problem = renameProblem(await rename(plan.name))",
+    to: '            const problem = renameProblem({ kind: "named" })',
     suite: "browser",
     scenario: "page",
     expect:
@@ -705,12 +705,43 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "your avatar is drawn as a person",
-    file: "packages/web/profile.tsx",
-    from: '          className="me"',
-    to: '          className="avatar"',
+    file: "packages/web/account-menu.tsx",
+    from: '          {avatar("me")}',
+    to: '          {avatar("avatar")}',
     suite: "browser",
     scenario: "page",
     expect: "another window shows on its root's board item, and you never do",
+  },
+  // ── a page over the workspace (packages/web/use-page.ts, ADR-0098) ──
+  {
+    name: "opening a page replaces the workspace's history entry",
+    file: "packages/web/use-page.ts",
+    from: '  if (to !== null) history.pushState(PAGE_STATE, "", hashOfPage(to))',
+    to: '  if (to !== null) history.replaceState(PAGE_STATE, "", hashOfPage(to))',
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "the profile page covers the workspace, and the browser's Back returns to the columns as they were",
+  },
+  {
+    name: "the workspace is mounted afresh under a page",
+    file: "packages/web/app.tsx",
+    from: '        id="workspace"\n        inert={page !== null}',
+    to: '        id="workspace"\n        key={page ?? "workspace"}\n        inert={page !== null}',
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "the profile page covers the workspace, and the browser's Back returns to the columns as they were",
+  },
+  {
+    name: "your name does not give way in the corner",
+    file: "packages/web/index.html",
+    from: "      .footer-you .account { display: flex; flex: 1 1 auto; min-width: 0; }",
+    to: "      .footer-you .account { display: flex; flex: 1 1 auto; }",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "the corner holds you, your inbox and your inventory side by side at 11.5rem with a two-digit badge",
   },
   {
     name: "this device's name and the session's agree only once, at settle",

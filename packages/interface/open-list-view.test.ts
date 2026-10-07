@@ -319,7 +319,11 @@ describe("pageTitle", () => {
     [3, "a root", r1, "(3) Tab names · pine·trie"],
     [0, "a new tab", t, "new agent · pine·trie"],
   ])("%i needing you, on %s", (count, _, here, words) => {
-    expect(pageTitle(count, here ?? null)).toBe(words)
+    expect(pageTitle(count, here ?? null, null)).toBe(words)
+  })
+  test("a page over the workspace names the window, not the root under it (ADR-0098)", () => {
+    expect(pageTitle(2, r1 ?? null, "profile")).toBe("(2) Profile · pine·trie")
+    expect(pageTitle(0, null, "profile")).toBe("Profile · pine·trie")
   })
 })
 

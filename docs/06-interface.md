@@ -46,7 +46,7 @@ This document fixes the design before any code. It draws E and T directly.
 │              ││      ││ │ send to agent…  send │││ │ reply in thread…  │ │
 │              ││      ││ └──────────────────────┘││ └───────────────────┘ │
 ├──────────────┤└──────┘└────────────────────────┘└───────────────────────┘
-│(A) Inbox 2 ▣│ ▦ Board · Backlog 3 · Doing 3 ◌2 ⇡1 (B)(C) · Done 41  publish
+│(A) Ada ✉2 ▣1│ ▦ Board · Backlog 3 · Doing 3 ◌2 ⇡1 (B)(C) · Done 41  publish
 └──────────────┴──────────────────────────────────────────────────────────────
 ```
 
@@ -128,25 +128,29 @@ beside it (ADR-0081, turned sideways).
     icon.
   - **＋** stands over its ▾.
 
-### The footer: you, your inbox, and the board (ADR-0077, ADR-0085, ADR-0091)
+### The footer: you, your inbox, and the board (ADR-0077, ADR-0085, ADR-0091, ADR-0098)
 
 One row along the bottom. Its own cell, under your list and as wide, is
-yours: your avatar, your inbox and your inventory. While your list is
-folded, the cell holds only your avatar, your inventory's toggle is in your
-profile, and your inbox stands just past the cell's edge. To the right is
-everyone's, from live data only: the board's strip, then publish. Your
-inbox carries the page's only badge: one place asks you for something, the
-other reports.
+yours: your avatar and name on the left, then your inbox and your inventory
+as two icons of one style on the right, with no borders and your list's
+hover fill. Your name is cut short before anything else gives way. While
+your list is folded, the cell holds only your avatar, which carries the
+inbox's badge on its corner, and the inbox and the inventory are in its
+menu. To the right is everyone's, from live data only: the board's strip,
+then publish. Your inbox carries the page's only badge: one place asks you
+for something, the other reports.
 While the page syncs, "syncing…" leads its right end.
 
-- **You:** your avatar opens your profile (ADR-0037): your name, and the
-  handle it gives you as you type it; your email; and **Not you? Sign in as
-  someone else**, which forgets who this device says you are and asks
-  again. A rename is sent on Enter or **save**, and Escape or a click
-  elsewhere discards it. A name no mention could reach is refused before it
-  is sent.
+- **You:** your avatar and name open a menu headed by who you are: your
+  avatar, your name and your email. Folded, it lists **Inbox** with its
+  badge and **Inventory** with its count (**Close inventory** while the
+  panel is open); choosing **Inbox** shows the inbox's sections in the same
+  menu, under **← back**. Then **Profile**, which opens your profile page
+  (Pages, below), and **Sign in as someone else**, which forgets who this
+  device says you are and asks again (ADR-0037).
 - **Your inbox** (ADR-0030, ADR-0077, ADR-0091), beside you: one menu of
-  what needs you, its trigger **Inbox**, drawn even with nothing in it. Its
+  what needs you, its trigger a tray icon named **Inbox** and what needs
+  you ("Inbox · 2 things need you: …"), drawn even with nothing in it. Its
   amber badge counts what the threads you follow need from you (a run that
   ended asking something, failing, or that no one could tell; work ready to
   accept) plus the mentions you have not seen; the page's title carries the
@@ -167,8 +171,9 @@ While the page syncs, "syncing…" leads its right end.
   shows only the unseen.
 - **The inbox is yours**, the same on every device of yours (ADR-0077). You
   start from your first load, with no backlog.
-- **Your inventory** (below), beside your inbox, or in your profile while
-  your list is folded.
+- **Your inventory** (below): a box icon beside your inbox, with its count
+  when it holds cards, titled "your inventory: 1 card"; in the account menu
+  while your list is folded.
 - **The board's strip**: ▦ **Board**, then each workflow state's name and
   count, avatars of the people reading in its roots, an amber dot when a
   root there needs you, and, only when there are any, **◌n**, its roots the
@@ -220,6 +225,20 @@ While the page syncs, "syncing…" leads its right end.
   (principle 6). Escape closes a menu open on the board, and then the board.
 - **Nothing opens a root by itself.** A mention is a notification: you
   choose to open it.
+
+### Pages (ADR-0098)
+
+A page covers the workspace: your list and the footer stay, and the
+workspace stays as you left it under the page. It opens with **← back** and
+its title. Back, the browser's Back, and choosing a root, a new tab, ＋, ▦
+or a row of your inbox all return to the workspace. The page is in the
+URL (`#profile`), so a reload stays on it; the window's title names it,
+"(2) Profile · pine·trie". While a page shows, the card and undo keys do
+nothing; Ctrl+Shift+L still folds your list.
+
+- **Profile**: your name, and the handle it gives you as you type it,
+  sent on Enter or **save**, which says **saved** once it is; a name no
+  mention could reach is refused before it is sent. Then your email.
 
 ### The board: where everyone's work stands (ADR-0085)
 

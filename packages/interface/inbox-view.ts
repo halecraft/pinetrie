@@ -1,5 +1,6 @@
 // interface/inbox-view — your inbox, under your list beside your avatar
-// (ADR-0091): how the threads you follow ended, their work ready to accept,
+// (ADR-0091), or in the menu your avatar opens while your list is folded
+// (ADR-0098): how the threads you follow ended, their work ready to accept,
 // what is worth a read, and mentions of you. It lists exactly what it
 // counts: the badge is what needs you (`inboxCount`), the one count the
 // window's title shows too. Decided as a value (`inboxView`) and worded in
@@ -76,15 +77,16 @@ export function inboxView(input: {
 }
 
 export interface InboxWords {
-  /** What the trigger shows beside its badge. */
-  readonly trigger: string
-  /** The trigger's accessible name and title. */
+  /** The trigger's accessible name and title: an icon has no words of its own. */
   readonly label: string
   /** The menu's own heading. */
   readonly heading: string
   /** Each section's heading: what it lists, or that it has emptied. */
   readonly sections: Readonly<Record<InboxSection, string>>
 }
+
+/** The inbox's name: its trigger's label leads with it, and the account menu's item is it (ADR-0098). */
+export const INBOX = "Inbox"
 
 export function inboxWords(view: InboxView): InboxWords {
   const { badge, mentions, unseen } = view
@@ -101,8 +103,7 @@ export function inboxWords(view: InboxView): InboxWords {
       ? "nothing needs you"
       : `${count(badge, "thing needs", "things need")} you`
   return {
-    trigger: "Inbox",
-    label: what.length === 0 ? needs : `${needs}: ${what.join(", ")}`,
+    label: `${INBOX} · ${what.length === 0 ? needs : `${needs}: ${what.join(", ")}`}`,
     heading: badge === 0 ? "Nothing needs you" : needs,
     sections: {
       needsYou: needsYou > 0 ? "Needs you" : "Nothing needs you now.",

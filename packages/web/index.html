@@ -737,9 +737,6 @@
       .inventory-card { flex: 1; min-width: 0; }
       .inventory-card .compose-row { justify-content: flex-start; }
       .inventory-empty { color: #6f7784; font-size: .8rem; }
-      .inventory-toggle { padding: .15rem .6rem; font-size: .75rem; background: none; color: #ddd;
-        border: 1px solid #3a3f48; border-radius: 999px; }
-      .inventory-toggle[aria-pressed="true"] { border-color: #9ecbff; color: #e6e6e6; }
       dialog.restore-ask { background: #171a1f; color: inherit; border: 1px solid #3a3f48;
         border-radius: 8px; }
       dialog.restore-ask::backdrop { background: rgb(0 0 0 / .5); }
@@ -800,7 +797,7 @@
         outline: 2px solid var(--track); outline-offset: 2px; }
       /* The footer (ADR-0085): one row of chrome, split where your list's edge
          is. Its own cell, at the list's width, is yours: you, your inbox
-         (ADR-0091) and your inventory. Then everyone's: the board's strip,
+         (ADR-0091) and your inventory (ADR-0098). Then everyone's: the board's strip,
          with where the agent works and what is ready to accept, "syncing…"
          while pending, and the publish button (ADR-0090). Nothing here
          animates: your list, the column and the rail show where the agent
@@ -808,9 +805,30 @@
       #bottom { grid-column: 1 / 3; grid-row: 2; display: flex; align-items: center;
         gap: 1rem; min-height: 42px; padding-right: .6rem; background: var(--chrome);
         --surface: var(--chrome); box-shadow: inset 0 1px 0 var(--edge); font-size: .8rem; }
+      /* Your corner (ADR-0098): you on the left, your inbox and inventory as
+         icons of one style on the right, with your list's hover fill and no
+         borders. Amber, the inbox's badge, is its only colour beside yours.
+         Its left padding lines your avatar up with your list's items. */
       .footer-you { flex: 0 0 var(--side); align-self: stretch; display: flex; align-items: center;
-        gap: .25rem; padding: 0 .4rem; box-shadow: inset -1px 0 0 var(--edge); }
-      .footer-you .inventory-toggle { margin-left: auto; padding: .15rem .45rem; white-space: nowrap; }
+        gap: .5rem; min-width: 0; padding: 0 .4rem 0 .45rem; box-shadow: inset -1px 0 0 var(--edge); }
+      .footer-you .account { display: flex; flex: 1 1 auto; min-width: 0; }
+      .footer-tools { display: flex; flex: none; align-items: center; gap: .25rem; }
+      .me-trigger { position: relative; display: inline-flex; align-items: center; gap: .5rem;
+        min-width: 0; max-width: 100%; padding: .2rem .4rem .2rem .2rem; background: none;
+        color: #aab4c3; border-radius: 6px; }
+      .me-trigger .initial { flex: none; width: 24px; height: 24px; line-height: 24px; font-size: 12px; }
+      .me-name { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+      .inbox-trigger, .inventory-toggle { position: relative;
+        display: inline-flex; align-items: center; justify-content: center; gap: .2rem;
+        min-width: 28px; height: 28px; padding: 0 .3rem; background: none; color: #8b93a1;
+        border: 0; border-radius: 6px; }
+      .me-trigger:hover, .inbox-trigger:hover, .inventory-toggle:hover,
+      .account.open .me-trigger, .inbox.open .inbox-trigger {
+        background: #1b1e24; --surface: #1b1e24; color: #e6e6e6; }
+      .inventory-toggle[aria-pressed="true"] { color: var(--on); background: var(--page);
+        --surface: var(--page); }
+      .icon { flex: none; display: block; }
+      .inventory-count { font-size: .72rem; font-variant-numeric: tabular-nums; }
       .footer-right { margin-left: auto; display: flex; align-items: center; gap: .75rem; }
       .sync-note { font-size: .75rem; color: #6f7784; }
       /* The board's strip: ▦, then each state's name, count, readers and mark. */
@@ -827,10 +845,9 @@
          a board item, apart from the amber that asks something of you. */
       .strip-working, .strip-ready { font-size: .75rem; color: #8b93a1; }
       .root-ready { flex: 0 0 auto; color: #8ab4f8; font-size: .8rem; line-height: 1; }
-      .reader-trigger, .inbox-trigger, .me-trigger { display: inline-flex; align-items: center; gap: .3rem;
+      .reader-trigger { display: inline-flex; align-items: center; gap: .3rem;
         padding: .1rem .3rem; background: none; color: #ddd; border-radius: 999px; }
-      .reader-trigger .initial, .me-trigger .initial { width: 22px; height: 22px;
-        line-height: 22px; font-size: 12px; }
+      .reader-trigger .initial { width: 22px; height: 22px; line-height: 22px; font-size: 12px; }
       /* The board, open (ADR-0085): over the columns, from the footer's edge,
          moving none of them. A column per open state, a column to add one,
          and the closed state collapsed to a count, a search and its rows. */
@@ -881,15 +898,15 @@
       .closed-search { padding: .3rem .5rem; background: var(--page); color: #ddd;
         border: 1px solid var(--edge); border-radius: 4px; font: inherit; }
       .closed-mine { color: #8b949e; font-size: .75rem; }
-      /* Your inbox (ADR-0091): the page's one badge, amber; quiet at zero. */
-      .inbox-trigger { color: #8b93a1; white-space: nowrap; }
+      /* Your inbox (ADR-0091): the page's one badge, amber; quiet at zero.
+         Beside its icon; folded, on your avatar's corner (ADR-0098), ringed in
+         what it sits on so it reads as apart from the circle. */
+      .inbox-badge { min-width: 1rem; height: 1rem; padding: 0 .25rem; line-height: 1rem;
+        border-radius: 999px; background: #e0c080; color: #111; font-size: .72rem;
+        font-weight: 600; text-align: center; font-variant-numeric: tabular-nums; }
       .inbox-trigger:has(.inbox-badge) { color: #ddd; }
-      .inbox-badge { min-width: 1.1rem; padding: 0 .3rem; border-radius: 999px; background: #e0c080;
-        color: #111; font-size: .72rem; font-weight: 600; text-align: center; }
-      /* At 11.5rem the corner holds you, your inbox with a two-digit badge and
-         your inventory only this tightly (ADR-0091). */
-      .footer-you .me-trigger { padding: .1rem 0; }
-      .footer-you .inbox-trigger { gap: .2rem; padding: .1rem .15rem; }
+      .me-trigger .inbox-badge { position: absolute; top: -4px; right: -6px;
+        box-shadow: 0 0 0 2px var(--surface); }
       /* The publish button (ADR-0090): a title that leads with a refusal
          marks it, so you hover before you click. */
       .publish-button { padding: .15rem .6rem; font-size: .8rem; background: none; color: #ddd;
@@ -932,32 +949,66 @@
       .here-thread.raised.needs-you .here-at { color: #e0c080; }
       .here-thread.raised.worth-a-read .here-at { color: #c9b48a; }
       .menu button.not-needed { padding: 0 .5rem .3rem 1.2rem; font-size: .72rem; color: #8b93a1; }
+      /* The name field (`name-input.tsx`), on your profile page as on the
+         identification screen below. */
+      .profile-name label { display: flex; justify-content: space-between;
+        align-items: center; gap: .5rem; }
+      .profile-name input { flex: 1; padding: .3rem .45rem; }
       /* Who you are, asked once per device before anything connects (ADR-0037). */
       #identity { grid-column: 1 / 3; align-self: start; display: flex; flex-direction: column;
         gap: .6rem; width: 20rem; margin: 20vh auto 0; padding: 1.25rem; border: 1px solid #23272e; border-radius: 8px;
         background: #1b1e24; }
-      #identity label, #profile label { display: flex; justify-content: space-between;
+      #identity label { display: flex; justify-content: space-between;
         align-items: center; gap: .5rem; }
-      #identity input, #profile input { flex: 1; padding: .3rem .45rem; }
+      #identity input { flex: 1; padding: .3rem .45rem; }
       #identity button { align-self: flex-end; padding: .3rem .9rem; }
       .identity-problem, .name-problem { margin: 0; color: #f0a0a0; font-size: .85rem; }
       .name-handle { margin: 0; color: #8b93a1; font-size: .8rem; }
-      /* Your profile, from your avatar at the footer's left. */
-      .profile { min-width: 18rem; padding: .5rem .75rem .75rem; gap: .5rem; }
-      .profile form { display: flex; flex-direction: column; gap: .4rem; }
-      .profile-save { align-self: flex-end; padding: .25rem .8rem; }
-      .profile-email { margin: .25rem 0 0; padding-top: .5rem; border-top: 1px solid #2a2e36;
-        color: #aab4c3; font-size: .85rem; }
-      .not-you { align-self: flex-start; background: none; border: 0; padding: 0; color: #8b93a1;
-        font: inherit; font-size: .8rem; cursor: pointer; }
-      .not-you:hover { color: #d6dce5; text-decoration: underline; }
+      /* The menu your avatar opens (ADR-0098): who you are, above its items,
+         then, folded, a count beside an item's name. */
+      .account .menu { min-width: 15rem; }
+      .account-lead { display: flex; align-items: center; gap: .6rem; margin: .25rem .5rem .4rem;
+        padding-bottom: .5rem; border-bottom: 1px solid #2c313a; }
+      .account-lead .initial { flex: none; width: 32px; height: 32px; line-height: 32px; font-size: 15px; }
+      .account-who { display: flex; flex-direction: column; min-width: 0; }
+      .account-name { color: #e6e6e6; font-weight: 600; overflow: hidden; text-overflow: ellipsis;
+        white-space: nowrap; }
+      .account-who .profile-email { color: #8b93a1; font-size: .75rem; overflow: hidden;
+        text-overflow: ellipsis; white-space: nowrap; }
+      .account-inbox, .account-inventory { display: flex; align-items: center; gap: .5rem; }
+      .menu-badge, .menu-count { margin-left: auto; padding: 0 .3rem; border-radius: 999px;
+        font-size: .72rem; font-weight: 600; }
+      .menu-badge { background: #e0c080; color: #111; }
+      .menu-count { color: #8b93a1; font-weight: 400; }
+
+      /* A page over the workspace (ADR-0098): in the workspace's cell, after
+         it and as high as the board, so it covers both; the footer's menus
+         (4) open over it. */
+      .page { grid-column: 2; grid-row: 1; position: relative; z-index: 3; min-height: 0;
+        overflow-y: auto; background: var(--page); }
+      .page-head { display: flex; align-items: center; gap: 1rem; max-width: 36rem;
+        margin: 0 auto; padding: 1.25rem 1.5rem .5rem; }
+      .page-head h1 { margin: 0; font-size: 1.1rem; letter-spacing: 0; text-transform: none;
+        color: #e6e6e6; outline: none; }
+      .page-back { padding: .2rem .6rem; background: none; color: #aab4c3;
+        border: 1px solid #3a3f48; border-radius: 999px; font-size: .8rem; }
+      .page-back:hover { color: #e6e6e6; border-color: #5a606b; }
+      .page-body { max-width: 36rem; margin: 0 auto; padding: .5rem 1.5rem 2rem; }
+      /* Your profile page. */
+      .profile-name { display: flex; flex-direction: column; gap: .4rem; }
+      .profile-actions { display: flex; align-items: center; justify-content: flex-end; gap: .75rem; }
+      .profile-save { padding: .3rem .9rem; }
+      .profile-saved { color: #8b93a1; font-size: .8rem; }
+      .profile-page .profile-email { margin: 1.25rem 0 0; padding-top: .75rem;
+        border-top: 1px solid #2a2e36; color: #aab4c3; font-size: .85rem; }
 
       /* Your list folded (ADR-0088), after the rules these refine: your pip
-         on an icon's corner, the footer's corner holding only your avatar,
-         and the inventory's toggle in your profile. */
+         on an icon's corner, and the footer's corner holding only your
+         avatar, which carries the inbox's badge (ADR-0098). */
       .open-icon .card-pip { position: absolute; bottom: -2px; right: -2px; }
       :root[data-list="icons"] .footer-you { justify-content: center; padding: 0; }
-      .profile .inventory-toggle { align-self: flex-start; margin-top: .5rem; }
+      :root[data-list="icons"] .footer-you .account { flex: none; }
+      :root[data-list="icons"] .me-trigger { padding: .2rem; }
     </style>
   </head>
   <body>

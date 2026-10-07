@@ -1,7 +1,7 @@
 // web/menu — a popover whose box is a list of items, in sections. Placement
 // and closing are `Popover`'s (`popover.tsx`).
 
-import { type ReactNode, useId } from "react"
+import { type ReactNode, useId, useLayoutEffect, useRef } from "react"
 import { Popover, type TriggerProps } from "./popover.tsx"
 
 /** A menu's items that can take focus, in order. */
@@ -51,6 +51,8 @@ export function Menu({
   gone,
   opensOn,
   triggerProps,
+  lead,
+  focusKey,
 }: {
   /** The wrapper's class; `open` is added while the menu is open. */
   className: string
@@ -73,7 +75,23 @@ export function Menu({
   /** `Popover`'s: what opens the menu, and what else its trigger carries. */
   opensOn?: "click" | "contextmenu"
   triggerProps?: TriggerProps
+  /**
+   * `Popover`'s: drawn above the list, outside it, since a menu holds only
+   * menu items. With a lead and no first heading, `label` names the list.
+   */
+  lead?: ReactNode
+  /**
+   * When this changes while the menu is open, its first item takes focus, as
+   * on opening: the item that had focus may have gone with the sections it
+   * swapped out.
+   */
+  focusKey?: string
 }) {
+  const list = useRef<HTMLDivElement>(null)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: only when the key changes
+  useLayoutEffect(() => {
+    focusable(list.current)[0]?.focus()
+  }, [focusKey])
   return (
     <Popover
       boxClassName="popover menu"
@@ -81,6 +99,7 @@ export function Menu({
       gone={gone}
       heading={sections[0]?.heading}
       label={label}
+      lead={lead}
       // Opened, the first item takes focus.
       onOpen={box => focusable(box)[0]?.focus()}
       onToggle={onToggle}
@@ -106,6 +125,7 @@ export function Menu({
             all[(here + step) % all.length]?.focus()
           }}
           className="menu-items"
+          ref={list}
           role="menu"
         >
           {sections.map((section, i) => (

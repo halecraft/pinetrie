@@ -4,6 +4,8 @@
 `PLAN-2026-09-29-pasted-images`. Amends ADR-0022 (admission checks where a
 request comes from) and ADR-0023 (image bytes are never part of the
 compacted document). Extended by ADR-0051: a tool's images are blobs too.
+Amended by ADR-0098 (proposed): a person's picture is a blob, and the
+sweep counts it as a reference.
 
 **Context.** A person cannot show the agent or a collaborator an image: a
 screenshot, a mockup, an error dialog. The session document is replicated

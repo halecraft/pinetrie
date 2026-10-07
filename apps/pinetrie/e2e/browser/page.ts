@@ -83,13 +83,15 @@ export const storedName = (p: Page) =>
   }, IDENTITY_KEY)
 
 /**
- * Open your profile, and whether a person could see it: `elementFromPoint`
- * at its centre, as `seeInMenu` checks a menu.
+ * Open your profile page from the menu your avatar opens (ADR-0098), and
+ * whether a person could see it: `elementFromPoint` at its centre, as
+ * `seeInMenu` checks a menu.
  */
 export async function openProfile(p: Page): Promise<boolean> {
-  await p.click("#bottom .me-trigger")
+  if (!(await chooseFromMenu(p, "#bottom .me-trigger", ".account-profile")))
+    return false
   const box = await p
-    .waitForSelector("#profile", { timeout: 15_000 })
+    .waitForSelector('.page[data-page="profile"]', { timeout: 15_000 })
     .catch(() => null)
   if (box === null) return false
   return box.evaluate(n => {

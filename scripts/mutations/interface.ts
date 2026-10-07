@@ -1854,7 +1854,7 @@ export const mutations: readonly Mutation[] = [
     name: "the window's title names no root",
     file: "packages/interface/open-list-view.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "  const place = here === null ? PRODUCT_NAME : `${here.label} · ${PRODUCT_NAME}`",
+    from: "  const place = shown === null ? PRODUCT_NAME : `${shown} · ${PRODUCT_NAME}`",
     to: "  const place = PRODUCT_NAME",
     command: unit,
     expect: "0 needing you, on a root",
@@ -2958,5 +2958,56 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "a WIP gone without landing offers no integration, and continuing from the project",
+  },
+  // ── pages and the account menu (ADR-0098) ──
+  {
+    name: "a new tab opens under the page",
+    file: "packages/interface/layout.ts",
+    from: '    case "show":\n    case "newTab":\n      return true',
+    to: '    case "show":\n      return true',
+    command: unit,
+    expect:
+      "showing a root, a new tab or the board leaves the page first, once",
+  },
+  {
+    name: "leaving a page loaded from its URL goes back out of pine·trie",
+    file: "packages/interface/page.ts",
+    from: '    ? "back"\n    : "replace"',
+    to: '    ? "back"\n    : "back"',
+    command: unit,
+    expect:
+      "leaving goes back only over an entry this tab pushed; else it replaces the page's",
+  },
+  {
+    name: "the folded avatar shows the inbox's badge at zero",
+    file: "packages/interface/account-view.ts",
+    from: "    badge: input.badge > 0 ? input.badge : null,",
+    to: "    badge: input.badge,",
+    command: unit,
+    expect: "folded true, 0 needing you",
+  },
+  {
+    name: "the full corner's menu lists the inbox",
+    file: "packages/interface/account-view.ts",
+    from: "  if (!input.folded) return { items: always, badge: null }",
+    to: "  if (!input.folded && input.badge < 0) return { items: always, badge: null }",
+    command: unit,
+    expect: "folded false, 0 needing you",
+  },
+  {
+    name: "a key takes a card into the inventory under a page",
+    file: "packages/interface/inventory-keys.ts",
+    from: "  if (focus.page) return null\n",
+    to: "",
+    command: unit,
+    expect: "while a page covers the workspace only the list's fold acts",
+  },
+  {
+    name: "the window's title names the root under the page",
+    file: "packages/interface/open-list-view.ts",
+    from: "    page !== null ? pageWords(page).title : here === null ? null : here.label",
+    to: "    here === null ? null : here.label",
+    command: unit,
+    expect: "a page over the workspace names the window, not the root under it",
   },
 ]

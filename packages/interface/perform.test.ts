@@ -54,6 +54,7 @@ const ports = () => {
     identity: { save: vi.fn(), clear: vi.fn() },
     reload: vi.fn(),
     listWidth: vi.fn(),
+    page: vi.fn(),
   } satisfies AppPorts
 }
 type Ports = ReturnType<typeof ports>
@@ -155,6 +156,11 @@ test.each<Row>([
     effect: { kind: "listWidth", width: "icons" },
     port: p => p.listWidth,
     args: ["icons"],
+  },
+  {
+    effect: { kind: "page", to: "profile" },
+    port: p => p.page,
+    args: ["profile"],
   },
   {
     effect: { kind: "createCard", card, text: "t", how },

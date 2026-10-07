@@ -202,6 +202,22 @@ export function afterClosing(layout: Layout, closed: Here): Here {
   return at < 0 || next === undefined ? NOTHING : next
 }
 
+/**
+ * Whether `action` shows something in the workspace: a root, a new tab or
+ * the board. A page over the workspace (ADR-0098) is left for it.
+ */
+export function showsWorkspace(action: LayoutAction): boolean {
+  switch (action.kind) {
+    case "show":
+    case "newTab":
+      return true
+    case "board":
+      return action.open
+    default:
+      return false
+  }
+}
+
 export function layoutReducer(state: Layout, action: LayoutAction): Layout {
   switch (action.kind) {
     // Choosing what to work in closes the board, which lay over it.

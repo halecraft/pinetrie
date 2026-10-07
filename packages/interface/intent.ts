@@ -54,9 +54,10 @@ import {
   showRoot,
 } from "./effects.ts"
 import type { NameStep } from "./identity.ts"
-import type { Here, LayoutAction } from "./layout.ts"
+import { type Here, type LayoutAction, showsWorkspace } from "./layout.ts"
 import { otherWidth } from "./list-width.ts"
 import type { MessageAct } from "./message-tools.ts"
+import type { PageName } from "./page.ts"
 import type { PutTarget } from "./put-target.ts"
 
 /** What a reader asks of one column. A message's acts are among them. */
@@ -195,6 +196,8 @@ export type Intent =
   | { readonly kind: "board"; readonly open: boolean }
   /** Fold your list to icons, or unfold it (ADR-0088). */
   | { readonly kind: "foldList" }
+  /** Show a page over the workspace, or, with null, the workspace (ADR-0098). */
+  | { readonly kind: "page"; readonly to: PageName | null }
   | {
       readonly kind: "rename"
       readonly root: EntryId
@@ -248,6 +251,33 @@ type RootColumnAction = Extract<LayoutAction, { kind: "columns" }>["action"]
  * a new root's id from the shell, which a new tab keeps (ADR-0066).
  */
 export function planIntent(
+  intent: Intent,
+  state: IntentState,
+  fresh: string,
+  newRoot: RootId,
+): readonly Effect[] {
+  return leavingPage(state.page, planOf(intent, state, fresh, newRoot))
+}
+
+/**
+ * `effects`, after leaving the page shown over the workspace when they show
+ * something there (`showsWorkspace`): a root, a new tab or the board would
+ * otherwise open under the page, unseen.
+ */
+function leavingPage(
+  page: PageName | null,
+  effects: readonly Effect[],
+): readonly Effect[] {
+  const shows = effects.some(
+    e => e.kind === "layout" && showsWorkspace(e.action),
+  )
+  return page !== null && shows
+    ? [{ kind: "page", to: null }, ...effects]
+    : effects
+}
+
+/** `planIntent`'s effects, before leaving a page. */
+function planOf(
   intent: Intent,
   state: IntentState,
   fresh: string,
@@ -325,6 +355,8 @@ export function planIntent(
       return [layout({ kind: "board", open: intent.open })]
     case "foldList":
       return [{ kind: "listWidth", width: otherWidth(state.listWidth) }]
+    case "page":
+      return [{ kind: "page", to: intent.to }]
     case "rename":
       return [{ kind: "mark", root: intent.root, title: intent.title }]
     case "retitle":
@@ -403,7 +435,7 @@ function planColumn(
     case "openAt":
       return planOpenAt(act.entry, state, fresh)
     case "newTab":
-      return planIntent(
+      return planOf(
         { kind: "newTab", asksAgent: act.asksAgent, prefill: act.prefill },
         state,
         fresh,

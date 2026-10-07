@@ -499,7 +499,7 @@ at its foot or Ctrl+Shift+L, kept per browser tab, and icons by default
 under 56rem. An item is its root's earliest sprite, else two initials on
 the root's colour; its signals stay on the icon, and its menu opens on a
 right-click. Folded, the footer's corner is your avatar alone, with the
-inventory in your profile.
+inventory and the inbox in the menu it opens (ADR-0098).
 
 **ADR-0089 — each root seeds its colours** (built). Twelve track colours
 (S110) at one lightness and chroma, kept off the attention amber, people's
@@ -558,6 +558,17 @@ reads every stored document's schema hash before it opens any, runs the
 migrations registered from it (`apps/pinetrie/host/migrations/`), after a
 backup and before any write if a record failed to load, or refuses to
 start. A migration is deleted once Duane's store has passed it.
+
+**ADR-0098 — your avatar opens a menu; your profile is a page** (built: the
+corner, the menu and the page; people's pictures are
+`PLAN-2026-10-07-person-pictures`). The corner drew three unrelated styles
+side by side, and the avatar opened a form. Now it is your avatar and name,
+then the inbox and the inventory as icons of one style; folded, your avatar
+alone carries the inbox's badge and its menu holds both. The menu shows who
+you are and offers your profile and signing out. The profile is the first
+page: it covers the workspace, which stays mounted and inert beneath it, is
+named in the URL's hash (`#profile`), and is left by its back button, the
+browser's Back, or showing anything in the workspace.
 
 **ADR-0019 — a lane is a line of work, not a unit of parallelism.** A person's
 lane is a *conversation lane* and never touches disk. A *work lane* carries
@@ -920,8 +931,9 @@ context.**
   in its prompt and a note at `/pinetrie/packages/pi/lane.md` (ADR-0046).
 - **Who you are** (ADR-0037): the page asks for your email and name once per
   browser. The email is who you are, in every tab and on every device; the
-  name is how you are shown, renamed in your profile: the avatar at the
-  footer's left. **Not you?** there forgets the email on that browser.
+  name is how you are shown, renamed on your profile page, from the menu
+  your avatar at the footer's left opens. **Sign in as someone else** there
+  forgets the email on that browser.
 - **Your pi skills and prompts are commands** (ADR-0036):
   `/<package>:skill:<name>` for a skill, `/<package>:<name>` for a prompt
   template. For example `/duane:skill:plan` or `/duane:comments`. Typing `/`

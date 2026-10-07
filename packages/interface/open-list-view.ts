@@ -21,6 +21,7 @@ import type { Moments, Status } from "./attention.ts"
 import type { CardMarks } from "./card-marks.ts"
 import type { Intent } from "./intent.ts"
 import { type Here, type Layout, listOf, sameHere } from "./layout.ts"
+import { type PageName, pageWords } from "./page.ts"
 import { type ColorSlot, rootSlot } from "./palette.ts"
 import { initialsOf, NO_TEXT } from "./root-label.ts"
 
@@ -294,11 +295,17 @@ export const listKey = (item: ItemView): string =>
 
 /**
  * The window's title: what needs you (`inboxCount`, your inbox's badge),
- * then the root you are on. `here` is null on nothing, and before
- * anything is chosen.
+ * then the page over the workspace (ADR-0098), else the root you are on.
+ * `here` is null on nothing, and before anything is chosen.
  */
-export const pageTitle = (count: number, here: ItemView | null): string => {
-  const place = here === null ? PRODUCT_NAME : `${here.label} · ${PRODUCT_NAME}`
+export const pageTitle = (
+  count: number,
+  here: ItemView | null,
+  page: PageName | null,
+): string => {
+  const shown =
+    page !== null ? pageWords(page).title : here === null ? null : here.label
+  const place = shown === null ? PRODUCT_NAME : `${shown} · ${PRODUCT_NAME}`
   return count === 0 ? place : `(${count}) ${place}`
 }
 

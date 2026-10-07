@@ -1,8 +1,10 @@
 // web/inventory-toggle — opens and closes your inventory's panel
-// (ADR-0048): in the footer's corner, or, while your list is folded, in your
-// profile (ADR-0088).
+// (ADR-0048), as an icon in the footer's corner beside your inbox
+// (ADR-0098). While your list is folded, the account menu toggles it instead
+// (`account-menu.tsx`).
 
-import { INVENTORY } from "@pinetrie/interface"
+import { inventoryWords } from "@pinetrie/interface"
+import { InventoryIcon } from "./icons.tsx"
 
 /** Your inventory's toggle: whether its panel is open, and its cards. */
 export interface InventoryToggleProps {
@@ -16,15 +18,22 @@ export function InventoryToggle({
   count,
   onToggle,
 }: InventoryToggleProps) {
+  const words = inventoryWords(count)
   return (
     <button
+      aria-label={words.label}
       aria-pressed={open}
       className="inventory-toggle"
       onClick={onToggle}
-      title="your inventory: cards you keep for later"
+      title={words.label}
       type="button"
     >
-      {INVENTORY} {count}
+      <InventoryIcon />
+      {count > 0 && (
+        <span aria-hidden className="inventory-count">
+          {count}
+        </span>
+      )}
     </button>
   )
 }

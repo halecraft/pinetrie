@@ -1,0 +1,233 @@
+// web/inbox-menu — your inbox's menu (ADR-0091): in the footer's corner as
+// an icon with its badge, and, while your list is folded, inside the account
+// menu (`account-menu.tsx`, ADR-0098). One hook builds its sections for both.
+// A thread's row (`threadRow`) is here too: the board's readers' menus use it.
+
+import {
+  type EntryId,
+  firstLine,
+  type LaneName,
+  messageText,
+  type ThreadName,
+  type TreeIndex,
+  type WriterId,
+} from "@pinetrie/core"
+import {
+  attentionWords,
+  type InboxItem,
+  type InboxSection,
+  type InboxView,
+  type InboxWords,
+  type Intent,
+  type Item,
+  inboxView,
+  inboxWords,
+  LEVEL_CLASS,
+} from "@pinetrie/interface"
+import { threadNameOf } from "@pinetrie/rules"
+import { useState } from "react"
+import { InboxIcon } from "./icons.tsx"
+import { Menu, type MenuItem, type MenuSection } from "./menu.tsx"
+import { nameFor } from "./presence.tsx"
+import type { InboxSeen } from "./use-inbox.ts"
+
+/**
+ * A thread as a menu row: its lane's name when it has one, its root's label,
+ * and the start of the message at `end`; choosing it opens it (`onOpen`).
+ */
+export function threadRow(input: {
+  readonly index: TreeIndex
+  readonly labelOf: (root: EntryId) => string
+  readonly onOpen: (id: EntryId, root: EntryId) => void
+}) {
+  return (
+    key: string,
+    end: EntryId,
+    root: EntryId,
+    name?: string,
+    at: string = firstLine(messageText(input.index.entries[end]?.message), 48),
+  ): MenuItem => ({
+    key,
+    className: "here-thread",
+    data: { entry: end },
+    label: (
+      <>
+        {name !== undefined && <span className="here-name">{name}</span>}
+        <span className="here-root">{input.labelOf(root)}</span>
+        <span className="here-at">{at}</span>
+      </>
+    ),
+    onChoose: () => input.onOpen(end, root),
+  })
+}
+
+/** A thread's menu row, as `threadRow` builds it. */
+export type ThreadRow = ReturnType<typeof threadRow>
+
+/** What your inbox draws from. */
+export interface InboxMenuProps {
+  readonly attention: readonly Item[]
+  readonly count: number
+  readonly mentions: readonly InboxItem[]
+  readonly inbox: InboxSeen
+  readonly thread: ThreadRow
+  readonly names: ReadonlyMap<LaneName, ThreadName>
+  readonly labelOf: (root: EntryId) => string
+  readonly nameOf: ReadonlyMap<WriterId, string>
+  readonly onOpen: (id: EntryId, root: EntryId) => void
+  readonly onIntent: (intent: Intent) => void
+}
+
+/**
+ * Your inbox's menu (ADR-0091): what the threads you follow raise for you,
+ * then mentions of you. What goes in which section is `inboxView`'s; this
+ * turns them into rows. Both the corner's inbox and, while your list is
+ * folded, the account menu draw it, so its rows, "not needed", the filter
+ * and "mark all seen" are one code path.
+ */
+export function useInboxMenu({
+  attention,
+  count,
+  mentions,
+  inbox,
+  thread,
+  names,
+  labelOf,
+  nameOf,
+  onIntent,
+  onOpen,
+}: InboxMenuProps): {
+  readonly view: InboxView
+  readonly words: InboxWords
+  /** The heading's, then each section's: the menu's whole sections. */
+  readonly sections: readonly MenuSection[]
+  /** Keeps the sections shown while the menu is open (`kept`), forgets them as it closes. */
+  readonly onToggle: (open: boolean) => void
+} {
+  const [onlyUnseen, setOnlyUnseen] = useState(false)
+  const [kept, setKept] = useState<readonly InboxSection[]>([])
+  const view = inboxView({
+    items: attention,
+    badge: count,
+    mentions: mentions.length,
+    unseen: inbox.unseen,
+    kept,
+  })
+  const words = inboxWords(view)
+  /** A raised item's rows: its thread, with its reason, and "not needed". */
+  const raised = (item: Item): MenuItem[] => [
+    {
+      ...thread(
+        `${item.lane}:${item.raised.kind}`,
+        item.end,
+        item.root,
+        threadNameOf(names, item.lane),
+        attentionWords(item.raised, w => nameFor(nameOf, w)),
+      ),
+      className: `here-thread raised ${LEVEL_CLASS[item.level]}`,
+    },
+    ...(item.raised.kind === "offer" && item.raised.source === null
+      ? []
+      : [
+          {
+            key: `${item.lane}:${item.raised.kind}:not-needed`,
+            className: "not-needed",
+            keepOpen: true,
+            label: "not needed",
+            title: "clear it, on every device of yours",
+            onChoose: () =>
+              onIntent({
+                kind: "notNeeded",
+                lane: item.lane,
+                raised: item.raised,
+              }),
+          },
+        ]),
+  ]
+  const listed = onlyUnseen
+    ? mentions.filter(m => inbox.isUnseen(m.id))
+    : mentions
+  const controls: MenuItem[] = [
+    {
+      key: "filter",
+      className: "inbox-filter",
+      keepOpen: true,
+      label: onlyUnseen ? "show all" : "show only unseen",
+      onChoose: () => setOnlyUnseen(!onlyUnseen),
+    },
+    {
+      key: "all-seen",
+      className: "inbox-all-seen",
+      disabled: inbox.unseen === 0,
+      keepOpen: true,
+      label: "mark all seen",
+      onChoose: inbox.markAllSeen,
+    },
+  ]
+  const rows: MenuItem[] = listed.map(m => ({
+    key: m.id,
+    className: inbox.isUnseen(m.id) ? "inbox-row unseen" : "inbox-row",
+    data: { entry: m.id },
+    label: (
+      <>
+        <span className="inbox-who">
+          {nameFor(nameOf, m.by)} · {labelOf(m.root)}
+        </span>
+        <span className="inbox-text">{firstLine(m.text, 48)}</span>
+      </>
+    ),
+    onChoose: () => {
+      inbox.markSeen(m.id)
+      onOpen(m.id, m.root)
+    },
+  }))
+  const items = (s: InboxSection): readonly MenuItem[] =>
+    s === "mentions"
+      ? mentions.length === 0
+        ? []
+        : [...controls, ...rows]
+      : view.items[s].flatMap(raised)
+  return {
+    view,
+    words,
+    // The first section only names the menu; each later one is a group.
+    sections: [
+      { key: "inbox", heading: words.heading, items: [] },
+      ...view.sections.map(s => ({
+        key: s,
+        heading: words.sections[s],
+        items: items(s),
+      })),
+    ],
+    onToggle: open => setKept(open ? view.sections : []),
+  }
+}
+
+/**
+ * Your inbox in the corner (ADR-0091, ADR-0098): an icon, its badge counting
+ * what needs you; nothing here animates, and it is drawn even with nothing in
+ * it.
+ */
+export function InboxMenu(props: InboxMenuProps) {
+  const { view, words, sections, onToggle } = useInboxMenu(props)
+  return (
+    <Menu
+      className="inbox"
+      label={words.label}
+      onToggle={onToggle}
+      sections={sections}
+      title={words.label}
+      trigger={
+        <>
+          <InboxIcon />
+          {view.badge > 0 && (
+            <span className="inbox-badge" data-needs-you={view.badge}>
+              {view.badge}
+            </span>
+          )}
+        </>
+      }
+      triggerClassName="inbox-trigger"
+    />
+  )
+}
