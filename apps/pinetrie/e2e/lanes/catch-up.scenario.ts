@@ -43,7 +43,7 @@ async function catchUpSection(check: Checks["check"]): Promise<void> {
     "a.txt": "a\n",
     ".gitignore": "node_modules/\n.vite/\n",
     // A publish here accepts your commit (ADR-0099).
-    "pinetrie.json": `${JSON.stringify({ offers: { catchUp: true } })}\n`,
+    "pinetrie.json": `${JSON.stringify({ publish: { catchUp: true } })}\n`,
   })
   const script = scriptedModel()
   const wh = await startSuiteHost({

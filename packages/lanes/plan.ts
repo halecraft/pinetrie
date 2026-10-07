@@ -357,13 +357,21 @@ export interface LaneConfig {
   readonly install: Install | null
   /** Relative paths, as written; `planShared` decides which apply. */
   readonly shared: readonly string[]
-  /** The `offers` key's values, as written; null where absent (`repoConfig`). */
-  readonly offers: {
-    readonly acceptedBookmark: string | null
-    readonly wipPrefix: string | null
-    readonly publish: string | null
-    readonly catchUp: WrittenFlag
-  }
+  /** How pine·trie uses your repo, as written (`repoConfig` decides). */
+  readonly repo: WrittenRepo
+}
+
+/**
+ * The `accepted`, `wip` and `publish` keys' values (ADR-0100), as written:
+ * null where absent. `offers` says the config still has the key they
+ * replaced, which is not read.
+ */
+export interface WrittenRepo {
+  readonly acceptedBookmark: string | null
+  readonly wipPrefix: string | null
+  readonly publish: string | null
+  readonly catchUp: WrittenFlag
+  readonly offers: boolean
 }
 
 /**
@@ -393,21 +401,24 @@ export function decodeLaneConfig(
   pnpmLock: boolean,
 ): LaneConfig {
   const lanes = isRecord(json) ? json.lanes : undefined
-  const offersKey = isRecord(json) ? json.offers : undefined
+  const key = (name: string): Record<string, unknown> => {
+    const value = isRecord(json) ? json[name] : undefined
+    return isRecord(value) ? value : {}
+  }
   const named = (v: unknown) => (typeof v === "string" ? v : null)
-  const offers = isRecord(offersKey)
-    ? {
-        acceptedBookmark: named(offersKey.onto),
-        wipPrefix: named(offersKey.wipPrefix),
-        publish: named(offersKey.publish),
-        catchUp: writtenFlag(offersKey.catchUp),
-      }
-    : { acceptedBookmark: null, wipPrefix: null, publish: null, catchUp: null }
+  const publish = key("publish")
+  const repo: WrittenRepo = {
+    acceptedBookmark: named(key("accepted").bookmark),
+    wipPrefix: named(key("wip").prefix),
+    publish: named(publish.bookmark),
+    catchUp: writtenFlag(publish.catchUp),
+    offers: isRecord(json) && json.offers !== undefined,
+  }
   const pnpm: Install | null = pnpmLock
     ? { command: "pnpm install --frozen-lockfile", lockfile: "pnpm-lock.yaml" }
     : null
   if (!isRecord(lanes))
-    return { grants: NO_GRANTS, install: pnpm, shared: [], offers }
+    return { grants: NO_GRANTS, install: pnpm, shared: [], repo }
   const mounts = Array.isArray(lanes.mounts)
     ? lanes.mounts.flatMap(m =>
         isRecord(m) &&
@@ -440,27 +451,28 @@ export function decodeLaneConfig(
     },
     install,
     shared: strings(lanes.shared),
-    offers,
+    repo,
   }
 }
 
 /**
- * Accepted work's bookmark, the WIP bookmarks' prefix (ADR-0060), the
- * bookmark publishing moves to accepted work (ADR-0076), and whether a publish
- * catches your files up and accepts your commits first (ADR-0099).
+ * How pine·trie uses your repo (ADR-0100): accepted work's bookmark, the WIP
+ * bookmarks' prefix (ADR-0060), the bookmark publishing moves to accepted
+ * work (ADR-0076), and whether a publish catches your files up and accepts
+ * your commits first (ADR-0099).
  */
 export interface RepoConfig {
   readonly acceptedBookmark: string
   readonly wipPrefix: string
   readonly publish: string
-  readonly catchUp: boolean
+  readonly publishCatchesUp: boolean
 }
 
 export const DEFAULT_REPO: RepoConfig = {
   acceptedBookmark: "pinetrie-onto",
   wipPrefix: "wip/",
   publish: "main",
-  catchUp: false,
+  publishCatchesUp: false,
 }
 
 /**
@@ -481,42 +493,56 @@ export const isBookmarkName = (name: string): boolean =>
   !name.endsWith(".") &&
   !name.endsWith(".lock")
 
+/** Each written value's key in the config, as a refusal names it. */
+const KEYS = {
+  acceptedBookmark: "accepted.bookmark",
+  wipPrefix: "wip.prefix",
+  publish: "publish.bookmark",
+} as const
+
 /**
- * Accepted work's config from the user's and the project's: the project's value
- * wins, since the bookmark belongs to the repo. A name that is not a bookmark,
- * or a `catchUp` that is not a boolean, falls back to the default, with why.
- * The WIP prefix is checked as the start of a name (`<prefix>x`).
+ * How pine·trie uses your repo, from the user's config and the project's: the
+ * project's value wins, since the bookmarks belong to the repo. A name that
+ * is not a bookmark, or a `publish.catchUp` that is not a boolean, falls back
+ * to the default, with why; a config's `offers`, which is no longer read, is
+ * named too. The WIP prefix is checked as the start of a name (`<prefix>x`).
  */
 export function repoConfig(
-  user: LaneConfig["offers"],
-  project: LaneConfig["offers"],
+  user: WrittenRepo,
+  project: WrittenRepo,
 ): { readonly repoConfig: RepoConfig; readonly refused: readonly string[] } {
-  const refused: string[] = []
+  const refused: string[] = [
+    ...(user.offers ? ["your config"] : []),
+    ...(project.offers ? ["pinetrie.json"] : []),
+  ].map(
+    file =>
+      `${file}: offers is no longer read; use accepted.bookmark, wip.prefix, publish.bookmark and publish.catchUp (ADR-0100)`,
+  )
   const pick = (
-    key: "acceptedBookmark" | "wipPrefix" | "publish",
+    key: keyof typeof KEYS,
     valid: (v: string) => boolean,
   ): string => {
     const value = project[key] ?? user[key]
     if (value === null) return DEFAULT_REPO[key]
     if (valid(value)) return value
     refused.push(
-      `offers.${key} "${value}" is not a bookmark name; using "${DEFAULT_REPO[key]}"`,
+      `${KEYS[key]} "${value}" is not a bookmark name; using "${DEFAULT_REPO[key]}"`,
     )
     return DEFAULT_REPO[key]
   }
   const flag = project.catchUp ?? user.catchUp
-  let catchUp = DEFAULT_REPO.catchUp
+  let catchUp = DEFAULT_REPO.publishCatchesUp
   if (typeof flag === "boolean") catchUp = flag
   else if (flag !== null)
     refused.push(
-      `offers.catchUp ${flag.invalid} is not true or false; using ${DEFAULT_REPO.catchUp}`,
+      `publish.catchUp ${flag.invalid} is not true or false; using ${DEFAULT_REPO.publishCatchesUp}`,
     )
   return {
     repoConfig: {
       acceptedBookmark: pick("acceptedBookmark", isBookmarkName),
       wipPrefix: pick("wipPrefix", v => isBookmarkName(`${v}x`)),
       publish: pick("publish", isBookmarkName),
-      catchUp,
+      publishCatchesUp: catchUp,
     },
     refused,
   }

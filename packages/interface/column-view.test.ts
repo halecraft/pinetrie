@@ -199,7 +199,7 @@ const ACCEPTED = {
     catchUp: null,
     conflicts: { commits: 0, files: [] },
   },
-  catchUp: true,
+  publishCatchesUp: true,
 } satisfies AcceptedRecord
 const BASE: BaseRecord = {
   lane: laneNameForThread("1"),

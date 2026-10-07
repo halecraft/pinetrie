@@ -77,7 +77,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
   const project = committedProject("pinetrie-lanes-", {
     "shared.txt": "one\ntwo\nthree\n",
     ".gitignore": "node_modules/\n.vite/\n",
-    "pinetrie.json": `${JSON.stringify({ lanes: { ssh: true }, offers: { catchUp: true } })}\n`,
+    "pinetrie.json": `${JSON.stringify({ lanes: { ssh: true }, publish: { catchUp: true } })}\n`,
   })
   const script = scriptedModel()
   const logs: string[] = []

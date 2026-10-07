@@ -34,7 +34,7 @@ const line = (commit = L2): AcceptedRecord => ({
     catchUp: null,
     conflicts: { commits: 0, files: [] },
   },
-  catchUp: true,
+  publishCatchesUp: true,
 })
 
 /** A lane on accepted work from L1, whose catch-up to L2 brings `files`. */

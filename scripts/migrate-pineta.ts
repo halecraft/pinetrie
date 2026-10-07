@@ -476,7 +476,7 @@ async function main(given: string | undefined): Promise<void> {
       root,
       false,
     )
-    const { repoConfig: line } = repoConfig(user.offers, own.offers)
+    const { repoConfig: line } = repoConfig(user.repo, own.repo)
     const owner = startRepoOwner({ root, repoConfig: line })
     try {
       const steps = await owner.command(async ops => {

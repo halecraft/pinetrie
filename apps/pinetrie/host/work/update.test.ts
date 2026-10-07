@@ -521,7 +521,7 @@ describe("catchUpInRun (ADR-0080)", () => {
           catchUp: null,
           conflicts: { commits: 0, files: [] },
         },
-        catchUp: true,
+        publishCatchesUp: true,
       }),
     )
     const asked: string[] = []

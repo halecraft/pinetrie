@@ -921,19 +921,19 @@ commit-message request `request.ts` (`describeRequest`).
 
 | record | namespace | key | written |
 |---|---|---|---|
-| accepted work: its commit, the WIP bookmarks above it, the publish bookmark and your work against it (`yours.ahead`, `yours.catchUp`), and `offers.catchUp` (`catchUp`) | `pinetrie.accepted` | `line` | when your repo's operation head moves |
+| accepted work: its commit, the WIP bookmarks above it, the publish bookmark and your work against it (`yours.ahead`, `yours.catchUp`), and `publish.catchUp` (`catchUp`) | `pinetrie.accepted` | `line` | when your repo's operation head moves |
 | a lane's base, as its newest `Pinetrie-Base` says it, whether a WIP base landed or is gone, what catching up would change and where that was read, and its untraced accepted-offer commits (S97) | `pinetrie.base` | the lane | when a refresh reads the lane |
 
 - **`planAcceptedRecord`** is accepted work's record from what the host read
   (`AcceptedFacts`), beside what setting accepted work up would write to your
   repo's config, which `@pinetrie/repo` words (`setupProposal`: jj's config
-  text), and `offers.catchUp` from accepted work's config (ADR-0099).
+  text), and `publish.catchUp` from accepted work's config (ADR-0099).
 - **`planAcceptedAction`** decides a setup or publish from the record read in
   its own step (`AcceptedDecision`): setup writes exactly the heads and log the
   record proposed, the text you were shown; a publish (`PublishDecision`,
   ADR-0090) says whether your files catch up first (`catchUp`) and whether
   your commits move with accepted work (`accept`), both false with
-  `offers.catchUp` off. `@pinetrie/repo` turns it into steps (`planSetup`,
+  `publish.catchUp` off. `@pinetrie/repo` turns it into steps (`planSetup`,
   `planPublishCatchUp`, `planPublishMove`).
 - **`planPublishFinish` is a publish's second round** (ADR-0090): from the
   record read again after the catch-up, the move, or the catch-up's
@@ -954,7 +954,7 @@ commit-message request `request.ts` (`describeRequest`).
   publish button reads it. Setup and publishing are anyone's, on any host
   (ADR-0099); setup is refused only once accepted work exists. A publish is
   refused, in order: `no_line`, `no_publish`, `not_fast_forward`; with
-  `offers.catchUp` on,
+  `publish.catchUp` on,
   `yours_conflict` (conflicted commits or files, or a preview that would
   conflict) and `refused` for files behind with no commit in common; then
   `refused` when `nothingToPublish(publishWork(record))`, the one "nothing

@@ -255,12 +255,13 @@ describe("planRun: a lane's container", () => {
   })
 })
 
-describe("lineConfig: the project's names win, and a bad one falls back", () => {
+describe("repoConfig: the project's values win, and a bad one falls back (ADR-0100)", () => {
   const none = {
     acceptedBookmark: null,
     wipPrefix: null,
     publish: null,
     catchUp: null,
+    offers: false,
   }
   test("defaults with nothing set", () => {
     expect(repoConfig(none, none)).toEqual({
@@ -272,33 +273,29 @@ describe("lineConfig: the project's names win, and a bad one falls back", () => 
     expect(
       repoConfig(
         {
+          ...none,
           acceptedBookmark: "mine",
           wipPrefix: "draft/",
           publish: "master",
           catchUp: true,
         },
-        {
-          acceptedBookmark: "trunk",
-          wipPrefix: null,
-          publish: null,
-          catchUp: null,
-        },
+        { ...none, acceptedBookmark: "trunk" },
       ).repoConfig,
     ).toEqual({
       acceptedBookmark: "trunk",
       wipPrefix: "draft/",
       publish: "master",
-      catchUp: true,
+      publishCatchesUp: true,
     })
   })
   test("catching up is off unless set, and the project's setting wins", () => {
-    expect(DEFAULT_REPO.catchUp).toBe(false)
+    expect(DEFAULT_REPO.publishCatchesUp).toBe(false)
     expect(
       repoConfig({ ...none, catchUp: true }, { ...none, catchUp: false })
-        .repoConfig.catchUp,
+        .repoConfig.publishCatchesUp,
     ).toBe(false)
     expect(
-      repoConfig(none, { ...none, catchUp: true }).repoConfig.catchUp,
+      repoConfig(none, { ...none, catchUp: true }).repoConfig.publishCatchesUp,
     ).toBe(true)
   })
   test("a catchUp that is not true or false falls back to off, saying why", () => {
@@ -306,21 +303,32 @@ describe("lineConfig: the project's names win, and a bad one falls back", () => 
       { ...none, catchUp: true },
       { ...none, catchUp: { invalid: '"yes"' } },
     )
-    expect(r.repoConfig.catchUp).toBe(false)
+    expect(r.repoConfig.publishCatchesUp).toBe(false)
     expect(r.refused).toEqual([
-      'offers.catchUp "yes" is not true or false; using false',
+      'publish.catchUp "yes" is not true or false; using false',
     ])
   })
   test("a name that is no bookmark falls back, saying why", () => {
     const r = repoConfig(none, {
+      ...none,
       acceptedBookmark: "has space",
       wipPrefix: "a..b/",
       publish: "a:b",
-      catchUp: null,
     })
     expect(r.repoConfig).toEqual(DEFAULT_REPO)
-    expect(r.refused).toHaveLength(3)
-    expect(r.refused[0]).toContain("has space")
+    expect(r.refused).toEqual([
+      `accepted.bookmark "has space" is not a bookmark name; using "${DEFAULT_REPO.acceptedBookmark}"`,
+      'wip.prefix "a..b/" is not a bookmark name; using "wip/"',
+      'publish.bookmark "a:b" is not a bookmark name; using "main"',
+    ])
+  })
+  test("a config that still has offers is named, and nothing of it is read", () => {
+    const r = repoConfig({ ...none, offers: true }, { ...none, offers: true })
+    expect(r.repoConfig).toEqual(DEFAULT_REPO)
+    expect(r.refused).toEqual([
+      "your config: offers is no longer read; use accepted.bookmark, wip.prefix, publish.bookmark and publish.catchUp (ADR-0100)",
+      "pinetrie.json: offers is no longer read; use accepted.bookmark, wip.prefix, publish.bookmark and publish.catchUp (ADR-0100)",
+    ])
   })
   test("isBookmarkName: git's rules", () => {
     for (const ok of ["pinetrie-onto", "wip/x", "a.b"])
@@ -338,11 +346,12 @@ describe("decodeLaneConfig: grants, the install and shared directories, total", 
         grants: NO_GRANTS,
         install: null,
         shared: [],
-        offers: {
+        repo: {
           acceptedBookmark: null,
           wipPrefix: null,
           publish: null,
           catchUp: null,
+          offers: false,
         },
       })
     expect(
@@ -362,37 +371,46 @@ describe("decodeLaneConfig: grants, the install and shared directories, total", 
       grants: { ssh: false, env: ["OK_1"], mounts: [] },
       install: null,
       shared: [".plans"],
-      offers: {
+      repo: {
         acceptedBookmark: null,
         wipPrefix: null,
         publish: null,
         catchUp: null,
+        offers: false,
       },
     })
   })
-  test("offers: accepted work's names, as written", () => {
+  test("accepted, wip and publish: how pine·trie uses your repo, as written", () => {
     expect(
       decodeLaneConfig(
         {
-          offers: {
-            onto: "trunk",
-            wipPrefix: 3,
-            publish: "master",
-          },
+          accepted: { bookmark: "trunk" },
+          wip: { prefix: 3 },
+          publish: { bookmark: "master" },
         },
         "/p",
         false,
-      ).offers,
+      ).repo,
     ).toEqual({
       acceptedBookmark: "trunk",
       wipPrefix: null,
       publish: "master",
       catchUp: null,
+      offers: false,
+    })
+    expect(
+      decodeLaneConfig({ offers: { onto: "trunk" } }, "/p", false).repo,
+    ).toEqual({
+      acceptedBookmark: null,
+      wipPrefix: null,
+      publish: null,
+      catchUp: null,
+      offers: true,
     })
   })
-  test("offers.catchUp: a boolean, else the text written", () => {
+  test("publish.catchUp: a boolean, else the text written", () => {
     const flag = (catchUp: unknown) =>
-      decodeLaneConfig({ offers: { catchUp } }, "/p", false).offers.catchUp
+      decodeLaneConfig({ publish: { catchUp } }, "/p", false).repo.catchUp
     expect(flag(true)).toBe(true)
     expect(flag(false)).toBe(false)
     expect(flag(undefined)).toBeNull()

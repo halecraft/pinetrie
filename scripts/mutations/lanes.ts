@@ -75,8 +75,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "publishing catches your files up unless told not to",
     file: plan,
-    from: "  catchUp: false,\n}",
-    to: "  catchUp: true,\n}",
+    from: "  publishCatchesUp: false,\n}",
+    to: "  publishCatchesUp: true,\n}",
     command: unit,
     expect: "catching up is off unless set, and the project's setting wins",
   },
@@ -95,6 +95,15 @@ export const mutations: readonly Mutation[] = [
     to: "  else if (flag !== null)\n    catchUp = true, refused.push(",
     command: unit,
     expect: "a catchUp that is not true or false falls back to off, saying why",
+  },
+  {
+    name: "a config's offers goes unsaid",
+    file: plan,
+    from: '    ...(project.offers ? ["pinetrie.json"] : []),\n',
+    to: "",
+    command: unit,
+    expect:
+      "a config that still has offers is named, and nothing of it is read",
   },
   {
     name: "a bookmark name may hold ..",

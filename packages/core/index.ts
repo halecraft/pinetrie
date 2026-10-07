@@ -1265,10 +1265,10 @@ export interface AcceptedRecord {
     }
   }
   /**
-   * `offers.catchUp` (ADR-0099): whether a publish catches your files up and
+   * `publish.catchUp` (ADR-0099): whether a publish catches your files up and
    * accepts your commits below `@` before moving the publish bookmark.
    */
-  readonly catchUp: boolean
+  readonly publishCatchesUp: boolean
 }
 
 /**

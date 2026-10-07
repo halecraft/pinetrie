@@ -348,7 +348,7 @@ describe("sendChat", () => {
             catchUp: null,
             conflicts: { commits: 0, files: [] },
           },
-          catchUp: true,
+          publishCatchesUp: true,
         }),
       )
     }

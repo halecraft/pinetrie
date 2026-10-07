@@ -474,7 +474,7 @@ pending.
   words it: "publish", or "publishing…" while out, and a title that says
   what it does from `publishWork` and the catch-up's preview (files it
   changes, other lines of your work that move), "your files do not move
-  (offers.catchUp is off)" when the setting leaves your files behind or
+  (publish.catchUp is off)" when the setting leaves your files behind or
   your commits unaccepted, then the jj, led by
   `acceptedRefusal` when the host would refuse (`PublishWords.refused`, the
   button's `data-refused`). The button still sends then: the

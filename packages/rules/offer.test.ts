@@ -307,7 +307,7 @@ describe("records", () => {
         catchUp: null,
         conflicts: { commits: 0, files: [] },
       },
-      catchUp: true,
+      publishCatchesUp: true,
     }
     const l = setRecord(ACCEPTED, line)
     expect([l.namespace, l.key]).toEqual(["pinetrie.accepted", "accepted"])

@@ -837,7 +837,7 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   writes `immutable_heads()` and `revsets.log` to the repo's config, the
   text the publish button's setup showed (`planSetup`). A publish
   (ADR-0090) is two rounds of gather, plan and execute in one command: the
-  catch-up (`planPublishCatchUp`, as you, only with `offers.catchUp` on
+  catch-up (`planPublishCatchUp`, as you, only with `publish.catchUp` on
   and only when your files are behind), then the record read again, with
   the catch-up's operation from `SharedFacts.op`, decided by
   `planPublishFinish` into the move (`planPublishMove`) or the catch-up's
@@ -845,7 +845,7 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   catch-up runs the undo and rethrows: the one branch that is not a plan's
   value. The record's preview runs `git merge-tree` on your repo (the
   step's `git`). Setup and publish are anyone's, on any host: what a
-  publish does is `offers.catchUp` (`RepoConfig`, carried on the record),
+  publish does is `publish.catchUp` (`RepoConfig`, carried on the record),
   never the bind or the invite key (ADR-0099).
 - **The base snapshot follows accepted work** (`work/index.ts`): the owner's
   `Moved.onto` refreshes it (`refreshBaseSoon`), so setup, an accept, an

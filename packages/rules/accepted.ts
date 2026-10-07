@@ -89,7 +89,7 @@ const AcceptedRecordSchema = Type.Object({
       files: Type.Array(Type.String()),
     }),
   }),
-  catchUp: Type.Boolean(),
+  publishCatchesUp: Type.Boolean(),
 })
 
 const BaseRecordSchema = Type.Object({
@@ -207,7 +207,7 @@ export const BASE: RecordSpec<BaseRecord, LaneName, "session"> = {
  * Accepted work's record, the page's cache, from what the host read of it
  * (ADR-0060): what setting it up would write to your repo's config
  * (`proposed`, `setupProposal`), and whether a publish catches your files up
- * (`offers.catchUp`, ADR-0099).
+ * (`publish.catchUp`, ADR-0099).
  */
 export function planAcceptedRecord(input: {
   readonly facts: AcceptedFacts
@@ -216,22 +216,22 @@ export function planAcceptedRecord(input: {
     readonly acceptedBookmark: string
     readonly wipPrefix: string
     readonly publish: string
-    readonly catchUp: boolean
+    readonly publishCatchesUp: boolean
   }
   readonly proposed: { readonly heads: string; readonly log: string }
 }): AcceptedRecord {
-  const { facts, repoConfig: line, proposed } = input
+  const { facts, repoConfig, proposed } = input
   return {
-    acceptedBookmark: line.acceptedBookmark,
-    wipPrefix: line.wipPrefix,
-    publish: line.publish,
+    acceptedBookmark: repoConfig.acceptedBookmark,
+    wipPrefix: repoConfig.wipPrefix,
+    publish: repoConfig.publish,
     commit: facts.commit,
     heads: { current: facts.heads, proposed: proposed.heads },
     log: { current: facts.log, proposed: proposed.log },
     wips: facts.wips,
     published: facts.published,
     yours: facts.yours,
-    catchUp: line.catchUp,
+    publishCatchesUp: repoConfig.publishCatchesUp,
   }
 }
 
@@ -250,24 +250,24 @@ const refused = (code: ErrCode): AcceptedActionState => ({
 export interface PublishWork {
   /** Line commits the publish bookmark lacks. */
   readonly acceptedCommits: number
-  /** Your commits below `@` it accepts: 0 with `offers.catchUp` off. */
+  /** Your commits below `@` it accepts: 0 with `publish.catchUp` off. */
   readonly yours: number
-  /** Whether your files catch up first: never with `offers.catchUp` off. */
+  /** Whether your files catch up first: never with `publish.catchUp` off. */
   readonly catchUp: boolean
 }
 
 /**
- * What a publish would do now. With `offers.catchUp` off it moves the publish
+ * What a publish would do now. With `publish.catchUp` off it moves the publish
  * bookmark alone, so your files and commits count for nothing.
  */
 export function publishWork(
-  record: Pick<AcceptedRecord, "catchUp" | "published" | "yours">,
+  record: Pick<AcceptedRecord, "publishCatchesUp" | "published" | "yours">,
 ): PublishWork {
-  const { catchUp, published, yours } = record
+  const { publishCatchesUp, published, yours } = record
   return {
     acceptedCommits: published.commit === null ? 0 : published.behind,
-    yours: catchUp ? yours.ahead : 0,
-    catchUp: catchUp && yours.behind > 0,
+    yours: publishCatchesUp ? yours.ahead : 0,
+    catchUp: publishCatchesUp && yours.behind > 0,
   }
 }
 
@@ -279,7 +279,7 @@ export const nothingToPublish = (work: PublishWork): boolean =>
  * Whether `action` may run on accepted work as `record` has it: the one rule the
  * host's `planAcceptedAction` and the page's button both read. Anyone admitted
  * may set up or publish (ADR-0099). A publish is refused before its first
- * step for whatever can be checked then (ADR-0090): with `offers.catchUp` on,
+ * step for whatever can be checked then (ADR-0090): with `publish.catchUp` on,
  * your files' conflicts and the catch-up's preview among them.
  */
 export function acceptedActionState(
@@ -292,7 +292,7 @@ export function acceptedActionState(
   const { published, yours } = record
   if (published.commit === null) return refused(ERR.NO_PUBLISH)
   if (published.ahead > 0) return refused(ERR.NOT_FAST_FORWARD)
-  if (record.catchUp) {
+  if (record.publishCatchesUp) {
     if (
       yours.conflicts.commits > 0 ||
       yours.conflicts.files.length > 0 ||
@@ -399,7 +399,9 @@ export function acceptedRefusal(
     }
     default:
       if (action === "setup") return "already set up"
-      return yours.behind > 0 && yours.catchUp === null && record.catchUp
+      return yours.behind > 0 &&
+        yours.catchUp === null &&
+        record.publishCatchesUp
         ? "your files share no commit with accepted work: rebase onto it in jj"
         : "nothing to publish"
   }

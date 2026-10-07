@@ -55,7 +55,7 @@ export interface AcceptedWork {
 export function createAcceptedWork(deps: {
   readonly owner: Pick<RepoOwner, "later" | "command">
   readonly basics: Pick<Basics, "session">
-  /** Accepted work's names and `offers.catchUp` (ADR-0060, ADR-0099). */
+  /** Accepted work's names and `publish.catchUp` (ADR-0060, ADR-0099). */
   readonly repoConfig: RepoConfig
   readonly writeValues: (writes: readonly ValueWrite[]) => Promise<void>
 }): AcceptedWork {

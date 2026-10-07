@@ -51,7 +51,7 @@ describe("accepted work (ADR-0060)", () => {
         acceptedBookmark: "pinetrie-onto",
         wipPrefix: "wip/",
         publish: "main",
-        catchUp: true,
+        publishCatchesUp: true,
       },
       proposed,
     }),
@@ -67,7 +67,7 @@ describe("accepted work (ADR-0060)", () => {
       record().acceptedBookmark,
       record().wipPrefix,
       record().publish,
-      record().catchUp,
+      record().publishCatchesUp,
     ]).toEqual(["pinetrie-onto", "wip/", "main", true])
   })
   test("setup writes the bookmark at your @- and exactly the proposed heads and log", () => {
@@ -78,10 +78,10 @@ describe("accepted work (ADR-0060)", () => {
       log: "logged",
     })
   })
-  test("setup runs whatever offers.catchUp says; a set line refuses it", () => {
-    expect(planAcceptedAction("setup", record({ catchUp: false })).kind).toBe(
-      "setup",
-    )
+  test("setup runs whatever publish.catchUp says; a set line refuses it", () => {
+    expect(
+      planAcceptedAction("setup", record({ publishCatchesUp: false })).kind,
+    ).toBe("setup")
     expect(
       planAcceptedAction("setup", record({ commit: commitId("c1") })).kind,
     ).toBe("refused")
@@ -112,9 +112,9 @@ describe("accepted work (ADR-0060)", () => {
       const s = acceptedActionState("publish", r)
       return s.kind === "refused" ? s.code : null
     }
-    test("with offers.catchUp off it moves the publish bookmark alone, whatever your files", () => {
+    test("with publish.catchUp off it moves the publish bookmark alone, whatever your files", () => {
       const r = at(unpublished, {
-        catchUp: false,
+        publishCatchesUp: false,
         yours: yours({
           behind: 2,
           ahead: 3,
@@ -134,7 +134,7 @@ describe("accepted work (ADR-0060)", () => {
         catchUp: false,
       })
     })
-    test("with offers.catchUp on it catches your files up and accepts your commits", () => {
+    test("with publish.catchUp on it catches your files up and accepts your commits", () => {
       const r = at(unpublished, {
         yours: yours({ behind: 2, ahead: 1, catchUp: preview }),
       })
@@ -188,7 +188,7 @@ describe("accepted work (ADR-0060)", () => {
         at(published),
         at(unpublished),
         at(published, { yours: yours({ ahead: 1 }) }),
-        at(published, { catchUp: false, yours: yours({ ahead: 1 }) }),
+        at(published, { publishCatchesUp: false, yours: yours({ ahead: 1 }) }),
       ])
         expect(nothingToPublish(publishWork(r))).toBe(code(r) === ERR.REFUSED)
     })

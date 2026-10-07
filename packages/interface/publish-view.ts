@@ -118,8 +118,8 @@ function publishSays(record: AcceptedRecord, work: PublishWork): string {
   // otherwise read as left out by mistake.
   const { behind, ahead } = record.yours
   const unmoved =
-    !record.catchUp && (behind > 0 || ahead > 0)
-      ? "; your files do not move (offers.catchUp is off)"
+    !record.publishCatchesUp && (behind > 0 || ahead > 0)
+      ? "; your files do not move (publish.catchUp is off)"
       : ""
   return `${said}${unmoved} · ${jj.join("; ")}`
 }

@@ -355,7 +355,7 @@ async function prepareLanes(
   }
   for (const r of sharing.refused)
     log(`[host] ${r.path} is not shared: ${r.reason}`)
-  const { repoConfig: names, refused } = repoConfig(user.offers, config.offers)
+  const { repoConfig: names, refused } = repoConfig(user.repo, config.repo)
   for (const r of refused) log(`[host] ${r}`)
   return { config, repoConfig: names, ...sharing }
 }
