@@ -239,9 +239,18 @@ URL (`#profile`), so a reload stays on it; the window's title names it,
 "(2) Profile · pine·trie". While a page shows, the card and undo keys do
 nothing; Ctrl+Shift+L still folds your list.
 
-- **Profile**: your name, and the handle it gives you as you type it,
-  sent on Enter or **save**, which says **saved** once it is; a name no
-  mention could reach is refused before it is sent. Then your email.
+- **Profile**: your picture, your name, then your email.
+  - **Your picture** is your circle, large, with **upload a picture** (or
+    **choose another**) and **remove**. An image chosen, dropped or pasted
+    there opens a round preview you drag to move it, with a **zoom**; **use
+    this picture** sends it ("saving…"), **cancel** drops it, and nothing
+    is sent before. Everyone's circle shows their picture wherever a
+    person is drawn: the corner, the account menu, readers on your list,
+    the board and columns. The rail's rings, card pips and the inventory's
+    borders keep each person's colour.
+  - **Your name**, and the handle it gives you as you type it, sent on
+    Enter or **save**, which says **saved** once it is; a name no mention
+    could reach is refused before it is sent.
 
 ### The board: where everyone's work stands (ADR-0085)
 

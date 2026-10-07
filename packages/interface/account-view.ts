@@ -60,7 +60,7 @@ export function accountWords(item: AccountItem): ControlWords {
         ? { label: "Close inventory" }
         : { label: "Inventory", title: inventoryWords(item.count).label }
     case "profile":
-      return { label: "Profile" }
+      return { label: "Profile", title: "your name and picture" }
     case "signOut":
       return {
         label: "Sign in as someone else",

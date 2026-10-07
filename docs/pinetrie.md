@@ -570,16 +570,19 @@ migrations registered from it (`apps/pinetrie/host/migrations/`), after a
 backup and before any write if a record failed to load, or refuses to
 start. A migration is deleted once Duane's store has passed it.
 
-**ADR-0098 — your avatar opens a menu; your profile is a page** (built: the
-corner, the menu and the page; people's pictures are
-`PLAN-2026-10-07-person-pictures`). The corner drew three unrelated styles
+**ADR-0098 — your avatar opens a menu; your profile is a page; a person may
+have a picture** (built). The corner drew three unrelated styles
 side by side, and the avatar opened a form. Now it is your avatar and name,
 then the inbox and the inventory as icons of one style; folded, your avatar
 alone carries the inbox's badge and its menu holds both. The menu shows who
 you are and offers your profile and signing out. The profile is the first
 page: it covers the workspace, which stays mounted and inert beneath it, is
 named in the URL's hash (`#profile`), and is left by its back button, the
-browser's Back, or showing anything in the workspace.
+browser's Back, or showing anything in the workspace. On it you crop an
+image to a square in the browser, which sends it at 256; it is a
+`pinetrie.picture` record apart from your name, the host fits any picture
+larger than 512 rather than refusing it, and the sweep keeps it. Every
+person's circle shows their picture over their initial.
 
 **ADR-0019 — a lane is a line of work, not a unit of parallelism.** A person's
 lane is a *conversation lane* and never touches disk. A *work lane* carries

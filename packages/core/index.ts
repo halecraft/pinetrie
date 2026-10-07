@@ -314,6 +314,8 @@ export const ERR = {
   INVALID_IDENTITY: "invalid_identity",
   /** A message shows a `/blob/` image the host does not store (ADR-0042). */
   IMAGE_MISSING: "image_missing",
+  /** A picture pi cannot decode or fit within `PICTURE_MOST` (ADR-0098). */
+  PICTURE_UNREADABLE: "picture_unreadable",
   /** A title with a line break, or longer than `MAX_TITLE` (ADR-0045). */
   INVALID_TITLE: "invalid_title",
   /** A new thread's lane id that names a lane pi already holds (ADR-0057). */
@@ -476,6 +478,8 @@ export type Intent =
   | { readonly kind: "reserve"; readonly lane: LaneName }
   /** Set the sender's display name: a label, never an identity. */
   | { readonly kind: "name"; readonly name: string }
+  /** Set the sender's picture to a stored blob, or with null remove it (ADR-0098). */
+  | { readonly kind: "picture"; readonly sha256: Sha256 | null }
   /** End a thread's running turn. Idempotent: an idle lane is already stopped. */
   | { readonly kind: "stop"; readonly lane: LaneName }
   /** Start a new turn on a thread whose last ask was stopped (ADR-0082). */
@@ -1877,6 +1881,12 @@ export interface SeatRecord {
 export interface ParticipantRecord {
   readonly writer: WriterId
   readonly name: string
+}
+
+/** A person's picture (ADR-0098): a blob, keyed by their writer. */
+export interface PictureRecord {
+  readonly writer: WriterId
+  readonly sha256: Sha256
 }
 
 // --- obligation: collaborators and compelled responders ----------------------

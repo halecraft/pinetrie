@@ -5,7 +5,7 @@ S29, S47. Amends ADR-0024 (presence keys per seat), ADR-0025 (authorship by
 seat), ADR-0027 and ADR-0030 (your other tabs are you). Amended by ADR-0048:
 the host writes a record of each seat's person (`pinetrie.seat`) as it
 connects, so a text's writers can be named after they leave.
-Amended by ADR-0098 (proposed): you rename yourself on your profile page;
+Amended by ADR-0098: you rename yourself on your profile page;
 your avatar opens a menu, not a dialog.
 
 **Context.** pine·trie chose each client's Kyneta peer id and made its writer

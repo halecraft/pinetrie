@@ -18,7 +18,7 @@ Amended by ADR-0091: under your list, your inbox sits between your avatar
 and your inventory; the activity menu goes, and each state on the strip
 counts its roots where the agent works and those with work ready to
 accept.
-Amended by ADR-0098 (proposed): the corner is you, with your name, then
+Amended by ADR-0098: the corner is you, with your name, then
 your inbox and inventory as icon buttons of one style.
 
 **Context.**

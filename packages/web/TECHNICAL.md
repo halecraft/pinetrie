@@ -62,6 +62,12 @@ about 55 ms (S59).
   its closed branches and its calls' streams (`callStreams`) are compared by
   value, since `projectSpine` builds new nodes on every projection. The rest
   are compared by identity.
+- **People's pictures come by context** (`Pictures`,
+  `pictures-context.ts`, ADR-0098), from `readParticipantPictures`, which
+  keeps its map while the pictures are the same. Only `Initial` reads it:
+  circles are drawn deep in avatar stacks, readers' menus, column headers
+  and the footer, and none inside a memoised message list, so a picture
+  set redraws circles alone.
 - **What a message's tables and images need from the pane comes by context,
   never a prop** (`pane-context.ts`, ADR-0078). `PaneReach` (what the pane
   shows, and `open`) is provided by `Column`, memoised on the subject with
@@ -966,6 +972,22 @@ the email is the only thing pine·trie chooses.
   for the inbox's in place, bumping `focusKey` so the first item takes
   focus. The trigger's `title` is your name as shown (`nameFor`), the one
   mentions resolve against.
+- **Your picture** (`picture-field.tsx`, ADR-0098) heads the profile page:
+  your circle at 96px, "upload a picture" over a hidden file input, and
+  "remove". An image chosen, dropped or pasted on the field is decoded by
+  the browser (`createImageBitmap`) and cropped in `picture-crop.tsx`: a
+  round preview, drawn at twice its CSS size, that a drag moves and a range
+  zooms (`moveCrop`, `zoomCrop`). Nothing is uploaded until "use this
+  picture", which draws the square at `PICTURE_SIZE` (256) to a canvas,
+  sends the PNG to `POST /blob` (`uploadImage`), then asks for the
+  `picture` command. A drag's files are hidden until the drop, so
+  `dragover` accepts by `dataTransfer.types`.
+- **A circle draws its person's picture over their initial** (`Initial`,
+  `presence.tsx`): an absolutely placed `img` that covers the circle, so the
+  initial shows while it loads, and again if it fails (the failed SHA-256
+  is kept, so a new picture is tried). Rail rings, card pips and the
+  inventory's borders stay colours: a person there is a mark, not a
+  portrait.
 - **Your profile is a page** (`profile-page.tsx`, Pages, below). Its submit
   is `planRename` (pure): refuse, unchanged, or send. A rename is sent on
   Enter or save, never on blur: a click on ← back or your list blurs the
@@ -1112,8 +1134,12 @@ leaving treats the history, are `page.ts`'s (`@pinetrie/interface`).
   `.account-inbox`, `.account-inventory`, `.account-profile`, `.not-you`
   and, in the inbox, `.account-back`. A page is
   `.page[data-page]`, with `.page-back`; the profile's holds
+  `.picture-field` (`.picture-upload`, `input.picture-file`,
+  `.picture-remove`; cropping, `.picture-crop` with `.picture-preview`,
+  `.picture-use` and `.picture-cancel`; `.picture-problem`),
   `input[name="name"]`, `.name-handle`, `.name-problem[data-problem]`,
-  `.profile-save`, `.profile-saved` and `.profile-email`. The
+  `.profile-save`, `.profile-saved` and `.profile-email`. A person's
+  picture is `.initial img`. The
   identification screen's email problem is `.identity-problem`.
 - **A page with nothing in your list opens on the board**, so a browser check
   that opens a second page opens its thread from there (`openFromBoard`), or

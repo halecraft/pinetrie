@@ -35,7 +35,7 @@ describe("accountWords", () => {
       { label: "Inventory", title: "your inventory: 2 cards" },
     ],
     [{ kind: "inventory", count: 2, open: true }, { label: "Close inventory" }],
-    [{ kind: "profile" }, { label: "Profile" }],
+    [{ kind: "profile" }, { label: "Profile", title: "your name and picture" }],
     [
       { kind: "signOut" },
       {

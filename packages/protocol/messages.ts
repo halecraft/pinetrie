@@ -40,6 +40,8 @@ export const HOST_PRINCIPAL = "pinetrie-host"
  *     `pinned` the versions of the thread's pinned cards its run waits for.
  *     It runs the agent only when the agent is its addressee (`address`).
  *   - `name` sets the sender's display name to `text`.
+ *   - `picture` sets the sender's picture to the blob whose SHA-256 is
+ *     `text`, or removes it with `""` (ADR-0098).
  *   - `stop` ends the running turn of the thread whose lane is `lane`.
  *   - `carry-on` starts a new turn on that thread after a stop, its prompt
  *     the host's carry-on message (ADR-0082).
@@ -83,6 +85,7 @@ export const HOST_PRINCIPAL = "pinetrie-host"
 export const COMMAND_KINDS = [
   "chat",
   "name",
+  "picture",
   "stop",
   "carry-on",
   "move-root",
@@ -197,6 +200,7 @@ export const OUTCOME_KINDS = [
   "busy",
   "conflict",
   "named",
+  "pictured",
   "stopped",
   "moved-root",
   "workflow-changed",

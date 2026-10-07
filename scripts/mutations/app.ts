@@ -712,6 +712,27 @@ export const mutations: readonly Mutation[] = [
     scenario: "page",
     expect: "another window shows on its root's board item, and you never do",
   },
+  // ── a person's picture (packages/web/presence.tsx, ADR-0098) ──
+  {
+    name: "a circle never draws its person's picture",
+    file: "packages/web/presence.tsx",
+    from: "      {picture !== undefined && picture !== failed && (",
+    to: "      {false && picture !== undefined && picture !== failed && (",
+    suite: "browser",
+    scenario: "images",
+    expect:
+      "a picture set on the profile page shows on your avatar in another person's window",
+  },
+  {
+    name: "the picture is sent at the image's size, not PICTURE_SIZE",
+    file: "packages/web/picture-crop.tsx",
+    from: "  out.width = PICTURE_SIZE\n  out.height = PICTURE_SIZE",
+    to: "  out.width = image.width\n  out.height = image.height",
+    suite: "browser",
+    scenario: "images",
+    expect:
+      "a picture set on the profile page shows on your avatar in another person's window",
+  },
   // ── a page over the workspace (packages/web/use-page.ts, ADR-0098) ──
   {
     name: "opening a page replaces the workspace's history entry",
@@ -726,8 +747,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the workspace is mounted afresh under a page",
     file: "packages/web/app.tsx",
-    from: '        id="workspace"\n        inert={page !== null}',
-    to: '        id="workspace"\n        key={page ?? "workspace"}\n        inert={page !== null}',
+    from: '          id="workspace"\n          inert={page !== null}',
+    to: '          id="workspace"\n          key={page ?? "workspace"}\n          inert={page !== null}',
     suite: "browser",
     scenario: "page",
     expect:

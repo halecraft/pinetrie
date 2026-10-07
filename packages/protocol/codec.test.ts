@@ -16,6 +16,7 @@ import {
   ROOT,
   rootIdFor,
   runId,
+  type Sha256,
   THE_AGENT,
   workflowStateIdFor,
   writerId,
@@ -194,6 +195,8 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       state: null,
     },
     { kind: "name", name: "Alice" },
+    { kind: "picture", sha256: "d".repeat(64) as Sha256 },
+    { kind: "picture", sha256: null },
     { kind: "stop", lane: laneNameForThread("abc") },
     { kind: "carry-on", lane: laneNameForThread("abc") },
     {
@@ -364,6 +367,14 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
   }
 })
 
+test("a picture names a stored image's hash, or none (ADR-0098); anything else is refused", () => {
+  const picture = (text: string) =>
+    decodeCommand(command({ id: "c", kind: "picture", text }))
+  assert.deepEqual(picture(""), { kind: "picture", sha256: null })
+  for (const bad of ["d".repeat(63), "D".repeat(64), "not a hash"])
+    assert.equal(picture(bad).kind, "refused")
+})
+
 test("a chat's malformed pinned cards are refused", () => {
   const chat = (pinned: string) =>
     decodeCommand(
@@ -422,6 +433,7 @@ test("encodeOutcome -> decodeReply round-trips every outcome", () => {
     { kind: "conflict", by: null },
     { kind: "appended", id: entryId("e-1") },
     { kind: "named" },
+    { kind: "pictured" },
     { kind: "stopped" },
     { kind: "moved-root" },
     { kind: "workflow-changed" },

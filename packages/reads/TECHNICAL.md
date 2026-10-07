@@ -38,7 +38,7 @@ Reads the host decides from, or that more than one reader needs:
 `readRenderableEntries`, `readTreeIndex`, `readLanes`, `readRunning`, `readLatestPrompt` (what a lane's run is: a
 run's end and `split_offer` decide by it), `readRunAuthor` (the person
 behind it, `promptAuthor`, ADR-0080),
-`readParticipantNames`, `readParticipants`, `readReading`, `readTyping`,
+`readParticipantNames`, `readParticipantPictures` (ADR-0098), `readParticipants`, `readReading`, `readTyping`,
 `readTypingIn` and `readQueueHolds` (ADR-0048 step 7), `readAgentActivity`,
 `readSeats`, `readPlaces` and `readPlacesRev` (ADR-0059), `readWorkflow`,
 `readBoardPlaces` and `readArchived` (the board, ADR-0085: the roots in the
@@ -132,8 +132,12 @@ Kyneta has let go.
   refresh writes the same values again, and Kyneta's record is then a new
   object (S59).
   `readReadingRoots` (each end's reported root, ADR-0063) keeps its map the
-  same way, and so does `readParticipantNames`, which reads the session's
-  whole `values` and so wakes on every directory write.
+  same way, and so do `readParticipantNames` and `readParticipantPictures`,
+  which every message's speaker and every circle compare by identity.
+- **`readReferencedBlobs` is what the sweep keeps**: each root's images
+  from its directory record, every card's text, every banner and every
+  person's picture (ADR-0098). An image left out of it is deleted after the
+  grace period.
 - **Build a `Record<EntryId, …>` from each entry's own `id`.** `Object.entries`
   and `Object.keys` give back `string`, which cannot index it (TS7053), so
   `renderableEntries` walks `Object.values` and keys by `entry.id`.

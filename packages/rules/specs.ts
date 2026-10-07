@@ -10,7 +10,7 @@ import { BASE, LINE } from "./line.ts"
 import { MARK } from "./mark.ts"
 import { NAME } from "./names.ts"
 import { OFFER } from "./offer.ts"
-import { PARTICIPANT } from "./participant.ts"
+import { PARTICIPANT, PICTURE } from "./participant.ts"
 import { QUEUE_HOLD } from "./queue-hold.ts"
 import type { RecordSpec } from "./records.ts"
 import { ROOT } from "./roots.ts"
@@ -39,6 +39,7 @@ export const RECORD_SPECS: readonly AnyRecordSpec[] = [
   NAME,
   OFFER,
   PARTICIPANT,
+  PICTURE,
   PROJECT,
   QUEUE_HOLD,
   REVISION,

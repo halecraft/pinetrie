@@ -27,6 +27,7 @@ import {
   type Intent,
   isLaneName,
   isRootId,
+  isSha256,
   isWorkflowStateId,
   keyOfFields,
   LINE_ACTIONS,
@@ -101,6 +102,8 @@ export type Outcome =
    */
   | { readonly kind: "conflict"; readonly by: WriterId | null }
   | { readonly kind: "named" }
+  /** The sender's picture is set, or removed (ADR-0098). */
+  | { readonly kind: "pictured" }
   | { readonly kind: "stopped" }
   /**
    * A root moved on the board, or already there (ADR-0085): into the closed
@@ -166,6 +169,13 @@ export function decodeCommand(
           "a name must be 1 to 40 characters, with a letter or digit, and not 'agent'",
         )
       : { kind: "name", name }
+  }
+  if (kind === "picture") {
+    const sha = text(wire?.text)
+    if (sha === "") return { kind: "picture", sha256: null }
+    return isSha256(sha)
+      ? { kind: "picture", sha256: sha }
+      : refused(ERR.IMAGE_MISSING, `not a stored image's hash: ${sha}`)
   }
   if (kind === "stop" || kind === "carry-on" || kind === "unqueue-all") {
     const lane = text(wire?.lane)
@@ -679,6 +689,8 @@ export function encodeIntent(id: string, intent: Intent): Command {
       })
     case "name":
       return command({ id, kind: "name", text: intent.name })
+    case "picture":
+      return command({ id, kind: "picture", text: intent.sha256 ?? "" })
     case "stop":
     case "carry-on":
     case "unqueue-all":
@@ -789,6 +801,8 @@ function outcomeToWire(id: string, outcome: Outcome): Reply {
       return reply({ id, outcome: "conflict", by: outcome.by ?? "" })
     case "named":
       return reply({ id, outcome: "named" })
+    case "pictured":
+      return reply({ id, outcome: "pictured" })
     case "stopped":
       return reply({ id, outcome: "stopped" })
     case "moved-root":
@@ -861,6 +875,8 @@ export function decodeReply(wire: Reply): Outcome {
       }
     case "named":
       return { kind: "named" }
+    case "pictured":
+      return { kind: "pictured" }
     case "stopped":
       return { kind: "stopped" }
     case "moved-root":

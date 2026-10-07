@@ -22,6 +22,7 @@ import {
   loadPiSetup,
   type ModelChoice,
   newId,
+  prepareImage,
 } from "@pinetrie/pi"
 import { Control } from "@pinetrie/protocol/line"
 import {
@@ -501,6 +502,13 @@ export async function startHost({
     piSetup,
     work,
     blobs,
+    fitImage: async (bytes, most) => {
+      const fitted = await prepareImage(bytes, {
+        maxWidth: most,
+        maxHeight: most,
+      })
+      return fitted.ok ? fitted.image : null
+    },
     cards: cardPort,
     start: runs.start,
     cancel: runs.cancel,

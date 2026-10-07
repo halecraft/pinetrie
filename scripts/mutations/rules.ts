@@ -2287,4 +2287,13 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "planWorkflowSeed: a store with no workflow gets the default one",
   },
+  // ── a person's picture (packages/rules/participant.ts, ADR-0098) ──
+  {
+    name: "a picture too large on one side only is set unfitted",
+    file: "packages/rules/participant.ts",
+    from: "  return ref.width > PICTURE_MOST || ref.height > PICTURE_MOST",
+    to: "  return ref.width > PICTURE_MOST && ref.height > PICTURE_MOST",
+    command: unit,
+    expect: "too wide",
+  },
 ]

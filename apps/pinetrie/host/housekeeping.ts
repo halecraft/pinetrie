@@ -71,6 +71,7 @@ export async function compactAfter(
 /**
  * Delete the images nothing shows any more: gather every card's text
  * (`CardPort.texts` of the cards `places` holds), then the store's list and the session's references
+ * (`readReferencedBlobs`: roots' images, banners and people's pictures)
  * with no await between them, `planSweep`, delete.
  */
 export async function sweepBlobs(input: {

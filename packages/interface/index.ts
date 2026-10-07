@@ -215,6 +215,7 @@ export {
   identityCodec,
   nameHint,
   parseIdentity,
+  pictureProblem,
   planRename,
   reconcileName,
   renameProblem,
@@ -322,6 +323,16 @@ export {
   type AppPorts,
   perform,
 } from "./perform.ts"
+export {
+  type Crop,
+  cropSource,
+  fitCrop,
+  MOST_ZOOM,
+  moveCrop,
+  PICTURE_SIZE,
+  pictureWords,
+  zoomCrop,
+} from "./picture-crop.ts"
 export {
   readingAt,
   seenBy,

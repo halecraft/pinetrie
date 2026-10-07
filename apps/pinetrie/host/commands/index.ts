@@ -53,6 +53,7 @@ import {
   type LaneDeps,
 } from "./lane.ts"
 import { handleMark, type MarkDeps } from "./mark.ts"
+import { handlePicture, type PictureDeps } from "./picture.ts"
 
 export interface CommandDeps {
   readonly basics: ChatDeps["basics"]
@@ -64,7 +65,8 @@ export interface CommandDeps {
     Pick<Records, "writeValues">
   readonly piSetup: ChatDeps["piSetup"]
   readonly work: ChatDeps["work"] & BoardDeps["work"] & LaneDeps["work"]
-  readonly blobs: ChatDeps["blobs"]
+  readonly blobs: ChatDeps["blobs"] & PictureDeps["blobs"]
+  readonly fitImage: PictureDeps["fitImage"]
   readonly cards: ChatDeps["cards"] & CardCommandDeps["cards"]
   readonly start: ChatDeps["start"]
   readonly cancel: LaneDeps["cancel"]
@@ -221,6 +223,8 @@ export function createCommands(deps: CommandDeps): Commands {
           setRecord(PARTICIPANT, { writer, name: intent.name }),
         ])
         return settled({ kind: "named" })
+      case "picture":
+        return settled(await handlePicture(deps, writer, intent))
       case "stop":
         return settled(await handleStop(deps, intent.lane, writer))
       case "carry-on":

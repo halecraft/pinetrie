@@ -79,6 +79,21 @@ test("a large image is fitted to 2000 wide, its size read from the resize", asyn
   )
 })
 
+test("a fit given is the box: a person's picture fits 512 on its longer side, its ratio kept (ADR-0098)", async () => {
+  const prepared = await prepareImage(greyPng(1200, 800), {
+    maxWidth: 512,
+    maxHeight: 512,
+  })
+  expect(prepared).toMatchObject({ ok: true, image: { width: 512 } })
+  const height = prepared.ok ? prepared.image.height : 0
+  expect(Math.abs(height - (512 * 800) / 1200)).toBeLessThanOrEqual(1)
+  const tall = await prepareImage(greyPng(300, 900), {
+    maxWidth: 512,
+    maxHeight: 512,
+  })
+  expect(tall).toMatchObject({ ok: true, image: { height: 512 } })
+})
+
 test("SVG, BMP and text are not images; a truncated PNG is unreadable", async () => {
   const svg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"/>')
   // A 24-bit BMP pi recognizes, which no provider takes inline. Wider than

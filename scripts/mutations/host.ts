@@ -1743,4 +1743,14 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "recover gives a new store the default workflow first",
   },
+  // ── a person's picture (commands/picture.ts, ADR-0098) ──
+  {
+    name: "a fitted picture records the original",
+    file: "apps/pinetrie/host/commands/picture.ts",
+    from: "      await records.writeValues([pictureWrites(writer, copy.sha256)])",
+    to: "      await records.writeValues([pictureWrites(writer, plan.sha256)])",
+    command: unit,
+    expect:
+      "an oversized picture is fitted within PICTURE_MOST, kept, and its copy set, not the original",
+  },
 ]

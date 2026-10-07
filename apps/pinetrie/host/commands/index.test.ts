@@ -89,6 +89,7 @@ function setUp(
     piSetup: pi.port,
     work: record<CommandDeps["work"]>(work).port,
     blobs: record<CommandDeps["blobs"]>({ ref: () => undefined }).port,
+    fitImage: async () => null,
     cards: cards.port,
     cancel: () => false,
     start: () => {

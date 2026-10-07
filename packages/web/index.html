@@ -309,8 +309,12 @@
       .avatars { display: inline-flex; gap: 2px; flex: 0 0 auto; }
       /* The circle. `.avatar` has no rule: it marks a person shown here, which
          the browser suite counts. */
-      .initial { display: inline-block; width: 16px; height: 16px; border-radius: 50%;
-        font-size: 10px; line-height: 16px; text-align: center; color: #111; font-weight: 600; }
+      .initial { position: relative; display: inline-block; width: 16px; height: 16px;
+        overflow: hidden; border-radius: 50%; font-size: 10px; line-height: 16px;
+        text-align: center; color: #111; font-weight: 600; }
+      /* A person's picture (ADR-0098), over their initial, which shows while
+         it loads. */
+      .initial img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
       .initial.more { background: #3a3f48; color: #bbb; }
       /* What became of a column's files, above its composer (ADR-0040): the offer
          in your repo (ADR-0038), or where a lane that works directly writes. */
@@ -994,6 +998,22 @@
         border: 1px solid #3a3f48; border-radius: 999px; font-size: .8rem; }
       .page-back:hover { color: #e6e6e6; border-color: #5a606b; }
       .page-body { max-width: 36rem; margin: 0 auto; padding: .5rem 1.5rem 2rem; }
+      /* Your profile page: your picture (ADR-0098), then your name. */
+      .picture-field { display: flex; flex-direction: column; gap: .5rem; margin-bottom: 1.25rem; }
+      .picture-current { display: flex; align-items: center; gap: 1rem; }
+      .initial.picture-large { width: 96px; height: 96px; line-height: 96px; font-size: 40px; }
+      .picture-actions { display: flex; align-items: center; gap: .5rem; }
+      .picture-actions button { padding: .25rem .7rem; background: none; color: #aab4c3;
+        border: 1px solid #3a3f48; border-radius: 999px; font-size: .8rem; }
+      .picture-actions button:hover:not(:disabled) { color: #e6e6e6; border-color: #5a606b; }
+      .picture-actions .picture-use { background: #2f6feb; color: #fff; border-color: #2f6feb; }
+      .picture-crop { display: flex; flex-direction: column; align-items: flex-start; gap: .6rem; }
+      /* The canvas is drawn at twice its size, for sharp pixels on a dense screen. */
+      .picture-preview { width: 200px; height: 200px; border-radius: 50%; cursor: grab;
+        touch-action: none; box-shadow: 0 0 0 1px #3a3f48; }
+      .picture-preview:active { cursor: grabbing; }
+      .picture-zoom { display: flex; align-items: center; gap: .5rem; color: #8b93a1; font-size: .8rem; }
+      .picture-problem { margin: 0; color: #f0a0a0; font-size: .85rem; }
       /* Your profile page. */
       .profile-name { display: flex; flex-direction: column; gap: .4rem; }
       .profile-actions { display: flex; align-items: center; justify-content: flex-end; gap: .75rem; }

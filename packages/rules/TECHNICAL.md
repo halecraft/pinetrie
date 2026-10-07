@@ -1173,3 +1173,13 @@ name, a bare string, keyed by writer id (`PARTICIPANT`, read as
 unnamed writer their email's part before the `@`, which the screen shows and
 a mention reaches (`normalizeEmail` requires a letter or digit there); `participants` lists every named writer and every writer in
 the tree, sorted, which is what a mention resolves against.
+
+A person's picture (ADR-0098) is a record of its own, `pinetrie.picture`
+(`PICTURE`, read as `PictureRecord { writer, sha256 }`): the blob's SHA-256
+alone, so a rename never rewrites it, and contents that are not a SHA-256
+are malformed. `planPicture` decides a `picture` command from the blob
+store's reference, read without the bytes: `null` clears, a blob the store
+does not hold is refused (`IMAGE_MISSING`), one wider or taller than
+`PICTURE_MOST` (512) is fitted, and the rest is set. The size is never a
+refusal: the host fits any client's picture. `pictureWrites` is the one
+writer of the record.

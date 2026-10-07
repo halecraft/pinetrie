@@ -3,11 +3,20 @@
 // A person's colour is kept apart from the branch palette (`palette.ts`): a
 // ring or an avatar must never read as a track. The first few people in a
 // session get colours far from each other and from the tracks (S110); the
-// rest, a hue from their writer id.
+// rest, a hue from their writer id. A person's circle shows their picture
+// when they have set one (ADR-0098), over their initial in their colour.
 
-import { type TreeIndex, type WriterId, writersOf } from "@pinetrie/core"
+import {
+  blobUrl,
+  type Sha256,
+  type TreeIndex,
+  type WriterId,
+  writersOf,
+} from "@pinetrie/core"
 import { stringHash } from "@pinetrie/interface"
 import { displayName } from "@pinetrie/rules"
+import { useContext, useState } from "react"
+import { Pictures } from "./pictures-context.ts"
 
 /**
  * The first people's colours: magenta, white and yellow, far apart, and
@@ -64,13 +73,20 @@ interface CircleProps {
   colorOf: (writer: WriterId) => string
 }
 
-/** A writer's circle: their initial, in their colour. */
+/**
+ * A writer's circle: their initial, in their colour, and over it their
+ * picture when they have one. The initial stays beneath, so a picture still
+ * loading, or one that fails, shows it.
+ */
 export function Initial({
   writer,
   nameOf,
   colorOf,
   className,
 }: CircleProps & { className: string }) {
+  const picture = useContext(Pictures).get(writer)
+  // The picture that failed to load: a new one is tried afresh.
+  const [failed, setFailed] = useState<Sha256 | null>(null)
   return (
     <span
       className={`initial ${className}`}
@@ -78,6 +94,14 @@ export function Initial({
       style={{ background: colorOf(writer) }}
     >
       {nameFor(nameOf, writer).slice(0, 1).toUpperCase()}
+      {picture !== undefined && picture !== failed && (
+        <img
+          alt=""
+          decoding="async"
+          onError={() => setFailed(picture)}
+          src={blobUrl(picture)}
+        />
+      )}
     </span>
   )
 }

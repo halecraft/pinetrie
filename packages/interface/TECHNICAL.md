@@ -540,7 +540,9 @@ pending.
   suite counts people by `.avatar`, and proves you are never among them by
   it. So your avatar in the corner and the account menu (`.me`) and the "+n" of `Avatars`
   (`.more`) are `.initial` and never `.avatar`.
-  The circle's shape is `.initial`'s rule; `.avatar` has none. Your list's
+  The circle's shape is `.initial`'s rule; `.avatar` has none. A person's
+  picture (ADR-0098) is an `img` inside the same circle, so both rules hold
+  with a picture or without. Your list's
   items and the board's hold readers' avatars too, so `.avatar` anywhere matches them,
   who never include you either.
 
@@ -1069,6 +1071,20 @@ change of wording then touches the words function, its one test, and
   not thumbnails. On send, the host reads the `/blob/` images from the text,
   and refuses the send if one is no longer stored (`image_missing`), which
   `settleSend` returns to the box.
+
+## A person's picture (`picture-crop.ts`, ADR-0098)
+
+- **The crop is a value** (`Crop`: a zoom and the square's centre, in the
+  image's pixels). `fitCrop` starts with the largest centred square;
+  `moveCrop` turns a drag over the preview into image pixels, the square
+  moving against the pointer; `zoomCrop` keeps the centre; `cropSource` is
+  what `drawImage` reads. Every step goes through one clamp, which keeps the
+  zoom in [1, `MOST_ZOOM`] and the square inside the image.
+- **The browser sends `PICTURE_SIZE`** (256): the host fits anything larger
+  than `PICTURE_MOST` (512, `@pinetrie/rules`), so a picture from any client
+  is drawn from at most 512 pixels.
+- **Its words are `pictureWords`**, and the host's answer's
+  `pictureProblem`, which reads a refusal or a failure as a rename's does.
 
 ## Commands in the composer (ADR-0036)
 

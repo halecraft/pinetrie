@@ -27,6 +27,7 @@ import { describe, expect, test } from "vitest"
 import {
   readHeldIndex,
   readParticipantNames,
+  readParticipantPictures,
   readParticipants,
   readRecords,
   readReferencedBlobs,
@@ -162,6 +163,23 @@ test("readReferencedBlobs: every root's images from its record, without its docu
     images: [SHA],
   })
   expect([...readReferencedBlobs(session, [])]).toEqual([SHA])
+})
+
+test("readReferencedBlobs: a person's picture is kept from the sweep (ADR-0098)", () => {
+  const session = newSessionDoc()
+  put(session, "pinetrie.picture", ADA, SHA)
+  expect([...readReferencedBlobs(session, [])]).toEqual([SHA])
+})
+
+test("readParticipantPictures: each writer's picture, the same map while none changes", () => {
+  const session = newSessionDoc()
+  put(session, "pinetrie.picture", ADA, SHA)
+  const pictures = readParticipantPictures(session)
+  expect([...pictures]).toEqual([[ADA, SHA]])
+  put(session, "pinetrie.participant", BEA, "Bea")
+  expect(readParticipantPictures(session)).toBe(pictures)
+  put(session, "pinetrie.picture", BEA, SHA)
+  expect(readParticipantPictures(session)).not.toBe(pictures)
 })
 
 test("readHeldIndex: several roots read as one tree, kept while none changes", () => {

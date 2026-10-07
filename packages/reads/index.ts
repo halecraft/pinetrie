@@ -91,6 +91,7 @@ import {
   NAME,
   OFFER,
   PARTICIPANT,
+  PICTURE,
   PROJECT,
   PROJECT_KEY,
   participants,
@@ -430,6 +431,19 @@ export const readParticipantNames = keptWhileSame(
   (doc: SessionDocHandle): ReadonlyMap<WriterId, string> =>
     new Map(
       [...readRecords(doc, PARTICIPANT).values()].map(r => [r.writer, r.name]),
+    ),
+  sameMap,
+)
+
+/**
+ * Each writer's picture (`pinetrie.picture`, ADR-0098). The same map while
+ * the pictures are the same, as `readParticipantNames`: every circle on the
+ * page reads it.
+ */
+export const readParticipantPictures = keptWhileSame(
+  (doc: SessionDocHandle): ReadonlyMap<WriterId, Sha256> =>
+    new Map(
+      [...readRecords(doc, PICTURE).values()].map(r => [r.writer, r.sha256]),
     ),
   sameMap,
 )
@@ -777,7 +791,7 @@ export function referencedBlobs(facts: {
 /**
  * Every image something still shows (`referencedBlobs`): each root's, from
  * its directory record, so no root is opened to sweep; every card's text;
- * and every banner.
+ * every banner; and every person's picture (ADR-0098).
  */
 export const readReferencedBlobs = (
   session: SessionDocHandle,
@@ -792,6 +806,8 @@ export const readReferencedBlobs = (
   )
   for (const root of readRoots(session).values())
     for (const sha of root.images) shas.add(sha)
+  for (const picture of readRecords(session, PICTURE).values())
+    shas.add(picture.sha256)
   return shas
 }
 

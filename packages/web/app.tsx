@@ -103,6 +103,7 @@ import {
   participantsIn,
   readHeldIndex,
   readParticipantNames,
+  readParticipantPictures,
   readRoots,
 } from "@pinetrie/reads"
 import { boardOf } from "@pinetrie/rules"
@@ -133,6 +134,7 @@ import { InventoryPanel } from "./inventory-panel.tsx"
 import { OpenList } from "./open-list.tsx"
 import { Page } from "./page.tsx"
 import { TrackSeed } from "./palette-context.ts"
+import { Pictures } from "./pictures-context.ts"
 import { nameFor, presenceColors, writerOrder } from "./presence.tsx"
 import { ProfilePage } from "./profile-page.tsx"
 import { EmptyRail, LiveRail } from "./rail.tsx"
@@ -351,6 +353,7 @@ export function App({
   // Its own read, not part of the facts: every message compares `nameOf` by
   // identity, so it may change only when a name does.
   const nameOf = useSelector(doc, readParticipantNames)
+  const pictures = useSelector(doc, readParticipantPictures)
 
   // Each root, for the board and its label: its title, else its first line
   // (ADR-0045). Which roots are in your list is yours (`openList`, ADR-0085).
@@ -1142,185 +1145,193 @@ export function App({
   const pip = <CardPip color={colorOf(session.writer)} />
   const thread = threadRow({ index, labelOf, onOpen: openIn })
   return (
-    <CardHistories value={historyFacts}>
-      {listView !== null && workspace.kind !== "connecting" ? (
-        <OpenList
-          colorOf={colorOf}
-          dragOf={dragOf}
-          index={index}
-          nameOf={nameOf}
-          onIntent={onIntent}
-          order={order}
-          session={session}
-          view={listView}
-          width={listWidth}
-        />
-      ) : (
-        <nav aria-label="your threads" id="open-list" />
-      )}
-      {inventoryOpen && (
-        <InventoryPanel
-          colorOf={colorOf}
-          column={lastColumnKey}
-          dock={dock}
-          held={held}
-          intents={intents}
-          onDock={d => setDock(stores.dock.save(d))}
-          onIntent={onIntent}
-          reader={{ me: session.writer, nameOf }}
-          refusals={moves.refusals.filter(r => r.actedAt.kind === "inventory")}
-          selected={selected}
-          session={session}
-          slots={slots}
-        />
-      )}
-      {/* Under a page the workspace stays mounted and laid out, only inert
+    <Pictures value={pictures}>
+      <CardHistories value={historyFacts}>
+        {listView !== null && workspace.kind !== "connecting" ? (
+          <OpenList
+            colorOf={colorOf}
+            dragOf={dragOf}
+            index={index}
+            nameOf={nameOf}
+            onIntent={onIntent}
+            order={order}
+            session={session}
+            view={listView}
+            width={listWidth}
+          />
+        ) : (
+          <nav aria-label="your threads" id="open-list" />
+        )}
+        {inventoryOpen && (
+          <InventoryPanel
+            colorOf={colorOf}
+            column={lastColumnKey}
+            dock={dock}
+            held={held}
+            intents={intents}
+            onDock={d => setDock(stores.dock.save(d))}
+            onIntent={onIntent}
+            reader={{ me: session.writer, nameOf }}
+            refusals={moves.refusals.filter(
+              r => r.actedAt.kind === "inventory",
+            )}
+            selected={selected}
+            session={session}
+            slots={slots}
+          />
+        )}
+        {/* Under a page the workspace stays mounted and laid out, only inert
           (ADR-0098). Remounted, its columns would lose their scroll; with
           `display: none`, `useStripNarrow` would measure the strip at 0 and
           turn an open pane into a modal dialog over the page. */}
-      <main
-        aria-hidden={page !== null || undefined}
-        id="workspace"
-        inert={page !== null}
-      >
-        {/* What the workspace's columns draw by (ADR-0087, ADR-0089): the
+        <main
+          aria-hidden={page !== null || undefined}
+          id="workspace"
+          inert={page !== null}
+        >
+          {/* What the workspace's columns draw by (ADR-0087, ADR-0089): the
             root's colours, whether the pane covers the page, how you read a
             review. Each changes rarely, and only its readers redraw. */}
-        <TrackSeed value={seed}>
-          <NarrowContext value={narrow}>
-            <ReviewPrefsContext value={reviewReach}>
-              {listView === null || workspace.kind === "connecting" ? (
-                <p className="connecting">connecting…</p>
-              ) : workspace.kind === "nothing" ? (
-                <p className="nothing-here">
-                  Open a thread from the board, or start one with ＋.
-                </p>
-              ) : (
-                <>
-                  {workspace.kind === "root" ? (
-                    <LiveRail
-                      activity={activity}
-                      asks={asks}
-                      digests={digests}
-                      revisions={workFacts.revisions}
-                      colorOf={colorOf}
-                      ends={ends}
-                      index={index}
-                      names={nameOf}
-                      onPick={openAt}
-                      open={shown}
-                      rows={rail}
-                      session={session}
-                      viewports={viewports}
-                      yours={yours}
-                    />
-                  ) : (
-                    <EmptyRail />
-                  )}
-                  {/* A column's header is its drag handle; its grip is the
+          <TrackSeed value={seed}>
+            <NarrowContext value={narrow}>
+              <ReviewPrefsContext value={reviewReach}>
+                {listView === null || workspace.kind === "connecting" ? (
+                  <p className="connecting">connecting…</p>
+                ) : workspace.kind === "nothing" ? (
+                  <p className="nothing-here">
+                    Open a thread from the board, or start one with ＋.
+                  </p>
+                ) : (
+                  <>
+                    {workspace.kind === "root" ? (
+                      <LiveRail
+                        activity={activity}
+                        asks={asks}
+                        digests={digests}
+                        revisions={workFacts.revisions}
+                        colorOf={colorOf}
+                        ends={ends}
+                        index={index}
+                        names={nameOf}
+                        onPick={openAt}
+                        open={shown}
+                        rows={rail}
+                        session={session}
+                        viewports={viewports}
+                        yours={yours}
+                      />
+                    ) : (
+                      <EmptyRail />
+                    )}
+                    {/* A column's header is its drag handle; its grip is the
                   keyboard's way to move it. */}
-                  <div id="strip" onPointerDown={dragColumn} ref={strip}>
-                    {workspace.slots.map(slot => {
-                      const column = columns[slot.position]
-                      const columnView = views[slot.position]
-                      if (column === undefined || columnView === undefined)
-                        return null
-                      return (
-                        <Column
-                          {...shared}
-                          closable={slot.closable}
-                          column={column}
-                          count={workspace.slots.length}
-                          landmarks={landmarks}
-                          seenEnd={seenEnds}
-                          forks={colors.forks}
-                          key={slot.key}
-                          onIntent={onIntent}
-                          onTyping={card => typing(columnView.tipId, card)}
-                          path={paths[slot.position] ?? new Set()}
-                          position={slot.position}
-                          readOnly={
-                            workspace.kind === "root"
-                              ? workspace.readOnly
-                              : null
-                          }
-                          shown={shown}
-                          track={slot.track}
-                          view={columnView}
-                        />
-                      )
-                    })}
-                  </div>
-                </>
-              )}
-              {layout.board && boardShown !== null && (
-                <Board
-                  mine={boardMine}
-                  onIntent={onIntent}
-                  onMine={setBoardMine}
-                  onQuery={setBoardQuery}
-                  pip={pip}
-                  query={boardQuery}
-                  readers={readers}
-                  thread={(end, root) => thread(end, end, root)}
-                  view={boardShown}
-                />
-              )}
-            </ReviewPrefsContext>
-          </NarrowContext>
-        </TrackSeed>
-      </main>
-      {page !== null && (
-        <Page onBack={() => onIntent({ kind: "page", to: null })} page={page}>
-          {page === "profile" && (
-            <ProfilePage
-              email={session.principal}
-              nameOf={nameOf}
-              rename={name => session.request({ kind: "name", name })}
-              writer={session.writer}
+                    <div id="strip" onPointerDown={dragColumn} ref={strip}>
+                      {workspace.slots.map(slot => {
+                        const column = columns[slot.position]
+                        const columnView = views[slot.position]
+                        if (column === undefined || columnView === undefined)
+                          return null
+                        return (
+                          <Column
+                            {...shared}
+                            closable={slot.closable}
+                            column={column}
+                            count={workspace.slots.length}
+                            landmarks={landmarks}
+                            seenEnd={seenEnds}
+                            forks={colors.forks}
+                            key={slot.key}
+                            onIntent={onIntent}
+                            onTyping={card => typing(columnView.tipId, card)}
+                            path={paths[slot.position] ?? new Set()}
+                            position={slot.position}
+                            readOnly={
+                              workspace.kind === "root"
+                                ? workspace.readOnly
+                                : null
+                            }
+                            shown={shown}
+                            track={slot.track}
+                            view={columnView}
+                          />
+                        )
+                      })}
+                    </div>
+                  </>
+                )}
+                {layout.board && boardShown !== null && (
+                  <Board
+                    mine={boardMine}
+                    onIntent={onIntent}
+                    onMine={setBoardMine}
+                    onQuery={setBoardQuery}
+                    pip={pip}
+                    query={boardQuery}
+                    readers={readers}
+                    thread={(end, root) => thread(end, end, root)}
+                    view={boardShown}
+                  />
+                )}
+              </ReviewPrefsContext>
+            </NarrowContext>
+          </TrackSeed>
+        </main>
+        {page !== null && (
+          <Page onBack={() => onIntent({ kind: "page", to: null })} page={page}>
+            {page === "profile" && (
+              <ProfilePage
+                email={session.principal}
+                nameOf={nameOf}
+                colorOf={colorOf}
+                rename={name => session.request({ kind: "name", name })}
+                setPicture={sha256 =>
+                  session.request({ kind: "picture", sha256 })
+                }
+                writer={session.writer}
+              />
+            )}
+          </Page>
+        )}
+        <Footer
+          syncing={status === "pending"}
+          strip={
+            <BoardStrip
+              count={count}
+              elsewhere={attention.elsewhere}
+              onIntent={onIntent}
+              open={layout.board}
+              pip={unsent.elsewhere ? pip : null}
+              readers={readers}
+              view={boardShown}
             />
-          )}
-        </Page>
-      )}
-      <Footer
-        syncing={status === "pending"}
-        strip={
-          <BoardStrip
-            count={count}
-            elsewhere={attention.elsewhere}
-            onIntent={onIntent}
-            open={layout.board}
-            pip={unsent.elsewhere ? pip : null}
-            readers={readers}
-            view={boardShown}
-          />
-        }
-        colorOf={colorOf}
-        nameOf={nameOf}
-        inbox={{
-          attention: attention.items,
-          count: needsYou,
-          mentions,
-          inbox,
-          thread,
-          names: workFacts.names,
-          labelOf,
-          nameOf,
-          onOpen: openIn,
-          onIntent,
-        }}
-        line={workFacts.line}
-        project={workFacts.project}
-        onIntent={onIntent}
-        me={{ writer: session.writer, email: session.principal }}
-        session={session}
-        inventory={{
-          open: inventoryOpen,
-          count: held.length,
-          onToggle: () => setInventoryOpen(open => !open),
-        }}
-        folded={listWidth === "icons"}
-      />
-    </CardHistories>
+          }
+          colorOf={colorOf}
+          nameOf={nameOf}
+          inbox={{
+            attention: attention.items,
+            count: needsYou,
+            mentions,
+            inbox,
+            thread,
+            names: workFacts.names,
+            labelOf,
+            nameOf,
+            onOpen: openIn,
+            onIntent,
+          }}
+          line={workFacts.line}
+          project={workFacts.project}
+          onIntent={onIntent}
+          me={{ writer: session.writer, email: session.principal }}
+          session={session}
+          inventory={{
+            open: inventoryOpen,
+            count: held.length,
+            onToggle: () => setInventoryOpen(open => !open),
+          }}
+          folded={listWidth === "icons"}
+        />
+      </CardHistories>
+    </Pictures>
   )
 }

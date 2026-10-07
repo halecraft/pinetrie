@@ -2,6 +2,7 @@
 // in the column's pane, as a table is (ADR-0078), and a tool's image, drawn
 // in its row, which opens capped (ADR-0051).
 
+import { writerId } from "@pinetrie/core"
 import { UPLOADING } from "@pinetrie/interface"
 import { scriptedModel, sha256Of } from "@pinetrie/pi"
 import type { Page } from "@playwright/test"
@@ -21,6 +22,7 @@ import {
   chooseFromMenu,
   col,
   launchBrowser,
+  openProfile,
   PANE_VIEWPORT,
   readRaw,
 } from "./page.ts"
@@ -308,6 +310,48 @@ async function run(check: Checks["check"]): Promise<void> {
             covers.hit &&
             back,
           `${JSON.stringify(covers)}, focus back ${back}`,
+        )
+        // Pia's picture (ADR-0098): chosen on her profile page, cropped to a
+        // square in the browser and sent at 256, then drawn in her circle in
+        // Quinn's window, where she reads the thread he has open.
+        await openProfile(pp)
+        await pp.setInputFiles(".picture-file", {
+          name: "me.png",
+          mimeType: "image/png",
+          buffer: greyPng(300, 200),
+        })
+        await pp.click(".picture-use", { timeout: 5_000 }).catch(() => {})
+        const took = await pp
+          .waitForSelector(".picture-crop", {
+            state: "detached",
+            timeout: 15_000,
+          })
+          .then(
+            () => true,
+            () => false,
+          )
+        await pp.click(".page-back").catch(() => {})
+        const pictured = await qp
+          .waitForFunction(
+            sel => {
+              const img = document.querySelector(sel)
+              return img instanceof HTMLImageElement &&
+                img.complete &&
+                img.naturalWidth > 0
+                ? [img.naturalWidth, img.naturalHeight]
+                : null
+            },
+            `.avatar[data-writer="${writerId("pia@browser.test")}"] img`,
+            { timeout: 15_000 },
+          )
+          .then(
+            h => h.jsonValue(),
+            () => null,
+          )
+        check(
+          "a picture set on the profile page shows on your avatar in another person's window",
+          took && JSON.stringify(pictured) === JSON.stringify([256, 256]),
+          `set ${took}, drawn ${JSON.stringify(pictured)}`,
         )
       } finally {
         await pp.context().close()

@@ -31,17 +31,28 @@ export type PreparedImage =
     }
   | { readonly ok: false; readonly reason: "not an image" | "unreadable" }
 
+/** The box an image is fitted within, in pixels, its ratio kept. */
+export interface ImageFit {
+  readonly maxWidth: number
+  readonly maxHeight: number
+}
+
 /**
  * `bytes` as the store keeps them: the type read from the bytes, never
- * declared, and the image fitted to 2000×2000 and 4.5 MB of base64, which
- * Anthropic accepts inline (its limit is 5 MB). pi's resize returns null both for bytes it
- * cannot decode and for an image nothing fits (S53), hence one reason for both.
+ * declared, and the image fitted to `fit`, else pi's default of 2000×2000,
+ * and 4.5 MB of base64, which Anthropic accepts inline (its limit is 5 MB).
+ * A person's picture is fitted smaller (ADR-0098). pi's resize returns null
+ * both for bytes it cannot decode and for an image nothing fits (S53), hence
+ * one reason for both.
  */
-export async function prepareImage(bytes: Uint8Array): Promise<PreparedImage> {
+export async function prepareImage(
+  bytes: Uint8Array,
+  fit?: ImageFit,
+): Promise<PreparedImage> {
   const sniffed = detectSupportedImageMimeType(bytes)
   if (sniffed === null || !isImageMime(sniffed))
     return { ok: false, reason: "not an image" }
-  const resized = await resizeImage(bytes, sniffed)
+  const resized = await resizeImage(bytes, sniffed, fit)
   if (resized === null) return { ok: false, reason: "unreadable" }
   // A resize gives PNG or JPEG, or the input's own type: never another.
   const mimeType = resized.mimeType

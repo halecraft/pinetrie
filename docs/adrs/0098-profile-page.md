@@ -1,8 +1,8 @@
 # ADR-0098 — Your avatar opens a menu, your profile is a page in the workspace's place, and a person may have a picture
 
-**Status:** Proposed (Duane, 2026-10-06). Implemented in two steps:
+**Status:** Accepted (Duane, 2026-10-07). Implemented in two steps:
 `PLAN-2026-10-07-account-corner` (the corner, the menu and the profile
-page; built), then `PLAN-2026-10-07-person-pictures` (pictures). Amends ADR-0037 (you
+page), then `PLAN-2026-10-07-person-pictures` (pictures); both built. Amends ADR-0037 (you
 rename yourself on your profile page), ADR-0042 (a person's picture is a
 blob the sweep keeps), ADR-0085 (the footer's corner), ADR-0088 (folded, the
 corner's avatar carries the inbox's badge, and the inventory's toggle is in
@@ -111,8 +111,11 @@ it is in the account menu).
   change and no migration.
 - **Set by a `picture` command** carrying a SHA-256, or `null` to remove it,
   for the sender's own writer only, as `name` is (ADR-0037). The host
-  refuses a blob it does not hold, or one larger than 512×512, which it
-  reads from the blob's stored dimensions without reading its bytes.
+  refuses a blob it does not hold. One larger than 512×512, which it tells
+  from the blob's stored dimensions without reading its bytes, it fits
+  within that by pi's resize, as an upload is fitted (ADR-0042), keeps as
+  a blob of its own, and sets that. No client's picture is refused for its
+  size, and none is drawn from more than 512 pixels.
 - **The blob sweep counts a picture as a reference.** An upload whose
   picture is never set is swept after the grace period, like an image
   pasted and deleted.

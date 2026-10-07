@@ -183,4 +183,12 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "readRecords keeps its map while its namespace is unchanged",
   },
+  {
+    name: "the sweep deletes people's pictures",
+    file: "packages/reads/index.ts",
+    from: "  for (const picture of readRecords(session, PICTURE).values())\n    shas.add(picture.sha256)\n",
+    to: "",
+    command: unit,
+    expect: "a person's picture is kept from the sweep",
+  },
 ]

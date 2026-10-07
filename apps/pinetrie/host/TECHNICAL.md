@@ -393,6 +393,15 @@ rejects `shutdown()`.
   drain does too, around each pop (`queued-card-pop.ts`), with `popNextQueuedCard` still
   synchronous (S69). The presence it reads is `readReading`'s pairs: a
   placer with a column open at the card's end saw it go.
+- **`picture` sets the sender's picture** (`commands/picture.ts`,
+  ADR-0098): `planPicture` over the blob's reference, read without its
+  bytes. A picture wider or taller than `PICTURE_MOST` is fitted by
+  `fitImage` (`prepareImage` with a 512 box, `@pinetrie/pi`), kept as a
+  blob of its own, and that copy is set; the original is left to the sweep,
+  which keeps only pictures that are set (`readReferencedBlobs`). The fit
+  runs inside the command's keeper step: an upload is already fitted to
+  2000×2000, so it takes milliseconds, and the browser's 256 picture is
+  never fitted at all.
 - **`traces-seen` deletes the sender's own traces**, ignoring any other
   id, and answers `seen`. A client sends it for the traces a column drew.
 - **`undo-move` undoes or redoes the sender's newest move in a root**

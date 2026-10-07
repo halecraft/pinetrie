@@ -3018,4 +3018,21 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a page over the workspace names the window, not the root under it",
   },
+  {
+    name: "a drag moves a picture's crop past the image's edge",
+    file: "packages/interface/picture-crop.ts",
+    from: "  return clamp(\n    { ...crop, x: crop.x - dx * scale, y: crop.y - dy * scale },\n    image,\n  )",
+    to: "  return { ...crop, x: crop.x - dx * scale, y: crop.y - dy * scale }",
+    command: unit,
+    expect:
+      "a drag moves the square against the pointer, and stops at the image's edge",
+  },
+  {
+    name: "the browser sends a picture the host must fit",
+    file: "packages/interface/picture-crop.ts",
+    from: "export const PICTURE_SIZE = 256",
+    to: "export const PICTURE_SIZE = 1024",
+    command: unit,
+    expect: "the browser's picture is never one the host must fit",
+  },
 ]

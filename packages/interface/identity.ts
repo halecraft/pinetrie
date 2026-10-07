@@ -96,6 +96,13 @@ export function renameProblem(
   }
 }
 
+/**
+ * What the profile page says of the host's answer to a picture (ADR-0098):
+ * a refusal's reason or a failure, as for a rename; null when it took.
+ */
+export const pictureProblem = (outcome: Outcome): string | null =>
+  renameProblem(outcome)?.message ?? null
+
 /** The handle a typed name gives you, or null when the name is refused. */
 export function nameHint(draft: string): string | null {
   const name = normalizeName(draft)

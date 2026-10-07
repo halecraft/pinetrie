@@ -32,6 +32,7 @@ import {
   NAME,
   OFFER,
   PARTICIPANT,
+  PICTURE,
   PROJECT,
   QUEUE_HOLD,
   RECORD_SPECS,
@@ -144,6 +145,12 @@ const SAMPLES: readonly Sample[] = [
     "peer",
   ),
   sample("participant", PARTICIPANT, { writer: ADA, name: "Ada" }, "writer"),
+  sample(
+    "picture",
+    PICTURE,
+    { writer: ADA, sha256: "b".repeat(64) as Sha256 },
+    "writer",
+  ),
   sample(
     "lane",
     LANE,
@@ -358,6 +365,7 @@ test("each record lives where it is read (ADR-0063): across roots in the session
     digest: "root",
     seat: "session",
     participant: "session",
+    picture: "session",
     lane: "session",
     revision: "root",
     offer: "session",

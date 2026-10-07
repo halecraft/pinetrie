@@ -245,7 +245,15 @@ export {
   offerView,
 } from "./offer-view.ts"
 export { keyAfter, orderAfter, orderBetween, orderKeys } from "./order.ts"
-export { displayName, PARTICIPANT, participants } from "./participant.ts"
+export {
+  displayName,
+  PARTICIPANT,
+  PICTURE,
+  PICTURE_MOST,
+  participants,
+  pictureWrites,
+  planPicture,
+} from "./participant.ts"
 export {
   decodePinned,
   encodePinned,

@@ -135,7 +135,7 @@ function planTeardown(
 
 /**
  * The roots a command writes in (ADR-0063), none for a new thread at the
- * root, a name, a stop, a move on the board or a change to its states, a reservation, a card's command,
+ * root, a name, a picture, a stop, a move on the board or a change to its states, a reservation, a card's command,
  * or a card's move into an inventory, or its removal. An offer acts in its
  * lane's root, and so does a carry-on; a move in each root its cards go to;
  * an undo of moves and a retitle in their root (ADR-0066, ADR-0074).
@@ -171,6 +171,7 @@ export function writesIn(
         to === null || to.kind === "inventory" ? [] : [to.root],
       )
     case "name":
+    case "picture":
     case "stop":
     // The board is the session's: a move into or out of the closed state
     // writes in no root, so a closed root can be reopened.
