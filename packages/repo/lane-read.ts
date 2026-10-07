@@ -221,12 +221,12 @@ export function planLaneRead(
       source: parsed.commit,
     }
   } else {
-    const line = rows.find(r => r.newestAccepted)
-    if (line === undefined) return { kind: "none" }
+    const newest = rows.find(r => r.newestAccepted)
+    if (newest === undefined) return { kind: "none" }
     base = {
       base: { kind: "accepted" },
-      start: line.commit,
-      source: line.commit,
+      start: newest.commit,
+      source: newest.commit,
     }
   }
   const untraced = rows.filter(r => r.untraced && !r.underBase)

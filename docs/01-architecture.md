@@ -118,7 +118,7 @@ packages/     libraries; their boundaries are enforced by resolution
   reads/         @pinetrie/reads        document reads shared by the host and the client
   lanes/         @pinetrie/lanes        a lane's container and disk, and jj and git in it (TECHNICAL.md)
   keeper/        @pinetrie/keeper       declares NOTHING; one step at a time on a resource (TECHNICAL.md)
-  repo/          @pinetrie/repo         your repo: reads, steps, the owner; offers, the line, lanes' refs (TECHNICAL.md)
+  repo/          @pinetrie/repo         your repo: reads, steps, the owner; offers, accepted work, lanes' refs (TECHNICAL.md)
   session/       @pinetrie/session      one client's connection to a host; no React (TECHNICAL.md)
   interface/     @pinetrie/interface    what a person sees and does, for any client; no React, no DOM (ADR-0093)
   web/           @pinetrie/web          the browser page: React and the DOM; owns its Vite build
@@ -202,7 +202,7 @@ where agent work is first wanted there, never moved, never written while it
 runs (ADR-0020). Threads run concurrently. Decisions are pure (`planChat`,
 `planArchive` and the rest in `@pinetrie/rules`, over facts read by `@pinetrie/reads`);
 the host gathers, plans and executes each command in one serial step. A
-decision that acts on your repo (an offer, the line) is a value typed in
+decision that acts on your repo (an offer, accepted work) is a value typed in
 `@pinetrie/core`, decided by `@pinetrie/rules` from facts `@pinetrie/repo`
 reads, and carried out by `@pinetrie/repo`'s steps: the two packages never
 import each other, and the host only connects them.

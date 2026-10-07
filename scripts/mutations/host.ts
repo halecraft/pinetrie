@@ -253,8 +253,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "accepted work's preview runs no git",
     file: "packages/repo/owner.ts",
-    from: "      kept = await readShared(op, runnerFor(root, { at: op }), git, line)",
-    to: '      kept = await readShared(op, runnerFor(root, { at: op }), async () => ({ ok: false, code: 1, stdout: "", stderr: "" }), line)',
+    from: "      kept = await readShared(op, runnerFor(root, { at: op }), git, repoConfig)",
+    to: '      kept = await readShared(op, runnerFor(root, { at: op }), async () => ({ ok: false, code: 1, stdout: "", stderr: "" }), repoConfig)',
     suite: "lanes",
     scenario: "main",
     expect:

@@ -54,7 +54,7 @@ const readName = (key: TrailerKey): string =>
   `${READ}${TRAILERS[key].slice(WRITTEN.length)}`
 
 /** A line `<key>: <value>` of each key, under any name `READ` matches. */
-const ACCEPTED = Object.fromEntries(
+const TRAILER_LINE = Object.fromEntries(
   (Object.keys(TRAILERS) as TrailerKey[]).map(k => [
     k,
     new RegExp(`^${readName(k)}: (.*)$`),
@@ -63,7 +63,7 @@ const ACCEPTED = Object.fromEntries(
 
 /** What follows `<key>: ` on `line`, as written; undefined when `line` is not that trailer. */
 const valueOn = (line: string, key: TrailerKey): string | undefined =>
-  ACCEPTED[key].exec(line)?.[1]
+  TRAILER_LINE[key].exec(line)?.[1]
 
 /**
  * Every value of trailer `key` in a message, from every paragraph, in order.
@@ -106,7 +106,7 @@ export const hasTrailer = (
 function ourLastParagraph(text: string): number | null {
   const cut = text.lastIndexOf("\n\n")
   if (cut < 0) return null
-  const ours = Object.values(ACCEPTED)
+  const ours = Object.values(TRAILER_LINE)
   return text
     .slice(cut + 2)
     .split("\n")

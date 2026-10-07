@@ -32,7 +32,7 @@ export interface Fingerprint {
 }
 
 /**
- * `all`: accepted work or a WIP moved, or this is the first observation. `acceptedBookmark`:
+ * `all`: accepted work or a WIP moved, or this is the first observation. `acceptedMoved`:
  * accepted work's bookmark moved since an earlier observation, which the base
  * snapshot follows (ADR-0090); never on the first, since startup reads the
  * base itself. `line`: the publish bookmark moved, which changes only the
@@ -42,7 +42,7 @@ export interface Fingerprint {
  */
 export interface Moved {
   readonly all: boolean
-  readonly acceptedBookmark: boolean
+  readonly acceptedMoved: boolean
   readonly published: boolean
   readonly yours: boolean
   readonly lanes: ReadonlySet<LaneName>
@@ -126,7 +126,7 @@ export function planObserve(
   const offers = new Set<ThreadName>()
   let all = prev === null
   let published = false
-  let acceptedBookmark = false
+  let acceptedMoved = false
   const names = new Set([
     ...(prev?.bookmarks.keys() ?? []),
     ...next.bookmarks.keys(),
@@ -144,12 +144,12 @@ export function planObserve(
     else if (watchedLocal(name, repoConfig)) {
       all = true
       if (name === repoConfig.acceptedBookmark && prev !== null)
-        acceptedBookmark = true
+        acceptedMoved = true
     }
   }
   return {
     all,
-    acceptedBookmark,
+    acceptedMoved,
     published: published,
     yours: prev === null || prev.at !== next.at,
     lanes,

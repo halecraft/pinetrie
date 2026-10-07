@@ -112,7 +112,7 @@ export async function startLaneWork(input: {
   // The base snapshot follows accepted work, however it moved: setup, an accept,
   // a publish, or jj outside pine·trie (ADR-0090).
   owner?.onMoved(moved => {
-    if (moved.acceptedBookmark) setup.refreshBaseSoon()
+    if (moved.acceptedMoved) setup.refreshBaseSoon()
   })
   /** Each lane's offer in your repo (ADR-0038); none without lanes of their own. */
   const offers: Offers | null =

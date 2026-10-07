@@ -350,7 +350,7 @@ describe("planObserve: what moved between two fingerprints", () => {
   }
   const none = {
     all: false,
-    acceptedBookmark: false,
+    acceptedMoved: false,
     published: false,
     yours: false,
     lanes: new Set(),
@@ -361,7 +361,7 @@ describe("planObserve: what moved between two fingerprints", () => {
     [
       "accepted work moved: the base snapshot follows it (ADR-0090)",
       fp({ ...base, "pinetrie-accepted": "c9" }),
-      { ...none, all: true, acceptedBookmark: true },
+      { ...none, all: true, acceptedMoved: true },
     ],
     ["a WIP moved", fp({ ...base, "wip/a": "c9" }), { ...none, all: true }],
     ["a WIP appeared", fp({ ...base, "wip/b": "c9" }), { ...none, all: true }],
@@ -403,9 +403,7 @@ describe("planObserve: what moved between two fingerprints", () => {
     expect(planObserve(null, fp({}), DEFAULT_REPO).all).toBe(true)
   })
   test("the first observation is not accepted work moving: startup reads the base itself", () => {
-    expect(planObserve(null, fp(base), DEFAULT_REPO).acceptedBookmark).toBe(
-      false,
-    )
+    expect(planObserve(null, fp(base), DEFAULT_REPO).acceptedMoved).toBe(false)
   })
   test("a bookmark of yours outside accepted work, the WIPs, the publish bookmark, the offers and the lanes' remotes is not read", () => {
     const stdout = [

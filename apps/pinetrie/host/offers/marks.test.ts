@@ -21,7 +21,7 @@ describe("planMarks: what a move the owner observed refreshes", () => {
   const archived = new Set([D])
   const moved = (over: Partial<Moved> = {}): Moved => ({
     all: false,
-    acceptedBookmark: false,
+    acceptedMoved: false,
     published: false,
     yours: false,
     lanes: new Set(),

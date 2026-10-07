@@ -102,7 +102,7 @@ export function startRepoOwner(input: {
   /** How often the heads are listed without an event; default 5 s. */
   readonly backstopMs?: number
 }): RepoOwner {
-  const { root, repoConfig: line } = input
+  const { root, repoConfig } = input
   const keeper = createKeeper<RepoKey>({
     ...(input.onError === undefined ? {} : { onError: input.onError }),
     ...(input.onSlow === undefined ? {} : { onSlow: input.onSlow }),
@@ -130,11 +130,11 @@ export function startRepoOwner(input: {
     if (!ran.ok) throw new Error(`jj op log failed: ${ran.stderr.trim()}`)
     const op = ran.stdout.trim()
     if (op === seen?.op) return
-    const read = await runnerFor(root, { at: op })(fingerprintRead(line))
+    const read = await runnerFor(root, { at: op })(fingerprintRead(repoConfig))
     if (!read.ok)
       throw new Error(`reading what moved failed: ${read.stderr.trim()}`)
-    const next = parseFingerprint(op, read.stdout, line)
-    const moved = planObserve(seen, next, line)
+    const next = parseFingerprint(op, read.stdout, repoConfig)
+    const moved = planObserve(seen, next, repoConfig)
     seen = next
     first.resolve()
     for (const listener of listeners) listener(moved)
@@ -154,7 +154,7 @@ export function startRepoOwner(input: {
     const op = seen?.op
     if (op === undefined) throw new Error("your repo has no operation to read")
     if (kept?.op !== op)
-      kept = await readShared(op, runnerFor(root, { at: op }), git, line)
+      kept = await readShared(op, runnerFor(root, { at: op }), git, repoConfig)
     return kept
   }
 
@@ -241,7 +241,7 @@ export function startRepoOwner(input: {
           if (listeners.has(listener))
             listener({
               all: true,
-              acceptedBookmark: false,
+              acceptedMoved: false,
               published: true,
               yours: true,
               lanes: new Set(),

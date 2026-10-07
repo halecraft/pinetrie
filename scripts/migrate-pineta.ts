@@ -476,12 +476,12 @@ async function main(given: string | undefined): Promise<void> {
       root,
       false,
     )
-    const { repoConfig: line } = repoConfig(user.repo, own.repo)
-    const owner = startRepoOwner({ root, repoConfig: line })
+    const { repoConfig: names } = repoConfig(user.repo, own.repo)
+    const owner = startRepoOwner({ root, repoConfig: names })
     try {
       const steps = await owner.command(async ops => {
-        const facts = await gatherRepo(ops.jj, ops.git, line)
-        const planned = planRepo(facts, line)
+        const facts = await gatherRepo(ops.jj, ops.git, names)
+        const planned = planRepo(facts, names)
         await ops.execute(planned)
         for (const o of facts.offers)
           say(

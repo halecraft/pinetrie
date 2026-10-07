@@ -148,19 +148,19 @@ async function placeOf(
   readonly base: BaseRecord
   readonly work: WorkChanges
 } | null> {
-  const { repoConfig: line, lane } = input
+  const { repoConfig, lane } = input
   const tip = await laneTipIn(jj, lane)
   if (tip === null) return null
-  const base = await laneBase(jj, tip, line)
+  const base = await laneBase(jj, tip, repoConfig)
   if (base === null) return null
-  const state = await readWipState(jj, line, base)
+  const state = await readWipState(jj, repoConfig, base)
   const target =
     base.base.kind === "wip" && state === "ok"
       ? await commitOf(jj, base.base.bookmark)
       : state === "gone"
         ? null
-        : await commitOf(jj, line.acceptedBookmark)
-  const start = await startOfOffer(jj, { tip, base, repoConfig: line, lane })
+        : await commitOf(jj, repoConfig.acceptedBookmark)
+  const start = await startOfOffer(jj, { tip, base, repoConfig, lane })
   const catchUp =
     target === null
       ? null
@@ -219,10 +219,10 @@ export async function gatherRefresh(
   input: OfferInput & { readonly archived: boolean },
 ): Promise<RefreshGather> {
   const { jj } = ops
-  const { lane, name, repoConfig: line } = input
+  const { lane, name, repoConfig } = input
   if (name === undefined) return { kind: "none" }
   if (input.archived) {
-    const target = `present(${revsetName(line.acceptedBookmark)})`
+    const target = `present(${revsetName(repoConfig.acceptedBookmark)})`
     const offer = await readOffer(jj, { name, target })
     return {
       kind: "plan",
@@ -234,7 +234,7 @@ export async function gatherRefresh(
   const gathered = await gatherLane(jj, {
     lane,
     name,
-    repoConfig: line,
+    repoConfig,
     shared: await ops.shared(),
     known: input.known,
   })

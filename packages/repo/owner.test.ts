@@ -124,7 +124,7 @@ describe("the owner of your repo", () => {
     await owner.idle()
     expect(moves.at(-1)).toEqual({
       all: false,
-      acceptedBookmark: false,
+      acceptedMoved: false,
       published: true,
       yours: false,
       lanes: new Set(),
@@ -152,7 +152,7 @@ describe("the owner of your repo", () => {
     await owner.idle()
     expect(moves.at(-1)).toEqual({
       all: false,
-      acceptedBookmark: false,
+      acceptedMoved: false,
       published: false,
       yours: false,
       lanes: new Set(),
