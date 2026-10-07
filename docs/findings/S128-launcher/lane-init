@@ -1,0 +1,77 @@
+#!/bin/sh
+# S128 probe (from S127's): PID 1 of the lane VM, under pine·trie's own
+# launcher. Also mounts the share "extra" (swapped while the VM runs), checks
+# Docker without its CLI, and gives socat a long timeout after an EOF.
+# S127: mounts the data disk with user_subvol_rm_allowed and loads tun.
+# Like S126's, it mounts, loads drivers, starts dockerd and
+# exposes it on vsock 2375, and a shell on vsock 2376 for the host's commands.
+# The kernel command line picks how the root is held:
+#   lane.root=ramdisk  stay on the initramfs; runc must not pivot_root
+#   lane.root=tmpfs    copy the initramfs into a tmpfs and switch to it
+#   lane.root=disk     already switched by stage 1 onto a read-only image
+# lane.data=/dev/vdX names the data disk (btrfs: Docker and lane subvolumes).
+export PATH=/usr/sbin:/usr/bin:/sbin:/bin
+mountpoint -q /proc || mount -t proc proc /proc
+mountpoint -q /sys || mount -t sysfs sys /sys
+mountpoint -q /dev || mount -t devtmpfs dev /dev
+t() { echo "T+$(cut -d' ' -f1 /proc/uptime) $*" > /dev/hvc0; }
+arg() { sed -n "s/.*$1=\([^ ]*\).*/\1/p" /proc/cmdline; }
+exec > /dev/hvc0 2>&1
+mode=$(arg lane.root); data=$(arg lane.data)
+t "init started (root: $mode)"
+
+if [ "$mode" = tmpfs ] && [ ! -e /.on-tmpfs ]; then
+  mkdir -p /newroot && mount -t tmpfs -o size=2g tmpfs /newroot
+  tar -C / -cf - --exclude=./proc --exclude=./sys --exclude=./dev --exclude=./newroot . | tar -C /newroot -xf -
+  touch /newroot/.on-tmpfs
+  mkdir -p /newroot/proc /newroot/sys /newroot/dev
+  t "root copied to tmpfs"
+  mount --move /dev /newroot/dev; mount --move /proc /newroot/proc; mount --move /sys /newroot/sys
+  exec switch_root /newroot /init
+fi
+[ "$mode" = ramdisk ] && export DOCKER_RAMDISK=true
+
+mkdir -p /dev/pts /dev/shm /run /tmp /var/lib/lanehost /mnt/host-working-copy
+mount -t devpts devpts /dev/pts
+mount -t tmpfs tmpfs /dev/shm
+mount -t tmpfs tmpfs /run
+mount -t tmpfs tmpfs /tmp
+mount -t cgroup2 cgroup2 /sys/fs/cgroup
+
+for f in /sys/bus/*/devices/*/modalias; do modprobe -q "$(cat "$f")" 2>/dev/null; done
+modprobe -a vsock vmw_vsock_virtio_transport virtiofs overlay btrfs bridge veth br_netfilter tun 2>/dev/null
+# No udev here: the kernel makes /dev/net/tun 0600; udev would make it 0666,
+# which a rootless Docker in a lane needs for its network (S127 run 1).
+chmod 666 /dev/net/tun
+t "drivers loaded"
+
+if ! mount -t btrfs -o user_subvol_rm_allowed "$data" /var/lib/lanehost 2>/dev/null; then
+  mkfs.btrfs -q -f "$data" && mount -t btrfs -o user_subvol_rm_allowed "$data" /var/lib/lanehost
+  t "data disk formatted btrfs (first boot)"
+fi
+mkdir -p /var/lib/lanehost/docker /var/lib/lanehost/lanes
+mount -t virtiofs -o ro repo /mnt/host-working-copy && t "working copy mounted"
+mkdir -p /mnt/extra && mount -t virtiofs extra /mnt/extra && t "extra share mounted"
+t "disks mounted"
+
+hostname lanes
+ip link set lo up
+ip link set eth0 up
+(udhcpc -i eth0 -q -f -n -t 20 -T 1 >/dev/null 2>&1 && t "network up: $(ip -4 -br addr show eth0)") &
+
+dockerd --host unix:///var/run/docker.sock --data-root /var/lib/lanehost/docker > /run/dockerd.log 2>&1 &
+# -t: after one side ends, wait an hour for the other, not socat's 0.5 s, so
+# `docker run -i` keeps its output after its input ends.
+socat -t 3600 VSOCK-LISTEN:2375,reuseaddr,fork UNIX-CONNECT:/var/run/docker.sock &
+# The host's commands (btrfs and the like): one shell per connection. A probe
+# only: anything that reaches this vsock port is root in the VM. -t as above:
+# under a bridge that carries the client's end, socat's 0.5 s cut commands off
+# (S129).
+socat -t 3600 VSOCK-LISTEN:2376,reuseaddr,fork EXEC:/bin/sh,stderr &
+ping_docker() { printf 'GET /_ping HTTP/1.0\r\n\r\n' | socat -t 2 - UNIX-CONNECT:/var/run/docker.sock 2>/dev/null | grep -q OK; }
+until [ -S /var/run/docker.sock ] && ping_docker; do sleep 0.05; done
+t "docker ready"
+dmesg | grep -E "Freeing unused kernel|Run /init"
+free -m | head -2
+echo "--- end ---"
+while :; do sleep 1; done

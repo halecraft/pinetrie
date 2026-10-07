@@ -22,6 +22,11 @@ spike that decides something leads to an ADR (`docs/adrs/README.md`), which
 cites it as evidence. No other file lists spikes. Open spikes are found by
 their Status: `rg -l '^\*\*Status:\*\* Open' docs/findings`.
 
+**Sources kept beside a spike.** A spike's code is thrown away, unless a
+plan builds on it: then the sources go in a folder named as the spike's
+file, without `.md` (`docs/findings/S131-share-slots/`), and the spike's
+file says what each is. They record what ran; they are not maintained.
+
 **Numbering.** As for ADRs (`docs/adrs/README.md`, Numbering): the next
 number free, and a clash caught by `scripts/numbering.test.ts`.
 

@@ -10,6 +10,7 @@ own machine a publish also catches your files up and integrates your
 commits; a refusal is a toast.
 Amended by ADR-0099: a publish moves `main` alone when
 `offers.catchUp` is off, on any host, not because the host admits others.
+**Amended by ADR-0102:** "your files" is "the working copy".
 
 **Context.** The header's **◆ project** menu (ADR-0061) had grown confusing
 (Duane, 2026-10-04):

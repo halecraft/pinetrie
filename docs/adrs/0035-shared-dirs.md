@@ -2,6 +2,8 @@
 
 **Status:** Accepted. Implemented by `PLAN-2026-09-28-shared-directories`.
 Evidence: S45. Amends ADR-0034: a new kind of grant.
+**Amended by ADR-0103:** on the Mac, a shared directory is a read-write
+entry of its host's slot in the lane VM, shared when the host starts.
 
 **Context.** ADR-0034 gives each lane its own disk, and a branch clones it.
 That is right for a project's files, and wrong for the person's own working

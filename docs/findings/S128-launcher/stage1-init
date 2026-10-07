@@ -1,0 +1,23 @@
+#!/bin/busybox sh
+# S126 probe, stage 1 (lane.root=disk): a 2 MB initramfs that mounts the
+# read-only system image (/dev/vda, erofs) under a tmpfs overlay and switches
+# to it. The system image's /init is lane-init.
+/bin/busybox --install -s /bin
+export PATH=/bin
+mount -t proc proc /proc
+mount -t sysfs sys /sys
+mount -t devtmpfs dev /dev
+insmod /m/virtio_blk.ko
+insmod /m/erofs.ko
+insmod /m/overlay.ko
+i=0; while [ ! -b /dev/vda ] && [ $i -lt 200 ]; do sleep 0.01; i=$((i+1)); done
+mkdir -p /ro /rw /newroot
+mount -t erofs -o ro /dev/vda /ro
+mount -t tmpfs -o size=2g tmpfs /rw
+mkdir -p /rw/upper /rw/work
+mount -t overlay overlay -o lowerdir=/ro,upperdir=/rw/upper,workdir=/rw/work /newroot
+echo "T+$(cut -d' ' -f1 /proc/uptime) stage 1: system image mounted" > /dev/hvc0
+mount --move /dev /newroot/dev
+mount --move /proc /newroot/proc
+mount --move /sys /newroot/sys
+exec switch_root /newroot /init

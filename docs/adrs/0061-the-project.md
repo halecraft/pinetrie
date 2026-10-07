@@ -13,6 +13,8 @@ ADR-0069: the header's ⇣ goes; its threads are the
 activity menu's "Ready to add", counted on its badge.
 Amended by ADR-0090: the project menu and "update my files" go, for one
 publish button; the line is "accepted work", not "the project".
+**Amended by ADR-0102:** the composer no longer says what a send does to
+your files, and "resolve with the agent" in your files goes.
 
 **Context.** Using ADR-0060's build, Duane found:
 

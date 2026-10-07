@@ -11,6 +11,7 @@ page's verb for an offer integration is *accept*; the code's stays
 Amended by ADR-0099: whether a publish catches your files up
 and accepts your commits is `offers.catchUp` (default off), not whether the
 host admits others; any host shows **set up**.
+**Amended by ADR-0102:** "your files" is "the working copy".
 
 **Context.** The footer's **◆ project** menu (ADR-0061, ADR-0076) showed
 the three places work sits: the line (`pinetrie-onto`), the publish

@@ -11,6 +11,7 @@ named at once, so `✦ new agent` shows only until its name arrives.
 **Amended by ADR-0073:** the name opens the thread's details; the reveal of
 where its lane started is in them, offered only below the path's first
 message.
+**Amended by ADR-0102:** there is no direct lane, and no direct work strip.
 
 **Context.** A column's header was one row holding everything the column knew
 about itself: the grip, "from Ada: …" (or "thread", "new chat", "new · with

@@ -14,6 +14,11 @@ copy being yours.
 commit, and work reaches your repo by a forward bookmark move.
 **Amended by ADR-0064:** the lane runtime carries rg, fd and sd beside
 jj, and the agent's `grep` and `find` tools run them.
+**Amended by ADR-0102:** where the lane runtime is missing, the host refuses
+to start; no lane works directly. **Its runtime superseded by ADR-0103:**
+lanes are Docker containers on btrfs snapshots, in a VM of pine·trie's own
+on the Mac and on the host on Linux; the trim container goes. The rest
+stands.
 
 **Context.** ADR-0032 gave each lane a jj workspace on the host and made a
 branch's inherited history read as if it had always worked there, by

@@ -11,6 +11,8 @@ agent thread's `<rules>`, a lane of its own or not, holds one more fixed line,
 first: the team pins cards to say what it wants from the thread, they appear
 in `<pinned-cards>` blocks, and the latest block holds. It is constant, so a
 lane's prompt still stays the same between runs.
+**Amended by ADR-0103:** a lane's servers are reached from the Mac through
+ports published on the VM's address.
 
 **Context.** An agent in a lane of its own (ADR-0034) was told two things: its
 copy is at `/workspace`, and your working copy is at `/mnt/host-working-copy`,

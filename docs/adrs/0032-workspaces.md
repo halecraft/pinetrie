@@ -22,6 +22,8 @@ integration line, or a copy of a WIP bookmark, not your `@-`.
 Amended by ADR-0061: where a new thread's agent works is a line left of
 the send button, saying what it does to your files, and its menu marks the
 choice.
+**Amended by ADR-0102:** working directly goes; every thread's agent works
+in a lane of its own.
 
 **Context.** The agent's tools run in the repo the host runs from, so two
 threads running tools at once share one directory and can collide. ADR-0022

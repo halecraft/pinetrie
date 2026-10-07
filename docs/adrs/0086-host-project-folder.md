@@ -3,6 +3,8 @@
 **Status:** Accepted. Evidence: S108. Implemented by
 `PLAN-2026-10-05-host-project-arg`. Amends ADR-0022: the repo the host runs
 from is the default project, not the only one.
+**Amended by ADR-0102:** a host started outside `pnpm host` refuses to
+start without a lane runtime; it never works directly.
 
 **Context.** `pnpm host` served pine·trie's own repo, found from where
 `server.ts` sits, and kept its session in that repo's `.pinetrie/pinetrie.db`.
