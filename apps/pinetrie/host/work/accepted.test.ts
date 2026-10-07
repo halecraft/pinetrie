@@ -71,7 +71,7 @@ describe("a publish with publish.catchUp off moves main alone (ADR-0099)", () =>
   test("your files behind and your commits below @ stay where they are", async () => {
     const { line, argv } = rig(facts(), { catchUp: false })
     expect(await line.act("publish")).toBeNull()
-    expect(argv()).toEqual([['bookmark move main --to "pinetrie-onto"']])
+    expect(argv()).toEqual([['bookmark move main --to "pinetrie-accepted"']])
   })
 })
 
@@ -80,8 +80,8 @@ describe("a publish with publish.catchUp on, in two rounds (ADR-0090)", () => {
     const { line, argv } = rig(facts({ behind: 0, ahead: 0, catchUp: null }))
     expect(await line.act("publish")).toBeNull()
     expect(argv()).toEqual([
-      ['rebase -b @ -d "pinetrie-onto"'],
-      ['bookmark move main --to "pinetrie-onto"'],
+      ['rebase -b @ -d "pinetrie-accepted"'],
+      ['bookmark move main --to "pinetrie-accepted"'],
     ])
   })
   test("your commits conflicted by the catch-up: it is reverted, and the refusal said", async () => {
@@ -91,7 +91,7 @@ describe("a publish with publish.catchUp on, in two rounds (ADR-0090)", () => {
     const answer = await line.act("publish")
     expect(answer?.code).toBe(ERR.YOURS_CONFLICT)
     expect(argv()).toEqual([
-      ['rebase -b @ -d "pinetrie-onto"'],
+      ['rebase -b @ -d "pinetrie-accepted"'],
       ["op revert op-catch-up"],
     ])
   })
@@ -101,8 +101,8 @@ describe("a publish with publish.catchUp on, in two rounds (ADR-0090)", () => {
     })
     await expect(line.act("publish")).rejects.toThrow("jj refused the move")
     expect(argv()).toEqual([
-      ['rebase -b @ -d "pinetrie-onto"'],
-      ['bookmark move main --to "pinetrie-onto"'],
+      ['rebase -b @ -d "pinetrie-accepted"'],
+      ['bookmark move main --to "pinetrie-accepted"'],
       ["op revert op-catch-up"],
     ])
   })

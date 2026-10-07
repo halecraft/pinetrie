@@ -133,7 +133,6 @@ export function createNewLanes(deps: {
   async function beginAt(owner: RepoOwner, base: string | null) {
     return planBegin({
       base,
-      acceptedBookmark: repoConfig.acceptedBookmark,
       wipPrefix: repoConfig.wipPrefix,
       facts: await owner.read(({ jj }) => beginFacts(jj, repoConfig, base)),
     })

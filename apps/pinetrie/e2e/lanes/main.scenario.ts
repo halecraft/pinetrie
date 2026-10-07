@@ -590,7 +590,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       "create",
       "main",
       "-r",
-      "roots(::pinetrie-onto ~ root())",
+      "roots(::pinetrie-accepted ~ root())",
     )
     writeFileSync(path.join(project, "shared.txt"), "one\ntwo (you)\nthree\n")
     jj(project, "commit", "-m", "you edit line two")
@@ -631,7 +631,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       "describe",
       "--ignore-immutable",
       "-r",
-      "pinetrie-onto",
+      "pinetrie-accepted",
       "-m",
       "you edit line two\n\nreworded",
     )
@@ -678,7 +678,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       rewritten >= 0 && offerNow() === lostAt && offerChange() === firstChange,
       `${JSON.stringify({ lostAt, now: offerNow(), record: offerOf()?.commits })}`,
     )
-    // Bring it up to date: the project's work merged into the lane, and the
+    // Catch it up: accepted work merged into the lane, and the
     // agent resolves the conflict, told what the card asked.
     script.use([
       {
@@ -768,13 +768,13 @@ async function mainSection(check: Checks["check"]): Promise<void> {
     const accepted =
       two === undefined
         ? null
-        : await wu.offer(two.name, "accept", "pinetrie-onto")
+        : await wu.offer(two.name, "accept", "pinetrie-accepted")
     const acceptedLog = jj(
       project,
       "log",
       "--no-graph",
       "-r",
-      "pinetrie-onto | pinetrie-onto-",
+      "pinetrie-accepted | pinetrie-accepted-",
       "-T",
       'description.first_line() ++ "\n"',
     )
@@ -847,7 +847,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       previewed >= 0 &&
         preview?.conflicts.length === 0 &&
         published.kind === "accepted-moved" &&
-        commitAt("pinetrie-onto") === commitAt("@-") &&
+        commitAt("pinetrie-accepted") === commitAt("@-") &&
         existsSync(path.join(project, "yours.txt")) &&
         caughtUpBy !== "" &&
         !caughtUpBy.startsWith(HOST_OPERATOR),
@@ -861,7 +861,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
       "publish moves main forward to accepted work, and nothing is left unpublished",
       unpublished > 0 &&
         caughtUp >= 0 &&
-        commitAt("main") === commitAt("pinetrie-onto"),
+        commitAt("main") === commitAt("pinetrie-accepted"),
       `${JSON.stringify({ unpublished, line: readAccepted(wh.session)?.published })}`,
     )
     script.use([{ text: "it fits" }])
@@ -1022,7 +1022,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
     }
     const branchA = await branchWriting("@agent branch a", "branch-a.txt")
     const aBefore = { files: filesOf(branchA), change: changeOf(branchA) }
-    await wu.offer(lane2 ?? ("" as LaneName), "accept", "pinetrie-onto")
+    await wu.offer(lane2 ?? ("" as LaneName), "accept", "pinetrie-accepted")
     const shrunk = await waitFor(
       () => filesOf(branchA) === JSON.stringify(["branch-a.txt"]),
       30_000,
@@ -1053,7 +1053,7 @@ async function mainSection(check: Checks["check"]): Promise<void> {
     const acceptedB = await wu.offer(
       branchB ?? ("" as LaneName),
       "accept",
-      "pinetrie-onto",
+      "pinetrie-accepted",
     )
     const withdrawn = await waitFor(() => offerOf() === undefined, 30_000)
     check(

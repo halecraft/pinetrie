@@ -110,15 +110,40 @@ describe("what is written reads back", () => {
   })
   test("baseMessage and baseOf round-trip a Pinetrie-Base, the newest of them; a malformed one reads as none", () => {
     const m = baseMessage("copy of wip/a@b", {
+      kind: "wip",
       bookmark: "wip/a@b",
       commit: C1,
     })
     expect(m).toBe("copy of wip/a@b\n\nPinetrie-Base: wip/a@b@c1\n")
-    expect(baseOf("x\n\nPinetrie-Base: nope\n")).toBeNull()
-    expect(baseOf(m)).toEqual({ bookmark: "wip/a@b", commit: C1 })
-    const later = baseMessage("update", { bookmark: "onto", commit: C1 })
-    expect(baseOf(`${m}\n${later}`)).toEqual({ bookmark: "onto", commit: C1 })
-    expect(baseOf("your commit")).toBeNull()
+    expect(baseOf("x\n\nPinetrie-Base: nope\n", "wip/")).toBeNull()
+    expect(baseOf(m, "wip/")).toEqual({
+      kind: "wip",
+      bookmark: "wip/a@b",
+      commit: C1,
+    })
+    const later = baseMessage("catch up", { kind: "accepted", commit: C1 })
+    expect(later).toBe("catch up\n\nPinetrie-Base: accepted@c1\n")
+    expect(baseOf(`${m}\n${later}`, "wip/")).toEqual({
+      kind: "accepted",
+      commit: C1,
+    })
+    expect(baseOf("your commit", "wip/")).toBeNull()
+  })
+  test("a base is a WIP by its prefix, else accepted work, whatever name accepted work's bookmark had (ADR-0100)", () => {
+    for (const name of ["accepted", "pinetrie-onto", "trunk"])
+      expect(baseOf(`b\n\nPinetrie-Base: ${name}@c1\n`, "wip/")).toEqual({
+        kind: "accepted",
+        commit: C1,
+      })
+    expect(baseOf("b\n\nPinetrie-Base: draft/x@c1\n", "draft/")).toEqual({
+      kind: "wip",
+      bookmark: "draft/x",
+      commit: C1,
+    })
+    expect(baseOf("b\n\nPinetrie-Base: accepted@c1\n", "")).toEqual({
+      kind: "accepted",
+      commit: C1,
+    })
   })
   test("offerMessage reads back: its thread, lane and entry, its ledger, and the message without them", () => {
     const ledger = { source: commitId("t1"), start: [commitId("s1")] }
@@ -241,17 +266,15 @@ describe("pre-rename: what the host wrote as Pineta is read", () => {
     ).toEqual([LANE])
   })
 
-  test("a base on a WIP is read; a base on the old line, pineta-onto, reads as none", () => {
-    expect(baseOf("copy of wip/a\n\nPineta-Base: wip/a@c1\n")).toEqual({
+  test("a base on a WIP is read; a base on pineta-onto reads as accepted work", () => {
+    expect(baseOf("copy of wip/a\n\nPineta-Base: wip/a@c1\n", "wip/")).toEqual({
+      kind: "wip",
       bookmark: "wip/a",
       commit: C1,
     })
     expect(
-      baseOf("update: pineta-onto\n\nPineta-Base: pineta-onto@c1\n"),
-    ).toBeNull()
-    expect(trailerValues("x\n\nPineta-Base: pineta-onto@c1\n", "base")).toEqual(
-      [],
-    )
+      baseOf("update: pineta-onto\n\nPineta-Base: pineta-onto@c1\n", "wip/"),
+    ).toEqual({ kind: "accepted", commit: C1 })
   })
 
   test("the writers write Pinetrie only", () => {
@@ -263,7 +286,7 @@ describe("pre-rename: what the host wrote as Pineta is read", () => {
         ledger: { source: C1, start: [C1] },
       }),
       revisionMessage({ title: "t", entry: entryId("e1"), lane: LANE }),
-      baseMessage("b", { bookmark: "onto", commit: C1 }),
+      baseMessage("b", { kind: "accepted", commit: C1 }),
     ].join("\n")
     expect(written).not.toContain("Pineta-")
     expect(Object.values(TRAILERS).every(t => t.startsWith("Pinetrie-"))).toBe(

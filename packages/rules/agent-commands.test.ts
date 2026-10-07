@@ -31,7 +31,7 @@ function floor(): Floor {
     budget: { tokens: 10_000, estimate: c => Math.ceil(c.length / 4) },
     skill: null,
     intent: "",
-    incoming: "The project's work",
+    incoming: "Accepted work",
   })
   if (found.kind !== "fits") throw new Error("the floor does not fit")
   return found.floor
@@ -42,7 +42,7 @@ const ADA = writerId("ada@x.io")
 const [B, C, D] = [commitId("b"), commitId("c"), commitId("d")]
 const MOVE = {
   base: { kind: "accepted" },
-  bookmark: "pinetrie-onto",
+  bookmark: "pinetrie-accepted",
   from: B,
   to: C,
 } as const
@@ -158,7 +158,6 @@ describe("catchUpAnswer", () => {
       {
         lane: LANE,
         from: { kind: "accepted" },
-        bookmark: "pinetrie-onto",
         merged: C,
         commits: ["a change"],
         files: ["a.ts"],

@@ -211,7 +211,7 @@ describe("forkPoint: a snapshot to clone, and what to start on", () => {
   const S = snapshotId("e")
   const begin = {
     kind: "accepted",
-    acceptedBookmark: "pinetrie-onto",
+    acceptedBookmark: "pinetrie-accepted",
     commit: commitId("l1"),
   } as const
   test("from a turn: its snapshot and the commit above", () => {

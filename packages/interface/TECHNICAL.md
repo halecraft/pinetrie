@@ -532,7 +532,7 @@ pending.
   section is a `<fieldset>` (role `group`, which Biome asks for as the
   element) named by its own, which is drawn `aria-hidden`. A section's notes
   are text, not items, and describe it (`aria-describedby`): setting up's
-  "pinetrie-onto goes at your @-". Items can carry
+  "pinetrie-accepted goes at your @-". Items can carry
   `data-*` attributes (`MenuItem.data`); one with `checked` is a
   `menuitemradio` with a ✓, and the arrow keys and the opening focus take
   both kinds.
@@ -787,7 +787,7 @@ became of its files (`strip`).
   WIP its bookmark, the thread a thread branched from its name. The words
   take core's `CatchUpFrom`, never a bookmark string, and accepted work's
   bookmark goes only in titles: `offerWords`' button titles ("moves
-  pinetrie-onto forward to pinetrie-offer/amber-fox"), `behindMark`'s,
+  pinetrie-accepted forward to pinetrie-offer/amber-fox"), `behindMark`'s,
   `baseChoices`'. A card's command is worded from `CatchUps` (the thread's
   base and its parent), which `Column` keeps as one object while it says
   the same, since the composer is memoised. A base that moved is worded by

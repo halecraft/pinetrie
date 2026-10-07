@@ -79,7 +79,6 @@ const OURS = commitId("22220000")
 const MERGE = commitId("33330000")
 const acceptedFrom: BaseMerge = {
   kind: "accepted",
-  acceptedBookmark: "pinetrie-onto",
   commit: ACCEPTED,
   mark: false,
 }
@@ -158,7 +157,6 @@ describe("planSettle: what a merge comes to (ADR-0060, ADR-0033)", () => {
         {
           lane: LANE,
           from: { kind: "accepted" },
-          bookmark: "pinetrie-onto",
           merged: ACCEPTED,
           files: ["a.txt"],
           commits: ["yours one"],
@@ -181,7 +179,6 @@ describe("planSettle: what a merge comes to (ADR-0060, ADR-0033)", () => {
         {
           lane: LANE,
           from: { kind: "wip", bookmark: "wip/x" },
-          bookmark: "wip/x",
           merged: ACCEPTED,
           files: ["a.txt"],
           commits: ["yours one"],
@@ -308,7 +305,6 @@ describe("applySettle: a settle's writes", () => {
       {
         lane: LANE,
         from: { kind: "accepted" },
-        bookmark: "pinetrie-onto",
         merged: ACCEPTED,
         commits: [],
         files: ["a.txt"],
@@ -507,7 +503,7 @@ describe("catchUpInRun (ADR-0080)", () => {
     putValue(
       b,
       setRecord(ACCEPTED_RECORD, {
-        acceptedBookmark: "pinetrie-onto",
+        acceptedBookmark: "pinetrie-accepted",
         wipPrefix: "wip/",
         publish: "main",
         published: { commit: null, behind: 0, ahead: 0 },

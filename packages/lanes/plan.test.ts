@@ -331,7 +331,7 @@ describe("repoConfig: the project's values win, and a bad one falls back (ADR-01
     ])
   })
   test("isBookmarkName: git's rules", () => {
-    for (const ok of ["pinetrie-onto", "wip/x", "a.b"])
+    for (const ok of ["pinetrie-accepted", "wip/x", "a.b"])
       expect(isBookmarkName(ok)).toBe(true)
     for (const bad of ["", "a b", "a..b", "-a", "a/", "a.lock", "a@b", "a:b"])
       expect(isBookmarkName(bad)).toBe(false)
@@ -539,13 +539,12 @@ test("planForkSetup: on accepted work, an empty commit naming it; its id read fo
   const steps = argvs(
     planForkSetup(LANE, {
       kind: "accepted",
-      acceptedBookmark: "pinetrie-onto",
       commit: C1,
     }),
   )
   expect(steps.slice(2, 4)).toEqual([
     "lane: jj new c1",
-    `lane: jj commit -m ${baseMessage("base: pinetrie-onto", { bookmark: "pinetrie-onto", commit: C1 })}`,
+    `lane: jj commit -m ${baseMessage("base: accepted work", { kind: "accepted", commit: C1 })}`,
   ])
   expect(steps.at(-1)).toContain(
     "jj --ignore-working-copy log --no-graph -r @-",
@@ -565,7 +564,7 @@ test("planForkSetup: a WIP's copy on accepted commit under it, never the WIP's o
   expect(steps.slice(2, 5)).toEqual([
     "lane: jj new c1",
     "lane: jj restore --from w1",
-    `lane: jj commit -m ${baseMessage("copy of wip/x", { bookmark: "wip/x", commit: W })}`,
+    `lane: jj commit -m ${baseMessage("copy of wip/x", { kind: "wip", bookmark: "wip/x", commit: W })}`,
   ])
   expect(steps.some(s => s.includes("jj new w1"))).toBe(false)
   expect(steps.at(-1)).toBe("lane: sh -c pnpm i")
@@ -618,15 +617,14 @@ describe("planMerge: an update's steps (ADR-0060)", () => {
     expect(
       planMerge({
         kind: "accepted",
-        acceptedBookmark: "pinetrie-onto",
         commit: C1,
         mark: true,
       }),
     ).toEqual({
       steps: [fetchById([C1])],
       source: C1,
-      message: baseMessage("update: pinetrie-onto", {
-        bookmark: "pinetrie-onto",
+      message: baseMessage("catch up: accepted work", {
+        kind: "accepted",
         commit: C1,
       }),
       mark: true,
@@ -645,7 +643,7 @@ describe("planMerge: an update's steps (ADR-0060)", () => {
       `lane: ${fetchById([W]).argv.join(" ")}`,
       "lane: jj new copy1",
       "lane: jj restore --from w1",
-      `lane: jj commit -m ${baseMessage("copy of wip/x", { bookmark: "wip/x", commit: W })}`,
+      `lane: jj commit -m ${baseMessage("copy of wip/x", { kind: "wip", bookmark: "wip/x", commit: W })}`,
     ])
     expect(plan).toMatchObject({
       source: "copy",
@@ -666,7 +664,7 @@ describe("planMerge: an update's steps (ADR-0060)", () => {
     ).toEqual({
       steps: [fetchById([C2])],
       source: C2,
-      message: "update: amber-fox",
+      message: "catch up: amber-fox",
       mark: false,
       came: { from: C1, to: C2 },
     })

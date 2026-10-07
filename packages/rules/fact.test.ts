@@ -25,7 +25,7 @@ const ACCEPTED: OfferFact = {
   lane: LANE,
   by: ADA,
   as: "kabcdefghij",
-  bookmark: "pinetrie-onto",
+  bookmark: "pinetrie-accepted",
   to: { kind: "accepted" },
 }
 const FACTS: readonly OfferFact[] = [
@@ -75,7 +75,7 @@ describe("a fact (ADR-0080)", () => {
 
   test("the model reads who did it, and an acceptance's change and bookmark", () => {
     expect(factContent(ACCEPTED, "Ada")).toContain(
-      "Ada accepted this thread's work, as the change kabcdefghij: pinetrie-onto moved forward to it.",
+      "Ada accepted this thread's work, as the change kabcdefghij: pinetrie-accepted moved forward to it.",
     )
     expect(factContent(FACTS[4] as OfferFact, "Ada")).toMatch(/^Ada rebuilt/)
   })
@@ -92,7 +92,7 @@ describe("a fact (ADR-0080)", () => {
       kind: "accept",
       name: "amber-fox" as ThreadName,
       bookmark: "pinetrie-offer/amber-fox",
-      destination: "pinetrie-onto",
+      destination: "pinetrie-accepted",
       top: "kabcdefghij",
       accepted: {} as OfferRecord,
     } as const
@@ -101,7 +101,7 @@ describe("a fact (ADR-0080)", () => {
         lane: LANE,
         by: ADA,
         decision,
-        acceptedBookmark: "pinetrie-onto",
+        acceptedBookmark: "pinetrie-accepted",
       }),
     ).toEqual(ACCEPTED)
     expect(
@@ -109,7 +109,7 @@ describe("a fact (ADR-0080)", () => {
         lane: LANE,
         by: ADA,
         decision: { ...decision, destination: "wip/search" },
-        acceptedBookmark: "pinetrie-onto",
+        acceptedBookmark: "pinetrie-accepted",
       }),
     ).toMatchObject({ to: { kind: "wip", bookmark: "wip/search" } })
     expect(actionFact("squash", LANE, ADA)).toEqual(FACTS[3])

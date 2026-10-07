@@ -387,10 +387,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "accepted work's merge names no base",
     file: plan,
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "      message: baseMessage(`update: ${from.acceptedBookmark}`, {",
-    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
-    to: "      message: ((title: string, _: unknown) => title)(`update: ${from.acceptedBookmark}`, {",
+    from: '      message: baseMessage("catch up: accepted work", {',
+    to: '      message: ((title: string, _: unknown) => title)("catch up: accepted work", {',
     command: unit,
     expect: "accepted work's merge names its base",
   },

@@ -1126,17 +1126,13 @@ export const spanKey = (s: DiffSpan): string =>
  */
 export type ForkStart =
   | { readonly kind: "commits"; readonly commits: readonly CommitId[] }
-  | {
-      readonly kind: "accepted"
-      readonly acceptedBookmark: string
-      readonly commit: CommitId
-    }
+  | { readonly kind: "accepted"; readonly commit: CommitId }
   | {
       readonly kind: "wip"
       readonly bookmark: string
       /** The WIP's commit: whose files the copy holds. */
       readonly commit: CommitId
-      /** Accepted work commit under the WIP: the copy's parent. */
+      /** The accepted commit under the WIP: the copy's parent. */
       readonly under: CommitId
     }
 
@@ -1148,7 +1144,6 @@ export type ForkStart =
 export type BaseMerge =
   | {
       readonly kind: "accepted"
-      readonly acceptedBookmark: string
       readonly commit: CommitId
       /** The thread moves to accepted work: with nothing to merge, a commit still names it. */
       readonly mark: boolean

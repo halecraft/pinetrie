@@ -195,13 +195,13 @@ export const mutations: readonly Mutation[] = [
     expect: "an offer's trailers and ledger, and the message without them",
   },
   {
-    name: "pre-rename: a base on the old line is read",
+    name: "a base off the WIP prefix is a WIP",
     file: trailers,
-    from: '    .filter(line => !(key === "base" && line.startsWith(OLD_LINE_BASE)))\n',
-    to: "",
+    from: "  return bookmark !== ACCEPTED_BASE && bookmark.startsWith(wipPrefix)\n",
+    to: "  return bookmark !== ACCEPTED_BASE\n",
     command: unit,
     expect:
-      "a base on a WIP is read; a base on the old line, pineta-onto, reads as none",
+      "a base is a WIP by its prefix, else accepted work, whatever name accepted work's bookmark had",
   },
   {
     name: "the youngest child continues the parent's track",

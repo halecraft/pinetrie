@@ -20,7 +20,7 @@ const LANE = laneNameForThread("1")
 const [L1, L2] = [commitId("l1"), commitId("l2")]
 
 const line = (commit = L2): AcceptedRecord => ({
-  acceptedBookmark: "pinetrie-onto",
+  acceptedBookmark: "pinetrie-accepted",
   wipPrefix: "wip/",
   publish: "main",
   published: { commit: null, behind: 0, ahead: 0 },

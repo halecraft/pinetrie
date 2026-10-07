@@ -334,8 +334,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an update on accepted work is stored as a WIP's",
     file: "packages/rules/update.ts",
-    from: '          : { base: details.bookmark, line: from.kind === "accepted" }),',
-    to: "          : { base: details.bookmark, line: false }),",
+    from: '            ? { base: "accepted", line: true }',
+    to: '            ? { base: "accepted", line: false }',
     command: unit,
     expect:
       "an update round-trips, shows one line, and tells the model what changed",

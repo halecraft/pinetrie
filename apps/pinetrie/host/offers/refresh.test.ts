@@ -171,8 +171,8 @@ test("a catch-up that merged your acceptance of the lane's work leaves nothing t
   const merged = await you.commit(
     [work, accepted],
     {},
-    baseMessage("update: pinetrie-onto", {
-      bookmark: DEFAULT_REPO.acceptedBookmark,
+    baseMessage("catch up: accepted work", {
+      kind: "accepted",
       commit: accepted,
     }),
   )
@@ -249,8 +249,8 @@ test("an accepted-offer commit of the lane with no Pinetrie-Source builds nothin
   const merged = await you.commit(
     [more, yours],
     { "a.txt": "yours\n" },
-    baseMessage("update: pinetrie-onto", {
-      bookmark: DEFAULT_REPO.acceptedBookmark,
+    baseMessage("catch up: accepted work", {
+      kind: "accepted",
       commit: yours,
     }),
   )

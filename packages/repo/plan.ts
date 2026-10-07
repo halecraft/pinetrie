@@ -40,10 +40,15 @@ export function immutableHeads(
   repoConfig: RepoConfig,
   current: string | null,
 ): string {
-  const acceptedBookmark = `present(${revsetName(repoConfig.acceptedBookmark)})`
-  const added = `${acceptedBookmark} | (${OFFER_BOOKMARKS} & children(${acceptedBookmark}))`
+  const added = acceptedHeads(repoConfig.acceptedBookmark)
   const base = (current ?? "builtin_immutable_heads()").trim()
   return base.endsWith(added) ? base : `${base} | ${added}`
+}
+
+/** What `immutableHeads` adds for accepted work's `bookmark`: it and the offers on it. */
+export const acceptedHeads = (bookmark: string): string => {
+  const accepted = `present(${revsetName(bookmark)})`
+  return `${accepted} | (${OFFER_BOOKMARKS} & children(${accepted}))`
 }
 
 /**

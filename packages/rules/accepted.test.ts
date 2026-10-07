@@ -43,12 +43,15 @@ describe("accepted work (ADR-0060)", () => {
       conflicts: { commits: 0, files: [] },
     },
   } as const
-  const proposed = { heads: "trunk() | present(pinetrie-onto)", log: "logged" }
+  const proposed = {
+    heads: "trunk() | present(pinetrie-accepted)",
+    log: "logged",
+  }
   const record = (over: Partial<AcceptedRecord> = {}): AcceptedRecord => ({
     ...planAcceptedRecord({
       facts,
       repoConfig: {
-        acceptedBookmark: "pinetrie-onto",
+        acceptedBookmark: "pinetrie-accepted",
         wipPrefix: "wip/",
         publish: "main",
         publishCatchesUp: true,
@@ -68,12 +71,12 @@ describe("accepted work (ADR-0060)", () => {
       record().wipPrefix,
       record().publish,
       record().publishCatchesUp,
-    ]).toEqual(["pinetrie-onto", "wip/", "main", true])
+    ]).toEqual(["pinetrie-accepted", "wip/", "main", true])
   })
   test("setup writes the bookmark at your @- and exactly the proposed heads and log", () => {
     expect(planAcceptedAction("setup", record())).toEqual({
       kind: "setup",
-      acceptedBookmark: "pinetrie-onto",
+      acceptedBookmark: "pinetrie-accepted",
       heads: proposed.heads,
       log: "logged",
     })
@@ -123,7 +126,7 @@ describe("accepted work (ADR-0060)", () => {
       })
       expect(planAcceptedAction("publish", r)).toEqual({
         kind: "publish",
-        acceptedBookmark: "pinetrie-onto",
+        acceptedBookmark: "pinetrie-accepted",
         publish: "main",
         catchUp: false,
         accept: false,
@@ -140,7 +143,7 @@ describe("accepted work (ADR-0060)", () => {
       })
       expect(planAcceptedAction("publish", r)).toEqual({
         kind: "publish",
-        acceptedBookmark: "pinetrie-onto",
+        acceptedBookmark: "pinetrie-accepted",
         publish: "main",
         catchUp: true,
         accept: true,
@@ -231,7 +234,7 @@ describe("accepted work (ADR-0060)", () => {
     describe("planPublishFinish: the second round, from accepted work read after the catch-up", () => {
       const decision = {
         kind: "publish",
-        acceptedBookmark: "pinetrie-onto",
+        acceptedBookmark: "pinetrie-accepted",
         publish: "main",
         catchUp: true,
         accept: false,
@@ -248,7 +251,7 @@ describe("accepted work (ADR-0060)", () => {
           },
           {
             kind: "move",
-            acceptedBookmark: "pinetrie-onto",
+            acceptedBookmark: "pinetrie-accepted",
             publish: "main",
             accept: true,
           },
@@ -272,7 +275,7 @@ describe("accepted work (ADR-0060)", () => {
           { decision, after: after({ ahead: 2 }), op: "op1" },
           {
             kind: "move",
-            acceptedBookmark: "pinetrie-onto",
+            acceptedBookmark: "pinetrie-accepted",
             publish: "main",
             accept: true,
           },
@@ -286,7 +289,7 @@ describe("accepted work (ADR-0060)", () => {
           },
           {
             kind: "move",
-            acceptedBookmark: "pinetrie-onto",
+            acceptedBookmark: "pinetrie-accepted",
             publish: "main",
             accept: false,
           },
@@ -332,14 +335,12 @@ describe("planBegin: accepted work, or a WIP's copy (ADR-0060)", () => {
   ) =>
     planBegin({
       base,
-      acceptedBookmark: "pinetrie-onto",
       wipPrefix: "wip/",
       facts,
     })
   test("accepted work's commit by default", () => {
     expect(begin(null, { acceptedCommit: L, wip: null })).toEqual({
       kind: "accepted",
-      acceptedBookmark: "pinetrie-onto",
       commit: L,
     })
   })
@@ -485,7 +486,6 @@ describe("planUpdateFrom: always the base the thread follows (ADR-0060)", () => 
   const now = { commit: commitId("w2"), under: commitId("l0") }
   const from = (over: Partial<Parameters<typeof planUpdateFrom>[0]> = {}) =>
     planUpdateFrom({
-      acceptedBookmark: "pinetrie-onto",
       base: wipBase,
       state: "ok",
       toAccepted: false,
@@ -495,7 +495,6 @@ describe("planUpdateFrom: always the base the thread follows (ADR-0060)", () => 
     })
   const line = (mark: boolean) => ({
     kind: "accepted",
-    acceptedBookmark: "pinetrie-onto",
     commit: L,
     mark,
   })

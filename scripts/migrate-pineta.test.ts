@@ -136,7 +136,7 @@ test("planRepo: the config's old clauses dropped and the current one added once;
     ),
   )
   expect(steps).toEqual([
-    `jj as you: config set --repo revset-aliases."immutable_heads()" builtin_immutable_heads() | present("pinetrie-onto") | (bookmarks(glob:"pinetrie-offer/*") & children(present("pinetrie-onto")))`,
+    `jj as you: config set --repo revset-aliases."immutable_heads()" builtin_immutable_heads() | present("pinetrie-accepted") | (bookmarks(glob:"pinetrie-offer/*") & children(present("pinetrie-accepted")))`,
     'jj as you: config set --repo revsets.log builtin_log() | bookmarks(glob:"pinetrie-offer/*")',
     "jj as host: abandon c1 c2",
     "jj as host: bookmark delete pineta-offer/amber-fox",
@@ -152,7 +152,7 @@ test("planRepo: a second plan over what the first left is empty", () => {
         offers: [],
         config: {
           heads:
-            'builtin_immutable_heads() | present("pinetrie-onto") | (bookmarks(glob:"pinetrie-offer/*") & children(present("pinetrie-onto")))',
+            'builtin_immutable_heads() | present("pinetrie-accepted") | (bookmarks(glob:"pinetrie-offer/*") & children(present("pinetrie-accepted")))',
           log: 'builtin_log() | bookmarks(glob:"pinetrie-offer/*")',
         },
       },

@@ -11,8 +11,6 @@
 // a malformed command is refused is decided in exactly one function.
 
 import {
-  ACCEPTED_ACTIONS,
-  type AcceptedAction,
   atEntry,
   CARD_COMMANDS,
   type CardCommand,

@@ -19,7 +19,7 @@ test("forkFacts reads nothing before every pending turn record is written", asyn
       read.push("begin")
       return {
         kind: "accepted",
-        acceptedBookmark: "pinetrie-onto",
+        acceptedBookmark: "pinetrie-accepted",
         commit: commitId("aaaa0000"),
       }
     },

@@ -208,11 +208,13 @@ export function planLaneRead(
   const tip = rows.find(r => r.tip)
   if (tip === undefined) return { kind: "none" }
   const based = rows.find(r => r.base)
-  const parsed = based === undefined ? null : baseOf(based.description)
+  const parsed =
+    based === undefined
+      ? null
+      : baseOf(based.description, input.repoConfig.wipPrefix)
   let base: LaneBase
   if (based !== undefined && parsed !== null) {
-    if (parsed.bookmark !== input.repoConfig.acceptedBookmark)
-      return { kind: "wip" }
+    if (parsed.kind === "wip") return { kind: "wip" }
     base = {
       base: { kind: "accepted" },
       start: parsed.commit,

@@ -45,7 +45,7 @@ import {
   revsetName,
 } from "@pinetrie/lanes"
 import type { PiSetup } from "@pinetrie/pi"
-import { type RepoOwner, startRepoOwner } from "@pinetrie/repo"
+import { type RepoOwner, renameAccepted, startRepoOwner } from "@pinetrie/repo"
 import { type Basics, failed, slow } from "../basics.ts"
 import { brokenConfigLine } from "../startup-lines.ts"
 import { lockHashAt } from "./disk.ts"
@@ -201,6 +201,22 @@ export async function startSetup(input: {
           onError: failed(basics, "your repo"),
           onSlow: slow(basics, "your repo"),
         })
+  // pre-accepted: the owner's first command, before its first observation
+  // (ADR-0100). Delete with `renameAccepted`.
+  if (owner !== null)
+    await owner
+      .command(ops =>
+        renameAccepted(
+          ops,
+          (lanes?.repoConfig ?? DEFAULT_REPO).acceptedBookmark,
+        ),
+      )
+      .then(
+        lines => {
+          for (const line of lines) log(`[host] ${line}`)
+        },
+        failed(basics, "renaming accepted work's bookmark"),
+      )
   // Read at startup, as `prepareImages` reads it, so a lane's prompt says
   // what its image has before the images are ready.
   const defaultImage =

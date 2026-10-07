@@ -14,7 +14,6 @@ import {
   type LaneName,
   type OfferAcceptanceDecision,
   type OfferFact,
-  type ThreadName,
   type WriterId,
 } from "@pinetrie/core"
 import { type Static, Type } from "typebox"

@@ -127,7 +127,7 @@ export async function laneBase(
   tip: string,
   repoConfig: RepoConfig,
 ): Promise<LaneBase | null> {
-  const newest = await newestBase(jj, tip)
+  const newest = await newestBase(jj, tip, repoConfig.wipPrefix)
   if (newest === null) {
     const [start] = await commitsOf(
       jj,
@@ -137,7 +137,7 @@ export async function laneBase(
       ? null
       : { base: { kind: "accepted" }, start, source: start }
   }
-  return newest.bookmark === repoConfig.acceptedBookmark
+  return newest.kind === "accepted"
     ? {
         base: { kind: "accepted" },
         start: newest.commit,

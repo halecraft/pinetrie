@@ -494,9 +494,9 @@ describe("where a new lane works: the chip and its menu", () => {
     ])
     expect(whereChoices(lanes, [], { kind: "own" })[0]?.disabled).toBe(false)
     expect(
-      whereChoices(lanes, [], { kind: "own" }, "pinetrie-onto")[0]?.title,
+      whereChoices(lanes, [], { kind: "own" }, "pinetrie-accepted")[0]?.title,
     ).toBe(
-      "a lane of its own, cloned from pinetrie-onto; its work comes back as pinetrie-offer/<thread>",
+      "a lane of its own, cloned from pinetrie-accepted; its work comes back as pinetrie-offer/<thread>",
     )
   })
 })

@@ -52,7 +52,7 @@ describe("logRevset: the offers added to your log (S77 item 8)", () => {
 describe("immutableHeads: accepted work and its offers added to yours", () => {
   test("added to jj's builtin when the repo defines none, with present()", () => {
     expect(immutableHeads(DEFAULT_REPO, null)).toBe(
-      'builtin_immutable_heads() | present("pinetrie-onto") | (bookmarks(glob:"pinetrie-offer/*") & children(present("pinetrie-onto")))',
+      'builtin_immutable_heads() | present("pinetrie-accepted") | (bookmarks(glob:"pinetrie-offer/*") & children(present("pinetrie-accepted")))',
     )
   })
   test("joined to your own definition, and idempotent", () => {
@@ -86,7 +86,7 @@ describe("offers (ADR-0038)", () => {
         repoConfig: DEFAULT_REPO,
         base: { base: { kind: "accepted" }, start: C1, source: C1 },
       }),
-    ).toBe(`(::(present("pinetrie-onto")) ~ ::present(c1)) & ${accepted}`)
+    ).toBe(`(::(present("pinetrie-accepted")) ~ ::present(c1)) & ${accepted}`)
     // A WIP lane starts at its copy, which holds no accepted-offer commit: what it
     // holds is the WIP's commit the copy was made from.
     expect(
@@ -99,7 +99,7 @@ describe("offers (ADR-0038)", () => {
         },
       }),
     ).toBe(
-      `(::(present("pinetrie-onto") | present("wip/a")) ~ ::present(c2)) & ${accepted}`,
+      `(::(present("pinetrie-accepted") | present("wip/a")) ~ ::present(c2)) & ${accepted}`,
     )
   })
   test("planOffer: a commit per source, by nonce; rebased, bookmarked, then described", () => {
@@ -161,11 +161,11 @@ describe("offers (ADR-0038)", () => {
         planOfferAcceptanceSteps({
           bookmark: "pinetrie-offer/amber-fox",
           top: "t",
-          destination: "pinetrie-onto",
+          destination: "pinetrie-accepted",
         }),
       ),
     ).toEqual([
-      op("bookmark", "move", "pinetrie-onto", "--to", "t"),
+      op("bookmark", "move", "pinetrie-accepted", "--to", "t"),
       op("bookmark", "delete", "pinetrie-offer/amber-fox"),
     ])
   })
@@ -202,24 +202,28 @@ describe("offers (ADR-0038)", () => {
   test("accepted work's setup is the host's bookmark and your config (ADR-0060)", () => {
     expect(
       argvs(
-        planSetup({ acceptedBookmark: "pinetrie-onto", heads: "H", log: "L" }),
+        planSetup({
+          acceptedBookmark: "pinetrie-accepted",
+          heads: "H",
+          log: "L",
+        }),
       ),
     ).toEqual([
-      op("bookmark", "create", "pinetrie-onto", "-r", "@-"),
+      op("bookmark", "create", "pinetrie-accepted", "-r", "@-"),
       'jj as you: config set --repo revset-aliases."immutable_heads()" H',
       "jj as you: config set --repo revsets.log L",
     ])
   })
   test("a publish: your catch-up is yours; the move is the host's, or yours in one step when it accepts your commits; its undo reverts, never restores (ADR-0090, S111)", () => {
     expect(
-      argvs(planPublishCatchUp({ acceptedBookmark: "pinetrie-onto" })),
-    ).toEqual(['jj as you: rebase -b @ -d "pinetrie-onto"'])
-    const move = { acceptedBookmark: "pinetrie-onto", publish: "main" }
+      argvs(planPublishCatchUp({ acceptedBookmark: "pinetrie-accepted" })),
+    ).toEqual(['jj as you: rebase -b @ -d "pinetrie-accepted"'])
+    const move = { acceptedBookmark: "pinetrie-accepted", publish: "main" }
     expect(argvs(planPublishMove({ ...move, accept: false }))).toEqual([
-      op("bookmark", "move", "main", "--to", '"pinetrie-onto"'),
+      op("bookmark", "move", "main", "--to", '"pinetrie-accepted"'),
     ])
     expect(argvs(planPublishMove({ ...move, accept: true }))).toEqual([
-      "jj as you: bookmark move pinetrie-onto main --to @-",
+      "jj as you: bookmark move pinetrie-accepted main --to @-",
     ])
     expect(argvs(planCatchUpUndo("op1"))).toEqual(["jj as you: op revert op1"])
   })
@@ -338,7 +342,7 @@ describe("planObserve: what moved between two fingerprints", () => {
     at: at === null ? null : commitId(at),
   })
   const base = {
-    "pinetrie-onto": "c1",
+    "pinetrie-accepted": "c1",
     "wip/a": "c2",
     main: "c0",
     "pinetrie-offer/amber-fox": "c3",
@@ -356,7 +360,7 @@ describe("planObserve: what moved between two fingerprints", () => {
     ["nothing moved", fp(base), none],
     [
       "accepted work moved: the base snapshot follows it (ADR-0090)",
-      fp({ ...base, "pinetrie-onto": "c9" }),
+      fp({ ...base, "pinetrie-accepted": "c9" }),
       { ...none, all: true, acceptedBookmark: true },
     ],
     ["a WIP moved", fp({ ...base, "wip/a": "c9" }), { ...none, all: true }],
@@ -385,7 +389,7 @@ describe("planObserve: what moved between two fingerprints", () => {
     [
       "an offer went",
       fp({
-        "pinetrie-onto": "c1",
+        "pinetrie-accepted": "c1",
         "wip/a": "c2",
         main: "c0",
         [`tip@pinetrie-${LANE}`]: "c4",
@@ -405,13 +409,13 @@ describe("planObserve: what moved between two fingerprints", () => {
   })
   test("a bookmark of yours outside accepted work, the WIPs, the publish bookmark, the offers and the lanes' remotes is not read", () => {
     const stdout = [
-      "c1\t\tpinetrie-onto,main,feature\tmain@origin,pinetrie-onto@git",
+      "c1\t\tpinetrie-accepted,main,feature\tmain@origin,pinetrie-accepted@git",
       `c4\t@\t\ttip@pinetrie-${LANE}`,
     ].join("\n")
     const read = parseFingerprint("op", stdout, DEFAULT_REPO)
     expect(read.bookmarks).toEqual(
       new Map([
-        ["pinetrie-onto", "c1"],
+        ["pinetrie-accepted", "c1"],
         ["main", "c1"],
         [`tip@pinetrie-${LANE}`, "c4"],
       ]),
@@ -421,10 +425,10 @@ describe("planObserve: what moved between two fingerprints", () => {
   test("a conflicted bookmark is all its targets", () => {
     const read = parseFingerprint(
       "op",
-      "c2\t\tpinetrie-onto\t\nc1\t\tpinetrie-onto\t",
+      "c2\t\tpinetrie-accepted\t\nc1\t\tpinetrie-accepted\t",
       DEFAULT_REPO,
     )
-    expect(read.bookmarks.get("pinetrie-onto")).toBe("c1,c2")
+    expect(read.bookmarks.get("pinetrie-accepted")).toBe("c1,c2")
   })
 })
 
@@ -450,7 +454,7 @@ describe("planLaneRead: what one lane's rows say", () => {
   const tip = row("a1", { tip: true, parents: [commitId("b1")] })
   const based = row("b1", {
     base: true,
-    description: `start\n\nPinetrie-Base: pinetrie-onto@c0\n`,
+    description: `start\n\nPinetrie-Base: pinetrie-accepted@c0\n`,
   })
   const offerRow = row("f1", {
     bookmark: true,

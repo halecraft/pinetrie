@@ -53,7 +53,7 @@ test("offerSeen: what an acceptance was shown is the record's ledger and whether
 describe("offerView: ADR-0038's table", () => {
   const MOVE = {
     base: { kind: "accepted" },
-    bookmark: "pinetrie-onto",
+    bookmark: "pinetrie-accepted",
     from: commitId("l1"),
     to: commitId("l2"),
   } as const
@@ -74,7 +74,7 @@ describe("offerView: ADR-0038's table", () => {
       activity,
       asked,
       base: null,
-      acceptedBookmark: "pinetrie-onto",
+      acceptedBookmark: "pinetrie-accepted",
       wipAhead: 0,
       catchUp: catching.catchUp ?? { kind: "current" },
       untraced: catching.untraced ?? false,
@@ -145,7 +145,7 @@ describe("offerView: ADR-0038's table", () => {
       held: false,
       acceptedAs: null,
       base: { kind: "accepted" },
-      acceptedBookmark: "pinetrie-onto",
+      acceptedBookmark: "pinetrie-accepted",
       catchUp: { kind: "current" },
       untraced: false,
       conflictCause: "work",
@@ -218,7 +218,7 @@ describe("offerView: ADR-0038's table", () => {
       base: { base: { kind: "wip", bookmark: "wip/a" }, state: "gone" },
       parent: null,
       parentRunning: false,
-      acceptedBookmark: "pinetrie-onto",
+      acceptedBookmark: "pinetrie-accepted",
       wipAhead: 0,
       catchUp: { kind: "current" },
       untraced: false,
@@ -270,7 +270,7 @@ describe("offerView: ADR-0038's table", () => {
       commit: typeof L1 | null,
       wips = [] as { bookmark: string; commit: typeof L1 }[],
     ) => ({
-      acceptedBookmark: "pinetrie-onto",
+      acceptedBookmark: "pinetrie-accepted",
       wipPrefix: "wip/",
       publish: "main",
       published: { commit: null, behind: 0, ahead: 0 },
@@ -339,7 +339,7 @@ describe("offerView: ADR-0038's table", () => {
     // Only what brings files says the move: the header's ↓ names it.
     const move = {
       base: { kind: "accepted" },
-      bookmark: "pinetrie-onto",
+      bookmark: "pinetrie-accepted",
       from: L1,
       to: L2,
     }
@@ -376,7 +376,7 @@ describe("a conflict that came with the copy, and the thread it branched from (A
       activity: "idle",
       asked: null,
       base: null,
-      acceptedBookmark: "pinetrie-onto",
+      acceptedBookmark: "pinetrie-accepted",
       wipAhead: 0,
       catchUp: { kind: "current" },
       untraced: false,

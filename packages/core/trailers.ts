@@ -66,16 +66,6 @@ const valueOn = (line: string, key: TrailerKey): string | undefined =>
   ACCEPTED[key].exec(line)?.[1]
 
 /**
- * pre-rename: a base on accepted work as the host wrote it before the rename.
- * The line's bookmark was `pineta-onto` then; it is `pinetrie-onto` now, so
- * the readers that compare a base's bookmark with accepted work's would take such
- * a base for a WIP that no longer exists. Read as no base, the lane falls
- * back to the newest accepted commit in its history (`laneBase`), which is the
- * line. A WIP's base keeps its name, and is read.
- */
-const OLD_LINE_BASE = "Pineta-Base: pineta-onto@"
-
-/**
  * Every value of trailer `key` in a message, from every paragraph, in order.
  * A squash of two commits keeps both messages, so a message can hold two
  * trailer paragraphs; jj's `trailers` template reads only the last (S77).
@@ -83,7 +73,6 @@ const OLD_LINE_BASE = "Pineta-Base: pineta-onto@"
 export function trailerValues(message: string, key: TrailerKey): string[] {
   return message
     .split("\n")
-    .filter(line => !(key === "base" && line.startsWith(OLD_LINE_BASE)))
     .flatMap(line => valueOn(line, key)?.trim() ?? [])
     .filter(v => v !== "")
 }
@@ -91,9 +80,7 @@ export function trailerValues(message: string, key: TrailerKey): string[] {
 /**
  * Commits whose message has a line `<key>: <value>`, or, with no value, any
  * line `<key>: ` of one of `keys`. `value` is inserted into jj's regex as it
- * is, so it holds no regex character: a thread's name (`word-word`). A base
- * on the old line is found, and `baseOf` reads it as none: it is still the
- * newest base, so an older WIP base below it is not taken for the lane's.
+ * is, so it holds no regex character: a thread's name (`word-word`).
  */
 export function trailerRevset(
   keys: readonly TrailerKey[],
@@ -149,15 +136,28 @@ export function entryOfMessage(description: string): EntryId | null {
 
 // ── a lane's base (ADR-0060) ──────────────────────────────────────────────
 
+/** A base as its trailer names it (ADR-0100): accepted work, or a WIP by its bookmark. */
+export type BaseTrailer =
+  | { readonly kind: "accepted"; readonly commit: CommitId }
+  | {
+      readonly kind: "wip"
+      readonly bookmark: string
+      readonly commit: CommitId
+    }
+
 /**
- * A commit's message that names a lane's base (ADR-0060): accepted work or a WIP
- * bookmark, and the commit it pointed at. The newest such commit in a lane's
- * history is the thread's base (`laneBase`).
+ * What a base trailer names accepted work by: its kind, not its bookmark,
+ * which config may rename (ADR-0100).
  */
-export const baseMessage = (
-  title: string,
-  base: { readonly bookmark: string; readonly commit: CommitId },
-): string => `${title}\n\n${TRAILERS.base}: ${base.bookmark}@${base.commit}\n`
+const ACCEPTED_BASE = "accepted"
+
+/**
+ * A commit's message that names a lane's base (ADR-0060): accepted work or a
+ * WIP bookmark, and the commit it pointed at. The newest such commit in a
+ * lane's history is the thread's base (`laneBase`).
+ */
+export const baseMessage = (title: string, base: BaseTrailer): string =>
+  `${title}\n\n${TRAILERS.base}: ${base.kind === "accepted" ? ACCEPTED_BASE : base.bookmark}@${base.commit}\n`
 
 /** `<bookmark>@<commit>`, a base trailer's value, read back; null if malformed. */
 function parseBase(
@@ -169,14 +169,19 @@ function parseBase(
 }
 
 /**
- * The newest base a message carries, parsed; null for none, a malformed one,
- * or one on the old line (`OLD_LINE_BASE`).
+ * The newest base a message carries; null for none or a malformed one. A name
+ * with the WIP prefix is that WIP; any other is accepted work (ADR-0100), so
+ * a base written under an older name of accepted work's bookmark
+ * (`pinetrie-onto`, `pineta-onto`) still reads as accepted work.
  */
-export function baseOf(
-  message: string,
-): { readonly bookmark: string; readonly commit: CommitId } | null {
+export function baseOf(message: string, wipPrefix: string): BaseTrailer | null {
   const value = trailerValues(message, "base").at(-1)
-  return value === undefined ? null : parseBase(value)
+  const parsed = value === undefined ? null : parseBase(value)
+  if (parsed === null) return null
+  const { bookmark, commit } = parsed
+  return bookmark !== ACCEPTED_BASE && bookmark.startsWith(wipPrefix)
+    ? { kind: "wip", bookmark, commit }
+    : { kind: "accepted", commit }
 }
 
 // ── an offer's message (ADR-0038, ADR-0060) ───────────────────────────────

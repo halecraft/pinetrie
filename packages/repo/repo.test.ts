@@ -388,8 +388,9 @@ describe("a lane's repo, with jj", () => {
     ).toContain("two (you)")
     // The copy is no commit of yours: your WIP stays yours (ADR-0060).
     expect(await commitsOf(laneJj, `${copy} & ${wip1.commit}`)).toEqual([])
-    expect(await newestBase(laneJj, copy)).toEqual({
+    expect(await newestBase(laneJj, copy, "wip/")).toEqual({
       at: copy,
+      kind: "wip",
       bookmark: "wip/x",
       commit: wip1.commit,
     })
@@ -613,7 +614,6 @@ describe("a lane's repo, with jj", () => {
     const acceptedMerge = async (mark = false) =>
       planMerge({
         kind: "accepted",
-        acceptedBookmark: line.acceptedBookmark,
         commit: await acceptedNow(),
         mark,
       })
@@ -742,10 +742,10 @@ describe("a lane's repo, with jj", () => {
       throw new Error("no mark")
     expect(await bookmarkOf(laneJj, LANE)).toBe(moved.mark)
     expect(
-      await newestBase(laneJj, bookmarkRevset(bookmarkName(LANE))),
+      await newestBase(laneJj, bookmarkRevset(bookmarkName(LANE)), "wip/"),
     ).toEqual({
       at: moved.mark,
-      bookmark: line.acceptedBookmark,
+      kind: "accepted",
       commit: await acceptedNow(),
     })
 
@@ -818,7 +818,7 @@ describe("a lane's repo, with jj", () => {
     // agent's commit, so the merge keeps b.txt.
     await edit(yoursDir, "yours.txt", "yours\n")
     await yoursJj(["commit", "-m", "you add a file"])
-    await yoursJj(["bookmark", "move", "pinetrie-onto", "--to", "@-"])
+    await yoursJj(["bookmark", "move", "pinetrie-accepted", "--to", "@-"])
     const line = await acceptedNow()
     await inLane([fetchById([line])])
     const { ours, merge } = await mergeBase(laneJj, LANE, line, "update")
@@ -935,7 +935,10 @@ describe("a lane's repo, with jj", () => {
       "-m",
       "feat: as I want it",
     ])
-    const facts = await readOffer(ops, { name: NAME, target: "pinetrie-onto" })
+    const facts = await readOffer(ops, {
+      name: NAME,
+      target: "pinetrie-accepted",
+    })
     const [now] = facts?.kind === "offer" ? facts.revisions : []
     if (now === undefined) throw new Error("no commit")
     expect(now.commit).not.toBe(w)
@@ -1053,8 +1056,8 @@ describe("a lane's repo, with jj", () => {
         laneJj,
         LANE,
         commit,
-        baseMessage(`update: ${line.acceptedBookmark}`, {
-          bookmark: line.acceptedBookmark,
+        baseMessage("catch up: accepted work", {
+          kind: "accepted",
           commit,
         }),
       )
@@ -1069,7 +1072,6 @@ describe("a lane's repo, with jj", () => {
       const commit = await acceptedNow()
       const plan = planMerge({
         kind: "accepted",
-        acceptedBookmark: line.acceptedBookmark,
         commit,
         mark: false,
       })
@@ -1199,7 +1201,6 @@ describe("a lane's repo, with jj", () => {
     await rig.inLane(
       planForkSetup(LANE, {
         kind: "accepted",
-        acceptedBookmark: rig.line.acceptedBookmark,
         commit: line,
       }),
     )
@@ -1574,8 +1575,8 @@ describe("a lane's repo, with jj", () => {
       rig.laneJj,
       LANE,
       l2,
-      baseMessage(`update: ${line.acceptedBookmark}`, {
-        bookmark: line.acceptedBookmark,
+      baseMessage("catch up: accepted work", {
+        kind: "accepted",
         commit: l2,
       }),
     )
@@ -1688,8 +1689,8 @@ describe("a lane's repo, with jj", () => {
       rig.laneJj,
       LANE,
       acceptedCommit,
-      baseMessage(`update: ${line.acceptedBookmark}`, {
-        bookmark: line.acceptedBookmark,
+      baseMessage("catch up: accepted work", {
+        kind: "accepted",
         commit: acceptedCommit,
       }),
     )
@@ -1730,7 +1731,7 @@ describe("a lane's repo, with jj", () => {
     await accept(await offer(base))
     await edit(yoursDir, "mine.txt", "mine\n")
     await yoursJj(["commit", "-m", "mine on accepted work"])
-    await yoursJj(["bookmark", "move", "pinetrie-onto", "--to", "@-"])
+    await yoursJj(["bookmark", "move", "pinetrie-accepted", "--to", "@-"])
     const before = await commitsOf(ops, "::@-")
     await executeRepo(yoursDir, laneRefSteps([{ lane: LANE, commit: null }]))
     expect(await commitsOf(ops, "::@-")).toEqual(before)
@@ -2650,7 +2651,7 @@ describe("a lane's repo, with jj", () => {
       expect(await commitsOf(forkJj, 'files(root:".pineta-lane")')).toEqual([])
     }, 60_000)
 
-    test("an old lane on the line: its Pineta-Base on pineta-onto reads as the line, the batched read and the separate reads alike; its offer starts above what it had accepted", async () => {
+    test("an old lane on accepted work: its Pineta-Base on pineta-onto reads as accepted work, the batched read and the separate reads alike; its offer starts above what it had accepted", async () => {
       const rig = await offerRig("old-base")
       const { yoursDir, yoursJj, laneDir, laneJj, ops, line, inLane, edit } =
         rig
@@ -2669,7 +2670,7 @@ describe("a lane's repo, with jj", () => {
       await inLane(
         planForkSetup(LANE, { kind: "commits", commits: [onAccepted] }),
       )
-      // The base as the host wrote it before the rename.
+      // The base as the host wrote it before the pine·trie rename.
       await laneJj([
         "new",
         "-m",

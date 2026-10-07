@@ -148,7 +148,7 @@ test("an acceptance writes the lane's base record, runs its steps, then marks th
     kind: "accept",
     name: NAME,
     bookmark: accepted.bookmark,
-    destination: "pinetrie-onto",
+    destination: "pinetrie-accepted",
     top: "kxyz",
     accepted,
   })

@@ -23,7 +23,7 @@ const budgetOf = (tokens: number): PromptBudget => ({
 const floorOf = (
   tokens: number,
   intent = "",
-  incoming = "The project's work",
+  incoming = "Accepted work",
 ): Floor => {
   const found = resolutionFloor({
     budget: budgetOf(tokens),
@@ -125,9 +125,9 @@ describe("planResolution: the land message", () => {
       "What the person asked",
     )
   })
-  test("the intro names the project's work, not yours", () => {
+  test("the intro names accepted work, not yours", () => {
     expect(plan([file("a.ts", 1)], 100_000).content).toContain(
-      "The project's work was merged",
+      "Accepted work was merged",
     )
   })
   test("the skill, every file and both labelled sides are always present", () => {
@@ -225,7 +225,7 @@ describe("planResolution: the land message", () => {
         budget: budgetOf(100),
         skill: null,
         intent: "x".repeat(1_000),
-        incoming: "The project's work",
+        incoming: "Accepted work",
       }),
     ).toMatchObject({ kind: "too-large", budget: 100 })
     const floor = floorOf(90)

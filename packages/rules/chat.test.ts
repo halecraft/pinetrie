@@ -47,7 +47,7 @@ function floor(): Floor {
     budget: { tokens: 10_000, estimate: c => Math.ceil(c.length / 4) },
     skill: null,
     intent: "",
-    incoming: "The project's work",
+    incoming: "Accepted work",
   })
   if (found.kind !== "fits") throw new Error("the floor does not fit")
   return found.floor

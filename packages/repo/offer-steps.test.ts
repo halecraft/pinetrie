@@ -200,7 +200,7 @@ test("offerAcceptanceEffects and describeEffects: the acceptance's bookmark move
       kind: "accept",
       name: NAME,
       bookmark: accepted.bookmark,
-      destination: "pinetrie-onto",
+      destination: "pinetrie-accepted",
       top: "ktop",
       accepted,
     }),
@@ -208,7 +208,7 @@ test("offerAcceptanceEffects and describeEffects: the acceptance's bookmark move
     steps: planOfferAcceptanceSteps({
       bookmark: accepted.bookmark,
       top: "ktop",
-      destination: "pinetrie-onto",
+      destination: "pinetrie-accepted",
     }),
     after: { kind: "accepted", record: accepted },
     built: false,

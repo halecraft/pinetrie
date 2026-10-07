@@ -98,7 +98,7 @@ const ACCEPTED: OfferFact = {
   lane: LANE,
   by: ADA,
   as: "kabcdefg",
-  bookmark: "pinetrie-onto",
+  bookmark: "pinetrie-accepted",
   to: { kind: "accepted" },
 }
 

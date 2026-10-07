@@ -529,7 +529,6 @@ export type ForkBegin = Extract<
 export function planBegin(input: {
   /** The WIP bookmark chosen at the first message; null for accepted work. */
   readonly base: string | null
-  readonly acceptedBookmark: string
   readonly wipPrefix: string
   readonly facts: {
     /** Accepted work's commit; null before it is set up. */
@@ -543,7 +542,6 @@ export function planBegin(input: {
   if (base === null)
     return {
       kind: "accepted",
-      acceptedBookmark: input.acceptedBookmark,
       commit: facts.acceptedCommit,
     }
   if (!base.startsWith(input.wipPrefix) || facts.wip === null)
@@ -578,7 +576,6 @@ export type UpdateRefusal =
  * nothing is merged. With no line, refused (`not_set_up`). Pure.
  */
 export function planUpdateFrom(input: {
-  readonly acceptedBookmark: string
   /** The lane's base, from its own history; null for a lane with none, on accepted work. */
   readonly base: LaneBase | null
   /** `wipState` of a WIP base (`@pinetrie/repo`); "ok" for accepted work. */
@@ -601,7 +598,6 @@ export function planUpdateFrom(input: {
   if (followed.kind === "accepted")
     return {
       kind: "accepted",
-      acceptedBookmark: input.acceptedBookmark,
       commit: input.acceptedCommit,
       mark: input.toAccepted && base?.base.kind === "wip",
     }

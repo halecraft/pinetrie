@@ -182,7 +182,7 @@ const SAMPLES: readonly Sample[] = [
     "line",
     ACCEPTED,
     {
-      acceptedBookmark: "pinetrie-onto",
+      acceptedBookmark: "pinetrie-accepted",
       wipPrefix: "wip/",
       publish: "main",
       published: { commit: C, behind: 1, ahead: 0 },

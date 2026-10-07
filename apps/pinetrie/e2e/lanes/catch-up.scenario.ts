@@ -100,7 +100,7 @@ async function catchUpSection(check: Checks["check"]): Promise<void> {
 
     // Accepted work moves on: your commit, published, which accepts it and
     // moves main (ADR-0090).
-    jj(project, "bookmark", "create", "main", "-r", "pinetrie-onto")
+    jj(project, "bookmark", "create", "main", "-r", "pinetrie-accepted")
     writeFileSync(path.join(project, "landed.txt"), "landed\n")
     jj(project, "commit", "-m", "you land landed.txt")
     await wu.actOnAccepted("publish")
@@ -152,7 +152,7 @@ async function catchUpSection(check: Checks["check"]): Promise<void> {
     )
 
     // An acceptance leaves a fact in the thread (ADR-0080).
-    const accepted = await wu.offer(lane, "accept", "pinetrie-onto")
+    const accepted = await wu.offer(lane, "accept", "pinetrie-accepted")
     const fact = await waitFor(() => {
       const now = tree()
       return ancestry(now, laneTip(lane)).path.some(

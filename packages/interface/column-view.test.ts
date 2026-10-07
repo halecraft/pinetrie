@@ -185,7 +185,7 @@ const work = (over: Partial<WorkFacts> = {}): WorkFacts => ({
 })
 /** Accepted work, one commit past the lane's base: `base` read what catching up brings. */
 const ACCEPTED = {
-  acceptedBookmark: "pinetrie-onto",
+  acceptedBookmark: "pinetrie-accepted",
   wipPrefix: "wip/",
   publish: "main",
   published: { commit: null, behind: 0, ahead: 0 },
@@ -539,7 +539,7 @@ describe("columnView: the work strip", () => {
     expect(shows.strip.words.menu.find(b => b.button === "update")).toEqual({
       button: "update",
       label: "catch up with accepted work",
-      title: "merges pinetrie-onto into this thread's copy",
+      title: "merges pinetrie-accepted into this thread's copy",
     })
     expect(shows.behind).toBeNull()
   })
@@ -722,7 +722,7 @@ describe("offerWords", () => {
         activity,
         asked: null,
         base,
-        acceptedBookmark: "pinetrie-onto",
+        acceptedBookmark: "pinetrie-accepted",
         wipAhead: 2,
         catchUp: catching.catchUp ?? { kind: "current" },
         untraced: catching.untraced ?? false,
@@ -815,7 +815,7 @@ describe("offerWords", () => {
   })
   const MOVE = {
     base: { kind: "accepted" },
-    bookmark: "pinetrie-onto",
+    bookmark: "pinetrie-accepted",
     from: commitId("a"),
     to: commitId("b"),
   } as const
@@ -824,10 +824,10 @@ describe("offerWords", () => {
       catchUp: { kind: "unknown" },
     })
     expect(w.buttons[0]?.title).toBe(
-      "moves pinetrie-onto forward to pinetrie-offer/amber-fox",
+      "moves pinetrie-accepted forward to pinetrie-offer/amber-fox",
     )
     expect(w.menu.find(b => b.button === "update")?.title).toBe(
-      "merges pinetrie-onto into this thread's copy",
+      "merges pinetrie-accepted into this thread's copy",
     )
     expect(words(offer, "idle", WIP_BASE).buttons[0]?.title).toBe(
       "moves wip/search forward to pinetrie-offer/amber-fox",
@@ -840,7 +840,8 @@ describe("offerWords", () => {
     expect(behind.buttons.find(b => b.button === "update")).toEqual({
       button: "update",
       label: "catch up with accepted work",
-      title: "merges pinetrie-onto into this thread's copy · changes 3 files",
+      title:
+        "merges pinetrie-accepted into this thread's copy · changes 3 files",
     })
     expect(words(undefined, "idle", ACCEPTED_BASE, brings).line).toBe(
       "accepted work has moved on since this thread started",
@@ -870,7 +871,7 @@ describe("offerWords", () => {
     expect(update({ kind: "unknown" })).toEqual({
       button: "update",
       label: "catch up with accepted work",
-      title: "merges pinetrie-onto into this thread's copy",
+      title: "merges pinetrie-accepted into this thread's copy",
     })
     // Nothing new is no "new work" either.
     expect(
@@ -979,7 +980,7 @@ describe("offerWords", () => {
     [
       "an acceptance from a WIP into accepted work",
       WIP_BASE,
-      sent("accept", "pinetrie-onto"),
+      sent("accept", "pinetrie-accepted"),
       "accepting…",
     ],
     ["a squash", ACCEPTED_BASE, sent("squash"), "squashing to one…"],
@@ -1025,7 +1026,7 @@ describe("behindMark: the header's mark for a base that moved on", () => {
     expect(behindMark(BASE, ACCEPTED)).toEqual({
       mark: "↓",
       title:
-        "accepted work has moved on since this thread started, in 2 files · pinetrie-onto: aaaaaaaa → bbbbbbbb",
+        "accepted work has moved on since this thread started, in 2 files · pinetrie-accepted: aaaaaaaa → bbbbbbbb",
     })
   })
   test("a thread's details say it in full (ADR-0073)", () => {

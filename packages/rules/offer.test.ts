@@ -293,7 +293,7 @@ describe("records", () => {
     expect(OFFER.decode(structuredClone(o.value), LANE)).toEqual(offer)
     expect(OFFER.decode({ ...offer, size: 0 }, LANE)).toBeUndefined()
     const line = {
-      acceptedBookmark: "pinetrie-onto",
+      acceptedBookmark: "pinetrie-accepted",
       wipPrefix: "wip/",
       publish: "main",
       published: { commit: null, behind: 0, ahead: 0 },
@@ -343,7 +343,6 @@ describe("the update and stack messages", () => {
   const details = {
     lane: LANE,
     from: { kind: "accepted" as const },
-    bookmark: "pinetrie-onto",
     merged: COPY,
     commits: ["feat: yours"],
     files: ["a.txt", "c.txt"],
@@ -358,11 +357,18 @@ describe("the update and stack messages", () => {
       content: "↓ caught up with accepted work: 2 files changed",
       merged: [COPY],
     })
-    expect(m.content).toContain("pinetrie-onto was merged into this thread")
+    expect(m.content).toContain("Accepted work was merged into this thread")
+    expect(m.details).toMatchObject({ base: "accepted", line: true })
+    // An update stored before ADR-0100 named accepted work by its bookmark.
+    expect(
+      decodeUpdate({
+        ...m,
+        details: { ...m.details, base: "pinetrie-accepted", line: true },
+      })?.from,
+    ).toEqual({ kind: "accepted" })
     const wip = {
       ...details,
       from: { kind: "wip" as const, bookmark: "wip/a" },
-      bookmark: "wip/a",
     }
     expect(renderableMessage(encodeUpdate(wip, 5))).toMatchObject({
       content: "↓ caught up with wip/a: 2 files changed",
@@ -376,7 +382,6 @@ describe("the update and stack messages", () => {
         lane: laneNameForThread("p"),
         name: "amber-fox" as ThreadName,
       },
-      bookmark: null,
     }
     const m = encodeUpdate(fromParent, 5)
     expect(decodeUpdate(structuredClone(m))).toEqual(fromParent)
@@ -429,18 +434,18 @@ describe("offerAcceptanceDestinations (ADR-0060)", () => {
     offerAcceptanceDestinations({
       base: line,
       state: "ok",
-      acceptedBookmark: "pinetrie-onto",
+      acceptedBookmark: "pinetrie-accepted",
       conflicted: false,
       wipAhead: 2,
       ...over,
     }).map(d => [d.bookmark, d.bringsAlong, d.final])
   test("a thread on accepted work: accepted work, final", () => {
-    expect(of()).toEqual([["pinetrie-onto", 0, true]])
+    expect(of()).toEqual([["pinetrie-accepted", 0, true]])
   })
   test("a WIP thread: its WIP first, then accepted work with the WIP's commits", () => {
     expect(of({ base: wip })).toEqual([
       ["wip/x", 0, false],
-      ["pinetrie-onto", 2, true],
+      ["pinetrie-accepted", 2, true],
     ])
   })
   test("a conflicted offer never lands on accepted work: only into a WIP", () => {
@@ -449,7 +454,7 @@ describe("offerAcceptanceDestinations (ADR-0060)", () => {
   })
   test("a landed WIP is accepted work's; a gone one has none", () => {
     expect(of({ base: wip, state: "landed" })).toEqual([
-      ["pinetrie-onto", 0, true],
+      ["pinetrie-accepted", 0, true],
     ])
     expect(of({ base: wip, state: "gone" })).toEqual([])
   })
@@ -608,7 +613,7 @@ describe("the offer's policy over a gather (ADR-0038, ADR-0060)", () => {
     } as const
     /** What the page drew: this offer's ledger, not conflicting. */
     const SHOWN = { ledger: o.ledger, conflicted: false }
-    const BOTH = new Set(["wip/x", "pinetrie-onto"])
+    const BOTH = new Set(["wip/x", "pinetrie-accepted"])
     const accept = (
       over: {
         readonly to?: string | null
@@ -630,7 +635,7 @@ describe("the offer's policy over a gather (ADR-0038, ADR-0060)", () => {
         seen: over.seen === undefined ? SHOWN : over.seen,
         acceptance: { wipAhead: 2, below: over.below ?? BOTH },
         editing: new Set(),
-        acceptedBookmark: "pinetrie-onto",
+        acceptedBookmark: "pinetrie-accepted",
         to: over.to ?? null,
         now: 9,
       })
@@ -653,7 +658,9 @@ describe("the offer's policy over a gather (ADR-0038, ADR-0060)", () => {
         top: "ktop",
         accepted: { ...record, acceptedAs: "ktop", at: 9 },
       })
-      expect(outcome(accept({ to: "pinetrie-onto" }))).toBe("pinetrie-onto")
+      expect(outcome(accept({ to: "pinetrie-accepted" }))).toBe(
+        "pinetrie-accepted",
+      )
     })
     test("refused in order: no offer, a WIP gone, nothing shown, divergent, other work, no such destination", () => {
       expect(outcome(accept({ gathered: null }))).toBe(ERR.NO_OFFER)
@@ -682,7 +689,7 @@ describe("the offer's policy over a gather (ADR-0038, ADR-0060)", () => {
         outcome(accept({ offer: { kind: "divergent", changes: ["k"] } })),
       ).toBe(ERR.NO_OFFER)
       expect(outcome(accept({ to: "main" }))).toBe(ERR.BAD_DESTINATION)
-      expect(outcome(accept({ below: new Set(["pinetrie-onto"]) }))).toBe(
+      expect(outcome(accept({ below: new Set(["pinetrie-accepted"]) }))).toBe(
         ERR.BAD_DESTINATION,
       )
     })
@@ -692,7 +699,7 @@ describe("the offer's policy over a gather (ADR-0038, ADR-0060)", () => {
       expect(outcome(accept({ offer: conflicted, seen: shown }))).toBe("wip/x")
       expect(
         outcome(
-          accept({ offer: conflicted, seen: shown, to: "pinetrie-onto" }),
+          accept({ offer: conflicted, seen: shown, to: "pinetrie-accepted" }),
         ),
       ).toBe(ERR.BAD_DESTINATION)
       const untraced = gather({
@@ -705,7 +712,7 @@ describe("the offer's policy over a gather (ADR-0038, ADR-0060)", () => {
         },
         offer: o,
       })
-      expect(outcome(accept({ gathered: untraced }))).toBe("pinetrie-onto")
+      expect(outcome(accept({ gathered: untraced }))).toBe("pinetrie-accepted")
     })
     test.each([
       [

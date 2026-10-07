@@ -629,7 +629,7 @@ describe("drain: a fact (ADR-0080)", () => {
       lane: LANE,
       by: ADA,
       as: "kabcdefgh",
-      bookmark: "pinetrie-onto",
+      bookmark: "pinetrie-accepted",
       to: { kind: "accepted" },
     } as const
     b.places.cards.set(

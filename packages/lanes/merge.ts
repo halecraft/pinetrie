@@ -12,6 +12,7 @@
 // this merge.
 
 import {
+  type BaseTrailer,
   baseOf,
   type CommitId,
   type LaneName,
@@ -198,20 +199,20 @@ async function markBase(
 /**
  * A lane's base as its history says it (ADR-0060): the newest commit in
  * `::rev` whose message carries a base trailer, read with `jj` (the lane's,
- * or your repo's on the lane's tip). Its value names the bookmark and the
- * commit it pointed at; null for a lane with none, one from before accepted work,
- * or one whose newest base is on accepted work as it was named before the rename
- * (`baseOf`).
+ * or your repo's on the lane's tip). Its value names accepted work, or a WIP
+ * by its bookmark (`baseOf`, by `wipPrefix`), and the commit it pointed at;
+ * null for a lane with none, one from before accepted work.
  */
 export async function newestBase(
   jj: Runner,
   rev: string,
-): Promise<{
-  /** The commit carrying the trailer. */
-  readonly at: CommitId
-  readonly bookmark: string
-  readonly commit: CommitId
-} | null> {
+  wipPrefix: string,
+): Promise<
+  | ({
+      /** The commit carrying the trailer. */ readonly at: CommitId
+    } & BaseTrailer)
+  | null
+> {
   const [at] = await commitsOf(
     jj,
     `latest(heads(::(${rev}) & ${trailerRevset(["base"])}))`,
@@ -227,7 +228,7 @@ export async function newestBase(
     "description",
   ])
   if (!ran.ok) throw new Error(describeFailure("jj log", ran))
-  const base = baseOf(ran.stdout)
+  const base = baseOf(ran.stdout, wipPrefix)
   return base === null ? null : { at, ...base }
 }
 

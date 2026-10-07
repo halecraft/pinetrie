@@ -17,6 +17,48 @@ const offersRefresh = [
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "pre-accepted: a configured bookmark is renamed over",
+    file: "packages/repo/pre-accepted.ts",
+    from: "  if (configured !== DEFAULT_REPO.acceptedBookmark)\n    return { steps: [], lines: [] }\n",
+    to: "",
+    command: [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "packages/repo/pre-accepted.test.ts",
+    ],
+    expect: "a config that names its own bookmark is left alone",
+  },
+  {
+    name: "pre-accepted: the rename runs onto pinetrie-accepted already there",
+    file: "packages/repo/pre-accepted.ts",
+    from: "  if (facts.old && !facts.current) {\n",
+    to: "  if (facts.old) {\n",
+    command: [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "packages/repo/pre-accepted.test.ts",
+    ],
+    expect: "both bookmarks: none renamed, and said",
+  },
+  {
+    name: "pre-accepted: any immutable_heads() is rewritten",
+    file: "packages/repo/pre-accepted.ts",
+    from: "  if (heads?.endsWith(oldHeads)) {\n",
+    to: "  if (heads !== null) {\n",
+    command: [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "packages/repo/pre-accepted.test.ts",
+    ],
+    expect: "nothing once done, with no line, or with a config of jj's own",
+  },
+  {
     name: "pre-rename: an old accepted offer's trailers are not read",
     file: "packages/core/trailers.ts",
     from: 'const READ = "Pine(?:trie|ta)-"',
@@ -25,13 +67,13 @@ export const mutations: readonly Mutation[] = [
     expect: "its offer starts above what it had accepted",
   },
   {
-    name: "pre-rename: a base on the old line reads as a WIP",
-    file: "packages/core/trailers.ts",
-    from: '    .filter(line => !(key === "base" && line.startsWith(OLD_LINE_BASE)))\n',
-    to: "",
+    name: "a lane read in a batch takes every base for a WIP's",
+    file: "packages/repo/lane-read.ts",
+    from: '    if (parsed.kind === "wip") return { kind: "wip" }\n',
+    to: '    return { kind: "wip" }\n',
     command: repoTest,
     expect:
-      "its Pineta-Base on pineta-onto reads as the line, the batched read and the separate reads alike",
+      "its Pineta-Base on pineta-onto reads as accepted work, the batched read and the separate reads alike",
   },
   {
     name: "a publish's catch-up moves only @'s line",
@@ -180,11 +222,12 @@ export const mutations: readonly Mutation[] = [
       "a new root thread starts at accepted work: it has what you landed, and not what you have not",
   },
   {
-    name: "accepted work's heads fail a repo with no line",
+    name: "accepted work's heads fail a repo with no accepted work",
     file: "packages/repo/plan.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: "  const acceptedBookmark = `present(${revsetName(repoConfig.acceptedBookmark)})`",
-    to: "  const acceptedBookmark = revsetName(line.acceptedBookmark)",
+    from: "  const accepted = `present(${revsetName(bookmark)})`",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
+    to: "  const accepted = `${revsetName(bookmark)}`",
     command: unit,
     expect: "added to jj's builtin when the repo defines none, with present()",
   },

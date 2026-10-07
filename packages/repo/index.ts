@@ -41,4 +41,5 @@ export {
   planSetup,
   setupProposal,
 } from "./plan.ts"
+export { renameAccepted } from "./pre-accepted.ts"
 export type { RepoStep } from "./step.ts"

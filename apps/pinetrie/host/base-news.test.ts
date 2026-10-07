@@ -30,7 +30,7 @@ function behind(to = "l2") {
   putValue(
     b,
     setRecord(ACCEPTED, {
-      acceptedBookmark: "pinetrie-onto",
+      acceptedBookmark: "pinetrie-accepted",
       wipPrefix: "wip/",
       publish: "main",
       published: { commit: null, behind: 0, ahead: 0 },

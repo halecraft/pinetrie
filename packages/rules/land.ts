@@ -1,7 +1,7 @@
 // land — the prompt of a resolution run (ADR-0033, ADR-0038, ADR-0055,
 // ADR-0084).
 //
-// Bringing a thread up to date merges the project's work, or the work of the
+// Bringing a thread up to date merges accepted work, or the work of the
 // thread it branched from (ADR-0072), into its lane, in the lane's own copy;
 // when that conflicts, the agent resolves it. The run starts with a land
 // message: a pi
@@ -188,7 +188,7 @@ export interface Floor {
   readonly skill: LandSkill | null
   /** The card's text, trimmed: what the person wants done with the new work; "" for nothing. */
   readonly intent: string
-  /** Whose work came in, as the model reads it: "The project's work", or a thread's. */
+  /** Whose work came in, as the model reads it: "Accepted work", a WIP's, or a thread's. */
   readonly incoming: string
   /** The `count` message's content. */
   readonly content: string

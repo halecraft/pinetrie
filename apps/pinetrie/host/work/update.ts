@@ -110,7 +110,9 @@ export function incomingOf(from: BaseMerge): string {
   const caughtUp = mergedFrom(from)
   return caughtUp.kind === "parent"
     ? `The work of the thread this one branched from (${caughtUp.name})`
-    : "The project's work"
+    : caughtUp.kind === "accepted"
+      ? "Accepted work"
+      : `The work on ${caughtUp.bookmark}`
 }
 
 /**
@@ -242,12 +244,6 @@ export function planSettle(
 ): Settle {
   const { lane, by, from } = ctx
   const caughtUp = mergedFrom(from)
-  const bookmark =
-    from.kind === "accepted"
-      ? from.acceptedBookmark
-      : from.kind === "wip"
-        ? from.bookmark
-        : null
   switch (facts.kind) {
     case "nothing":
       return {
@@ -261,7 +257,6 @@ export function planSettle(
           {
             lane,
             from: caughtUp,
-            bookmark,
             merged: facts.from,
             files: facts.files,
             commits: facts.commits,
@@ -289,7 +284,10 @@ export function planSettle(
             },
             theirs: {
               label: "theirs",
-              who: bookmark ?? `the thread ${catchUpName(caughtUp)}`,
+              who:
+                caughtUp.kind === "parent"
+                  ? `the thread ${catchUpName(caughtUp)}`
+                  : catchUpName(caughtUp),
               reasons: touching(facts.theirs, path).map(d => firstLine(d, 200)),
             },
           })),
@@ -513,7 +511,6 @@ export function createUpdates(deps: {
         ),
       }))
       return planUpdateFrom({
-        acceptedBookmark: repoConfig.acceptedBookmark,
         base,
         state,
         toAccepted,

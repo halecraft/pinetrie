@@ -28,8 +28,9 @@ const STACK_TYPE = "pinetrie.stack"
 const UpdateDetailsSchema = Type.Object({
   lane: Type.String({ minLength: 1 }),
   /**
-   * The bookmark the thread was brought up to date with: accepted work, or its
-   * WIP. Absent in updates stored before ADR-0060, which merged your `@`.
+   * What the thread was brought up to date with: its WIP's bookmark, or for
+   * accepted work its bookmark then, or `accepted` since ADR-0100, read by
+   * `line`. Absent in updates stored before ADR-0060, which merged your `@`.
    */
   base: Type.Optional(Type.String({ minLength: 1 })),
   /**
@@ -62,8 +63,6 @@ interface UpdateDetails {
   readonly lane: LaneName
   /** What was merged in; null for an update stored before ADR-0060. */
   readonly from: CatchUpFrom | null
-  /** The base's bookmark, which the model reads; null for a parent. */
-  readonly bookmark: string | null
   /** The commit merged: accepted work's, or the WIP's copy. */
   readonly merged: CommitId
   readonly commits: readonly string[]
@@ -105,7 +104,6 @@ const fromStoredUpdate = (
     ? {
         lane: d.lane,
         from: storedFrom(d),
-        bookmark: d.parent === undefined ? (d.base ?? null) : null,
         merged: commitId(d.copy),
         commits: d.commits,
         files: d.files,
@@ -135,9 +133,13 @@ export function encodeUpdate(
       : details.commits.map(c => `- ${firstLine(c, 200)}\n`).join("")
   const { from } = details
   const what =
-    from?.kind === "parent"
-      ? `The work of the thread this one branched from (${from.name})`
-      : (details.bookmark ?? "The person's work")
+    from === null
+      ? "The person's work"
+      : from.kind === "parent"
+        ? `The work of the thread this one branched from (${from.name})`
+        : from.kind === "accepted"
+          ? "Accepted work"
+          : from.bookmark
   const files = details.files.map(f => `- ${f}\n`).join("") || "- (none)\n"
   return {
     role: "custom",
@@ -148,11 +150,13 @@ export function encodeUpdate(
     display: true,
     details: {
       lane: details.lane,
-      ...(from?.kind === "parent"
-        ? { parent: { lane: from.lane, name: from.name } }
-        : from === null || details.bookmark === null
-          ? {}
-          : { base: details.bookmark, line: from.kind === "accepted" }),
+      ...(from === null
+        ? {}
+        : from.kind === "parent"
+          ? { parent: { lane: from.lane, name: from.name } }
+          : from.kind === "accepted"
+            ? { base: "accepted", line: true }
+            : { base: from.bookmark, line: false }),
       copy: details.merged,
       commits: [...details.commits],
       files: [...details.files],

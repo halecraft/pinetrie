@@ -15,9 +15,7 @@ import {
   CATCH_UP_TOOL,
   type CommitId,
   commitId,
-  isLaneName,
   type OfferRecord,
-  type ThreadName,
 } from "@pinetrie/core"
 import { type Static, Type } from "typebox"
 import { baseMovedOn, catchUpOf } from "./accepted.ts"

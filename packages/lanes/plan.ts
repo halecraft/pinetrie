@@ -469,7 +469,7 @@ export interface RepoConfig {
 }
 
 export const DEFAULT_REPO: RepoConfig = {
-  acceptedBookmark: "pinetrie-onto",
+  acceptedBookmark: "pinetrie-accepted",
   wipPrefix: "wip/",
   publish: "main",
   publishCatchesUp: false,
@@ -805,23 +805,18 @@ export const restoreVolume = (
 ]
 
 /**
- * The lane steps that start a lane on accepted work: an empty commit on accepted work's
- * commit naming it, left as `@-`. Its trailer says the thread is on accepted work.
+ * The lane steps that start a lane on accepted work: an empty commit on
+ * accepted work's commit, left as `@-`, whose trailer says the thread is on
+ * accepted work.
  */
-export const planAcceptedStart = (
-  acceptedBookmark: string,
-  commit: CommitId,
-): LaneStep[] => [
+export const planAcceptedStart = (commit: CommitId): LaneStep[] => [
   fetchById([commit]),
   inLane("jj", "new", commit),
   inLane(
     "jj",
     "commit",
     "-m",
-    baseMessage(`base: ${acceptedBookmark}`, {
-      bookmark: acceptedBookmark,
-      commit,
-    }),
+    baseMessage("base: accepted work", { kind: "accepted", commit }),
   ),
 ]
 
@@ -842,6 +837,7 @@ export const planWipCopy = (
     "commit",
     "-m",
     baseMessage(`copy of ${wip.bookmark}`, {
+      kind: "wip",
       bookmark: wip.bookmark,
       commit: wip.commit,
     }),
@@ -879,8 +875,8 @@ export function planMerge(from: BaseMerge): MergePlan {
     return {
       steps: [fetchById([from.commit])],
       source: from.commit,
-      message: baseMessage(`update: ${from.acceptedBookmark}`, {
-        bookmark: from.acceptedBookmark,
+      message: baseMessage("catch up: accepted work", {
+        kind: "accepted",
         commit: from.commit,
       }),
       mark: from.mark,
@@ -890,7 +886,7 @@ export function planMerge(from: BaseMerge): MergePlan {
     return {
       steps: [fetchById([from.commit])],
       source: from.commit,
-      message: `update: ${from.name}`,
+      message: `catch up: ${from.name}`,
       mark: false,
       came: { from: from.caughtUpWith, to: from.commit },
     }
@@ -967,7 +963,7 @@ export function planForkSetup(
 ): LaneStep[] {
   const base: LaneStep[] =
     start.kind === "accepted"
-      ? planAcceptedStart(start.acceptedBookmark, start.commit)
+      ? planAcceptedStart(start.commit)
       : start.kind === "wip"
         ? [
             fetchById([start.commit, start.under]),

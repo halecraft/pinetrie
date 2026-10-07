@@ -1403,7 +1403,7 @@ async function run(
                   "file",
                   "list",
                   "-r",
-                  "pinetrie-onto",
+                  "pinetrie-accepted",
                   'root:"from-lane.txt"',
                 ],
                 { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] },

@@ -25,7 +25,7 @@ const yours = (
 })
 
 const record = (over: Partial<AcceptedRecord> = {}): AcceptedRecord => ({
-  acceptedBookmark: "pinetrie-onto",
+  acceptedBookmark: "pinetrie-accepted",
   wipPrefix: "wip/",
   publish: "main",
   published: { commit: commitId("m0"), behind: 0, ahead: 0 },
@@ -58,7 +58,7 @@ describe("publishView: one button, only with something to do (ADR-0090)", () => 
     const w = words(record({ commit: null }))
     expect(w.label).toBe("set up")
     if (w.kind !== "setup") throw new Error(w.kind)
-    expect(w.heading).toBe("Set up accepted work: pinetrie-onto")
+    expect(w.heading).toBe("Set up accepted work: pinetrie-accepted")
     expect(w.notes[1]).toContain("builtin_immutable_heads() | …")
     expect(w.notes[2]).toContain("builtin_log() | …")
     expect(w.notes[3]).toContain('bookmarks(glob:"pinetrie-offer/*")')
@@ -86,7 +86,7 @@ describe("publishWords: what the button says it will do (ADR-0090)", () => {
     const w = words(record(unpublished(2)))
     expect(w.label).toBe("publish")
     expect(w.title).toBe(
-      "moves main forward over 2 accepted commits · jj bookmark move main --to pinetrie-onto",
+      "moves main forward over 2 accepted commits · jj bookmark move main --to pinetrie-accepted",
     )
   })
   test("with publish.catchUp off, the title says your files do not move, naming the setting", () => {
@@ -95,10 +95,10 @@ describe("publishWords: what the button says it will do (ADR-0090)", () => {
         record({ ...unpublished(2), publishCatchesUp: false, yours: yours(y) }),
       ).title
     expect(off({ behind: 1, ahead: 1 })).toBe(
-      "moves main forward over 2 accepted commits; your files do not move (publish.catchUp is off) · jj bookmark move main --to pinetrie-onto",
+      "moves main forward over 2 accepted commits; your files do not move (publish.catchUp is off) · jj bookmark move main --to pinetrie-accepted",
     )
     expect(off({})).toBe(
-      "moves main forward over 2 accepted commits · jj bookmark move main --to pinetrie-onto",
+      "moves main forward over 2 accepted commits · jj bookmark move main --to pinetrie-accepted",
     )
   })
   test("with publish.catchUp on: your files catch up, your commits are accepted, then main moves", () => {
@@ -113,7 +113,7 @@ describe("publishWords: what the button says it will do (ADR-0090)", () => {
       }),
     )
     expect(w.title).toBe(
-      "catches your files up with accepted work (changes 4 files; 1 other line of your work moves with it), accepts your 2 commits, then moves main forward over 1 accepted commit · jj rebase -b @ -d pinetrie-onto; jj bookmark move pinetrie-onto main --to @-",
+      "catches your files up with accepted work (changes 4 files; 1 other line of your work moves with it), accepts your 2 commits, then moves main forward over 1 accepted commit · jj rebase -b @ -d pinetrie-accepted; jj bookmark move pinetrie-accepted main --to @-",
     )
   })
   test("a publish the host would refuse leads its title with why", () => {
@@ -205,7 +205,7 @@ describe("publishToast and resolveIntent (ADR-0090)", () => {
       }),
     )
     expect(would?.kind === "newTab" ? would.prefill?.text : null).toBe(
-      "/pinetrie:skill:resolve-conflicts Catching my files up with accepted work (pinetrie-onto) conflicts in a.ts, b.ts. Rebase my work onto it (jj rebase -b @ -d pinetrie-onto) and resolve the conflicts in my working copy.",
+      "/pinetrie:skill:resolve-conflicts Catching my files up with accepted work (pinetrie-accepted) conflicts in a.ts, b.ts. Rebase my work onto it (jj rebase -b @ -d pinetrie-accepted) and resolve the conflicts in my working copy.",
     )
     // A catch-up reverted for your commits' conflicts left none to name.
     const reverted = resolveIntent(
@@ -213,7 +213,7 @@ describe("publishToast and resolveIntent (ADR-0090)", () => {
       record({ yours: yours({ behind: 1 }) }),
     )
     expect(reverted?.kind === "newTab" ? reverted.prefill?.text : null).toBe(
-      "/pinetrie:skill:resolve-conflicts Catching my files up with accepted work (pinetrie-onto) conflicts. Rebase my work onto it (jj rebase -b @ -d pinetrie-onto) and resolve the conflicts in my working copy.",
+      "/pinetrie:skill:resolve-conflicts Catching my files up with accepted work (pinetrie-accepted) conflicts. Rebase my work onto it (jj rebase -b @ -d pinetrie-accepted) and resolve the conflicts in my working copy.",
     )
     expect(resolveIntent(null, record())).toBe(null)
   })
@@ -254,7 +254,7 @@ describe("the thread's base in its header, and the bases a new lane may start fr
         true,
       ],
     ])
-    expect(baseChoices(line, null)[0]?.title).toBe("pinetrie-onto at c1")
+    expect(baseChoices(line, null)[0]?.title).toBe("pinetrie-accepted at c1")
     expect(baseChoices(record(), null)).toEqual([])
     expect(baseChoices(record({ commit: null }), null)).toEqual([])
     expect(baseChoices(null, null)).toEqual([])
