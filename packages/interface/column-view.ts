@@ -64,7 +64,7 @@ import { commandWords } from "./card-words.ts"
 import type { ColumnView } from "./column-paths.ts"
 import { type Column, freshOf } from "./columns.ts"
 import { ago, count } from "./counts.ts"
-import { speakerLabel } from "./names.ts"
+import { speakerWords } from "./names.ts"
 import { outcomeWords } from "./outcome-words.ts"
 import type { Reader } from "./send.ts"
 import { linkWords, type ThreadLink } from "./thread-link.ts"
@@ -551,7 +551,7 @@ function originOf(
   const worked = stretches.findLast(s => above.has(s.start))
   const speaker =
     message.role === "chat"
-      ? speakerLabel(f.nameOf, message.writer, message.author ?? "")
+      ? speakerWords(message, f.nameOf)
       : ((worked === undefined ? undefined : f.work.names.get(worked.lane)) ??
         "agent")
   return {

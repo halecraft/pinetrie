@@ -17,6 +17,7 @@ import type {
 } from "@pinetrie/core"
 import {
   type CardColumn,
+  type ColumnMatches,
   type Column as ColumnSpec,
   type ColumnView,
   cardOfFace,
@@ -56,6 +57,7 @@ export type SharedColumnProps = Omit<
   | "count"
   | "onTyping"
   | "path"
+  | "matches"
   | "position"
   | "drawnAt"
   | "readOnly"
@@ -75,6 +77,8 @@ interface Projected {
   readonly track: number
   /** Who holds the thread a branch not yet sent forks in, when someone else does (ADR-0124). */
   readonly heldBy: WriterId | null
+  /** Its matches while a search applies (ADR-0101), else null. */
+  readonly matches: ColumnMatches | null
 }
 
 export function Strip(p: {
@@ -151,6 +155,7 @@ export function Strip(p: {
         task={task}
         track={projected.track}
         view={projected.view}
+        matches={projected.matches}
         width={item?.width ?? 1}
       />
     )

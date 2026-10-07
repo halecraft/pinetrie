@@ -1124,8 +1124,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the column does not know who you are",
     file: "packages/web/column.tsx",
-    from: "              reader={{ me: p.session.writer, nameOf: p.nameOf }}\n              prefill={freshMode?.prefill}",
-    to: '              reader={{ me: "w-nobody" as WriterId, nameOf: p.nameOf }}\n              prefill={freshMode?.prefill}',
+    from: "                  reader={{ me: p.session.writer, nameOf: p.nameOf }}\n                  prefill={freshMode?.prefill}",
+    to: '                  reader={{ me: "w-nobody" as WriterId, nameOf: p.nameOf }}\n                  prefill={freshMode?.prefill}',
     suite: "browser",
     scenario: "page",
     expect:
@@ -2244,6 +2244,36 @@ export const mutations: readonly Mutation[] = [
     scenario: "page",
     expect:
       "hold queue holds the thread's queue, and unqueue all puts every queued card below the line",
+  },
+  {
+    name: "the page gathers no search focus",
+    file: "packages/web/app.tsx",
+    from: "        search: searchFocus(el, searchable, searchOpen),",
+    to: '        search: "closed",',
+    suite: "browser",
+    scenario: "tools",
+    expect:
+      "a search shows each column only its matches and lights them on the rail, and Escape puts every column back where it was",
+  },
+  {
+    name: "leaving a search outlines nothing",
+    file: "packages/web/use-reveal.ts",
+    from: '  message.dataset.landed = ""',
+    to: "  void message",
+    suite: "browser",
+    scenario: "tools",
+    expect:
+      "a match in an ask's work leaves the search at its message, its fold open, and outlined",
+  },
+  {
+    name: "a reveal does not wait for the fold it opens",
+    file: "packages/web/app.tsx",
+    from: "      reveal(entry, foldOpened.current)",
+    to: "      reveal(entry)",
+    suite: "browser",
+    scenario: "tools",
+    expect:
+      "a match in an ask's work leaves the search at its message, its fold open, and outlined",
   },
   {
     name: "the strip draws no note column",

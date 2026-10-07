@@ -140,6 +140,7 @@ const state = (
   tasks: tasksFor(index, [TEST_TASK, R1]),
   listWidth: "full",
   page: null,
+  searching: false,
 })
 const plan = (intent: Intent, s: IntentState) =>
   planIntent(intent, s, {

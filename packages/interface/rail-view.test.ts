@@ -75,11 +75,25 @@ test("railItems: a dot at a thread end holding your card carries your colour", (
   const marks = railItems([item("c"), item("o")], {
     open: new Set([entryId("o")]),
     yours: { ends: new Set([entryId("c")]), color: "#f0f" },
+    matches: null,
   }).map(([, m]) => m)
   expect(marks).toEqual([
-    { open: false, yours: "#f0f" },
-    { open: true, yours: null },
+    { open: false, yours: "#f0f", matches: null },
+    { open: true, yours: null, matches: null },
   ])
+})
+
+test("railItems: while searching, an item counts every match among its messages, a capsule's later ones too", () => {
+  const item = (id: string) => ({
+    ids: [entryId(id), entryId(`${id}-later`)] as const,
+  })
+  const hit = { from: 0, to: 1 }
+  const marks = railItems([item("a"), item("b")], {
+    open: new Set(),
+    yours: { ends: new Set(), color: "#f0f" },
+    matches: { hits: new Map([[entryId("a-later"), [hit] as const]]) },
+  }).map(([, m]) => m.matches)
+  expect(marks).toEqual([1, 0])
 })
 
 test("railView: whole items outlined, one band per branch, and a tick where an edge cuts a capsule", () => {

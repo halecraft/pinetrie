@@ -1,6 +1,7 @@
 // interface/page-keys — the page's own keys, wherever focus is: take into
 // the inventory, put, undo and redo moves (ADR-0048 step 4), and fold the
-// sidebar (ADR-0088). A grid's own keys are `grid-keys.ts`'s.
+// sidebar (ADR-0088), and open and close a search of the thread's task
+// (ADR-0101). A grid's own keys are `grid-keys.ts`'s.
 // Pure: one table, from a key and where focus is to an intent or nothing.
 // The key-system redesign replaces this file.
 //
@@ -13,7 +14,9 @@
 // with X outside a text box takes as Ctrl+Shift+I does, and the put key in a
 // text box puts a reference there as a link (ADR-0126). Cmd+C is not a key
 // here: on a selection it is the page's `copy` event's (`copySelection`),
-// and with none the column's (`onEntryKey`); Cmd+V is the browser's.
+// and with none the column's (`onEntryKey`); Cmd+V is the browser's. `/`
+// opens a search outside a text box; Escape closes it from the search
+// itself, its field included.
 
 import { type CardId, kindOfCard } from "@pinetrie/core"
 import type { Intent } from "./intent.ts"
@@ -44,6 +47,12 @@ export interface KeyFocus {
    * since a take, a put or an undo would act on columns no one can see.
    */
   readonly page: boolean
+  /**
+   * Where search stands: "unavailable" with no tree shown (a new tab, the
+   * board), "focused" while open with focus in the bar, a match list or
+   * nowhere.
+   */
+  readonly search: "unavailable" | "closed" | "open" | "focused"
 }
 
 /** The intent a key asks for, or null for a key that is not one of these. */
@@ -54,6 +63,10 @@ export function keyAct(event: KeyLike, focus: KeyFocus): Intent | null {
   // The sidebar's width (ADR-0088), from anywhere, as the chords below.
   if (chord && key === "l") return { kind: "foldList" }
   if (focus.page) return null
+  const plain = !event.ctrlKey && !event.metaKey && !event.altKey
+  // Before the text box's guard: the search's field is a text box.
+  if (plain && event.key === "Escape" && focus.search === "focused")
+    return { kind: "search", act: { kind: "close" } }
   if (chord && key === "i")
     return focus.card === null
       ? null
@@ -77,6 +90,8 @@ export function keyAct(event: KeyLike, focus: KeyFocus): Intent | null {
         }
   }
   if (focus.inText || event.altKey) return null
+  if (plain && event.key === "/" && focus.search !== "unavailable")
+    return { kind: "search", act: { kind: "open" } }
   const command = event.metaKey !== event.ctrlKey
   // Cmd+X outside a text box takes the focused card into your inventory
   // (ADR-0126), as Ctrl+Shift+I does.

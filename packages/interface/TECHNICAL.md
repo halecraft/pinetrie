@@ -141,7 +141,8 @@ function is proven by a unit test in a second.
   flags, and draws the view's strings. It compares no document fact, builds
   no label, and chooses nothing that is offered. The views are `appView`
   (`app-view.ts`), `sidebarView`, `boardView`, `columnView`, `messageTools`, `railItems`,
-  `rowSummary` and `rowView`, `callStatus`, `editorState` and `startText`. What stays in
+  `rowSummary` and `rowView`, `callStatus`, `editorState` and `startText`,
+  and a search's `columnMatches` and `searchLine`. What stays in
   components and `use-*.ts` is what needs a browser: measuring, focus and
   the caret, scrolling, observers, subscriptions.
 - **A click is an `Intent`** (`intent.ts`). A column's acts are nested
@@ -830,7 +831,9 @@ the columns read one. `segmentPath` (`ask-segments.ts`) decides what a column fo
   it has no span (`askSpan`), so its fold offers no review. The pane
   reads the span itself (`askReviewTarget`, `packages/web/pane.ts`).
   `askWords` says an ask the same everywhere: the bar, the working mark's
-  title, the rail's tooltip, outline.
+  title, the rail's tooltip, outline, a search's match. `askLine` reads the
+  ask's prompt from the index and words it so, for the rail, the column and
+  a match.
 - **An ask's summary is said once** (`planAskWork`). Its summary
   (`foldWords`: what its work holds, how it ended, and in story its
   headline, a model's marked as one) is built once and given to one place,
@@ -878,6 +881,50 @@ the columns read one. `segmentPath` (`ask-segments.ts`) decides what a column fo
   `data-first`), `.ask-files`, `.ask-line` (`.running`), `.ask-headline`, `.ask-digest`,
   `.ask-outcome`, `.ask-bar` (`data-ask`, `data-where`), `.left-line`.
   The browser suite reads finished work raw (`readRaw`).
+
+## Search (`search.ts`, `search-view.ts`, ADR-0101)
+
+A search covers the task you are on: `searchCorpus` over its rail's rows
+(`taskRail`), every message's text as `messageAt` gives it, then
+`searchTexts` with a parsed query. `App` holds the `SearchState` (never
+stored), and `searchOn` applies it only on the task it was opened on.
+
+- **Whole words, by lookarounds, not `\b`.** JavaScript's `\b` knows only
+  ASCII word characters, so it would find "rail" in "railé". `queryPattern`
+  puts `(?<![\p{L}\p{N}\p{M}_])` before, and the matching lookahead after,
+  only at an edge that is itself a word character, so `@ada` and `c++` match
+  too. `-` is not a word character, unlike in a handle (`HANDLE_CHARS`,
+  core), so "rail" finds "rail-view". The words join with `\s+`, and the
+  flags are `giu`.
+- **The query is composed (NFC), the text is not.** Composing the text would
+  move the ranges a snippet cuts by; text typed in a browser is NFC already.
+- **Unlike the board's label search, on purpose.** The board keeps any label
+  holding what is typed, as you type (`board-view.ts`), which suits short
+  labels. This finds words in prose. Neither should be made to match the
+  other.
+- **Built only while searching.** `App` builds no corpus while the bar is
+  closed, and searches the deferred query (`useDeferredValue`).
+- **One match is one message**, however often the phrase is in it, and it
+  belongs to the column that draws it (`ColumnView.nodes`), so none is drawn
+  twice. `columnMatches` gives its rows in path order, which is time order,
+  with a gap row for each run of messages left out. `searchLine` counts the
+  hits no column draws by `App`'s `shown`.
+- **The rail marks whole items** (`RailMarks.matches`, `itemMatches`): a
+  count, 0 to dim, null while not searching. Matches are no landmarks, so a
+  keystroke never moves a capsule.
+- **Showing something new leaves the search** (`leavingSearch`, `intent.ts`),
+  as `leavingPage` leaves a page (ADR-0098): a plan that reveals a message,
+  opens or unfolds a column, or shows another task, a new tab or the board gets the
+  search's close first and, for a revealed message, `landed` last, which
+  outlines it. Every way of showing a message is a plan, so a match row
+  sends plain `openAt`. The `landed` effect is not `mark`: that name is a
+  title's mark on a task.
+- **`open` names no task in an intent** (`SearchAsk`): `searchActOn` gives it
+  the task you are on, so `keyAct` needs none.
+- **Keys** (`page-keys.ts`): `/` outside a text box opens it, unless
+  `KeyFocus.search` is `"unavailable"`; Escape closes it when `"focused"`,
+  checked before the text box's guard, so Escape in the field is this rule
+  too.
 
 ## A message's tools (`message-tools.ts`, ADR-0043)
 
@@ -1464,7 +1511,8 @@ docked left, centre or right by this device's choice (`inventory-dock.ts`,
   (`ROOT_MIME`, The board, above). `NOT_A_HANDLE` includes `[draggable='true']`, so
   a card's drag never starts a column's.
 - **Keys** (`page-keys.ts`, `keyAct`): one table of the page's own keys,
-  not only the inventory's, read by one `keydown` listener in `App` that decides nothing. Ctrl+Shift+I takes the
+  not only the inventory's, read by one `keydown` listener in `App` that
+  decides nothing. It holds the search's keys too (Search, above). Ctrl+Shift+I takes the
   focused card into the inventory (`data-card` on the focused element, a box's included);
   Ctrl+Shift+O puts the selected one in the column whose element last held
   focus; Cmd or Ctrl with Z, Shift+Z, or Ctrl+Y undo and redo a move, only
@@ -1575,4 +1623,7 @@ provider's prompt cache. The screen shows the writer's current name, with the
 name the message was sent under in parentheses when they differ
 (`speakerLabel`, `names.ts`): "Duane (duane)". Someone who set no name is
 shown by their email's part before the `@`. Each rendered chat carries its
-`writer` for the lookup.
+`writer` for the lookup. `speakerWords` names any message as its column does:
+a person so, with those who wrote it with them, and any other role by its
+label ("agent", "caught up"). A message and a search's match both say it; a
+fork's origin says it for a person, and names the agent by its thread.

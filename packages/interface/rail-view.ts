@@ -4,6 +4,8 @@
 import type { AgentRun, DigestBody, EntryId, RailRow } from "@pinetrie/core"
 import { digestText } from "@pinetrie/rules"
 import { railLandmarks } from "./rail.ts"
+import type { SearchResult } from "./search.ts"
+import { itemMatches } from "./search-view.ts"
 import type { WorkStats } from "./work-stats.ts"
 
 /**
@@ -98,9 +100,14 @@ export interface RailMarks {
   readonly open: boolean
   /** Your colour when an unsent card of yours waits here (ADR-0048), else null. */
   readonly yours: string | null
+  /**
+   * How many of its messages a search finds (`itemMatches`, ADR-0101): 0 to
+   * dim it, null while not searching.
+   */
+  readonly matches: number | null
 }
 
-/** Each item's marks, read from its first message. */
+/** Each item's marks, read from its first message; its matches from all of them. */
 export function railItems<
   I extends { readonly ids: readonly [EntryId, ...EntryId[]] },
 >(
@@ -111,6 +118,7 @@ export function railItems<
       readonly ends: ReadonlySet<EntryId>
       readonly color: string
     }
+    readonly matches: SearchResult | null
   },
 ): readonly (readonly [item: I, marks: RailMarks])[] {
   return items.map(item => {
@@ -120,6 +128,7 @@ export function railItems<
       {
         open: facts.open.has(id),
         yours: facts.yours.ends.has(id) ? facts.yours.color : null,
+        matches: itemMatches(item.ids, facts.matches),
       },
     ] as const
   })

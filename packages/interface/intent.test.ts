@@ -117,6 +117,7 @@ const at = (
   tasks: TASKS,
   listWidth: "full",
   page: null,
+  searching: false,
 })
 /** A root shown: the root you are on, and in the sidebar, at its end if it was not. */
 const shown = (root: string, id: TaskId): Effect[] => [
@@ -1011,5 +1012,61 @@ describe("a page over the stage (ADR-0098)", () => {
   })
   test("with no page, nothing is added", () => {
     expect(plan(r2)).not.toContainEqual(leave)
+  })
+})
+
+describe("a search over the root you are on (ADR-0101)", () => {
+  const searching: IntentState = { ...R1, searching: true }
+  const close: Effect = { kind: "search", act: { kind: "close" } }
+  const openAt: Intent = { kind: "openAt", entry: entryId("3-b") }
+  test("a search act is the search effect; opening opens on the task you are on, and on no task does nothing", () => {
+    expect(plan({ kind: "search", act: { kind: "type", query: "x" } })).toEqual(
+      [{ kind: "search", act: { kind: "type", query: "x" } }],
+    )
+    expect(plan({ kind: "search", act: { kind: "open" } })).toEqual([
+      { kind: "search", act: { kind: "open", task: R1_ID } },
+    ])
+    expect(
+      plan({ kind: "search", act: { kind: "open" } }, at(onNewTab)),
+    ).toEqual([])
+  })
+  test("openAt while searching closes the search first and marks the message last", () => {
+    expect(plan(openAt, searching)).toEqual([
+      close,
+      ...plan(openAt),
+      { kind: "landed", entry: "3-b" },
+    ])
+  })
+  test("another task, a new tab, the board, a link or a new column close it too", () => {
+    const r2: Intent = {
+      kind: "show",
+      here: { kind: "task", task: TASK_OF("5-r2") },
+    }
+    expect(plan(r2, searching)).toEqual([close, ...plan(r2)])
+    const board: Intent = { kind: "board", open: true, focus: true }
+    expect(plan(board, searching)).toEqual([close, ...plan(board)])
+    const inbox: Intent = {
+      kind: "openLink",
+      link: linkOn(TASK_OF("5-r2")),
+      entry: entryId("9-unheld"),
+    }
+    expect(plan(inbox, searching)[0]).toEqual(close)
+    const branch = column({
+      kind: "branch",
+      branch: { at: entryId("2-a"), prefill: undefined },
+    })
+    expect(plan(branch, searching)).toEqual([close, ...plan(branch)])
+  })
+  test("what shows nothing new leaves the search open", () => {
+    for (const intent of [
+      { kind: "foldList" },
+      { kind: "board", open: false },
+      column({ kind: "density", density: "raw" }),
+    ] satisfies Intent[])
+      expect(plan(intent, searching)).toEqual(plan(intent))
+  })
+  test("while not searching, openAt plans exactly as before", () => {
+    expect(plan(openAt)).not.toContainEqual(close)
+    expect(plan(openAt).some(e => e.kind === "landed")).toBe(false)
   })
 })

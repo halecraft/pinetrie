@@ -8,20 +8,20 @@
 // column headers and fork dots take the same, so a branch looks the same
 // everywhere.
 
-import {
-  type AgentRun,
-  type AskIndex,
-  type DigestBody,
-  type EntryId,
-  messageAt,
-  type RailRow,
-  type RevisionRecord,
-  type TreeIndex,
-  type WriterId,
+import type {
+  AgentRun,
+  AskIndex,
+  DigestBody,
+  EntryId,
+  RailRow,
+  RevisionRecord,
+  TreeIndex,
+  WriterId,
 } from "@pinetrie/core"
 import {
-  askWords,
+  askLine,
   compactRail,
+  matchCountWords,
   opens,
   pickAt,
   type RailItem,
@@ -31,6 +31,7 @@ import {
   railKeep,
   railScroll,
   railView,
+  type SearchResult,
   type StretchFill,
   stretchFill,
   stretchWords,
@@ -83,6 +84,7 @@ export function Rail({
   nameOf,
   digests,
   viewports,
+  matches,
 }: {
   /** The tree the items were compacted from: a long ask's capsule names its ask. */
   index: TreeIndex
@@ -105,6 +107,8 @@ export function Rail({
   nameOf: (writer: WriterId) => string
   /** Each mounted column's view, outlined (ADR-0058); none, no outlines. */
   viewports?: ViewportStore
+  /** What a search finds here (ADR-0101): the rest is dimmed. Null while not searching. */
+  matches: SearchResult | null
   /**
    * Each fork to a thread on no column of this canvas (ADR-0117), worded:
    * a press follows its link, which a thread someone else holds does not.
@@ -119,7 +123,11 @@ export function Rail({
   // Rows go by depth, so the last item in depth-first order need not be the lowest.
   const slots = items.reduce((n, it) => Math.max(n, it.slot + it.span), 0)
   return (
-    <nav aria-label="this thread's tree" className="rail">
+    <nav
+      aria-label="this thread's tree"
+      className="rail"
+      data-searching={matches === null ? undefined : "yes"}
+    >
       <div className="rail-tree">
         <svg height={y(slots)} width={x(places - 1) + PAD}>
           <title>
@@ -150,7 +158,7 @@ export function Rail({
         </svg>
         {/* Dots and capsules are buttons over the drawing, so they are
           reachable by keyboard and read as controls. */}
-        {railItems(items, { open, yours }).map(([it, marks]) =>
+        {railItems(items, { open, yours, matches }).map(([it, marks]) =>
           it.kind === "stretch" ? (
             <Capsule
               key={it.ids[0]}
@@ -159,6 +167,7 @@ export function Rail({
                 workWords(it.stats, nameOf),
                 it.ask === null ? null : (digests.get(it.ask) ?? null),
               )}
+              matches={marks.matches}
               onPick={onPick}
               open={marks.open}
               stretch={it}
@@ -169,6 +178,7 @@ export function Rail({
               id={it.ids[0]}
               key={it.ids[0]}
               yours={marks.yours}
+              matches={marks.matches}
               onPick={onPick}
               open={marks.open}
               people={here.get(it.ids[0]) ?? []}
@@ -353,16 +363,6 @@ function RailViewport({
   )
 }
 
-/** A long ask's first line, for its capsule's tooltip; null for any other stretch. */
-function askLine(
-  index: TreeIndex,
-  ask: EntryId | null,
-  nameOf: (writer: WriterId) => string,
-): string | null {
-  const prompt = ask === null ? null : messageAt(index, ask)
-  return prompt === null ? null : askWords(prompt, nameOf)
-}
-
 /**
  * A root's rail with others' rings. It reads presence itself, so a presence
  * write redraws the rail and not the columns. Others' thread ends are kept
@@ -450,6 +450,8 @@ function Dot(p: {
   yours: string | null
   activity: readonly AgentRun[]
   people: readonly { name: string; color: string }[]
+  /** Its matches while searching (`RailMarks.matches`), else null. */
+  matches: number | null
   onPick: (id: EntryId) => void
 }) {
   const colors = useTrackColors()
@@ -469,6 +471,7 @@ function Dot(p: {
         .join(" ")}
       data-entry={p.id}
       data-here={p.people.length > 0 ? String(p.people.length) : undefined}
+      data-match={p.matches ?? undefined}
       data-open={p.open ? "yes" : "no"}
       data-track={p.track}
       onClick={() => p.onPick(p.id)}
@@ -485,11 +488,15 @@ function Dot(p: {
             : `0 0 0 1.5px ${PANEL}, 0 0 0 3.5px ${first.color}`,
       }}
       title={
-        p.yours === null
-          ? here
-          : [here, "your unsent card is here"]
-              .filter(t => t !== undefined)
-              .join(" · ")
+        [
+          p.matches === null || p.matches === 0
+            ? undefined
+            : matchCountWords(p.matches),
+          here,
+          p.yours === null ? undefined : "your unsent card is here",
+        ]
+          .filter(t => t !== undefined)
+          .join(" · ") || undefined
       }
       type="button"
     >
@@ -520,19 +527,26 @@ function Capsule(p: {
   stretch: RailStretch
   label: string
   open: boolean
+  /** Its matches while searching (`RailMarks.matches`), else null. */
+  matches: number | null
   onPick: (id: EntryId) => void
 }) {
   const { stretch } = p
+  const label =
+    p.matches === null || p.matches === 0
+      ? p.label
+      : `${matchCountWords(p.matches)} · ${p.label}`
   const color = useTrackColors().color(stretch.track)
   const fill = stretchFill(stretch.stats)
   return (
     <button
-      aria-label={p.label}
+      aria-label={label}
       className="rail-stretch"
       data-ask={stretch.ask ?? undefined}
       data-count={stretch.ids.length}
       data-entry={stretch.ids[0]}
       data-fill={fill}
+      data-match={p.matches ?? undefined}
       data-open={p.open ? "yes" : "no"}
       data-span={stretch.span}
       data-track={stretch.track}
@@ -549,7 +563,7 @@ function Capsule(p: {
         borderColor: color,
         background: FILL[fill](color),
       }}
-      title={p.label}
+      title={label}
       type="button"
     />
   )

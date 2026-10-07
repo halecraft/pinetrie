@@ -17,6 +17,7 @@ import type { LayoutAction } from "./layout.ts"
 import type { ListWidth } from "./list-width.ts"
 import { commentMarkdown } from "./markdown-of.ts"
 import type { PageName } from "./page.ts"
+import type { SearchAct } from "./search.ts"
 import { afterSpinOff } from "./spin-off.ts"
 import type { TextUpload } from "./upload.ts"
 
@@ -72,6 +73,10 @@ export interface AppPorts {
   readonly listWidth: (width: ListWidth) => void
   /** Show a page over the stage, or, with null, the stage (ADR-0098). */
   readonly page: (to: PageName | null) => void
+  /** Carry a search act out on the tab's search (`searchReducer`, ADR-0101). */
+  readonly search: (act: SearchAct) => void
+  /** Outline a message briefly once it is drawn (`useReveal`). */
+  readonly landed: (entry: EntryId) => void
   /** Keep markdown as a blob: a reference's quote (`uploadText`). */
   readonly uploadText: (markdown: string) => Promise<TextUpload>
   /** Put markdown on the system clipboard. */
@@ -131,6 +136,9 @@ function performOne(effect: Effect, ports: AppPorts): void {
       return
     case "page":
       ports.page(effect.to)
+      return
+    case "search":
+      ports.search(effect.act)
       return
     case "request":
       void ports.session.request(effect.intent)
@@ -267,6 +275,9 @@ function performOne(effect: Effect, ports: AppPorts): void {
       return
     case "reveal":
       ports.reveal(effect.entry)
+      return
+    case "landed":
+      ports.landed(effect.entry)
       return
     case "openWhenHeld":
       ports.openWhenHeld(effect.entry)

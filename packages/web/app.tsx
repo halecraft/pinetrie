@@ -4,12 +4,13 @@
 // rail beside a strip of columns, and the footer along the bottom: you, the
 // board's strip, what needs you and publish (docs/06-interface.md,
 // ADR-0122). The rail draws the root's tree; each column is one path, read on
-// its own scroll; the board opens over them. What is drawn is a read of the
+// its own scroll; the board opens over them, and a search's bar above them
+// (ADR-0101). What is drawn is a read of the
 // document, through `@pinetrie/reads` and `projection.ts`. The sidebar is your
 // own document, on every device (`openThreads`). Which root you are on, each
 // root's columns and whether the board is open are this window's own view
 // state: a reducer (`layout.ts`), kept in this browser tab's storage and
-// never in the document (ADR-0027).
+// never in the document (ADR-0027). A search is view state too, never kept.
 //
 // `App` gathers, `appView` (`app-view.ts`) decides what is shown, and a click
 // comes back as an `Intent`, which `planIntent` (`intent.ts`) plans and
@@ -47,6 +48,7 @@ import {
   type Column as ColumnSpec,
   claimFocus,
   columnLandmarks,
+  columnMatches,
   composerPlacesStore,
   type Dock,
   DROP_ZONE,
@@ -61,6 +63,7 @@ import {
   inboxCount,
   initialLayout,
   inventoryThreads,
+  type KeyFocus,
   keyAct,
   type Layout,
   type ListWidth,
@@ -76,6 +79,7 @@ import {
   openColumns,
   ownCards,
   pageTitle,
+  parseQuery,
   parseSearch,
   perform,
   placeAt,
@@ -93,10 +97,16 @@ import {
   resolveLayout,
   rootEntriesOf,
   rootSeed,
+  type SearchState,
   type SeenEnd,
   type Spot,
   type Strip as StripView,
   screenMemory,
+  searchCorpus,
+  searchLine,
+  searchOn,
+  searchReducer,
+  searchTexts,
   shownWidth,
   sidebarView,
   spotFor,
@@ -152,6 +162,7 @@ import {
 } from "@pinetrie/session"
 import {
   useCallback,
+  useDeferredValue,
   useEffect,
   useLayoutEffect,
   useMemo,
@@ -176,6 +187,7 @@ import {
   type ReviewPrefs,
   ReviewPrefsContext,
 } from "./review-prefs.ts"
+import { SearchBar, SearchToggle } from "./search-bar.tsx"
 import { Sidebar } from "./sidebar.tsx"
 import { SignalMark } from "./signal-mark.tsx"
 import { Strip } from "./strip.tsx"
@@ -191,7 +203,7 @@ import { PLACED } from "./use-follow.ts"
 import { useInbox } from "./use-inbox.ts"
 import { NarrowContext, useStripNarrow } from "./use-narrow.ts"
 import { goTo, usePage } from "./use-page.ts"
-import { useReveal, useRevealCard } from "./use-reveal.ts"
+import { useLanding, useReveal, useRevealCard } from "./use-reveal.ts"
 import { useRootDrag } from "./use-root-drag.ts"
 import { useSameData } from "./use-same-data.ts"
 import { useSmallWindow } from "./use-small-window.ts"
@@ -214,6 +226,24 @@ const ITEM_HOVER_MS = 600
 
 const cardOrNull = (id: string | undefined): CardId | null =>
   id === undefined ? null : (parseCardId(id) ?? null)
+
+/**
+ * Where search stands for the keys (`KeyFocus.search`): focused in the bar,
+ * a match list, or nowhere, which Escape closes from.
+ */
+function searchFocus(
+  el: Element | null,
+  searchable: boolean,
+  open: boolean,
+): KeyFocus["search"] {
+  if (!searchable) return "unavailable"
+  if (!open) return "closed"
+  return el === null ||
+    el === document.body ||
+    el.closest(".search-bar, .match-list") !== null
+    ? "focused"
+    : "open"
+}
 
 /**
  * Bring a newly opened column's first message level with its fork point in
@@ -871,6 +901,45 @@ export function App({
     [index, views],
   )
   const shown = useMemo(() => new Set(paths.flatMap(p => [...p])), [paths])
+  // The search of the task you are on (ADR-0101), never stored. Its corpus,
+  // result and matches are built only while it applies, and from the
+  // deferred query, so typing stays quick on a long task.
+  const [searchState, setSearch] = useState<SearchState | null>(null)
+  const search = searchOn(searchState, active)
+  const searchQuery = useDeferredValue(search?.query ?? "")
+  const searchOpen = search !== null
+  const corpus = useMemo(
+    () => (searchOpen ? searchCorpus(index, rail) : null),
+    [searchOpen, index, rail],
+  )
+  const searchResult = useMemo(() => {
+    const query = parseQuery(searchQuery)
+    return corpus === null || query === null ? null : searchTexts(corpus, query)
+  }, [corpus, searchQuery])
+  const since = search?.since ?? 0
+  const matches = useMemo(
+    () =>
+      searchResult === null
+        ? null
+        : views.map(v =>
+            columnMatches(v.nodes, searchResult, {
+              index,
+              asks,
+              nameOf,
+              since,
+            }),
+          ),
+    [searchResult, views, index, asks, nameOf, since],
+  )
+  const searchWords = useMemo(
+    () => searchLine(searchResult, shown),
+    [searchResult, shown],
+  )
+  // The board lies over the columns, so a search there would find what no
+  // one can see.
+  const searchable = active?.kind === "task" && !layout.board
+  const searchField = useRef<HTMLInputElement>(null)
+  const searchToggle = useRef<HTMLButtonElement>(null)
   const view = useMemo(
     () =>
       appView({
@@ -919,12 +988,13 @@ export function App({
                   closable: slot.closable,
                   track: slot.track,
                   heldBy: freshOf(column)?.held?.by ?? null,
+                  matches: search === null ? null : (matches?.[i] ?? null),
                 },
               ] as const,
             ]
       }),
     )
-  }, [view.stage, columns, views, paths])
+  }, [view.stage, columns, views, paths, search, matches])
   const offered = useMemo(
     () => offeredByTask(view.offers, workFacts.names, taskOfThread),
     [view.offers, workFacts.names, taskOfThread],
@@ -1137,6 +1207,7 @@ export function App({
   // view is scrolled to.
   const reveal = useReveal(stripEl)
   const revealCard = useRevealCard(stripEl)
+  const landed = useLanding(stripEl)
 
   // Your inventory (ADR-0048 step 4): this tab's moves and your slots, the
   // panel's selection, whether it is open (never stored), and its dock
@@ -1223,17 +1294,24 @@ export function App({
   // An opened fold draws in its own ask (`AskWork`): a render of `App`
   // runs `useReveal`'s wait once it has.
   const [, setOpened] = useState(0)
+  const foldOpened = useRef(false)
   // An entry to show once this tab holds its root (`openIn`, ADR-0063).
   const [whenHeld, setWhenHeld] = useState<EntryId | null>(null)
   const ports: AppPorts = {
     dispatch,
     session,
     attention: session.attention,
-    reveal,
+    // A fold opened before the reveal renders above the message: the reveal
+    // waits for that render (`useReveal`'s `afterRender`).
+    reveal: entry => {
+      reveal(entry, foldOpened.current)
+      foldOpened.current = false
+    },
     revealCard,
     openWhenHeld: setWhenHeld,
     openFold: ask => {
       folds.set(ask, "open")
+      foldOpened.current = true
       setOpened(n => n + 1)
     },
     arm: key => {
@@ -1246,6 +1324,17 @@ export function App({
       stores.list.save(width)
     },
     page: goTo,
+    search: act => {
+      // Closed from the bar, focus goes back to its 🔍; closed by a pick,
+      // it stays where the pick left it.
+      const fromBar = document.activeElement?.closest(".search-bar") != null
+      setSearch(s => searchReducer(s, act, Date.now()))
+      requestAnimationFrame(() => {
+        if (act.kind === "open") searchField.current?.focus()
+        if (act.kind === "close" && fromBar) searchToggle.current?.focus()
+      })
+    },
+    landed,
     uploadText,
     clipboard: text => {
       void navigator.clipboard?.writeText(text).catch(() => {})
@@ -1300,6 +1389,7 @@ export function App({
           tasks,
           listWidth,
           page,
+          searching: searchOpen,
         },
         {
           key: crypto.randomUUID(),
@@ -1331,6 +1421,7 @@ export function App({
         selectedCard: slots[String(selected)] ?? null,
         column: lastColumn.current,
         page: page !== null,
+        search: searchFocus(el, searchable, searchOpen),
       })
       if (intent === null) return
       e.preventDefault()
@@ -1338,7 +1429,7 @@ export function App({
     }
     document.addEventListener("keydown", onKey)
     return () => document.removeEventListener("keydown", onKey)
-  }, [onIntent, selected, slots, page])
+  }, [onIntent, selected, slots, page, searchable, searchOpen])
   // Cmd+C on a selection outside a text box (ADR-0126) is copied as the
   // browser copies it, what you selected and nothing else; one inside one
   // message that a range names is taken as a reference too, its markdown
@@ -1627,57 +1718,79 @@ export function App({
                     </p>
                   ) : (
                     <>
-                      {stage.kind === "task" ? (
-                        <LiveRail
-                          activity={activity}
-                          asks={asks}
-                          digests={digests}
-                          revisions={workFacts.revisions}
-                          colorOf={colorOf}
-                          ends={ends}
-                          index={index}
-                          names={nameOf}
-                          onPick={openAt}
-                          open={shown}
-                          rows={rail}
-                          session={session}
-                          stubs={drawnStubs}
-                          onLink={(link, at) =>
-                            onIntent({ kind: "openLink", link, entry: at })
-                          }
-                          viewports={viewports}
-                          yours={yours}
+                      {search !== null && (
+                        <SearchBar
+                          field={searchField}
+                          line={searchWords}
+                          onIntent={onIntent}
+                          query={search.query}
                         />
-                      ) : (
-                        <EmptyRail />
                       )}
-                      <Strip
-                        canvas={canvas}
-                        noteViews={noteViews}
-                        threadFaceOf={threadFaceOf}
-                        onIntent={onIntent}
-                        onPointerDown={dragColumn}
-                        projected={projected}
-                        reader={historyFacts.reader}
-                        readers={readers}
-                        shared={{
-                          ...shared,
-                          landmarks,
-                          seenEnd: seenEnds,
-                          forks,
-                          onIntent,
-                          shown,
-                        }}
-                        strip={strip}
-                        stripRef={stripEl}
-                        taskColumn={taskColumn}
-                        taskPins={taskPins}
-                        taskPinsInView={taskPinsInView}
-                        told={told}
-                        thread={readerRow}
-                        typing={typing}
-                        stage={stage}
-                      />
+                      <div className="stage-row">
+                        <div className="rail-side">
+                          {stage.kind === "task" && search === null && (
+                            <div className="search-lead">
+                              <SearchToggle
+                                onIntent={onIntent}
+                                open={false}
+                                toggle={searchToggle}
+                              />
+                            </div>
+                          )}
+                          {stage.kind === "task" ? (
+                            <LiveRail
+                              activity={activity}
+                              asks={asks}
+                              digests={digests}
+                              revisions={workFacts.revisions}
+                              colorOf={colorOf}
+                              ends={ends}
+                              index={index}
+                              names={nameOf}
+                              onPick={openAt}
+                              open={shown}
+                              matches={searchResult}
+                              rows={rail}
+                              session={session}
+                              stubs={drawnStubs}
+                              onLink={(link, at) =>
+                                onIntent({ kind: "openLink", link, entry: at })
+                              }
+                              viewports={viewports}
+                              yours={yours}
+                            />
+                          ) : (
+                            <EmptyRail />
+                          )}
+                        </div>
+                        <Strip
+                          canvas={canvas}
+                          noteViews={noteViews}
+                          threadFaceOf={threadFaceOf}
+                          onIntent={onIntent}
+                          onPointerDown={dragColumn}
+                          projected={projected}
+                          reader={historyFacts.reader}
+                          readers={readers}
+                          shared={{
+                            ...shared,
+                            landmarks,
+                            seenEnd: seenEnds,
+                            forks,
+                            onIntent,
+                            shown,
+                          }}
+                          strip={strip}
+                          stripRef={stripEl}
+                          taskColumn={taskColumn}
+                          taskPins={taskPins}
+                          taskPinsInView={taskPinsInView}
+                          told={told}
+                          thread={readerRow}
+                          typing={typing}
+                          stage={stage}
+                        />
+                      </div>
                     </>
                   )}
                   {layout.board && boardShown !== null && (

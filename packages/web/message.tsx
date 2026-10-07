@@ -29,12 +29,11 @@ import {
   type ScreenMemory,
   selectionReference,
   showsText,
-  speakerLabel,
+  speakerWords,
   TAKE_COPY,
   TAKE_COPY_INTO_INVENTORY,
   taskPinnedMarkerWords,
   toolBody,
-  withContributors,
 } from "@pinetrie/interface"
 import { canvasLines } from "@pinetrie/rules"
 import { type LiveDocHandle, readStreamText } from "@pinetrie/schema"
@@ -48,31 +47,10 @@ import { useTrackColors } from "./palette-context.ts"
 import { MessageSource } from "./pane-context.ts"
 import { nameFor } from "./presence.tsx"
 
-/** What a message's role is called above it, where it is not its own name. */
-const ROLE_LABEL: Readonly<Record<string, string>> = {
-  assistant: "agent",
-  land: "catching up",
-  update: "caught up",
-  "carry-on": "resumed",
-  fact: "offer",
-  behind: "the base",
-  heard: "heard",
-}
-
 function MessageView(p: MessageProps) {
   const { node } = p
   const colors = useTrackColors()
-  const speaker =
-    node.role === "chat"
-      ? withContributors(
-          speakerLabel(p.nameOf, node.writer, node.author ?? ""),
-          (node.contributors ?? []).map(w => nameFor(p.nameOf, w)),
-        )
-      : node.role === "relay" || node.role === "answer"
-        ? // Another thread's ask, by its asker; an answer, by the thread
-          // that answered (ADR-0128).
-          (node.author ?? node.role)
-        : (ROLE_LABEL[node.role] ?? node.role)
+  const speaker = speakerWords(node, p.nameOf)
   const classes = [
     "msg",
     node.role,

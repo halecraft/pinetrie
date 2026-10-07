@@ -209,6 +209,12 @@ that scrolls and for one that opens a column.
   same state, so no render follows, and an effect waiting for one never runs
   (S33: the rail's scroll-to did nothing). Otherwise the id waits for the render
   the pick causes, in a layout effect with no dependencies.
+- **Unless a fold opens for it.** `openAt` opens the fold a message is in,
+  then reveals it. An ask's last word is drawn while its fold is closed, so
+  a reveal at once scrolled to it, and the fold's render then pushed it
+  down. `App`'s `openFold` port notes that a fold opened, and its `reveal`
+  port passes `afterRender`, which waits for that render (`setOpened`) even
+  for a message already drawn.
 - **It scrolls only a message that is out of view.** A branch opened from its
   fork point is already level with it, and centring it would undo that.
 - **It dispatches `PLACED`.** A column scrolled down, from 0 or from a shorter
@@ -218,6 +224,47 @@ that scrolls and for one that opens a column.
   defensive: no suite check reaches it (ADR-0122).
 - **It is declared after the alignment effect in `App`,** so a pick the
   alignment left out of view is scrolled to in the same commit.
+- **`useLanding` outlines where leaving a search landed** (the `landed`
+  effect, ADR-0101): `data-landed` on the message once it is drawn, waiting
+  as a reveal does, removed on `animationend`. The outline and its fade are
+  CSS.
+
+## Searching a task (`search-bar.tsx`, `match-list.tsx`, ADR-0101)
+
+The search's values are the interface's (`packages/interface/TECHNICAL.md`,
+"Search"). `App` holds its state and builds its result; the page draws the
+bar, each column's matches, and the rail's marks.
+
+- **The thread stays under its matches** (S126). Everything in a column below
+  its header is in `.column-below`, positioned; in it, `.column-under` holds
+  the thread, its details, its cards, its work strip and its composer, and
+  takes `inert` while searching. `MatchList` lies over it, absolutely, and
+  scrolls on its own. Covering changes no box under it: the body keeps its
+  `scrollTop`, and no `ResizeObserver` callback fires, so leaving restores
+  nothing. `inert` blurs a focused composer, and Tab cannot reach it.
+- **`.column-below` is the messages' `offsetParent`**, and the body's.
+  `placement` and `placeOnReturn` measure a message's `offsetTop` against the
+  body's, and the difference holds (S126). Only `.column-content` must stay
+  unpositioned.
+- **A covered column marks nothing read** (ADR-0077): the attention effect
+  and `leave` skip `read` while `matches` is not null. It follows its end
+  under the layer as before. A mention drawn under the layer still counts as
+  seen (`useInbox` reads `shown`), since it is drawn in a column of the task
+  you are on.
+- **An empty query is no search.** `Column.matches` is null until the query
+  has a word, so the page is as it was while the bar is open and empty.
+- **The stage is a column**: the bar while open, then `.stage-row`,
+  which holds `.rail-side` (the 🔍 in `.search-lead`, then the rail) and
+  `#strip`. A new tab's rail has no 🔍 and the same width, so `#strip`'s
+  left edge does not move across its first send. The bar's own `.search-lead`
+  holds the pressed 🔍 over the rail.
+- **Focus.** The bar focuses its field as it mounts, and `/` while it is open
+  focuses it again (the `search` port, a frame later). Closed from the bar,
+  focus goes back to the rail's 🔍; closed by a pick, it stays where the pick
+  left it. `searchFocus` tells `keyAct` where search stands: "focused" in the
+  bar, a match list, or with nothing focused.
+- **The bar slides in only.** It unmounts as it closes, which has no frame to
+  slide out in.
 
 ## The page's colours (`index.html`, ADR-0081)
 
@@ -1129,6 +1176,13 @@ kind, in a switch that is total too.
   `.text > p:only-child:text-is(…)`.
 - **Waiting on a selector** is in `apps/pinetrie/e2e/TECHNICAL.md`: a wait
   for an element CSS hides never ends early.
+- **A search** (ADR-0101): `.search-bar`, `.search-toggle[aria-pressed]`
+  (in `#stage .rail-side` while closed, in the bar while open),
+  `.search-field`, `.search-clear`, `.search-done`, `.search-line`; a
+  column's `.match-list`, `.match-row[data-entry]`, `.match-gap`,
+  `.match-none` and its header's `.match-count`; the rail's
+  `.rail[data-searching]` and each item's `[data-match]`; and
+  `.msg[data-landed]` where leaving landed.
 
 ## Who you are (ADR-0037)
 

@@ -53,7 +53,7 @@ export {
   lastEndedAsk,
 } from "./ask-view.ts"
 export {
-  askWords,
+  askLine,
   DENSITIES,
   type Density,
   densityWords,
@@ -356,10 +356,7 @@ export {
   selectionReference,
   showsText,
 } from "./message-tools.ts"
-export {
-  speakerLabel,
-  withContributors,
-} from "./names.ts"
+export { speakerWords } from "./names.ts"
 export {
   ADD_TO_QUEUE,
   type NextButton,
@@ -388,7 +385,7 @@ export {
   planLeave,
   profileWords,
 } from "./page.ts"
-export { keyAct } from "./page-keys.ts"
+export { type KeyFocus, keyAct } from "./page-keys.ts"
 export {
   type ColorSlot,
   rootSeed,
@@ -507,6 +504,30 @@ export {
   type ScreenMemory,
   screenMemory,
 } from "./screen-memory.ts"
+export {
+  parseQuery,
+  type SearchAct,
+  type SearchResult,
+  type SearchState,
+  type SnippetPart,
+  searchCorpus,
+  searchOn,
+  searchReducer,
+  searchTexts,
+} from "./search.ts"
+export {
+  type ColumnMatches,
+  columnMatches,
+  type MatchRow,
+  matchCountWords,
+  SEARCH_CLEAR,
+  SEARCH_CLOSE_TITLE,
+  SEARCH_DONE,
+  SEARCH_DONE_TITLE,
+  SEARCH_FIELD_LABEL,
+  SEARCH_OPEN_TITLE,
+  searchLine,
+} from "./search-view.ts"
 export {
   type ButtonWords,
   baseChoices,

@@ -3,8 +3,11 @@
 
 import {
   type AskOutcome,
+  type EntryId,
   firstLine,
+  messageAt,
   type TranscriptMessage,
+  type TreeIndex,
   type WriterId,
 } from "@pinetrie/core"
 import type { AskView } from "./ask-view.ts"
@@ -29,6 +32,16 @@ export function askWords(
   const who =
     prompt.writer === undefined ? (prompt.author ?? "") : nameOf(prompt.writer)
   return who === "" ? `"${line}"` : `${who}: "${line}"`
+}
+
+/** Ask `ask` as one line (`askWords`), or null for no ask or none drawn. */
+export function askLine(
+  index: TreeIndex,
+  ask: EntryId | null,
+  nameOf: (writer: WriterId) => string,
+): string | null {
+  const prompt = ask === null ? null : messageAt(index, ask)
+  return prompt === null ? null : askWords(prompt, nameOf)
 }
 
 /** A span of time as it reads in a fold's line: "42s", "4m 12s", "2h 5m". */

@@ -16,6 +16,7 @@ import {
   type ThreadName,
 } from "@pinetrie/core"
 import {
+  matchCountWords,
   rowSummary,
   rowView,
   toolWord,
@@ -330,7 +331,119 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         )
         await bo.close()
 
-        // 6. A column's density is kept with it across a reload.
+        // 6. A search (ADR-0101): each column shows only its own matches over
+        // its thread, the rail lights them, and Escape puts every column back
+        // where it was, since the thread stayed under the matches.
+        const texts = [
+          "read the notes, slowly",
+          "Read it eight times.",
+          "read them once more",
+          "Read it again.",
+        ]
+        const firstShown = () =>
+          ap.$eval(bodyOf, b => {
+            const view = b.getBoundingClientRect()
+            const m = [
+              ...b.querySelectorAll<HTMLElement>(".msg[data-entry]"),
+            ].find(m => m.getBoundingClientRect().bottom > view.top)
+            return {
+              top: Math.round(b.scrollTop),
+              first: m?.dataset.entry ?? "",
+            }
+          })
+        await ap.$eval(bodyOf, b => {
+          b.scrollTop = Math.round((b.scrollHeight - b.clientHeight) / 2)
+        })
+        await twoFrames(ap)
+        const before = await firstShown()
+        await ap.evaluate(() =>
+          (document.activeElement as HTMLElement | null)?.blur(),
+        )
+        await ap.keyboard.press("/")
+        const focused = await ap
+          .waitForSelector(".search-bar .search-field:focus", {
+            timeout: 5_000,
+          })
+          .then(
+            () => true,
+            () => false,
+          )
+        await ap.keyboard.type("read")
+        await ap
+          .waitForSelector(`${col(0)} .match-list .match-row`, {
+            timeout: 5_000,
+          })
+          .catch(() => null)
+        const rows = await ap.$$eval(`${col(0)} .match-list .match-row`, rs =>
+          rs.map(r => (r as HTMLElement).dataset.entry ?? ""),
+        )
+        const lit = await ap.$$eval(".rail[data-searching] [data-match]", ms =>
+          ms.reduce((n, m) => n + Number((m as HTMLElement).dataset.match), 0),
+        )
+        const barLine = await ap
+          .$eval(".search-bar .search-line", n => n.textContent ?? "")
+          .catch(() => "")
+        const header = await ap
+          .$eval(`${col(0)} .match-count`, n => n.textContent ?? "")
+          .catch(() => "")
+        await ap.keyboard.press("Escape")
+        const gone = await ap
+          .waitForSelector(".search-bar", { state: "detached", timeout: 5_000 })
+          .then(
+            () => true,
+            () => false,
+          )
+        await twoFrames(ap)
+        const back = await firstShown()
+        const expected = texts.map(askId)
+        check(
+          "a search shows each column only its matches and lights them on the rail, and Escape puts every column back where it was",
+          focused &&
+            rows.join() === expected.join() &&
+            lit === expected.length &&
+            barLine === matchCountWords(expected.length) &&
+            header === matchCountWords(expected.length) &&
+            gone &&
+            (await ap.$(`${col(0)} .match-list`)) === null &&
+            back.top === before.top &&
+            back.first === before.first,
+          `${JSON.stringify({ focused, rows, expected, lit, barLine, header, gone, before, back })}`,
+        )
+
+        // 7. A match in an ask's work leaves the search at its message, its
+        // fold open, and outlines where it landed.
+        const word = askId("Read it eight times.")
+        await ap.click("#stage .search-toggle")
+        await ap.waitForSelector(".search-bar .search-field:focus", {
+          timeout: 5_000,
+        })
+        await ap.keyboard.type("eight")
+        await ap.click(`${col(0)} .match-row[data-entry="${word}"]`)
+        const landed = await ap
+          .waitForSelector(
+            `${col(0)} .msg[data-entry="${word}"][data-landed]`,
+            {
+              state: "attached",
+              timeout: 5_000,
+            },
+          )
+          .then(
+            () => true,
+            () => false,
+          )
+        const left = (await ap.$(".search-bar")) === null
+        const foldOpen = (await ap.$(`${work1}[data-open]`)) !== null
+        await twoFrames(ap)
+        check(
+          "a match in an ask's work leaves the search at its message, its fold open, and outlined",
+          landed &&
+            left &&
+            foldOpen &&
+            (await inView(msg("Read it eight times."))),
+          `${JSON.stringify({ landed, left, foldOpen })}`,
+        )
+
+        // 8. A column's density is kept with it across a reload.
         await ap.click(`${col(0)} .density-choice[data-density="outline"]`)
         await ap.reload({ waitUntil: "domcontentloaded" })
         const kept = await ap

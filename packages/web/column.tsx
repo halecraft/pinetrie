@@ -17,7 +17,6 @@ import {
   isThreadId,
   type LaneView,
   laneOf,
-  messageAt,
   nearestRevision,
   type Position,
   pinnedInView,
@@ -40,7 +39,7 @@ import {
   AGENT_MARK,
   agentsRow,
   agentsWords,
-  askWords,
+  askLine,
   bannerUrl,
   behind,
   branchesAt,
@@ -48,6 +47,7 @@ import {
   type ColumnAct,
   type ColumnHow,
   type ColumnKey,
+  type ColumnMatches,
   type Column as ColumnSpec,
   type ColumnView,
   type ComposerPlacesStore,
@@ -147,6 +147,7 @@ import { COPIED, useCopy } from "./copy.ts"
 import { Dock } from "./dock.tsx"
 import { Margin } from "./margin.tsx"
 import { blockOfProperty } from "./markdown.ts"
+import { MatchList } from "./match-list.tsx"
 import { Menu } from "./menu.tsx"
 import { MessageList } from "./message-list.tsx"
 import { MessageText } from "./message-text.tsx"
@@ -275,6 +276,11 @@ export interface ColumnProps {
   traces: ReadonlyMap<string, TraceRecord>
   /** Each column's composer, which a put on the column reads (`put-target.ts`). */
   composers: ComposerPlacesStore
+  /**
+   * This column's matches while a search applies (ADR-0101), laid over its
+   * thread; null while not searching.
+   */
+  matches: ColumnMatches | null
 }
 
 /** The take handle's words: what dropping it on a slot does. */
@@ -570,7 +576,12 @@ export function Column(p: ColumnProps) {
         unseen: left.unseen,
         released: left.released,
       })
-      if (left.following && leftLane !== null && view.tipId !== null)
+      if (
+        left.following &&
+        p.matches === null &&
+        leftLane !== null &&
+        view.tipId !== null
+      )
         p.attention.read(leftLane, view.tipId)
       p.attention.leave()
       p.spots.save(
@@ -591,15 +602,16 @@ export function Column(p: ColumnProps) {
     view.tipId,
   )
   // Watching its end, in a page you can see, you have read the thread to it:
-  // a run you watch end raises nothing (ADR-0077). `readStep` decides when
-  // the mark is written.
+  // a run you watch end raises nothing (ADR-0077). Covered by a search, it
+  // is not watched (ADR-0101). `readStep` decides when the mark is written.
   const attention = p.attention
+  const covered = p.matches !== null
   useEffect(() => {
     if (attention === undefined || leftLane === null || view.tipId === null)
       return
-    if (end.releasedTip === null && visible)
+    if (end.releasedTip === null && visible && !covered)
       attention.read(leftLane, view.tipId)
-  }, [attention, leftLane, view.tipId, end.releasedTip, visible])
+  }, [attention, leftLane, view.tipId, end.releasedTip, visible, covered])
   // This thread's lane, as the host will find it: busy means a compelled
   // message waits.
   // A fresh column's thread starts with its first send: it has no lane yet.
@@ -612,10 +624,8 @@ export function Column(p: ColumnProps) {
     lane.kind === "lane" && lane.running ? promptOf(index, lane.tip) : null
   const density = p.column.density ?? "story"
   const nameFn = (w: WriterId) => nameFor(p.nameOf, w)
-  const askLine = (ask: EntryId | null): string | null => {
-    const prompt = ask === null ? null : messageAt(index, ask)
-    return prompt === null ? null : askWords(prompt, nameFn)
-  }
+  const askLineOf = (ask: EntryId | null): string | null =>
+    askLine(index, ask, nameFn)
   // Which ask the work at the top belongs to, while its message is out of
   // sight (ADR-0106). Outline draws each ask's line under its message.
   const atTop = useAskBar(body, density !== "outline")
@@ -647,7 +657,7 @@ export function Column(p: ColumnProps) {
   // mounted: they spin only then, and not when a reload or a tab switch
   // mounts them open (ADR-0073), as a banner there at mount does not fade.
   const [openedHere, setOpenedHere] = useState(false)
-  const working = workingWords(running, askLine(runningAsk))
+  const working = workingWords(running, askLineOf(runningAsk))
   // The cards at this column's end (ADR-0048): yours, which the composer
   // edits, and everyone else's, drawn above it. A thread's cards are found
   // by where its thread ends now; a fresh column's by its key.
@@ -827,7 +837,13 @@ export function Column(p: ColumnProps) {
               : { target: review, line: shows.strip.words.line },
           nodes: view.nodes,
           askTarget: ask =>
-            askReviewTarget(index, p.asks, p.work.revisions, ask, askLine(ask)),
+            askReviewTarget(
+              index,
+              p.asks,
+              p.work.revisions,
+              ask,
+              askLineOf(ask),
+            ),
         })
   // Reset in render, not an effect: no frame draws a pane that is gone.
   if (pane !== null && paneShows === null) setPane(null)
@@ -1036,6 +1052,9 @@ export function Column(p: ColumnProps) {
                 running={running}
                 working={working}
               />
+              {p.matches !== null && (
+                <span className="match-count">{p.matches.count}</span>
+              )}
               {shows.base !== null && (
                 <span className="thread-base">{shows.base}</span>
               )}
@@ -1193,247 +1212,263 @@ export function Column(p: ColumnProps) {
               </div>
             )}
           </header>
-          {shows.identity.kind === "agent" && shows.identity.details.open && (
-            <ThreadDetailsPanel
-              banner={shows.banner}
-              details={shows.identity.details}
-              id={detailsId}
-              name={shows.identity.name}
-              onOpen={openAt}
-              running={running}
-              spinFirst={openedHere}
-              working={working}
-            />
-          )}
-          {!fresh && threadEnd !== null && (
-            <PinnedStrip
-              box={
-                pinning && pinKey !== null ? (
-                  <CardEditor
-                    at={at}
-                    card={pinned.find(c => c.id === pinShown)}
-                    catchUps={catchUps}
-                    commands={[]}
-                    fresh={false}
-                    how={how}
-                    lane={lane}
-                    onAct={act}
-                    onBranchInstead={branchInstead}
-                    onCreatesLane={undefined}
-                    onIntent={p.onIntent}
-                    onLeave={() => setPinning(false)}
-                    onSend={onSend}
-                    onShows={setPinBox}
-                    onTyping={p.onTyping}
-                    participants={p.participants}
-                    agents={agents}
-                    pending={undefined}
-                    place={textPlaceOf(
-                      drawnPlace(pinKey, p.session.writer, p.cards),
-                    )}
-                    prefill={undefined}
-                    readOnly={p.readOnly}
-                    reader={reader}
-                    session={p.session}
-                    takeFocus={() => true}
-                    where={undefined}
+          {/* Under a search, the thread stays as it is, covered and inert,
+          with its matches laid over it (ADR-0101, S126): leaving needs no
+          restoring. Positioned, this is the messages' offsetParent, and the
+          body's, so their offsets from the body hold. */}
+          <div className="column-below">
+            <div className="column-under" inert={p.matches !== null}>
+              {shows.identity.kind === "agent" &&
+                shows.identity.details.open && (
+                  <ThreadDetailsPanel
+                    banner={shows.banner}
+                    details={shows.identity.details}
+                    id={detailsId}
+                    name={shows.identity.name}
+                    onOpen={openAt}
+                    running={running}
+                    spinFirst={openedHere}
+                    working={working}
                   />
-                ) : null
-              }
-              cards={pinned.filter(c => c.id !== pinShown)}
-              catchUps={catchUps}
-              inView={inView}
-              onNewPin={newPin === "strip" ? openPin : null}
-              onAct={act}
-              onTyping={p.onTyping}
-              putKey={putPinned}
-              queueOn={queueOn}
-              readOnly={p.readOnly}
-              reader={reader}
-              session={p.session}
-            />
-          )}
-          <div className="column-body" ref={body}>
-            {atTop !== null && (
-              <div className="ask-bar-slot">
-                <button
-                  className="ask-bar"
-                  data-ask={atTop.ask}
-                  data-where={atTop.kind}
-                  onClick={() => {
-                    if (atTop.kind === "elsewhere") return openAt(atTop.ask)
-                    body.current
-                      ?.querySelector(`.msg[data-entry="${atTop.ask}"]`)
-                      ?.scrollIntoView({ block: "start" })
-                  }}
-                  title="the message this work answers"
-                  type="button"
-                >
-                  {atTop.kind === "elsewhere" && "↰ answering "}
-                  {askLine(atTop.ask)}
-                </button>
-              </div>
-            )}
-            {/* `useFollow` watches its height. Keep it unpositioned: it would
-            become the messages' offsetParent, and `alignOnOpen` measures
-            their offsetTop against the body's. */}
-            {/* biome-ignore lint/a11y/noStaticElementInteractions: the column's entry keys (`onEntryKey`); each message's tools are buttons */}
-            <div
-              className="column-content"
-              onClick={e => {
-                const msg =
-                  e.target instanceof Element
-                    ? e.target.closest<HTMLElement>(".msg[data-entry]")
-                    : null
-                // The drawn entry, branded as the view holds it.
-                const entry = view.nodes.find(
-                  n => n.id === msg?.dataset.entry,
-                )?.id
-                if (entry !== undefined) setSelected(entry)
-              }}
-              onKeyDown={onEntryKey}
-              ref={content}
-              tabIndex={-1}
-            >
-              {/* Room above the first message, so opening can bring it level with
-            its fork point even when the column is short. */}
-              <div className="spacer" ref={spacer} />
-              <MessageList
-                forks={p.forks}
-                index={index}
-                joins={shows.joins}
-                crossTaskLinks={crossTasks}
-                onLink={openLink}
-                lane={lane}
-                nameOf={p.nameOf}
-                onAct={act}
-                rows={p.rows}
-                asks={p.asks}
-                density={density}
-                folds={p.folds}
-                landmarks={p.landmarks}
-                releasedTip={end.releasedTip}
-                revisions={p.work.revisions}
-                runningAsk={runningAsk}
-                digests={p.digests}
-                margins={margins}
-                marginSlot={marginSlot}
-                onMargin={onMargin}
-                openMargin={openMargin}
-                leftBefore={leftLine(
-                  index,
-                  leftAt,
-                  view.nodes.map(n => n.id),
                 )}
-                live={p.session.live}
-                shown={p.shown}
-                tools={p.live.tools}
-                view={view}
-                writable={writable}
-              />
-              {streamingLanes.map(l => {
-                const reply = p.live.replies.get(l)
-                return (
-                  reply !== undefined && (
-                    <Reply doc={p.session.live} key={reply.id} stream={reply} />
-                  )
-                )
-              })}
-              {/* Where the agent's next text will appear. It takes no height:
-            CSS hides it while a row the work opened runs, and in outline,
-            where the running ask's own line pulses. */}
-              {running && <div aria-hidden className="working-line" />}
-            </div>
-            {/* What the content shrank by while the agent works, up to a third
-          of the view (`useFollow`). Not the spacer above: that one lines the
-          column up on opening. */}
-            <div className="column-floor" ref={floor} />
-            {end.unseen && (
-              <div className="jump-slot">
-                <button
-                  className="jump-latest"
-                  onClick={end.follow}
-                  type="button"
-                >
-                  ↓ new below
-                </button>
-              </div>
-            )}
-          </div>
-          {traceRows.length > 0 && (
-            <div className="traces">
-              {traceRows.map(g => {
-                const last = g.traces.at(-1)
-                return (
-                  last !== undefined && (
+              {!fresh && threadEnd !== null && (
+                <PinnedStrip
+                  box={
+                    pinning && pinKey !== null ? (
+                      <CardEditor
+                        at={at}
+                        card={pinned.find(c => c.id === pinShown)}
+                        catchUps={catchUps}
+                        commands={[]}
+                        fresh={false}
+                        how={how}
+                        lane={lane}
+                        onAct={act}
+                        onBranchInstead={branchInstead}
+                        onCreatesLane={undefined}
+                        onIntent={p.onIntent}
+                        onLeave={() => setPinning(false)}
+                        onSend={onSend}
+                        onShows={setPinBox}
+                        onTyping={p.onTyping}
+                        participants={p.participants}
+                        agents={agents}
+                        pending={undefined}
+                        place={textPlaceOf(
+                          drawnPlace(pinKey, p.session.writer, p.cards),
+                        )}
+                        prefill={undefined}
+                        readOnly={p.readOnly}
+                        reader={reader}
+                        session={p.session}
+                        takeFocus={() => true}
+                        where={undefined}
+                      />
+                    ) : null
+                  }
+                  cards={pinned.filter(c => c.id !== pinShown)}
+                  catchUps={catchUps}
+                  inView={inView}
+                  onNewPin={newPin === "strip" ? openPin : null}
+                  onAct={act}
+                  onTyping={p.onTyping}
+                  putKey={putPinned}
+                  queueOn={queueOn}
+                  readOnly={p.readOnly}
+                  reader={reader}
+                  session={p.session}
+                />
+              )}
+              <div className="column-body" ref={body}>
+                {atTop !== null && (
+                  <div className="ask-bar-slot">
                     <button
-                      className="trace"
-                      data-trace={g.traces.map(t => t.id).join(" ")}
-                      key={last.id}
-                      onClick={() =>
-                        p.onIntent({ kind: "openTrace", trace: last })
-                      }
-                      title="show where it is now"
+                      className="ask-bar"
+                      data-ask={atTop.ask}
+                      data-where={atTop.kind}
+                      onClick={() => {
+                        if (atTop.kind === "elsewhere") return openAt(atTop.ask)
+                        body.current
+                          ?.querySelector(`.msg[data-entry="${atTop.ask}"]`)
+                          ?.scrollIntoView({ block: "start" })
+                      }}
+                      title="the message this work answers"
                       type="button"
                     >
-                      {traceWords(g, reader)}
+                      {atTop.kind === "elsewhere" && "↰ answering "}
+                      {askLineOf(atTop.ask)}
                     </button>
-                  )
-                )
-              })}
-            </div>
-          )}
-          <Dock
-            asks={p.asks}
-            blank={p.blank}
-            cards={p.cards}
-            catchUps={catchUps}
-            index={index}
-            lane={lane.kind === "lane" ? lane : null}
-            notices={refused.map(r => (
-              <div className="refused-move" key={noticeKey(r)}>
-                {noticeWords(r, reader)}
+                  </div>
+                )}
+                {/* `useFollow` watches its height. Keep it unpositioned: it would
+            become the messages' offsetParent, and `alignOnOpen` measures
+            their offsetTop against the body's. */}
+                {/* biome-ignore lint/a11y/noStaticElementInteractions: the column's entry keys (`onEntryKey`); each message's tools are buttons */}
+                <div
+                  className="column-content"
+                  onClick={e => {
+                    const msg =
+                      e.target instanceof Element
+                        ? e.target.closest<HTMLElement>(".msg[data-entry]")
+                        : null
+                    // The drawn entry, branded as the view holds it.
+                    const entry = view.nodes.find(
+                      n => n.id === msg?.dataset.entry,
+                    )?.id
+                    if (entry !== undefined) setSelected(entry)
+                  }}
+                  onKeyDown={onEntryKey}
+                  ref={content}
+                  tabIndex={-1}
+                >
+                  {/* Room above the first message, so opening can bring it level with
+            its fork point even when the column is short. */}
+                  <div className="spacer" ref={spacer} />
+                  <MessageList
+                    forks={p.forks}
+                    index={index}
+                    joins={shows.joins}
+                    crossTaskLinks={crossTasks}
+                    onLink={openLink}
+                    lane={lane}
+                    nameOf={p.nameOf}
+                    onAct={act}
+                    rows={p.rows}
+                    asks={p.asks}
+                    density={density}
+                    folds={p.folds}
+                    landmarks={p.landmarks}
+                    releasedTip={end.releasedTip}
+                    revisions={p.work.revisions}
+                    runningAsk={runningAsk}
+                    digests={p.digests}
+                    margins={margins}
+                    marginSlot={marginSlot}
+                    onMargin={onMargin}
+                    openMargin={openMargin}
+                    leftBefore={leftLine(
+                      index,
+                      leftAt,
+                      view.nodes.map(n => n.id),
+                    )}
+                    live={p.session.live}
+                    shown={p.shown}
+                    tools={p.live.tools}
+                    view={view}
+                    writable={writable}
+                  />
+                  {streamingLanes.map(l => {
+                    const reply = p.live.replies.get(l)
+                    return (
+                      reply !== undefined && (
+                        <Reply
+                          doc={p.session.live}
+                          key={reply.id}
+                          stream={reply}
+                        />
+                      )
+                    )
+                  })}
+                  {/* Where the agent's next text will appear. It takes no height:
+            CSS hides it while a row the work opened runs, and in outline,
+            where the running ask's own line pulses. */}
+                  {running && <div aria-hidden className="working-line" />}
+                </div>
+                {/* What the content shrank by while the agent works, up to a third
+          of the view (`useFollow`). Not the spacer above: that one lines the
+          column up on opening. */}
+                <div className="column-floor" ref={floor} />
+                {end.unseen && (
+                  <div className="jump-slot">
+                    <button
+                      className="jump-latest"
+                      onClick={end.follow}
+                      type="button"
+                    >
+                      ↓ new below
+                    </button>
+                  </div>
+                )}
               </div>
-            ))}
-            onAct={act}
-            onTyping={p.onTyping}
-            queueAt={queueOn}
-            queued={queued}
-            readOnly={p.readOnly}
-            reader={reader}
-            session={p.session}
-          >
-            <Composer
-              card={mine}
-              place={place}
-              where={{
-                accepted: p.work.accepted,
-                forkConflicts: forkConflicts.length,
-              }}
-              commands={p.work.commands}
-              at={at}
-              how={how}
-              fresh={fresh}
-              reader={{ me: p.session.writer, nameOf: p.nameOf }}
-              prefill={freshMode?.prefill}
-              lane={lane}
-              onBranchInstead={branchInstead}
-              onSend={onSend}
-              onAct={act}
-              onCreatesLane={setCreatesLane}
-              onIntent={p.onIntent}
-              onTyping={p.onTyping}
-              takeFocus={() => p.takeFocus(p.column.key)}
-              catchUps={catchUps}
-              putColumn={putColumn}
-              participants={p.participants}
-              agents={agents}
-              pending={freshMode?.pending}
-              readOnly={p.readOnly}
-              typingAt={view.tipId}
-              session={p.session}
-            />
-          </Dock>
+              {traceRows.length > 0 && (
+                <div className="traces">
+                  {traceRows.map(g => {
+                    const last = g.traces.at(-1)
+                    return (
+                      last !== undefined && (
+                        <button
+                          className="trace"
+                          data-trace={g.traces.map(t => t.id).join(" ")}
+                          key={last.id}
+                          onClick={() =>
+                            p.onIntent({ kind: "openTrace", trace: last })
+                          }
+                          title="show where it is now"
+                          type="button"
+                        >
+                          {traceWords(g, reader)}
+                        </button>
+                      )
+                    )
+                  })}
+                </div>
+              )}
+              <Dock
+                asks={p.asks}
+                blank={p.blank}
+                cards={p.cards}
+                catchUps={catchUps}
+                index={index}
+                lane={lane.kind === "lane" ? lane : null}
+                notices={refused.map(r => (
+                  <div className="refused-move" key={noticeKey(r)}>
+                    {noticeWords(r, reader)}
+                  </div>
+                ))}
+                onAct={act}
+                onTyping={p.onTyping}
+                queueAt={queueOn}
+                queued={queued}
+                readOnly={p.readOnly}
+                reader={reader}
+                session={p.session}
+              >
+                <Composer
+                  card={mine}
+                  place={place}
+                  where={{
+                    accepted: p.work.accepted,
+                    forkConflicts: forkConflicts.length,
+                  }}
+                  commands={p.work.commands}
+                  at={at}
+                  how={how}
+                  fresh={fresh}
+                  reader={{ me: p.session.writer, nameOf: p.nameOf }}
+                  prefill={freshMode?.prefill}
+                  lane={lane}
+                  onBranchInstead={branchInstead}
+                  onSend={onSend}
+                  onAct={act}
+                  onCreatesLane={setCreatesLane}
+                  onIntent={p.onIntent}
+                  onTyping={p.onTyping}
+                  takeFocus={() => p.takeFocus(p.column.key)}
+                  catchUps={catchUps}
+                  putColumn={putColumn}
+                  participants={p.participants}
+                  agents={agents}
+                  pending={freshMode?.pending}
+                  readOnly={p.readOnly}
+                  typingAt={view.tipId}
+                  session={p.session}
+                />
+              </Dock>
+            </div>
+            {p.matches !== null && (
+              <MatchList matches={p.matches} onOpen={openAt} />
+            )}
+          </div>
         </div>
         {pane !== null && paneShows !== null && (
           <Pane

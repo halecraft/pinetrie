@@ -80,6 +80,8 @@ const ports = () => {
     clipboard: vi.fn(),
     insertText: vi.fn(),
     page: vi.fn(),
+    search: vi.fn(),
+    landed: vi.fn(),
   } satisfies AppPorts
 }
 type Ports = ReturnType<typeof ports>
@@ -128,6 +130,16 @@ test.each<Row>([
     effect: { kind: "reveal", entry: entryId("e") },
     port: p => p.reveal,
     args: ["e"],
+  },
+  {
+    effect: { kind: "landed", entry: entryId("e") },
+    port: p => p.landed,
+    args: ["e"],
+  },
+  {
+    effect: { kind: "search", act: { kind: "close" } },
+    port: p => p.search,
+    args: [{ kind: "close" }],
   },
   {
     effect: { kind: "revealCard", card: textCardId("c") },

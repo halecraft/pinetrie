@@ -52,6 +52,7 @@ import {
 import type { ListWidth } from "./list-width.ts"
 import type { PageName } from "./page.ts"
 import type { ComposerPlaces } from "./put-target.ts"
+import type { SearchAct } from "./search.ts"
 import type { Tasks } from "./tasks.ts"
 
 export type Effect =
@@ -60,6 +61,8 @@ export type Effect =
   | { readonly kind: "listWidth"; readonly width: ListWidth }
   /** Show a page over the stage, or, with null, the stage (ADR-0098). */
   | { readonly kind: "page"; readonly to: PageName | null }
+  /** Open, type in, clear or close the search of the root you are on (ADR-0101). */
+  | { readonly kind: "search"; readonly act: SearchAct }
   /** Mark what `lane` raised "not needed", in your attention document. */
   | {
       readonly kind: "notNeeded"
@@ -213,6 +216,8 @@ export type Effect =
   | { readonly kind: "openWhenHeld"; readonly entry: EntryId }
   /** Scroll to entry `entry` once it is drawn (`useReveal`). */
   | { readonly kind: "reveal"; readonly entry: EntryId }
+  /** Outline entry `entry` briefly, once drawn: where leaving a search landed. */
+  | { readonly kind: "landed"; readonly entry: EntryId }
   /** Scroll a queued card into view in its column's dock (ADR-0113). */
   | { readonly kind: "revealCard"; readonly card: CardId }
   /** Open ask `ask`'s fold, so what is revealed in it is drawn (ADR-0106). */
@@ -249,6 +254,8 @@ export interface IntentState {
   readonly listWidth: ListWidth
   /** The page over the stage, if any (ADR-0098). */
   readonly page: PageName | null
+  /** A search applies on the root you are on (`searchOn`, ADR-0101). */
+  readonly searching: boolean
 }
 
 /** What the card intents decide from (ADR-0048 step 4). */

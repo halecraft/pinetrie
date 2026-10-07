@@ -167,11 +167,17 @@
       :root[data-list="icons"] .list-fold { align-self: center; }
       .connecting, .nothing-here { margin: 1rem; color: #6f7784; }
 
-      /* The stage: the rail (E, everything in this root) beside the columns (paths). */
+      /* The stage: the rail (E, everything in this root) beside the columns
+         (paths), under a search's bar while one is open (ADR-0101). */
       #stage { grid-column: 2; grid-row: 1; position: relative; display: flex;
-        min-height: 0; min-width: 0; background: var(--page); }
-      .rail { position: relative; flex: 0 0 auto; min-width: 3rem; padding: 0 .25rem;
-        overflow-y: auto; border-right: 1px solid #23272e; }
+        flex-direction: column; min-height: 0; min-width: 0; background: var(--page); }
+      .stage-row { flex: 1; display: flex; min-height: 0; min-width: 0; }
+      /* The rail and, on a task, the 🔍 above it. As wide around a new tab's
+         rail as around a task's, so the strip keeps its place. */
+      .rail-side { flex: 0 0 auto; display: flex; flex-direction: column; min-height: 0;
+        border-right: 1px solid #23272e; }
+      .rail { position: relative; flex: 1; min-height: 0; min-width: 3rem; padding: 0 .25rem;
+        overflow-y: auto; }
       /* Centred in the rail, whose min-width is wider than a narrow tree. */
       .rail-tree { position: relative; width: fit-content; margin: 0 auto; isolation: isolate; }
       /* A new tab's rail: where its first message will be drawn. */
@@ -1299,6 +1305,61 @@
       :root[data-list="icons"] .footer-you { justify-content: center; padding: 0; }
       :root[data-list="icons"] .footer-you .account { flex: none; }
       :root[data-list="icons"] .me-trigger { padding: .2rem; }
+
+      /* A search of the root you are on (ADR-0101). The bar lies across the
+         workspace's top, its 🔍 over the rail where it sat, in a tint and a
+         shadow of its own: what is under it is not the threads. */
+      .search-lead { display: flex; justify-content: center; align-items: center;
+        min-width: 3rem; padding: .3rem .25rem; }
+      .search-toggle { padding: .1rem .3rem; border: 1px solid transparent; border-radius: 4px;
+        background: none; color: #aaa; font-size: .85rem; line-height: 1.2; cursor: pointer; }
+      .search-toggle:hover { border-color: #3a4250; }
+      .search-toggle[aria-pressed="true"] { background: #2b3546; border-color: #4f5d75; color: #fff; }
+      .search-bar { position: relative; z-index: 4; flex: 0 0 auto; display: flex; align-items: center; gap: .6rem;
+        padding-right: .75rem; background: #1b2433; border-bottom: 1px solid #2f3c52;
+        box-shadow: 0 2px 10px rgb(0 0 0 / .5); font-size: .85rem; color: #ccd;
+        animation: search-in .14s ease-out; }
+      .search-box { position: relative; display: flex; align-items: center; flex: 0 1 24rem; }
+      .search-field { flex: 1; min-width: 0; padding: .3rem 1.8rem .3rem .5rem; border: 1px solid #3a4760;
+        border-radius: 4px; background: #10151e; color: #eee; font: inherit; }
+      .search-clear { position: absolute; right: .25rem; padding: 0 .25rem; border: 0;
+        background: none; color: #9aa3b5; cursor: pointer; font-size: .85rem; }
+      .search-line { flex: 1; min-width: 0; color: #9aa3b5; white-space: nowrap; overflow: hidden;
+        text-overflow: ellipsis; }
+      .search-done { padding: .2rem .7rem; border: 1px solid #4f5d75; border-radius: 4px;
+        background: #2b3546; color: #fff; font: inherit; cursor: pointer; }
+      @keyframes search-in { from { transform: translateY(-100%); opacity: 0; } }
+      @media (prefers-reduced-motion: reduce) { .search-bar { animation: none; } }
+      /* While a search finds something, the rail dims what it does not find,
+         rings what it does, and hides the columns' views, which are covered. */
+      .rail[data-searching] [data-match="0"], .rail[data-searching] svg path { opacity: .25; }
+      .rail[data-searching] [data-match]:not([data-match="0"]) { outline: 2px solid #f2c94c;
+        outline-offset: 1px; }
+      .rail[data-searching] .rail-view, .rail[data-searching] .rail-tick { display: none; }
+      /* A column under a search: its thread stays, covered and inert, and its
+         matches are laid over it (S126). Only .column-content must stay
+         unpositioned (above); .column-below is the messages' offsetParent. */
+      .column-below { position: relative; flex: 1; min-height: 0; display: flex;
+        flex-direction: column; }
+      .column-under { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+      .match-list { position: absolute; inset: 0; z-index: 3; overflow-y: auto; display: flex;
+        flex-direction: column; gap: .35rem; padding: .6rem .75rem; background: #171b22; }
+      .match-row { display: flex; flex-direction: column; gap: .15rem; padding: .4rem .55rem;
+        border: 1px solid #2a313c; border-left: 3px solid var(--track, #777); border-radius: 4px;
+        background: #1d222b; color: inherit; font: inherit; text-align: left; cursor: pointer; }
+      .match-row:hover, .match-row:focus-visible { border-color: var(--track, #777); }
+      .match-head { display: flex; gap: .5rem; font-size: .75rem; color: #8a93a3; }
+      .match-who { color: #ddd; font-weight: 600; }
+      .match-ask { font-size: .75rem; color: #8a93a3; }
+      .match-text { font-size: .85rem; line-height: 1.4; overflow-wrap: anywhere; }
+      .match-text mark { padding: 0 1px; border-radius: 2px; background: #f2c94c; color: #111; }
+      .match-gap { padding: .15rem 0; color: #6f7784; font-size: .75rem; text-align: center; }
+      .match-none { margin: .25rem 0; color: #6f7784; }
+      .match-count { color: #f2c94c; font-size: .75rem; white-space: nowrap; }
+      /* Where leaving a search landed: an outline in the column's colour, fading. */
+      .msg[data-landed] { animation: landed 1.6s ease-out; }
+      @keyframes landed { 0%, 50% { outline: 2px solid var(--track, #777); outline-offset: 2px; }
+        100% { outline: 2px solid transparent; outline-offset: 2px; } }
     </style>
   </head>
   <body>

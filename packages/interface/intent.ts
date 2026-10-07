@@ -83,11 +83,17 @@ import {
   showTask,
 } from "./effects.ts"
 import type { NameStep } from "./identity.ts"
-import { type Here, showsStage, type ViewChange } from "./layout.ts"
+import {
+  type Here,
+  type LayoutAction,
+  showsStage,
+  type ViewChange,
+} from "./layout.ts"
 import { otherWidth } from "./list-width.ts"
 import { type MessageAct, selectionReference } from "./message-tools.ts"
 import type { PageName } from "./page.ts"
 import type { PutTarget } from "./put-target.ts"
+import { type SearchAsk, searchActOn } from "./search.ts"
 import { planSpinOff } from "./spin-off.ts"
 import { openOf, type ThreadLink } from "./thread-link.ts"
 
@@ -322,6 +328,8 @@ export type Intent =
   | { readonly kind: "foldList" }
   /** Show a page over the stage, or, with null, the stage (ADR-0098). */
   | { readonly kind: "page"; readonly to: PageName | null }
+  /** Open, type in, clear or close the search of the task you are on (ADR-0101). */
+  | { readonly kind: "search"; readonly act: SearchAsk }
   /** Title a task or a note column, or clear its title with null (ADR-0116). */
   | {
       readonly kind: "rename"
@@ -404,8 +412,43 @@ export function planIntent(
   state: IntentState,
   minted: Minted,
 ): readonly Effect[] {
-  return leavingPage(state.page, planOf(intent, state, minted))
+  return leavingSearch(
+    state.searching,
+    leavingPage(state.page, planOf(intent, state, minted)),
+  )
 }
+
+/**
+ * `effects`, after closing the search when they show something it covers
+ * (ADR-0101): a message revealed, a column opened or unfolded, or another
+ * task, a new tab or the board. A message revealed is outlined last, so
+ * leaving shows where it landed.
+ */
+function leavingSearch(
+  searching: boolean,
+  effects: readonly Effect[],
+): readonly Effect[] {
+  if (!searching) return effects
+  const shown = effects.findLast(e => e.kind === "reveal")
+  const shows =
+    shown !== undefined ||
+    effects.some(e => e.kind === "layout" && opensOrShows(e.action))
+  if (!shows) return effects
+  return [
+    { kind: "search", act: { kind: "close" } },
+    ...effects,
+    ...(shown === undefined
+      ? []
+      : [{ kind: "landed", entry: shown.entry } as const]),
+  ]
+}
+
+/** A layout action that draws something new where the search was. */
+const opensOrShows = (action: LayoutAction): boolean =>
+  showsStage(action) ||
+  (action.kind === "view" &&
+    (action.change.kind === "openFresh" ||
+      (action.change.kind === "fold" && action.change.unfolded)))
 
 /**
  * `effects`, after leaving the page shown over the stage when they show
@@ -563,6 +606,10 @@ function planOf(
       return [{ kind: "listWidth", width: otherWidth(state.listWidth) }]
     case "page":
       return [{ kind: "page", to: intent.to }]
+    case "search": {
+      const act = searchActOn(intent.act, state.layout.active)
+      return act === null ? [] : [{ kind: "search", act }]
+    }
     case "rename":
       return [
         {

@@ -20,6 +20,7 @@ const focus = (over: Partial<KeyFocus> = {}): KeyFocus => ({
   selectedCard: C2,
   column: "k-1",
   page: false,
+  search: "closed",
   ...over,
 })
 const chord = { ctrlKey: true, shiftKey: true }
@@ -113,4 +114,38 @@ test("while a page covers the stage only the list's fold acts (ADR-0098)", () =>
   expect(keyAct(key("I", chord), onPage)).toBeNull()
   expect(keyAct(key("O", chord), onPage)).toBeNull()
   expect(keyAct(key("z", { metaKey: true }), onPage)).toBeNull()
+})
+
+describe("keyAct: search (ADR-0101)", () => {
+  const open = { kind: "search", act: { kind: "open" } }
+  const close = { kind: "search", act: { kind: "close" } }
+  test.each<[string, KeyLike, Partial<KeyFocus>, unknown]>([
+    ["/ opens it", key("/"), {}, open],
+    ["/ in a box is text", key("/"), { inText: true }, null],
+    [
+      "/ with no tree shown does nothing",
+      key("/"),
+      { search: "unavailable" },
+      null,
+    ],
+    ["/ while open focuses it again", key("/"), { search: "open" }, open],
+    ["/ under a page does nothing", key("/"), { page: true }, null],
+    ["/ with a modifier is not it", key("/", { metaKey: true }), {}, null],
+    [
+      "Escape in the search closes it",
+      key("Escape"),
+      { search: "focused" },
+      close,
+    ],
+    [
+      "Escape in its field closes it",
+      key("Escape"),
+      { search: "focused", inText: true },
+      close,
+    ],
+    ["Escape elsewhere is not it", key("Escape"), { search: "open" }, null],
+    ["Escape with no search is not it", key("Escape"), {}, null],
+  ])("%s", (_, k, f, intent) => {
+    expect(keyAct(k, focus(f))).toEqual(intent)
+  })
 })

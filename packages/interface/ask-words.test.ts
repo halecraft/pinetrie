@@ -1,12 +1,14 @@
-import { writerId } from "@pinetrie/core"
+import { entryId, writerId } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
+  askLine,
   askWords,
   durationWords,
   foldWords,
   outcomeWords,
   workWords,
 } from "./ask-words.ts"
+import { entry, indexOf } from "./fixtures.ts"
 import type { WorkStats } from "./work-stats.ts"
 
 const ada = writerId("ada@example.com")
@@ -167,4 +169,15 @@ describe("foldWords", () => {
   )("%s", (_, view, where, words) => {
     expect(read(view, where)).toBe(words)
   })
+})
+
+test("askLine: a prompt by a person, by the host, and none", () => {
+  const index = indexOf([
+    entry("1", null, { role: "chat", content: "Fix the rail", writer: ada }),
+    entry("2", "1", { role: "land", content: "✓ catching up" }),
+  ])
+  expect(askLine(index, entryId("1"), nameOf)).toBe('Ada: "Fix the rail"')
+  expect(askLine(index, entryId("2"), nameOf)).toBe("✓ catching up")
+  expect(askLine(index, null, nameOf)).toBeNull()
+  expect(askLine(index, entryId("gone"), nameOf)).toBeNull()
 })

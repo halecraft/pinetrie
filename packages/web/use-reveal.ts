@@ -1,4 +1,5 @@
-// web/use-reveal — bring a picked message into view, and keep it there.
+// web/use-reveal — bring a picked message into view, and keep it there;
+// and outline where leaving a search landed (ADR-0101).
 
 import { type RefObject, useCallback, useLayoutEffect, useRef } from "react"
 import { PLACED } from "./use-follow.ts"
@@ -44,12 +45,16 @@ function showCard(container: HTMLElement, card: string): boolean {
  * root, is drawn by the render the pick causes. A newer pick replaces
  * one still waiting.
  *
+ * With `afterRender`, it waits for the render a pick causes even when the
+ * message is drawn: a fold opening above it moves it (an ask's last word is
+ * drawn while its fold is closed).
+ *
  * Call it after any layout effect that places columns: layout effects run in
  * the order they are declared, so the pick's scroll comes last.
  */
 export function useReveal(
   container: RefObject<HTMLElement | null>,
-): (id: string) => void {
+): (id: string, afterRender?: boolean) => void {
   const pending = useRef<string | null>(null)
   useLayoutEffect(() => {
     const id = pending.current
@@ -58,9 +63,50 @@ export function useReveal(
     if (show(el, id)) pending.current = null
   })
   return useCallback(
+    (id: string, afterRender = false) => {
+      const el = container.current
+      pending.current = !afterRender && el !== null && show(el, id) ? null : id
+    },
+    [container],
+  )
+}
+
+/** Set `data-landed` on `.msg[data-entry=id]` until its animation ends. False when it is not drawn. */
+function land(container: HTMLElement, id: string): boolean {
+  const message = container.querySelector<HTMLElement>(
+    `.msg[data-entry="${id}"]`,
+  )
+  if (message === null) return false
+  message.dataset.landed = ""
+  message.addEventListener(
+    "animationend",
+    () => {
+      delete message.dataset.landed
+    },
+    { once: true },
+  )
+  return true
+}
+
+/**
+ * Outline entry `id` in `container` briefly, where leaving a search landed
+ * (ADR-0101): now, if it is drawn, or once it is, as `useReveal` waits. CSS
+ * draws and fades the outline (`.msg[data-landed]`).
+ */
+export function useLanding(
+  container: RefObject<HTMLElement | null>,
+): (id: string) => void {
+  const pending = useRef<string | null>(null)
+  useLayoutEffect(() => {
+    const id = pending.current
+    const el = container.current
+    if (id === null || el === null) return
+    if (land(el, id)) pending.current = null
+  })
+  return useCallback(
     (id: string) => {
       const el = container.current
-      pending.current = el !== null && show(el, id) ? null : id
+      pending.current = el !== null && land(el, id) ? null : id
     },
     [container],
   )

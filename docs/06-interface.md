@@ -36,7 +36,8 @@ This document fixes the design before any code. It draws E and T directly.
 
 ```
 ┌ the sidebar ───┐┌ rail ┐┌ column 1 ──────────────┐┌ column 2 ─────────────┐
-│▎Fix the sync ││ ●    ││ Ada                    ││▌from Ada: "Say…" (blue)│
+│▎Fix the sync ││ 🔍   ││ Ada                    ││▌from Ada: "Say…" (blue)│
+│              ││ ●    ││                        ││                       │
 │▎bug ◉ (B)    ││ │    ││ Say exactly: OK  ●blue ││ Bea                   │
 │ Release notes││ ├──● ││ agent: OK              ││ an aside              │
 │ Q3 planning ·││ │  │ ││ Ada                    ││ agent: …      ●green  │
@@ -50,7 +51,8 @@ This document fixes the design before any code. It draws E and T directly.
 └──────────────┴──────────────────────────────────────────────────────────────
 ```
 
-There is no header: the columns start at the top of the window. The page's
+There is no header: the columns start at the top of the window, but for a
+search's bar while you search (below). The page's
 one row of chrome is the footer, and it splits where the sidebar's edge does:
 under the sidebar, what is yours; to the right, what is everyone's (ADR-0122).
 
@@ -630,7 +632,8 @@ the tree.
 - **A column wears its rail track's colour**, so you can see which branches are
   on screen and where they sit in the whole.
 - **Clicking a message in the rail brings it into view**: in the column that
-  shows it, or in a new column opened beside it.
+  shows it, or in a new column opened beside it. While you search, it leaves
+  the search there (below).
 - **Uneventful stretches are capsules** (ADR-0031, ADR-0106). A message is
   always its own dot if it is the root's first message, a branch's first
   message, a fork, a thread end, a thread end someone else is reading, where
@@ -656,6 +659,49 @@ the tree.
   move in view, except while your pointer is over the rail.
 
 The rail is E; the column is T. Seeing both at once is the product.
+
+### Search: a task's rail, each column its own matches (ADR-0101)
+
+- **🔍 at the rail's top searches the task you are on**, titled "search this
+  tree · /"; `/` outside a text box does the same. It opens a bar across the
+  top of the rail and the columns, in a tint and a shadow of its own, which
+  pushes them down. The 🔍 leads the bar, pressed, where it sat, titled
+  "close search · Esc". A new tab has no 🔍, and while the board is open
+  over the columns, `/` is the board's own search's (ADR-0115), which finds
+  tasks by their labels; this one finds words in one task's messages.
+- **It finds a phrase of whole words**: the words you type, in order, with any
+  space between them, in any case. A word is found only whole: "rail" finds
+  "the rail." and "rail-view", never "trail" or "rails". It looks in every
+  message on the task's rail, as written: people's, the agent's, and pine·trie's own
+  lines. It does not look in tool calls or their output. A reply still being
+  written is found once it is a message.
+- **Until you type, nothing changes.** With the field empty, the columns and
+  the rail are as they were.
+- **Each column shows only its own matches**, laid over its thread: the
+  messages it draws that match, oldest first. A match says who wrote it, how
+  long ago (the date in its title), the ask it is part of
+  (`in Ada: "Fix the rail…"`), and a snippet with each match marked. Between
+  matches, a line says what was left out: "⋯ 12 messages". A column with
+  none says "no matches in this thread". Its header counts them, "4
+  matches", beside the thread's name. The composer and the work strip are
+  under the matches with the rest of the thread, out of reach.
+- **The rail lights the matches**: a dot or a capsule holding one is ringed,
+  its title leading with its count, and everything else is dimmed. The
+  columns' views are not outlined while you search.
+- **The bar says what you are looking at**: the field, with **⌫** while it
+  holds text, "9 matches · 2 on branches not open" (or "no matches"), and
+  **done** at its end, titled "back to the threads · Esc".
+- **⌫ clears; done closes.** ⌫ empties the field and keeps the bar, with the
+  caret in it. **done**, the pressed 🔍, and Escape in the bar or a column's
+  matches close it, and every column is where you left it: its thread stayed
+  under the matches. Closing from the bar puts focus back on the 🔍.
+- **Showing a message leaves the search.** Pressing a match closes the search,
+  shows the message in its column, its ask's fold opened, and outlines it
+  briefly in the column's colour. A pick on the rail, a dimmed one included,
+  a mention from your inbox, or going to another task, a new tab or the
+  board leaves it too.
+- **A search is this tab's**, never stored, and writes nothing. A column under
+  a search does not mark its thread read: no one is reading it.
 
 ### Context, drawn
 
