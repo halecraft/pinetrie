@@ -8,6 +8,10 @@ Amended in place (`PLAN-2026-10-07-lane-runtime`, S130, S131): one VM per
 user, not per host. Each host's directories are a slot of their own,
 filled once and never replaced while it runs, 16 by default. The VM's
 memory is a quarter of the Mac's, between 4 and 16 GiB.
+Amended again (S135, S136): the VM's network is `gvproxy`'s, run by the
+launcher, not Virtualization's NAT, which another tool's VM can take away;
+lanes are fenced from `gvproxy`'s own addresses, and a project may grant
+ports of the Mac's loopback (`lanes.hostPorts`).
 Supersedes ADR-0034's runtime:
 - a VM per lane, by Apple's `container`;
 - an ext4 volume per lane, cloned with APFS;
@@ -234,9 +238,21 @@ The spikes:
 - **The working copy is held read-only on the Mac's side,** so even a lane
   given the wrong capabilities cannot write it (S128). Shared directories
   stay writable by every lane, as ADR-0035 decided.
-- **The network is as under `container`** (ADR-0034): a lane reaches the
-  internet and every service on the Mac bound to all interfaces (S128). It
-  is still not a grant.
+- **The network is the launcher's own** (S136): `gvproxy`, a user-mode
+  network stack, as Podman, Lima and CRC run, so a VM another tool starts
+  cannot take it away. Virtualization's NAT is shared by every VM on the
+  Mac, and one `container run` removed its Mac side under a running VM
+  (S135).
+- **A lane reaches what it did under `container`** (ADR-0034, S128): the
+  internet and the Mac's services bound to all interfaces, at its LAN
+  address. A fence in the VM keeps it from `gvproxy`'s own addresses: the
+  Mac's loopback, which `gvproxy` exposes, and its API, which opens ports
+  on the Mac (S136). A project may grant ports of the loopback
+  (`lanes.hostPorts`), to its own lanes only: each project's lanes have a
+  Docker network of their own. pine·trie's own port is never granted, since
+  a host on loopback takes no key.
+- **Seeing what a lane serves,** from the Mac's browser, is the host's to
+  open (through `gvproxy`'s API, which no lane reaches): a plan of its own.
 - **`e2e:lanes` and the fast suites run in a lane.** An outer lane's
   rootless Docker takes about 16 s to start (S125, S127). Its inner lanes
   have no limits of their own, and cannot be privileged.

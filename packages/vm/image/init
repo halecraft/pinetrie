@@ -1,8 +1,9 @@
 #!/bin/sh
 # PID 1 of pine·trie's lane VM (S128), on the system image stage 1 switched to.
 # It loads the drivers, mounts the data disk and each host's slot, and starts
-# Docker on vsock 2375, each slot's ssh agent, and a sync on vsock 2377. No
-# shell listens on any port. Every stage logs a `T+` line, the guest's uptime, to the console.
+# Docker, each slot's ssh agent and a sync on vsock 2377. Docker is bridged
+# to vsock 2375 only once the lanes' fence is set. No shell listens on any
+# port. Every stage logs a `T+` line, the guest's uptime, to the console.
 #
 # The kernel's command line: lane.slots=<n>, the share devices `slot0` …
 # `slot<n-1>` the launcher made.
@@ -66,9 +67,6 @@ else
 fi
 
 dockerd --host unix:///var/run/docker.sock --data-root /var/lib/lanehost/docker > /run/dockerd.log 2>&1 &
-# -t: after one side ends, wait an hour for the other, not socat's 0.5 s, so
-# `docker run -i` keeps its output after its input ends (S128, S129).
-socat -t 3600 VSOCK-LISTEN:2375,reuseaddr,fork UNIX-CONNECT:/var/run/docker.sock &
 # Each slot's ssh agent: a socket lanes bind, connected to the launcher's
 # vsock port for that slot, which reaches its host's agent.
 i=0
@@ -84,5 +82,35 @@ socat VSOCK-LISTEN:2377,reuseaddr,fork SYSTEM:'sync && echo synced' &
 
 ping_docker() { printf 'GET /_ping HTTP/1.0\r\n\r\n' | socat -t 2 - UNIX-CONNECT:/var/run/docker.sock 2>/dev/null | grep -q OK; }
 until [ -S /var/run/docker.sock ] && ping_docker; do sleep 0.05; done
+
+# The fence (S136): gvproxy's network is the gateway (192.168.127.1), whose
+# port 80 is gvproxy's API, which opens ports on the Mac, and the host
+# address (192.168.127.254), which is the Mac's loopback. A lane reaches the
+# gateway's DNS and nothing else of it, unless a project grants a port (the
+# host inserts its rules above these). In DOCKER-USER, which Docker made at
+# its start and runs first for every container's traffic: a lane cannot
+# change it. Lanes' traffic only: the VM's own (pulls) is not forwarded.
+fence() {
+  i=0
+  until iptables -L DOCKER-USER -n >/dev/null 2>&1; do
+    i=$((i + 1))
+    [ "$i" -lt 100 ] || return 1
+    sleep 0.05
+  done
+  iptables -I DOCKER-USER -d 192.168.127.0/24 -j REJECT &&
+    iptables -I DOCKER-USER -d 192.168.127.1 -p tcp --dport 53 -j RETURN &&
+    iptables -I DOCKER-USER -d 192.168.127.1 -p udp --dport 53 -j RETURN
+}
+if ! fence; then
+  # Docker stays out of the Mac's reach: no host's lease gets an answer.
+  t "the lanes' fence could not be set: Docker is not bridged to the Mac"
+  while :; do sleep 3600; done
+fi
+t "the lanes' fence is set"
+
+# Docker reaches the Mac only now, behind the fence. -t: after one side
+# ends, wait an hour for the other, not socat's 0.5 s, so `docker run -i`
+# keeps its output after its input ends (S128, S129).
+socat -t 3600 VSOCK-LISTEN:2375,reuseaddr,fork UNIX-CONNECT:/var/run/docker.sock &
 t "docker ready"
 while :; do sleep 3600; done

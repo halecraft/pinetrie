@@ -40,10 +40,14 @@ RUN npx -y "playwright@${PLAYWRIGHT_VERSION}" install --with-deps chromium-headl
 # on its inner lanes' btrfs subvolume (`pinetrie-inner-docker`). runc's
 # NoNewKeyring is its default: Docker's seccomp profile refuses `keyctl`. The
 # docker CLI and buildx are for a pine·trie host running in the lane.
+# newuidmap and newgidmap carry file capabilities, not setuid: setuid root,
+# they open uid_map as root, and writing it needs CAP_SYS_ADMIN over the new
+# namespace, which a lane lacks; as its owner (uid 1000) with CAP_SETUID they
+# may write it (S135). rootlesskit makes slirp4netns's tap device with `ip`.
 ARG DOCKER_VERSION=29.8.2
 ARG BUILDX_VERSION=0.37.2
 RUN apt-get update -qq \
- && apt-get install -y -qq --no-install-recommends btrfs-progs uidmap slirp4netns iptables \
+ && apt-get install -y -qq --no-install-recommends btrfs-progs uidmap slirp4netns iptables iproute2 libcap2-bin \
  && rm -rf /var/lib/apt/lists/* \
  && curl -fsSL "https://download.docker.com/linux/static/stable/aarch64/docker-${DOCKER_VERSION}.tgz" \
     | tar -xz -C /usr/local/bin --strip-components=1 \
@@ -53,6 +57,9 @@ RUN apt-get update -qq \
  && curl -fsSL -o /usr/local/lib/docker/cli-plugins/docker-buildx \
     "https://github.com/docker/buildx/releases/download/v${BUILDX_VERSION}/buildx-v${BUILDX_VERSION}.linux-arm64" \
  && chmod +x /usr/local/lib/docker/cli-plugins/docker-buildx \
+ && chmod u-s /usr/bin/newuidmap /usr/bin/newgidmap \
+ && setcap cap_setuid+ep /usr/bin/newuidmap \
+ && setcap cap_setgid+ep /usr/bin/newgidmap \
  && groupmod -n rootless node \
  && usermod -l rootless -d /home/rootless -m node \
  && echo "rootless:100000:65536" > /etc/subuid \

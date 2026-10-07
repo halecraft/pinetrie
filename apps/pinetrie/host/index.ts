@@ -365,6 +365,8 @@ export async function startHost({
     defaultDirect: !lanes,
     containers,
     runtimeRefused,
+    // A port of 0 is chosen when the host listens, after this.
+    ownPort: port === 0 ? null : port,
     machine: decodeLaneConfig(userJson, toolsIn ?? "/", false).machine,
     log,
   })

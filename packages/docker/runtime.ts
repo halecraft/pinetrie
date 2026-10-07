@@ -30,12 +30,14 @@ import {
   PROJECT_LABEL,
   planDiskCommand,
   planDisksHelper,
+  planHostPortRules,
   planNestedDisk,
   planProjectRecord,
   planProjectSweep,
   planSlotSweep,
   projectDisks,
   projectKey,
+  projectNetwork,
   renderRun,
   SLOT_LABEL,
   subvolumeCheck,
@@ -79,6 +81,12 @@ export interface DockerRuntime extends LaneRuntime {
    * disk, which must exist (`create`).
    */
   importArgv(lane: LaneName): readonly string[]
+  /**
+   * The project's grant of the host's ports (`lanes.hostPorts`), in the
+   * lane VM's firewall, replacing the last. False where the target has no
+   * host address (Linux), and nothing is done.
+   */
+  grantHostPorts(ports: readonly number[]): Promise<boolean>
 }
 
 /** Docker, at `target`, keeping the lanes of the project at `root` under `lanesDir`. */
@@ -95,11 +103,33 @@ export function dockerRuntime(input: {
   const runArgs = (shape: Parameters<LaneRuntime["runArgs"]>[0]) =>
     renderRun(shape, { target, disks, project: key, seccomp: NESTED_PROFILE })
 
+  const disksTag = readFile(DISKS_FILE, "utf8").then(
+    content =>
+      `pinetrie-disks:${createHash("sha256").update(content).digest("hex").slice(0, 12)}`,
+  )
   async function startHelper(): Promise<void> {
-    const content = await readFile(DISKS_FILE, "utf8")
-    const tag = `pinetrie-disks:${createHash("sha256").update(content).digest("hex").slice(0, 12)}`
+    const tag = await disksTag
     if (!(await imageExists(target, tag)))
       await buildImage(target, { file: DISKS_FILE, tag, buildArgs: [] })
+    // The project's lanes' network, labelled for the sweep.
+    const network = projectNetwork(key)
+    if (!(await docker(target, ["network", "inspect", network])).ok) {
+      const made = await docker(target, [
+        "network",
+        "create",
+        "--label",
+        `${PROJECT_LABEL}=${key}`,
+        network,
+      ])
+      // Another host of the project may have made it at the same moment.
+      if (
+        !made.ok &&
+        !(await docker(target, ["network", "inspect", network])).ok
+      )
+        throw new Error(
+          `docker network create ${network}: ${made.stderr.trim()}`,
+        )
+    }
     await ensureContainer(
       target,
       DISKS_CONTAINER,
@@ -127,6 +157,31 @@ export function dockerRuntime(input: {
         `a disk operation failed (exit ${ran.code}): ${ran.stderr.trim().split("\n")[0] ?? ""}`,
       )
     return ran
+  }
+  /** A project's grant rules, in a throwaway container on the VM's own network. */
+  async function firewall(
+    k: string,
+    subnet: string,
+    ports: readonly number[],
+  ): Promise<void> {
+    if (target.hostAddress === null) return
+    await dockerOrThrow(target, [
+      "run",
+      "--rm",
+      "--network",
+      "host",
+      "--cap-add",
+      "NET_ADMIN",
+      "--cap-add",
+      "NET_RAW",
+      await disksTag,
+      ...planHostPortRules({
+        key: k,
+        subnet,
+        hostAddress: target.hostAddress,
+        ports,
+      }),
+    ])
   }
   const subvolumeAt = async (at: string) => {
     await helperReady()
@@ -205,7 +260,9 @@ export function dockerRuntime(input: {
       })
       for (const name of planned.containers)
         await docker(target, ["rm", "-f", name])
-      for (const k of planned.projects)
+      for (const k of planned.projects) {
+        await docker(target, ["network", "rm", projectNetwork(k)])
+        await firewall(k, "", [])
         await disksOrThrow([
           "sh",
           "-c",
@@ -213,7 +270,21 @@ export function dockerRuntime(input: {
           "sh",
           projectDisks(lanesDir, k).dir,
         ])
+      }
       return planned.projects
+    },
+    async grantHostPorts(ports) {
+      if (target.hostAddress === null) return false
+      await helperReady()
+      const inspected = await dockerOrThrow(target, [
+        "network",
+        "inspect",
+        "-f",
+        "{{(index .IPAM.Config 0).Subnet}}",
+        projectNetwork(key),
+      ])
+      await firewall(key, inspected.stdout.trim(), ports)
+      return true
     },
   }
 }

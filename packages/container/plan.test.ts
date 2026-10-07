@@ -30,7 +30,7 @@ const spec: LaneSpec = {
     shared: [],
     hostPaths: [],
   }),
-  grants: { ssh: false, nested: false, env: [] },
+  grants: { ssh: false, nested: false, hostPorts: [], env: [] },
   identity: { name: "agent", email: "agent@pinetrie" },
   memory: "2G",
 }
@@ -88,7 +88,10 @@ describe("renderRun: a lane's shape as `container run`", () => {
     expect(
       renderRun(
         planShape(
-          { ...spec, grants: { ssh: true, nested: false, env: [] } },
+          {
+            ...spec,
+            grants: { ssh: true, nested: false, hostPorts: [], env: [] },
+          },
           {},
         ),
       ),

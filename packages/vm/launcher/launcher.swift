@@ -2,13 +2,19 @@
 // it keeps the VM running while any host holds a lease, gives each host a
 // slot of its own, and bridges Docker with half-closes.
 //
-//   launcher <state dir> <image dir> <slots> <memory bytes> <cpus>
+//   launcher <state dir> <image dir> <slots> <memory bytes> <cpus> <gvproxy>
 //
 // In <state dir>: launcher.lock (an exclusive flock: a second launcher exits
 // at once), data.img (the data disk, 256 GiB sparse, formatted by the guest
-// on first boot), mac (the VM's MAC address), console.log, empty/ (an empty
-// slot's share), and the
-// sockets docker.sock (the guest's vsock 2375) and control.sock (leases).
+// on first boot), console.log, gvproxy.log, empty/ (an empty slot's share),
+// and the sockets docker.sock (the guest's vsock 2375), control.sock
+// (leases), gv.sock and net.sock (the network card's frames) and gv-api.sock
+// (gvproxy's API, on the Mac's side only).
+//
+// The VM's network is gvproxy's (gvisor-tap-vsock, S136), which the launcher
+// runs and stops with the VM: the card's frames go to it as datagrams on a
+// unix socket. Not Virtualization's NAT, which macOS shares between every VM
+// on the Mac and which one `container run` took away (S135).
 //
 // The lease protocol is JSON, one message a line, on control.sock; its
 // host's side is `packages/vm/protocol.ts`. A connection is a lease:
@@ -33,15 +39,23 @@ setvbuf(stdout, nil, _IOLBF, 0)
 func log(_ s: String) { print("launcher: \(s)") }
 
 let args = CommandLine.arguments
-guard args.count == 6, let slotCount = Int(args[3]), let memoryBytes = UInt64(args[4]),
+guard args.count == 7, let slotCount = Int(args[3]), let memoryBytes = UInt64(args[4]),
   let cpus = Int(args[5])
 else {
   FileHandle.standardError.write(
-    "usage: launcher <state dir> <image dir> <slots> <memory bytes> <cpus>\n".data(using: .utf8)!)
+    "usage: launcher <state dir> <image dir> <slots> <memory bytes> <cpus> <gvproxy>\n".data(
+      using: .utf8)!)
   exit(2)
 }
 let state = args[1]
 let image = args[2]
+let gvproxyBinary = args[6]
+/// Under 1 GiB is a caller's mistake: Docker and lanes do not fit, and
+/// Virtualization's floor (4 MiB) would boot a VM that fails to start.
+guard memoryBytes >= 1 << 30 else {
+  log("memory must be at least 1 GiB: \(memoryBytes) bytes")
+  exit(2)
+}
 /// A VM boots with 20 share devices alongside its others, and not 24 (S131).
 guard (1...20).contains(slotCount) else {
   log("slots must be 1 to 20: \(slotCount)")
@@ -104,21 +118,76 @@ do {
   exit(1)
 }
 
-let net = VZVirtioNetworkDeviceConfiguration()
-net.attachment = VZNATNetworkDeviceAttachment()
-// One MAC address per state directory, kept in <state dir>/mac: a random
-// one each boot takes a new DHCP lease from the Mac each boot. Written
-// through a symlink (not atomically), so a test's VM can keep its own.
-let macPath = "\(state)/mac"
-if let text = try? String(contentsOfFile: macPath, encoding: .utf8),
-  let kept = VZMACAddress(string: text.trimmingCharacters(in: .whitespacesAndNewlines))
-{
-  net.macAddress = kept
-} else {
-  let made = VZMACAddress.randomLocallyAdministered()
-  try? made.string.write(toFile: macPath, atomically: false, encoding: .utf8)
-  net.macAddress = made
+// gvproxy, before the VM: the card connects to its socket.
+let gvSocket = "\(state)/gv.sock"
+for stale in [gvSocket, "\(state)/gv-api.sock"] { unlink(stale) }
+let gvproxy = Process()
+gvproxy.executableURL = url(gvproxyBinary)
+// -ssh-port -1: gvproxy forwards none of the Mac's ports to the VM.
+gvproxy.arguments = [
+  "-ssh-port", "-1", "-listen-vfkit", "unixgram://\(gvSocket)", "-listen",
+  "unix://\(state)/gv-api.sock",
+]
+FileManager.default.createFile(atPath: "\(state)/gvproxy.log", contents: nil)
+let gvLog = FileHandle(forWritingAtPath: "\(state)/gvproxy.log")
+gvproxy.standardOutput = gvLog
+gvproxy.standardError = gvLog
+do {
+  try gvproxy.run()
+} catch {
+  log("gvproxy: \(error)")
+  exit(1)
 }
+atexit {
+  if gvproxy.isRunning { kill(gvproxy.processIdentifier, SIGTERM) }
+}
+var waited = 0
+while !FileManager.default.fileExists(atPath: gvSocket) && waited < 100 {
+  usleep(50_000)
+  waited += 1
+}
+guard FileManager.default.fileExists(atPath: gvSocket) else {
+  log("gvproxy made no socket in 5 s: see gvproxy.log")
+  exit(1)
+}
+
+let net = VZVirtioNetworkDeviceConfiguration()
+// The card's frames as datagrams on a unix socket connected to gvproxy, as
+// vfkit does: bound to a path of our own, the first datagram "VFKT", and
+// large buffers (vfkit's: 1 MiB to send, 4 MiB to receive).
+do {
+  let fd = socket(AF_UNIX, SOCK_DGRAM, 0)
+  let local = "\(state)/net.sock"
+  unlink(local)
+  guard var here = unixAddress(local), var there = unixAddress(gvSocket) else {
+    log("socket path too long: \(local)")
+    exit(1)
+  }
+  let size = socklen_t(MemoryLayout<sockaddr_un>.size)
+  let bound = withUnsafePointer(to: &here) {
+    $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { bind(fd, $0, size) }
+  }
+  let connected = withUnsafePointer(to: &there) {
+    $0.withMemoryRebound(to: sockaddr.self, capacity: 1) { connect(fd, $0, size) }
+  }
+  guard bound == 0, connected == 0 else {
+    log("gvproxy \(gvSocket): \(String(cString: strerror(errno)))")
+    exit(1)
+  }
+  var sendBuffer = Int32(1 << 20)
+  var receiveBuffer = Int32(4 << 20)
+  setsockopt(fd, SOL_SOCKET, SO_SNDBUF, &sendBuffer, socklen_t(MemoryLayout<Int32>.size))
+  setsockopt(fd, SOL_SOCKET, SO_RCVBUF, &receiveBuffer, socklen_t(MemoryLayout<Int32>.size))
+  let magic = Array("VFKT".utf8)
+  guard magic.withUnsafeBytes({ write(fd, $0.baseAddress, $0.count) }) == magic.count else {
+    log("gvproxy handshake: \(String(cString: strerror(errno)))")
+    exit(1)
+  }
+  net.attachment = VZFileHandleNetworkDeviceAttachment(
+    fileHandle: FileHandle(fileDescriptor: fd, closeOnDealloc: true))
+}
+// gvproxy's DHCP has one lease, for this address (its default config).
+net.macAddress = VZMACAddress(string: "5a:94:ef:e4:0c:ee")!
 config.networkDevices = [net]
 
 FileManager.default.createFile(atPath: "\(state)/console.log", contents: nil)
@@ -527,6 +596,10 @@ stopSignal.resume()
 
 // --- start --------------------------------------------------------------------
 
+// A VM without its network serves no lane: it stops with gvproxy.
+gvproxy.terminationHandler = { p in
+  DispatchQueue.main.async { stopVM("gvproxy exited (status \(p.terminationStatus))") }
+}
 serveLeases("\(state)/control.sock")
 scheduleIdleStop()
 log("starting: \(slotCount) slots, \(config.memorySize >> 20) MiB, \(config.cpuCount) CPUs, image \(image)")

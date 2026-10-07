@@ -95,6 +95,8 @@ export interface LaneGrants {
   readonly ssh: boolean
   /** Lanes of their own inside each lane: rootless Docker (ADR-0103). */
   readonly nested: boolean
+  /** Ports of the Mac's loopback a lane may reach, through the lane VM (S136). */
+  readonly hostPorts: readonly number[]
   /** Environment variable names passed from the host. */
   readonly env: readonly string[]
   /** Further read-only mounts. */
@@ -111,6 +113,7 @@ export interface Mount {
 export const NO_GRANTS: LaneGrants = {
   ssh: false,
   nested: false,
+  hostPorts: [],
   env: [],
   mounts: [],
 }
@@ -131,7 +134,7 @@ export interface LaneSpec {
   /** Every host path the lane sees, from `planMounts`. */
   readonly mounts: readonly Mount[]
   /** The grants that are not mounts: your ssh agent, lanes inside, named variables. */
-  readonly grants: Pick<LaneGrants, "ssh" | "nested" | "env">
+  readonly grants: Pick<LaneGrants, "ssh" | "nested" | "hostPorts" | "env">
   readonly identity: { readonly name: string; readonly email: string }
   readonly memory: string
 }
@@ -247,6 +250,8 @@ export interface ContainerShape {
   readonly ssh: boolean
   /** Lanes of its own inside it: rootless Docker (ADR-0103). */
   readonly nested: boolean
+  /** Ports of the Mac's loopback it may reach (`LaneGrants.hostPorts`). */
+  readonly hostPorts: readonly number[]
 }
 
 /**
@@ -271,6 +276,7 @@ export function planShape(
     mounts: spec.mounts,
     ssh: spec.grants.ssh,
     nested: spec.grants.nested,
+    hostPorts: spec.grants.hostPorts,
     env: Object.fromEntries([
       ...passed,
       ["JJ_USER", spec.identity.name],
@@ -457,6 +463,15 @@ export function decodeLaneConfig(
     grants: {
       ssh: lanes.ssh === true,
       nested: lanes.nested === true,
+      hostPorts: Array.isArray(lanes.hostPorts)
+        ? [
+            ...new Set(
+              lanes.hostPorts.filter(
+                (p): p is number => Number.isInteger(p) && p >= 1 && p <= 65535,
+              ),
+            ),
+          ].sort((a, b) => a - b)
+        : [],
       env: strings(lanes.env).filter(n => /^[A-Za-z_][A-Za-z0-9_]*$/.test(n)),
       mounts,
     },

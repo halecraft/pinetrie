@@ -86,12 +86,34 @@ only `@pinetrie/core` and knows nothing of lanes (`workspace.test.ts`).
   `/run/pinetrie/ssh-<i>.sock` and connects to vsock `2400+i`, where the
   launcher connects it to the agent its lease named. A lane cannot open a
   vsock socket (S128), so only that socat reaches it.
-- **The network comes before Docker** (`init`): Docker answers only after
-  DHCP has written `/etc/resolv.conf`, or after 10 s without an answer. A
-  pull Docker answered before then asked `[::1]:53` and failed (S134).
-- **One MAC address per state directory** (`mac`): Virtualization's
-  default is a random one each boot, which takes a new DHCP lease from the
-  Mac each boot.
+- **The network is gvproxy's** (gvisor-tap-vsock, S136), which the
+  launcher starts before the VM and stops with it; if it exits, the VM
+  stops. The card's frames go to it as datagrams on a unix socket
+  (`VZFileHandleNetworkDeviceAttachment`): bound to `net.sock`, connected
+  to its `gv.sock`, `VFKT` first, buffers of 1 and 4 MiB, as vfkit does.
+  The VM's address is `gvproxy`'s one DHCP lease, for MAC
+  `5a:94:ef:e4:0c:ee`: `192.168.127.2`, with the gateway and DNS at
+  `.1` and the Mac's loopback at `.254` (`GVPROXY_HOST_ADDRESS`).
+  - **Not Virtualization's NAT:** macOS shares it between every VM on the
+    Mac, and one `container run` removed its Mac side, `bridge100`, under a
+    running VM, which had no network from then on (S135).
+  - **`-ssh-port -1`:** by default `gvproxy` forwards the Mac's
+    `127.0.0.1:2222` to the VM's port 22.
+  - **Pinned:** `launcher/gvproxy.json` names the release and its SHA-256;
+    `ensureGvproxy` fetches it once into `bin/`, refusing another hash.
+  - **Its API** (`gv-api.sock`) is on the Mac's side only, for the host.
+- **The lanes' fence** (`init`): `gvproxy`'s network holds the Mac's
+  loopback (`.254`) and its API on the gateway (`.1:80`), which opens ports
+  on the Mac; without a fence a lane reaches both (S136). Three rules in
+  `DOCKER-USER`, which Docker runs first for every container's traffic: the
+  gateway's DNS returns, the rest of `192.168.127.0/24` is rejected. Docker
+  is bridged to the Mac (vsock 2375) only once they are set, so no host
+  starts a lane before them, and without them it is never bridged. A
+  project's `lanes.hostPorts` adds rules above them, from the host
+  (`packages/docker/TECHNICAL.md`).
+- **The network comes before Docker** (`init`): Docker starts after DHCP
+  has written `/etc/resolv.conf`, or after 10 s without an answer. A pull
+  Docker answered before then asked `[::1]:53` and failed (S134).
 - **The idle stop:** with no lease for 10 minutes (`LAUNCHER_IDLE_SECONDS`),
   and on `SIGTERM`, the launcher asks the guest to `sync` (vsock 2377),
   stops the VM, and exits. A running VM keeps the image and launcher it

@@ -207,7 +207,12 @@ export async function startSetup(input: {
         shared: base ? [] : (lanes?.shared ?? []),
         hostPaths: base ? [] : hostPaths,
       }),
-      grants: { ssh: grants.ssh, nested: grants.nested, env: grants.env },
+      grants: {
+        ssh: grants.ssh,
+        nested: grants.nested,
+        hostPorts: grants.hostPorts,
+        env: grants.env,
+      },
       identity: r.identity,
       memory: LANE_MEMORY,
     }
@@ -261,6 +266,7 @@ export async function startSetup(input: {
             runtime,
             runtimeReady: found?.ready ?? (async () => {}),
             mountsOf: r => specOf(BASE_LANE, r).mounts,
+            hostPorts: lanes?.config.grants.hostPorts ?? [],
             refreshBaseNow,
             log,
           }),
@@ -348,6 +354,8 @@ async function prepare(input: {
   readonly runtimeReady: Found["ready"]
   /** Every host path a lane of this host mounts. */
   readonly mountsOf: (r: Ready) => readonly Mount[]
+  /** The ports of the Mac's loopback the project grants its lanes. */
+  readonly hostPorts: readonly number[]
   readonly refreshBaseNow: (
     on: LaneRuntime,
     at: string,
@@ -387,6 +395,7 @@ async function prepare(input: {
   await input.runtimeReady({
     defaultImage: runtimeFrom,
     mounts: input.mountsOf(result),
+    hostPorts: input.hostPorts,
   })
   await input.refreshBaseNow(runtime, at, result)
   log("[host] lanes of their own are ready")

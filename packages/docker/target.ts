@@ -10,4 +10,10 @@ export interface DockerTarget {
   readonly labels: Readonly<Record<string, string>>
   /** The ssh agent's socket on Docker's machine, for a lane granted ssh; null with none. */
   readonly sshAgent: string | null
+  /**
+   * Where a lane reaches the host's loopback, for the ports a project
+   * grants (`lanes.hostPorts`): gvproxy's host address in the Mac's lane VM;
+   * null where there is none (Linux).
+   */
+  readonly hostAddress: string | null
 }

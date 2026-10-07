@@ -10,6 +10,12 @@ export {
   type RunInImage,
   readImageSources,
 } from "./build.ts"
+export {
+  ensureGvproxy,
+  type GvproxyPin,
+  gvproxyPath,
+  readGvproxyPin,
+} from "./gvproxy.ts"
 export { buildLauncher, gatherLauncher, launcherName } from "./launcher.ts"
 export {
   type Lease,
@@ -19,6 +25,7 @@ export {
   vmProblem,
 } from "./lease.ts"
 export {
+  GVPROXY_HOST_ADDRESS,
   IMAGE_FILES,
   IMAGE_OUTPUTS,
   type ImageSources,

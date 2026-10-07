@@ -244,4 +244,70 @@ export const mutations: readonly Mutation[] = [
     command: unit("apps/pinetrie/host/work/runtime.test.ts"),
     expect: "stop throws the runtime's words; direct keeps them as the reason",
   },
+  {
+    name: "lanes share Docker's default network, whatever their project",
+    file: plan,
+    from: '    "--network",\n    projectNetwork(input.project),\n',
+    to: "",
+    command: unit("packages/docker"),
+    expect: "every lane is on its project's network",
+  },
+  {
+    name: "a lane is told the host's ports where there is no host address",
+    file: plan,
+    from: "    target.hostAddress !== null && shape.hostPorts.length > 0",
+    to: "    shape.hostPorts.length > 0",
+    command: unit("packages/docker"),
+    expect: "a lane is told the host's address and its granted ports",
+  },
+  {
+    name: "a project's grant applies to every project's lanes",
+    file: plan,
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "          `iptables -I DOCKER-USER -s ${input.subnet} -j ${chain}`,",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
+    to: "          `iptables -I DOCKER-USER -j ${chain}`,",
+    command: unit("packages/docker"),
+    expect: "the rules accept each port only from the project's network",
+  },
+  {
+    name: "a lane is granted the host's own port",
+    file: "apps/pinetrie/host/work/runtime.ts",
+    from: "  return { grant: ports.filter(p => p !== ownPort), refused }",
+    to: "  return { grant: ports, refused }",
+    command: unit("apps/pinetrie/host/work/runtime.test.ts"),
+    expect: "planHostPortGrant: the granted ports, but the host's own",
+  },
+  // ── the network (S135, S136), the contract's checks ──
+  {
+    name: "(Mac) a lane is on the VM's own network, outside the fence",
+    file: plan,
+    from: '    "--network",\n    projectNetwork(input.project),\n',
+    to: '    "--network",\n    "host",\n',
+    suite: "lanes",
+    scenario: "contract",
+    expect:
+      "a lane cannot reach the Mac's loopback, nor gvproxy's API that opens ports on the Mac",
+  },
+  {
+    name: "(Mac) a project's grant reaches every project's lanes",
+    file: plan,
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "          `iptables -I DOCKER-USER -s ${input.subnet} -j ${chain}`,",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
+    to: "          `iptables -I DOCKER-USER -j ${chain}`,",
+    suite: "lanes",
+    scenario: "contract",
+    expect:
+      "a port of the Mac's loopback the project grants answers its lanes, and not another project's",
+  },
+  {
+    name: "(Mac) the VM's network is Virtualization's NAT again",
+    file: launcher,
+    from: "  net.attachment = VZFileHandleNetworkDeviceAttachment(\n    fileHandle: FileHandle(fileDescriptor: fd, closeOnDealloc: true))\n",
+    to: "  net.attachment = VZNATNetworkDeviceAttachment()\n",
+    suite: "lanes",
+    scenario: "contract",
+    expect: "a container run on the Mac leaves running lanes on the network",
+  },
 ]

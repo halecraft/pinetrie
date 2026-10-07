@@ -114,6 +114,10 @@ changes pine·trie can keep this note true. You can skip them.
   lanes lanes of their own (`lanes.nested` in `pinetrie.json`): then a
   rootless Docker answers at `$DOCKER_HOST`.
   <!-- packages/lanes/plan.ts LaneGrants -->
+- The person's machine's own services (bound to its loopback) are out of
+  reach, but for ports the project grants (`lanes.hostPorts`): those are at
+  `$PINETRIE_HOST`, and `$PINETRIE_HOST_PORTS` lists them.
+  <!-- packages/docker/plan.ts HOST_ENV -->
 - There is no model key: pi's `auth.json` is not in the lane.
 - There are no credentials: the person's home directory is not mounted. A
   project grants its lanes an ssh agent, named environment variables, or

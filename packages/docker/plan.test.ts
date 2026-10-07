@@ -20,6 +20,7 @@ import {
   parsePs,
   planDiskCommand,
   planDockerHost,
+  planHostPortRules,
   planProjectSweep,
   planSlotSweep,
   projectDisks,
@@ -43,7 +44,7 @@ const spec: LaneSpec = {
     shared: [{ path: ".plans", source: "/Users/ada/p/.plans" }],
     hostPaths: [],
   }),
-  grants: { ssh: false, nested: false, env: [] },
+  grants: { ssh: false, nested: false, hostPorts: [], env: [] },
   identity: { name: "agent", email: "agent@pinetrie" },
   memory: "4G",
 }
@@ -55,6 +56,7 @@ const mac: DockerTarget = {
   pathOf: p => `/mnt/host-shares/3/${p.replaceAll("/", "_")}`,
   labels: { "pinetrie.slot": "3" },
   sshAgent: "/run/pinetrie/ssh-3.sock",
+  hostAddress: "192.168.127.254",
 }
 const render = (shape: ContainerShape, target = mac) =>
   renderRun(shape, {
@@ -140,7 +142,7 @@ describe("renderRun: a lane's shape as `docker run`", () => {
     expect(nested.slice(-3)).toEqual([
       "sh",
       "-c",
-      "pinetrie-inner-docker & exec sleep infinity",
+      "(pinetrie-inner-docker &); exec sleep infinity",
     ])
   })
   test("on Linux, paths as they are", () => {
@@ -149,6 +151,7 @@ describe("renderRun: a lane's shape as `docker run`", () => {
       pathOf: p => p,
       labels: {},
       sshAgent: null,
+      hostAddress: null,
     }
     const argv = render(shapes[1] as ContainerShape, linux)
     expect(valuesOf(argv, "--mount")).toContain(
@@ -347,4 +350,60 @@ test("a failed build names buildx's error, not its builder", () => {
     "ERROR: failed to solve: docker.io/library/alpine:3.23: failed to resolve source metadata",
   )
   expect(buildError("just this\n")).toBe("just this")
+})
+
+describe("a project's grant of the host's ports", () => {
+  const granted = planShape(
+    { ...spec, grants: { ...spec.grants, hostPorts: [3000, 5432] } },
+    {},
+  )
+  test("every lane is on its project's network", () => {
+    expect(valuesOf(render(shapes[0] as ContainerShape), "--network")).toEqual([
+      `pinetrie-${key}`,
+    ])
+  })
+  test("a lane is told the host's address and its granted ports, where the target has an address", () => {
+    expect(valuesOf(render(granted), "-e")).toEqual(
+      expect.arrayContaining([
+        "PINETRIE_HOST=192.168.127.254",
+        "PINETRIE_HOST_PORTS=3000,5432",
+      ]),
+    )
+    expect(render(shapes[0] as ContainerShape).join(" ")).not.toContain(
+      "PINETRIE_HOST",
+    )
+    const linux: DockerTarget = { ...mac, hostAddress: null }
+    expect(render(granted, linux).join(" ")).not.toContain("PINETRIE_HOST")
+  })
+  test("the rules accept each port only from the project's network, to the host's address, after clearing its old ones", () => {
+    const [sh, c, script = ""] = planHostPortRules({
+      key,
+      subnet: "172.18.0.0/16",
+      hostAddress: "192.168.127.254",
+      ports: [3000, 5432],
+    })
+    expect([sh, c]).toEqual(["sh", "-c"])
+    const lines = script.split("\n")
+    const chain = `PT-${key.slice(0, 16)}`
+    expect(lines.findIndex(l => l.includes("-D "))).toBeLessThan(
+      lines.findIndex(l => l.includes("--dport")),
+    )
+    expect(lines).toContain(
+      `iptables -A ${chain} -d 192.168.127.254 -p tcp --dport 5432 -j ACCEPT`,
+    )
+    expect(lines.at(-1)).toBe(
+      `iptables -I DOCKER-USER -s 172.18.0.0/16 -j ${chain}`,
+    )
+  })
+  test("with no ports, only the old rules go", () => {
+    const [, , script = ""] = planHostPortRules({
+      key,
+      subnet: "172.18.0.0/16",
+      hostAddress: "192.168.127.254",
+      ports: [],
+    })
+    expect(script).not.toContain("ACCEPT")
+    expect(script).not.toContain("-I DOCKER-USER")
+    expect(script.split("\n").at(-1)).toBe(`iptables -X PT-${key.slice(0, 16)}`)
+  })
 })

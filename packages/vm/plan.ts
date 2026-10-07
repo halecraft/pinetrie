@@ -78,6 +78,9 @@ const GiB = 1024 ** 3
 export const vmMemory = (macMemory: number): number =>
   Math.min(16 * GiB, Math.max(4 * GiB, Math.floor(macMemory / 4)))
 
+/** gvproxy's address for the Mac's loopback, in the VM's network (S136). */
+export const GVPROXY_HOST_ADDRESS = "192.168.127.254"
+
 /** Where a slot's directories are in the VM. */
 export const SHARES_ROOT = "/mnt/host-shares"
 

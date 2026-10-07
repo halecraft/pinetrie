@@ -31,8 +31,19 @@ export const ROOTLESS_UID = 1000
 export const INNER_DOCKER_HOST = `unix:///run/user/${ROOTLESS_UID}/docker.sock`
 /** Where a lane granted ssh finds the agent. */
 export const SSH_AGENT_IN_LANE = "/run/pinetrie/ssh-agent.sock"
-/** A nested lane's command: its inner Docker, then the lane's own wait. */
-export const NESTED_COMMAND = "pinetrie-inner-docker & exec sleep infinity"
+/**
+ * A nested lane's command: its inner Docker, then the lane's own wait. The
+ * inner Docker starts in a subshell that exits at once, so `--init` adopts
+ * it and reaps it when it ends: `sleep` would leave it a zombie.
+ */
+export const NESTED_COMMAND = "(pinetrie-inner-docker &); exec sleep infinity"
+
+/** Each project's lanes are on a network of their own, so a grant is its project's. */
+export const projectNetwork = (key: string): string => `pinetrie-${key}`
+
+/** The variables a lane is told the host's granted ports by. */
+export const HOST_ENV = "PINETRIE_HOST"
+export const HOST_PORTS_ENV = "PINETRIE_HOST_PORTS"
 
 /** A project's key on Docker's machine: a hash of its root. */
 export const projectKey = (root: string): string =>
@@ -115,6 +126,15 @@ export function renderRun(
       ]
     : ["--security-opt", "no-new-privileges"]
   const labels = { [PROJECT_LABEL]: input.project, ...target.labels }
+  const hostPorts =
+    target.hostAddress !== null && shape.hostPorts.length > 0
+      ? [
+          "-e",
+          `${HOST_ENV}=${target.hostAddress}`,
+          "-e",
+          `${HOST_PORTS_ENV}=${shape.hostPorts.join(",")}`,
+        ]
+      : []
   return [
     "run",
     "-d",
@@ -127,6 +147,8 @@ export function renderRun(
     shape.name,
     "-m",
     shape.memory,
+    "--network",
+    projectNetwork(input.project),
     ...Object.entries(labels).flatMap(([k, v]) => ["--label", `${k}=${v}`]),
     ...mountArgs(disks.lane(shape.lane), {
       source: disks.lane(shape.lane),
@@ -135,6 +157,7 @@ export function renderRun(
     }),
     ...shape.mounts.flatMap(m => mountArgs(target.pathOf(m.source), m)),
     ...ssh,
+    ...hostPorts,
     ...nested,
     ...Object.entries(shape.env).flatMap(([k, v]) => ["-e", `${k}=${v}`]),
     "-w",
@@ -407,6 +430,42 @@ export function dockerWords(r: DockerRefusal): string {
     case "no-rm-allowed":
       return `${r.dir} is on btrfs mounted without user_subvol_rm_allowed, so a lane's disk cannot be deleted without privilege: \`sudo mount -o remount,user_subvol_rm_allowed ${r.dir}\``
   }
+}
+
+/** The firewall chain of one project's grant in the lane VM. */
+export const grantChain = (key: string): string => `PT-${key.slice(0, 16)}`
+
+/**
+ * One project's `lanes.hostPorts` as a script for the lane VM's firewall,
+ * run by the host in a container on the VM's own network with
+ * `CAP_NET_ADMIN`. Its earlier rules are removed first, so a host's start
+ * replaces them. Each granted port is accepted only from the project's
+ * network (`subnet`), to the host's address, over TCP, above the init's
+ * fence, which rejects the rest (`packages/vm/image/init`). With no ports,
+ * only the removal.
+ */
+export function planHostPortRules(input: {
+  readonly key: string
+  readonly subnet: string
+  readonly hostAddress: string
+  readonly ports: readonly number[]
+}): readonly string[] {
+  const chain = grantChain(input.key)
+  const clear = [
+    `iptables -S DOCKER-USER | grep -- '-j ${chain}$' | sed 's/^-A /-D /' | while read -r rule; do eval iptables "$rule"; done`,
+    `iptables -F ${chain} 2>/dev/null || iptables -N ${chain}`,
+  ]
+  const grant =
+    input.ports.length === 0
+      ? [`iptables -X ${chain}`]
+      : [
+          ...input.ports.map(
+            p =>
+              `iptables -A ${chain} -d ${input.hostAddress} -p tcp --dport ${p} -j ACCEPT`,
+          ),
+          `iptables -I DOCKER-USER -s ${input.subnet} -j ${chain}`,
+        ]
+  return ["sh", "-c", ["set -e", ...clear, ...grant].join("\n")]
 }
 
 /** A container as `docker ps` lists it: its name and labels. */

@@ -69,7 +69,7 @@ const spec: LaneSpec = {
   image: "pinetrie-lane:abc",
   imagePath: "/usr/local/bin:/usr/bin:/bin",
   mounts: planMounts(parts),
-  grants: { ssh: false, nested: false, env: [] },
+  grants: { ssh: false, nested: false, hostPorts: [], env: [] },
   identity: { name: "agent", email: "agent@pinetrie" },
   memory: "2G",
 }
@@ -184,7 +184,12 @@ describe("planShape: a lane's container, as any runtime would make it", () => {
     const granted = planShape(
       {
         ...spec,
-        grants: { ssh: true, nested: false, env: ["GITHUB_TOKEN", "MISSING"] },
+        grants: {
+          ssh: true,
+          nested: false,
+          hostPorts: [],
+          env: ["GITHUB_TOKEN", "MISSING"],
+        },
       },
       { GITHUB_TOKEN: "t" },
     )
@@ -354,7 +359,13 @@ describe("decodeLaneConfig: grants, the install and shared directories, total", 
         false,
       ),
     ).toEqual({
-      grants: { ssh: false, nested: false, env: ["OK_1"], mounts: [] },
+      grants: {
+        ssh: false,
+        nested: false,
+        hostPorts: [],
+        env: ["OK_1"],
+        mounts: [],
+      },
       install: null,
       shared: [".plans"],
       repo: {
@@ -366,6 +377,14 @@ describe("decodeLaneConfig: grants, the install and shared directories, total", 
       },
       machine: { runtime: null, slots: null },
     })
+  })
+  test("lanes.hostPorts: whole ports from 1 to 65535, once each, in order", () => {
+    const ports = (v: unknown) =>
+      decodeLaneConfig({ lanes: { hostPorts: v } }, "/p", false).grants
+        .hostPorts
+    expect(ports([5432, 3000, 3000, 0, 70000, 2.5, "80"])).toEqual([3000, 5432])
+    expect(ports("5432")).toEqual([])
+    expect(ports(undefined)).toEqual([])
   })
   test("lanes.nested grants lanes inside a lane, only when true", () => {
     const nested = (v: unknown) =>
@@ -433,6 +452,7 @@ describe("decodeLaneConfig: grants, the install and shared directories, total", 
     ).toEqual({
       ssh: true,
       nested: false,
+      hostPorts: [],
       env: [],
       mounts: [{ source: "/p/d", target: "/d", readonly: true }],
     })

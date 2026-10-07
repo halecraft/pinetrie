@@ -8,6 +8,7 @@ import {
   builderWords,
   findProject,
   planBuilder,
+  planHostPortGrant,
   planRuntime,
   projectOf,
   RuntimeRefused,
@@ -142,3 +143,16 @@ describe.skipIf(process.platform === "darwin")(
     })
   },
 )
+
+test("planHostPortGrant: the granted ports, but the host's own, refused with why", () => {
+  expect(planHostPortGrant([3000, 7391], 7391)).toEqual({
+    grant: [3000],
+    refused: [
+      "lanes.hostPorts 7391 is not granted: it is this pine·trie host's own port, which takes no key on loopback",
+    ],
+  })
+  expect(planHostPortGrant([3000, 7391], null)).toEqual({
+    grant: [3000, 7391],
+    refused: [],
+  })
+})

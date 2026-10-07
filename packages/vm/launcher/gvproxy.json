@@ -1,0 +1,5 @@
+{
+  "version": "v0.8.9",
+  "url": "https://github.com/containers/gvisor-tap-vsock/releases/download/v0.8.9/gvproxy-darwin",
+  "sha256": "c6f7b4bc7f21bf810b5cf54e04d979b014c5d96472a03a9e97fe62a00940067c"
+}

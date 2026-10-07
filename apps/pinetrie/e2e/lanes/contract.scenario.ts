@@ -9,7 +9,7 @@
 //   so a change to the launcher is what runs, and the person's hosts are
 //   untouched.
 
-import { execFile, execFileSync } from "node:child_process"
+import { execFile, execFileSync, spawn } from "node:child_process"
 import {
   existsSync,
   mkdirSync,
@@ -32,11 +32,13 @@ import {
 import {
   describeFailure,
   executeOrThrow,
+  type LaneRuntime,
   laneContainer,
+  type Mount,
   planSnapshot,
   run,
 } from "@pinetrie/lanes"
-import { vmStateDir } from "@pinetrie/vm"
+import { GVPROXY_HOST_ADDRESS, vmStateDir } from "@pinetrie/vm"
 import { findProject } from "../../host/work/runtime.ts"
 import type { Checks } from "../checks.ts"
 import {
@@ -58,8 +60,10 @@ import {
 
 export const scenario: Scenario = {
   needs: runtimeProblem,
-  run: ({ check }) =>
-    E2E_RUNTIME === "docker" ? dockerContract(check) : contractSection(check),
+  run: ({ check, skip }) =>
+    E2E_RUNTIME === "docker"
+      ? dockerContract(check, skip)
+      : contractSection(check),
 }
 
 /** Clones the contract checks. */
@@ -202,8 +206,7 @@ while (!fs.existsSync("/probe/stop")) {
  * A VM of the contract's own on the Mac: a state directory sharing the
  * built images and launchers, and a data disk of its own kept between runs
  * (`contract-data.img`), so a cold start formats it only the first time and
- * Docker keeps what it pulled, and a MAC address of its own
- * (`contract-mac`), so each boot does not take another DHCP lease. Its launcher stops 2 s after its last lease.
+ * Docker keeps what it pulled. Its launcher stops 2 s after its last lease.
  * Returns how to put the environment back.
  */
 function ownVm(): { readonly state: string; restore(): void } | null {
@@ -217,7 +220,6 @@ function ownVm(): { readonly state: string; restore(): void } | null {
     symlinkSync(path.join(real, d), path.join(vm, d))
   }
   symlinkSync(path.join(real, "contract-data.img"), path.join(vm, "data.img"))
-  symlinkSync(path.join(real, "contract-mac"), path.join(vm, "mac"))
   const saved = {
     XDG_STATE_HOME: process.env.XDG_STATE_HOME,
     LAUNCHER_IDLE_SECONDS: process.env.LAUNCHER_IDLE_SECONDS,
@@ -237,8 +239,39 @@ function ownVm(): { readonly state: string; restore(): void } | null {
 const median = (xs: readonly number[]) =>
   [...xs].sort((a, b) => a - b)[Math.floor(xs.length / 2)] ?? 0
 
-async function dockerContract(check: Checks["check"]): Promise<void> {
+/**
+ * A server on the Mac's loopback, answering `mac <name>`, in a process of its
+ * own: this one blocks while a lane connects (S136). Its port, and how to stop
+ * it.
+ */
+async function loopbackServer(
+  name: string,
+): Promise<{ readonly port: number; stop(): void }> {
+  const child = spawn(
+    process.execPath,
+    [
+      "-e",
+      `require("http").createServer((q, r) => r.end("mac ${name}")).listen(0, "127.0.0.1", function () { console.log(this.address().port) })`,
+    ],
+    { stdio: ["ignore", "pipe", "inherit"] },
+  )
+  const port = await new Promise<number>((resolve, reject) => {
+    child.stdout?.once("data", d => resolve(Number(String(d).trim())))
+    child.once("exit", code => reject(new Error(`the server exited ${code}`)))
+  })
+  // However the scenario ends, the server does not outlive it.
+  process.once("exit", () => child.kill())
+  return { port, stop: () => child.kill() }
+}
+
+async function dockerContract(
+  check: Checks["check"],
+  skip: Checks["skip"],
+): Promise<void> {
   const own = ownVm()
+  const onMac = process.platform === "darwin"
+  const closedPort = await loopbackServer("closed")
+  const grantedPort = await loopbackServer("granted")
   const logs: string[] = []
   const log = (l: string) => {
     logs.push(l)
@@ -270,35 +303,46 @@ async function dockerContract(check: Checks["check"]): Promise<void> {
   const lanes: LaneName[] = []
   const snapshots: SnapshotId[] = []
   /** A lane of host A's, on a new disk, with the working copy, a shared directory and the probe. */
-  const lane = async (image: string): Promise<LaneName> => {
+  /** Host A's directories, as its slot shares them. */
+  const mountsOfA = [
+    { source: projA, target: "/mnt/host-working-copy", readonly: true },
+    {
+      source: path.join(projA, ".plans"),
+      target: "/workspace/.plans",
+      readonly: false,
+    },
+    { source: probe, target: "/probe", readonly: false },
+  ] as const
+  /** A lane on `on`'s runtime, mounting only what that host's slot shares. */
+  const lane = async (
+    image: string,
+    on: LaneRuntime = runtime,
+    mounts: readonly Mount[] = mountsOfA,
+  ): Promise<LaneName> => {
     const name = laneNameForThread(`contract-${process.pid}-${lanes.length}`)
     lanes.push(name)
-    await runtime.disk({ kind: "create", lane: name })
+    laneRuntimes.set(name, on)
+    await on.disk({ kind: "create", lane: name })
     const started = Date.now()
-    await runtime.run({
+    await on.run({
       name: laneContainer(name),
       lane: name,
       image,
       memory: "1g",
-      mounts: [
-        { source: projA, target: "/mnt/host-working-copy", readonly: true },
-        {
-          source: path.join(projA, ".plans"),
-          target: "/workspace/.plans",
-          readonly: false,
-        },
-        { source: probe, target: "/probe", readonly: false },
-      ],
+      mounts,
       env: {},
       ssh: false,
       nested: false,
+      hostPorts: [],
     })
     runMs.push(Date.now() - started)
     return name
   }
   const runMs: number[] = []
+  const laneRuntimes = new Map<LaneName, LaneRuntime>()
   const exec = (name: LaneName, script: string) => {
-    const [p = "docker", ...rest] = runtime.execArgv(laneContainer(name), [
+    const on = laneRuntimes.get(name) ?? runtime
+    const [p = "docker", ...rest] = on.execArgv(laneContainer(name), [
       "sh",
       "-c",
       script,
@@ -319,15 +363,8 @@ async function dockerContract(check: Checks["check"]): Promise<void> {
 
     await a.ready({
       defaultImage: "",
-      mounts: [
-        { source: projA, target: "/mnt/host-working-copy", readonly: true },
-        {
-          source: path.join(projA, ".plans"),
-          target: "/workspace/.plans",
-          readonly: false,
-        },
-        { source: probe, target: "/probe", readonly: false },
-      ],
+      hostPorts: [grantedPort.port],
+      mounts: mountsOfA,
     })
     for (const image of [NODE_IMAGE, PYTHON_IMAGE, ALPINE_IMAGE])
       await runtime.runInImage(image, ["true"])
@@ -447,7 +484,37 @@ async function dockerContract(check: Checks["check"]): Promise<void> {
       vsock.stdout.trim().split("\n").at(-1) ?? "",
     )
 
+    // ── the fence (S136): the Mac's loopback and gvproxy's API ──
+    /** What a lane got from `url`: the server's answer, or wget's error. */
+    const fetchFrom = async (name: LaneName, url: string) =>
+      (
+        await exec(name, `wget -q -T 3 -O - '${url}' 2>&1 || echo "failed"`)
+      ).stdout.trim()
+    if (onMac) {
+      const fenced = await lane(ALPINE_IMAGE)
+      const loopback = await fetchFrom(
+        fenced,
+        `http://${GVPROXY_HOST_ADDRESS}:${closedPort.port}/`,
+      )
+      const api = await fetchFrom(
+        fenced,
+        "http://192.168.127.1/services/forwarder/all",
+      )
+      check(
+        "a lane cannot reach the Mac's loopback, nor gvproxy's API that opens ports on the Mac",
+        !loopback.includes("mac closed") && api.includes("failed"),
+        `loopback: ${loopback.split("\n").at(-1)} | API: ${api.split("\n").at(-1)}`,
+      )
+    } else
+      skip(
+        "a lane cannot reach the Mac's loopback, nor gvproxy's API that opens ports on the Mac",
+        "gvproxy is the Mac's lane VM's network",
+      )
+
     // ── two hosts' slots ──
+    const mountsOfB = [
+      { source: projB, target: "/mnt/host-working-copy", readonly: true },
+    ] as const
     const b = await findProject({
       dir: projB,
       defaultDirect: false,
@@ -456,12 +523,26 @@ async function dockerContract(check: Checks["check"]): Promise<void> {
       log,
     })
     if (b?.runtime !== null && b !== null) {
-      await b.ready({
-        defaultImage: "",
-        mounts: [
-          { source: projB, target: "/mnt/host-working-copy", readonly: true },
-        ],
-      })
+      await b.ready({ defaultImage: "", hostPorts: [], mounts: mountsOfB })
+      if (onMac) {
+        const granted = `http://${GVPROXY_HOST_ADDRESS}:${grantedPort.port}/`
+        const ofA = await fetchFrom(await lane(ALPINE_IMAGE), granted)
+        const laneOfB = await lane(ALPINE_IMAGE, b.runtime, mountsOfB)
+        const ofB = await fetchFrom(laneOfB, granted)
+        check(
+          "a port of the Mac's loopback the project grants answers its lanes, and not another project's",
+          ofA.includes("mac granted") && !ofB.includes("mac granted"),
+          `project A: ${ofA.split("\n").at(-1)} | project B: ${ofB.split("\n").at(-1)}`,
+        )
+        await b.runtime.remove(laneContainer(laneOfB)).catch(() => {})
+        await b.runtime.disk({ kind: "delete", lane: laneOfB }).catch(() => {})
+        laneRuntimes.delete(laneOfB)
+        lanes.splice(lanes.indexOf(laneOfB), 1)
+      } else
+        skip(
+          "a port of the Mac's loopback the project grants answers its lanes, and not another project's",
+          "gvproxy is the Mac's lane VM's network",
+        )
       await b.close()
     }
     const after = await exec(
@@ -474,6 +555,30 @@ async function dockerContract(check: Checks["check"]): Promise<void> {
         existsSync(path.join(projA, ".plans", "after.md")),
       after.stdout.trim().replace(/\n/g, " ") + after.stderr.trim(),
     )
+
+    // ── another tool's VM (S135): a `container run` beside running lanes ──
+    const containerUp =
+      onMac &&
+      quietSh("container system status >/dev/null 2>&1 && echo up").trim() ===
+        "up"
+    if (containerUp) {
+      quietSh(
+        "container run --rm docker.io/library/alpine:3.23 true >/dev/null 2>&1",
+      )
+      const lookup = await exec(
+        writerLane,
+        "nslookup registry-1.docker.io 2>&1 | tail -2",
+      )
+      check(
+        "a container run on the Mac leaves running lanes on the network",
+        /Address: \d+\.\d+/.test(lookup.stdout),
+        lookup.stdout.trim().replace(/\n/g, " | "),
+      )
+    } else
+      skip(
+        "a container run on the Mac leaves running lanes on the network",
+        onMac ? "Apple's container is not running" : "the Mac's VMs only",
+      )
 
     // ── costs ──
     await lane(ALPINE_IMAGE)
@@ -499,9 +604,12 @@ async function dockerContract(check: Checks["check"]): Promise<void> {
     )
   } finally {
     for (const l of lanes) {
-      await runtime.remove(laneContainer(l)).catch(() => {})
-      await runtime.disk({ kind: "delete", lane: l }).catch(() => {})
+      const on = laneRuntimes.get(l) ?? runtime
+      await on.remove(laneContainer(l)).catch(() => {})
+      await on.disk({ kind: "delete", lane: l }).catch(() => {})
     }
+    closedPort.stop()
+    grantedPort.stop()
     await runtime
       .disk({ kind: "deleteSnapshots", ids: snapshots })
       .catch(() => {})

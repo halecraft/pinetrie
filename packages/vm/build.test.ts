@@ -30,6 +30,25 @@ describe("the image's sources", () => {
     expect(init).not.toMatch(/EXEC:[^\s]*sh/)
     expect(init).not.toMatch(/SYSTEM:[^']*'[^']*\bsh\b/)
   })
+  test("Docker reaches the Mac only behind the lanes' fence", () => {
+    const init = imageFile("init")
+    const fenced = init.indexOf("if ! fence; then")
+    const bridged = init.indexOf("VSOCK-LISTEN:2375")
+    expect(fenced).toBeGreaterThan(0)
+    expect(bridged).toBeGreaterThan(fenced)
+  })
+  test("the fence rejects gvproxy's network but the gateway's DNS", () => {
+    const init = imageFile("init")
+    expect(init).toContain(
+      "iptables -I DOCKER-USER -d 192.168.127.0/24 -j REJECT",
+    )
+    expect(init).toContain(
+      "iptables -I DOCKER-USER -d 192.168.127.1 -p udp --dport 53 -j RETURN",
+    )
+    expect(init).toContain(
+      "iptables -I DOCKER-USER -d 192.168.127.1 -p tcp --dport 53 -j RETURN",
+    )
+  })
   test("the init loads the manifest's modules, which build.sh writes", () => {
     expect(imageFile("init")).toContain(
       "modprobe -a $(cat /etc/pinetrie/modules)",

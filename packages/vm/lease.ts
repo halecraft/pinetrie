@@ -12,6 +12,7 @@ import os from "node:os"
 import path from "node:path"
 import { createInterface } from "node:readline"
 import { checkImageDir, readImageSources } from "./build.ts"
+import { ensureGvproxy, readGvproxyPin } from "./gvproxy.ts"
 import { buildLauncher, gatherLauncher } from "./launcher.ts"
 import {
   imageDir,
@@ -135,6 +136,8 @@ export async function leaseVm(input: {
       input.log("[vm] building the lane VM's launcher")
       await buildLauncher(launcher.binary)
     }
+    // The VM's network (S136): fetched and checked once, then kept.
+    const gvproxy = await ensureGvproxy(stateDir, await readGvproxyPin())
     const out = openSync(path.join(stateDir, "launcher.log"), "a")
     started = Date.now()
     spawn(
@@ -145,6 +148,7 @@ export async function leaseVm(input: {
         String(input.slots),
         String(vmMemory(os.totalmem())),
         String(os.availableParallelism()),
+        gvproxy,
       ],
       { detached: true, stdio: ["ignore", out, out] },
     ).unref()

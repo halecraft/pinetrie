@@ -28,7 +28,7 @@ import {
   type RuntimeChoice,
   type WrittenMachine,
 } from "@pinetrie/lanes"
-import { leaseVm, vmStateDir } from "@pinetrie/vm"
+import { GVPROXY_HOST_ADDRESS, leaseVm, vmStateDir } from "@pinetrie/vm"
 import { type Convert, converter } from "./convert.ts"
 
 /** What the host found where it runs: the project, and its lanes' runtime when they have their own. */
@@ -37,17 +37,37 @@ export interface Found {
   readonly runtime: LaneRuntime | null
   /**
    * Called once by setup, before any lane starts: pine·trie's default image
-   * (`container` trims a stopped lane's disk with it), and every host path
-   * a lane mounts (on the Mac, shared into this host's slot of the VM).
+   * (`container` trims a stopped lane's disk with it), every host path a
+   * lane mounts (on the Mac, shared into this host's slot of the VM), and
+   * the ports of the Mac's loopback the project grants its lanes.
    */
   ready(input: {
     readonly defaultImage: string
     readonly mounts: readonly Mount[]
+    readonly hostPorts: readonly number[]
   }): Promise<void>
   /** After the lanes stop, at shutdown: on the Mac, the lease ends and the slot empties. */
   close(): Promise<void>
   /** pre-docker: converts a lane made under `container`; null where there is none to read. */
   readonly convert: Convert | null
+}
+
+/**
+ * Which granted ports of the Mac's loopback lanes may reach. The host's own
+ * port is refused, with why: a host bound to loopback takes no key, so a lane
+ * reaching it would act as a person (`startHost`).
+ */
+export function planHostPortGrant(
+  ports: readonly number[],
+  ownPort: number | null,
+): { readonly grant: readonly number[]; readonly refused: readonly string[] } {
+  const refused = ports
+    .filter(p => p === ownPort)
+    .map(
+      p =>
+        `lanes.hostPorts ${p} is not granted: it is this pine·trie host's own port, which takes no key on loopback`,
+    )
+  return { grant: ports.filter(p => p !== ownPort), refused }
 }
 
 /** Thrown when the chosen runtime cannot run lanes here; startup stops with its words. */
@@ -125,6 +145,8 @@ export async function findProject(input: {
   readonly containers: boolean
   /** A runtime's refusal: thrown (`stop`), or the project works directly with its words. */
   readonly runtimeRefused?: "stop" | "direct"
+  /** The port this host listens on, refused to lanes; null when it is not known yet. */
+  readonly ownPort?: number | null
   /** The user config's `lanes.runtime` and `lanes.vm.slots`, as written. */
   readonly machine: WrittenMachine
   readonly log: (line: string) => void
@@ -132,7 +154,12 @@ export async function findProject(input: {
   if (input.dir === null) return null
   const dir = input.dir
   const found: Found = input.containers
-    ? await runtimeFound(dir, input.machine, input.log).catch(error => {
+    ? await runtimeFound(
+        dir,
+        input.machine,
+        input.log,
+        input.ownPort ?? null,
+      ).catch(error => {
         if (
           !(error instanceof RuntimeRefused) ||
           input.runtimeRefused !== "direct"
@@ -161,6 +188,7 @@ async function runtimeFound(
   dir: string,
   written: WrittenMachine,
   log: (line: string) => void,
+  ownPort: number | null,
 ): Promise<Found> {
   const { machine, refused } = machineConfig(written)
   for (const r of refused) log(`[host] ${r}`)
@@ -185,7 +213,7 @@ async function runtimeFound(
     rootDefault: "own",
   }
   return planned.kind === "docker-vm"
-    ? vmFound(project, root.ok, planned.lanesDir, machine.slots, log)
+    ? vmFound(project, root.ok, planned.lanesDir, machine.slots, log, ownPort)
     : hostDockerFound(project, root.ok, planned.lanesDir, log)
 }
 
@@ -217,6 +245,7 @@ async function hostDockerFound(
     pathOf: p => p,
     labels: {},
     sshAgent: process.env.SSH_AUTH_SOCK ?? null,
+    hostAddress: null,
   }
   const refusal = planDockerHost(await gatherDockerHost(target, lanesDir))
   if (refusal !== null) throw new RuntimeRefused(dockerWords(refusal))
@@ -225,8 +254,12 @@ async function hostDockerFound(
   return {
     project,
     runtime,
-    ready: async () => {
+    ready: async ({ hostPorts }) => {
       sweptLog(await runtime.sweepProjects(), log)
+      if (hostPorts.length > 0)
+        log(
+          "[host] lanes.hostPorts applies to the Mac's lane VM: on Linux a lane reaches the host's services bound to all interfaces, at Docker's bridge gateway",
+        )
     },
     close: async () => {},
     convert: null,
@@ -244,6 +277,7 @@ async function vmFound(
   lanesDir: string,
   slots: number,
   log: (line: string) => void,
+  ownPort: number | null,
 ): Promise<Found> {
   const lease = await leaseVm({
     stateDir: vmStateDir(process.env, homedir()),
@@ -265,6 +299,7 @@ async function vmFound(
     },
     labels: { [SLOT_LABEL]: String(lease.slot) },
     sshAgent: `/run/pinetrie/ssh-${lease.slot}.sock`,
+    hostAddress: GVPROXY_HOST_ADDRESS,
   }
   const refusal = planDockerHost(await gatherDockerHost(target, null))
   if (refusal !== null) {
@@ -287,12 +322,21 @@ async function vmFound(
   return {
     project,
     runtime,
-    async ready({ mounts }) {
+    async ready({ mounts, hostPorts }) {
       const filled = await lease.fill(
         mounts.map(m => ({ source: m.source, readOnly: m.readonly })),
       )
       pathOf = filled.pathOf
       sweptLog(await runtime.sweepProjects(), log)
+      // Before any lane starts: the grant replaces whatever a host of this
+      // project set before.
+      const { grant, refused } = planHostPortGrant(hostPorts, ownPort)
+      for (const r of refused) log(`[host] ${r}`)
+      await runtime.grantHostPorts(grant)
+      if (grant.length > 0)
+        log(
+          `[host] lanes may reach these ports of your Mac's loopback, at ${GVPROXY_HOST_ADDRESS}: ${grant.join(", ")}`,
+        )
     },
     close: () => lease.close(),
     convert: paths === null ? null : converter({ paths, docker: runtime, log }),

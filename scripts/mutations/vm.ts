@@ -102,4 +102,28 @@ export const mutations: readonly Mutation[] = [
     expect:
       "an unknown kind, an unknown reason, or a malformed field is refused",
   },
+  {
+    name: "the fence lets lanes reach all of gvproxy's network",
+    file: "packages/vm/image/init",
+    from: "  iptables -I DOCKER-USER -d 192.168.127.0/24 -j REJECT &&\n",
+    to: "  true &&\n",
+    command: unit,
+    expect: "the fence rejects gvproxy's network but the gateway's DNS",
+  },
+  {
+    name: "Docker is bridged to the Mac before the fence is set",
+    file: "packages/vm/image/init",
+    from: "until [ -S /var/run/docker.sock ] && ping_docker; do sleep 0.05; done\n\n# The fence",
+    to: "socat -t 3600 VSOCK-LISTEN:2375,reuseaddr,fork UNIX-CONNECT:/var/run/docker.sock &\nuntil [ -S /var/run/docker.sock ] && ping_docker; do sleep 0.05; done\n\n# The fence",
+    command: unit,
+    expect: "Docker reaches the Mac only behind the lanes' fence",
+  },
+  {
+    name: "gvproxy is kept whatever its hash",
+    file: "packages/vm/gvproxy.ts",
+    from: "  if (got !== pin.sha256)\n",
+    to: "  if (false)\n",
+    command: unit,
+    expect: "a fetch whose hash is not the pin's is refused",
+  },
 ]

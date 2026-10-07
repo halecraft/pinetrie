@@ -54,6 +54,27 @@ declares it (`workspace.test.ts`).
   with `rm -rf`, since an inner Docker makes subvolumes inside it: `rmdir` of
   an empty subvolume deletes it.
 
+## Networks, and the host's ports (S136)
+
+- **Each project's lanes are on a Docker network of their own**
+  (`pinetrie-<project key>`, labelled with the project), made with the disks
+  helper, and removed by the startup sweep with its project. A project's
+  grant applies to its network's addresses only, as the VM is every host's.
+- **`lanes.hostPorts`** in a project's `pinetrie.json` lists ports of the
+  Mac's loopback its lanes may reach, at `gvproxy`'s host address
+  (`192.168.127.254`). The host writes them into the VM's firewall at its
+  start (`grantHostPorts`, `planHostPortRules`): a chain per project
+  (`PT-<key>`), jumped to from `DOCKER-USER` for the project's subnet, above
+  the init's fence, replacing its earlier rules. The rules are written from
+  a throwaway container of the disks image on the VM's own network with
+  `CAP_NET_ADMIN`: the host, which holds Docker's socket, may; a lane never
+  can. A lane is told the address and ports (`PINETRIE_HOST`,
+  `PINETRIE_HOST_PORTS`). The host's own port is refused: on loopback it
+  takes no key (`planHostPortGrant`).
+- **On Linux the grant applies to nothing:** a lane reaches the host's
+  services bound to all interfaces at Docker's bridge gateway, and never
+  its loopback. The host says so once.
+
 ## What a lane never gets
 
 `renderRun` never passes `--privileged`, `--cap-add` or a Docker socket
@@ -116,5 +137,10 @@ measured. Its checks:
 - a lane's `socket(AF_VSOCK)` fails;
 - a second host started and stopped beside the first leaves the first's
   lane reading its working copy and writing its shared directory;
+- (Mac) a lane cannot reach the Mac's loopback, nor `gvproxy`'s API;
+- (Mac) a port the project grants answers its lanes, and not another
+  project's;
+- (Mac, with `container` running) a `container run` leaves running lanes on
+  the network;
 - costs: `docker run -d` under 150 ms, a snapshot under 50 ms, a cold VM's
   Docker answering under 2 s; the launcher's open files in the detail.
