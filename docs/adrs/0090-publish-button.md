@@ -12,6 +12,8 @@ Amended by ADR-0099: whether a publish catches your files up
 and accepts your commits is `offers.catchUp` (default off), not whether the
 host admits others; any host shows **set up**.
 **Amended by ADR-0102:** "your files" is "the working copy".
+Amended by ADR-0100: the code says *accepted work* and *accept* as the
+page does; `offers` is replaced by `accepted`, `wip` and `publish`.
 
 **Context.** The footer's **◆ project** menu (ADR-0061, ADR-0076) showed
 the three places work sits: the line (`pinetrie-onto`), the publish

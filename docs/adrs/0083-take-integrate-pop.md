@@ -11,6 +11,8 @@ None of their decisions change. Their texts stay as written, and keep the
 old word.
 Amended by ADR-0090: the page's word for an offer integration is
 *accept*; the code's stays *integrate*, and "land" folds into it.
+Amended by ADR-0100: the code's verb for an offer integration is *accept*,
+and an integrated-offer commit is an accepted-offer commit.
 
 **Context.** "Take" had come to mean five things in the code and docs,
 three of them acts in the domain:

@@ -7,6 +7,8 @@ any host shows **set up**), ADR-0076 (a publish that moves `main` alone is
 the setting turned off, not a host that admits others) and ADR-0060, "As
 built" (`line` commands are anyone's: no `not_yours`).
 **Amended by ADR-0102:** "your files" is "the working copy".
+Amended by ADR-0100: `offers.catchUp` is `publish.catchUp`, and
+`publishCatchesUp` in code.
 
 **Context.** ADR-0090 made a publish three steps on the host's own machine
 (your files catch up, your commits below `@` are accepted, `main` moves)

@@ -34,6 +34,8 @@ leaves on the line an *integrated-offer commit*; the record's `taken` is
 Amended by ADR-0090: "land my work" goes; a publish integrates your
 commits below `@` and catches your files up first, on the host's own
 machine; the line is "accepted work" in every word the page shows.
+Amended by ADR-0100: the line is *accepted work* in code too, and its
+bookmark is `pinetrie-accepted`; a base names accepted work by kind.
 
 **Context.**
 
