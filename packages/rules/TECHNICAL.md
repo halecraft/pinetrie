@@ -383,8 +383,21 @@ which are swept.
 - **One message per person at a thread end** (`planStoredCardRepair`,
   ADR-0113): before notes, everyone's cards there were one kind, so a
   starting host makes every one of a person's messages at one end but the
-  one `yourCard` would choose a note, outside every gesture. Remove it once
-  every store has started with notes.
+  one `yourCard` would choose a note, outside every gesture, and gives every
+  note with no cell the first empty one on its board, in id order. Remove
+  it once every store has started with notes and cells.
+- **A note has a cell on its thread's notes board** (`NOTES_GRID`). The
+  host alone gives one a move leaves to it (`placeAt`: a note key with no
+  cell takes the first empty one, `withCell`), as it gives order keys, and
+  so do its own writes of notes (`planUnsent`, `planFreshFollow`). Without
+  the tree, it counts a board by the note's lane, else its root and where
+  it was made (`boardOf`): two notes of one lane-less thread made at
+  different ends may share a cell, which the page draws apart
+  (`notesBoardView`). A key names its cell (`sameKey`), so a move of a note
+  someone moved to another cell since is refused `moved`; and
+  `planMoves` refuses a batch that leaves two notes in one cell
+  (`cellClash`), checked once all its moves are written, so a swap is one
+  step.
 - **A pinned card** (ADR-0048 step 5) is a note's place with an `order`.
   Pinning moves your message, a note or a queued card to pinned at the
   same `at` and lane (`pinnedOf`); unpinning makes it a note (`noteOf`). Anyone may do either in

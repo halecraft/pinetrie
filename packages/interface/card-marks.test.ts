@@ -131,6 +131,7 @@ describe("cardMarks", () => {
         root: TEST_ROOT,
         at: atEntry(entryId("e2")),
         lane: null,
+        cell: 0,
       },
     }
     expect(sets(marks([note]))).toEqual({

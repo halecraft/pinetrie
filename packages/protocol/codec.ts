@@ -467,11 +467,14 @@ function pinnedFromWire(s: string): readonly SentCard[] | undefined {
 const isCardCommand = (c: string): c is CardCommand =>
   (CARD_COMMANDS as readonly string[]).includes(c)
 
-/** A place's key as a JSON value: its flat fields, null for none. */
+/**
+ * A place's key as a JSON value: its flat fields, null for none. A key has
+ * no order but a note's, which is its cell (ADR-0113).
+ */
 const keyToJson = (key: PlaceKey | null) => {
   if (key === null) return null
-  const { kind, root, at, lane, column, seen, holder } = placeFields(key)
-  return { kind, root, at, lane, column, seen, holder }
+  const { kind, root, at, lane, column, order, seen, holder } = placeFields(key)
+  return { kind, root, at, lane, column, order, seen, holder }
 }
 
 /** A place's key -> the wire: its flat fields as JSON, `""` for none. */
@@ -508,7 +511,7 @@ function keyFromJson(value: unknown): PlaceKey | null | undefined {
     at: field("at"),
     lane: field("lane"),
     column: field("column"),
-    order: "",
+    order: field("kind") === "note" ? field("order") : "",
     by: "",
     seen: field("seen"),
     holder: field("holder"),

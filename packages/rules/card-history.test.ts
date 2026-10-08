@@ -38,7 +38,13 @@ const END = entryId("e-end")
 const C1 = cardId("c-1")
 const at = atEntry(entryId("e-1"))
 
-const DRAFTING: CardPlace = { kind: "note", root: ROOT, at, lane: LANE }
+const DRAFTING: CardPlace = {
+  kind: "note",
+  root: ROOT,
+  at,
+  lane: LANE,
+  cell: 0,
+}
 const QUEUED: CardPlace = {
   kind: "queued",
   root: ROOT,
@@ -63,6 +69,7 @@ const ELSEWHERE: CardPlace = {
   root: ROOT,
   at: atEntry(entryId("e-2")),
   lane: null,
+  cell: 0,
 }
 
 const card = (
@@ -216,7 +223,7 @@ describe("planProvenance: traces", () => {
         for: ADA,
         card: C1,
         by: BEA,
-        from: { kind: "note", root: ROOT, at, lane: LANE },
+        from: { kind: "note", root: ROOT, at, lane: LANE, cell: 0 },
         to: { kind: "queued", root: ROOT, at, lane: LANE, seen: "" },
         message: null,
         at: 7,
@@ -283,7 +290,7 @@ describe("planProvenance: traces", () => {
       for: ADA,
       card: C1,
       by: BEA,
-      from: { kind: "note", root: ROOT, at, lane: LANE },
+      from: { kind: "note", root: ROOT, at, lane: LANE, cell: 0 },
       to: { kind: "queued", root: ROOT, at, lane: LANE, seen: "" },
       message: null,
       at: 1,
@@ -330,7 +337,7 @@ describe("movedBackBy", () => {
         kind: "moved",
         by,
         from: { kind: "queued", root: ROOT, at, lane: LANE, seen: "" },
-        to: { kind: "note", root: ROOT, at, lane: LANE },
+        to: { kind: "note", root: ROOT, at, lane: LANE, cell: 0 },
         at: 1,
       },
     ],
@@ -352,7 +359,7 @@ test("planTraceSweep: traces too old, and histories whose card is gone", () => {
     for: ADA,
     card: C1,
     by: BEA,
-    from: { kind: "note", root: ROOT, at, lane: LANE },
+    from: { kind: "note", root: ROOT, at, lane: LANE, cell: 0 },
     to: null,
     message: null,
     at: when,

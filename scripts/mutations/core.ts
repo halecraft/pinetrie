@@ -78,6 +78,14 @@ export const mutations: readonly Mutation[] = [
       "a compaction ends the walk with its answer, unless the read passes it",
   },
   {
+    name: "a note's key loses its cell on the wire",
+    file: "packages/protocol/codec.ts",
+    from: '    order: field("kind") === "note" ? field("order") : "",',
+    to: '    order: "",',
+    command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
+    expect: "a note's key carries its cell",
+  },
+  {
     name: "traces seen may name none",
     file: "packages/protocol/codec.ts",
     from: "    value.length === 0 ||\n",
@@ -393,8 +401,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the wire drops an inventory's holder",
     file: "packages/protocol/codec.ts",
-    from: "  return { kind, root, at, lane, column, seen, holder }",
-    to: "  return { kind, root, at, lane, column, seen }",
+    from: "  return { kind, root, at, lane, column, order, seen, holder }",
+    to: "  return { kind, root, at, lane, column, order, seen }",
     command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
     expect: "encodeIntent -> decodeCommand round-trips every intent",
   },
@@ -623,6 +631,14 @@ export const mutations: readonly Mutation[] = [
     to: "  from: null,",
     command: unit,
     expect: "a move goes from where the card is",
+  },
+  {
+    name: "a grid move wraps past the left edge",
+    file: "packages/core/grid.ts",
+    from: "      return row * width + Math.max(0, col - 1)",
+    to: "      return row * width + col - 1",
+    command: unit,
+    expect: "step on the 3 × 6 inventory: left at the left edge",
   },
   {
     name: "an unqueue loses its root",

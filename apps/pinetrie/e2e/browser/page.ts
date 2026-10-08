@@ -80,10 +80,43 @@ export async function chooseOnCard(
   frame: string,
   item: string,
 ): Promise<boolean> {
-  for (let tries = 0; tries < 3; tries++)
-    if (await chooseFromMenu(p, `${frame} .card-menu-trigger`, item))
-      return true
+  const trigger = `${frame} .card-menu-trigger`
+  for (let tries = 0; tries < 3; tries++) {
+    // The Escape that closes a menu not chosen from also folds a grid's
+    // open card, and its ⋯ with it.
+    if (tries > 0 && (await p.locator(trigger).count()) === 0) return false
+    if (await chooseFromMenu(p, trigger, item)) return true
+  }
   return false
+}
+
+/**
+ * Open `card` on the notes board of the column `column` matches (ADR-0113):
+ * the board opened from its notes line if none is, then the note's cell.
+ * The selector of its open frame, which may not be there.
+ */
+export async function openNote(
+  p: Page,
+  column: string,
+  card: string,
+): Promise<string> {
+  // Dispatched, not clicked: the inventory, floating in the middle of the
+  // screen, may cover the notes line.
+  if ((await p.locator(".pane-notes").count()) === 0)
+    await p
+      .locator(`${column} .notes-toggle`)
+      .dispatchEvent("click")
+      .catch(() => {})
+  await p
+    .locator(`.pane-notes .note-cell[data-card="${card}"]`)
+    .dispatchEvent("click", undefined, { timeout: 10_000 })
+    .catch(() => {})
+  return `.pane-notes .card-frame:has(textarea[data-card="${card}"])`
+}
+
+/** Close the notes board, wide beside its thread or over a narrow page. */
+export async function closeNotes(p: Page): Promise<void> {
+  await p.click(".pane:has(.pane-notes) .pane-close").catch(() => {})
 }
 
 /** Your name as the page shows it: the one mentions resolve against. */

@@ -257,6 +257,9 @@ would refuse each whole undo of a move (S82).
 - **Your message is stored as kind `drafting`**, the kind every card at a
   thread's end had before notes (ADR-0113); a note as `note`, with a
   message's fields. So no stored row changed with the split.
+- **A note's cell is its row's `order`**, a decimal, "" for none yet. No
+  new field, so no migration (ADR-0096); `placeOfFields` refuses any other
+  `order` for a note.
 - **A client cannot write it.** Every peer registers `writersPolicy`
   (`@pinetrie/protocol/writers`), Kyneta's `canWrite`, so a client's write
   throws before it is made, and the host refuses the same operations from

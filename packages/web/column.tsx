@@ -65,8 +65,10 @@ import {
   leftLine,
   NEW_PIN,
   NEW_PIN_TITLE,
-  NOTES_EMPTY,
+  NOTES_LINE_TITLE,
   newPinAt,
+  notesLineWords,
+  notesPlaced,
   noticeKey,
   noticeWords,
   type Pending,
@@ -121,12 +123,13 @@ import {
   useState,
   useSyncExternalStore,
 } from "react"
-import { CardEditor, NoteCardEditor, QueuedCardEditor } from "./card-editor.tsx"
+import { CardEditor, QueuedCardEditor } from "./card-editor.tsx"
 import { Composer } from "./composer.tsx"
 import { COPIED, useCopy } from "./copy.ts"
 import { Menu } from "./menu.tsx"
 import { MessageList } from "./message-list.tsx"
 import { MessageText } from "./message-text.tsx"
+import { NotesBoard } from "./notes-board.tsx"
 import { useTrackColors } from "./palette-context.ts"
 import {
   askReviewTarget,
@@ -544,11 +547,13 @@ export function Column(p: ColumnProps) {
           nodes: view.nodes,
           askTarget: ask =>
             askReviewTarget(index, p.asks, p.work.revisions, ask, askLine(ask)),
+          notes: !fresh && threadEnd !== null,
         })
   // Reset in render, not an effect: no frame draws a pane that is gone.
   if (pane !== null && paneShows === null) setPane(null)
   const paneId = `pane-${p.column.key}`
   const toggleReview = useStable(() => openPane({ kind: "offer" }))
+  const toggleNotes = useStable(() => openPane({ kind: "notes" }))
   // Catching up and splitting are a card with the command and no text,
   // queued at once (ADR-0108, ADR-0061, ADR-0080): the host pops it when
   // the lane is free. An acceptance names its destination: the default,
@@ -595,7 +600,7 @@ export function Column(p: ColumnProps) {
       create: {
         id: newCardId(),
         owner: p.session.writer,
-        place: { kind: "note", root, at, lane: lane.name },
+        place: { kind: "note", root, at, lane: lane.name, cell: null },
         placer: p.session.writer,
         carries: { kind: "message", command: null },
         unsent: null,
@@ -614,19 +619,16 @@ export function Column(p: ColumnProps) {
   const forkConflicts =
     above.commit === null ? [] : conflictsAt(p.work.revisions, above.commit)
 
-  // The notes at this end (ADR-0113): everyone's, drawn above the composer.
-  // A fresh column has none; any card under its key but your message is
-  // drawn there too.
-  const notes = fresh
-    ? p.cards.filter(
-        c =>
-          c.place.kind === "fresh" &&
-          c.place.column === p.column.key &&
-          c.id !== mine?.id,
-      )
-    : threadEnd === null
+  // The notes at this end (ADR-0113): everyone's, on the thread's notes
+  // board. A fresh column has none.
+  const notes =
+    fresh || threadEnd === null
       ? []
       : cardsAt("note", threadEnd, p.cards, p.lanes, index)
+  const cells = useMemo(
+    () => new Map([...notesPlaced(notes)].map(([n, c]) => [n, c.id] as const)),
+    [notes],
+  )
   const place =
     composerPlace(
       p.column,
@@ -642,7 +644,7 @@ export function Column(p: ColumnProps) {
     composers.set(
       key,
       writable && place !== undefined
-        ? { place, message: mine?.id ?? null }
+        ? { place, message: mine?.id ?? null, cells }
         : null,
     )
   })
@@ -1059,34 +1061,31 @@ export function Column(p: ColumnProps) {
               })}
             </div>
           )}
-          {/* The notes at this end (ADR-0113): shown in full, each editable
-          by anyone here. With none, a drop zone shown only while a card is
-          dragged, as the empty pinned strip is. */}
-          {(notes.length > 0 || (putColumn !== null && !fresh)) && (
+          {/* The notes line (ADR-0113): how many notes there are and whose,
+          opening the thread's notes board in the pane. A drop on it makes a
+          note, in the board's first empty cell. */}
+          {!fresh && threadEnd !== null && (
             <div
-              className="cards"
-              data-empty={notes.length === 0 || undefined}
+              className="notes-line"
               {...(putColumn === null
                 ? {}
                 : dropProps({ kind: "column", key: putColumn }))}
             >
-              {notes.length === 0 && (
-                <span className="notes-empty">{NOTES_EMPTY}</span>
-              )}
-              {notes.map(c => (
-                <NoteCardEditor
-                  card={c}
-                  catchUps={catchUps}
-                  key={c.id}
-                  onAct={act}
-                  onTyping={p.onTyping}
-                  queueOn={queueOn}
-                  readOnly={p.readOnly}
-                  reader={reader}
-                  seats={p.seats}
-                  session={p.session}
-                />
-              ))}
+              <button
+                aria-controls={pane?.kind === "notes" ? paneId : undefined}
+                aria-expanded={pane?.kind === "notes"}
+                className="notes-toggle"
+                onClick={toggleNotes}
+                title={NOTES_LINE_TITLE}
+                type="button"
+              >
+                {notesLineWords(notes.length)}
+              </button>
+              <Avatars
+                colorOf={p.colorOf}
+                nameOf={p.nameOf}
+                writers={[...new Set(notes.map(c => c.owner))]}
+              />
             </div>
           )}
           <WorkStripView
@@ -1156,6 +1155,24 @@ export function Column(p: ColumnProps) {
             close={closePane}
             id={paneId}
             key={paneKey(pane)}
+            notes={
+              threadEnd === null ? null : (
+                <NotesBoard
+                  catchUps={catchUps}
+                  colorOf={p.colorOf}
+                  columnKey={key}
+                  notes={notes}
+                  onAct={act}
+                  onIntent={p.onIntent}
+                  onTyping={p.onTyping}
+                  queueOn={queueOn}
+                  readOnly={p.readOnly}
+                  reader={reader}
+                  seats={p.seats}
+                  session={p.session}
+                />
+              )
+            }
             track={p.track}
             view={paneShows}
           />

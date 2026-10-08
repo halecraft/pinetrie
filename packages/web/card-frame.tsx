@@ -1,8 +1,9 @@
 // web/card-frame — the frame every text card is drawn in (ADR-0111): a
 // header that is its grip and its signals (icon, place, state, who put it
 // there, a command's chip, ⋯ and ×), its body, and a footer of ↑ ↓ and its
-// one primary action. What it shows is `cardFrame`'s value, in
-// `cardFrameWords`'s words.
+// one primary action; and its face, the card folded in a grid's cell
+// (`CardFace`). What they show is `cardFrame`'s and `cardFace`'s values, in
+// `cardFrameWords`'s and `cardFaceWords`'s words.
 //
 // The body is the caller's, and keeps its elements while the card comes
 // into being: the composer's box must stay one element for its whole life
@@ -12,10 +13,12 @@
 import type { CardId, CardRecord, WriterId } from "@pinetrie/core"
 import {
   CARD_MIME,
+  type CardFaceView,
   type CardFrameView,
   type CatchUps,
   CLEAR_COMMAND,
   type ColumnAct,
+  cardFaceWords,
   cardFrameWords,
   DISCARD_CARD,
   DISCARD_CARD_TITLE,
@@ -27,6 +30,7 @@ import {
 import { type ReactNode, useRef, useState } from "react"
 import { CardHistory, MovedBack } from "./card-history.tsx"
 import { Menu } from "./menu.tsx"
+import { Initial } from "./presence.tsx"
 
 /** A tone's class; the inventory's is `held`, since `.inventory` is the panel's. */
 const TONE_CLASS: Readonly<Record<CardFrameView["tone"], string>> = {
@@ -218,5 +222,44 @@ export function DiscardButton(p: { onDiscard: () => void }) {
     >
       {DISCARD_CARD}
     </button>
+  )
+}
+
+/**
+ * A card folded (ADR-0113): a strip in its place's colour, its icon, its
+ * owner's circle, its command's chip, its first three lines, and its slot's
+ * key in your inventory. Not an `Avatar`: the browser suite counts people
+ * by `.avatar`.
+ */
+export function CardFace(p: {
+  face: CardFaceView
+  reader: Reader
+  colorOf: (writer: WriterId) => string
+}) {
+  const { face } = p
+  const words = cardFaceWords(face, p.reader)
+  return (
+    <span
+      className="card-face"
+      data-tone={face.tone}
+      title={`${words.owner}: ${face.lines}`}
+    >
+      <span className="card-face-head">
+        <span aria-hidden className="card-icon">
+          {words.icon}
+        </span>
+        <Initial
+          className="card-face-owner"
+          colorOf={p.colorOf}
+          nameOf={p.reader.nameOf}
+          writer={face.owner}
+        />
+        {words.command !== null && (
+          <span className="card-chip">{words.command}</span>
+        )}
+        {face.key !== null && <span className="card-face-key">{face.key}</span>}
+      </span>
+      <span className="card-face-lines">{face.lines}</span>
+    </span>
   )
 }

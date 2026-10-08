@@ -147,7 +147,8 @@ describe("popNextQueuedCard", () => {
     const cards = newPlacesDoc()
     queue(cards, "c-1", "a")
     const row = cards.cards()["c-1"]
-    if (row !== undefined) cards.cards.set("c-1", { ...row, kind: "note" })
+    if (row !== undefined)
+      cards.cards.set("c-1", { ...row, kind: "note", order: "" })
     expect(
       popNextQueuedCard(
         cards,
@@ -393,6 +394,7 @@ describe("drain", () => {
           root: TEST_ROOT,
           at: atEntry(E1),
           lane: LANE,
+          cell: 0,
         },
         unsent: "no such image",
       }),
@@ -427,6 +429,7 @@ describe("drain", () => {
           root: TEST_ROOT,
           at: atEntry(E1),
           lane: LANE,
+          cell: 0,
         },
         unsent: "the host failed: store closed",
       }),
@@ -517,6 +520,7 @@ describe("drain: bring up to date (ADR-0108)", () => {
           root: TEST_ROOT,
           at: atEntry(E1),
           lane: LANE,
+          cell: 0,
         },
       }),
     ])

@@ -1,11 +1,6 @@
 import { cardId } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
-import {
-  type KeyFocus,
-  type KeyLike,
-  keyAct,
-  stepSlot,
-} from "./inventory-keys.ts"
+import { type KeyFocus, type KeyLike, keyAct } from "./inventory-keys.ts"
 
 const C1 = cardId("c-1")
 const C2 = cardId("c-2")
@@ -21,7 +16,6 @@ const focus = (over: Partial<KeyFocus> = {}): KeyFocus => ({
   card: null,
   inText: false,
   inPanel: false,
-  selected: 7,
   selectedCard: C2,
   column: "k-1",
   page: false,
@@ -77,27 +71,10 @@ describe("keyAct", () => {
     expect(keyAct(key("z"), focus())).toBeNull()
   })
 
-  test("arrows and hjkl move through the grid only while the panel has focus", () => {
-    expect(keyAct(key("l"), focus({ inPanel: true }))).toEqual({
-      kind: "selectSlot",
-      slot: 8,
-    })
-    expect(keyAct(key("ArrowUp"), focus({ inPanel: true }))).toEqual({
-      kind: "selectSlot",
-      slot: 1,
-    })
-    expect(keyAct(key("l"), focus())).toBeNull()
-    expect(keyAct(key("l"), focus({ inPanel: true, inText: true }))).toBeNull()
+  test("a grid's keys are its own (`gridKeyAct`): none here", () => {
+    expect(keyAct(key("l"), focus({ inPanel: true }))).toBeNull()
+    expect(keyAct(key("ArrowUp"), focus({ inPanel: true }))).toBeNull()
   })
-})
-
-test("stepSlot moves through the 3 × 6 grid and stops at its edges", () => {
-  expect(stepSlot(0, "left")).toBe(0)
-  expect(stepSlot(0, "right")).toBe(1)
-  expect(stepSlot(5, "right")).toBe(5)
-  expect(stepSlot(1, "down")).toBe(7)
-  expect(stepSlot(13, "down")).toBe(13)
-  expect(stepSlot(7, "up")).toBe(1)
 })
 
 test("while a page covers the workspace only the list's fold acts (ADR-0098)", () => {
@@ -106,7 +83,4 @@ test("while a page covers the workspace only the list's fold acts (ADR-0098)", (
   expect(keyAct(key("I", chord), onPage)).toBeNull()
   expect(keyAct(key("O", chord), onPage)).toBeNull()
   expect(keyAct(key("z", { metaKey: true }), onPage)).toBeNull()
-  expect(
-    keyAct(key("ArrowLeft"), focus({ page: true, inPanel: true })),
-  ).toBeNull()
 })

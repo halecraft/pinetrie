@@ -533,7 +533,7 @@ describe("planIntent", () => {
       const move = {
         card: c,
         from: { kind: "queued", root: TEST_ROOT, at: where, lane, seen: "v" },
-        to: { ...atEnd, kind: "note" },
+        to: { ...atEnd, kind: "note", cell: null },
       }
       expect(plan(unqueue, state)).toEqual([
         {

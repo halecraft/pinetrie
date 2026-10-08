@@ -205,6 +205,7 @@ export function planPut(
   const facts = state.cards
   const now = cardOf(facts, card)
   if (now === undefined) return []
+  if (target.kind === "cell") return putInCell(now, target, state)
   if (target.kind !== "inventory" && intoMessage(target, facts.composers))
     return putInMessage(now, target.key, state)
   if (target.kind === "inventory") {
@@ -216,7 +217,12 @@ export function planPut(
   }
   const to = placeOfTarget(target, facts.composers, facts.me)
   const from = keyOf(now.place)
-  if (to === null || sameKey(from, to)) return []
+  // A note put on its own column stays in its cell.
+  const here =
+    from.kind === "note" && to?.kind === "note" && to.cell === null
+      ? { ...from, cell: null }
+      : from
+  if (to === null || sameKey(here, to)) return []
   const move = moveOf(now, to)
   return [moveCard(move, { actedAt: atColumn(target.key), slot: null }, true)]
 }
@@ -269,6 +275,47 @@ function putInMessage(
     slot: now.place.kind === "inventory" ? slotOf(facts.slots, now.id) : null,
   }
   return [{ kind: "keep", moves: [into, back], actedAt, close: [] }]
+}
+
+/**
+ * `now` into a cell of column `key`'s notes board (ADR-0113). An empty cell
+ * takes it. A note there swaps with it, in one move the host accepts or
+ * refuses whole, when `now` is a note or in your inventory (into its slot);
+ * from anywhere else, `now` takes the first empty cell instead, since the
+ * note could not go where it was.
+ */
+function putInCell(
+  now: CardRecord,
+  target: Extract<PutTarget, { kind: "cell" }>,
+  state: IntentState,
+): readonly Effect[] {
+  const facts = state.cards
+  const spot = facts.composers.get(target.key)
+  const to = placeOfTarget(target, facts.composers, facts.me)
+  if (spot === undefined || to === null) return []
+  const there = spot.cells.get(target.cell)
+  if (there === now.id) return []
+  const actedAt = atColumn(target.key)
+  const occupant = there === undefined ? undefined : cardOf(facts, there)
+  if (occupant === undefined)
+    return [moveCard(moveOf(now, to), { actedAt, slot: null }, true)]
+  const from = keyOf(now.place)
+  if (from.kind !== "note" && from.kind !== "inventory") {
+    const first = to.kind === "note" ? { ...to, cell: null } : to
+    return [moveCard(moveOf(now, first), { actedAt, slot: null }, true)]
+  }
+  const back = {
+    move: moveOf(occupant, from),
+    slot: from.kind === "inventory" ? slotOf(facts.slots, now.id) : null,
+  }
+  return [
+    {
+      kind: "keep",
+      moves: [{ move: moveOf(now, to), slot: null }, back],
+      actedAt,
+      close: [],
+    },
+  ]
 }
 
 /** Your message `card` to the notes at its thread's end (ADR-0113). */

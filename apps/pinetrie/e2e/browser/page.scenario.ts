@@ -58,6 +58,7 @@ import {
   boardSel,
   chooseFromMenu,
   chooseOnCard,
+  closeNotes,
   componentRenders,
   connected,
   itemSel,
@@ -65,6 +66,7 @@ import {
   OWN_MENU,
   openBoard,
   openFromBoard,
+  openNote,
   openProfile,
   RAIL_MESSAGES,
   seeInMenu,
@@ -2903,9 +2905,9 @@ async function run(check: Checks["check"]): Promise<void> {
           .last()
           .getAttribute("data-entry")
         await second.click(`.rail-dot[data-entry="${cardEnd}"]`)
-        const theirs = `.cards textarea[data-card="${together}"]`
+        // Nowhere in the other window: not in a composer, not as a note.
         const messageHidden = await second
-          .waitForSelector(theirs, { timeout: 2_000 })
+          .waitForSelector(`[data-card="${together}"]`, { timeout: 2_000 })
           .then(
             () => false,
             () => true,
@@ -2915,31 +2917,36 @@ async function run(check: Checks["check"]): Promise<void> {
           `${col(0)} .composer`,
           '.move-to[data-to="note"]',
         )
+        const theirColumn = `.column:has(.msg[data-entry="${cardEnd}"])`
+        const theirs = `${await openNote(second, theirColumn, together)} textarea`
         const shownThere = await hasValue(second, theirs, "Together:")
         check(
-          "your message shows only in your window; moved to the notes, it shows in the other's column, above its composer",
+          "your message shows only in your window; moved to the notes, it shows on the other's notes board",
           messageHidden && shownThere,
           `hidden ${messageHidden}, a note there ${shownThere}`,
         )
         await second.focus(theirs)
         await second.keyboard.press("End")
         await second.keyboard.type(" from B")
-        const ours = `${col(0)} .cards textarea[data-card="${together}"]`
-        const mergedHere = await hasValue(page, ours, "Together: from B")
+        const ourFrame = await openNote(page, col(0), together)
+        const mergedHere = await hasValue(
+          page,
+          `${ourFrame} textarea`,
+          "Together: from B",
+        )
         const heading = await second
-          .textContent(
-            `.cards .card-frame:has(textarea[data-card="${together}"]) .card-by`,
-          )
+          .textContent(`${theirs.replace(/ textarea$/, "")} .card-by`)
           .catch(() => "")
         check(
           "the other window's edit reaches the note's owner, and the note names who wrote in it",
           mergedHere && /'s note · with /.test(heading ?? ""),
           `${heading}`,
         )
-        // The note discarded, and a message again, for what follows.
-        await page.click(
-          `${col(0)} .cards .card-frame:has(textarea[data-card="${together}"]) .discard-card`,
-        )
+        // The note discarded, the board closed, and a message again, for
+        // what follows.
+        await page.click(`${ourFrame} .discard-card`)
+        await closeNotes(page)
+        await closeNotes(second)
         await page.click(box)
         await page.keyboard.type("Together: from B")
         await hasValue(page, box, "Together: from B")
@@ -3143,8 +3150,6 @@ async function run(check: Checks["check"]): Promise<void> {
           tabMarked && otherBare && railMarked,
           `tab ${tabMarked}, other tab bare ${otherBare}, rail ${railMarked}`,
         )
-        // Sam sees Ada's card above his composer, and no mark: it is not his.
-        await hasValue(second, theirs, "where was I")
         // Emptied, the card's record stays, and the marks go: they read its text.
         const records = readPlaces(host.places).length
         await page.focus(box)
@@ -3267,7 +3272,7 @@ async function run(check: Checks["check"]): Promise<void> {
       const lineShown = await page
         .waitForFunction(
           s => document.querySelector(s)?.textContent === "for later: a plan",
-          `${slotOf(parked)} .slot-line`,
+          `${slotOf(parked)} .card-face-lines`,
           { timeout: 10_000 },
         )
         .then(
@@ -3275,7 +3280,7 @@ async function run(check: Checks["check"]): Promise<void> {
           () => false,
         )
       const firstLine = await page
-        .textContent(`${slotOf(parked)} .slot-line`)
+        .textContent(`${slotOf(parked)} .card-face-lines`)
         .catch(() => "")
       const boxEmptied = await valueIs(downBox, "")
       await waitFor(() => placeOf(parked)?.kind === "inventory", 5_000)
@@ -3312,7 +3317,7 @@ async function run(check: Checks["check"]): Promise<void> {
       await page.click(downBox)
       await page.click(slotOf(parked))
       await page.keyboard.press("Control+Shift+O")
-      const putNote = `${col(1)} .cards textarea[data-card="${parked}"]`
+      const putNote = `${await openNote(page, col(1), parked)} textarea`
       const putBack = await valueIs(putNote, "for later: a plan")
       await waitFor(() => placeOf(parked)?.kind === "note", 5_000)
       check(
@@ -3320,6 +3325,7 @@ async function run(check: Checks["check"]): Promise<void> {
         putBack && placeOf(parked)?.kind === "note",
         `${await boxText(putNote)}; ${placeOf(parked)?.kind}`,
       )
+      await closeNotes(page)
       // Undo, outside a box: the put is undone, and the card is back in its
       // slot. The host records a move as it applies it (ADR-0066), so the key
       // can follow at once.
@@ -3368,6 +3374,42 @@ async function run(check: Checks["check"]): Promise<void> {
         "a card's × discards it, and the undo key outside a box brings it back",
         discardUndone >= 0,
         `${discardUndone} ms; ${placeOf(parked)?.kind}`,
+      )
+      // Selected, a card opens whole in place, over its neighbours, its box
+      // focusable; Escape there folds it, and focus is back on its slot
+      // (ADR-0113).
+      await page.click(slotOf(parked))
+      const openInPlace = await page
+        .$eval(slotOf(parked), slot => {
+          const open = slot.parentElement?.querySelector(".card-grid-open")
+          const s = slot.getBoundingClientRect()
+          const o = open?.getBoundingClientRect()
+          return (
+            o !== undefined &&
+            Math.abs(o.top - s.top) < 2 &&
+            o.width > s.width * 1.5 &&
+            open?.querySelector("textarea") !== null
+          )
+        })
+        .catch(() => false)
+      await page.focus(".inventory .card-grid-open textarea")
+      await page.keyboard.press("Escape")
+      const foldedBack = await page
+        .waitForFunction(
+          sel =>
+            document.querySelector(".inventory .card-grid-open") === null &&
+            document.activeElement === document.querySelector(sel),
+          slotOf(parked),
+          { timeout: 5_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        )
+      check(
+        "a card selected in the inventory opens in place, and Escape folds it",
+        openInPlace && foldedBack,
+        `opened ${openInPlace}, folded ${foldedBack}`,
       )
       await page.click(slotOf(parked))
       await page.click(".inventory .discard-card")
@@ -3427,6 +3469,9 @@ async function run(check: Checks["check"]): Promise<void> {
       )
       const pinnedCard =
         (await page.getAttribute(composerBox, "data-card")) ?? ""
+      // The inventory, left open in the middle of the screen, would cover it.
+      if ((await page.locator(".inventory").count()) > 0)
+        await page.click("#bottom .inventory-toggle")
       await chooseOnCard(
         page,
         `${col(0)} .composer`,
@@ -3503,7 +3548,7 @@ async function run(check: Checks["check"]): Promise<void> {
         '.move-to[data-to="note"]',
       )
       const emptied = await valueIs(composerBox, "")
-      const noteFrame = `${col(0)} .cards .card-frame:has(textarea[data-card="${noted}"])`
+      const noteFrame = await openNote(page, col(0), noted)
       const drawnAsNote = await appears(noteFrame)
       await chooseOnCard(page, noteFrame, '.move-to[data-to="message"]')
       const back = await page
@@ -3518,10 +3563,11 @@ async function run(check: Checks["check"]): Promise<void> {
           () => false,
         )
       check(
-        "Move to notes takes your message above the composer, and the note's Move to your message brings it back into the box",
+        "Move to notes puts your message on the notes board, and the note's Move to your message brings it back into the box",
         emptied && drawnAsNote && back,
         `emptied ${emptied}, a note ${drawnAsNote}, back ${back}`,
       )
+      await closeNotes(page)
 
       // "+ pin" (ADR-0048), in the conversation below, which has no pinned
       // card: the header offers it, and the box it opens in the strip makes a

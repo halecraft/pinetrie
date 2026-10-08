@@ -26,6 +26,7 @@ const atEnd = (root: RootId) =>
     root,
     at: atEntry(entryId("e-1")),
     lane: null,
+    cell: 0,
   }) as const
 const inventory = { kind: "inventory", holder: ADA } as const
 

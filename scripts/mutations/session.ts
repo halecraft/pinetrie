@@ -144,9 +144,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a take into the inventory ignores the selected slot",
-    file: "packages/session/inventory.ts",
-    from: "    start !== undefined &&\n    isSlot(start) &&",
-    to: "    false &&\n    isSlot(start) &&",
+    file: "packages/core/grid.ts",
+    from: "  if (start !== undefined && isCell(grid, start) && !taken.has(start))",
+    to: "  if (false && start !== undefined && isCell(grid, start) && !taken.has(start))",
     command: unit,
     expect: "the start when it is empty, else the first empty in reading order",
   },

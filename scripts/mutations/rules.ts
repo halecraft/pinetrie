@@ -1116,8 +1116,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "planUnsent writes queued",
     file: "packages/rules/card.ts",
-    from: "      root: card.place.root,\n      at: card.place.at,\n      lane: card.place.lane,\n    },\n    unsent: reason,",
-    to: "      root: card.place.root,\n      at: card.place.at,\n      lane: card.place.lane,\n    } && card.place,\n    unsent: reason,",
+    from: "      cell: null,\n    }),\n    unsent: reason,",
+    to: "      cell: null,\n    }) && card.place,\n    unsent: reason,",
     command: unit,
     expect: "planUnsent: the whole record, a note where it was queued",
   },
@@ -1349,8 +1349,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a card's lane is cast, not checked",
     file: "packages/core/index.ts",
-    from: '            lane: isLaneName(f.lane) ? f.lane : null,\n          }\n    case "pinned":',
-    to: '            lane: f.lane === "" ? null : (f.lane as LaneName),\n          }\n    case "pinned":',
+    from: '            lane: isLaneName(f.lane) ? f.lane : null,\n          }\n    case "note": {',
+    to: '            lane: f.lane === "" ? null : (f.lane as LaneName),\n          }\n    case "note": {',
     command: unit,
     expect: "keeps its text, and loses the lane",
   },
@@ -1381,8 +1381,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a first send carries every column's fresh cards",
     file: "packages/rules/card.ts",
-    from: "        c.place.column === place.column,",
-    to: "        true,",
+    from: "      c.place.column !== place.column\n",
+    to: "      false\n",
     command: unit,
     expect:
       "planFreshFollow: the sent card's column's other cards become notes",
@@ -1520,8 +1520,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "several moves are planned against the cards before any",
     file: "packages/rules/card.ts",
-    from: "    now = afterStep(now, step)\n",
-    to: "",
+    from: "    now = afterStep(now, step)\n  }\n  // Checked once all",
+    to: "  }\n  // Checked once all",
     command: unit,
     expect: "each move planned against the cards the earlier ones left",
   },
@@ -2186,6 +2186,22 @@ export const mutations: readonly Mutation[] = [
     to: "  if (!input.held && !there) return []",
     command: unit,
     expect: "a hold is written where there is none",
+  },
+  {
+    name: "a move into a note's cell lets two share it",
+    file: "packages/rules/card.ts",
+    from: '  if (clash !== null) return { kind: "refused", code: "moved", now: clash }',
+    to: "  void clash",
+    command: unit,
+    expect: "a move into a cell another note holds is refused moved",
+  },
+  {
+    name: "a note arrives with no cell",
+    file: "packages/rules/card.ts",
+    from: '    case "note":\n      return withCell(cards, key)\n',
+    to: "",
+    command: unit,
+    expect: "a note with no cell takes the first empty one on its board",
   },
   {
     name: "the startup repair keeps every message",

@@ -16,7 +16,7 @@ import { createPortal } from "react-dom"
 import { BlobImage } from "./blob-image.tsx"
 import { drawTree } from "./message-text.tsx"
 import { useTrackColors } from "./palette-context.ts"
-import { OPEN_IN_TAB, type PaneView, paneLabel } from "./pane.ts"
+import { NOTES_TITLE, OPEN_IN_TAB, type PaneView, paneLabel } from "./pane.ts"
 import { PaneHead } from "./pane-head.tsx"
 import { ReviewPane } from "./review-pane.tsx"
 import { useNarrow } from "./use-narrow.ts"
@@ -26,10 +26,13 @@ export function Pane({
   view,
   track,
   close,
+  notes,
 }: {
   /** What the strip's review line controls. */
   id: string
   view: PaneView
+  /** The column's notes board, drawn when `view` is its. */
+  notes: ReactNode
   /** The column's colour: a dialog in `body` does not inherit it. */
   track: number
   /** Stable (`useStable`). */
@@ -37,7 +40,12 @@ export function Pane({
 }) {
   const narrow = useNarrow()
   const shown =
-    view.kind === "review" ? (
+    view.kind === "notes" ? (
+      <>
+        <PaneHead close={close} narrow={narrow} title={NOTES_TITLE} />
+        <div className="pane-body pane-notes">{notes}</div>
+      </>
+    ) : view.kind === "review" ? (
       <ReviewPane
         close={close}
         line={view.line}

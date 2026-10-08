@@ -318,6 +318,7 @@ describe("a card's place as flat fields (ADR-0059)", () => {
       root: TEST_ROOT,
       at: atEntry(entryId("e-1")),
       lane: null,
+      cell: 0,
     },
     {
       kind: "queued",
@@ -368,7 +369,8 @@ describe("a card's place as flat fields (ADR-0059)", () => {
     const pinned = keyOf(places[2] as CardPlace)
     expect(sameKey(pinned, keyOf({ ...(places[2] as CardPlace) }))).toBe(true)
     expect(
-      pinned.kind === "pinned" && sameKey(pinned, { ...pinned, kind: "note" }),
+      pinned.kind === "pinned" &&
+        sameKey(pinned, { ...pinned, kind: "note", cell: 0 }),
     ).toBe(false)
   })
 
@@ -432,7 +434,7 @@ describe("moves, built once (ADR-0059)", () => {
     carries: { kind: "message", command: null },
     unsent: null,
   })
-  const atEnd = card({ kind: "note", root: TEST_ROOT, at, lane: LANE })
+  const atEnd = card({ kind: "note", root: TEST_ROOT, at, lane: LANE, cell: 0 })
   const lanes = (
     root: typeof TEST_ROOT,
   ): ReadonlyMap<typeof LANE, LaneRecord> =>
@@ -442,7 +444,7 @@ describe("moves, built once (ADR-0059)", () => {
     const gone = discardedOf(atEnd.place, OTHER)
     expect(moveOf(atEnd, gone)).toEqual({
       card: cardId("c-1"),
-      from: { kind: "note", root: TEST_ROOT, at, lane: LANE },
+      from: { kind: "note", root: TEST_ROOT, at, lane: LANE, cell: 0 },
       to: { kind: "gone", root: TEST_ROOT, why: { kind: "discarded" } },
     })
     expect(discardedOf({ kind: "inventory", holder: ADA }, OTHER)).toEqual({
@@ -484,14 +486,14 @@ describe("moves, built once (ADR-0059)", () => {
         by: ADA,
         seen: "v",
       }),
-    ).toEqual({ kind: "note", root: OTHER, at, lane: LANE })
+    ).toEqual({ kind: "note", root: OTHER, at, lane: LANE, cell: null })
   })
 
   test("a pin pins a card below the line or queued, at the same thread end", () => {
     const pinned = { kind: "pinned", root: OTHER, at, lane: LANE }
-    expect(pinnedOf({ kind: "note", root: OTHER, at, lane: LANE })).toEqual(
-      pinned,
-    )
+    expect(
+      pinnedOf({ kind: "note", root: OTHER, at, lane: LANE, cell: 0 }),
+    ).toEqual(pinned)
     expect(
       pinnedOf({
         kind: "queued",

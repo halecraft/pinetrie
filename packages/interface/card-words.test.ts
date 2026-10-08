@@ -182,6 +182,7 @@ describe("history and traces (ADR-0048 step 6)", () => {
     root: ROOT,
     at: atEntry(entryId("e-1")),
     lane: laneNameForThread("x"),
+    cell: 0,
   }
   const queued: PlaceKey = {
     kind: "queued",

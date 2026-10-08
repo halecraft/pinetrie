@@ -40,12 +40,14 @@ test("before: a shared card's thread end in a loaded root; none for a root not l
       root: ROOT_ID,
       at: atEntry(E1),
       lane: LANE,
+      cell: 0,
     }),
     card("away", {
       kind: "note",
       root: elsewhere,
       at: atEntry(E1),
       lane: LANE,
+      cell: 0,
     }),
     card("held", { kind: "inventory", holder: ADA }),
   ])

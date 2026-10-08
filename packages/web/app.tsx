@@ -978,7 +978,6 @@ export function App({
             : null,
         inText: isTextBox(el),
         inPanel: el?.closest(".inventory") != null,
-        selected,
         selectedCard: slots[String(selected)] ?? null,
         column: lastColumn.current,
         page: page !== null,

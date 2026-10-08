@@ -89,7 +89,13 @@ const card = (over: Partial<CardRecord> = {}): CardRecord => ({
 /** A note at e2, as `card` is your message there. */
 const note = (over: Partial<CardRecord> = {}): CardRecord =>
   card({
-    place: { kind: "note", root: TEST_ROOT, at: atEntry(E2), lane: null },
+    place: {
+      kind: "note",
+      root: TEST_ROOT,
+      at: atEntry(E2),
+      lane: null,
+      cell: 0,
+    },
     ...over,
   })
 const LANE = laneNameForThread("x")
@@ -295,7 +301,13 @@ describe("where a card sits", () => {
     const beas = note({ id: cardId("c-2"), owner: BEA })
     const sibling = card({
       id: cardId("c-3"),
-      place: { kind: "note", root: TEST_ROOT, at: atEntry(F1), lane: null },
+      place: {
+        kind: "note",
+        root: TEST_ROOT,
+        at: atEntry(F1),
+        lane: null,
+        cell: 0,
+      },
     })
     expect(
       cardsAt("note", entryId("e2"), [mine, beas, sibling], [], tree()),
@@ -361,6 +373,84 @@ describe("where a card sits", () => {
   })
 })
 
+describe("notes' cells (ADR-0113)", () => {
+  const C1 = cardId("c-1")
+  const at = (cell: number | null, id = "c-1", lane = LANE) =>
+    card({
+      id: cardId(id),
+      place: { kind: "note", root: TEST_ROOT, at: atEntry(E2), lane, cell },
+    })
+  const key = (cell: number | null) =>
+    ({
+      kind: "note",
+      root: TEST_ROOT,
+      at: atEntry(E2),
+      lane: LANE,
+      cell,
+    }) as const
+
+  test("a note with no cell takes the first empty one on its board; another lane's board does not count", () => {
+    const taken = [
+      at(0, "c-7"),
+      at(2, "c-8"),
+      at(1, "c-9", laneNameForThread("y")),
+    ]
+    const step = planMove(
+      [...taken, card()],
+      { card: cardId("c-1"), from: keyOf(card().place), to: key(null) },
+      ADA,
+    )
+    expect(step.kind === "write" && step.record.place).toMatchObject({
+      kind: "note",
+      cell: 1,
+    })
+  })
+
+  test("a move into a cell another note holds is refused moved, naming it", () => {
+    const other = { ...at(3, "c-7"), placer: BEA }
+    expect(
+      planMoves([other, at(0)], [{ card: C1, from: key(0), to: key(3) }], ADA),
+    ).toEqual({ kind: "refused", code: "moved", now: other })
+  })
+
+  test("a swap of two notes' cells is two moves, accepted whole", () => {
+    const step = planMoves(
+      [at(0), at(3, "c-7")],
+      [
+        { card: C1, from: key(0), to: key(3) },
+        { card: cardId("c-7"), from: key(3), to: key(0) },
+      ],
+      ADA,
+    )
+    expect(step.kind).toBe("steps")
+  })
+
+  test("a stored note with no cell is given the first empty one, in id order", () => {
+    const steps = planStoredCardRepair(
+      [at(0, "c-1"), at(null, "c-3"), at(null, "c-2")],
+      new Map(),
+    )
+    expect(
+      steps.map(s => s.kind === "write" && [s.record.id, s.record.place]),
+    ).toEqual([
+      ["c-2", expect.objectContaining({ cell: 1 })],
+      ["c-3", expect.objectContaining({ cell: 2 })],
+    ])
+  })
+
+  test("a note's cell is its row's order: a decimal, and none as empty", () => {
+    expect(decodeCard("c-1", encodeCard(at(5)))?.place).toMatchObject({
+      cell: 5,
+    })
+    expect(decodeCard("c-1", encodeCard(at(null)))?.place).toMatchObject({
+      cell: null,
+    })
+    expect(
+      decodeCard("c-1", { ...encodeCard(at(5)), order: "x" }),
+    ).toBeUndefined()
+  })
+})
+
 describe("planStoredCardRepair (ADR-0113)", () => {
   test("of two of your messages at one end, the one yourCard skips becomes a note; another person's is untouched", () => {
     const older = card({ id: cardId("c-1") })
@@ -374,7 +464,7 @@ describe("planStoredCardRepair (ADR-0113)", () => {
     expect(planStoredCardRepair([older, newer, beas], ends)).toEqual([
       {
         kind: "write",
-        record: { ...older, place: { ...older.place, kind: "note" } },
+        record: { ...older, place: { ...older.place, kind: "note", cell: 0 } },
       },
     ])
   })
@@ -539,7 +629,13 @@ describe("the queue", () => {
           lane: LANE,
           seen: "",
         },
-        to: { kind: "note", root: TEST_ROOT, at: atEntry(E2), lane: LANE },
+        to: {
+          kind: "note",
+          root: TEST_ROOT,
+          at: atEntry(E2),
+          lane: LANE,
+          cell: null,
+        },
       })),
     )
   })
@@ -550,7 +646,18 @@ describe("the queue", () => {
       placer: BEA,
       carries: { kind: "message", command: "bring-up-to-date" },
     }
-    expect(planUnsent(q, "no such image")).toEqual({
+    // In the first empty cell on its board: a note there holds cell 0.
+    const there = {
+      ...card({ id: cardId("c-9") }),
+      place: {
+        kind: "note",
+        root: TEST_ROOT,
+        at: atEntry(E2),
+        lane: LANE,
+        cell: 0,
+      },
+    } as const
+    expect(planUnsent([there, q], q, "no such image")).toEqual({
       kind: "write",
       record: {
         ...q,
@@ -559,6 +666,7 @@ describe("the queue", () => {
           root: TEST_ROOT,
           at: atEntry(E2),
           lane: LANE,
+          cell: 1,
         },
         unsent: "no such image",
       },
@@ -918,6 +1026,7 @@ describe("handoffs (ADR-0059)", () => {
             root: TEST_ROOT,
             at: atEntry(E2),
             lane: LANE,
+            cell: 0,
           },
         },
       },

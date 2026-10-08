@@ -1,15 +1,14 @@
 // web/inventory-panel — your inventory (ADR-0048 step 4): a panel that
 // floats over the columns, docked left, centre or right by this device's
-// choice, holding a fixed 3 × 6 grid of slots and, beside it, the selected
-// card whole and editable. What it draws is `inventoryView`; every click and
-// drop here is an intent, planned like any other.
+// choice, holding a fixed 3 × 6 grid of slots (`CardGrid`, ADR-0113), the
+// selected card opening whole and editable in place. What it draws is
+// `inventoryView`; every click and drop here is an intent, planned like any
+// other.
 
-import { subscribe } from "@kyneta/schema"
-import type { CardId, CardRecord, WriterId } from "@pinetrie/core"
+import type { CardRecord, WriterId } from "@pinetrie/core"
 import {
   cardFrame,
   type Dock,
-  dropProps,
   INVENTORY,
   type Intent,
   inventoryView,
@@ -20,46 +19,16 @@ import {
   type Reader,
   snapTo,
 } from "@pinetrie/interface"
-import { displayName } from "@pinetrie/rules"
 import type {
   CardNotice,
   Intents,
   SessionClient,
   Slots,
 } from "@pinetrie/session"
-import { type CSSProperties, useEffect, useRef, useState } from "react"
+import { type CSSProperties, useRef, useState } from "react"
 import { BoundCardEditor } from "./card-editor.tsx"
-import { dragCard } from "./card-frame.tsx"
-
-/**
- * The text of each card in `ids`, read from its document and kept current.
- * A card's text arrives after its record, so one not yet read is "".
- */
-function useCardTexts(
-  session: Pick<SessionClient, "cardText">,
-  ids: readonly CardId[],
-): ReadonlyMap<CardId, string> {
-  const [texts, setTexts] = useState<ReadonlyMap<CardId, string>>(new Map())
-  const key = ids.join(" ")
-  // biome-ignore lint/correctness/useExhaustiveDependencies: keyed on the ids, not the array
-  useEffect(() => {
-    const stops = ids.map(id => {
-      const doc = session.cardText(id)
-      const read = () =>
-        setTexts(prev =>
-          prev.get(id) === doc.text()
-            ? prev
-            : new Map(prev).set(id, doc.text()),
-        )
-      read()
-      return subscribe(doc, read)
-    })
-    return () => {
-      for (const stop of stops) stop()
-    }
-  }, [key, session])
-  return texts
-}
+import { CardGrid } from "./card-grid.tsx"
+import { useCardTexts } from "./use-card-texts.ts"
 
 export function InventoryPanel(p: {
   session: SessionClient
@@ -88,7 +57,6 @@ export function InventoryPanel(p: {
     selected: p.selected,
     texts,
   })
-  const selected = view.card
   const frame = useRef<HTMLElement>(null)
   // Dragged by its frame, it follows the pointer, then settles at the
   // nearest third.
@@ -129,62 +97,26 @@ export function InventoryPanel(p: {
         }}
         title="drag to dock left, centre or right"
       >
-        {INVENTORY} · {view.slots.length - view.free}/{view.slots.length}
+        {INVENTORY} · {view.grid.cells.length - view.free}/
+        {view.grid.cells.length}
       </div>
       <div className="inventory-body">
-        <div className="inventory-grid">
-          {view.slots.map(slot => (
-            <button
-              aria-pressed={slot.selected}
-              className={slot.card === null ? "slot empty" : "slot"}
-              data-card={slot.card?.id}
-              data-slot={slot.index}
-              {...dropProps({ kind: "inventory", slot: slot.index })}
-              draggable={slot.card !== null}
-              key={slot.index}
-              onClick={() =>
-                p.onIntent({ kind: "selectSlot", slot: slot.index })
-              }
-              onDragStart={e => {
-                if (slot.card !== null) dragCard(e, slot.card.id)
-              }}
-              style={
-                slot.card === null
-                  ? undefined
-                  : { borderColor: p.colorOf(slot.card.owner) }
-              }
-              title={
-                slot.card === null
-                  ? undefined
-                  : `${displayName(slot.card.owner, p.reader.nameOf.get(slot.card.owner))}: ${slot.firstLine}`
-              }
-              type="button"
-            >
-              {slot.label !== null && (
-                <span className="slot-label">{slot.label}</span>
-              )}
-              <span
-                className="slot-line"
-                style={
-                  slot.card === null
-                    ? undefined
-                    : { color: p.colorOf(slot.card.owner) }
-                }
-              >
-                {slot.firstLine}
-              </span>
-            </button>
-          ))}
-        </div>
-        <div className="inventory-card">
-          {selected === null ? (
-            <p className="inventory-empty">
-              select a slot; take a card with Ctrl+Shift+I or its take button
-            </p>
-          ) : (
+        <CardGrid
+          kind="inventory"
+          colorOf={p.colorOf}
+          onMove={(card, slot) =>
+            p.onIntent({
+              kind: "put",
+              card: card.id,
+              target: { kind: "inventory", slot },
+            })
+          }
+          onSelect={slot => p.onIntent({ kind: "selectSlot", slot })}
+          reader={p.reader}
+          renderOpen={card => (
             <BoundCardEditor
               among={null}
-              card={selected}
+              card={card}
               catchUps={null}
               foot={
                 <button
@@ -194,7 +126,7 @@ export function InventoryPanel(p: {
                     if (p.column !== null)
                       p.onIntent({
                         kind: "put",
-                        card: selected.id,
+                        card: card.id,
                         target: { kind: "column", key: p.column },
                       })
                   }}
@@ -204,27 +136,27 @@ export function InventoryPanel(p: {
                   {PUT}
                 </button>
               }
-              key={selected.id}
-              onDiscard={() =>
-                p.onIntent({ kind: "discard", card: selected.id })
-              }
+              key={card.id}
+              onDiscard={() => p.onIntent({ kind: "discard", card: card.id })}
               onTyping={() => {}}
               readOnly={false}
               reader={p.reader}
               rows={4}
               session={p.session}
-              view={cardFrame(selected, "inventory", {
+              view={cardFrame(card, "inventory", {
                 me: p.reader.me,
                 readOnly: false,
               })}
             />
           )}
-          {p.notices.map(r => (
-            <div className="refused-move" key={noticeKey(r)}>
-              {noticeWords(r, p.reader)}
-            </div>
-          ))}
-        </div>
+          targetOf={slot => ({ kind: "inventory", slot })}
+          view={view.grid}
+        />
+        {p.notices.map(r => (
+          <div className="refused-move" key={noticeKey(r)}>
+            {noticeWords(r, p.reader)}
+          </div>
+        ))}
       </div>
     </aside>
   )

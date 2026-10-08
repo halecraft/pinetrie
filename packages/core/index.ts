@@ -1417,6 +1417,12 @@ export type CardPlace =
       readonly root: RootId
       readonly at: Position
       readonly lane: LaneName | null
+      /**
+       * Its cell on the thread's notes board (`NOTES_GRID`, ADR-0113); null
+       * for none yet: a move's target asking the host for the first empty
+       * one, or a note stored before cells.
+       */
+      readonly cell: number | null
     }
   | {
       readonly kind: "pinned"
@@ -1473,11 +1479,6 @@ export type CardPlace =
 /** Why a card is gone: the stored kind of its place. */
 export type GoneWhy = { readonly kind: "discarded" }
 
-/** How many cards an inventory holds: a fixed grid (ADR-0048). */
-export const INVENTORY_SLOTS = 18
-/** The inventory grid's width: 3 rows of 6. */
-export const INVENTORY_COLUMNS = 6
-
 /**
  * The card a chat is sent from, with its text's version as its sender had it
  * (`textVersion`): queued, the host pops it only once it holds that much
@@ -1533,8 +1534,18 @@ export function keyOf(place: CardPlace): PlaceKey {
 export function sameKey(a: PlaceKey, b: PlaceKey): boolean {
   switch (a.kind) {
     case "composing":
+      return (
+        b.kind === "composing" && samePosition(a.at, b.at) && a.lane === b.lane
+      )
+    // A note's cell is part of where it is: a move to a cell another note
+    // took since is refused, as a move of a card someone moved is.
     case "note":
-      return b.kind === a.kind && samePosition(a.at, b.at) && a.lane === b.lane
+      return (
+        b.kind === "note" &&
+        samePosition(a.at, b.at) &&
+        a.lane === b.lane &&
+        a.cell === b.cell
+      )
     case "pinned":
       return (
         b.kind === "pinned" && samePosition(a.at, b.at) && a.lane === b.lane
@@ -1609,11 +1620,13 @@ export const moveOf = (card: CardRecord, to: PlaceKey): Move => ({
  */
 export const noteOf = (
   place: Extract<CardPlace, { kind: "queued" | "pinned" | "composing" }>,
+  cell: number | null = null,
 ): PlaceKey => ({
   kind: "note",
   root: place.root,
   at: place.at,
   lane: place.lane,
+  cell,
 })
 
 /**
@@ -1704,6 +1717,8 @@ export function placeFields(place: CardPlace | PlaceKey): PlaceFields {
   switch (place.kind) {
     // Your message keeps the stored kind it had as a drafting card, so no
     // stored row changed with the split (ADR-0113).
+    // A note's cell is its row's `order`, a decimal: no new field, so no
+    // migration (ADR-0096).
     case "composing":
     case "note":
       return {
@@ -1712,7 +1727,10 @@ export function placeFields(place: CardPlace | PlaceKey): PlaceFields {
         at: entryOrEmpty(place.at),
         lane: place.lane ?? "",
         column: "",
-        order: "",
+        order:
+          place.kind === "note" && place.cell !== null
+            ? String(place.cell)
+            : "",
         by: "",
         seen: "",
         holder: "",
@@ -1781,6 +1799,12 @@ export function placeFields(place: CardPlace | PlaceKey): PlaceFields {
   }
 }
 
+/** A note's stored `order` -> its cell: "" is none; undefined for no cell. */
+const cellOfOrder = (order: string): number | null | undefined => {
+  if (order === "") return null
+  return /^\d+$/.test(order) ? Number(order) : undefined
+}
+
 /**
  * Flat strings -> a place; undefined for one that is malformed. A card at a
  * thread's end or queued has an entry for its `at`, never the root; a fresh
@@ -1817,18 +1841,26 @@ export function placeOfFields(f: PlaceFields): CardPlace | undefined {
             why: { kind: "discarded" },
           }
     case "drafting":
-    case "note":
       return f.at === "" || !isRootId(f.root)
         ? undefined
         : {
-            kind:
-              f.kind === "drafting"
-                ? ("composing" as const)
-                : ("note" as const),
+            kind: "composing",
             root: f.root,
             at: atEntry(entryId(f.at)),
             lane: isLaneName(f.lane) ? f.lane : null,
           }
+    case "note": {
+      const cell = cellOfOrder(f.order)
+      return f.at === "" || !isRootId(f.root) || cell === undefined
+        ? undefined
+        : {
+            kind: "note",
+            root: f.root,
+            at: atEntry(entryId(f.at)),
+            lane: isLaneName(f.lane) ? f.lane : null,
+            cell,
+          }
+    }
     case "pinned":
       return f.at === "" || !isRootId(f.root) || f.order === ""
         ? undefined
@@ -2221,6 +2253,7 @@ export function orderNewEntries(
 export * from "./asks.ts"
 export * from "./edits.ts"
 export * from "./errors.ts"
+export * from "./grid.ts"
 export * from "./images.ts"
 export * from "./live.ts"
 export * from "./offers.ts"

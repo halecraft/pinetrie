@@ -40,6 +40,7 @@ const atEnd = {
   root: TEST_ROOT,
   at: atEntry(E1),
   lane: LANE,
+  cell: 0,
 } as const
 /** Texts the host holds whole. */
 const held = { textNow: () => "x", holds: () => true }
@@ -503,6 +504,7 @@ test("spend: a fresh column's first send leaves its other cards notes at the new
         root: TEST_ROOT,
         at: atEntry(sent),
         lane: null,
+        cell: 0,
       },
     }),
     expect.objectContaining({

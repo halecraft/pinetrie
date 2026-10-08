@@ -494,6 +494,19 @@ test("a reply carries the places document's rev when its step wrote it; none is 
   assert.equal(revOfReply(encodeOutcome("c", { kind: "named" })), null)
 })
 
+test("a note's key carries its cell, and none as none (ADR-0113)", () => {
+  for (const cell of [3, null]) {
+    const note = {
+      kind: "note",
+      root: TEST_ROOT,
+      at: atEntry(entryId("e-1")),
+      lane: null,
+      cell,
+    } as const
+    assert.deepEqual(decodeKey(encodeKey(note)), note)
+  }
+})
+
 test('decodeKey: "" is none; anything malformed is undefined', () => {
   assert.equal(decodeKey(""), null)
   for (const bad of [

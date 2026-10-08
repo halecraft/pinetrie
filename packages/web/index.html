@@ -672,10 +672,11 @@
       /* The notes at this end (ADR-0113), above your composer. With none, a
          drop zone shown only while a card is dragged, as the empty pinned
          strip is. */
-      .cards { padding: .5rem .75rem 0; border-top: 1px solid #23272e; }
-      .cards[data-empty] { display: none; }
-      body[data-card-drag] .cards[data-empty] { display: block; padding-bottom: .5rem; }
-      .notes-empty { display: block; font-size: .72rem; color: #6f7784; }
+      .notes-line { display: flex; align-items: center; gap: .5rem; padding: .3rem .75rem;
+        border-top: 1px solid #23272e; font-size: .75rem; }
+      .notes-toggle { background: none; border: 0; padding: .1rem 0; color: #8b93a1; cursor: pointer; }
+      .notes-toggle[aria-expanded="true"] { color: #ddd; }
+      body[data-card-drag] .notes-line { outline: 1px dashed #6f7784; outline-offset: -2px; }
       /* A text card's frame (ADR-0111), coloured by its place, which says who
          reads it: your inventory yours, a draft neutral, queued blue (the
          agent reads it once), pinned violet (on every run). */
@@ -761,7 +762,7 @@
       .pinned-read-text { white-space: pre-wrap; color: #c3c8d0; }
       .pinned-read-retired { margin: .3rem 0 0 .75rem; font-style: italic; }
       /* Your inventory (ADR-0048): floating over the columns' middle, docked
-         left, centre or right, a 3 × 6 grid beside the selected card. */
+         left, centre or right, a 3 × 6 card grid. */
       .inventory { position: fixed; z-index: 5; top: 30vh; width: min(52rem, 94vw);
         background: #171a1f; border: 1px solid #3a3f48; border-radius: 8px;
         box-shadow: 0 8px 32px rgb(0 0 0 / .5); }
@@ -770,17 +771,35 @@
       .inventory[data-dock="right"] { right: 1rem; }
       .inventory-frame { padding: .3rem .75rem; font-size: .75rem; color: #8b93a1;
         cursor: grab; user-select: none; border-bottom: 1px solid #23272e; touch-action: none; }
-      .inventory-body { display: flex; gap: .75rem; padding: .75rem; }
-      .inventory-grid { display: grid; grid-template-columns: repeat(6, 5.5rem);
-        grid-auto-rows: 3.5rem; gap: .35rem; flex: none; }
-      .slot { position: relative; padding: .3rem; text-align: left; overflow: hidden;
-        background: #1b1e24; border: 1px solid #2c313a; border-radius: 4px; font-size: .72rem; }
-      .slot.empty { border-style: dashed; }
-      .slot[aria-pressed="true"] { outline: 2px solid #9ecbff; }
-      .slot-label { position: absolute; top: .1rem; right: .25rem; color: #6f7784; font-size: .65rem; }
-      .slot-line { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-      .inventory-card { flex: 1; min-width: 0; }
-      .inventory-empty { color: #6f7784; font-size: .8rem; }
+      .inventory-body { padding: .75rem; }
+      /* A card grid (ADR-0113): index cards about 8 × 5.5rem in their cells,
+         empty cells dashed; the open card lifted over its neighbours. */
+      .card-grid { display: grid; grid-auto-rows: 5.5rem; gap: .35rem; }
+      .card-grid-cell { position: relative; min-width: 0; }
+      .card-grid-cell > button { width: 100%; height: 100%; padding: 0; text-align: left;
+        overflow: hidden; background: #1b1e24; border: 1px solid #2c313a; border-radius: 4px; }
+      .card-grid-cell > button.empty { border-style: dashed; background: none; }
+      .card-grid-cell > button[aria-pressed="true"] { outline: 2px solid #9ecbff; }
+      .card-grid-open { position: absolute; top: 0; z-index: 3; width: 22rem;
+        box-shadow: 0 8px 24px rgb(0 0 0 / .5); }
+      .card-grid-open[data-side="left"] { left: 0; }
+      .card-grid-open[data-side="right"] { right: 0; }
+      .card-grid-open .card-frame { margin: 0; }
+      /* A card folded: its place's colour as a strip, its owner, its lines. */
+      .card-face { --tone: #6f7784; display: flex; flex-direction: column; height: 100%;
+        border-top: 3px solid var(--tone); padding: .2rem .35rem; font-size: .72rem; }
+      .card-face[data-tone="queued"] { --tone: #58a6ff; }
+      .card-face[data-tone="pinned"] { --tone: #b392f0; }
+      .card-face[data-tone="inventory"] { --tone: var(--you, #e3b341); }
+      .card-face-head { display: flex; align-items: center; gap: .3rem; color: #8b93a1; }
+      .card-face-head .card-icon { color: var(--tone); }
+      .card-face-owner { width: 1rem; height: 1rem; font-size: .6rem; }
+      .card-face-key { margin-left: auto; color: #6f7784; font-size: .65rem; }
+      .card-face-lines { margin-top: .15rem; white-space: pre-wrap; color: #c3c8d0;
+        display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+      /* The notes board in the pane: a narrow pane scrolls it sideways. */
+      .pane-notes { overflow: auto; padding: .75rem; }
+      .notes-grid { width: max-content; }
       dialog.restore-ask { background: #171a1f; color: inherit; border: 1px solid #3a3f48;
         border-radius: 8px; }
       dialog.restore-ask::backdrop { background: rgb(0 0 0 / .5); }

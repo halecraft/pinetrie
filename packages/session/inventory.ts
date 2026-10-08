@@ -13,7 +13,10 @@
 import {
   type CardId,
   type CardRecord,
+  firstEmpty as firstEmptyCell,
+  INVENTORY_GRID,
   INVENTORY_SLOTS,
+  isCell,
   type WriterId,
 } from "@pinetrie/core"
 
@@ -31,28 +34,24 @@ export type Intents = ReadonlyMap<CardId, number>
 
 export const NO_INTENTS: Intents = new Map()
 
-/** Every slot index, in reading order. */
+/** Every slot index, in reading order: the inventory grid's cells. */
 export const SLOT_INDICES: readonly number[] = Array.from(
   { length: INVENTORY_SLOTS },
   (_, n) => n,
 )
 
+/** The slots `slots` fills. */
+const takenOf = (slots: Slots): ReadonlySet<number> =>
+  new Set(Object.keys(slots).map(Number))
+
 /**
  * The first empty slot in reading order, from `start` if it is empty; null
- * when full.
+ * when full (core's `firstEmpty` over the inventory's grid).
  */
-export function firstEmpty(slots: Slots, start?: number): number | null {
-  if (
-    start !== undefined &&
-    isSlot(start) &&
-    slots[String(start)] === undefined
-  )
-    return start
-  return SLOT_INDICES.find(n => slots[String(n)] === undefined) ?? null
-}
+export const firstEmpty = (slots: Slots, start?: number): number | null =>
+  firstEmptyCell(INVENTORY_GRID, takenOf(slots), start)
 
-const isSlot = (n: number): boolean =>
-  Number.isInteger(n) && n >= 0 && n < INVENTORY_SLOTS
+const isSlot = (n: number): boolean => isCell(INVENTORY_GRID, n)
 
 /**
  * The slots as they should be: `intents` in their chosen slots; every other

@@ -11,6 +11,8 @@ import { describe, expect, test } from "vitest"
 import {
   type CardFrameFacts,
   type CardTone,
+  cardFace,
+  cardFaceWords,
   cardFrame,
   cardFrameWords,
   moveWords,
@@ -49,7 +51,13 @@ const composing: CardPlace = {
   at,
   lane: LANE,
 }
-const note: CardPlace = { kind: "note", root: TEST_ROOT, at, lane: LANE }
+const note: CardPlace = {
+  kind: "note",
+  root: TEST_ROOT,
+  at,
+  lane: LANE,
+  cell: 0,
+}
 const queued: CardPlace = {
   kind: "queued",
   root: TEST_ROOT,
@@ -318,5 +326,30 @@ describe("cardFrameWords", () => {
     expect(moveWords("inventory").label).toBe("Move to your inventory")
     expect(moveWords("note").label).toBe("Move to notes")
     expect(moveWords("message").label).toBe("Move to your message")
+  })
+})
+
+describe("cardFace (ADR-0113)", () => {
+  test("its first three lines, leading blank lines left out; a short command chip; whose", () => {
+    const c = card(note, {
+      owner: BEA,
+      carries: { kind: "message", command: "bring-up-to-date" },
+    })
+    const face = cardFace(c, "\n\none\ntwo\nthree\nfour", {
+      tone: "note",
+      key: null,
+    })
+    expect(face).toEqual({
+      tone: "note",
+      owner: BEA,
+      command: "bring-up-to-date",
+      lines: "one\ntwo\nthree",
+      key: null,
+    })
+    expect(cardFaceWords(face, READER)).toEqual({
+      icon: "▭",
+      command: "catch up",
+      owner: "Bea",
+    })
   })
 })

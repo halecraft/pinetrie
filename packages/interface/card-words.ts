@@ -188,8 +188,11 @@ export const NEW_PIN_TITLE =
 /** That box, empty. */
 export const NEW_PIN_PLACEHOLDER =
   "what the agent should keep in mind on every run"
-/** A thread's notes with none: where a drop makes one (ADR-0113). */
-export const NOTES_EMPTY = "drop a card here to make it a note"
+/** A column's notes line (ADR-0113): how many notes the thread has. */
+export const notesLineWords = (n: number): string =>
+  n === 0 ? "notes" : `notes (${n})`
+export const NOTES_LINE_TITLE =
+  "the thread's notes board, beside it; drop a card here to make it a note"
 /** The pinned strip with no cards: where a drop pins one. */
 export const PINNED_EMPTY = "drop a card here to pin it for the agent"
 

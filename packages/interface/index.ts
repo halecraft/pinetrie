@@ -95,8 +95,10 @@ export {
   type ThreadCard,
 } from "./board-view.ts"
 export {
+  type CardFaceView,
   type CardFrameFacts,
   type CardFrameView,
+  cardFaceWords,
   cardFrame,
   cardFrameWords,
   moveWords,
@@ -134,7 +136,8 @@ export {
   NEW_PIN,
   NEW_PIN_PLACEHOLDER,
   NEW_PIN_TITLE,
-  NOTES_EMPTY,
+  NOTES_LINE_TITLE,
+  notesLineWords,
   noticeKey,
   noticeWords,
   PINNED_EMPTY,
@@ -204,6 +207,8 @@ export {
   initialFollow,
   type SeenEnd,
 } from "./follow.ts"
+export { gridKeyAct } from "./grid-keys.ts"
+export type { GridView } from "./grid-view.ts"
 export {
   planHeldRoots,
   rootEntriesOf,
@@ -289,6 +294,7 @@ export {
   speakerLabel,
   withContributors,
 } from "./names.ts"
+export { notesBoardView, notesPlaced } from "./notes-board-view.ts"
 export {
   BACK,
   hashOfPage,
@@ -354,6 +360,7 @@ export {
   composerPlacesStore,
   DROP_ZONE,
   dropProps,
+  type PutTarget,
   targetOfElement,
 } from "./put-target.ts"
 export {

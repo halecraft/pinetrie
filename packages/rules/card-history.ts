@@ -174,11 +174,13 @@ function movedBack(
 ): "unqueued" | "unpinned" | null {
   if (to.kind !== "note" || (from.kind !== "queued" && from.kind !== "pinned"))
     return null
+  // In whichever cell the host gave it.
   const below: PlaceKey = {
     kind: "note",
     root: from.root,
     at: from.at,
     lane: from.lane,
+    cell: to.cell,
   }
   if (!sameKey(below, to)) return null
   return from.kind === "queued" ? "unqueued" : "unpinned"

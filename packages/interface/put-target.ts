@@ -23,6 +23,8 @@ export type PutTarget =
   | { readonly kind: "column"; readonly key: string }
   /** A column's composer: your message, which a message with text there gives way to by a swap. */
   | { readonly kind: "composer"; readonly key: string }
+  /** A cell of a column's notes board (ADR-0113): a note there, which a note in it swaps with. */
+  | { readonly kind: "cell"; readonly key: string; readonly cell: number }
   /** The pinned strip at the top of a thread's column (ADR-0048). */
   | { readonly kind: "pinned"; readonly key: string }
   /** A slot of your inventory. */
@@ -39,9 +41,11 @@ const PUT_COMPOSER = "data-put-composer"
 const PUT_PINNED = "data-put-pinned"
 /** The attribute a slot carries: its index. */
 const PUT_SLOT = "data-put-slot"
+/** The attribute a notes board's cell carries: its column's key and its cell, as `key:cell`. */
+const PUT_CELL = "data-put-cell"
 
 /** What an element a drop may land on matches: any mark. */
-export const DROP_ZONE = `[${PUT_COLUMN}],[${PUT_COMPOSER}],[${PUT_PINNED}],[${PUT_SLOT}]`
+export const DROP_ZONE = `[${PUT_COLUMN}],[${PUT_COMPOSER}],[${PUT_PINNED}],[${PUT_SLOT}],[${PUT_CELL}]`
 
 /** The attributes that mark an element as `target`, spread onto it by the page. */
 export function dropProps(target: PutTarget): Readonly<Record<string, string>> {
@@ -54,6 +58,8 @@ export function dropProps(target: PutTarget): Readonly<Record<string, string>> {
       return { [PUT_PINNED]: target.key }
     case "inventory":
       return { [PUT_SLOT]: String(target.slot) }
+    case "cell":
+      return { [PUT_CELL]: `${target.key}:${target.cell}` }
   }
 }
 
@@ -68,6 +74,9 @@ export function targetOfElement(el: {
     return { kind: "composer", key: composer }
   const pinned = el.getAttribute(PUT_PINNED)
   if (pinned !== null && pinned !== "") return { kind: "pinned", key: pinned }
+  const cell = /^(.+):(\d+)$/.exec(el.getAttribute(PUT_CELL) ?? "")
+  if (cell?.[1] !== undefined && cell[2] !== undefined)
+    return { kind: "cell", key: cell[1], cell: Number(cell[2]) }
   const slot = el.getAttribute(PUT_SLOT)
   if (slot === null || !/^\d+$/.test(slot)) return null
   return { kind: "inventory", slot: Number(slot) }
@@ -79,6 +88,8 @@ export interface ComposerSpot {
   readonly place: CardPlace
   /** Your message there, if you have one (`yourCard`). */
   readonly message: CardId | null
+  /** Its notes board as drawn (`notesPlaced`): cell to note. */
+  readonly cells: ReadonlyMap<number, CardId>
 }
 
 /** Column key to its composer (`ComposerSpot`). */
@@ -96,10 +107,11 @@ export const intoMessage = (
   (target.kind === "column" && places.get(target.key)?.place.kind === "fresh")
 
 /**
- * The place `target` names: a note at a column's end (`noteOf`), its
- * composer's place, the same thread end pinned (`pinnedOf`), or your
- * inventory; null for a column no composer publishes, and for a fresh
- * column's strip, which it has none of.
+ * The place `target` names: a note at a column's end (`noteOf`), in a cell
+ * of its board or the first empty one, its composer's place, the same
+ * thread end pinned (`pinnedOf`), or your inventory; null for a column no
+ * composer publishes, and for a fresh column's strip or board, which it
+ * has none of.
  */
 export function placeOfTarget(
   target: PutTarget,
@@ -110,10 +122,17 @@ export function placeOfTarget(
   const place = places.get(target.key)?.place
   if (place === undefined) return null
   if (target.kind === "pinned") return pinnedOf(place)
+  if (target.kind === "cell")
+    return place.kind === "composing" ? noteOf(place, target.cell) : null
   if (target.kind === "column" && place.kind === "composing")
     return noteOf(place)
   return keyOf(place)
 }
+
+const sameCells = (
+  a: ReadonlyMap<number, CardId>,
+  b: ReadonlyMap<number, CardId>,
+): boolean => a.size === b.size && [...a].every(([n, id]) => b.get(n) === id)
 
 /** A store each column writes its composer to as it renders; reading it redraws nothing. */
 export interface ComposerPlacesStore {
@@ -132,6 +151,7 @@ export function composerPlacesStore(): ComposerPlacesStore {
           ? now === undefined
           : now !== undefined &&
             now.message === spot.message &&
+            sameCells(now.cells, spot.cells) &&
             sameKey(keyOf(now.place), keyOf(spot.place))
       )
         return

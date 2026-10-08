@@ -20,6 +20,7 @@ import {
   type CatchUpCommand,
   cardId,
   type EntryId,
+  firstEmpty,
   INVENTORY_SLOTS,
   keyOf,
   type LaneName,
@@ -28,6 +29,7 @@ import {
   type MoveRefusal,
   moveOf,
   movesOfDocId,
+  NOTES_GRID,
   noteOf,
   type OfferFact,
   PLAIN,
@@ -219,6 +221,84 @@ const byOrder = (a: CardRecord, b: CardRecord): number => {
   return a.id < b.id ? -1 : a.id > b.id ? 1 : 0
 }
 
+// ── notes' cells (ADR-0113) ───────────────────────────────────────────────
+
+type NotePlace = Extract<CardPlace, { kind: "note" }>
+
+/**
+ * The board a note's cell is on, as the host can tell without the tree:
+ * its lane's, which is its thread's, else its root and where it was made.
+ * Two notes of one lane-less thread made at different ends are counted on
+ * two boards: the page draws a cell two notes claim in one of them
+ * (`notesBoardView`).
+ */
+const boardOf = (p: {
+  readonly root: RootId
+  readonly at: Position
+  readonly lane: LaneName | null
+}): string => `${p.root} ${p.lane ?? (p.at.kind === "entry" ? p.at.id : "")}`
+
+const isNote = (
+  c: CardRecord,
+): c is CardRecord & { readonly place: NotePlace } => c.place.kind === "note"
+
+/** The cells taken on `place`'s board. */
+const cellsTaken = (
+  cards: readonly CardRecord[],
+  place: Parameters<typeof boardOf>[0],
+): ReadonlySet<number> => {
+  const board = boardOf(place)
+  return new Set(
+    cards.flatMap(c =>
+      isNote(c) && c.place.cell !== null && boardOf(c.place) === board
+        ? [c.place.cell]
+        : [],
+    ),
+  )
+}
+
+/**
+ * `place` as a note in a cell: its own, or for none the first empty one on
+ * its board (`firstEmpty` over `NOTES_GRID`). The host alone assigns a cell
+ * a move leaves to it, as it assigns order keys.
+ */
+const withCell = (
+  cards: readonly CardRecord[],
+  place: NotePlace,
+): NotePlace => ({
+  ...place,
+  cell:
+    place.cell ??
+    firstEmpty(NOTES_GRID, cellsTaken(cards, place)) ??
+    // A growing grid always has one.
+    0,
+})
+
+/**
+ * A note among `written` that shares a board and a cell with another, as
+ * `cards` are now: the other, whose placer a refusal names; null for none.
+ */
+function cellClash(
+  cards: readonly CardRecord[],
+  written: readonly CardId[],
+): CardRecord | null {
+  for (const id of written) {
+    const c = cards.find(x => x.id === id)
+    if (c === undefined || !isNote(c) || c.place.cell === null) continue
+    const board = boardOf(c.place)
+    const cell = c.place.cell
+    const other = cards.find(
+      o =>
+        o.id !== c.id &&
+        isNote(o) &&
+        o.place.cell === cell &&
+        boardOf(o.place) === board,
+    )
+    if (other !== undefined) return other
+  }
+  return null
+}
+
 /** Where a column's composer is: a thread's end, or a fresh column by its key. */
 type CardWhere =
   | { readonly kind: "end"; readonly end: EntryId }
@@ -330,16 +410,21 @@ export const planUnqueueAll = (
  * write is nobody's move. Never queued again, or the next drain would pop
  * it and fail the same way (S69, answer 5).
  */
-export const planUnsent = (card: QueuedCard, reason: string): PlaceStep => ({
+export const planUnsent = (
+  cards: readonly CardRecord[],
+  card: QueuedCard,
+  reason: string,
+): PlaceStep => ({
   kind: "write",
   record: {
     ...card,
-    place: {
+    place: withCell(cards, {
       kind: "note",
       root: card.place.root,
       at: card.place.at,
       lane: card.place.lane,
-    },
+      cell: null,
+    }),
     unsent: reason,
   },
 })
@@ -448,6 +533,8 @@ function placeAt(
       return { ...key, order: orderAfter(cards.filter(isPinned)) }
     case "gone":
       return { ...key, by: sender }
+    case "note":
+      return withCell(cards, key)
     default:
       return key
   }
@@ -657,20 +744,32 @@ export function planFreshFollow(
 ): readonly PlaceStep[] {
   const place = cards.find(c => c.id === sent)?.place
   if (place?.kind !== "fresh" || place.root !== root) return []
-  return cards
-    .filter(
-      c =>
-        c.id !== sent &&
-        c.place.kind === "fresh" &&
-        c.place.column === place.column,
+  const steps: PlaceStep[] = []
+  let now = cards
+  for (const c of cards) {
+    if (
+      c.id === sent ||
+      c.place.kind !== "fresh" ||
+      c.place.column !== place.column
     )
-    .map(c => ({
+      continue
+    const step: PlaceStep = {
       kind: "write",
       record: {
         ...c,
-        place: { kind: "note", root, at: atEntry(at), lane },
+        place: withCell(now, {
+          kind: "note",
+          root,
+          at: atEntry(at),
+          lane,
+          cell: null,
+        }),
       },
-    }))
+    }
+    steps.push(step)
+    now = afterStep(now, step)
+  }
+  return steps
 }
 
 /**
@@ -705,8 +804,25 @@ export function planStoredCardRepair(
     }
     steps.push({
       kind: "write",
-      record: { ...c, place: { ...place, kind: "note" } },
+      record: { ...c, place: { ...place, kind: "note", cell: null } },
     })
+  }
+  // Every note with no cell takes the first empty one on its board, in id
+  // order (ADR-0113): the messages just made notes among them.
+  let now = steps.reduce(afterStep, cards)
+  const cellLess = now
+    .filter(isNote)
+    .filter(c => c.place.cell === null)
+    .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+  for (const c of cellLess) {
+    const step: PlaceStep = {
+      kind: "write",
+      record: { ...c, place: withCell(now, c.place) },
+    }
+    const i = steps.findIndex(s => s.kind === "write" && s.record.id === c.id)
+    if (i >= 0) steps[i] = step
+    else steps.push(step)
+    now = afterStep(now, step)
   }
   return steps
 }
@@ -743,6 +859,13 @@ export function planMoves(
     steps.push(step)
     now = afterStep(now, step)
   }
+  // Checked once all are written, so a swap of two notes' cells is one
+  // step, and a cell someone took since is refused (ADR-0113).
+  const clash = cellClash(
+    now,
+    moves.map(m => m.card),
+  )
+  if (clash !== null) return { kind: "refused", code: "moved", now: clash }
   return { kind: "steps", steps }
 }
 

@@ -1,36 +1,20 @@
 // interface/inventory-view — what the inventory panel draws (ADR-0048 step 4,
-// ADR-0059). Pure: `settleSlots`, the one slot rule the repair writes too,
-// each slot with its card.
+// ADR-0059): `settleSlots`, the one slot rule the repair writes too, as a
+// card grid (`gridView`), each of the first nine slots labelled 1–9. Pure.
 
-import type { CardId, CardRecord } from "@pinetrie/core"
-import {
-  type Intents,
-  SLOT_INDICES,
-  type Slots,
-  settleSlots,
-} from "@pinetrie/session"
-
-export interface SlotView {
-  readonly index: number
-  readonly card: CardRecord | null
-  /** The card's first line, "" for none. */
-  readonly firstLine: string
-  /** "1"–"9" for the first nine slots, else null. */
-  readonly label: string | null
-  readonly selected: boolean
-}
+import { type CardId, type CardRecord, INVENTORY_GRID } from "@pinetrie/core"
+import { type Intents, type Slots, settleSlots } from "@pinetrie/session"
+import { type GridView, gridView } from "./grid-view.ts"
 
 export interface InventoryView {
-  readonly slots: readonly SlotView[]
-  readonly selected: number
-  /** The selected slot's card, shown whole beside the grid. */
-  readonly card: CardRecord | null
+  readonly grid: GridView
   /** How many slots are empty. */
   readonly free: number
 }
 
-const firstLineOf = (text: string): string =>
-  text.trimStart().split("\n", 1)[0]?.trim() ?? ""
+/** "1"–"9" for the first nine slots, else null. */
+export const slotKey = (slot: number): string | null =>
+  slot < 9 ? String(slot + 1) : null
 
 /** What the panel draws: `settleSlots`, each slot with its card. */
 export function inventoryView(input: {
@@ -47,22 +31,18 @@ export function inventoryView(input: {
     input.slots,
     input.intents,
   )
-  const slots = SLOT_INDICES.map(index => {
-    const id = settled[String(index)]
-    const card = id === undefined ? null : (byId.get(id) ?? null)
-    return {
-      index,
-      card,
-      firstLine:
-        card === null ? "" : firstLineOf(input.texts.get(card.id) ?? ""),
-      label: index < 9 ? String(index + 1) : null,
-      selected: index === input.selected,
-    }
-  })
-  return {
-    slots,
-    selected: input.selected,
-    card: slots[input.selected]?.card ?? null,
-    free: slots.filter(s => s.card === null).length,
+  const placed = new Map<number, CardRecord>()
+  for (const [slot, id] of Object.entries(settled)) {
+    const card = byId.get(id)
+    if (card !== undefined) placed.set(Number(slot), card)
   }
+  const grid = gridView({
+    grid: INVENTORY_GRID,
+    tone: "inventory",
+    placed,
+    selected: input.selected,
+    texts: input.texts,
+    keyOf: slotKey,
+  })
+  return { grid, free: grid.cells.length - placed.size }
 }

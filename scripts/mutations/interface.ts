@@ -2340,6 +2340,22 @@ export const mutations: readonly Mutation[] = [
     expect: "a message with text takes the note's place",
   },
   {
+    name: "a note dropped on a note leaves that note there",
+    file: "packages/interface/card-intents.ts",
+    from: "      moves: [{ move: moveOf(now, to), slot: null }, back],",
+    to: "      moves: [{ move: moveOf(now, to), slot: null }],",
+    command: unit,
+    expect: "a note on a note swaps the two",
+  },
+  {
+    name: "a face shows a card's fourth line",
+    file: "packages/interface/card-frame.ts",
+    from: '  lines: text.trimStart().split("\\n").slice(0, 3).join("\\n").trimEnd(),',
+    to: '  lines: text.trimStart().split("\\n").slice(0, 4).join("\\n").trimEnd(),',
+    command: unit,
+    expect: "its first three lines, leading blank lines left out",
+  },
+  {
     name: "a queued card cannot be pinned from its ⋯",
     file: "packages/interface/card-frame.ts",
     from: '        pin,\n        take,\n      ]\n    case "pinned":',
@@ -2469,18 +2485,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "every slot is labelled",
     file: "packages/interface/inventory-view.ts",
-    from: "      label: index < 9 ? String(index + 1) : null,",
-    to: "      label: String(index + 1),",
+    from: "  slot < 9 ? String(slot + 1) : null",
+    to: "  String(slot + 1)",
     command: unit,
-    expect: "draws exactly settleSlots, with labels 1–9",
-  },
-  {
-    name: "a grid move wraps past the left edge",
-    file: "packages/interface/inventory-keys.ts",
-    from: "      return row * INVENTORY_COLUMNS + Math.max(0, col - 1)",
-    to: "      return row * INVENTORY_COLUMNS + col - 1",
-    command: unit,
-    expect: "stepSlot moves through the 3 × 6 grid and stops at its edges",
+    expect: "labels the first nine slots 1–9 on their faces",
   },
   {
     name: "a take into the inventory ignores the selection",
@@ -2493,7 +2501,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a put where the card already is moves it",
     file: "packages/interface/card-intents.ts",
-    from: "  if (to === null || sameKey(from, to)) return []",
+    from: "  if (to === null || sameKey(here, to)) return []",
     to: "  if (to === null) return []",
     command: unit,
     expect:
@@ -2550,13 +2558,12 @@ export const mutations: readonly Mutation[] = [
     expect: "undo and redo with Meta or Ctrl, only outside a text box",
   },
   {
-    name: "the grid keys move outside the panel",
-    file: "packages/interface/inventory-keys.ts",
-    from: "  if (!focus.inPanel || step === undefined",
-    to: "  if (step === undefined",
+    name: "Alt+arrow moves a cell that holds no card",
+    file: "packages/interface/grid-keys.ts",
+    from: "  return at.hasCard && to !== at.selected\n",
+    to: "  return to !== at.selected\n",
     command: unit,
-    expect:
-      "arrows and hjkl move through the grid only while the panel has focus",
+    expect: "Alt+arrows move the selected card a cell",
   },
   {
     name: "Cmd+Ctrl+Shift+I takes too",

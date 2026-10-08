@@ -1027,6 +1027,9 @@ draws it.
 - **A command is a chip** (`commandWords`, `commandNote` its title). In
   your inventory `catchUps` is null, since a command there has no thread
   to name, and no chip is drawn.
+- **A face is the card folded** (`cardFace`): its tone, its owner, its
+  command (a short chip, `cardFaceWords`, since a face names no thread),
+  its first three lines, and its slot's 1–9 in your inventory.
 
 ## Threads, lanes and the composer (ADR-0020)
 
@@ -1251,9 +1254,9 @@ list: an archived root's work is done, so it never lights ▦ (`elsewhere`).
 
 A panel floating over the columns (`inventory-panel.tsx`, drawn by `App`),
 docked left, centre or right by this device's choice (`inventory-dock.ts`,
-`snapTo`, kept as a `deviceState`), holding a 3 × 6 grid of slots and the
-selected card whole beside it (`BoundCardEditor`). Open or closed is `App`'s
-state, never stored.
+`snapTo`, kept as a `deviceState`), holding a 3 × 6 card grid (`CardGrid`,
+*Card grids* below), the selected card opening whole in place. Open or
+closed is `App`'s state, never stored.
 
 - **Two layers**: the host's records say which cards are in your
   inventory, and your inventory document which slot holds each. The session
@@ -1282,19 +1285,19 @@ state, never stored.
 - **A swap is undone by this tab's own stack** (the session's `swaps`)
   while the panel has focus (`keyAct`'s `inPanel`); one whose slot the
   repair changed since is refused, `slots-changed` (S90).
-- **The grid's keys** step through it by `stepSlot` (`inventory-keys.ts`),
-  stopping at its edges.
 - **A card an undo puts back in your inventory takes its old slot while the
   repair has not cleared it** (`steadiness`), else the first empty one: the
   host knows no slots.
 - **One landing rule** (`put-target.ts`). A put and a drop name a
-  `PutTarget`: a column by key, or a slot. A column's place is its
-  composer's (`composerPlace`, `column-view.ts`), which each writable
-  `Column` publishes to `ComposerPlaces` as it renders; reading it redraws
-  nothing. A drop target carries `data-put-column` (the column's
-  `form.composer` and the cards above it) or `data-put-slot`, both written
-  by `dropProps` and read by `targetOfElement`, so a drop lands exactly
-  where a put can. A column's pinned strip carries `data-put-pinned`: it
+  `PutTarget`: a column by key (a note there), its composer (your
+  message), a cell of its notes board, its pinned strip, or a slot. Each
+  writable `Column` publishes its composer as it renders
+  (`ComposerSpot`: its place, `composerPlace` in `column-view.ts`, your
+  message there, and its notes board's cells as drawn); reading it redraws
+  nothing. A drop target carries `data-put-column` (the notes line),
+  `data-put-composer`, `data-put-cell` (`key:cell`), `data-put-pinned` or
+  `data-put-slot`, each written by `dropProps` and read by
+  `targetOfElement`, so a drop lands exactly where a put can. A column's pinned strip carries `data-put-pinned`: it
   lands where the column's composer would create a card, pinned (`pinnedOf`),
   and a fresh column's strip, which has no thread, lands nowhere. A slot as the target swaps a card already in your
   inventory, and takes any other into the inventory at that slot.
@@ -1317,8 +1320,8 @@ state, never stored.
   focused card into the inventory (`data-card` on the focused element, a box's included);
   Ctrl+Shift+O puts the selected one in the column whose element last held
   focus; Cmd or Ctrl with Z, Shift+Z, or Ctrl+Y undo and redo a move, only
-  outside a text box, where the box's own text undo has them; arrows and
-  `hjkl` move through the grid while the panel has focus. Ctrl+Shift+L
+  outside a text box, where the box's own text undo has them. A grid's
+  keys are its own (`gridKeyAct`, *Card grids* below). Ctrl+Shift+L
   folds or unfolds the sidebar (ADR-0088), from anywhere, as I and O.
   The open board's keys are a second table, `boardKeyAct` (`board-view.ts`),
   read by `Board`'s own listener, until the key-system redesign replaces
@@ -1334,12 +1337,37 @@ state, never stored.
   element animates from the old box. A take into the inventory while the
   panel is closed opens it briefly.
 - **Selectors for the browser suite:** `.inventory` (the panel),
-  `.inventory .slot[data-slot][data-card]` and `.slot-line`, `.inventory
-  .put`, `.inventory .discard-card`, `#bottom .inventory-toggle`
-  (`.account-inventory` in the account menu while the sidebar is folded), a card's
-  `.take-into-inventory`, a message's `.take-copy-into-inventory`, and a
-  fresh column's `.close-keep`,
+  `.inventory .slot[data-slot][data-card]` and its `.card-face-lines`, the
+  open card's `.card-grid-open`, `.inventory .put`, `.inventory
+  .discard-card`, `#bottom .inventory-toggle` (`.account-inventory` in the
+  account menu while the sidebar is folded), a message's
+  `.take-copy-into-inventory`, and a fresh column's `.close-keep`,
   `.close-discard` and `.close-cancel`.
+
+## Card grids (`grid-view.ts`, `grid-keys.ts`, ADR-0113)
+
+Your inventory and a thread's notes board are one grid (`CardGrid`,
+`packages/web/card-grid.tsx`): core's `grid.ts` says what a cell is
+(`INVENTORY_GRID`, 6 × 3; `NOTES_GRID`, 4 wide and growing), the first
+empty one (`firstEmpty`), a step (`step`) and the rows drawn (`rowsShown`).
+
+- **`gridView`** lays cards out by cell, each folded (`cardFace`), with the
+  selection and the selected card. `inventoryView` places them by
+  `settleSlots`, each of the first nine labelled 1–9 (`slotKey`);
+  `notesBoardView` by each note's cell (`notesPlaced`): a note with no
+  cell yet, or one whose cell an older note holds, is drawn in the next
+  empty cell. The host counts a lane-less thread's notes by where each was
+  made (`@pinetrie/rules`, *Cards*), so two can claim one cell.
+- **`gridKeyAct`** is a grid's keys while it has focus: arrows and `hjkl`
+  select, Alt+arrows move the selected card (a put on that cell or slot,
+  which swaps), Enter opens it, and Escape folds it, from its box too.
+- **A move in a notes board is a put on a cell** (`putInCell`): an empty
+  cell takes the card; on a note, a note or a card from your inventory
+  swaps with it in one move of the two, and a card from anywhere else
+  takes the first empty cell. A put on the column, with no cell, leaves
+  the cell to the host (`placeAt`).
+- **The notes board is a pane subject** (`notes`, `packages/web/pane.ts`),
+  opened from the column's notes line.
 
 ## Names
 

@@ -194,7 +194,8 @@ session or someone else's inventory throws before it is made.
 - **`settleSlots` is the one slot rule**: the page's panel draws it
   (`inventoryView`, `@pinetrie/interface`), the repair writes towards it, and a
   take into the inventory lands by the same `firstEmpty`: the selected slot if empty, else the
-  first empty.
+  first empty. Both are core's grid rule over `INVENTORY_GRID` (`grid.ts`),
+  which the notes board's cells share.
 - **The repair waits for a card to be steady** (`steadiness`, S79): it
   places a card, or clears its slot, only once the card has been held, or
   not, for `STEADY_MS`, and looks again then. It reads the host's records,

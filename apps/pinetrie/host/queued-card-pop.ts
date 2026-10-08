@@ -350,7 +350,7 @@ function unsent(
   reason: string,
 ): void {
   const { session, places, log } = deps.basics
-  applyPlaceSteps(places, [planUnsent(card, reason)])
+  applyPlaceSteps(places, [planUnsent(readPlaces(places), card, reason)])
   log(
     `[host] ${readThreadName(session, card.place.lane)}: a queued card was not sent: ${reason}`,
   )

@@ -764,23 +764,34 @@ The rail is E; the column is T. Seeing both at once is the product.
   its column until its first message is sent. Others writing at the
   thread's end show above it as "Bea is writing…".
 - **A note is a card below the line that everyone at the thread's end
-  sees**, above their composer, headed "Ada's note · with Bea", and anyone
-  can type in it. Your message's **Move to notes** makes it one; a note's
-  **Move to your message** puts it in your composer. A note dropped on the
-  composer becomes your message, and a message there with text takes the
-  note's place, in one move the undo key outside a box undoes; an empty one
-  is discarded. In a new branch, a message with text takes a card only from
-  your inventory ("not moved: your message here holds text"). While you
-  drag a card, a thread with no notes shows "drop a card here to make it a
-  note" above the composer. An unqueued card, an unpinned card, a card the
-  host could not send and a card put in a column are notes.
+  sees**, on the thread's **notes board**, and anyone can type in it. Your
+  message's **Move to notes** makes it one; a note's **Move to your
+  message** puts it in your composer. A note dropped on the composer
+  becomes your message, and a message there with text takes the note's
+  place, in one move the undo key outside a box undoes; an empty one is
+  discarded. In a new branch, a message with text takes a card only from
+  your inventory ("not moved: your message here holds text"). An unqueued
+  card, an unpinned card, a card the host could not send and a card put in
+  a column are notes.
+- **The notes board is a grid in the column's pane**, 4 wide, with one
+  empty row below its last note to grow into, opened and closed by the
+  column's **notes (n)** line above the composer, beside the circles of
+  whose notes are there. A narrow pane scrolls it sideways. Each note sits
+  in a cell, folded to its first three lines, and keeps it, gaps included,
+  for everyone: a cell is an address. Click a note, or Enter on it, and it
+  opens whole in place, over its neighbours, headed "Ada's note · with
+  Bea"; Escape folds it. Arrows and `hjkl` move the selection, and
+  Alt+arrows the selected note a cell. A card dropped on an empty cell goes
+  there; on a note, the two swap, in one move, when the card is a note or
+  from your inventory. Dropped on the notes line, or put in the column, a
+  card takes the first empty cell.
 - **Marks say where you left something unsent** (ADR-0048): a small dot in
   your colour on its root's item in the sidebar, and on the rail at its
   thread's end, whether or not that thread's column is open. A root you
   closed is marked on ▦ and its thread card; an archived root only on its
   thread card, since its work is done. Only your own message and the notes
-  you own count, and only while they hold text: emptied, sent or discarded, the dot goes. A bare `@agent ` is
-  nothing typed.
+  you own count, and only while they hold text: emptied, sent or
+  discarded, the dot goes. A bare `@agent ` is nothing typed.
 - **Sending spends the card.** The box stays as it was until the host
   answers: written or running, the card is gone and the box empty; a
   conflict or a refusal leaves the card, so nothing is lost or put back.
@@ -891,12 +902,14 @@ The rail is E; the column is T. Seeing both at once is the product.
   middle of the screen by default; drag its top bar and it settles left,
   centre or right, and this device remembers where. Only you see it, on
   every root and device; nobody else can move a card into or out of it.
-- **A fixed 3 × 6 grid.** Each slot shows its card's first line in its
-  author's colour; the first nine are numbered 1–9. Click a slot, or move
-  with the arrow keys or `hjkl` while the panel has focus, to select it; the
-  selected card is shown whole beside the grid, and editable. Cards keep
-  their slots, gaps included, on every device. Dropping a card on a slot
-  that holds one swaps the two.
+- **A fixed 3 × 6 grid of cards**, the notes board's grid: each slot shows
+  its card folded, its first three lines under its author's circle; the
+  first nine are numbered 1–9. Click a slot, or move with the arrow keys or
+  `hjkl` while the panel has focus, to select it; a click or Enter opens
+  the card whole in place, over its neighbours, and editable, and Escape
+  folds it. Cards keep their slots, gaps included, on every device.
+  Dropping a card on a slot that holds one swaps the two, and so do
+  Alt+arrows.
 - **Take** moves a card into your inventory (a *take into the inventory*,
   ADR-0083): Ctrl+Shift+I in its box, **Move to your inventory** in its ⋯,
   or a drag of its header onto the panel. It lands in the selected slot if that is empty, else the first
@@ -904,12 +917,13 @@ The rail is E; the column is T. Seeing both at once is the product.
   closed shows it briefly. A message's **take** copies its
   text, or your selection in it, as a new card: the message keeps it. Full
   means full: the nineteenth card is refused with "inventory full".
-- **Put** moves the selected card below the line at the end of the column
-  you were last in: Ctrl+Shift+O, the panel's **put** button, or a drag out
-  of the panel onto a column's composer or the cards above it. Held over a
-  root in the sidebar, a drag opens it. Put where you have no card, it becomes your
-  composer; where you have one, it is shown above it. The selected card's
-  **×** discards it; the undo key brings it back.
+- **Put** moves the selected card to the notes of the column you were last
+  in: Ctrl+Shift+O, the panel's **put** button, or a drag out
+  of the panel onto a column's notes line or a cell of its notes board: a
+  note, in the first empty cell, or the cell it is dropped on. Dropped on a
+  composer, it becomes your message there. Held over a root in the sidebar,
+  a drag opens it. The open card's **×** discards it; the undo key brings
+  it back.
 - **Undo a move** with Cmd+Z (Ctrl+Z elsewhere) while no box has focus;
   Cmd+Shift+Z, Ctrl+Shift+Z or Ctrl+Y redo it (ADR-0066). It undoes your
   newest move in the root you are on, from any of your tabs, after a reload
@@ -986,10 +1000,9 @@ board's records (ADR-0112); a card's text is its own document (ADR-0048).
   renamed the sidebar, which shows your open threads. Until they are built,
   this document describes what is.
 - **Notes and the dock** (ADR-0113), accepted and partly built: a card
-  below the line is a note, the composer is yours alone, and sending
-  removes a queue's hold (*Your message and notes*). Not yet built: the
-  notes laid out on the thread's notes board, a shared grid in the
-  column's pane; the column's foot as a dock of the queue, the line and
+  below the line is a note, on the thread's notes board; the composer is
+  yours alone; sending removes a queue's hold (*Your message and notes*).
+  Not yet built: the column's foot as a dock of the queue, the line and
   your message, whose queue header says what happens next; the work strip
   in the column's header.
 - **Narrow screens**: the stacked sequence described above, with the sidebar

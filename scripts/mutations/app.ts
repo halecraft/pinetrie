@@ -1732,8 +1732,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the wire carries no holder",
     file: "packages/protocol/codec.ts",
-    from: "  return { kind, root, at, lane, column, seen, holder }",
-    to: "  return { kind, root, at, lane, column, seen }",
+    from: "  return { kind, root, at, lane, column, order, seen, holder }",
+    to: "  return { kind, root, at, lane, column, order, seen }",
     suite: "host",
     scenario: "cards",
     expect: "a move out of someone else's inventory is refused, as not theirs",
@@ -1760,7 +1760,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a column publishes no composer place",
     file: "packages/web/column.tsx",
-    from: "      writable && place !== undefined\n        ? { place, message: mine?.id ?? null }\n        : null,",
+    from: "      writable && place !== undefined\n        ? { place, message: mine?.id ?? null, cells }\n        : null,",
     to: "      null,",
     suite: "browser",
     scenario: "page",
@@ -1937,7 +1937,7 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "page",
     expect:
-      "your message shows only in your window; moved to the notes, it shows in the other's column, above its composer",
+      "your message shows only in your window; moved to the notes, it shows on the other's notes board",
   },
   {
     name: "a note offers no way into your message",
@@ -1947,7 +1947,7 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "page",
     expect:
-      "Move to notes takes your message above the composer, and the note's Move to your message brings it back into the box",
+      "Move to notes puts your message on the notes board, and the note's Move to your message brings it back into the box",
   },
   {
     name: "a composer keeps showing the card a drop swapped away",
@@ -1966,6 +1966,16 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "page",
     expect: "what you type is still there after switching tabs",
+  },
+  {
+    name: "Escape leaves a grid's card open",
+    file: "packages/web/card-grid.tsx",
+    from: '          case "fold":\n            select(view.selected)\n',
+    to: '          case "fold":\n            p.onSelect(view.selected)\n',
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "a card selected in the inventory opens in place, and Escape folds it",
   },
   {
     name: "Enter in a + pin box sends",

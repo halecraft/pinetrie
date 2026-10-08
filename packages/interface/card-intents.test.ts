@@ -37,7 +37,9 @@ const atEnd = {
   at: atEntry(A),
   lane: null,
 } as const
-const note = { ...atEnd, kind: "note" } as const
+const note = { ...atEnd, kind: "note", cell: 0 } as const
+/** A move's note target: the host gives it the first empty cell. */
+const toNote = { ...note, cell: null } as const
 const pinnedKey = {
   kind: "pinned",
   root: TEST_ROOT,
@@ -82,8 +84,8 @@ const facts = (over: Partial<CardFacts> = {}): CardFacts => ({
   slots: {},
   selected: 0,
   composers: new Map<string, ComposerSpot>([
-    [threadKey, { place: atEnd, message: null }],
-    ["f-1", { place: freshF1, message: null }],
+    [threadKey, { place: atEnd, message: null, cells: new Map() }],
+    ["f-1", { place: freshF1, message: null, cells: new Map() }],
   ]),
   ...over,
 })
@@ -174,7 +176,7 @@ describe("take into the inventory (ADR-0048 step 4)", () => {
 describe("put", () => {
   test("to a column: a note at its end, said there (ADR-0113)", () => {
     const s = state({ cards: [card(C1, inventory)], slots: { "3": C1 } })
-    const move = { card: C1, from: inventory, to: note }
+    const move = { card: C1, from: inventory, to: toNote }
     expect(
       plan(
         { kind: "put", card: C1, target: { kind: "column", key: threadKey } },
@@ -240,7 +242,7 @@ describe("your message (ADR-0113)", () => {
       filled: new Set(filled ? [MSG] : []),
       slots: { "3": C1 },
       composers: new Map<string, ComposerSpot>([
-        [key, { place, message: MSG }],
+        [key, { place, message: MSG, cells: new Map() }],
       ]),
     })
   const toComposer = (key = threadKey): Intent => ({
@@ -326,12 +328,79 @@ describe("your message (ADR-0113)", () => {
     expect(plan(inColumn({ kind: "toNote", card: C1 }, threadKey), s)).toEqual([
       {
         kind: "moveCard",
-        move: { card: C1, from: atEnd, to: note },
+        move: { card: C1, from: atEnd, to: toNote },
         how: { actedAt: { kind: "column", key: threadKey }, slot: null },
         queuedBy: null,
         fly: true,
       },
     ])
+  })
+})
+
+describe("a notes board's cells (ADR-0113)", () => {
+  const C3 = cardId("c-3")
+  const inCell = (cell: number) => ({ ...note, cell })
+  const board = (cards: readonly CardRecord[], cells: [number, typeof C1][]) =>
+    state({
+      cards,
+      slots: { "3": C1 },
+      composers: new Map<string, ComposerSpot>([
+        [threadKey, { place: atEnd, message: null, cells: new Map(cells) }],
+      ]),
+    })
+  const toCell = (card: typeof C1, cell: number): Intent => ({
+    kind: "put",
+    card,
+    target: { kind: "cell", key: threadKey, cell },
+  })
+
+  test("an empty cell takes the card", () => {
+    expect(
+      plan(toCell(C1, 4), board([card(C1, inCell(0))], [[0, C1]]))[0],
+    ).toMatchObject({
+      kind: "moveCard",
+      move: { card: C1, from: inCell(0), to: inCell(4) },
+    })
+  })
+
+  test("a note on a note swaps the two, in one move of the two", () => {
+    const s = board(
+      [card(C1, inCell(0)), card(C3, inCell(4))],
+      [
+        [0, C1],
+        [4, C3],
+      ],
+    )
+    expect(plan(toCell(C1, 4), s)).toEqual([
+      {
+        kind: "keep",
+        moves: [
+          { move: { card: C1, from: inCell(0), to: inCell(4) }, slot: null },
+          { move: { card: C3, from: inCell(4), to: inCell(0) }, slot: null },
+        ],
+        actedAt: { kind: "column", key: threadKey },
+        close: [],
+      },
+    ])
+  })
+
+  test("a card from your inventory on a note: the note takes its slot", () => {
+    const s = board([card(C1, inventory), card(C3, inCell(4))], [[4, C3]])
+    expect(plan(toCell(C1, 4), s)[0]).toMatchObject({
+      kind: "keep",
+      moves: [
+        { move: { card: C1, to: inCell(4) } },
+        { move: { card: C3, to: inventory }, slot: 3 },
+      ],
+    })
+  })
+
+  test("a pinned card on a note takes the first empty cell instead", () => {
+    const s = board([card(C1, pinnedAtA), card(C3, inCell(4))], [[4, C3]])
+    expect(plan(toCell(C1, 4), s)[0]).toMatchObject({
+      kind: "moveCard",
+      move: { card: C1, to: toNote },
+    })
   })
 })
 
@@ -355,7 +424,7 @@ describe("pin and unpin (ADR-0048 step 5)", () => {
       plan(inColumn({ kind: "unpin", card: C1 }, threadKey), s)[0],
     ).toMatchObject({
       kind: "moveCard",
-      move: { card: C1, from: pinnedKey, to: note },
+      move: { card: C1, from: pinnedKey, to: toNote },
     })
   })
 

@@ -84,7 +84,7 @@ async function run(check: Checks["check"]): Promise<void> {
       }) as const
     /** A note at `end` (ADR-0113): shared, as your message is not. */
     const noteAt = (end: string | null) =>
-      ({ ...drafting(end), kind: "note" }) as const
+      ({ ...drafting(end), kind: "note", cell: 0 }) as const
     const newCard = (
       who: SessionClient,
       end: string | null,

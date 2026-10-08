@@ -678,9 +678,11 @@ heads a range, which has no description.
 ## A column's pane (`pane.ts`, `pane.tsx`, ADR-0078)
 
 Beside the thread, a column has one pane, holding one thing at a time: the
-offer's review, an ask's, a table from a message, or a stored image.
+offer's review, an ask's, a table from a message, a stored image, or the
+thread's notes board (ADR-0113).
 
-- **A subject is a name, never data** (`PaneSubject`): the offer, an ask by
+- **A subject is a name, never data** (`PaneSubject`): the offer, the notes
+  board (drawn while the column has a thread end), an ask by
   its entry, a table by its entry and its number in that message, an image
   by its hash and the message it is in (null in a reply still streaming).
   `paneKey` names it as a string; `samePane` compares keys, and the pane is
@@ -807,9 +809,18 @@ the session sends moves and draws them until its copy holds them
   message there) for `planPut`: a put on the column makes a note, a drop on
   the composer (`data-put-composer`) your message, swapping out one with
   text (`App`'s `filled` says which hold text).
-- **The notes are drawn above the composer** (`NoteCardEditor`), and with
-  none, a drop zone shown only while a card is dragged, as the empty pinned
-  strip is (`.cards[data-empty]`).
+- **The notes are on the notes board** (`notes-board.tsx`, `NotesBoard`), a
+  `CardGrid` in the column's pane, each opening as a `NoteCardEditor`. The
+  column's notes line (`.notes-line`) says how many there are and whose,
+  opens and closes the board (`.notes-toggle`), and is the column's drop
+  target for a new note.
+- **`CardGrid`** (`card-grid.tsx`) draws a `GridView` as index cards, each
+  cell a button (the drop target, `dropProps`, and the card's drag) holding
+  its `CardFace`. Its keys are `gridKeyAct`'s, on the grid; the open card
+  is the caller's (`renderOpen`), drawn over its neighbours from its cell,
+  towards the grid's middle (`data-side`). A face's owner is an `Initial`,
+  not an `Avatar`: the suites count people by `.avatar`. A cell's text
+  comes from `useCardTexts`.
 - **One editor for every card: `card-editor.tsx`, in one frame:
   `card-frame.tsx`** (ADR-0111). `CardEditor` is your composer's and the
   "+ pin" box's; every other card is a `BoundCardEditor`, a note named in
@@ -931,7 +942,11 @@ stays in view; the strip scrolls past 30vh.
   prompt's `.msg`. A card's frame is `.card-frame` (with `data-tone`), its
   header `.card-head` (`.card-state[data-state]`, `.card-by`), its ⋯
   `.card-menu-trigger` and its items `.move-to[data-to]` and
-  `.card-history-item`; its × `.discard-card`.
+  `.card-history-item`; its × `.discard-card`. A notes board is
+  `.pane-notes`, its cells `.note-cell[data-cell][data-card]`, the open
+  card `.card-grid-open`; the column's `.notes-line` and `.notes-toggle`.
+  `openNote` and `closeNotes` (`apps/pinetrie/e2e/browser/page.ts`) open a
+  note on the board and close it.
 
 ## History and traces (ADR-0048 step 6)
 

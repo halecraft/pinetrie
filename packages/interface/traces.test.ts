@@ -21,6 +21,7 @@ const at = (id: string): PlaceKey => ({
   root: ROOT,
   at: atEntry(entryId(id)),
   lane: null,
+  cell: 0,
 })
 const queued: PlaceKey = {
   kind: "queued",

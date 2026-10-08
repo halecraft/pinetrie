@@ -34,9 +34,12 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
   const fresh = composerPlace({ key: "k-fresh", fresh: {} }, E1, TEST_ROOT)
   store.set(
     "k-thread",
-    thread === null ? null : { place: thread, message: null },
+    thread === null ? null : { place: thread, message: null, cells: new Map() },
   )
-  store.set("k-fresh", fresh === null ? null : { place: fresh, message: null })
+  store.set(
+    "k-fresh",
+    fresh === null ? null : { place: fresh, message: null, cells: new Map() },
+  )
   const targets: PutTarget[] = [
     { kind: "column", key: "k-thread" },
     { kind: "column", key: "k-fresh" },
@@ -46,6 +49,7 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
     { kind: "column", key: "k-closed" },
     { kind: "pinned", key: "k-thread" },
     { kind: "pinned", key: "k-fresh" },
+    { kind: "cell", key: "k-thread", cell: 6 },
   ]
 
   test.each(targets)("a drop on %o lands where a put to it lands", target => {
@@ -59,7 +63,11 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
   test("a column lands as a note at its end, its composer as your message; a fresh column as its message; a slot as your inventory; a column no store holds as nothing", () => {
     const at = (t: PutTarget) => placeOfTarget(t, store.current(), ME)
     const end = { root: TEST_ROOT, at: E1, lane: LANE }
-    expect(at(targets[0] as PutTarget)).toEqual({ kind: "note", ...end })
+    expect(at(targets[0] as PutTarget)).toEqual({
+      kind: "note",
+      ...end,
+      cell: null,
+    })
     expect(at(targets[1] as PutTarget)).toEqual({
       kind: "fresh",
       column: "k-fresh",
