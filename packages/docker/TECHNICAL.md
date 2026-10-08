@@ -103,7 +103,9 @@ never reaches the VM's Docker or the launcher's ports.
   `DOCKER_HOST=unix:///run/user/1000/docker.sock`. It keeps setuid:
   rootless Docker's `newuidmap` needs it. Its command starts
   `pinetrie-inner-docker` (pine·trie's default image), which runs
-  `dockerd-rootless.sh` as `rootless` (uid 1000), then waits.
+  `dockerd-rootless.sh` as `rootless` (uid 1000), then waits. The command
+  runs at each start of the container, whose `/run` outlives a stop, so the
+  script first clears `/run/user/1000`: a stale pid file refused the daemon.
 - **The profile** (`seccomp-nested.json`) is `moby/profiles`' default, at the
   commit `UPSTREAM` names, without the three rules that refuse `clone` with
   namespace flags and `clone3` to a container without `CAP_SYS_ADMIN`, and

@@ -209,13 +209,13 @@ runtime keeps them). A suite's own helpers are beside its scenarios:
   write to a document still loading. If Kyneta's hydration stops calling
   `loadAll` first, nothing is delayed, and the mutation "the host serves
   before it has recovered" survives.
-- **A nested lane's inner Docker may be down when a run starts** (seen
-  2026-10-08): the lane's command starts it (`pinetrie-inner-docker`), and
-  a process does not outlive its run. Started again, it timed out on a
-  stale containerd pid under `/run/user/1000/docker`. Remove
-  `/run/user/1000/docker`, `/run/user/1000/docker.sock` and
-  `/run/user/1000/dockerd-rootless`, then run `pinetrie-inner-docker` in
-  the background; `docker info` answers within seconds.
+- **A nested lane's inner Docker starts afresh with its container**
+  (`pinetrie-inner-docker`, `packages/lanes/image/Containerfile`): `/run`
+  outlives a stopped container, so the script clears `/run/user/1000` first;
+  a pid file left from before the stop named a pid another process now held,
+  and the daemon refused to start (seen 2026-10-08). A lane made from an
+  image before that fix needs it by hand: remove `/run/user/1000`, then run
+  `pinetrie-inner-docker` in the background.
 - **A browser scenario closes its pages before its host stops, but
   `banner`.** A page holds Vite's HMR socket, and `banner` shuts its host
   down with its page still open, to check that the host stops anyway
