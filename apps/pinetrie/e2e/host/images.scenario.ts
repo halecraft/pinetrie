@@ -3,16 +3,16 @@
 import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { cardId, type ImageRef, type LaneName, ROOT } from "@pinetrie/core"
+import { type ImageRef, type LaneName, ROOT } from "@pinetrie/core"
 import { scriptedModel, sha256Of } from "@pinetrie/pi"
 import { openStore } from "../../host/store.ts"
 import type { Checks } from "../checks.ts"
 import {
+  composeAt,
   idleNow,
   join,
   laneNamesOf,
   queueCard,
-  rootAt,
   startSuiteHost,
   waitFor,
 } from "../harness.ts"
@@ -110,23 +110,12 @@ async function run(check: Checks["check"]): Promise<void> {
     await waitFor(() => paused.reached, 10_000)
     const queuedText = `@agent and this? ![green](/blob/${green.sha256})`
     const lane = laneNamesOf(ih)[0] as LaneName | undefined
-    const queued = cardId(crypto.randomUUID())
-    iu.createCard(
-      {
-        id: queued,
-        place: {
-          kind: "composing",
-          root: rootAt(iu, at(replyId)),
-          at: at(replyId),
-          lane: lane ?? null,
-        },
-        carries: { kind: "message", command: null },
-        unsent: null,
-      },
+    const queued = await composeAt(
+      iu,
+      { entry: replyId, lane: lane ?? null },
       queuedText,
     )
-    if (lane !== undefined)
-      void queueCard(iu, queued, { lane, at: at(replyId) })
+    if (lane !== undefined) void queueCard(iu, queued, lane)
     await waitFor(() => ih.cardText(queued) === queuedText, 5_000)
 
     paused.resume()
@@ -147,20 +136,10 @@ async function run(check: Checks["check"]): Promise<void> {
     // across a restart (ADR-0048).
     await upload(BLUE_PNG)
     const yellow = await upload(YELLOW_PNG)
-    const drafted = cardId(crypto.randomUUID())
     const draftedText = `next: ![yellow](/blob/${yellow.sha256})`
-    iu.createCard(
-      {
-        id: drafted,
-        place: {
-          kind: "composing",
-          root: rootAt(iu, at(idOfIn(ih, "a green one"))),
-          at: at(idOfIn(ih, "a green one")),
-          lane: null,
-        },
-        carries: { kind: "message", command: null },
-        unsent: null,
-      },
+    const drafted = await composeAt(
+      iu,
+      { entry: idOfIn(ih, "a green one"), lane: null },
       draftedText,
     )
     await waitFor(() => ih.cardText(drafted) === draftedText, 5_000)

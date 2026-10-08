@@ -127,10 +127,20 @@ suite's own helpers are beside its scenarios: `host/support.ts`,
   `rootRecordsOf`, `lanesOf`, `laneNamesOf`, `tipIn` and `entryMessageIn`
   read across them, as one.
 - **A scenario's client holds every root** (`holdEvery`, in `join`), and its
-  `chat` and `mark` wait until it holds the root of the entry they name: a
-  page holds only its tabs' roots, and writes only where it reads.
-- **A card's place at an entry names its root** (`rootAt`), from the host or
-  a client.
+  `chat` and `mark` wait until it holds the root of the entry they name
+  (`rootHeldWithin`): a page holds only its tabs' roots, and writes only
+  where it reads. On a timeout they send anyway, and the session's refusal
+  (`NO_ROOT`) comes back as their answer, not a throw.
+- **A card's place at an entry names its root.** On the host it is
+  `rootHolding`. From a client, a card is made with `composeAt`, which waits
+  until the client's copy has the entry (`waitForRootHolding`), then makes
+  the card in that root. Never name a root from a client's copy without
+  that wait: a client gets a run's entries after the host goes idle, so a
+  step that names a root right after an idle wait races sync. In a lane the
+  client lost that race every time, by about 10 ms (`tools`, step 6).
+- **The host's `docs.rootOfEntry` is another lookup**
+  (`apps/pinetrie/host/docs.ts`): the root whose *root entry* is the entry,
+  not the root holding it. A card's root is `rootHolding`'s.
 - **A scenario queues and unqueues through the harness** (`queueCard`,
   `unqueueCard`), as a column's plan does: each finds the card as its client
   draws it, builds the move with core's `moveOf` (into its lane's root,

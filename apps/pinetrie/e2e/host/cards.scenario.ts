@@ -6,6 +6,7 @@ import path from "node:path"
 import {
   type CardId,
   cardId,
+  type EntryId,
   entryId,
   type LaneName,
   ROOT,
@@ -34,7 +35,7 @@ import {
   lateFor,
   queueCard,
   refusedWrite,
-  rootAt,
+  rootHolding,
   startSuiteHost,
   tipIn,
   treeOf,
@@ -75,19 +76,19 @@ async function run(check: Checks["check"]): Promise<void> {
     }
     const cIdle = () => waitFor(() => idleNow(ch), 30_000)
     const onHost = (id: CardId) => readPlaces(ch.places).find(c => c.id === id)
-    const drafting = (end: string | null) =>
+    const drafting = (end: EntryId | null) =>
       ({
         kind: "composing",
-        root: rootAt(ch, at(end)),
+        root: rootHolding(ch, end),
         at: at(end),
         lane: null,
       }) as const
     /** A note at `end` (ADR-0113): shared, as your message is not. */
-    const noteAt = (end: string | null) =>
+    const noteAt = (end: EntryId | null) =>
       ({ ...drafting(end), kind: "note", cell: 0 }) as const
     const newCard = (
       who: SessionClient,
-      end: string | null,
+      end: EntryId | null,
       text: string,
       place: "composing" | "note" = "composing",
     ): CardId => {
@@ -221,7 +222,7 @@ async function run(check: Checks["check"]): Promise<void> {
     ada.cardText(c3).text.insert(13, " is ready")
     const c5 = newCard(ada, busyEnd, "@Bea never mind")
     await waitFor(() => ch.cardText(c5) === "@Bea never mind", 5_000)
-    void queueCard(ada, c5, { lane, at: at(busyEnd) })
+    void queueCard(ada, c5, lane)
     await waitFor(() => onHost(c5)?.place.kind === "queued", 5_000)
     void unqueueCard(ada, c5)
     await waitFor(
@@ -264,7 +265,7 @@ async function run(check: Checks["check"]): Promise<void> {
     // record can reach the host before its text (S96), and the pop waits.
     const idleEnd = tipOf()
     const c6 = newCard(ada, idleEnd, "@Bea while it is quiet")
-    void queueCard(ada, c6, { lane, at: at(idleEnd) })
+    void queueCard(ada, c6, lane)
     const popped = await waitFor(
       () =>
         Object.values(treeOf(ch).entries).some(
@@ -287,7 +288,7 @@ async function run(check: Checks["check"]): Promise<void> {
     const quickEnd = tipOf()
     const c7 = newCard(ada, quickEnd, "@Bea too quick")
     await waitFor(() => ch.cardText(c7) === "@Bea too quick", 5_000)
-    void queueCard(ada, c7, { lane, at: at(quickEnd) })
+    void queueCard(ada, c7, lane)
     void unqueueCard(ada, c7)
     const told = await waitFor(
       () =>
@@ -315,7 +316,7 @@ async function run(check: Checks["check"]): Promise<void> {
     await waitFor(() => ch.cardText(c8) === "@Bea wait for me", 5_000)
     ada.setTyping(typeEnd ?? "", c8)
     await waitFor(() => readTypingIn(ch.presence).has(c8), 5_000)
-    void queueCard(ada, c8, { lane, at: at(typeEnd) })
+    void queueCard(ada, c8, lane)
     await waitFor(() => onHost(c8)?.place.kind === "queued", 5_000)
     await ch.quiet()
     const waited = onHost(c8)?.place.kind === "queued"
@@ -352,7 +353,7 @@ async function run(check: Checks["check"]): Promise<void> {
         from: drafting(pinEnd),
         to: {
           kind: "pinned",
-          root: rootAt(ch, at(pinEnd)),
+          root: rootHolding(ch, pinEnd),
           at: at(pinEnd),
           lane: null,
         },
@@ -407,7 +408,7 @@ async function run(check: Checks["check"]): Promise<void> {
     ])
     const pinnedHere = {
       kind: "pinned",
-      root: rootAt(ch, at(editEnd)),
+      root: rootHolding(ch, editEnd),
       at: at(editEnd),
       lane: null,
       // The host gives it its order: a key carries none.
@@ -439,10 +440,10 @@ async function run(check: Checks["check"]): Promise<void> {
     // another while Ada reads that thread, which leaves none. The host learns
     // what Ada reads from presence alone.
     const traceEnd = tipOf()
-    const pinnedAt = (end: string | null) =>
+    const pinnedAt = (end: EntryId | null) =>
       ({
         kind: "pinned",
-        root: rootAt(ch, at(end)),
+        root: rootHolding(ch, end),
         at: at(end),
         lane: null,
       }) as const
@@ -460,7 +461,7 @@ async function run(check: Checks["check"]): Promise<void> {
       { card: away, from: noteAt(traceEnd), to: pinnedAt(traceEnd) },
       byBea,
     )
-    ada.setReading("k-ada", traceEnd ?? "", rootAt(ch, at(traceEnd)))
+    ada.setReading("k-ada", traceEnd ?? "", rootHolding(ch, traceEnd))
     await waitFor(
       () =>
         readReading(ch.presence).some(
@@ -587,12 +588,12 @@ async function run(check: Checks["check"]): Promise<void> {
     // Ada's second session undoes, in this root, the take into the inventory
     // her first session made here; her take in another root stays. An undo after Bea moved the
     // card is refused, naming Bea. A keep of three cards is one move.
-    const here = rootAt(ch, at(tipOf()))
+    const here = rootHolding(ch, tipOf())
     const other = await ada.chat("a root of its own", ROOT, { mode: "branch" })
     const otherEnd = other.kind === "appended" ? other.id : null
     const takeIntoInventory = (
       card: CardId,
-      end: string | null,
+      end: EntryId | null,
       slot: number,
     ) => ada.moveCard({ card, from: drafting(end), to: mine }, into(slot))
     const a1 = newCard(ada, tipOf(), "taken here")

@@ -39,13 +39,13 @@ import { IDENTITY_KEY } from "@pinetrie/web/storage-keys"
 import type { Page } from "@playwright/test"
 import type { Checks } from "../checks.ts"
 import {
+  composeAt,
   entriesOf,
   idleNow,
   join,
   lanesOf,
   moveRootTo,
   queueCard,
-  rootAt,
   rootRecordsOf,
   startSuiteHost,
   suiteModel,
@@ -843,24 +843,13 @@ async function run(check: Checks["check"]): Promise<void> {
       const beaLane = Object.keys(host.live.activeRuns())[0] as
         | LaneName
         | undefined
-      const beaEnd = atEntry(entryId(await tipOf0()))
-      const again = cardId(crypto.randomUUID())
-      other.createCard(
-        {
-          id: again,
-          place: {
-            kind: "composing",
-            root: rootAt(other, beaEnd),
-            at: beaEnd,
-            lane: beaLane ?? null,
-          },
-          carries: { kind: "message", command: null },
-          unsent: null,
-        },
+      const beaTip = entryId(await tipOf0())
+      const again = await composeAt(
+        other,
+        { entry: beaTip, lane: beaLane ?? null },
         "@agent Bea again",
       )
-      if (beaLane !== undefined)
-        void queueCard(other, again, { lane: beaLane, at: beaEnd })
+      if (beaLane !== undefined) void queueCard(other, again, beaLane)
       // Hers is queued first: a mutant that draws no queued card fails at
       // the check below, not here.
       await waitFor(

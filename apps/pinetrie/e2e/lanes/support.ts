@@ -11,7 +11,6 @@ import {
   atEntry,
   type CardCommand,
   type CardId,
-  cardId,
   entryId,
   type LaneName,
   messageText,
@@ -27,13 +26,13 @@ import { rowMessage } from "@pinetrie/schema"
 import type { SessionClient } from "@pinetrie/session"
 import {
   committedProject,
+  composeAt,
   E2E_RUNTIME,
   entriesOf,
   idleNow,
   join,
   lanesOf,
   queueCard,
-  rootAt,
   setUpAccepted,
   startSuiteHost,
   treeOf,
@@ -56,33 +55,23 @@ export const bringUpToDate = (
   lane: LaneName,
   tip: string | null,
   text: string,
-): CardId => queueCommand(session, lane, tip, text, "bring-up-to-date")
+): Promise<CardId> => queueCommand(session, lane, tip, text, "bring-up-to-date")
 
-/** A card with `command` and `text`, made at the thread's end and queued, as a command button does (ADR-0080). */
-export function queueCommand(
+/**
+ * A card with `command` and `text`, made at the thread's end once the
+ * session holds it (`composeAt`) and queued, as a command button does
+ * (ADR-0080).
+ */
+export async function queueCommand(
   session: SessionClient,
   lane: LaneName,
   tip: string | null,
   text: string,
   command: CardCommand,
-): CardId {
-  const id = cardId(crypto.randomUUID())
-  const where = at(tip)
-  session.createCard(
-    {
-      id,
-      place: {
-        kind: "composing",
-        root: rootAt(session, where),
-        at: where,
-        lane,
-      },
-      carries: { kind: "message", command },
-      unsent: null,
-    },
-    text,
-  )
-  void queueCard(session, id, { lane, at: where })
+): Promise<CardId> {
+  const entry = tip === null ? null : entryId(tip)
+  const id = await composeAt(session, { entry, lane, command }, text)
+  void queueCard(session, id, lane)
   return id
 }
 

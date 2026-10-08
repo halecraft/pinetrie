@@ -9,6 +9,13 @@ const checks = [
   "run",
   "apps/pinetrie/e2e/checks.test.ts",
 ]
+const harness = [
+  "pnpm",
+  "exec",
+  "vitest",
+  "run",
+  "apps/pinetrie/e2e/harness.test.ts",
+]
 const proofs = [
   "pnpm",
   "exec",
@@ -28,6 +35,14 @@ const scenarios = [
 ]
 
 export const mutations: readonly Mutation[] = [
+  {
+    name: "a client names an entry's root without waiting for its copy to have it",
+    file: "apps/pinetrie/e2e/harness.ts",
+    from: "  await waitFor(() => client.rootOf(entry) !== undefined, timeoutMs)\n",
+    to: "",
+    command: harness,
+    expect: "a client whose copy gets the entry after two polls: its root",
+  },
   {
     name: "a timeout kills only the direct child",
     file: "scripts/mutate.ts",

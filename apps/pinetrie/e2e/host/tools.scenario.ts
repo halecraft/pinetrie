@@ -6,7 +6,6 @@ import path from "node:path"
 import type { Store } from "@kyneta/exchange"
 import { subscribe } from "@kyneta/schema"
 import {
-  cardId,
   laneNameForThread,
   projectSpine,
   ROOT,
@@ -22,13 +21,13 @@ import { openStore } from "../../host/store.ts"
 import type { Checks } from "../checks.ts"
 import {
   committedProject,
+  composeAt,
   entriesOf,
   idleNow,
   join,
   lanesOf,
   noQueued,
   queueCard,
-  rootAt,
   rootRecordsOf,
   startSuiteHost,
   treeOf,
@@ -279,23 +278,12 @@ async function run(check: Checks["check"]): Promise<void> {
     const heldText = "@Bob queued across a restart"
     if (l6 !== undefined && l6.tip !== null) {
       beginRun(th.live, l6.name, runId("r-held"))
-      const held = cardId(crypto.randomUUID())
-      const where = at(l6.tip)
-      u.createCard(
-        {
-          id: held,
-          place: {
-            kind: "composing",
-            root: rootAt(u, where),
-            at: where,
-            lane: l6.name,
-          },
-          carries: { kind: "message", command: null },
-          unsent: null,
-        },
+      const held = await composeAt(
+        u,
+        { entry: l6.tip, lane: l6.name },
         heldText,
       )
-      void queueCard(u, held, { lane: l6.name, at: where })
+      void queueCard(u, held, l6.name)
       await waitFor(
         () =>
           th.cardText(held) === heldText &&

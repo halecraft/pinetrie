@@ -721,7 +721,7 @@ async function mainSection(
     }
     const landBefore = landOf()
     if (two !== undefined)
-      bringUpToDate(wu, two.name, laneTip(two.name), intent)
+      await bringUpToDate(wu, two.name, laneTip(two.name), intent)
     await waitFor(() => {
       const land = landOf()
       return land !== null && land !== landBefore
@@ -884,7 +884,12 @@ async function mainSection(
     )
     script.use([{ text: "it fits" }])
     if (two !== undefined)
-      bringUpToDate(wu, two.name, laneTip(two.name), "check yours still fits")
+      await bringUpToDate(
+        wu,
+        two.name,
+        laneTip(two.name),
+        "check yours still fits",
+      )
     await waitFor(() => idOf("it fits") !== null, 60_000)
     await idle()
     const afterUpdate = projectTranscript(
@@ -945,7 +950,7 @@ async function mainSection(
     const split =
       lane2 === undefined
         ? null
-        : queueCommand(wu, lane2, laneTip(lane2), "", "split")
+        : await queueCommand(wu, lane2, laneTip(lane2), "", "split")
     await idle()
     const stacked = await waitFor(() => offerOf()?.size === 2, 30_000)
     const squashed =

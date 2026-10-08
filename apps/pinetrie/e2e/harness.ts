@@ -19,8 +19,11 @@ import path from "node:path"
 import { NotAWriterError } from "@kyneta/exchange"
 import { subscribe } from "@kyneta/schema"
 import {
+  atEntry,
+  type CardCommand,
   type CardId,
   type CardRecord,
+  cardId,
   type EntryId,
   errorText,
   type LaneName,
@@ -157,11 +160,12 @@ export const join = async (
   })
   holdEvery(client)
   // A scenario writes at an entry another client has just made: wait until
-  // this one holds its root, as a page shows only what it holds.
+  // this one holds its root, as a page shows only what it holds. On a
+  // timeout it sends anyway, and the session refuses it (`NO_ROOT`).
   const holds = (at: Position) =>
     at.kind === "root"
-      ? Promise.resolve(0)
-      : waitFor(() => client.rootOf(at.id) !== undefined, 10_000)
+      ? Promise.resolve(undefined)
+      : rootHeldWithin(client, at.id, 10_000)
   const { chat, mark } = client
   return Object.assign(client, {
     chat: async (...args: Parameters<SessionClient["chat"]>) => {
@@ -440,19 +444,23 @@ export function moveRootTo(
 }
 
 /**
- * Queue `id` on `lane` from `at`, as a column's queue does: in its lane's
- * root (`queueRoot`), with its text's version as `client` has it (S96).
+ * Queue `id` on `lane` from where it is, as a column's queue does: in its
+ * lane's root (`queueRoot`), at the card's own position, with its text's
+ * version as `client` has it (S96). Throws for a card with no position.
  */
 export function queueCard(
   client: SessionClient,
   id: CardId,
-  to: { readonly lane: LaneName; readonly at: Position },
+  lane: LaneName,
 ): ReturnType<SessionClient["queueCard"]> {
   const card = drawnCard(client, id)
-  const root = queueRoot(to.lane, card, readLaneRecords(client.session))
+  if (!("at" in card.place))
+    throw new Error(`${id} has no position to queue from`)
+  const { at } = card.place
+  const root = queueRoot(lane, card, readLaneRecords(client.session))
   if (root === undefined) throw new Error(`no root to queue ${id} in`)
   return client.queueCard(
-    moveOf(card, { kind: "queued", root, at: to.at, lane: to.lane, seen: "" }),
+    moveOf(card, { kind: "queued", root, at, lane, seen: "" }),
     "keep",
   )
 }
@@ -506,23 +514,88 @@ export const entryMessageIn = (
 }
 
 /**
- * The root a host or a client holds `at` in: where a card drafting there is
- * (ADR-0063).
+ * The root whose document holds `entry` on the host: where a card at that
+ * entry goes (ADR-0063). Throws when no root it holds has the entry, or when
+ * there is no entry (a lane with no tip yet).
  */
-export function rootAt(
-  x: Pick<RunningHost, "docs"> | Pick<SessionClient, "rootOf">,
-  at: Position,
+export function rootHolding(
+  host: Pick<RunningHost, "docs">,
+  entry: EntryId | null,
 ): RootId {
-  const id = at.kind === "entry" ? at.id : null
   const root =
-    id === null
+    entry === null
       ? undefined
-      : "docs" in x
-        ? x.docs
-            .loaded()
-            .find(r => x.docs.view(r)?.doc.entries.get(id) !== undefined)
-        : x.rootOf(id)
+      : host.docs
+          .loaded()
+          .find(r => host.docs.view(r)?.doc.entries.get(entry) !== undefined)
   if (root === undefined)
-    throw new Error(`no root held here has ${JSON.stringify(at)}`)
+    throw new Error(`no root the host holds has the entry ${entry}`)
   return root
+}
+
+/**
+ * The root holding `entry` in the client's copy, waiting up to `timeoutMs`
+ * for the copy to have it; undefined when it never does. A client gets the
+ * host's writes a little after the host makes them: in a lane, a run's
+ * entries arrived about 10 ms after the host went idle.
+ */
+async function rootHeldWithin(
+  client: Pick<SessionClient, "rootOf">,
+  entry: EntryId,
+  timeoutMs: number,
+): Promise<RootId | undefined> {
+  await waitFor(() => client.rootOf(entry) !== undefined, timeoutMs)
+  return client.rootOf(entry)
+}
+
+/**
+ * The root holding `entry` in the client's copy, once that copy has it
+ * (`rootHeldWithin`). Throws after `timeoutMs`, or when there is no entry.
+ * Scenarios reach it through `composeAt`.
+ */
+export async function waitForRootHolding(
+  client: Pick<SessionClient, "rootOf">,
+  entry: EntryId | null,
+  timeoutMs = 10_000,
+): Promise<RootId> {
+  const root =
+    entry === null ? undefined : await rootHeldWithin(client, entry, timeoutMs)
+  if (root === undefined)
+    throw new Error(`no root this client holds has the entry ${entry}`)
+  return root
+}
+
+/**
+ * A card composing at `entry`, made by `client` once its copy has the
+ * entry, so its place names the root holding it. The caller queues it
+ * (`queueCard`) when the card is to be sent.
+ */
+export async function composeAt(
+  client: Pick<SessionClient, "rootOf" | "createCard">,
+  place: {
+    readonly entry: EntryId | null
+    readonly lane: LaneName | null
+    readonly command?: CardCommand | null
+  },
+  text: string,
+): Promise<CardId> {
+  const { entry } = place
+  if (entry === null) throw new Error("no entry to compose a card at")
+  const root = await waitForRootHolding(client, entry)
+  const id = cardId(crypto.randomUUID())
+  void client.createCard(
+    {
+      id,
+      place: {
+        kind: "composing",
+        root,
+        at: atEntry(entry),
+        lane: place.lane,
+      },
+      carries: { kind: "message", command: place.command ?? null },
+      unsent: null,
+    },
+    text,
+  )
+  return id
 }
