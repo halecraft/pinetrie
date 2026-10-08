@@ -17,6 +17,7 @@ import { buildLauncher, gatherLauncher } from "./launcher.ts"
 import {
   imageDir,
   imageKey,
+  OLD_LAUNCHER_WORDS,
   planShares,
   planVm,
   planVmVersion,
@@ -135,6 +136,10 @@ export async function leaseVm(input: LeaseInput): Promise<Lease> {
   const { lease, want, canStart } = await leaseOnce(input)
   const version = planVmVersion(lease.identity, want)
   if (version.kind === "current") return lease
+  if (version.kind === "old-launcher") {
+    input.log(`[vm] ${OLD_LAUNCHER_WORDS}`)
+    return lease
+  }
   if (version.kind === "stale") {
     input.log(`[vm] ${staleVmWords(version.leases, want.image)}`)
     return lease
@@ -263,7 +268,12 @@ export async function vmProblem(stateDir: string): Promise<string | null> {
 
 export async function leaseOn(
   socket: net.Socket,
-  input: { readonly agent: string | null; readonly log: (l: string) => void },
+  input: {
+    readonly agent: string | null
+    readonly log: (l: string) => void
+    /** How long a lease's reply may take: 30 s unless a test says. */
+    readonly replyMs?: number
+  },
 ): Promise<Lease> {
   const lines = createInterface({ input: socket })
   const queue: FromLauncher[] = []
@@ -284,21 +294,40 @@ export async function leaseOn(
     }),
   )
   socket.on("error", () => {})
-  const next = (): Promise<FromLauncher | null> =>
-    queue.length > 0
-      ? Promise.resolve(queue.shift() ?? null)
-      : ended
-        ? Promise.resolve(null)
-        : new Promise(resolve => waiters.push(resolve))
-  const reply = async (): Promise<FromLauncher> => {
-    const m = await next()
+  /**
+   * The launcher's next message, or null when the lease ended. Waits at most
+   * `ms`, then fails naming `what`: a launcher that never answers must not
+   * hang the host's start.
+   */
+  const next = (what: string, ms: number): Promise<FromLauncher | null> => {
+    if (queue.length > 0) return Promise.resolve(queue.shift() ?? null)
+    if (ended) return Promise.resolve(null)
+    return new Promise((resolve, reject) => {
+      const waiter = (m: FromLauncher | null) => {
+        clearTimeout(timer)
+        resolve(m)
+      }
+      const timer = setTimeout(() => {
+        waiters.splice(waiters.indexOf(waiter), 1)
+        reject(
+          new Error(
+            `the lane VM's launcher did not answer ${what} in ${ms / 1000} s`,
+          ),
+        )
+      }, ms)
+      waiters.push(waiter)
+    })
+  }
+  const reply = async (what: string, ms: number): Promise<FromLauncher> => {
+    const m = await next(what, ms)
     if (m === null) throw new Error("the lane VM's launcher closed the lease")
     if (m.kind === "refused") throw new VmRefused(launcherWords(m))
     return m
   }
 
+  input.log("[vm] asking the lane VM's launcher for a slot")
   socket.write(encode({ kind: "lease", agent: input.agent }))
-  const slot = await reply().catch(error => {
+  const slot = await reply("a lease", input.replyMs ?? 30_000).catch(error => {
     socket.destroy()
     throw error
   })
@@ -325,7 +354,7 @@ export async function leaseOn(
     async retire() {
       closing = true
       socket.write(encode({ kind: "retire" }))
-      const m = await next()
+      const m = await next("a retire", 60_000)
       if (m?.kind === "refused") {
         closing = false
         throw new VmRefused(launcherWords(m))
@@ -337,7 +366,7 @@ export async function leaseOn(
       filled = true
       const shares = planShares(slot.slot, dirs)
       socket.write(encode({ kind: "fill", entries: shares.entries }))
-      const m = await reply()
+      const m = await reply("a fill", 30_000)
       if (m.kind !== "filled")
         throw new Error("the lane VM did not fill the slot")
       return { pathOf: shares.pathOf }

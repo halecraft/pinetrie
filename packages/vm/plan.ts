@@ -181,6 +181,8 @@ export type VmVersion =
   | { readonly kind: "retire" }
   /** Out of date, but other hosts' lanes run on it: join it, and say so. */
   | { readonly kind: "stale"; readonly leases: number }
+  /** A launcher older than `retire`: join it, and say how to replace it. */
+  | { readonly kind: "old-launcher" }
 
 /**
  * Whether a running VM is the one this host would start: its image and its
@@ -189,18 +191,23 @@ export type VmVersion =
  */
 export function planVmVersion(
   running: {
-    readonly image: string
-    readonly launcher: string
-    readonly leases: number
+    readonly image: string | null
+    readonly launcher: string | null
+    readonly leases: number | null
   },
   want: { readonly image: string; readonly launcher: string },
 ): VmVersion {
+  if (running.leases === null) return { kind: "old-launcher" }
   if (running.image === want.image && running.launcher === want.launcher)
     return { kind: "current" }
   return running.leases <= 1
     ? { kind: "retire" }
     : { kind: "stale", leases: running.leases }
 }
+
+/** A host joining a VM whose launcher cannot be asked to retire, in its log. */
+export const OLD_LAUNCHER_WORDS =
+  "the lane VM's launcher is older than this host's and cannot be replaced from here: this host joins it. To replace it, stop every pine·trie host, then `pkill -TERM -f 'pinetrie/vm/bin/launcher-'`; it also stops by itself 10 minutes after its last host"
 
 /** A host joining an out-of-date VM, in its log. */
 export const staleVmWords = (leases: number, image: string): string =>

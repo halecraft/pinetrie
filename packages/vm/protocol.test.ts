@@ -54,3 +54,14 @@ test("an unknown kind, an unknown reason, or a malformed field is refused", () =
   ).toBeNull()
   expect(decodeToLauncher('{"kind":"shell","cmd":"sh"}')).toBeNull()
 })
+
+test("a slot from a launcher older than the VM's identity is read, its identity null", () => {
+  expect(decodeFromLauncher('{"kind":"slot","slot":1,"docker":"/d"}')).toEqual({
+    kind: "slot",
+    slot: 1,
+    docker: "/d",
+    image: null,
+    launcher: null,
+    leases: null,
+  })
+})

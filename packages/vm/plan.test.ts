@@ -161,6 +161,11 @@ describe("planVmVersion: join a current VM; replace an old one only when no othe
       planVmVersion({ ...want, launcher: "launcher-old", leases: 1 }, want),
     ).toEqual({ kind: "retire" })
   })
+  test("a launcher older than its identity: join it, and say how to replace it", () => {
+    expect(
+      planVmVersion({ image: null, launcher: null, leases: null }, want),
+    ).toEqual({ kind: "old-launcher" })
+  })
   test("older, with other hosts on it: join it, and say so", () => {
     const v = planVmVersion({ ...want, image: "old", leases: 3 }, want)
     expect(v).toEqual({ kind: "stale", leases: 3 })

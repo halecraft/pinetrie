@@ -150,4 +150,28 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "each message is one line, and decodes to itself",
   },
+  {
+    name: "a slot from an older launcher is not read, and the host waits for it",
+    file: "packages/vm/protocol.ts",
+    from: '      if (!Number.isInteger(v.slot) || typeof v.docker !== "string")',
+    to: '      if (!Number.isInteger(v.slot) || typeof v.docker !== "string" || typeof v.image !== "string")',
+    command: unit,
+    expect: "a slot from a launcher older than the VM's identity is read",
+  },
+  {
+    name: "an older launcher is asked to retire",
+    file: "packages/vm/plan.ts",
+    from: '  if (running.leases === null) return { kind: "old-launcher" }\n',
+    to: "",
+    command: unit,
+    expect: "a launcher older than its identity: join it",
+  },
+  {
+    name: "a launcher's reply has no deadline",
+    file: "packages/vm/lease.ts",
+    from: "      }, ms)\n",
+    to: "      }, ms * 1000)\n",
+    command: unit,
+    expect: "a launcher that never answers fails the lease in time",
+  },
 ]

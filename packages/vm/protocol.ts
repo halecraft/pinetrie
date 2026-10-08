@@ -36,14 +36,17 @@ export type LauncherRefusal =
   | { readonly reason: "busy"; readonly leases: number }
   | { readonly reason: "unreadable" }
 
-/** What a running VM was started from, and who holds it. */
+/**
+ * What a running VM was started from, and who holds it. Null throughout from
+ * a launcher older than these fields, which cannot be asked to retire.
+ */
 export interface VmIdentity {
   /** The image's key: its directory's name (`imageKey`). */
-  readonly image: string
+  readonly image: string | null
   /** The launcher binary's name (`launcherName`). */
-  readonly launcher: string
+  readonly launcher: string | null
   /** Leases held, this one included. */
-  readonly leases: number
+  readonly leases: number | null
 }
 
 export type FromLauncher =
@@ -71,21 +74,22 @@ export function decodeFromLauncher(line: string): FromLauncher | null {
   }
   if (!isRecord(v)) return null
   switch (v.kind) {
-    case "slot":
-      return Number.isInteger(v.slot) &&
-        typeof v.docker === "string" &&
+    case "slot": {
+      if (!Number.isInteger(v.slot) || typeof v.docker !== "string") return null
+      // A launcher older than the VM's identity sends none of it.
+      const named =
         typeof v.image === "string" &&
         typeof v.launcher === "string" &&
         Number.isInteger(v.leases)
-        ? {
-            kind: "slot",
-            slot: Number(v.slot),
-            docker: v.docker,
-            image: v.image,
-            launcher: v.launcher,
-            leases: Number(v.leases),
-          }
-        : null
+      return {
+        kind: "slot",
+        slot: Number(v.slot),
+        docker: v.docker,
+        image: named ? String(v.image) : null,
+        launcher: named ? String(v.launcher) : null,
+        leases: named ? Number(v.leases) : null,
+      }
+    }
     case "filled":
       return { kind: "filled" }
     case "refused":

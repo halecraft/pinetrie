@@ -130,6 +130,13 @@ only `@pinetrie/core` and knows nothing of lanes (`workspace.test.ts`).
   that cannot start the current VM (no image, no Xcode tools) joins the old
   one and says what is missing. Without this, a host after an update joined
   the VM left running by the last one, for up to its 10 idle minutes.
+- **A launcher older than the VM's identity** sends a `slot` without it:
+  read with a null identity (`VmIdentity`), joined, and the log says how to
+  replace it, since it cannot take `retire`. A decoder that dropped such a
+  reply left a host waiting for a slot that never came, with nothing logged.
+- **Every launcher reply has a deadline:** 30 s for a lease or a fill, 60 s
+  for a retire; past it the host fails naming what it waited for. The host
+  logs before it asks for a slot.
 - **A host keeps its lease** (`keepLease`): one that ends without the host
   closing it (its launcher stopped or died) is leased again, which starts a
   VM, with a wait doubling from 1 s to 30 s; the slot is swept and filled

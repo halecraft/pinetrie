@@ -160,3 +160,12 @@ test("retire: the launcher stops and ends the lease, or refuses while others hol
     "2 other hosts hold leases",
   )
 })
+
+test("a launcher that never answers fails the lease in time, naming what it waited for", async () => {
+  const l = await standIn(() => null)
+  const socket = await connect(l.control)
+  if (socket === null) throw new Error("no stand-in")
+  await expect(
+    leaseOn(socket, { agent: null, log, replyMs: 100 }),
+  ).rejects.toThrow("did not answer a lease in 0.1 s")
+})
