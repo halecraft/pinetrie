@@ -12,6 +12,8 @@
     `offers` is replaced by `accepted`, `wip` and `publish`.
   - ADR-0099: `offers.catchUp` is `publish.catchUp`, and `publishCatchesUp` in
     code.
+- **Amended by:**
+  - ADR-0118: accepted work is a branched source's.
 
 **Context.** ADR-0090 made the page say **accepted work** and **accept**,
 and left the code saying *the line* and *integrate*, and the repo and the

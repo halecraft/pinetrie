@@ -1,11 +1,14 @@
 # ADR-0046 — A lane's agent is told where it is: a short block in every prompt, and a note it reads when it needs it
 
-- **Status:** Accepted
+- **Status:** Superseded
 - **Area:** `packages/lanes/TECHNICAL.md`, `packages/pi/TECHNICAL.md`
 - **Evidence:** S23, S56
 - **Amends:**
   - ADR-0034: a lane's agent is told what holds in every lane, and no port
     proxy is built.
+- **Superseded by:**
+  - ADR-0121: restated whole, with what ADR-0048, ADR-0064 and ADR-0103
+    changed in it folded in.
 - **Amended by:**
   - ADR-0048: every agent thread's `<rules>`, a lane of its own or not, holds
     one more fixed line, first: the team pins cards to say what it wants from

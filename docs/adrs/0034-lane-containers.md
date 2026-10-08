@@ -27,6 +27,9 @@
   - ADR-0103: its runtime is superseded: lanes are Docker containers on btrfs
     snapshots, in a VM of pine·trie's own on the Mac and on the host on Linux;
     the trim container goes. The rest stands.
+  - ADR-0118: a source is a grant, and a lane may have several disks.
+  - ADR-0119: a lane at rest is its revisions; what else is on its disk is
+    rebuildable.
 
 **Context.** ADR-0032 gave each lane a jj workspace on the host and made a
 branch's inherited history read as if it had always worked there, by

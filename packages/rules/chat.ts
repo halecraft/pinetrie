@@ -5,7 +5,7 @@
 // message with its `content`, so `content` carries the speaker ("Alice: …")
 // and needs no projector. A message that compels the agent IS the agent's
 // prompt, so its thread's lane runs it; one that compels nobody is appended
-// with no run (ADR-0020). Who a message is for comes from its mentions, then
+// with no run (ADR-0120). Who a message is for comes from its mentions, then
 // from whether its thread has a lane (`address`, ADR-0021).
 //
 // `details` holds the structured fields, which readers decode here and never

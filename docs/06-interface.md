@@ -23,7 +23,7 @@ This document fixes the design before any code. It draws E and T directly.
 3. **No thread is special.** The data has no "main thread"; the interface should
    not invent one. Whatever you put first is what reads as the trunk. Roots
    are peers too: you open the ones you work in, in the sidebar (ADR-0030,
-   ADR-0112).
+   ADR-0122).
 4. **Show context, don't describe it.** What the agent will read is a path: the
    column shows it, and marks where the agent joined.
 5. **Say the effect, not a mode name.** "send to agent" says what
@@ -52,9 +52,9 @@ This document fixes the design before any code. It draws E and T directly.
 
 There is no header: the columns start at the top of the window. The page's
 one row of chrome is the footer, and it splits where the sidebar's edge does:
-under the sidebar, what is yours; to the right, what is everyone's (ADR-0112).
+under the sidebar, what is yours; to the right, what is everyone's (ADR-0122).
 
-### The sidebar: the roots you have open (ADR-0030, ADR-0045, ADR-0077, ADR-0112)
+### The sidebar: the roots you have open (ADR-0030, ADR-0045, ADR-0077, ADR-0122)
 
 Down the left edge: the roots you have open, in your order, then new tabs,
 then ＋. It is darker than the page, and the root you are on is the page's
@@ -130,7 +130,7 @@ beside it (ADR-0081, turned sideways).
     icon.
   - **＋** stands over its ▾.
 
-### The footer: you, your inbox, and the board (ADR-0069, ADR-0077, ADR-0112, ADR-0091, ADR-0098)
+### The footer: you, your inbox, and the board (ADR-0069, ADR-0077, ADR-0122, ADR-0091, ADR-0098)
 
 One row along the bottom. Its own cell, under the sidebar and as wide, is
 yours: your avatar and name on the left, then your inbox and your inventory
@@ -256,7 +256,7 @@ nothing; Ctrl+Shift+L still folds the sidebar.
     Enter or **save**, which says **saved** once it is; a name no mention
     could reach is refused before it is sent.
 
-### The board: where everyone's work stands (ADR-0112)
+### The board: where everyone's work stands (ADR-0122)
 
 ▦, or a state in the strip, opens the board over the columns, from the
 footer's edge: it moves none of them. ▦ again, Escape (once a filter is
@@ -669,7 +669,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   at the end of the sidebar, labelled "new agent" or "new conversation", and
   closing it leaves no trace. Its first send makes the root, which joins
   the sidebar and the board: at the end of the first open state from your
-  list's ＋, of its own state from a board column's (ADR-0112). Others find
+  list's ＋, of its own state from a board column's (ADR-0122). Others find
   it on the board, and see you in it there.
 - **An empty session** shows the board, with nothing in it, and ＋.
 - **A page with nothing in the sidebar** (a first visit, or a list you
@@ -992,18 +992,18 @@ The rail is E; the column is T. Seeing both at once is the product.
 | every tree in one rail, one after another | one root at a time, with its own rail (ADR-0029) |
 | a column on another root, with no stripe and no fork dot | nothing: the columns you see share their root |
 | the rail's `+`, and Start Chat and Start Agent in place of a composer | ＋: agent, or conversation |
-| a tab bar shared by everyone, with no close for yourself | the sidebar, yours on every device, with **×** (ADR-0030, ADR-0112) |
-| a new root by anyone appearing as a tab | the board shows it, and who is in it; you open it (ADR-0112) |
-| the Archive tab, and the header's people | the board: every root in a workflow state, Done the archive (ADR-0112) |
+| a tab bar shared by everyone, with no close for yourself | the sidebar, yours on every device, with **×** (ADR-0030, ADR-0122) |
+| a new root by anyone appearing as a tab | the board shows it, and who is in it; you open it (ADR-0122) |
+| the Archive tab, and the header's people | the board: every root in a workflow state, Done the archive (ADR-0122) |
 
 The last row mattered for `PLAN-2026-09-26-thread-lanes`: with no control moving
 a lane, the `navigate` command had no caller and was deleted with `prompt` and
-`branch`. Lanes now never move at all (ADR-0020).
+`branch`. Lanes now never move at all (ADR-0120).
 
 ## Data
 
 Every part of this is a read of what the document already holds, except the
-board's records (ADR-0112); a card's text is its own document (ADR-0048).
+board's records (ADR-0122); a card's text is its own document (ADR-0048).
 
 - **A column** is a client-local anchor entry. Its path is `projectTranscript`
   of `followTip(anchor)`, or, once it is bound to a lane, of the lane's tip;
@@ -1012,7 +1012,7 @@ board's records (ADR-0112); a card's text is its own document (ADR-0048).
   creation order (uuidv7).
 - **A thread's mode** is its lane; **names** are `pinetrie.participant` values.
 - **A root** is a root of the tree index (an orphan counts as one). **Your
-  list** is your own document (`open:<you>`, ADR-0112), each root's id to an
+  list** is your own document (`open:<you>`, ADR-0122), each root's id to an
   order key, written only by your tabs: the roots in it that are not
   archived, plus the root you are on.
 - **The board and the footer** read presence (people, and the thread each
@@ -1021,7 +1021,7 @@ board's records (ADR-0112); a card's text is its own document (ADR-0048).
   attention document (`attention:<you>`, ADR-0077), on every device of
   yours: an entry id (`mentionsSince`), at or before which every mention is
   seen, and the ids of later ones you have seen.
-- **The board** is two host-written records (ADR-0112): the workflow
+- **The board** is two host-written records (ADR-0122): the workflow
   (`pinetrie.workflow`, the open states in order and the closed one) and each
   root's place (`pinetrie.board`, by its id: its state, its rank there, who
   moved it and when). A root in the closed state is archived; the host
@@ -1029,10 +1029,20 @@ board's records (ADR-0112); a card's text is its own document (ADR-0048).
 - **Which root you are on, each root's columns, new tabs and whether the
   board is open** are view state, kept in the browser per browser tab, with
   the device's latest for a new one, and never in the document (ADR-0027,
-  amended by ADR-0029, ADR-0030 and ADR-0112).
+  amended by ADR-0029, ADR-0030 and ADR-0122).
 
 ## Deferred, but designed for
 
+- **Tasks and the canvas** (ADR-0116), accepted, not yet built: the board would hold
+  tasks, and a task's canvas would lay out what it holds as columns, in an
+  order everyone shares, each folded only for whoever folds it: threads
+  from any root under a rail that draws a forest, note columns in place of
+  each thread's notes board, file cards showing a source's file, and
+  media. Each thread's agent would be told what is on its canvas.
+- **Threads as cards** (ADR-0117), accepted, not yet built: a thread would have an id and
+  one place, in a task or an inventory; taking it would move its card, not
+  its run; copying it would branch at its end, and a copy's fork row would
+  lead back to its source, or say who has it.
 - **What is left of cards and the dock** (ADR-0111, ADR-0113): a thread
   card's body on the board drawn from its pinned cards' first lines (today
   its first line, under a title); and the notes line's avatars as the
@@ -1040,7 +1050,7 @@ board's records (ADR-0112); a card's text is its own document (ADR-0048).
   presence field of its own.
 - **Narrow screens**: the stacked sequence described above, with the sidebar
   collapsed to each root's banner (ADR-0050, ADR-0053) and the footer to ▦,
-  what needs you and you (ADR-0112); built after the wide layout works. The
+  what needs you and you (ADR-0122); built after the wide layout works. The
   column's pane is its first step (ADR-0078): over a narrow window it covers
   the page, and ← goes back to the thread. Below 56rem the sidebar narrows and
   the strip shows its first states only.

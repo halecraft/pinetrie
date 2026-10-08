@@ -39,7 +39,7 @@ const HELD = laneNameForThread("01a0f9eb-86e1-77ad-a822-2a306786223f")
 const NEW = laneNameForThread("01a0f9eb-86e1-77ad-a822-2a3067862240")
 const [DOING, DONE] = [workflowStateIdFor("d"), workflowStateIdFor("x")]
 
-/** The test's root in `state` on a board of Doing and Done (ADR-0112). */
+/** The test's root in `state` on a board of Doing and Done (ADR-0122). */
 const placeRoot = (b: ReturnType<typeof basics>, state: typeof DOING) => {
   putValue(
     b,

@@ -20,6 +20,8 @@
   - ADR-0102: there is no direct lane, and no direct work strip.
   - ADR-0113: the work strip moves from the column's foot to a row of its
     header.
+  - ADR-0117: a fork row names a copy's source, or a parent thread in another
+    task.
 
 **Context.** A column's header was one row holding everything the column knew
 about itself: the grip, "from Ada: …" (or "thread", "new chat", "new · with

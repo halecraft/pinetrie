@@ -52,7 +52,7 @@ export interface ColumnSlot {
 export type Workspace =
   /** Before the first `prune`: nothing is chosen yet. */
   | { readonly kind: "connecting" }
-  /** No root and no new tab: the board, and ＋ (ADR-0112). */
+  /** No root and no new tab: the board, and ＋ (ADR-0122). */
   | { readonly kind: "nothing" }
   | {
       readonly kind: "root"
@@ -74,7 +74,7 @@ export interface AppViewInput {
   readonly columns: readonly Column[]
   /** `branchColors(rail, views).track`, memoised by `App`. */
   readonly tracks: readonly number[]
-  /** The roots in the closed state, by root entry (ADR-0112). */
+  /** The roots in the closed state, by root entry (ADR-0122). */
   readonly archived: ReadonlyMap<EntryId, ArchivedRoot>
   readonly workflow: Workflow | null
   readonly nameOf: ReadonlyMap<WriterId, string>
@@ -202,7 +202,7 @@ export const hereRail = (
   active?.kind === "root" ? projectRail(index, active.root) : []
 
 /**
- * What an archived root's column says and offers (ADR-0112): who moved it to
+ * What an archived root's column says and offers (ADR-0122): who moved it to
  * the closed state, and Restore, which moves it to the first open state.
  */
 export function readOnlyWords(

@@ -6,7 +6,7 @@
     <title>pine·trie</title>
     <style>
       /* --page is the paper the columns are on, --chrome the darker list and
-         footer around it (ADR-0081, ADR-0112). --surface is whatever a thing
+         footer around it (ADR-0081, ADR-0122). --surface is whatever a thing
          sits on, set by its context: a ring that must read as a gap around a
          dot uses it. --side is the sidebar's width, which the footer's own
          cell shares, so the two split along one line; folded to icons, it is
@@ -21,7 +21,7 @@
       .actions button, .tools button { background: none; border: 1px solid #3a3f48; color: #aaa;
         padding: .05rem .45rem; border-radius: 3px; }
       /* The sidebar down the left, the workspace beside it, and the footer under
-         both (ADR-0112). There is no header: the columns start at the top. */
+         both (ADR-0122). There is no header: the columns start at the top. */
       body {
         margin: 0; height: 100vh; display: grid;
         grid-template-columns: var(--side) minmax(0, 1fr);
@@ -34,7 +34,7 @@
       h1 { font-size: 1rem; letter-spacing: .08em; text-transform: uppercase; color: #8b93a1; margin: 0 0 .25rem; }
 
 
-      /* The sidebar (ADR-0112): your open roots, in your order, then new tabs,
+      /* The sidebar (ADR-0122): your open roots, in your order, then new tabs,
          then ＋. Its right edge is an inset shadow: a descendant's fill paints
          over it, so the root you are on, filled with the page's colour,
          opens into the page beside it (ADR-0081, turned sideways). An item is
@@ -897,7 +897,7 @@
       #strip:has(.column-head[data-color="pending"]:hover) .fork-dot[data-color="pending"],
       #strip:has(.fork-dot[data-color="pending"]:hover) .column-head[data-color="pending"] {
         outline: 2px solid var(--track); outline-offset: 2px; }
-      /* The footer (ADR-0112): one row of chrome, split where the sidebar's edge
+      /* The footer (ADR-0122): one row of chrome, split where the sidebar's edge
          is. Its own cell, at the list's width, is yours: you, your inbox
          (ADR-0091) and your inventory (ADR-0098). Then everyone's: the board's strip,
          with where the agent works and what is ready to accept, "syncing…"
@@ -969,7 +969,7 @@
       .reader-trigger { display: inline-flex; align-items: center; gap: .3rem;
         padding: .1rem .3rem; background: none; color: #ddd; border-radius: 999px; }
       .reader-trigger .initial { width: 22px; height: 22px; line-height: 22px; font-size: 12px; }
-      /* The board, open (ADR-0112): over the columns, from the footer's edge,
+      /* The board, open (ADR-0122): over the columns, from the footer's edge,
          moving none of them. A column per open state, and the closed
          state's, marked ✓, with its count and rows; they scroll,
          and the filter's banner stays at the foot (ADR-0115). */

@@ -18,6 +18,9 @@
   - ADR-0112: a note dropped on a workflow state in the footer's strip, or in
     the sidebar, becomes a new thread; a held queue is not work, so it draws
     no ring.
+- **Amended by:**
+  - ADR-0116: notes are in note columns, the task's; the notes board and the
+    dock's notes line go.
 
 **Context.**
 

@@ -173,7 +173,7 @@ export type Status =
 /**
  * The highest level among `roots` (`highest`): what one mark says for them
  * all. The one rule for a root's item, a board column's dot and ▦'s, which
- * covers the roots not in the sidebar (ADR-0112). Working raises nothing.
+ * covers the roots not in the sidebar (ADR-0122). Working raises nothing.
  */
 export const markOf = (
   status: ReadonlyMap<EntryId, Status>,

@@ -133,7 +133,7 @@ export async function sweepHistories(input: {
 
 /**
  * Delete the holds on queues nobody can use (ADR-0048 step 7): gather the
- * holds, each lane's root and the roots in the closed state (ADR-0112), plan (`planHoldSweep`), then
+ * holds, each lane's root and the roots in the closed state (ADR-0122), plan (`planHoldSweep`), then
  * delete them in one write. Archiving is refused while cards are queued, so
  * a hold swept holds nothing.
  */

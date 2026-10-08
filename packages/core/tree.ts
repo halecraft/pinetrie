@@ -776,7 +776,7 @@ export function latestTip(tips: Iterable<EntryId | null>): EntryId | null {
  * view moves on to it. A branch elsewhere is not below `at`, so the view never
  * jumps to it.
  *
- * Leaves, not lane tips: a conversation thread has no lane at all (ADR-0020),
+ * Leaves, not lane tips: a conversation thread has no lane at all (ADR-0120),
  * so its end is its newest leaf, whoever wrote it. A thread that has a lane is
  * followed through the lane instead (`threadOf`, and a bound column), because
  * a conversation forked at the lane's tip is newer and is not its thread.
@@ -908,7 +908,7 @@ export type ThreadLane =
  * A lane is busy while it runs or has cards queued: the agent works there,
  * or will once its queue is released. A root with a busy lane is not
  * archived (`rootWork`), and a
- * stopped thread does not carry on behind cards waiting (ADR-0020,
+ * stopped thread does not carry on behind cards waiting (ADR-0120,
  * ADR-0048).
  */
 export const isBusy = (lane: LaneView): boolean =>
@@ -978,7 +978,7 @@ export function threadOf(
       return { kind: "unknown" }
     end = lane.tip
   } else {
-    // A lane's tip is its thread's end (ADR-0020), so the end names the
+    // A lane's tip is its thread's end (ADR-0120), so the end names the
     // thread's lane with no stored mapping. Two lanes share a tip for a moment
     // after a compelled branch at a lane's tip, until the new one's prompt
     // commits: then the end names neither.

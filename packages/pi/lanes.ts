@@ -1,6 +1,6 @@
 // pi/lanes — where each lane's tools work, as pi sees it (ADR-0032,
 // ADR-0034), and what a lane is told: its system prompt, and for a lane of
-// its own, a block about itself (ADR-0046).
+// its own, a block about itself (ADR-0121).
 //
 // One harness serves every lane, but pi resolves the tools' context from the
 // run's `Context` only: `toolContext` is a function of it. So every call that
@@ -50,7 +50,7 @@ export interface LaneAccess {
 }
 
 /**
- * What a lane of its own is told about itself (ADR-0046). The host builds
+ * What a lane of its own is told about itself (ADR-0121). The host builds
  * every name in it: `PINETRIE_MOUNT` and `LANE_NOTE` are in `@pinetrie/lanes`,
  * which this package does not declare. Nothing here changes while the lane
  * lives: a change would alter every request's prefix, and Anthropic then
@@ -99,7 +99,7 @@ const listed = (words: readonly string[]): string =>
     : `${words.slice(0, -1).join(", ")} and ${words.at(-1)}`
 
 /**
- * The block a lane of its own is told, one guideline per line (ADR-0046).
+ * The block a lane of its own is told, one guideline per line (ADR-0121).
  * Guidelines, not a section of its own: `pi-anthropic-auth` rebuilds the
  * prompt by its section tags, keeping `<rules>` and dropping `<docs>` (S23).
  * pi drops a guideline equal to an earlier one, so no two lines may be equal.

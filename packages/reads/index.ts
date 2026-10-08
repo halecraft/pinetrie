@@ -597,17 +597,17 @@ export function readPlaces(places: PlacesDocHandle): readonly CardRecord[] {
 /** The places document's `rev`: raised with every write (ADR-0059). */
 export const readPlacesRev = (places: PlacesDocHandle): number => places.rev()
 
-/** The session's workflow (`pinetrie.workflow`, ADR-0112), or null before a host wrote it. */
+/** The session's workflow (`pinetrie.workflow`, ADR-0122), or null before a host wrote it. */
 export const readWorkflow = (doc: SessionDocHandle): Workflow | null =>
   readRecords(doc, WORKFLOW).get(WORKFLOW_KEY) ?? null
 
-/** Each root's place on the board (`pinetrie.board`, ADR-0112), by its id. */
+/** Each root's place on the board (`pinetrie.board`, ADR-0122), by its id. */
 export const readBoardPlaces = (
   doc: SessionDocHandle,
 ): ReadonlyMap<RootId, BoardPlace> => readRecords(doc, BOARD)
 
 /**
- * The roots in the closed workflow state, archived (ADR-0029, ADR-0112), by
+ * The roots in the closed workflow state, archived (ADR-0029, ADR-0122), by
  * id; none before a host wrote the workflow. The same map while the same
  * roots are archived by the same writers at the same times: every write to
  * the session's values wakes it, the directory's included.

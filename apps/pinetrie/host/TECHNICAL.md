@@ -33,7 +33,7 @@ wires them.
 | `seats.ts` | each connected seat's person, written once as a `pinetrie.seat` record (started after `recover`), and unloading the histories of moves of a person with no seat left |
 | `startup.ts` | `recover`: what a starting host does before it takes a command |
 | `control.ts` | the command Line of each client seat, and who its writer is |
-| `commands/` | one module per command: `chat`, `board` (a move on the board, a change to its states: ADR-0112), `mark`, `lane` (stop, carry on, hold or release a queue, offer: each finds its lane through `laneAt`), `cards` (a move, a reorder, unqueue all, an undo of moves, a command, a busy chat's card queued, a sent card spent: ADR-0059, ADR-0066); `index.ts` decodes, decides where it runs (`placeOfCommand`), checks the archive, routes, and sends a popped queued card behind the same check (`sendPoppedQueuedCard`) |
+| `commands/` | one module per command: `chat`, `board` (a move on the board, a change to its states: ADR-0122), `mark`, `lane` (stop, carry on, hold or release a queue, offer: each finds its lane through `laneAt`), `cards` (a move, a reorder, unqueue all, an undo of moves, a command, a busy chat's card queued, a sent card spent: ADR-0059, ADR-0066); `index.ts` decodes, decides where it runs (`placeOfCommand`), checks the archive, routes, and sends a popped queued card behind the same check (`sendPoppedQueuedCard`) |
 | `http.ts` | the HTTP server: admission, Vite, the websocket, blobs, offer reads, invites |
 | `responses.ts` | every answer the host writes itself, as a pure `HttpAnswer` |
 | `routes.ts` | what a request or an upgrade gets, pure: admission first (`planRequest`, `planUpgrade`), then which requests are the host's (`route`) |
@@ -166,7 +166,7 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
 - **A starting host opens the roots `planLoads` names**: every root in the
   directory that is not archived, before `recover`. A busy root cannot be
   archived, so these hold every lane a crash could have interrupted. Which
-  roots are archived is the board's (`readArchived`, ADR-0112).
+  roots are archived is the board's (`readArchived`, ADR-0122).
   Archiving `unload`s a root (`work/archive.ts`); restoring opens it.
   `unload` first runs its `onReleasing` listeners: the scribe's `release`
   closes the agent's harness over the root, then the root's pi session
@@ -453,7 +453,7 @@ rejects `shutdown()`.
   history its move names. The answer is the chat's: `appended`, with the
   first message's id.
 - **A person's documents are clients' documents the host only keeps**
-  (ADR-0059, ADR-0077, ADR-0112): their inventory, their attention and
+  (ADR-0059, ADR-0077, ADR-0122): their inventory, their attention and
   their list. `resolveDoc` names a `<kind>:<writer>` id's kind, and the host
   interprets it as `InventoryDoc`, `AttentionDoc` or `OpenDoc`; the policy shares it only with the
   peers whose principal is that writer (`holdsPersonDoc`), and who may

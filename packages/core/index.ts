@@ -37,7 +37,7 @@ declare const writerIdBrand: unique symbol
  * A person, as the transport identifies them, never as a message claims: the
  * principal their connection named, which is their email (ADR-0037).
  * Authorship is recorded in each message by this id; people own no lanes
- * (ADR-0020).
+ * (ADR-0120).
  */
 export type WriterId = string & { readonly [writerIdBrand]: true }
 
@@ -92,7 +92,7 @@ export const emailLocalPart = (writer: WriterId): string => {
 
 declare const laneNameBrand: unique symbol
 /**
- * A thread's lane: a line of work (ADR-0019), never moved (ADR-0020). Its id
+ * A thread's lane: a line of work (ADR-0019), never moved (ADR-0120). Its id
  * can exist before the lane does: a column reserves it, and the thread is
  * named under it (ADR-0057). `laneNameForThread()` and `parseNewLane()` mint
  * one, and every reader of a stored or sent name checks it with `isLaneName()`,
@@ -159,7 +159,7 @@ export const parseNewRoot = (s: string): RootId | undefined =>
 
 declare const workflowStateIdBrand: unique symbol
 /**
- * A workflow state's id (ADR-0112): `w-` and an id the host mints as the
+ * A workflow state's id (ADR-0122): `w-` and an id the host mints as the
  * state is added. A state is named apart from its id, so a rename keeps
  * every root's place.
  */
@@ -287,24 +287,24 @@ export const ERR = {
   /** A display name is empty or too long. */
   INVALID_NAME: "invalid_name",
   /**
-   * A write in a root in the closed workflow state (ADR-0029, ADR-0112). The
+   * A write in a root in the closed workflow state (ADR-0029, ADR-0122). The
    * message names who moved it there.
    */
   ARCHIVED: "archived",
   /** Moving a root into the closed state while its agent works or cards are queued. */
   ROOT_BUSY: "root_busy",
   /**
-   * Moving a root from a state it has left (ADR-0112). The message names who
+   * Moving a root from a state it has left (ADR-0122). The message names who
    * moved it, and where.
    */
   ROOT_MOVED: "root_moved",
-  /** A workflow state the session's workflow does not hold (ADR-0112). */
+  /** A workflow state the session's workflow does not hold (ADR-0122). */
   UNKNOWN_STATE: "unknown_state",
-  /** Removing a workflow state that still holds a root (ADR-0112). */
+  /** Removing a workflow state that still holds a root (ADR-0122). */
   STATE_NOT_EMPTY: "state_not_empty",
-  /** Moving or removing the closed workflow state (ADR-0112). */
+  /** Moving or removing the closed workflow state (ADR-0122). */
   STATE_CLOSED: "state_closed",
-  /** A workflow state named with nothing but spaces (ADR-0112). */
+  /** A workflow state named with nothing but spaces (ADR-0122). */
   EMPTY_NAME: "empty_name",
   /** Removing the only open workflow state: a new root needs one to land in. */
   LAST_STATE: "last_state",
@@ -470,7 +470,7 @@ export type Intent =
       readonly base: string | null
       /**
        * The workflow state a root this message starts lands in, at its end;
-       * null for the first open state (ADR-0112). Read only when it starts one.
+       * null for the first open state (ADR-0122). Read only when it starts one.
        */
       readonly state: WorkflowStateId | null
     }
@@ -519,7 +519,7 @@ export type Intent =
       readonly state: WorkflowStateId | null
     }
   /**
-   * Move a root on the board (ADR-0112): from the state its sender saw it in,
+   * Move a root on the board (ADR-0122): from the state its sender saw it in,
    * to `to`, before `before` there, or at its end. Into the closed state it
    * archives the root, and out of it restores the root.
    */
@@ -530,7 +530,7 @@ export type Intent =
       readonly to: WorkflowStateId
       readonly before: RootId | null
     }
-  /** Change the session's workflow states (ADR-0112). */
+  /** Change the session's workflow states (ADR-0122). */
   | { readonly kind: "workflow"; readonly edit: WorkflowEdit }
   /** Title an entry, or clear its title with null (ADR-0045). */
   | {
@@ -607,7 +607,7 @@ export const OFFER_ACTIONS: readonly OfferAction[] = [
 export type AcceptedAction = "setup" | "publish"
 export const ACCEPTED_ACTIONS: readonly AcceptedAction[] = ["setup", "publish"]
 
-// --- the board (ADR-0112) ---------------------------------------------------
+// --- the board (ADR-0122) ---------------------------------------------------
 
 /** A workflow state: a column of the board. */
 export interface WorkflowState {
@@ -2223,7 +2223,7 @@ export function normalizeName(name: string): string | undefined {
  * have worked: brands constrain how a value is CREATED, while the risk for seq
  * is how it is SERIALIZED, and a branded number drops into any `number` field
  * with no error. Contrast `LaneName`, where creation IS the danger (a writer's
- * id or "main" used as a lane, ADR-0020) and the brand therefore does real
+ * id or "main" used as a lane, ADR-0120) and the brand therefore does real
  * work.
  */
 export function findSeqKeys(value: unknown, path = "$"): string[] {

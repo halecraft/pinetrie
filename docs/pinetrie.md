@@ -150,7 +150,7 @@ it, and the ADR says why. Every decision in force is in `docs/adrs/`, and
 | Entries are immutable; a merge is a new node, never an edit. The tree is explicit (`parentId`), never a CRDT's history. | ADR-0004, ADR-0008 | `docs/01-architecture.md`, `packages/schema/TECHNICAL.md` |
 | A fold's `ours` leg is mandatory. | ADR-0010 | `docs/01-architecture.md` |
 | Only `packages/pi` imports pi. | ADR-0003 | `AGENTS.md`, `packages/pi/TECHNICAL.md` |
-| The host is the only writer of the session's documents; clients send commands. A lane belongs to its thread, and is never moved. | ADR-0020, ADR-0023 | `ARCHITECTURE.md`, `packages/schema/TECHNICAL.md` |
+| The host is the only writer of the session's documents; clients send commands. A lane belongs to its thread, and is never moved. | ADR-0120, ADR-0023 | `ARCHITECTURE.md`, `packages/schema/TECHNICAL.md` |
 | Everything unsent is a card, and a card's place has one owner at a time: the host, or a person's inventory. | ADR-0048, ADR-0059 | `packages/schema/TECHNICAL.md` |
 | One owner writes your repo, and the host never touches the working copy or `@` except in a publish with `publish.catchUp` on, as you. An acceptance is a forward bookmark move. | ADR-0065, ADR-0104 | `docs/the-jujutsu-repo.md`, `packages/repo/TECHNICAL.md` |
 | What the host cannot tell, it does not act on: an unknown answer never builds an offer. | ADR-0067 | `packages/repo/TECHNICAL.md` |
@@ -257,7 +257,7 @@ string union `"pending" | "empty" | "populated"`, not an object.
 
 **The interface is the sidebar of roots down the left, and the root you are
 on, a rail beside columns** (`docs/06-interface.md`,
-`packages/interface/TECHNICAL.md`, ADR-0029, ADR-0112), over a footer showing
+`packages/interface/TECHNICAL.md`, ADR-0029, ADR-0122), over a footer showing
 who is here, what needs you and the board, which slides up over the columns
 with every root in its workflow state: each
 column is one path on its own scroll, a branch opens beside its parent in its
@@ -347,7 +347,7 @@ independently shippable:
 
 1. ~~tree read~~ — done: `projectSpine`, spine + branch markers, navigation is client-local state
 2. branch write — create a branch from any entry; Aside first
-3. ~~concurrent lanes~~ — done; since ADR-0020, a lane per thread, not per writer
+3. ~~concurrent lanes~~ — done; since ADR-0120, a lane per thread, not per writer
 4. ~~references~~ — done, then withdrawn (ADR-0043): nothing read them
 5. ~~humans in the tree~~ (ADR-0018) — done: chat and compelled responders, presence (ADR-0024), notes (ADR-0025, since removed), and cards (ADR-0048)
 6. Scout — read-only tools
@@ -398,7 +398,7 @@ context.**
   now enforced by resolution; see `docs/01-architecture.md`.
   It has now failed the same way twice (`.mjs`-blind, then `.tsx`-blind) while
   reporting "all boundary rules hold".
-- ~~Multi-writer is proven only at the *storage* layer.~~ Since ADR-0020, two
+- ~~Multi-writer is proven only at the *storage* layer.~~ Since ADR-0120, two
   threads' lanes run at once, and one thread's writers queue.
 - **The suites and their mutations spend most of their time waiting** (S65).
   What remains after the dead waits were removed, and the suites became
@@ -457,7 +457,7 @@ context.**
 - **A thread's container stops when its run ends**, and starts again at the
   next message. A dev server or watcher the agent started ends with the run.
   The agent is told this, and what else holds in every lane, by a short block
-  in its prompt and a note at `/pinetrie/packages/pi/lane.md` (ADR-0046).
+  in its prompt and a note at `/pinetrie/packages/pi/lane.md` (ADR-0121).
 - **Who you are** (ADR-0037): the page asks for your email and name once per
   browser. The email is who you are, in every tab and on every device; the
   name is how you are shown, renamed on your profile page, from the menu

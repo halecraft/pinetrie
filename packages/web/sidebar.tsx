@@ -1,5 +1,5 @@
 // web/sidebar — the sidebar, down the left edge: the roots you have open,
-// in your order, then new tabs, then ＋ (ADR-0030, ADR-0112); full, or folded
+// in your order, then new tabs, then ＋ (ADR-0030, ADR-0122); full, or folded
 // to an icon per item (ADR-0088, `FoldedItem`).
 //
 // The sidebar is yours, on every device: × closes a root for you and writes

@@ -1,5 +1,5 @@
 // interface/here — who else is in the session, for the board and the sidebar
-// (ADR-0030, ADR-0112). Pure.
+// (ADR-0030, ADR-0122). Pure.
 //
 // Presence is thread-level (ADR-0024): each column of the root a person is on
 // reports the end of its thread. `peopleHere` groups those by person, where
@@ -61,7 +61,7 @@ export const readerHeading = (name: string, gone: boolean): string =>
 
 /**
  * The people reading in `roots`, each with only their threads there: a board
- * item's readers, or a board state's (ADR-0112). A person reading elsewhere
+ * item's readers, or a board state's (ADR-0122). A person reading elsewhere
  * only is left out.
  */
 export function peopleIn(

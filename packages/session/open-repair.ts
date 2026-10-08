@@ -1,4 +1,4 @@
-// session/open-repair — what the sidebar's document should say (ADR-0112).
+// session/open-repair — what the sidebar's document should say (ADR-0122).
 // Pure: `open-threads.ts` writes what these decide.
 
 import type { RootId } from "@pinetrie/core"

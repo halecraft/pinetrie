@@ -1,4 +1,4 @@
-// pi/thread-lanes — each thread's pi lane (ADR-0020) in one root's document,
+// pi/thread-lanes — each thread's pi lane (ADR-0120) in one root's document,
 // held while that root's harness is (`Scribe.release` closes it), behind
 // handles that speak only pinetrie's types. A lane is never moved, and its tip
 // is never read here: readers use the document.
@@ -102,7 +102,7 @@ type PiResult =
 export type BeforePrompt = BehindMessage | PinnedMessage
 
 /**
- * A thread's lane (ADR-0020). It is never moved: it advances only by its own
+ * A thread's lane (ADR-0120). It is never moved: it advances only by its own
  * appends and runs, so its tip stays its thread's end. The host touches it only
  * while it is idle (S21).
  */

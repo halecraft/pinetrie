@@ -43,7 +43,7 @@ import { scriptedModel } from "./scripted.ts"
 import { startPi } from "./start-pi.ts"
 import { assembleTools } from "./tools.ts"
 
-// ── what a lane of its own is told (ADR-0046) ────────────────────────────
+// ── what a lane of its own is told (ADR-0121) ────────────────────────────
 
 /** A lane's facts with nothing granted, no shared directory, on a project's own image. */
 const facts = (over: Partial<LaneFacts> = {}): LaneFacts => ({

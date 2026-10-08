@@ -1,6 +1,6 @@
 # ADR-0020 — Lanes belong to threads and never move; people own none
 
-- **Status:** Accepted
+- **Status:** Superseded
 - **Area:** `docs/01-architecture.md`, `docs/06-interface.md`
 - **Evidence:** S19, S20, S21
 - **Supersedes:**
@@ -8,6 +8,9 @@
 - **Amends:**
   - ADR-0018: lanes belong to threads.
   - ADR-0019: people own no lanes, so there are no conversation lanes.
+- **Superseded by:**
+  - ADR-0120: restated whole, with what ADR-0021, ADR-0026 and ADR-0048
+    changed in it folded in.
 - **Amended by:**
   - ADR-0021: the lane is also the thread's mode.
   - ADR-0026: what waits for a busy lane is a queued note, not the outbox.

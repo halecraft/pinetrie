@@ -460,7 +460,7 @@ describe("listOf", () => {
   })
 })
 
-test("unlisted: the roots not in the sidebar, and not archived (ADR-0077, ADR-0112)", () => {
+test("unlisted: the roots not in the sidebar, and not archived (ADR-0077, ADR-0122)", () => {
   const open = { open: [entryId("1-r1")] }
   expect(
     unlisted(open, new Set([entryId("7-r3")]), [
@@ -676,7 +676,7 @@ describe("encodeLayout / decodeLayout", () => {
         },
         newTabs: [],
       },
-      // v4 held the sidebar (ADR-0112), and an Archive tab; one in v5's shape
+      // v4 held the sidebar (ADR-0122), and an Archive tab; one in v5's shape
       // under v4 is dropped too.
       { v: 4, active: null, roots: {}, newTabs: [], board: false },
       { v: 4, active: { kind: "archive" }, open: [], roots: {}, newTabs: [] },

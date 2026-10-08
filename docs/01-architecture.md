@@ -204,7 +204,7 @@ The host owns one pi harness and is **not a writer**. Each connected client is
 a writer, identified by the transport's `LineSender.peer` and recorded in every
 message it sends; writers own no lanes. A lane belongs to a thread: created
 where agent work is first wanted there, never moved, never written while it
-runs (ADR-0020). A lane is a line of agent work, with its own state on disk,
+runs (ADR-0120). A lane is a line of agent work, with its own state on disk,
 not a way to answer two people at once (ADR-0019). Threads run concurrently. Decisions are pure (`planChat`,
 `planArchive` and the rest in `@pinetrie/rules`, over facts read by `@pinetrie/reads`);
 the host gathers, plans and executes each command in one serial step. A
@@ -212,6 +212,10 @@ decision that acts on your repo (an offer, accepted work) is a value typed in
 `@pinetrie/core`, decided by `@pinetrie/rules` from facts `@pinetrie/repo`
 reads, and carried out by `@pinetrie/repo`'s steps: the two packages never
 import each other, and the host only connects them.
+
+ADR-0119, accepted and not yet built, keeps a thread, its lane and the host the lane runs
+on apart, so a lane at rest could later be rebuilt on another machine:
+one host holds a lane at a time, and the model is each run's choice.
 
 Wire sentinels live only in `packages/protocol/codec.ts`. The wire is total, so `""`
 stands for "absent"; the codec decodes commands into an `Intent` union and
@@ -287,7 +291,7 @@ presence         ephemeral                who reads which thread, in which root
 ```
 
 The host holds the session, `live`, the places and every root not archived
-(not in the board's closed state, ADR-0112).
+(not in the board's closed state, ADR-0122).
 A client holds the session, `live`, the places and only the roots its tabs
 show; it reads every other root through its directory record. pi runs one
 session and one harness per root (ADR-0092, ADR-0095).

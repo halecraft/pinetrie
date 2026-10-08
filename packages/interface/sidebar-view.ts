@@ -1,5 +1,5 @@
 // interface/sidebar-view — what the sidebar shows and offers (ADR-0030,
-// ADR-0112), full or folded to icons (ADR-0088), decided. PURE: `Sidebar`
+// ADR-0122), full or folded to icons (ADR-0088), decided. PURE: `Sidebar`
 // (`sidebar.tsx`) draws it, and each click sends the intent it names.
 
 import type {
@@ -31,7 +31,7 @@ export type ItemMenuItem =
   /** Ask a model for a title from the root's messages (ADR-0074). */
   | { readonly kind: "retitle"; readonly intent: Intent }
   /**
-   * Move the root on the board to another workflow state (ADR-0112), its
+   * Move the root on the board to another workflow state (ADR-0122), its
    * thread card's (`ThreadMove`). Into the closed state it is archived:
    * refused while its agent works there (`busy`), and it withdraws the
    * offers of its threads named in `drops` (ADR-0061).

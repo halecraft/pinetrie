@@ -15,6 +15,8 @@
   - ADR-0063: a session is a document per root, a session document of its
     records, and one of what is streaming; it is still the boundary of who is
     in it.
+  - ADR-0117: a copy's lane, like a branch's, is made when its agent is first
+    asked.
 
 **Context.** ADR-0018 stored a default at an entry (`pinetrie.thread`): below a
 *working session* entry the agent answers every message, below a

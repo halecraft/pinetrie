@@ -25,6 +25,8 @@
     document has a session and no harness.
   - ADR-0095: the session's document has its own schema, `SessionDoc` (the
     host's records alone), and a root's is pi's storage plus `records`.
+  - ADR-0116: a root is the unit of storage, not of work; the host holds the
+    roots of open tasks' threads.
 
 **Context.** The session was one Kyneta document, `pinetrie:session`: pi's
 storage for every root ever started, the host's records, and what is

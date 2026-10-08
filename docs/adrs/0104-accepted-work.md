@@ -8,6 +8,8 @@
   - ADR-0060: restated whole, with ADR-0061, ADR-0065, ADR-0067, ADR-0072,
     ADR-0076, ADR-0079, ADR-0080, ADR-0083, ADR-0090, ADR-0099 and ADR-0100
     folded in.
+- **Amended by:**
+  - ADR-0118: accepted work, WIPs and publish are per branched source.
 
 Restates ADR-0060 as amended by ADR-0061, ADR-0065, ADR-0067, ADR-0072,
 ADR-0076, ADR-0079, ADR-0080, ADR-0083, ADR-0090, ADR-0099, ADR-0100 and its

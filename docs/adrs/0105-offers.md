@@ -9,6 +9,7 @@
     folded in.
 - **Amended by:**
   - ADR-0113: the offer's line is in the column's header.
+  - ADR-0118: a thread has an offer in each source it changed.
 
 Restates ADR-0038 as amended by ADR-0039, ADR-0040, ADR-0047, ADR-0055,
 ADR-0060, ADR-0061, ADR-0065, ADR-0067, ADR-0080, ADR-0083, ADR-0100 and

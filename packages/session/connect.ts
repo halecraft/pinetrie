@@ -305,7 +305,7 @@ export interface SessionClient {
   readonly attention: AttentionStore
   /**
    * The sidebar: the roots you have open, in your order, on every device of
-   * yours (ADR-0112). A root moved to the closed state leaves it, but the one
+   * yours (ADR-0122). A root moved to the closed state leaves it, but the one
    * the page reports it shows (`here`).
    */
   readonly openThreads: OpenThreads
@@ -609,7 +609,7 @@ export async function connectSession(
           ? line.request(plan.intent, plan.id)
           : tracked(plan.intent, [plan.pending], null)
       return sent.then(({ outcome }) => {
-        // A root you start is in the sidebar (ADR-0112).
+        // A root you start is in the sidebar (ADR-0122).
         if (startsRoot(at, outcome)) open.ensure(root)
         return outcome
       })

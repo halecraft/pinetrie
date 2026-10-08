@@ -49,10 +49,10 @@ export const HOST_PRINCIPAL = "pinetrie-host"
  *     it (`release`), ADR-0048 step 7.
  *   - `unqueue-all` takes every message card queued on that thread back
  *     below the line.
- *   - `move-root` moves the root `root` on the board (ADR-0112): `text` is
+ *   - `move-root` moves the root `root` on the board (ADR-0122): `text` is
  *     JSON `{ from, to, before }`, the state its sender saw it in, the state
  *     it goes to, and the root it goes before there, or null for the end.
- *   - `workflow` changes the board's states (ADR-0112): `mode` names the
+ *   - `workflow` changes the board's states (ADR-0122): `mode` names the
  *     action (`add`, `rename`, `move`, `remove`), `targetId` the state (`""`
  *     to add), `text` its name, and `parentId` the state it goes before
  *     (`""` for after every open state).
@@ -190,7 +190,7 @@ export interface Command {
   readonly base: string
   /**
    * `chat` and `spin-off`: the workflow state a root it starts lands in,
-   * or `""` for the first open state (ADR-0112).
+   * or `""` for the first open state (ADR-0122).
    */
   readonly state: string
 }

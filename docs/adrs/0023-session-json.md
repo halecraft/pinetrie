@@ -21,6 +21,8 @@
     inventories.
   - ADR-0063: the session is a `json` document per root, a session document
     and `pinetrie:live`, each compacted alone.
+  - ADR-0119: the session's host writes the session's records; a lane's host
+    writes its thread.
 
 **Context.** The session document was on Loro, a CRDT: every replica could write
 it and merge. None does. The host alone writes the session document (pi's

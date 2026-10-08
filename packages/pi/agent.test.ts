@@ -49,7 +49,7 @@ import { laneErrCode } from "./thread-lanes.ts"
 describe("laneErrCode", () => {
   test("maps pi's refusals onto our codes", () => {
     expect(laneErrCode("UnknownTarget")).toBe(ERR.UNKNOWN_TARGET)
-    // Nothing navigates a lane any more (ADR-0020).
+    // Nothing navigates a lane any more (ADR-0120).
     expect(laneErrCode("InvalidNavigation")).toBe(ERR.REFUSED)
     // A crash leaves pi's operation open: busy until resumed (S36 item 18).
     expect(laneErrCode("LaneBusy")).toBe(ERR.BUSY)

@@ -28,6 +28,8 @@
     place replaces the archive record.
   - ADR-0089: tracks still start at 0, but trunks no longer share a colour:
     each root's id seeds its palette.
+  - ADR-0116: a task, not a root, is what opens; columns side by side need not
+    share a root, and the rail draws a forest.
 
 **Context.** The rail draws every tree in one strip, one after another, and
 columns from different trees sit side by side. `projectRail` starts each

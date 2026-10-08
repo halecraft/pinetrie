@@ -1,4 +1,4 @@
-// pi/agent — the agent at work in threads' lanes (ADR-0020, ADR-0092): a
+// pi/agent — the agent at work in threads' lanes (ADR-0120, ADR-0092): a
 // harness per root (ADR-0063), built through the scribe over that root's one
 // pi session, from the person's pi setup. Only this package may import pi
 // (ADR-0003, enforced by module resolution): everything pi-shaped is

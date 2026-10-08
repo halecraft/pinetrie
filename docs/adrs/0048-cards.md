@@ -76,6 +76,9 @@
     board, a shared grid; a composer shows only its owner's card; "add to
     queue" on an idle thread holds the queue, and a send from the composer
     releases it.
+  - ADR-0116: a card can be pinned to a task, and read by every thread of it.
+  - ADR-0117: a card in an inventory is its holder's alone, and links to it
+    say who has it.
 
 Steps 1 to 7 are built, but for step 6's contributors, which wait for Kyneta.
 Probe 2 is answered by S69, probes 1 and 4, for the inventory, by S75 and S76,

@@ -40,7 +40,7 @@ export const messageCount = (
   return { held: inHeld, total }
 }
 
-/** The count's tooltip: ▦'s, in the footer (ADR-0112). */
+/** The count's tooltip: ▦'s, in the footer (ADR-0122). */
 export const messageCountTitle = ({ held, total }: MessageCount): string =>
   `${held} in the threads this tab has loaded, of ${total} in the session`
 

@@ -4,7 +4,7 @@ The browser page (ADR-0093): React components, hooks and what touches the
 DOM, drawing what `@pinetrie/interface` decides
 (`packages/interface/TECHNICAL.md`): the sidebar of roots down the left, the
 root you are on as a rail beside a strip of columns, and the board in the
-footer (`docs/06-interface.md`, ADR-0112). Its connection to the host is
+footer (`docs/06-interface.md`, ADR-0122). Its connection to the host is
 `@pinetrie/session` (`packages/session/TECHNICAL.md`), which declares no
 React. The page implements the interface's `AppPorts` (`app.tsx`) and keeps
 in the browser what the interface encodes (`tab-state.ts`,
@@ -154,7 +154,7 @@ error.
   whole or not at all, and `v` rejects an older one: a `v: 2` layout (before
   your tabs were yours, ADR-0030) is dropped once and overwritten by the first
   save; so is a `v: 4` one (before the sidebar was your own document,
-  ADR-0112), and the page opens on the sidebar's last root, else the board. A lane that is not a lane name
+  ADR-0122), and the page opens on the sidebar's last root, else the board. A lane that is not a lane name
   is left off; `sync` binds the column again.
 - **`reserved` is stored** (ADR-0057), and decoded only in the shape the host
   accepts (`parseNewLane`), so a reload keeps the thread's name. The device
@@ -201,7 +201,7 @@ that scrolls and for one that opens a column.
   path, has not moved up, so it is still following, and the next resize would
   take it to its end (S33, answer 6). Since the Archive preview went, every
   column it scrolls was placed by `App`'s alignment first, so this is
-  defensive: no suite check reaches it (ADR-0112).
+  defensive: no suite check reaches it (ADR-0122).
 - **It is declared after the alignment effect in `App`,** so a pick the
   alignment left out of view is scrolled to in the same commit.
 

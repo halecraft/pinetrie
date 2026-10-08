@@ -29,7 +29,7 @@ export const PINETRIE_INSTALL = path.resolve(import.meta.dirname, "../..")
 /** The helper's own path, inside every lane. */
 export const HELPER = `${PINETRIE_MOUNT}/packages/pi/lane-helper.ts`
 
-/** The note a lane's agent is pointed at, inside every lane (ADR-0046). */
+/** The note a lane's agent is pointed at, inside every lane (ADR-0121). */
 export const LANE_NOTE = `${PINETRIE_MOUNT}/packages/pi/lane.md`
 
 /** The command that opens a lane's channel: the helper on the runtime's Node. */

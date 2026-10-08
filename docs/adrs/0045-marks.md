@@ -12,6 +12,7 @@
   - ADR-0074: a model titles a root when its first lane starts, or when a
     person asks (Auto-update title), and an untitled root no agent works in is
     labelled `Chat`.
+  - ADR-0116: a title is a mark on the task.
 
 **Context.** A root tab's label is its first message's first line, cut to 40
 characters. That line is often a preamble ("I'd like to start talking about a

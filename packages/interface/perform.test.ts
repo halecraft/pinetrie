@@ -248,7 +248,7 @@ test("an undo of moves plans what its answer shows, afresh", async () => {
   )
 })
 
-test("a move on the board runs what follows it only once the host accepts it (ADR-0112)", async () => {
+test("a move on the board runs what follows it only once the host accepts it (ADR-0122)", async () => {
   const request = {
     kind: "move-root",
     root: TEST_ROOT,

@@ -20,6 +20,8 @@
   - ADR-0113: the drafts leave the column for the notes board; the column's
     foot is a dock of the queue, the line and your message, whose queue header
     says what happens next and holds the one control for it.
+  - ADR-0116: a thread card is a thread, held by a task or an inventory; a
+    text card on a board state starts a task.
 
 **Context.**
 

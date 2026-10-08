@@ -9,6 +9,8 @@
 - **Amended by:**
   - ADR-0102: a host started outside `pnpm host` refuses to start without a
     lane runtime; it never works directly.
+  - ADR-0118: the host serves sources, not one project, and keeps its session
+    outside them.
 
 **Context.** `pnpm host` served pine·trie's own repo, found from where
 `server.ts` sits, and kept its session in that repo's `.pinetrie/pinetrie.db`.

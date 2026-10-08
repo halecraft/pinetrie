@@ -13,6 +13,8 @@
 - **Amended by:**
   - ADR-0060: the first send carries the thread's base, which the host checks
     before it creates the lane.
+  - ADR-0117: the id a column mints is the thread's, conversation threads
+    included.
 
 **Context.** A thread's name (ADR-0039) and its icon (ADR-0053) are keyed by
 its lane, and the lane is made only by the first send: `createThreadLane`

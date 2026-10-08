@@ -56,7 +56,7 @@ export type Effect =
     }
   /** Ask the host for something that moves no card (`HostRequest`). */
   | { readonly kind: "request"; readonly intent: HostRequest }
-  /** Change the sidebar, in your own document (`openThreads`, ADR-0112). */
+  /** Change the sidebar, in your own document (`openThreads`, ADR-0122). */
   | { readonly kind: "list"; readonly act: ListAct }
   /**
    * Make a card a thread (ADR-0111); `afterSpinOff` decides from its
@@ -165,7 +165,7 @@ export type Effect =
   | { readonly kind: "forgetIdentity" }
   | { readonly kind: "reload" }
 
-/** A change to the sidebar, by root id: your document's key (ADR-0112). */
+/** A change to the sidebar, by root id: your document's key (ADR-0122). */
 export type ListAct =
   /** At its end, unless it is in the sidebar already. */
   | { readonly kind: "ensure"; readonly root: RootId }

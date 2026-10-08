@@ -53,7 +53,7 @@ async function commandsSection(
         `/mnt/host${path.join(fixtures, "fixture-pkg", "skills", "explain")}/SKILL.md`,
       ),
     )
-    // What the lane is told about itself (ADR-0046), in a real container.
+    // What the lane is told about itself (ADR-0121), in a real container.
     // It names no bookmark, which changes when the thread is named: S85, and
     // `packages/pi/lanes.test.ts`.
     const lane = h.laneWith("read it")?.name

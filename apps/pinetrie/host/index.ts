@@ -284,7 +284,7 @@ export async function startHost({
   // Clients find the host by its principal and address their Lines to the
   // seat Kyneta issues it (ADR-0037). The host has no WRITER identity:
   // writers are the connected clients, named by their principals, and they
-  // own no lanes; lanes belong to threads (ADR-0020).
+  // own no lanes; lanes belong to threads (ADR-0120).
   const exchange = new Exchange({
     principal: HOST_PRINCIPAL,
     type: "service",

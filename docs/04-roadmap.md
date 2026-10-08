@@ -60,7 +60,7 @@ Roughly in dependency order, each independently shippable:
    client-local state rather than a write. The spine view was later replaced
    by columns and a rail, and then by a tab per root, each with its own rail
    and columns (`docs/06-interface.md`, ADR-0029).
-2. ~~**Branch write**~~ — **done**, both directions. *Superseded by ADR-0020:*
+2. ~~**Branch write**~~ — **done**, both directions. *Superseded by ADR-0120:*
    lanes no longer move, so a branch is a new thread (and, when the agent is
    asked, a new lane) rather than a navigated one. A `branch` command names a
    parent; the host navigates there with pi's `navigateTree`, then prompts. A
@@ -76,7 +76,7 @@ Roughly in dependency order, each independently shippable:
    - A foreign-written entry is NOT navigable: pi's session index never saw it
      created.
 
-3. ~~**Concurrent lanes**~~ — **done.** *Superseded by ADR-0020:* lanes belong
+3. ~~**Concurrent lanes**~~ — **done.** *Superseded by ADR-0120:* lanes belong
    to threads, not writers; threads run concurrently. (Originally: a lane and a turn per writer, keyed by
    the transport's peer id. Two windows run turns at once; neither moves the
    other's lane; streams do not mix. Findings: pi refuses to navigate to the

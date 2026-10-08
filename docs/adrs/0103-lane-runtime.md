@@ -22,6 +22,8 @@
     launcher, not Virtualization's NAT, which another tool's VM can take away;
     lanes are fenced from `gvproxy`'s own addresses, and a project may grant
     ports of the Mac's loopback (`lanes.hostPorts`).
+- **Amended by:**
+  - ADR-0118: a host's slot holds its sources.
 
 Supersedes ADR-0034's runtime:
 - a VM per lane, by Apple's `container`;

@@ -1,11 +1,14 @@
 # ADR-0112 — Your open roots run down the left; a board in the footer shows where everyone's work stands
 
-- **Status:** Accepted
+- **Status:** Superseded
 - **Area:** `docs/06-interface.md`, `packages/interface/TECHNICAL.md`
 - **Evidence:** S69
 - **Supersedes:**
   - ADR-0085: restated whole, with what ADR-0088, ADR-0091 and ADR-0098
     changed in it folded in.
+- **Superseded by:**
+  - ADR-0122: restated whole, with what ADR-0109 (as ADR-0115 amends it),
+    ADR-0111 and ADR-0113 changed in it folded in.
 - **Amended by:**
   - ADR-0109: the search and "mine" move from the closed state to the board's
     top, and filter every state, open and closed.

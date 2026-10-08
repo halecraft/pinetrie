@@ -1,5 +1,5 @@
 // host/commands/board — move a root on the board, or change its workflow
-// states (ADR-0112).
+// states (ADR-0122).
 //
 // A move runs in up to three parts (ADR-0065). On the documents' keeper:
 // gather the workflow and the places, plan the move (`planRootMove`); if it

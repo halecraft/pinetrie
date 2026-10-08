@@ -82,7 +82,7 @@ export interface StoredValueRecord {
   readonly sealed?: true
 }
 
-/** pi's namespace for lane tips, keyed by lane name (a thread's, ADR-0020). */
+/** pi's namespace for lane tips, keyed by lane name (a thread's, ADR-0120). */
 export const LANE_TIP = "pi.branch.tip"
 
 /** A stored value's own record of its address and contents. */

@@ -1,6 +1,6 @@
 // interface/card-marks — where your unsent cards are, as marks (ADR-0048, step
 // 2): on the sidebar's roots and new tabs, on the rail at a thread's end, on
-// the board's items, and on ▦ for a root not in the sidebar (ADR-0112). An
+// the board's items, and on ▦ for a root not in the sidebar (ADR-0122). An
 // archived root's work is done, so it lights only its own item on the board,
 // never ▦. They answer "where was I?",
 // so they count only the cards you own (contributors wait for Kyneta,
@@ -69,7 +69,7 @@ export interface CardMarks {
   readonly ends: ReadonlySet<EntryId>
   /**
    * A root in `roots` is not in the sidebar and not archived: ▦ is marked
-   * (ADR-0112).
+   * (ADR-0122).
    */
   readonly elsewhere: boolean
 }
@@ -80,7 +80,7 @@ export function cardMarks(input: {
   /** Cards that hold text (`holdsText`), by id. */
   readonly filled: ReadonlySet<CardId>
   readonly layout: Layout
-  /** Roots in the closed workflow state (ADR-0029, ADR-0112), by root entry. */
+  /** Roots in the closed workflow state (ADR-0029, ADR-0122), by root entry. */
   readonly archived: ReadonlySet<EntryId>
   readonly lanes: readonly LaneView[]
   readonly index: TreeIndex

@@ -147,7 +147,7 @@ These tests are co-located here on purpose: `toStoredRow` takes pi's
 ADR-0003 exists to hold. `vitest.config.mjs` includes `packages/*/*.test.ts`
 for this reason.
 
-### Lanes belong to threads, and never move (ADR-0020)
+### Lanes belong to threads, and never move (ADR-0120)
 
 The host owns one harness. A lane is a thread's line of work: created by
 `Agent.createThreadLane(at, lane)` where agent work is first wanted in a
@@ -448,7 +448,7 @@ item 18, and in `lanes.test.ts` against the harness.
   (S44 item 2).
 - **The system prompt** names the lane's directory. For a lane of its own it
   adds a block of guidelines, `laneGuidelines(facts)` in `lanes.ts`
-  (ADR-0046): what holds in every lane, filled in with the lane's own
+  (ADR-0121): what holds in every lane, filled in with the lane's own
   values, in about 260 tokens. The model is sent the conversation as stored:
   nothing is rewritten.
   - **Guidelines, not a section of its own.** pi joins its sections into one

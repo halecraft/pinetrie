@@ -213,7 +213,7 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
 - **Whether a lane runs the default image is known at startup**, before the
   images are built: the project has no `projectContainerfile(root)`. The
   host reads it once, as `prepareImages` does, and tells each lane's agent
-  (`defaultImage`, ADR-0046): the browser and python3.
+  (`defaultImage`, ADR-0121): the browser and python3.
 
 ## Containers
 
@@ -243,7 +243,7 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   host's `work/containers.ts`); the disk needs nothing more. The next run
   starts it again.
   Processes the agent started, dev servers included, end with the run. The
-  agent is told so (ADR-0046).
+  agent is told so (ADR-0121).
 - **What reaches existing lanes this way:** a rebuilt image, changed grants,
   links or shared directories. The arguments are fixed when a container is
   created, and before labels existed the host only restarted it. A container
@@ -487,7 +487,7 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   launches Chromium, through pine·trie's Playwright, and python3 on the default
   image. Its `commands` section
   reads skill files at `/mnt/host`, and checks what a real lane's prompt
-  tells it about itself and that the note it names is there (ADR-0046). It
+  tells it about itself and that the note it names is there (ADR-0121). It
   has five scenarios (`apps/pinetrie/e2e/lanes/`), `main`, `images`,
   `shared`, `commands` and `contract`, and `PINETRIE_SCENARIO` picks some.
   It runs on Docker, and where Docker cannot run lanes, each scenario

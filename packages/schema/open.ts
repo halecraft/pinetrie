@@ -1,4 +1,4 @@
-// schema/open — the roots a person has open, in their order (ADR-0112): a
+// schema/open — the roots a person has open, in their order (ADR-0122): a
 // Yjs document per person, written only by that person's tabs, so the list is
 // the same on every device of theirs. The host stores and relays it, shared
 // with its person only (host/policy.ts), and never writes it; its id and who

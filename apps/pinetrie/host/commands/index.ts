@@ -189,7 +189,7 @@ export function createCommands(deps: CommandDeps): Commands {
         const sendId = id === "" ? newId() : id
         const sent = await sendChat(deps, writer, sendId, intent)
         // A thread at the root that was written started a root: it takes its
-        // place on the board in the same step (ADR-0112).
+        // place on the board in the same step (ADR-0122).
         if (intent.at.kind === "root" && spendsCard(sent))
           await placeNewRoot(deps, writer, intent)
         const card = intent.card
@@ -211,7 +211,7 @@ export function createCommands(deps: CommandDeps): Commands {
       case "spin-off":
         return cardCommands.spinOff(writer, intent, async chat => {
           const sent = await sendChat(deps, writer, newId(), chat)
-          // Its board place, as a chat that starts a root takes (ADR-0112).
+          // Its board place, as a chat that starts a root takes (ADR-0122).
           if (spendsCard(sent)) await placeNewRoot(deps, writer, chat)
           return sent
         })
@@ -286,7 +286,7 @@ export function createCommands(deps: CommandDeps): Commands {
   }
 }
 
-/** A root a chat started, put at the end of the state its sender chose (ADR-0112). */
+/** A root a chat started, put at the end of the state its sender chose (ADR-0122). */
 async function placeNewRoot(
   deps: Pick<CommandDeps, "basics" | "records">,
   writer: WriterId,
@@ -312,7 +312,7 @@ async function placeNewRoot(
 
 /**
  * A command that would write in an archived root, one in the closed
- * workflow state, is refused, naming who moved it there (ADR-0029, ADR-0112). `sendChat`'s only callers are this dispatcher and
+ * workflow state, is refused, naming who moved it there (ADR-0029, ADR-0122). `sendChat`'s only callers are this dispatcher and
  * `sendPoppedQueuedCard`, both behind it, so it needs no check of its own.
  * `root` is the roots the command writes in (`writesIn`), which names them,
  * so no root's document is opened to check. Null when the command may go on.

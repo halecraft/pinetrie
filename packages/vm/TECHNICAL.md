@@ -164,6 +164,14 @@ one source given twice is one entry, read-write if either is.
   rootless Docker in a lane (S127).
 - **A bind into a replaced share fails with "No such file or directory",**
   and the guest logs nothing (S130).
+- **A file the Mac and a lane append to at once loses the Mac's lines,**
+  in a shared directory or any read-write share: 11 to 20 of 100 kept,
+  the lane's all kept, nothing torn. Lanes of one host appending through
+  their slot keep every line (S141).
+- **One Mac directory in two slots at once** loses both sides' appends,
+  tears lines, and can refuse a create through one slot of a file just
+  made through the other (S141). Nothing prevents it: two hosts sharing
+  one read-write directory would meet it.
 - **The VM's `T+` clock is the guest's uptime,** not the Mac's: they differ
   by the launcher's own start and the first ping, 0.15–0.5 s (S128).
 - **`setShare:` is not in the public headers:** the launcher calls it by

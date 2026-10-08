@@ -1,4 +1,4 @@
-// web/board — the board (ADR-0112): everyone's roots, each in its
+// web/board — the board (ADR-0122): everyone's roots, each in its
 // workflow state. Its strip sits in the footer and says each state's name,
 // count, the people reading in its roots, its highest mark, and how many of
 // its roots the agent works in and have work ready to accept (ADR-0091),

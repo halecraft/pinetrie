@@ -8,6 +8,8 @@ Numbered 0072 until 2026-10-04, when two files held that number.
   - ADR-0045: a model titles a root when its first lane starts, or when a
     person asks (Auto-update title), and an untitled root no agent works in is
     labelled `Chat`.
+- **Amended by:**
+  - ADR-0116: the model titles a task, from its first thread's first ask.
 
 **Context.** A root tab's label is its title, else its first message's first
 line (ADR-0045). The first line is often a preamble ("I'd like to start

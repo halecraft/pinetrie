@@ -1,4 +1,4 @@
-// e2e/host/board — moving a root on the board (ADR-0112), archiving it in
+// e2e/host/board — moving a root on the board (ADR-0122), archiving it in
 // the closed state (ADR-0029), and titling one (ADR-0045), through the
 // command Line. What each decides is unit-tested (`@pinetrie/rules`'
 // `board.test.ts`, `archive.test.ts` and `mark.test.ts`, the host's

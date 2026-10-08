@@ -111,7 +111,7 @@ cannot reach the wrong document and needs no guard at run time.
   which each client decides for its person.
 - **`LANE`** is written for every lane as it is created, naming its root;
   `work` is null for a lane with no work of its own.
-- **`WORKFLOW` and `BOARD`** (`board.ts`, ADR-0112): the session's workflow
+- **`WORKFLOW` and `BOARD`** (`board.ts`, ADR-0122): the session's workflow
   states, a singleton, and each root's place on the board, keyed by its
   `RootId`.
 - **`QUEUE_HOLD`** (`queue-hold.ts`, ADR-0048 step 7): a thread's queue
@@ -180,7 +180,7 @@ are the only code that builds or reads the shape.
   (ADR-0036), keeping the people it names. `planChat` runs it on the host, and
   the composer's `planSend` (`packages/interface/send.ts`) runs it before a send,
   so the button's promise and the host's decision cannot drift apart.
-- **`planChat` decides what a message does** (ADR-0020), over the thread
+- **`planChat` decides what a message does** (ADR-0120), over the thread
   `threadOf` gives, and names exactly where to write:
 
   | a message… | no lane | idle lane | busy lane (running, cards queued, or its queue held: `sendWaits`) |
@@ -552,7 +552,7 @@ contents: Yjs derives it from the peer, which this package cannot.
   A seat stored under its `clientID` before ADR-0062 reads with that text as
   its `peer`, which is its address, so the delete finds it.
 
-# The board (`board.ts`, ADR-0112)
+# The board (`board.ts`, ADR-0122)
 
 Every root is in one workflow state. The workflow is a host-written
 singleton (`WORKFLOW`): the open states in board order, then the closed
@@ -590,7 +590,7 @@ it, and when.
   fixed-width base-36, so string order is numeric order; `keyAfter`,
   `orderBetween` (null with no room), `orderKeys`.
 
-# The archive (`archive.ts`, ADR-0029, ADR-0112)
+# The archive (`archive.ts`, ADR-0029, ADR-0122)
 
 A root put aside for everyone: one in the closed workflow state. Moving it
 there or out writes only its board place: entries are immutable, so a root

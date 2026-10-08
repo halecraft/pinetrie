@@ -1,7 +1,7 @@
 # S20 — can a compelled message wait its turn behind the agent?
 
 - **Status:** Answered
-- **Led to:** ADR-0020, ADR-0026
+- **Led to:** ADR-0020, ADR-0026, ADR-0120
 
 **Answer: yes, with pi's own queue: `Lane.followUp`, with the harness option
 `followUpMode: "one-at-a-time"`.** A chat message queued while the agent is
