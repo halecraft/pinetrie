@@ -1174,7 +1174,8 @@ leaving treats the history, are `page.ts`'s (`@pinetrie/interface`).
   `.root-ready` when a thread has work ready, and `.item-menu`; the states
   scroll in `.board-states`, a head's count is `.board-count` (`[data-kept]`
   while filtered), and a filter's banner is `.board-filter` with
-  `.board-filter-clear`, at the board's foot; `.add-state`, `.state-name`.
+  `.board-filter-clear`, at the board's foot; `.state-name`; a state's ⋯ adds one with `.add-state-left` and
+  `.add-state-right`, its field in a `.board-new-state` column.
   The footer is `#bottom`: ▦ is
   `.board-toggle`, whose `data-messages` is the session's message count
   (the browser suite's `countIsHosts` waits on it), with `.board-filtered`

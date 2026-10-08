@@ -1445,6 +1445,24 @@ export const mutations: readonly Mutation[] = [
       "it keeps, in every state and in place, the roots whose label holds every word",
   },
   {
+    name: "a state added right of a column lands left of it",
+    file: "packages/interface/board-view.ts",
+    from: "      addBefore: { left: state.id, right: next?.state.id ?? null },",
+    to: "      addBefore: { left: state.id, right: state.id },",
+    command: unit,
+    expect:
+      "a column moves left or right one place; one holding a root, or the only open one, says why it cannot be removed",
+  },
+  {
+    name: "a state added is always added last",
+    file: "packages/interface/board-view.ts",
+    from: '  edit: { action: "add", state: null, name, before },',
+    to: '  edit: { action: "add", state: null, name, before: null },',
+    command: unit,
+    expect:
+      "nameStateIntent renames a state; addStateIntent adds one where it was asked for",
+  },
+  {
     name: "the board's search keeps every root",
     file: "packages/interface/board-view.ts",
     from: "  const keeps = search === null ? null : boardFilter(search, input.me)",

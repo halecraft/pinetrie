@@ -13,14 +13,15 @@
 // closed state it is archived (ADR-0029). An item with a thread whose work
 // is ready to accept carries ⇡, for everyone. Selecting an item opens it in your
 // list; dragged onto the sidebar, it opens there. A state's name is edited in
-// place, its ⋯ moves or removes it, and ＋ state adds one. The closed state
-// is a count and its most recent roots. The search and "mine" filter every
-// state in place (ADR-0109); a banner at the board's foot names the filter,
-// `/` focuses the search, and Escape clears the filter before it closes the
-// board. What it shows is `boardView`'s.
+// place, and its ⋯ moves or removes it, or adds one beside it. The closed
+// state, marked ✓, shows its count and its most recent roots. The search and
+// "mine" filter every state in place (ADR-0109); a banner at the board's foot
+// names the filter, `/` focuses the search, and Escape clears the filter
+// before it closes the board. What it shows is `boardView`'s.
 
-import type { EntryId, WriterId } from "@pinetrie/core"
+import type { EntryId, WorkflowStateId, WriterId } from "@pinetrie/core"
 import {
+  addStateIntent,
   type BoardSide,
   type BoardView,
   boardKeyAct,
@@ -372,7 +373,23 @@ export function Board({
       document.removeEventListener("click", onClick, true)
     }
   }, [onIntent, onClearFilter, filtered, searchRef])
-  const [adding, setAdding] = useState(false)
+  // A state being added: its name field stands where it will go.
+  const [adding, setAdding] = useState<{
+    before: WorkflowStateId | null
+  } | null>(null)
+  const newState = (before: WorkflowStateId | null) =>
+    adding !== null && adding.before === before ? (
+      <div className="board-column board-new-state" key="new-state">
+        <div className="board-head">
+          <StateName
+            editing
+            name=""
+            onEnd={() => setAdding(null)}
+            onName={name => onIntent(addStateIntent(before, name))}
+          />
+        </div>
+      </div>
+    ) : null
   // An open column's item is a place to drop before; a closed row is not,
   // since the closed state shows its roots by activity, not by place.
   const item = (t: ThreadCard, place: boolean) => (
@@ -402,7 +419,8 @@ export function Board({
   return (
     <section aria-label="board" className="board" id="board" ref={self}>
       <div className="board-states">
-        {view.open.map(column => (
+        {view.open.map(column => [
+          newState(column.state.id),
           <div
             className="board-column"
             data-state={column.state.id}
@@ -431,6 +449,13 @@ export function Board({
                 className="state-more"
                 label={`more for ${column.state.name}`}
                 sections={[
+                  {
+                    key: "add",
+                    items: [
+                      addItem("left", column.addBefore.left, setAdding),
+                      addItem("right", column.addBefore.right, setAdding),
+                    ],
+                  },
                   {
                     key: "state",
                     items: [
@@ -469,27 +494,9 @@ export function Board({
               {column.items.map(t => item(t, true))}
             </div>
             <AddButton add={column.add} onIntent={onIntent} />
-          </div>
-        ))}
-        <div className="board-add-state">
-          {adding ? (
-            <StateName
-              editing
-              name=""
-              onEnd={() => setAdding(false)}
-              onName={name => onIntent(nameStateIntent(null, name))}
-            />
-          ) : (
-            <button
-              className="add-state"
-              onClick={() => setAdding(true)}
-              title="add a workflow state to the board, for everyone"
-              type="button"
-            >
-              ＋ state
-            </button>
-          )}
-        </div>
+          </div>,
+        ])}
+        {newState(null)}
         <div
           className="board-closed"
           data-state={view.closed.state.id}
@@ -501,6 +508,9 @@ export function Board({
           })}
         >
           <div className="board-head">
+            <span aria-hidden className="closed-mark">
+              ✓
+            </span>
             <StateName
               name={view.closed.state.name}
               onName={name =>
@@ -542,6 +552,18 @@ const moveItem = (
   title: `move this state one place ${side}, for everyone`,
   label: side === "left" ? "Move left" : "Move right",
   onChoose: () => onIntent(intent),
+})
+
+const addItem = (
+  side: "left" | "right",
+  before: WorkflowStateId | null,
+  setAdding: (adding: { before: WorkflowStateId | null }) => void,
+): MenuItem => ({
+  key: `add-${side}`,
+  className: `add-state-${side}`,
+  title: `add a workflow state ${side} of this one, for everyone`,
+  label: side === "left" ? "Add state left" : "Add state right",
+  onChoose: () => setAdding({ before }),
 })
 
 /** A root on the board: its status, label and pip; its readers; its ⋯. */

@@ -15,6 +15,7 @@ import { orderKeys } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import type { Status } from "./attention.ts"
 import {
+  addStateIntent,
   type BoardKeyFocus,
   type BoardSearch,
   type BoardViewInput,
@@ -240,6 +241,8 @@ describe("boardView", () => {
       edit: { action: "move", state: DOING, name: "", before: BACKLOG },
     })
     expect(doing?.right).toBeNull()
+    expect(backlog?.addBefore).toEqual({ left: BACKLOG, right: DOING })
+    expect(doing?.addBefore).toEqual({ left: DOING, right: null })
     expect(backlog?.remove.why).toBe("holds a root: move it first")
     expect(removeWords(0, 1)).toBe("the board needs one open state")
     expect(removeWords(0, 2)).toBeNull()
@@ -453,12 +456,16 @@ describe("board words", () => {
   })
 })
 
-test("nameStateIntent: a name for a state renames it; for none, adds one", () => {
+test("nameStateIntent renames a state; addStateIntent adds one where it was asked for", () => {
   expect(nameStateIntent(DOING, "Now")).toEqual({
     kind: "editWorkflow",
     edit: { action: "rename", state: DOING, name: "Now", before: null },
   })
-  expect(nameStateIntent(null, "Review")).toEqual({
+  expect(addStateIntent(DOING, "Review")).toEqual({
+    kind: "editWorkflow",
+    edit: { action: "add", state: null, name: "Review", before: DOING },
+  })
+  expect(addStateIntent(null, "Review")).toEqual({
     kind: "editWorkflow",
     edit: { action: "add", state: null, name: "Review", before: null },
   })

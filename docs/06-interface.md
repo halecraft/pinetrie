@@ -302,16 +302,18 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   board. The filter outlives closing the board, not a reload.
 - **The closed state archives** (ADR-0029): a root there is read-only for
   everyone until it is moved out, the host lets go of it, and its threads'
-  offers leave your repo. It shows as a count and its most recent roots, or
-  every root the search keeps, newest first. An archived root opened from it
+  offers leave your repo. Its column, as wide as the others and marked ✓,
+  shows a count and its most recent roots, or every root the search keeps,
+  newest first. An archived root opened from it
   is read-only, with **Restore** in its composer's place, which moves it to
   the first open state; it leaves the sidebar when you switch away unless you
   restore it.
 - **Anyone edits the states**: a state's name is a button that turns into a
   field (Enter or leaving it saves; Escape keeps the old name); its `⋯`
-  moves it left or right, or removes it, which is refused, with the reason,
-  while it holds a root or is the only open state; **＋ state** adds one
-  after the open states. The closed state can be renamed, never moved or
+  moves it left or right, adds a state left or right of it (a name field
+  stands where it will go), or removes it, which is refused, with the
+  reason, while it holds a root or is the only open state. Adding a state is
+  rare, so it takes no room on the board. The closed state can be renamed, never moved or
   removed.
 - **A backlog item is a conversation root**: an idea not started is a root
   with no agent (ADR-0021); people discuss it below its first message, and

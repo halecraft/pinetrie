@@ -96,6 +96,11 @@ export interface BoardColumnView {
   /** One place left or right among the open states; null at an end. */
   readonly left: Intent | null
   readonly right: Intent | null
+  /** Where a state added beside it goes: before this state, or before the next (null: last). */
+  readonly addBefore: {
+    readonly left: WorkflowStateId
+    readonly right: WorkflowStateId | null
+  }
   /** Remove it, or why it cannot be removed (`removeWords`): every root counts. */
   readonly remove: { readonly intent: Intent; readonly why: string | null }
 }
@@ -298,6 +303,7 @@ export function boardView(input: BoardViewInput): BoardView {
       },
       left: previous === undefined ? null : before(previous.state.id),
       right: next === undefined ? null : before(afterNext?.state.id ?? null),
+      addBefore: { left: state.id, right: next?.state.id ?? null },
       remove: {
         intent: {
           kind: "editWorkflow",
@@ -454,18 +460,22 @@ export const clickClosesBoard = (
   release: BoardSide,
 ): boolean => press === "elsewhere" && release === "elsewhere"
 
-/** A state renamed, or a new one added: the board's name field sends this. */
+/** A state renamed: its name field sends this. */
 export const nameStateIntent = (
-  state: WorkflowStateId | null,
+  state: WorkflowStateId,
   name: string,
 ): Intent => ({
   kind: "editWorkflow",
-  edit: {
-    action: state === null ? "add" : "rename",
-    state,
-    name,
-    before: null,
-  },
+  edit: { action: "rename", state, name, before: null },
+})
+
+/** A state added before `before`, or after the open states if null: a new state's name field sends this. */
+export const addStateIntent = (
+  before: WorkflowStateId | null,
+  name: string,
+): Intent => ({
+  kind: "editWorkflow",
+  edit: { action: "add", state: null, name, before },
 })
 
 /** A state's ◌ and ⇡, as their titles say them, in the strip and in a column's head (ADR-0091). */

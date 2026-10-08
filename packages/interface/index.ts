@@ -70,6 +70,7 @@ export {
   threadWriters,
 } from "./attention.ts"
 export {
+  addStateIntent,
   BOARD_SEARCH,
   type BoardKey,
   type BoardSearch,
