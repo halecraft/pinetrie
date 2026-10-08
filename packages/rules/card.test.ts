@@ -25,6 +25,7 @@ import {
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
+  blankQueued,
   cardEnd,
   cardsAt,
   decodeCard,
@@ -683,6 +684,23 @@ describe("the queue", () => {
     ] as const)("isBlankMessage: %s is %s", (_, carries, text, blank) => {
       expect(isBlankMessage({ ...empty, carries }, text)).toBe(blank)
     })
+  })
+
+  test("blankQueued: a queued message with no command and no text, whose text is held as its queuer had it; not one whose text has not arrived", () => {
+    const empty = queued("c-1", "a")
+    const behind = {
+      ...queued("c-2", "b"),
+      place: { ...queued("c-2", "b").place, seen: "v-1" },
+    }
+    const command: QueuedCard = {
+      ...queued("c-3", "c"),
+      carries: { kind: "message", command: "split" },
+    }
+    const blank = blankQueued([empty, behind, command, card()], {
+      holds: (_, seen) => seen === "",
+      text: () => " ",
+    })
+    expect([...blank]).toEqual([empty.id])
   })
 
   test("planUnqueueAll: every message card queued on the lane, back where it was queued, in order; a fact and another lane's stay", () => {

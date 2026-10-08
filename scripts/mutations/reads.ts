@@ -5,6 +5,15 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/reads"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a blank queued card waits",
+    file: "packages/reads/index.ts",
+    from: "    const queue = queuedOn(cards, name).filter(c => !blank.has(c.id))",
+    to: "    const queue = queuedOn(cards, name)",
+    command: unit,
+    expect:
+      "readLanes: a lane's queued cards are what waits; askedBy is who queued the first, lastWaiting the last",
+  },
+  {
     name: "a new lane on a host with tools is sent the host's paths",
     file: "packages/reads/index.ts",
     from: "  return readProject(session) !== null\n",

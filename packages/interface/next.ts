@@ -18,7 +18,6 @@ import {
 import {
   carryOnState,
   displayName,
-  isBlankMessage,
   planNextQueuedCardPop,
   queuedOn,
 } from "@pinetrie/rules"
@@ -66,8 +65,8 @@ export interface NextFacts {
   readonly cards: readonly CardRecord[]
   /** The cards someone types in now (presence `typingIn`). */
   readonly typing: ReadonlySet<CardId>
-  /** Each queued card's text as this page holds it; one not read yet is absent. */
-  readonly texts: ReadonlyMap<CardId, string>
+  /** The queued cards that are blank messages (`blankQueued`): the drain passes over them. */
+  readonly blank: ReadonlySet<CardId>
   readonly index: TreeIndex
   readonly asks: AskIndex
   /** Who stopped each ask, by its prompt. */
@@ -77,20 +76,13 @@ export interface NextFacts {
 /**
  * What `lane` does next, as its host would decide it: running; else the pop
  * `planNextQueuedCardPop` plans, a blank message passed over as the drain
- * passes it (`isBlankMessage`); else a stop `carryOnState` lets carry on;
- * else idle. A card whose text the page has not read is not blank.
+ * passes it (`blankQueued`); else a stop `carryOnState` lets carry on;
+ * else idle.
  */
 export function nextOf(lane: LaneView, facts: NextFacts): Next {
   if (lane.running) return { kind: "running" }
   const queue = queuedOn(facts.cards, lane.name)
-  const blank = new Set(
-    queue
-      .filter(c => {
-        const text = facts.texts.get(c.id)
-        return text !== undefined && isBlankMessage(c, text)
-      })
-      .map(c => c.id),
-  )
+  const { blank } = facts
   const resumable =
     carryOnState(lane, { index: facts.index, asks: facts.asks }).kind === "ok"
   if (lane.heldBy !== null) {

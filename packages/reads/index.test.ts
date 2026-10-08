@@ -121,9 +121,13 @@ test("readLanes: a lane's queued cards are what waits; askedBy is who queued the
     queued("c-1", "a", "ada@x.io"),
     atEnd,
   ]
-  const found = readLanes(view, readTreeIndex(doc), cards, new Map()).find(
-    l => l.name === lane,
-  )
+  const found = readLanes(
+    view,
+    readTreeIndex(doc),
+    cards,
+    new Map(),
+    new Set(),
+  ).find(l => l.name === lane)
   expect(found).toMatchObject({
     running: false,
     waiting: 2,
@@ -131,19 +135,42 @@ test("readLanes: a lane's queued cards are what waits; askedBy is who queued the
     lastWaiting: writerId("bea@x.io"),
     heldBy: null,
   })
-  expect(readLanes(view, readTreeIndex(doc), [], new Map())[0]).toMatchObject({
+  expect(
+    readLanes(view, readTreeIndex(doc), [], new Map(), new Set())[0],
+  ).toMatchObject({
     waiting: 0,
     askedBy: null,
     lastWaiting: null,
     heldBy: null,
   })
+  // A blank queued card does not wait: the drain passes over it, so a queue
+  // of blank cards alone leaves its lane idle (ADR-0113).
+  expect(
+    readLanes(
+      view,
+      readTreeIndex(doc),
+      cards,
+      new Map(),
+      new Set([cardId("c-2")]),
+    ).find(l => l.name === lane),
+  ).toMatchObject({ waiting: 1, lastWaiting: writerId("ada@x.io") })
+  expect(
+    readLanes(
+      view,
+      readTreeIndex(doc),
+      cards,
+      new Map(),
+      new Set([cardId("c-1"), cardId("c-2")]),
+    ).find(l => l.name === lane),
+  ).toMatchObject({ waiting: 0, askedBy: null, lastWaiting: null })
   // A held queue names who holds it (ADR-0048 step 7).
   const holds = new Map([[lane, { lane, by: writerId("cy@x.io"), at: 1 }]])
-  expect(readLanes(view, readTreeIndex(doc), [], holds)[0]?.heldBy).toBe(
-    writerId("cy@x.io"),
-  )
+  expect(
+    readLanes(view, readTreeIndex(doc), [], holds, new Set())[0]?.heldBy,
+  ).toBe(writerId("cy@x.io"))
   beginRun(live, lane, runId("r-1"))
   expect(
-    readLanes(view, readTreeIndex(doc), cards, new Map())[0]?.running,
+    readLanes(view, readTreeIndex(doc), cards, new Map(), new Set())[0]
+      ?.running,
   ).toBe(true)
 })

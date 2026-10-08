@@ -14,6 +14,7 @@ import { expect, test } from "vitest"
 import {
   basics,
   methods,
+  NO_BLANK_CARDS,
   putLane,
   putValue,
   ROOT_ID,
@@ -58,6 +59,7 @@ function setUp() {
     records: records.port,
     work: work.port,
     keeper: createKeeper(),
+    cards: NO_BLANK_CARDS,
   }
   return { b, root, records, work, deps }
 }

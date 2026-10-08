@@ -1122,8 +1122,8 @@ draws it.
   held (with the card a release sends first, `planNextQueuedCardPop` with
   no hold, and whether the turn may also carry on, `carryOnState`); else
   the pop the drain would make now (`sending`, or waiting on typing), a
-  blank message passed over (`isBlankMessage`, the page's texts; a card
-  not read yet is not blank); else stopped (who, from `stops`); else idle.
+  blank message passed over (`blankQueued`, read from the page's texts by
+  `useBlankQueued`, the rule the host's drain and `readLanes` use); else stopped (who, from `stops`); else idle.
   `queueHead` adds the lane, the holder and the message cards queued, and
   `queueHeadPlan` decides the one button (stop, send queue, resume), the
   ⋯ items (resume, hold, release, unqueue all) and where ▸ sits.

@@ -45,6 +45,7 @@ import {
   readRoots,
   readWorkflow,
 } from "@pinetrie/reads"
+import { NONE_BLANK } from "@pinetrie/rules"
 import {
   hasLaneRecord,
   type LiveDocHandle,
@@ -337,7 +338,10 @@ export const lanesOf = (
 ): readonly LaneView[] => {
   const { roots, live, session } = held(x)
   const holds = readQueueHolds(session)
-  return roots.flatMap(doc => readLanes({ doc, live }, index, cards, holds))
+  // The suites' checks read the queue's order and holds, not who waits.
+  return roots.flatMap(doc =>
+    readLanes({ doc, live }, index, cards, holds, NONE_BLANK),
+  )
 }
 
 /** Every lane name pi holds, in the roots `x` holds. */

@@ -95,6 +95,7 @@ export {
   type WorkflowPlan,
 } from "./board.ts"
 export {
+  blankQueued,
   type CarryPlan,
   cardEnd,
   cardsAt,
@@ -106,6 +107,7 @@ export {
   type MoveStep,
   type MovesStep,
   type NextQueuedCardPopStep,
+  NONE_BLANK,
   type PlaceStep,
   placeEnd,
   planCardSweep,

@@ -104,9 +104,12 @@ Kyneta has let go.
   new entry decodes only itself.
 
 - **`readLanes` reads two documents**: the session, and every card's record
-  (`readPlaces` of the places document), passed in. A lane's `waiting` is its
-  queued cards (`queuedOn`), so a lane with cards queued is busy (`isBusy`)
-  even between two pops. The client reads lanes with its cards, in `App`;
+  (`readPlaces` of the places document), passed in, and the queued cards
+  that are blank (`blankQueued`, from the texts its caller holds). A lane's
+  `waiting` is its queued cards (`queuedOn`) less the blank ones, so a lane
+  with cards queued is busy (`isBusy`) even between two pops, and one with
+  only blank cards queued is not: the drain passes over them (ADR-0113). A
+  read that uses only the lanes' tips or names passes `NONE_BLANK`. The client reads lanes with its cards, in `App`;
   a read that needs only runs and tips uses `readRunning` and
   `readLaneNames`, as `readAgentActivity` does.
 - **`readLanes`' `askedBy`** is the writer of the message a running lane is

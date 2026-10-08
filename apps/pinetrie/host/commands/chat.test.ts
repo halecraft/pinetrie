@@ -30,6 +30,7 @@ import { describe, expect, test } from "vitest"
 import {
   basics,
   methods,
+  NO_BLANK_CARDS,
   putLane,
   putValue,
   ROOT_ID,
@@ -78,7 +79,9 @@ function setUp(begin: ErrCode | null = null) {
     piSetup: pi.port,
     work: work.port,
     blobs: record<ChatDeps["blobs"]>().port,
-    cards: record<ChatDeps["cards"]>().port,
+    cards: record<ChatDeps["cards"]>({
+      blankQueued: NO_BLANK_CARDS.blankQueued,
+    }).port,
     start: (lane, start) => {
       started.push(lane)
       if (start.kind === "prompt") seen.push(start.pinnedSeen)
@@ -189,6 +192,7 @@ describe("sendChat", () => {
     if (project !== null) putValue(b, setRecord(PROJECT, project))
     const cards = record<ChatDeps["cards"]>({
       writers: async () => [ALICE, BEA],
+      blankQueued: NO_BLANK_CARDS.blankQueued,
     })
     const pi = record<FakePi>({
       commands: () => [],
@@ -418,9 +422,11 @@ describe("sendChat", () => {
     expect(appended?.args[0]).toMatchObject({
       details: { contributors: [BEA] },
     })
-    expect(cards.calls.map(c => [c.method, ...c.args])).toEqual([
-      ["writers", "c-1"],
-    ])
+    expect(
+      cards.calls
+        .filter(c => c.method === "writers")
+        .map(c => [c.method, ...c.args]),
+    ).toEqual([["writers", "c-1"]])
   })
 
   test("spendsCard: written or running takes the card; busy, a conflict, a refusal or a failure leaves it", () => {
@@ -476,7 +482,7 @@ describe("sendChat", () => {
   test("a message with no card names no one else", async () => {
     const { pi, cards, deps } = setUp()
     await sendChat(deps, ALICE, "s-1", chat("plain"))
-    expect(cards.calls).toEqual([])
+    expect(cards.calls.filter(c => c.method === "writers")).toEqual([])
     const appended = pi.calls.find(c => c.method === "appendToTree")
     expect(
       (appended?.args[0] as { details: ChatDetails }).details.contributors,

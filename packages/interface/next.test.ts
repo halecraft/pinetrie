@@ -77,7 +77,7 @@ const facts = (
     stopped?: boolean
     cards?: readonly CardRecord[]
     typing?: readonly CardId[]
-    texts?: Record<string, string>
+    blank?: readonly string[]
     stops?: ReadonlyMap<EntryId, StopRecord>
   } = {},
 ): NextFacts => {
@@ -85,9 +85,7 @@ const facts = (
   return {
     cards: over.cards ?? [],
     typing: new Set(over.typing ?? []),
-    texts: new Map(
-      Object.entries(over.texts ?? {}).map(([k, v]) => [cardId(k), v]),
-    ),
+    blank: new Set((over.blank ?? []).map(cardId)),
     index: i,
     asks: indexAsks(i),
     stops: over.stops ?? new Map(),
@@ -117,7 +115,7 @@ describe("nextOf: what the thread does next, as the host decides it (ADR-0113)",
     [
       "held with only a blank card: nothing to send",
       { waiting: 1, heldBy: BEA },
-      { cards: [queued("c-1", "a")], texts: { "c-1": " " } },
+      { cards: [queued("c-1", "a")], blank: ["c-1"] },
       { kind: "held", by: BEA, top: null, count: 0, resumable: false },
     ],
     [
@@ -147,14 +145,8 @@ describe("nextOf: what the thread does next, as the host decides it (ADR-0113)",
     [
       "a blank top card is passed over, as the drain passes it",
       { waiting: 2 },
-      { cards: two, texts: { "c-1": "", "c-2": "go" } },
+      { cards: two, blank: ["c-1"] },
       { kind: "sending", top: C2, typing: false },
-    ],
-    [
-      "a card whose text is not read yet is not blank",
-      { waiting: 2 },
-      { cards: two, texts: { "c-2": "go" } },
-      { kind: "sending", top: C1, typing: false },
     ],
   ])("%s", (_, over, f, next) => {
     expect(nextOf(lane(over), facts(f))).toEqual(next)

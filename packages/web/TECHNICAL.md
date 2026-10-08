@@ -517,8 +517,14 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   (`.the-line`), the column's notices, then what `Column` puts in it: your
   message (`Composer`) and the notes line. CSS caps it at a third of the
   column (`.dock`'s `max-height`) and it scrolls within. It reads presence
-  (`readTypingIn`) and the queued cards' texts (`useCardTexts`) itself, for
-  `queueHead`, so typing redraws the dock and not the column (S59).
+  (`readTypingIn`) and which queued cards are blank (`useBlankQueued`)
+  itself, for `queueHead`, so typing redraws the dock and not the column
+  (S59).
+- **Which queued cards are blank** is `useBlankQueued` (`blankQueued` over
+  the page's copies of their texts), in `App` for the lanes (`readHeldLanes`:
+  a blank card does not wait, so it draws no ring) and in the dock. It
+  changes only when the set does, so typing in a queued card redraws
+  neither.
   - **The header's one button** (`.next-button`) is `.stop` (sending
     `stop`), `.resume` (`carry-on`) or `.release-queue` ("send queue (n)",
     the `holdQueue` act). Its ⋯ (`.queue-menu-trigger`) holds `.resume`,

@@ -70,7 +70,7 @@ export interface ChatDeps {
   >
   readonly blobs: Pick<BlobStore, "ref">
   /** Who wrote in a card: its other writers are a message's contributors (ADR-0048). */
-  readonly cards: Pick<CardPort, "writers">
+  readonly cards: Pick<CardPort, "writers" | "blankQueued">
   readonly start: Runs["start"]
   /** A new lane may title its root (ADR-0074). */
   readonly titles: Pick<Titles, "laneStarted">
@@ -134,15 +134,13 @@ export async function sendChat(
       ? []
       : (await cards.writers(chat.card.id)).filter(w => w !== writer)
 
+  const placed = readPlaces(deps.basics.places)
+  const blank = await cards.blankQueued(placed)
+
   // plan (pure)
   const thread = threadOf(
     index,
-    readLanes(
-      view,
-      index,
-      readPlaces(deps.basics.places),
-      readQueueHolds(session),
-    ),
+    readLanes(view, index, placed, readQueueHolds(session), blank),
     {
       at: chat.at,
       mode: chat.mode,

@@ -4,6 +4,7 @@
 // it.
 
 import {
+  type CardId,
   type EntryId,
   type LaneName,
   type RootId,
@@ -283,3 +284,8 @@ export function basics(
     lines,
   }
 }
+
+/** A host whose queued cards all hold text: none is blank (`blankQueued`). */
+export const NO_BLANK_CARDS = {
+  blankQueued: async () => new Set<CardId>(),
+} as const

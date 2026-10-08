@@ -22,6 +22,7 @@ import {
   cardsAt,
   displayName,
   encodePinned,
+  NONE_BLANK,
   type PinnedMessage,
   pinnedReads,
   planPinnedRead,
@@ -72,6 +73,8 @@ export function createPinned(deps: {
       index,
       records,
       readQueueHolds(session),
+      // Only the lanes' tips are read here: their thread ends.
+      NONE_BLANK,
     )
     return { index, tip, pinned: cardsAt("pinned", tip, records, lanes, index) }
   }

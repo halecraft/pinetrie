@@ -37,6 +37,7 @@ import {
   ROOT,
   rootIdFor,
   sameKey,
+  seenAt,
   shellWord,
   THE_AGENT,
   writerId,
@@ -475,6 +476,22 @@ describe("moves, built once (ADR-0059)", () => {
     expect(placeOfFields({ ...fields, holder: "" })).toBeUndefined()
     expect(
       sameKey(keyOf(place), { kind: "gone", root: OTHER, why: place.why }),
+    ).toBe(false)
+  })
+
+  test("seenAt: a note seen with no cell is anywhere on its board; one seen in a cell is where it is only in that cell", () => {
+    const note = {
+      kind: "note",
+      root: TEST_ROOT,
+      at: atEntry(entryId("e-1")),
+      lane: null,
+    } as const
+    const now = { ...note, cell: 3 }
+    expect(seenAt(now, { ...note, cell: null })).toBe(true)
+    expect(seenAt(now, { ...note, cell: 3 })).toBe(true)
+    expect(seenAt(now, { ...note, cell: 2 })).toBe(false)
+    expect(
+      seenAt(now, { ...note, at: atEntry(entryId("e-2")), cell: null }),
     ).toBe(false)
   })
 

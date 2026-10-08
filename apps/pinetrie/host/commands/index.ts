@@ -67,7 +67,10 @@ export interface CommandDeps {
   readonly work: ChatDeps["work"] & BoardDeps["work"] & LaneDeps["work"]
   readonly blobs: ChatDeps["blobs"] & PictureDeps["blobs"]
   readonly fitImage: PictureDeps["fitImage"]
-  readonly cards: ChatDeps["cards"] & CardCommandDeps["cards"]
+  readonly cards: ChatDeps["cards"] &
+    CardCommandDeps["cards"] &
+    LaneDeps["cards"] &
+    BoardDeps["cards"]
   readonly start: ChatDeps["start"]
   readonly cancel: LaneDeps["cancel"]
   readonly names: Pick<Names, "reserve">

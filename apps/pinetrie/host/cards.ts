@@ -5,14 +5,14 @@
 // Where a card is lives in the places document, which `places.ts` writes;
 // this port is about texts alone: who wrote in one, loading them for the
 // queue's pops and a run's pinned cards, whether they hold what a queuer or
-// a sender had, destroying a spent one, and gathering them for the sweeps, so no text
-// is read twice.
+// a sender had, which queued cards are blank, destroying a spent one, and
+// gathering them for the sweeps, so no text is read twice.
 
 import { type Exchange, type Store, whenHydrated } from "@kyneta/exchange"
 import { subscribe } from "@kyneta/schema"
-import type { CardId, WriterId } from "@pinetrie/core"
+import type { CardId, CardRecord, WriterId } from "@pinetrie/core"
 import { readSeats } from "@pinetrie/reads"
-import { writersOfClients } from "@pinetrie/rules"
+import { blankQueued, writersOfClients } from "@pinetrie/rules"
 import {
   cardDocId,
   type SessionDocHandle,
@@ -56,6 +56,12 @@ export interface CardPort {
    * `signal` aborts, unsubscribing either way.
    */
   whenWritten(id: CardId, signal?: AbortSignal): Promise<void>
+  /**
+   * The queued cards that are blank messages (`blankQueued`), each queued
+   * card's text loaded first, so one whose text has not arrived is never
+   * read as blank. What a read of lanes counts as waiting leaves them out.
+   */
+  blankQueued(cards: readonly CardRecord[]): Promise<ReadonlySet<CardId>>
   /** These cards' texts, with who wrote in each. */
   texts(ids: readonly CardId[]): Promise<readonly GatheredText[]>
   /** Every stored card text document, by id. */
@@ -108,6 +114,15 @@ export function startCards(input: {
     whenWritten(id, signal) {
       const t = exchange.get(cardDocId(id), TextDoc)
       return until(t, () => t.text().trim() !== "", signal)
+    },
+    async blankQueued(cards) {
+      const queued = cards.filter(c => c.place.kind === "queued")
+      for (const c of queued) await text(cardDocId(c.id))
+      return blankQueued(queued, {
+        holds: (id, seen) =>
+          textHolds(exchange.get(cardDocId(id), TextDoc), seen),
+        text: id => exchange.get(cardDocId(id), TextDoc).text(),
+      })
     },
     async texts(ids) {
       const out: GatheredText[] = []

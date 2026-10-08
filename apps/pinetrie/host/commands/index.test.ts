@@ -20,6 +20,7 @@ import type { HostKey } from "../basics.ts"
 import {
   applyWrites,
   basics,
+  NO_BLANK_CARDS,
   putValue,
   ROOT_ID,
   record,
@@ -62,6 +63,7 @@ function setUp(
   const cards = record<CommandDeps["cards"]>({
     writers: async () => [],
     destroy: async () => {},
+    blankQueued: NO_BLANK_CARDS.blankQueued,
   })
   const drains: string[] = []
   const titles = record<CommandDeps["titles"]>({

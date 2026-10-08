@@ -32,10 +32,10 @@ import {
   readTypingIn,
 } from "@pinetrie/reads"
 import {
+  blankQueued,
   type CarryPlan,
   displayName,
   encodeFact,
-  isBlankMessage,
   planCarry,
   planNextQueuedCardPop,
   planUnsent,
@@ -93,15 +93,10 @@ export function popNextQueuedCard(
   texts: Pick<CardPort, "textNow" | "holds">,
 ): NextQueuedCardPop {
   const cards = readPlaces(places)
-  const blank = new Set(
-    queuedOn(cards, lane)
-      .filter(
-        c =>
-          texts.holds(c.id, c.place.seen) &&
-          isBlankMessage(c, texts.textNow(c.id)),
-      )
-      .map(c => c.id),
-  )
+  const blank = blankQueued(queuedOn(cards, lane), {
+    holds: texts.holds,
+    text: texts.textNow,
+  })
   const step = planNextQueuedCardPop(cards, lane, { ...facts, blank })
   if (step.kind !== "pop") return step
   const { card } = step

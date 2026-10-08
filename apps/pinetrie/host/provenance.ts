@@ -28,6 +28,7 @@ import {
   CARD_HISTORY,
   type Cause,
   deleteRecord,
+  NONE_BLANK,
   type ProvenanceSteps,
   placeEnd,
   planProvenance,
@@ -132,6 +133,8 @@ export function createProvenance(deps: ProvenanceDeps): Provenance {
               index,
               cards,
               readQueueHolds(session),
+              // Only the lanes' tips are read here: their thread ends.
+              NONE_BLANK,
             )
             roots.set(root, { index, lanes })
           }

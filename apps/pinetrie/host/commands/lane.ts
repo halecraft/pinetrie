@@ -41,6 +41,7 @@ import {
 } from "@pinetrie/rules"
 import { type RootDocHandle, readLaneTip } from "@pinetrie/schema"
 import { type Basics, failed, type HostKeeper } from "../basics.ts"
+import type { CardPort } from "../cards.ts"
 import { applyPlaceSteps } from "../places.ts"
 import type { Provenance } from "../provenance.ts"
 import type { Records } from "../records.ts"
@@ -61,6 +62,8 @@ export interface LaneDeps {
   readonly keeper: Pick<HostKeeper, "run">
   /** Each card's history: a fact's card is the host's write. */
   readonly provenance: Pick<Provenance, "before" | "after">
+  /** Which queued cards are blank: they leave a lane idle (ADR-0113). */
+  readonly cards: Pick<CardPort, "blankQueued">
 }
 
 /** A thread's lane as its root's document has it now (`laneAt`). */
@@ -76,19 +79,22 @@ interface LaneHere {
  * for a lane no root holds.
  */
 async function laneAt(
-  basics: Pick<Basics, "docs" | "live" | "places" | "session">,
+  deps: Pick<LaneDeps, "basics" | "cards">,
   lane: LaneName,
 ): Promise<LaneHere | null> {
-  const { docs, live, places, session } = basics
+  const { docs, live, places, session } = deps.basics
   const root = docs.rootOfLane(lane)
   if (root === null) return null
   const doc = await docs.root(root)
+  const cards = readPlaces(places)
+  const blank = await deps.cards.blankQueued(cards)
   const index = readTreeIndex(doc)
   const view = readLanes(
     { doc, live },
     index,
-    readPlaces(places),
+    cards,
     readQueueHolds(session),
+    blank,
   ).find(l => l.name === lane)
   return view === undefined ? null : { root, doc, index, lane: view }
 }
@@ -102,12 +108,12 @@ async function laneAt(
  * abort would reach nothing: it is cancelled instead.
  */
 export async function handleStop(
-  deps: Pick<LaneDeps, "basics" | "agent" | "records" | "cancel">,
+  deps: Pick<LaneDeps, "basics" | "cards" | "agent" | "records" | "cancel">,
   lane: LaneName,
   by: WriterId,
 ): Promise<Outcome> {
   const { agent } = deps
-  const here = await laneAt(deps.basics, lane)
+  const here = await laneAt(deps, lane)
   if (here === null)
     return {
       kind: "refused",
@@ -143,13 +149,13 @@ export async function handleStop(
  * asks for the lane's drain: nothing else would pop what waited.
  */
 export async function handleQueueHold(
-  deps: Pick<LaneDeps, "basics" | "drain" | "records">,
+  deps: Pick<LaneDeps, "basics" | "cards" | "drain" | "records">,
   lane: LaneName,
   held: boolean,
   by: WriterId,
 ): Promise<Outcome> {
   // gather
-  const here = await laneAt(deps.basics, lane)
+  const here = await laneAt(deps, lane)
   if (here === null)
     return {
       kind: "refused",
@@ -176,12 +182,12 @@ export async function handleQueueHold(
  * the documents' keeper, so a second press finds the lane busy.
  */
 export async function handleCarryOn(
-  deps: Pick<LaneDeps, "basics" | "start">,
+  deps: Pick<LaneDeps, "basics" | "cards" | "start">,
   lane: LaneName,
   by: WriterId,
 ): Promise<Outcome> {
   const { basics } = deps
-  const here = await laneAt(basics, lane)
+  const here = await laneAt(deps, lane)
   const planned = planCarryOn(
     here === null ? null : { ...here, asks: indexAsks(here.index) },
     {

@@ -1584,6 +1584,24 @@ export function sameKey(a: PlaceKey, b: PlaceKey): boolean {
 }
 
 /**
+ * Whether a card at `now` is where a move's sender saw it, `from`: the
+ * same place (`sameKey`), where a note seen with no cell is anywhere on its
+ * board. A note's cell is the host's to give, as a queued card's order is,
+ * so a note the sender has just made, unqueued, unpinned or put on a column
+ * is drawn with none until the host's write reaches them: as a move's
+ * target a null cell asks the host for one, and as its source it is
+ * whichever the host gave. A note seen in one cell and now in another has
+ * moved.
+ */
+export const seenAt = (now: PlaceKey, from: PlaceKey): boolean =>
+  sameKey(
+    now,
+    from.kind === "note" && from.cell === null && now.kind === "note"
+      ? { ...from, cell: now.cell }
+      : from,
+  )
+
+/**
  * What queueing a card does to its queue's hold (ADR-0113): nothing; hold an
  * idle queue first, so a card staged there is not sent while it is written;
  * or release it, so the card is sent after those queued before it.

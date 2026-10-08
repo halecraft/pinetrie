@@ -555,8 +555,11 @@ rejects `shutdown()`.
   to stop (`typing`, `untilNotTyped`, which watches presence; a decay
   reaches the host's subscribers, S28), or, when every card queued is a
   blank message, for the first to be written in (`blank`, `whenWritten`).
-  A blank message (`isBlankMessage`: no command, only whitespace) is passed
-  over and stays queued (ADR-0113); one whose text is behind is not blank,
+  A blank message (`blankQueued`: no command, only whitespace) is passed
+  over and stays queued (ADR-0113), and does not wait: a command that reads
+  lanes for who waits (a chat, a queue, a stop, a carry-on, a move to the
+  closed state) gathers the blank cards first (`CardPort.blankQueued`,
+  which loads each queued card's text). One whose text is behind is not blank,
   or the cards behind it would go first. A wait is given up when its card
   leaves the queue (`givenUp`), and its end drains the lane again. `runs.start` marks a lane
   running at once (a `begin`), so a drain behind a started run pops

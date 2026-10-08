@@ -25,6 +25,7 @@ import {
   basics,
   fakeLane,
   methods,
+  NO_BLANK_CARDS,
   putLane,
   putValue,
   ROOT_ID,
@@ -68,7 +69,13 @@ test("stopping a running lane records who stopped its ask, then aborts its run",
   const { b, lane, handle, pi } = running()
   expect(
     await handleStop(
-      { basics: b, agent: pi.port, records: pi.port, cancel: () => false },
+      {
+        basics: b,
+        cards: NO_BLANK_CARDS,
+        agent: pi.port,
+        records: pi.port,
+        cancel: () => false,
+      },
       lane,
       ada,
     ),
@@ -98,7 +105,13 @@ test("a second stop of the same ask records nothing more", async () => {
     setRecord(STOP, { prompt: entryId("e-1"), by: bea, at: 1 }, ROOT_ID),
   )
   await handleStop(
-    { basics: b, agent: pi.port, records: pi.port, cancel: () => false },
+    {
+      basics: b,
+      cards: NO_BLANK_CARDS,
+      agent: pi.port,
+      records: pi.port,
+      cancel: () => false,
+    },
     lane,
     ada,
   )
@@ -112,6 +125,7 @@ test("a stop while a chat's run waits for its pinned cards cancels it there, and
   await handleStop(
     {
       basics: b,
+      cards: NO_BLANK_CARDS,
       agent: pi.port,
       records: pi.port,
       cancel: l => {
@@ -149,7 +163,13 @@ test("a stop with a message card queued holds the queue in the same write as its
     }),
   )
   await handleStop(
-    { basics: b, agent: pi.port, records: pi.port, cancel: () => false },
+    {
+      basics: b,
+      cards: NO_BLANK_CARDS,
+      agent: pi.port,
+      records: pi.port,
+      cancel: () => false,
+    },
     lane,
     ada,
   )
@@ -182,6 +202,7 @@ test("a hold is written once, its release deleted and the lane drained, each ans
       },
     },
     drain: (l: LaneName) => void drained.push(l),
+    cards: NO_BLANK_CARDS,
   }
   expect(await handleQueueHold(deps, lane, true, ada)).toEqual({
     kind: "held",
@@ -278,7 +299,9 @@ function stopped() {
 
 test("carrying on a stopped lane starts a run whose prompt is the carry-on message", async () => {
   const { b, lane, started, start } = stopped()
-  expect(await handleCarryOn({ basics: b, start }, lane, ada)).toEqual({
+  expect(
+    await handleCarryOn({ basics: b, start, cards: NO_BLANK_CARDS }, lane, ada),
+  ).toEqual({
     kind: "started",
     runId: runId("r-2"),
   })
@@ -301,14 +324,16 @@ test("carrying on a stopped lane starts a run whose prompt is the carry-on messa
 test("a carry-on the rule refuses is answered with its refusal, and starts nothing", async () => {
   const { b, lane, started, start } = stopped()
   beginRun(b.live, lane, runId("r-1"))
-  expect(await handleCarryOn({ basics: b, start }, lane, ada)).toEqual({
+  expect(
+    await handleCarryOn({ basics: b, start, cards: NO_BLANK_CARDS }, lane, ada),
+  ).toEqual({
     kind: "refused",
     code: "busy",
     message: "the thread is working",
   })
   expect(
     await handleCarryOn(
-      { basics: b, start },
+      { basics: b, start, cards: NO_BLANK_CARDS },
       laneNameForThread("fedcba9876543210"),
       ada,
     ),

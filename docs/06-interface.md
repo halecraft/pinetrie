@@ -409,7 +409,9 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   queue's end, never a note first, and focuses it; on an idle thread it
   holds the queue first, so the card is not sent as you type it. The host
   passes over a blank message (no command, nothing typed) and sends the
-  cards behind it; the blank card stays until someone writes in it. The rail scrolls on its own, and
+  cards behind it; the blank card stays until someone writes in it. It does
+  not keep the thread working: a thread with only blank cards queued draws
+  no ring, can be resumed, and can be moved to the closed state. The rail scrolls on its own, and
   follows the column you move (below).
 - **A column shown again is where you left it** (ADR-0058): the same message
   at the same height, or its end if you were following it. If its thread

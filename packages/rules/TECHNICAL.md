@@ -399,12 +399,13 @@ which are swept.
   it was made (`boardOf`): two notes of one lane-less thread made at
   different ends may share a cell, which the page draws apart
   (`notesBoardView`). A key names its cell (`sameKey`), so a move of a note
-  someone moved to another cell since is refused `moved`. A move from a
-  note with no cell is not: its sender made the note and moved it before
-  the host's cell arrived, as a command button does, made as a note and
-  queued at once (`stillAt`), and any cell on its board is where it was
-  seen. Every note the host holds has a cell, so no other move names
-  none. And `planMoves` refuses a batch that leaves two notes in one cell
+  someone moved to another cell since is refused `moved`. `planMove`
+  compares with core's `seenAt`, not `sameKey`: a note seen with no cell
+  is anywhere on its board. The host gives a note its cell, so the page
+  draws a note it has just made, unqueued, unpinned or put on a column
+  with none until the host's write arrives, and a second move made in that
+  time names none. Every note the host holds has a cell, so no other move
+  names none. And `planMoves` refuses a batch that leaves two notes in one cell
   (`cellClash`), checked once all its moves are written, so a swap is one
   step.
 - **A pinned card** (ADR-0048 step 5) is a note's place with an `order`.
@@ -421,8 +422,10 @@ which are swept.
   and between; `orderBetween` is a step from one open end or the midpoint,
   null when none fits. Only the host assigns them (`planMove`,
   `planReorder`). `planNextQueuedCardPop` passes over blank messages
-  (`isBlankMessage`: no command, only whitespace; the caller names them,
-  ADR-0113), which stay where they are; of the rest, the top card is the
+  (`blankQueued`: a queued `isBlankMessage`, no command and only
+  whitespace, whose text the caller holds as its queuer had it, S96;
+  ADR-0113), which stay where they are, and wait for nothing: `readLanes`
+  leaves them out of `waiting`; of the rest, the top card is the
   one it speaks of. It answers `idle` while the lane runs or nothing is
   queued; `held` when its queue is held and its top card is a message;
   `typing` when someone types in its top card (presence `typingIn`);

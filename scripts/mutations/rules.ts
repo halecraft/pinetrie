@@ -6,6 +6,15 @@ const archive = "packages/rules/archive.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a card whose text has not arrived is blank",
+    file: "packages/rules/card.ts",
+    from: "      texts.holds(c.id, c.place.seen) &&\n",
+    to: "",
+    command: unit,
+    expect:
+      "blankQueued: a queued message with no command and no text, whose text is held as its queuer had it; not one whose text has not arrived",
+  },
+  {
     name: "a lane with no copy of its own is stored with one",
     file: "packages/rules/work.ts",
     from: '    work: ownCopy ? { kind: "own" } : null,',
@@ -1234,7 +1243,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a note seen with no cell has moved",
-    file: "packages/rules/card.ts",
+    file: "packages/core/index.ts",
     from: '    from.kind === "note" && from.cell === null && now.kind === "note"\n',
     to: "    false\n",
     command: unit,
@@ -1243,7 +1252,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a note seen in any cell is where it is",
-    file: "packages/rules/card.ts",
+    file: "packages/core/index.ts",
     from: '    from.kind === "note" && from.cell === null && now.kind === "note"\n',
     to: '    from.kind === "note" && now.kind === "note"\n',
     command: unit,
@@ -1437,7 +1446,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a move skips the compare",
     file: "packages/rules/card.ts",
-    from: "  if (!stillAt(now.place, move.from))",
+    from: "  if (!seenAt(keyOf(now.place), move.from))",
     to: "  if (false)",
     command: unit,
     expect: "the compare: gone when there is no record, moved when",

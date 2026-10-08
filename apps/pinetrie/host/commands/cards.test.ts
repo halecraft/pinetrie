@@ -30,7 +30,7 @@ import {
 import { newPresenceDoc, readingKey, seatKey } from "@pinetrie/schema"
 import { beginRun, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
-import { applyWrites, basics, record, row } from "../fakes.ts"
+import { applyWrites, basics, NO_BLANK_CARDS, record, row } from "../fakes.ts"
 import { applyPlaceSteps } from "../places.ts"
 import { createProvenance } from "../provenance.ts"
 import { popNextQueuedCard } from "../queued-card-pop.ts"
@@ -71,6 +71,7 @@ function setUp() {
   const cards = record<CardCommandDeps["cards"]>({
     destroy: async () => {},
     hydrate: async () => {},
+    blankQueued: NO_BLANK_CARDS.blankQueued,
     textNow: id => texts.get(id) ?? "",
   })
   const drains: string[] = []

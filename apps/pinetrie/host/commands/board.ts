@@ -45,6 +45,7 @@ import {
 } from "@pinetrie/rules"
 import { readLaneTip, type SessionDocHandle } from "@pinetrie/schema"
 import type { Basics, HostKeeper } from "../basics.ts"
+import type { CardPort } from "../cards.ts"
 import type { Records } from "../records.ts"
 import type { LaneWork } from "../work/index.ts"
 
@@ -56,6 +57,8 @@ export interface BoardDeps {
   readonly records: Pick<Records, "writeValues">
   readonly work: Pick<LaneWork, "teardown" | "repo">
   readonly keeper: Pick<HostKeeper, "run" | "track">
+  /** Which queued cards are blank: they leave a lane idle (ADR-0113). */
+  readonly cards: Pick<CardPort, "blankQueued">
 }
 
 /** The lanes of their own that work in `root`, from their records. */
@@ -152,6 +155,7 @@ async function planCrossing(
 ): Promise<ReturnType<typeof planArchive>> {
   const { session, docs, live, places } = deps.basics
   const doc = await docs.root(root)
+  const blank = await deps.cards.blankQueued(readPlaces(places))
   const index = readTreeIndex(doc)
   const own =
     deps.work.repo === null
@@ -169,6 +173,7 @@ async function planCrossing(
       index,
       readPlaces(places),
       readQueueHolds(session),
+      blank,
     ),
     own,
     revisions: readRevisions(doc),

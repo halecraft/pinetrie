@@ -302,24 +302,27 @@ function askerOf(index: TreeIndex, tip: EntryId | null): WriterId | undefined {
 }
 
 /**
- * Every thread lane: its tip, whether it runs, how many cards are queued for
- * it (ADR-0048), who holds it (for a conflict's "by"): the writer of the ask
+ * Every thread lane: its tip, whether it runs, how many cards wait for it
+ * (ADR-0048), who holds it (for a conflict's "by"): the writer of the ask
  * it is answering (`askerOf`), or who queued its first card; who queued
  * its last card, whom a card queued now follows; and who holds its queue
  * (ADR-0048 step 7). `cards` is every card's record (`readPlaces`), `holds`
- * the session's held queues (`readQueueHolds`).
+ * the session's held queues (`readQueueHolds`). A blank queued message
+ * (`blank`, `blankQueued`) does not wait: the drain passes over it, so a
+ * queue of blank cards alone leaves its lane idle (ADR-0113).
  */
 export function readLanes(
   view: Pick<RootView, "doc" | "live">,
   index: TreeIndex,
   cards: readonly CardRecord[],
   holds: ReadonlyMap<LaneName, QueueHold>,
+  blank: ReadonlySet<CardId>,
 ): readonly LaneView[] {
   const { doc, live } = view
   return readLaneNames(doc).map(name => {
     const tip = readLaneTip(doc, name)
     const running = readRunning(live, name)
-    const queue = queuedOn(cards, name)
+    const queue = queuedOn(cards, name).filter(c => !blank.has(c.id))
     const asking = running ? askerOf(index, tip) : queue[0]?.place.by
     return {
       name,

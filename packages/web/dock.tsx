@@ -37,10 +37,10 @@ import {
 import { readTypingIn } from "@pinetrie/reads"
 import { factLine, type QueuedCard } from "@pinetrie/rules"
 import { newCardId, type SessionClient } from "@pinetrie/session"
-import { type ReactNode, useEffect, useMemo, useRef, useState } from "react"
+import { type ReactNode, useEffect, useRef, useState } from "react"
 import { QueuedCardEditor } from "./card-editor.tsx"
 import { Menu } from "./menu.tsx"
-import { useCardTexts } from "./use-card-texts.ts"
+import { useBlankQueued } from "./use-blank-queued.ts"
 
 export function Dock(p: {
   session: SessionClient
@@ -66,15 +66,14 @@ export function Dock(p: {
 }) {
   const { lane, queued } = p
   const typing = useSelector(p.session.presence, readTypingIn)
-  const ids = useMemo(() => queued.map(c => c.id), [queued])
-  const texts = useCardTexts(p.session, ids)
+  const blank = useBlankQueued(p.session, queued)
   const head =
     lane === null || p.readOnly !== null
       ? null
       : queueHead(lane, {
           cards: p.cards,
           typing,
-          texts,
+          blank,
           index: p.index,
           asks: p.asks,
           stops: p.stops,

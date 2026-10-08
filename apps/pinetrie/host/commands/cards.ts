@@ -50,6 +50,7 @@ import {
   type LiftPlan,
   type MoveStep,
   type MovesStep,
+  NONE_BLANK,
   type PlaceStep,
   planFreshFollow,
   planLiftRoot,
@@ -88,7 +89,10 @@ export const settled = (
 
 export interface CardCommandDeps {
   readonly basics: Pick<Basics, "docs" | "live" | "places" | "session" | "now">
-  readonly cards: Pick<CardPort, "destroy" | "hydrate" | "textNow">
+  readonly cards: Pick<
+    CardPort,
+    "destroy" | "hydrate" | "textNow" | "blankQueued"
+  >
   /** Queue a drain of the lane on the documents' keeper, not awaited. */
   readonly drain: (lane: LaneName) => void
   readonly histories: Pick<
@@ -224,9 +228,14 @@ export function createCardCommands(deps: CardCommandDeps) {
     const { lane, reserved } = sent.chat
     const held =
       reserved !== null &&
-      readLanes({ doc, live }, index, cards, readQueueHolds(session)).some(
-        l => l.name === reserved,
-      )
+      readLanes(
+        { doc, live },
+        index,
+        cards,
+        readQueueHolds(session),
+        // Only the lanes' names are read here.
+        NONE_BLANK,
+      ).some(l => l.name === reserved)
     return {
       message: at,
       steps: planFreshFollow(
@@ -477,9 +486,10 @@ export function createCardCommands(deps: CardCommandDeps) {
       const doc = await docs.root(chat.root)
       const index = readTreeIndex(doc)
       const cards = readPlaces(places)
+      const blank = await deps.cards.blankQueued(cards)
       const thread = threadOf(
         index,
-        readLanes({ doc, live }, index, cards, readQueueHolds(session)),
+        readLanes({ doc, live }, index, cards, readQueueHolds(session), blank),
         {
           at: chat.at,
           mode: chat.mode,

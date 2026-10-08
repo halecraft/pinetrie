@@ -151,6 +151,7 @@ import type { DeviceState, TabState } from "./tab-state.ts"
 import { isTextBox } from "./text-box.ts"
 import { ThreadStates } from "./thread-states.ts"
 import { useAttention } from "./use-attention.ts"
+import { useBlankQueued } from "./use-blank-queued.ts"
 import { useColumnDrag } from "./use-column-drag.ts"
 import { useFilledCards } from "./use-filled-cards.ts"
 import { FLIGHT_MS, useFlight } from "./use-flight.ts"
@@ -347,12 +348,14 @@ export function App({
     session.cards.current,
   )
   // Each lane, with its queue from the cards (ADR-0048): read again on every
-  // change to the session, as a run's start or end is one, and to the cards.
+  // change to the session, as a run's start or end is one, and to the
+  // cards; a blank queued card does not wait (ADR-0113).
+  const blank = useBlankQueued(session, cards)
   const lanes = useSelector(
     heldView,
     useCallback(
-      (v: HeldView) => readHeldLanes(v, readHeldIndex(v.roots), cards),
-      [cards],
+      (v: HeldView) => readHeldLanes(v, readHeldIndex(v.roots), cards, blank),
+      [cards, blank],
     ),
   )
   // Its own read, not part of the facts: every message compares `nameOf` by
