@@ -41,8 +41,10 @@ follow this list. A name only this package uses is imported from its module.
 - `chat.ts`, `participant.ts`, `images.ts`, `commands.ts`: a person's
   message, who is in the session, the images a message shows, and `/`
   commands (`pinetrie.commands`).
-- `land.ts`, `update.ts`, `pinned.ts`: the resolution's prompt, the
-  update and stack messages, the pinned cards a run reads.
+- `history.ts`: the history message builder (`historyMessage`), whose spec
+  each kind of host message in a thread is (below).
+- `land.ts`, `update.ts`, `stack.ts`, `pinned.ts`: the resolution's prompt,
+  the update and stack messages, the pinned cards a run reads.
 - `fact.ts`, `behind.ts`, `agent-commands.ts`: what a command on an offer
   did, as a fact in the thread; the base's new work, told or caught up; the
   agent's `catch_up` and `split_offer` (ADR-0080).
@@ -61,9 +63,12 @@ follow this list. A name only this package uses is imported from its module.
   record.
 - `work.ts`: where lanes work (`pinetrie.lane`, `pinetrie.revision`,
   `pinetrie.project`).
-- `accepted.ts`: accepted work and a thread's base (`pinetrie.accepted`,
-  `pinetrie.base`): where a lane begins, what catching up would do and merge,
-  and the thread a lane branched from.
+- `accepted.ts`: accepted work (`pinetrie.accepted`): its record, setup and
+  publishing.
+- `base.ts`: a thread's base (`pinetrie.base`): where a lane begins, what
+  catching up would do and merge, and the thread a lane branched from.
+- `catch-up-from.ts`: what a catch-up merges (`CatchUpFrom`), as history
+  stores it and as every wording names it.
 - `offer.ts`, `offer-view.ts`, `review.ts`: an offer's record and the
   host's decisions about it, the page's view of it, and the review's wire.
 
@@ -620,8 +625,7 @@ abort. A stop recorded for a run that answered anyway is ignored
 
 **Carrying on** (ADR-0082). pi cannot continue a run that Stop ended
 (S105), so Resume starts a new run whose prompt is a carry-on message
-(`pinetrie.carry-on`, role `carry-on`), a pi `CustomMessage` in `land.ts`'s
-pattern. Its `content` tells the model who asked it to carry on, and that
+(`pinetrie.carry-on`, role `carry-on`), a history message. Its `content` tells the model who asked it to carry on, and that
 what it was writing when stopped was not kept; its `details` hold the lane,
 who resumed and their name then, for the column's line ("↻ resumed by
 Ada"). It is a prompt, so its run is an ask of its own (`PROMPT_ROLES`).
@@ -881,7 +885,7 @@ commit-message request `request.ts` (`describeRequest`).
   `commits` are the revisions' commits at that read, what a review may
   read. A divergent offer is recorded only once repaired.
 
-## What the page reads (`offer-view.ts`, `accepted.ts`)
+## What the page reads (`offer-view.ts`, `base.ts`)
 
 - **`offerView`** is the work strip's states (ADR-0105) as a decision, from an
   `OfferStatus`: the offer's state, its buttons, its menu, which of those
@@ -905,7 +909,7 @@ commit-message request `request.ts` (`describeRequest`).
   when every file it conflicts in is in its `startConflicts`, the files
   conflicted where it starts, so the conflict came with the lane's copy;
   else `work` (ADR-0072).
-- **`parentNow`** (`accepted.ts`) is the thread a lane branched from, read from
+- **`parentNow`** (`base.ts`) is the thread a lane branched from, read from
   the document alone: `forkParent` (core) names it and the fork commit; its
   newest commit is the nearest above its thread's end; what the lane last
   caught up with (`caughtUpWith`) is the newest of the parent's commits that an update or land message
@@ -913,7 +917,7 @@ commit-message request `request.ts` (`describeRequest`).
   the fork commit. A lane's commits only move forward, so the parent is
   ahead when the two differ (`parentAhead`). `planParentUpdate` merges its
   newest commit, or nothing, or refuses `no_parent` and `parent_running`.
-- **`catchUpOf`** (`accepted.ts`) says what catching up would do, from `pinetrie.base` and
+- **`catchUpOf`** (`base.ts`) says what catching up would do, from `pinetrie.base` and
   accepted work's record: `current` (the base has not moved since the lane last
   caught up with it, or no line is set up), `unknown` (it moved, and the
   host's `catchUp` was not read at the commit it is at now; or there is no
@@ -924,13 +928,12 @@ commit-message request `request.ts` (`describeRequest`).
   or `brings`, with the file count and the move, the one kind that carries
   it. `catchUpOf` owns those checks; the commit comparison under them
   (`baseMoved`) is private to it.
-- **`catchUpName`** (`accepted.ts`) is the one wording of what a catch-up
+- **`catchUpName`** (`catch-up-from.ts`) is the one wording of what a catch-up
   merges (`CatchUpFrom`): "accepted work" for accepted work (ADR-0090), the
   bookmark for a WIP (ADR-0061), the thread's name for the thread a thread branched from
-  (ADR-0072). `updateLine` uses it through the update's `from`, decoded
-  from the stored `parent`, else `base` and its `line` flag; an update
-  stored before the flag names its base by its bookmark. Update and land
-  messages are history, so their old fields still decode.
+  (ADR-0072). `updateLine` uses it through the update's `from`, stored as
+  it is (`CatchUpFromSchema`). `incomingWords` names it for the model, and
+  `baseMovedOn` says a base moved.
 
 ## The review's wire (`review.ts`)
 
@@ -954,7 +957,7 @@ commit-message request `request.ts` (`describeRequest`).
     `answerReview` and `answerDiff` settle what was read: 502 when the
     read failed, 413 past `MAX_DIFF_BYTES`.
 
-# Accepted work and a thread's base (`accepted.ts`, ADR-0104, ADR-0061, ADR-0072)
+# Accepted work and a thread's base (`accepted.ts`, `base.ts`, ADR-0104, ADR-0061, ADR-0072)
 
 | record | namespace | key | written |
 |---|---|---|---|
@@ -982,10 +985,11 @@ commit-message request `request.ts` (`describeRequest`).
   them away, so `acceptedRefusal`'s "your commits have conflicts" would be
   untrue. It lives here, not beside the steps,
   because `@pinetrie/repo` does not import this package.
-- **`effectiveBase`**, **`catchUpOf`**, **`parentNow`**, **`catchUpName`**
-  (accepted work is "accepted work", ADR-0090) and **`baseMovedOn`** (a base
-  that moved, worded once) are here too. How the page reads them is under Offers,
-  "What the page reads".
+- **`effectiveBase`**, **`catchUpOf`** and **`parentNow`** are in `base.ts`,
+  with the `pinetrie.base` record; **`catchUpName`** (accepted work is
+  "accepted work", ADR-0090) and **`baseMovedOn`** (a base that moved,
+  worded once) in `catch-up-from.ts`. How the page reads them is under
+  Offers, "What the page reads".
 - **`acceptedActionState` is the one rule for a setup or publish** (ADR-0076,
   ADR-0090): the host's `planAcceptedAction` decides from it, and the page's
   publish button reads it. Setup and publishing are anyone's, on any host
@@ -1069,9 +1073,9 @@ commit-message request `request.ts` (`describeRequest`).
 
 # Pinned cards (`pinned.ts`, ADR-0048 step 5, S92)
 
-A cards entry is a pi `CustomMessage`, `customType: "pinetrie.pinned"`,
-`display: false`, in `update.ts`'s pattern: `content` is what the model reads,
-`details` the `PinnedView` (`@pinetrie/core`) pine·trie reads back. `encodePinned`
+A cards entry is a history message (`PINNED`), `customType: "pinetrie.pinned"`,
+`display: false`: `content` is what the model reads, `details` the
+`PinnedView` (`@pinetrie/core`) pine·trie reads back. `encodePinned`
 and the total `decodePinned` are the only code that builds or reads it, and
 `renderableMessage` makes it role `pinned`, which no projection draws.
 
@@ -1099,10 +1103,35 @@ and the total `decodePinned` are the only code that builds or reads it, and
 - **`PINNED_RULE`** is the line every agent thread's `<rules>` holds
   (`packages/pi`).
 
-# Updates and stacks (`update.ts`, ADR-0105)
+# History messages (`history.ts`)
 
-Two pi `CustomMessage`s in `land.ts`'s pattern, as is the carry-on message
-(`stop.ts`, above). An update (`pinetrie.update`,
+The host's own messages in a thread (update, stack, land, fact, behind,
+carry-on, pinned) are pi `CustomMessage`s: `content` is what the model
+reads, `details` what pine·trie reads back.
+
+- **History stores the code's own values.** A message's `details` are the
+  code's type as it is now, and `historyMessage(customType, schema)` gives
+  each kind its `encode` and `decode`: encoding stores the value, and
+  decoding is the schema's check alone. History is never rewritten, so a
+  message stored before its shape changed does not decode: the column
+  leaves it out (core's `renderableMessage` drops a `custom` message it was
+  not given a role for), and the model still reads its `content`. Its
+  `merged` or `behind.to` no longer counts either, so a lane may hear its
+  base's news once more (`baseKnown`), and a branch read its parent as
+  ahead (`parentNow`) until the parent commits again.
+- **The schema is the type.** Ids are branded schemas (`decode.ts`:
+  `LaneNameSchema`, `WriterIdSchema`, `CommitSchema`, `ThreadNameSchema`,
+  `CardIdSchema`), whose `Static` is the brand, and `List` an array whose
+  `Static` is `readonly`. A lane is checked with core's `LANE_PATTERN`, the
+  pattern `isLaneName` tests, so no decoder checks a lane by hand.
+- **Every kind is held to it** (`history.test.ts`): `MESSAGE_SPECS` must
+  list every spec a module here exports, and each round-trips a sample and
+  renders in its role.
+
+# Updates and stacks (`update.ts`, `stack.ts`, ADR-0105)
+
+Two history messages, as is the carry-on message (`stop.ts`, above). An
+update (`pinetrie.update`,
 role `update`) is a fact in the thread, never a prompt: which of your commits
 came in and which files changed, so the agent's next run reads them again,
 or that none did. A merge that changed no file is still an update: the
@@ -1116,8 +1145,7 @@ the tip it must match, and the bookmark to leave on it.
 
 # Facts, base news and agent commands (`fact.ts`, `behind.ts`, `agent-commands.ts`, ADR-0080)
 
-- **A fact is a `CustomMessage`** in `update.ts`'s pattern (`pinetrie.fact`,
-  role `fact`): `content` is what the model reads, `details` the
+- **A fact is a history message** (`pinetrie.fact`, role `fact`): `content` is what the model reads, `details` the
   `OfferFact`, which the column words as one line (`factLine`). Each offer
   action has one: an acceptance (`acceptedFact`: the change, the
   bookmark, and that bookmark as the thread knows it, accepted work or a WIP),

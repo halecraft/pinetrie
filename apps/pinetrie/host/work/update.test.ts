@@ -260,7 +260,7 @@ describe("planSettle: what a merge comes to (ADR-0104, ADR-0033)", () => {
     )
     if (clean.kind !== "clean") throw new Error("not clean")
     expect(clean.message.details).toMatchObject({
-      parent: { name: "amber-fox" },
+      from: { kind: "parent", name: "amber-fox" },
     })
     const conflicted = planSettle(
       {

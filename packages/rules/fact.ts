@@ -2,43 +2,32 @@
 // (ADR-0080): an acceptance, a description asked for again, a
 // squash, a refresh.
 //
-// A fact message is a pi `CustomMessage` in `update.ts`'s pattern: `content`
-// is what the model reads, `details` the fact, which the column words as one
-// line (`factLine`). It reaches the thread through a queued card carrying the
+// A history message (`history.ts`): `content` is what the model reads,
+// `details` the fact, which the column words as one line (`factLine`). It reaches the thread through a queued card carrying the
 // fact (`planFactCard`, `card.ts`), popped in order with the other cards: at
 // once on an idle thread, when the run ends on a running one.
 
-import {
-  type CatchUpFrom,
-  isLaneName,
-  type LaneName,
-  type OfferAcceptanceDecision,
-  type OfferFact,
-  type WriterId,
+import type {
+  CatchUpFrom,
+  LaneName,
+  OfferAcceptanceDecision,
+  OfferFact,
+  WriterId,
 } from "@pinetrie/core"
-import { type Static, Type } from "typebox"
-import { catchUpName } from "./accepted.ts"
-import { decodeWith } from "./decode.ts"
-import {
-  fromStoredFrom,
-  StoredFromSchema,
-  toStoredFrom,
-} from "./stored-from.ts"
+import { Type } from "typebox"
+import { Value } from "typebox/value"
+import { CatchUpFromSchema, catchUpName } from "./catch-up-from.ts"
+import { LaneNameSchema, WriterIdSchema } from "./decode.ts"
+import { type HistoryMessage, historyMessage } from "./history.ts"
 
-export const FACT_TYPE = "pinetrie.fact"
-
-// A fact is stored in a thread's history, which nothing rewrites, so its
-// stored kinds keep the words of when facts began (ADR-0100): an acceptance
-// is stored as `integrated`, and accepted work as `line` (`stored-from.ts`),
-// read and written through `fromStored` and `toStored`.
 const OfferFactSchema = Type.Union([
   Type.Object({
-    kind: Type.Literal("integrated"),
-    lane: Type.String({ minLength: 1 }),
-    by: Type.String(),
+    kind: Type.Literal("accepted"),
+    lane: LaneNameSchema,
+    by: WriterIdSchema,
     as: Type.String({ minLength: 1 }),
     bookmark: Type.String({ minLength: 1 }),
-    to: StoredFromSchema,
+    to: CatchUpFromSchema,
   }),
   Type.Object({
     kind: Type.Union([
@@ -46,64 +35,26 @@ const OfferFactSchema = Type.Union([
       Type.Literal("squashed"),
       Type.Literal("refreshed"),
     ]),
-    lane: Type.String({ minLength: 1 }),
-    by: Type.String(),
+    lane: LaneNameSchema,
+    by: WriterIdSchema,
   }),
 ])
 
-const FactSchema = Type.Object({
-  role: Type.Literal("custom"),
-  customType: Type.Literal(FACT_TYPE),
-  details: OfferFactSchema,
-})
+export const FACT_TYPE = "pinetrie.fact"
+
+export const FACT = historyMessage(FACT_TYPE, OfferFactSchema)
 
 /** The pi `CustomMessage` a fact is stored as. */
-export interface FactMessage {
-  readonly role: "custom"
-  readonly customType: typeof FACT_TYPE
-  readonly content: string
-  readonly display: true
-  /** The fact as stored (`toStored`); `decodeFact` reads it back. */
-  readonly details: StoredFact
-  readonly timestamp: number
-}
-
-type StoredFact = Static<typeof OfferFactSchema>
-
-/** A fact as stored -> the fact; undefined for one malformed. Total. */
-const fromStored = (
-  d: Static<typeof OfferFactSchema>,
-): OfferFact | undefined => {
-  if (!isLaneName(d.lane)) return undefined
-  if (d.kind !== "integrated")
-    return { kind: d.kind, lane: d.lane, by: d.by as WriterId }
-  const to = fromStoredFrom(d.to)
-  return to === undefined
-    ? undefined
-    : {
-        kind: "accepted",
-        lane: d.lane,
-        by: d.by as WriterId,
-        as: d.as,
-        bookmark: d.bookmark,
-        to,
-      }
-}
-
-/** A fact as stored: an acceptance under its stored kind. */
-const toStored = (fact: OfferFact): Static<typeof OfferFactSchema> =>
-  fact.kind === "accepted"
-    ? { ...fact, kind: "integrated", to: toStoredFrom(fact.to) }
-    : fact
+export type FactMessage = HistoryMessage<typeof FACT_TYPE, OfferFact>
 
 /** A fact as a card carries it, in the places document's flat strings. */
-export const encodeOfferFact = (fact: OfferFact): string =>
-  JSON.stringify(toStored(fact))
+export const encodeOfferFact = (fact: OfferFact): string => JSON.stringify(fact)
 
 /** A card's stored fact -> the fact; undefined for one malformed. Total. */
 export function decodeOfferFact(stored: string): OfferFact | undefined {
   try {
-    return decodeWith(OfferFactSchema, JSON.parse(stored), fromStored)
+    const fact: unknown = JSON.parse(stored)
+    return Value.Check(OfferFactSchema, fact) ? fact : undefined
   } catch {
     return undefined
   }
@@ -111,7 +62,7 @@ export function decodeOfferFact(stored: string): OfferFact | undefined {
 
 /** A stored message -> its fact, or undefined if it is not one. */
 export const decodeFact = (message: unknown): OfferFact | undefined =>
-  decodeWith(FactSchema, message, ({ details }) => fromStored(details))
+  FACT.decode(message)
 
 /** Where an acceptance went, after "accepted": nothing for accepted work, else a WIP's name. */
 const into = (to: CatchUpFrom) =>
@@ -150,14 +101,7 @@ export const encodeFact = (
   fact: OfferFact,
   name: string,
   timestamp: number,
-): FactMessage => ({
-  role: "custom",
-  customType: FACT_TYPE,
-  content: factContent(fact, name),
-  display: true,
-  details: toStored(fact),
-  timestamp,
-})
+): FactMessage => FACT.encode(fact, factContent(fact, name), timestamp)
 
 /**
  * An acceptance's fact (ADR-0080), from the decision it carried out: the change it

@@ -16,7 +16,7 @@ import {
   type RootId,
   type WriterId,
 } from "@pinetrie/core"
-import { type CatchUpNow, type ParentNow, parentAhead } from "./accepted.ts"
+import { type CatchUpNow, type ParentNow, parentAhead } from "./base.ts"
 import { type PlaceStep, queuedOn } from "./card.ts"
 import type { LandMessage } from "./land.ts"
 import type { OfferStatus } from "./offer.ts"

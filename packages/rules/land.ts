@@ -4,82 +4,44 @@
 // Bringing a thread up to date merges accepted work, or the work of the
 // thread it branched from (ADR-0072), into its lane, in the lane's own copy;
 // when that conflicts, the agent resolves it. The run starts with a land
-// message: a pi
-// `CustomMessage`, like chat, whose `content` is what the model reads (the
-// resolution skill and the conflict material) and whose `details` are what the
-// column shows (one short line, and the files). The model never reads the
+// message: a history message (`history.ts`) whose `content` is what the
+// model reads (the resolution skill and the conflict material) and whose
+// `details` are what the column shows (one short line, and the files). The model never reads the
 // details; the column never shows the content. The content fits what pi
 // keeps when it compacts (`resolutionFloor`, `planResolution`). How the run
 // ended is read as any run's is (ADR-0080, S104): the conflicts left are the
 // offer's, and an ask is the agent's `ask_about_conflict` in the tree.
 
-import {
-  type CommitId,
-  commitId,
-  isLaneName,
-  type LaneName,
-  type WriterId,
-} from "@pinetrie/core"
 import { type Static, Type } from "typebox"
-import { CommitSchema, decodeWith } from "./decode.ts"
+import { CommitSchema, LaneNameSchema, List, WriterIdSchema } from "./decode.ts"
+import { type HistoryMessage, historyMessage } from "./history.ts"
 import { leftOut } from "./request.ts"
 
 export const LAND_TYPE = "pinetrie.land"
 
 const LandDetailsSchema = Type.Object({
-  lane: Type.String({ minLength: 1 }),
+  lane: LaneNameSchema,
   /** The base's commit that was merged: accepted work's, or a WIP's copy (ADR-0104). */
-  yours: Type.Array(CommitSchema),
+  yours: List(CommitSchema),
   /** The files that conflicted when it merged. */
-  files: Type.Array(Type.String()),
+  files: List(Type.String()),
   /** The skill the run followed, and a hash of its content; null with none found. */
   skill: Type.Union([
     Type.Object({ path: Type.String(), hash: Type.String() }),
     Type.Null(),
   ]),
-  by: Type.String(),
+  by: WriterIdSchema,
 })
 
-const LandSchema = Type.Object({
-  role: Type.Literal("custom"),
-  customType: Type.Literal(LAND_TYPE),
-  details: LandDetailsSchema,
-})
+type LandDetails = Static<typeof LandDetailsSchema>
 
-interface LandDetails {
-  readonly lane: LaneName
-  readonly yours: readonly CommitId[]
-  readonly files: readonly string[]
-  readonly skill: { readonly path: string; readonly hash: string } | null
-  readonly by: WriterId
-}
+export const LAND = historyMessage(LAND_TYPE, LandDetailsSchema)
 
 /** The pi `CustomMessage` a resolution's prompt is stored as. */
-export interface LandMessage {
-  readonly role: "custom"
-  readonly customType: typeof LAND_TYPE
-  readonly content: string
-  readonly display: true
-  readonly details: LandDetails
-  readonly timestamp: number
-}
-
-const fromStored = (
-  d: Static<typeof LandDetailsSchema>,
-): LandDetails | undefined =>
-  isLaneName(d.lane)
-    ? {
-        lane: d.lane,
-        yours: d.yours.map(commitId),
-        files: d.files,
-        skill: d.skill,
-        by: d.by as WriterId,
-      }
-    : undefined
+export type LandMessage = HistoryMessage<typeof LAND_TYPE, LandDetails>
 
 /** A stored message -> its land details, or undefined if it is not one. */
-export const decodeLand = (message: unknown): LandDetails | undefined =>
-  decodeWith(LandSchema, message, ({ details }) => fromStored(details))
+export const decodeLand = LAND.decode
 
 /** The one line a column shows for a land message. */
 export const landLine = (d: LandDetails): string =>
@@ -353,12 +315,8 @@ export function planResolution(input: {
     }
     return floor.content
   })()
-  return {
-    role: "custom",
-    customType: LAND_TYPE,
-    content,
-    display: true,
-    details: {
+  return LAND.encode(
+    {
       ...input.details,
       files: files.map(f => f.path),
       skill:
@@ -366,6 +324,7 @@ export function planResolution(input: {
           ? null
           : { path: floor.skill.path, hash: floor.skill.hash },
     },
-    timestamp: input.timestamp,
-  }
+    content,
+    input.timestamp,
+  )
 }

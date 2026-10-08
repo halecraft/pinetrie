@@ -1,11 +1,10 @@
 // behind — a thread's base has new work (ADR-0080): what the thread is told,
 // and when it is caught up instead.
 //
-// A behind message is a pi `CustomMessage` in `update.ts`'s pattern:
-// `content` is what the model reads, `details` the `BehindView` the column
-// words as one line. It is written before a run's prompt, in the commit that
-// admits the run, as a cards entry is (S92), or steered into a running thread
-// (S103 item 4). `planBaseNews` is the one decision: a lane with work of its
+// A history message (`history.ts`): `content` is what the model reads,
+// `details` the `BehindView` the column words as one line. It is written
+// before a run's prompt, in the commit that admits the run, as a cards entry
+// is (S92), or steered into a running thread (S103 item 4). `planBaseNews` is the one decision: a lane with work of its
 // own is told, one with none is caught up before its run, never both.
 
 import {
@@ -14,18 +13,13 @@ import {
   type BehindView,
   CATCH_UP_TOOL,
   type CommitId,
-  commitId,
   type OfferRecord,
 } from "@pinetrie/core"
-import { type Static, Type } from "typebox"
-import { baseMovedOn, catchUpOf } from "./accepted.ts"
-import { CommitSchema, decodeWith } from "./decode.ts"
-import {
-  fromStoredFrom,
-  type StoredFrom,
-  StoredFromSchema,
-  toStoredFrom,
-} from "./stored-from.ts"
+import { Type } from "typebox"
+import { catchUpOf } from "./base.ts"
+import { baseMovedOn, CatchUpFromSchema } from "./catch-up-from.ts"
+import { CommitSchema, List } from "./decode.ts"
+import { type HistoryMessage, historyMessage } from "./history.ts"
 
 export const BEHIND_TYPE = "pinetrie.behind"
 
@@ -33,47 +27,21 @@ export const BEHIND_TYPE = "pinetrie.behind"
 const NAMED_FILES = 20
 
 const BehindDetailsSchema = Type.Object({
-  from: StoredFromSchema,
+  from: CatchUpFromSchema,
   to: CommitSchema,
-  files: Type.Array(Type.String()),
-  overlap: Type.Array(Type.String()),
-  conflicts: Type.Array(Type.String()),
+  files: List(Type.String()),
+  overlap: List(Type.String()),
+  conflicts: List(Type.String()),
 })
 
-const BehindSchema = Type.Object({
-  role: Type.Literal("custom"),
-  customType: Type.Literal(BEHIND_TYPE),
-  details: BehindDetailsSchema,
-})
+export const BEHIND = historyMessage(BEHIND_TYPE, BehindDetailsSchema)
 
 /** The pi `CustomMessage` a base's news is stored as. */
-export interface BehindMessage {
-  readonly role: "custom"
-  readonly customType: typeof BEHIND_TYPE
-  readonly content: string
-  readonly display: true
-  /** The view as stored (`toStoredFrom`); `decodeBehind` reads it back. */
-  readonly details: Omit<BehindView, "from"> & { readonly from: StoredFrom }
-  readonly timestamp: number
-}
-
-const fromStored = (
-  d: Static<typeof BehindDetailsSchema>,
-): BehindView | undefined => {
-  const { from } = d
-  const rest = {
-    to: commitId(d.to),
-    files: d.files,
-    overlap: d.overlap,
-    conflicts: d.conflicts,
-  }
-  const known = fromStoredFrom(from)
-  return known === undefined ? undefined : { from: known, ...rest }
-}
+export type BehindMessage = HistoryMessage<typeof BEHIND_TYPE, BehindView>
 
 /** A stored message -> what it told, or undefined if it is not one. */
 export const decodeBehind = (message: unknown): BehindView | undefined =>
-  decodeWith(BehindSchema, message, ({ details }) => fromStored(details))
+  BEHIND.decode(message)
 
 const plural = (n: number, one: string, many: string) =>
   `${n} ${n === 1 ? one : many}`
@@ -110,14 +78,7 @@ export function behindContent(v: BehindView): string {
 export const encodeBehind = (
   view: BehindView,
   timestamp: number,
-): BehindMessage => ({
-  role: "custom",
-  customType: BEHIND_TYPE,
-  content: behindContent(view),
-  display: true,
-  details: { ...view, from: toStoredFrom(view.from) },
-  timestamp,
-})
+): BehindMessage => BEHIND.encode(view, behindContent(view), timestamp)
 
 /** What a base with new work comes to for a thread (ADR-0080). */
 export type BaseNews =

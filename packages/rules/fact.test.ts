@@ -55,12 +55,14 @@ describe("a fact (ADR-0080)", () => {
     ).toBeUndefined()
   })
 
-  test("an acceptance is stored under the kind facts began with, which a thread's history holds", () => {
-    expect(encodeFact(ACCEPTED, "Ada", 1).details.kind).toBe("integrated")
-    expect(JSON.parse(encodeOfferFact(ACCEPTED)).kind).toBe("integrated")
-    const stored = { ...ACCEPTED, kind: "integrated", to: { kind: "line" } }
-    expect(JSON.parse(encodeOfferFact(ACCEPTED)).to).toEqual({ kind: "line" })
-    expect(decodeOfferFact(JSON.stringify(stored))).toEqual(ACCEPTED)
+  test("an acceptance is stored as the fact it is; one stored under the kind facts began with does not decode", () => {
+    expect(encodeFact(ACCEPTED, "Ada", 1).details).toEqual(ACCEPTED)
+    expect(JSON.parse(encodeOfferFact(ACCEPTED))).toEqual(ACCEPTED)
+    const older = { ...ACCEPTED, kind: "integrated", to: { kind: "line" } }
+    expect(decodeOfferFact(JSON.stringify(older))).toBeUndefined()
+    expect(
+      decodeFact({ ...encodeFact(ACCEPTED, "Ada", 1), details: older }),
+    ).toBeUndefined()
   })
 
   test.each([

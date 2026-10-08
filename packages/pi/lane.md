@@ -75,7 +75,7 @@ changes pine·trie can keep this note true. You can skip them.
   don't need to. <!-- packages/core/trailers.ts wipDescription -->
 - The person can ask for the offer as a stack of revisions. A pine·trie message
   then asks you to build it, and says how.
-  <!-- packages/rules/update.ts planStack -->
+  <!-- packages/rules/stack.ts planStack -->
 - The person sees your files only through the offer, which pine·trie brings up
   to date after each turn. Nothing you write appears in their editor.
 

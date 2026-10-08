@@ -46,14 +46,9 @@ import { decodeWith } from "./decode.ts"
 import { decodeFact, factLine } from "./fact.ts"
 import { decodeLand, type LandMessage, landLine } from "./land.ts"
 import { decodePinned } from "./pinned.ts"
+import { decodeStack, type StackMessage, stackLine } from "./stack.ts"
 import { type CarryOnMessage, carryOnLine, decodeCarryOn } from "./stop.ts"
-import {
-  decodeStack,
-  decodeUpdate,
-  type StackMessage,
-  stackLine,
-  updateLine,
-} from "./update.ts"
+import { decodeUpdate, updateLine } from "./update.ts"
 import { showHostWorkingCopy } from "./work.ts"
 
 export const CHAT_TYPE = "pinetrie.chat"

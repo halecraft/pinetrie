@@ -8,8 +8,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an update that changed no file says files changed",
     file: "packages/rules/update.ts",
-    from: '      files === ""\n',
-    to: "      false\n",
+    from: '    files === ""\n',
+    to: "    false\n",
     command: unit,
     expect:
       "an update that changed no file says so, and one with no commits says why",
@@ -130,7 +130,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a split's brief is dropped",
-    file: "packages/rules/update.ts",
+    file: "packages/rules/stack.ts",
     from: '      asked(input.intent ?? ""),',
     to: '      asked(""),',
     command: unit,
@@ -323,7 +323,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a moved base is never seen",
-    file: "packages/rules/accepted.ts",
+    file: "packages/rules/base.ts",
     from: "  return now === undefined || now.commit === base.start\n",
     to: "  return true\n",
     command: unit,
@@ -332,7 +332,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a lane the host has not read is caught up",
-    file: "packages/rules/accepted.ts",
+    file: "packages/rules/base.ts",
     from: '  if (base === undefined) return { kind: "unknown" }',
     to: '  if (base === undefined) return { kind: "current" }',
     command: unit,
@@ -341,7 +341,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a WIP thread is measured against accepted work",
-    file: "packages/rules/accepted.ts",
+    file: "packages/rules/base.ts",
     from: '    thread.kind === "accepted"\n      ? { bookmark: accepted.acceptedBookmark, commit }',
     to: "    true\n      ? { bookmark: accepted.acceptedBookmark, commit }",
     command: unit,
@@ -350,7 +350,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "accepted work is named by its bookmark",
-    file: "packages/rules/accepted.ts",
+    file: "packages/rules/catch-up-from.ts",
     from: '  from.kind === "accepted"\n    ? "accepted work"',
     to: '  from.kind === "accepted"\n    ? "pinetrie-acceptedBookmark"',
     command: unit,
@@ -358,13 +358,22 @@ export const mutations: readonly Mutation[] = [
       "an update round-trips, shows one line, and tells the model what changed",
   },
   {
-    name: "an update on accepted work is stored as a WIP's",
-    file: "packages/rules/update.ts",
-    from: '            ? { base: "accepted", line: true }',
-    to: '            ? { base: "accepted", line: false }',
+    name: "a history message decodes without its schema's check",
+    file: "packages/rules/history.ts",
+    from: "      Value.Check(schema, message)\n",
+    to: '      typeof message === "object"\n',
     command: unit,
     expect:
-      "an update round-trips, shows one line, and tells the model what changed",
+      "a lane that is no lane does not decode: the schema checks it as isLaneName does",
+  },
+  {
+    name: "a history message kind is left out of MESSAGE_SPECS",
+    file: "packages/rules/update.ts",
+    from: 'export const UPDATE = historyMessage("pinetrie.update", UpdateDetailsSchema)\n',
+    to: 'export const UPDATE = historyMessage("pinetrie.update", UpdateDetailsSchema)\nexport const UPDATE_TOO = historyMessage("pinetrie.update-too", UpdateDetailsSchema)\n',
+    command: unit,
+    expect:
+      "MESSAGE_SPECS holds every history spec this package's modules export, one per type",
   },
   {
     name: "an offer of no files can be accepted",
@@ -393,13 +402,13 @@ export const mutations: readonly Mutation[] = [
       "planUndeclaredSweep deletes every record of a namespace no spec declares",
   },
   {
-    name: "an acceptance's fact is stored under its new kind",
+    name: "a card's fact decodes whatever its kind",
     file: "packages/rules/fact.ts",
-    from: '    ? { ...fact, kind: "integrated", to: toStoredFrom(fact.to) }',
-    to: '    ? ({ ...fact, kind: "integrated", to: toStoredFrom(fact.to) } && (fact as never))',
+    from: "    return Value.Check(OfferFactSchema, fact) ? fact : undefined\n",
+    to: "    return fact as OfferFact\n",
     command: unit,
     expect:
-      "an acceptance is stored under the kind facts began with, which a thread's history holds",
+      "an acceptance is stored as the fact it is; one stored under the kind facts began with does not decode",
   },
   {
     name: "an offer record from before ADR-0100 forgets its acceptance",
@@ -457,7 +466,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the host's read of catching up counts at any commit",
-    file: "packages/rules/accepted.ts",
+    file: "packages/rules/base.ts",
     from: '  if (read === null || read.to !== move.to) return { kind: "unknown" }',
     to: '  if (read === null) return { kind: "unknown" }',
     command: unit,
@@ -527,7 +536,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a landed WIP's thread stays on the WIP",
-    file: "packages/rules/accepted.ts",
+    file: "packages/rules/base.ts",
     from: '    : effectiveBase({ base: base?.base ?? { kind: "accepted" }, state })',
     to: '    : effectiveBase({ base: base?.base ?? { kind: "accepted" }, state: "ok" })',
     command: unit,
@@ -536,7 +545,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "any bookmark is a base",
-    file: "packages/rules/accepted.ts",
+    file: "packages/rules/base.ts",
     from: "  if (!base.startsWith(input.wipPrefix) || facts.wip === null)",
     to: "  if (facts.wip === null)",
     command: unit,
@@ -1478,7 +1487,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a WIP's copy is made on the WIP's own commit",
-    file: "packages/rules/accepted.ts",
+    file: "packages/rules/base.ts",
     from: '    : { kind: "wip", bookmark: followed.bookmark, ...wipNow, on: base.start }',
     to: '    : { kind: "wip", bookmark: followed.bookmark, ...wipNow, on: base.source }',
     command: unit,
@@ -1486,7 +1495,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a move to accepted work is never marked",
-    file: "packages/rules/accepted.ts",
+    file: "packages/rules/base.ts",
     from: '      mark: input.toAccepted && base?.base.kind === "wip",',
     to: "      mark: false,",
     command: unit,
@@ -1822,7 +1831,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a catch-up with the parent is forgotten",
-    file: "packages/rules/accepted.ts",
+    file: "packages/rules/base.ts",
     from: "    if (merged !== undefined) {\n      caughtUpWith = merged",
     to: "    if (merged !== undefined) {\n      caughtUpWith = fork.commit",
     command: unit,
@@ -1839,7 +1848,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a catch-up with the parent runs while it works",
-    file: "packages/rules/accepted.ts",
+    file: "packages/rules/base.ts",
     from: "  if (running) return ERR.PARENT_RUNNING\n",
     to: "",
     command: unit,

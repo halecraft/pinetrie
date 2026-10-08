@@ -4,8 +4,9 @@
 
 import type { HostNamespace, Target, ValueWrite } from "@pinetrie/core"
 
-import { ACCEPTED, BASE } from "./accepted.ts"
+import { ACCEPTED } from "./accepted.ts"
 import { BANNER } from "./banner.ts"
+import { BASE } from "./base.ts"
 import { BOARD, WORKFLOW } from "./board.ts"
 import { CARD_HISTORY, TRACE } from "./card-history.ts"
 import { COMMANDS } from "./commands.ts"

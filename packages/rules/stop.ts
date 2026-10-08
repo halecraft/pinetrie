@@ -5,9 +5,8 @@
 // second.
 //
 // pi cannot continue a run Stop ended (S105), so carrying on is a new run
-// whose prompt is a carry-on message, a pi `CustomMessage` in `land.ts`'s
-// pattern: `content` is what the model reads, `details` what the column
-// shows. `carryOnState` is the one rule for when a lane may carry on, read
+// whose prompt is a carry-on message, a history message (`history.ts`):
+// `content` is what the model reads, `details` what the column shows. `carryOnState` is the one rule for when a lane may carry on, read
 // by the host's `planCarryOn` and the column's run button.
 
 import {
@@ -17,7 +16,6 @@ import {
   ERR,
   type ErrCode,
   isBusy,
-  isLaneName,
   type LaneName,
   type LaneView,
   promptOf,
@@ -28,9 +26,10 @@ import {
   type TreeIndex,
   type WriterId,
 } from "@pinetrie/core"
-import { Type } from "typebox"
+import { type Static, Type } from "typebox"
 import type { QueuedCard } from "./card.ts"
-import { decodeAt, decodeWith, entryKey } from "./decode.ts"
+import { decodeAt, entryKey, LaneNameSchema, WriterIdSchema } from "./decode.ts"
+import { type HistoryMessage, historyMessage } from "./history.ts"
 import { holdOnStop } from "./queue-hold.ts"
 import type { RecordSpec } from "./records.ts"
 
@@ -99,44 +98,25 @@ export function planStop(
 
 const CARRY_ON_TYPE = "pinetrie.carry-on"
 
-const CarryOnSchema = Type.Object({
-  role: Type.Literal("custom"),
-  customType: Type.Literal(CARRY_ON_TYPE),
-  details: Type.Object({
-    lane: Type.String({ minLength: 1 }),
-    by: Type.String({ minLength: 1 }),
-    name: Type.String(),
-  }),
+const CarryOnDetailsSchema = Type.Object({
+  lane: LaneNameSchema,
+  by: WriterIdSchema,
+  /** Who resumed, as named when they did: the column's line shows it. */
+  name: Type.String(),
 })
 
-interface CarryOnDetails {
-  readonly lane: LaneName
-  readonly by: WriterId
-  /** Who resumed, as named when they did: the column's line shows it. */
-  readonly name: string
-}
+type CarryOnDetails = Static<typeof CarryOnDetailsSchema>
+
+export const CARRY_ON = historyMessage(CARRY_ON_TYPE, CarryOnDetailsSchema)
 
 /** The pi `CustomMessage` a carry-on's prompt is stored as. */
-export interface CarryOnMessage {
-  readonly role: "custom"
-  readonly customType: typeof CARRY_ON_TYPE
-  readonly content: string
-  readonly display: true
-  readonly details: CarryOnDetails
-  readonly timestamp: number
-}
+export type CarryOnMessage = HistoryMessage<
+  typeof CARRY_ON_TYPE,
+  CarryOnDetails
+>
 
 /** A stored message -> its carry-on details, or undefined if it is not one. */
-export const decodeCarryOn = (message: unknown): CarryOnDetails | undefined =>
-  decodeWith(CarryOnSchema, message, ({ details }) =>
-    isLaneName(details.lane)
-      ? {
-          lane: details.lane,
-          by: details.by as WriterId,
-          name: details.name,
-        }
-      : undefined,
-  )
+export const decodeCarryOn = CARRY_ON.decode
 
 /** The one line a column shows for a carry-on message. */
 export const carryOnLine = (d: CarryOnDetails): string =>
@@ -205,15 +185,11 @@ export function planCarryOn(
   if (state.kind === "refused") return refusedCarryOn(state.code)
   return {
     kind: "start",
-    message: {
-      role: "custom",
-      customType: CARRY_ON_TYPE,
-      content:
-        `${who.name} asked you to carry on from where you were stopped. ` +
+    message: CARRY_ON.encode(
+      { lane: here.lane.name, by: who.by, name: who.name },
+      `${who.name} asked you to carry on from where you were stopped. ` +
         "Anything you were writing when you were stopped was not kept.",
-      display: true,
-      details: { lane: here.lane.name, by: who.by, name: who.name },
-      timestamp: who.timestamp,
-    },
+      who.timestamp,
+    ),
   }
 }

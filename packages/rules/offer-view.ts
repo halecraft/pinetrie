@@ -20,7 +20,7 @@ import {
   effectiveBase,
   type ParentNow,
   parentAhead,
-} from "./accepted.ts"
+} from "./base.ts"
 import {
   type OfferAcceptanceDestination,
   type OfferStatus,

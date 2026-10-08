@@ -37,6 +37,9 @@ spent spikes: history, which search skips unless you name the folder.
   `pinetrie` in code names (`@pinetrie/core`, `PINETRIE_PORT`); `Pinetrie-`
   only in git trailers (`Pinetrie-Base`), after `Signed-off-by`.
 - No backwards compatibility: delete old code rather than keeping it beside new.
+  That holds for a thread's history too: a host message stores the code's
+  own value, and one stored in an older shape stops decoding
+  (`packages/rules/TECHNICAL.md`, "History messages").
 - No non-null assertions (`!`).
 - Functional core, imperative shell: gather, then plan (pure, returning values),
   then execute. Decisions are values, and tests exercise them without I/O.

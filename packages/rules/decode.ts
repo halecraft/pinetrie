@@ -5,12 +5,16 @@
 // One bad value must not break every client's render.
 
 import {
+  type CardId,
+  type CommitId,
   type EntryId,
   entryId,
   isLaneName,
   isRootId,
+  LANE_PATTERN,
   type LaneName,
   type RootId,
+  type ThreadName,
   type WriterId,
 } from "@pinetrie/core"
 import { type Static, type TSchema, Type } from "typebox"
@@ -18,8 +22,9 @@ import { Value } from "typebox/value"
 
 /**
  * Check `value` against `schema`, then brand it with `build`; undefined if it
- * does not match. `build` may refuse it too, by returning undefined: each
- * lane is checked there with `isLaneName`.
+ * does not match. `build` may refuse it too, by returning undefined: a
+ * schema without the branded ids below checks each lane there with
+ * `isLaneName`. A history message needs no `build` (`history.ts`).
  */
 export function decodeWith<S extends TSchema, T>(
   schema: S,
@@ -69,5 +74,31 @@ export const fixedKey = <K extends string>(
   key: string,
 ): K | undefined => (key === expected ? expected : undefined)
 
-/** A commit id as a record stores it: never empty. */
-export const CommitSchema = Type.String({ minLength: 1 })
+// Branded ids as stored: each schema's `Static` is the brand, so a value that
+// passes `Value.Check` is already the code's own type. A lane is checked with
+// core's `LANE_PATTERN`, the pattern `isLaneName` tests.
+
+/** A commit id as stored: never empty. */
+export const CommitSchema = Type.Unsafe<CommitId>(Type.String({ minLength: 1 }))
+
+/** A lane's name as stored (`LANE_PATTERN`). */
+export const LaneNameSchema = Type.Unsafe<LaneName>(
+  Type.String({ pattern: LANE_PATTERN }),
+)
+
+/** Who wrote something, as stored: never empty. */
+export const WriterIdSchema = Type.Unsafe<WriterId>(
+  Type.String({ minLength: 1 }),
+)
+
+/** A thread's two-word name, as stored: never empty. */
+export const ThreadNameSchema = Type.Unsafe<ThreadName>(
+  Type.String({ minLength: 1 }),
+)
+
+/** A card's id, as stored: never empty. */
+export const CardIdSchema = Type.Unsafe<CardId>(Type.String({ minLength: 1 }))
+
+/** An array as the code's types hold it: its `Static` is a `readonly` array. */
+export const List = <T extends TSchema>(item: T) =>
+  Type.Immutable(Type.Array(item))

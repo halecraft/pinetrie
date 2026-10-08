@@ -24,7 +24,7 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import type { ForkBegin } from "./accepted.ts"
+import type { ForkBegin } from "./base.ts"
 import {
   CommitSchema,
   decodeAt,

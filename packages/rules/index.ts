@@ -9,27 +9,13 @@ export {
   type AcceptedActionState,
   acceptedActionState,
   acceptedRefusal,
-  BASE,
-  baseMovedOn,
-  type CatchUpNow,
-  catchUpName,
-  catchUpOf,
-  effectiveBase,
-  type ForkBegin,
-  mergedFrom,
   nothingToPublish,
-  type ParentNow,
   type PublishWork,
-  parentNow,
   planAcceptedAction,
   planAcceptedRecord,
-  planBegin,
-  planParentUpdate,
   planPublishFinish,
-  planUpdateFrom,
   publishUndone,
   publishWork,
-  type UpdateRefusal,
 } from "./accepted.ts"
 export {
   type CatchUpRefusal,
@@ -66,6 +52,19 @@ export {
   decodeBannerConfig,
   planAsk,
 } from "./banner.ts"
+export {
+  BASE,
+  type CatchUpNow,
+  catchUpOf,
+  effectiveBase,
+  type ForkBegin,
+  type ParentNow,
+  parentNow,
+  planBegin,
+  planParentUpdate,
+  planUpdateFrom,
+  type UpdateRefusal,
+} from "./base.ts"
 export {
   type BaseNews,
   BEHIND_TYPE,
@@ -139,6 +138,12 @@ export {
   type Verb,
   verbOf,
 } from "./card-history.ts"
+export {
+  baseMovedOn,
+  catchUpName,
+  incomingWords,
+  mergedFrom,
+} from "./catch-up-from.ts"
 export {
   addressChat,
   agentByDefault,
@@ -303,6 +308,7 @@ export {
   RECORD_SPECS,
   type StoredRecords,
 } from "./specs.ts"
+export { decodeStack, planStack, type StackMessage } from "./stack.ts"
 export { planStartup } from "./startup.ts"
 export {
   type CarryOnMessage,
@@ -320,14 +326,7 @@ export {
   titleRequest,
   titleStillWanted,
 } from "./title.ts"
-export {
-  decodeStack,
-  encodeUpdate,
-  incomingWords,
-  planStack,
-  type StackMessage,
-  type UpdateMessage,
-} from "./update.ts"
+export { encodeUpdate, type UpdateMessage } from "./update.ts"
 export {
   type EndReply,
   endReplyOf,

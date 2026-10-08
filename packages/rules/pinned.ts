@@ -1,7 +1,7 @@
 // pinned — the pinned cards a run reads (ADR-0048, S92).
 //
-// A cards entry is a pi `CustomMessage` in `update.ts`'s pattern: `content` is
-// what the model reads, `details` what pinetrie reads back. The host plans one
+// A cards entry is a history message (`history.ts`): `content` is what the
+// model reads, `details` what pinetrie reads back. The host plans one
 // when a run starts and the thread's pinned cards differ from those the model
 // last read on the path (`pinnedInView`, in @pinetrie/core), and pi writes it
 // with the run's prompt, in the commit that admits the run. It restates every
@@ -11,16 +11,15 @@
 import {
   type CardId,
   type CardRecord,
-  cardId,
   firstLine,
-  isLaneName,
   type LaneName,
   type PinnedCardRead,
   type PinnedView,
   type WriterId,
 } from "@pinetrie/core"
-import { type Static, Type } from "typebox"
-import { decodeWith } from "./decode.ts"
+import { Type } from "typebox"
+import { CardIdSchema, LaneNameSchema, List, WriterIdSchema } from "./decode.ts"
+import { type HistoryMessage, historyMessage } from "./history.ts"
 
 export const PINNED_TYPE = "pinetrie.pinned"
 
@@ -32,57 +31,31 @@ export const PINNED_RULE =
   "The team pins cards to say what it wants from this thread. They appear in the conversation in `<pinned-cards>` blocks, and the latest block is what holds."
 
 const PinnedDetailsSchema = Type.Object({
-  lane: Type.String({ minLength: 1 }),
-  cards: Type.Array(
+  lane: LaneNameSchema,
+  cards: List(
     Type.Object({
-      id: Type.String({ minLength: 1 }),
+      id: CardIdSchema,
       text: Type.String(),
-      by: Type.String({ minLength: 1 }),
+      by: WriterIdSchema,
     }),
   ),
-  retired: Type.Array(
+  retired: List(
     Type.Object({
-      id: Type.String({ minLength: 1 }),
+      id: CardIdSchema,
       line: Type.String(),
     }),
   ),
 })
 
-const PinnedSchema = Type.Object({
-  role: Type.Literal("custom"),
-  customType: Type.Literal(PINNED_TYPE),
-  details: PinnedDetailsSchema,
-})
+/** The column draws its own marker for a cards entry, not pi's message. */
+export const PINNED = historyMessage(PINNED_TYPE, PinnedDetailsSchema, false)
 
 /** The pi `CustomMessage` a cards entry is stored as. */
-export interface PinnedMessage {
-  readonly role: "custom"
-  readonly customType: typeof PINNED_TYPE
-  readonly content: string
-  /** The column draws its own marker, not pi's message. */
-  readonly display: false
-  readonly details: Static<typeof PinnedDetailsSchema>
-  readonly timestamp: number
-}
+export type PinnedMessage = HistoryMessage<typeof PINNED_TYPE, PinnedView>
 
 /** A stored message -> the cards it says a run read, or undefined if it is not one. */
 export const decodePinned = (message: unknown): PinnedView | undefined =>
-  decodeWith(PinnedSchema, message, ({ details }) =>
-    isLaneName(details.lane)
-      ? {
-          lane: details.lane,
-          cards: details.cards.map(c => ({
-            id: cardId(c.id),
-            text: c.text,
-            by: c.by as WriterId,
-          })),
-          retired: details.retired.map(r => ({
-            id: cardId(r.id),
-            line: r.line,
-          })),
-        }
-      : undefined,
-  )
+  PINNED.decode(message)
 
 /**
  * A card's closing tags, so a card cannot close the block the model is told
@@ -126,18 +99,15 @@ export function encodePinned(
   nameOf: (writer: WriterId) => string,
   timestamp: number,
 ): PinnedMessage {
-  return {
-    role: "custom",
-    customType: PINNED_TYPE,
-    content: pinnedContent(view, nameOf),
-    display: false,
-    details: {
+  return PINNED.encode(
+    {
       lane: view.lane,
       cards: view.cards.map(c => ({ id: c.id, text: c.text, by: c.by })),
       retired: view.retired.map(r => ({ id: r.id, line: r.line })),
     },
+    pinnedContent(view, nameOf),
     timestamp,
-  }
+  )
 }
 
 /** How a pinned card stands against what the model last read. */

@@ -19,6 +19,7 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
+import { incomingWords } from "./catch-up-from.ts"
 import {
   ACCEPTED,
   BASE as BASE_RECORD,
@@ -39,7 +40,7 @@ import {
   setRecord,
 } from "./index.ts"
 import { offerAcceptanceDestinations, offerMoved } from "./offer.ts"
-import { decodeUpdate, incomingWords } from "./update.ts"
+import { decodeUpdate } from "./update.ts"
 
 const LANE = laneNameForThread("1")
 const ADA = writerId("ada@x.io")
@@ -358,14 +359,11 @@ describe("the update and stack messages", () => {
       merged: [COPY],
     })
     expect(m.content).toContain("Accepted work was merged into this thread")
-    expect(m.details).toMatchObject({ base: "accepted", line: true })
-    // An update stored before ADR-0100 named accepted work by its bookmark.
-    expect(
-      decodeUpdate({
-        ...m,
-        details: { ...m.details, base: "pinetrie-accepted", line: true },
-      })?.from,
-    ).toEqual({ kind: "accepted" })
+    expect(m.details).toEqual(details)
+    // One stored in an older shape does not decode, and the column leaves it out.
+    const { from: _f, merged: _m, ...rest } = details
+    const older = { ...rest, base: "accepted", line: true, copy: COPY }
+    expect(decodeUpdate({ ...m, details: older })).toBeUndefined()
     const wip = {
       ...details,
       from: { kind: "wip" as const, bookmark: "wip/a" },
@@ -412,7 +410,6 @@ describe("the update and stack messages", () => {
     })
   })
   test.each([
-    [null, "The person's work"],
     [{ kind: "accepted" }, "Accepted work"],
     [{ kind: "wip", bookmark: "wip/a" }, "The work on wip/a"],
     [

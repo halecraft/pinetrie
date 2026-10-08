@@ -107,11 +107,19 @@ export const laneNameForThread = (id: string): LaneName =>
   `${LANE_PREFIX}${id}` as LaneName
 
 /**
+ * A lane name as a regular expression's source: the prefix and at least one
+ * character more. `@pinetrie/rules`' `LaneNameSchema` checks stored lanes
+ * with it, so a schema and `isLaneName` cannot disagree.
+ */
+export const LANE_PATTERN = `^${LANE_PREFIX}[\\s\\S]`
+
+const LANE_RE = new RegExp(LANE_PATTERN)
+
+/**
  * Whether text names a thread's lane: the check wherever a lane name is read,
  * in the codec, the schema's readers, `@pinetrie/rules`' decoders and the pi adapter.
  */
-export const isLaneName = (s: string): s is LaneName =>
-  s.startsWith(LANE_PREFIX) && s.length > LANE_PREFIX.length
+export const isLaneName = (s: string): s is LaneName => LANE_RE.test(s)
 
 const NEW_LANE =
   /^t-[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
