@@ -7,6 +7,8 @@
   - ADR-0085: restated whole, with what ADR-0088, ADR-0091 and ADR-0098
     changed in it folded in.
 - **Amended by:**
+  - ADR-0109: the search and "mine" move from the closed state to the board's
+    top, and filter every state, open and closed.
   - ADR-0111: a board item is a thread card; a text card put on a board state
     becomes a conversation root there, which the undo key lifts back into the
     card while the root holds only that message; "your list" is the sidebar,

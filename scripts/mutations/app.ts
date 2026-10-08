@@ -636,8 +636,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "Escape closes the board under a menu open on it",
     file: "packages/web/board.tsx",
-    from: '      if (e.key === "Escape" && self.current?.querySelector(".open") == null)',
-    to: '      if (e.key === "Escape")',
+    from: '        menuOpen: self.current?.querySelector(".open") != null,',
+    to: "        menuOpen: false,",
     suite: "browser",
     scenario: "page",
     expect:

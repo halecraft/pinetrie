@@ -1156,8 +1156,9 @@ leaving treats the history, are `page.ts`'s (`@pinetrie/interface`).
   per open state and `.board-closed` for the closed one, each item a
   `.thread-card[data-root][data-entry]` with `.board-open`, `.board-label`,
   `.reader-trigger` per reader (its menu `.reader`, `.open` while open),
-  `.root-ready` when a thread has work ready, and `.item-menu`; `.closed-search`,
-  `.add-state`, `.state-name`. The footer is `#bottom`: ▦ is
+  `.root-ready` when a thread has work ready, and `.item-menu`; the search
+  is `.board-bar`'s `.board-search` and `.board-mine`, above
+  `.board-states`; `.add-state`, `.state-name`. The footer is `#bottom`: ▦ is
   `.board-toggle`, whose `data-messages` is the session's message count
   (the browser suite's `countIsHosts` waits on it), each state
   `.strip-state[data-state]`, with `.strip-working` and `.strip-ready`

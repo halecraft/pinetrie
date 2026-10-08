@@ -15,16 +15,22 @@ import { orderKeys } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import type { Status } from "./attention.ts"
 import {
+  type BoardKeyFocus,
   type BoardViewInput,
+  boardKeyAct,
   boardView,
   CLOSED_RECENT,
   clickClosesBoard,
   closedRows,
+  keptWords,
   nameStateIntent,
   readyWords,
   removeWords,
+  rootsWords,
+  searchWords,
   stripWords,
 } from "./board-view.ts"
+import type { KeyLike } from "./inventory-keys.ts"
 
 const ADA = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
@@ -107,7 +113,7 @@ describe("boardView", () => {
       ["Backlog", [E(3)]],
       ["Doing", [E(2), E(1)]],
     ])
-    expect(view.closed.count).toBe(2)
+    expect(view.closed.total).toBe(2)
     expect(view.strip.map(s => [s.name, s.count, s.closed])).toEqual([
       ["Backlog", 1, false],
       ["Doing", 2, false],
@@ -248,22 +254,59 @@ test("clickClosesBoard: a click pressed and let go outside the board and its str
   expect(clickClosesBoard(null, "elsewhere")).toBe(false)
 })
 
-describe("closedRows", () => {
-  const rows = (over: Partial<BoardViewInput>) =>
-    boardView(input(over)).closed.rows.map(t => t.entry)
-  test("newest activity first", () => {
-    expect(rows({})).toEqual([E(5), E(4)])
+describe("the board's search (ADR-0109)", () => {
+  const labels = new Map([
+    [E(1), "Board search design"],
+    [E(2), "Palette work"],
+    [E(3), "Search the backlog"],
+    [E(4), "Old spike about SQLite"],
+    [E(5), "Palette search"],
+  ])
+  const kept = (over: Partial<BoardViewInput>) => {
+    const view = boardView(input({ labels, ...over }))
+    return [
+      ...view.open.map(c => c.items.map(t => t.entry)),
+      view.closed.rows.map(t => t.entry),
+    ]
+  }
+  test("with none, every root shows, the closed state's newest first", () => {
+    expect(kept({})).toEqual([[E(3)], [E(2), E(1)], [E(5), E(4)]])
+    const view = boardView(input())
+    expect([view.filtered, view.total]).toEqual([false, 5])
   })
-  test("search is case-insensitive over each root's label, not its messages (ADR-0063)", () => {
-    expect(rows({ query: "palette" })).toEqual([E(5)])
-    expect(rows({ query: "SQLITE" })).toEqual([E(4)])
-    expect(rows({ query: "nothing" })).toEqual([])
+  test("it keeps, in every state and in place, the roots whose label holds every word, case-insensitively, in any order (labels, not messages: ADR-0063)", () => {
+    expect(kept({ query: "SEARCH" })).toEqual([[E(3)], [E(1)], [E(5)]])
+    expect(kept({ query: " design  board " })).toEqual([[], [E(1)], []])
+    expect(kept({ query: "board nothing" })).toEqual([[], [], []])
+    expect(kept({ query: "sqlite" })).toEqual([[], [], [E(4)]])
   })
-  test("mine keeps the roots you wrote in", () => {
-    expect(rows({ mine: true })).toEqual([E(4)])
-    expect(rows({ mine: true, me: BEA })).toEqual([E(5)])
+  test("mine keeps the roots you wrote in, in every state", () => {
+    expect(kept({ mine: true })).toEqual([[E(3)], [E(1)], [E(4)]])
+    expect(kept({ mine: true, me: BEA })).toEqual([[], [E(2)], [E(5)]])
+    expect(kept({ mine: true, query: "palette" })).toEqual([[], [], []])
   })
-  test("with no query, only the most recent few", () => {
+  test("a state's total, mark, counts and Remove, and the strip, count every root, kept or not; heads say how many are kept", () => {
+    const status = new Map<EntryId, Status>([[E(2), { kind: "working" }]])
+    const view = boardView(input({ labels, status, query: "board" }))
+    const doing = view.open[1]
+    expect(view.filtered).toBe(true)
+    expect([doing?.items.length, doing?.total, doing?.working]).toEqual([
+      1, 2, 1,
+    ])
+    expect(doing?.remove.why).not.toBeNull()
+    expect([view.closed.kept, view.closed.total]).toEqual([0, 2])
+    expect(view.strip.map(s => [s.count, s.roots.length])).toEqual([
+      [1, 1],
+      [2, 2],
+      [2, 0],
+    ])
+  })
+  test("Move up and Move down step among the items shown", () => {
+    const view = boardView(input({ labels, query: "board" }))
+    const [only] = view.open[1]?.items ?? []
+    expect([only?.up, only?.down]).toEqual([null, null])
+  })
+  test("with no query, the closed state shows only its most recent few", () => {
     const item = (n: number) =>
       ({
         ...boardView(input()).closed.rows[0],
@@ -274,12 +317,61 @@ describe("closedRows", () => {
       }) as never
     const many = Array.from({ length: CLOSED_RECENT + 3 }, (_, n) => item(n))
     const summaries = new Map()
-    expect(
-      closedRows({ items: many, summaries, query: "", mine: false, me: ADA }),
-    ).toHaveLength(CLOSED_RECENT)
-    expect(
-      closedRows({ items: many, summaries, query: "r", mine: false, me: ADA }),
-    ).toHaveLength(CLOSED_RECENT + 3)
+    expect(closedRows({ items: many, summaries, query: " " })).toHaveLength(
+      CLOSED_RECENT,
+    )
+    expect(closedRows({ items: many, summaries, query: "r" })).toHaveLength(
+      CLOSED_RECENT + 3,
+    )
+  })
+})
+
+describe("boardKeyAct", () => {
+  const key = (k: string, mod: Partial<KeyLike> = {}): KeyLike => ({
+    key: k,
+    ctrlKey: false,
+    metaKey: false,
+    shiftKey: false,
+    altKey: false,
+    ...mod,
+  })
+  const at = (over: Partial<BoardKeyFocus> = {}): BoardKeyFocus => ({
+    menuOpen: false,
+    query: "",
+    inText: false,
+    ...over,
+  })
+  test.each([
+    [
+      "Escape with a menu open is the menu's",
+      key("Escape"),
+      at({ menuOpen: true, query: "x" }),
+      null,
+    ],
+    ["Escape clears a query", key("Escape"), at({ query: "x" }), "clearSearch"],
+    ["Escape with no query closes the board", key("Escape"), at(), "close"],
+    ["/ focuses the search", key("/"), at(), "focusSearch"],
+    ["/ in a text box is typed", key("/"), at({ inText: true }), null],
+    ["Ctrl+/ is not the board's", key("/", { ctrlKey: true }), at(), null],
+    ["Cmd+/ is not the board's", key("/", { metaKey: true }), at(), null],
+    ["Alt+/ is not the board's", key("/", { altKey: true }), at(), null],
+    ["another key is not the board's", key("s"), at(), null],
+  ] as const)("%s", (_, event, focus, act) => {
+    expect(boardKeyAct(event, focus)).toBe(act)
+  })
+})
+
+describe("board words", () => {
+  test.each([
+    [rootsWords(1), "1 root"],
+    [rootsWords(41), "41 roots"],
+    [keptWords(12, 96, true), "12 of 96"],
+    [keptWords(96, 96, true), "96 of 96"],
+    [keptWords(96, 96, false), "96"],
+    [searchWords(1), "search 1 root…"],
+    [searchWords(140), "search 140 roots…"],
+  ])("%s", (said, words) => {
+    expect(said).toBe(words)
   })
 })
 

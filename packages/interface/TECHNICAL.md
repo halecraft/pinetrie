@@ -74,8 +74,8 @@ page's (`storage-keys.ts`, `tab-state.ts`, `same-props.ts`, `colors.ts`).
   board's items, `prune`'s known roots, the inbox's mentions, ▦'s count (`messageCount`: the held roots' messages, of every root's), the participants (`participantsIn`), the
   roots of running lanes and of offers (`workAnywhere`, `laneRootsOf`), and the
   root of a card drafted in a root not held (`cardMarks`'s `rootEntries`).
-  The board's closed state searches labels: a search of every message would
-  hold every root.
+  The board's search covers labels: a search of every message would hold
+  every root.
 - **A record's read keeps its map while its namespace is unchanged**
   (`readRecords`, ADR-0095), so a directory write wakes no read of names.
   `readParticipantNames` also keeps its map while the names are the same,
@@ -307,14 +307,22 @@ and each item's signals.
 
 - **What the board shows is `boardView`'s**, over `boardOf` (`@pinetrie/rules`):
   the strip (each state's name, count, roots and `markOf`), each open state
-  as a column of items, and the closed state's `closedRows`. An item's
+  as a column of the items the search keeps, and the closed state's
+  `closedRows`. An item's
   `moves` are its `⋯`'s Move to ▸, one per other state, with the busy reason
   into the closed state; `up` and `down` its Move up and Move down within
-  its state, so the keyboard reaches every move a drag makes. Its words
-  are worded beside it, one function each (`removeWords`, `closedWords`).
-- **The closed state searches labels** (`closedRows`), newest first, "mine"
-  being the roots `RootSummary.writers` holds you in; with no query, its
-  `CLOSED_RECENT` newest.
+  its state, among the items shown (`stepsIn`), so the keyboard reaches
+  every move a drag makes. Its words are worded beside it, one function
+  each (`removeWords`, `rootsWords`, `keptWords`, `searchWords`).
+- **One search filters every state in place** (`boardFilter`, ADR-0109):
+  every word in the label, "mine" being the roots `RootSummary.writers`
+  holds you in. Not filtered is `null`, not a predicate that keeps all.
+  Each state's items are built once, then filtered, then given their steps,
+  since `stepsIn` needs the kept ones. An open column's `items` and the
+  closed state's `kept` are what the search keeps; `total`, in both, is
+  every root, which a column's mark, counts and Remove, and the strip,
+  count. The closed state's `closedRows` are its kept roots newest first;
+  with no query, its `CLOSED_RECENT` newest.
 - **One landing rule for a root's drag** (`root-target.ts`), as
   `put-target.ts` is for a card's: `rootDropProps` marks a column, an item
   or the sidebar (`data-root-state`, `data-root-before`, `data-list-before`),
@@ -1296,6 +1304,13 @@ state, never stored.
   outside a text box, where the box's own text undo has them; arrows and
   `hjkl` move through the grid while the panel has focus. Ctrl+Shift+L
   folds or unfolds the sidebar (ADR-0088), from anywhere, as I and O.
+  The open board's keys are a second table, `boardKeyAct` (`board-view.ts`),
+  read by `Board`'s own listener, until the key-system redesign replaces
+  both: clearing its query and focusing its search are view state, not
+  intents. Escape there clears a query before it closes the board, after
+  any menu open on it; `/` focuses the search outside a text box. Both
+  listeners ask `isTextBox` (`packages/web/text-box.ts`), which counts any
+  `<input>`, a checkbox too.
 - **A move flies** (`use-flight.ts`): `perform` measures the card's element
   before the move (`ports.fly`), and once it is drawn elsewhere that
   element animates from the old box. A take into the inventory while the

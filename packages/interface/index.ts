@@ -70,14 +70,18 @@ export {
   threadWriters,
 } from "./attention.ts"
 export {
+  type BoardKey,
   type BoardSide,
   type BoardView,
+  boardKeyAct,
   boardView,
   clickClosesBoard,
-  closedWords,
+  keptWords,
   nameStateIntent,
   readyWords,
+  rootsWords,
   type StripState,
+  searchWords,
   stripWords,
   type ThreadCard,
 } from "./board-view.ts"

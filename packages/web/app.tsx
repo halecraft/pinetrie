@@ -144,6 +144,7 @@ import {
 } from "./review-prefs.ts"
 import { Sidebar } from "./sidebar.tsx"
 import type { DeviceState, TabState } from "./tab-state.ts"
+import { isTextBox } from "./text-box.ts"
 import { useAttention } from "./use-attention.ts"
 import { useColumnDrag } from "./use-column-drag.ts"
 import { useFilledCards } from "./use-filled-cards.ts"
@@ -174,10 +175,6 @@ const ITEM_HOVER_MS = 600
 
 const cardOrNull = (id: string | undefined): CardId | null =>
   id === undefined || id === "" ? null : cardId(id)
-
-/** Whether `el` is a text box, whose undo keys are its own. */
-const isTextBox = (el: Element | null): boolean =>
-  el instanceof HTMLTextAreaElement || el instanceof HTMLInputElement
 
 /**
  * Bring a newly opened column's first message level with its fork point in
@@ -734,7 +731,7 @@ export function App({
           sprites,
         })
   const title = pageTitle(needsYou, listView?.selected ?? null, page)
-  // The closed state's search and "mine": never stored.
+  // The board's search and "mine": never stored.
   const [boardQuery, setBoardQuery] = useState("")
   const [boardMine, setBoardMine] = useState(false)
   const boardShown = useMemo(

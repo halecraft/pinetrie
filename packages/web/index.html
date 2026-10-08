@@ -893,13 +893,20 @@
         padding: .1rem .3rem; background: none; color: #ddd; border-radius: 999px; }
       .reader-trigger .initial { width: 22px; height: 22px; line-height: 22px; font-size: 12px; }
       /* The board, open (ADR-0112): over the columns, from the footer's edge,
-         moving none of them. A column per open state, a column to add one,
-         and the closed state collapsed to a count, a search and its rows. */
+         moving none of them. Its search above (ADR-0109), which stays while
+         the states scroll below it: a column per open state, a column to add
+         one, and the closed state collapsed to a count and its rows. */
       #board { position: absolute; z-index: 3; left: 0; right: 0; bottom: 0; max-height: 70%;
-        display: flex; align-items: flex-start; gap: .75rem; padding: .9rem; overflow: auto;
+        display: flex; flex-direction: column; gap: .6rem; padding: .9rem;
         background: #111317;
         border-top: 1px solid var(--edge); box-shadow: 0 -12px 24px #0008;
         font-size: .8rem; color: #c9d1d9; --surface: #111317; }
+      .board-bar { display: flex; align-items: center; gap: .75rem; flex: 0 0 auto; }
+      .board-search { width: 18rem; max-width: 100%; padding: .3rem .5rem; background: var(--page); color: #ddd;
+        border: 1px solid var(--edge); border-radius: 4px; font: inherit; }
+      .board-mine { color: #8b949e; font-size: .75rem; }
+      .board-states { display: flex; align-items: flex-start; gap: .75rem; min-height: 0; overflow: auto;
+        padding: .35rem; margin: -.35rem; }
       .board-column, .board-closed { display: flex; flex-direction: column; gap: .4rem; min-width: 0; }
       .board-column { flex: 1 1 12rem; }
       .board-closed { flex: 0 0 14rem; }
@@ -939,9 +946,6 @@
       .thread-card:hover .item-more, .thread-card:focus-within .item-more, .item-more.open { visibility: visible; }
       .board-add-state { flex: 0 0 auto; }
       .add-state { padding: .3rem .6rem; background: none; color: #aab4c3; border: 1px dashed #3a3f48; }
-      .closed-search { padding: .3rem .5rem; background: var(--page); color: #ddd;
-        border: 1px solid var(--edge); border-radius: 4px; font: inherit; }
-      .closed-mine { color: #8b949e; font-size: .75rem; }
       /* Your inbox (ADR-0091): the page's one badge, amber; quiet at zero.
          Beside its icon; folded, on your avatar's corner (ADR-0098), ringed in
          what it sits on so it reads as apart from the circle. */

@@ -257,8 +257,8 @@ nothing; Ctrl+Shift+L still folds the sidebar.
 ### The board: where everyone's work stands (ADR-0112)
 
 ▦, or a state in the strip, opens the board over the columns, from the
-footer's edge: it moves none of them. ▦ again, Escape, or a click outside
-it and its strip closes it, and so does choosing something to work in. Whether it is open is this browser
+footer's edge: it moves none of them. ▦ again, Escape (once a query is
+cleared), or a click outside it and its strip closes it, and so does choosing something to work in. Whether it is open is this browser
 tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
 
 - **Every root is in one workflow state.** Each open state is a column of
@@ -279,11 +279,19 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   run that needs you, is a mark, never a move. A move from a state the root
   has left is refused, naming who moved it and where ("not moved: Bea moved
   it to Doing first").
+- **One search for the whole board** (ADR-0109), at its top, with
+  **mine** (the roots you wrote in), filters every state in place: a root
+  is kept when its label holds every word typed, in any order (labels, not
+  every message, which would load every root, ADR-0063). The states keep
+  their places and the items their order, and each state's head says how
+  many it shows ("12 of 96"); its mark and counts, and the strip's, still
+  count every root. Move up and Move down step among the items shown. `/`
+  focuses the field while the board is open; Escape clears a query before
+  it closes the board.
 - **The closed state archives** (ADR-0029): a root there is read-only for
   everyone until it is moved out, the host lets go of it, and its threads'
-  offers leave your repo. It shows as a count, a search over labels (not
-  every message, which would load every root, ADR-0063), **mine** (the roots
-  you wrote in), and its most recent roots. An archived root opened from it
+  offers leave your repo. It shows as a count and its most recent roots, or
+  every root the search keeps, newest first. An archived root opened from it
   is read-only, with **Restore** in its composer's place, which moves it to
   the first open state; it leaves the sidebar when you switch away unless you
   restore it.

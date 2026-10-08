@@ -11,16 +11,19 @@
 // is ready to accept carries ⇡, for everyone. Selecting an item opens it in your
 // list; dragged onto the sidebar, it opens there. A state's name is edited in
 // place, its ⋯ moves or removes it, and ＋ state adds one. The closed state
-// is a count, a search over labels and its most recent roots. What it shows
-// is `boardView`'s.
+// is a count and its most recent roots. Above the states, one search over
+// labels, and "mine", filter every state in place (ADR-0109); `/` focuses it,
+// and Escape clears it before it closes the board. What it shows is
+// `boardView`'s.
 
 import type { EntryId, WriterId } from "@pinetrie/core"
 import {
   type BoardSide,
   type BoardView,
+  boardKeyAct,
   clickClosesBoard,
-  closedWords,
   type Intent,
+  keptWords,
   LEVEL_CLASS,
   LEVEL_WORDS,
   type Level,
@@ -30,7 +33,9 @@ import {
   readyWords,
   rootDropProps,
   rootGroupProps,
+  rootsWords,
   type StripState,
+  searchWords,
   stripWords,
   type ThreadCard,
 } from "@pinetrie/interface"
@@ -45,6 +50,7 @@ import {
   StatusMark,
 } from "./root-signals.tsx"
 import { AddButton } from "./sidebar.tsx"
+import { isTextBox } from "./text-box.ts"
 import { startRootDrag } from "./use-root-drag.ts"
 
 /** ▦'s mark's title: what the roots not in the sidebar raise. */
@@ -168,7 +174,7 @@ export function Board({
 }: {
   view: BoardView
   onIntent: (intent: Intent) => void
-  /** The closed state's search and its "mine": never stored. */
+  /** The board's search and its "mine": never stored. */
   query: string
   onQuery: (q: string) => void
   mine: boolean
@@ -178,16 +184,26 @@ export function Board({
   thread: (end: EntryId, root: EntryId) => MenuItem
   pip: React.ReactNode
 }) {
-  // Escape closes the board, as ▦ does, and so does a click outside it
-  // (`clickClosesBoard`). A menu open on the board takes the first Escape
-  // (`Popover`), and the board the next. Both ends of a click are read in the
-  // capture phase, before what was clicked can take itself out of the page.
+  // The board's keys are `boardKeyAct`'s: Escape closes the board, as ▦
+  // does, once a menu open on it (`Popover`) and then a query have taken
+  // theirs. A click outside it closes it too (`clickClosesBoard`). Both ends
+  // of a click are read in the capture phase, before what was clicked can
+  // take itself out of the page.
   const self = useRef<HTMLElement>(null)
+  const search = useRef<HTMLInputElement>(null)
   useEffect(() => {
     const close = () => onIntent({ kind: "board", open: false })
     const onKey = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && self.current?.querySelector(".open") == null)
-        close()
+      const act = boardKeyAct(e, {
+        menuOpen: self.current?.querySelector(".open") != null,
+        query,
+        inText: isTextBox(document.activeElement),
+      })
+      if (act === "focusSearch") {
+        e.preventDefault()
+        search.current?.focus()
+      } else if (act === "clearSearch") onQuery("")
+      else if (act === "close") close()
     }
     const side = (at: EventTarget | null): BoardSide =>
       !(at instanceof Element)
@@ -213,7 +229,7 @@ export function Board({
       document.removeEventListener("pointerdown", onPress, true)
       document.removeEventListener("click", onClick, true)
     }
-  }, [onIntent])
+  }, [onIntent, onQuery, query])
   const [adding, setAdding] = useState(false)
   // An open column's item is a place to drop before; a closed row is not,
   // since the closed state shows its roots by activity, not by place.
@@ -232,122 +248,23 @@ export function Board({
       thread={thread}
     />
   )
+  const stateCount = (shown: number, total: number) => (
+    <span className="board-count" title={rootsWords(total)}>
+      {keptWords(shown, total, view.filtered)}
+    </span>
+  )
   return (
     <section aria-label="board" className="board" id="board" ref={self}>
-      {view.open.map(column => (
-        <div
-          className="board-column"
-          data-state={column.state.id}
-          key={column.state.id}
-          {...rootGroupProps}
-          {...rootDropProps({
-            kind: "state",
-            state: column.state.id,
-            before: null,
-          })}
-        >
-          <div className="board-head">
-            <StateName
-              name={column.state.name}
-              onName={name => onIntent(nameStateIntent(column.state.id, name))}
-            />
-            <span className="board-count">{column.items.length}</span>
-            {column.mark !== null && (
-              <StatusMark
-                arrived={null}
-                level={column.mark}
-                title={LEVEL_WORDS[column.mark]}
-              />
-            )}
-            <Menu
-              className="state-more"
-              label={`more for ${column.state.name}`}
-              sections={[
-                {
-                  key: "state",
-                  items: [
-                    ...(column.left === null
-                      ? []
-                      : [moveItem("left", column.left, onIntent)]),
-                    ...(column.right === null
-                      ? []
-                      : [moveItem("right", column.right, onIntent)]),
-                    {
-                      key: "remove",
-                      className: "remove-state",
-                      disabled: column.remove.why !== null,
-                      title: "remove this state from the board, for everyone",
-                      label: (
-                        <>
-                          Remove
-                          {column.remove.why !== null && (
-                            <span className="why"> · {column.remove.why}</span>
-                          )}
-                        </>
-                      ),
-                      onChoose: () => onIntent(column.remove.intent),
-                    },
-                  ],
-                },
-              ]}
-              trigger="⋯"
-              triggerClassName="state-menu"
-            />
-          </div>
-          <div className="board-cards">
-            {column.items.map(t => item(t, true))}
-          </div>
-          <AddButton add={column.add} onIntent={onIntent} />
-        </div>
-      ))}
-      <div className="board-add-state">
-        {adding ? (
-          <StateName
-            editing
-            name=""
-            onEnd={() => setAdding(false)}
-            onName={name => onIntent(nameStateIntent(null, name))}
-          />
-        ) : (
-          <button
-            className="add-state"
-            onClick={() => setAdding(true)}
-            title="add a workflow state to the board, for everyone"
-            type="button"
-          >
-            ＋ state
-          </button>
-        )}
-      </div>
-      <div
-        className="board-closed"
-        data-state={view.closed.state.id}
-        {...rootGroupProps}
-        {...rootDropProps({
-          kind: "state",
-          state: view.closed.state.id,
-          before: null,
-        })}
-      >
-        <div className="board-head">
-          <StateName
-            name={view.closed.state.name}
-            onName={name =>
-              onIntent(nameStateIntent(view.closed.state.id, name))
-            }
-          />
-          <span className="board-count" title={closedWords(view.closed.count)}>
-            {view.closed.count}
-          </span>
-        </div>
+      <div className="board-bar">
         <input
-          aria-label={`search ${view.closed.state.name}`}
-          className="closed-search"
+          aria-label="search the board"
+          className="board-search"
           onChange={e => onQuery(e.target.value)}
-          placeholder={`search ${closedWords(view.closed.count)}…`}
+          placeholder={searchWords(view.total)}
+          ref={search}
           value={query}
         />
-        <label className="closed-mine">
+        <label className="board-mine">
           <input
             checked={mine}
             onChange={e => onMine(e.target.checked)}
@@ -355,8 +272,120 @@ export function Board({
           />{" "}
           mine
         </label>
-        <div className="board-cards">
-          {view.closed.rows.map(t => item(t, false))}
+      </div>
+      <div className="board-states">
+        {view.open.map(column => (
+          <div
+            className="board-column"
+            data-state={column.state.id}
+            key={column.state.id}
+            {...rootGroupProps}
+            {...rootDropProps({
+              kind: "state",
+              state: column.state.id,
+              before: null,
+            })}
+          >
+            <div className="board-head">
+              <StateName
+                name={column.state.name}
+                onName={name =>
+                  onIntent(nameStateIntent(column.state.id, name))
+                }
+              />
+              {stateCount(column.items.length, column.total)}
+              {column.mark !== null && (
+                <StatusMark
+                  arrived={null}
+                  level={column.mark}
+                  title={LEVEL_WORDS[column.mark]}
+                />
+              )}
+              <Menu
+                className="state-more"
+                label={`more for ${column.state.name}`}
+                sections={[
+                  {
+                    key: "state",
+                    items: [
+                      ...(column.left === null
+                        ? []
+                        : [moveItem("left", column.left, onIntent)]),
+                      ...(column.right === null
+                        ? []
+                        : [moveItem("right", column.right, onIntent)]),
+                      {
+                        key: "remove",
+                        className: "remove-state",
+                        disabled: column.remove.why !== null,
+                        title: "remove this state from the board, for everyone",
+                        label: (
+                          <>
+                            Remove
+                            {column.remove.why !== null && (
+                              <span className="why">
+                                {" "}
+                                · {column.remove.why}
+                              </span>
+                            )}
+                          </>
+                        ),
+                        onChoose: () => onIntent(column.remove.intent),
+                      },
+                    ],
+                  },
+                ]}
+                trigger="⋯"
+                triggerClassName="state-menu"
+              />
+            </div>
+            <div className="board-cards">
+              {column.items.map(t => item(t, true))}
+            </div>
+            <AddButton add={column.add} onIntent={onIntent} />
+          </div>
+        ))}
+        <div className="board-add-state">
+          {adding ? (
+            <StateName
+              editing
+              name=""
+              onEnd={() => setAdding(false)}
+              onName={name => onIntent(nameStateIntent(null, name))}
+            />
+          ) : (
+            <button
+              className="add-state"
+              onClick={() => setAdding(true)}
+              title="add a workflow state to the board, for everyone"
+              type="button"
+            >
+              ＋ state
+            </button>
+          )}
+        </div>
+        <div
+          className="board-closed"
+          data-state={view.closed.state.id}
+          {...rootGroupProps}
+          {...rootDropProps({
+            kind: "state",
+            state: view.closed.state.id,
+            before: null,
+          })}
+        >
+          <div className="board-head">
+            <StateName
+              name={view.closed.state.name}
+              onName={name =>
+                onIntent(nameStateIntent(view.closed.state.id, name))
+              }
+            />
+            {stateCount(view.closed.kept, view.closed.total)}
+          </div>
+          <div className="board-cards">
+            {view.closed.rows.map(t => item(t, false))}
+          </div>
         </div>
       </div>
     </section>
