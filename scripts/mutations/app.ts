@@ -291,10 +291,30 @@ export const mutations: readonly Mutation[] = [
       "an opened row shows the whole command in its label's place, once, and a short one's has nothing to swap",
   },
   {
+    name: "a tool's tag sits beside its command, not at the row's right",
+    file: "packages/web/index.html",
+    from: "      .tool-tag { float: right; margin-left: .6rem;",
+    to: "      .tool-tag { margin-left: .6rem;",
+    suite: "browser",
+    scenario: "tools",
+    expect:
+      "a shell row's tag sits at its top right, and its opened command is laid out a step a line, its command names marked",
+  },
+  {
+    name: "an opened command is its preview again, not laid out",
+    file: "packages/web/message.tsx",
+    from: "            <Runs runs={summary.whole} />",
+    to: "            <Runs runs={summary.preview} />",
+    suite: "browser",
+    scenario: "tools",
+    expect:
+      "a shell row's tag sits at its top right, and its opened command is laid out a step a line, its command names marked",
+  },
+  {
     name: "a tool row never shows its whole label",
     file: "packages/web/message.tsx",
-    from: "        {call.wholeLabel !== undefined && (",
-    to: "        {call.wholeLabel === null && (",
+    from: "        {summary.whole !== undefined && (",
+    to: "        {summary.whole === null && (",
     suite: "browser",
     scenario: "tools",
     expect:

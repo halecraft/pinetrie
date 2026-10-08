@@ -24,7 +24,7 @@ import {
   type Position,
   type WriterId,
 } from "./index.ts"
-import { subjectOf, toolLabel, wholeToolLabel } from "./tools.ts"
+import { subjectOf } from "./tools.ts"
 
 // ── entries and messages ──────────────────────────────────────────────────
 
@@ -156,26 +156,27 @@ export interface TranscriptMessage {
   /** Role `chat` only: the `/blob/` images its text shows (ADR-0042). */
   readonly images?: readonly ImageRef[]
   /** Role `assistant` only: the tools it called, each with its result once known. */
-  readonly toolCalls?: readonly ToolCallView[]
+  readonly toolCalls?: readonly ToolCall[]
   /** Roles `update` and `land` only: the commits merged into the lane (ADR-0072). */
   readonly merged?: readonly CommitId[]
 }
 
-/** A tool call as a reader sees it. */
-export interface ToolCallView {
+/**
+ * A tool call, as stored: what it is, not how it reads. Its words are
+ * `@pinetrie/interface`'s (`callLabel`, ADR-0114).
+ */
+export interface ToolCall {
   readonly id: string
+  /** The tool's name as the model called it: a `ToolId`, or a tool pine·trie does not register. */
   readonly name: string
-  readonly label: string
-  /** `label` uncut, when it is cut (`wholeToolLabel`). */
-  readonly wholeLabel?: string
   /** What it touched, whole: a path, a command, or a search's pattern and path (`subjectOf`). */
   readonly subject?: string
   /** Its result, when the result is on the same path. */
-  readonly result?: ToolResultView
+  readonly result?: ToolResult
 }
 
-/** A tool's result as a reader sees it. */
-export interface ToolResultView {
+/** A tool's result. */
+export interface ToolResult {
   readonly text: string
   readonly isError: boolean
   /** The images it returned, stored as blobs. */
@@ -325,31 +326,21 @@ export function messageAt(
   return entry === undefined ? null : renderableMessage(entry)
 }
 
-/** One call as a reader sees it, before its result is paired with it. */
-function callView(id: string, name: string, args: unknown): ToolCallView {
-  const wholeLabel = wholeToolLabel(name, args)
+/** One call, before its result is paired with it. */
+function callOf(id: string, name: string, args: unknown): ToolCall {
   const subject = subjectOf(name, args)
-  return {
-    id,
-    name,
-    label: toolLabel(name, args),
-    ...(wholeLabel === undefined ? {} : { wholeLabel }),
-    ...(subject === undefined ? {} : { subject }),
-  }
+  return subject === undefined ? { id, name } : { id, name, subject }
 }
 
-/** An assistant message's tool calls, from its `toolCall` content parts. */
-/** The tool calls an assistant message makes, as a reader sees them; none for any other message. */
-export function toolCallsOf(
-  message: AgentMessageLike | undefined,
-): ToolCallView[] {
+/** The tool calls an assistant message makes, from its `toolCall` content parts; none for any other message. */
+export function toolCallsOf(message: AgentMessageLike | undefined): ToolCall[] {
   const content = message?.content
   if (!Array.isArray(content)) return []
   return content.flatMap(part =>
     part?.type === "toolCall" &&
     typeof part.id === "string" &&
     typeof part.name === "string"
-      ? [callView(part.id, part.name, part.arguments)]
+      ? [callOf(part.id, part.name, part.arguments)]
       : [],
   )
 }
@@ -357,7 +348,7 @@ export function toolCallsOf(
 /** A `toolResult` entry -> the call it answers and what it said, or null. */
 function toolResultOf(
   entry: EntryLike,
-): ({ readonly callId: string } & ToolResultView) | null {
+): ({ readonly callId: string } & ToolResult) | null {
   const m = entry.message
   if (entry.type !== "message" || m?.role !== "toolResult") return null
   if (typeof m.toolCallId !== "string") return null
@@ -534,8 +525,8 @@ export const conflictAskedAt = (
 export function resultsOn(
   index: TreeIndex,
   ids: Iterable<EntryId>,
-): ReadonlyMap<string, ToolResultView> {
-  const results = new Map<string, ToolResultView>()
+): ReadonlyMap<string, ToolResult> {
+  const results = new Map<string, ToolResult>()
   for (const id of ids) {
     const entry = index.entries[id]
     const r = entry === undefined ? null : toolResultOf(entry)

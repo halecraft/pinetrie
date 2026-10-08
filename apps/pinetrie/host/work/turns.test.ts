@@ -1,11 +1,11 @@
-import { entryId, toolLabel } from "@pinetrie/core"
+import { entryId } from "@pinetrie/core"
 import { readTreeIndex } from "@pinetrie/reads"
 import { newRootDoc, writeEntry } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import { row } from "../fakes.ts"
 import { titleOf } from "./turns.ts"
 
-test("a turn's title is its message's first line, else its first tool's label, else turn", () => {
+test("a turn's title is its message's first line, else its first call in words, else turn", () => {
   const doc = newRootDoc()
   const call = {
     type: "toolCall",
@@ -18,6 +18,6 @@ test("a turn's title is its message's first line, else its first tool's label, e
   writeEntry(doc, row("e3", "e2", { role: "assistant", content: [] }))
   const index = readTreeIndex(doc)
   expect(titleOf(index, entryId("e1"))).toBe("fix it")
-  expect(titleOf(index, entryId("e2"))).toBe(toolLabel("bash", call.arguments))
+  expect(titleOf(index, entryId("e2"))).toBe("shell ls -la")
   expect(titleOf(index, entryId("e3"))).toBe("turn")
 })

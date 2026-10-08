@@ -29,8 +29,9 @@ page's (`storage-keys.ts`, `tab-state.ts`, `same-props.ts`, `colors.ts`).
   root's config, which includes the DOM. A `window`, a `document` or a DOM
   member here fails; a mere mention of the `HTMLElement` type does not, since
   React's types declare it. `workspace.test.ts` pins the dependencies (core,
-  protocol, reads, rules, schema, session and TypeBox), and only the page and
-  the app may depend on this package.
+  protocol, reads, rules, schema, session, shell and TypeBox), and only the
+  page and the app may depend on this package. The host takes `callLabel`
+  from here for a revision titled by its first call.
 - **`index.ts` exports by name only what another package imports**, as
   `@pinetrie/rules`' does; a name only this package and its tests use is
   imported from its module. The tests' fixtures are `fixtures.ts`, which the
@@ -128,7 +129,7 @@ function is proven by a unit test in a second.
   flags, and draws the view's strings. It compares no document fact, builds
   no label, and chooses nothing that is offered. The views are `appView`
   (`app-view.ts`), `openListView`, `boardView`, `columnView`, `messageTools`, `railItems`,
-  `toolBody` and `callStatus`, `editorState` and `startText`. What stays in
+  `rowSummary`, `toolBody` and `callStatus`, `editorState` and `startText`. What stays in
   components and `use-*.ts` is what needs a browser: measuring, focus and
   the caret, scrolling, observers, subscriptions.
 - **A click is an `Intent`** (`intent.ts`). A column's acts are nested
@@ -741,8 +742,9 @@ them in one row: *copy*, *edit* or *new tab*, `→`.
 
 - **Copy is the message as markdown** (`copyText`, `copy-text.ts`): its
   text as stored, not as drawn (mentions, a `/command` and
-  `![name](/blob/…)` as written), then each tool call, its whole label in
-  code and its whole result fenced, past the 20,000 characters a row shows.
+  `![name](/blob/…)` as written), then each tool call, its tool's word and
+  all it touched in code (`callLabel(call, "whole")`), and its whole result
+  fenced, past the 20,000 characters a row shows.
   A fence or code span is longer than any run of backticks inside it. A
   result's images, a `write`'s content and an `edit`'s change are not in
   the view, so they are not copied. It only reads, so a column that can't
@@ -953,9 +955,20 @@ change of wording then touches the words function, its one test, and
   `describe("offerWords")` and `describe("sendButton")` are) pins the words.
 - **Suites compare with the words function**, never a literal: the browser
   suite builds its labels from `recipientWords`, `queueWords` and `UPLOADING`
-  (`@pinetrie/interface`), as it does tool labels from `toolLabel`. A check
+  (`@pinetrie/interface`), as it does a tool row's from `rowSummary` and
+  `toolWord`. A check
   that is about the words themselves (a run's tooltip, a refusal's reason)
   keeps its literal.
+- **A tool has an id and a word** (ADR-0114, `tool-words.ts`). The model
+  calls `bash`, `grep` and `ask_about_conflict` (`TOOL_IDS`, core), and a
+  person reads "shell", "search" and "ask" (`toolWord`). Core holds what a
+  call is (`ToolCall`: id, name, subject, result); every line of words about
+  a call is `callLabel`'s, cut to its preview (`previewEnd`) or whole, for
+  revision titles, an ask's live line and copied calls. A row's summary is
+  `rowSummary` (`tool-row.ts`): the word as a tag, and what the call
+  touched, previewed and whole, in runs by role. Its views are one table by
+  tool id, `VIEWS`: `bash` reads through `@pinetrie/shell`, and a later
+  tool's own view (a read's range, an edit's diff) joins it there.
 - **Docs quote labels in `docs/06-interface.md` only.** An ADR states the rule
   ("the button says what the send does, and to whom"), and this file names the
   function.

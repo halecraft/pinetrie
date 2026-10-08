@@ -42,6 +42,7 @@ browser ──commands (Kyneta Line)──▶ host ──▶ pi agent core
 | `vm` | a Linux machine on the Mac: the image's build, the launcher, a host's lease on a slot; it knows nothing of lanes |
 | `container` | running lanes on Apple's `container`, until `PLAN-2026-10-07-containers-only` deletes it |
 | `session` | one client's connection to a host, its own documents and what it has in flight |
-| `interface` | what a person sees and can do, decided, for any client: no React, no DOM (ADR-0093) |
+| `shell` | shell source as structure: a command's words by role, and a one-line command laid out to a width; it declares only `unbash` (ADR-0114) |
+| `interface` | what a person sees and can do, decided, for any client: no React, no DOM (ADR-0093). A tool keeps its id for the model and has a word for people (`shell`, `search`), which interface gives; core holds only what a call is (ADR-0114) |
 | `web` | the browser page: React and the DOM, drawing what `interface` decides |
 | `apps/pinetrie` | the host; its shell is split by responsibility (`apps/pinetrie/host/TECHNICAL.md`). The one place that picks a runtime and wires `vm` to `docker` (`host/work/runtime.ts`) |

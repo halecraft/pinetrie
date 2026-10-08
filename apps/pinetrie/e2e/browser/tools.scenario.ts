@@ -14,9 +14,8 @@ import {
   projectRail,
   ROOT,
   type ThreadName,
-  toolLabel,
 } from "@pinetrie/core"
-import { workingWords } from "@pinetrie/interface"
+import { rowSummary, toolWord, workingWords } from "@pinetrie/interface"
 import { scriptedModel } from "@pinetrie/pi"
 import {
   readLaneRecords,
@@ -107,7 +106,7 @@ async function run(
         const longRun = (reply: string) =>
           script.use([
             ...Array.from({ length: 8 }, () => ({
-              tool: "read",
+              tool: "read" as const,
               args: { path: "notes.txt" },
             })),
             { tool: "bash", args: { command: "sleep 2; echo waited" } },
@@ -1042,9 +1041,9 @@ async function run(
           )
         }
 
-        // A label shows a command's first line, and at most 120 characters;
-        // the row, opened, shows all of it in the label's place, once. A
-        // command its label shows whole has nothing to swap.
+        // A row previews a command's first line, and at most 120 characters;
+        // the row, opened, shows all of it in the preview's place, once. A
+        // command its preview shows whole has nothing to swap.
         {
           const WHOLE = `echo ${"long ".repeat(30)}\necho second line`
           script.use([
@@ -1062,12 +1061,11 @@ async function run(
           const closed = await summaryShows()
           await row.locator("summary").click()
           const opened = await summaryShows()
-          const whole = `bash ${WHOLE}`
-          const swaps = await tp
-            .locator(cut)
-            .filter({ hasText: "echo tick" })
-            .locator(".tool-label-whole")
-            .count()
+          const whole = WHOLE
+          // A command short enough to need no layout, run earlier.
+          const short = tp.locator(cut).filter({ hasText: "echo quick" })
+          const shorts = await short.count()
+          const swaps = await short.locator(".tool-label-whole").count()
           check(
             "an opened row shows the whole command in its label's place, once, and a short one's has nothing to swap",
             closed.includes("…") &&
@@ -1075,8 +1073,62 @@ async function run(
               opened.includes(whole) &&
               !opened.includes("…") &&
               opened.split("echo long").length === 2 &&
+              shorts > 0 &&
               swaps === 0,
-            `${JSON.stringify(closed.slice(-12))}, ${opened.split("echo long").length - 1} times, ${swaps}`,
+            `${JSON.stringify(closed.slice(-12))}, ${opened.split("echo long").length - 1} times, ${swaps} of ${shorts}`,
+          )
+        }
+
+        // A shell row's tag is its tool's word, at its top right (ADR-0114),
+        // and a long one-line chain opens laid out, a step a line, each
+        // step's command marked.
+        {
+          const STEPS = [
+            "mkdir -p /tmp/chain",
+            "cd /tmp/chain",
+            "touch a",
+            "ls -la",
+            "cat a",
+            "wc -c a",
+            "echo done",
+          ]
+          script.use([
+            { tool: "bash", args: { command: STEPS.join(" && ") } },
+            { text: "chained" },
+          ])
+          await say("chain some steps")
+          await toolIdle()
+          const chained = `${col(0)} .tool[data-tool="bash"][data-status="ok"]:has-text("mkdir -p /tmp/chain")`
+          await appears(chained, 10_000)
+          const row = tp.locator(chained).last()
+          await row.locator("summary").click()
+          const seen = await row.evaluate(r => {
+            const summary = r.querySelector("summary")?.getBoundingClientRect()
+            const tag = r.querySelector(".tool-tag")
+            const box = tag?.getBoundingClientRect()
+            const whole = r.querySelector(
+              ".tool-label-whole",
+            ) as HTMLElement | null
+            return {
+              tag: tag?.textContent ?? "",
+              right: (summary?.right ?? 0) - (box?.right ?? 0),
+              top: (box?.top ?? 0) - (summary?.top ?? 0),
+              lines: (whole?.innerText ?? "").split("\n").length,
+              commands: [
+                ...r.querySelectorAll(".tool-label-whole .sh-command"),
+              ].map(c => c.textContent ?? ""),
+            }
+          })
+          check(
+            "a shell row's tag sits at its top right, and its opened command is laid out a step a line, its command names marked",
+            seen.tag === toolWord("bash") &&
+              Math.abs(seen.right) <= 2 &&
+              Math.abs(seen.top) <= 2 &&
+              seen.lines === STEPS.length &&
+              STEPS.every(step =>
+                seen.commands.includes(step.split(" ")[0] ?? ""),
+              ),
+            JSON.stringify(seen),
           )
         }
 
@@ -1125,7 +1177,9 @@ async function run(
               ? [`${before.steps}→${f.steps}`]
               : []
           })
-          const label = toolLabel("bash", { command: COMMAND })
+          const label = rowSummary({ id: "", name: "bash", subject: COMMAND })
+            .preview.map(r => r.text)
+            .join("")
           const twice = during.filter(
             f => f.labels.filter(l => l === label).length > 1,
           ).length
@@ -1691,7 +1745,7 @@ async function run(
         await tp.click("#open-list .add-agent")
         script.use([
           ...Array.from({ length: 30 }, () => ({
-            tool: "read",
+            tool: "read" as const,
             args: { path: "notes.txt" },
           })),
           { tool: "read", args: { path: "missing.txt" } },

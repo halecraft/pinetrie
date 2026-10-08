@@ -131,7 +131,7 @@ describe("→", () => {
 
 describe("copy", () => {
   test("offered for a message with text or tool calls, and none with neither", () => {
-    const call = { id: "c", name: "bash", label: "bash ls" }
+    const call = { id: "c", name: "bash", subject: "ls" }
     expect(tools(chat("x", false)).copy).toBe(true)
     expect(tools(chat("x", false)).takeCopyIntoInventory).toBe(true)
     expect(

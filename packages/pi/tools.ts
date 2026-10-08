@@ -8,84 +8,113 @@ import {
   createWriteTool,
 } from "@earendil-works/pi-agent-core"
 import {
+  BANNER_TOOL,
+  BASH_TOOL,
   type BlobStore,
   CATCH_UP_TOOL,
   CONFLICT_TOOL,
+  EDIT_TOOL,
+  FIND_TOOL,
+  GREP_TOOL,
   type LaneName,
+  READ_TOOL,
   SPLIT_TOOL,
+  TOOL_IDS,
+  type ToolId,
+  WRITE_TOOL,
 } from "@pinetrie/core"
 import type { BannerAnswer, BannerAsk } from "@pinetrie/rules"
-import { BANNER_TOOL, bannerTool } from "./banner.ts"
+import { bannerTool } from "./banner.ts"
 import { readImageProcessor } from "./images.ts"
 import { conflictTool, type LaneHooks } from "./lanes.ts"
 import { findTool, grepTool } from "./search.ts"
 import { catchUpTool, splitTool } from "./thread-tools.ts"
 
-/**
- * Every tool the harness registers, and the names of the file tools among
- * them: pi-agent-core's `read`, `write`, `edit` and `bash`, and our `grep` and
- * `find` (ADR-0064). Each lane uses the file tools in its own directory
- * (`toolContextOf`, in `lanes.ts`). They are also pi's `selectedTools`, and
- * naming `grep` or `find` there drops pi's rule to search with bash. `read`
- * fits an image and stores it before pi writes the result, so the session
- * keeps a reference (ADR-0051). Besides them, the tools the host answers:
- * `ask_about_conflict`, `catch_up` and `split_offer` (ADR-0080), and
- * `set_banner`.
- */
-export function assembleTools(input: {
+export interface ToolsInput {
   readonly hooks: LaneHooks
   readonly blobs: Pick<BlobStore, "put"> | undefined
   /** Where `set_banner` sends its asks; undefined while banners are off. */
   readonly bannerAsks:
     | ((lane: LaneName, ask: BannerAsk) => Promise<BannerAnswer>)
     | undefined
-}): { readonly registered: readonly unknown[]; readonly files: string[] } {
-  const files = [
+}
+
+/**
+ * Each tool, made, by its id (ADR-0114): a tool with no factory fails to
+ * compile, and `tools.test.ts` checks each is named its id, which catches a
+ * pi upgrade renaming one of its own. pi-agent-core makes `read`, `write`,
+ * `edit` and `bash`; pine·trie makes the rest.
+ */
+export const TOOLS: Readonly<
+  Record<ToolId, (input: ToolsInput) => { readonly name: string }>
+> = {
+  // `read` fits an image and stores it before pi writes the result, so the
+  // session keeps a reference (ADR-0051).
+  [READ_TOOL]: input =>
     createReadTool(
       input.blobs === undefined
         ? {}
         : { imageProcessor: readImageProcessor(input.blobs) },
     ),
-    createWriteTool(),
-    createEditTool(),
-    createBashTool(),
-    grepTool(),
-    findTool(),
-  ]
+  [WRITE_TOOL]: () => createWriteTool(),
+  [EDIT_TOOL]: () => createEditTool(),
+  [BASH_TOOL]: () => createBashTool(),
+  [GREP_TOOL]: () => grepTool(),
+  [FIND_TOOL]: () => findTool(),
+  [CONFLICT_TOOL]: input =>
+    conflictTool((lane, q) => input.hooks.askedAboutConflict(lane, q)),
+  [CATCH_UP_TOOL]: input =>
+    catchUpTool((lane, from) => input.hooks.catchUp(lane, from)),
+  [SPLIT_TOOL]: input => splitTool(lane => input.hooks.askSplit(lane)),
+  [BANNER_TOOL]: input => bannerTool(input.bannerAsks),
+}
+
+/**
+ * The file tools: pi-agent-core's `read`, `write`, `edit` and `bash`, and our
+ * `grep` and `find` (ADR-0064). Each lane uses them in its own directory
+ * (`toolContextOf`, in `lanes.ts`). They are also pi's `selectedTools`, and
+ * naming `grep` or `find` there drops pi's rule to search with bash.
+ */
+const FILE_TOOLS: readonly ToolId[] = [
+  READ_TOOL,
+  WRITE_TOOL,
+  EDIT_TOOL,
+  BASH_TOOL,
+  GREP_TOOL,
+  FIND_TOOL,
+]
+
+/**
+ * Every tool the harness registers, in `TOOL_IDS`' order, and the names of
+ * the file tools among them. Besides the file tools, the tools the host
+ * answers: `ask_about_conflict`, `catch_up` and `split_offer` (ADR-0080), and
+ * `set_banner`.
+ */
+export function assembleTools(input: ToolsInput): {
+  readonly registered: readonly unknown[]
+  readonly files: string[]
+} {
   return {
-    registered: [
-      ...files,
-      conflictTool((lane, q) => input.hooks.askedAboutConflict(lane, q)),
-      catchUpTool((lane, from) => input.hooks.catchUp(lane, from)),
-      splitTool(lane => input.hooks.askSplit(lane)),
-      bannerTool(input.bannerAsks),
-    ],
-    files: files.map(t => t.name),
+    registered: TOOL_IDS.map(id => TOOLS[id](input)),
+    files: [...FILE_TOOLS],
   }
 }
 
 /**
- * What a lane's runs may call: the file tools, `ask_about_conflict`,
- * `catch_up` and `split_offer` (ADR-0080), and `set_banner` when banners are
- * on. One list for every run, a resolution's included, whatever kind of lane
- * runs it: a tool that does not apply answers why. A list that changed
- * between runs would change every request's prefix, and Anthropic then drops
- * the lane's earlier thinking (S85). pi stores the list in a lane's configuration, and fails a run whose list
- * names a tool not registered, so `assembleTools` registers every tool
+ * What a lane's runs may call: every tool, in `TOOL_IDS`' order, but
+ * `set_banner` only when banners are on. One list for every run, a
+ * resolution's included, whatever kind of lane runs it: a tool that does not
+ * apply answers why. A list that changed between runs would change every
+ * request's prefix, and Anthropic then drops the lane's earlier thinking
+ * (S85). pi stores the list in a lane's configuration, and fails a run whose
+ * list names a tool not registered, so `assembleTools` registers every tool
  * whatever the setting, and a lane stored with another list is given this
  * one when it is first held (`threadLanes`).
  */
 export function activeToolNames(input: {
-  readonly files: readonly string[]
   readonly banners: boolean
 }): string[] {
-  return [
-    ...input.files,
-    CONFLICT_TOOL,
-    CATCH_UP_TOOL,
-    SPLIT_TOOL,
-    ...(input.banners ? [BANNER_TOOL] : []),
-  ]
+  return TOOL_IDS.filter(id => input.banners || id !== BANNER_TOOL)
 }
 
 /** Whether `next` names other tools than `active`, in any order. */

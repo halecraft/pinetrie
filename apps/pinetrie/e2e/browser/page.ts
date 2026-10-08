@@ -129,7 +129,7 @@ interface ColumnFrame {
   readonly steps: number
   /** Its thread's lane is running: its composer offers Stop. */
   readonly running: boolean
-  /** Each tool label drawn, as text. */
+  /** Each tool row's preview drawn (`.tool-label`), as text: no tag. */
   readonly labels: readonly string[]
 }
 

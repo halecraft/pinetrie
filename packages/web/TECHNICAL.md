@@ -431,14 +431,33 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
 ## Tools and live work (ADR-0107)
 
 - **A tool call is a row under the agent's message** (`ToolRow` in
-  `message.tsx`): its label (`toolLabel`), ✓, ✗ or …, and its result folded in
-  a `<details>`, cut at 20,000 characters for display. A label shows a command's first line, at
-  most 120 characters; a `grep` or `find` label shows its pattern and the
-  path it searches (`subjectOf`, core). A cut label is shown uncut in its place while the row
-  is open (`.tool-label-whole`, from `wholeToolLabel`): CSS on `[open]`
-  swaps the two, so the command is never drawn twice and no state is kept.
-  The live row is the committed row, so a running command, once its row
-  opens, shows it whole.
+  `message.tsx`), its result folded in a `<details>`, cut at 20,000
+  characters for display. Its summary is `rowSummary`'s (`@pinetrie/interface`,
+  ADR-0114), in this order:
+  - `.tool-tag`, the tool's word ("shell", "read", "search"), absent for a
+    call that touched nothing it names, whose word is then its preview;
+  - `.tool-label`, the preview: what the call touched (`subjectOf`, core),
+    to its first line or 120 characters, with "…" when cut. A `grep` or
+    `find` shows its pattern and the path it searches;
+  - `.tool-label-whole`, all of it, when that reads otherwise: a long or
+    multi-line command whole, a long one-line chain laid out a step a line
+    (`@pinetrie/shell`). CSS on `[open]` swaps it for the preview, so the
+    command is never drawn twice and no state is kept;
+  - `.tool-status`: ✓, ✗ or ….
+
+  Each is drawn in runs (`Runs`), a `<span class="sh-<role>">` each, and a
+  plain run as bare text: a command's names, options, strings, variables,
+  redirects, keywords and operators are coloured apart. The live row is the
+  committed row, so a running command, once its row opens, shows it whole.
+- **The tag floats right, first in the summary**, so it takes the row's top
+  right and the label wraps around it. The summary stays a list item: a
+  flex summary loses its ▶. An open command is one inline block beside the
+  tag, so every line of it has the room the tag leaves: `LAYOUT_WIDTH`
+  (`tool-row.ts`) is 44 characters, the Mac's SF Mono at .8rem (0.6em a
+  character) in a 28rem column's 25.5rem, less the ▶ and the tag. A wider
+  open command drops below the tag. Measured in headless Chromium, whose
+  fallback monospace is 0.5em wide, so it is the Mac's font that sets the
+  width.
 - **How much of a row shows is `rowSize`'s** (`tool-row.ts`, ADR-0049):
   `closed`, `capped` or `full`, from two facts the row holds.
   `revealed` is set by a timer once the call's output has streamed for

@@ -8,7 +8,7 @@
     "format": "biome format . --write",
     "lint": "biome check .",
     "lint:fix": "biome check . --write",
-    "typecheck": "tsc --noEmit && tsc --noEmit -p packages/interface",
+    "typecheck": "tsc --noEmit && tsc --noEmit -p packages/interface && tsc --noEmit -p packages/shell",
     "test": "vitest run",
     "test:watch": "vitest",
     "conformance": "pnpm --filter @pinetrie/conformance run conformance",

@@ -14,6 +14,7 @@
     "@pinetrie/rules": "workspace:*",
     "@pinetrie/schema": "workspace:*",
     "@pinetrie/session": "workspace:*",
+    "@pinetrie/shell": "workspace:*",
     "typebox": "1.3.27"
   }
 }

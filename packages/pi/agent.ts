@@ -191,12 +191,7 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
         })
   // An agent with no tools registers none, so its lanes may call none.
   const activeTools =
-    tools === null
-      ? []
-      : activeToolNames({
-          files: assembled.files,
-          banners: bannerAsks !== undefined,
-        })
+    tools === null ? [] : activeToolNames({ banners: bannerAsks !== undefined })
   // A call with no lane named (none should run tools) works in the project.
   const accessFor = (lane: LaneName | undefined): LaneAccess =>
     tools === null || lane === undefined

@@ -60,7 +60,7 @@ async function run(check: Checks["check"]): Promise<void> {
       ).spine
       return spine
         .flatMap(n => n.toolCalls ?? [])
-        .find(c => c.label === "read shot.png")
+        .find(c => c.name === "read" && c.subject === "shot.png")
     }
     const red = sha256Of(RED_PNG)
     const tu = await join(th, "tia", "tool-images")

@@ -21,6 +21,7 @@ import {
 } from "@pinetrie/core"
 import { askStats, type Segment } from "./ask-segments.ts"
 import { outcomeWords, workWords } from "./ask-words.ts"
+import { callLabel } from "./tool-words.ts"
 
 /** A column's messages as drawn: one on its own, or an ask's work together. */
 export type ColumnRow =
@@ -115,7 +116,8 @@ function liveLine(
   const newest = work.at(-1)
   const message = newest === undefined ? null : messageAt(index, newest)
   const call = message?.toolCalls?.at(-1)
-  if (call !== undefined && asks.last.get(ask) === newest) return call.label
+  if (call !== undefined && asks.last.get(ask) === newest)
+    return callLabel(call, "cut")
   for (const id of work.toReversed()) {
     const line = firstLine(messageAt(index, id)?.text ?? "", LIVE_LINE)
     if (line !== "") return line

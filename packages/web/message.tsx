@@ -3,9 +3,10 @@
 // what the reader asks as a `MessageAct`.
 
 import { useSelector } from "@kyneta/react"
-import type { StreamId, ToolCallView, TranscriptMessage } from "@pinetrie/core"
+import type { StreamId, ToolCall, TranscriptMessage } from "@pinetrie/core"
 import {
   CALL_MARK,
+  callLabel,
   callStatus,
   click,
   copyIntoInventoryText,
@@ -18,8 +19,10 @@ import {
   plural,
   REVEAL_MS,
   type RowMemory,
+  type Run,
   retiredWords,
   rowSize,
+  rowSummary,
   type ScreenMemory,
   showsText,
   speakerLabel,
@@ -289,10 +292,10 @@ function CopyIcon() {
 const SHOWN = 20_000
 
 /**
- * One tool call: what it touched, whether it worked, and what it returned. A
- * cut label (a long or multi-line command) is shown uncut in its place while
- * the row is open: CSS on `[open]` swaps the two, so the command is never
- * shown twice. The result is its own entry in the tree, paired here by
+ * One tool call: its tool's word as a tag, what it touched, whether it
+ * worked, and what it returned (`rowSummary`, ADR-0114). What it touched is
+ * previewed closed and shown whole open (a command laid out a step a line):
+ * CSS on `[open]` swaps the two, so it is never shown twice. The result is its own entry in the tree, paired here by
  * `projectSpine`; with none yet, the call is still running or was cut off.
  * How much is shown is `rowSize`'s: a call whose output streams for
  * `REVEAL_MS`, or whose result has an image, opens its row, capped, and only
@@ -306,7 +309,7 @@ function ToolRow({
   doc,
   rows,
 }: {
-  call: ToolCallView
+  call: ToolCall
   stream: StreamId | undefined
   doc: LiveDocHandle
   rows: ScreenMemory<RowMemory>
@@ -318,6 +321,7 @@ function ToolRow({
   const [memory, setMemory] = useRemembered(rows, call.id)
   const { revealed } = memory
   const body = toolBody(call.result)
+  const summary = useMemo(() => rowSummary(call), [call])
   const size = rowSize({ ...memory, shows: body.kind === "images" })
   // Set once and never unset, so the row stays open when the result arrives.
   // A result within REVEAL_MS clears the timer: the row never opened.
@@ -348,9 +352,16 @@ function ToolRow({
           setMemory(m => ({ ...m, reader: click(size) }))
         }}
       >
-        <span className="tool-label">{call.label}</span>
-        {call.wholeLabel !== undefined && (
-          <span className="tool-label-whole">{call.wholeLabel}</span>
+        {summary.tag !== undefined && (
+          <span className="tool-tag">{summary.tag}</span>
+        )}
+        <span className="tool-label">
+          <Runs runs={summary.preview} />
+        </span>
+        {summary.whole !== undefined && (
+          <span className="tool-label-whole">
+            <Runs runs={summary.whole} />
+          </span>
         )}{" "}
         <span className="tool-status">{mark}</span>
       </summary>
@@ -358,7 +369,7 @@ function ToolRow({
         <div className="tool-images">
           {body.images.map(image => (
             <StoredImage
-              alt={call.subject ?? call.label}
+              alt={call.subject ?? callLabel(call, "cut")}
               image={image}
               key={image.sha256}
               title={body.note}
@@ -369,6 +380,20 @@ function ToolRow({
         <ToolOutput doc={doc} result={call.result?.text} stream={live} />
       )}
     </details>
+  )
+}
+
+/** A summary's runs, each in a span its role colours (`.sh-*`); plain text bare. */
+function Runs({ runs }: { runs: readonly Run[] }) {
+  return runs.map((run, i) =>
+    run.role === "plain" ? (
+      run.text
+    ) : (
+      // biome-ignore lint/suspicious/noArrayIndexKey: runs are fixed for a call, and never reordered
+      <span className={`sh-${run.role}`} key={i}>
+        {run.text}
+      </span>
+    ),
   )
 }
 

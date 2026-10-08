@@ -22,6 +22,7 @@ import {
   type Provider,
   type TranscriptContext,
 } from "@earendil-works/pi-ai"
+import type { ToolId } from "@pinetrie/core"
 import { VERDICT_ALONE, VERDICT_THEN_DIGEST } from "@pinetrie/rules"
 
 /**
@@ -34,7 +35,7 @@ export type ScriptStep =
   | { readonly text: string }
   | { readonly reply: (context: readonly string[]) => string }
   | {
-      readonly tool: string
+      readonly tool: ToolId
       readonly args: Record<string, unknown>
       readonly text?: string
     }

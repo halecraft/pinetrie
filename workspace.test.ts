@@ -104,7 +104,7 @@ test("session declares only Kyneta's exchange and WebSocket transport, core, pro
   ])
 })
 
-test("interface declares only core, protocol, reads, rules, schema, session and TypeBox: no React, no DOM", () => {
+test("interface declares only core, protocol, reads, rules, schema, session, shell and TypeBox: no React, no DOM", () => {
   // What any client shows and does (ADR-0093): a TTY must be able to take
   // it without a browser. `packages/interface/tsconfig.json` checks the DOM.
   assert.deepEqual(deps(read("packages/interface")).sort(), [
@@ -114,8 +114,20 @@ test("interface declares only core, protocol, reads, rules, schema, session and 
     "@pinetrie/rules",
     "@pinetrie/schema",
     "@pinetrie/session",
+    "@pinetrie/shell",
     "typebox",
   ])
+})
+
+test("shell declares only unbash: shell source as structure, nothing of pine·trie's", () => {
+  assert.deepEqual(allDeps(read("packages/shell")), ["unbash"])
+})
+
+test("only interface declares shell: which call reads as shell is its decision (ADR-0114)", () => {
+  const declaring = WORKSPACE.filter(dir =>
+    allDeps(read(dir)).includes("@pinetrie/shell"),
+  ).sort()
+  assert.deepEqual(declaring, ["packages/interface"])
 })
 
 test("only the page and the app depend on interface: nothing below it does", () => {
@@ -234,4 +246,5 @@ const PROBED = [
   "@kyneta/exchange",
   "react",
   "@earendil-works/pi-agent-core",
+  "unbash",
 ]

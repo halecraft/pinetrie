@@ -1,28 +1,52 @@
 // Which tools a lane's runs may call, decided without a harness.
 
-import { CATCH_UP_TOOL, CONFLICT_TOOL, SPLIT_TOOL } from "@pinetrie/core"
+import { BANNER_TOOL, TOOL_IDS } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
-import { BANNER_TOOL } from "./banner.ts"
 import { parseCatchUpArgs } from "./thread-tools.ts"
-import { activeToolNames, toolsChanged } from "./tools.ts"
+import { activeToolNames, assembleTools, TOOLS, toolsChanged } from "./tools.ts"
 
-const files = ["read", "write", "edit", "bash"]
+const unused = async (): Promise<never> => {
+  throw new Error("not called")
+}
+const input = {
+  hooks: {
+    turnDone: unused,
+    askedAboutConflict: unused,
+    catchUp: unused,
+    askSplit: unused,
+  },
+  blobs: undefined,
+  bannerAsks: undefined,
+}
+
+describe("TOOLS (ADR-0114)", () => {
+  test.each(TOOL_IDS)("%s is the name of the tool made for it", id => {
+    expect(TOOLS[id](input).name).toBe(id)
+  })
+
+  test("every tool is registered, in the order the model is given them", () => {
+    expect(
+      assembleTools(input).registered.map(t => (t as { name: string }).name),
+    ).toEqual([...TOOL_IDS])
+  })
+})
 
 describe("activeToolNames", () => {
-  test("the file tools and ask_about_conflict always; set_banner with banners", () => {
-    expect(activeToolNames({ files, banners: false })).toEqual([
-      ...files,
-      CONFLICT_TOOL,
-      CATCH_UP_TOOL,
-      SPLIT_TOOL,
-    ])
-    expect(activeToolNames({ files, banners: true })).toEqual([
-      ...files,
-      CONFLICT_TOOL,
-      CATCH_UP_TOOL,
-      SPLIT_TOOL,
-      BANNER_TOOL,
-    ])
+  // The order is every request's prefix (S85): pinned, not derived.
+  const always = [
+    "read",
+    "write",
+    "edit",
+    "bash",
+    "grep",
+    "find",
+    "ask_about_conflict",
+    "catch_up",
+    "split_offer",
+  ]
+  test("every tool always; set_banner with banners", () => {
+    expect(activeToolNames({ banners: false })).toEqual(always)
+    expect(activeToolNames({ banners: true })).toEqual([...always, BANNER_TOOL])
   })
 })
 

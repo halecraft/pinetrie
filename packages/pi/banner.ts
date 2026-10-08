@@ -5,6 +5,7 @@
 // (`bannerImageConfig`).
 
 import {
+  BANNER_TOOL,
   blobOfUrl,
   errorText,
   isSha256,
@@ -17,8 +18,6 @@ import { Type } from "typebox"
 import type { ImagesSetup } from "./config.ts"
 import { prepareImage } from "./images.ts"
 import { laneOf } from "./lanes.ts"
-
-export const BANNER_TOOL = "set_banner"
 
 type Context = Parameters<typeof laneOf>[0]
 

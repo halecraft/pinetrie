@@ -15,6 +15,7 @@ import {
   turnEntry,
   turnMerged,
 } from "@pinetrie/core"
+import { callLabel } from "@pinetrie/interface"
 import type { Keeper } from "@pinetrie/keeper"
 import {
   bookmarkOf,
@@ -34,7 +35,7 @@ import type { LaneRegistry } from "./registry.ts"
 /** A revision's title: a message's first line, cut. */
 const TITLE_LENGTH = 72
 
-/** The title a revision is described with: the message's first line, or its first tool. */
+/** The title a revision is described with: the message's first line, or its first call in words (`callLabel`). */
 export function titleOf(index: TreeIndex, entry: EntryId): string {
   const text = firstLine(
     messageText(index.entries[entry]?.message),
@@ -42,7 +43,7 @@ export function titleOf(index: TreeIndex, entry: EntryId): string {
   )
   if (text !== "") return text
   const call = toolCallsOf(index.entries[entry]?.message)[0]
-  return call === undefined ? "turn" : call.label
+  return call === undefined ? "turn" : callLabel(call, "cut")
 }
 
 export interface Turns {

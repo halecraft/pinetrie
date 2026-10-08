@@ -28,12 +28,13 @@ import {
   ROOT,
   rootOf,
   startsRun,
+  subjectOf,
+  TOOL_IDS,
   tailEdit,
   threadOf,
-  toolLabel,
+  toolIdOf,
   turnEntry,
   turnMerged,
-  wholeToolLabel,
   writerId,
   writersOf,
 } from "./index.ts"
@@ -414,7 +415,6 @@ describe("tool calls: paired with their results on the path", () => {
       {
         id: "c1",
         name: "read",
-        label: "read notes.txt",
         subject: "notes.txt",
         result: { text: "MANGO", isError: false, images: [] },
       },
@@ -451,7 +451,6 @@ describe("tool calls: paired with their results on the path", () => {
       {
         id: "c6",
         name: "read",
-        label: "read shot.png",
         subject: "shot.png",
         result: {
           text: "Read image file [image/png]",
@@ -468,7 +467,7 @@ describe("tool calls: paired with their results on the path", () => {
       },
     ])
   })
-  test("a call whose label is cut carries it uncut", () => {
+  test("a call carries its whole subject, every line of it", () => {
     const command = "pnpm test\necho done"
     const long = indexTree({
       ...entries,
@@ -483,8 +482,6 @@ describe("tool calls: paired with their results on the path", () => {
       {
         id: "c9",
         name: "bash",
-        label: "bash pnpm test",
-        wholeLabel: `bash ${command}`,
         subject: command,
       },
     ])
@@ -539,30 +536,24 @@ describe("messageImages: only stored references", () => {
   })
 })
 
-describe("toolLabel and tailEdit", () => {
-  test("toolLabel names what the call touches", () => {
-    expect(toolLabel("read", { path: "a.ts" })).toBe("read a.ts")
-    expect(toolLabel("bash", { command: "pnpm test\necho done" })).toBe(
-      "bash pnpm test",
-    )
-    expect(toolLabel("mystery", { x: 1 })).toBe("mystery")
-    expect(toolLabel("constructor", { path: "a" })).toBe("constructor")
-    expect(toolLabel("grep", { pattern: "TODO", path: "src" })).toBe(
-      "grep TODO src",
-    )
-    expect(toolLabel("find", { pattern: "*.ts" })).toBe("find *.ts")
+describe("subjectOf, toolIdOf and tailEdit", () => {
+  test.each([
+    ["read", { path: "a.ts" }, "a.ts"],
+    ["bash", { command: "pnpm test\necho done" }, "pnpm test\necho done"],
+    ["grep", { pattern: "TODO", path: "src" }, "TODO src"],
+    ["find", { pattern: "*.ts" }, "*.ts"],
+    ["catch_up", {}, "base"],
+    ["split_offer", {}, undefined],
+    ["mystery", { path: "a" }, undefined],
+    ["constructor", { path: "a" }, undefined],
+  ])("subjectOf(%s, %o) is %s", (name, args, subject) => {
+    expect(subjectOf(name, args)).toBe(subject)
   })
 
-  test("wholeToolLabel is the label uncut, and nothing when it is not cut", () => {
-    expect(wholeToolLabel("bash", { command: "pnpm test" })).toBeUndefined()
-    expect(wholeToolLabel("bash", { command: "pnpm test\necho done" })).toBe(
-      "bash pnpm test\necho done",
-    )
-    const long = `echo ${"x".repeat(200)}`
-    expect(toolLabel("bash", { command: long }).endsWith("…")).toBe(true)
-    expect(wholeToolLabel("bash", { command: long })).toBe(`bash ${long}`)
-    expect(wholeToolLabel("read", { path: "a.ts" })).toBeUndefined()
-    expect(wholeToolLabel("mystery", { x: 1 })).toBeUndefined()
+  test("toolIdOf knows every registered tool, and nothing else", () => {
+    for (const id of TOOL_IDS) expect(toolIdOf(id)).toBe(id)
+    expect(toolIdOf("mystery")).toBeUndefined()
+    expect(toolIdOf("constructor")).toBeUndefined()
   })
 
   // A tail-kept view: lines 1..n, keeping the last `keep` lines.

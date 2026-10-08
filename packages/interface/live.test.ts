@@ -58,7 +58,7 @@ describe("liveWork", () => {
 
 describe("callStreams", () => {
   test("a message gets only its own calls' streams, equal by value when nothing of its own changed", () => {
-    const call = (id: string) => ({ id, name: "bash", label: "bash x" })
+    const call = (id: string) => ({ id, name: "bash", subject: "x" })
     const tools = new Map([
       ["c1", streamId("s1")],
       ["c9", streamId("s9")],

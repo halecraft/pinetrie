@@ -5,6 +5,7 @@ import { mkdtemp, realpath, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import {
+  BANNER_TOOL,
   type LaneName,
   laneNameForThread,
   messageText,
@@ -23,12 +24,7 @@ import { type RootDocHandle, readEntries, rowMessage } from "@pinetrie/schema"
 import { newRootDoc } from "@pinetrie/schema/fixtures"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
 import { newId } from "./agent.ts"
-import {
-  BANNER_TOOL,
-  bannerImageConfig,
-  drawnOf,
-  parseBannerArgs,
-} from "./banner.ts"
+import { bannerImageConfig, drawnOf, parseBannerArgs } from "./banner.ts"
 import { ONE_ROOT, oneRoot } from "./one-root.ts"
 import {
   SCRIPTED_IMAGE_PNG,

@@ -527,6 +527,19 @@
       .tool summary { cursor: pointer; color: #aab4c3; }
       /* Not a scroll container: a long path wraps, or it runs out of the column. */
       .tool-label { font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
+      /* The tool's word, at the row's top right, where a code block's language
+         sits, so it never reads as part of the command (ADR-0114). A float, first
+         in the summary, so the label wraps around it; the summary stays a list
+         item, since a flex summary loses its ▶. */
+      .tool-tag { float: right; margin-left: .6rem; font-size: 11px; line-height: 1.6;
+        text-transform: uppercase; letter-spacing: .1em; color: #6f7784; }
+      /* A command's runs by role (`rowSummary`, @pinetrie/shell). */
+      .sh-command { color: #9ecbff; }
+      .sh-option, .sh-redirect { color: #8a93a2; }
+      .sh-string { color: #7bd88f; }
+      .sh-variable { color: #e8c07a; }
+      .sh-keyword, .sh-operator { color: #c8d0dc; }
+      .sh-comment { color: #6f7784; font-style: italic; }
       .tool[data-status="ok"] .tool-status { color: #7bd88f; }
       .tool[data-status="error"] .tool-status { color: #f28b82; }
       .tool-output { overflow: auto; margin: .3rem 0 0; padding: .4rem;
@@ -538,7 +551,8 @@
       .tool-images { margin: .3rem 0 0; }
       .tool-images img { display: block; max-width: 100%; height: auto; margin-bottom: .3rem; }
       .tool[data-size="capped"] .tool-images img { max-width: min(100%, calc(10rem * var(--ratio))); }
-      /* A cut label, uncut, in its place while the row is open. */
+      /* What the call touched, whole (a command laid out), in the preview's place
+         while the row is open. */
       .tool-label-whole { display: none; font-family: ui-monospace, monospace;
         white-space: pre-wrap; overflow-wrap: anywhere; max-width: 100%;
         overflow: auto; vertical-align: top; }

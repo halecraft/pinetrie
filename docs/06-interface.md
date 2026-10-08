@@ -636,10 +636,14 @@ The rail is E; the column is T. Seeing both at once is the product.
 - The speaker's name heads each human message; the agent's messages are marked
   as the agent's.
 - **Tool calls are rows under the agent's message** (ADR-0107): what the call
-  touched (`read packages/core/tree.ts`, `bash pnpm test`), then ✓, ✗, or …
-  while it has no result, with the result folded away. A long or multi-line
-  command is cut in the label, and the opened row shows it whole in its
-  place. A result is its own
+  touched (`packages/core/tree.ts`, `pnpm test`), then ✓, ✗, or … while it
+  has no result, with the result folded away. The tool's word is a tag at
+  the row's top right, apart from what it touched: "shell", "read",
+  "search", "ask" (ADR-0114). The model still calls its tools by their ids
+  (`bash`, `grep`). A shell command is highlighted, its commands, options,
+  strings and variables told apart. A long or multi-line one is cut at its
+  first line, and the opened row shows it whole in its place, a long
+  one-line chain laid out a step a line. A result is its own
   entry in the tree, but it belongs to its call, so it adds no message and no
   row on the rail.
 - **An image a tool read is drawn in its row** (ADR-0051), which opens on
@@ -691,7 +695,8 @@ The rail is E; the column is T. Seeing both at once is the product.
   focus (ADR-0043): *copy* first, then *edit*, and `→` last, in the
   right margin, since what it opens appears to the right. Copy puts the
   message on the clipboard as markdown: its text as it was written, then
-  each tool call it made, the command or path and its whole output. It
+  each tool call it made, its tool's word and the command or path, and its
+  whole output. It
   shows a check for two seconds; over plain http, which has no clipboard,
   it selects the message's text and tool rows for you to copy. Beneath a message stay only the
   buttons of branches no column shows.

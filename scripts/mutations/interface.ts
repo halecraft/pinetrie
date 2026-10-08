@@ -1268,10 +1268,47 @@ export const mutations: readonly Mutation[] = [
   {
     name: "copy cuts a long label",
     file: "packages/interface/copy-text.ts",
-    from: "  const label = call.wholeLabel ?? call.label",
-    to: "  const label = call.label",
+    from: '  const label = callLabel(call, "whole")',
+    to: '  const label = callLabel(call, "cut")',
     command: unit,
-    expect: "a cut label is copied whole",
+    expect: "a subject is copied whole",
+  },
+  {
+    name: "the whole label drops a command's later lines",
+    file: "packages/interface/tool-words.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: '  if (length === "whole") return `${word} ${subject}`',
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    to: '  if (length === "whole") return `${word} ${subject.split("\\n")[0]}`',
+    command: unit,
+    expect:
+      "a long subject is cut at PREVIEW_LENGTH, and whole keeps every line",
+  },
+  {
+    name: "bash reads as bash",
+    file: "packages/interface/tool-words.ts",
+    from: '  [BASH_TOOL]: "shell",',
+    to: '  [BASH_TOOL]: "bash",',
+    command: unit,
+    expect: "bash reads as its word",
+  },
+  {
+    name: "an opened row never shows more than its preview",
+    file: "packages/interface/tool-row.ts",
+    from: "    whole: textOf(whole) === textOf(preview) ? undefined : whole,",
+    to: "    whole: undefined,",
+    command: unit,
+    expect:
+      "a long chain is tagged shell, highlighted, and opened a step a line",
+  },
+  {
+    name: "a shell command is not laid out",
+    file: "packages/interface/tool-row.ts",
+    from: "  return { preview: cutRuns(spans, at, cut), whole: laidOut ?? spans }",
+    to: "  return { preview: cutRuns(spans, at, cut), whole: spans }",
+    command: unit,
+    expect:
+      "a long chain is tagged shell, highlighted, and opened a step a line",
   },
   {
     name: "the longest backtick run, found by spreading every run",

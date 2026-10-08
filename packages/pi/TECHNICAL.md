@@ -482,6 +482,14 @@ item 18, and in `lanes.test.ts` against the harness.
   in the request changed since it was written, and pi asks it to
   (`drop_block`): a changed tool list or prompt costs the lane its earlier
   reasoning, and its cache from the top.
+  - **Tools register from one table keyed by `ToolId`** (`TOOLS`,
+    `tools.ts`, ADR-0114), in `TOOL_IDS`' order (core), which is the order
+    of every request's list: a reordered `TOOL_IDS` changes every lane's
+    prefix once. A tool with no factory fails to compile, and
+    `tools.test.ts` checks each is named its id, so a pi upgrade that
+    renames one of its own fails there. The id is what the model calls; it
+    never changes for people's words ("shell" for `bash` is interface's).
+    The constants (`BASH_TOOL`, `GREP_TOOL`, `BANNER_TOOL`…) are core's.
   - **The host's tools are active in every lane** (`activeToolNames`,
     `tools.ts`): `ask_about_conflict`, `catch_up` and `split_offer`
     (ADR-0080). A call that does not apply answers why: the tool list never

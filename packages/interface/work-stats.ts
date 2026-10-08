@@ -6,7 +6,7 @@ import {
   messageAt,
   type RevisionRecord,
   resultsOn,
-  type ToolCallView,
+  type ToolCall,
   type TreeIndex,
   type WriterId,
   writersOf,
@@ -70,7 +70,7 @@ export function statsOf(
   revisions: ReadonlyMap<EntryId, RevisionRecord>,
 ): WorkStats {
   let people = 0
-  const calls: ToolCallView[] = []
+  const calls: ToolCall[] = []
   const files = new Set<string>()
   const times: number[] = []
   for (const id of [...messages, ...others]) {

@@ -17,6 +17,8 @@ import { NodeExecutionEnv } from "@earendil-works/pi-agent-core/harness/env/node
 import {
   CONFLICT_TOOL,
   type EntryId,
+  FIND_TOOL,
+  GREP_TOOL,
   HOST_WORKING_COPY,
   hostPathInLane,
   isWithin,
@@ -30,7 +32,6 @@ import { Type } from "typebox"
 import type { ModelSetup } from "./config.ts"
 import { buildSystemPrompt, ensureTool } from "./deep.ts"
 import { type LaneChannel, laneEnv } from "./lane-env.ts"
-import { FIND_TOOL, GREP_TOOL } from "./search.ts"
 
 /** How a lane's tools reach its files, as the host resolves it. */
 export type LaneAccess =

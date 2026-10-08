@@ -788,7 +788,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a turn's title ignores its tools",
     file: "apps/pinetrie/host/work/turns.ts",
-    from: '  return call === undefined ? "turn" : call.label',
+    from: '  return call === undefined ? "turn" : callLabel(call, "cut")',
     to: '  return "turn"',
     command: unit,
     expect: "a turn's title is its message's first line",

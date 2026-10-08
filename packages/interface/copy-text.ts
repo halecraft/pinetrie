@@ -1,11 +1,12 @@
 // interface/copy-text — what a message's copy puts on the clipboard, as markdown.
 
-import type { ToolCallView, TranscriptMessage } from "@pinetrie/core"
+import type { ToolCall, TranscriptMessage } from "@pinetrie/core"
+import { callLabel } from "./tool-words.ts"
 
 /**
  * A message as markdown: its text as stored, then each tool call it made, in
- * order. A call is its whole label in code, then its result's text, whole, in
- * a fenced block. A call still running has no result yet, and a result's
+ * order. A call is its tool's word and all it touched, in code (`callLabel`),
+ * then its result's text, whole, in a fenced block. A call still running has no result yet, and a result's
  * images are left out. Empty for a message with neither text nor calls.
  */
 export function copyText(node: TranscriptMessage): string {
@@ -14,8 +15,8 @@ export function copyText(node: TranscriptMessage): string {
     .join("\n\n")
 }
 
-function callText(call: ToolCallView): string {
-  const label = call.wholeLabel ?? call.label
+function callText(call: ToolCall): string {
+  const label = callLabel(call, "whole")
   const head = label.includes("\n") ? fenced(label) : inlineCode(label)
   const result = call.result?.text ?? ""
   return result === "" ? head : `${head}\n\n${fenced(result)}`

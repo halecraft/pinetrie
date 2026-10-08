@@ -146,6 +146,9 @@ importers:
       '@pinetrie/session':
         specifier: workspace:*
         version: link:../session
+      '@pinetrie/shell':
+        specifier: workspace:*
+        version: link:../shell
       typebox:
         specifier: 1.3.27
         version: 1.3.27
@@ -286,6 +289,12 @@ importers:
       '@pinetrie/schema':
         specifier: workspace:*
         version: link:../schema
+
+  packages/shell:
+    dependencies:
+      unbash:
+        specifier: 5.0.0
+        version: 5.0.0
 
   packages/vm:
     dependencies:
@@ -1968,6 +1977,10 @@ packages:
     resolution: {integrity: sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==}
     engines: {node: '>=14.17'}
     hasBin: true
+
+  unbash@5.0.0:
+    resolution: {integrity: sha512-RYNm/ISFtflWpIcXTPHHLJZ0mqzInav+L9ke9PcL+hHsSf9+Fd/syPb614Mlqs/O3AYgjnvxDOFl0a+zVqi1/w==}
+    engines: {node: '>=14'}
 
   undici-types@7.16.0:
     resolution: {integrity: sha512-Zz+aZWSj8LE6zoxD+xrjh4VfkIG8Ya6LvYkZqtUQGJPZjYl53ypCaUwWqo7eI0x66KBGeRo+mlBEkMSeSZ38Nw==}
@@ -3935,6 +3948,8 @@ snapshots:
   typebox@1.3.27: {}
 
   typescript@5.9.3: {}
+
+  unbash@5.0.0: {}
 
   undici-types@7.16.0: {}
 

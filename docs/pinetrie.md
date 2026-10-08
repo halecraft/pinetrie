@@ -125,12 +125,13 @@ packages/container/    @pinetrie/container    lanes on Apple's `container`, unti
 packages/keeper/       @pinetrie/keeper       declares NOTHING; one step at a time on a resource
 packages/repo/         @pinetrie/repo         your repo: reads, steps, the owner (ADR-0038, 0060, 0065)
 packages/session/      @pinetrie/session      one client's connection to a host; no React
+packages/shell/        @pinetrie/shell        unbash only; shell source as structure (ADR-0114)
 packages/interface/    @pinetrie/interface    what a person sees and does, for any client; no React, no DOM (ADR-0093)
 packages/web/          @pinetrie/web          the browser page: React and the DOM; owns its Vite build
 (root)                                      development tooling only
 ```
 
-Dependency direction is physical: **core → schema, protocol → pi, session → interface → web → app**.
+Dependency direction is physical: **core → schema, protocol → pi, session, shell → interface → web → app**.
 The root declares only tooling, so a package can import only what it declares.
 
 ---

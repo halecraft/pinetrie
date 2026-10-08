@@ -6,12 +6,7 @@
 // tip. A tool's stream is drawn by its call's row, which stops drawing it once
 // the row has a result.
 
-import type {
-  AgentRun,
-  StreamId,
-  StreamRecord,
-  ToolCallView,
-} from "@pinetrie/core"
+import type { AgentRun, StreamId, StreamRecord, ToolCall } from "@pinetrie/core"
 import { isCurrentReply } from "@pinetrie/rules"
 
 export interface LiveWork {
@@ -43,7 +38,7 @@ export function liveWork(
  * calls starts or stops streaming.
  */
 export function callStreams(
-  calls: readonly ToolCallView[] | undefined,
+  calls: readonly ToolCall[] | undefined,
   tools: LiveWork["tools"],
 ): Readonly<Record<string, StreamId>> {
   const out: Record<string, StreamId> = {}

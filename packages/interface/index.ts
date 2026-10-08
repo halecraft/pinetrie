@@ -452,9 +452,12 @@ export {
   NO_MEMORY,
   REVEAL_MS,
   type RowMemory,
+  type Run,
   rowSize,
+  rowSummary,
   toolBody,
 } from "./tool-row.ts"
+export { callLabel, toolWord } from "./tool-words.ts"
 export {
   keptTraces,
   seenBatches,

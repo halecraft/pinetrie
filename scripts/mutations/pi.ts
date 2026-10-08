@@ -211,10 +211,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "set_banner is registered only while banners are on",
     file: "packages/pi/tools.ts",
-    from: "      bannerTool(input.bannerAsks),",
-    to: "      ...(input.bannerAsks === undefined ? [] : [bannerTool(input.bannerAsks)]),",
+    from: "    registered: TOOL_IDS.map(id => TOOLS[id](input)),",
+    to: "    registered: TOOL_IDS.filter(id => id !== BANNER_TOOL || input.bannerAsks !== undefined).map(id => TOOLS[id](input)),",
     command: unit,
-    expect: "still runs once they are off",
+    expect: "every tool is registered, in the order the model is given them",
   },
   {
     name: "a split image keeps its bytes beside its reference",
@@ -387,20 +387,34 @@ export const mutations: readonly Mutation[] = [
   {
     name: "active tools forget the banner tool",
     file: "packages/pi/tools.ts",
-    from: "    ...(input.banners ? [BANNER_TOOL] : []),",
-    to: "    ...(input.banners ? [] : []),",
+    from: "  return TOOL_IDS.filter(id => input.banners || id !== BANNER_TOOL)",
+    to: "  return TOOL_IDS.filter(id => id !== BANNER_TOOL)",
     command: unit,
-    expect:
-      "the file tools and ask_about_conflict always; set_banner with banners",
+    expect: "every tool always; set_banner with banners",
   },
   {
     name: "ask_about_conflict is in a lane's tools only sometimes",
-    file: "packages/pi/tools.ts",
-    from: "    CONFLICT_TOOL,\n",
+    file: "packages/core/tools.ts",
+    from: "  CONFLICT_TOOL,\n",
     to: "",
     command: unit,
-    expect:
-      "the file tools and ask_about_conflict always; set_banner with banners",
+    expect: "every tool always; set_banner with banners",
+  },
+  {
+    name: "the tools are registered in another order than the model's",
+    file: "packages/pi/tools.ts",
+    from: "    registered: TOOL_IDS.map(id => TOOLS[id](input)),",
+    to: "    registered: [...TOOL_IDS].reverse().map(id => TOOLS[id](input)),",
+    command: unit,
+    expect: "every tool is registered, in the order the model is given them",
+  },
+  {
+    name: "a tool is named other than its id",
+    file: "packages/pi/tools.ts",
+    from: "  [BASH_TOOL]: () => createBashTool(),",
+    to: '  [BASH_TOOL]: () => ({ ...createBashTool(), name: "shell" }),',
+    command: unit,
+    expect: "bash is the name of the tool made for it",
   },
   {
     name: "ask_about_conflict says it asked with no conflict",
@@ -529,8 +543,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "grep and find are not file tools, so pi's bash rule stays",
     file: "packages/pi/tools.ts",
-    from: "    grepTool(),\n    findTool(),\n",
-    to: "",
+    from: "  GREP_TOOL,\n  FIND_TOOL,\n]",
+    to: "]",
     command: unit,
     expect: "the prompt no longer tells the model to search with bash",
   },

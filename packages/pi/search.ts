@@ -15,12 +15,10 @@ import {
   formatSize,
   type ShellOutputView,
 } from "@earendil-works/pi-agent-core"
-import { shellWord } from "@pinetrie/core"
+import { FIND_TOOL, GREP_TOOL, shellWord } from "@pinetrie/core"
 import { Type } from "typebox"
 import type { SearchProgram, ToolContext } from "./lanes.ts"
 
-export const GREP_TOOL = "grep"
-export const FIND_TOOL = "find"
 export type SearchTool = typeof GREP_TOOL | typeof FIND_TOOL
 
 const PROGRAM: Readonly<Record<SearchTool, SearchProgram>> = {
