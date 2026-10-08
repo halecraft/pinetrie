@@ -406,6 +406,17 @@ describe("notes' cells (ADR-0113)", () => {
     })
   })
 
+  test("a note made with no cell and moved before its cell arrived is where its sender saw it; one seen in another cell has moved", () => {
+    const queue = (from: ReturnType<typeof key>) =>
+      planMove(
+        [at(0)],
+        { card: C1, from, to: { ...queuedPlace, at: atEntry(E2) } },
+        ADA,
+      ).kind
+    expect(queue(key(null))).toBe("write")
+    expect(queue(key(2))).toBe("refused")
+  })
+
   test("a move into a cell another note holds is refused moved, naming it", () => {
     const other = { ...at(3, "c-7"), placer: BEA }
     expect(

@@ -566,6 +566,21 @@ function refuseInto(
 }
 
 /**
+ * Whether a card is where a move's sender saw it (`sameKey`). A note seen
+ * with no cell is one its sender made and moved before the host's cell for
+ * it arrived (`withCell`), as a command button's card is, made as a note
+ * and queued at once: any cell on its board is where it was seen. Every
+ * note the host holds has a cell, so no other move names none.
+ */
+const stillAt = (now: CardPlace, from: PlaceKey): boolean =>
+  sameKey(
+    keyOf(now),
+    from.kind === "note" && from.cell === null && now.kind === "note"
+      ? { ...from, cell: now.cell }
+      : from,
+  )
+
+/**
  * A handoff: a compare-and-set on where the card is. The host accepts a move
  * only if the card is still where its sender saw it; someone else's reorder
  * since does not count as moving it (`sameKey`). A move to where the card is
@@ -611,7 +626,7 @@ export function planMove(
     return { kind: "refused", code: "gone", now: null }
   // A fact is the host's, on its way into the thread: nobody moves it.
   if (now.carries.kind === "fact") return { kind: "refused", code: "fact", now }
-  if (!sameKey(keyOf(now.place), move.from))
+  if (!stillAt(now.place, move.from))
     return { kind: "refused", code: "moved", now }
   // A move to where the card is would requeue it last, under its sender's
   // name: a card changes its place in line by a reorder (`planReorder`).

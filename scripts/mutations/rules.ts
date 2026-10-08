@@ -1199,6 +1199,23 @@ export const mutations: readonly Mutation[] = [
     expect: "a card stored before facts is a message (ADR-0080)",
   },
   {
+    name: "a note seen with no cell has moved",
+    file: "packages/rules/card.ts",
+    from: '    from.kind === "note" && from.cell === null && now.kind === "note"\n',
+    to: "    false\n",
+    command: unit,
+    expect:
+      "a note made with no cell and moved before its cell arrived is where its sender saw it",
+  },
+  {
+    name: "a note seen in any cell is where it is",
+    file: "packages/rules/card.ts",
+    from: '    from.kind === "note" && from.cell === null && now.kind === "note"\n',
+    to: '    from.kind === "note" && now.kind === "note"\n',
+    command: unit,
+    expect: "one seen in another cell has moved",
+  },
+  {
     name: "a fact card can be moved",
     file: "packages/rules/card.ts",
     from: '  // A fact is the host\'s, on its way into the thread: nobody moves it.\n  if (now.carries.kind === "fact") return { kind: "refused", code: "fact", now }',
@@ -1386,7 +1403,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a move skips the compare",
     file: "packages/rules/card.ts",
-    from: "  if (!sameKey(keyOf(now.place), move.from))",
+    from: "  if (!stillAt(now.place, move.from))",
     to: "  if (false)",
     command: unit,
     expect: "the compare: gone when there is no record, moved when",

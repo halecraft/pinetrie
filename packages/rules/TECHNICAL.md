@@ -399,8 +399,12 @@ which are swept.
   it was made (`boardOf`): two notes of one lane-less thread made at
   different ends may share a cell, which the page draws apart
   (`notesBoardView`). A key names its cell (`sameKey`), so a move of a note
-  someone moved to another cell since is refused `moved`; and
-  `planMoves` refuses a batch that leaves two notes in one cell
+  someone moved to another cell since is refused `moved`. A move from a
+  note with no cell is not: its sender made the note and moved it before
+  the host's cell arrived, as a command button does, made as a note and
+  queued at once (`stillAt`), and any cell on its board is where it was
+  seen. Every note the host holds has a cell, so no other move names
+  none. And `planMoves` refuses a batch that leaves two notes in one cell
   (`cellClash`), checked once all its moves are written, so a swap is one
   step.
 - **A pinned card** (ADR-0048 step 5) is a note's place with an `order`.
