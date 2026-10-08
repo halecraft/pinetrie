@@ -416,6 +416,15 @@ export const mutations: readonly Mutation[] = [
     expect: "your offer command waits while it is out, and not once answered",
   },
   {
+    name: "redoing a stale stack's split does not say it replaces the stack",
+    file: "packages/interface/column-view.ts",
+    from: ": splits all of this thread's work, the changes since included`",
+    to: "`",
+    command: unit,
+    expect:
+      "the labels follow the state, and name where an acceptance adds the work",
+  },
+  {
     name: "an acceptance in flight names the default destination, not the one chosen",
     file: "packages/interface/column-view.ts",
     from: "  const to = destinations.find(d => d.bookmark === acting.to) ?? destinations[0]",

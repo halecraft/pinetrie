@@ -801,9 +801,16 @@ describe("offerWords", () => {
       "squash to one",
     ])
     expect(labels({ ...offer, size: 3, stale: true })).toEqual([
-      "split again",
+      "redo the split",
       "accept stack and the rest",
     ])
+    expect(
+      words({ ...offer, size: 3, stale: true }).buttons.find(
+        b => b.button === "split",
+      )?.title,
+    ).toBe(
+      "replaces the stack of 3: splits all of this thread's work, the changes since included",
+    )
     expect(labels({ ...offer, edited: true })).toEqual([
       "accept",
       "refresh (discards your edits)",

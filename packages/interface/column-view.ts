@@ -913,10 +913,15 @@ export function offerWords(
             : `merges ${parent ?? "the thread this one branched from"}'s newest work into this thread's copy`,
         }
       case "split":
-        return {
-          button,
-          label: state === "stale" ? "split again" : BUTTON_LABEL[button],
-        }
+        // A stale stack is replaced, not split further: the new split takes
+        // all of the thread's work, the turns after the old one too.
+        return state === "stale"
+          ? {
+              button,
+              label: "redo the split",
+              title: `replaces the stack of ${facts.size}: splits all of this thread's work, the changes since included`,
+            }
+          : { button, label: BUTTON_LABEL[button] }
       default:
         return { button, label: BUTTON_LABEL[button] }
     }
