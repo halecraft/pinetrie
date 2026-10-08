@@ -80,8 +80,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an accepted move is dropped at its answer",
     file: "packages/session/card-moves.ts",
-    from: "      if (answer.rev <= state.rev) return { ...state, pending: rest }",
-    to: "      return { ...state, pending: rest }",
+    from: "      if (answer.rev <= state.rev) return { ...state, pending: rest, notices }",
+    to: "      return { ...state, pending: rest, notices }",
     command: unit,
     expect: "accepted, the answer before the places",
   },
@@ -96,16 +96,16 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an accepted move waits for a change after the copy has it",
     file: "packages/session/card-moves.ts",
-    from: "      if (answer.rev <= state.rev) return { ...state, pending: rest }",
-    to: "      if (answer.rev < state.rev) return { ...state, pending: rest }",
+    from: "      if (answer.rev <= state.rev) return { ...state, pending: rest, notices }",
+    to: "      if (answer.rev < state.rev) return { ...state, pending: rest, notices }",
     command: unit,
     expect: "accepted, the places before the answer",
   },
   {
     name: "a refusal is not kept",
     file: "packages/session/card-moves.ts",
-    from: "              : [...state.refusals, answer.refusal],",
-    to: "              : state.refusals,",
+    from: "              : [...state.notices, answer.refusal],",
+    to: "              : state.notices,",
     command: unit,
     expect: "refused: dropped at once",
   },
@@ -116,7 +116,7 @@ export const mutations: readonly Mutation[] = [
     to: "          () => false,",
     command: unit,
     expect:
-      "a later move where you acted forgets the refusals there, not elsewhere",
+      "a later move where you acted forgets the notices there, not elsewhere",
   },
   {
     name: "withPending gives a new array when it draws nothing",
@@ -219,8 +219,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a creation's take into the inventory is no intent",
     file: "packages/session/card-moves.ts",
-    from: '  p.kind === "create"\n    ? p.draft.id\n',
-    to: '  p.kind === "create"\n    ? ("" as CardId)\n',
+    from: '    case "create":\n      return p.draft.id\n',
+    to: '    case "create":\n      return "" as CardId\n',
     command: unit,
     expect: "each take into the inventory in flight's slot, a creation's too",
   },
@@ -279,7 +279,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a queue is sent without its text's version",
     file: "packages/session/card-moves.ts",
-    from: '  move.to?.kind === "queued" ? { ...move, to: { ...move.to, seen } } : move',
+    from: '  move.to.kind === "queued" ? { ...move, to: { ...move.to, seen } } : move',
     to: "  move",
     command: unit,
     expect: "a queue carries the text's version as sent",
@@ -318,12 +318,12 @@ export const mutations: readonly Mutation[] = [
       "every move drawn at once, and every one accepted by the one answer",
   },
   {
-    name: "a swap keeps the refusals at the inventory",
+    name: "a swap keeps the notices at the inventory",
     file: "packages/session/card-moves.ts",
-    from: "        refusals: state.refusals.filter(r => !sameActedAt(r.actedAt, event.at)),",
-    to: "        refusals: state.refusals,",
+    from: "        notices: state.notices.filter(r => !sameActedAt(r.actedAt, event.at)),",
+    to: "        notices: state.notices,",
     command: unit,
-    expect: "a swap forgets the refusals at the inventory, not elsewhere",
+    expect: "a swap forgets the notices at the inventory, not elsewhere",
   },
   {
     name: "a send from a card is not drawn out of its composer",

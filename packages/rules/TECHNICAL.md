@@ -299,13 +299,20 @@ which are swept.
   the host and on a client, is built by core's `moveOf` (from where the
   card is); an unqueue's target is `draftingOf`, and a queue's root
   `queueRoot`, its lane's. No `from` creates the card, its sender its
-  owner; no `to` removes it, and only a fresh column's card, or one in the
-  sender's own inventory, can be removed. Queueing puts it after the lane's
+  owner. Nobody removes a card: `Move.to` is never null. A discard is a move
+  to `gone` (`discardedOf`, ADR-0111), from any place the sender may move
+  out of, recorded in the history of the root it names: the card's own, or
+  for a card in no root the one its discarder was on. A gone card keeps its
+  record and text, is drawn nowhere (every read of a place names the kinds
+  it draws), and moves only by an undo:
+  a handoff from gone is refused `gone`. `planGoneSweep`
+  (`card-history.ts`) deletes it once its newest history event is older
+  than `GONE_KEEP_MS` (7 days). Queueing puts it after the lane's
   last card, queued by the sender, and clears why it was not sent before;
   below the line, or into an inventory, it keeps both. A move to where the
   card already is is refused `moved`: it would queue the card last under its
   sender's name, and a card changes its place in line by a reorder.
-  Refusals: `gone` (no record), `moved`, `exists`, `not-fresh`, `full`,
+  Refusals: `gone` (no record, or discarded), `moved`, `exists`, `full`,
   `not-yours`.
 - **A reorder is a card's action in place, not a move** (`planReorder`,
   ADR-0048 step 7). It names the card, its place's key, and the two cards
@@ -347,7 +354,7 @@ which are swept.
   whole too (ADR-0066). `planMoveCommand` is that and the lanes to drain:
   each one a card ends queued on, when it is not running.
 - **Which history a move enters is `historyOf`'s** (ADR-0066): none for a
-  creation or a removal (a composer's new card, a copy, a discard, a send);
+  creation (a composer's new card, a copy) or a send, which is no move;
   else the root the card goes to, when it is in one, else the root it
   leaves, read from its record, since a move is accepted only from there.
   Every place in a root names it, so no tree is read. An inventory is in no
@@ -374,7 +381,7 @@ which are swept.
 - **A pinned card** (ADR-0048 step 5) is a drafting card's place with an
   `order`. Pinning moves it from drafting to pinned at the same `at` and
   lane (`pinnedOf`); unpinning back (`draftingOf`). Anyone may do either in
-  a shared place, and a pinned card is not removed (`not-fresh`). The host
+  a shared place. The host
   orders it after every pinned card in the session (`placeAt`), not only its
   thread's: a thread is found through the tree, which a handoff does not
   read, and an order only has to grow within a thread.
@@ -411,9 +418,18 @@ not `pinetrie:live`, so it lasts until a release, across a restart.
 - **`planHoldSweep`**: the holds whose lane no root holds (`pinetrie.lane`),
   or whose root is archived. Archiving is refused while cards are queued,
   so a swept hold held nothing.
-- **`isBusy` is unchanged.** A held queue with no card is not busy: it
-  neither blocks archiving nor marks a tab. Only a send's decision reads the
-  hold (`sendWaits`, in `planChat` and the client's `planSend`).
+- **`isBusy` is unchanged, and a held queue is not work.** A held queue
+  with no card is not busy: it blocks no archiving. A busy lane that is not
+  running and whose queue is held is `held` in `rootWork` (core), which
+  refuses archiving as `waiting` does but draws no ring (`rootStatus`):
+  nothing happens there until a person acts (ADR-0113).
+- **`planQueueCard`** (ADR-0113): every queue is one request, `queue-card`,
+  a move into a queue and what it does to the hold (`keep`, `hold-if-idle`,
+  `release`), planned together: `planMoveCommand` for the move and, only
+  if it is accepted, `planQueueHold` for the hold. `hold-if-idle` holds
+  nothing on a running lane. The host writes the hold before it carries the
+  move, so the move's drain finds the queue as planned. A send on an idle
+  held thread is `release`: sending removes the hold.
 
 # Card history and traces (`card-history.ts`, ADR-0048 step 6)
 

@@ -119,11 +119,12 @@ never holds the places document itself. `connectSession` registers
 session or someone else's inventory throws before it is made.
 
 - **Every move is a request to the host**: creating a card (its text in one
-  undo step, then a `move` from nowhere, then its command), queueing,
-  unqueueing, discarding, and setting a command. The host applies each in
-  arrival order or refuses it. A move into a queue gets its text's version
-  as this client has it as it is sent (`stampSeen`, S96); nothing else
-  changes the move the page planned.
+  undo step, then a `move` from nowhere, then its command), unqueueing,
+  discarding, and setting a command; and queueing, which is `queue-card`
+  alone (`queueCard`, ADR-0113): the host refuses a `move` into a queue. The
+  host applies each in arrival order or refuses it. A queue gets its text's
+  version as this client has it as it is sent (`stampSeen`, S96); nothing
+  else changes the move the page planned.
 - **The tab's moves are one pure reducer** (`movesStep`): sent, answered,
   the copy changed, the host left. `localStep` holds it with the host's
   records and the cards drawn from the two, in one store, so a change to
@@ -150,10 +151,15 @@ session or someone else's inventory throws before it is made.
 - **Several cards move as one** (`moveCards`, a keep): never none. A keep
   with no card left is the page's to settle (`planKeep` closes the column),
   so the session's moves always name a card.
-- **Refusals are values** (`CardRefusal`, kept by `movesStep` until your
-  next move where you acted); the page words them (`refusalWords`). Each
-  move carries where you were looking when you made it (`ActedAt`: a
-  column's key, or the inventory), and its refusal is drawn there.
+- **Notices are values** (`CardNotice`, kept by `movesStep` until your
+  next move where you acted): a refusal, or a discard the host accepted
+  (ADR-0111), which says the undo key brings it back. The page words them
+  (`noticeWords`). Each move carries where you were looking when you made it
+  (`ActedAt`: a column's key, or the inventory), and its notice is drawn
+  there.
+- **A send is pending as a send** (`sendPendingOf`): its card is drawn
+  nowhere until the copy holds what the host did with it. A move always
+  names where the card goes.
 - **An undo of moves waits for the copy** (`whenRev`): the session sends
   `undo-move` and resolves once its copy of the places reaches the reply's
   `rev`.

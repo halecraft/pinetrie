@@ -446,6 +446,8 @@ function placeAt(
       }
     case "pinned":
       return { ...key, order: orderAfter(cards.filter(isPinned)) }
+    case "gone":
+      return { ...key, by: sender }
     default:
       return key
   }
@@ -486,14 +488,15 @@ function refuseInto(
  * - No `from`: the card is created, its sender its owner, with no command.
  * - A card carrying a fact is the host's (ADR-0080): every move of it is
  *   refused `fact`.
- * - No `to`: the card is removed. Only a fresh column's card is, or one in
- *   the sender's own inventory: neither is anywhere anyone else sees.
+ * - To gone: a discard (ADR-0111), from any place the sender may move out
+ *   of. A gone card moves only by an undo, which is no handoff: a move out
+ *   of gone is refused `gone`.
  * - Into or out of an inventory: only its holder's, and into it only while
  *   it holds fewer than `INVENTORY_SLOTS` cards. A creation obeys both.
  * - To the queue: after the lane's last card, queued by the sender, and why
  *   it was not sent before is cleared. Below the line again, it keeps both.
  * - Pinned: after every pinned card (`placeAt`). Anyone may pin or unpin in
- *   a shared place, and a pinned card is not removed.
+ *   a shared place.
  */
 export function planMove(
   cards: readonly CardRecord[],
@@ -503,7 +506,6 @@ export function planMove(
   const now = cards.find(c => c.id === move.card)
   if (move.from === null) {
     if (now !== undefined) return { kind: "refused", code: "exists", now }
-    if (move.to === null) return { kind: "refused", code: "gone", now: null }
     const refusal = refuseInto(move.to, cards, move.card, sender)
     if (refusal !== null) return { kind: "refused", code: refusal, now: null }
     return {
@@ -518,21 +520,18 @@ export function planMove(
       },
     }
   }
-  if (now === undefined) return { kind: "refused", code: "gone", now: null }
+  if (now === undefined || now.place.kind === "gone")
+    return { kind: "refused", code: "gone", now: null }
   // A fact is the host's, on its way into the thread: nobody moves it.
   if (now.carries.kind === "fact") return { kind: "refused", code: "fact", now }
   if (!sameKey(keyOf(now.place), move.from))
     return { kind: "refused", code: "moved", now }
   // A move to where the card is would requeue it last, under its sender's
   // name: a card changes its place in line by a reorder (`planReorder`).
-  if (move.to !== null && sameKey(move.from, move.to))
+  if (sameKey(move.from, move.to))
     return { kind: "refused", code: "moved", now }
   if (!ownsPlace(move.from, sender))
     return { kind: "refused", code: "not-yours", now }
-  if (move.to === null)
-    return now.place.kind === "fresh" || now.place.kind === "inventory"
-      ? { kind: "remove", id: now.id }
-      : { kind: "refused", code: "not-fresh", now }
   const refusal = refuseInto(move.to, cards, move.card, sender)
   if (refusal !== null) return { kind: "refused", code: refusal, now }
   return {
@@ -731,26 +730,26 @@ export function planMoveCommand(
 
 // ── moves' history (ADR-0066) ─────────────────────────────────────────────
 
-/** The root a place is in; null for an inventory. */
+/** The root a place is in; null for an inventory, or a card gone in none. */
 const rootOfPlace = (place: CardPlace | PlaceKey): RootId | null =>
   place.kind === "inventory" ? null : place.root
 
 /**
  * The root whose history of the sender's moves `moves` enter, or null for
- * none (ADR-0066). A creation or a removal enters none: a composer's new
- * card, a copy, a discard, a send. Otherwise the root the card goes to,
- * when it goes to one, else the root it leaves, read from its record, since
- * the host accepts a move only from where the card is. So a take into the
- * inventory is recorded where it left, a put where it went, and a drag
- * across roots where it went. Of several, the first that names a root names
- * the step's. Pure.
+ * none (ADR-0066). A creation enters none: a composer's new card, a copy.
+ * Otherwise the root the card goes to, when it goes to one, else the root it
+ * leaves, read from its record, since the host accepts a move only from
+ * where the card is. So a take into the inventory is recorded where it
+ * left, a put where it went, a drag across roots where it went, and a
+ * discard in the root its gone place names (`discardedOf`). Of several, the
+ * first that names a root names the step's. Pure.
  */
 export function historyOf(
   moves: readonly Move[],
   cards: readonly CardRecord[],
 ): RootId | null {
   for (const move of moves) {
-    if (move.from === null || move.to === null) return null
+    if (move.from === null) return null
     const from = cards.find(c => c.id === move.card)?.place
     const root =
       rootOfPlace(move.to) ?? (from === undefined ? null : rootOfPlace(from))

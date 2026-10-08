@@ -8,8 +8,10 @@ import {
   isBusy,
   type LaneName,
   type LaneView,
+  laneWork,
   type RootId,
   type RootRecord,
+  type RootWork,
   type VerdictRecord,
   type WriterId,
 } from "@pinetrie/core"
@@ -61,7 +63,7 @@ export function useAttention(input: {
   readonly laneRoots: ReadonlyMap<LaneName, EntryId>
   readonly archived: ReadonlySet<EntryId>
   /** Roots whose agent works, held or not (`workAnywhere`). */
-  readonly work: ReadonlyMap<EntryId, unknown>
+  readonly work: ReadonlyMap<EntryId, RootWork>
   readonly layout: Pick<Layout, "open">
   /** The session has settled: before, a change is data arriving, not news. */
   readonly settled: boolean
@@ -74,11 +76,15 @@ export function useAttention(input: {
     () => threadWriters(input.directory),
     [input.directory],
   )
+  // A thread whose cards wait behind a held queue is not busy: nothing
+  // happens there until a person releases it, so what it raised still shows.
   const busy = useMemo(
     () =>
       new Set([
         ...input.running.map(r => r.lane),
-        ...input.lanes.filter(isBusy).map(l => l.name),
+        ...input.lanes
+          .filter(l => isBusy(l) && laneWork(l) !== "held")
+          .map(l => l.name),
       ]),
     [input.running, input.lanes],
   )

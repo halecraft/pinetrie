@@ -12,17 +12,16 @@ import {
   INVENTORY,
   type Intent,
   inventoryView,
+  noticeKey,
+  noticeWords,
   PUT,
   PUT_TITLE,
-  REMOVE,
   type Reader,
-  refusalKey,
-  refusalWords,
   snapTo,
 } from "@pinetrie/interface"
 import { displayName } from "@pinetrie/rules"
 import type {
-  CardRefusal,
+  CardNotice,
   Intents,
   SessionClient,
   Slots,
@@ -69,7 +68,7 @@ export function InventoryPanel(p: {
   selected: number
   dock: Dock
   onDock: (dock: Dock) => void
-  refusals: readonly CardRefusal[]
+  notices: readonly CardNotice[]
   reader: Reader
   colorOf: (writer: WriterId) => string
   /** The column a put lands in: the one last focused, if any. */
@@ -186,6 +185,9 @@ export function InventoryPanel(p: {
               onTyping={() => {}}
               queued={null}
               readOnly={false}
+              onDiscard={() =>
+                p.onIntent({ kind: "discard", card: selected.id })
+              }
               reorder={null}
               rows={4}
               session={p.session}
@@ -206,20 +208,11 @@ export function InventoryPanel(p: {
               >
                 {PUT}
               </button>
-              <button
-                className="remove"
-                onClick={() =>
-                  p.onIntent({ kind: "remove", card: selected.id })
-                }
-                type="button"
-              >
-                {REMOVE}
-              </button>
             </BoundCardEditor>
           )}
-          {p.refusals.map(r => (
-            <div className="refused-move" key={refusalKey(r)}>
-              {refusalWords(r, p.reader)}
+          {p.notices.map(r => (
+            <div className="refused-move" key={noticeKey(r)}>
+              {noticeWords(r, p.reader)}
             </div>
           ))}
         </div>

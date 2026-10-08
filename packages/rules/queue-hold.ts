@@ -2,20 +2,25 @@
 // or a release, the hold a Stop leaves, and the holds the host sweeps.
 //
 // While a lane's queue is held, the host pops no message card from it, only
-// facts (`planNextQueuedCardPop`, `card.ts`), and a send there waits in it
-// (`sendWaits`, @pinetrie/core). So people can line up several cards on an idle thread and
-// let them go together. The hold is a session record, so it outlasts a
-// restart: a queue staged overnight must not drain when the host starts.
+// facts (`planNextQueuedCardPop`, `card.ts`). So people can line up several
+// cards on an idle thread and let them go together. A send there queues
+// (`sendWaits`, @pinetrie/core) and, on an idle thread, releases the hold
+// with it (`planQueueCard`, ADR-0113): sending removes the hold. The hold
+// is a session record, so it outlasts a restart: a queue staged overnight
+// must not drain when the host starts.
 
 import type {
+  CardRecord,
   LaneName,
+  Move,
   QueueHold,
+  QueueHoldChange,
   RootId,
   ValueWrite,
   WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import type { QueuedCard } from "./card.ts"
+import { type MovesStep, planMoveCommand, type QueuedCard } from "./card.ts"
 import { decodeAt, laneKey } from "./decode.ts"
 import { deleteRecord, type RecordSpec, setRecord } from "./records.ts"
 
@@ -56,6 +61,49 @@ export function planQueueHold(input: {
   return input.held
     ? [setRecord(QUEUE_HOLD, { lane, by: input.by, at: input.now })]
     : [deleteRecord(QUEUE_HOLD, lane)]
+}
+
+/**
+ * A card queued, and its queue's hold changed with it (ADR-0113): the move
+ * planned as any move is (`planMoveCommand`), and, only when it is
+ * accepted, the hold's writes. The hold goes first when the host carries it
+ * out, so the drain the move asks for finds the queue as this says: held
+ * before a staged card can be popped, released before the drain. A move
+ * that queues nothing changes no hold. Pure.
+ */
+export function planQueueCard(input: {
+  readonly cards: readonly CardRecord[]
+  readonly holds: ReadonlyMap<LaneName, QueueHold>
+  readonly move: Move
+  readonly hold: QueueHoldChange
+  readonly by: WriterId
+  readonly now: number
+  readonly running: (lane: LaneName) => boolean
+}): {
+  readonly step: MovesStep
+  readonly drain: readonly LaneName[]
+  readonly holds: readonly ValueWrite[]
+} {
+  const { move, hold } = input
+  const { step, drain } = planMoveCommand(
+    input.cards,
+    [move],
+    input.by,
+    input.running,
+  )
+  if (step.kind === "refused" || move.to.kind !== "queued" || hold === "keep")
+    return { step, drain, holds: [] }
+  const { lane } = move.to
+  const held = hold === "hold-if-idle"
+  if (held && input.running(lane)) return { step, drain, holds: [] }
+  const holds = planQueueHold({
+    holds: input.holds,
+    lane,
+    by: input.by,
+    now: input.now,
+    held,
+  })
+  return { step, drain, holds }
 }
 
 /**

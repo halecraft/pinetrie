@@ -13,6 +13,7 @@ import type {
   EntryId,
   RootId,
   RootSummary,
+  RootWork,
   Workflow,
   WorkflowState,
   WorkflowStateId,
@@ -54,7 +55,7 @@ export interface BoardMove {
   /** To the closed state: it archives the root. */
   readonly closes: boolean
   /** Why it is refused now (`ROOT_BUSY_REASON`'s key), into the closed state only. */
-  readonly busy: "running" | "waiting" | null
+  readonly busy: RootWork | null
   readonly intent: Intent
 }
 
@@ -128,7 +129,7 @@ export interface BoardViewInput {
   readonly mine: boolean
   readonly me: WriterId
   /** The agent's work in each root, held or not (`workAnywhere`): a root it works in is not closed. */
-  readonly work: ReadonlyMap<string, "running" | "waiting">
+  readonly work: ReadonlyMap<string, RootWork>
 }
 
 export function boardView(input: BoardViewInput): BoardView {

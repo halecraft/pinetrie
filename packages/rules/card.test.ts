@@ -4,6 +4,7 @@ import {
   type CardPlace,
   type CardRecord,
   cardId,
+  discardedOf,
   type EntryLike,
   entryId,
   INVENTORY_SLOTS,
@@ -74,6 +75,7 @@ const tree = (...more: EntryLike[]): TreeIndex =>
       ),
     ),
   )
+const OTHER = rootIdFor("01a0ffd2-0000-7000-8000-00000000000b")
 const card = (over: Partial<CardRecord> = {}): CardRecord => ({
   id: cardId("c-1"),
   owner: ADA,
@@ -141,7 +143,11 @@ describe("planCarry (ADR-0080)", () => {
     expect(
       planMove(
         [fact],
-        { card: fact.id, from: keyOf(fact.place), to: null },
+        {
+          card: fact.id,
+          from: keyOf(fact.place),
+          to: discardedOf(fact.place, null),
+        },
         ADA,
       ),
     ).toEqual({ kind: "refused", code: "fact", now: fact })
@@ -641,23 +647,73 @@ describe("handoffs (ADR-0059)", () => {
       kind: "write",
       record: { ...p, place: drafting, placer: BEA },
     })
-    expect(planMove([p], { card: C1, from, to: null }, ADA)).toEqual({
-      kind: "refused",
-      code: "not-fresh",
-      now: p,
-    })
   })
 
-  test("a removal: a fresh column's card, not a drafting one", () => {
-    const fresh = card({ place: freshPlace("k") })
-    expect(
-      planMove([fresh], { card: C1, from: freshPlace("k"), to: null }, ADA),
-    ).toEqual({ kind: "remove", id: C1 })
-    const c = card({ place: drafting })
-    expect(planMove([c], { card: C1, from: drafting, to: null }, ADA)).toEqual({
-      kind: "refused",
-      code: "not-fresh",
-      now: c,
+  describe("a discard (ADR-0111)", () => {
+    const gone = (place: CardRecord["place"]) => discardedOf(place, OTHER)
+    test.each([
+      ["a drafting card", drafting],
+      ["a fresh column's card", freshPlace("k")],
+      [
+        "a pinned card",
+        {
+          kind: "pinned",
+          root: TEST_ROOT,
+          at: atEntry(E2),
+          lane: LANE,
+          order: "a",
+        },
+      ],
+      [
+        "a queued card",
+        {
+          kind: "queued",
+          root: TEST_ROOT,
+          at: atEntry(E2),
+          lane: LANE,
+          order: "a",
+          by: BEA,
+          seen: "",
+        },
+      ],
+    ] as const)("of %s: gone in its own root, by its discarder", (_, place) => {
+      const c = card({ place })
+      expect(
+        planMove([c], { card: C1, from: keyOf(place), to: gone(place) }, ADA),
+      ).toEqual({
+        kind: "write",
+        record: {
+          ...c,
+          place: {
+            kind: "gone",
+            root: TEST_ROOT,
+            by: ADA,
+            why: { kind: "discarded" },
+          },
+          placer: ADA,
+        },
+      })
+    })
+
+    test("a gone card is moved by no handoff, and a popped one is gone", () => {
+      const discarded = card({
+        place: {
+          kind: "gone",
+          root: TEST_ROOT,
+          by: ADA,
+          why: { kind: "discarded" },
+        },
+      })
+      expect(
+        planMove(
+          [discarded],
+          { card: C1, from: keyOf(discarded.place), to: drafting },
+          ADA,
+        ),
+      ).toEqual({ kind: "refused", code: "gone", now: null })
+      expect(
+        planMove([], { card: C1, from: drafting, to: gone(card().place) }, ADA),
+      ).toEqual({ kind: "refused", code: "gone", now: null })
     })
   })
 
@@ -725,14 +781,17 @@ describe("handoffs (ADR-0059)", () => {
       ).toBe("write")
     })
 
-    test("removal from your own inventory is allowed, from someone else's refused", () => {
+    test("a discard from your own inventory is gone in the root you are on; from someone else's refused", () => {
       const held = card({ place: mine })
-      expect(planMove([held], { card: C1, from: mine, to: null }, ADA)).toEqual(
-        { kind: "remove", id: C1 },
+      const to = discardedOf(mine, OTHER)
+      expect(planMove([held], { card: C1, from: mine, to }, ADA)).toMatchObject(
+        { kind: "write", record: { place: { kind: "gone", root: OTHER } } },
       )
-      expect(planMove([held], { card: C1, from: mine, to: null }, BEA)).toEqual(
-        { kind: "refused", code: "not-yours", now: held },
-      )
+      expect(planMove([held], { card: C1, from: mine, to }, BEA)).toEqual({
+        kind: "refused",
+        code: "not-yours",
+        now: held,
+      })
     })
 
     test("a key names its holder: Bea's inventory is not Ada's", () => {
@@ -1163,7 +1222,6 @@ describe("storage", () => {
 })
 
 describe("historyOf: the root a move enters the sender's history in (ADR-0066)", () => {
-  const OTHER = rootIdFor("01a0ffd2-0000-7000-8000-00000000000b")
   const C1 = cardId("c-1")
   const inv = { kind: "inventory", holder: ADA } as const
   const draftingIn = (root: RootId) =>
@@ -1220,9 +1278,15 @@ describe("historyOf: the root a move enters the sender's history in (ADR-0066)",
       null,
     ],
     [
-      "a removal: none",
-      [{ card: C1, from: freshPlace("k"), to: null }],
-      at(freshPlace("k")),
+      "a discard: the root its gone place names",
+      [{ card: C1, from: inv, to: discardedOf(inv, OTHER) }],
+      at(inv),
+      OTHER,
+    ],
+    [
+      "a discard in no root: none",
+      [{ card: C1, from: inv, to: discardedOf(inv, null) }],
+      at(inv),
       null,
     ],
     [

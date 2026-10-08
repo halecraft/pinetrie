@@ -1,7 +1,8 @@
 // host/housekeeping — what the host does between runs besides draining:
 // compact the session (ADR-0023), delete images nothing shows (ADR-0042),
 // retire histories of moves no one will undo again (ADR-0066), and delete
-// holds on queues nobody can use (ADR-0048 step 7).
+// holds on queues nobody can use (ADR-0048 step 7), and delete discarded
+// cards no one brought back in a week (ADR-0111).
 
 import type { Exchange, Store } from "@kyneta/exchange"
 import {
@@ -18,6 +19,7 @@ import {
 import {
   planSweep,
   readArchived,
+  readCardHistories,
   readLaneRecords,
   readPlaces,
   readQueueHolds,
@@ -26,6 +28,7 @@ import {
 } from "@pinetrie/reads"
 import {
   deleteRecord,
+  planGoneSweep,
   planHistorySweep,
   planHoldSweep,
   QUEUE_HOLD,
@@ -33,6 +36,7 @@ import {
 import type { Basics } from "./basics.ts"
 import type { CardPort } from "./cards.ts"
 import type { MoveHistories } from "./move-history.ts"
+import { applyPlaceSteps } from "./places.ts"
 import type { Records } from "./records.ts"
 
 /**
@@ -153,4 +157,30 @@ export async function sweepHolds(input: {
     swept.map(lane => deleteRecord(QUEUE_HOLD, lane)),
   )
   log(`[host] swept ${swept.length} hold(s) on queues nobody can use`)
+}
+
+/**
+ * Delete the cards discarded more than `GONE_KEEP_MS` ago (ADR-0111): gather
+ * the places and the cards' histories, plan (`planGoneSweep`), then delete
+ * each record, then its text (S64). The histories left with no card go with
+ * the provenance's own sweep, which the caller runs after.
+ */
+export async function sweepGone(input: {
+  readonly basics: Pick<Basics, "session" | "places" | "log" | "now">
+  readonly cards: Pick<CardPort, "destroy">
+}): Promise<void> {
+  const { session, places, log, now } = input.basics
+  // gather
+  const cards = readPlaces(places)
+  const histories = readCardHistories(session)
+  // plan
+  const doomed = planGoneSweep({ cards, histories, now: now() })
+  // execute
+  if (doomed.length === 0) return
+  applyPlaceSteps(
+    places,
+    doomed.map(id => ({ kind: "remove", id })),
+  )
+  for (const id of doomed) await input.cards.destroy(id)
+  log(`[host] deleted ${doomed.length} card(s) discarded over a week ago`)
 }

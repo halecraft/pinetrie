@@ -54,7 +54,7 @@ export const UNPROVEN: Readonly<Record<string, readonly string[]>> = {
     "Cmd+Z after a send changes nothing",
     "Cmd+Z past a card's creation empties it and keeps its record, and Cmd+Shift+Z in its box brings its text back",
     "a new branch's text is kept across a tab switch",
-    "closing a new branch that holds text asks first, and discarding removes its card",
+    "closing a new branch that holds text asks first, and discarding takes its card away",
     "a card of yours with text marks its root's item in your list and its thread's end on the rail",
     "a closed root holding your card marks ▦ and its board item, and comes back as it was",
     "a reload keeps who you are: your name",

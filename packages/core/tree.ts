@@ -915,7 +915,8 @@ export type ThreadLane =
 
 /**
  * A lane is busy while it runs or has cards queued: the agent works there,
- * or will. A root with a busy lane is not archived (`rootWork`), and a
+ * or will once its queue is released. A root with a busy lane is not
+ * archived (`rootWork`), and a
  * stopped thread does not carry on behind cards waiting (ADR-0020,
  * ADR-0048).
  */

@@ -9,7 +9,7 @@ import {
   type ThreadName,
   writerId,
 } from "@pinetrie/core"
-import type { CardRefusal } from "@pinetrie/session"
+import type { CardNotice } from "@pinetrie/session"
 import { describe, expect, test } from "vitest"
 import {
   cardStatus,
@@ -17,11 +17,11 @@ import {
   commandWords,
   historyWords,
   movedBackWords,
+  noticeWords,
   pinnedMarkerWords,
   pinnedStatusWords,
   pinnedWords,
   queuedWords,
-  refusalWords,
   retiredWords,
   sizeWords,
   traceWords,
@@ -33,8 +33,8 @@ import type { TraceGroup } from "./traces.ts"
 const ME = writerId("ada@x.test")
 const BEA = writerId("bea@x.test")
 const READER = { me: ME, nameOf: new Map([[BEA, "Bea"]]) }
-type MoveRefused = Extract<CardRefusal, { fromQueue: boolean }>
-const refusal = (over: Partial<MoveRefused>): CardRefusal => ({
+type MoveRefused = Extract<CardNotice, { fromQueue: boolean }>
+const refusal = (over: Partial<MoveRefused>): CardNotice => ({
   card: cardId("c-1"),
   actedAt: { kind: "inventory" },
   code: "gone",
@@ -109,33 +109,41 @@ describe("card words", () => {
     ],
     ["unsentWords", unsentWords("no such image"), "not sent: no such image"],
     [
-      "refusalWords, an unqueue the pop beat, yours",
-      refusalWords(refusal({ by: ME }), READER),
+      "noticeWords, an unqueue the pop beat, yours",
+      noticeWords(refusal({ by: ME }), READER),
       "already sent as your message, before you unqueued it",
     ],
     [
-      "refusalWords, an unqueue the pop beat, Bea's",
-      refusalWords(refusal({ by: BEA }), READER),
+      "noticeWords, an unqueue the pop beat, Bea's",
+      noticeWords(refusal({ by: BEA }), READER),
       "already sent as Bea's message, before you unqueued it",
     ],
     [
-      "refusalWords, gone from a drafting place",
-      refusalWords(refusal({ fromQueue: false }), READER),
-      "not moved: it was sent or removed first",
+      "noticeWords, gone from a drafting place",
+      noticeWords(refusal({ fromQueue: false }), READER),
+      "not moved: it was sent or discarded first",
     ],
     [
-      "refusalWords, moved by Bea first",
-      refusalWords(refusal({ code: "moved", by: BEA }), READER),
+      "noticeWords, moved by Bea first",
+      noticeWords(refusal({ code: "moved", by: BEA }), READER),
       "not moved: Bea moved it first",
     ],
     [
-      "refusalWords, moved by you in another tab",
-      refusalWords(refusal({ code: "moved", by: ME }), READER),
+      "noticeWords, moved by you in another tab",
+      noticeWords(refusal({ code: "moved", by: ME }), READER),
       "not moved: you moved it first",
     ],
     [
-      "refusalWords, a full inventory",
-      refusalWords(refusal({ code: "full" }), READER),
+      "noticeWords, your discard",
+      noticeWords(
+        { card: null, actedAt: { kind: "inventory" }, code: "discarded" },
+        READER,
+      ),
+      "discarded · the undo key (⌘Z outside a box) brings it back",
+    ],
+    [
+      "noticeWords, a full inventory",
+      noticeWords(refusal({ code: "full" }), READER),
       "inventory full",
     ],
   ])("%s", (_, words, expected) => {

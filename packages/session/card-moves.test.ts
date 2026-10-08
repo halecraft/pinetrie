@@ -89,14 +89,7 @@ describe("the tab's moves (ADR-0059)", () => {
       ["c-1", "queued"],
       ["c-2", "drafting"],
     ])
-    const out = run([
-      sent({
-        ...sentAs,
-        id: "m-1",
-        kind: "move",
-        move: { card: C1, from: drafting, to: null },
-      }),
-    ])
+    const out = run([sent({ ...sentAs, id: "m-1", kind: "send", card: C1 })])
     expect(withPending(host, out, ME)).toEqual([])
   })
 
@@ -137,21 +130,41 @@ describe("the tab's moves (ADR-0059)", () => {
       { kind: "answered", id: "m-1", answer: { kind: "refused", refusal } },
     ])
     expect(withPending(host, s, ME)).toBe(host)
-    expect(s.refusals).toEqual([refusal])
+    expect(s.notices).toEqual([refusal])
   })
 
-  test("a later move where you acted forgets the refusals there, not elsewhere", () => {
+  test("an accepted discard is kept as a notice where you made it, until your next move there; drawn gone until then", () => {
+    const gone = {
+      kind: "gone",
+      root: TEST_ROOT,
+      why: { kind: "discarded" },
+    } as const
+    const discard = {
+      ...sentAs,
+      id: "d-1",
+      kind: "move",
+      move: { card: C1, from: drafting, to: gone },
+    } as const
+    const s = run([sent(discard), accepted("d-1", 4)])
+    expect(s.notices).toEqual([
+      { card: C1, actedAt: COLUMN, code: "discarded" },
+    ])
+    expect(withPending(host, s, ME)[0]?.place).toEqual({ ...gone, by: ME })
+    expect(movesStep(s, sent(queueIt)).notices).toEqual([])
+  })
+
+  test("a later move where you acted forgets the notices there, not elsewhere", () => {
     const refusal = (actedAt: ActedAt) =>
       ({ card: C1, actedAt, code: "gone", by: null, fromQueue: true }) as const
     const s: MovesState = {
       ...NO_MOVES,
-      refusals: [
+      notices: [
         refusal(COLUMN),
         refusal(OTHER_COLUMN),
         refusal({ kind: "inventory" }),
       ],
     }
-    expect(movesStep(s, sent(queueIt)).refusals).toEqual([
+    expect(movesStep(s, sent(queueIt)).notices).toEqual([
       refusal(OTHER_COLUMN),
       refusal({ kind: "inventory" }),
     ])
@@ -300,7 +313,7 @@ describe("a command of several moves: a keep (ADR-0066)", () => {
 })
 
 describe("acted with no host to ask", () => {
-  test("a swap forgets the refusals at the inventory, not elsewhere", () => {
+  test("a swap forgets the notices at the inventory, not elsewhere", () => {
     const atInventory = {
       card: null,
       actedAt: { kind: "inventory" },
@@ -318,7 +331,7 @@ describe("acted with no host to ask", () => {
       { kind: "refused", refusal: inColumn },
       { kind: "acted", at: { kind: "inventory" } },
     ])
-    expect(s.refusals).toEqual([inColumn])
+    expect(s.notices).toEqual([inColumn])
   })
 })
 
@@ -377,7 +390,7 @@ describe("a move's decisions, before and after it is sent", () => {
   test("a queue carries the text's version as sent; any other move is left alone", () => {
     const move = { card: C1, from: drafting, to: queuedKey }
     expect(stampSeen(move, "v9").to).toEqual({ ...queuedKey, seen: "v9" })
-    const out = { card: C1, from: drafting, to: null }
+    const out = { card: C1, from: drafting, to: drafting }
     expect(stampSeen(out, "v9")).toBe(out)
   })
 })

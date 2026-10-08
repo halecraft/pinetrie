@@ -37,6 +37,7 @@ import {
   type OfferAction,
   PLAIN,
   type Position,
+  type QueueHoldChange,
   type Reorder,
   type RootId,
   type WriterId,
@@ -85,7 +86,7 @@ import {
   type ActedAt,
   AT_INVENTORY,
   answerOf,
-  type CardRefusal,
+  type CardNotice,
   cardOfPending,
   intentsOf,
   type LocalEvent,
@@ -228,9 +229,8 @@ export interface SessionClient {
   createCard(card: NewCard, text: string, how?: MoveHow): Promise<MoveAnswer>
   /**
    * Ask the host to move a card (ADR-0059), as the page planned it: a take
-   * into the inventory, a put, a queue, an unqueue, or a discard (`to` null). A move into a
-   * queue is sent with its text's version as this client has it then (S96).
-   * Into your inventory with `how.slot`, the slot is written once the host
+   * into the inventory, a put, an unqueue, or a discard (to gone); a queue is
+   * `queueCard`. Into your inventory with `how.slot`, the slot is written once the host
    * accepts, before the answer is recorded, so the repair never sees the
    * card held without its slot. `queuedBy`, for an unqueue, is who queued
    * the card: if the host popped it first, the refusal says it was sent, as
@@ -240,6 +240,17 @@ export interface SessionClient {
     move: Move,
     how?: MoveHow,
     queuedBy?: WriterId | null,
+  ): Promise<MoveAnswer>
+  /**
+   * Ask the host to queue a card (ADR-0113): `move` into a queue, sent with
+   * its text's version as this client has it then (S96), and what it does to
+   * that queue's hold, which the host decides with the move in one step.
+   * Drawn queued at once; resolves with the host's answer.
+   */
+  queueCard(
+    move: Move,
+    hold: QueueHoldChange,
+    how?: MoveHow,
   ): Promise<MoveAnswer>
   /**
    * Ask the host to move a queued or pinned card among its neighbours, as
@@ -271,7 +282,7 @@ export interface SessionClient {
    */
   undoSwap(direction: MoveDirection): Promise<void>
   /** Keep a refusal: one made before anything was sent, or an undo's. */
-  refuse(refusal: CardRefusal): void
+  refuse(refusal: CardNotice): void
   /** This tab's moves: in flight and refused (`card-moves.ts`). */
   readonly moves: Readable<MovesState>
   /**
@@ -526,20 +537,15 @@ export async function connectSession(
   const versionOf = (id: CardId): string => textVersion(texts.text(id))
 
   /**
-   * A move, tracked; with `draft`, a creation, drawn as that record. A move
-   * into a queue carries its text's version as this client has it now: the
-   * host pops the card only once it holds that much (S96).
+   * A move, tracked; with `draft`, a creation, drawn as that record. Never
+   * into a queue: that is `queueCard`'s, with its text's version.
    */
   function sendMove(
-    planned: Move,
+    move: Move,
     how: MoveHow,
     queuedBy: WriterId | null,
     draft: CardRecord | null,
   ): Promise<MoveAnswer> {
-    const move =
-      planned.to?.kind === "queued"
-        ? stampSeen(planned, versionOf(planned.card))
-        : planned
     return tracked(
       { kind: "move", moves: [move] },
       [pendingOf(crypto.randomUUID(), move, how, draft)],
@@ -625,6 +631,14 @@ export async function connectSession(
     },
     moveCard(move, how = OFF_PAGE, queuedBy = null) {
       return sendMove(move, how, queuedBy, null)
+    },
+    queueCard(planned, hold, how = OFF_PAGE) {
+      const move = stampSeen(planned, versionOf(planned.card))
+      return tracked(
+        { kind: "queue-card", move, hold },
+        [pendingOf(crypto.randomUUID(), move, how, null)],
+        null,
+      ).then(r => r.answer)
     },
     reorderCard(reorder, how = OFF_PAGE) {
       const pending: Pending = {

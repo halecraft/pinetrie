@@ -81,7 +81,9 @@ beside it (ADR-0081, turned sideways).
   wherever it is shown: your list, the board, your inbox.
 - **An item shows what happens in its root while you are elsewhere**
   (ADR-0077), before its label: a still blue ring while the agent works
-  there or is finishing its summary, which needs nothing from you; a filled
+  there, cards wait to be sent to it, or it is finishing its summary, which
+  needs nothing from you (cards behind a held queue wait for a person, and
+  draw no ring, ADR-0113); a filled
   amber dot when something there needs you, which pulses three times as it
   arrives and then stays still; a dim amber dot when something is worth a
   read; and, when a run you follow ends with nothing to do, a ✓ that fades.
@@ -652,7 +654,8 @@ The rail is E; the column is T. Seeing both at once is the product.
   (ADR-0044).
   **Stop** ends the turn, and records who pressed it under the ask
   (ADR-0106); cards queued are then held, until someone presses
-  **release** (ADR-0048 step 7). Once it has stopped, **Resume**
+  **send queue (n)**, or sends a message there (ADR-0048 step 7,
+  ADR-0113). Once it has stopped, **Resume**
   takes its place: it starts a new turn with a message from the host,
   "↻ resumed by <name>" (ADR-0082), until anything else is written at the
   thread's end.
@@ -736,12 +739,22 @@ The rail is E; the column is T. Seeing both at once is the product.
   send is back below the line saying "not sent: …" until it is queued again.
 - **The queue has its own controls** (ADR-0048 step 7), beside Stop and
   Resume on any thread with an agent: **hold queue**, and once held "queue
-  held by Bea" and **release**; and **unqueue all** while a card waits.
-  While the queue is held nothing in it is sent, and a send there waits in
-  it, so you can line up several steps on a quiet thread and let them go
-  together. Notes the thread will read (a fact, ADR-0080) still go. Unqueue
-  all puts every queued card below the line at once, and the undo key
-  outside a box puts them back.
+  held by Bea" and **send queue (n)**, which releases it (**release** with
+  nothing queued); and **unqueue all** while a card waits. While the queue
+  is held nothing in it is sent, so you can line up several steps on a
+  quiet thread and let them go together. Notes the thread will read (a
+  fact, ADR-0080) still go. **Sending removes the hold** (ADR-0113): on an
+  idle thread whose queue is held, your send button reads **send all (n)**,
+  and queues your message last and releases the queue in one step. On a
+  running thread a send waits in the held queue. Unqueue all puts every
+  queued card below the line at once, and the undo key outside a box puts
+  them back.
+- **× on a card discards it** (ADR-0111), wherever it is: your composer's,
+  another drafting card, a queued or pinned card, or the selected card in
+  your inventory; so does Ctrl+Shift+Backspace in its box. Where you did it,
+  the column says "discarded · the undo key (⌘Z outside a box) brings it
+  back", and the undo key does, for a week; then the host deletes it.
+  Discarding someone else's card leaves them a trace, as a move does.
 - **↑ and ↓ on a queued card, or Alt+↑ and Alt+↓ in its box, move it one
   place in line**; the box keeps its caret. A card never passes a note the
   thread will read. A move the queue overtook says "not moved: the cards
@@ -757,7 +770,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   someone else's. Each tab has its own history, which a reload forgets.
 - **Closing a new branch that holds text asks** "keep what you typed in your
   inventory?": **keep in inventory** (focused, the default), **discard**,
-  which is final, or **cancel**. Keep moves every card in the branch with
+  which the undo key reverses, or **cancel**. Keep moves every card in the branch with
   text into your inventory, and closes the branch once each is there; with
   too few empty slots it says so ("not kept: needs 2 slots, 1 free") and the
   branch stays open.
@@ -838,16 +851,16 @@ The rail is E; the column is T. Seeing both at once is the product.
   you were last in: Ctrl+Shift+O, the panel's **put** button, or a drag out
   of the panel onto a column's composer or the cards above it. Held over a
   root in your list, a drag opens it. Put where you have no card, it becomes your
-  composer; where you have one, it is shown above it. **Remove** deletes the
-  selected card for good.
+  composer; where you have one, it is shown above it. The selected card's
+  **×** discards it; the undo key brings it back.
 - **Undo a move** with Cmd+Z (Ctrl+Z elsewhere) while no box has focus;
   Cmd+Shift+Z, Ctrl+Shift+Z or Ctrl+Y redo it (ADR-0066). It undoes your
   newest move in the root you are on, from any of your tabs, after a reload
   or a restart too. As it acts it shows where the card went back: the
   panel, the thread's column, or a branch you closed since, opened again at
   the end of its root's columns. If anyone moved the card since, it is refused, saying
-  who, and nothing moves. A keep of a branch's cards is undone whole. Sends,
-  discards and copies are final; so is a keep that closed a new tab, whose
+  who, and nothing moves. A keep of a branch's cards is undone whole. Sends
+  and copies are final; so is a keep that closed a new tab, whose
   cards you take back from the panel. An archived root's moves cannot be
   undone, and are forgotten 7 days after it was archived.
 - **Undo a swap** with the same keys while the panel has focus: this tab's

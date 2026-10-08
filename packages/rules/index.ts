@@ -129,6 +129,7 @@ export {
   HISTORY_EVENTS,
   movedBackBy,
   type ProvenanceSteps,
+  planGoneSweep,
   planProvenance,
   planTraceSweep,
   type RecordStep,
@@ -267,6 +268,7 @@ export {
 } from "./pinned.ts"
 export {
   planHoldSweep,
+  planQueueCard,
   planQueueHold,
   QUEUE_HOLD,
 } from "./queue-hold.ts"

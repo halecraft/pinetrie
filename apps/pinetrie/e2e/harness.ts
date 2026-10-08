@@ -447,12 +447,13 @@ export function queueCard(
   client: SessionClient,
   id: CardId,
   to: { readonly lane: LaneName; readonly at: Position },
-): ReturnType<SessionClient["moveCard"]> {
+): ReturnType<SessionClient["queueCard"]> {
   const card = drawnCard(client, id)
   const root = queueRoot(to.lane, card, readLaneRecords(client.session))
   if (root === undefined) throw new Error(`no root to queue ${id} in`)
-  return client.moveCard(
+  return client.queueCard(
     moveOf(card, { kind: "queued", root, at: to.at, lane: to.lane, seen: "" }),
+    "keep",
   )
 }
 

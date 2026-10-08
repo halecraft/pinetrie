@@ -331,17 +331,18 @@ export interface QueueControls {
   readonly lane: LaneName
   /** Who holds the queue; null when it is not held. */
   readonly heldBy: WriterId | null
-  /** Unqueue all is offered: a message card is queued. */
-  readonly unqueueAll: boolean
+  /** The message cards queued: what a release sends, and unqueue all takes back. */
+  readonly messages: number
 }
 
 function queueControls(f: ColumnFacts): QueueControls | null {
   const { lane } = f
   if (!f.writable || lane.kind !== "lane") return null
+  const messages = f.queued.filter(c => c.carries.kind === "message").length
   return {
     lane: lane.name,
     heldBy: lane.heldBy,
-    unqueueAll: f.queued.some(c => c.carries.kind === "message"),
+    messages,
   }
 }
 
@@ -700,7 +701,8 @@ export const runWords = (run: RunButton): ControlWords =>
 
 /**
  * The queue controls in words (ADR-0048 step 7): "hold queue", or who holds
- * it and "release"; and "unqueue all" when a card waits.
+ * it and "send queue (n)", which releases it ("release" with nothing to
+ * send, ADR-0113); and "unqueue all" when a card waits.
  */
 export function queueControlWords(
   controls: QueueControls,
@@ -727,17 +729,21 @@ export function queueControlWords(
             className: "hold-queue",
           }
         : {
-            label: "release",
-            title: "send what is queued here, in order",
+            label:
+              controls.messages === 0
+                ? "release"
+                : `send queue (${controls.messages})`,
+            title: "release the hold: what is queued here is sent, in order",
             className: "release-queue",
           },
-    unqueueAll: controls.unqueueAll
-      ? {
-          label: "unqueue all",
-          title: "take every queued card back below the line",
-          className: "unqueue-all",
-        }
-      : null,
+    unqueueAll:
+      controls.messages > 0
+        ? {
+            label: "unqueue all",
+            title: "take every queued card back below the line",
+            className: "unqueue-all",
+          }
+        : null,
   }
 }
 

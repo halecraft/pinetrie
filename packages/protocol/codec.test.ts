@@ -269,25 +269,24 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       ],
     },
     {
-      kind: "move",
-      moves: [
-        {
-          card: cardId("c-7"),
-          from: {
-            kind: "drafting",
-            root: TEST_ROOT,
-            at: atEntry(entryId("e-5")),
-            lane: laneNameForThread("abc"),
-          },
-          to: {
-            kind: "queued",
-            root: TEST_ROOT,
-            at: atEntry(entryId("e-5")),
-            lane: laneNameForThread("abc"),
-            seen: "v-2",
-          },
+      kind: "queue-card",
+      move: {
+        card: cardId("c-7"),
+        from: {
+          kind: "drafting",
+          root: TEST_ROOT,
+          at: atEntry(entryId("e-5")),
+          lane: laneNameForThread("abc"),
         },
-      ],
+        to: {
+          kind: "queued",
+          root: TEST_ROOT,
+          at: atEntry(entryId("e-5")),
+          lane: laneNameForThread("abc"),
+          seen: "v-2",
+        },
+      },
+      hold: "release",
     },
     {
       kind: "move",
@@ -300,7 +299,12 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
             at: atEntry(entryId("e-5")),
             lane: null,
           },
-          to: null,
+          to: { kind: "gone", root: TEST_ROOT, why: { kind: "discarded" } },
+        },
+        {
+          card: cardId("c-8"),
+          from: { kind: "inventory", holder: writerId("ada@example.com") },
+          to: { kind: "gone", root: null, why: { kind: "discarded" } },
         },
       ],
     },
@@ -538,7 +542,7 @@ test("decode: a move needs its cards, each with a place; set-command a known com
       kind: "move",
       moves: encodeMoves([
         { card: cardId("c-1"), from: null, to: fresh },
-        { card: cardId("c-2"), from: null, to: null },
+        { card: cardId("c-2"), from: null, to: null as never },
       ]),
     },
     { kind: "set-command", cardId: "c-1", mode: "pull" },
@@ -579,6 +583,28 @@ test("decode: a malformed reorder or queue hold is refused (ADR-0048 step 7)", (
     lane: laneNameForThread("abc"),
     seen: "",
   }
+  const moves = JSON.stringify([{ card: "c-1", from: null, to: queued }])
+  // One way into a queue (ADR-0113): `move` refuses it, `queue-card` takes
+  // one move into a queue and a known hold change.
+  assert.equal(decodeCommand({ kind: "move", moves }).kind, "refused")
+  assert.equal(
+    decodeCommand({ kind: "queue-card", moves, mode: "release" }).kind,
+    "queue-card",
+  )
+  assert.equal(
+    decodeCommand({ kind: "queue-card", moves, mode: "later" }).kind,
+    "refused",
+  )
+  assert.equal(
+    decodeCommand({
+      kind: "queue-card",
+      moves: JSON.stringify([
+        { card: "c-1", from: null, to: { kind: "inventory", holder: "w" } },
+      ]),
+      mode: "keep",
+    }).kind,
+    "refused",
+  )
   const reorder = (cardId: string, moves: unknown) =>
     decodeCommand({ kind: "reorder", cardId, moves: JSON.stringify(moves) })
       .kind

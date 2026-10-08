@@ -493,6 +493,15 @@ export type Intent =
       readonly lane: LaneName
       readonly held: boolean
     }
+  /**
+   * Queue a card (ADR-0113): `move` into a lane's queue, and what it does to
+   * that queue's hold, decided with the move in one step.
+   */
+  | {
+      readonly kind: "queue-card"
+      readonly move: Move
+      readonly hold: QueueHoldChange
+    }
   /** Take every message card queued on a thread back below the line. */
   | { readonly kind: "unqueue-all"; readonly lane: LaneName }
   /**
@@ -1389,6 +1398,8 @@ export const commandOf = (card: {
  * host pops it or someone unqueues it. Fresh: an unsent branch or new tab,
  * by its column's key, in the root it will start or branch in. Inventory: in its holder's inventory; which slot holds
  * it is the holder's own document (`InventoryDoc`), not the host's (ADR-0059).
+ * Gone: discarded, drawn nowhere, kept so the undo key can bring it back
+ * until the host sweeps it (ADR-0111).
  */
 export type CardPlace =
   | {
@@ -1437,6 +1448,21 @@ export type CardPlace =
       readonly at: Position
     }
   | { readonly kind: "inventory"; readonly holder: WriterId }
+  | {
+      readonly kind: "gone"
+      /**
+       * The root whose history of moves the discard is in: its old place's,
+       * or for a card in no root the root its discarder was on; null for none,
+       * and then nothing undoes it.
+       */
+      readonly root: RootId | null
+      /** Who discarded it. */
+      readonly by: WriterId
+      readonly why: GoneWhy
+    }
+
+/** Why a card is gone: the stored kind of its place. */
+export type GoneWhy = { readonly kind: "discarded" }
 
 /** How many cards an inventory holds: a fixed grid (ADR-0048). */
 export const INVENTORY_SLOTS = 18
@@ -1485,6 +1511,8 @@ export function keyOf(place: CardPlace): PlaceKey {
     case "fresh":
     case "inventory":
       return place
+    case "gone":
+      return { kind: "gone", root: place.root, why: place.why }
   }
 }
 
@@ -1511,8 +1539,22 @@ export function sameKey(a: PlaceKey, b: PlaceKey): boolean {
       return b.kind === "fresh" && a.column === b.column
     case "inventory":
       return b.kind === "inventory" && a.holder === b.holder
+    case "gone":
+      return b.kind === "gone" && a.root === b.root && a.why.kind === b.why.kind
   }
 }
+
+/**
+ * What queueing a card does to its queue's hold (ADR-0113): nothing; hold an
+ * idle queue first, so a card staged there is not sent while it is written;
+ * or release it, so the card is sent after those queued before it.
+ */
+export type QueueHoldChange = "keep" | "hold-if-idle" | "release"
+export const QUEUE_HOLD_CHANGES: readonly QueueHoldChange[] = [
+  "keep",
+  "hold-if-idle",
+  "release",
+]
 
 /** Which way an undo of moves goes. */
 export type MoveDirection = "undo" | "redo"
@@ -1520,12 +1562,14 @@ export const MOVE_DIRECTIONS: readonly MoveDirection[] = ["undo", "redo"]
 
 /**
  * A handoff (ADR-0059): move a card from where its sender saw it to another
- * place. `from` null creates the card; `to` null removes it.
+ * place. `from` null creates the card. Nobody removes one: a discard is a
+ * move to gone (ADR-0111), and only the host deletes a record, for a card it
+ * sends or sweeps.
  */
 export interface Move {
   readonly card: CardId
   readonly from: PlaceKey | null
-  readonly to: PlaceKey | null
+  readonly to: PlaceKey
 }
 
 /**
@@ -1543,8 +1587,8 @@ export interface Reorder {
   readonly before: CardId | null
 }
 
-/** `card`'s move from where it is now to `to`; `to` null removes it. */
-export const moveOf = (card: CardRecord, to: PlaceKey | null): Move => ({
+/** `card`'s move from where it is now to `to`. */
+export const moveOf = (card: CardRecord, to: PlaceKey): Move => ({
   card: card.id,
   from: keyOf(card.place),
   to,
@@ -1561,6 +1605,19 @@ export const draftingOf = (
   root: place.root,
   at: place.at,
   lane: place.lane,
+})
+
+/**
+ * Where a discard puts a card (ADR-0111): gone, in the history of the root
+ * it was in, else of `here`, the root its discarder is on.
+ */
+export const discardedOf = (
+  place: CardPlace,
+  here: RootId | null,
+): PlaceKey => ({
+  kind: "gone",
+  root: "root" in place ? place.root : here,
+  why: { kind: "discarded" },
 })
 
 /**
@@ -1597,8 +1654,6 @@ export type MoveRefusal =
   | "gone"
   /** A creation whose id is in use. */
   | "exists"
-  /** A removal of a card in neither a fresh column nor the sender's inventory. */
-  | "not-fresh"
   /** The sender's inventory holds `INVENTORY_SLOTS` cards already. */
   | "full"
   /** A move into or out of someone else's inventory. */
@@ -1694,6 +1749,19 @@ export function placeFields(place: CardPlace | PlaceKey): PlaceFields {
         seen: "",
         holder: place.holder,
       }
+    // Stored under its reason, with who discarded it as its holder.
+    case "gone":
+      return {
+        kind: place.why.kind,
+        root: place.root ?? "",
+        at: "",
+        lane: "",
+        column: "",
+        order: "",
+        by: "",
+        seen: "",
+        holder: "by" in place ? place.by : "",
+      }
   }
 }
 
@@ -1722,6 +1790,15 @@ export function placeOfFields(f: PlaceFields): CardPlace | undefined {
       return f.holder === ""
         ? undefined
         : { kind: "inventory", holder: f.holder as WriterId }
+    case "discarded":
+      return f.holder === "" || (f.root !== "" && !isRootId(f.root))
+        ? undefined
+        : {
+            kind: "gone",
+            root: f.root === "" ? null : f.root,
+            by: f.holder as WriterId,
+            why: { kind: "discarded" },
+          }
     case "drafting":
       return f.at === "" || !isRootId(f.root)
         ? undefined
@@ -1776,6 +1853,14 @@ export function keyOfFields(f: PlaceFields): PlaceKey | undefined {
           root: f.root,
           at: atEntry(entryId(f.at)),
           lane: isLaneName(f.lane) ? f.lane : null,
+        }
+  if (f.kind === "discarded")
+    return f.root !== "" && !isRootId(f.root)
+      ? undefined
+      : {
+          kind: "gone",
+          root: f.root === "" ? null : f.root,
+          why: { kind: "discarded" },
         }
   if (f.kind !== "queued") return placeOfFields(f)
   return f.at === "" || !isRootId(f.root) || !isLaneName(f.lane)

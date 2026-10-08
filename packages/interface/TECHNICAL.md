@@ -1032,11 +1032,22 @@ change of wording then touches the words function, its one test, and
 - **The queue's controls** (ADR-0048 step 7) are the column's, beside Stop
   and Resume: `columnView`'s `queue` (`QueueControls`) for a writable column
   whose thread has a lane, worded by `queueControlWords`: "hold queue", or
-  "queue held by Bea" and "release"; and "unqueue all" while a message card
-  waits (`ColumnFacts.queuedMessages`). Each is a `ColumnAct` (`holdQueue`,
-  `unqueueAll`) that `planIntent` turns into one `request`. A send to a held
-  idle lane queues (`planSend` reads core's `sendWaits`), and its button's
-  title says the queue is held (`HELD_QUEUE_TITLE`).
+  "queue held by Bea" and "send queue (n)", which releases it ("release"
+  with no message card queued); and "unqueue all" while a message card
+  waits. Each is a `ColumnAct` (`holdQueue`, `unqueueAll`) that
+  `planIntent` turns into one `request`.
+- **Every queue is a `queueCard` effect** (ADR-0113): the `queue` act and a
+  command button's queue carry what the queue does to its hold, and the
+  session sends one `queue-card` request. `planSend` decides the hold: on
+  an idle lane whose queue is held, `release`, and the queue place is
+  `releases`, which `queueWords` words "send all (n)"; else `keep`.
+- **A discard is a move to gone** (ADR-0111): the `discard` act (a card's
+  ×, or Ctrl+Shift+Backspace in its box, `cardKeyAct`) and the inventory's
+  `discard` intent plan `planDiscard`: `discardedOf` the card's place, in
+  the history of the root you are on when the card is in none, so the undo
+  key there brings it back. The close ask's discard is the same move per
+  card. The session keeps your accepted discard as a notice where you made
+  it (`CardNotice`, `noticeWords`), as it keeps a refusal.
 - **A queued or pinned card moves one place** with its ↑ and ↓
   (`ReorderButtons`) or Alt+↑/↓ in its box (`card-keys.ts`, `cardKeyAct`).
   Both are the `reorder` act, carrying the card's list as drawn, by id;
@@ -1247,7 +1258,7 @@ state, never stored.
   panel is closed opens it briefly.
 - **Selectors for the browser suite:** `.inventory` (the panel),
   `.inventory .slot[data-slot][data-card]` and `.slot-line`, `.inventory
-  .put`, `.inventory .remove`, `#bottom .inventory-toggle`
+  .put`, `.inventory .discard-card`, `#bottom .inventory-toggle`
   (`.account-inventory` in the account menu while your list is folded), a card's
   `.take-into-inventory`, a message's `.take-copy-into-inventory`, and a
   fresh column's `.close-keep`,

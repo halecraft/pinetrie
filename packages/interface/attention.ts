@@ -10,6 +10,7 @@ import type {
   EntryId,
   LaneName,
   RootRecord,
+  RootWork,
   Verdict,
   VerdictRecord,
   WriterId,
@@ -186,19 +187,21 @@ export const markOf = (
   )
 
 /**
- * Each root's status: working while the agent works there or its verdict is
- * pending (the agent's side is not finished); else its highest item. A root
- * with neither has none.
+ * Each root's status: working while the agent works there, cards wait for it
+ * to be free, or its verdict is pending (the agent's side is not finished);
+ * else its highest item. Cards behind a held queue are not work: they wait
+ * for a person (ADR-0113). A root with none of these has none.
  */
 export function rootStatus(input: {
   readonly items: readonly Item[]
-  /** Roots where the agent works, held or not (`workAnywhere`). */
-  readonly work: ReadonlyMap<EntryId, unknown>
+  /** Roots where the agent works, held by this tab or not (`workAnywhere`). */
+  readonly work: ReadonlyMap<EntryId, RootWork>
   readonly verdicts: ReadonlyMap<LaneName, VerdictRecord>
   readonly laneRoots: ReadonlyMap<LaneName, EntryId>
 }): ReadonlyMap<EntryId, Status> {
   const out = new Map<EntryId, Status>()
-  for (const root of input.work.keys()) out.set(root, { kind: "working" })
+  for (const [root, work] of input.work)
+    if (work !== "held") out.set(root, { kind: "working" })
   for (const v of input.verdicts.values()) {
     const root = input.laneRoots.get(v.lane)
     if (root !== undefined && v.verdict.kind === "pending")

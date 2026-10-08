@@ -60,6 +60,9 @@ export function revealOf(
         actedAt: at(place.column),
       }
     }
+    // Discarded: drawn nowhere, so nothing comes into view.
+    case "gone":
+      return { effects: [], actedAt: AT_INVENTORY }
     case "drafting":
     case "pinned":
     case "queued": {

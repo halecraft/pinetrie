@@ -154,6 +154,7 @@ export type Verb =
   | "unpinned"
   | "took-into-inventory"
   | "put"
+  | "discarded"
   | "moved"
 
 /** Whether a place is one everyone at a thread sees, and anyone may move. */
@@ -189,6 +190,7 @@ export function verbOf(from: PlaceKey | null, to: PlaceKey | null): Verb {
   if (from === null) return "created"
   const back = movedBack(from, to)
   if (back !== null) return back
+  if (to.kind === "gone") return "discarded"
   if (to.kind === "queued") return "queued"
   if (to.kind === "pinned") return "pinned"
   if (to.kind === "inventory") return "took-into-inventory"
@@ -365,6 +367,28 @@ export function planProvenance(input: {
     })
   }
   return { histories, traces }
+}
+
+/** How long a discarded card is kept for the undo key to bring back (ADR-0111). */
+export const GONE_KEEP_MS = 7 * 24 * 60 * 60 * 1000
+
+/**
+ * The gone cards to delete, record and text: each whose newest history
+ * event, its discard or what came after, is older than `GONE_KEEP_MS`, or
+ * that has no history to tell. Pure.
+ */
+export function planGoneSweep(input: {
+  readonly cards: readonly CardRecord[]
+  readonly histories: ReadonlyMap<CardId, CardHistoryRecord>
+  readonly now: number
+}): readonly CardId[] {
+  return input.cards
+    .filter(c => {
+      if (c.place.kind !== "gone") return false
+      const last = input.histories.get(c.id)?.events.at(-1)
+      return last === undefined || input.now - last.at > GONE_KEEP_MS
+    })
+    .map(c => c.id)
 }
 
 /**

@@ -8,6 +8,7 @@ import {
   type CardPlace,
   type CardRecord,
   cardId,
+  discardedOf,
   draftingOf,
   emailLocalPart,
   entryId,
@@ -437,12 +438,39 @@ describe("moves, built once (ADR-0059)", () => {
   ): ReadonlyMap<typeof LANE, LaneRecord> =>
     new Map([[LANE, { lane: LANE, root, work: null, by: ADA, createdAt: 0 }]])
 
-  test("a move goes from where the card is", () => {
-    expect(moveOf(drafting, null)).toEqual({
+  test("a move goes from where the card is; a discard is gone in its root, or the one you are on", () => {
+    const gone = discardedOf(drafting.place, OTHER)
+    expect(moveOf(drafting, gone)).toEqual({
       card: cardId("c-1"),
       from: { kind: "drafting", root: TEST_ROOT, at, lane: LANE },
-      to: null,
+      to: { kind: "gone", root: TEST_ROOT, why: { kind: "discarded" } },
     })
+    expect(discardedOf({ kind: "inventory", holder: ADA }, OTHER)).toEqual({
+      kind: "gone",
+      root: OTHER,
+      why: { kind: "discarded" },
+    })
+    expect(discardedOf({ kind: "inventory", holder: ADA }, null)).toMatchObject(
+      { root: null },
+    )
+  })
+
+  test("a gone place is stored under its reason, with who discarded it", () => {
+    const place = {
+      kind: "gone",
+      root: TEST_ROOT,
+      by: ADA,
+      why: { kind: "discarded" },
+    } as const
+    const fields = placeFields(place)
+    expect(fields).toMatchObject({ kind: "discarded", holder: ADA })
+    expect(placeOfFields(fields)).toEqual(place)
+    expect(keyOfFields({ ...fields, holder: "" })).toEqual(keyOf(place))
+    expect(placeOfFields({ ...fields, root: "" })).toMatchObject({ root: null })
+    expect(placeOfFields({ ...fields, holder: "" })).toBeUndefined()
+    expect(
+      sameKey(keyOf(place), { kind: "gone", root: OTHER, why: place.why }),
+    ).toBe(false)
   })
 
   test("an unqueue puts a card back where it was queued, in its root", () => {

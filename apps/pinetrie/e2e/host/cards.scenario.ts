@@ -289,7 +289,7 @@ async function run(check: Checks["check"]): Promise<void> {
       () =>
         ada.moves
           .current()
-          .refusals.some(r => r.card === c7 && r.code === "gone"),
+          .notices.some(r => r.card === c7 && r.code === "gone"),
       5_000,
     )
     await ch.quiet()

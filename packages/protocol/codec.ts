@@ -46,6 +46,8 @@ import {
   parseNewRoot,
   parseTitle,
   placeFields,
+  QUEUE_HOLD_CHANGES,
+  type QueueHoldChange,
   type Refusal,
   type Reorder,
   ROOT,
@@ -253,9 +255,25 @@ export function decodeCommand(
   if (kind === "setup" || kind === "publish") return { kind }
   if (kind === "move") {
     const moves = decodeMoves(text(wire?.moves))
-    return typeof moves === "string"
-      ? refused(ERR.UNKNOWN_TARGET, moves)
+    if (typeof moves === "string") return refused(ERR.UNKNOWN_TARGET, moves)
+    // One way into a queue, which decides its hold too (ADR-0113).
+    return moves.some(m => m.to.kind === "queued")
+      ? refused(ERR.UNKNOWN_TARGET, "a card is queued by queue-card")
       : { kind: "move", moves }
+  }
+  if (kind === "queue-card") {
+    const moves = decodeMoves(text(wire?.moves))
+    if (typeof moves === "string") return refused(ERR.UNKNOWN_TARGET, moves)
+    const [move, ...more] = moves
+    if (move === undefined || more.length > 0 || move.to.kind !== "queued")
+      return refused(
+        ERR.UNKNOWN_TARGET,
+        "a queue-card names one move into a queue",
+      )
+    const hold = text(wire?.mode)
+    return isQueueHoldChange(hold)
+      ? { kind, move, hold }
+      : refused(ERR.UNKNOWN_KIND, `unknown queue hold change: ${hold}`)
   }
   if (kind === "undo-move") {
     const root = text(wire?.root)
@@ -526,7 +544,7 @@ export function decodeMoves(s: string): readonly Move[] | string {
     const to = keyFromJson(m.to ?? null)
     if (from === undefined || to === undefined)
       return "a move names a malformed place"
-    if (from === null && to === null) return "a move must name a place"
+    if (to === null) return "a move must name where the card goes"
     moves.push({ card: cardId(card), from, to })
   }
   return moves
@@ -590,6 +608,9 @@ function decodeMovedCards(s: string): readonly MovedCard[] {
   })
 }
 
+const isQueueHoldChange = (h: string): h is QueueHoldChange =>
+  (QUEUE_HOLD_CHANGES as readonly string[]).includes(h)
+
 const isMoveDirection = (d: string): d is MoveDirection =>
   (MOVE_DIRECTIONS as readonly string[]).includes(d)
 
@@ -597,7 +618,6 @@ const MOVE_REFUSALS: readonly MoveRefusal[] = [
   "moved",
   "gone",
   "exists",
-  "not-fresh",
   "full",
   "not-yours",
   "fact",
@@ -741,6 +761,13 @@ export function encodeIntent(id: string, intent: Intent): Command {
       return command({ id, kind: "reserve", lane: intent.lane })
     case "move":
       return command({ id, kind: "move", moves: encodeMoves(intent.moves) })
+    case "queue-card":
+      return command({
+        id,
+        kind: "queue-card",
+        moves: encodeMoves([intent.move]),
+        mode: intent.hold,
+      })
     case "undo-move":
       return command({
         id,

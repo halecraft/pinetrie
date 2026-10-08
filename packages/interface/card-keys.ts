@@ -1,29 +1,31 @@
 // interface/card-keys — the keys a card's own box takes for what the card does
-// in its place (ADR-0048, *Physics* 5): Alt+↑ and Alt+↓ move a queued or
-// pinned card one place up or down. Pure: a key and the card's list as
-// drawn, to an act or nothing. The key-system redesign replaces this file.
+// in its place (ADR-0048, *Physics* 5; ADR-0111): Alt+↑ and Alt+↓ move a
+// queued or pinned card one place up or down, and Ctrl+Shift+Backspace
+// discards a card. Pure: a key and the card's list as drawn, to an act or
+// nothing. The key-system redesign replaces this file.
 //
-// Only queued and pinned boxes ask. On a Mac, Option+↑/↓ moves a textarea's
-// caret to its paragraph's start or end; those boxes lose that, and the
-// composer and drafting cards keep it.
+// Only queued and pinned boxes take Alt+↑/↓. On a Mac, Option+↑/↓ moves a
+// textarea's caret to its paragraph's start or end; those boxes lose that,
+// and the composer and drafting cards keep it. Ctrl, not Cmd, as take
+// (Ctrl+Shift+I) and put (Ctrl+Shift+O) are: Cmd+Backspace deletes the line.
 
 import type { CardId } from "@pinetrie/core"
 import type { ColumnAct } from "./intent.ts"
 import type { KeyLike } from "./inventory-keys.ts"
 
-/** The act a key in a queued or pinned card's box asks for, or null. */
+/**
+ * The act a key in a card's box asks for, or null. `among` is its list as
+ * drawn when it has a place in line, else null: only such a card reorders.
+ */
 export function cardKeyAct(
   event: KeyLike & { readonly isComposing: boolean },
   card: CardId,
-  among: readonly CardId[],
+  among: readonly CardId[] | null,
 ): ColumnAct | null {
-  if (
-    event.isComposing ||
-    !event.altKey ||
-    event.ctrlKey ||
-    event.metaKey ||
-    event.shiftKey
-  )
+  if (event.isComposing || event.metaKey) return null
+  if (event.ctrlKey && event.shiftKey && !event.altKey)
+    return event.key === "Backspace" ? { kind: "discard", card } : null
+  if (!event.altKey || event.ctrlKey || event.shiftKey || among === null)
     return null
   if (event.key === "ArrowUp") return { kind: "reorder", card, among, step: -1 }
   if (event.key === "ArrowDown")

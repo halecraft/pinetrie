@@ -10,6 +10,7 @@ import {
   type ChatMode,
   type ProjectRecord,
   parseMentions,
+  type QueueHoldChange,
   sendWaits,
   type ThreadLane,
   type WorkSetting,
@@ -152,8 +153,12 @@ export interface SendPlan {
   readonly to: Address
   /** Where a queued send would wait: the button's in `queue` mode, and a conflict's. */
   readonly queue: QueuePlace
-  /** The thread's queue is held: a queued send waits for a release (ADR-0048 step 7). */
-  readonly held: boolean
+  /**
+   * What a queued send does to the queue's hold (ADR-0113): on an idle thread
+   * whose queue is held, it releases it, so the queue goes and this card
+   * after it; else it leaves the hold as it is.
+   */
+  readonly hold: Extract<QueueHoldChange, "keep" | "release">
   /**
    * The card's command (ADR-0108), and whether it has text to send after
    * it: the button then names the command.
@@ -205,12 +210,15 @@ export function planSend(input: {
   const queued =
     lane.kind === "lane" && (sendWaits(lane) || input.command !== null)
   const mode: ComposerMode = fresh ? "branch" : queued ? "queue" : "reply"
+  const releases = lane.kind === "lane" && !lane.running && lane.heldBy !== null
   return {
     mode,
     createsLane: compelled && (fresh || lane.kind === "none"),
     to,
-    queue: queuePlace(lane, input.reader),
-    held: lane.kind === "lane" && lane.heldBy !== null,
+    queue: releases
+      ? { kind: "releases", count: lane.waiting + 1 }
+      : queuePlace(lane, input.reader),
+    hold: releases ? "release" : "keep",
     agentByDefault: agentByDefault(how),
     command:
       input.command === null
@@ -236,10 +244,6 @@ export interface SendButton extends ButtonWords {
   readonly disabled: boolean
 }
 
-/** The queue button's title while the thread's queue is held. */
-export const HELD_QUEUE_TITLE =
-  "the queue is held: sent once someone releases it"
-
 /** The button's label while an image uploads: a send then would lack its markdown. */
 export const UPLOADING = "uploading image…"
 
@@ -253,9 +257,7 @@ export function sendButton(plan: SendPlan, busy: EditorBusy): SendButton {
     : plan.command !== null
       ? commandSendWords(plan.command, plan.queue)
       : plan.mode === "queue"
-        ? plan.held
-          ? { ...queueWords(plan.queue), title: HELD_QUEUE_TITLE }
-          : queueWords(plan.queue)
+        ? queueWords(plan.queue)
         : recipientWords(plan.to)
   return { ...words, disabled: busy.uploading || busy.sending }
 }
@@ -311,6 +313,11 @@ export const placeholderWords = (plan: SendPlan): string =>
 
 /** Where a message queued now would wait: what the queue button says. */
 export type QueuePlace =
+  /**
+   * Last in a held queue that the send releases (ADR-0113): `count` cards go,
+   * this one with them.
+   */
+  | { readonly kind: "releases"; readonly count: number }
   /** Nothing waits: it is popped when the run ends. */
   | { readonly kind: "next" }
   /** Behind `ahead` queued cards, the last of them yours. */
@@ -339,17 +346,24 @@ export function queuePlace(lane: ThreadLane, reader: Reader): QueuePlace {
  * The title counts the queue when one name stands for more than one.
  */
 export function queueWords(place: QueuePlace): ButtonWords {
-  const label =
-    place.kind === "next"
-      ? "queue up next"
-      : place.kind === "afterYours"
-        ? "queue after yours"
-        : `queue after ${place.name}`
-  const title =
-    place.kind !== "next" && place.ahead > 1
-      ? `${place.ahead} waiting ahead`
-      : null
-  return { label, title }
+  switch (place.kind) {
+    case "releases":
+      return {
+        label: `send all (${place.count})`,
+        title: "release the held queue: what waits goes first, then this",
+      }
+    case "next":
+      return { label: "queue up next", title: null }
+    case "afterYours":
+    case "after":
+      return {
+        label:
+          place.kind === "afterYours"
+            ? "queue after yours"
+            : `queue after ${place.name}`,
+        title: place.ahead > 1 ? `${place.ahead} waiting ahead` : null,
+      }
+  }
 }
 
 /**

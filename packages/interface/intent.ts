@@ -17,6 +17,7 @@ import {
   moveOf,
   type OfferAction,
   type Position,
+  type QueueHoldChange,
   type RootId,
   type TraceRecord,
   type WorkflowEdit,
@@ -24,18 +25,18 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
-import { IN_COLUMN } from "@pinetrie/session"
+import { AT_INVENTORY, IN_COLUMN } from "@pinetrie/session"
 import type { Density } from "./ask-words.ts"
 import type { Raised } from "./attention.ts"
 import {
   afterUndo,
   cardOf,
   moveCard,
+  planDiscard,
   planKeep,
   planOpenTrace,
   planPin,
   planPut,
-  planRemove,
   planTakeCopyIntoInventory,
   planTakeIntoInventory,
   planUndoMove,
@@ -65,6 +66,8 @@ export type ColumnAct =
   | MessageAct
   /** Close the column, discarding `discard` first: a fresh column's cards. */
   | { readonly kind: "close"; readonly discard: readonly CardId[] }
+  /** Discard a card here; the undo key brings it back (ADR-0111). */
+  | { readonly kind: "discard"; readonly card: CardId }
   /**
    * Close a fresh column, keeping `cards` (its cards with text) in your
    * inventory first; it closes once every one is accepted.
@@ -88,12 +91,16 @@ export type ColumnAct =
       readonly at: EntryId
       readonly pending: Pending
     }
-  /** Queue a card on the column's lane, from where it was (ADR-0048). */
+  /**
+   * Queue a card on the column's lane, from where it was (ADR-0048), and
+   * change that queue's hold with it (ADR-0113).
+   */
   | {
       readonly kind: "queue"
       readonly card: CardId
       readonly lane: LaneName
       readonly at: Position
+      readonly hold: QueueHoldChange
     }
   /** Pin a card below the line at the top of its thread's column (ADR-0048). */
   | { readonly kind: "pin"; readonly card: CardId }
@@ -223,8 +230,8 @@ export type Intent =
   | { readonly kind: "takeIntoInventory"; readonly card: CardId }
   /** Put `card` at `target`: a column's end, or a slot (a swap, or a take into the inventory there). */
   | { readonly kind: "put"; readonly card: CardId; readonly target: PutTarget }
-  /** Remove a card from your inventory: final, as a discard is. */
-  | { readonly kind: "remove"; readonly card: CardId }
+  /** Discard a card in your inventory; the undo key brings it back (ADR-0111). */
+  | { readonly kind: "discard"; readonly card: CardId }
   /** Select an inventory slot. */
   | { readonly kind: "selectSlot"; readonly slot: number }
   /**
@@ -373,8 +380,12 @@ function planOf(
       return planTakeIntoInventory(intent.card, state)
     case "put":
       return planPut(intent.card, intent.target, state)
-    case "remove":
-      return planRemove(intent.card, state)
+    case "discard":
+      return planDiscard(
+        intent.card,
+        { actedAt: AT_INVENTORY, slot: null },
+        state,
+      )
     case "selectSlot":
       return [{ kind: "select", slot: intent.slot }]
     case "undoMove":
@@ -466,14 +477,13 @@ function planColumn(
         }),
       )
     case "close": {
-      const discard = act.discard.flatMap(id => {
-        const now = cardOf(state.cards, id)
-        return now === undefined
-          ? []
-          : [moveCard(moveOf(now, null), IN_COLUMN(key), false)]
-      })
+      const discard = act.discard.flatMap(id =>
+        planDiscard(id, IN_COLUMN(key), state),
+      )
       return [...discard, ...closing()]
     }
+    case "discard":
+      return planDiscard(act.card, IN_COLUMN(key), state)
     case "keep":
       return planKeep(act.cards, key, closing(), state)
     case "takeIntoInventory":
@@ -494,7 +504,9 @@ function planColumn(
     case "queue": {
       const now = cardOf(state.cards, act.card)
       const move = now === undefined ? null : queueMove(now, act, state.cards)
-      return move === null ? [] : [moveCard(move, IN_COLUMN(key), false)]
+      return move === null
+        ? []
+        : [{ kind: "queueCard", move, hold: act.hold, how: IN_COLUMN(key) }]
     }
     case "unqueue": {
       // If the host popped the card first, the refusal says it was sent.
@@ -550,7 +562,16 @@ function planColumn(
           text: "",
           how: IN_COLUMN(key),
         },
-        ...(queued === null ? [] : [moveCard(queued, IN_COLUMN(key), false)]),
+        ...(queued === null
+          ? []
+          : [
+              {
+                kind: "queueCard",
+                move: queued,
+                hold: "keep",
+                how: IN_COLUMN(key),
+              } as const,
+            ]),
       ]
     }
     case "offer":

@@ -7,6 +7,16 @@ import type { Mutation } from "../mutate.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a card's × does nothing",
+    file: "packages/web/card-editor.tsx",
+    from: "      onClick={p.onDiscard}",
+    to: "      onClick={() => {}}",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "a card's × discards it, and the undo key outside a box brings it back",
+  },
+  {
     // Needs `container`: run on the Mac.
     name: "a catch-up's turn names no commit",
     file: "apps/pinetrie/host/work/turns.ts",
@@ -1583,8 +1593,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a queued card carries no version of its text",
     file: "packages/session/connect.ts",
-    from: "        ? stampSeen(planned, versionOf(planned.card))",
-    to: '        ? stampSeen(planned, "")',
+    from: "      const move = stampSeen(planned, versionOf(planned.card))",
+    to: '      const move = stampSeen(planned, "")',
     suite: "host",
     scenario: "cards",
     expect:

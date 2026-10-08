@@ -92,6 +92,7 @@ import { hotReload as holdHotReload } from "./hot-reload.ts"
 import {
   compactAfter,
   sweepBlobs,
+  sweepGone,
   sweepHistories,
   sweepHolds,
 } from "./housekeeping.ts"
@@ -580,6 +581,7 @@ export async function startHost({
       })
       await sweepHistories({ basics, store, histories, startup: false })
       await sweepHolds({ basics, records })
+      await sweepGone({ basics, cards: cardPort })
       await provenance.sweep()
     },
   })
@@ -631,6 +633,8 @@ export async function startHost({
   })
   await sweepHistories({ basics, store, histories, startup: true })
   await sweepHolds({ basics, records })
+  await sweepGone({ basics, cards: cardPort })
+  await provenance.sweep()
   const seats = startSeats({ exchange, basics, keeper, records, histories })
   const control = startControl({
     exchange,

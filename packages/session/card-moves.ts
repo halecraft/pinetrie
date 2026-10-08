@@ -32,7 +32,7 @@ import type { Intents } from "./inventory.ts"
 
 /**
  * Where you were looking when you acted: a column, by key, or the inventory.
- * A refusal is drawn there (`CardRefusal`).
+ * A refusal is drawn there (`CardNotice`).
  */
 export type ActedAt =
   | { readonly kind: "column"; readonly key: string }
@@ -67,7 +67,7 @@ export const IN_COLUMN = (key: string): MoveHow => ({
   slot: null,
 })
 
-/** A move made with no page: a suite's client. Its refusals are kept where no column is. */
+/** A move made with no page: a suite's client. Its notices are kept where no column is. */
 export const OFF_PAGE: MoveHow = IN_COLUMN("")
 
 /** Not yet answered, or accepted with the places document's `rev` after it. */
@@ -89,18 +89,21 @@ interface Sent {
 
 /**
  * A move this tab sent: a creation draws its record, a move its target, a
- * reorder what the host would write for it (`planReorder`).
+ * reorder what the host would write for it (`planReorder`), and a send its
+ * card gone from where it was, into the message the host writes.
  */
 export type Pending =
   | (Sent & { readonly kind: "create"; readonly draft: CardRecord })
   | (Sent & { readonly kind: "move"; readonly move: Move })
   | (Sent & { readonly kind: "reorder"; readonly reorder: Reorder })
+  | (Sent & { readonly kind: "send"; readonly card: CardId })
 
 /**
- * Something of yours refused, kept to be worded where you acted: a move or
- * an undo the host refused, or an undone swap whose slots changed since.
+ * Something of yours to say where you acted, kept until your next move
+ * there: a move or an undo the host refused, an undone swap whose slots
+ * changed since, or a discard the undo key can bring back (ADR-0111).
  */
-export type CardRefusal = {
+export type CardNotice = {
   /** The card it was about; null when no one card is named. */
   readonly card: CardId | null
   readonly actedAt: ActedAt
@@ -117,26 +120,28 @@ export type CardRefusal = {
     }
   /** An undone swap whose slots no longer hold what it wrote. */
   | { readonly code: "slots-changed" }
+  /** Your discard, accepted. */
+  | { readonly code: "discarded" }
 )
 
 export interface MovesState {
   readonly pending: readonly Pending[]
-  readonly refusals: readonly CardRefusal[]
+  readonly notices: readonly CardNotice[]
   /** This tab's copy of the places document's `rev`. */
   readonly rev: number
 }
 
-export const NO_MOVES: MovesState = { pending: [], refusals: [], rev: 0 }
+export const NO_MOVES: MovesState = { pending: [], notices: [], rev: 0 }
 
 /** What the host's answer to a move means here. */
 export type MoveAnswer =
   | { readonly kind: "accepted"; readonly rev: number }
   /** Dropped; with a refusal to word, or null for an answer the sender words itself. */
-  | { readonly kind: "refused"; readonly refusal: CardRefusal | null }
+  | { readonly kind: "refused"; readonly refusal: CardNotice | null }
 
 export type MovesEvent =
   /**
-   * Moves sent as one command: drawn at once, and the refusals where they
+   * Moves sent as one command: drawn at once, and the notices where they
    * were made go.
    */
   | { readonly kind: "sent"; readonly pending: readonly Pending[] }
@@ -149,10 +154,10 @@ export type MovesEvent =
   | { readonly kind: "changed"; readonly rev: number }
   /** The host left: the session is over, as a client does not reconnect. */
   | { readonly kind: "hostLeft" }
-  /** You acted at `at` with no host to ask (a swap): the refusals there go. */
+  /** You acted at `at` with no host to ask (a swap): the notices there go. */
   | { readonly kind: "acted"; readonly at: ActedAt }
   /** Something refused before anything was sent, or by an undo. */
-  | { readonly kind: "refused"; readonly refusal: CardRefusal }
+  | { readonly kind: "refused"; readonly refusal: CardNotice }
 
 const answered = (p: Pending, rev: number): Pending => ({
   ...p,
@@ -162,6 +167,14 @@ const answered = (p: Pending, rev: number): Pending => ({
 const drawn = (p: Pending, rev: number): boolean =>
   p.answer.state === "sent" || p.answer.rev > rev
 
+/** The discards a command sent as `id` made, each a notice where it was made. */
+const discardsIn = (pending: readonly Pending[], id: string): CardNotice[] =>
+  pending.flatMap(p =>
+    p.id === id && p.kind === "move" && p.move.to.kind === "gone"
+      ? [{ card: p.move.card, actedAt: p.actedAt, code: "discarded" as const }]
+      : [],
+  )
+
 export function movesStep(state: MovesState, event: MovesEvent): MovesState {
   switch (event.kind) {
     case "sent": {
@@ -169,7 +182,7 @@ export function movesStep(state: MovesState, event: MovesEvent): MovesState {
       return {
         ...state,
         pending: [...state.pending, ...pending],
-        refusals: state.refusals.filter(
+        notices: state.notices.filter(
           r => !pending.some(p => sameActedAt(r.actedAt, p.actedAt)),
         ),
       }
@@ -183,15 +196,17 @@ export function movesStep(state: MovesState, event: MovesEvent): MovesState {
         return {
           ...state,
           pending: rest,
-          refusals:
+          notices:
             answer.refusal === null
-              ? state.refusals
-              : [...state.refusals, answer.refusal],
+              ? state.notices
+              : [...state.notices, answer.refusal],
         }
+      const notices = [...state.notices, ...discardsIn(state.pending, event.id)]
       // The copy already holds it: `places` arrived first.
-      if (answer.rev <= state.rev) return { ...state, pending: rest }
+      if (answer.rev <= state.rev) return { ...state, pending: rest, notices }
       return {
         ...state,
+        notices,
         pending: state.pending.map(p =>
           p.id === event.id ? answered(p, answer.rev) : p,
         ),
@@ -200,10 +215,10 @@ export function movesStep(state: MovesState, event: MovesEvent): MovesState {
     case "acted":
       return {
         ...state,
-        refusals: state.refusals.filter(r => !sameActedAt(r.actedAt, event.at)),
+        notices: state.notices.filter(r => !sameActedAt(r.actedAt, event.at)),
       }
     case "refused":
-      return { ...state, refusals: [...state.refusals, event.refusal] }
+      return { ...state, notices: [...state.notices, event.refusal] }
     case "changed": {
       if (event.rev === state.rev) return state
       const pending = state.pending.filter(p => drawn(p, event.rev))
@@ -220,12 +235,18 @@ export function movesStep(state: MovesState, event: MovesEvent): MovesState {
 }
 
 /** The card a pending move moves. */
-export const cardOfPending = (p: Pending): CardId =>
-  p.kind === "create"
-    ? p.draft.id
-    : p.kind === "reorder"
-      ? p.reorder.card
-      : p.move.card
+export const cardOfPending = (p: Pending): CardId => {
+  switch (p.kind) {
+    case "create":
+      return p.draft.id
+    case "reorder":
+      return p.reorder.card
+    case "send":
+      return p.card
+    case "move":
+      return p.move.card
+  }
+}
 
 /** A move sent as `id`, unanswered; with `draft`, a creation drawn as that record. */
 export function pendingOf(
@@ -245,6 +266,20 @@ export function pendingOf(
     : { ...sent, kind: "create", draft }
 }
 
+/** A send of `card` as `id`, unanswered: the card is drawn nowhere until then. */
+export const sendPendingOf = (
+  id: string,
+  card: CardId,
+  how: MoveHow,
+): Pending => ({
+  id,
+  answer: { state: "sent" },
+  slot: how.slot,
+  actedAt: how.actedAt,
+  kind: "send",
+  card,
+})
+
 /**
  * The slot an accepted move writes: one into your inventory, at the slot
  * its take into the inventory chose. Null for any other move, or answer.
@@ -253,7 +288,7 @@ export function slotOnAccept(
   p: Pending,
   answer: MoveAnswer,
 ): { readonly card: CardId; readonly slot: number } | null {
-  if (p.kind === "reorder") return null
+  if (p.kind === "reorder" || p.kind === "send") return null
   const into = p.kind === "create" ? p.draft.place : p.move.to
   return answer.kind === "accepted" &&
     into?.kind === "inventory" &&
@@ -268,7 +303,7 @@ export function slotOnAccept(
  * returned as it is.
  */
 export const stampSeen = (move: Move, seen: string): Move =>
-  move.to?.kind === "queued" ? { ...move, to: { ...move.to, seen } } : move
+  move.to.kind === "queued" ? { ...move, to: { ...move.to, seen } } : move
 
 /** The slot each take into the inventory this tab has in flight chose, by card. */
 export function intentsOf(state: MovesState): Intents {
@@ -286,14 +321,20 @@ const LAST = "\uffff"
 /**
  * A key as the place it is drawn as. A queued or pinned one waits for the
  * host to give it an order, so it is drawn last among its kind, a queued one
- * queued by you.
+ * queued by you; a gone one is gone by you.
  */
-export const drawnPlace = (key: PlaceKey, me: WriterId): CardPlace =>
-  key.kind === "queued"
-    ? { ...key, order: LAST, by: me }
-    : key.kind === "pinned"
-      ? { ...key, order: LAST }
-      : key
+export function drawnPlace(key: PlaceKey, me: WriterId): CardPlace {
+  switch (key.kind) {
+    case "queued":
+      return { ...key, order: LAST, by: me }
+    case "pinned":
+      return { ...key, order: LAST }
+    case "gone":
+      return { ...key, by: me }
+    default:
+      return key
+  }
+}
 
 /**
  * The host's records, with this tab's moves its copy does not yet hold drawn
@@ -324,10 +365,13 @@ export function withPending(
         if (w.kind === "write") cards.set(w.record.id, w.record)
       continue
     }
+    if (p.kind === "send") {
+      cards.delete(p.card)
+      continue
+    }
     const now = cards.get(p.move.card)
     if (now === undefined) continue
-    if (p.move.to === null) cards.delete(p.move.card)
-    else cards.set(p.move.card, { ...now, place: drawnPlace(p.move.to, me) })
+    cards.set(p.move.card, { ...now, place: drawnPlace(p.move.to, me) })
   }
   return [...cards.values()].sort((a, b) =>
     a.id < b.id ? -1 : a.id > b.id ? 1 : 0,

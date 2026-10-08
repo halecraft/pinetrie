@@ -205,6 +205,8 @@ export function createCommands(deps: CommandDeps): Commands {
       }
       case "move":
         return cardCommands.move(writer, intent.moves)
+      case "queue-card":
+        return cardCommands.queueCard(writer, intent.move, intent.hold)
       case "reorder":
         return cardCommands.reorder(writer, intent.reorder)
       case "unqueue-all":

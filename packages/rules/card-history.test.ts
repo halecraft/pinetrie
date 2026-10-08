@@ -8,6 +8,7 @@ import {
   cardId,
   type EntryId,
   entryId,
+  keyOf,
   laneNameForThread,
   PLAIN,
   type PlaceKey,
@@ -19,8 +20,10 @@ import {
 import { describe, expect, test } from "vitest"
 import {
   type Cause,
+  GONE_KEEP_MS,
   HISTORY_EVENTS,
   movedBackBy,
+  planGoneSweep,
   planProvenance,
   planTraceSweep,
   TRACE_MAX_AGE_MS,
@@ -370,4 +373,40 @@ test("planTraceSweep: traces too old, and histories whose card is gone", () => {
     traces: [{ kind: "delete", key: "old" }],
     histories: [{ kind: "delete", key: gone }],
   })
+})
+
+test("planGoneSweep: a card discarded a week ago or more, or with no history to tell; never one drawn somewhere", () => {
+  const discarded: CardPlace = {
+    kind: "gone",
+    root: ROOT,
+    by: ADA,
+    why: { kind: "discarded" },
+  }
+  const event = (when: number) => ({
+    kind: "moved" as const,
+    by: ADA,
+    from: keyOf(DRAFTING),
+    to: keyOf(discarded),
+    at: when,
+  })
+  const now = GONE_KEEP_MS + 100
+  const old = cardId("c-old")
+  const fresh = cardId("c-fresh")
+  const silent = cardId("c-silent")
+  expect(
+    planGoneSweep({
+      cards: [
+        { ...card(discarded), id: old },
+        { ...card(discarded), id: fresh },
+        { ...card(discarded), id: silent },
+        card(DRAFTING),
+      ],
+      histories: new Map([
+        [old, { card: old, events: [event(50)] }],
+        [fresh, { card: fresh, events: [event(now - 10)] }],
+        [C1, { card: C1, events: [event(0)] }],
+      ]),
+      now,
+    }),
+  ).toEqual([old, silent])
 })

@@ -56,22 +56,39 @@ export function summarizeRoots(index: TreeIndex): readonly RootSummary[] {
 }
 
 /**
+ * What a root's lanes hold: the agent running there, cards it will be sent
+ * when it is free (`waiting`), or cards that wait for someone to release the
+ * queue (`held`, ADR-0113).
+ */
+export type RootWork = "running" | "waiting" | "held"
+
+const WORK_RANK: Record<RootWork, number> = { held: 0, waiting: 1, running: 2 }
+
+/** A busy lane's work: running, else held while its queue is held, else waiting. */
+export const laneWork = (lane: LaneView): RootWork =>
+  lane.running ? "running" : lane.heldBy !== null ? "held" : "waiting"
+
+/**
  * The agent's work in each root, by the root that holds each lane's tip. A
- * lane with no tip is in no root, and `running` wins over `waiting`. The one
- * rule for when a root cannot be archived: `planArchive` refuses from it, and
- * the tab's menu disables Archive from it.
+ * lane with no tip is in no root; running wins over waiting, and waiting
+ * over held. The one rule for when a root cannot be archived: `planArchive`
+ * refuses from any of them, and Move to the closed state is disabled from
+ * it. Only running and waiting ring a root (`rootStatus`): a held queue
+ * waits for a person.
  */
 export function rootWork(
   index: TreeIndex,
   lanes: readonly LaneView[],
-): ReadonlyMap<EntryId, "running" | "waiting"> {
-  const work = new Map<EntryId, "running" | "waiting">()
+): ReadonlyMap<EntryId, RootWork> {
+  const work = new Map<EntryId, RootWork>()
   for (const lane of lanes) {
     if (lane.tip === null || !isBusy(lane)) continue
     const root = rootOf(index, lane.tip)
     if (root === null) continue
-    if (lane.running) work.set(root, "running")
-    else if (work.get(root) !== "running") work.set(root, "waiting")
+    const now = laneWork(lane)
+    const was = work.get(root)
+    if (was === undefined || WORK_RANK[now] > WORK_RANK[was])
+      work.set(root, now)
   }
   return work
 }

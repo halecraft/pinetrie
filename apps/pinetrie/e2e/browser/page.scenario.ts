@@ -2985,7 +2985,9 @@ async function run(check: Checks["check"]): Promise<void> {
           freshKept && freshText.endsWith("a fresh thought"),
           `${await boxValue(page, freshBox)}`,
         )
-        const cardsBefore = readPlaces(host.places).length
+        const cardsBefore = readPlaces(host.places).filter(
+          c => c.place.kind !== "gone",
+        ).length
         await page.click(`${col(1)} .close`)
         const asks = await page
           .waitForSelector(`${col(1)} .close-ask`, { timeout: 5_000 })
@@ -3004,10 +3006,12 @@ async function run(check: Checks["check"]): Promise<void> {
             () => true,
             () => false,
           )
-        await waitFor(() => readPlaces(host.places).length < cardsBefore, 5_000)
+        const shown = () =>
+          readPlaces(host.places).filter(c => c.place.kind !== "gone").length
+        await waitFor(() => shown() < cardsBefore, 5_000)
         check(
-          "closing a new branch that holds text asks first, and discarding removes its card",
-          asks && closed && readPlaces(host.places).length === cardsBefore - 1,
+          "closing a new branch that holds text asks first, and discarding takes its card away",
+          asks && closed && shown() === cardsBefore - 1,
         )
         // Marks (ADR-0048, step 2): a pip where a card of yours holds text.
         const pipIn = (p: typeof page, sel: string) =>
@@ -3252,9 +3256,27 @@ async function run(check: Checks["check"]): Promise<void> {
         (document.activeElement as HTMLElement | null)?.blur(),
       )
       await page.keyboard.press("ControlOrMeta+z")
+      // Discarded with its ×, and back in its slot with the undo key: a
+      // discard is a move the host's history holds (ADR-0111).
       await page.click(slotOf(parked))
-      await page.click(".inventory .remove")
-      await waitFor(() => placeOf(parked) === undefined, 5_000)
+      await page.click(".inventory .discard-card")
+      await waitFor(() => placeOf(parked)?.kind === "gone", 5_000)
+      await page.evaluate(() =>
+        (document.activeElement as HTMLElement | null)?.blur(),
+      )
+      await page.keyboard.press("ControlOrMeta+z")
+      const discardUndone = await waitFor(
+        () => placeOf(parked)?.kind === "inventory",
+        5_000,
+      )
+      check(
+        "a card's × discards it, and the undo key outside a box brings it back",
+        discardUndone >= 0,
+        `${discardUndone} ms; ${placeOf(parked)?.kind}`,
+      )
+      await page.click(slotOf(parked))
+      await page.click(".inventory .discard-card")
+      await waitFor(() => placeOf(parked)?.kind === "gone", 5_000)
       const columnsBefore = await page.locator(".column").count()
       // Closing a fresh column with text keeps its card, in the slot selected.
       const branchable = page
@@ -3581,7 +3603,7 @@ async function run(check: Checks["check"]): Promise<void> {
       )
       check("a reload keeps your inventory's cards in their slots", stillInSlot)
       await page.click(`.inventory .slot[data-card="${thought}"]`)
-      await page.click(".inventory .remove")
+      await page.click(".inventory .discard-card")
       await page.click("#bottom .inventory-toggle")
       await page.fill(`${col(0)} .composer .input`, "")
       // A new tab shares the device's storage (same context; every

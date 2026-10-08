@@ -31,3 +31,16 @@ test("Alt+↑ and Alt+↓ move the card one place; anything else is the box's ow
   expect(cardKeyAct(key("ArrowUp", { isComposing: true }), C, among)).toBeNull()
   expect(cardKeyAct(key("ArrowLeft"), C, among)).toBeNull()
 })
+
+test("Ctrl+Shift+Backspace discards any card; a card with no place in line takes no Alt+↑", () => {
+  const discard = key("Backspace", {
+    altKey: false,
+    ctrlKey: true,
+    shiftKey: true,
+  })
+  expect(cardKeyAct(discard, C, null)).toEqual({ kind: "discard", card: C })
+  expect(cardKeyAct(discard, C, among)).toEqual({ kind: "discard", card: C })
+  expect(cardKeyAct({ ...discard, metaKey: true }, C, null)).toBeNull()
+  expect(cardKeyAct({ ...discard, shiftKey: false }, C, null)).toBeNull()
+  expect(cardKeyAct(key("ArrowUp"), C, null)).toBeNull()
+})

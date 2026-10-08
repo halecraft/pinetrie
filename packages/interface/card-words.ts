@@ -17,7 +17,7 @@ import {
   type Verb,
   verbOf,
 } from "@pinetrie/rules"
-import type { CardRefusal } from "@pinetrie/session"
+import type { CardNotice } from "@pinetrie/session"
 import type { PinnedMarker } from "./column-view.ts"
 import { lineWords, type Reader } from "./send.ts"
 import type { TraceGroup } from "./traces.ts"
@@ -114,20 +114,26 @@ export const reorderWords = (step: -1 | 1): ControlWords =>
 /** A card the host could not send, until it is queued again. */
 export const unsentWords = (reason: string): string => `not sent: ${reason}`
 
+/** What a discard of yours says where you made it, until your next move there. */
+export const DISCARDED_NOTICE =
+  "discarded · the undo key (⌘Z outside a box) brings it back"
+
 /**
- * Something of yours refused (ADR-0059): a move, a reorder or an undo the
- * host refused, or an undone swap whose slots changed. Gone from the queue,
- * the host had popped the card first (S69), so it was sent as its queuer's
- * message; moved, someone else moved it first; order changed, the cards a
- * reorder named moved first.
+ * Something of yours to say where you acted: a discard (ADR-0111), or a
+ * refusal (ADR-0059): a move, a reorder or an undo the host refused, or an
+ * undone swap whose slots changed. Gone from the queue, the host had popped
+ * the card first (S69), so it was sent as its queuer's message; moved,
+ * someone else moved it first; order changed, the cards a reorder named
+ * moved first.
  */
-export function refusalWords(refusal: CardRefusal, reader: Reader): string {
-  if (refusal.code === "slots-changed")
+export function noticeWords(notice: CardNotice, reader: Reader): string {
+  if (notice.code === "discarded") return DISCARDED_NOTICE
+  if (notice.code === "slots-changed")
     return "not undone: those slots have changed since"
-  const { by } = refusal
-  switch (refusal.code) {
+  const { by } = notice
+  switch (notice.code) {
     case "gone":
-      if (!refusal.fromQueue) return "not moved: it was sent or removed first"
+      if (!notice.fromQueue) return "not moved: it was sent or discarded first"
       return by === null
         ? "already sent before you unqueued it"
         : by === reader.me
@@ -147,7 +153,6 @@ export function refusalWords(refusal: CardRefusal, reader: Reader): string {
     case "order-changed":
       return "not moved: the cards around it changed first"
     case "exists":
-    case "not-fresh":
       return "not moved"
   }
 }
@@ -175,8 +180,10 @@ export const TAKE_COPY_INTO_INVENTORY = "take a copy into your inventory"
 export const PUT = "put"
 export const PUT_TITLE =
   "put below the line in the column you were in (Ctrl+Shift+O)"
-/** The panel's button that removes the selected card: final. */
-export const REMOVE = "remove"
+/** A card's button that discards it; the undo key brings it back (ADR-0111). */
+export const DISCARD_CARD = "×"
+export const DISCARD_CARD_TITLE =
+  "discard (Ctrl+Shift+Backspace) · the undo key brings it back"
 /** Closing a fresh column that holds text: the default, and the final choice. */
 export const KEEP_IN_INVENTORY = "keep in inventory"
 export const DISCARD = "discard"
@@ -186,9 +193,9 @@ export const closeAskWords = (n: number): string =>
     ? "keep what you typed in your inventory?"
     : `keep the ${n} cards here in your inventory?`
 
-/** A refusal's React key: what it is about, and why. */
-export const refusalKey = (refusal: CardRefusal): string =>
-  `${refusal.code}:${refusal.card ?? ""}`
+/** A notice's React key: what it is about, and why. */
+export const noticeKey = (notice: CardNotice): string =>
+  `${notice.code}:${notice.card ?? ""}`
 
 // ── pinned cards (ADR-0048 step 5) ────────────────────────────────────────
 
@@ -254,6 +261,7 @@ const PARTICIPLE: Readonly<Record<Verb, string>> = {
   unpinned: "unpinned",
   "took-into-inventory": "taken",
   put: "put",
+  discarded: "discarded",
   moved: "moved",
 }
 
@@ -292,6 +300,7 @@ const ACTIVE: Readonly<Record<Verb, string>> = {
   unpinned: "unpinned",
   "took-into-inventory": "took",
   put: "put",
+  discarded: "discarded",
   moved: "moved",
 }
 

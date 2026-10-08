@@ -9,6 +9,7 @@ import type {
   LaneView,
   MarkRecord,
   RootId,
+  RootWork,
   Sha256,
   ThreadName,
   TreeIndex,
@@ -42,7 +43,7 @@ export type ItemMenuItem =
       readonly kind: "moveTo"
       readonly name: string
       readonly closes: boolean
-      readonly busy: "running" | "waiting" | null
+      readonly busy: RootWork | null
       readonly drops: readonly string[]
       readonly intent: Intent
     }
@@ -117,7 +118,7 @@ export interface OpenListViewInput {
   /** Roots in the closed state, by root entry. */
   readonly archived: ReadonlySet<EntryId>
   /** The agent's work in each root, held or not (`workAnywhere`). */
-  readonly work: ReadonlyMap<string, "running" | "waiting">
+  readonly work: ReadonlyMap<string, RootWork>
   /** The threads with an open offer, by root (`offeredByRoot`). */
   readonly offered: ReadonlyMap<EntryId, readonly string[]>
   readonly unsent: CardMarks

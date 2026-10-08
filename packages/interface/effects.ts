@@ -14,6 +14,7 @@ import type {
   Move,
   MoveDirection,
   OfferAction,
+  QueueHoldChange,
   Reorder,
   RootId,
   TreeIndex,
@@ -21,7 +22,7 @@ import type {
 } from "@pinetrie/core"
 import type {
   ActedAt,
-  CardRefusal,
+  CardNotice,
   HostRequest,
   MoveHow,
   SlotMove,
@@ -76,7 +77,7 @@ export type Effect =
       readonly text: string
       readonly how: MoveHow
     }
-  /** A move (ADR-0059): a take into the inventory, a put, a queue, an unqueue, a discard. */
+  /** A move (ADR-0059): a take into the inventory, a put, an unqueue, a discard. */
   | {
       readonly kind: "moveCard"
       readonly move: Move
@@ -85,6 +86,13 @@ export type Effect =
       readonly queuedBy: WriterId | null
       /** Whether the card animates to where it lands (`ports.fly`). */
       readonly fly: boolean
+    }
+  /** A card queued, and its queue's hold changed with it (ADR-0113). */
+  | {
+      readonly kind: "queueCard"
+      readonly move: Move
+      readonly hold: QueueHoldChange
+      readonly how: MoveHow
     }
   /** A reorder (ADR-0048 step 7), drawn at once, as a move is. */
   | {
@@ -115,7 +123,7 @@ export type Effect =
   /** Undo or redo this tab's newest swap in your inventory. */
   | { readonly kind: "undoSwap"; readonly direction: MoveDirection }
   /** Keep a refusal made before anything was sent. */
-  | { readonly kind: "refuse"; readonly refusal: CardRefusal }
+  | { readonly kind: "refuse"; readonly refusal: CardNotice }
   /** Open the inventory; `brief`: only for the flight of a take into it, if it was closed. */
   | { readonly kind: "showInventory"; readonly brief: boolean }
   | { readonly kind: "select"; readonly slot: number }

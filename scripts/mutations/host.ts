@@ -1092,12 +1092,12 @@ export const mutations: readonly Mutation[] = [
     expect: "its card is queued behind the others",
   },
   {
-    name: "a removed card keeps its text",
+    name: "a spent card keeps its text",
     file: "apps/pinetrie/host/commands/cards.ts",
     from: '      if (s.kind === "remove") await deps.cards.destroy(s.id)',
     to: "",
     command: unit,
-    expect: "a removal destroys the text after the record",
+    expect: "spend: the record goes, then its text",
   },
   {
     name: "an update leaves its lane running unless clean",

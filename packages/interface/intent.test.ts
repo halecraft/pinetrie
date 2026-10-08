@@ -288,7 +288,11 @@ describe("planIntent", () => {
     const R1 = at(onRoot("1-r1"), undefined, holding)
     const discard = {
       kind: "moveCard",
-      move: { card: "c", from: place, to: null },
+      move: {
+        card: "c",
+        from: place,
+        to: { kind: "gone", root: TEST_ROOT, why: { kind: "discarded" } },
+      },
       how: {
         actedAt: { kind: "column", key: "col-k" },
         slot: null,
@@ -485,8 +489,14 @@ describe("planIntent", () => {
         cards: [{ ...fresh, id: c, place }],
         laneRecords: records,
       }) satisfies CardFacts
-    test("a queue is one move, into its lane's root, said in the column; with no root, or no card, nothing", () => {
-      const queue = column({ kind: "queue", card: c, lane, at: where })
+    test("a queue is one queueCard, into its lane's root, with the hold change asked, said in the column; with no root, or no card, nothing", () => {
+      const queue = column({
+        kind: "queue",
+        card: c,
+        lane,
+        at: where,
+        hold: "release",
+      })
       for (const layout of [onRoot("1-r1"), onNewTab]) {
         const state = at(layout, undefined, withCard(drafting))
         const move = {
@@ -495,13 +505,7 @@ describe("planIntent", () => {
           to: { kind: "queued", root: OTHER_ROOT, at: where, lane, seen: "" },
         }
         expect(plan(queue, state)).toEqual([
-          {
-            kind: "moveCard",
-            move,
-            how: inColumn,
-            queuedBy: null,
-            fly: false,
-          },
+          { kind: "queueCard", move, hold: "release", how: inColumn },
         ])
       }
       const fresh = withCard(
@@ -613,15 +617,14 @@ describe("planIntent", () => {
           how: inColumn,
         },
         {
-          kind: "moveCard",
+          kind: "queueCard",
           move: {
             card: fresh.id,
             from: fresh.place,
             to: { kind: "queued", root: TEST_ROOT, at: where, lane, seen: "" },
           },
+          hold: "keep",
           how: inColumn,
-          queuedBy: null,
-          fly: false,
         },
       ])
     })

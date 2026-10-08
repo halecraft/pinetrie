@@ -15,6 +15,7 @@ import {
   projectRail,
   type RailRow,
   type RootId,
+  type RootWork,
   type TreeIndex,
   type Workflow,
   type WriterId,
@@ -100,19 +101,19 @@ export const laneRootsOf = (
  * The agent's work in each root, held by this tab or not: the held lanes'
  * (`rootWork`), and every lane running in the session, by its root's entry
  * (ADR-0063, ADR-0091); running wins over waiting, and a root with no entry
- * yet is left out. What rings a root, in your list and on the board, and
- * what refuses its move to the closed state.
+ * yet is left out. What refuses a root's move to the closed state, and, but
+ * for `held`, what rings it in your list and on the board (`rootStatus`).
  */
 export function workAnywhere(input: {
   /** The held roots' work (`rootWork`). */
-  readonly held: ReadonlyMap<EntryId, "running" | "waiting">
+  readonly held: ReadonlyMap<EntryId, RootWork>
   /** Lanes running in any root (`readRunningLanes`). */
   readonly running: readonly {
     readonly lane: LaneName
     readonly root: RootId
   }[]
   readonly rootEntries: ReadonlyMap<RootId, EntryId>
-}): ReadonlyMap<EntryId, "running" | "waiting"> {
+}): ReadonlyMap<EntryId, RootWork> {
   const work = new Map(input.held)
   for (const { root } of input.running) {
     const entry = input.rootEntries.get(root)

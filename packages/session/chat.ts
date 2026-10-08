@@ -7,7 +7,6 @@ import {
   type ChatMode,
   type Intent,
   type LaneName,
-  moveOf,
   type Position,
   parseMentions,
   type RootId,
@@ -16,7 +15,7 @@ import {
   type WorkSetting,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
-import { IN_COLUMN, type Pending, pendingOf } from "./card-moves.ts"
+import { IN_COLUMN, type Pending, sendPendingOf } from "./card-moves.ts"
 
 /** How a chat is sent: its mode, its column's lane, and its send id. */
 export interface ChatHow {
@@ -129,12 +128,7 @@ export function planChatRequest(input: {
     pending:
       card === null
         ? null
-        : pendingOf(
-            id,
-            moveOf(card.record, null),
-            IN_COLUMN(how.column ?? ""),
-            null,
-          ),
+        : sendPendingOf(id, card.record.id, IN_COLUMN(how.column ?? "")),
   }
 }
 

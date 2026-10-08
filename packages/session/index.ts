@@ -10,7 +10,7 @@ export {
   type ActedAt,
   AT_INVENTORY,
   atColumn,
-  type CardRefusal,
+  type CardNotice,
   drawnPlace,
   IN_COLUMN,
   intentsOf,

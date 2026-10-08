@@ -1,4 +1,4 @@
-// interface/card-intents — what take into the inventory, put, keep, remove and
+// interface/card-intents — what take into the inventory, put, keep, discard and
 // undo do (ADR-0048 step 4, ADR-0052, ADR-0059, ADR-0066), as effects. Pure:
 // `planIntent` calls these, and `perform` carries out what they return.
 //
@@ -12,6 +12,7 @@
 import {
   type CardId,
   type CardRecord,
+  discardedOf,
   draftingOf,
   keyOf,
   type LaneName,
@@ -32,7 +33,7 @@ import type { Outcome } from "@pinetrie/protocol/codec"
 import {
   AT_INVENTORY,
   atColumn,
-  type CardRefusal,
+  type CardNotice,
   firstEmpty,
   IN_COLUMN,
   type MoveAnswer,
@@ -110,7 +111,7 @@ export const cardOf = (
 ): CardRecord | undefined => facts.cards.find(c => c.id === card)
 
 /** A take into the inventory refused before it is sent: it is full, as the host would say. */
-const full = (card: CardId): CardRefusal => ({
+const full = (card: CardId): CardNotice => ({
   card,
   actedAt: AT_INVENTORY,
   code: "full",
@@ -246,15 +247,23 @@ export function planUnpin(
     : []
 }
 
-/** Remove a card from your inventory: final, so not recorded. */
-export function planRemove(
+/**
+ * Discard `card` (ADR-0111): a move to gone, in the history of the root it
+ * is in, else of the root you are on, so the undo key there brings it back.
+ * Made where `how` says; nothing for a card not drawn or not yours to move.
+ */
+export function planDiscard(
   card: CardId,
+  how: MoveHow,
   state: IntentState,
 ): readonly Effect[] {
   const now = cardOf(state.cards, card)
-  if (now?.place.kind !== "inventory") return []
+  if (now === undefined || now.carries.kind === "fact") return []
+  // Someone else's inventory is theirs to empty (ADR-0059).
+  if (now.place.kind === "inventory" && state.cards.me !== now.place.holder)
+    return []
   return [
-    moveCard(moveOf(now, null), { actedAt: AT_INVENTORY, slot: null }, false),
+    moveCard(moveOf(now, discardedOf(now.place, rootOfTab(state))), how, false),
   ]
 }
 

@@ -66,6 +66,8 @@ import {
   NEW_PIN,
   NEW_PIN_TITLE,
   newPinAt,
+  noticeKey,
+  noticeWords,
   type Pending,
   type QueueControls,
   queueControlWords,
@@ -74,8 +76,6 @@ import {
   type ReserveStep,
   type RowMemory,
   type RunButton,
-  refusalKey,
-  refusalWords,
   runWords,
   type ScreenMemory,
   type SeenEnd,
@@ -404,7 +404,7 @@ export function Column(p: ColumnProps) {
   const refused = useSyncExternalStore(
     p.session.moves.subscribe,
     p.session.moves.current,
-  ).refusals.filter(
+  ).notices.filter(
     r => r.actedAt.kind === "column" && r.actedAt.key === p.column.key,
   )
   const reader = { me: p.session.writer, nameOf: p.nameOf }
@@ -1007,8 +1007,8 @@ export function Column(p: ColumnProps) {
                 ),
               )}
               {refused.map(r => (
-                <div className="refused-move" key={refusalKey(r)}>
-                  {refusalWords(r, reader)}
+                <div className="refused-move" key={noticeKey(r)}>
+                  {noticeWords(r, reader)}
                 </div>
               ))}
             </div>

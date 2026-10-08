@@ -72,6 +72,24 @@ describe("rootWork", () => {
       ["3-r2", "waiting"],
     ])
   })
+  test("cards behind a held queue are held, below waiting and running in the same root", () => {
+    const held = { waiting: 2, heldBy: ADA }
+    expect([...rootWork(index, [lane("2-a", held)])]).toEqual([
+      ["1-r1", "held"],
+    ])
+    expect([
+      ...rootWork(index, [lane("2-a", held), lane("4-b", { waiting: 1 })]),
+    ]).toEqual([["1-r1", "waiting"]])
+    expect([
+      ...rootWork(index, [
+        lane("2-a", { ...held, running: true }),
+        lane("4-b", held),
+      ]),
+    ]).toEqual([["1-r1", "running"]])
+  })
+  test("a held queue with nothing in it is no work", () => {
+    expect([...rootWork(index, [lane("2-a", { heldBy: ADA })])]).toEqual([])
+  })
   test("an idle lane is no work, and a lane with no tip is in no root", () => {
     expect([
       ...rootWork(index, [lane("2-a"), lane(null, { running: true })]),

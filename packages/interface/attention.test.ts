@@ -216,6 +216,17 @@ describe("rootStatus", () => {
     ).toEqual({ kind: "working" })
   })
 
+  test("cards behind a held queue are not working: the root shows what was raised there, or nothing", () => {
+    const items = attentionOf(input({ offers: [offer(A, "c-1")] }))
+    const work = new Map([
+      [R1, "held"],
+      [R2, "held"],
+    ] as const)
+    const status = rootStatus({ ...facts, items, work })
+    expect(status.get(R1)?.kind).toBe("needsYou")
+    expect(status.has(R2)).toBe(false)
+  })
+
   test("a root with nothing raised and nothing working has no status", () => {
     expect(rootStatus({ ...facts, items: [] }).size).toBe(0)
   })

@@ -5,6 +5,23 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/rules"]
 const archive = "packages/rules/archive.ts"
 
 export const mutations: readonly Mutation[] = [
+  {
+    name: "a send to a held queue leaves it held",
+    file: "packages/rules/queue-hold.ts",
+    from: '  const held = hold === "hold-if-idle"\n',
+    to: '  if (hold === "release") return { step, drain, holds: [] }\n  const held = hold === "hold-if-idle"\n',
+    command: unit,
+    expect: "release, held: released",
+  },
+  {
+    name: "a discarded card is kept for good",
+    file: "packages/rules/card-history.ts",
+    from: "      return last === undefined || input.now - last.at > GONE_KEEP_MS",
+    to: "      return last === undefined",
+    command: unit,
+    expect:
+      "planGoneSweep: a card discarded a week ago or more, or with no history to tell; never one drawn somewhere",
+  },
   // ── card history and traces (ADR-0048 step 6) ──
   {
     name: "a trace is left for the card's own mover",
@@ -1345,12 +1362,12 @@ export const mutations: readonly Mutation[] = [
     expect: "a creation: the sender owns and placed it",
   },
   {
-    name: "any card can be removed",
+    name: "a gone card moves by a handoff",
     file: "packages/rules/card.ts",
-    from: '    return now.place.kind === "fresh" || now.place.kind === "inventory"',
-    to: "    return true",
+    from: '  if (now === undefined || now.place.kind === "gone")',
+    to: "  if (now === undefined)",
     command: unit,
-    expect: "a removal: a fresh column's card, not a drafting one",
+    expect: "a gone card is moved by no handoff, and a popped one is gone",
   },
   {
     name: "a first send carries every column's fresh cards",
@@ -1375,7 +1392,7 @@ export const mutations: readonly Mutation[] = [
     to: "  if (false)",
     command: unit,
     expect:
-      "removal from your own inventory is allowed, from someone else's refused",
+      "a discard from your own inventory is gone in the root you are on; from someone else's refused",
   },
   {
     name: "an inventory holds a nineteenth card",
@@ -1404,8 +1421,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a move into an inventory writes in a root",
     file: archive,
-    from: '        to === null || to.kind === "inventory" ? [] : [to.root],',
-    to: "        to === null ? [] : [(to as { root: RootId }).root],",
+    from: '        to.kind === "inventory" || to.root === null ? [] : [to.root],',
+    to: '        to.kind === "inventory" ? [] : [to.root as RootId],',
     command: unit,
     expect: "a move into an inventory",
   },
@@ -1485,7 +1502,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a creation enters a history",
     file: "packages/rules/card.ts",
-    from: "    if (move.from === null || move.to === null) return null\n",
+    from: "    if (move.from === null) return null\n",
     to: "",
     command: unit,
     expect: "a creation: none",
@@ -2107,7 +2124,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a move to where the card is requeues it",
     file: "packages/rules/card.ts",
-    from: '  if (move.to !== null && sameKey(move.from, move.to))\n    return { kind: "refused", code: "moved", now }\n',
+    from: '  if (sameKey(move.from, move.to))\n    return { kind: "refused", code: "moved", now }\n',
     to: "",
     command: unit,
     expect: "a move to where the card is is refused",

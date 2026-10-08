@@ -21,6 +21,7 @@ export interface AppPorts {
     | "retitle"
     | "createCard"
     | "moveCard"
+    | "queueCard"
     | "moveCards"
     | "reorderCard"
     | "undoMoves"
@@ -111,6 +112,10 @@ function performOne(effect: Effect, ports: AppPorts): void {
     case "moveCard":
       if (effect.fly) ports.fly(effect.move.card)
       void ports.session.moveCard(effect.move, effect.how, effect.queuedBy)
+      return
+    case "queueCard":
+      ports.fly(effect.move.card)
+      void ports.session.queueCard(effect.move, effect.hold, effect.how)
       return
     case "reorderCard":
       void ports.session.reorderCard(effect.reorder, effect.how)

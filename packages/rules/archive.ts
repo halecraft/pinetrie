@@ -19,6 +19,7 @@ import {
   type Refusal,
   type RevisionRecord,
   type RootId,
+  type RootWork,
   refused,
   rootOf,
   rootWork,
@@ -59,7 +60,8 @@ type ArchivePlan =
 export const ROOT_BUSY_REASON = {
   running: "the agent is working here",
   waiting: "cards are queued here",
-} as const
+  held: "cards are queued here",
+} as const satisfies Record<RootWork, string>
 
 /**
  * Decide what crossing the closed state's edge does. A root the agent works
@@ -136,7 +138,7 @@ function planTeardown(
 /**
  * The roots a command writes in (ADR-0063), none for a new thread at the
  * root, a name, a picture, a stop, a move on the board or a change to its states, a reservation, a card's command,
- * or a card's move into an inventory, or its removal. An offer acts in its
+ * or a card's move into an inventory, or a discard in no root. An offer acts in its
  * lane's root, and so does a carry-on; a move in each root its cards go to;
  * an undo of moves and a retitle in their root (ADR-0066, ADR-0074).
  */
@@ -157,6 +159,9 @@ export function writesIn(
     case "queue-hold":
     case "unqueue-all":
       return only(rootOfLane(intent.lane))
+    // A card queued writes in its queue's root.
+    case "queue-card":
+      return only(intent.move.to.kind === "queued" ? intent.move.to.root : null)
     // A reorder stays in the place it names.
     case "reorder":
       return [intent.reorder.at.root]
@@ -164,11 +169,11 @@ export function writesIn(
     case "retitle":
     case "undo-move":
       return [intent.root]
-    // A move into a thread or a fresh column writes in its root; an
-    // inventory is in none.
+    // A move into a thread or a fresh column writes in its root, and a
+    // discard in the root it names; an inventory is in none.
     case "move":
       return intent.moves.flatMap(({ to }) =>
-        to === null || to.kind === "inventory" ? [] : [to.root],
+        to.kind === "inventory" || to.root === null ? [] : [to.root],
       )
     case "name":
     case "picture":

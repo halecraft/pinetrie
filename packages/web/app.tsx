@@ -1172,9 +1172,7 @@ export function App({
             onDock={d => setDock(stores.dock.save(d))}
             onIntent={onIntent}
             reader={{ me: session.writer, nameOf }}
-            refusals={moves.refusals.filter(
-              r => r.actedAt.kind === "inventory",
-            )}
+            notices={moves.notices.filter(r => r.actedAt.kind === "inventory")}
             selected={selected}
             session={session}
             slots={slots}

@@ -10,6 +10,15 @@ const trailers = "packages/core/trailers.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a discard goes in the root its discarder is on",
+    file: core,
+    from: '  root: "root" in place ? place.root : here,',
+    to: "  root: here,",
+    command: unit,
+    expect:
+      "a move goes from where the card is; a discard is gone in its root, or the one you are on",
+  },
+  {
     name: "nothing is steered into a run",
     file: asks,
     from: "      steered.set(at, prompt)\n",
@@ -258,6 +267,15 @@ export const mutations: readonly Mutation[] = [
     to: "    if (lane.tip === null || !lane.running) continue",
     command: unit,
     expect: "running and waiting lanes resolve to their roots",
+  },
+  {
+    name: "cards behind a held queue are waiting",
+    file: roots,
+    from: '  lane.running ? "running" : lane.heldBy !== null ? "held" : "waiting"',
+    to: '  lane.running ? "running" : "waiting"',
+    command: unit,
+    expect:
+      "cards behind a held queue are held, below waiting and running in the same root",
   },
   {
     name: "followTip has no cycle guard going down",

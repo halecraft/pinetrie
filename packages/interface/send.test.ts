@@ -15,7 +15,6 @@ import {
   type ComposerMode,
   failedWords,
   forkWords,
-  HELD_QUEUE_TITLE,
   lineWords,
   placeholderWords,
   planSend,
@@ -186,7 +185,7 @@ describe("planSend: what the send does, as the host will decide (ADR-0021)", () 
       createsLane: false,
       to: { compels: NOBODY, people: [] },
       queue: { kind: "next" },
-      held: false,
+      hold: "keep",
       agentByDefault: false,
       command: null,
     })
@@ -229,11 +228,17 @@ describe("planSend: what the send does, as the host will decide (ADR-0021)", () 
       to: { compels: NOBODY, people: ["Ada"] },
     })
   })
-  test("an idle lane whose queue is held queues too, and says it is held (ADR-0048 step 7)", () => {
-    expect(plan("hi", { lane: lane({ heldBy: BEA }) })).toMatchObject({
+  test("on an idle lane whose queue is held, a send queues last and releases it; on a running one it waits (ADR-0113)", () => {
+    expect(
+      plan("hi", { lane: lane({ heldBy: BEA, waiting: 2, lastWaiting: BEA }) }),
+    ).toMatchObject({
       mode: "queue",
-      held: true,
+      hold: "release",
+      queue: { kind: "releases", count: 3 },
     })
+    expect(
+      plan("hi", { lane: lane({ heldBy: BEA, running: true }) }),
+    ).toMatchObject({ mode: "queue", hold: "keep", queue: { kind: "next" } })
   })
   test("a card with a command is queued, even on an idle lane; with no lane it is not (ADR-0108)", () => {
     expect(
@@ -264,7 +269,7 @@ describe("sendButton: the plan in words, and whether it can be pressed", () => {
     createsLane: false,
     to,
     queue: { kind: "after", name: "Bea", ahead: 3 },
-    held: false,
+    hold: "keep",
     agentByDefault: false,
     command: null,
   })
@@ -302,11 +307,15 @@ describe("sendButton: the plan in words, and whether it can be pressed", () => {
       false,
     ],
     [
-      "queued while the queue is held: the title says it waits for a release",
-      { ...sent(AGENT, "queue"), held: true },
+      "queued on an idle thread whose queue is held: it sends them all",
+      {
+        ...sent(AGENT, "queue"),
+        queue: { kind: "releases", count: 3 },
+        hold: "release",
+      },
       IDLE,
-      "queue after Bea",
-      HELD_QUEUE_TITLE,
+      "send all (3)",
+      "release the held queue: what waits goes first, then this",
       false,
     ],
     [

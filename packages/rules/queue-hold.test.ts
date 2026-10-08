@@ -1,9 +1,19 @@
-import { laneNameForThread, rootIdFor, writerId } from "@pinetrie/core"
+import {
+  atEntry,
+  type CardRecord,
+  cardId,
+  entryId,
+  laneNameForThread,
+  PLAIN,
+  rootIdFor,
+  writerId,
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import type { QueuedCard } from "./card.ts"
 import {
   holdOnStop,
   planHoldSweep,
+  planQueueCard,
   planQueueHold,
   QUEUE_HOLD,
 } from "./queue-hold.ts"
@@ -97,4 +107,68 @@ test("planHoldSweep: a hold whose lane no root holds, or whose root is archived,
       archived: root => root === ROOT_B,
     }),
   ).toEqual([L2, L3])
+})
+
+describe("planQueueCard (ADR-0113)", () => {
+  const at = atEntry(entryId("e1"))
+  const drafting = { kind: "drafting", root: ROOT_A, at, lane: L } as const
+  const card: CardRecord = {
+    id: cardId("c-1"),
+    owner: ADA,
+    placer: ADA,
+    place: drafting,
+    carries: PLAIN,
+    unsent: null,
+  }
+  const move = {
+    card: card.id,
+    from: drafting,
+    to: { kind: "queued", root: ROOT_A, at, lane: L, seen: "" },
+  } as const
+  const plan = (
+    hold: "keep" | "hold-if-idle" | "release",
+    over: { holds?: typeof held; running?: boolean; cards?: CardRecord[] } = {},
+  ) =>
+    planQueueCard({
+      cards: over.cards ?? [card],
+      holds: over.holds ?? new Map(),
+      move,
+      hold,
+      by: BEA,
+      now: 7,
+      running: () => over.running ?? false,
+    })
+  test.each([
+    ["keep, held: the hold stays", "keep", { holds: held }, []],
+    [
+      "hold-if-idle, idle: held first, by the sender",
+      "hold-if-idle",
+      {},
+      [setRecord(QUEUE_HOLD, { lane: L, by: BEA, at: 7 })],
+    ],
+    [
+      "hold-if-idle, running: the run's end pops it after the others",
+      "hold-if-idle",
+      { running: true },
+      [],
+    ],
+    [
+      "release, held: released",
+      "release",
+      { holds: held },
+      [deleteRecord(QUEUE_HOLD, L)],
+    ],
+    ["release, not held: nothing to release", "release", {}, []],
+  ] as const)("%s", (_, hold, over, holds) => {
+    const planned = plan(hold, over)
+    expect(planned.step.kind).toBe("steps")
+    expect(planned.holds).toEqual(holds)
+    expect(planned.drain).toEqual("running" in over ? [] : [L])
+  })
+  test("a move the host refuses changes no hold", () => {
+    expect(plan("release", { holds: held, cards: [] })).toMatchObject({
+      step: { kind: "refused", code: "gone" },
+      holds: [],
+    })
+  })
 })

@@ -87,13 +87,18 @@ describe("planArchive", () => {
     })
     expect(plan({ root: entryId("nope") })).toMatchObject({ kind: "refused" })
   })
-  test("refuses while the agent works in the root, or messages wait there", () => {
+  test("refuses while the agent works in the root, or cards wait there, held or not", () => {
     expect(plan({ lanes: [lane("b", { running: true })] })).toEqual({
       kind: "refused",
       code: ERR.ROOT_BUSY,
       message: "the agent is working here",
     })
     expect(plan({ lanes: [lane("a", { waiting: 1 })] })).toEqual({
+      kind: "refused",
+      code: ERR.ROOT_BUSY,
+      message: "cards are queued here",
+    })
+    expect(plan({ lanes: [lane("a", { waiting: 1, heldBy: BEA })] })).toEqual({
       kind: "refused",
       code: ERR.ROOT_BUSY,
       message: "cards are queued here",

@@ -95,6 +95,7 @@ export const COMMAND_KINDS = [
   "offer",
   "reserve",
   "move",
+  "queue-card",
   "reorder",
   "queue-hold",
   "unqueue-all",

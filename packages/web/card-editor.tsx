@@ -40,6 +40,8 @@ import {
   cardKeyAct,
   cardStatus,
   commandNote,
+  DISCARD_CARD,
+  DISCARD_CARD_TITLE,
   type EditorEvent,
   type EditorState,
   type EditorStep,
@@ -90,7 +92,13 @@ import {
 import { type QueuedCard, writersOfClients } from "@pinetrie/rules"
 import { textClients } from "@pinetrie/schema"
 import { IN_COLUMN, newCardId, type SessionClient } from "@pinetrie/session"
-import { type ReactNode, useEffect, useRef, useState } from "react"
+import {
+  type KeyboardEvent,
+  type ReactNode,
+  useEffect,
+  useRef,
+  useState,
+} from "react"
 import { CardHistory, MovedBack } from "./card-history.tsx"
 import { Menu } from "./menu.tsx"
 import { useStable } from "./use-stable.ts"
@@ -360,13 +368,20 @@ export function CardEditor(p: {
   )
 
   /**
-   * Queue the card on this column's lane, from its end. False when there is
-   * no card or no lane to queue on: nothing was queued.
+   * Queue the card on this column's lane, from its end, releasing a held
+   * queue when the plan says so (ADR-0113). False when there is no card or
+   * no lane to queue on: nothing was queued.
    */
   const queueHere = (from: CardId | null): boolean => {
     if (from === null || p.lane.kind !== "lane" || p.at.kind !== "entry")
       return false
-    p.onAct({ kind: "queue", card: from, lane: p.lane.name, at: p.at })
+    p.onAct({
+      kind: "queue",
+      card: from,
+      lane: p.lane.name,
+      at: p.at,
+      hold: plan.hold,
+    })
     return true
   }
   const send = async (
@@ -613,6 +628,14 @@ export function CardEditor(p: {
         }}
         onKeyDown={e => {
           if (e.nativeEvent.isComposing) return
+          if (card !== undefined && p.readOnly === null) {
+            const act = cardKeyAct(keyOfBox(e), card.id, null)
+            if (act !== null) {
+              e.preventDefault()
+              p.onAct(act)
+              return
+            }
+          }
           // While commands are offered, the keys move through them.
           if (highlighted !== undefined) {
             if (e.key === "ArrowDown" || e.key === "ArrowUp") {
@@ -709,6 +732,11 @@ export function CardEditor(p: {
           )}
           {card !== undefined && <CardHistory card={card.id} />}
           {card !== undefined && (
+            <DiscardButton
+              onDiscard={() => p.onAct({ kind: "discard", card: card.id })}
+            />
+          )}
+          {card !== undefined && (
             <TakeIntoInventoryButton
               card={card.id}
               onTakeIntoInventory={id =>
@@ -792,10 +820,13 @@ export function BoundCardEditor(p: {
     readonly among: readonly CardRecord[]
     readonly onAct: (act: ColumnAct) => void
   } | null
+  /** Discards the card (ADR-0111): its × and Ctrl+Shift+Backspace; null for none. */
+  onDiscard: (() => void) | null
 }) {
   const { session, card } = p
   // A read-only box moves nothing.
   const reorder = p.readOnly ? null : p.reorder
+  const discard = p.readOnly ? null : p.onDiscard
   const box = useRef<HTMLTextAreaElement>(null)
   const [text, setText] = useState("")
   // Of fixed identity, so a new `onText` each render never binds the box again.
@@ -811,6 +842,7 @@ export function BoundCardEditor(p: {
     <div className={p.className} data-queued={p.queued ?? undefined}>
       <div className="card-heading">
         {p.heading} <MovedBack card={card.id} owner={card.owner} />
+        {discard !== null && <DiscardButton onDiscard={discard} />}
       </div>
       <textarea
         autoComplete="off"
@@ -818,20 +850,19 @@ export function BoundCardEditor(p: {
         data-card={card.id}
         onInput={() => p.onTyping(card.id)}
         onKeyDown={e => {
-          if (reorder === null) return
           const act = cardKeyAct(
-            {
-              key: e.key,
-              altKey: e.altKey,
-              ctrlKey: e.ctrlKey,
-              metaKey: e.metaKey,
-              shiftKey: e.shiftKey,
-              isComposing: e.nativeEvent.isComposing,
-            },
+            keyOfBox(e),
             card.id,
-            reorder.among.map(c => c.id),
+            reorder === null ? null : reorder.among.map(c => c.id),
           )
           if (act === null) return
+          if (act.kind === "discard") {
+            if (discard === null) return
+            e.preventDefault()
+            discard()
+            return
+          }
+          if (reorder === null) return
           e.preventDefault()
           reorder.onAct(act)
         }}
@@ -851,6 +882,31 @@ export function BoundCardEditor(p: {
         <CardHistory card={card.id} />
       </div>
     </div>
+  )
+}
+
+/** A card box's keydown, as `cardKeyAct` reads it. */
+const keyOfBox = (e: KeyboardEvent<HTMLTextAreaElement>) => ({
+  key: e.key,
+  altKey: e.altKey,
+  ctrlKey: e.ctrlKey,
+  metaKey: e.metaKey,
+  shiftKey: e.shiftKey,
+  isComposing: e.nativeEvent.isComposing,
+})
+
+/** A card's ×: discards it, and the undo key outside a box brings it back (ADR-0111). */
+export function DiscardButton(p: { onDiscard: () => void }) {
+  return (
+    <button
+      aria-label={DISCARD_CARD_TITLE}
+      className="discard-card"
+      onClick={p.onDiscard}
+      title={DISCARD_CARD_TITLE}
+      type="button"
+    >
+      {DISCARD_CARD}
+    </button>
   )
 }
 
@@ -923,6 +979,7 @@ export function QueuedCardEditor(p: {
           )}
         </>
       }
+      onDiscard={() => p.onAct({ kind: "discard", card: card.id })}
       onTyping={p.onTyping}
       queued={card.id}
       readOnly={p.readOnly !== null}
@@ -985,6 +1042,7 @@ export function PinnedCardEditor(p: {
       card={card}
       className="card-editor pinned"
       heading={pinnedWords(card.placer, p.reader)}
+      onDiscard={() => p.onAct({ kind: "discard", card: card.id })}
       onText={setText}
       onTyping={p.onTyping}
       queued={null}

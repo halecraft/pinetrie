@@ -1178,7 +1178,7 @@ describe("columnView: the queue's controls (ADR-0048 step 7)", () => {
     expect(controls({ lane: onLane(laneView(A, "6")) })).toEqual({
       lane: A,
       heldBy: null,
-      unqueueAll: false,
+      messages: 0,
     })
     expect(
       controls({
@@ -1202,7 +1202,7 @@ describe("columnView: the queue's controls (ADR-0048 step 7)", () => {
           },
         ],
       }),
-    ).toEqual({ lane: A, heldBy: BEA, unqueueAll: true })
+    ).toEqual({ lane: A, heldBy: BEA, messages: 1 })
   })
   test("none read-only, nor with no lane", () => {
     expect(controls({ lane: { kind: "none" } })).toBeNull()
@@ -1210,26 +1210,25 @@ describe("columnView: the queue's controls (ADR-0048 step 7)", () => {
       controls({ lane: onLane(laneView(A, "6")), writable: false }),
     ).toBeNull()
   })
-  test("words: hold, or who holds it and release; unqueue all only when offered", () => {
+  test("words: hold, or who holds it and send queue (n), which releases it; unqueue all only when offered", () => {
     const reader = { me: ADA, nameOf: new Map([[BEA, "Bea"]]) }
     const free = queueControlWords(
-      { lane: A, heldBy: null, unqueueAll: false },
+      { lane: A, heldBy: null, messages: 0 },
       reader,
     )
     expect(free.held).toBeNull()
     expect(free.hold.label).toBe("hold queue")
     expect(free.unqueueAll).toBeNull()
     const held = queueControlWords(
-      { lane: A, heldBy: BEA, unqueueAll: true },
+      { lane: A, heldBy: BEA, messages: 2 },
       reader,
     )
     expect(held.held).toBe("queue held by Bea")
-    expect(held.hold.label).toBe("release")
+    expect(held.hold.label).toBe("send queue (2)")
     expect(held.unqueueAll?.label).toBe("unqueue all")
     expect(
-      queueControlWords({ lane: A, heldBy: ADA, unqueueAll: false }, reader)
-        .held,
-    ).toBe("queue held by you")
+      queueControlWords({ lane: A, heldBy: ADA, messages: 0 }, reader),
+    ).toMatchObject({ held: "queue held by you", hold: { label: "release" } })
   })
 })
 

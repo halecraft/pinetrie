@@ -22,6 +22,7 @@ import {
   type Move,
   type MoveDirection,
   moveOf,
+  type QueueHoldChange,
   type Reorder,
   type RootId,
   type SentCard,
@@ -45,6 +46,7 @@ import {
   type PlaceStep,
   planFreshFollow,
   planMoveCommand,
+  planQueueCard,
   planReorder,
   planSetCommand,
   planUnqueueAll,
@@ -55,6 +57,7 @@ import type { CardPort } from "../cards.ts"
 import type { MoveHistories } from "../move-history.ts"
 import { applyPlaceSteps, type Gesture, raiseRev } from "../places.ts"
 import type { Provenance } from "../provenance.ts"
+import type { Records } from "../records.ts"
 import type { Chat } from "./chat.ts"
 
 /**
@@ -72,13 +75,15 @@ export const settled = (
 ): Settled => ({ outcome, rev })
 
 export interface CardCommandDeps {
-  readonly basics: Pick<Basics, "docs" | "live" | "places" | "session">
+  readonly basics: Pick<Basics, "docs" | "live" | "places" | "session" | "now">
   readonly cards: Pick<CardPort, "destroy">
   /** Queue a drain of the lane on the documents' keeper, not awaited. */
   readonly drain: (lane: LaneName) => void
   readonly histories: Pick<MoveHistories, "gestureOf" | "step">
   /** Each card's history, and traces (ADR-0048 step 6). */
   readonly provenance: Pick<Provenance, "before" | "after" | "seen">
+  /** A queue's hold, written with a card queued (ADR-0113). */
+  readonly records: Pick<Records, "writeValues">
 }
 
 export function createCardCommands(deps: CardCommandDeps) {
@@ -182,8 +187,40 @@ export function createCardCommands(deps: CardCommandDeps) {
     return carry(step, drain, { kind: "move", by: writer }, gesture)
   }
 
+  /**
+   * A card queued, and its queue's hold changed with it (ADR-0113), in one
+   * step: planned whole (`planQueueCard`), then the hold written, then the
+   * move carried as any move is, so the drain it asks for finds the hold as
+   * planned. Recorded in the sender's history as a move is; the hold is not,
+   * so an undo puts the card back and leaves the queue held or released.
+   */
+  async function queueCard(
+    writer: WriterId,
+    queued: Move,
+    hold: QueueHoldChange,
+  ): Promise<Settled> {
+    // gather: the history's stack, loaded before the places are read
+    const root = historyOf([queued], readPlaces(places))
+    const gesture =
+      root === null ? undefined : await deps.histories.gestureOf(writer, root)
+    // plan
+    const plan = planQueueCard({
+      cards: readPlaces(places),
+      holds: readQueueHolds(session),
+      move: queued,
+      hold,
+      by: writer,
+      now: deps.basics.now(),
+      running,
+    })
+    // execute
+    if (plan.holds.length > 0) await deps.records.writeValues(plan.holds)
+    return carry(plan.step, plan.drain, { kind: "move", by: writer }, gesture)
+  }
+
   return {
     move,
+    queueCard,
 
     /**
      * A queued or pinned card moved among its neighbours (ADR-0048 step 7),

@@ -6,6 +6,33 @@ const workspace = ["pnpm", "exec", "vitest", "run", "workspace.test.ts"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a send to a held idle queue keeps the hold",
+    file: "packages/interface/send.ts",
+    from: '  const releases = lane.kind === "lane" && !lane.running && lane.heldBy !== null',
+    to: "  const releases = false",
+    command: unit,
+    expect:
+      "on an idle lane whose queue is held, a send queues last and releases it",
+  },
+  {
+    name: "Ctrl+Shift+Backspace is the box's own",
+    file: "packages/interface/card-keys.ts",
+    from: '    return event.key === "Backspace" ? { kind: "discard", card } : null',
+    to: "    return null",
+    command: unit,
+    expect:
+      "Ctrl+Shift+Backspace discards any card; a card with no place in line takes no Alt+↑",
+  },
+  {
+    name: "a held queue rings its root",
+    file: "packages/interface/attention.ts",
+    from: '    if (work !== "held") out.set(root, { kind: "working" })',
+    to: '    out.set(root, { kind: "working" })',
+    command: unit,
+    expect:
+      "cards behind a held queue are not working: the root shows what was raised there, or nothing",
+  },
+  {
     name: "the interface declares React",
     file: "packages/interface/package.json",
     from: '    "@pinetrie/session": "workspace:*",\n',
@@ -1147,16 +1174,22 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the queue's length is never told",
     file: "packages/interface/send.ts",
-    from: '    place.kind !== "next" && place.ahead > 1',
-    to: "    false",
+    from:
+      "        title: place.ahead > 1 ? `$" +
+      "{place.ahead} waiting ahead` : null,",
+    to: "        title: null,",
     command: unit,
     expect: "counts the queue when one name stands for several",
   },
   {
     name: "one waiting is counted too",
     file: "packages/interface/send.ts",
-    from: '    place.kind !== "next" && place.ahead > 1',
-    to: '    place.kind !== "next" && place.ahead > 0',
+    from:
+      "        title: place.ahead > 1 ? `$" +
+      "{place.ahead} waiting ahead` : null,",
+    to:
+      "        title: place.ahead > 0 ? `$" +
+      "{place.ahead} waiting ahead` : null,",
     command: unit,
     expect: "says where it waits",
   },
@@ -1746,8 +1779,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a closed branch's card is not discarded",
     file: "packages/interface/intent.ts",
-    from: "      const discard = act.discard.flatMap(id => {",
-    to: "      const discard = act.discard.slice(0, 0).flatMap(id => {",
+    from: "      const discard = act.discard.flatMap(id =>",
+    to: "      const discard = act.discard.slice(0, 0).flatMap(id =>",
     command: unit,
     expect: "closing a column discards its card first",
   },
@@ -2848,8 +2881,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "Alt+Shift+↑ reorders",
     file: "packages/interface/card-keys.ts",
-    from: "    event.metaKey ||\n    event.shiftKey\n",
-    to: "    event.metaKey\n",
+    from: "  if (!event.altKey || event.ctrlKey || event.shiftKey || among === null)",
+    to: "  if (!event.altKey || event.ctrlKey || among === null)",
     command: unit,
     expect: "Alt+↑ and Alt+↓ move the card one place",
   },
@@ -2863,20 +2896,21 @@ export const mutations: readonly Mutation[] = [
       "typing is written at most once a second, and at once in another card",
   },
   {
-    name: "a held queue is not said on the queue button",
+    name: "a held queue is not released by a send",
     file: "packages/interface/send.ts",
-    from: '    held: lane.kind === "lane" && lane.heldBy !== null,',
-    to: "    held: false,",
+    from: '    hold: releases ? "release" : "keep",',
+    to: '    hold: "keep",',
     command: unit,
-    expect: "an idle lane whose queue is held queues too",
+    expect:
+      "on an idle lane whose queue is held, a send queues last and releases it",
   },
   {
     name: "a queue's controls offer unqueue all with nothing queued",
     file: "packages/interface/column-view.ts",
-    from: '    unqueueAll: f.queued.some(c => c.carries.kind === "message"),',
-    to: "    unqueueAll: true,",
+    from: "      controls.messages > 0\n",
+    to: "      true\n",
     command: unit,
-    expect: "a writable thread with a lane: hold, and unqueue all",
+    expect: "unqueue all only when offered",
   },
   {
     name: "the root you are on is lost when your list lacks it",

@@ -15,9 +15,10 @@ import {
   readCardHistories,
   readPlaces,
   readPlacesRev,
+  readQueueHolds,
   readTraces,
 } from "@pinetrie/reads"
-import type { UndoResult } from "@pinetrie/rules"
+import { QUEUE_HOLD, setRecord, type UndoResult } from "@pinetrie/rules"
 import { newPresenceDoc, readingKey, seatKey } from "@pinetrie/schema"
 import { beginRun, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
@@ -87,6 +88,7 @@ function setUp() {
     drain: lane => void drains.push(lane),
     histories: histories.port,
     provenance,
+    records: { writeValues: async writes => applyWrites(b, writes) },
   })
   const undoes = (result: UndoResult, revert: () => void = () => {}) => {
     undoing = result
@@ -184,27 +186,66 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
     })
   })
 
-  test("a removal destroys the text after the record", async () => {
-    const { b, cards, commands, put } = setUp()
-    put({
-      place: { kind: "fresh", column: "k", root: TEST_ROOT, at: ROOT } as const,
+  test("a discard keeps the card, gone, in the discarder's history of its root: no text is destroyed, and its placer gets a trace", async () => {
+    const { b, cards, commands, put, recorded } = setUp()
+    put({ placer: BEA })
+    const gone = {
+      kind: "gone",
+      root: TEST_ROOT,
+      why: { kind: "discarded" },
+    } as const
+    expect(
+      (await commands.move(ADA, [{ card: C1, from: drafting, to: gone }]))
+        .outcome,
+    ).toEqual({ kind: "moved" })
+    expect(readPlaces(b.places).map(c => c.place)).toEqual([
+      { ...gone, by: ADA },
+    ])
+    expect(cards.calls).toEqual([])
+    expect(recorded).toEqual([[ADA, TEST_ROOT]])
+    expect([...readTraces(b.session).values()]).toMatchObject([
+      { for: BEA, by: ADA, from: drafting },
+    ])
+  })
+})
+
+describe("queue-card (ADR-0113)", () => {
+  test("release: the card queued last and the hold gone in one step, then the lane drained", async () => {
+    const { b, commands, put, drains, recorded } = setUp()
+    put()
+    applyWrites(b, [setRecord(QUEUE_HOLD, { lane: LANE, by: BEA, at: 1 })])
+    const done = await commands.queueCard(
+      ADA,
+      { card: C1, from: drafting, to: queuedKey },
+      "release",
+    )
+    expect(done.outcome).toEqual({ kind: "moved" })
+    expect(readQueueHolds(b.session).has(LANE)).toBe(false)
+    expect(readPlaces(b.places)[0]?.place).toMatchObject({
+      kind: "queued",
+      by: ADA,
     })
-    await commands.move(ADA, [
-      {
-        card: C1,
-        from: {
-          kind: "fresh",
-          column: "k",
-          root: TEST_ROOT,
-          at: ROOT,
-        } as const,
-        to: null,
-      },
-    ])
-    expect(readPlaces(b.places)).toEqual([])
-    expect(cards.calls.map(c => [c.method, ...c.args])).toEqual([
-      ["destroy", C1],
-    ])
+    expect(drains).toEqual([LANE])
+    expect(recorded).toEqual([[ADA, TEST_ROOT]])
+  })
+
+  test("hold-if-idle holds an idle queue before the drain; a refused move changes no hold", async () => {
+    const { b, commands, put } = setUp()
+    put()
+    await commands.queueCard(
+      ADA,
+      { card: C1, from: drafting, to: queuedKey },
+      "hold-if-idle",
+    )
+    expect(readQueueHolds(b.session).get(LANE)?.by).toBe(ADA)
+    const other = setUp()
+    const refused = await other.commands.queueCard(
+      ADA,
+      { card: C1, from: drafting, to: queuedKey },
+      "hold-if-idle",
+    )
+    expect(refused.outcome).toMatchObject({ kind: "unmoved", code: "gone" })
+    expect(readQueueHolds(other.b.session).size).toBe(0)
   })
 })
 

@@ -276,6 +276,9 @@ would refuse each whole undo of a move (S82).
   from before ADR-0066 a `json` `pinetrie:places` document, that no code
   opens; delete them by hand. The startup sweep removes the texts no record
   names.
+- **A gone card is stored under its reason** (ADR-0111): kind `discarded`,
+  its history's root in `root` ("" for none), and who discarded it in
+  `holder`. No new field, so no migration.
 - **`holder`** is whose inventory holds a card (`CardPlace` `inventory`);
   rows written before it existed do not decode, and no stored session held
   any.

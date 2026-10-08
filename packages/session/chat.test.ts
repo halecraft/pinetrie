@@ -4,13 +4,12 @@ import {
   cardId,
   entryId,
   laneNameForThread,
-  moveOf,
   ROOT,
   runId,
   writerId,
 } from "@pinetrie/core"
 import { expect, test } from "vitest"
-import { IN_COLUMN, pendingOf } from "./card-moves.ts"
+import { IN_COLUMN, sendPendingOf } from "./card-moves.ts"
 import { planChatRequest, startsRoot } from "./chat.ts"
 import { TEST_ROOT } from "./fixtures.ts"
 
@@ -103,7 +102,7 @@ test("a send with no card is not drawn; one from a card draws the card out of it
   })
   expect(fromCard.id).toBe("f-1")
   expect(fromCard.pending).toEqual(
-    pendingOf("f-1", moveOf(card, null), IN_COLUMN("col-1"), null),
+    sendPendingOf("f-1", card.id, IN_COLUMN("col-1")),
   )
 })
 

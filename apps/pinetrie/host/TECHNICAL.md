@@ -557,6 +557,14 @@ rejects `shutdown()`.
   `planQueueHold`): it answers how the queue is now, `held` or `released`,
   whether it wrote or the queue was already so. A release asks for the lane's drain: nothing else
   would pop what waited.
+- **`queue-card` queues a card and changes its queue's hold in one step**
+  (`queueCard`, `planQueueCard`, ADR-0113): the hold is written first, then
+  the move carried as `move` carries one, so its drain finds the queue held
+  or released as planned. The move is in the sender's history; the hold is
+  not, so an undo takes the card back and leaves the hold.
+- **Discarded cards are swept** (`sweepGone`, `housekeeping.ts`): a card
+  gone more than `GONE_KEEP_MS` loses its record, then its text, at startup
+  and in `settle`'s sweep, before the provenance's sweep deletes its history.
 - **`reorder` and `unqueue-all` are moves of their own** (`commands/cards.ts`).
   A reorder is written in the sender's history of its place's root
   (`planReorder`), through `carry`, and drains nothing. Unqueue all plans
