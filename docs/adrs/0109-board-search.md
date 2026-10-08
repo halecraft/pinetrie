@@ -5,6 +5,11 @@
 - **Amends:**
   - ADR-0112: the search and "mine" move from the closed state to the board's
     top, and filter every state, open and closed.
+- **Amended by:**
+  - ADR-0115: the search and "mine" move to the footer's strip while the board
+    is open, in the states' place; a column's head shows the strip's counts
+    over the roots it shows; a banner names a filter; Escape and Clear lift
+    the words and "mine"; a person's open focuses the search.
 
 **Context.** ADR-0085, restated as ADR-0112, gave the board one search, the
 closed state's, carried over from the Archive tab: archived roots were the

@@ -127,9 +127,9 @@ export interface Step<T> {
 }
 
 /**
- * Move up and Move down for `item`, among `shown` (the items of `order` a
- * search keeps, in that order), so every move is seen. Up goes before the
- * shown item above. Down goes after the shown item below, so before what
+ * Move up and Move down for `item`, among the items of `order` that
+ * `isShown` keeps, so every move is seen. Up goes before the nearest shown
+ * item above. Down goes after the nearest shown item below, so before what
  * follows that item in `order`: a move names what it goes before. Each is
  * null where it would do nothing: up at the top, down at the bottom, both
  * for an item not shown.
@@ -137,17 +137,15 @@ export interface Step<T> {
 export function stepsIn<T>(
   order: readonly T[],
   item: T,
-  shown: readonly T[],
+  isShown: (t: T) => boolean,
 ): { readonly up: Step<T> | null; readonly down: Step<T> | null } {
-  const at = shown.indexOf(item)
-  if (at < 0) return { up: null, down: null }
-  const below = shown[at + 1]
+  const at = order.indexOf(item)
+  if (at < 0 || !isShown(item)) return { up: null, down: null }
+  const above = order.slice(0, at).findLast(isShown)
+  const belowAt = order.findIndex((t, i) => i > at && isShown(t))
   return {
-    up: at === 0 ? null : { before: shown[at - 1] ?? null },
-    down:
-      below === undefined
-        ? null
-        : { before: order[order.indexOf(below) + 1] ?? null },
+    up: above === undefined ? null : { before: above },
+    down: belowAt < 0 ? null : { before: order[belowAt + 1] ?? null },
   }
 }
 

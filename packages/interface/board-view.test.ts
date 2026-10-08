@@ -16,19 +16,23 @@ import { describe, expect, test } from "vitest"
 import type { Status } from "./attention.ts"
 import {
   type BoardKeyFocus,
+  type BoardSearch,
   type BoardViewInput,
   boardKeyAct,
   boardView,
   CLOSED_RECENT,
   clickClosesBoard,
   closedRows,
+  filterTitle,
+  filterWords,
   keptWords,
   nameStateIntent,
+  parseSearch,
   readyWords,
   removeWords,
   rootsWords,
   searchWords,
-  stripWords,
+  stateWords,
 } from "./board-view.ts"
 import type { KeyLike } from "./inventory-keys.ts"
 
@@ -97,8 +101,7 @@ const input = (over: Partial<BoardViewInput> = {}): BoardViewInput => ({
   status: new Map(),
   cardRoots: new Set(),
   ready: new Map(),
-  query: "",
-  mine: false,
+  search: null,
   me: ADA,
   work: new Map(),
   ...over,
@@ -113,7 +116,7 @@ describe("boardView", () => {
       ["Backlog", [E(3)]],
       ["Doing", [E(2), E(1)]],
     ])
-    expect(view.closed.total).toBe(2)
+    expect(view.closed.count).toEqual({ kind: "all", total: 2 })
     expect(view.strip.map(s => [s.name, s.count, s.closed])).toEqual([
       ["Backlog", 1, false],
       ["Doing", 2, false],
@@ -165,19 +168,19 @@ describe("boardView", () => {
       [],
       ["amber-fox", "cozy-mallard"],
     ])
-    expect(view.open.map(c => [c.working, c.ready])).toEqual([
+    expect(view.open.map(c => [c.signals.working, c.signals.ready])).toEqual([
       [1, 0],
       [1, 1],
     ])
-    expect(view.strip.map(s => [s.working, s.ready])).toEqual([
+    expect(view.strip.map(s => [s.signals.working, s.signals.ready])).toEqual([
       [1, 0],
       [1, 1],
       [0, 0],
     ])
   })
 
-  test("stripWords and readyWords: what the strip's counts and an item's ⇡ say", () => {
-    expect(stripWords({ working: 1, ready: 2 })).toEqual({
+  test("stateWords and readyWords: what a state's ◌ and ⇡ and an item's ⇡ say", () => {
+    expect(stateWords({ working: 1, ready: 2 })).toEqual({
       working: "the agent is working in 1 root",
       ready: "2 roots with work ready to accept",
     })
@@ -269,44 +272,70 @@ describe("the board's search (ADR-0109)", () => {
       view.closed.rows.map(t => t.entry),
     ]
   }
-  test("with none, every root shows, the closed state's newest first", () => {
+  const find = (query: string, mine = false) => ({
+    search: parseSearch(query, mine),
+  })
+  test("with none, every root shows, the closed state's newest first, and every count is of all", () => {
     expect(kept({})).toEqual([[E(3)], [E(2), E(1)], [E(5), E(4)]])
     const view = boardView(input())
-    expect([view.filtered, view.total]).toEqual([false, 5])
+    expect(view.shown).toEqual({ kind: "all", total: 5 })
+    expect(view.open.map(c => c.count.kind)).toEqual(["all", "all"])
   })
   test("it keeps, in every state and in place, the roots whose label holds every word, case-insensitively, in any order (labels, not messages: ADR-0063)", () => {
-    expect(kept({ query: "SEARCH" })).toEqual([[E(3)], [E(1)], [E(5)]])
-    expect(kept({ query: " design  board " })).toEqual([[], [E(1)], []])
-    expect(kept({ query: "board nothing" })).toEqual([[], [], []])
-    expect(kept({ query: "sqlite" })).toEqual([[], [], [E(4)]])
+    expect(kept(find("SEARCH"))).toEqual([[E(3)], [E(1)], [E(5)]])
+    expect(kept(find(" design  board "))).toEqual([[], [E(1)], []])
+    expect(kept(find("board nothing"))).toEqual([[], [], []])
+    expect(kept(find("sqlite"))).toEqual([[], [], [E(4)]])
   })
   test("mine keeps the roots you wrote in, in every state", () => {
-    expect(kept({ mine: true })).toEqual([[E(3)], [E(1)], [E(4)]])
-    expect(kept({ mine: true, me: BEA })).toEqual([[], [E(2)], [E(5)]])
-    expect(kept({ mine: true, query: "palette" })).toEqual([[], [], []])
+    expect(kept(find("", true))).toEqual([[E(3)], [E(1)], [E(4)]])
+    expect(kept({ ...find("", true), me: BEA })).toEqual([[], [E(2)], [E(5)]])
+    expect(kept(find("palette", true))).toEqual([[], [], []])
   })
-  test("a state's total, mark, counts and Remove, and the strip, count every root, kept or not; heads say how many are kept", () => {
-    const status = new Map<EntryId, Status>([[E(2), { kind: "working" }]])
-    const view = boardView(input({ labels, status, query: "board" }))
+  test("a filtered head counts what it shows; its mark, Remove and the strip count every root", () => {
+    const status = new Map<EntryId, Status>([
+      [E(1), { kind: "working" }],
+      [E(2), { kind: "working" }],
+    ])
+    const ready = new Map([[E(2), ["amber-fox"]]])
+    const item = {
+      lane: laneNameForThread("a"),
+      root: E(2),
+      end: E(2),
+      level: "needsYou" as const,
+      raised: { kind: "offer" as const, source: "c" },
+    }
+    status.set(E(2), { kind: "needsYou", item })
+    const view = boardView(input({ labels, status, ready, ...find("board") }))
     const doing = view.open[1]
-    expect(view.filtered).toBe(true)
-    expect([doing?.items.length, doing?.total, doing?.working]).toEqual([
-      1, 2, 1,
-    ])
+    expect(view.shown).toEqual({
+      kind: "filtered",
+      search: { words: ["board"], mine: false },
+      kept: 1,
+      total: 5,
+    })
+    expect(doing?.items.map(t => t.entry)).toEqual([E(1)])
+    expect(doing?.count).toEqual({ kind: "kept", kept: 1, total: 2 })
+    expect(doing?.signals).toEqual({ working: 1, ready: 0, roots: [E(1)] })
+    expect(doing?.mark).toBe("needsYou")
     expect(doing?.remove.why).not.toBeNull()
-    expect([view.closed.kept, view.closed.total]).toEqual([0, 2])
-    expect(view.strip.map(s => [s.count, s.roots.length])).toEqual([
-      [1, 1],
-      [2, 2],
-      [2, 0],
+    expect(view.open[0]?.items).toEqual([])
+    expect(view.open[0]?.remove.why).not.toBeNull()
+    expect(view.closed.count).toEqual({ kind: "kept", kept: 0, total: 2 })
+    expect(
+      view.strip.map(s => [s.count, s.signals.ready, s.signals.roots.length]),
+    ).toEqual([
+      [1, 0, 1],
+      [2, 1, 2],
+      [2, 0, 0],
     ])
   })
-  test("Move up and Move down step among the items shown", () => {
-    const view = boardView(input({ labels, query: "board" }))
-    const [only] = view.open[1]?.items ?? []
-    expect([only?.up, only?.down]).toEqual([null, null])
+  test("Move up and Move down step among the items shown, and only shown roots have cards", () => {
+    const view = boardView(input({ labels, ...find("board") }))
+    const [only, ...rest] = view.open[1]?.items ?? []
+    expect([only?.up, only?.down, rest]).toEqual([null, null, []])
   })
-  test("with no query, the closed state shows only its most recent few", () => {
+  test("with no words, the closed state shows only its most recent few, mine alone included", () => {
     const item = (n: number) =>
       ({
         ...boardView(input()).closed.rows[0],
@@ -317,12 +346,22 @@ describe("the board's search (ADR-0109)", () => {
       }) as never
     const many = Array.from({ length: CLOSED_RECENT + 3 }, (_, n) => item(n))
     const summaries = new Map()
-    expect(closedRows({ items: many, summaries, query: " " })).toHaveLength(
-      CLOSED_RECENT,
-    )
-    expect(closedRows({ items: many, summaries, query: "r" })).toHaveLength(
-      CLOSED_RECENT + 3,
-    )
+    const rows = (search: BoardSearch | null) =>
+      closedRows({ items: many, summaries, search }).length
+    expect(rows(null)).toBe(CLOSED_RECENT)
+    expect(rows(parseSearch("", true))).toBe(CLOSED_RECENT)
+    expect(rows(parseSearch("r", false))).toBe(CLOSED_RECENT + 3)
+  })
+})
+
+describe("parseSearch", () => {
+  test.each([
+    ["", false, null],
+    ["   ", false, null],
+    ["  Board  search ", false, { words: ["board", "search"], mine: false }],
+    ["", true, { words: [], mine: true }],
+  ] as const)("%j, mine %s", (query, mine, search) => {
+    expect(parseSearch(query, mine)).toEqual(search)
   })
 })
 
@@ -337,7 +376,7 @@ describe("boardKeyAct", () => {
   })
   const at = (over: Partial<BoardKeyFocus> = {}): BoardKeyFocus => ({
     menuOpen: false,
-    query: "",
+    filtered: false,
     inText: false,
     ...over,
   })
@@ -345,11 +384,16 @@ describe("boardKeyAct", () => {
     [
       "Escape with a menu open is the menu's",
       key("Escape"),
-      at({ menuOpen: true, query: "x" }),
+      at({ menuOpen: true, filtered: true }),
       null,
     ],
-    ["Escape clears a query", key("Escape"), at({ query: "x" }), "clearSearch"],
-    ["Escape with no query closes the board", key("Escape"), at(), "close"],
+    [
+      "Escape clears a filter, in the search field too",
+      key("Escape"),
+      at({ filtered: true, inText: true }),
+      "clearFilter",
+    ],
+    ["Escape with no filter closes the board", key("Escape"), at(), "close"],
     ["/ focuses the search", key("/"), at(), "focusSearch"],
     ["/ in a text box is typed", key("/"), at({ inText: true }), null],
     ["Ctrl+/ is not the board's", key("/", { ctrlKey: true }), at(), null],
@@ -362,16 +406,50 @@ describe("boardKeyAct", () => {
 })
 
 describe("board words", () => {
-  test.each([
+  const filtered = (
+    words: string[],
+    mine: boolean,
+    kept: number,
+    total: number,
+  ) => ({ kind: "filtered" as const, search: { words, mine }, kept, total })
+  // Named by the words, so a mutant that changes them fails its own test.
+  const said: readonly (readonly [string, string])[] = [
     [rootsWords(1), "1 root"],
     [rootsWords(41), "41 roots"],
-    [keptWords(12, 96, true), "12 of 96"],
-    [keptWords(96, 96, true), "96 of 96"],
-    [keptWords(96, 96, false), "96"],
+    [keptWords({ kind: "kept", kept: 12, total: 96 }), "12 of 96"],
+    [keptWords({ kind: "kept", kept: 96, total: 96 }), "96 of 96"],
+    [keptWords({ kind: "all", total: 96 }), "96"],
     [searchWords(1), "search 1 root…"],
     [searchWords(140), "search 140 roots…"],
-  ])("%s", (said, words) => {
-    expect(said).toBe(words)
+    [
+      filterWords(filtered(["parser"], true, 14, 140)),
+      'Filtered by "parser" and mine: 14 of 140 roots',
+    ],
+    [
+      filterWords(filtered(["parser", "plan"], false, 1, 140)),
+      'Filtered by "parser plan": 1 of 140 roots',
+    ],
+    [
+      filterWords(filtered([], true, 3, 140)),
+      "Filtered to roots you wrote in: 3 of 140 roots",
+    ],
+    [
+      filterWords(filtered(["parser"], false, 0, 140)),
+      'No roots match "parser"',
+    ],
+    [
+      filterWords(filtered(["parser"], true, 0, 140)),
+      'No roots you wrote in match "parser"',
+    ],
+    [filterWords(filtered([], true, 0, 1)), "You wrote in none of 1 root"],
+    [
+      filterTitle({ words: ["parser"], mine: true }),
+      'filtered: "parser", mine',
+    ],
+    [filterTitle({ words: [], mine: true }), "filtered: mine"],
+  ]
+  test.each(said.map(([was, words]) => [words, was]))("%s", (words, was) => {
+    expect(was).toBe(words)
   })
 })
 

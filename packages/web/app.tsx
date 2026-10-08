@@ -35,6 +35,7 @@ import {
 import {
   type AppPorts,
   appView,
+  BOARD_SEARCH,
   boardView,
   branchColors,
   CARD_MIME,
@@ -69,6 +70,7 @@ import {
   offeredByRoot,
   ownCards,
   pageTitle,
+  parseSearch,
   perform,
   placeAt,
   placement,
@@ -731,9 +733,20 @@ export function App({
           sprites,
         })
   const title = pageTitle(needsYou, listView?.selected ?? null, page)
-  // The board's search and "mine": never stored.
+  // The board's search and "mine": never stored, so a filter outlives
+  // closing the board but not a reload. One parse decides the filter
+  // (`parseSearch`); the field's ref is for `/`, which `Board` hears.
   const [boardQuery, setBoardQuery] = useState("")
   const [boardMine, setBoardMine] = useState(false)
+  const boardSearch = useMemo(
+    () => parseSearch(boardQuery, boardMine),
+    [boardQuery, boardMine],
+  )
+  const clearBoardFilter = useCallback(() => {
+    setBoardQuery("")
+    setBoardMine(false)
+  }, [])
+  const boardSearchField = useRef<HTMLInputElement>(null)
   const boardShown = useMemo(
     () =>
       workflow === null
@@ -747,8 +760,7 @@ export function App({
             status: attention.status,
             cardRoots: unsent.roots,
             ready: offered,
-            query: boardQuery,
-            mine: boardMine,
+            search: boardSearch,
             me: session.writer,
             work,
           }),
@@ -761,8 +773,7 @@ export function App({
       attention.status,
       unsent.roots,
       offered,
-      boardQuery,
-      boardMine,
+      boardSearch,
       session.writer,
       work,
     ],
@@ -1257,13 +1268,11 @@ export function App({
                 )}
                 {layout.board && boardShown !== null && (
                   <Board
-                    mine={boardMine}
+                    onClearFilter={clearBoardFilter}
                     onIntent={onIntent}
-                    onMine={setBoardMine}
-                    onQuery={setBoardQuery}
                     pip={pip}
-                    query={boardQuery}
                     readers={readers}
+                    searchRef={boardSearchField}
                     thread={(end, root) => thread(end, end, root)}
                     view={boardShown}
                   />
@@ -1294,10 +1303,16 @@ export function App({
             <BoardStrip
               count={count}
               elsewhere={attention.elsewhere}
+              mine={boardMine}
               onIntent={onIntent}
+              onMine={setBoardMine}
+              onQuery={setBoardQuery}
               open={layout.board}
               pip={unsent.elsewhere ? pip : null}
+              query={boardQuery}
               readers={readers}
+              searchRef={boardSearchField}
+              takeFocus={() => takeFocus(BOARD_SEARCH)}
               view={boardShown}
             />
           }

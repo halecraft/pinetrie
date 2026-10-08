@@ -875,7 +875,9 @@
       .inventory-count { font-size: .72rem; font-variant-numeric: tabular-nums; }
       .footer-right { margin-left: auto; display: flex; align-items: center; gap: .75rem; }
       .sync-note { font-size: .75rem; color: #6f7784; }
-      /* The board's strip: ▦, then each state's name, count, readers and mark. */
+      /* The board's strip: ▦, then each state's name, count, readers and
+         mark; while the board is open, its search and "mine" in their place
+         (ADR-0115). */
       .board-strip { display: flex; align-items: center; gap: .9rem; min-width: 0;
         overflow-x: auto; }
       .board-toggle, .strip-state { display: inline-flex; align-items: center; gap: .35rem;
@@ -884,27 +886,38 @@
       .board-toggle[aria-expanded="true"] { background: var(--page); }
       .board-toggle .glyph { color: #8b949e; }
       .strip-count { color: #e6e6e6; font-weight: 600; }
+      /* A filter is on, the board closed: blue, the board's accent, never the
+         amber that asks something of you. */
+      .board-filtered { color: #8ab4f8; font-weight: 400; }
+      /* The search in the strip: it shrinks on a narrow window. A filter is
+         marked by the field's border, not an outline: the strip scrolls
+         sideways, which clips anything drawn outside its box. */
+      .board-search-box { position: relative; display: inline-flex; flex: 0 1 18rem; min-width: 8rem; }
+      .board-search { flex: 1; min-width: 0; padding: .25rem 1.6rem .25rem .5rem; background: var(--page);
+        color: #ddd; border: 1px solid var(--edge); border-radius: 4px; font: inherit; }
+      .board-search[data-filtered] { border-color: #8ab4f8; }
+      .board-search-clear { position: absolute; top: 0; bottom: 0; right: .15rem; padding: 0 .35rem;
+        background: none; color: #8b93a1; font-size: .95rem; line-height: 1; }
+      .board-search-clear:hover, .board-search-clear:focus-visible { color: #e6e6e6; }
+      .board-mine { flex: none; color: #8b949e; font-size: .75rem; white-space: nowrap; }
       /* A state's roots the agent works in, and with work ready to accept
-         (ADR-0091): facts, muted, never a badge, never moving. ⇡ is blue on
-         a thread card, apart from the amber that asks something of you. */
-      .strip-working, .strip-ready { font-size: .75rem; color: #8b93a1; }
+         (ADR-0091), in the strip and in a column's head: facts, muted, never
+         a badge, never moving. ⇡ is blue on a thread card, apart from the
+         amber that asks something of you. */
+      .state-working, .state-ready { font-size: .75rem; color: #8b93a1; }
       .root-ready { flex: 0 0 auto; color: #8ab4f8; font-size: .8rem; line-height: 1; }
       .reader-trigger { display: inline-flex; align-items: center; gap: .3rem;
         padding: .1rem .3rem; background: none; color: #ddd; border-radius: 999px; }
       .reader-trigger .initial { width: 22px; height: 22px; line-height: 22px; font-size: 12px; }
       /* The board, open (ADR-0112): over the columns, from the footer's edge,
-         moving none of them. Its search above (ADR-0109), which stays while
-         the states scroll below it: a column per open state, a column to add
-         one, and the closed state collapsed to a count and its rows. */
+         moving none of them. A column per open state, a column to add one,
+         and the closed state collapsed to a count and its rows; they scroll,
+         and the filter's banner stays at the foot (ADR-0115). */
       #board { position: absolute; z-index: 3; left: 0; right: 0; bottom: 0; max-height: 70%;
         display: flex; flex-direction: column; gap: .6rem; padding: .9rem;
         background: #111317;
         border-top: 1px solid var(--edge); box-shadow: 0 -12px 24px #0008;
         font-size: .8rem; color: #c9d1d9; --surface: #111317; }
-      .board-bar { display: flex; align-items: center; gap: .75rem; flex: 0 0 auto; }
-      .board-search { width: 18rem; max-width: 100%; padding: .3rem .5rem; background: var(--page); color: #ddd;
-        border: 1px solid var(--edge); border-radius: 4px; font: inherit; }
-      .board-mine { color: #8b949e; font-size: .75rem; }
       .board-states { display: flex; align-items: flex-start; gap: .75rem; min-height: 0; overflow: auto;
         padding: .35rem; margin: -.35rem; }
       .board-column, .board-closed { display: flex; flex-direction: column; gap: .4rem; min-width: 0; }
@@ -916,6 +929,16 @@
       .state-name-input { width: 9rem; padding: .1rem .4rem; background: var(--page); color: #e6e6e6;
         border: 1px solid #3a3f48; border-radius: 4px; font: inherit; }
       .board-count { color: #6f7784; font-size: .7rem; }
+      .board-count[data-kept] { color: #8ab4f8; }
+      /* The filter's banner, at the board's foot: blue, as the counts it
+         explains. */
+      .board-filter { flex: none; display: flex; align-items: center; gap: .75rem;
+        padding: .35rem .6rem; border-left: 2px solid #8ab4f8; border-radius: 0 4px 4px 0;
+        background: #8ab4f81a; color: #c9d1d9; }
+      .board-filter-words { flex: 1; min-width: 0; }
+      .board-filter-clear { flex: none; padding: .1rem .55rem; background: none; color: #8ab4f8;
+        border: 1px solid #8ab4f866; border-radius: 999px; font-size: .75rem; }
+      .board-filter-clear:hover, .board-filter-clear:focus-visible { color: #e6e6e6; border-color: #8ab4f8; }
       .state-more { position: relative; margin-left: auto; }
       .state-menu, .item-menu { padding: 0 .3rem; background: none; color: #aaa; }
       .board-cards { position: relative; display: flex; flex-direction: column; gap: .4rem;

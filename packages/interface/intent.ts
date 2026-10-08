@@ -28,6 +28,7 @@ import type { Outcome } from "@pinetrie/protocol/codec"
 import { AT_INVENTORY, IN_COLUMN } from "@pinetrie/session"
 import type { Density } from "./ask-words.ts"
 import type { Raised } from "./attention.ts"
+import { BOARD_SEARCH } from "./board-view.ts"
 import {
   afterUndo,
   cardOf,
@@ -204,8 +205,14 @@ export type Intent =
     }
   /** Change the board's workflow states (ADR-0112). */
   | { readonly kind: "editWorkflow"; readonly edit: WorkflowEdit }
-  /** Open or close the board. */
-  | { readonly kind: "board"; readonly open: boolean }
+  /** Close the board. */
+  | { readonly kind: "board"; readonly open: false }
+  /**
+   * Open the board. `focus`: a person opened it (▦, a state in the strip),
+   * so its search takes focus once (`armFocus`). The board opening by
+   * itself, with nothing to show (`pruneLayout`), sends no intent.
+   */
+  | { readonly kind: "board"; readonly open: true; readonly focus: boolean }
   /** Fold the sidebar to icons, or unfold it (ADR-0088). */
   | { readonly kind: "foldList" }
   /** Show a page over the workspace, or, with null, the workspace (ADR-0098). */
@@ -364,7 +371,12 @@ function planOf(
         { kind: "request", intent: { kind: "workflow", edit: intent.edit } },
       ]
     case "board":
-      return [layout({ kind: "board", open: intent.open })]
+      return [
+        ...(intent.open && intent.focus
+          ? [{ kind: "armFocus", key: BOARD_SEARCH } as const]
+          : []),
+        layout({ kind: "board", open: intent.open }),
+      ]
     case "foldList":
       return [{ kind: "listWidth", width: otherWidth(state.listWidth) }]
     case "page":

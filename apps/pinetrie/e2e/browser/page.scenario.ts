@@ -1078,7 +1078,7 @@ async function run(check: Checks["check"]): Promise<void> {
         mode: "branch",
       })
       const working = await page
-        .waitForSelector("#bottom .strip-working", { timeout: 30_000 })
+        .waitForSelector("#bottom .state-working", { timeout: 30_000 })
         .then(
           () => true,
           () => false,
@@ -1818,6 +1818,72 @@ async function run(check: Checks["check"]): Promise<void> {
           )
           await page.click("#bottom .board-toggle")
           await tb.click("#bottom .board-toggle")
+        }
+
+        // 4e. The board's search (ADR-0115): opened with ▦, its field in the
+        // footer takes focus, and a filter shows a banner at the board's
+        // foot without moving the field. A word no label holds hides every
+        // root, so the board shrinks as far as it can. Clear lifts the
+        // words and mine.
+        {
+          const field = "#bottom .board-search"
+          await page.click("#bottom .board-toggle")
+          await page.waitForSelector("#board", { timeout: 15_000 })
+          const focused = await page
+            .waitForFunction(
+              sel => document.activeElement === document.querySelector(sel),
+              field,
+              { timeout: 5_000 },
+            )
+            .then(
+              () => true,
+              () => false,
+            )
+          const box = () =>
+            page
+              .$eval(field, n => {
+                const r = n.getBoundingClientRect()
+                return [r.x, r.y, r.width, r.height].map(Math.round).join()
+              })
+              .catch(() => "")
+          const before = await box()
+          await page.fill(field, "zzqx")
+          const banner = await page
+            .waitForSelector("#board .board-filter", { timeout: 5_000 })
+            .then(
+              () => true,
+              () => false,
+            )
+          const after = await box()
+          await page.check("#bottom .board-mine input").catch(() => null)
+          await page.click("#board .board-filter-clear").catch(() => null)
+          const cleared = await page
+            .waitForSelector("#board .board-filter", {
+              state: "detached",
+              timeout: 5_000,
+            })
+            .then(
+              () => true,
+              () => false,
+            )
+          const mineOff = await page
+            .isChecked("#bottom .board-mine input")
+            .then(
+              on => !on,
+              () => false,
+            )
+          check(
+            "▦ opens the board with its search focused in the footer, and a filter shows a banner without moving the field",
+            focused && banner && cleared && before !== "" && before === after,
+            `${before} → ${after}; focused ${focused}, banner ${banner}, cleared ${cleared}`,
+          )
+          check(
+            "the banner's Clear lifts the filter's words and mine",
+            cleared && mineOff,
+            `cleared ${cleared}, mine off ${mineOff}`,
+          )
+          if ((await page.$("#board")) !== null)
+            await page.click("#bottom .board-toggle")
         }
 
         // 5. ＋'s menu, by keyboard; an unsent new tab closes without a trace.

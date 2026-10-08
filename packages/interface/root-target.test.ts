@@ -139,28 +139,29 @@ describe("placeAfter", () => {
 })
 
 describe("stepsIn", () => {
+  const all = () => true
   test("up goes before the one above; down before the one after next, or to the end", () => {
-    expect(stepsIn(["a", "b", "c"], "a", ["a", "b", "c"])).toEqual({
+    expect(stepsIn(["a", "b", "c"], "a", all)).toEqual({
       up: null,
       down: { before: "c" },
     })
-    expect(stepsIn(["a", "b", "c"], "b", ["a", "b", "c"])).toEqual({
+    expect(stepsIn(["a", "b", "c"], "b", all)).toEqual({
       up: { before: "a" },
       down: { before: null },
     })
-    expect(stepsIn(["a", "b", "c"], "c", ["a", "b", "c"])).toEqual({
+    expect(stepsIn(["a", "b", "c"], "c", all)).toEqual({
       up: { before: "b" },
       down: null,
     })
   })
 
   test("an item not in the order steps nowhere", () => {
-    expect(stepsIn(["a"], "z", ["a"])).toEqual({ up: null, down: null })
+    expect(stepsIn(["a"], "z", all)).toEqual({ up: null, down: null })
   })
 
   test("among the items shown, a move passes the hidden ones: up before the shown one above, down just after the shown one below", () => {
     const order = ["a", "x", "b", "y", "c", "z"]
-    const shown = ["a", "b", "c"]
+    const shown = (t: string) => ["a", "b", "c"].includes(t)
     expect(stepsIn(order, "b", shown)).toEqual({
       up: { before: "a" },
       down: { before: "z" },

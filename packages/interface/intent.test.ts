@@ -13,6 +13,7 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
+import { BOARD_SEARCH } from "./board-view.ts"
 import type { CardFacts, Effect, IntentState } from "./effects.ts"
 import { NEW_ROOT, tree } from "./fixtures.ts"
 import {
@@ -182,7 +183,17 @@ describe("planIntent", () => {
     expect(plan({ kind: "editWorkflow", edit })).toEqual([
       { kind: "request", intent: { kind: "workflow", edit } },
     ])
-    expect(plan({ kind: "board", open: true })).toEqual([
+    expect(plan({ kind: "board", open: true, focus: false })).toEqual([
+      { kind: "layout", action: { kind: "board", open: true } },
+    ])
+    expect(plan({ kind: "board", open: false })).toEqual([
+      { kind: "layout", action: { kind: "board", open: false } },
+    ])
+  })
+
+  test("a person's open of the board arms its search's focus first; the board's own open arms nothing", () => {
+    expect(plan({ kind: "board", open: true, focus: true })).toEqual([
+      { kind: "armFocus", key: BOARD_SEARCH },
       { kind: "layout", action: { kind: "board", open: true } },
     ])
   })
@@ -730,7 +741,7 @@ describe("a page over the workspace (ADR-0098)", () => {
       asksAgent: false,
     })
     expect(plan(fromColumn, onPage)).toEqual([leave, ...plan(fromColumn)])
-    const board: Intent = { kind: "board", open: true }
+    const board: Intent = { kind: "board", open: true, focus: true }
     expect(plan(board, onPage)).toEqual([leave, ...plan(board)])
     const inbox: Intent = {
       kind: "openIn",

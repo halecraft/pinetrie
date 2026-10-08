@@ -563,10 +563,29 @@ export const mutations: readonly Mutation[] = [
       "a reader's menu open when they leave stays open and says so, and their avatar leaves once you close it",
   },
   {
+    name: "Clear leaves mine on",
+    file: "packages/web/app.tsx",
+    from: "    setBoardMine(false)",
+    to: "    void setBoardMine",
+    suite: "browser",
+    scenario: "page",
+    expect: "the banner's Clear lifts the filter's words and mine",
+  },
+  {
+    name: "the board's search takes no focus when you open the board",
+    file: "packages/web/board.tsx",
+    from: "    if (takeFocus()) searchRef.current?.focus()",
+    to: "    if (takeFocus() && false) searchRef.current?.focus()",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "▦ opens the board with its search focused in the footer, and a filter shows a banner without moving the field",
+  },
+  {
     name: "the strip's working count pulses",
     file: "packages/web/index.html",
-    from: "      .strip-working, .strip-ready { font-size: .75rem; color: #8b93a1; }",
-    to: "      .strip-working, .strip-ready { font-size: .75rem; color: #8b93a1; animation: pulse 1s ease-in-out infinite; }",
+    from: "      .state-working, .state-ready { font-size: .75rem; color: #8b93a1; }",
+    to: "      .state-working, .state-ready { font-size: .75rem; color: #8b93a1; animation: pulse 1s ease-in-out infinite; }",
     suite: "browser",
     scenario: "page",
     expect:

@@ -1725,7 +1725,7 @@ async function run(
             mode: "branch",
           })
           const newRoot = treeOf(toolHost).roots.at(-1) ?? ""
-          await appears("#bottom .strip-working")
+          await appears("#bottom .state-working")
           await openBoard(tp)
           const ringed = `#board ${boardSel(newRoot)}:has(.root-status.working) .board-open`
           await appears(ringed)

@@ -3,7 +3,10 @@
 // count, the people reading in its roots, its highest mark, and how many of
 // its roots the agent works in and have work ready to accept (ADR-0091),
 // counts that ask nothing of you; ▦ opens the board over the columns, moving
-// none of them, and ▦, Escape or a click outside it closes it.
+// none of them, and ▦, Escape or a click outside it closes it. While the
+// board is open, the strip holds the board's search and "mine" in the
+// states' place, and each column's head says what the state's button did
+// (ADR-0115).
 //
 // Opened, each open state is a column: drag an item to another column, or
 // within one, or use its ⋯'s Move to ▸, to move it for everyone. To the
@@ -11,20 +14,23 @@
 // is ready to accept carries ⇡, for everyone. Selecting an item opens it in your
 // list; dragged onto the sidebar, it opens there. A state's name is edited in
 // place, its ⋯ moves or removes it, and ＋ state adds one. The closed state
-// is a count and its most recent roots. Above the states, one search over
-// labels, and "mine", filter every state in place (ADR-0109); `/` focuses it,
-// and Escape clears it before it closes the board. What it shows is
-// `boardView`'s.
+// is a count and its most recent roots. The search and "mine" filter every
+// state in place (ADR-0109); a banner at the board's foot names the filter,
+// `/` focuses the search, and Escape clears the filter before it closes the
+// board. What it shows is `boardView`'s.
 
 import type { EntryId, WriterId } from "@pinetrie/core"
 import {
   type BoardSide,
   type BoardView,
   boardKeyAct,
+  CLEAR_FILTER,
+  type Count,
   clickClosesBoard,
+  filterTitle,
+  filterWords,
   type Intent,
   keptWords,
-  LEVEL_CLASS,
   LEVEL_WORDS,
   type Level,
   type MessageCount,
@@ -34,13 +40,14 @@ import {
   rootDropProps,
   rootGroupProps,
   rootsWords,
+  type StateSignals,
   type StripState,
   searchWords,
-  stripWords,
+  stateWords,
   type ThreadCard,
 } from "@pinetrie/interface"
 import { ROOT_BUSY_REASON } from "@pinetrie/rules"
-import { useEffect, useRef, useState } from "react"
+import { type RefObject, useEffect, useRef, useState } from "react"
 import { Menu, type MenuItem } from "./menu.tsx"
 import {
   ReaderMenus,
@@ -58,8 +65,10 @@ const elsewhereWords = (level: Level): string =>
   `a thread not in the sidebar: ${LEVEL_WORDS[level]}`
 
 /**
- * The strip: ▦, then each state's name, count, readers and mark, and its
- * roots the agent works in (◌) and with work ready to accept (⇡), ADR-0091.
+ * The strip: ▦, then, while the board is closed, each state's name, count,
+ * readers, mark, ◌ and ⇡ (ADR-0091); while it is open, the board's search
+ * and "mine" in their place (ADR-0115). ▦ carries ⌕ while a filter is on
+ * and the board is closed, so a filter kept across closing is not missed.
  */
 export function BoardStrip({
   view,
@@ -69,6 +78,12 @@ export function BoardStrip({
   elsewhere,
   pip,
   readers,
+  query,
+  onQuery,
+  mine,
+  onMine,
+  searchRef,
+  takeFocus,
 }: {
   view: BoardView | null
   open: boolean
@@ -80,8 +95,24 @@ export function BoardStrip({
   /** A root not in the sidebar holds an unsent card of yours. */
   pip: React.ReactNode | null
   readers: ReadersProps
+  /** What is typed in the board's search, and its "mine": never stored. */
+  query: string
+  onQuery: (query: string) => void
+  mine: boolean
+  onMine: (mine: boolean) => void
+  /** The search field, which `Board` focuses on `/`. */
+  searchRef: RefObject<HTMLInputElement | null>
+  /** Whether the search takes focus as it mounts: armed when a person opens the board (`claimFocus`). */
+  takeFocus: () => boolean
 }) {
-  const toggle = () => onIntent({ kind: "board", open: !open })
+  const shown = view?.shown ?? null
+  const filter = shown?.kind === "filtered" ? shown.search : null
+  const toggle = () =>
+    onIntent(
+      open
+        ? { kind: "board", open: false }
+        : { kind: "board", open: true, focus: true },
+    )
   return (
     <div className="board-strip">
       <button
@@ -89,7 +120,11 @@ export function BoardStrip({
         className="board-toggle"
         data-messages={count.total}
         onClick={toggle}
-        title={messageCountTitle(count)}
+        title={
+          filter !== null && !open
+            ? `${messageCountTitle(count)} · ${filterTitle(filter)}`
+            : messageCountTitle(count)
+        }
         type="button"
       >
         <span aria-hidden className="glyph">
@@ -103,17 +138,105 @@ export function BoardStrip({
             title={elsewhereWords(elsewhere)}
           />
         )}
+        {filter !== null && !open && (
+          <span
+            aria-label={filterTitle(filter)}
+            className="board-filtered"
+            role="img"
+          >
+            ⌕
+          </span>
+        )}
         {pip}
       </button>
-      {view?.strip.map(s => (
-        <StripStateButton
-          key={s.id}
-          onOpen={() => onIntent({ kind: "board", open: true })}
-          readers={readers}
-          state={s}
+      {open ? (
+        <StripSearch
+          filtered={filter !== null}
+          mine={mine}
+          onMine={onMine}
+          onQuery={onQuery}
+          placeholder={searchWords(shown?.total ?? 0)}
+          query={query}
+          searchRef={searchRef}
+          takeFocus={takeFocus}
         />
-      ))}
+      ) : (
+        view?.strip.map(s => (
+          <StripStateButton
+            key={s.id}
+            onOpen={() => onIntent({ kind: "board", open: true, focus: true })}
+            readers={readers}
+            state={s}
+          />
+        ))
+      )}
     </div>
+  )
+}
+
+/**
+ * The board's search in the strip: the field, its × (which clears only what
+ * is typed), and "mine".
+ */
+function StripSearch({
+  query,
+  onQuery,
+  mine,
+  onMine,
+  filtered,
+  placeholder,
+  searchRef,
+  takeFocus,
+}: {
+  query: string
+  onQuery: (query: string) => void
+  mine: boolean
+  onMine: (mine: boolean) => void
+  /** A filter is on: the field is outlined in the board's blue. */
+  filtered: boolean
+  placeholder: string
+  searchRef: RefObject<HTMLInputElement | null>
+  takeFocus: () => boolean
+}) {
+  // biome-ignore lint/correctness/useExhaustiveDependencies: once, as the board opens
+  useEffect(() => {
+    if (takeFocus()) searchRef.current?.focus()
+  }, [])
+  return (
+    <>
+      <span className="board-search-box">
+        <input
+          aria-label="search the board"
+          className="board-search"
+          data-filtered={filtered || undefined}
+          onChange={e => onQuery(e.target.value)}
+          placeholder={placeholder}
+          ref={searchRef}
+          value={query}
+        />
+        {query !== "" && (
+          <button
+            aria-label="clear the search"
+            className="board-search-clear"
+            onClick={() => {
+              onQuery("")
+              searchRef.current?.focus()
+            }}
+            type="button"
+          >
+            ×
+          </button>
+        )}
+      </span>
+      <label className="board-mine">
+        <input
+          checked={mine}
+          onChange={e => onMine(e.target.checked)}
+          type="checkbox"
+        />{" "}
+        mine
+      </label>
+    </>
   )
 }
 
@@ -126,7 +249,6 @@ function StripStateButton({
   onOpen: () => void
   readers: ReadersProps
 }) {
-  const words = stripWords(state)
   return (
     <button
       className="strip-state"
@@ -137,26 +259,49 @@ function StripStateButton({
     >
       <span className="strip-name">{state.name}</span>{" "}
       <b className="strip-count">{state.count}</b>
-      {!state.closed && <Readers {...readers} roots={state.roots} />}
-      {state.mark !== null && (
-        <span
-          aria-label={LEVEL_WORDS[state.mark]}
-          className={`root-status ${LEVEL_CLASS[state.mark]}`}
-          role="img"
-          title={LEVEL_WORDS[state.mark]}
-        />
-      )}
-      {state.working > 0 && (
-        <span className="strip-working" title={words.working}>
-          ◌{state.working}
-        </span>
-      )}
-      {state.ready > 0 && (
-        <span className="strip-ready" title={words.ready}>
-          ⇡{state.ready}
-        </span>
-      )}
+      <StateSignalMarks
+        mark={state.mark}
+        readers={readers}
+        signals={state.signals}
+      />
     </button>
+  )
+}
+
+/**
+ * A state's readers' avatars, highest mark, ◌ and ⇡: in the strip over
+ * every root in it, in a column's head over the roots shown, with the mark
+ * over every root in both.
+ */
+function StateSignalMarks({
+  signals,
+  mark,
+  readers,
+}: {
+  signals: StateSignals
+  mark: Level | null
+  readers: ReadersProps
+}) {
+  const words = stateWords(signals)
+  return (
+    <>
+      {signals.roots.length > 0 && (
+        <Readers {...readers} roots={signals.roots} />
+      )}
+      {mark !== null && (
+        <StatusMark arrived={null} level={mark} title={LEVEL_WORDS[mark]} />
+      )}
+      {signals.working > 0 && (
+        <span className="state-working" title={words.working}>
+          ◌{signals.working}
+        </span>
+      )}
+      {signals.ready > 0 && (
+        <span className="state-ready" title={words.ready}>
+          ⇡{signals.ready}
+        </span>
+      )}
+    </>
   )
 }
 
@@ -164,45 +309,42 @@ function StripStateButton({
 export function Board({
   view,
   onIntent,
-  query,
-  onQuery,
-  mine,
-  onMine,
+  onClearFilter,
+  searchRef,
   readers,
   thread,
   pip,
 }: {
   view: BoardView
   onIntent: (intent: Intent) => void
-  /** The board's search and its "mine": never stored. */
-  query: string
-  onQuery: (q: string) => void
-  mine: boolean
-  onMine: (mine: boolean) => void
+  /** Lift the whole filter: its words and "mine". */
+  onClearFilter: () => void
+  /** The search field in the strip, which `/` focuses. */
+  searchRef: RefObject<HTMLInputElement | null>
   readers: ReadersProps
   /** A thread as a row of a reader's menu, which opens it. */
   thread: (end: EntryId, root: EntryId) => MenuItem
   pip: React.ReactNode
 }) {
   // The board's keys are `boardKeyAct`'s: Escape closes the board, as ▦
-  // does, once a menu open on it (`Popover`) and then a query have taken
+  // does, once a menu open on it (`Popover`) and then a filter have taken
   // theirs. A click outside it closes it too (`clickClosesBoard`). Both ends
   // of a click are read in the capture phase, before what was clicked can
   // take itself out of the page.
   const self = useRef<HTMLElement>(null)
-  const search = useRef<HTMLInputElement>(null)
+  const filtered = view.shown.kind === "filtered"
   useEffect(() => {
     const close = () => onIntent({ kind: "board", open: false })
     const onKey = (e: KeyboardEvent) => {
       const act = boardKeyAct(e, {
         menuOpen: self.current?.querySelector(".open") != null,
-        query,
+        filtered,
         inText: isTextBox(document.activeElement),
       })
       if (act === "focusSearch") {
         e.preventDefault()
-        search.current?.focus()
-      } else if (act === "clearSearch") onQuery("")
+        searchRef.current?.focus()
+      } else if (act === "clearFilter") onClearFilter()
       else if (act === "close") close()
     }
     const side = (at: EventTarget | null): BoardSide =>
@@ -229,7 +371,7 @@ export function Board({
       document.removeEventListener("pointerdown", onPress, true)
       document.removeEventListener("click", onClick, true)
     }
-  }, [onIntent, onQuery, query])
+  }, [onIntent, onClearFilter, filtered, searchRef])
   const [adding, setAdding] = useState(false)
   // An open column's item is a place to drop before; a closed row is not,
   // since the closed state shows its roots by activity, not by place.
@@ -248,31 +390,17 @@ export function Board({
       thread={thread}
     />
   )
-  const stateCount = (shown: number, total: number) => (
-    <span className="board-count" title={rootsWords(total)}>
-      {keptWords(shown, total, view.filtered)}
+  const stateCount = (count: Count) => (
+    <span
+      className="board-count"
+      data-kept={count.kind === "kept" || undefined}
+      title={rootsWords(count.total)}
+    >
+      {keptWords(count)}
     </span>
   )
   return (
     <section aria-label="board" className="board" id="board" ref={self}>
-      <div className="board-bar">
-        <input
-          aria-label="search the board"
-          className="board-search"
-          onChange={e => onQuery(e.target.value)}
-          placeholder={searchWords(view.total)}
-          ref={search}
-          value={query}
-        />
-        <label className="board-mine">
-          <input
-            checked={mine}
-            onChange={e => onMine(e.target.checked)}
-            type="checkbox"
-          />{" "}
-          mine
-        </label>
-      </div>
       <div className="board-states">
         {view.open.map(column => (
           <div
@@ -293,14 +421,12 @@ export function Board({
                   onIntent(nameStateIntent(column.state.id, name))
                 }
               />
-              {stateCount(column.items.length, column.total)}
-              {column.mark !== null && (
-                <StatusMark
-                  arrived={null}
-                  level={column.mark}
-                  title={LEVEL_WORDS[column.mark]}
-                />
-              )}
+              {stateCount(column.count)}
+              <StateSignalMarks
+                mark={column.mark}
+                readers={readers}
+                signals={column.signals}
+              />
               <Menu
                 className="state-more"
                 label={`more for ${column.state.name}`}
@@ -381,13 +507,27 @@ export function Board({
                 onIntent(nameStateIntent(view.closed.state.id, name))
               }
             />
-            {stateCount(view.closed.kept, view.closed.total)}
+            {stateCount(view.closed.count)}
           </div>
           <div className="board-cards">
             {view.closed.rows.map(t => item(t, false))}
           </div>
         </div>
       </div>
+      {view.shown.kind === "filtered" && (
+        // At the board's foot: the board grows up from the footer, so its
+        // foot holds still as a filter shrinks it.
+        <div className="board-filter" role="status">
+          <span className="board-filter-words">{filterWords(view.shown)}</span>
+          <button
+            className="board-filter-clear"
+            onClick={onClearFilter}
+            type="button"
+          >
+            {CLEAR_FILTER}
+          </button>
+        </div>
+      )}
     </section>
   )
 }

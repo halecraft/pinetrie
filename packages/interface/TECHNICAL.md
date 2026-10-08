@@ -251,8 +251,9 @@ and each item's signals.
 - **A click outside the board closes it** only when it was pressed outside
   too (`clickClosesBoard`): a selection dragged out of the board keeps it,
   and a drag from the sidebar fires no click, so it can still drop there. The
-  strip counts as the board's own, so its buttons act alone: ▦ toggles, and
-  a state's button keeps the board open rather than closing and reopening it.
+  strip counts as the board's own, so what is in it acts alone: ▦ toggles,
+  and while the board is open, the search field, its × and "mine" (which
+  stand in the state buttons' place then, ADR-0115) keep it open.
 - **Moving a root on the board** is a `moveRoot` effect: the host's
   `move-root`, and, into the closed state, the effects that close it for you
   (`moved`), which `afterRootMove` runs only once the host answers
@@ -306,23 +307,33 @@ and each item's signals.
 ## The board (`board-view.ts`, `board.tsx`, ADR-0112)
 
 - **What the board shows is `boardView`'s**, over `boardOf` (`@pinetrie/rules`):
-  the strip (each state's name, count, roots and `markOf`), each open state
-  as a column of the items the search keeps, and the closed state's
-  `closedRows`. An item's
+  the strip (each state's name, count, `markOf` and signals), each open state
+  as a column of the cards the search keeps, the closed state's
+  `closedRows`, and `shown`, what the whole board shows (`BoardShown`: all,
+  or filtered with the search, kept and total). A card's
   `moves` are its `⋯`'s Move to ▸, one per other state, with the busy reason
   into the closed state; `up` and `down` its Move up and Move down within
-  its state, among the items shown (`stepsIn`), so the keyboard reaches
-  every move a drag makes. Its words are worded beside it, one function
-  each (`removeWords`, `rootsWords`, `keptWords`, `searchWords`).
-- **One search filters every state in place** (`boardFilter`, ADR-0109):
-  every word in the label, "mine" being the roots `RootSummary.writers`
-  holds you in. Not filtered is `null`, not a predicate that keeps all.
-  Each state's items are built once, then filtered, then given their steps,
-  since `stepsIn` needs the kept ones. An open column's `items` and the
-  closed state's `kept` are what the search keeps; `total`, in both, is
-  every root, which a column's mark, counts and Remove, and the strip,
-  count. The closed state's `closedRows` are its kept roots newest first;
-  with no query, its `CLOSED_RECENT` newest.
+  its state, among the cards shown (`stepsIn`, given a predicate, so the
+  shown cards are always cut from the state's order), so the keyboard
+  reaches every move a drag makes. Its words are worded beside it, one
+  function each (`removeWords`, `rootsWords`, `keptWords`, `searchWords`,
+  `stateWords`, `filterWords`, `filterTitle`).
+- **One search filters every state in place** (ADR-0109, ADR-0115). What
+  was typed and "mine" are parsed once (`parseSearch`) into a
+  `BoardSearch`, or null for none: the one place an empty search is
+  decided, which the filter, `closedRows`' cap, `shown` and Escape all
+  read. `boardFilter` keeps every word in the label, "mine" being the roots
+  `RootSummary.writers` holds you in. A state's roots are listed with their
+  entries, filtered, and only the kept ones become cards, steps and all, so
+  no card exists with placeholder moves. A state's head reads its `Count`
+  (all, or kept of total) and its `signals`; the closed state's
+  `closedRows` are its kept cards newest first, and with no words (none, or
+  "mine" alone) its `CLOSED_RECENT` newest.
+- **A state's signals are counted by one function**, `stateSignals`
+  (`StateSignals`: ◌, ⇡, and the roots whose readers show), over every root
+  for the strip and over the shown roots for a column's head. The mark is
+  `markOf` over every root in both, and Remove counts every root: a filter
+  hides no warning and empties no state.
 - **One landing rule for a root's drag** (`root-target.ts`), as
   `put-target.ts` is for a card's: `rootDropProps` marks a column, an item
   or the sidebar (`data-root-state`, `data-root-before`, `data-list-before`),
@@ -348,10 +359,11 @@ and each item's signals.
   (`setDragImage`). All of it is DOM attributes, never React state, as a
   column's drag is.
 - **`markOf` is the one rule for a mark over several roots** (`attention.ts`):
-  a board column's, a strip state's and ▦'s (the roots not in the sidebar,
-  `unlisted`).
+  a board column's head, a strip state's and ▦'s (the roots not in the
+  sidebar, `unlisted`).
 - **Readers' avatars read presence themselves** (`root-signals.tsx`):
-  `Readers` for the sidebar's items and the strip's states, `ReaderMenus` (a
+  `Readers` for the sidebar's items, the strip's states and each open
+  column's head (`StateSignalMarks`, `board.tsx`), `ReaderMenus` (a
   menu of each reader's threads there, `peopleIn`) for a thread card, so a
   presence write redraws them and not `App` (S59).
 - **The board is `#board`, absolutely placed in `#workspace`** from its
@@ -404,7 +416,11 @@ counter.
   layout: a column restored on reload,
   or mounted again when its tab is shown, leaves focus where it is. The focus
   runs in an effect, after the strip's alignment, and scrolls a column opened
-  past the strip's edge into view.
+  past the strip's edge into view. The board's search is armed the same way,
+  with `BOARD_SEARCH`, by a `board` intent a person sent (▦, a state's
+  button: `focus: true`), and claimed as the field mounts in the strip. The
+  board opening by itself with nothing to show (`pruneLayout`) sends no
+  intent, so it takes no focus.
   Exact: no other message at the same point, the lane's own next append
   included, can be mistaken for it. "branch here" opens one holding the text
   (`pending`), and that column's composer sends it, so a refusal shows where
@@ -1306,9 +1322,11 @@ state, never stored.
   folds or unfolds the sidebar (ADR-0088), from anywhere, as I and O.
   The open board's keys are a second table, `boardKeyAct` (`board-view.ts`),
   read by `Board`'s own listener, until the key-system redesign replaces
-  both: clearing its query and focusing its search are view state, not
-  intents. Escape there clears a query before it closes the board, after
-  any menu open on it; `/` focuses the search outside a text box. Both
+  both: clearing its filter and focusing its search are view state, not
+  intents. Escape there clears the filter (its words and "mine") before it
+  closes the board, after any menu open on it, in a text box too: in the
+  search field it is how you leave the search. `/` focuses the search
+  outside a text box. Both
   listeners ask `isTextBox` (`packages/web/text-box.ts`), which counts any
   `<input>`, a checkbox too.
 - **A move flies** (`use-flight.ts`): `perform` measures the card's element

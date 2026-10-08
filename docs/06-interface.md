@@ -180,9 +180,12 @@ While the page syncs, "syncing…" leads its right end.
   count, avatars of the people reading in its roots, an amber dot when a
   root there needs you, and, only when there are any, **◌n**, its roots the
   agent works in, and **⇡n**, its roots with work ready to accept (ADR-0091).
-  Those two are facts for everyone: never a badge, never moving. ▦ carries
-  the highest mark of the roots not in the sidebar, and a dot in your colour
-  when one of them holds something you typed; its title is the session's
+  Those two are facts for everyone: never a badge, never moving. While the
+  board is open, the board's search and **mine** take the states' place,
+  since each column's head shows the same (ADR-0115). ▦ carries
+  the highest mark of the roots not in the sidebar, a dot in your colour
+  when one of them holds something you typed, and a blue ⌕ while a filter
+  is on and the board is closed; its title is the session's
   message count, "2 in the threads this tab has loaded, of 4 in the
   session": the messages in the roots this browser tab holds, of every
   root's. Nothing in the footer animates: the sidebar, the column, the rail
@@ -257,7 +260,7 @@ nothing; Ctrl+Shift+L still folds the sidebar.
 ### The board: where everyone's work stands (ADR-0112)
 
 ▦, or a state in the strip, opens the board over the columns, from the
-footer's edge: it moves none of them. ▦ again, Escape (once a query is
+footer's edge: it moves none of them. ▦ again, Escape (once a filter is
 cleared), or a click outside it and its strip closes it, and so does choosing something to work in. Whether it is open is this browser
 tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
 
@@ -279,15 +282,24 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   run that needs you, is a mark, never a move. A move from a state the root
   has left is refused, naming who moved it and where ("not moved: Bea moved
   it to Doing first").
-- **One search for the whole board** (ADR-0109), at its top, with
-  **mine** (the roots you wrote in), filters every state in place: a root
-  is kept when its label holds every word typed, in any order (labels, not
-  every message, which would load every root, ADR-0063). The states keep
-  their places and the items their order, and each state's head says how
-  many it shows ("12 of 96"); its mark and counts, and the strip's, still
-  count every root. Move up and Move down step among the items shown. `/`
-  focuses the field while the board is open; Escape clears a query before
-  it closes the board.
+- **A column's head** shows the state's name, its count, the readers'
+  avatars of its roots, its highest mark, and, only when there are any,
+  **◌n** and **⇡n**, as the strip's button does (ADR-0115).
+- **One search for the whole board** (ADR-0109, ADR-0115), in the footer's
+  strip while the board is open, with **mine** (the roots you wrote in),
+  filters every state in place: a root is kept when its label holds every
+  word typed, in any order (labels, not every message, which would load
+  every root, ADR-0063). The states keep their places and the items their
+  order. While a filter is on, each head's count says how many it shows
+  ("12 of 96"), its ◌, ⇡ and readers count those, and the count and the
+  field's border are blue; its mark, Remove's refusal and the strip count
+  every root. A banner at the board's foot names the filter ("Filtered by
+  "parser" and mine: 14 of 140 roots") with **Clear**, which lifts the words
+  and mine; the field's **×** clears only the words. Move up and Move down
+  step among the items shown. Opening the board with ▦ or a state's button
+  focuses the field; the board opening by itself does not. `/` focuses it
+  while the board is open; Escape clears the filter before it closes the
+  board. The filter outlives closing the board, not a reload.
 - **The closed state archives** (ADR-0029): a root there is read-only for
   everyone until it is moved out, the host lets go of it, and its threads'
   offers leave your repo. It shows as a count and its most recent roots, or

@@ -1156,13 +1156,18 @@ leaving treats the history, are `page.ts`'s (`@pinetrie/interface`).
   per open state and `.board-closed` for the closed one, each item a
   `.thread-card[data-root][data-entry]` with `.board-open`, `.board-label`,
   `.reader-trigger` per reader (its menu `.reader`, `.open` while open),
-  `.root-ready` when a thread has work ready, and `.item-menu`; the search
-  is `.board-bar`'s `.board-search` and `.board-mine`, above
-  `.board-states`; `.add-state`, `.state-name`. The footer is `#bottom`: ▦ is
+  `.root-ready` when a thread has work ready, and `.item-menu`; the states
+  scroll in `.board-states`, a head's count is `.board-count` (`[data-kept]`
+  while filtered), and a filter's banner is `.board-filter` with
+  `.board-filter-clear`, at the board's foot; `.add-state`, `.state-name`.
+  The footer is `#bottom`: ▦ is
   `.board-toggle`, whose `data-messages` is the session's message count
-  (the browser suite's `countIsHosts` waits on it), each state
-  `.strip-state[data-state]`, with `.strip-working` and `.strip-ready`
-  when nonzero; `connected` (`page.ts`) waits for
+  (the browser suite's `countIsHosts` waits on it), with `.board-filtered`
+  (⌕) while a filter is on and the board is closed. With the board closed,
+  each state is `.strip-state[data-state]`; with it open, the strip holds
+  `.board-search` (`[data-filtered]` while a filter is on), its
+  `.board-search-clear` and `.board-mine` instead. A strip state and an open
+  column's head show `.state-working` and `.state-ready` when nonzero; `connected` (`page.ts`) waits for
   `#sidebar .add-agent` with no `.sync-note`. The corner is
   `.footer-you`: its icons are in `.footer-tools`. Your inbox is `.inbox`,
   its trigger `.inbox-trigger` and badge `.inbox-badge[data-needs-you]`
