@@ -403,12 +403,13 @@ item 18, and in `lanes.test.ts` against the harness.
   directly. pi builds both the tools and the system prompt from it.
   `programs` says where the search tools find rg and fd, in `env`'s file
   system: the runtime's `bin/` for a lane of its own (`LaneAccess.programs`,
-  from the host's `RUNTIME_BIN`), `hostProgram` for one that works
-  directly. A tool never runs a bare program name, so no lane runs whatever
+  from the host's `RUNTIME_BIN`). A tool never runs a bare program name, so no lane runs whatever
   its `PATH` happens to hold.
-- **A lane working directly** gets pi's `NodeExecutionEnv` in its directory
-  (`directEnv`). Every method first awaits `ready`, and `shellEnv` sets
-  `JJ_EDITOR`, `VISUAL` and `EDITOR` to `false`.
+- **An agent without tools, or a lane with no copy of its own,** gets no
+  access (`toolContextOf(null, project)`): `refusingEnv`, whose every method
+  answers `not_supported`, and a prompt naming the project's root, every
+  skill at its own path, and `PINNED_RULE` alone. A call with no lane named
+  is the same.
 - **A lane of its own** gets `laneEnv(dir, gate)`: a proxy whose every method
   first awaits the gate, then forwards the call over the lane's channel.
   - The helper (`lane-helper.ts`) serves pi's own `NodeExecutionEnv` in the
@@ -565,12 +566,6 @@ item 18, and in `lanes.test.ts` against the harness.
 - **Gitignored paths are skipped**, a shared `.plans` included, unless named
   as `path`. With no `path`, neither program is given one, so paths print
   without a leading `./`.
-- **On the host,** `hostProgram` asks pi's `ensureTool`: the program in pi's
-  bin directory, else on `PATH` (fd also as `fdfind`), else downloaded into
-  that directory, unless `PI_OFFLINE` is set. A found path is remembered
-  (`rememberedProgram`), since pi's lookup runs `spawnSync` on every call; a
-  miss is asked again. No suite calls it: a direct lane in a suite scripts no
-  search.
 - **The tests** cover the plans and words purely (`search.test.ts`), and a
   stand-in rg run through the real helper (`lanes.test.ts`), which shows the
   head capture and the absolute path crossing the channel. The real programs
@@ -693,8 +688,7 @@ a counter.
 Reaches pi entry points that are absent from its `exports` map, by relative path
 into `node_modules`: `createAgentHarness`, `addUsage`/`emptyUsage`,
 `ModelRuntime`, and, for the person's pi setup, `SettingsManager`,
-`DefaultResourceLoader` and `buildSystemPrompt`. For the search tools in a
-lane that works directly: `ensureTool`. For commands:
+`DefaultResourceLoader` and `buildSystemPrompt`. For commands:
 `loadSkillsFromDir`, `loadPromptTemplates`, `substituteArgs`
 and `parseCommandArgs`. For images (ADR-0042):
 `detectSupportedImageMimeType`, `resizeImage` and `formatDimensionNote`. Those paths are depth-sensitive: they broke when this

@@ -37,17 +37,15 @@ import type { RecordSpec } from "./records.ts"
 /** The one `pinetrie.project` value's key: a host has one project. */
 export const PROJECT_KEY = "project"
 
-const WorkSettingSchema = Type.Union([
+/** A lane's work as stored: its own copy, or null for none (`ownCopy`). */
+const OwnCopySchema = Type.Union([
   Type.Object({ kind: Type.Literal("own") }),
-  Type.Object({
-    kind: Type.Literal("direct"),
-    dir: Type.String({ minLength: 1 }),
-  }),
+  Type.Null(),
 ])
 
 const LaneRecordSchema = Type.Object({
   root: Type.String({ minLength: 1 }),
-  work: Type.Union([WorkSettingSchema, Type.Null()]),
+  work: OwnCopySchema,
   by: Type.String(),
   createdAt: Type.Number(),
 })
@@ -65,35 +63,30 @@ const RevisionRecordSchema = Type.Object({
   conflicts: Type.Optional(Type.Array(Type.String())),
 })
 
-const ProjectRecordSchema = Type.Union([
-  Type.Object({
-    kind: Type.Literal("lanes"),
-    root: Type.String({ minLength: 1 }),
-    rootDefault: Type.Union([Type.Literal("own"), Type.Literal("direct")]),
-  }),
-  Type.Object({
-    kind: Type.Literal("direct"),
-    root: Type.String({ minLength: 1 }),
-    reason: Type.String(),
-  }),
-])
+const ProjectRecordSchema = Type.Object({
+  root: Type.String({ minLength: 1 }),
+})
 
 /**
  * Each lane's record, written as the lane is created: the root it works in
- * (ADR-0063), and its setting, its own copy or a directory, or null for none.
+ * (ADR-0063), and whether it has a copy of its own, stored as its work
+ * (`{ kind: "own" }`, or null for none) as records before ADR-0102 hold it.
  */
 export const LANE: RecordSpec<LaneRecord, LaneName, "session"> = {
   namespace: "pinetrie.lane",
   home: "session",
   keyOf: r => r.lane,
-  encode: ({ lane, ...contents }) => contents,
+  encode: ({ lane, ownCopy, ...contents }) => ({
+    ...contents,
+    work: ownCopy ? { kind: "own" } : null,
+  }),
   decode: (contents, key) =>
     decodeAt(LaneRecordSchema, contents, laneKey(key), (r, lane) =>
       isRootId(r.root)
         ? {
             lane,
             root: r.root,
-            work: r.work,
+            ownCopy: r.work !== null,
             by: r.by as WriterId,
             createdAt: r.createdAt,
           }
@@ -141,7 +134,8 @@ export const PROJECT: RecordSpec<ProjectRecord, typeof PROJECT_KEY, "session"> =
         ProjectRecordSchema,
         contents,
         fixedKey(PROJECT_KEY, key),
-        r => r,
+        // A record before ADR-0102 has a kind and a default: not read.
+        r => ({ root: r.root }),
       ),
   }
 
@@ -152,8 +146,8 @@ export const PROJECT: RecordSpec<ProjectRecord, typeof PROJECT_KEY, "session"> =
  * that made tool calls, since ignored files change without a commit: its
  * snapshot, and a commit when one was made. A prompt with nothing to commit
  * records the lane's newest revision, so a branch from it names the commit
- * its disk was at even after its base moved. A lane working directly records
- * its prompts only, with neither. Only a turn's own commit carries the paths
+ * its disk was at even after its base moved. A lane with no copy of its own
+ * records its prompts only, with neither. Only a turn's own commit carries the paths
  * it changed: a prompt's newest revision is what came before it (ADR-0106).
  * Every record with a commit carries that commit's conflicts, so a branch
  * from any of them knows its copy's (ADR-0072). A turn whose `catch_up`

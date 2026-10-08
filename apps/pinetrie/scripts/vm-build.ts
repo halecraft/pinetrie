@@ -8,8 +8,8 @@ import path from "node:path"
 import { hostBytesRunner, run } from "@pinetrie/lanes"
 import { buildVmImage, IMAGE_OUTPUTS, vmStateDir } from "@pinetrie/vm"
 import {
+  BUILDER_WORDS,
   type Builder,
-  builderWords,
   planBuilder,
 } from "../host/work/runtime.ts"
 
@@ -20,13 +20,10 @@ const answers = async (program: string, args: readonly string[]) =>
   (await run(program, args)).ok
 
 const builder = planBuilder({
-  platform: process.platform,
   vmDocker:
     existsSync(vmSocket) &&
     (await answers("docker", ["-H", `unix://${vmSocket}`, "version"])),
-  hostDocker:
-    process.platform === "linux" && (await answers("docker", ["version"])),
-  container: await answers("container", ["system", "status"]),
+  hostDocker: await answers("docker", ["version"]),
 })
 
 /** The CLI and its leading arguments that run a throwaway container. */
@@ -36,13 +33,11 @@ function runner(b: Exclude<Builder, { kind: "none" }>): readonly string[] {
       return ["docker", "-H", `unix://${vmSocket}`, "run", "--rm"]
     case "docker-host":
       return ["docker", "run", "--rm"]
-    case "container":
-      return ["container", "run", "--rm"]
   }
 }
 
 if (builder.kind === "none") {
-  console.error(`[vm:build] ${builderWords(builder)}`)
+  console.error(`[vm:build] ${BUILDER_WORDS}`)
   process.exit(1)
 }
 const cli = runner(builder)

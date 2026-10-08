@@ -65,7 +65,7 @@ export function encodeUpdate(
   return UPDATE.encode(
     details,
     files === ""
-      ? `${what} was merged into this thread's own copy. It changed none of your files, so what you read before still holds.\n\nWhat came in:\n${commits}`
+      ? `${what} was merged into this thread's own copy. It changed no file in this copy, so what you read before still holds.\n\nWhat came in:\n${commits}`
       : `${what} was merged into this thread's own copy, so these files changed under you. Read them again before relying on what you saw earlier.\n\n` +
           `What came in:\n${commits}\nFiles that changed:\n${files}`,
     timestamp,

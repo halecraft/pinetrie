@@ -2,45 +2,36 @@
 
 import path from "node:path"
 import { ROOT } from "@pinetrie/core"
-import { scriptedModel } from "@pinetrie/pi"
 import { readCommands } from "@pinetrie/reads"
 import { rowMessage } from "@pinetrie/schema"
 import type { Checks } from "../checks.ts"
-import {
-  committedProject,
-  entriesOf,
-  idleNow,
-  join,
-  startSuiteHost,
-  waitFor,
-} from "../harness.ts"
+import { entriesOf, START_CHAT, waitFor } from "../harness.ts"
+import type { LaneHosts } from "../lane-hosts.ts"
 import type { Scenario } from "../scenario.ts"
 
-import { START_CHAT } from "./support.ts"
-
 export const scenario: Scenario = {
-  run: ({ check }) => run(check),
+  lanes: true,
+  run: ({ check }, { lanes }) => run(check, lanes),
 }
 
-async function run(check: Checks["check"]): Promise<void> {
-  // A fixture pi directory whose settings list two packages; no containers.
+async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
+  // A fixture pi directory whose settings list two packages.
   {
     const fixtures = path.join(
       import.meta.dirname,
       "../../../../packages/pi/fixtures",
     )
-    const project = committedProject("pinetrie-commands-", { "a.txt": "a\n" })
-    const script = scriptedModel()
-    const ch = await startSuiteHost({
-      model: { kind: "scripted", script },
-      project: { dir: project, tools: true },
-      containers: false,
+    const {
+      host: ch,
+      user: cu,
+      script,
+      idle: cidle,
+      close,
+    } = await lanes.sectionHost({
+      files: { "a.txt": "a\n" },
       agentDir: path.join(fixtures, "pi-agent"),
-      log: () => {},
     })
-    const cu = await join(ch, "uma", "containers")
     await cu.request({ kind: "name", name: "Uma" })
-    const cidle = () => waitFor(() => idleNow(ch), 60_000)
     await waitFor(() => readCommands(ch.session).length > 0, 10_000)
     check(
       "the host lists every command its pi loaded, each under its package",
@@ -69,7 +60,8 @@ async function run(check: Checks["check"]): Promise<void> {
       START_CHAT,
     )
     await cidle()
-    const hello = path.join(fixtures, "fixture-pkg", "skills", "hello")
+    // As the lane reads it, under /mnt/host (ADR-0036).
+    const hello = `/mnt/host${path.join(fixtures, "fixture-pkg", "skills", "hello")}`
     const typed = Object.values(entriesOf(ch))
       .map(
         r =>
@@ -108,7 +100,6 @@ async function run(check: Checks["check"]): Promise<void> {
       `${told}`,
     )
 
-    await cu.close()
-    await ch.shutdown()
+    await close()
   }
 }

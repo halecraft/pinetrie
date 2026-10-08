@@ -618,7 +618,7 @@ describe("encodeLayout / decodeLayout", () => {
     ).toEqual([{ key: "a", anchor: entryId("1-r1"), fresh: {} }])
   })
 
-  test("a prefill, blank or content, and where its agent works, is stored and restored: only pending sends on opening", () => {
+  test("a prefill, blank or content, is stored and restored: only pending sends on opening", () => {
     const l = {
       ...initialLayout(),
       roots: new Map([
@@ -643,7 +643,6 @@ describe("encodeLayout / decodeLayout", () => {
                 prefill: {
                   text: "resolve them",
                   blank: false,
-                  work: { kind: "direct" as const, dir: "/work" },
                 },
               },
             },

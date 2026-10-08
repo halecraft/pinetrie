@@ -11,7 +11,6 @@ import type { Keeper } from "@pinetrie/keeper"
 import {
   executeOrThrow,
   LANE_NOTE,
-  NO_GRANTS,
   oldNamesOnDisk,
   PINETRIE_MOUNT,
   planContainer,
@@ -31,11 +30,11 @@ import type { LaneRegistry } from "./registry.ts"
 import type { Setup } from "./setup.ts"
 
 const RETIRED =
-  "this thread's lane predates lane containers (ADR-0034); branch from it to continue with its files"
+  "this thread's lane has no disk and no snapshot to start from; branch from it to continue with its files"
 
 export interface Containers {
-  /** Where a lane's tools run: its container, or a directory on the host. */
-  access(lane: LaneName): LaneAccess
+  /** Where a lane's tools run: its container; null for a lane with no copy of its own. */
+  access(lane: LaneName): LaneAccess | null
   /** Before any run: queue a lane of its own's container to start. */
   beforeRun(lane: LaneName): void
   /** After a run: stop its container, and follow its offer. */
@@ -57,7 +56,7 @@ export function createContainers(deps: {
   readonly registry: LaneRegistry
   /** Work nobody awaits: `quiet` waits for it. */
   readonly keeper: Keeper
-  readonly offers: Offers | null
+  readonly offers: Offers
 }): Containers {
   const { basics, setup, registry, keeper, offers } = deps
   const { session, docs, log } = basics
@@ -71,16 +70,13 @@ export function createContainers(deps: {
   /** The newest snapshot of `lane`'s own records that is still there. */
   async function newestSnapshot(lane: LaneName): Promise<SnapshotId | null> {
     const { runtime } = setup
-    if (runtime === null) return null
     for (const id of await ownSnapshots(lane))
       if (await runtime.snapshotExists(id)) return id
     return null
   }
 
   async function startContainer(lane: LaneName): Promise<void> {
-    const { ready, root, runtime } = setup
-    if (ready === null || root === null || runtime === null)
-      throw new Error("lanes of their own are off for this host")
+    const { ready, runtime } = setup
     const r = await ready
     const handle = registry.handleOf(lane)
     const container = handle.container
@@ -94,11 +90,7 @@ export function createContainers(deps: {
       await runtime.remove(container)
     }
     if (decided === "create" || decided === "recreate") {
-      // pre-docker: a lane made under `container` has its disk moved first.
-      const disk =
-        (await runtime.diskExists(lane)) ||
-        (setup.convert !== null &&
-          (await setup.convert(lane, await ownSnapshots(lane))))
+      const disk = await runtime.diskExists(lane)
       const newest = disk ? null : await newestSnapshot(lane)
       const from = planStartFrom({ disk, newest })
       switch (from.kind) {
@@ -127,32 +119,14 @@ export function createContainers(deps: {
 
   return {
     access(lane) {
-      const record = registry.recordOf(lane)
-      if (record?.work?.kind === "direct")
-        return {
-          kind: "direct",
-          dir: record.work.dir,
-          ready: Promise.resolve(),
-        }
-      // A lane with no record, or a lane of its own where containers are
-      // unavailable, works in the project. Only an agent with tools asks,
-      // and lane work has a project then.
-      if (record === undefined || !registry.isOwn(lane)) {
-        if (setup.project === null)
-          throw new Error("lane work has no project: the agent has no tools")
-        return {
-          kind: "direct",
-          dir: setup.project.root,
-          ready: Promise.resolve(),
-        }
-      }
+      // A lane with no copy of its own, or no record, gets no tools.
+      if (!registry.isOwn(lane)) return null
       const handle = registry.handleOf(lane)
-      const grants = setup.lanes?.config.grants ?? NO_GRANTS
+      const { grants } = setup.lanes.config
       return {
-        kind: "lane",
         facts: {
           dir: WORKSPACE_ROOT,
-          shared: setup.lanes?.shared.map(d => d.path) ?? [],
+          shared: setup.lanes.shared.map(d => d.path),
           grants: {
             ssh: grants.ssh,
             env: grants.env,
@@ -188,7 +162,7 @@ export function createContainers(deps: {
 
     runEnded(lane) {
       if (!registry.isOwn(lane)) return
-      offers?.runEnded(lane)
+      offers.runEnded(lane)
       const handle = registry.handleOf(lane)
       void keeper.track(
         handle.queue

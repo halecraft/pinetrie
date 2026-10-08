@@ -48,7 +48,7 @@ export const mutations: readonly Mutation[] = [
     expect: "vm declares only core: it knows nothing of lanes",
   },
   {
-    name: "the image is built in Apple's container though the VM's Docker runs",
+    name: "the image is built in the machine's Docker though the VM's runs",
     file: "apps/pinetrie/host/work/runtime.ts",
     from: '  if (f.vmDocker) return { kind: "docker-vm" }\n',
     to: "",
@@ -59,7 +59,21 @@ export const mutations: readonly Mutation[] = [
       "run",
       "apps/pinetrie/host/work/runtime.test.ts",
     ],
-    expect: "the VM's own Docker first, on any platform",
+    expect: "the VM's own Docker first",
+  },
+  {
+    name: "a Docker on the Mac is not asked",
+    file: "apps/pinetrie/host/work/runtime.ts",
+    from: '  if (f.hostDocker) return { kind: "docker-host" }\n',
+    to: "",
+    command: [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "apps/pinetrie/host/work/runtime.test.ts",
+    ],
+    expect: "else a Docker on this machine, whatever its platform",
   },
   {
     name: "a source given read-only and read-write is shared read-only",

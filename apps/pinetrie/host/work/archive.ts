@@ -21,8 +21,8 @@ export function createArchive(deps: {
   readonly basics: Basics
   /** Your repo's offers when lanes have their own copies, else null. */
   readonly offers: Pick<Offers, "moveLanes"> | null
-  /** What lanes of their own run on; null when they work directly. */
-  readonly runtime: LaneRuntime | null
+  /** What lanes run on. */
+  readonly runtime: LaneRuntime
   readonly registry: LaneRegistry
   /** Work nobody awaits: `quiet` waits for it. */
   readonly keeper: Keeper
@@ -32,13 +32,13 @@ export function createArchive(deps: {
     async teardown({ forget, refs, snapshots }) {
       for (const lane of forget) {
         await registry.forget(lane)
-        if (runtime !== null) await removeLane(runtime, lane)
+        await removeLane(runtime, lane)
       }
       if (offers !== null && refs.length > 0)
         await offers
           .moveLanes(refs)
           .catch(failed(basics, "moving archived or restored lanes' history"))
-      if (runtime !== null && snapshots.length > 0)
+      if (snapshots.length > 0)
         void keeper.track(
           runtime
             .disk({ kind: "deleteSnapshots", ids: snapshots })

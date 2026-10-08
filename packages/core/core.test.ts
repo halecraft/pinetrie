@@ -439,7 +439,9 @@ describe("moves, built once (ADR-0059)", () => {
   const lanes = (
     root: typeof TEST_ROOT,
   ): ReadonlyMap<typeof LANE, LaneRecord> =>
-    new Map([[LANE, { lane: LANE, root, work: null, by: ADA, createdAt: 0 }]])
+    new Map([
+      [LANE, { lane: LANE, root, ownCopy: false, by: ADA, createdAt: 0 }],
+    ])
 
   test("a move goes from where the card is; a discard is gone in its root, or the one you are on", () => {
     const gone = discardedOf(atEnd.place, OTHER)

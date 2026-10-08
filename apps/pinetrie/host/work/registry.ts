@@ -49,18 +49,16 @@ export interface LaneRegistry {
 
 export function createRegistry(input: {
   readonly session: SessionDocHandle
-  /** What lanes of their own run on; null when they work directly. */
-  readonly runtime: LaneRuntime | null
+  /** What lanes run on. */
+  readonly runtime: LaneRuntime
 }): LaneRegistry {
   const { runtime } = input
   const handles = new Map<LaneName, LaneHandle<LaneChannel>>()
   const recordOf = (lane: LaneName) => readLaneRecords(input.session).get(lane)
-  const open = runtime === null ? null : openLinkOf(runtime)
+  const open = openLinkOf(runtime)
   function handleOf(lane: LaneName): LaneHandle<LaneChannel> {
     let handle = handles.get(lane)
     if (handle === undefined) {
-      if (runtime === null || open === null)
-        throw new Error("lanes of their own are off for this host")
       handle = laneHandle(runtime, laneContainer(lane), open)
       handles.set(lane, handle)
     }
@@ -70,7 +68,7 @@ export function createRegistry(input: {
     handleOf,
     laneJjOf: lane => laneJj(handleOf(lane).runners.lane),
     recordOf,
-    isOwn: lane => runtime !== null && recordOf(lane)?.work?.kind === "own",
+    isOwn: lane => recordOf(lane)?.ownCopy === true,
     async forget(lane) {
       const handle = handles.get(lane)
       handles.delete(lane)

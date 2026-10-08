@@ -12,17 +12,17 @@
 
 import type { LaneName, ProjectRecord } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
-import { DEFAULT_REPO } from "@pinetrie/lanes"
 import type { LaneHooks, PiSetup } from "@pinetrie/pi"
 import { readRunning } from "@pinetrie/reads"
 import type { RepoOwner } from "@pinetrie/repo"
+import { refusedAnswer } from "@pinetrie/rules"
 import type { Basics } from "../basics.ts"
 import { type Offers, startOffers } from "../offers/index.ts"
 import type { Records } from "../records.ts"
 import { type AcceptedWork, createAcceptedWork } from "./accepted.ts"
 import { type Archive, createArchive } from "./archive.ts"
 import { type Containers, createContainers } from "./containers.ts"
-import { createNewLanes, type NewLanes } from "./create.ts"
+import { createNewLanes, type NewLanes, recordLane } from "./create.ts"
 import { createFetches } from "./fetch.ts"
 import { createRegistry } from "./registry.ts"
 import type { Found } from "./runtime.ts"
@@ -39,7 +39,7 @@ export type LaneWork = Pick<
   Containers,
   "access" | "beforeRun" | "runEnded" | "close"
 > &
-  Pick<NewLanes, "checkDirectory" | "checkBegin" | "prepareLane"> &
+  Pick<NewLanes, "checkBegin" | "prepareLane"> &
   Pick<Updates, "prepareUpdate"> &
   Pick<Splits, "prepareSplit" | "splitEnded"> &
   Archive & {
@@ -96,41 +96,51 @@ export async function startLaneWork(input: {
     setup: input.piSetup,
     keeper,
   })
+  if (setup === null)
+    return {
+      ...NO_LANES,
+      prepareLane: (view, lane, _at, by) =>
+        recordLane(
+          {
+            basics,
+            records: input.records,
+            ensureNames: input.ensureNames,
+          },
+          view,
+          lane,
+          false,
+          by,
+        ),
+    }
   const baseListeners: ((lane: LaneName) => void)[] = []
   const { owner, runtime } = setup
   const registry = createRegistry({ session, runtime })
-  const repoConfig = setup.lanes?.repoConfig ?? DEFAULT_REPO
-  /** Accepted work in your repo (ADR-0104); none without lanes of their own. */
-  const accepted: AcceptedWork | null =
-    owner === null
-      ? null
-      : createAcceptedWork({
-          owner,
-          basics,
-          repoConfig: repoConfig,
-          writeValues: writes => input.records.writeValues(writes),
-        })
+  const { repoConfig } = setup.lanes
+  /** Accepted work in your repo (ADR-0104). */
+  const accepted = createAcceptedWork({
+    owner,
+    basics,
+    repoConfig,
+    writeValues: writes => input.records.writeValues(writes),
+  })
   // The base snapshot follows accepted work, however it moved: setup, an accept,
   // a publish, or jj outside pine·trie (ADR-0090).
-  owner?.onMoved(moved => {
+  owner.onMoved(moved => {
     if (moved.acceptedMoved) setup.refreshBaseSoon()
   })
-  /** Each lane's offer in your repo (ADR-0105); none without lanes of their own. */
-  const offers: Offers | null =
-    owner === null || accepted === null
-      ? null
-      : startOffers({
-          owner,
-          repoConfig: repoConfig,
-          basics,
-          records: input.records,
-          piSetup: input.piSetup,
-          running: lane => readRunning(basics.live, lane),
-          baseChanged: lane => {
-            for (const listener of baseListeners) listener(lane)
-          },
-          acceptedWork: accepted,
-        })
+  /** Each lane's offer in your repo (ADR-0105). */
+  const offers = startOffers({
+    owner,
+    repoConfig,
+    basics,
+    records: input.records,
+    piSetup: input.piSetup,
+    running: lane => readRunning(basics.live, lane),
+    baseChanged: lane => {
+      for (const listener of baseListeners) listener(lane)
+    },
+    acceptedWork: accepted,
+  })
   const containers = createContainers({
     basics,
     setup,
@@ -190,7 +200,6 @@ export async function startLaneWork(input: {
       askedAboutConflict: updates.askedAboutConflict,
       catchUp: updates.catchUpInRun,
     },
-    checkDirectory: newLanes.checkDirectory,
     checkBegin: newLanes.checkBegin,
     prepareLane: newLanes.prepareLane,
     beforeRun: containers.beforeRun,
@@ -204,7 +213,7 @@ export async function startLaneWork(input: {
     teardown: archive.teardown,
     async quiet() {
       await keeper.idle()
-      await owner?.idle()
+      await owner.idle()
     },
     async close() {
       await containers.close()
@@ -215,4 +224,34 @@ export async function startLaneWork(input: {
       baseListeners.push(listener)
     },
   }
+}
+
+/** Lane work of a host with no tools: no project, no lanes, no repo; its lanes are recorded all the same. */
+const NO_LANES: LaneWork = {
+  project: null,
+  access: () => {
+    throw new Error("the agent has no tools: it works in no lane")
+  },
+  hooks: {
+    turnDone: async () => {},
+    askedAboutConflict: async () => false,
+    catchUp: async () => refusedAnswer("no-copy"),
+  },
+  checkBegin: async () => null,
+  prepareLane: async () => {},
+  beforeRun: () => {},
+  runEnded: () => {},
+  prepareUpdate: async () => ({
+    kind: "refused",
+    reason: "the lane has no copy of its own",
+  }),
+  prepareSplit: async () => ({ refused: "the lane has no copy of its own" }),
+  splitEnded: async () => null,
+  offers: null,
+  accepted: null,
+  owner: null,
+  teardown: async () => {},
+  quiet: async () => {},
+  close: async () => {},
+  onBaseChanged: () => {},
 }

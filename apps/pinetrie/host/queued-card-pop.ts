@@ -104,7 +104,6 @@ export const chatOfPoppedQueuedCard = (popped: PoppedQueuedCard): Chat => ({
   lane: popped.card.place.lane,
   asksAgent: false,
   mentions: parseMentions(popped.text),
-  work: null,
   card: { id: popped.card.id, seen: popped.card.place.seen },
   // Its thread's pinned cards were edited long before it was popped.
   pinned: [],

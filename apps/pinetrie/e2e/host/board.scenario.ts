@@ -17,9 +17,14 @@ import {
   readWorkflow,
 } from "@pinetrie/reads"
 import type { Checks } from "../checks.ts"
-import { join, rootRecordsOf, waitFor, withHost } from "../harness.ts"
+import {
+  join,
+  rootRecordsOf,
+  START_CHAT,
+  waitFor,
+  withHost,
+} from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
-import { START_CHAT } from "./support.ts"
 
 export const scenario: Scenario = {
   run: ({ check }) => run(check),

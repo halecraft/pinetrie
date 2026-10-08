@@ -1360,7 +1360,7 @@ describe("a lane's repo, with jj", () => {
     ])
 
     // Accept: accepted work moved forward to the offer, as the host; your @ and
-    // your files untouched; the offer's bookmark gone.
+    // the working copy untouched; the offer's bookmark gone.
     const atBefore = await commitsOf(yoursJj, "@")
     await accept({ built: one })
     expect(await commitsOf(yoursJj, "@")).toEqual(atBefore)

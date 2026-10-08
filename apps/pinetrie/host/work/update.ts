@@ -30,7 +30,6 @@ import {
   commitTurn,
   conflictsIn,
   copyFacts,
-  DEFAULT_REPO,
   laneBase,
   type Merged,
   type MergePlan,
@@ -354,7 +353,7 @@ export interface Updates {
    * pi's hook: the lane's agent asked about a conflict. Taken while jj finds
    * a conflict in the lane's copy, in any run (ADR-0080, S104): read on the
    * lane's queue, never from a revision record, which can be late. A lane
-   * that works directly has no copy to ask about.
+   * with no copy of its own has nothing to ask about.
    */
   askedAboutConflict(lane: LaneName): Promise<boolean>
 }
@@ -370,7 +369,7 @@ export function createUpdates(deps: {
 }): Updates {
   const { basics, setup, registry, containers } = deps
   const { docs } = basics
-  const repoConfig = setup.lanes?.repoConfig ?? DEFAULT_REPO
+  const { repoConfig } = setup.lanes
 
   /**
    * The update's entry recorded as a revision, the merge its commit, with a
@@ -537,12 +536,7 @@ export function createUpdates(deps: {
       const doc = await docs.laneDoc(lane)
       // Who the update is by: the person behind the run.
       const by = doc === null ? null : readRunAuthor(doc, docs.session, lane)
-      if (
-        !registry.isOwn(lane) ||
-        owner === null ||
-        doc === null ||
-        by === null
-      )
+      if (!registry.isOwn(lane) || doc === null || by === null)
         return refusedAnswer("no-copy")
       // gather
       const index = readTreeIndex(doc)
@@ -592,7 +586,7 @@ export function createUpdates(deps: {
     async prepareUpdate(handle, by, intent, command, follows) {
       const lane = handle.name
       const { owner } = setup
-      if (!registry.isOwn(lane) || owner === null)
+      if (!registry.isOwn(lane))
         return refused("the lane has no copy of its own")
       return withLaneStarted(
         {

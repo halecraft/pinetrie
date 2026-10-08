@@ -478,7 +478,7 @@ describe("planIntent", () => {
     const inColumn = { actedAt: here, slot: null }
     const OTHER_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff")
     const laneRecords = new Map([
-      [lane, { lane, root: OTHER_ROOT, work: null, by: ada, createdAt: 0 }],
+      [lane, { lane, root: OTHER_ROOT, ownCopy: false, by: ada, createdAt: 0 }],
     ])
     const atEnd = {
       kind: "composing",

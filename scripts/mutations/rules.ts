@@ -6,6 +6,26 @@ const archive = "packages/rules/archive.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a lane with no copy of its own is stored with one",
+    file: "packages/rules/work.ts",
+    from: '    work: ownCopy ? { kind: "own" } : null,',
+    to: '    work: { kind: "own" },',
+    command: unit,
+    expect:
+      "a lane's copy of its own is stored as its work, as records before ADR-0102 hold it",
+  },
+  // ── the lanes suite, proven in a lane (ADR-0103) ──
+  {
+    name: "a fork at a turn starts from the base snapshot",
+    file: "packages/rules/work.ts",
+    from: '        snapshot: input.above.snapshot ?? BASE_SNAPSHOT,\n        start: { kind: "commits"',
+    to: '        snapshot: BASE_SNAPSHOT,\n        start: { kind: "commits"',
+    suite: "lanes",
+    scenario: "main",
+    expect:
+      "a branch at a turn has that turn's tracked files, node_modules and .vite cache, byte for byte",
+  },
+  {
     name: "an update that changed no file says files changed",
     file: "packages/rules/update.ts",
     from: '    files === ""\n',
@@ -1871,7 +1891,7 @@ export const mutations: readonly Mutation[] = [
     expect: "a stack is stale when the lane moved past its ledger",
   },
   {
-    name: "a publish runs while your files would conflict",
+    name: "a publish runs while the working copy would conflict",
     file: "packages/rules/accepted.ts",
     from: "      return refused(ERR.YOURS_CONFLICT)\n",
     to: "      return OK\n",

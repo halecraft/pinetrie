@@ -29,7 +29,7 @@ describe("records: one spec each, total decoders", () => {
   const lane = {
     lane: LANE,
     root: rootIdFor("test-root"),
-    work: { kind: "own" as const },
+    ownCopy: true,
     by: ADA,
     createdAt: 1,
   }
@@ -41,11 +41,7 @@ describe("records: one spec each, total decoders", () => {
     paths: ["a.txt", "d/c é.txt"],
     conflicts: ["b.txt"],
   }
-  const project = {
-    kind: "lanes" as const,
-    root: "/p",
-    rootDefault: "own" as const,
-  }
+  const project = { root: "/p" }
   test("each record round-trips, keyed as its reader expects", () => {
     const l = setRecord(LANE_RECORD, lane)
     expect([l.namespace, l.key, LANE_RECORD.decode(l.value, l.key)]).toEqual([
@@ -71,22 +67,34 @@ describe("records: one spec each, total decoders", () => {
     const { conflicts: _, ...old } = revision
     expect(REVISION.decode(old, "e1")).toEqual({ ...old, conflicts: [] })
   })
-  test("a project record from before lane containers is dropped, and rewritten at start", () => {
+  test("a project record from before ADR-0102 reads as its root alone, and is rewritten at start", () => {
     expect(
       PROJECT.decode(
-        { kind: "workspaces", root: "/p", rootDefault: "own" },
+        { kind: "lanes", root: "/p", rootDefault: "own" },
         "project",
       ),
-    ).toBeUndefined()
+    ).toEqual({ root: "/p" })
   })
-  test("malformed values are dropped, never thrown", () => {
+  test("a lane's copy of its own is stored as its work, as records before ADR-0102 hold it", () => {
+    expect(LANE_RECORD.encode(lane)).toMatchObject({ work: { kind: "own" } })
+    expect(LANE_RECORD.encode({ ...lane, ownCopy: false })).toMatchObject({
+      work: null,
+    })
+    const none = LANE_RECORD.encode({ ...lane, ownCopy: false })
+    expect(LANE_RECORD.decode(none, LANE)?.ownCopy).toBe(false)
+  })
+  test("malformed values are dropped, never thrown: a lane stored as working directly among them", () => {
+    const stored = LANE_RECORD.encode(lane) as Record<string, unknown>
     const other = laneNameForThread("other")
     expect([
       ...recordsOf(LANE_RECORD, [
-        { key: other, value: { ...lane, work: { kind: "direct" } } },
-        { key: "main", value: lane },
+        {
+          key: other,
+          value: { ...stored, work: { kind: "direct", dir: "/p" } },
+        },
+        { key: "main", value: stored },
         { key: other, value: 3 },
-        { key: LANE, value: lane },
+        { key: LANE, value: stored },
       ]).values(),
     ]).toEqual([lane])
   })

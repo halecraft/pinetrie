@@ -184,7 +184,7 @@ describe("a pi session per root (ADR-0063)", () => {
         setRecord(LANE, {
           lane,
           root,
-          work: null,
+          ownCopy: false,
           by: writerId("ada@x.io"),
           createdAt: 1,
         }),

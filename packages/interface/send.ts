@@ -8,12 +8,10 @@ import {
   type Address,
   type CardCommand,
   type ChatMode,
-  type ProjectRecord,
   parseMentions,
   type QueueHoldChange,
   sendWaits,
   type ThreadLane,
-  type WorkSetting,
   type WriterId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
@@ -376,26 +374,7 @@ export function raceWords(by: WriterId | null, reader: Reader): string {
   return `${displayName(by, reader.nameOf.get(by))} asked the agent a moment before you`
 }
 
-// ── where a new lane works ────────────────────────────────────────────────
-
-/**
- * Where a new thread's agent works, and what that means for your files: the
- * line under the box, which opens the where menu. A lane of its own starts
- * from accepted work unless it starts from a WIP (ADR-0104).
- */
-export function whereWords(
-  work: WorkSetting,
-  project: ProjectRecord,
-  base: string | null = null,
-): string {
-  if (work.kind === "own")
-    return base === null
-      ? "works on its own copy · your files stay as they are"
-      : `starts from your unfinished work: ${base}`
-  return work.dir === project.root
-    ? "edits your files directly"
-    : `edits files in ${work.dir}`
-}
+// ── where a new lane starts (ADR-0104) ────────────────────────────────────
 
 /**
  * A new lane here would be cloned from a commit with conflicts: its offer
@@ -404,92 +383,14 @@ export function whereWords(
 export const forkWords = (files: number): string =>
   `starts from a copy with an unresolved conflict in ${files} ${files === 1 ? "file" : "files"}`
 
-/** A row of the where menu: its name, what it means, and whether it is chosen. */
-export interface WhereChoice {
-  readonly key: string
-  readonly className: "where-own" | "where-yours" | "where-used" | "where-other"
-  /** The setting it picks; null for "another directory…", which asks for one. */
-  readonly setting: WorkSetting | null
-  readonly row: string
-  readonly detail: string | null
-  /** Whether it is the current choice; undefined for one that asks. */
-  readonly checked: boolean | undefined
-  readonly disabled: boolean
-  readonly title: string | undefined
-}
-
 /**
- * The where menu's first section, in order: its own copy, your files, each
- * directory another lane works in, and another directory. `acceptedBookmark` is the
- * line's bookmark, for its own copy's title; null before accepted work is read.
+ * What a new thread starts from, the line that opens the menu of bases
+ * (`baseChoices`): accepted work, or a WIP.
  */
-export function whereChoices(
-  project: ProjectRecord,
-  usedDirs: readonly string[],
-  work: WorkSetting,
-  acceptedBookmark: string | null = null,
-): readonly WhereChoice[] {
-  const chosen = (setting: WorkSetting) =>
-    setting.kind === work.kind &&
-    (setting.kind === "own" ||
-      (work.kind === "direct" && setting.dir === work.dir))
-  const own: WorkSetting = { kind: "own" }
-  const yours: WorkSetting = { kind: "direct", dir: project.root }
-  return [
-    {
-      key: "own",
-      className: "where-own",
-      setting: own,
-      row: "its own copy",
-      detail: "you review its work, then accept it",
-      checked: chosen(own),
-      disabled: project.kind !== "lanes",
-      title:
-        project.kind === "direct"
-          ? project.reason
-          : acceptedBookmark === null
-            ? undefined
-            : `a lane of its own, cloned from ${acceptedBookmark}; its work comes back as pinetrie-offer/<thread>`,
-    },
-    {
-      key: "yours",
-      className: "where-yours",
-      setting: yours,
-      row: "your files",
-      detail: "it edits them directly",
-      checked: chosen(yours),
-      disabled: false,
-      title: undefined,
-    },
-    ...usedDirs
-      .filter(dir => dir !== project.root)
-      .map((dir): WhereChoice => {
-        const setting: WorkSetting = { kind: "direct", dir }
-        return {
-          key: dir,
-          className: "where-used",
-          setting,
-          row: dir,
-          detail: "another thread works there",
-          checked: chosen(setting),
-          disabled: false,
-          title: undefined,
-        }
-      }),
-    {
-      key: "other",
-      className: "where-other",
-      setting: null,
-      row: "another directory…",
-      detail: null,
-      checked: undefined,
-      disabled: false,
-      title: undefined,
-    },
-  ]
-}
-
-// ── where a new lane starts (ADR-0104) ────────────────────────────────────
+export const startWords = (base: string | null): string =>
+  base === null
+    ? "starts from accepted work"
+    : `starts from your unfinished work: ${base}`
 
 /** A row of the where menu that picks a new lane's base. */
 export interface BaseChoice {

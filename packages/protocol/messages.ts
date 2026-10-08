@@ -143,12 +143,6 @@ export interface Command {
   /** `chat`: a Start Agent column, where no mention asks the agent. */
   readonly asksAgent: boolean
   /**
-   * `chat`: where a lane it creates works: `own`, `direct` (in `workDir`), or
-   * `""` for the lane above's setting (ADR-0032).
-   */
-  readonly workKind: string
-  readonly workDir: string
-  /**
    * `mark`: the entry; `offer` `accept`: the destination bookmark, `""`
    * for the default; `workflow`: the state. Separate from `parentId` on
    * purpose.
@@ -268,8 +262,6 @@ export const EMPTY_COMMAND: Command = Object.freeze({
   mode: "",
   lane: "",
   asksAgent: false,
-  workKind: "",
-  workDir: "",
   targetId: "",
   cardId: "",
   reserved: "",

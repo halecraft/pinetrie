@@ -9,39 +9,53 @@ The end-to-end suites, each a directory of scenarios:
 | `browser` | `browser.ts` | `browser/*.scenario.ts` | `pnpm run e2e:browser` |
 
 They share `checks.ts` (recording a check, and stopping at one),
-`scenario.ts` (choosing, skipping and running scenarios) and `harness.ts`
+`scenario.ts` (choosing, skipping and running scenarios), `harness.ts`
 (waiting, `idleNow`, throwaway projects, joining a host through `@pinetrie/session`'s
-`connectSession`, `withHost`, the scripted model, `E2E_RUNTIME`,
-`runtimeProblem`) and `lane-runtime.ts` (the suites' runtime's CLI, and a
-lane's container and disks read and removed as that runtime keeps them). A
-suite's own helpers are beside its scenarios: `host/support.ts`,
-`lanes/support.ts`, `browser/page.ts`.
+`connectSession`, a host with no tools and `withHost`, positions and
+starts, the scripted model), `lane-hosts.ts` (why the
+suites' runtime cannot run here, `runtimeProblem`; hosts with tools,
+`LaneHosts`; a section's host with accepted work set up, `sectionHost`; a
+lane's shell, `inLane`; `cleanUp`) and `lane-runtime.ts` (the suites'
+runtime's CLI, and a lane's container and disks read and removed as that
+runtime keeps them). A suite's own helpers are beside its scenarios:
+`host/support.ts`, `lanes/support.ts`, `browser/page.ts`.
 
 ## Scenarios
 
 - **A host reads the suites' user config, not the person's.**
-  `startSuiteHost` (`harness.ts`) passes `SUITE_CONFIG`, which turns the
-  automatic title off (ADR-0074) and names the lanes' runtime, unless a
-  scenario names its own file; one that writes its own spreads
-  `SUITE_CONFIG` into it, and `SUITE_CONFIG.lanes` into its `lanes`.
+  `startSuiteHost` (`harness.ts`) and `LaneHosts` pass `SUITE_CONFIG`,
+  which turns the automatic title off (ADR-0074), unless a scenario names
+  its own file; one that writes its own spreads `SUITE_CONFIG` into it.
   `startHost` without a `userConfig` would read
   `~/.config/pinetrie/config.json`.
-- **One suite runs under either runtime** (ADR-0103):
-  `PINETRIE_E2E_RUNTIME` puts `lanes.runtime` in every host's user config:
-  `docker`, the default, or `container`. Under Docker, `e2e:lanes` runs on
-  the Mac against the lane VM, on Linux against the host's Docker, and
-  inside a pine·trie lane granted `lanes.nested` against the lane's
-  rootless Docker, its lanes in `/var/lib/pinetrie-lanes`. In a lane it took
-  120 s (2026-10-08: 64 passed, the Mac's network checks and ssh skipped),
-  with pine·trie's default image already built in the inner Docker.
+- **Lanes run on Docker** (ADR-0103): on the Mac against the lane VM, on
+  Linux against the host's Docker, and inside a pine·trie lane granted
+  `lanes.nested` against the lane's rootless Docker, its lanes in
+  `/var/lib/pinetrie-lanes`.
+- **In a lane, on its rootless Docker** (2026-10-08, the default image
+  already built in the inner Docker; its first build adds about a minute):
+  `pnpm run e2e` took 58 s (54 passed, `live` skipped), `pnpm run
+  e2e:lanes` 134 s (64 passed; the Mac's network checks and ssh skipped)
+  and `pnpm run e2e:browser` 223 s (177 passed). `pnpm run verify` runs
+  the first two.
 - **In a nested lane, inner lanes write as uid 1000,** the rootless user:
   each throwaway project is opened to others' search (`committedProject`),
   and only the paths lanes write are handed to that user
   (`ownForInnerLanes`), never a repository, which git then refuses to the
   host. A lane's writes there are uid 1000's (`lanesWriteAs`).
-- **A suite's host works directly where its runtime cannot run**
-  (`runtimeRefused: "direct"`, `startSuiteHost`): the project's reason is
-  the runtime's words. A host started by `server.ts` stops instead.
+- **Every agent with tools works in real lanes** (ADR-0102). A scenario
+  whose agent has tools declares `lanes: true` (`Scenario`, `scenario.ts`):
+  the runner asks `runtimeProblem` once per suite, skips the scenario with
+  its words where the runtime cannot run, and otherwise gives it
+  `LaneHosts`, the only way to a host with tools. `startSuiteHost` takes
+  no project with tools, so a scenario cannot start lanes without saying
+  so. A host with lanes starts its root threads at accepted work
+  (ADR-0104): `sectionHost` sets it up; a scenario starting its own with
+  `LaneHosts.startHost` calls `setUpAccepted`, and removes its lanes'
+  containers and disks at its end (`cleanUp`).
+- **What an agent's tool writes is in its lane, not the project:** a check
+  reads it there (`inLane`, under `/workspace`) or through the lane's
+  revision.
 
 - **A scenario is one file, and one run against its own host.** It depends
   on no other scenario: what it needs it makes, through the session (`join`)
@@ -50,14 +64,11 @@ suite's own helpers are beside its scenarios: `host/support.ts`,
 - **`PINETRIE_SCENARIO=a,b` runs only those**, in name order. An unknown name
   exits 2. A suite mutation sets it (`scripts/mutate.ts`, `SUITES`), so a
   mutant runs one scenario, and stops at its check (`PINETRIE_STOP_AT`).
-- **A scenario that cannot run here says why, and is skipped** (`needs`):
-  `runtimeProblem()` gives the host's own reason the suites' runtime cannot
-  give lanes their own here (`findProject` on a throwaway project: a
-  `RuntimeRefused`, or a project that works directly), and `live` needs
-  `PINETRIE_LIVE`. Inside the
-  browser's `tools`, the offer and review checks are each `skip`ped with the
-  host's project record's reason when its lanes work directly. A skip is
-  neither a pass nor a fail.
+- **A scenario that cannot run here says why, and is skipped**
+  (`scenarioProblem`): for one with `lanes: true`, `runtimeProblem()` gives
+  the host's own reason the suites' runtime cannot give lanes their own
+  here (`findProject` on a throwaway project); then its own `needs`, as
+  `live`'s `PINETRIE_LIVE`. A skip is neither a pass nor a fail.
 - **A scenario that throws fails under its name** (`ERROR name · message`),
   and the next one runs.
 
@@ -189,13 +200,22 @@ suite's own helpers are beside its scenarios: `host/support.ts`,
   frames stop carrying a document's id as bytes, nothing is delayed, and the
   mutation "a run does not wait for its pinned cards' text" survives.
 
-- **`slowToLoad` delays one document's first `currentMeta`**, by
-  `LATE_LOAD_MS` (`host/support.ts`). Kyneta's `#hydrate` reads
-  `currentMeta` before `loadAll`, so this delays that document's first load
-  and nothing else (the `tools` and `cards` restarts). If Kyneta's hydration
-  stops reading `currentMeta`, nothing is delayed, and the mutations "the
-  host does not wait for its stored session" and "the host serves before it
-  has recovered" survive.
+- **`slowToLoad` delays one document's first `loadAll`**, by
+  `LATE_LOAD_MS` (`host/support.ts`): the exchange's hydration, and
+  nothing else (the `tools` and `cards` restarts). Not its first
+  `currentMeta`: the startup reads every document's before the exchange
+  opens (`readStored`, ADR-0096), which would take the delay. A host that
+  wrote to the session before it loaded would throw: Kyneta refuses a
+  write to a document still loading. If Kyneta's hydration stops calling
+  `loadAll` first, nothing is delayed, and the mutation "the host serves
+  before it has recovered" survives.
+- **A nested lane's inner Docker may be down when a run starts** (seen
+  2026-10-08): the lane's command starts it (`pinetrie-inner-docker`), and
+  a process does not outlive its run. Started again, it timed out on a
+  stale containerd pid under `/run/user/1000/docker`. Remove
+  `/run/user/1000/docker`, `/run/user/1000/docker.sock` and
+  `/run/user/1000/dockerd-rootless`, then run `pinetrie-inner-docker` in
+  the background; `docker info` answers within seconds.
 - **A browser scenario closes its pages before its host stops, but
   `banner`.** A page holds Vite's HMR socket, and `banner` shuts its host
   down with its page still open, to check that the host stops anyway

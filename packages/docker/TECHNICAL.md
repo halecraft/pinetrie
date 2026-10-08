@@ -140,7 +140,5 @@ measured. Its checks:
 - (Mac) a lane cannot reach the Mac's loopback, nor `gvproxy`'s API;
 - (Mac) a port the project grants answers its lanes, and not another
   project's;
-- (Mac, with `container` running) a `container run` leaves running lanes on
-  the network;
 - costs: `docker run -d` under 150 ms, a snapshot under 50 ms, a cold VM's
   Docker answering under 2 s; the launcher's open files in the detail.

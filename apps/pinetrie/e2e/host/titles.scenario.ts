@@ -9,22 +9,17 @@ import { scriptedModel } from "@pinetrie/pi"
 import { readRoots } from "@pinetrie/reads"
 import { TITLE_REQUEST_HEAD } from "@pinetrie/rules"
 import type { Checks } from "../checks.ts"
-import {
-  committedProject,
-  idleNow,
-  join,
-  startSuiteHost,
-  waitFor,
-} from "../harness.ts"
+import { at, START_AGENT, waitFor } from "../harness.ts"
+import type { LaneHosts } from "../lane-hosts.ts"
 import type { Scenario } from "../scenario.ts"
-import { at, idOfIn, START_AGENT, sleep } from "./support.ts"
+import { idOfIn } from "./support.ts"
 
 export const scenario: Scenario = {
-  run: ({ check }) => run(check),
+  lanes: true,
+  run: ({ check }, { lanes }) => run(check, lanes),
 }
 
-async function run(check: Checks["check"]): Promise<void> {
-  const project = committedProject("pinetrie-titles-", { "a.txt": "a\n" })
+async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
   // An empty config: titles are on by default.
   const userConfig = path.join(
     mkdtempSync(path.join(tmpdir(), "pinetrie-titles-config-")),
@@ -43,18 +38,16 @@ async function run(check: Checks["check"]): Promise<void> {
       },
     },
   })
-  const th = await startSuiteHost({
+  const {
+    host: th,
+    user: tu,
+    idle,
+    close,
+  } = await lanes.sectionHost({
+    files: { "a.txt": "a\n" },
     model: { kind: "scripted", script },
-    project: { dir: project, tools: true },
-    containers: false,
     userConfig,
-    log: () => {},
   })
-  const tu = await join(th, "ada", "titles")
-  const idle = async () => {
-    await waitFor(() => idleNow(th), 60_000)
-    await th.quiet()
-  }
   const record = () => [...readRoots(th.session).values()][0]
   const title = () => record()?.title ?? null
 
@@ -87,7 +80,5 @@ async function run(check: Checks["check"]): Promise<void> {
     answer.kind === "retitling" && replaced,
     `${answer.kind}; ${title()}`,
   )
-  await tu.close()
-  await sleep(100)
-  await th.shutdown()
+  await close()
 }

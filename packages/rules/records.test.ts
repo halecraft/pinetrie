@@ -156,7 +156,7 @@ const SAMPLES: readonly Sample[] = [
   sample(
     "lane",
     LANE,
-    { lane: L, root: TEST_ROOT, work: { kind: "own" }, by: ADA, createdAt: 1 },
+    { lane: L, root: TEST_ROOT, ownCopy: true, by: ADA, createdAt: 1 },
     "lane",
   ),
   sample(
@@ -227,12 +227,7 @@ const SAMPLES: readonly Sample[] = [
     "lane",
   ),
   sample("queue hold", QUEUE_HOLD, { lane: L, by: ADA, at: 1 }, "lane"),
-  sample(
-    "project",
-    PROJECT,
-    { kind: "lanes", root: "/p", rootDefault: "own" },
-    null,
-  ),
+  sample("project", PROJECT, { root: "/p" }, null),
   sample("commands", COMMANDS, { commands: [] }, null),
   sample("root", ROOT, rootRecord, "root"),
   sample(

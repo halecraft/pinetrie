@@ -117,7 +117,7 @@ describe("banners in a harness", () => {
       model: { kind: "scripted", script },
       project: root,
       tools: {
-        access: () => ({ kind: "direct", dir: root, ready: Promise.resolve() }),
+        access: () => null,
         hooks: {
           turnDone: async () => {},
           askedAboutConflict: async () => false,

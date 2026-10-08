@@ -42,7 +42,6 @@ test("a chat fills in what its column left out, carries its column's reservation
     mode: "reply",
     lane: null,
     asksAgent: false,
-    work: null,
     card: null,
     pinned: [],
     reserved: null,

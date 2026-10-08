@@ -10,25 +10,27 @@ import { readPlaces } from "@pinetrie/reads"
 import { openStore } from "../../host/store.ts"
 import type { Checks } from "../checks.ts"
 import {
+  at,
   committedProject,
   held,
   idleNow,
-  join,
   lanesOf,
-  startSuiteHost,
+  START_AGENT,
   treeOf,
   waitFor,
 } from "../harness.ts"
 import { RED_PNG } from "../images.ts"
+import type { LaneHosts } from "../lane-hosts.ts"
 import type { Scenario } from "../scenario.ts"
 
-import { at, recordsHold, START_AGENT, sleep } from "./support.ts"
+import { recordsHold, sleep } from "./support.ts"
 
 export const scenario: Scenario = {
-  run: ({ check }) => run(check),
+  lanes: true,
+  run: ({ check }, { lanes }) => run(check, lanes),
 }
 
-async function run(check: Checks["check"]): Promise<void> {
+async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
   {
     const work = committedProject("pinetrie-tool-images-", {
       "shot.png": RED_PNG,
@@ -41,16 +43,15 @@ async function run(check: Checks["check"]): Promise<void> {
     let opened = openStore(dbFile)
     const GRACE_MS = 1_500
     const start = () =>
-      startSuiteHost({
+      lanes.sectionHost({
+        dir: work,
         model: { kind: "scripted", script },
-        project: { dir: work, tools: true },
-        containers: false,
         store: opened.store,
         blobs: opened.blobs,
         blobGraceMs: GRACE_MS,
-        log: () => {},
       })
-    let th = await start()
+    let section = await start()
+    let th = section.host
     const tidle = () => waitFor(() => idleNow(th), 30_000)
     const readCall = () => {
       const tree = treeOf(th)
@@ -63,7 +64,7 @@ async function run(check: Checks["check"]): Promise<void> {
         .find(c => c.name === "read" && c.subject === "shot.png")
     }
     const red = sha256Of(RED_PNG)
-    const tu = await join(th, "tia", "tool-images")
+    const tu = section.user
 
     // pi's pending entries, as each change of the document leaves them: a
     // compaction after the run rewrites the history they were in (S93).
@@ -121,13 +122,12 @@ async function run(check: Checks["check"]): Promise<void> {
 
     // 3. After a restart on the same file and the grace, the sweep keeps it,
     // and it still reaches the model.
-    await tu.close()
-    await sleep(100)
-    await th.shutdown()
+    await section.close(true)
     opened = openStore(dbFile)
-    th = await start()
+    section = await start()
+    th = section.host
     await sleep(GRACE_MS + 200)
-    const tv = await join(th, "tia", "tool-images")
+    const tv = section.user
     script.use([{ text: "still red" }])
     const tip = lanesOf(th, treeOf(th), readPlaces(th.places))[0]
     await tv.chat("@agent and now?", at(tip?.tip ?? null), {
@@ -135,8 +135,6 @@ async function run(check: Checks["check"]): Promise<void> {
     })
     await tidle()
     await th.quiet()
-    await tv.close()
-    await sleep(100)
-    await th.shutdown()
+    await section.close()
   }
 }

@@ -17,7 +17,6 @@ import { createServer as createViteServer } from "vite"
 import { WebSocketServer } from "ws"
 import { KEY_COOKIE, planInvites, requestFacts, urlHost } from "./admission.ts"
 import { MAX_UPLOAD_BYTES, planUploadHeaders } from "./blobs.ts"
-import type { HotReload } from "./hot-reload.ts"
 import {
   blobResponse,
   type HttpAnswer,
@@ -52,12 +51,11 @@ export async function startHttp(input: {
   /** Whether the agent has tools: off loopback, the log warns what a link grants. */
   readonly tools: boolean
   readonly serverTransport: WebsocketServerTransport
-  readonly hotReload: HotReload
   readonly blobs: BlobStore
   readonly offers: LaneWork["offers"]
   readonly log: (message: string) => void
 }): Promise<RunningHttp> {
-  const { port, bind, key, serverTransport, hotReload, blobs, offers } = input
+  const { port, bind, key, serverTransport, blobs, offers } = input
 
   const wss = new WebSocketServer({ noServer: true })
   wss.on("connection", ws => {
@@ -83,7 +81,6 @@ export async function startHttp(input: {
   const vite = await createViteServer({
     root: clientDir,
     configFile: path.join(clientDir, "vite.config.ts"),
-    plugins: [hotReload.plugin],
     server: {
       middlewareMode: true,
       hmr: { server: viteUpgrades },
@@ -92,7 +89,6 @@ export async function startHttp(input: {
       allowedHosts: true,
     },
   })
-  hotReload.attach(() => vite.ws.send({ type: "full-reload" }))
   // Each request carries out its plan (`planRequest`), which admits first.
   httpServer.on("request", (req, res) => {
     const to = planRequest(requestFacts(req), key, req.method)
@@ -124,7 +120,7 @@ export async function startHttp(input: {
 
   /**
    * `GET /offer/…`: a review or a diff of a commit an open offer holds. A
-   * project whose lanes work directly has no offers.
+   * host without tools has no offers.
    */
   async function serveOfferRead(ask: OfferAsk, res: ServerResponse) {
     const answer =

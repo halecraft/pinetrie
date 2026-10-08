@@ -1,12 +1,63 @@
 // Mutations for @pinetrie/lanes. Run: pnpm mutate scripts/mutations/lanes.ts
 // The planners' checks are unit tests, in seconds. The suite mutations run one
-// `e2e:lanes` scenario, which needs `container`: on the Mac.
+// `e2e:lanes` scenario, on the suites' Docker: in a lane, or on the Mac.
 import type { Mutation } from "../mutate.ts"
 
 const unit = ["pnpm", "exec", "vitest", "run", "packages/lanes"]
 const plan = "packages/lanes/plan.ts"
 
 export const mutations: readonly Mutation[] = [
+  // ── the lanes suite, proven in a lane (ADR-0103) ──
+  {
+    name: "a fork's inherited history is not made immutable",
+    file: "packages/lanes/plan.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "${WORKSPACE_ROOT} ${immutable} >",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
+    to: "${WORKSPACE_ROOT} none\\\\(\\\\) >",
+    suite: "lanes",
+    scenario: "main",
+    expect: "rewriting an inherited commit in a fork is refused",
+  },
+  {
+    name: "a fork works on its parent's working-copy change",
+    file: "packages/lanes/plan.ts",
+    from: '            inLane("jj", "new", ...start.commits),\n',
+    to: "",
+    suite: "lanes",
+    scenario: "main",
+    expect: "your repo holds every lane's commits with no divergent change",
+  },
+  {
+    name: "a lane mounts no host path",
+    file: "packages/lanes/plan.ts",
+    from: "    ...parts.hostPaths.map(p => at(p, hostPathInLane(p))),\n",
+    to: "",
+    suite: "lanes",
+    scenario: "commands",
+    expect: "the lane reads the skill's references and runs its scripts there",
+  },
+  {
+    name: "a shared directory inside .jj is shared",
+    file: "packages/lanes/plan.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "  return NEVER_SHARED.includes(top) ? `it is inside ${top}` : null",
+    to: "  return null",
+    suite: "lanes",
+    scenario: "shared",
+    expect:
+      "the user's shared directories apply, and a refused one is logged with its reason",
+  },
+  {
+    name: "a container made from another spec is kept",
+    file: "packages/lanes/plan.ts",
+    from: '  if (label !== input.want) return "recreate"',
+    to: '  if (false) return "recreate"',
+    suite: "lanes",
+    scenario: "shared",
+    expect:
+      "after a restart, an existing lane has the newly shared directory, with its disk as it was",
+  },
   {
     name: "pre-rename: the old config folder moves after the bookmarks",
     file: plan,
@@ -73,7 +124,7 @@ export const mutations: readonly Mutation[] = [
     expect: "the project's name wins over the user's",
   },
   {
-    name: "publishing catches your files up unless told not to",
+    name: "publishing catches the working copy up unless told not to",
     file: plan,
     from: "  publishCatchesUp: false,\n}",
     to: "  publishCatchesUp: true,\n}",

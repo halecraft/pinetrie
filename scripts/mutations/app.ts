@@ -6,6 +6,112 @@
 import type { Mutation } from "../mutate.ts"
 
 export const mutations: readonly Mutation[] = [
+  // ── the lanes suite, proven in a lane (ADR-0103) ──
+  {
+    name: "a new lane forks from the root, not where it branched",
+    file: "apps/pinetrie/host/work/create.ts",
+    from: "                  nearestRevision(readTreeIndex(doc), readRevisions(doc), at),",
+    to: '                  nearestRevision(readTreeIndex(doc), readRevisions(doc), { kind: "root" }),',
+    suite: "lanes",
+    scenario: "main",
+    expect:
+      "a branch of a branch starts from its parent's turn, and leaves it alone",
+  },
+  {
+    name: "your home directory is a lane's working copy",
+    file: "apps/pinetrie/host/work/setup.ts",
+    from: "        hostWorkingCopy: root,",
+    to: "        hostWorkingCopy: homedir(),",
+    suite: "lanes",
+    scenario: "main",
+    expect:
+      "your home directory is not in a lane; your working copy is, at /mnt/host-working-copy",
+  },
+  {
+    name: "only the base snapshot's lane mounts the shared directories",
+    file: "apps/pinetrie/host/work/setup.ts",
+    from: "        shared: base ? [] : lanes.shared,",
+    to: "        shared: base ? lanes.shared : [],",
+    suite: "lanes",
+    scenario: "shared",
+    expect: "another lane reads it",
+  },
+  {
+    name: "a lane's thread is sent a command's files at their host paths",
+    file: "apps/pinetrie/host/commands/chat.ts",
+    from: "deps.piSetup.expand(source, typed.args, own)",
+    to: "deps.piSetup.expand(source, typed.args, false)",
+    suite: "lanes",
+    scenario: "commands",
+    expect:
+      "in a lane of its own, an expanded skill names its files at /mnt/host",
+  },
+  {
+    name: "a person's path to the working copy is stored as written",
+    file: "apps/pinetrie/host/commands/chat.ts",
+    from: "    hostWorkingCopy: own ? (work.project?.root ?? null) : null,",
+    to: "    hostWorkingCopy: null,",
+    suite: "lanes",
+    scenario: "main",
+    expect:
+      "a person's path to your working copy is stored as the lane sees it, under /mnt/host-working-copy",
+  },
+  {
+    name: "an image with no git is not checked",
+    file: "apps/pinetrie/host/work/setup.ts",
+    from: "  const refused = await checkImage(runtime, lane)",
+    to: "  const refused = null",
+    suite: "lanes",
+    scenario: "images",
+    expect: "an image with no git cannot host a lane, and says so",
+  },
+  {
+    name: "a turn's snapshot is never recorded",
+    file: "apps/pinetrie/host/work/turns.ts",
+    from: "                snapshot: snapped ? planned.snapshot : null,",
+    to: "                snapshot: null,",
+    suite: "lanes",
+    scenario: "images",
+    expect: "and its turn is committed and snapshotted",
+  },
+  {
+    name: "a turn's commits are not fetched into your repo",
+    file: "apps/pinetrie/host/work/turns.ts",
+    from: "        if (committed !== null) void deps.fetchLane(lane, [newest])",
+    to: "        if (false) void deps.fetchLane(lane, [newest])",
+    suite: "lanes",
+    scenario: "main",
+    expect:
+      "each turn of a lane of its own records a snapshot, and your repo fetches its commits",
+  },
+  {
+    name: "the host never writes what it found",
+    file: "apps/pinetrie/host/startup.ts",
+    from: "    ...(work.project === null\n      ? []",
+    to: "    ...(true\n      ? []",
+    suite: "lanes",
+    scenario: "main",
+    expect: "the host finds Docker and gives threads lanes of their own",
+  },
+  {
+    name: "a lane with no disk and no snapshot starts anyway",
+    file: "apps/pinetrie/host/work/containers.ts",
+    from: '        case "retired":\n          throw new Error(RETIRED)',
+    to: '        case "retired":\n          break',
+    suite: "lanes",
+    scenario: "main",
+    expect:
+      "a lane with no disk and no snapshot is retired, and its tools say to branch from it",
+  },
+  {
+    name: "a restored lane finds no snapshot",
+    file: "apps/pinetrie/host/work/containers.ts",
+    from: "      if (await runtime.snapshotExists(id)) return id",
+    to: "      if (false) return id",
+    suite: "lanes",
+    scenario: "main",
+    expect: "after restoring, a lane runs again on its newest snapshot",
+  },
   {
     name: "a card's × does nothing",
     file: "packages/web/card-frame.tsx",
@@ -17,7 +123,6 @@ export const mutations: readonly Mutation[] = [
       "a card's × discards it, and the undo key outside a box brings it back",
   },
   {
-    // Needs `container`: run on the Mac.
     name: "a catch-up's turn names no commit",
     file: "apps/pinetrie/host/work/turns.ts",
     from: "        const merged = turnMerged(index, tip)",
@@ -28,7 +133,6 @@ export const mutations: readonly Mutation[] = [
       "a catch_up mid-run merges accepted work, and a branch at its turn has accepted work's file",
   },
   {
-    // Needs `container`: run on the Mac.
     name: "an acceptance's fact is never written",
     file: "apps/pinetrie/host/commands/lane.ts",
     from: "    .run(() => recordFact(deps, done.fact))",
@@ -204,10 +308,10 @@ export const mutations: readonly Mutation[] = [
     expect: "End on its grip moves it last, and scrolls the strip to show it",
   },
   {
-    name: "the host does not wait for its stored session",
-    file: "apps/pinetrie/host/index.ts",
-    from: "  await whenHydrated(session)",
-    to: "  void whenHydrated(session)",
+    name: "a starting host pops no card queued before it",
+    file: "apps/pinetrie/host/startup.ts",
+    from: "  void settle(planned.drain)",
+    to: "  void settle([])",
     suite: "host",
     scenario: "tools",
     expect:
@@ -712,16 +816,7 @@ export const mutations: readonly Mutation[] = [
     expect:
       "after a reload, what was seen stays seen, and a mention made meanwhile counts",
   },
-  {
-    name: "the chip hides its choice",
-    file: "packages/web/card-editor.tsx",
-    from: '            {whereWords(\n              p.work,\n              p.project,\n              p.work.kind === "own" ? p.base : null,\n            )}\n',
-    to: "",
-    suite: "browser",
-    scenario: "tools",
-    expect:
-      "the chip says where the new thread's agent works, and the menu changes it",
-  },
+
   // ── your profile (packages/web/profile-page.tsx, ADR-0037, ADR-0098) ──
   {
     name: "the handle hint is never shown",
@@ -1165,6 +1260,35 @@ export const mutations: readonly Mutation[] = [
     expect: "typing beside an open review redraws none of it",
   },
   {
+    name: "the start line never shows",
+    file: "packages/web/card-editor.tsx",
+    from: "  if (bases.length === 0 && p.forkConflicts === 0) return null\n",
+    to: "  return null\n",
+    suite: "browser",
+    scenario: "tools",
+    expect:
+      "with a WIP above accepted work, the line says what the new thread starts from, and its menu changes it; with none, there is no line",
+  },
+  {
+    name: "the offer's line opens no review",
+    file: "packages/web/column.tsx",
+    from: "          onClick={review.toggle}\n",
+    to: "          onClick={() => {}}\n",
+    suite: "browser",
+    scenario: "tools",
+    expect:
+      "the offer's line opens its review beside the thread, which keeps its 28rem: a row per file, and a file's diff",
+  },
+  {
+    name: "an accepted offer's line stays a button",
+    file: "packages/web/column.tsx",
+    from: "      {strip.review === null ? (\n",
+    to: "      {false ? (\n",
+    suite: "browser",
+    scenario: "tools",
+    expect: "the review closes, and after the acceptance there is none to open",
+  },
+  {
     name: "the host serves before it has recovered",
     file: "apps/pinetrie/host/index.ts",
     from: "  await recover({",
@@ -1436,16 +1560,6 @@ export const mutations: readonly Mutation[] = [
     expect: "a prompt command gives the model its template, with its arguments",
   },
   {
-    name: "a direct lane works in the project",
-    file: "apps/pinetrie/host/work/containers.ts",
-    from: "          dir: record.work.dir,",
-    to: "          dir: setup.project?.root ?? record.work.dir,",
-    suite: "host",
-    scenario: "direct",
-    expect:
-      "a lane working directly writes in its directory, and a branch below inherits it",
-  },
-  {
     name: "an upload answers another hash",
     file: "apps/pinetrie/host/http.ts",
     from: "      send(res, uploaded(blobs.put(prepared.image)))",
@@ -1485,13 +1599,13 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the agent is given no tools",
-    file: "apps/pinetrie/host/index.ts",
-    from: "    tools:\n      toolsIn === null\n        ? null",
-    to: "    tools:\n      true\n        ? null",
+    file: "packages/pi/agent.ts",
+    from: "    tools === null ? [] : activeToolNames({ banners: bannerAsks !== undefined })",
+    to: "    [] as string[]",
     suite: "host",
     scenario: "tools",
     expect:
-      "the agent wrote a file, then edited it, working directly in the project",
+      "the agent wrote a file, then edited it, in its lane, leaving the project as it was",
   },
   {
     name: "a running command's output is never sent",

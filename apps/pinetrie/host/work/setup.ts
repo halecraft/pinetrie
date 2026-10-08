@@ -18,7 +18,6 @@ import {
   checkImage,
   commitsOf,
   configJson,
-  DEFAULT_REPO,
   decodeLaneConfig,
   ensureRuntime,
   gatherLinks,
@@ -26,7 +25,6 @@ import {
   type LaneRuntime,
   type LaneSpec,
   type Mount,
-  NO_GRANTS,
   normalShared,
   PINETRIE_INSTALL,
   pinetrieDir,
@@ -45,7 +43,6 @@ import type { PiSetup } from "@pinetrie/pi"
 import { type RepoOwner, renameAccepted, startRepoOwner } from "@pinetrie/repo"
 import { type Basics, failed, slow } from "../basics.ts"
 import { brokenConfigLine } from "../startup-lines.ts"
-import type { Convert } from "./convert.ts"
 import { lockHashAt } from "./disk.ts"
 import { openLinkOf } from "./registry.ts"
 import type { Found } from "./runtime.ts"
@@ -78,28 +75,31 @@ export interface Ready {
 /** The lane configs and shared directories (ADR-0035), read at startup. */
 export type PreparedLanes = Awaited<ReturnType<typeof prepareLanes>>
 
+/**
+ * What a host with tools found for its lanes, all of it or none
+ * (`startSetup` returns null without tools): a host with tools has a
+ * project, a runtime, your repo's owner and the lanes' configs.
+ */
 export interface Setup {
-  /** What the host found where it runs; null when it has no tools. */
-  readonly project: ProjectRecord | null
-  /** The project root when lanes have their own copies, else null. */
-  readonly root: string | null
-  /** The one writer of your repo (ADR-0065); null when lanes have no copies here. */
-  readonly owner: RepoOwner | null
-  /** What lanes of their own run on; null when they work directly. */
-  readonly runtime: LaneRuntime | null
-  /** pre-docker: converts a lane made under `container` (`work/convert.ts`); null where none can be. */
-  readonly convert: Convert | null
-  readonly lanes: PreparedLanes | null
+  /** What the host found where it runs. */
+  readonly project: ProjectRecord
+  /** The project's root. */
+  readonly root: string
+  /** The one writer of your repo (ADR-0065). */
+  readonly owner: RepoOwner
+  /** What lanes run on. */
+  readonly runtime: LaneRuntime
+  readonly lanes: PreparedLanes
   /**
    * Whether lanes run pinetrie's default image, with its browser (ADR-0041) and
    * python3 (ADR-0064): the project has no `pinetrie.Containerfile`.
    */
   readonly defaultImage: boolean
-  /** The images, runtime and grants; null when lanes have no copies here. */
-  readonly ready: Promise<Ready> | null
+  /** The images, runtime and grants, made in the background. */
+  readonly ready: Promise<Ready>
   /**
-   * The host paths every lane of its own is granted, read-only: the roots of
-   * the commands pi loaded (ADR-0036). None when lanes have no copies here.
+   * The host paths every lane is granted, read-only: the roots of the
+   * commands pi loaded (ADR-0036).
    */
   readonly hostPaths: readonly string[]
   /** A lane's spec. The base lane gets no shared directories and no host paths. */
@@ -124,75 +124,54 @@ export async function startSetup(input: {
   readonly setup: Pick<PiSetup, "commands" | "agentDir">
   /** Work nobody awaits: `quiet` waits for it. */
   readonly keeper: Keeper
-}): Promise<Setup> {
+}): Promise<Setup | null> {
   const { basics, keeper, found } = input
   const { log } = basics
-  const project = found?.project ?? null
-  const runtime = found?.runtime ?? null
-  const root = project?.kind === "lanes" ? project.root : null
-  if (project !== null) {
-    if (project.kind === "lanes")
-      log(
-        `[host] each thread's agent works in its own container, on a disk cloned from its fork point; your working copy is /mnt/host-working-copy there, read-only${project.rootDefault === "direct" ? " (new threads work directly here by default)" : ""}`,
-      )
-    else log(`[host] lanes work directly in ${project.root}: ${project.reason}`)
-  }
+  if (found === null) return null
+  const { project, runtime } = found
+  const { root } = project
+  log(
+    "[host] each thread's agent works in its own container, on a disk cloned from its fork point; your working copy is /mnt/host-working-copy there, read-only",
+  )
 
   // Before the rest, since a run's prompt names the shared directories.
-  const lanes =
-    root === null ? null : await prepareLanes(root, input.userConfig, log)
+  const lanes = await prepareLanes(root, input.userConfig, log)
   // Made here, from the project root and accepted work's names, before anything
   // else reads your repo: the reads below, lane work's and the offers'.
-  const owner =
-    root === null
-      ? null
-      : startRepoOwner({
-          root,
-          repoConfig: lanes?.repoConfig ?? DEFAULT_REPO,
-          onError: failed(basics, "your repo"),
-          onSlow: slow(basics, "your repo"),
-        })
+  const owner = startRepoOwner({
+    root,
+    repoConfig: lanes.repoConfig,
+    onError: failed(basics, "your repo"),
+    onSlow: slow(basics, "your repo"),
+  })
   // pre-accepted: the owner's first command, before its first observation
   // (ADR-0100). Delete with `renameAccepted`.
-  if (owner !== null)
-    await owner
-      .command(ops =>
-        renameAccepted(
-          ops,
-          (lanes?.repoConfig ?? DEFAULT_REPO).acceptedBookmark,
-        ),
-      )
-      .then(
-        lines => {
-          for (const line of lines) log(`[host] ${line}`)
-        },
-        failed(basics, "renaming accepted work's bookmark"),
-      )
+  await owner
+    .command(ops => renameAccepted(ops, lanes.repoConfig.acceptedBookmark))
+    .then(
+      lines => {
+        for (const line of lines) log(`[host] ${line}`)
+      },
+      failed(basics, "renaming accepted work's bookmark"),
+    )
   // Read at startup, as `prepareImages` reads it, so a lane's prompt says
   // what its image has before the images are ready.
-  const defaultImage =
-    root !== null &&
-    (await stat(projectContainerfile(root)).then(
-      () => false,
-      () => true,
-    ))
+  const defaultImage = await stat(projectContainerfile(root)).then(
+    () => false,
+    () => true,
+  )
 
-  const hostMounts =
-    root === null
-      ? null
-      : planHostMounts({
-          roots: input.setup.commands().map(c => c.root),
-          home: homedir(),
-          agentDir: input.setup.agentDir(),
-        })
-  for (const r of hostMounts?.refused ?? [])
+  const hostMounts = planHostMounts({
+    roots: input.setup.commands().map(c => c.root),
+    home: homedir(),
+    agentDir: input.setup.agentDir(),
+  })
+  for (const r of hostMounts.refused)
     log(`[host] ${r.path} is not readable in lanes: ${r.reason}`)
-  const hostPaths = hostMounts?.mounts ?? []
+  const hostPaths = hostMounts.mounts
 
   const specOf = (lane: LaneName, r: Ready, base = false): LaneSpec => {
-    if (root === null)
-      throw new Error("lanes of their own are off for this host")
-    const grants = lanes?.config.grants ?? NO_GRANTS
+    const grants = lanes.config.grants
     return {
       lane,
       image: r.image,
@@ -204,7 +183,7 @@ export async function startSetup(input: {
         ignoreDir: pinetrieDir(root).laneGit,
         links: r.links,
         grants: grants.mounts,
-        shared: base ? [] : (lanes?.shared ?? []),
+        shared: base ? [] : lanes.shared,
         hostPaths: base ? [] : hostPaths,
       }),
       grants: {
@@ -223,12 +202,9 @@ export async function startSetup(input: {
    * from accepted work, or from a WIP's copy on it. Nothing to do before accepted work
    * is set up.
    */
-  async function refreshBaseNow(on: LaneRuntime, at: string, r: Ready) {
-    if (owner === null) return
-    const acceptedBookmark = revsetName(
-      (lanes?.repoConfig ?? DEFAULT_REPO).acceptedBookmark,
-    )
-    const install = lanes?.config.install ?? null
+  async function refreshBaseNow(r: Ready) {
+    const acceptedBookmark = revsetName(lanes.repoConfig.acceptedBookmark)
+    const install = lanes.config.install
     const read = await owner.read(async ({ jj }) => {
       const yours = await commitsOf(jj, `present(${acceptedBookmark})`)
       const [commit] = yours
@@ -240,15 +216,15 @@ export async function startSetup(input: {
     if (read === null) return
     const { yours, commit, lock } = read
     const made = await refreshBase({
-      runtime: on,
-      root: at,
+      runtime,
+      root,
       // Nothing in the base should see a shared directory.
       spec: specOf(BASE_LANE, r, true),
       env: process.env,
       yours,
       lock,
       install,
-      open: openLinkOf(on),
+      open: openLinkOf(runtime),
     })
     if (made)
       log(
@@ -257,30 +233,25 @@ export async function startSetup(input: {
   }
 
   // --- the images, runtime and base snapshot, in the background ----------
-  const ready: Promise<Ready> | null =
-    root === null || runtime === null
-      ? null
-      : keeper.track(
-          prepare({
-            at: root,
-            runtime,
-            runtimeReady: found?.ready ?? (async () => {}),
-            mountsOf: r => specOf(BASE_LANE, r).mounts,
-            hostPorts: lanes?.config.grants.hostPorts ?? [],
-            refreshBaseNow,
-            log,
-          }),
-        )
-  ready?.catch(error =>
+  const ready: Promise<Ready> = keeper.track(
+    prepare({
+      at: root,
+      runtime,
+      runtimeReady: found.ready,
+      mountsOf: r => specOf(BASE_LANE, r).mounts,
+      hostPorts: lanes.config.grants.hostPorts,
+      refreshBaseNow,
+      log,
+    }),
+  )
+  ready.catch(error =>
     log(`[host] lanes of their own cannot start: ${errorText(error)}`),
   )
 
   /** The base snapshot's refreshes, one at a time. */
   const base = createKeeper()
   async function baseAtAccepted(): Promise<void> {
-    if (ready === null || runtime === null || root === null) return
-    const [on, at] = [runtime, root]
-    await base.run(async () => refreshBaseNow(on, at, await ready))
+    await base.run(async () => refreshBaseNow(await ready))
   }
   function refreshBaseSoon(): void {
     void keeper.track(
@@ -293,7 +264,6 @@ export async function startSetup(input: {
     root,
     owner,
     runtime,
-    convert: found?.convert ?? null,
     lanes,
     defaultImage,
     ready,
@@ -356,11 +326,7 @@ async function prepare(input: {
   readonly mountsOf: (r: Ready) => readonly Mount[]
   /** The ports of the Mac's loopback the project grants its lanes. */
   readonly hostPorts: readonly number[]
-  readonly refreshBaseNow: (
-    on: LaneRuntime,
-    at: string,
-    r: Ready,
-  ) => Promise<void>
+  readonly refreshBaseNow: (r: Ready) => Promise<void>
   readonly log: (m: string) => void
 }): Promise<Ready> {
   const { at, runtime, log } = input
@@ -397,7 +363,7 @@ async function prepare(input: {
     mounts: input.mountsOf(result),
     hostPorts: input.hostPorts,
   })
-  await input.refreshBaseNow(runtime, at, result)
+  await input.refreshBaseNow(result)
   log("[host] lanes of their own are ready")
   return result
 }

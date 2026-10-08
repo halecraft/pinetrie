@@ -12,10 +12,8 @@
 //                    edits and runs commands: each thread's agent in its own
 //                    Linux container, on a disk cloned from where it branched,
 //                    with the project read-only at /mnt/host-working-copy
-//                    (ADR-0034), so hot reload stays on
-//   PINETRIE_LANES=0   new threads' agents work directly in the project
-//                    instead, as you, sharing it; while one runs, hot reload
-//                    holds an update to a file it could be editing
+//                    (ADR-0034, ADR-0102). Then the folder must be a jj repo,
+//                    and Docker must run lanes: the lane VM on the Mac
 //   PINETRIE_STORE     the SQLite file the session and pasted images are kept in
 //                    (default .pinetrie/pinetrie.db in the project's root)
 //   PINETRIE_PROVIDER, PINETRIE_MODEL
@@ -27,11 +25,12 @@
 // As it starts, the host prints the project, the store, the user config it
 // read, and where its model came from.
 //
-// A refused folder or argument prints why and exits 2, before anything opens.
+// A refused folder or argument prints why and exits 2, before anything opens;
+// a host with tools that cannot run its lanes prints why and exits 1.
 // The first SIGINT or SIGTERM shuts the host down; a second ends the process.
 import path from "node:path"
 import { prepareProjectDir } from "@pinetrie/lanes"
-import { startHost } from "./index.ts"
+import { HostRefused, startHost } from "./index.ts"
 import {
   planInvocation,
   type Refusal,
@@ -44,7 +43,6 @@ import {
   projectLine,
   storeLine,
 } from "./startup-lines.ts"
-import { RuntimeRefused } from "./work/runtime.ts"
 
 const env = process.env
 function refuse(refusal: Refusal): never {
@@ -76,11 +74,10 @@ const host = await startHost({
     ...(env.PINETRIE_MODEL === undefined ? {} : { model: env.PINETRIE_MODEL }),
   },
   project: { dir: root, tools: env.PINETRIE_TOOLS !== "0" },
-  lanes: env.PINETRIE_LANES !== "0",
   store: store.file,
 }).catch(error => {
-  // The chosen runtime cannot run lanes here: its words say how to fix it.
-  if (error instanceof RuntimeRefused) {
+  // Lanes cannot run here: the words say how to fix it.
+  if (error instanceof HostRefused) {
     console.error(`[host] lanes cannot start: ${error.message}`)
     process.exit(1)
   }

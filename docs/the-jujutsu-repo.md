@@ -31,7 +31,7 @@ are in the page's titles.
 The names `pinetrie-accepted`, `main` and `wip/` are the defaults. A project
 sets its own in `pinetrie.json`, or a person in
 `$XDG_CONFIG_HOME/pinetrie/config.json`; the project's wins.
-`publish.catchUp` (default `false`) makes a publish catch your files up and
+`publish.catchUp` (default `false`) makes a publish catch the working copy up and
 accept your commits first (ADR-0099):
 
 ```json

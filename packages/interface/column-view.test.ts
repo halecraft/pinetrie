@@ -53,11 +53,10 @@ import {
   workingWords,
 } from "./column-view.ts"
 import { entry, indexOf, TEST_ROOT } from "./fixtures.ts"
-import { whereWords } from "./send.ts"
 
 const A = laneNameForThread("a")
 const B = laneNameForThread("b")
-const C = laneNameForThread("c")
+const _C = laneNameForThread("c")
 const AMBER = "amber-fox" as ThreadName
 const COPPER = "copper-owl" as ThreadName
 const ADA = writerId("ada@x.io")
@@ -170,7 +169,7 @@ describe("lanesAlong", () => {
   })
 })
 
-const PROJECT: ProjectRecord = { kind: "lanes", root: "/p", rootDefault: "own" }
+const PROJECT: ProjectRecord = { root: "/p" }
 const work = (over: Partial<WorkFacts> = {}): WorkFacts => ({
   project: PROJECT,
   commands: [],
@@ -224,10 +223,10 @@ const laneView = (name: LaneName, tip: string, running = false): LaneView => ({
   heldBy: null,
 })
 const onLane = (view: LaneView): ThreadLane => ({ kind: "lane", ...view })
-const record = (lane: LaneName, work: LaneRecord["work"]): LaneRecord => ({
+const record = (lane: LaneName, ownCopy: boolean): LaneRecord => ({
   lane,
   root: TEST_ROOT,
-  work,
+  ownCopy,
   by: ADA,
   createdAt: 1,
 })
@@ -308,7 +307,6 @@ describe("columnView: the header", () => {
       details: {
         open: false,
         started: null,
-        where: null,
         behind: null,
         start: null,
       },
@@ -426,18 +424,16 @@ describe("columnView: a thread's details (ADR-0073)", () => {
     expect(detailsOf(columnView(onB()))?.open).toBe(false)
     expect(detailsOf(columnView(onB({ detailsOpen: true })))?.open).toBe(true)
   })
-  test("who started the lane, and where it works, from its record; neither before it has one", () => {
-    const lanes = new Map([[B, record(B, { kind: "own" })]])
+  test("who started the lane, from its record; no one before it has one", () => {
+    const lanes = new Map([[B, record(B, true)]])
     const shown = detailsOf(
       columnView(
         onB({ work: work({ revisions: OWNERS, names: NAMES, lanes }) }),
       ),
     )
     expect(shown?.started).toEqual({ by: "Ada", at: 1 })
-    expect(shown?.where).toBe(whereWords({ kind: "own" }, PROJECT))
     const none = detailsOf(columnView(onB()))
     expect(none?.started).toBeNull()
-    expect(none?.where).toBeNull()
   })
   test.each([
     [
@@ -509,7 +505,7 @@ describe("columnView: the work strip", () => {
   const own = (over: Partial<ColumnFacts> = {}) =>
     facts(1, {
       lane: onLane(laneView(B, "b2")),
-      work: work({ lanes: new Map([[B, record(B, { kind: "own" })]]) }),
+      work: work({ lanes: new Map([[B, record(B, true)]]) }),
       ...over,
     })
   test("none without a lane, without a project, or read-only", () => {
@@ -520,7 +516,7 @@ describe("columnView: the work strip", () => {
         own({
           work: work({
             project: null,
-            lanes: new Map([[B, record(B, { kind: "own" })]]),
+            lanes: new Map([[B, record(B, true)]]),
           }),
         }),
       ).strip,
@@ -531,7 +527,7 @@ describe("columnView: the work strip", () => {
       own({
         work: work({
           accepted: ACCEPTED,
-          lanes: new Map([[B, record(B, { kind: "own" })]]),
+          lanes: new Map([[B, record(B, true)]]),
         }),
       }),
     )
@@ -597,7 +593,7 @@ describe("columnView: the work strip", () => {
         own({
           lane: onLane(laneView(B, "b2", running)),
           work: work({
-            lanes: new Map([[B, record(B, { kind: "own" })]]),
+            lanes: new Map([[B, record(B, true)]]),
             offers: new Map([[B, offer]]),
           }),
         }),
@@ -626,52 +622,14 @@ describe("columnView: the work strip", () => {
       review: null,
     })
   })
-  test("direct: where changes land, and other running lanes in the same directory", () => {
-    const direct = (dir: string) => record(C, { kind: "direct", dir })
-    const lanes = new Map([
-      [A, record(A, { kind: "direct", dir: "/p" })],
-      [B, record(B, { kind: "direct", dir: "/p" })],
-      [C, direct("/elsewhere")],
-    ])
+  test("a lane with no copy of its own has no strip", () => {
     const shows = columnView(
       facts(1, {
-        lane: onLane(laneView(B, "b2", true)),
-        lanes: [
-          laneView(A, "6", true),
-          laneView(B, "b2", true),
-          laneView(C, "x", true),
-        ],
-        work: work({
-          lanes,
-          names: new Map([...NAMES, [C, "tan-elk" as ThreadName]]),
-        }),
-      }),
-    )
-    expect(shows.strip).toEqual({
-      kind: "direct",
-      line: "edits your files directly",
-      alsoHere: [AMBER],
-    })
-    const idle = columnView(
-      facts(1, {
-        lane: onLane(laneView(C, "b2")),
-        lanes: [laneView(A, "6"), laneView(C, "b2")],
-        work: work({ lanes, names: NAMES }),
-      }),
-    )
-    expect(idle.strip).toEqual({
-      kind: "direct",
-      line: "edits files in /elsewhere",
-      alsoHere: [],
-    })
-    const quiet = columnView(
-      facts(1, {
         lane: onLane(laneView(B, "b2")),
-        lanes: [laneView(A, "6"), laneView(B, "b2")],
-        work: work({ lanes, names: NAMES }),
+        work: work({ lanes: new Map([[B, record(B, false)]]), names: NAMES }),
       }),
     )
-    expect(quiet.strip).toMatchObject({ alsoHere: [] })
+    expect(shows.strip).toEqual({ kind: "none" })
   })
 })
 
@@ -1073,7 +1031,6 @@ describe("identityWords", () => {
         details: {
           open: false,
           started: null,
-          where: null,
           behind: null,
           start: null,
         },

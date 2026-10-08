@@ -59,7 +59,6 @@ import {
   WORKFLOW_ACTIONS,
   type WorkflowAction,
   type WorkflowStateId,
-  type WorkSetting,
   type WriterId,
 } from "@pinetrie/core"
 import { type Command, command, type Reply, reply } from "./messages.ts"
@@ -212,9 +211,6 @@ export function decodeCommand(
     if (lane !== "" && !isLaneName(lane)) {
       return refused(ERR.UNKNOWN_TARGET, `not a thread's lane: ${lane}`)
     }
-    const work = workFromWire(text(wire?.workKind), text(wire?.workDir))
-    if (work === "invalid")
-      return refused(ERR.BAD_DIRECTORY, "working directly needs a directory")
     const reserved = text(wire?.reserved)
     const reservedLane = reserved === "" ? null : parseNewLane(reserved)
     if (reservedLane === undefined) return notNewLane(reserved)
@@ -244,7 +240,6 @@ export function decodeCommand(
       lane: isLaneName(lane) ? lane : null,
       asksAgent: wire?.asksAgent === true,
       mentions: parseMentions(body),
-      work,
       card: cardFromWire(text(wire?.cardId), text(wire?.seen)),
       pinned,
       reserved: reservedLane,
@@ -657,24 +652,6 @@ export function rootMoveFromWire(s: string): {
 const isChatMode = (mode: string): mode is ChatMode =>
   (CHAT_MODES as readonly string[]).includes(mode)
 
-/** The wire's work fields -> a setting, null for "the lane above's", or invalid. */
-function workFromWire(
-  kind: string,
-  dir: string,
-): WorkSetting | null | "invalid" {
-  if (kind === "") return null
-  if (kind === "own") return { kind: "own" }
-  if (kind === "direct") return dir === "" ? "invalid" : { kind: "direct", dir }
-  return "invalid"
-}
-
-const workToWire = (work: WorkSetting | null) =>
-  work === null
-    ? { workKind: "", workDir: "" }
-    : work.kind === "own"
-      ? { workKind: "own", workDir: "" }
-      : { workKind: "direct", workDir: work.dir }
-
 /** Intent -> the flat wire command. The client's half of `decodeCommand`. */
 export function encodeIntent(id: string, intent: Intent): Command {
   switch (intent.kind) {
@@ -688,7 +665,6 @@ export function encodeIntent(id: string, intent: Intent): Command {
         mode: intent.mode,
         lane: intent.lane ?? "",
         asksAgent: intent.asksAgent,
-        ...workToWire(intent.work),
         cardId: intent.card?.id ?? "",
         seen: intent.card?.seen ?? "",
         pinned: pinnedToWire(intent.pinned),

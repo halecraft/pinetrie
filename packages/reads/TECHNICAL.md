@@ -46,10 +46,11 @@ closed state, derived and kept while the same, since every write to the
 session's values wakes it), `readMarks` (ADR-0045), `readStops` and
 `readDigests` (ADR-0106), and
 where lanes work (ADR-0032, ADR-0034): `readLaneRecords`, `readRevisions`, `readLandings`,
-`readProject` (`lanes`, or `direct` and why). `workAt` is where a lane created
-at an entry would work, and the commit and snapshot it would start from: the
-composer shows it, and the host creates the lane by it, and decides by it
-whether a sent message's paths are stored under `/mnt/host-working-copy`. The board's items are a
+`readProject` (the project's root, written only by a host with tools).
+`worksOwn` says whether a send's thread works, or will work, in a copy of
+its own (the lane's `ownCopy`, or, for a lane to be made, whether the host
+has a project, ADR-0102): the host decides by it whether a sent message's
+paths are stored under `/mnt/host-working-copy`. The board's items are a
 client-only read, in `packages/interface/board-view.ts`. Live streams are read with `readStreams` in
 `@pinetrie/schema`; an entry count stays in `packages/interface/projection.ts`.
 

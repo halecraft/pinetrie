@@ -365,29 +365,14 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "the sidebar's roots and the one you are on, and no other",
   },
-  {
-    name: "conflicts in your files offer no agent",
-    file: "packages/interface/publish-view.ts",
-    from: '          acting.kind === "refused" && acting.code === ERR.YOURS_CONFLICT,',
-    to: "          false,",
-    command: unit,
-    expect: "your files conflict: resolve with the agent",
-  },
-  {
-    name: "every refusal offers the agent",
-    file: "packages/interface/publish-view.ts",
-    from: '          acting.kind === "refused" && acting.code === ERR.YOURS_CONFLICT,',
-    to: '          acting.kind === "refused",',
-    command: unit,
-    expect: "a refusal",
-  },
+
   {
     name: "the publish title names no file the catch-up changes",
     file: "packages/interface/publish-view.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
-    from: '      `catches your files up with accepted work (changes ${count(preview?.changes ?? 0, "file", "files")}${moves})`,',
+    from: '      `catches the working copy up with accepted work (changes ${count(preview?.changes ?? 0, "file", "files")}${moves})`,',
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
-    to: "      `catches your files up with accepted work${moves}`,",
+    to: "      `catches the working copy up with accepted work${moves}`,",
     command: unit,
     expect: "your commits are accepted, then main moves",
   },
@@ -432,24 +417,7 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "your last command: an acceptance from a WIP into accepted work",
   },
-  {
-    name: "a prefill forgets where its agent works",
-    file: "packages/interface/layout.ts",
-    from: "                    : { work: { ...c.fresh.prefill.work } }),",
-    to: "                    : {}),",
-    command: unit,
-    expect:
-      "a prefill, blank or content, and where its agent works, is stored and restored",
-  },
-  {
-    name: "the where menu checks nothing",
-    file: "packages/interface/send.ts",
-    from: "      checked: chosen(own),",
-    to: "      checked: false,",
-    command: unit,
-    expect:
-      "the current choice is checked; another directory, which asks, is neither",
-  },
+
   {
     name: "the bases are offered with no WIP to choose",
     file: "packages/interface/send.ts",
@@ -1080,14 +1048,7 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "who works here",
   },
-  {
-    name: "a lane idle in the same directory warns",
-    file: "packages/interface/column-view.ts",
-    from: "          other.running &&",
-    to: "          true &&",
-    command: unit,
-    expect: "other running lanes in the same directory",
-  },
+
   {
     name: "a stack reads as one offer",
     file: "packages/interface/column-view.ts",
@@ -1210,30 +1171,7 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "never names you",
   },
-  {
-    name: "the own copy is offered in a direct project",
-    file: "packages/interface/send.ts",
-    from: '      disabled: project.kind !== "lanes",',
-    to: "      disabled: false,",
-    command: unit,
-    expect: "a copy cannot be chosen where the project cannot have one",
-  },
-  {
-    name: "the working copy is offered twice",
-    file: "packages/interface/send.ts",
-    from: "      .filter(dir => dir !== project.root)",
-    to: "      .filter(dir => dir !== undefined)",
-    command: unit,
-    expect: "the working copy is never a used directory's row",
-  },
-  {
-    name: "a working copy reads as a directory",
-    file: "packages/interface/send.ts",
-    from: '  return work.dir === project.root\n    ? "edits your files directly"',
-    to: '  return false\n    ? "edits your files directly"',
-    command: unit,
-    expect: "whereWords says each setting by what it does to your files",
-  },
+
   {
     name: "a content prefill sent unchanged sends nothing",
     file: "packages/interface/send.ts",
@@ -3042,12 +2980,13 @@ export const mutations: readonly Mutation[] = [
     expect: "before setup, set up whatever publish.catchUp says",
   },
   {
-    name: "the title hides that your files do not move",
+    name: "the title hides that the working copy does not move",
     file: "packages/interface/publish-view.ts",
     from: "    !record.publishCatchesUp && (behind > 0 || ahead > 0)",
     to: "    false && (behind > 0 || ahead > 0)",
     command: unit,
-    expect: "with publish.catchUp off, the title says your files do not move",
+    expect:
+      "with publish.catchUp off, the title says the working copy does not move",
   },
   {
     name: "the button's title says nothing of a publish the host would refuse",

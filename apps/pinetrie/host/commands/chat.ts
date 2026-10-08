@@ -13,9 +13,7 @@ import {
   laneNameForThread,
   type PlanMode,
   type SentCard,
-  type TreeIndex,
   threadOf,
-  type WorkSetting,
   type WriterId,
 } from "@pinetrie/core"
 import type { Agent, PiSetup, Scribe } from "@pinetrie/pi"
@@ -34,7 +32,6 @@ import {
   readRoots,
   readThreadName,
   readTreeIndex,
-  workAt,
   worksOwn,
 } from "@pinetrie/reads"
 import {
@@ -69,11 +66,7 @@ export interface ChatDeps {
   readonly piSetup: Pick<PiSetup, "commands" | "expand">
   readonly work: Pick<
     LaneWork,
-    | "project"
-    | "checkDirectory"
-    | "checkBegin"
-    | "prepareLane"
-    | "prepareUpdate"
+    "project" | "checkBegin" | "prepareLane" | "prepareUpdate"
   >
   readonly blobs: Pick<BlobStore, "ref">
   /** Who wrote in a card: its other writers are a message's contributors (ADR-0048). */
@@ -87,10 +80,7 @@ export interface ChatDeps {
 export interface ChatContext {
   /** The root's documents the send was planned from. */
   readonly view: RootView
-  readonly index: TreeIndex
   readonly writer: WriterId
-  /** Where the send asked a new lane to work, if anywhere. */
-  readonly work: WorkSetting | null
   /** The WIP bookmark a new lane begins from; null for accepted work (ADR-0104). */
   readonly base: string | null
   /** The thread's pinned cards as the sender had them: a run waits for them. */
@@ -175,13 +165,7 @@ export async function sendChat(
   // A thread that works, or will work, in its own copy is sent paths as
   // its lane sees them: your working copy's (ADR-0034), and a command's
   // files (ADR-0036).
-  const own = worksOwn(view, index, {
-    lane: thread.lane,
-    end: thread.end,
-    mode: chat.mode,
-    at: chat.at,
-    work: chat.work,
-  })
+  const own = worksOwn(view.session, { lane: thread.lane, mode: chat.mode })
   // gather: the command its first word names, from its file as it is now
   const typed = parseCommand(chat.text)
   const source =
@@ -255,9 +239,7 @@ export async function sendChat(
     return catchUpFirst(deps, writer, sendId, chat, planned.lane)
   const sent = await executeChat(deps, planned, {
     view,
-    index,
     writer,
-    work: chat.work,
     base: chat.base,
     pinned: chat.pinned,
   })
@@ -313,7 +295,7 @@ export async function executeChat(
 ): Promise<Outcome> {
   const { agent, work } = deps
   const { log, now } = deps.basics
-  const { view, index, writer } = context
+  const { view, writer } = context
   const { root } = view
   const message = (details: ChatDetails) => encodeChat(details, now())
   switch (planned.kind) {
@@ -352,22 +334,7 @@ export async function executeChat(
         }),
       }
     case "createAndRun": {
-      // Where the new lane works: the send's choice, else the lane above,
-      // else the project's default (ADR-0032).
-      const { work: setting } = workAt(view, index, planned.at, context.work)
-      const bad = await work.checkDirectory(setting)
-      if (bad !== null)
-        return {
-          kind: "refused",
-          code: bad,
-          message: "there is no such directory to work in",
-        }
-      const begin = await work.checkBegin(
-        view,
-        setting,
-        planned.at,
-        context.base,
-      )
+      const begin = await work.checkBegin(view, planned.at, context.base)
       if (begin !== null)
         return {
           kind: "refused",
@@ -391,7 +358,6 @@ export async function executeChat(
       await work.prepareLane(
         view,
         created.lane,
-        setting,
         planned.at,
         writer,
         context.base,

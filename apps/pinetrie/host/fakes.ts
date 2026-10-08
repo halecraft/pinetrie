@@ -242,7 +242,7 @@ export function putLane(
     setRecord(LANE, {
       lane,
       root: ROOT_ID,
-      work: null,
+      ownCopy: false,
       by: NOBODY_WRITER,
       createdAt: 0,
     }),

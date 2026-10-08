@@ -309,7 +309,7 @@ export interface AcceptedFacts
 
 /**
  * A publish (ADR-0090), decided before its first step: on the host's own
- * machine, your files catch up with accepted work first (`catchUp`), and your
+ * machine, the working copy catches up with accepted work first (`catchUp`), and your
  * commits below `@` move onto it with the publish bookmark (`accept`).
  */
 export interface PublishDecision {

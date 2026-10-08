@@ -2,7 +2,7 @@
 // Run: pnpm mutate scripts/mutations/repo.ts
 // The plans' checks are unit tests, in seconds; the real-jj checks in
 // `repo.test.ts` take a few seconds each. The suite mutations run one
-// `e2e:lanes` scenario, which needs `container`: on the Mac.
+// `e2e:lanes` scenario, on the suites' Docker: in a lane, or on the Mac.
 import type { Mutation } from "../mutate.ts"
 
 const unit = ["pnpm", "exec", "vitest", "run", "packages/repo"]
@@ -23,6 +23,17 @@ const offersRefresh = [
 ]
 
 export const mutations: readonly Mutation[] = [
+  // ── the lanes suite, proven in a lane (ADR-0103) ──
+  {
+    name: "nothing in your repo is immutable",
+    file: "packages/repo/plan.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: '  const base = (current ?? "builtin_immutable_heads()").trim()\n  return base.endsWith(added) ? base : `${base} | ${added}`',
+    to: '  return "none()"',
+    suite: "lanes",
+    scenario: "main",
+    expect: "a lane's commits in your repo are immutable",
+  },
   {
     name: "pre-accepted: a configured bookmark is renamed over",
     file: "packages/repo/pre-accepted.ts",

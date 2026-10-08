@@ -353,7 +353,6 @@ export {
   publishToast,
   publishView,
   publishWords,
-  resolveIntent,
 } from "./publish-view.ts"
 export {
   CARD_MIME,
@@ -442,9 +441,8 @@ export {
   sendButton,
   settleSend,
   spent,
+  startWords,
   UPLOADING,
-  whereChoices,
-  whereWords,
 } from "./send.ts"
 export {
   dropsWords,

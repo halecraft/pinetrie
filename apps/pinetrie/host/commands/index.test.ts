@@ -272,7 +272,6 @@ test("a popped queued card in an archived root is refused, and the agent is neve
     lane: null,
     asksAgent: false,
     mentions: [],
-    work: null,
     card: null,
     pinned: [],
     reserved: null,

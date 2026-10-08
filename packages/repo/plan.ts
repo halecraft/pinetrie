@@ -100,7 +100,7 @@ export const moveForward = (
 
 /**
  * A publish's catch-up (ADR-0090): your work above accepted work rebased onto it,
- * as you, since it changes your files; jj snapshots them first. `-b @` moves
+ * as you, since it changes the working copy; jj snapshots it first. `-b @` moves
  * every head on your work with `@` (S80 item 1); `-r` would strip them of the
  * commits under them. A conflict is recorded, not refused, and
  * `planPublishFinish` reads it.

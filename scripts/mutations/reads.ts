@@ -5,6 +5,21 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/reads"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "a new lane on a host with tools is sent the host's paths",
+    file: "packages/reads/index.ts",
+    from: "  return readProject(session) !== null\n",
+    to: "  return false\n",
+    command: [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "apps/pinetrie/host/commands/chat.test.ts",
+    ],
+    expect:
+      "in a thread that works in its own copy, your working copy's paths are stored as the lane sees them",
+  },
+  {
     name: "a root's title is not its mark",
     file: "packages/reads/index.ts",
     from: "    title: entry === null ? null : (readMarks(doc).get(entry)?.title ?? null),",

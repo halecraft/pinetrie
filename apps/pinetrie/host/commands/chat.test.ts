@@ -15,7 +15,6 @@ import {
   writerId,
 } from "@pinetrie/core"
 import type { ThreadLaneHandle } from "@pinetrie/pi"
-import { readTreeIndex } from "@pinetrie/reads"
 import {
   ACCEPTED,
   BASE,
@@ -59,17 +58,13 @@ const details: ChatDetails = {
 /** The agent, the scribe and the setup in one record, so the order of their calls shows. */
 type FakePi = ChatDeps["agent"] & ChatDeps["scribe"] & ChatDeps["piSetup"]
 
-function setUp(
-  bad: typeof ERR.BAD_DIRECTORY | null,
-  begin: ErrCode | null = null,
-) {
+function setUp(begin: ErrCode | null = null) {
   const b = basics()
   const pi = record<FakePi>({
     createThreadLane: async () => ({ kind: "created", lane: LANE }),
   })
   const work = record<ChatDeps["work"]>({
     project: null,
-    checkDirectory: async () => bad,
     checkBegin: async () => begin,
     prepareLane: async () => {},
   })
@@ -93,9 +88,7 @@ function setUp(
   }
   const context = {
     view: { root: ROOT_ID, doc: b.root, session: b.session, live: b.live },
-    index: readTreeIndex(b.root),
     writer: ALICE,
-    work: null,
     base: null,
     pinned: [],
   }
@@ -103,20 +96,8 @@ function setUp(
 }
 
 describe("executeChat", () => {
-  test("createAndRun in a missing directory refuses, and never creates the lane", async () => {
-    const { pi, started, deps, context } = setUp(ERR.BAD_DIRECTORY)
-    const out = await executeChat(
-      deps,
-      { kind: "createAndRun", at: ROOT, lane: LANE, details },
-      context,
-    )
-    expect(out).toMatchObject({ kind: "refused", code: ERR.BAD_DIRECTORY })
-    expect(methods(pi.calls)).toEqual([])
-    expect(started).toEqual([])
-  })
-
   test("createAndRun creates the lane, prepares it, may title its root, and runs there", async () => {
-    const { pi, work, started, titles, deps, context } = setUp(null)
+    const { pi, work, started, titles, deps, context } = setUp()
     const out = await executeChat(
       deps,
       { kind: "createAndRun", at: ROOT, lane: LANE, details },
@@ -126,11 +107,7 @@ describe("executeChat", () => {
     expect(pi.calls.map(c => [c.method, ...c.args])).toEqual([
       ["createThreadLane", { root: ROOT_ID, at: ROOT }, LANE],
     ])
-    expect(methods(work.calls)).toEqual([
-      "checkDirectory",
-      "checkBegin",
-      "prepareLane",
-    ])
+    expect(methods(work.calls)).toEqual(["checkBegin", "prepareLane"])
     expect(titles.calls.map(c => c.args)).toEqual([
       [
         {
@@ -145,7 +122,7 @@ describe("executeChat", () => {
   })
 
   test("a run carries the sender's pinned versions, for it to wait for", async () => {
-    const { seen, deps, context } = setUp(null)
+    const { seen, deps, context } = setUp()
     const pinned = [{ id: cardId("c-1"), seen: "v-1" }]
     await executeChat(
       deps,
@@ -164,7 +141,7 @@ describe("executeChat", () => {
   })
 
   test("createAndRun from a base that cannot begin refuses, and never creates the lane (ADR-0104)", async () => {
-    const { pi, started, deps, context } = setUp(null, ERR.BAD_BASE)
+    const { pi, started, deps, context } = setUp(ERR.BAD_BASE)
     const out = await executeChat(
       deps,
       { kind: "createAndRun", at: ROOT, lane: LANE, details },
@@ -176,7 +153,7 @@ describe("executeChat", () => {
   })
 
   test("busy writes nothing and answers busy: the sender's client queues its card", async () => {
-    const { pi, work, started, deps, context } = setUp(null)
+    const { pi, work, started, deps, context } = setUp()
     const out = await executeChat(deps, { kind: "busy" }, context)
     expect(out).toEqual({ kind: "busy" })
     expect([pi.calls, work.calls, started]).toEqual([[], [], []])
@@ -195,7 +172,6 @@ describe("sendChat", () => {
     lane: null,
     asksAgent,
     mentions: parseMentions(text),
-    work: null,
     card: null,
     pinned: [],
     reserved: null,
@@ -230,7 +206,6 @@ describe("sendChat", () => {
       piSetup: pi.port,
       work: record<ChatDeps["work"]>({
         project,
-        checkDirectory: async () => null,
         checkBegin: async () => null,
         prepareLane: async () => {},
         prepareUpdate,
@@ -300,11 +275,7 @@ describe("sendChat", () => {
   })
 
   test("in a thread that works in its own copy, your working copy's paths are stored as the lane sees them", async () => {
-    const { started, deps } = setUp({
-      kind: "lanes",
-      root: "/proj",
-      rootDefault: "own",
-    })
+    const { started, deps } = setUp({ root: "/proj" })
     await sendChat(deps, ALICE, "s-1", chat("@agent read /proj/a.txt"))
     expect(started[0]?.details.text).toBe(
       "@agent read /mnt/host-working-copy/a.txt",
@@ -428,9 +399,7 @@ describe("sendChat", () => {
       { kind: "conflict", by: BEA },
       {
         view: { root: ROOT_ID, doc: b.root, session: b.session, live: b.live },
-        index: readTreeIndex(b.root),
         writer: ALICE,
-        work: null,
         base: null,
         pinned: [],
       },

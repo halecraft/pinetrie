@@ -5,6 +5,45 @@ const unit = ["pnpm", "exec", "vitest", "run", "packages/pi"]
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "an agent without a lane runs its calls",
+    file: "packages/pi/lane-env.ts",
+    from: '          ok: false,\n          error: new FileError("not_supported", why),',
+    to: "          ok: true,\n          value: undefined,",
+    command: unit,
+    expect:
+      "toolContextOf: no access is no lane, named by the project's root, whose every call is refused",
+  },
+  // ── the lanes suite, proven in a lane (ADR-0103) ──
+  {
+    name: "a lane's prompt lists its skills at their host paths",
+    file: "packages/pi/lanes.ts",
+    from: "          : skillsInLane(setup.skills, toolContext.lane.hostPaths),",
+    to: "          : setup.skills,",
+    suite: "lanes",
+    scenario: "commands",
+    expect: "the system prompt lists the skills the model may use at /mnt/host",
+  },
+  {
+    name: "a lane is not told it is in a lane",
+    file: "packages/pi/lanes.ts",
+    from: "          : [PINNED_RULE, ...laneGuidelines(toolContext.lane.facts)],",
+    to: "          : [PINNED_RULE],",
+    suite: "lanes",
+    scenario: "commands",
+    expect: "a lane of its own is told it is in a lane, and of its browser",
+  },
+  {
+    name: "an abort is sent before the request it aborts",
+    file: "packages/pi/lane-env.ts",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
+    from: "      child.stdin.write(`${encode(request(id))}\\n`)\n      if (signal?.aborted)",
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
+    to: "      if (signal?.aborted) {\n        child.stdin.write(`${encode({ abort: id })}\\n`)\n        child.stdin.write(`${encode(request(id))}\\n`)\n        return\n      }\n      child.stdin.write(`${encode(request(id))}\\n`)\n      if (signal?.aborted)",
+    command: unit,
+    expect: "a call aborted while it waited for its lane is aborted, not run",
+  },
+
+  {
     name: "a steer is never queued",
     file: "packages/pi/thread-lanes.ts",
     from: "          const queued = await lane.steer(message, undefined, ctx)",
@@ -45,14 +84,7 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "ignored, whatever it is called",
   },
-  {
-    name: "a direct lane's tools do not wait for its setup",
-    file: "packages/pi/lanes.ts",
-    from: "        await ready",
-    to: "        void ready",
-    command: unit,
-    expect: "a tool waits for setup",
-  },
+
   {
     name: "a turn is not awaited before the next request",
     file: "packages/pi/agent.ts",
@@ -127,14 +159,7 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "its rules tell it about the lane",
   },
-  {
-    name: "a direct lane is told it is in a container",
-    file: "packages/pi/lanes.ts",
-    from: "      dir: access.dir,\n      lane: null,",
-    to: '      dir: access.dir,\n      lane: { hostPaths: [], facts: { dir: access.dir, shared: [], grants: { ssh: false, env: [], mounts: [] }, defaultImage: false, install: "/pinetrie", note: "" } },',
-    command: unit,
-    expect: "a lane that works directly is told nothing of a lane",
-  },
+
   {
     name: "the lane is not told its grants",
     file: "packages/pi/lanes.ts",
@@ -565,14 +590,7 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "names the browser and python3 only on the default image",
   },
-  {
-    name: "a program the host could not find is remembered as missing",
-    file: "packages/pi/lanes.ts",
-    from: "    if (path !== null) found.set(program, path)",
-    to: '    found.set(program, path ?? "")',
-    command: unit,
-    expect: "a found path is asked once; a null is asked again",
-  },
+
   {
     name: "a lane's search tools run a bare program name",
     file: "packages/pi/lanes.ts",

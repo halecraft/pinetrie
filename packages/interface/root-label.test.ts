@@ -52,7 +52,7 @@ describe("labels and summaries, from the directory (ADR-0063)", () => {
       {
         lane,
         root: rootIdFor(n),
-        work: null,
+        ownCopy: false,
         by: writerId("p-ada"),
         createdAt: 0,
       },

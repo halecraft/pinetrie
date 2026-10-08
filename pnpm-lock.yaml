@@ -47,9 +47,6 @@ importers:
       '@kyneta/websocket-transport':
         specifier: link:../../../kyneta/workspace/pineta/packages/exchange/transports/websocket
         version: link:../../../kyneta/workspace/pineta/packages/exchange/transports/websocket
-      '@pinetrie/container':
-        specifier: workspace:*
-        version: link:../../packages/container
       '@pinetrie/core':
         specifier: workspace:*
         version: link:../../packages/core
@@ -105,15 +102,6 @@ importers:
       '@types/ws':
         specifier: 8.18.1
         version: 8.18.1
-
-  packages/container:
-    dependencies:
-      '@pinetrie/core':
-        specifier: workspace:*
-        version: link:../core
-      '@pinetrie/lanes':
-        specifier: workspace:*
-        version: link:../lanes
 
   packages/core: {}
 

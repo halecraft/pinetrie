@@ -1,5 +1,5 @@
 // repo/accepted — accepted work in your repo (ADR-0104): what it is now,
-// read as values for the host to plan from, and what catching your files up
+// read as values for the host to plan from, and what catching the working copy up
 // with it would do (S80). Reads only; the host's steps that set it up and
 // publish it are `planSetup`, `planPublishCatchUp`, `planPublishMove` and
 // `planCatchUpUndo` (`plan.ts`, ADR-0090).
@@ -21,7 +21,7 @@ import {
 } from "@pinetrie/lanes"
 import { changeOf } from "./offer.ts"
 
-/** What `planPublishCatchUp`'s rebase would do to your files (S80): `AcceptedRecord`'s shape. */
+/** What `planPublishCatchUp`'s rebase would do to the working copy (S80): `AcceptedRecord`'s shape. */
 type CatchUpPreview = NonNullable<AcceptedFacts["yours"]["catchUp"]>
 
 const count = async (jj: Runner, revset: string): Promise<number> =>

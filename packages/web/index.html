@@ -421,7 +421,6 @@
       .review-diff [data-kind="meta"] { color: #6f7784; }
       .work .offer-take { border-color: #4f7a4f; color: #a8d8a8; }
       .work .offer-update { border-color: #6b5a33; color: #e8c07a; }
-      .work .work-warning { color: #e8c07a; }
       .column-body { flex: 1; overflow-y: auto; padding: .75rem 1.75rem .75rem .75rem; }
 
       .msg { position: relative; margin: 0 0 1rem; }
@@ -806,21 +805,21 @@
       /* A card's command (ADR-0055), above its box: what sending it does first. */
       .card-command { margin-bottom: .3rem; font-size: .75rem; color: #e8c07a; }
       .card-command-clear { padding: 0 .3rem; font-size: .72rem; background: none; border: none; color: #8b93a1; }
-      /* Where a new thread's agent works, said as what it does to your files:
-         a line of text left of the send button, not a second button. */
-      .where-line { flex: 1; min-width: 0; display: flex; }
-      .where-line .where-menu { flex: 1; min-width: 0; display: flex; }
-      .where-menu .where-trigger { flex: 1; min-width: 0; display: flex; padding: 0; background: none;
+      /* What a new thread starts from, when there is a choice: a line of
+         text left of the send button, not a second button. */
+      .start-line { flex: 1; min-width: 0; display: flex; }
+      .start-line .start-menu { flex: 1; min-width: 0; display: flex; }
+      .start-menu .start-trigger { flex: 1; min-width: 0; display: flex; padding: 0; background: none;
         border: none; color: #8b93a1; font-size: .75rem; text-align: left; }
-      .where-menu .where-trigger:hover { color: #e6e6e6; }
-      .where-menu .where-words { min-width: 0; overflow: hidden; white-space: nowrap;
+      .start-menu .start-trigger:hover { color: #e6e6e6; }
+      .start-menu .start-words { min-width: 0; overflow: hidden; white-space: nowrap;
         text-overflow: ellipsis; }
-      .where-menu .where-trigger:hover .where-words { text-decoration: underline; }
-      .where-menu .where-caret { flex: none; margin-left: .35rem; }
-      .where-line:has(.where-fork-conflict) { flex-direction: column; }
-      .where-fork-conflict { font-size: .72rem; color: #d0a15f; }
+      .start-menu .start-trigger:hover .start-words { text-decoration: underline; }
+      .start-menu .start-caret { flex: none; margin-left: .35rem; }
+      .start-line:has(.start-fork-conflict) { flex-direction: column; }
+      .start-fork-conflict { font-size: .72rem; color: #d0a15f; }
       .menu-section:has([role="menuitemradio"]) [role="menuitem"] { padding-left: 1.6rem; }
-      .where-menu .where-detail { display: block; margin-left: 1.1rem; font-size: .72rem; color: #8b93a1; }
+      .start-menu .start-detail { display: block; margin-left: 1.1rem; font-size: .72rem; color: #8b93a1; }
       .status { font-size: .75rem; color: #d0a15f; }
       input, .card-editor textarea {
         flex: 1; padding: .5rem .7rem; border-radius: 6px;

@@ -15,6 +15,35 @@ const launcher = "packages/vm/launcher/launcher.swift"
 const unit = (path: string) => ["pnpm", "exec", "vitest", "run", path]
 
 export const mutations: readonly Mutation[] = [
+  // ── the lanes suite, proven in a lane (ADR-0103) ──
+  {
+    name: "lanes share the network of the machine Docker runs on",
+    file: "packages/docker/plan.ts",
+    from: '    "--network",\n    projectNetwork(input.project),',
+    to: '    "--network",\n    "host",',
+    suite: "lanes",
+    scenario: "main",
+    expect: "two lanes serve :5173 at once, each its own",
+  },
+  {
+    name: "a lane's disk is mounted read-only",
+    file: "packages/docker/plan.ts",
+    from: "      target: WORKSPACE_ROOT,\n      readonly: false,",
+    to: "      target: WORKSPACE_ROOT,\n      readonly: true,",
+    suite: "lanes",
+    scenario: "main",
+    expect:
+      "two lanes write the same file, each on its own disk, and your working copy is untouched",
+  },
+  {
+    name: "a lane granted ssh is given no agent",
+    file: "packages/docker/plan.ts",
+    from: "    shape.ssh && target.sshAgent !== null",
+    to: "    false && target.sshAgent !== null",
+    suite: "lanes",
+    scenario: "main",
+    expect: "with ssh granted, the lane has SSH_AUTH_SOCK",
+  },
   {
     name: "a snapshot is a new empty subvolume, not a snapshot of the lane",
     file: plan,
@@ -195,14 +224,6 @@ export const mutations: readonly Mutation[] = [
     expect: "another runtime, or more than 20 slots, refused with why",
   },
   {
-    name: "the user's choice of container is ignored",
-    file: "apps/pinetrie/host/work/runtime.ts",
-    from: '  if (f.choice === "container") return { kind: "container" }\n',
-    to: "",
-    command: unit("apps/pinetrie/host/work/runtime.test.ts"),
-    expect: "container, wherever it was chosen",
-  },
-  {
     name: "a host in a nested lane keeps its lanes in the state directory",
     file: "apps/pinetrie/host/work/runtime.ts",
     from: "    lanesDir: f.nestedMount\n",
@@ -237,12 +258,20 @@ export const mutations: readonly Mutation[] = [
     expect: "a failed build names buildx's error, not its builder",
   },
   {
-    name: "a suite's host refuses to start where its runtime cannot run",
+    name: "a host whose Docker does not answer is given lanes",
     file: "apps/pinetrie/host/work/runtime.ts",
-    from: 'input.runtimeRefused !== "direct"',
-    to: "true",
+    from: "  if (refusal !== null) return refusedWith(dockerWords(refusal))\n  const runtime = dockerRuntime({ target, lanesDir, root })\n  log(",
+    to: "  const runtime = dockerRuntime({ target, lanesDir, root })\n  log(",
     command: unit("apps/pinetrie/host/work/runtime.test.ts"),
-    expect: "stop throws the runtime's words; direct keeps them as the reason",
+    expect: "a Docker that does not answer, in the runtime's words",
+  },
+  {
+    name: "a folder with no jj repo is given lanes",
+    file: "packages/lanes/plan.ts",
+    from: '  if (d.repo !== "jj")\n    return {',
+    to: "  if (false)\n    return {",
+    command: unit("apps/pinetrie/host/work/runtime.test.ts"),
+    expect: "a folder with no jj repo, with how to make one",
   },
   {
     name: "lanes share Docker's default network, whatever their project",
@@ -301,15 +330,7 @@ export const mutations: readonly Mutation[] = [
     expect:
       "a port of the Mac's loopback the project grants answers its lanes, and not another project's",
   },
-  {
-    name: "(Mac) the VM's network is Virtualization's NAT again",
-    file: launcher,
-    from: "  net.attachment = VZFileHandleNetworkDeviceAttachment(\n    fileHandle: FileHandle(fileDescriptor: fd, closeOnDealloc: true))\n",
-    to: "  net.attachment = VZNATNetworkDeviceAttachment()\n",
-    suite: "lanes",
-    scenario: "contract",
-    expect: "a container run on the Mac leaves running lanes on the network",
-  },
+
   {
     name: "(Mac) a host whose VM stopped does not lease again",
     file: "packages/vm/keep.ts",

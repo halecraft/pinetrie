@@ -7,8 +7,7 @@
 import { existsSync } from "node:fs"
 import { homedir } from "node:os"
 import path from "node:path"
-import { containerRuntime, prepareContainerHost } from "@pinetrie/container"
-import type { ProjectRecord } from "@pinetrie/core"
+import { errorText, type ProjectRecord } from "@pinetrie/core"
 import {
   type DockerTarget,
   dockerRuntime,
@@ -25,7 +24,6 @@ import {
   machineConfig,
   planRoot,
   prepareProjectDir,
-  type RuntimeChoice,
   type WrittenMachine,
 } from "@pinetrie/lanes"
 import {
@@ -34,17 +32,17 @@ import {
   leaseVm,
   vmStateDir,
 } from "@pinetrie/vm"
-import { type Convert, converter } from "./convert.ts"
 
-/** What the host found where it runs: the project, and its lanes' runtime when they have their own. */
+/** What the host found where it runs: the project, and the runtime its lanes run on. */
 export interface Found {
+  readonly kind: "found"
   readonly project: ProjectRecord
-  readonly runtime: LaneRuntime | null
+  readonly runtime: LaneRuntime
   /**
-   * Called once by setup, before any lane starts: pine·trie's default image
-   * (`container` trims a stopped lane's disk with it), every host path a
-   * lane mounts (on the Mac, shared into this host's slot of the VM), and
-   * the ports of the Mac's loopback the project grants its lanes.
+   * Called once by setup, before any lane starts: pine·trie's default image,
+   * every host path a lane mounts (on the Mac, shared into this host's slot
+   * of the VM), and the ports of the Mac's loopback the project grants its
+   * lanes.
    */
   ready(input: {
     readonly defaultImage: string
@@ -53,8 +51,12 @@ export interface Found {
   }): Promise<void>
   /** After the lanes stop, at shutdown: on the Mac, the lease ends and the slot empties. */
   close(): Promise<void>
-  /** pre-docker: converts a lane made under `container`; null where there is none to read. */
-  readonly convert: Convert | null
+}
+
+/** Why a host with tools cannot run its lanes here, worded with its fix. */
+export interface Refused {
+  readonly kind: "refused"
+  readonly words: string
 }
 
 /**
@@ -75,37 +77,15 @@ export function planHostPortGrant(
   return { grant: ports.filter(p => p !== ownPort), refused }
 }
 
-/** Thrown when the chosen runtime cannot run lanes here; startup stops with its words. */
-export class RuntimeRefused extends Error {}
-
-/**
- * The project as the host keeps it. `PINETRIE_LANES=0` (`defaultDirect`)
- * changes a new root lane's default, never whether a lane may have its own
- * copy. Pure.
- */
-export function projectOf(
-  found: Pick<Found, "project"> | null,
-  defaultDirect: boolean,
-): ProjectRecord | null {
-  if (found === null) return null
-  const { project } = found
-  return project.kind === "lanes" && defaultDirect
-    ? { ...project, rootDefault: "direct" }
-    : project
-}
-
 /** What decides which runtime lanes run on. */
 export interface RuntimeFacts {
   readonly platform: NodeJS.Platform
-  /** `lanes.runtime` from the user config (`machineConfig`). */
-  readonly choice: RuntimeChoice
   /** Inside a lane granted lanes of its own: its inner lanes' directory is mounted. */
   readonly nestedMount: boolean
   readonly stateHome: string
 }
 
 export type RuntimePlan =
-  | { readonly kind: "container" }
   | { readonly kind: "docker-vm"; readonly lanesDir: string }
   | { readonly kind: "docker-host"; readonly lanesDir: string }
 
@@ -113,12 +93,10 @@ export type RuntimePlan =
 export const VM_LANES_DIR = "/var/lib/lanehost"
 
 /**
- * `container` when the user chose it; Docker otherwise, in the lane VM on
- * the Mac and the host's own on Linux. Inside a lane, its inner lanes'
- * directory is the lanes directory.
+ * Docker: in the lane VM on the Mac, and the host's own on Linux. Inside a
+ * lane, its inner lanes' directory is the lanes directory.
  */
 export function planRuntime(f: RuntimeFacts): RuntimePlan {
-  if (f.choice === "container") return { kind: "container" }
   if (f.platform === "darwin")
     return { kind: "docker-vm", lanesDir: VM_LANES_DIR }
   return {
@@ -129,110 +107,53 @@ export function planRuntime(f: RuntimeFacts): RuntimePlan {
   }
 }
 
-const NONE: Pick<Found, "ready" | "close" | "convert"> = {
-  ready: async () => {},
-  close: async () => {},
-  convert: null,
-}
-
 /**
- * Find the project in `dir`, and whether its lanes can have their own copies,
- * on the runtime the user config chooses. Null with no tools (`dir` null).
- * Read before pi's setup, which loads from its root. A Docker that cannot run
- * lanes throws `RuntimeRefused`.
+ * Find the project in `dir`, and the runtime its lanes run on: Docker, in
+ * the lane VM on the Mac and the host's own on Linux. Null with no tools
+ * (`dir` null). Refused, with its words, where lanes cannot run: a folder
+ * with no jj repo, or a runtime that cannot run them. Read before pi's
+ * setup, which loads from its root.
  */
 export async function findProject(input: {
   /** The project's folder, whose root is found from it; null with no tools. */
   readonly dir: string | null
-  /** `PINETRIE_LANES=0`: a new root lane works directly by default. */
-  readonly defaultDirect: boolean
-  /** False: lanes never get containers here, and no runtime is asked. */
-  readonly containers: boolean
-  /** A runtime's refusal: thrown (`stop`), or the project works directly with its words. */
-  readonly runtimeRefused?: "stop" | "direct"
   /** The port this host listens on, refused to lanes; null when it is not known yet. */
   readonly ownPort?: number | null
-  /** The user config's `lanes.runtime` and `lanes.vm.slots`, as written. */
+  /** The user config's `lanes.vm.slots`, as written. */
   readonly machine: WrittenMachine
   readonly log: (line: string) => void
-}): Promise<Found | null> {
+}): Promise<Found | Refused | null> {
   if (input.dir === null) return null
-  const dir = input.dir
-  const found: Found = input.containers
-    ? await runtimeFound(
-        dir,
-        input.machine,
-        input.log,
-        input.ownPort ?? null,
-      ).catch(error => {
-        if (
-          !(error instanceof RuntimeRefused) ||
-          input.runtimeRefused !== "direct"
-        )
-          throw error
-        return {
-          project: { kind: "direct", root: dir, reason: error.message },
-          runtime: null,
-          ...NONE,
-        } satisfies Found
-      })
-    : {
-        project: {
-          kind: "direct",
-          root: input.dir,
-          reason: "lanes of their own are off for this host",
-        },
-        runtime: null,
-        ...NONE,
-      }
-  const project = projectOf(found, input.defaultDirect)
-  return project === null ? null : { ...found, project }
+  return runtimeFound(
+    input.dir,
+    input.machine,
+    input.log,
+    input.ownPort ?? null,
+  )
 }
+
+const refusedWith = (words: string): Refused => ({ kind: "refused", words })
 
 async function runtimeFound(
   dir: string,
   written: WrittenMachine,
   log: (line: string) => void,
   ownPort: number | null,
-): Promise<Found> {
+): Promise<Found | Refused> {
   const { machine, refused } = machineConfig(written)
   for (const r of refused) log(`[host] ${r}`)
   const env = process.env
   const planned = planRuntime({
     platform: process.platform,
-    choice: machine.runtime,
     nestedMount: existsSync(NESTED_MOUNT),
     stateHome: env.XDG_STATE_HOME ?? path.join(homedir(), ".local", "state"),
   })
-  if (planned.kind === "container") return containerFound(dir)
-  const root = planRoot(await prepareProjectDir(dir), dir)
-  if ("direct" in root)
-    return {
-      project: { kind: "direct", root: root.direct, reason: root.reason },
-      runtime: null,
-      ...NONE,
-    }
-  const project: ProjectRecord = {
-    kind: "lanes",
-    root: root.ok,
-    rootDefault: "own",
-  }
+  const root = planRoot(await prepareProjectDir(dir))
+  if ("refused" in root) return refusedWith(root.refused)
+  const project: ProjectRecord = { root: root.ok }
   return planned.kind === "docker-vm"
     ? vmFound(project, root.ok, planned.lanesDir, machine.slots, log, ownPort)
     : hostDockerFound(project, root.ok, planned.lanesDir, log)
-}
-
-async function containerFound(dir: string): Promise<Found> {
-  const { project, paths } = await prepareContainerHost(dir)
-  if (paths === null) return { project, runtime: null, ...NONE }
-  const tools = Promise.withResolvers<string>()
-  return {
-    project,
-    runtime: containerRuntime({ paths, trimImage: () => tools.promise }),
-    ready: async ({ defaultImage }) => tools.resolve(defaultImage),
-    close: async () => {},
-    convert: null,
-  }
 }
 
 /** Docker on this machine (Linux): its socket, paths as they are. */
@@ -241,7 +162,7 @@ async function hostDockerFound(
   root: string,
   lanesDir: string,
   log: (line: string) => void,
-): Promise<Found> {
+): Promise<Found | Refused> {
   const host = process.env.DOCKER_HOST
   const target: DockerTarget = {
     socket: host?.startsWith("unix://")
@@ -253,10 +174,11 @@ async function hostDockerFound(
     hostAddress: null,
   }
   const refusal = planDockerHost(await gatherDockerHost(target, lanesDir))
-  if (refusal !== null) throw new RuntimeRefused(dockerWords(refusal))
+  if (refusal !== null) return refusedWith(dockerWords(refusal))
   const runtime = dockerRuntime({ target, lanesDir, root })
   log(`[host] lanes run on Docker, their disks in ${lanesDir}`)
   return {
+    kind: "found",
     project,
     runtime,
     ready: async ({ hostPorts }) => {
@@ -267,7 +189,6 @@ async function hostDockerFound(
         )
     },
     close: async () => {},
-    convert: null,
   }
 }
 
@@ -283,7 +204,7 @@ async function vmFound(
   slots: number,
   log: (line: string) => void,
   ownPort: number | null,
-): Promise<Found> {
+): Promise<Found | Refused> {
   const leaseNow = () =>
     leaseVm({
       stateDir: vmStateDir(process.env, homedir()),
@@ -291,11 +212,11 @@ async function vmFound(
       agent: process.env.SSH_AUTH_SOCK ?? null,
       log,
     })
-  const first = await leaseNow().catch(error => {
-    throw new RuntimeRefused(
-      error instanceof Error ? error.message : String(error),
-    )
-  })
+  const leased = await leaseNow().catch((error: unknown) =>
+    refusedWith(errorText(error)),
+  )
+  if ("words" in leased) return leased
+  const first = leased
   /** The lease held now: a new one after the VM stopped under this host. */
   let current = first
   let pathOf: ((source: string) => string) | null = null
@@ -319,7 +240,7 @@ async function vmFound(
   const refusal = planDockerHost(await gatherDockerHost(target, null))
   if (refusal !== null) {
     await first.close()
-    throw new RuntimeRefused(dockerWords(refusal))
+    return refusedWith(dockerWords(refusal))
   }
   /** A slot's containers left by a host that died holding it (S130). */
   const sweep = async (lease: typeof first) => {
@@ -331,13 +252,6 @@ async function vmFound(
   }
   await sweep(first)
   const runtime = dockerRuntime({ target, lanesDir, root })
-  // pre-docker: lanes made under `container` move over at their first start,
-  // while `container` runs to read them.
-  const { paths } = await prepareContainerHost(root)
-  if (paths === null)
-    log(
-      "[host] Apple's container is not running: a lane made under it cannot move to Docker until it does",
-    )
   /** What setup gave `ready`, for each lease after the first. */
   let given: { mounts: readonly Mount[]; hostPorts: readonly number[] } | null =
     null
@@ -373,6 +287,7 @@ async function vmFound(
     log,
   })
   return {
+    kind: "found",
     project,
     runtime,
     async ready({ mounts, hostPorts }) {
@@ -381,7 +296,6 @@ async function vmFound(
       sweptLog(await runtime.sweepProjects(), log)
     },
     close: () => kept.close(),
-    convert: paths === null ? null : converter({ paths, docker: runtime, log }),
   }
 }
 
@@ -394,36 +308,31 @@ const sweptLog = (keys: readonly string[], log: (line: string) => void) => {
 
 /** What decides where the VM's image is built. */
 export interface BuilderFacts {
-  readonly platform: NodeJS.Platform
   /** The VM's Docker answers, through the launcher's `docker.sock`. */
   readonly vmDocker: boolean
-  /** The host's own Docker answers. */
+  /** A Docker on this machine answers (`docker version`): any vendor's. */
   readonly hostDocker: boolean
-  /** Apple's `container` is running. */
-  readonly container: boolean
 }
 
-/** Where the VM's image is built: the first Linux runtime found. */
+/** Where the VM's image is built: the first Docker found. */
 export type Builder =
   | { readonly kind: "docker-vm" }
   | { readonly kind: "docker-host" }
-  | { readonly kind: "container" }
-  | { readonly kind: "none"; readonly platform: NodeJS.Platform }
+  | { readonly kind: "none" }
 
 /**
- * The VM's own Docker if it runs; else the host's Docker on Linux (on the
- * Mac, a Docker of another vendor is not asked); else Apple's `container`.
+ * The VM's own Docker if it runs; else a Docker on this machine, on any
+ * platform: the one way to build a Mac's first image, or a new one while
+ * its VM is stopped, since the VM starts only from the current image
+ * (`planVm`'s `no-image`). The build runs one throwaway container with no
+ * mount, so any Docker does (`packages/vm/build.ts`).
  */
 export function planBuilder(f: BuilderFacts): Builder {
   if (f.vmDocker) return { kind: "docker-vm" }
-  if (f.platform === "linux" && f.hostDocker) return { kind: "docker-host" }
-  if (f.container) return { kind: "container" }
-  return { kind: "none", platform: f.platform }
+  if (f.hostDocker) return { kind: "docker-host" }
+  return { kind: "none" }
 }
 
 /** Why the image cannot be built here, worded with what would let it. */
-export function builderWords(b: Extract<Builder, { kind: "none" }>): string {
-  return b.platform === "darwin"
-    ? "no Linux runtime to build the VM image in: start Apple's `container` (`container system start`)"
-    : "no Linux runtime to build the VM image in: Docker does not answer (`docker version`)"
-}
+export const BUILDER_WORDS =
+  "no Docker to build the lane VM's image in: start a Docker on this machine (`docker version` answers), or the lane VM if it has an image"

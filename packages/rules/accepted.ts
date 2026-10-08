@@ -121,7 +121,7 @@ export const ACCEPTED: RecordSpec<
 /**
  * Accepted work's record, the page's cache, from what the host read of it
  * (ADR-0104): what setting it up would write to your repo's config
- * (`proposed`, `setupProposal`), and whether a publish catches your files up
+ * (`proposed`, `setupProposal`), and whether a publish catches the working copy up
  * (`publish.catchUp`, ADR-0099).
  */
 export function planAcceptedRecord(input: {
@@ -167,13 +167,13 @@ export interface PublishWork {
   readonly acceptedCommits: number
   /** Your commits below `@` it accepts: 0 with `publish.catchUp` off. */
   readonly yours: number
-  /** Whether your files catch up first: never with `publish.catchUp` off. */
+  /** Whether the working copy catches up first: never with `publish.catchUp` off. */
   readonly catchUp: boolean
 }
 
 /**
  * What a publish would do now. With `publish.catchUp` off it moves the publish
- * bookmark alone, so your files and commits count for nothing.
+ * bookmark alone, so the working copy and your commits count for nothing.
  */
 export function publishWork(
   record: Pick<AcceptedRecord, "publishCatchesUp" | "published" | "yours">,
@@ -195,7 +195,7 @@ export const nothingToPublish = (work: PublishWork): boolean =>
  * host's `planAcceptedAction` and the page's button both read. Anyone admitted
  * may set up or publish (ADR-0099). A publish is refused before its first
  * step for whatever can be checked then (ADR-0090): with `publish.catchUp` on,
- * your files' conflicts and the catch-up's preview among them.
+ * the working copy's conflicts and the catch-up's preview among them.
  */
 export function acceptedActionState(
   action: AcceptedAction,
@@ -307,9 +307,9 @@ export function acceptedRefusal(
     case ERR.YOURS_CONFLICT: {
       const would = yours.catchUp?.conflicts ?? []
       if (yours.conflicts.files.length > 0)
-        return `your files have conflicts in ${named(yours.conflicts.files)}`
+        return `the working copy has conflicts in ${named(yours.conflicts.files)}`
       if (would.length > 0)
-        return `catching your files up would conflict in ${named(would)}`
+        return `catching the working copy up would conflict in ${named(would)}`
       return `${commits(yours.conflicts.commits)} of yours ${yours.conflicts.commits === 1 ? "has" : "have"} conflicts`
     }
     default:
@@ -317,7 +317,7 @@ export function acceptedRefusal(
       return yours.behind > 0 &&
         yours.catchUp === null &&
         record.publishCatchesUp
-        ? "your files share no commit with accepted work: rebase onto it in jj"
+        ? "the working copy shares no commit with accepted work: rebase onto it in jj"
         : "nothing to publish"
   }
 }
@@ -334,5 +334,5 @@ export function publishUndone(
   if (code !== ERR.YOURS_CONFLICT)
     return acceptedRefusal("publish", code, after)
   const n = after.yours.conflicts.commits
-  return `catching your files up would leave ${commits(n)} of yours with conflicts`
+  return `catching the working copy up would leave ${commits(n)} of yours with conflicts`
 }

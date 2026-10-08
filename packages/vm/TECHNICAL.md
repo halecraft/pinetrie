@@ -20,8 +20,10 @@ only `@pinetrie/core` and knows nothing of lanes (`workspace.test.ts`).
   temporary directory and checked against its `SHA256SUMS` first.
 - **The build needs no mount** (`planBuild`): the sources go in as base64
   arguments, and the outputs come out as a tar on stdout. So it runs alike
-  under Apple's `container`, the host's Docker and the VM's own.
-  `pnpm vm:build` picks the first that answers (`planBuilder`).
+  in any Docker: `pnpm vm:build` picks the VM's own if it runs, else one on
+  this machine, of any vendor (`planBuilder`). A Mac's first image, or a
+  new one while its VM is stopped, needs one there: the VM starts only from
+  the current image (`planVm`).
 - **Never run another distribution's `depmod`** on the modules: Debian's
   kmod has no zlib, skips `.ko.gz`, and writes an empty index (S128).
   `build.sh` keeps Alpine's own `modules.dep` and indexes, and checks each

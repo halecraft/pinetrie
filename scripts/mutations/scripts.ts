@@ -124,6 +124,15 @@ export const mutations: readonly Mutation[] = [
     expect: "planSuite runs a scenario with no problem",
   },
   {
+    name: "a scenario that runs lanes is never asked the runtime",
+    file: "apps/pinetrie/e2e/scenario.ts",
+    from: "  return (input.lanes ? input.runtime : null) ?? input.needs",
+    to: "  return input.needs",
+    command: scenarios,
+    expect:
+      "scenarioProblem: one that runs lanes is skipped with the runtime's words",
+  },
+  {
     name: "budgetBreaches lets a layer reach one past its square root",
     file: "scripts/budget.ts",
     from: "    ...(c.acceptance > allowed(c.unit)",

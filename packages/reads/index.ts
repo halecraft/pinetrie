@@ -17,7 +17,6 @@
 // returns what reading again would.
 
 import {
-  type Above,
   type AcceptedRecord,
   type AgentMessageLike,
   type AgentRun,
@@ -44,11 +43,9 @@ import {
   type MarkRecord,
   messageImages,
   messageText,
-  nearestRevision,
   type OfferRecord,
   type PinnedView,
   type PlanMode,
-  type Position,
   type ProjectRecord,
   parseMentions,
   promptOf,
@@ -67,9 +64,7 @@ import {
   type TreeIndex,
   type VerdictRecord,
   type Workflow,
-  type WorkSetting,
   type WriterId,
-  workFor,
   writersOf,
 } from "@pinetrie/core"
 import {
@@ -722,54 +717,21 @@ export const readCommands = (
 
 /**
  * Whether a send's thread works, or will work, in its own copy: its lane is
- * one of its own, or the lane the send would create would be. Paths to your
- * working copy, and to granted host paths, are then written as the lane sees
- * them (ADR-0034, ADR-0036). A lane of its own where the host has no lanes
- * of their own now works directly, so it is not.
+ * one of its own, or the send would create a lane on a host with tools,
+ * whose new lanes all have their own (ADR-0102). Paths to your working copy,
+ * and to granted host paths, are then written as the lane sees them
+ * (ADR-0034, ADR-0036).
  */
 export function worksOwn(
-  view: Pick<RootView, "doc" | "session">,
-  index: TreeIndex,
+  session: SessionDocHandle,
   send: {
     readonly lane: ThreadLane
-    /** The thread's end: where a reply would create its lane. */
-    readonly end: Position
     readonly mode: PlanMode
-    /** Where a branch would start. */
-    readonly at: Position
-    readonly work: WorkSetting | null
   },
 ): boolean {
-  if (readProject(view.session)?.kind !== "lanes") return false
   if (send.lane.kind === "lane" && send.mode !== "branch")
-    return (
-      readLaneRecords(view.session).get(send.lane.name)?.work?.kind === "own"
-    )
-  return (
-    workAt(view, index, send.mode === "branch" ? send.at : send.end, send.work)
-      .work?.kind === "own"
-  )
-}
-
-/**
- * Where a lane created at `at` would work, and the files it would start
- * from: the send's choice, else the lane above, else the project's default.
- * The composer shows this, and the host creates the lane by it.
- */
-export function workAt(
-  view: Pick<RootView, "doc" | "session">,
-  index: TreeIndex,
-  at: Position,
-  choice: WorkSetting | null,
-): { readonly work: WorkSetting | null; readonly above: Above } {
-  const above = nearestRevision(index, readRevisions(view.doc), at)
-  const work = workFor({
-    choice,
-    above: above.lane,
-    lanes: readLaneRecords(view.session),
-    project: readProject(view.session),
-  })
-  return { work, above }
+    return readLaneRecords(session).get(send.lane.name)?.ownCopy === true
+  return readProject(session) !== null
 }
 
 // --- blobs (ADR-0042) ---------------------------------------------------------

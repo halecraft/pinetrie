@@ -134,6 +134,20 @@ describe("laneEnv: pi's tools, answered by the helper", () => {
     expect(survivors(marker)).toEqual([])
   })
 
+  test("a call aborted while it waited for its lane is aborted, not run", async () => {
+    const control = new AbortController()
+    control.abort()
+    const env = laneEnv(dir, ready)
+    const started = Date.now()
+    const result = await env.exec(
+      "sleep 2; echo ran",
+      undefined,
+      withAbortSignal(control.signal, BACKGROUND_CONTEXT),
+    )
+    expect(result.ok ? "ran" : result.error.code).toBe("aborted")
+    expect(Date.now() - started).toBeLessThan(1500)
+  })
+
   test("a timeout kills a backgrounded grandchild", async () => {
     const env = laneEnv(dir, ready)
     const marker = "sleep 42.71"

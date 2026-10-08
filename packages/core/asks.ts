@@ -195,7 +195,7 @@ export function lastWord(
  * An ask's files as a span: from the commit its prompt's record names, what
  * the lane had before it (`planTurnRecord`), to the nearest commit at its
  * run's last entry (`nearestRevision`). Null when they are the same, or a
- * lane working directly records none.
+ * lane with no copy of its own records none.
  */
 export function askSpan(
   index: TreeIndex,

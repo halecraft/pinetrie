@@ -12,7 +12,6 @@ import {
   type RootId,
   type SentCard,
   type WorkflowStateId,
-  type WorkSetting,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import { IN_COLUMN, type Pending, sendPendingOf } from "./card-moves.ts"
@@ -24,8 +23,6 @@ export interface ChatHow {
   readonly lane?: LaneName
   /** A Start Agent column. */
   readonly asksAgent?: boolean
-  /** Where a lane this send creates works; absent, the lane above's setting (ADR-0032). */
-  readonly work?: WorkSetting
   /** The send's id, minted by a fresh column so it can find its message. */
   readonly id?: string
   /** The card the text is sent from, which the host spends once it is sent. */
@@ -69,7 +66,6 @@ function chatIntent(input: {
     lane: how.lane ?? null,
     asksAgent: how.asksAgent === true,
     mentions: parseMentions(text),
-    work: how.work ?? null,
     card: input.card,
     pinned: input.pinned,
     reserved: how.reserved ?? null,

@@ -1330,7 +1330,6 @@ export function App({
             onIntent,
           }}
           accepted={workFacts.accepted}
-          project={workFacts.project}
           onIntent={onIntent}
           me={{ writer: session.writer, email: session.principal }}
           session={session}

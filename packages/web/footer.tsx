@@ -11,13 +11,12 @@
 // a menu you opened: an open menu keeps a section whose rows have gone, and
 // says so.
 
-import type { AcceptedRecord, ProjectRecord, WriterId } from "@pinetrie/core"
+import type { AcceptedRecord, WriterId } from "@pinetrie/core"
 import {
   type Intent,
   publishToast,
   publishView,
   publishWords,
-  resolveIntent,
 } from "@pinetrie/interface"
 import type { AcceptedActing, SessionClient } from "@pinetrie/session"
 import { type ReactNode, useState, useSyncExternalStore } from "react"
@@ -38,7 +37,6 @@ export function Footer({
   colorOf,
   inbox,
   accepted: line,
-  project,
   onIntent,
   inventory,
   me,
@@ -55,9 +53,7 @@ export function Footer({
   inbox: InboxMenuProps
   /** Accepted work (ADR-0104), as the host last read it. */
   accepted: AcceptedRecord | null
-  /** Where the host runs: "resolve with the agent" works in its root. */
-  project: ProjectRecord | null
-  /** Where the account menu and the publish toast's "resolve with the agent" go. */
+  /** Where the account menu's choices go. */
   onIntent: (intent: Intent) => void
   /** Your inventory's toggle: whether its panel is open, and its cards. */
   inventory: InventoryToggleProps
@@ -91,12 +87,7 @@ export function Footer({
       {strip}
       <div className="footer-right">
         {syncing && <span className="sync-note">syncing…</span>}
-        <PublishButton
-          accepted={line}
-          onIntent={onIntent}
-          project={project}
-          session={session}
-        />
+        <PublishButton accepted={line} session={session} />
       </div>
     </footer>
   )
@@ -110,14 +101,10 @@ export function Footer({
  */
 function PublishButton({
   accepted: line,
-  project,
   session,
-  onIntent,
 }: {
   accepted: AcceptedRecord | null
-  project: ProjectRecord | null
   session: Pick<SessionClient, "actOnAccepted" | "acting">
-  onIntent: (intent: Intent) => void
 }) {
   // Your last command here, kept by the session until your next.
   const acting = useSyncExternalStore(
@@ -127,18 +114,10 @@ function PublishButton({
   const [dismissed, setDismissed] = useState<AcceptedActing | null>(null)
   const view = publishView(line)
   const said = acting === dismissed ? null : publishToast(acting)
-  const resolve = said?.resolve === true ? resolveIntent(project, line) : null
   const toast =
     said === null ? null : (
       <Toast
-        action={
-          resolve === null
-            ? null
-            : {
-                label: "resolve with the agent",
-                onChoose: () => onIntent(resolve),
-              }
-        }
+        action={null}
         onDismiss={() => setDismissed(acting)}
         text={said.text}
       />

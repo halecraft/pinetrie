@@ -509,15 +509,6 @@ const StoredColumn = Type.Object({
         Type.Object({
           text: Type.String(),
           blank: Type.Boolean(),
-          work: Type.Optional(
-            Type.Union([
-              Type.Object({ kind: Type.Literal("own") }),
-              Type.Object({
-                kind: Type.Literal("direct"),
-                dir: Type.String({ minLength: 1 }),
-              }),
-            ]),
-          ),
         }),
       ),
     }),
@@ -566,9 +557,6 @@ const toStored = (c: Column): Stored => ({
                 prefill: {
                   text: c.fresh.prefill.text,
                   blank: c.fresh.prefill.blank,
-                  ...(c.fresh.prefill.work === undefined
-                    ? {}
-                    : { work: { ...c.fresh.prefill.work } }),
                 },
               }),
         },
@@ -612,9 +600,6 @@ const fromStored = (s: Stored, mintRoot: (() => RootId) | null): Column => ({
                 prefill: {
                   text: s.fresh.prefill.text,
                   blank: s.fresh.prefill.blank,
-                  ...(s.fresh.prefill.work === undefined
-                    ? {}
-                    : { work: { ...s.fresh.prefill.work } }),
                 },
               }),
         },

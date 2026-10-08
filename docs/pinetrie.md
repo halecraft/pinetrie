@@ -121,7 +121,6 @@ packages/reads/        @pinetrie/reads        document reads shared by host and 
 packages/lanes/        @pinetrie/lanes        what a lane is and runs; the LaneRuntime port, no runtime (ADR-0032–0034, 0103)
 packages/docker/       @pinetrie/docker       lanes on Docker, on btrfs subvolumes (ADR-0103)
 packages/vm/           @pinetrie/vm           the Mac's lane VM: image, launcher, a host's lease on a slot (ADR-0103)
-packages/container/    @pinetrie/container    lanes on Apple's `container`, until its removal
 packages/keeper/       @pinetrie/keeper       declares NOTHING; one step at a time on a resource
 packages/repo/         @pinetrie/repo         your repo: reads, steps, the owner (ADR-0038, 0060, 0065)
 packages/session/      @pinetrie/session      one client's connection to a host; no React
@@ -153,7 +152,7 @@ it, and the ADR says why. Every decision in force is in `docs/adrs/`, and
 | Only `packages/pi` imports pi. | ADR-0003 | `AGENTS.md`, `packages/pi/TECHNICAL.md` |
 | The host is the only writer of the session's documents; clients send commands. A lane belongs to its thread, and is never moved. | ADR-0020, ADR-0023 | `ARCHITECTURE.md`, `packages/schema/TECHNICAL.md` |
 | Everything unsent is a card, and a card's place has one owner at a time: the host, or a person's inventory. | ADR-0048, ADR-0059 | `packages/schema/TECHNICAL.md` |
-| One owner writes your repo, and the host never touches your files or `@` except in a publish with `publish.catchUp` on, as you. An acceptance is a forward bookmark move. | ADR-0065, ADR-0104 | `docs/the-jujutsu-repo.md`, `packages/repo/TECHNICAL.md` |
+| One owner writes your repo, and the host never touches the working copy or `@` except in a publish with `publish.catchUp` on, as you. An acceptance is a forward bookmark move. | ADR-0065, ADR-0104 | `docs/the-jujutsu-repo.md`, `packages/repo/TECHNICAL.md` |
 | What the host cannot tell, it does not act on: an unknown answer never builds an offer. | ADR-0067 | `packages/repo/TECHNICAL.md` |
 | Every thread's agent works in a lane of its own; nothing works directly in a directory. | ADR-0102, ADR-0103 | `ARCHITECTURE.md`, `packages/lanes/TECHNICAL.md` |
 | What a person sees and does is decided in `@pinetrie/interface`, with no DOM and no React. | ADR-0093 | `packages/interface/TECHNICAL.md` |
@@ -444,9 +443,11 @@ context.**
   committed work (`@-`), with dependencies installed, so commit what it should
   see. It sees its own directory at `/workspace` and your working copy at
   `/mnt/host-working-copy`, read-only, and nothing else of your machine unless `pinetrie.json`
-  grants it. Your working copy is yours, so hot reload stays on. It needs
-  Apple's `container` running (`docs/05-stack.md` D10); without it, threads
-  work directly. Restart the host to pick up changes to host code.
+  grants it. Your working copy is yours, so hot reload stays on. It needs a
+  jj repo and Docker (ADR-0102, ADR-0103): the lane VM on the Mac (`pnpm
+  vm:build` once, in any Docker on the Mac), on Linux Docker with a btrfs lanes directory; without
+  them the host says what is missing and does not start. Restart the host
+  to pick up changes to host code.
 - **`pnpm run host` serves React's production build** through Vite's dev
   server (`NODE_ENV=production`): hot reload stays, as a full page reload,
   and a long thread stays quick to type in (S59).
@@ -509,11 +510,6 @@ context.**
   uncommitted edits included. A thread's own history is in your repo out of
   sight:
   `jj log -r '::remote_bookmarks(remote=glob:"pinetrie-*") ~ ::@'`.
-- **Working directly:** the send button's `▾` sets a new thread to work in
-  your working copy, or any directory, with no container, as you. A branch
-  inherits its thread's setting. `PINETRIE_LANES=0` makes it the default. Such
-  a thread shares its directory, and while one runs, hot reload holds an update
-  to a file inside it.
 - **Summaries of asks** (ADR-0056, on by default since ADR-0071, shaped by
   ADR-0075): a model, the one commit messages use, writes each long ask's
   work a headline and a few points while someone reads the running thread,

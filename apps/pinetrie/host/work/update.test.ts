@@ -9,7 +9,12 @@ import {
   type ThreadName,
   writerId,
 } from "@pinetrie/core"
-import { createQueue, planMerge } from "@pinetrie/lanes"
+import {
+  createQueue,
+  DEFAULT_REPO,
+  decodeLaneConfig,
+  planMerge,
+} from "@pinetrie/lanes"
 import { readTreeIndex } from "@pinetrie/reads"
 import type { RepoOwner } from "@pinetrie/repo"
 import {
@@ -35,6 +40,14 @@ import {
   type Settle,
   withLaneStarted,
 } from "./update.ts"
+
+/** A project's lane configs: none of its own. */
+const LANES = {
+  shared: [],
+  refused: [],
+  config: decodeLaneConfig({}, "/p", false),
+  repoConfig: DEFAULT_REPO,
+}
 
 const LANE = laneNameForThread("0123456789abcdef")
 
@@ -426,7 +439,7 @@ describe("askedAboutConflict (ADR-0080)", () => {
     }
     const updates = createUpdates({
       basics: b,
-      setup: { root: null, owner: null, lanes: null },
+      setup: { root: "/p", owner: record<RepoOwner>().port, lanes: LANES },
       registry: record<Parameters<typeof createUpdates>[0]["registry"]>({
         isOwn: () => own,
         laneJjOf: () => jj,
@@ -532,11 +545,7 @@ describe("catchUpInRun (ADR-0080)", () => {
     }
     const updates = createUpdates({
       basics: b,
-      setup: {
-        root: null,
-        owner: record<RepoOwner>().port,
-        lanes: null,
-      },
+      setup: { root: "/p", owner: record<RepoOwner>().port, lanes: LANES },
       registry: record<Parameters<typeof createUpdates>[0]["registry"]>({
         isOwn: () => true,
         laneJjOf: () => jj,

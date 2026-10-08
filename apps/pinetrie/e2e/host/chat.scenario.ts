@@ -11,16 +11,18 @@ import { readPlaces } from "@pinetrie/reads"
 import { readStreams } from "@pinetrie/schema"
 import type { Checks } from "../checks.ts"
 import {
+  at,
   idleNow,
   join,
   lanesOf,
+  START_AGENT,
+  START_CHAT,
   suiteModel,
   treeOf,
   waitFor,
   withHost,
 } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
-import { at, START_AGENT, START_CHAT } from "./support.ts"
 
 export const scenario: Scenario = {
   run: ({ check }) => run(check),

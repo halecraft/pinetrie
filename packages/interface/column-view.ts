@@ -61,7 +61,7 @@ import type { Column } from "./columns.ts"
 import { ago, count } from "./counts.ts"
 import { speakerLabel } from "./names.ts"
 import { outcomeWords } from "./outcome-words.ts"
-import { type Reader, whereWords } from "./send.ts"
+import type { Reader } from "./send.ts"
 
 /** The agent's mark, wherever the agent or a lane of it is named. */
 export const AGENT_MARK = "✦"
@@ -179,11 +179,6 @@ export interface ThreadDetails {
   readonly open: boolean
   /** Who started its lane and when, from the lane's record; null before there is one. */
   readonly started: { readonly by: string; readonly at: number } | null
-  /**
-   * Where it works (`whereWords`): a direct lane's strip says it too, at the
-   * column's foot. Null with no project, or for a lane with no work of its own.
-   */
-  readonly where: string | null
   /** `behindMark`'s title, in full: the header shows only its ↓. */
   readonly behind: string | null
   /**
@@ -253,7 +248,7 @@ export type ReviewTarget = Pick<
 
 /**
  * What became of a column's files: the offer, with what its review reads
- * while it is open and holds files, or where a direct lane writes.
+ * while it is open and holds files.
  */
 export type WorkStrip =
   | {
@@ -266,12 +261,6 @@ export type WorkStrip =
       readonly review: ReviewTarget | null
       /** Where `accept` and `accept-into-accepted` go (ADR-0104). */
       readonly destinations: OfferView["destinations"]
-    }
-  | {
-      readonly kind: "direct"
-      readonly line: string
-      /** Other lanes running in the same directory now. */
-      readonly alsoHere: readonly ThreadName[]
     }
   | { readonly kind: "none" }
 
@@ -529,7 +518,6 @@ function detailsOf(
 ): ThreadDetails {
   const { index, work } = f
   const record = head === null ? undefined : work.lanes.get(head)
-  const setting = record?.work ?? null
   const last = stretches.at(-1)
   const start = last?.lane === head ? last.start : null
   return {
@@ -541,10 +529,6 @@ function detailsOf(
             by: displayName(record.by, f.nameOf.get(record.by)),
             at: record.createdAt,
           },
-    where:
-      setting === null || work.project === null
-        ? null
-        : whereWords(setting, work.project),
     behind: behind?.title ?? null,
     start: start === null || isFirst(index, start) ? null : start,
   }
@@ -606,26 +590,7 @@ function workStrip(f: ColumnFacts, parent: ParentNow | null): WorkStrip {
   const project = work.project
   if (!f.writable || lane.kind !== "lane" || project === null) return NO_STRIP
   const record = work.lanes.get(lane.name)
-  if (record === undefined) return NO_STRIP
-  if (record.work?.kind === "direct") {
-    const dir = record.work.dir
-    return {
-      kind: "direct",
-      line: whereWords(record.work, project),
-      alsoHere: f.lanes.flatMap(other => {
-        const setting = work.lanes.get(other.name)?.work
-        const name = work.names.get(other.name)
-        return other.name !== lane.name &&
-          other.running &&
-          setting?.kind === "direct" &&
-          setting.dir === dir &&
-          name !== undefined
-          ? [name]
-          : []
-      }),
-    }
-  }
-  if (project.kind !== "lanes") return NO_STRIP
+  if (record === undefined || !record.ownCopy) return NO_STRIP
   const offer = offerStatus(work.offers.get(lane.name))
   const base = work.bases.get(lane.name) ?? null
   const view = offerView({

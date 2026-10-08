@@ -12,18 +12,14 @@ import {
   hostPathInLane,
   indexTree,
   isBusy,
-  type LaneName,
-  type LaneRecord,
   laneNameForThread,
   nearestRevision,
   promptOf,
   type RevisionRecord,
   ROOT,
-  rootIdFor,
   sendWaits,
   snapshotId,
   turnEntry,
-  workFor,
   writerId,
 } from "./index.ts"
 
@@ -268,81 +264,6 @@ describe("forkParent and conflictsAt: what a lane's copy was cloned from (ADR-00
     ])
     expect(conflictsAt(records, C1)).toEqual(["a.txt", "b.txt"])
     expect(conflictsAt(records, CB)).toEqual([])
-  })
-})
-
-describe("workFor: the choice, then the lane above, then the project's default", () => {
-  const record = (lane: LaneName, work: LaneRecord["work"]): LaneRecord => ({
-    lane,
-    root: rootIdFor("test-root"),
-    work,
-    by: writerId("x"),
-    createdAt: 0,
-  })
-  const lanes = new Map([
-    [A, record(A, { kind: "own" })],
-    [D, record(D, { kind: "direct", dir: "/tmp/elsewhere" })],
-  ])
-  const lanesProject = {
-    kind: "lanes" as const,
-    root: "/p",
-    rootDefault: "own" as const,
-  }
-  test("a choice wins over the lane above", () => {
-    expect(
-      workFor({
-        choice: { kind: "direct", dir: "/x" },
-        above: A,
-        lanes,
-        project: lanesProject,
-      }),
-    ).toEqual({ kind: "direct", dir: "/x" })
-  })
-  test("with no choice, the lane above is inherited, its directory included", () => {
-    expect(
-      workFor({ choice: null, above: D, lanes, project: lanesProject }),
-    ).toEqual({
-      kind: "direct",
-      dir: "/tmp/elsewhere",
-    })
-  })
-  test("with no lane above, the project's default", () => {
-    expect(
-      workFor({ choice: null, above: null, lanes, project: lanesProject }),
-    ).toEqual({
-      kind: "own",
-    })
-  })
-  test("PINETRIE_LANES=0 changes a root lane's default, never what may be chosen", () => {
-    const directByDefault = { ...lanesProject, rootDefault: "direct" as const }
-    expect(
-      workFor({ choice: null, above: null, lanes, project: directByDefault }),
-    ).toEqual({ kind: "direct", dir: "/p" })
-    expect(
-      workFor({
-        choice: { kind: "own" },
-        above: null,
-        lanes,
-        project: directByDefault,
-      }),
-    ).toEqual({ kind: "own" })
-    expect(
-      workFor({ choice: null, above: A, lanes, project: directByDefault }),
-    ).toEqual({
-      kind: "own",
-    })
-  })
-  test("a project with no lanes of their own makes an own copy work directly in its root", () => {
-    const direct = { kind: "direct" as const, root: "/p", reason: "no git" }
-    expect(
-      workFor({ choice: { kind: "own" }, above: A, lanes, project: direct }),
-    ).toEqual({
-      kind: "direct",
-      dir: "/p",
-    })
-  })
-  test("no project: the host has no tools", () => {
-    expect(workFor({ choice: null, above: A, lanes, project: null })).toBeNull()
   })
 })
 

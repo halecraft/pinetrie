@@ -85,8 +85,8 @@ export interface CreateAgentOptions {
    * the host's user, so they are on only when asked for.
    */
   readonly tools: {
-    /** How a lane's tools reach its files: its container, or a directory (ADR-0034). */
-    readonly access: (lane: LaneName) => LaneAccess
+    /** How a lane's tools reach its files: its container (ADR-0034); null for a lane with no copy of its own. */
+    readonly access: (lane: LaneName) => LaneAccess | null
     readonly hooks: LaneHooks
   } | null
   /**
@@ -192,11 +192,10 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
   // An agent with no tools registers none, so its lanes may call none.
   const activeTools =
     tools === null ? [] : activeToolNames({ banners: bannerAsks !== undefined })
-  // A call with no lane named (none should run tools) works in the project.
-  const accessFor = (lane: LaneName | undefined): LaneAccess =>
-    tools === null || lane === undefined
-      ? { kind: "direct", dir: project, ready: Promise.resolve() }
-      : tools.access(lane)
+  // No tools, or a call with no lane named: no access, and every call is
+  // refused (`toolContextOf`).
+  const accessFor = (lane: LaneName | undefined): LaneAccess | null =>
+    tools === null || lane === undefined ? null : tools.access(lane)
   const systemPrompt = systemPromptFor(setup, assembled.files)
   // Each lane's last request's prefix, in memory: a restart starts fresh.
   const prefixes = new Map<string, string>()
@@ -224,7 +223,7 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
         tools: [...assembled.registered] as never[],
         activeToolNames: activeTools,
         toolContext: (context: typeof CTX): ToolContext =>
-          toolContextOf(accessFor(laneOf(context))),
+          toolContextOf(accessFor(laneOf(context)), project),
         systemPrompt,
         toProviderMessages: messages =>
           providerMessages(messages, options.blobs ?? NO_BLOBS),

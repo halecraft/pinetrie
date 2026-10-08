@@ -12,6 +12,7 @@ import {
   idleNow,
   join,
   laneNamesOf,
+  START_AGENT,
   SUITE_CONFIG,
   startSuiteHost,
   tipIn,
@@ -21,7 +22,7 @@ import {
 import { imageSize, RED_PNG } from "../images.ts"
 import type { Scenario } from "../scenario.ts"
 
-import { runOf, START_AGENT } from "./support.ts"
+import { runOf } from "./support.ts"
 
 export const scenario: Scenario = {
   needs: async () =>

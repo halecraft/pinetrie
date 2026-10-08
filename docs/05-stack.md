@@ -190,7 +190,11 @@ I lean (a), but it is the one choice with no precedent to copy.
 
 ---
 
-### D10 — Apple's `container` for lanes of their own ✅ adopted (ADR-0034)
+### D10 — Apple's `container` for lanes of their own ⛔ superseded (ADR-0103)
+
+Lanes run on Docker on btrfs, in pine·trie's own VM on the Mac
+(ADR-0103); `@pinetrie/container` is deleted, and no lane works directly
+(ADR-0102). What follows is the decision as it was.
 
 Each agent lane of its own runs in a Linux VM made by Apple's `container`.
 The requirements:

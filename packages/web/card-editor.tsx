@@ -24,10 +24,8 @@ import type {
   CommandSummary,
   PinnedView,
   Position,
-  ProjectRecord,
   SeatRecord,
   ThreadLane,
-  WorkSetting,
 } from "@pinetrie/core"
 import { commandOf } from "@pinetrie/core"
 import {
@@ -68,10 +66,9 @@ import {
   sizeWords,
   spent,
   startText,
+  startWords,
   tokensOf,
   uploadImage,
-  whereChoices,
-  whereWords,
 } from "@pinetrie/interface"
 import { type QueuedCard, writersOfClients } from "@pinetrie/rules"
 import { textClients } from "@pinetrie/schema"
@@ -108,13 +105,8 @@ function bindText(
   }
 }
 
-/** Where a lane this editor's send creates would work, and the choices. */
+/** What a lane this editor's send creates would start from. */
 export interface Where {
-  /** The lane above's setting, else the project's default (`workFor`). */
-  readonly defaultWork: WorkSetting | null
-  readonly project: ProjectRecord | null
-  /** Directories other lanes work in directly: offered again. */
-  readonly usedDirs: readonly string[]
   /** Accepted work, for the bases a new lane may start from (ADR-0104). */
   readonly accepted: AcceptedRecord | null
   /** Files conflicted in the commit a new lane here would be cloned from (ADR-0072). */
@@ -125,8 +117,8 @@ export interface Where {
  * Before sending, the button says what the message will do: who it is for,
  * and whether it will wait. `planSend` decides as the host will, over the
  * thread `threadOf` gives (ADR-0021), and `sendButton` words it. When the send
- * starts an agent, a chip beside it says where that agent will work, and
- * changes it.
+ * starts a thread and there is a WIP, a line beside it says what the thread
+ * starts from, and changes it (`StartLine`).
  *
  * A reply carries the end its sender saw. If another writer's compelled
  * message got there first, or the lane became busy, the host writes nothing
@@ -221,9 +213,6 @@ export function CardEditor(p: {
     text: string
     line: string
   } | null>(null)
-  const [choice, setChoice] = useState<WorkSetting | null>(
-    prefill?.work ?? null,
-  )
   /** The WIP a new lane of its own starts from; null for accepted work (ADR-0104). */
   const [base, setBase] = useState<string | null>(null)
   const command = card === undefined ? null : commandOf(card)
@@ -245,7 +234,6 @@ export function CardEditor(p: {
   const [picked, setPicked] = useState(0)
   const matches = pins || hidden === text ? [] : matchCommands(text, p.commands)
   const highlighted = matches[Math.min(picked, matches.length - 1)]
-  const work = choice ?? p.where?.defaultWork ?? null
   const { onCreatesLane, onShows } = p
   useEffect(
     () => onCreatesLane?.(plan.createsLane),
@@ -391,10 +379,7 @@ export function CardEditor(p: {
       ...p.how,
       mode: as,
       ...(id === undefined ? {} : { id }),
-      ...(plan.createsLane && choice !== null ? { work: choice } : {}),
-      ...(plan.createsLane && work?.kind === "own" && base !== null
-        ? { base }
-        : {}),
+      ...(plan.createsLane && base !== null ? { base } : {}),
       ...(from === null ? {} : { card: from }),
     })
     step({ kind: "settled", spent: spent(outcome) })
@@ -507,27 +492,14 @@ export function CardEditor(p: {
               </div>
             ) : (
               <div className="compose-row">
-                {plan.createsLane &&
-                  work !== null &&
-                  p.where !== undefined &&
-                  p.where.project !== null && (
-                    <div className="where-line">
-                      <WhereMenu
-                        project={p.where.project}
-                        usedDirs={p.where.usedDirs}
-                        work={work}
-                        choose={setChoice}
-                        accepted={p.where.accepted}
-                        base={base}
-                        chooseBase={setBase}
-                      />
-                      {work.kind === "own" && p.where.forkConflicts > 0 && (
-                        <span className="where-fork-conflict">
-                          {forkWords(p.where.forkConflicts)}
-                        </span>
-                      )}
-                    </div>
-                  )}
+                {plan.createsLane && p.where !== undefined && (
+                  <StartLine
+                    accepted={p.where.accepted}
+                    base={base}
+                    chooseBase={setBase}
+                    forkConflicts={p.where.forkConflicts}
+                  />
+                )}
                 <button
                   className="send primary"
                   disabled={button.disabled}
@@ -937,86 +909,60 @@ export function PinnedCardEditor(p: {
 }
 
 /**
- * The line under the box that says where a new thread's agent works, and
- * what that does to your files; it opens the menu that changes it. A lane of
- * its own may start from a WIP instead of accepted work (ADR-0104), offered
- * only when there is one.
+ * The line under the box that says what a new thread starts from, opening
+ * the menu of bases: accepted work or a WIP (ADR-0104). With no WIP there is
+ * no choice, and no line; a fork from a conflicted commit says so.
  */
-function WhereMenu(p: {
-  project: ProjectRecord
-  usedDirs: readonly string[]
-  work: WorkSetting
-  choose: (work: WorkSetting) => void
+function StartLine(p: {
   accepted: AcceptedRecord | null
   base: string | null
   chooseBase: (base: string | null) => void
+  forkConflicts: number
 }) {
-  const row = (name: string, detail: string | null) => (
-    <>
-      <span className="where-name">{name}</span>
-      {detail !== null && <span className="where-detail">{detail}</span>}
-    </>
-  )
-  const bases = p.work.kind === "own" ? baseChoices(p.accepted, p.base) : []
+  const bases = baseChoices(p.accepted, p.base)
+  if (bases.length === 0 && p.forkConflicts === 0) return null
   return (
-    <Menu
-      className="where-menu"
-      label="where the agent works"
-      sections={[
-        {
-          key: "work",
-          heading: "where the agent works",
-          items: whereChoices(
-            p.project,
-            p.usedDirs,
-            p.work,
-            p.accepted?.acceptedBookmark ?? null,
-          ).map(c => ({
-            key: c.key,
-            label: row(c.row, c.detail),
-            className: c.className,
-            disabled: c.disabled,
-            ...(c.checked === undefined ? {} : { checked: c.checked }),
-            ...(c.title === undefined ? {} : { title: c.title }),
-            onChoose: () => {
-              if (c.setting !== null) return p.choose(c.setting)
-              const dir = window.prompt("The directory to work in")?.trim()
-              if (dir !== undefined && dir !== "")
-                p.choose({ kind: "direct", dir })
+    <div className="start-line">
+      {bases.length > 0 && (
+        <Menu
+          className="start-menu"
+          label="what the thread starts from"
+          sections={[
+            {
+              key: "base",
+              heading: "start from",
+              items: bases.map(c => ({
+                key: c.key,
+                label: (
+                  <>
+                    <span className="start-name">{c.row}</span>
+                    {c.detail !== null && (
+                      <span className="start-detail">{c.detail}</span>
+                    )}
+                  </>
+                ),
+                className: "start-base",
+                checked: c.chosen,
+                title: c.title,
+                data: { base: c.base ?? "" },
+                onChoose: () => p.chooseBase(c.base),
+              })),
             },
-          })),
-        },
-        ...(bases.length === 0
-          ? []
-          : [
-              {
-                key: "base",
-                heading: "start from",
-                items: bases.map(c => ({
-                  key: c.key,
-                  label: row(c.row, c.detail),
-                  className: "where-base",
-                  checked: c.chosen,
-                  title: c.title,
-                  data: { base: c.base ?? "" },
-                  onChoose: () => p.chooseBase(c.base),
-                })),
-              },
-            ]),
-      ]}
-      trigger={
-        <>
-          <span className="where-words" data-work={p.work.kind}>
-            {whereWords(
-              p.work,
-              p.project,
-              p.work.kind === "own" ? p.base : null,
-            )}
-          </span>
-          <span className="where-caret">▾</span>
-        </>
-      }
-      triggerClassName="where-trigger"
-    />
+          ]}
+          trigger={
+            <>
+              <span className="start-words">{startWords(p.base)}</span>
+              <span className="start-caret">▾</span>
+            </>
+          }
+          triggerClassName="start-trigger"
+        />
+      )}
+      {p.forkConflicts > 0 && (
+        <span className="start-fork-conflict">
+          {forkWords(p.forkConflicts)}
+        </span>
+      )}
+    </div>
   )
 }

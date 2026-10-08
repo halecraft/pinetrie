@@ -66,9 +66,9 @@ export interface Splits {
 export function createSplits(deps: {
   readonly basics: Basics
   /** The owner of your repo when lanes have their own copies, else null. */
-  readonly owner: RepoOwner | null
+  readonly owner: RepoOwner
   readonly registry: LaneRegistry
-  readonly offers: Offers | null
+  readonly offers: Offers
   readonly piSetup: Pick<PiSetup, "skill">
   readonly beforeRun: Containers["beforeRun"]
   readonly fetchLane: Fetches["fetchLane"]
@@ -77,7 +77,7 @@ export function createSplits(deps: {
   const { session, docs, log } = basics
   return {
     async prepareSplit(lane, by, intent) {
-      if (!registry.isOwn(lane) || owner === null || offers === null)
+      if (!registry.isOwn(lane))
         return { refused: "the lane has no copy of its own" }
       const span = await offers.stackSpan(lane)
       if (span === null) return { refused: "the lane has nothing to offer" }
@@ -100,13 +100,7 @@ export function createSplits(deps: {
           ? { present: false as const }
           : readEntryMessage(doc, prompt)
       const details = stored.present ? decodeStack(stored.message) : undefined
-      if (
-        !registry.isOwn(lane) ||
-        owner === null ||
-        details === undefined ||
-        offers === null
-      )
-        return null
+      if (!registry.isOwn(lane) || details === undefined) return null
       try {
         const refused = await finishSplit(
           {

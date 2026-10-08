@@ -40,7 +40,7 @@ import type { RepoStep } from "./step.ts"
 export interface RepoOps {
   /** jj as the host: `--ignore-working-copy`, `operation.username=pinetrie-host`. */
   readonly jj: Runner
-  /** jj as you, for a step that moves your files or lands your work. */
+  /** jj as you, for a step that moves the working copy or lands your work. */
   readonly jjAsYou: Runner
   readonly git: Runner
   /** Carry out a repo plan's steps: the only way a `RepoStep` runs. */

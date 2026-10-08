@@ -141,8 +141,8 @@ test("lanes declares only core: it runs jj and git in a lane, on a runtime it is
   assert.deepEqual(deps(read("packages/lanes")), ["@pinetrie/core"])
 })
 
-/** The packages that run lanes, each a `LaneRuntime` (ADR-0103). */
-const RUNTIMES = ["@pinetrie/container", "@pinetrie/docker", "@pinetrie/vm"]
+/** The packages that run lanes, and the VM Docker runs in on the Mac (ADR-0103). */
+const RUNTIMES = ["@pinetrie/docker", "@pinetrie/vm"]
 
 test("a runtime declares only core, and lanes when it runs lanes; never another runtime", () => {
   for (const dir of WORKSPACE) {

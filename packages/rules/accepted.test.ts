@@ -115,7 +115,7 @@ describe("accepted work (ADR-0104)", () => {
       const s = acceptedActionState("publish", r)
       return s.kind === "refused" ? s.code : null
     }
-    test("with publish.catchUp off it moves the publish bookmark alone, whatever your files", () => {
+    test("with publish.catchUp off it moves the publish bookmark alone, whatever the working copy holds", () => {
       const r = at(unpublished, {
         publishCatchesUp: false,
         yours: yours({
@@ -137,7 +137,7 @@ describe("accepted work (ADR-0104)", () => {
         catchUp: false,
       })
     })
-    test("with publish.catchUp on it catches your files up and accepts your commits", () => {
+    test("with publish.catchUp on it catches the working copy up and accepts your commits", () => {
       const r = at(unpublished, {
         yours: yours({ behind: 2, ahead: 1, catchUp: preview }),
       })
@@ -216,7 +216,7 @@ describe("accepted work (ADR-0104)", () => {
             }),
           }),
         ),
-      ).toBe("your files have conflicts in a, b, c and 2 more")
+      ).toBe("the working copy has conflicts in a, b, c and 2 more")
       expect(
         acceptedRefusal(
           "publish",
@@ -228,7 +228,7 @@ describe("accepted work (ADR-0104)", () => {
             }),
           }),
         ),
-      ).toBe("catching your files up would conflict in x.ts")
+      ).toBe("catching the working copy up would conflict in x.ts")
     })
 
     describe("planPublishFinish: the second round, from accepted work read after the catch-up", () => {
@@ -312,7 +312,7 @@ describe("accepted work (ADR-0104)", () => {
       },
     })
     expect(publishUndone(ERR.YOURS_CONFLICT, after)).toBe(
-      "catching your files up would leave 2 commits of yours with conflicts",
+      "catching the working copy up would leave 2 commits of yours with conflicts",
     )
     expect(publishUndone(ERR.NOT_FAST_FORWARD, after)).toBe(
       acceptedRefusal("publish", ERR.NOT_FAST_FORWARD, after),

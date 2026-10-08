@@ -5,19 +5,16 @@
 // made tool calls, has a revision record. So one walk up from an entry finds
 // the lane it belongs to (the nearest record's), its commit (the nearest
 // record with one) and its disk (the nearest record with a snapshot). A lane
-// that works directly records its prompts with neither: it still counts as
-// the lane above, but the walk passes it for commit and disk.
+// with no copy of its own records its prompts with neither: it still counts
+// as the lane above, but the walk passes it for commit and disk.
 
 import type {
   CommitId,
   EntryId,
   LaneName,
-  LaneRecord,
   Position,
-  ProjectRecord,
   RevisionRecord,
   SnapshotId,
-  WorkSetting,
 } from "./index.ts"
 import { ancestry, type TreeIndex } from "./tree.ts"
 
@@ -29,7 +26,7 @@ export interface Above {
   readonly commit: CommitId | null
   /**
    * The lane of the record holding `commit`: the copy a fork clones. Not
-   * `lane` when the nearest record's lane works directly and records none.
+   * `lane` when the nearest record's lane has no copy of its own and records none.
    */
   readonly commitLane: LaneName | null
   /** The nearest recorded snapshot; null means the base snapshot. */
@@ -127,33 +124,4 @@ export function firstPromptOf(
     if (id !== undefined && revisions.get(id)?.lane === lane) return id
   }
   return null
-}
-
-/**
- * Where a new lane works: the send's choice, else the setting of the lane
- * above its fork point, else the project's default for a root lane. A project
- * that cannot have lanes of their own makes any "own copy" work directly in
- * its root. Null with
- * no project: the host has no tools.
- */
-export function workFor(input: {
-  readonly choice: WorkSetting | null
-  readonly above: LaneName | null
-  readonly lanes: ReadonlyMap<LaneName, LaneRecord>
-  readonly project: ProjectRecord | null
-}): WorkSetting | null {
-  const { project } = input
-  if (project === null) return null
-  const wanted =
-    input.choice ??
-    (input.above === null ? undefined : input.lanes.get(input.above)?.work) ??
-    null
-  if (project.kind === "direct")
-    return wanted?.kind === "direct"
-      ? wanted
-      : { kind: "direct", dir: project.root }
-  if (wanted !== null) return wanted
-  return project.rootDefault === "own"
-    ? { kind: "own" }
-    : { kind: "direct", dir: project.root }
 }

@@ -141,8 +141,8 @@ export function renderRun(
     "--init",
     "--name",
     shape.name,
-    // A lane's hostname is its container's name, as under `container`;
-    // Docker's own is the container's id.
+    // A lane's hostname is its container's name; Docker's own would be the
+    // container's id.
     "--hostname",
     shape.name,
     "-m",

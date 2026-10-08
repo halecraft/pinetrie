@@ -1,10 +1,11 @@
 import {
+  type AcceptedRecord,
   type Address,
+  commitId,
   ERR,
   entryId,
   laneNameForThread,
   NOBODY,
-  type ProjectRecord,
   runId,
   THE_AGENT,
   type ThreadLane,
@@ -12,6 +13,7 @@ import {
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
+  baseChoices,
   type ComposerMode,
   failedWords,
   forkWords,
@@ -26,8 +28,7 @@ import {
   sendButton,
   settleSend,
   spent,
-  whereChoices,
-  whereWords,
+  startWords,
 } from "./send.ts"
 
 const ME = writerId("duane@example.com")
@@ -436,76 +437,57 @@ describe("raceWords", () => {
   })
 })
 
-describe("where a new lane works: the chip and its menu", () => {
-  const lanes: ProjectRecord = {
-    kind: "lanes",
-    root: "/work",
-    rootDefault: "own",
-  }
-  const direct: ProjectRecord = {
-    kind: "direct",
-    root: "/work",
-    reason: "not a jj repo",
-  }
+describe("what a new lane starts from: its line", () => {
   test("forkWords: a new lane cloned from a conflicted commit says so (ADR-0072)", () => {
     expect(forkWords(1)).toBe(
       "starts from a copy with an unresolved conflict in 1 file",
     )
     expect(forkWords(3)).toMatch(/in 3 files$/)
   })
-  test("whereWords says each setting by what it does to your files", () => {
-    expect(whereWords({ kind: "own" }, lanes)).toBe(
-      "works on its own copy · your files stay as they are",
-    )
-    expect(whereWords({ kind: "own" }, lanes, "wip/search")).toBe(
-      "starts from your unfinished work: wip/search",
-    )
-    expect(whereWords({ kind: "direct", dir: "/work" }, lanes)).toBe(
-      "edits your files directly",
-    )
-    expect(whereWords({ kind: "direct", dir: "/tmp/x" }, lanes)).toBe(
-      "edits files in /tmp/x",
-    )
+  /** Accepted work, set up, with `wips` above it. */
+  const accepted = (
+    wips: AcceptedRecord["wips"] = [],
+    commit: AcceptedRecord["commit"] = commitId("c1"),
+  ): AcceptedRecord => ({
+    acceptedBookmark: "pinetrie-accepted",
+    wipPrefix: "wip/",
+    publish: "main",
+    published: { commit: null, behind: 0, ahead: 0 },
+    commit,
+    heads: { current: null, proposed: "" },
+    log: { current: null, proposed: "" },
+    wips,
+    yours: {
+      behind: 0,
+      ahead: 0,
+      catchUp: null,
+      conflicts: { commits: 0, files: [] },
+    },
+    publishCatchesUp: false,
   })
-  test("the current choice is checked; another directory, which asks, is neither", () => {
-    const own = whereChoices(lanes, ["/tmp/x"], { kind: "own" })
-    expect(own.map(c => [c.key, c.checked])).toEqual([
-      ["own", true],
-      ["yours", false],
-      ["/tmp/x", false],
-      ["other", undefined],
+  test("baseChoices: accepted work first, then each WIP with how far behind it is; none with no line, or no WIP", () => {
+    const line = accepted([
+      { bookmark: "wip/search", commit: commitId("w"), behind: 3, ahead: 1 },
     ])
     expect(
-      whereChoices(lanes, ["/tmp/x"], { kind: "direct", dir: "/tmp/x" }).map(
-        c => c.checked,
-      ),
-    ).toEqual([false, false, true, undefined])
-    expect(own[0]?.detail).toBe("you review its work, then accept it")
-  })
-  test("the working copy is never a used directory's row", () => {
-    expect(
-      whereChoices(lanes, ["/work", "/tmp/x"], { kind: "own" }).map(
-        c => c.className,
-      ),
-    ).toEqual(["where-own", "where-yours", "where-used", "where-other"])
-  })
-  test("a copy cannot be chosen where the project cannot have one, and says why", () => {
-    expect(
-      whereChoices(direct, [], { kind: "own" }).map(c => [
-        c.key,
-        c.disabled,
-        c.title,
-      ]),
+      baseChoices(line, "wip/search").map(c => [c.row, c.detail, c.chosen]),
     ).toEqual([
-      ["own", true, "not a jj repo"],
-      ["yours", false, undefined],
-      ["other", false, undefined],
+      ["accepted work", null, false],
+      [
+        "wip/search",
+        "your unfinished work · 3 commits behind accepted work",
+        true,
+      ],
     ])
-    expect(whereChoices(lanes, [], { kind: "own" })[0]?.disabled).toBe(false)
-    expect(
-      whereChoices(lanes, [], { kind: "own" }, "pinetrie-accepted")[0]?.title,
-    ).toBe(
-      "a lane of its own, cloned from pinetrie-accepted; its work comes back as pinetrie-offer/<thread>",
+    expect(baseChoices(line, null)[0]?.title).toBe("pinetrie-accepted at c1")
+    expect(baseChoices(accepted(), null)).toEqual([])
+    expect(baseChoices(accepted([], null), null)).toEqual([])
+    expect(baseChoices(null, null)).toEqual([])
+  })
+  test("startWords: accepted work, or the WIP chosen", () => {
+    expect(startWords(null)).toBe("starts from accepted work")
+    expect(startWords("wip/search")).toBe(
+      "starts from your unfinished work: wip/search",
     )
   })
 })

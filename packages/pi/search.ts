@@ -130,7 +130,6 @@ export type SearchOutcome =
   | { readonly kind: "found"; readonly text: string; readonly cut: SearchCut }
   | { readonly kind: "none" }
   | { readonly kind: "failed"; readonly text: string }
-  | { readonly kind: "unavailable"; readonly program: SearchProgram }
   | {
       readonly kind: "stopped"
       readonly why: "aborted" | "timeout" | "error"
@@ -198,11 +197,6 @@ export function searchText(
       }
     case "failed":
       return { ok: false, text: outcome.text }
-    case "unavailable":
-      return {
-        ok: false,
-        text: `${outcome.program} is not available on this host and could not be fetched; search with bash.`,
-      }
     case "stopped":
       return {
         ok: false,
@@ -236,13 +230,10 @@ function searchExecute<P>(
   ) => {
     const { args, limit } = plan(params)
     const program = await toolContext.programs(PROGRAM[tool])
-    const outcome =
-      program === null
-        ? ({ kind: "unavailable", program: PROGRAM[tool] } as const)
-        : searchOutcome(
-            tool,
-            await run(toolContext, shellCommand(program, args), limit, context),
-          )
+    const outcome = searchOutcome(
+      tool,
+      await run(toolContext, shellCommand(program, args), limit, context),
+    )
     const { ok, text } = searchText(tool, outcome, limit)
     if (!ok) throw new Error(text)
     return { content: [{ type: "text" as const, text }], details: undefined }

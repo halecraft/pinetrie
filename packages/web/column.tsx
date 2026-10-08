@@ -27,7 +27,6 @@ import {
   type TreeIndex,
   threadOf,
   type WriterId,
-  workFor,
 } from "@pinetrie/core"
 import {
   AGENT_MARK,
@@ -607,15 +606,8 @@ export function Column(p: ColumnProps) {
       },
     })
   }
-  // Where a lane this column's next send creates would work, before a choice,
-  // and what its copy would start with.
+  // What a lane this column's next send creates would start with.
   const above = nearestRevision(index, p.work.revisions, at)
-  const defaultWork = workFor({
-    choice: null,
-    above: above.lane,
-    lanes: p.work.lanes,
-    project: p.work.project,
-  })
   const forkConflicts =
     above.commit === null ? [] : conflictsAt(p.work.revisions, above.commit)
 
@@ -1115,17 +1107,8 @@ export function Column(p: ColumnProps) {
             card={mine}
             place={place}
             where={{
-              defaultWork,
-              project: p.work.project,
               accepted: p.work.accepted,
               forkConflicts: forkConflicts.length,
-              usedDirs: [
-                ...new Set(
-                  [...p.work.lanes.values()].flatMap(r =>
-                    r.work?.kind === "direct" ? [r.work.dir] : [],
-                  ),
-                ),
-              ],
             }}
             commands={p.work.commands}
             at={at}
@@ -1390,7 +1373,7 @@ function Identity({
 
 /**
  * A named thread's details, under its header (ADR-0073): its mark
- * magnified, its name, who started it and where it works, what it works on
+ * magnified, its name, who started it, what it works on
  * now, whether its base has moved on, and where its lane started on this
  * path. The mark is `ThreadMark` itself, scaled by CSS. It spins as the
  * reader opens the details here (`spinFirst`) and at each click; mounted
@@ -1419,7 +1402,7 @@ function ThreadDetailsPanel({
 }) {
   const [spins, setSpins] = useState(spinFirst ? 1 : 0)
   const [now] = useState(() => Date.now())
-  const { started, where, behind, start } = details
+  const { started, behind, start } = details
   return (
     <section aria-label={name} className="thread-details" id={id}>
       <button
@@ -1440,7 +1423,6 @@ function ThreadDetailsPanel({
             {startedWords(started, now)}
           </div>
         )}
-        {where !== null && <div className="thread-details-where">{where}</div>}
         {working !== undefined && (
           <div className="thread-details-working">{working}</div>
         )}
@@ -1502,7 +1484,7 @@ function Bookmark({ name }: { name: string }) {
 
 /**
  * What became of the column's files, at its foot (ADR-0040): the lane's offer
- * in your repo (ADR-0105), or where a lane that works directly writes. An
+ * in your repo (ADR-0105). An
  * offer's line opens its review (ADR-0047); its bookmark, copied, finds it in
  * jj or jjui.
  */
@@ -1520,17 +1502,6 @@ function WorkStripView({
   }
 }) {
   if (strip.kind === "none") return null
-  if (strip.kind === "direct")
-    return (
-      <div className="work" data-state="direct">
-        <span className="work-line">{strip.line}</span>
-        {strip.alsoHere.map(name => (
-          <span className="work-warning" key={name}>
-            {name} is working here too
-          </span>
-        ))}
-      </div>
-    )
   const { words } = strip
   return (
     <div className="work offer" data-state={strip.state}>

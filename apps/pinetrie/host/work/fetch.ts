@@ -44,7 +44,7 @@ export interface Fetches {
 export function createFetches(deps: {
   readonly basics: Basics
   /** The owner of your repo when lanes have their own copies, else null. */
-  readonly owner: RepoOwner | null
+  readonly owner: RepoOwner
   readonly registry: LaneRegistry
   /** Work nobody awaits: `quiet` waits for it. */
   readonly keeper: Keeper
@@ -67,7 +67,6 @@ export function createFetches(deps: {
 
   return {
     fetchLane(lane, have, stack = false) {
-      if (owner === null) return Promise.resolve()
       const yours = owner
       const handle = registry.handleOf(lane)
       const bundled = handle.queue.enqueue(async () => {

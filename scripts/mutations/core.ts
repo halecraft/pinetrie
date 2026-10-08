@@ -9,6 +9,17 @@ const core = "packages/core/index.ts"
 const trailers = "packages/core/trailers.ts"
 
 export const mutations: readonly Mutation[] = [
+  // ── the lanes suite, proven in a lane (ADR-0103) ──
+  {
+    name: "an offer's message names its thread under another key",
+    file: "packages/core/trailers.ts",
+    from: '  thread: "Pinetrie-Thread",',
+    to: '  thread: "Pinetrie-Topic",',
+    suite: "lanes",
+    scenario: "main",
+    expect:
+      "every lane has a two-word name, unique; the offer's bookmark and trailer carry it",
+  },
   {
     name: "a discard goes in the root its discarder is on",
     file: core,
@@ -495,14 +506,7 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a turn that changed only ignored files",
   },
-  {
-    name: "PINETRIE_LANES=0 is ignored",
-    file: "packages/core/work.ts",
-    from: '  return project.rootDefault === "own"',
-    to: "  return true",
-    command: unit,
-    expect: "PINETRIE_LANES=0 changes a root lane's default",
-  },
+
   {
     name: "an email may hold a colon",
     file: core,

@@ -498,8 +498,8 @@ pending.
   refuses by; else `publish`, carrying `acceptedActionState`. `publishWords`
   words it: "publish", or "publishing…" while out, and a title that says
   what it does from `publishWork` and the catch-up's preview (files it
-  changes, other lines of your work that move), "your files do not move
-  (publish.catchUp is off)" when the setting leaves your files behind or
+  changes, other lines of your work that move), "the working copy does not
+  move (publish.catchUp is off)" when the setting leaves the working copy behind or
   your commits unaccepted, then the jj, led by
   `acceptedRefusal` when the host would refuse (`PublishWords.refused`, the
   button's `data-refused`). The button still sends then: the
@@ -901,11 +901,8 @@ became of its files (`strip`).
   up (the config text it writes: `immutable_heads()` and `revsets.log`),
   disabled while a setup or publish is out. A refusal or failure is a `Toast`
   above the footer, which keeps the `acting` entry you dismissed so the
-  same one does not come back. "Resolve with the agent" is no `line`
-  command: `resolveIntent` opens a new agent tab whose `Prefill` carries its
-  text (your conflicted files, or what catching up would conflict, with the
-  rebase to run) and its work setting (your files), which the editor starts
-  its choice from.
+  same one does not come back. It offers nothing: a conflict in the
+  working copy is the person's, in jj (ADR-0102).
 - **The origin row and the details' "where it started" are `openAt`
   intents** (`planOpen`), which reveal the entry in whichever column shows
   it. A column's lane may have started in a column to its left.
@@ -929,8 +926,6 @@ became of its files (`strip`).
   - **It spins only when opened here.** `Column` keeps `openedHere`, set by
     the opening click; details mounted open, by a reload or a tab switch,
     are still, as `mountedBanner` keeps a banner there at mount from fading.
-  - **`where` repeats a direct lane's strip line** (`whereWords`), on
-    purpose: every thread's details say where it works.
   - **Toggling dispatches no `PLACED`**, unlike density: it changes the
     view's height, not the content's, and `useFollow` follows that.
 - **The banner (ADR-0050, ADR-0053) is the thread's at the column's end**

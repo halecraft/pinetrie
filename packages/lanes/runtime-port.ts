@@ -48,7 +48,7 @@ export interface LaneRuntime {
   run(shape: ContainerShape): Promise<void>
   containerFacts(container: string): Promise<ContainerFacts>
   start(container: string): Promise<void>
-  /** Stop it; `container` then trims its disk, Docker does nothing more. */
+  /** Stop it; its disk stays as it is. */
   stop(container: string): Promise<void>
   /** Delete the container, running or not; its disk stays. Succeeds when there is none. */
   remove(container: string): Promise<void>

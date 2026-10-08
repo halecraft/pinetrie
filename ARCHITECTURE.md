@@ -23,8 +23,8 @@ browser ──commands (Kyneta Line)──▶ host ──▶ pi agent core
   disk, where pi's tools run. Every thread's agent works in one; none works
   directly in a directory (ADR-0102). A branch clones its parent's disk. Lanes run
   on Docker, on btrfs snapshots: in pine·trie's own VM on the Mac, on the
-  host on Linux (ADR-0103), or on Apple's `container` where the user config
-  says so, until it is removed. A lane's work
+  host on Linux (ADR-0103). A host with tools that cannot run them does not
+  start. A lane's work
   reaches your repo as an offer, a single commit you can review first.
 
 ## Packages
@@ -40,7 +40,6 @@ browser ──commands (Kyneta Line)──▶ host ──▶ pi agent core
 | `lanes` | what a lane is and what runs in it: its container's shape, mounts, grants, jj and git, forks, turns and bundles; it defines the `LaneRuntime` port and implements no runtime |
 | `docker` | running lanes on Docker: the `LaneRuntime` over the docker CLI, btrfs disks in a helper container, Docker's startup refusals, lanes inside a lane |
 | `vm` | a Linux machine on the Mac: the image's build, the launcher, a host's lease on a slot; it knows nothing of lanes |
-| `container` | running lanes on Apple's `container`, until `PLAN-2026-10-07-containers-only` deletes it |
 | `session` | one client's connection to a host, its own documents and what it has in flight |
 | `shell` | shell source as structure: a command's words by role, and a one-line command laid out to a width; it declares only `unbash` (ADR-0114) |
 | `interface` | what a person sees and can do, decided, for any client: no React, no DOM (ADR-0093). A tool keeps its id for the model and has a word for people (`shell`, `search`), which interface gives; core holds only what a call is (ADR-0114) |

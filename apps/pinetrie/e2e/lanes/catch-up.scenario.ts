@@ -18,27 +18,32 @@ import { readPlaces, readRevisions } from "@pinetrie/reads"
 import { rowMessage } from "@pinetrie/schema"
 import type { Checks } from "../checks.ts"
 import {
+  at,
+  BRANCH,
   committedProject,
   entriesOf,
   idleNow,
   join,
   lanesOf,
   rootRecordsOf,
-  runtimeProblem,
+  START_AGENT,
   setUpAccepted,
-  startSuiteHost,
   treeOf,
   waitFor,
 } from "../harness.ts"
+import { cleanUp, type LaneHosts } from "../lane-hosts.ts"
 import type { Scenario } from "../scenario.ts"
-import { at, BRANCH, cleanUp, jj, START_AGENT } from "./support.ts"
+import { jj } from "./support.ts"
 
 export const scenario: Scenario = {
-  needs: runtimeProblem,
-  run: ({ check }) => catchUpSection(check),
+  lanes: true,
+  run: ({ check }, { lanes }) => catchUpSection(check, lanes),
 }
 
-async function catchUpSection(check: Checks["check"]): Promise<void> {
+async function catchUpSection(
+  check: Checks["check"],
+  lanes: LaneHosts,
+): Promise<void> {
   const project = committedProject("pinetrie-catch-up-", {
     "a.txt": "a\n",
     ".gitignore": "node_modules/\n.vite/\n",
@@ -46,7 +51,7 @@ async function catchUpSection(check: Checks["check"]): Promise<void> {
     "pinetrie.json": `${JSON.stringify({ publish: { catchUp: true } })}\n`,
   })
   const script = scriptedModel()
-  const wh = await startSuiteHost({
+  const wh = await lanes.startHost({
     model: { kind: "scripted", script },
     project: { dir: project, tools: true },
     log: m => {

@@ -10,8 +10,7 @@
     "e2e:live": "PINETRIE_LIVE=1 PINETRIE_SCENARIO=live node e2e/e2e.ts",
     "e2e:browser": "node e2e/browser.ts",
     "e2e:lanes": "node e2e/lanes.ts",
-    "vm:build": "node scripts/vm-build.ts",
-    "lanes:convert": "node scripts/lanes-convert.ts"
+    "vm:build": "node scripts/vm-build.ts"
   },
   "dependencies": {
     "@kyneta/exchange": "link:../../../kyneta/workspace/pineta/packages/exchange",
@@ -19,7 +18,6 @@
     "@kyneta/sql-store-core": "link:../../../kyneta/workspace/pineta/packages/exchange/stores/sql-core",
     "@kyneta/sqlite-store": "link:../../../kyneta/workspace/pineta/packages/exchange/stores/sqlite",
     "@kyneta/websocket-transport": "link:../../../kyneta/workspace/pineta/packages/exchange/transports/websocket",
-    "@pinetrie/container": "workspace:*",
     "@pinetrie/core": "workspace:*",
     "@pinetrie/docker": "workspace:*",
     "@pinetrie/interface": "workspace:*",

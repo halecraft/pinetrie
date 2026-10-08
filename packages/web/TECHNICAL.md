@@ -544,25 +544,17 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   - Playwright counts a zero-height element as hidden: wait for
     `.working-line` with `state: "attached"`, or read its computed
     `visibility` (S67).
-- **Where a new thread's agent works** (ADR-0032, ADR-0061). When a send would
-  create a lane (it asks the agent where no lane is, or it is a branch), a
-  line left of the button (`.where-line`) says where, in `whereWords`'s
-  words, by what it does to your files: "works on its own copy · your files
-  stay as they are ▾", "edits your files directly ▾" or "edits files in
-  <dir> ▾". It opens a menu whose first section is `whereChoices`
-  (`send.ts`): its own copy, your files, directories other lanes used, and
-  "another directory…", each a name and what it means ("you review its
-  work, then accept it", "it edits them directly"), the current
-  one checked. Its own copy is disabled, with the project's reason, where
-  the project cannot have one. For its own copy, and only when there are
-  WIP bookmarks, a second section lists where the thread starts from
-  (`baseChoices`): accepted work, then each WIP with how far it is behind
-  accepted work; accepted work then names the WIP. The base is each editor's state, as
-  the work choice is, and is sent with the chat. The choice is
-  the composer's state until sent, as `asksAgent` is; its default is
-  `workFor`, the host's own decision. The chip's words are `.where-words`,
-  with `data-work` (`own` or `direct`): `Menu` passes no attributes to its
-  trigger, so they sit on a span inside it.
+- **What a new thread starts from** (ADR-0104, ADR-0102). When a send would
+  create a lane and you have WIP bookmarks, a line left of the button
+  (`StartLine`, `.start-line`) says what it starts from, in `startWords`'
+  words ("starts from accepted work ▾", "starts from your unfinished work:
+  wip/x ▾"), and opens `baseChoices` (`send.ts`): accepted work, then each
+  WIP with how far it is behind accepted work. With no WIP there is no
+  choice, and no line; a fork from a conflicted commit says so there
+  (`forkWords`). The base is each editor's state until sent, and is sent
+  with the chat. Every thread's agent works in a lane of its own: there is
+  no place to choose. The words are `.start-words`: `Menu` passes no
+  attributes to its trigger, so they sit on a span inside it.
 - **A column's header** (ADR-0040) names who works in it (`✦ amber-fox`,
   `✦ new agent`, or nothing in a conversation), then, in a second row, where
   it forks. It shows no commit and nothing of where the lane works.
@@ -574,8 +566,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   ("catch up with accepted work", "rewrite description"). What the lane runs
   now (`activityOf`: a turn, a resolution, or a split, from its latest
   prompt's role) comes first: while it runs, accepted work counts files so far
-  and offers nothing. A lane that works directly says so ("edits your files
-  directly"), and names other lanes running in the same directory now.
+  and offers nothing. A lane with no copy of its own has no strip.
 - **Catching up and splitting are a card queued at once** (ADR-0108,
   ADR-0061, ADR-0080): the button is the `queueCommand` act, which creates a
   card at the thread's end with the command and no text, then queues it,
@@ -620,8 +611,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   `.review-list-file`, titled with the display path) and `.review-diffs`;
   each file is `.review-file[data-key][data-letter][data-state]`, its head
   `.review-file-head`, its diff `.review-diff` of `[data-kind]` lines. The
-  28rem check measures `.column-thread`. A direct lane's strip is `.work[data-state="direct"]`, with
-  `.work-warning`. The header's `.agent-name` holds the thread's name in
+  28rem check measures `.column-thread`. The header's `.agent-name` holds the thread's name in
   `data-thread` (`.agent-name.pending` before it has one); its origin row
   is `.origin`. A lane's divider is `.lane-join`, with `data-thread`. The
   header's mark is `.thread-mark` (`.pulse` while its lane runs). The name

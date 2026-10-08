@@ -183,7 +183,7 @@ export function planMounts(parts: {
  * Which host paths a lane is granted, read-only (ADR-0036): the roots a
  * command's files live in. Nested roots collapse into the outermost. A root
  * that is, or contains, your home directory, `/` or pi's agent directory
- * (which holds `auth.json`) is refused, as is one `container` cannot mount.
+ * (which holds `auth.json`) is refused, as is one Docker cannot mount.
  * A root inside the agent directory, such as a package it installed, is not
  * refused: it lies inside it, and does not contain it.
  */
@@ -209,7 +209,7 @@ export function planHostMounts(input: {
           : isWithin(input.agentDir, root)
             ? "it is, or holds, pi's agent directory"
             : root.includes(",") && root.includes(":")
-              ? "it has both a comma and a colon, which container cannot mount"
+              ? "it has both a comma and a colon, which Docker's mount arguments cannot name"
               : null
     if (reason === null) allowed.push(root)
     else refused.push({ path: root, reason })
@@ -363,13 +363,12 @@ export interface LaneConfig {
   readonly machine: WrittenMachine
 }
 
-/** `lanes.runtime` and `lanes.vm.slots` as written: null where absent. */
+/** `lanes.vm.slots` as written: null where absent. */
 export interface WrittenMachine {
-  readonly runtime: string | { readonly invalid: string } | null
   readonly slots: number | { readonly invalid: string } | null
 }
 
-const NO_MACHINE: WrittenMachine = { runtime: null, slots: null }
+const NO_MACHINE: WrittenMachine = { slots: null }
 
 /**
  * The `accepted`, `wip` and `publish` keys' values (ADR-0100), as written:
@@ -438,12 +437,6 @@ export function decodeLaneConfig(
   const invalid = (v: unknown) => ({ invalid: JSON.stringify(v) ?? String(v) })
   const vm = isRecord(lanes.vm) ? lanes.vm : {}
   const machine: WrittenMachine = {
-    runtime:
-      lanes.runtime === undefined
-        ? null
-        : typeof lanes.runtime === "string"
-          ? lanes.runtime
-          : invalid(lanes.runtime),
     slots:
       vm.slots === undefined
         ? null
@@ -498,11 +491,6 @@ export function decodeLaneConfig(
   }
 }
 
-/** Where lanes run: Apple's `container`, or Docker (ADR-0103). */
-export type RuntimeChoice = "container" | "docker"
-
-/** The runtime when the user config names none. */
-export const DEFAULT_RUNTIME: RuntimeChoice = "docker"
 /** The slots a lane VM boots with when the user config names none. */
 export const DEFAULT_VM_SLOTS = 16
 /** A VM boots with 20 share devices alongside its others, and not 24 (S131). */
@@ -510,27 +498,19 @@ export const MAX_VM_SLOTS = 20
 
 /** This machine's lane settings, from the user's config; each bad value refused, naming why. */
 export interface MachineConfig {
-  readonly runtime: RuntimeChoice
   readonly slots: number
 }
 
 /**
- * The runtime and the VM's slots, from the user's config only: they are a
- * person's machine settings, not a project's. A value that cannot be used is
- * refused, with why, and the default holds.
+ * The VM's slots, from the user's config only: a person's machine setting,
+ * not a project's. A value that cannot be used is refused, with why, and
+ * the default holds.
  */
 export function machineConfig(user: WrittenMachine): {
   readonly machine: MachineConfig
   readonly refused: readonly string[]
 } {
   const refused: string[] = []
-  let runtime = DEFAULT_RUNTIME
-  if (user.runtime === "container" || user.runtime === "docker")
-    runtime = user.runtime
-  else if (user.runtime !== null)
-    refused.push(
-      `lanes.runtime ${typeof user.runtime === "string" ? JSON.stringify(user.runtime) : user.runtime.invalid} is not "container" or "docker"; using "${DEFAULT_RUNTIME}"`,
-    )
   let slots = DEFAULT_VM_SLOTS
   const n = user.slots
   if (
@@ -544,13 +524,13 @@ export function machineConfig(user: WrittenMachine): {
     refused.push(
       `lanes.vm.slots ${typeof n === "number" ? n : n.invalid} is not a whole number from 1 to ${MAX_VM_SLOTS}: a VM boots with at most ${MAX_VM_SLOTS} share devices beside its others; using ${DEFAULT_VM_SLOTS}`,
     )
-  return { machine: { runtime, slots }, refused }
+  return { machine: { slots }, refused }
 }
 
 /**
  * How pine·trie uses your repo (ADR-0100): accepted work's bookmark, the WIP
  * bookmarks' prefix (ADR-0104), the bookmark publishing moves to accepted
- * work (ADR-0076), and whether a publish catches your files up and accepts
+ * work (ADR-0076), and whether a publish catches the working copy up and accepts
  * your commits first (ADR-0099).
  */
 export interface RepoConfig {
@@ -721,7 +701,7 @@ export function pinetrieDir(root: string): {
   readonly dir: string
   /** The session's SQLite file, unless `PINETRIE_STORE` names another. */
   readonly store: string
-  /** `base.json`, and `container`'s snapshots of lanes' disks. */
+  /** `base.json`; Docker keeps lanes' snapshots in its lanes directory. */
   readonly snapshots: string
   /** The lane runtime, one directory per image tag. */
   readonly runtime: string
@@ -1270,10 +1250,8 @@ export function planBaseRefresh(input: {
   ]
 }
 
-/** A project's root, or the folder lanes work directly in and why. */
-export type ProjectRoot =
-  | { readonly ok: string }
-  | { readonly direct: string; readonly reason: string }
+/** A project's root for lanes, or why its folder cannot have them. */
+export type ProjectRoot = { readonly ok: string } | { readonly refused: string }
 
 /** What the file system, jj and git say about a project's folder. */
 export interface RootFacts {
@@ -1336,21 +1314,15 @@ export function projectDirWords(r: ProjectDirRefusal): string {
 }
 
 /**
- * Where lanes work, from what `planProjectDir` found in `dir`. A folder
- * refused works directly where it is, or at its root when only the exclude
- * failed. With no jj repo, lanes work directly: a lane's commits need jj on
- * both sides.
+ * The root lanes work from, from what `planProjectDir` found: a folder it
+ * refused, or one with no jj repo, cannot have lanes (a lane's commits need
+ * jj on both sides), and the refusal says how to make one.
  */
-export function planRoot(d: ProjectDir, dir: string): ProjectRoot {
-  if (d.kind === "refused")
-    return {
-      direct: d.refusal.kind === "unexcludable" ? d.refusal.root : dir,
-      reason: projectDirWords(d.refusal),
-    }
+export function planRoot(d: ProjectDir): ProjectRoot {
+  if (d.kind === "refused") return { refused: projectDirWords(d.refusal) }
   if (d.repo !== "jj")
     return {
-      direct: d.root,
-      reason: `${d.root} has no jj repo: \`jj git init --colocate\` gives its lanes their own copies`,
+      refused: `${d.root} has no jj repo: \`jj git init --colocate\` makes one, and gives its threads' agents their lanes`,
     }
   return { ok: d.root }
 }
@@ -1397,7 +1369,7 @@ export function planContainer(input: {
 /**
  * Where a lane's container, made anew, starts from: its disk if it has one;
  * else its newest snapshot (a restored root); else nothing, and the lane
- * predates lane containers.
+ * is retired: a branch from it continues.
  */
 export function planStartFrom(input: {
   readonly disk: boolean

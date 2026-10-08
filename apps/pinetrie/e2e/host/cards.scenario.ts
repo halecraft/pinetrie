@@ -28,6 +28,7 @@ import type { SessionClient } from "@pinetrie/session"
 import { openStore } from "../../host/store.ts"
 import type { Checks } from "../checks.ts"
 import {
+  at,
   idleNow,
   join,
   laneNamesOf,
@@ -36,6 +37,7 @@ import {
   queueCard,
   refusedWrite,
   rootHolding,
+  START_AGENT,
   startSuiteHost,
   tipIn,
   treeOf,
@@ -43,7 +45,7 @@ import {
   waitFor,
 } from "../harness.ts"
 import type { Scenario } from "../scenario.ts"
-import { at, LATE_LOAD_MS, START_AGENT, sleep, slowToLoad } from "./support.ts"
+import { LATE_LOAD_MS, sleep, slowToLoad } from "./support.ts"
 
 export const scenario: Scenario = {
   run: ({ check }) => run(check),

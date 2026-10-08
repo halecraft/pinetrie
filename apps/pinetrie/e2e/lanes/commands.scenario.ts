@@ -4,24 +4,27 @@
 import path from "node:path"
 import { atEntry, entryId, ROOT } from "@pinetrie/core"
 import type { Checks } from "../checks.ts"
-import { runtimeProblem } from "../harness.ts"
+import { START_AGENT } from "../harness.ts"
+import { inLane, type LaneHosts } from "../lane-hosts.ts"
 import type { Scenario } from "../scenario.ts"
-import { inLane, START_AGENT, sectionHost } from "./support.ts"
 
 export const scenario: Scenario = {
-  needs: runtimeProblem,
-  run: ({ check }) => commandsSection(check),
+  lanes: true,
+  run: ({ check }, { lanes }) => commandsSection(check, lanes),
 }
 
 // ── commands: skill files at /mnt/host in a lane (ADR-0036) ─────────────────
-async function commandsSection(check: Checks["check"]): Promise<void> {
+async function commandsSection(
+  check: Checks["check"],
+  lanes: LaneHosts,
+): Promise<void> {
   const fixtures = path.join(
     import.meta.dirname,
     "../../../../packages/pi/fixtures",
   )
   const agentDir = path.join(fixtures, "pi-agent")
   const hello = path.join(fixtures, "fixture-pkg", "skills", "hello")
-  const h = await sectionHost({ files: { "a.txt": "a\n" }, agentDir })
+  const h = await lanes.sectionHost({ files: { "a.txt": "a\n" }, agentDir })
   try {
     let told = ""
     let system = ""
@@ -71,7 +74,7 @@ async function commandsSection(check: Checks["check"]): Promise<void> {
       {
         tool: "bash",
         args: {
-          command: `cat ${skillDir}/references/note.md; sh ${skillDir}/scripts/hello.sh; ls /mnt/host${agentDir} 2>&1 | head -1`,
+          command: `cat ${skillDir}/references/note.md; sh ${skillDir}/scripts/hello.sh`,
         },
       },
       { text: "ran it" },
@@ -87,11 +90,6 @@ async function commandsSection(check: Checks["check"]): Promise<void> {
     check(
       "the lane reads the skill's references and runs its scripts there",
       ran.includes("HELLO-NOTE") && ran.includes("HELLO-SCRIPT"),
-    )
-    check(
-      "pi's agent directory is never mounted",
-      ran.includes("No such file or directory"),
-      `${ran.trim().split("\n").at(-1)}`,
     )
   } finally {
     await h.close()

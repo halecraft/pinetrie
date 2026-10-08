@@ -15,24 +15,22 @@ import path from "node:path"
 import { atEntry, entryId, ROOT } from "@pinetrie/core"
 import { readRevisions } from "@pinetrie/reads"
 import type { Checks } from "../checks.ts"
-import { rootRecordsOf, runtimeProblem, SUITE_CONFIG } from "../harness.ts"
+import { BRANCH, rootRecordsOf, START_AGENT, SUITE_CONFIG } from "../harness.ts"
+import type { LaneHosts } from "../lane-hosts.ts"
 import { lanesWriteAs } from "../lane-runtime.ts"
 import type { Scenario } from "../scenario.ts"
-import {
-  BRANCH,
-  jj,
-  START_AGENT,
-  sectionHost,
-  snapshotListing,
-} from "./support.ts"
+import { jj, snapshotListing } from "./support.ts"
 
 export const scenario: Scenario = {
-  needs: runtimeProblem,
-  run: ({ check }) => sharedSection(check),
+  lanes: true,
+  run: ({ check }, { lanes }) => sharedSection(check, lanes),
 }
 
 // ── shared: directories every lane and you see, never branched (ADR-0035) ──
-async function sharedSection(check: Checks["check"]): Promise<void> {
+async function sharedSection(
+  check: Checks["check"],
+  lanes: LaneHosts,
+): Promise<void> {
   const logs: string[] = []
   const store = path.join(
     realpathSync(mkdtempSync(path.join(tmpdir(), "pinetrie-store-"))),
@@ -43,10 +41,10 @@ async function sharedSection(check: Checks["check"]): Promise<void> {
     userConfig,
     JSON.stringify({
       ...SUITE_CONFIG,
-      lanes: { ...SUITE_CONFIG.lanes, shared: [".plans", ".jj/x"] },
+      lanes: { shared: [".plans", ".jj/x"] },
     }),
   )
-  let h = await sectionHost({
+  let h = await lanes.sectionHost({
     files: { "shared.txt": "one\n" },
     store,
     userConfig,
@@ -128,7 +126,7 @@ async function sharedSection(check: Checks["check"]): Promise<void> {
       JSON.stringify({ lanes: { shared: ["notes"] } }),
     )
     await h.close(true)
-    h = await sectionHost({ dir, store, userConfig, logs })
+    h = await lanes.sectionHost({ dir, store, userConfig, logs })
     h.script.use([
       {
         tool: "bash",

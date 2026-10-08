@@ -52,8 +52,6 @@ type MimeModule =
   typeof import("./node_modules/@earendil-works/pi-coding-agent/dist/utils/mime.js")
 type ImageResizeModule =
   typeof import("./node_modules/@earendil-works/pi-coding-agent/dist/utils/image-resize.js")
-type ToolsManagerModule =
-  typeof import("./node_modules/@earendil-works/pi-coding-agent/dist/utils/tools-manager.js")
 
 const base = new URL("./node_modules/", import.meta.url)
 const deep = (p: string): Promise<unknown> => import(new URL(p, base).href)
@@ -93,9 +91,6 @@ const mime = (await deep(
 const imageResize = (await deep(
   "@earendil-works/pi-coding-agent/dist/utils/image-resize.js",
 )) as ImageResizeModule
-const toolsManager = (await deep(
-  "@earendil-works/pi-coding-agent/dist/utils/tools-manager.js",
-)) as ToolsManagerModule
 
 export const { addUsage, emptyUsage } = usage
 export const { loadSkillsFromDir } = skills
@@ -107,7 +102,6 @@ export const {
 } = promptTemplates
 export const { detectSupportedImageMimeType } = mime
 export const { resizeImage, formatDimensionNote } = imageResize
-export const { ensureTool } = toolsManager
 export const { SettingsManager } = settings
 export const { CONFIG_DIR_NAME } = piConfig
 export const { DefaultResourceLoader } = resourceLoader

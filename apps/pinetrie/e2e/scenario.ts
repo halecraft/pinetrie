@@ -9,14 +9,42 @@ import { readdirSync } from "node:fs"
 import path from "node:path"
 import { pathToFileURL } from "node:url"
 import { type Checks, createChecks, isStop } from "./checks.ts"
+import type { LaneHosts } from "./lane-hosts.ts"
 
-export interface Scenario {
-  /**
-   * Why it cannot run in this environment, or null: `container` missing
-   * (`runtimeProblem`, `harness.ts`), or `PINETRIE_LIVE` unset.
-   */
-  readonly needs?: () => Promise<string | null>
-  run(checks: Checks): Promise<void>
+/** What a scenario is given beside its checks. */
+export interface Given {
+  readonly lanes: LaneHosts
+}
+
+/**
+ * A scenario. One whose agent has tools declares `lanes: true`: it is skipped
+ * where the suites' runtime cannot run (`runtimeProblem`), and only it is
+ * given hosts with lanes.
+ */
+export type Scenario =
+  | {
+      readonly lanes?: false
+      /** Why it cannot run in this environment, or null: `PINETRIE_LIVE` unset. */
+      readonly needs?: () => Promise<string | null>
+      run(checks: Checks): Promise<void>
+    }
+  | {
+      readonly lanes: true
+      readonly needs?: () => Promise<string | null>
+      run(checks: Checks, given: Given): Promise<void>
+    }
+
+/**
+ * Why a scenario cannot run here, or null: the runtime's reason first, for
+ * one that runs lanes, then its own `needs`. Pure.
+ */
+export function scenarioProblem(input: {
+  readonly lanes: boolean
+  /** `runtimeProblem`'s answer; asked only for a scenario that runs lanes. */
+  readonly runtime: string | null
+  readonly needs: string | null
+}): string | null {
+  return (input.lanes ? input.runtime : null) ?? input.needs
 }
 
 /** The file suffix that makes a file a scenario; its stem is its name. */
@@ -93,12 +121,29 @@ export async function runSuite(title: string, dir: string): Promise<never> {
   }
   const scenarios = new Map<string, Scenario>()
   const problems = new Map<string, string | null>()
+  // Imported, and the runtime asked, once, and only for a suite with a
+  // scenario that runs lanes.
+  let hosts: Promise<typeof import("./lane-hosts.ts")> | null = null
+  let runtime: Promise<string | null> | null = null
+  const laneHosts = () => {
+    hosts ??= import("./lane-hosts.ts")
+    return hosts
+  }
   for (const name of chosen) {
     const mod = (await import(
       pathToFileURL(path.join(dir, `${name}${SCENARIO_SUFFIX}`)).href
     )) as { scenario: Scenario }
     scenarios.set(name, mod.scenario)
-    problems.set(name, (await mod.scenario.needs?.()) ?? null)
+    const lanes = mod.scenario.lanes === true
+    if (lanes) runtime ??= laneHosts().then(m => m.runtimeProblem())
+    problems.set(
+      name,
+      scenarioProblem({
+        lanes,
+        runtime: lanes ? await runtime : null,
+        needs: (await mod.scenario.needs?.()) ?? null,
+      }),
+    )
   }
   const plan = planSuite(all, named, problems)
   const checks = createChecks()
@@ -111,7 +156,10 @@ export async function runSuite(title: string, dir: string): Promise<never> {
         continue
       }
       try {
-        await scenarios.get(step.name)?.run(checks)
+        const scenario = scenarios.get(step.name)
+        if (scenario?.lanes === true)
+          await scenario.run(checks, { lanes: (await laneHosts()).laneHosts })
+        else await scenario?.run(checks)
       } catch (error) {
         if (isStop(error)) break
         checks.error(

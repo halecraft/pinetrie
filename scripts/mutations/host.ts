@@ -4,32 +4,14 @@ import type { Mutation } from "../mutate.ts"
 const unit = ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host"]
 
 export const mutations: readonly Mutation[] = [
-  // ── pre-docker: pnpm lanes:convert (delete with host/work/convert.ts) ──
   {
-    name: "lanes:convert tries lanes with no work",
-    file: "apps/pinetrie/host/work/convert.ts",
-    from: '  return [...records].flatMap(r => (r.work?.kind === "own" ? [r.lane] : []))',
-    to: "  return [...records].map(r => r.lane)",
+    name: "a host whose lanes cannot run starts anyway",
+    file: "apps/pinetrie/host/index.ts",
+    from: '  if (found?.kind === "refused") throw new HostRefused(found.words)\n',
+    to: "",
     command: unit,
     expect:
-      "lanes:convert tries every lane of its own, and no lane without work",
-  },
-  {
-    name: "lanes:convert does not say a lane will read as retired",
-    file: "apps/pinetrie/host/work/convert.ts",
-    from: "no container volume or snapshot; it will read as retired`",
-    to: "no container volume or snapshot`",
-    command: unit,
-    expect:
-      "lanes:convert says which lanes will read as retired, and is silent on those on Docker",
-  },
-  {
-    name: "lanes:convert's summary counts every outcome as converted",
-    file: "apps/pinetrie/host/work/convert.ts",
-    from: "    const n = all.filter(c => c.kind === kind).length\n",
-    to: '    const n = all.filter(c => kind === "converted" || c.kind === kind).length\n',
-    command: unit,
-    expect: "lanes:convert's summary counts each outcome it came to",
+      "a host with tools on a folder with no jj repo does not start, and says how to make one",
   },
   {
     name: "a move jj refuses after a publish's catch-up leaves it",
@@ -285,7 +267,7 @@ export const mutations: readonly Mutation[] = [
     suite: "lanes",
     scenario: "main",
     expect:
-      "publish previews catching your files up, then rebases your work onto accepted work as you, and accepts it",
+      "publish previews catching the working copy up, then rebases your work onto accepted work as you, and accepts it",
   },
   {
     name: "restoring does not refresh its lanes",
@@ -558,14 +540,7 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a failed drain is logged; the other lanes drain",
   },
-  {
-    name: "a lane is made before its directory is checked",
-    file: "apps/pinetrie/host/commands/chat.ts",
-    from: "      const bad = await work.checkDirectory(setting)",
-    to: "      await agent.createThreadLane(planned.at)\n      const bad = await work.checkDirectory(setting)",
-    command: unit,
-    expect: "never creates the lane",
-  },
+
   {
     name: "the dispatcher skips the archive gate",
     file: "apps/pinetrie/host/commands/index.ts",
@@ -780,14 +755,7 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "with a key, an upgrade without it is refused",
   },
-  {
-    name: "a missing directory is worked in anyway",
-    file: "apps/pinetrie/host/work/create.ts",
-    from: "  return found?.isDirectory() === true ? null : ERR.BAD_DIRECTORY",
-    to: "  return null",
-    command: unit,
-    expect: "checkDirectory refuses a file and a missing path",
-  },
+
   {
     name: "a fork waits for no pending turn record",
     file: "apps/pinetrie/host/work/create.ts",
@@ -1558,24 +1526,7 @@ export const mutations: readonly Mutation[] = [
     expect: "a carry-on the rule refuses is answered with its refusal",
   },
   // ── hot reload holds only what a direct lane edits ──
-  {
-    name: "hot reload holds every update while any direct lane runs",
-    file: "apps/pinetrie/host/hot-reload.ts",
-    from: "        if (!isHeld(file, dirs())) return undefined\n",
-    to: "        if (dirs().length === 0) return undefined\n",
-    command: unit,
-    expect:
-      "a lane working directly in another project holds none of the client's updates",
-  },
-  {
-    name: "hot reload reloads while a held file's lane still runs",
-    file: "apps/pinetrie/host/hot-reload.ts",
-    from: "      if ([...held].some(file => isHeld(file, now))) return\n",
-    to: "",
-    command: unit,
-    expect:
-      "a lane working directly in pinetrie holds the client's updates until its run ends, then reloads once",
-  },
+
   // ── the command line (ADR-0086) ──
   {
     name: "a relative folder is read from the working directory",
@@ -1712,14 +1663,6 @@ export const mutations: readonly Mutation[] = [
     to: '  "scribe",\n  "agent",',
     command: unit,
     expect: "planShutdown closes intake",
-  },
-  {
-    name: "projectOf ignores PINETRIE_LANES=0",
-    file: "apps/pinetrie/host/work/runtime.ts",
-    from: '  return project.kind === "lanes" && defaultDirect',
-    to: '  return project.kind === "lanes" && defaultDirect && false',
-    command: unit,
-    expect: "projectOf keeps a project's own copies",
   },
   // ── the stored schemas, checked at start (ADR-0096) ──
   {

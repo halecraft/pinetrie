@@ -13,7 +13,6 @@ import {
   createContextKey,
   withContextValue,
 } from "@earendil-works/pi-agent-core/harness/context"
-import { NodeExecutionEnv } from "@earendil-works/pi-agent-core/harness/env/nodejs"
 import {
   CONFLICT_TOOL,
   type EntryId,
@@ -23,41 +22,32 @@ import {
   hostPathInLane,
   isWithin,
   type LaneName,
-  NO_EDITOR,
   PRODUCT_NAME,
   type RuntimeProgram,
 } from "@pinetrie/core"
 import { PINNED_RULE, type ToolAnswer } from "@pinetrie/rules"
 import { Type } from "typebox"
 import type { ModelSetup } from "./config.ts"
-import { buildSystemPrompt, ensureTool } from "./deep.ts"
-import { type LaneChannel, laneEnv } from "./lane-env.ts"
+import { buildSystemPrompt } from "./deep.ts"
+import { type LaneChannel, laneEnv, refusingEnv } from "./lane-env.ts"
 
-/** How a lane's tools reach its files, as the host resolves it. */
-export type LaneAccess =
-  /** Directly in a directory on the host, once `ready` settles. */
-  | {
-      readonly kind: "direct"
-      readonly dir: string
-      readonly ready: Promise<void>
-    }
+/**
+ * How a lane's tools reach its files, as the host resolves it: in the lane's
+ * container, through its helper. `gate` settles with the channel once the
+ * lane is started and its queue has drained: tools wait for it, the model
+ * does not.
+ */
+export interface LaneAccess {
+  readonly facts: LaneFacts
   /**
-   * In the lane's container, through its helper. `gate` settles with the
-   * channel once the lane is started and its queue has drained: tools wait
-   * for it, the model does not.
+   * Host paths mounted read-only at `/mnt/host` and their path
+   * (ADR-0036): the roots of the skills this lane can read.
    */
-  | {
-      readonly kind: "lane"
-      readonly facts: LaneFacts
-      /**
-       * Host paths mounted read-only at `/mnt/host` and their path
-       * (ADR-0036): the roots of the skills this lane can read.
-       */
-      readonly hostPaths: readonly string[]
-      /** Where the lane runtime's programs are in the lane (`RUNTIME_BIN`). */
-      readonly programs: string
-      readonly gate: () => Promise<LaneChannel>
-    }
+  readonly hostPaths: readonly string[]
+  /** Where the lane runtime's programs are in the lane (`RUNTIME_BIN`). */
+  readonly programs: string
+  readonly gate: () => Promise<LaneChannel>
+}
 
 /**
  * What a lane of its own is told about itself (ADR-0046). The host builds
@@ -126,7 +116,7 @@ export function laneGuidelines(facts: LaneFacts): string[] {
   return [
     `You work in a ${PRODUCT_NAME} lane: a Linux container where you are root, in your own jj repo at ${dir}.`,
     `${PRODUCT_NAME} commits your changes after each message, so you need not commit. Don't rewrite earlier revisions. Your work so far: \`jj log -r 'immutable_heads()..'\`.`,
-    "The person gets your work as one commit, and never sees your files live.",
+    "The person gets your work as one commit, and never sees your changes live.",
     `Only ${dir} lasts. Background processes end with each run, and nothing outside ${dir} reaches a branch.`,
     `${HOST_WORKING_COPY} is the person's working copy, read-only. ${facts.install} is ${PRODUCT_NAME}'s install, not your project.`,
     ...facts.shared.map(
@@ -176,26 +166,10 @@ export const laneOf = (context: Context): LaneName | undefined =>
   context.value(LANE)
 
 /**
- * pi's Node environment in a directory on the host, every method of which
- * first waits for `ready`. A failed setup fails the call with its error.
- */
-export function directEnv(dir: string, ready: Promise<void>): NodeExecutionEnv {
-  const inner = new NodeExecutionEnv({ cwd: dir, shellEnv: { ...NO_EDITOR } })
-  return new Proxy(inner, {
-    get(target, prop, receiver) {
-      const value = Reflect.get(target, prop, receiver)
-      if (typeof value !== "function") return value
-      return async (...args: unknown[]) => {
-        await ready
-        return value.apply(target, args)
-      }
-    },
-  })
-}
-
-/**
  * What pi builds a request's tools and system prompt from. `lane` is null for
- * a lane that works directly: it gets no block, and every skill at its own path.
+ * an agent without tools, or a lane with no copy of its own: its prompt names
+ * the project's root, it gets no lane block, every skill is at its own path,
+ * and its `env` refuses every call.
  */
 export interface ToolContext {
   readonly env: ExecutionEnv
@@ -208,50 +182,30 @@ export interface ToolContext {
   } | null
 }
 
+/** Why a call without a lane is refused. */
+const NO_TOOLS =
+  "this thread's agent has no tools here: it works in no lane of its own"
+
 /** A program the search tools run: one the lane runtime carries. */
 export type SearchProgram = Extract<RuntimeProgram, "rg" | "fd">
 
-/**
- * Where `program` is in the file system the tools run in: a path, or a name
- * the shell finds on `PATH`. Null when the host has none and could not fetch
- * it.
- */
-export type ProgramPath = (program: SearchProgram) => Promise<string | null>
+/** Where `program` is in the file system the tools run in: the lane runtime's. */
+export type ProgramPath = (program: SearchProgram) => Promise<string>
 
 /**
- * `lookup`, remembered per program once it finds one. A null is asked again
- * on the next call, so a download that failed can succeed later.
+ * Where a lane's tools work, and what its prompt says about it. No access:
+ * an agent without tools, or a lane with no copy of its own, whose prompt
+ * names `project` and whose every call is refused.
  */
-export function rememberedProgram(
-  lookup: (program: SearchProgram) => Promise<string | null>,
-): ProgramPath {
-  const found = new Map<SearchProgram, string>()
-  return async program => {
-    const known = found.get(program)
-    if (known !== undefined) return known
-    const path = await lookup(program)
-    if (path !== null) found.set(program, path)
-    return path
-  }
-}
-
-/**
- * The host's own rg and fd, for a lane that works directly: in pi's bin
- * directory, else on `PATH`, else downloaded into that directory by pi
- * (`PI_OFFLINE` stops that). Remembered, since pi's lookup runs `spawnSync <program> --version`
- * on every call and blocks the host's event loop meanwhile.
- */
-export const hostProgram: ProgramPath = rememberedProgram(
-  async program => (await ensureTool(program)) ?? null,
-)
-
-/** Where a lane's tools work, and what its prompt says about it. */
-export function toolContextOf(access: LaneAccess): ToolContext {
-  if (access.kind === "direct")
+export function toolContextOf(
+  access: LaneAccess | null,
+  project: string,
+): ToolContext {
+  if (access === null)
     return {
-      env: directEnv(access.dir, access.ready),
-      programs: hostProgram,
-      dir: access.dir,
+      env: refusingEnv(project, NO_TOOLS),
+      programs: async program => program,
+      dir: project,
       lane: null,
     }
   const { facts, hostPaths, programs } = access

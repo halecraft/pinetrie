@@ -2,8 +2,17 @@
 // whose threads' agents each work in a Linux container on a disk cloned from
 // where they branched (ADR-0034).
 
-import { existsSync, readFileSync, rmSync, writeFileSync } from "node:fs"
-import { homedir } from "node:os"
+import {
+  chmodSync,
+  existsSync,
+  mkdtempSync,
+  readFileSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs"
+import { createServer } from "node:net"
+import { homedir, tmpdir } from "node:os"
 import path from "node:path"
 import {
   ancestry,
@@ -34,8 +43,9 @@ import { deleteRecord, OFFER } from "@pinetrie/rules"
 import { rowMessage } from "@pinetrie/schema"
 import type { Checks } from "../checks.ts"
 import {
+  at,
+  BRANCH,
   committedProject,
-  E2E_RUNTIME,
   entriesOf,
   entryMessageIn,
   idleNow,
@@ -43,40 +53,35 @@ import {
   lanesOf,
   moveRootTo,
   rootRecordsOf,
-  runtimeProblem,
+  START_AGENT,
   setUpAccepted,
-  startSuiteHost,
   treeOf,
   waitFor,
 } from "../harness.ts"
+import { cleanUp, inLane, inLaneQuiet, type LaneHosts } from "../lane-hosts.ts"
 import type { Scenario } from "../scenario.ts"
 import {
-  at,
-  BRANCH,
   bringUpToDate,
-  cleanUp,
   container,
   containerExists,
   deleteSnapshot,
-  inLane,
-  inLaneQuiet,
   jj,
-  jjFails,
+  jjRefusal,
   queueCommand,
   removeLane,
-  START_AGENT,
   snapshotExists,
 } from "./support.ts"
 
 export const scenario: Scenario = {
-  needs: runtimeProblem,
-  run: ({ check, skip }) => mainSection(check, skip),
+  lanes: true,
+  run: ({ check, skip }, { lanes }) => mainSection(check, skip, lanes),
 }
 
 // ── the main section: one host, checks 1–8 ────────────────────────────
 async function mainSection(
   check: Checks["check"],
-  skip: Checks["skip"],
+  _skip: Checks["skip"],
+  lanes: LaneHosts,
 ): Promise<void> {
   const home = homedir()
   const marker = path.join(home, `.pinetrie-e2e-marker-${process.pid}`)
@@ -88,7 +93,8 @@ async function mainSection(
   })
   const script = scriptedModel()
   const logs: string[] = []
-  const wh = await startSuiteHost({
+  const agent = await standInAgent()
+  const wh = await lanes.startHost({
     model: { kind: "scripted", script },
     project: { dir: project, tools: true },
     log: m => {
@@ -142,8 +148,8 @@ async function mainSection(
   try {
     await waitFor(() => readProject(wh.session) !== null, 30_000)
     check(
-      "the host finds container and gives threads lanes of their own",
-      readProject(wh.session)?.kind === "lanes",
+      "the host finds Docker and gives threads lanes of their own",
+      readProject(wh.session)?.root === project,
       `${JSON.stringify(readProject(wh.session))}`,
     )
     // Threads start at accepted work (ADR-0104): set it up at the
@@ -223,22 +229,11 @@ async function mainSection(
       bash?.includes("No such file or directory") === true &&
         bash.includes("/mnt/host-working-copy/shared.txt"),
     )
-    // On Linux, Docker forwards the host's own agent, and a host may have none.
-    if (
-      E2E_RUNTIME === "docker" &&
-      process.platform !== "darwin" &&
-      process.env.SSH_AUTH_SOCK === undefined
+    check(
+      "with ssh granted, the lane has SSH_AUTH_SOCK",
+      /ssh: \S+/.test(bash ?? ""),
+      `${bash?.match(/ssh: .*/)?.[0] ?? "none"}`,
     )
-      skip(
-        "with ssh granted, the lane has SSH_AUTH_SOCK",
-        "this host has no ssh agent to forward",
-      )
-    else
-      check(
-        "with ssh granted, the lane has SSH_AUTH_SOCK",
-        /ssh: \S+/.test(bash ?? ""),
-        `${bash?.match(/ssh: .*/)?.[0] ?? "none"}`,
-      )
 
     // ── revisions: in the document, and in your repo by bundle ─────────────
     // Lane one's first run committed who.txt; its prompt and that message each
@@ -266,10 +261,14 @@ async function mainSection(
         ofOne.some(r => r.commit !== null && r.commit === bookmark(one?.name)),
       `${ofOne.length} records`,
     )
+    const refusal =
+      bookmark(one?.name) === ""
+        ? null
+        : jjRefusal(project, "describe", "-r", bookmark(one?.name), "-m", "x")
     check(
       "a lane's commits in your repo are immutable",
-      bookmark(one?.name) !== "" &&
-        jjFails(project, "describe", "-r", bookmark(one?.name), "-m", "x"),
+      refusal?.includes("immutable") === true,
+      `${refusal?.split("\n")[0] ?? "described"}`,
     )
 
     // ── 2. Branching: the whole directory, byte for byte ───────────────────
@@ -474,7 +473,8 @@ async function mainSection(
         ),
     )
 
-    // ── 5. A timeout and an abort leave nothing running in the guest ───────
+    // ── 5. A timeout and an abort: that their processes are gone is
+    // `packages/pi/lane-env.test.ts`'s. Later steps go on from this run.
     script.use([
       {
         tool: "bash",
@@ -496,18 +496,6 @@ async function mainSection(
     if (atOnce !== undefined)
       await wu.request({ kind: "stop", lane: atOnce.name })
     await idle()
-    const left =
-      atOnce === undefined
-        ? "?"
-        : inLane(
-            atOnce.name,
-            "ps -eo args | grep -c 'sleep 7[78]' || true",
-          ).trim()
-    check(
-      "a bash timeout and an aborted run leave no process in the guest",
-      left === "0",
-      `${left} left`,
-    )
 
     // ── 6. Offers: the thread's work as one commit you accept (ADR-0105) ─
     const offerOf = () =>
@@ -861,7 +849,7 @@ async function mainSection(
     const commitAt = (rev: string) =>
       jj(project, "log", "--no-graph", "-r", rev, "-T", "commit_id")
     check(
-      "publish previews catching your files up, then rebases your work onto accepted work as you, and accepts it",
+      "publish previews catching the working copy up, then rebases your work onto accepted work as you, and accepts it",
       previewed >= 0 &&
         preview?.conflicts.length === 0 &&
         published.kind === "accepted-moved" &&
@@ -923,7 +911,7 @@ async function mainSection(
           )
     // Where the host starts the offer, as it computes it.
     const tipCommit = commitId(laneTipCommit)
-    // Your own reads, as you would run them: never snapshotting your files.
+    // Your own reads, as you would run them: never snapshotting the working copy.
     const yours: Runner = args =>
       run("jj", ["-R", project, "--ignore-working-copy", ...args])
     const base = await laneBase(yours, tipCommit, DEFAULT_REPO)
@@ -1184,8 +1172,8 @@ async function mainSection(
       toolResults(one?.name).at(-1)?.trim() === "parent-later",
     )
 
-    // A lane with a record and neither a disk nor a snapshot predates lane
-    // containers: its tools say so, and name what to do.
+    // A lane with a record and neither a disk nor a snapshot is retired
+    // (`planStartFrom`): its tools say so, and name what to do.
     if (two !== undefined) {
       await wh.quiet()
       removeLane(project, two.name)
@@ -1200,8 +1188,10 @@ async function mainSection(
     await wu.chat("are you there?", at(two?.tip ?? null), { lane: two?.name })
     await idle()
     check(
-      "a lane with no disk and no snapshot says it predates lane containers",
-      toolResults(two?.name).at(-1)?.includes("predates lane containers") ===
+      "a lane with no disk and no snapshot is retired, and its tools say to branch from it",
+      toolResults(two?.name)
+        .at(-1)
+        ?.includes("no disk and no snapshot to start from; branch from it") ===
         true,
       `${toolResults(two?.name).at(-1)?.slice(0, 60) ?? "none"}`,
     )
@@ -1210,6 +1200,33 @@ async function mainSection(
     rmSync(marker, { force: true })
     await wu.close().catch(() => {})
     await wh.shutdown().catch(() => {})
+    agent?.close()
     cleanUp(wh.session, project)
+  }
+}
+
+/**
+ * On Linux a host forwards its own ssh agent to a lane granted one, and a
+ * host may have none: then a socket of the scenario's own stands in, named
+ * by `SSH_AUTH_SOCK` while the scenario runs. A lane is only handed the
+ * socket, so nothing need answer on it. Opened to the rootless user that a
+ * nested lane's Docker runs as, which mounts it. Null where none is needed.
+ */
+async function standInAgent(): Promise<{ close(): void } | null> {
+  if (process.platform === "darwin" || process.env.SSH_AUTH_SOCK !== undefined)
+    return null
+  const dir = realpathSync(mkdtempSync(path.join(tmpdir(), "pinetrie-agent-")))
+  chmodSync(dir, 0o755)
+  const socket = path.join(dir, "agent.sock")
+  const server = createServer(c => c.end())
+  await new Promise<void>(resolve => server.listen(socket, resolve))
+  chmodSync(socket, 0o777)
+  process.env.SSH_AUTH_SOCK = socket
+  return {
+    close() {
+      delete process.env.SSH_AUTH_SOCK
+      server.close()
+      rmSync(dir, { recursive: true, force: true })
+    },
   }
 }

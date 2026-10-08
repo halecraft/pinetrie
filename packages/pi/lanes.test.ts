@@ -25,7 +25,7 @@ import {
 } from "@pinetrie/rules"
 import { readEntries, rowMessage } from "@pinetrie/schema"
 import { newRootDoc } from "@pinetrie/schema/fixtures"
-import { afterAll, beforeAll, describe, expect, test } from "vitest"
+import { afterAll, afterEach, beforeAll, describe, expect, test } from "vitest"
 import { newId } from "./agent.ts"
 import { type LaneChannel, openChannel } from "./lane-env.ts"
 import {
@@ -35,8 +35,6 @@ import {
   laneContext,
   laneGuidelines,
   NO_CONFLICTS,
-  rememberedProgram,
-  type SearchProgram,
   systemPromptFor,
   toolContextOf,
 } from "./lanes.ts"
@@ -58,23 +56,23 @@ const facts = (over: Partial<LaneFacts> = {}): LaneFacts => ({
   ...over,
 })
 
-test("toolContextOf: a direct lane is no lane; a lane of its own carries its facts", () => {
-  const direct = toolContextOf({
-    kind: "direct",
-    dir: "/repo",
-    ready: Promise.resolve(),
-  })
-  expect({ dir: direct.dir, lane: direct.lane }).toEqual({
+test("toolContextOf: no access is no lane, named by the project's root, whose every call is refused; a lane of its own carries its facts", async () => {
+  const none = toolContextOf(null, "/repo")
+  expect({ dir: none.dir, lane: none.lane }).toEqual({
     dir: "/repo",
     lane: null,
   })
-  const own = toolContextOf({
-    kind: "lane",
-    facts: facts(),
-    hostPaths: ["/skills"],
-    programs: "/pinetrie-runtime/bin",
-    gate: () => new Promise(() => {}),
-  })
+  const ran = await none.env.exec("echo hi", undefined, BACKGROUND_CONTEXT)
+  expect(ran.ok).toBe(false)
+  const own = toolContextOf(
+    {
+      facts: facts(),
+      hostPaths: ["/skills"],
+      programs: "/pinetrie-runtime/bin",
+      gate: () => new Promise(() => {}),
+    },
+    "/repo",
+  )
   expect({ dir: own.dir, lane: own.lane }).toEqual({
     dir: "/workspace",
     lane: { facts: facts(), hostPaths: ["/skills"] },
@@ -82,30 +80,17 @@ test("toolContextOf: a direct lane is no lane; a lane of its own carries its fac
 })
 
 test("toolContextOf: a lane of its own runs the runtime's programs by path", async () => {
-  const own = toolContextOf({
-    kind: "lane",
-    facts: facts(),
-    hostPaths: [],
-    programs: "/pinetrie-runtime/bin",
-    gate: () => new Promise(() => {}),
-  })
+  const own = toolContextOf(
+    {
+      facts: facts(),
+      hostPaths: [],
+      programs: "/pinetrie-runtime/bin",
+      gate: () => new Promise(() => {}),
+    },
+    "/repo",
+  )
   expect(await own.programs("rg")).toBe("/pinetrie-runtime/bin/rg")
   expect(await own.programs("fd")).toBe("/pinetrie-runtime/bin/fd")
-})
-
-test("rememberedProgram: a found path is asked once; a null is asked again", async () => {
-  const asked: SearchProgram[] = []
-  const answers: (string | null)[] = [null, "/bin/rg"]
-  const programs = rememberedProgram(async program => {
-    asked.push(program)
-    const next = answers.shift()
-    if (next === undefined) throw new Error("asked a third time")
-    return next
-  })
-  expect(await programs("rg")).toBe(null)
-  expect(await programs("rg")).toBe("/bin/rg")
-  expect(await programs("rg")).toBe("/bin/rg")
-  expect(asked).toEqual(["rg", "rg"])
 })
 
 test("the prompt no longer tells the model to search with bash", () => {
@@ -126,13 +111,13 @@ test("the prompt no longer tells the model to search with bash", () => {
   const prompt = systemPromptFor(
     { contextFiles: [], skills: [] },
     files,
-  )(toolContextOf({ kind: "direct", dir: "/repo", ready: Promise.resolve() }))
+  )(toolContextOf(null, "/repo"))
   expect(prompt).not.toContain("file operations like ls, rg, find")
   // pi's rule as it is without our tools, so the check above can fail.
   const without = systemPromptFor({ contextFiles: [], skills: [] }, [
     "read",
     "bash",
-  ])(toolContextOf({ kind: "direct", dir: "/repo", ready: Promise.resolve() }))
+  ])(toolContextOf(null, "/repo"))
   expect(without).toContain("file operations like ls, rg, find")
 })
 
@@ -140,7 +125,7 @@ test("every thread is told what pinned cards are, once, in a line of its own (AD
   const prompt = systemPromptFor(
     { contextFiles: [], skills: [] },
     [],
-  )(toolContextOf({ kind: "direct", dir: "/repo", ready: Promise.resolve() }))
+  )(toolContextOf(null, "/repo"))
   expect(prompt.split(PINNED_RULE).length - 1).toBe(1)
   // pi drops a guideline equal to another: the lane's lines stay distinct.
   expect(laneGuidelines(facts())).not.toContain(PINNED_RULE)
@@ -283,7 +268,7 @@ describe("lanes in a harness", () => {
 
   /** An agent whose lanes work where `wheres` says, recording what happens. */
   async function setUp(
-    wheres: Map<LaneName, LaneAccess>,
+    wheres: Map<LaneName, LaneAccess | null>,
     turns: string[] = [],
   ) {
     const doc = newRootDoc()
@@ -313,7 +298,7 @@ describe("lanes in a harness", () => {
         },
       },
     })
-    const newLane = async (where: LaneAccess) => {
+    const newLane = async (where: LaneAccess | null) => {
       const made = await agent.createThreadLane(
         { root: ONE_ROOT, at: ROOT },
         laneNameForThread(newId()),
@@ -330,11 +315,36 @@ describe("lanes in a harness", () => {
     return { agent, script, newLane, texts, doc }
   }
 
-  const where = (dir: string): LaneAccess => ({
-    kind: "direct",
-    dir,
-    ready: Promise.resolve(),
+  /** Channels to the helpers `where` opened, closed after each test. */
+  const opened: LaneChannel[] = []
+  afterEach(async () => {
+    for (const channel of opened.splice(0)) {
+      channel.close()
+      await channel.closed
+    }
   })
+  /**
+   * A lane of its own in `dir`, its helper a local process, as
+   * `lane-env.test.ts`'s is: its tools wait for `ready`, the model does not.
+   */
+  const where = (dir: string, ready = Promise.resolve()): LaneAccess => {
+    const channel = openChannel([
+      "env",
+      `PINETRIE_WORKSPACE_ROOT=${dir}`,
+      process.execPath,
+      path.join(import.meta.dirname, "lane-helper.ts"),
+    ])
+    opened.push(channel)
+    return {
+      facts: facts({ dir }),
+      hostPaths: [],
+      programs: path.join(dir, "bin"),
+      gate: async () => {
+        await ready
+        return channel
+      },
+    }
+  }
 
   test("two lanes at once each run their tools in their own directory", async () => {
     const [a, b] = [path.join(root, "a"), path.join(root, "b")]
@@ -370,7 +380,7 @@ describe("lanes in a harness", () => {
       release = r
     })
     const { agent, script, newLane, texts } = await setUp(new Map())
-    const lane = await newLane({ kind: "direct", dir, ready })
+    const lane = await newLane(where(dir, ready))
     script.use([
       { tool: "bash", args: { command: "cat marker.txt" } },
       { text: "done" },
@@ -401,7 +411,6 @@ describe("lanes in a harness", () => {
     ])
     const { agent, script, newLane, texts } = await setUp(new Map())
     const lane = await newLane({
-      kind: "lane",
       facts: facts({ dir, shared: [".plans"] }),
       hostPaths: [],
       programs: path.join(dir, "bin"),
@@ -451,7 +460,6 @@ describe("lanes in a harness", () => {
     ])
     const { agent, script, newLane, texts } = await setUp(new Map())
     const lane = await newLane({
-      kind: "lane",
       facts: facts({ dir }),
       hostPaths: [],
       programs: path.join(dir, "bin"),
@@ -475,12 +483,9 @@ describe("lanes in a harness", () => {
     await agent.close()
   })
 
-  test("a lane that works directly is told nothing of a lane", async () => {
-    const dir = path.join(root, "plain")
-    const { mkdir } = await import("node:fs/promises")
-    await mkdir(dir)
+  test("a lane with no copy of its own is told nothing of a lane", async () => {
     const { agent, script, newLane } = await setUp(new Map())
-    const lane = await newLane(where(dir))
+    const lane = await newLane(null)
     let told = ""
     script.use([
       {

@@ -87,7 +87,7 @@ export function runnerFor(root: string, as: RepoRunner): Runner {
   }
 }
 
-/** jj on your repo as you: a command that may snapshot or move your files. */
+/** jj on your repo as you: a command that may snapshot or move the working copy. */
 export const hostJj = (root: string): Runner => runnerFor(root, "you")
 
 /** jj on your repo as the host acts on it while you work. */

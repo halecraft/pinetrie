@@ -4,8 +4,9 @@ This package's one job is what a lane is and what runs in it: the
 container's shape, mounts, grants, lane config, jj and git in a lane, forks,
 turns, bundles, the base, the queue and the handle (ADR-0032 to ADR-0034).
 It defines the `LaneRuntime` port and implements no runtime (ADR-0103):
-`@pinetrie/docker` and `@pinetrie/container` do, and the app picks one
-(`apps/pinetrie/host/work/runtime.ts`). Your repo is `@pinetrie/repo`'s
+`@pinetrie/docker` does, and the app composes it
+(`apps/pinetrie/host/work/runtime.ts`). Every lane has its own copy: none
+works directly in a directory (ADR-0102). Your repo is `@pinetrie/repo`'s
 (`packages/repo/TECHNICAL.md`), which builds on this package: what a lane
 also runs, through a `Runner` it is given, is here (`laneBase`,
 `REVISION_READ`, `commitsOf`), and so are the names both sides use
@@ -40,8 +41,7 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   - images built from a Containerfile, and a throwaway container's stdout as
     bytes (`runInImage`), from which the lane runtime is extracted.
 - **Who implements it:** `@pinetrie/docker` (`dockerRuntime`, the Mac's lane
-  VM and Linux) and `@pinetrie/container` (Apple's `container`, deleted by
-  `PLAN-2026-10-07-containers-only`). Neither imports the other.
+  VM and Linux), the one implementation.
 
 ## Where things are
 
@@ -71,8 +71,8 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
 - `image.ts`, `runtime.ts`: the image and the lane runtime. `image.ts`
   gathers what `planImages` needs and builds what it plans.
 - `runtime-port.ts`: `LaneRuntime`, every call the host makes to a
-  runtime, and `DiskOp`. This package implements no runtime: Apple's
-  `container` is `@pinetrie/container`'s (`containerRuntime`).
+  runtime, and `DiskOp`. This package implements no runtime: Docker's is
+  `@pinetrie/docker`'s (`dockerRuntime`).
   `lane.ts`: the container, the queue, and the handle. `base.ts`: the base snapshot, and a lane's base as its
   history names it (`laneBase`), read from the lane's repo or yours.
 
@@ -80,8 +80,8 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
 
 - **Every disk operation is a `DiskOp`** (`runtime-port.ts`), carried out by
   the runtime the host hands in: create, restore from a snapshot, snapshot,
-  delete, and delete snapshots. `@pinetrie/container` keeps disks as volumes
-  and snapshots as APFS clones (`packages/container/TECHNICAL.md`).
+  delete, and delete snapshots. Docker's keeps both as btrfs subvolumes
+  (`packages/docker/TECHNICAL.md`).
 - **`sync` comes before every snapshot** (`planSnapshot`). Otherwise files the
   lane wrote but had not flushed come out empty in the snapshot (S41 item 1).
 - **The base is a snapshot like any other** (`BASE_SNAPSHOT`), which each
@@ -227,7 +227,8 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
 
   A container made anew starts from what `planStartFrom` decides: its
   disk; else its newest snapshot (a restored root); else nothing, and the
-  lane predates lane containers. Both decisions are in `plan.ts`.
+  lane is retired: a branch from it continues. Both decisions are in
+  `plan.ts`.
 - **A disk restored from a snapshot gets the current names**
   (`pre-rename:`). A snapshot of a lane made before b05e2252 holds
   `pineta/<lane>` and `.pineta-lane/` (S114): `bookmarkOf` would find no
@@ -239,8 +240,8 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   from the lane's own volume does none of it: the one-off migration renamed
   those. Remove both once no snapshot from before the rename remains.
 - **A lane's container is stopped after every run** (`runEnded` in the
-  host's `work/containers.ts`): `container`'s runtime then trims its disk,
-  Docker's does nothing more. The next run starts it again.
+  host's `work/containers.ts`); the disk needs nothing more. The next run
+  starts it again.
   Processes the agent started, dev servers included, end with the run. The
   agent is told so (ADR-0046).
 - **What reaches existing lanes this way:** a rebuilt image, changed grants,
@@ -295,8 +296,8 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   host paths, in a `ContainerShape`. A runtime renders each, and does not
   know what a mount is for.
 - **A path with both a comma and a colon is refused** (`planHostMounts`):
-  `container`'s `--mount` separates its fields with commas and `-v` with
-  colons, so it cannot mount one (S46 item 4).
+  Docker's `--mount` separates its fields with commas and `-v` with colons,
+  so it cannot mount one (S46 item 4).
 - **Granted host paths** (`planHostMounts`) are the roots of the commands pi
   loaded, read-only at `/mnt/host` and their host path (`hostPathInLane`), so
   none can shadow a directory of the image's (S46). Nested roots collapse. A
@@ -489,13 +490,12 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   tells it about itself and that the note it names is there (ADR-0046). It
   has five scenarios (`apps/pinetrie/e2e/lanes/`), `main`, `images`,
   `shared`, `commands` and `contract`, and `PINETRIE_SCENARIO` picks some.
-  It runs under the runtime `PINETRIE_E2E_RUNTIME` names (`docker`, the
-  default, or `container`), and where that runtime cannot run, each scenario
+  It runs on Docker, and where Docker cannot run lanes, each scenario
   reports SKIP with the host's own reason (`runtimeProblem`).
   Its hosts pass their own `userConfig`, so the person's own lane config
   never applies. Each
-  suite-level mutation in `scripts/mutations/lanes.ts`, `repo.ts`,
-  `container.ts` and `docker.ts` runs only the scenario its check is in, and
+  suite-level mutation in `scripts/mutations/lanes.ts`, `repo.ts` and
+  `docker.ts`, among others, runs only the scenario its check is in, and
   stops at that check. Each on `plan.ts` proves a fact about a real lane
   that a unit test cannot: `sync`, a
   read-only mount, a shared mount seen both ways, the git ignore variables,
@@ -504,6 +504,5 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   `planContainer`'s and `planStartFrom`'s rules are unit mutations. These
   are all that `e2e:lanes` proves by mutation: the host's lane work and offers
   are proven by unit tests (`apps/pinetrie/host/TECHNICAL.md`).
-- **The `contract` scenario is each runtime's own:** under `container`, the
-  soak of journaled volumes (`packages/container/TECHNICAL.md`); under
-  Docker, the checks in `packages/docker/TECHNICAL.md`.
+- **The `contract` scenario is Docker's:** the checks in
+  `packages/docker/TECHNICAL.md`.

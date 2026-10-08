@@ -115,6 +115,9 @@ export function openChannel(argv: readonly string[]): LaneChannel {
     const id = next++
     return new Promise((resolve, reject) => {
       pending.set(id, { resolve, reject, onUpdate })
+      // The request first: the helper ignores an abort for an id it has not
+      // been sent, so a call aborted while it waited for its lane would run.
+      child.stdin.write(`${encode(request(id))}\n`)
       if (signal?.aborted) child.stdin.write(`${encode({ abort: id })}\n`)
       else
         signal?.addEventListener(
@@ -124,7 +127,6 @@ export function openChannel(argv: readonly string[]): LaneChannel {
           },
           { once: true },
         )
-      child.stdin.write(`${encode(request(id))}\n`)
     })
   }
 
@@ -188,6 +190,27 @@ export function laneEnv(
       }
     },
   }) as unknown as ExecutionEnv
+}
+
+/**
+ * pi's `ExecutionEnv` for an agent with no lane: every method answers a
+ * `not_supported` error naming `why`, as pi's environments must never throw.
+ */
+export function refusingEnv(cwd: string, why: string): ExecutionEnv {
+  return new Proxy(
+    { cwd },
+    {
+      get(t, prop) {
+        if (prop === "cwd") return t.cwd
+        if (prop === "then" || typeof prop !== "string") return undefined
+        if (prop === "cleanup") return async () => {}
+        return async () => ({
+          ok: false,
+          error: new FileError("not_supported", why),
+        })
+      },
+    },
+  ) as unknown as ExecutionEnv
 }
 
 /** How a lane command ended; the shape `@pinetrie/lanes` reads as `Ran`. */

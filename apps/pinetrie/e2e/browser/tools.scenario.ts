@@ -22,7 +22,6 @@ import {
   readNames,
   readOffers,
   readPlaces,
-  readProject,
 } from "@pinetrie/reads"
 import type { Checks } from "../checks.ts"
 import {
@@ -31,10 +30,10 @@ import {
   join,
   lanesOf,
   setUpAccepted,
-  startSuiteHost,
   treeOf,
   waitFor,
 } from "../harness.ts"
+import type { LaneHosts } from "../lane-hosts.ts"
 import { removeLane } from "../lane-runtime.ts"
 import type { Scenario } from "../scenario.ts"
 
@@ -56,34 +55,27 @@ import {
   seeInMenu,
   stepAway,
   stepBack,
-  TO_AGENT,
   twoFrames,
 } from "./page.ts"
 
 export const scenario: Scenario = {
-  run: ({ check, skip }) => run(check, skip),
+  lanes: true,
+  run: ({ check }, { lanes }) => run(check, lanes),
 }
 
-async function run(
-  check: Checks["check"],
-  skip: Checks["skip"],
-): Promise<void> {
+async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
   const browser = await launchBrowser()
   try {
     // ── asks: each ask's work folds, and the rail opens it (ADR-0106) ─────
-    // No containers. The column is read in story, as a new one opens. A
-    // column is read raw in the blocks below (`readRaw`).
+    // The column is read in story, as a new one opens. A column is read raw
+    // in the blocks below (`readRaw`).
     {
-      const work = committedProject("pinetrie-browser-asks-", {
-        "notes.txt": "hello\n",
-      })
       const script = scriptedModel({ tokensPerSecond: 400 })
-      const askHost = await startSuiteHost({
+      const asks = await lanes.sectionHost({
+        files: { "notes.txt": "hello\n" },
         model: { kind: "scripted", script },
-        project: { dir: work, tools: true },
-        containers: false,
-        log: () => {},
       })
+      const askHost = asks.host
       const ap = await (await browser.newContext()).newPage()
       await asPerson(ap, "asa@browser.test", "Asa")
       try {
@@ -172,7 +164,12 @@ async function run(
         // bar names the ask whose message is above, and takes no room.
         longRun("Read it again.")
         await say("read them once more")
-        await ap.waitForSelector(`${col(0)} .tool.live`, { timeout: 15_000 })
+        // The command that waits, live: every read before it is drawn, so
+        // the scroll below lands inside the ask's work, as a lane's start
+        // can hold the reads back (ADR-0102).
+        await ap.waitForSelector(`${col(0)} .tool.live:has-text("sleep")`, {
+          timeout: 15_000,
+        })
         const second = askId("read them once more")
         const work2 = `${col(0)} .ask-work[data-ask-of="${second}"]`
         await ap.$eval(
@@ -361,7 +358,7 @@ async function run(
         )
       } finally {
         await ap.context().close()
-        await askHost.shutdown()
+        await asks.close()
       }
     }
 
@@ -371,7 +368,7 @@ async function run(
       })
       // Slow enough that a reply is seen while it is still being written.
       const script = scriptedModel({ tokensPerSecond: 60 })
-      const toolHost = await startSuiteHost({
+      const toolHost = await lanes.startHost({
         model: { kind: "scripted", script },
         project: { dir: work, tools: true },
         // A fixture pi directory, for commands (ADR-0036).
@@ -381,13 +378,8 @@ async function run(
         ),
         log: () => {},
       })
-      // Lanes have containers of their own only where the suites' runtime
-      // runs; the host's project record says so, with its reason where they
-      // do not.
-      const project = readProject(toolHost.session)
-      const noContainers = project?.kind === "direct" ? project.reason : null
       // A new thread of its own starts at accepted work (ADR-0104).
-      if (noContainers === null) {
+      {
         const owner = await join(toolHost, "owner", "tools")
         await setUpAccepted(toolHost.session, owner)
         await owner.close()
@@ -417,45 +409,70 @@ async function run(
             await tp.click(`${sel} summary`)
         }
 
-        // ── where the agent will work, said before sending (ADR-0032) ───────
-        // The button says what the send does; accepted work beside it, where the new
-        // thread's agent works and what that does to your files.
-        const send = `${col(0)} .composer .send`
-        const chip = `${col(0)} .where-trigger`
-        /** The chip's words, its setting, and the button's words. */
-        const said = async () => {
-          const words = tp.locator(`${chip} .where-words`)
-          return [
-            (
-              (await words.textContent({ timeout: 5_000 }).catch(() => "")) ??
-              ""
-            ).trim(),
-            await words
-              .getAttribute("data-work", { timeout: 5_000 })
-              .catch(() => null),
-            ((await tp.textContent(send)) ?? "").trim(),
-          ].join(" | ")
-        }
+        // ── what a new thread starts from, said before sending (ADR-0104) ───
+        // With no WIP there is nothing to choose, and no line. A WIP above
+        // accepted work offers one; it goes again before the thread starts.
+        const startLine = `${col(0)} .start-line`
+        const trigger = `${col(0)} .start-trigger`
+        const startSaid = async () =>
+          (
+            (await tp
+              .locator(`${trigger} .start-words`)
+              .textContent({ timeout: 5_000 })
+              .catch(() => "")) ?? ""
+          ).trim()
+        const inWork = (...args: string[]) =>
+          execFileSync("jj", ["--no-pager", "-R", work, ...args], {
+            stdio: "pipe",
+          })
         await tp.fill(`${col(0)} .composer .input`, "what is in notes?")
-        if (noContainers !== null)
-          skip(
-            "the chip says where the new thread's agent works, and the menu changes it",
-            noContainers,
+        {
+          const noLine = (await tp.$(startLine)) === null
+          inWork("new", "--no-edit", "pinetrie-accepted", "-m", "wip e2e")
+          inWork(
+            "bookmark",
+            "create",
+            "wip/e2e",
+            "-r",
+            'latest(description(exact:"wip e2e\n"))',
           )
-        else {
-          const onCopy = await said()
-          const chose = await chooseFromMenu(tp, chip, ".where-yours")
-          const direct = await said()
-          await chooseFromMenu(tp, chip, ".where-own")
-          const again = await said()
+          const offered = await appears(trigger)
+          const atAccepted = await startSaid()
+          // A menu that is not there is not opened: its click would wait out
+          // Playwright's timeout, and fail the scenario, not the check.
+          const chose =
+            offered &&
+            (await chooseFromMenu(
+              tp,
+              trigger,
+              '.start-base[data-base="wip/e2e"]',
+            ))
+          const onWip = await startSaid()
+          if (offered)
+            await chooseFromMenu(tp, trigger, '.start-base[data-base=""]')
+          const back = await startSaid()
+          inWork("abandon", "wip/e2e")
+          inWork("bookmark", "delete", "wip/e2e")
+          const gone =
+            (await tp
+              .waitForSelector(startLine, {
+                state: "detached",
+                timeout: 20_000,
+              })
+              .then(
+                () => true,
+                () => false,
+              )) === true
           check(
-            "the chip says where the new thread's agent works, and the menu changes it",
-            onCopy ===
-              `works on its own copy · your files stay as they are | own | ${TO_AGENT}` &&
+            "with a WIP above accepted work, the line says what the new thread starts from, and its menu changes it; with none, there is no line",
+            noLine &&
+              offered &&
+              atAccepted === "starts from accepted work" &&
               chose &&
-              direct === `edits your files directly | direct | ${TO_AGENT}` &&
-              again === onCopy,
-            `${onCopy}; ${direct}; ${again}`,
+              onWip === "starts from your unfinished work: wip/e2e" &&
+              back === atAccepted &&
+              gone,
+            `${noLine}; ${atAccepted}; ${onWip}; ${back}; gone ${gone}`,
           )
         }
 
@@ -1338,16 +1355,7 @@ async function run(
             .catch(() => "")) ?? ""
 
         // ── the review, beside the thread (ADR-0047) ─────────────────────────
-        if (noContainers !== null)
-          for (const label of [
-            "the offer's line opens its review beside the thread, which keeps its 28rem: a row per file, and a file's diff",
-            "typing beside an open review redraws none of it",
-            "a file's head stays pinned while its diff scrolls, and the list brings a file to the top",
-            "the column's foot shows the thread's offer in words, its bookmark apart, and its add button moves accepted work to it, leaving your working copy",
-            "the review closes, and after the acceptance there is none to open",
-          ])
-            skip(label, noContainers)
-        else {
+        {
           // Once described: describing rewrites the offer's commit, and the review
           // would read the new one mid-check.
           await waitFor(

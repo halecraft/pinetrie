@@ -68,7 +68,7 @@ function rig(
 }
 
 describe("a publish with publish.catchUp off moves main alone (ADR-0099)", () => {
-  test("your files behind and your commits below @ stay where they are", async () => {
+  test("the working copy behind and your commits below @ stay where they are", async () => {
     const { line, argv } = rig(facts(), { catchUp: false })
     expect(await line.act("publish")).toBeNull()
     expect(argv()).toEqual([['bookmark move main --to "pinetrie-accepted"']])

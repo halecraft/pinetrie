@@ -27,8 +27,6 @@ const Command = Schema.struct({
   mode: Schema.string(),
   lane: Schema.string(),
   asksAgent: Schema.boolean(),
-  workKind: Schema.string(),
-  workDir: Schema.string(),
   targetId: Schema.string(),
   cardId: Schema.string(),
   reserved: Schema.string(),

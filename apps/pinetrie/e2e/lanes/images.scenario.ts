@@ -5,13 +5,14 @@ import { ROOT } from "@pinetrie/core"
 import { PINETRIE_MOUNT } from "@pinetrie/lanes"
 import { readRevisions } from "@pinetrie/reads"
 import type { Checks } from "../checks.ts"
-import { rootRecordsOf, runtimeProblem } from "../harness.ts"
+import { rootRecordsOf, START_AGENT } from "../harness.ts"
+import type { LaneHosts } from "../lane-hosts.ts"
 import type { Scenario } from "../scenario.ts"
-import { imageHost, START_AGENT, sectionHost } from "./support.ts"
+import { imageHost } from "./support.ts"
 
 export const scenario: Scenario = {
-  needs: runtimeProblem,
-  run: ({ check }) => imagesSection(check),
+  lanes: true,
+  run: ({ check }, { lanes }) => imagesSection(check, lanes),
 }
 
 // ── 9. Any image with sh and git: pinetrie brings Node and its programs ────
@@ -19,8 +20,12 @@ export const scenario: Scenario = {
 // runtime's Node, through its own loader, and the search tools on the
 // runtime's static rg and fd. An image with no git cannot host a lane.
 
-async function imagesSection(check: Checks["check"]): Promise<void> {
+async function imagesSection(
+  check: Checks["check"],
+  lanes: LaneHosts,
+): Promise<void> {
   const alpine = await imageHost(
+    lanes,
     "FROM docker.io/library/alpine:3.22\nRUN apk add --no-cache git\n",
   )
   try {
@@ -75,7 +80,7 @@ async function imagesSection(check: Checks["check"]): Promise<void> {
     await alpine.close()
   }
 
-  const bare = await imageHost("FROM docker.io/library/alpine:3.22\n")
+  const bare = await imageHost(lanes, "FROM docker.io/library/alpine:3.22\n")
   try {
     bare.script.use([
       { tool: "bash", args: { command: "echo hello" } },
@@ -95,7 +100,7 @@ async function imagesSection(check: Checks["check"]): Promise<void> {
   // pinetrie's default image carries the browser its Playwright drives
   // (ADR-0041). The check is an agent's command, so it sees the image's
   // environment as an agent does.
-  const pinetrie = await sectionHost({
+  const pinetrie = await lanes.sectionHost({
     files: { "notes.txt": "the secret word is MANGO\n" },
   })
   try {

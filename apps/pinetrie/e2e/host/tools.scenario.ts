@@ -1,6 +1,6 @@
 // e2e/host/tools — the agent reads, writes, edits and runs, visibly (ADR-0107).
 
-import { existsSync, mkdtempSync, readFileSync } from "node:fs"
+import { existsSync, mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
 import type { Store } from "@kyneta/exchange"
@@ -20,6 +20,7 @@ import { beginRun } from "@pinetrie/schema/fixtures"
 import { openStore } from "../../host/store.ts"
 import type { Checks } from "../checks.ts"
 import {
+  at,
   committedProject,
   composeAt,
   entriesOf,
@@ -29,18 +30,18 @@ import {
   noQueued,
   queueCard,
   rootRecordsOf,
-  startSuiteHost,
+  START_AGENT,
+  setUpAccepted,
   treeOf,
   waitFor,
 } from "../harness.ts"
+import { cleanUp, inLane, type LaneHosts } from "../lane-hosts.ts"
 import type { Scenario } from "../scenario.ts"
 
 import {
-  at,
   idOfIn,
   LATE_LOAD_MS,
   rootBytes,
-  START_AGENT,
   sleep,
   slowToLoad,
   storedLines,
@@ -48,10 +49,11 @@ import {
 } from "./support.ts"
 
 export const scenario: Scenario = {
-  run: ({ check }) => run(check),
+  lanes: true,
+  run: ({ check }, { lanes }) => run(check, lanes),
 }
 
-async function run(check: Checks["check"]): Promise<void> {
+async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
   // A second host with a scripted model, tools in a temporary directory, and its
   // session in a SQLite file, so every step is repeatable and spends nothing.
   {
@@ -67,11 +69,9 @@ async function run(check: Checks["check"]): Promise<void> {
     let opened = openStore(dbFile)
     let stored = opened.store
     const open = (log: (m: string) => void, store: Store = stored) =>
-      startSuiteHost({
+      lanes.startHost({
         model: { kind: "scripted", script },
         project: { dir: work, tools: true },
-        // `verify` runs anywhere: lanes of their own are `e2e:lanes`'s.
-        containers: false,
         store,
         blobs: opened.blobs,
         log,
@@ -87,6 +87,7 @@ async function run(check: Checks["check"]): Promise<void> {
     let unwatch = watch()
     const u = await join(th, "uma", "tools")
     await u.request({ kind: "name", name: "Uma" })
+    await setUpAccepted(th.session, u)
 
     // 1. Read a file, then answer.
     script.use([
@@ -111,14 +112,13 @@ async function run(check: Checks["check"]): Promise<void> {
     const lane = tlane()
     await u.chat("make new.txt", at(lane?.tip ?? null), { lane: lane?.name })
     await tidle()
-    // This host has no containers, so the lane works directly in the project.
-    // A lane of its own is `e2e:lanes`'s.
-    const written = path.join(work, "new.txt")
+    // In its lane's own copy: the project is the person's working copy,
+    // which no lane writes (ADR-0034).
+    const inItsLane = lane === undefined ? "" : inLane(lane.name, "cat new.txt")
     check(
-      "the agent wrote a file, then edited it, working directly in the project",
-      lane !== undefined &&
-        existsSync(written) &&
-        readFileSync(written, "utf8") === "beta\n",
+      "the agent wrote a file, then edited it, in its lane, leaving the project as it was",
+      inItsLane === "beta\n" && !existsSync(path.join(work, "new.txt")),
+      JSON.stringify(inItsLane),
     )
 
     // 3. A long command streams live, as edits, and leaves no stream behind.
@@ -324,9 +324,14 @@ async function run(check: Checks["check"]): Promise<void> {
     await waitFor(() => idOfIn(th, heldText) !== null, 15_000)
     await th.quiet()
     const afterRestart = await storedRecords(stored, SESSION_DOC_ID)
+    // One whole document, and fewer records than it opened: what the host
+    // writes once it has compacted (the offers' refresh, read from the repo)
+    // follows it.
     check(
       "a starting host compacts the session it opened",
-      beforeRestart.records > 2 && afterRestart.records <= 2,
+      beforeRestart.records > 2 &&
+        afterRestart.entireties === 1 &&
+        afterRestart.records < beforeRestart.records,
       `${beforeRestart.records} records -> ${afterRestart.records}`,
     )
     const after = {
@@ -358,5 +363,6 @@ async function run(check: Checks["check"]): Promise<void> {
     await sleep(100)
     // The host's Exchange closes its stores when it shuts down, this one too.
     await th.shutdown()
+    cleanUp(th.session, work)
   }
 }

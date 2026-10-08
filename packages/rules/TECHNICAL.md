@@ -762,8 +762,8 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
     puts that commit's files back.
   - A prompt with nothing to commit records the lane's newest commit, so a
     branch from it names what its disk was at.
-  - A lane working directly records its prompts with neither: it counts as
-    the lane above, and the walk passes it.
+  - A lane with no copy of its own records its prompts with neither: it
+    counts as the lane above, and the walk passes it.
   - A record from before lane containers has no `snapshot` key, which decodes
     as null.
   - Only a turn's own commit carries `paths` (`changedPaths`, ADR-0106): a
@@ -971,7 +971,7 @@ commit-message request `request.ts` (`describeRequest`).
 - **`planAcceptedAction`** decides a setup or publish from the record read in
   its own step (`AcceptedDecision`): setup writes exactly the heads and log the
   record proposed, the text you were shown; a publish (`PublishDecision`,
-  ADR-0090) says whether your files catch up first (`catchUp`) and whether
+  ADR-0090) says whether the working copy catches up first (`catchUp`) and whether
   your commits move with accepted work (`accept`), both false with
   `publish.catchUp` off. `@pinetrie/repo` turns it into steps (`planSetup`,
   `planPublishCatchUp`, `planPublishMove`).

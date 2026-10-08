@@ -37,7 +37,6 @@ wires them.
 | `http.ts` | the HTTP server: admission, Vite, the websocket, blobs, offer reads, invites |
 | `responses.ts` | every answer the host writes itself, as a pure `HttpAnswer` |
 | `routes.ts` | what a request or an upgrade gets, pure: admission first (`planRequest`, `planUpgrade`), then which requests are the host's (`route`) |
-| `hot-reload.ts` | Vite's hot updates: one to a file inside a running direct lane's directory is held until a run's end (`isHeld`); the project does not come into it |
 | `admission.ts`, `policy.ts`, `lines.ts`, `blobs.ts`, `store.ts` | the invite key and links, the write policy, departed seats, the image store, the SQLite store |
 | `work/` | lane containers and disks (§ Lane work) |
 | `offers/` | each lane's offer in your repo, on the owner of your repo (§ Offers); accepted work's record and commands are `work/accepted.ts`'s |
@@ -138,8 +137,8 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
   streams (ADR-0044: a stream stays open past its message's end) and clears
   its active run. `laneStopped` is lane work's `runEnded`: the container
   stops, and the offer is refreshed; then base news forgets what it
-  steered into the lane, so the next run plans from the tree alone. `ended` runs hot reload, which reads
-  which lanes run, and drains the lane; a drain that ran before
+  steered into the lane, so the next run plans from the tree alone. `ended`
+  drains the lane; a drain that ran before
   `endRun` could start the next run with the last one's reply still open.
 - **The verdict is pending before `endRun`** (ADR-0077, `Digests.pending`):
   written after, a page would see the lane stopped beside the last run's
@@ -147,8 +146,7 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
   asks, as at `ended`.
 - **A failure before `endRun` is logged as `run end failed`,** and `endRun`
   and every step after it still run.
-- **`ended` is one function, set once** in `startHost`: hot reload, then
-  `settle`, banners, and the verdict with the final digest. It breaks a cycle: a run's end
+- **`ended` is one function, set once** in `startHost`: `settle`, banners, and the verdict with the final digest. It breaks a cycle: a run's end
   drains, the drain may run an update, and an update may start a run.
   `runs.ts` imports neither the queue's pop nor the commands.
 - **`ended` is given the run's prompt**, read at the start of `end()`,
@@ -259,12 +257,15 @@ any refresh they queued.
   `prepareProjectDir` (`@pinetrie/lanes`) finds its root and adds `/.pinetrie/`
   to its repo's exclude file, so the store, opened first in `startHost`, is
   never taken into your `@` (S108). A suite skips this: it gives its own
-  store, and `prepareContainerHost` runs `prepareProjectDir` again for lanes, which
+  store, and `findProject` runs `prepareProjectDir` again for lanes, which
   writes nothing the second time.
 - **The project is apart from tools** (`StartHostOptions.project`). pi's
-  settings and `AGENTS.md` load from it with tools off too; lane work starts
-  with a directory only with tools on, so `Setup.project` is null without
-  them, and nothing asks a lane's access then.
+  settings and `AGENTS.md` load from it with tools off too, on any folder;
+  lane work starts only with tools on. `startSetup` returns a whole `Setup`
+  (project, runtime, your repo's owner, the lanes' configs, `ready`) or,
+  without tools, null, and lane work is then `NO_LANES`: it records each
+  lane and its name, and has no offers, accepted work or owner. Nothing
+  asks a lane's access then.
 - **Commands are taken only after `recover`.** `Control.listen` is made
   earlier, and `startControl` registers `onReceive` after `recover`. Earlier,
   a new message could run before an interrupted lane resumed, and jump a
@@ -275,8 +276,9 @@ any refresh they queued.
   1. the documents, then the host's records (`createRecords`, ADR-0095),
      which every module that writes a record takes
      (`Pick<Records, "writeValues">`), then the scribe;
-  2. the project and its lanes' runtime (`findProject`, `work/runtime.ts`),
-     then pi's setup (`loadPiSetup`), which loads from its root and reads no
+  2. the project and its lanes' runtime (`findProject`, `work/runtime.ts`,
+     before the store opens, so a refusal leaves nothing to close), then
+     pi's setup (`loadPiSetup`), which loads from its root and reads no
      document; the title-model and banner logs follow it;
   3. the documents' keeper, the roots `planLoads` names, the directory,
      banners, digests, titles, names, provenance and the split call, each
@@ -293,16 +295,16 @@ any refresh they queued.
   for a drain, a drain sends through the commands), as closures that run
   only once both exist.
 
-- **The runtime is chosen at startup** (`work/runtime.ts`, ADR-0103) from
-  the user config's `lanes.runtime` (`machineConfig`): `container`, or
-  Docker, which is the lane VM's on the Mac and the host's own on Linux
-  (`planRuntime`).
-  - **A runtime that cannot run lanes stops startup** (`RuntimeRefused`):
-    `server.ts` prints its words, each with its fix, and exits 1. The
-    refusals: no docker CLI or daemon, no buildx, a lanes directory not on
+- **The runtime is Docker** (`work/runtime.ts`, ADR-0103): the lane VM's on
+  the Mac and the host's own on Linux (`planRuntime`).
+  - **A host with tools that cannot run lanes does not start** (ADR-0102):
+    `findProject` returns the refusal as a value, worded with its fix, and
+    `startHost` throws it as `HostRefused`; `server.ts` prints it and exits
+    1. The refusals: a folder with no jj repo (`planRoot`), and the
+    runtime's: no docker CLI or daemon, no buildx, a lanes directory not on
     btrfs with `user_subvol_rm_allowed` (Linux), and on the Mac the VM's
     (no image, no Xcode tools, not Apple silicon or older than macOS 13, a
-    full VM). A folder with no jj repo still works directly.
+    full VM). Without tools a host starts on any folder.
   - **On the Mac the host takes a lease** on a slot of the user's lane VM
     (`leaseVm`), starting the VM if need be, then removes every container
     labelled with its slot (`sweepSlot`): a host that died holding the slot
@@ -537,9 +539,9 @@ rejects `shutdown()`.
   leaves the queue (`givenUp`), and its end drains the lane again. `runs.start` marks a lane
   running at once (a `begin`), so a drain behind a started run pops
   nothing.
-- **`executeChat` still checks a new lane's directory and asks pi for the
-  lane.** Both are ports that may refuse, not facts to gather. The directory
-  is checked first, so a refused send creates no lane.
+- **`executeChat` still checks where a new lane begins and asks pi for the
+  lane.** Both are ports that may refuse, not facts to gather. The begin is
+  checked first (`checkBegin`), so a refused send creates no lane.
 - **The new lane's id is decided before that, in `planChat`** (ADR-0057).
   `sendChat` gathers `newLane` beside `sendId`: the column's reserved id,
   the lanes pi holds, and a spare made with `newId`. pi makes no ids.
@@ -703,17 +705,16 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 
 | module | owns |
 |---|---|
-| `setup.ts` | `Setup`: the project, lane configs and shared directories, the owner of your repo (`Setup.owner`, made from the project root once accepted work's names are read, before anything else reads your repo), the default-image check, the images and runtime (`ready`), `specOf`, the granted host paths (planned at its start, from the commands pi's setup loaded), and the base snapshot's refreshes. The project is found before it (`findProject`, its rule `projectOf`), since pi's setup loads from its root |
+| `setup.ts` | `Setup`, all of it or none: the project, lane configs and shared directories, the owner of your repo (`Setup.owner`, made from the project root once accepted work's names are read, before anything else reads your repo), the default-image check, the images and runtime (`ready`), `specOf`, the granted host paths (planned at its start, from the commands pi's setup loaded), and the base snapshot's refreshes. The project is found before it (`findProject`), since pi's setup loads from its root |
 | `registry.ts` | `LaneRegistry`: each lane's handle, its jj, its record, whether it is a lane of its own; the only module that touches the handles |
 | `containers.ts` | `access`, a container's start (`planContainer`, `planStartFrom`; after a restore from a snapshot, `planOldNamesOnDisk`, `pre-rename:`), `beforeRun`, `runEnded` |
 | `fetch.ts` | a lane's history into your repo: the bundle on the lane's queue, the import an owner command (`importLane`) |
 | `turns.ts` | pi's `turnDone`: the turn's revision, snapshot and fetch; the turn records still being written (`pendingRecords`). A revision is titled by its message's first line, else its first call in a person's words (`titleOf`, `callLabel` from `@pinetrie/interface`, ADR-0114: `shell pnpm test`, not `bash …`). A lane is fetched into your repo only after a turn that commits, so a lane that never changed a file has no `tip@pinetrie-<lane>`, no refresh and no `pinetrie.base` until it catches up (a clean merge is fetched) |
-| `create.ts` | a new lane: `checkDirectory`, its record and name, its fork (`forkFacts` waits for `pendingRecords`) |
+| `create.ts` | a new lane: `checkBegin`, its record and name (`recordLane`), its fork (`forkFacts` waits for `pendingRecords`) |
 | `update.ts` | an update (`withLaneStarted`, then one queued step, `planSettle` and `applySettle`); `catchUpInRun`, the agent's `catch_up`; `askedAboutConflict`, which asks jj for conflicts in the lane's copy |
 | `split.ts` | a split's prompt, and its end (`finishSplit`, which moves the lane back to its tip even when a step before it throws: left on the stack, the lane refuses every catch-up) |
 | `archive.ts` | a close's or a reopen's teardown (`planArchive`'s), off the documents' keeper |
 | `runtime.ts` | the composition root, the one place that picks the runtime: gathers, plans (`planRuntime`, `planBuilder` for `pnpm vm:build`), and builds the `LaneRuntime` lanes of their own get (`Setup.runtime`), wiring `@pinetrie/vm`'s lease to `@pinetrie/docker` on the Mac |
-| `convert.ts` | pre-docker: a lane made under `container` moved to Docker at its first start there, its disk piped as a tar from a `container` into Docker's disks helper; the one module that holds both runtimes. `pnpm lanes:convert` (`apps/pinetrie/scripts/lanes-convert.ts`) moves every lane at once, archived ones too, with the host stopped |
 | `disk.ts` | the snapshot on a lane's queue, and the lockfile's hash |
 
 - **State lives where it changes.** What startup found is `Setup`'s, fixed
@@ -872,7 +873,7 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   text the publish button's setup showed (`planSetup`). A publish
   (ADR-0090) is two rounds of gather, plan and execute in one command: the
   catch-up (`planPublishCatchUp`, as you, only with `publish.catchUp` on
-  and only when your files are behind), then the record read again, with
+  and only when the working copy is behind), then the record read again, with
   the catch-up's operation from `SharedFacts.op`, decided by
   `planPublishFinish` into the move (`planPublishMove`) or the catch-up's
   undo (`planCatchUpUndo`) and a worded refusal. A move jj refuses after a

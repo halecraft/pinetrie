@@ -152,7 +152,6 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       lane: null,
       asksAgent: true,
       mentions: [{ kind: "agent", agent: THE_AGENT }],
-      work: null,
       card: null,
       pinned: [],
       reserved: NEW_LANE,
@@ -168,7 +167,6 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       lane: laneNameForThread("abc"),
       asksAgent: false,
       mentions: [{ kind: "person", name: "bob" }],
-      work: { kind: "own" },
       card: { id: cardId("c-7"), seen: "v-1" },
       pinned: [
         { id: cardId("c-8"), seen: "v-2" },
@@ -187,7 +185,6 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       lane: null,
       asksAgent: false,
       mentions: [],
-      work: { kind: "direct", dir: "/tmp/elsewhere" },
       card: null,
       pinned: [],
       reserved: null,
@@ -762,26 +759,6 @@ test("a retitle names its root; anything else is refused", () => {
     refusalCode(decodeCommand({ kind: "retitle", root: "e-1" })),
     ERR.UNKNOWN_TARGET,
   )
-})
-
-test("working directly needs a directory; an unknown work kind is refused", () => {
-  const base = {
-    id: "c-2",
-    kind: "chat",
-    text: "go",
-    parentId: "",
-    root: NEW_ROOT,
-    mode: "branch",
-  }
-  assert.equal(
-    decodeCommand({ ...base, workKind: "direct", workDir: "" }).kind,
-    "refused",
-  )
-  assert.equal(
-    decodeCommand({ ...base, workKind: "elsewhere" }).kind,
-    "refused",
-  )
-  assert.equal(decodeCommand({ ...base, workKind: "" }).kind, "chat")
 })
 
 test("decode: a reserved lane is a new thread's id, t- and a uuidv7, or none (ADR-0057)", () => {

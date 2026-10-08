@@ -9,30 +9,29 @@ import { readBanners, readPlaces } from "@pinetrie/reads"
 import { rowMessage } from "@pinetrie/schema"
 import type { Checks } from "../checks.ts"
 import {
-  committedProject,
+  at,
   entriesOf,
-  idleNow,
-  join,
   lanesOf,
+  START_AGENT,
   SUITE_CONFIG,
-  startSuiteHost,
   treeOf,
   waitFor,
 } from "../harness.ts"
 import { RED_PNG } from "../images.ts"
+import type { LaneHosts } from "../lane-hosts.ts"
 import type { Scenario } from "../scenario.ts"
 
-import { at, idOfIn, START_AGENT, sleep } from "./support.ts"
+import { idOfIn, sleep } from "./support.ts"
 
 export const scenario: Scenario = {
-  run: ({ check }) => run(check),
+  lanes: true,
+  run: ({ check }, { lanes }) => run(check, lanes),
 }
 
-async function run(check: Checks["check"]): Promise<void> {
+async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
   // Turned on by the user config. A scripted model draws a fixed image; the
   // grace is short, so the sweep's handling of banners shows.
   {
-    const project = committedProject("pinetrie-banners-", { "a.txt": "a\n" })
     const userConfig = path.join(
       mkdtempSync(path.join(tmpdir(), "pinetrie-banner-config-")),
       "config.json",
@@ -43,20 +42,18 @@ async function run(check: Checks["check"]): Promise<void> {
     )
     const script = scriptedModel({ answer: { text: "noted" } })
     const GRACE_MS = 1_000
-    const bh = await startSuiteHost({
+    const {
+      host: bh,
+      user: bu,
+      idle: bidle,
+      close,
+    } = await lanes.sectionHost({
+      files: { "a.txt": "a\n" },
       model: { kind: "scripted", script },
-      project: { dir: project, tools: true },
-      containers: false,
       userConfig,
       blobGraceMs: GRACE_MS,
-      log: () => {},
     })
-    const bu = await join(bh, "bea", "banners")
     await bu.request({ kind: "name", name: "Bea" })
-    const bidle = async () => {
-      await waitFor(() => idleNow(bh), 60_000)
-      await bh.quiet()
-    }
     const blobAt = (sha: string) => fetch(`${bh.httpUrl}blob/${sha}`)
 
     // 1. A new thread's banner is made as it is named, while its first run is
@@ -127,8 +124,6 @@ async function run(check: Checks["check"]): Promise<void> {
       mode: "reply",
     })
     await bidle()
-    await bu.close()
-    await sleep(100)
-    await bh.shutdown()
+    await close()
   }
 }

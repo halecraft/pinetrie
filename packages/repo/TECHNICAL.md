@@ -256,7 +256,7 @@ update's merge will change.**
   (`planPublishMove`, ADR-0076), which changes no file and is anyone's
   command.
   A publish's catch-up (`planPublishCatchUp`: `jj rebase -b @ -d <accepted>`) is
-  one exception, since it changes your files; an accepting move is the
+  one exception, since it changes the working copy; an accepting move is the
   other: `jj bookmark move <accepted> <publish> --to @-` moves accepted work to your
   commits, your act, so it runs as you (`as: "you"`, ADR-0090), and its
   undo (`planCatchUpUndo`) too. Accepted work's config is set as you too: `jj
@@ -327,12 +327,12 @@ update's merge will change.**
   paragraph, on its WIP line and kept through a description. The source is
   the lane tip the whole offer holds, a stack's revisions included:
   accepted, it says you have that tip.
-- **`acceptedFacts` previews catching your files up** (`yours.catchUp`, S80):
+- **`acceptedFacts` previews catching the working copy up** (`yours.catchUp`, S80):
   `git merge-tree --write-tree --name-only --merge-base=<fork point> <accepted>
   <@>` exits 1 on conflicts and prints the merged tree, the conflicting
   paths, a blank line, then its messages; the tree against `@`'s names the
   files that change. It writes only a tree object. It reads `@` as last
-  snapshotted: the host never snapshots your files. Null when nothing is
+  snapshotted: the host never snapshots the working copy. Null when nothing is
   behind, or `@` shares no commit with accepted work but the root. `-b @`
   moves every head on your work, which the preview counts: `-r` would
   strip them of the commits under them. `yours.conflicts` counts your

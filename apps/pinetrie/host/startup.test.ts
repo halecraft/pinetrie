@@ -179,11 +179,7 @@ test("recover deletes the records of a type no spec declares, in the session and
 })
 
 test("recover writes the project record only when it changed, in one write", async () => {
-  const project: ProjectRecord = {
-    kind: "lanes",
-    root: "/repo",
-    rootDefault: "own",
-  }
+  const project: ProjectRecord = { root: "/repo" }
   const run = async (b: ReturnType<typeof basics>) => {
     const agent = fakePi()
     await recover(

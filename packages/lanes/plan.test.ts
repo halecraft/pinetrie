@@ -149,7 +149,7 @@ describe("planHostMounts: granted host paths, and the ones never mounted", () =>
       "/Users: it is, or holds, your home directory",
       "/Users/ada: it is, or holds, your home directory",
       "/Users/ada/.pi: it is, or holds, pi's agent directory",
-      "/x/a,b:c: it has both a comma and a colon, which container cannot mount",
+      "/x/a,b:c: it has both a comma and a colon, which Docker's mount arguments cannot name",
     ])
   })
 })
@@ -224,28 +224,24 @@ test("specHashOf: the hash of the runtime's arguments, changed when they change"
   ).not.toBe(specHashOf(runtime, shape))
 })
 
-describe("machineConfig: the runtime and the VM's slots, each bad value refused", () => {
-  test("defaults: Docker, 16 slots", () => {
-    expect(machineConfig({ runtime: null, slots: null })).toEqual({
-      machine: { runtime: "docker", slots: 16 },
+describe("machineConfig: the VM's slots, a bad value refused", () => {
+  test("default: 16 slots", () => {
+    expect(machineConfig({ slots: null })).toEqual({
+      machine: { slots: 16 },
       refused: [],
     })
   })
   test("what the user wrote, when it can be used", () => {
-    expect(machineConfig({ runtime: "container", slots: 20 }).machine).toEqual({
-      runtime: "container",
-      slots: 20,
-    })
+    expect(machineConfig({ slots: 20 }).machine).toEqual({ slots: 20 })
   })
-  test("another runtime, or more than 20 slots, refused with why; the default holds", () => {
-    const { machine, refused } = machineConfig({ runtime: "podman", slots: 24 })
-    expect(machine).toEqual({ runtime: "docker", slots: 16 })
+  test("more than 20 slots, refused with why; the default holds", () => {
+    const { machine, refused } = machineConfig({ slots: 24 })
+    expect(machine).toEqual({ slots: 16 })
     expect(refused).toEqual([
-      'lanes.runtime "podman" is not "container" or "docker"; using "docker"',
       "lanes.vm.slots 24 is not a whole number from 1 to 20: a VM boots with at most 20 share devices beside its others; using 16",
     ])
-    expect(machineConfig({ runtime: null, slots: 2.5 }).refused).toHaveLength(1)
-    expect(machineConfig({ runtime: null, slots: 0 }).refused).toHaveLength(1)
+    expect(machineConfig({ slots: 2.5 }).refused).toHaveLength(1)
+    expect(machineConfig({ slots: 0 }).refused).toHaveLength(1)
   })
 })
 
@@ -347,7 +343,7 @@ describe("decodeLaneConfig: grants, the install and shared directories, total", 
           catchUp: null,
           offers: false,
         },
-        machine: { runtime: null, slots: null },
+        machine: { slots: null },
       })
     expect(
       decodeLaneConfig(
@@ -380,7 +376,7 @@ describe("decodeLaneConfig: grants, the install and shared directories, total", 
         catchUp: null,
         offers: false,
       },
-      machine: { runtime: null, slots: null },
+      machine: { slots: null },
     })
   })
   test("lanes.hostPorts: whole ports from 1 to 65535, once each, in order", () => {
@@ -398,15 +394,11 @@ describe("decodeLaneConfig: grants, the install and shared directories, total", 
     expect(nested("true")).toBe(false)
     expect(nested(undefined)).toBe(false)
   })
-  test("lanes.runtime and lanes.vm.slots: the machine's settings, as written", () => {
+  test("lanes.vm.slots: the machine's setting, as written", () => {
     const machine = (lanes: unknown) =>
       decodeLaneConfig({ lanes }, "/p", false).machine
-    expect(machine({ runtime: "docker", vm: { slots: 4 } })).toEqual({
-      runtime: "docker",
-      slots: 4,
-    })
-    expect(machine({ runtime: 3, vm: { slots: "4" } })).toEqual({
-      runtime: { invalid: "3" },
+    expect(machine({ vm: { slots: 4 } })).toEqual({ slots: 4 })
+    expect(machine({ vm: { slots: "4" } })).toEqual({
       slots: { invalid: '"4"' },
     })
   })
@@ -875,30 +867,25 @@ describe("the host: its root", () => {
       refusal: { kind: "unsafe", root: "/" },
     })
   })
-  test("planRoot: a jj repo's root; a refused folder works directly where it is, and a repo without jj at its root", () => {
-    expect(
-      planRoot({ kind: "found", root: "/p", repo: "jj" }, "/p/sub"),
-    ).toEqual({ ok: "/p" })
-    expect(
-      planRoot(
-        { kind: "refused", refusal: { kind: "unsafe", root: HOME } },
-        "/p/sub",
-      ),
-    ).toEqual({
-      direct: "/p/sub",
-      reason: expect.stringContaining("your home directory"),
+  test("planRoot: a jj repo's root; a refused folder, or a repo without jj, is refused with how to fix it", () => {
+    expect(planRoot({ kind: "found", root: "/p", repo: "jj" })).toEqual({
+      ok: "/p",
     })
     expect(
-      planRoot(
-        { kind: "refused", refusal: { kind: "unexcludable", root: "/p" } },
-        "/p/sub",
-      ),
-    ).toEqual({ direct: "/p", reason: expect.stringContaining("--colocate") })
+      planRoot({ kind: "refused", refusal: { kind: "unsafe", root: HOME } }),
+    ).toEqual({ refused: expect.stringContaining("your home directory") })
     expect(
-      planRoot({ kind: "found", root: "/p", repo: "git" }, "/p/sub"),
-    ).toMatchObject({
-      direct: "/p",
-      reason: expect.stringContaining("no jj repo"),
+      planRoot({
+        kind: "refused",
+        refusal: { kind: "unexcludable", root: "/p" },
+      }),
+    ).toEqual({ refused: expect.stringContaining("--colocate") })
+    expect(planRoot({ kind: "found", root: "/p", repo: "git" })).toEqual({
+      refused:
+        "/p has no jj repo: `jj git init --colocate` makes one, and gives its threads' agents their lanes",
+    })
+    expect(planRoot({ kind: "found", root: "/p", repo: null })).toEqual({
+      refused: expect.stringContaining("no jj repo"),
     })
   })
   test("planExclude: adds each missing line once, on a line of its own", () => {

@@ -310,12 +310,10 @@ export const ERR = {
   LAST_STATE: "last_state",
   /** A lane pi holds an operation open on: after a crash, until it resumes. */
   BUSY: "busy",
-  /** Landing a lane that has no copy of its own: it works directly. */
+  /** Landing a lane that has no copy of its own: a host without tools made it. */
   NOT_OWN_COPY: "not_own_copy",
   /** An offer action on a lane with no offer in your repo (ADR-0105). */
   NO_OFFER: "no_offer",
-  /** A lane asked to work directly in a directory that is not one. */
-  BAD_DIRECTORY: "bad_directory",
   /** A `/package:name` command that names no command there is (ADR-0036). */
   UNKNOWN_COMMAND: "unknown_command",
   /** A peer whose principal is not an email: nobody the host can name. */
@@ -336,7 +334,7 @@ export const ERR = {
   NO_PUBLISH: "no_publish",
   /** Publishing while the publish bookmark has commits accepted work lacks (ADR-0076). */
   NOT_FAST_FORWARD: "not_fast_forward",
-  /** Publishing while your files have conflicts, or catching them up would make some (ADR-0090). */
+  /** Publishing while the working copy has conflicts, or catching it up would make some (ADR-0090). */
   YOURS_CONFLICT: "yours_conflict",
   /** An acceptance into a bookmark that is not one of the offer's destinations now. */
   BAD_DESTINATION: "bad_destination",
@@ -450,12 +448,6 @@ export type Intent =
       /** A Start Agent column: with no mention, the agent is asked. */
       readonly asksAgent: boolean
       readonly mentions: readonly Mention[]
-      /**
-       * Where a lane this message creates works: its own copy, or directly in
-       * a directory. Null: the lane above's setting, else the project's
-       * default (ADR-0032). Read only when the message creates a lane.
-       */
-      readonly work: WorkSetting | null
       /**
        * The card the text was sent from, spent once it is written or running
        * (ADR-0048), or queued when the lane is busy (ADR-0059).
@@ -970,11 +962,6 @@ export const snapshotId = (id: string): SnapshotId => id as SnapshotId
 /** The project's disk at accepted work's commit, which root lanes fork from (ADR-0104). */
 export const BASE_SNAPSHOT = snapshotId("base")
 
-/** Where a lane's tools work: its own container and disk, or directly in a directory. */
-export type WorkSetting =
-  | { readonly kind: "own" }
-  | { readonly kind: "direct"; readonly dir: string }
-
 /**
  * A lane's record: a host-written `pinetrie.lane` value keyed by the lane's
  * name, written once, when the lane is created. The setting never changes:
@@ -984,8 +971,11 @@ export interface LaneRecord {
   readonly lane: LaneName
   /** The root the lane works in (ADR-0063). */
   readonly root: RootId
-  /** Its own copy, or a directory; null for a lane with no work of its own. */
-  readonly work: WorkSetting | null
+  /**
+   * Whether it works in a copy of its own, in its container (ADR-0102):
+   * false for a lane a host without tools made.
+   */
+  readonly ownCopy: boolean
   readonly by: WriterId
   readonly createdAt: number
 }
@@ -1000,11 +990,11 @@ export interface LaneRecord {
 export interface RevisionRecord {
   readonly entry: EntryId
   readonly lane: LaneName
-  /** The turn's commit; null when nothing tracked changed, or the lane works directly. */
+  /** The turn's commit; null when nothing tracked changed, or the lane has no copy of its own. */
   readonly commit: CommitId | null
   /**
-   * The lane's whole disk at this entry; null for a lane that works directly,
-   * and in records written before lane containers.
+   * The lane's whole disk at this entry; null for a lane with no copy of its
+   * own, and in records written before lane containers.
    */
   readonly snapshot: SnapshotId | null
   /**
@@ -1018,18 +1008,12 @@ export interface RevisionRecord {
 
 /**
  * What the host found where it runs: a host-written `pinetrie.project` value,
- * rewritten at every start. With `direct`, no lane can have its own copy, and
- * `reason` says why (no repo, or no usable `container`). With `lanes`, a new
- * root lane gets `rootDefault` (`PINETRIE_LANES=0` makes it `direct`), and any
- * lane may choose either.
+ * rewritten at every start, and only by a host with tools, whose every lane
+ * has its own copy (ADR-0102).
  */
-export type ProjectRecord =
-  | {
-      readonly kind: "lanes"
-      readonly root: string
-      readonly rootDefault: "own" | "direct"
-    }
-  | { readonly kind: "direct"; readonly root: string; readonly reason: string }
+export interface ProjectRecord {
+  readonly root: string
+}
 
 /**
  * A lane's offer: one revision, or a stack, in your repo, holding the lane's
@@ -1257,7 +1241,7 @@ export interface AcceptedRecord {
   /**
    * Your `@-` against accepted work: accepted commits it lacks (`behind`), and
    * your commits below `@` accepted work lacks (`ahead`, `::@- ~ ::<accepted>`: what
-   * a publish accepts, ADR-0090). `catchUp` is what catching your files
+   * a publish accepts, ADR-0090). `catchUp` is what catching the working copy
    * up would do (S80): how many files change, those that conflict, and your
    * other heads that move with `@`; null when nothing is behind, or `@`
    * shares no commit with accepted work. `conflicts` are your conflicted commits
@@ -1277,7 +1261,7 @@ export interface AcceptedRecord {
     }
   }
   /**
-   * `publish.catchUp` (ADR-0099): whether a publish catches your files up and
+   * `publish.catchUp` (ADR-0099): whether a publish catches the working copy up and
    * accepts your commits below `@` before moving the publish bookmark.
    */
   readonly publishCatchesUp: boolean

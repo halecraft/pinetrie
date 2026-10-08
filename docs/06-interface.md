@@ -200,7 +200,7 @@ While the page syncs, "syncing…" leads its right end.
   (`docs/the-jujutsu-repo.md`), done only when you choose it. After,
   **publish** shows only while there is something to publish, and does it
   in one act, the same whoever presses it and wherever the host listens:
-  - with `publish.catchUp` on, your files catch up with accepted work
+  - with `publish.catchUp` on, the working copy catches up with accepted work
     (`jj rebase -b @ -d <accepted>`, as you) when they are behind; your
     commits below `@` are accepted; then `main` (`publish.bookmark`) moves
     forward to accepted work. Your commits and `main` move together in one
@@ -210,10 +210,10 @@ While the page syncs, "syncing…" leads its right end.
 
   Its title says what it will do, with how many files catching up
   changes and any other line of your work that moves with it, or, with
-  the setting off and your files behind or commits waiting, that your
-  files do not move (`publish.catchUp` is off), then the jj commands. It
+  the setting off and the working copy behind or commits waiting, that the
+  working copy does not move (`publish.catchUp` is off), then the jj commands. It
   does not push. What can be checked first is (`main` holding commits
-  accepted work lacks; with the setting on, your files' conflicts and what
+  accepted work lacks; with the setting on, the working copy's conflicts and what
   catching up would conflict), and the title leads with why it would be
   refused.
   If your commits come out of the catch-up conflicted, or the move fails,
@@ -222,9 +222,8 @@ While the page syncs, "syncing…" leads its right end.
   While a publish is out the button reads "publishing…". A refusal or a
   failure is a **toast** above the footer ("not done:" and why; "it
   failed, and may be part done:" and why), until you dismiss it or send
-  another. When your files conflict, the toast offers **resolve with the
-  agent**, which opens a new agent thread working in your files, its box
-  holding the `resolve-conflicts` skill and the files, for you to send.
+  another. A conflict in the working copy is said, and left to you, in jj
+  (ADR-0102).
 - **A menu you opened stays open until you close it.** The footer's and the
   board's avatars and counts come from live data, but when what one stands
   for goes while its menu is open (a person leaves the root, the last thing
@@ -403,9 +402,7 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   started says so instead: "began from a copy with an unresolved conflict
   in 1 file", and, when the thread it branched from has since resolved
   those files, "· amber-fox has resolved it", with **catch up with
-  amber-fox** as its button (ADR-0072). One
-  working directly says "edits your files directly", and warns while
-  another agent works in the same directory. Its **⋯** menu holds **catch
+  amber-fox** as its button (ADR-0072). Its **⋯** menu holds **catch
   up with** the thread's base (accepted work, or its WIP), or, once its WIP
   is gone, **continue from accepted work**; and, while the thread it branched
   from has new commits, **catch up with** that thread by its name, greyed
@@ -600,12 +597,11 @@ The rail is E; the column is T. Seeing both at once is the product.
   "queue up next", "queue after Bea" or "queue after yours", naming who
   queued the last card already waiting. It uses the host's own decision (`addressChat`,
   over `threadOf`), so it cannot promise a reply that will not come. When the
-  send starts an agent, a line left of the button says where it will work, by
-  what that does to your files ("works on its own copy · your files stay as
-  they are ▾", or "edits your files directly"), and opens the choices, the
-  current one checked (ADR-0061). When you have WIP bookmarks, a second
-  section says where its copy **starts from**: accepted work, or a WIP,
-  with how far that is behind accepted work (ADR-0104).
+  send starts a thread and you have WIP bookmarks, a line left of the
+  button says what its copy **starts from** ("starts from accepted work ▾"),
+  and opens the choices: accepted work, or a WIP, with how far that is
+  behind accepted work (ADR-0104). Every thread's agent works in a lane of
+  its own (ADR-0102): there is no place to choose.
 - **Who else is here** (ADR-0024) shows where there is room for it:
   - the **rail** rings the dot at the end of each thread someone else is reading,
     in their colour, with a count when several do; hovering names them. The

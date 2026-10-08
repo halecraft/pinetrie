@@ -154,12 +154,6 @@ describe("searchText", () => {
       text: "bad",
     })
     expect(
-      searchText("grep", { kind: "unavailable", program: "rg" }, 1),
-    ).toEqual({
-      ok: false,
-      text: "rg is not available on this host and could not be fetched; search with bash.",
-    })
-    expect(
       searchText("find", { kind: "stopped", why: "aborted", message: "x" }, 1),
     ).toEqual({ ok: false, text: "Search aborted" })
     expect(

@@ -7,14 +7,9 @@ import { UPLOADING } from "@pinetrie/interface"
 import { scriptedModel, sha256Of } from "@pinetrie/pi"
 import type { Page } from "@playwright/test"
 import type { Checks } from "../checks.ts"
-import {
-  committedProject,
-  idleNow,
-  startSuiteHost,
-  suiteModel,
-  waitFor,
-} from "../harness.ts"
+import { idleNow, startSuiteHost, suiteModel, waitFor } from "../harness.ts"
 import { greyPng, RED_PNG } from "../images.ts"
+import type { LaneHosts } from "../lane-hosts.ts"
 import type { Scenario } from "../scenario.ts"
 
 import {
@@ -28,10 +23,11 @@ import {
 } from "./page.ts"
 
 export const scenario: Scenario = {
-  run: ({ check }) => run(check),
+  lanes: true,
+  run: ({ check }, { lanes }) => run(check, lanes),
 }
 
-async function run(check: Checks["check"]): Promise<void> {
+async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
   const browser = await launchBrowser()
   try {
     {
@@ -362,16 +358,12 @@ async function run(check: Checks["check"]): Promise<void> {
     {
       // Taller than a capped row's 10rem.
       const tall = greyPng(300, 400)
-      const work = committedProject("pinetrie-browser-tool-images-", {
-        "tall.png": tall,
-      })
       const script = scriptedModel()
-      const imageHost = await startSuiteHost({
+      const section = await lanes.sectionHost({
+        files: { "tall.png": tall },
         model: { kind: "scripted", script },
-        project: { dir: work, tools: true },
-        containers: false,
-        log: () => {},
       })
+      const imageHost = section.host
       // It may use the clipboard, for copy's check (S68).
       const ip = await (
         await browser.newContext({
@@ -484,7 +476,7 @@ async function run(check: Checks["check"]): Promise<void> {
         )
       } finally {
         await ip.context().close()
-        await imageHost.shutdown()
+        await section.close()
       }
     }
   } finally {

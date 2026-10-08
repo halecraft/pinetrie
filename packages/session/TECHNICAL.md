@@ -266,10 +266,10 @@ command on that lane (or accepted work); an answer that carried it out clears
 it, since the record then says how things stand. An acceptance names the offer
 this tab's record shows as it sends (`offerSeen`, ADR-0065). A split is
 no offer command: it is a card's command, queued (ADR-0080).
-A refusal keeps its code (`Unsuccessful.code`), so a view can act on why:
-the page's publish toast offers "resolve with the agent" only for
-`yours_conflict` (ADR-0090). A setup or publish's refusal or failure is shown by
-that toast, not a menu.
+A refusal keeps its code (`Unsuccessful.code`). A setup or publish's
+refusal or failure is shown by the page's publish toast, not a menu
+(ADR-0090); a conflict in the working copy is said there, and left to jj
+(ADR-0102).
 
 ## Presence (`presence-seat.ts`, ADR-0024)
 

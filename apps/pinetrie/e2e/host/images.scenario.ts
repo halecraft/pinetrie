@@ -8,18 +8,20 @@ import { scriptedModel, sha256Of } from "@pinetrie/pi"
 import { openStore } from "../../host/store.ts"
 import type { Checks } from "../checks.ts"
 import {
+  at,
   composeAt,
   idleNow,
   join,
   laneNamesOf,
   queueCard,
+  START_AGENT,
   startSuiteHost,
   waitFor,
 } from "../harness.ts"
 import { BLUE_PNG, GREEN_PNG, RED_PNG, YELLOW_PNG } from "../images.ts"
 import type { Scenario } from "../scenario.ts"
 
-import { at, idOfIn, recordsHold, START_AGENT, sleep } from "./support.ts"
+import { idOfIn, recordsHold, sleep } from "./support.ts"
 
 export const scenario: Scenario = {
   run: ({ check }) => run(check),

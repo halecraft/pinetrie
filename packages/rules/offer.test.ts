@@ -398,7 +398,7 @@ describe("the update and stack messages", () => {
   test("an update that changed no file says so, and one with no commits says why", () => {
     const m = encodeUpdate({ ...details, commits: [], files: [] }, 5)
     expect(m.content).toContain(
-      "Accepted work was merged into this thread's own copy. It changed none of your files, so what you read before still holds.",
+      "Accepted work was merged into this thread's own copy. It changed no file in this copy, so what you read before still holds.",
     )
     expect(m.content).not.toContain("Files that changed")
     expect(m.content).not.toContain("changed under you")

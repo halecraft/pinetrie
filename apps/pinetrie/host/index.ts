@@ -88,7 +88,6 @@ import {
   planLoads,
   rootsOpenedWords,
 } from "./docs.ts"
-import { hotReload as holdHotReload } from "./hot-reload.ts"
 import {
   compactAfter,
   sweepBlobs,
@@ -145,27 +144,11 @@ export interface StartHostOptions {
   /**
    * The project (ADR-0086): where pi's settings and `AGENTS.md` load from,
    * and, with `tools`, where the agent reads, writes and runs commands, each
-   * lane in its own container, on its own disk (ADR-0034). Absent or null:
-   * no project, and no tools.
+   * lane in its own container, on its own disk (ADR-0034, ADR-0102). Absent
+   * or null: no project, and no tools. With tools, a folder with no jj repo,
+   * or a runtime that cannot run lanes, refuses the start (`HostRefused`).
    */
   readonly project?: { readonly dir: string; readonly tools: boolean } | null
-  /**
-   * Whether a new root lane gets its own copy by default. False makes every
-   * new root lane work directly in the project (`PINETRIE_LANES=0`).
-   */
-  readonly lanes?: boolean
-  /**
-   * Whether lanes may have containers at all. False makes the project work
-   * directly without asking a runtime: a suite that must run anywhere.
-   */
-  readonly containers?: boolean
-  /**
-   * When the chosen runtime cannot run lanes here: `stop`, the default,
-   * throws `RuntimeRefused` and the host does not start (`server.ts` prints
-   * why); `direct` makes the project work directly, its reason the
-   * runtime's words, as a suite's host must where no runtime runs.
-   */
-  readonly runtimeRefused?: "stop" | "direct"
   /**
    * The user's lane config (ADR-0035), by default
    * `$XDG_CONFIG_HOME/pinetrie/config.json`. A suite passes its own file rather
@@ -235,15 +218,18 @@ export interface RunningHost {
   shutdown(): Promise<void>
 }
 
+/**
+ * Thrown by `startHost` when a host with tools cannot run its lanes here:
+ * `findProject`'s refusal, worded with its fix. Nothing was opened.
+ */
+export class HostRefused extends Error {}
+
 export async function startHost({
   port = 0,
   bind = DEFAULT_BIND,
   key: givenKey,
   model,
   project = null,
-  lanes = true,
-  containers = true,
-  runtimeRefused = "stop",
   userConfig = userConfigFile(),
   agentDir,
   store: storeFile = null,
@@ -254,6 +240,23 @@ export async function startHost({
 }: StartHostOptions): Promise<RunningHost> {
   const key = isLoopback(bind) ? null : (givenKey ?? newKey())
   const toolsIn = project?.tools === true ? project.dir : null
+
+  // The user config, read once: its shared directories (ADR-0035), its
+  // renames for command packages (ADR-0036) and whether threads get banners.
+  // Missing or broken decodes as empty, and the log says which.
+  const userRead = await readConfigFile(userConfig)
+  log(configLine(userConfig, userRead))
+  const userJson = configJson(userRead)
+  // The project, before anything opens, so a refusal leaves nothing to
+  // close, and before pi's setup, which loads from its root (ADR-0086).
+  const found = await findProject({
+    dir: toolsIn,
+    // A port of 0 is chosen when the host listens, after this.
+    ownPort: port === 0 ? null : port,
+    machine: decodeLaneConfig(userJson, toolsIn ?? "/", false).machine,
+    log,
+  })
+  if (found?.kind === "refused") throw new HostRefused(found.words)
 
   // --- transport + exchange ------------------------------------------------
   const serverTransport = new WebsocketServerTransport()
@@ -354,23 +357,6 @@ export async function startHost({
   // the agent's harness over it, then its session (ADR-0063).
   docs.onReleasing(root => scribe.release(root))
   docs.onReleasing(root => histories.unloadRoot(root))
-  // The user config, read once: its shared directories (ADR-0035), its
-  // renames for command packages (ADR-0036) and whether threads get banners.
-  // Missing or broken decodes as empty, and the log says which.
-  const userRead = await readConfigFile(userConfig)
-  log(configLine(userConfig, userRead))
-  const userJson = configJson(userRead)
-  // The project, before pi's setup, which loads from its root (ADR-0086).
-  const found = await findProject({
-    dir: toolsIn,
-    defaultDirect: !lanes,
-    containers,
-    runtimeRefused,
-    // A port of 0 is chosen when the host listens, after this.
-    ownPort: port === 0 ? null : port,
-    machine: decodeLaneConfig(userJson, toolsIn ?? "/", false).machine,
-    log,
-  })
   const projectRoot = found?.project.root ?? project?.dir ?? null
   const bannerConfig = decodeBannerConfig(userJson)
   const titleConfig = decodeTitleConfig(userJson)
@@ -500,7 +486,6 @@ export async function startHost({
   // refreshes announce a changed base, and a running lane is steered.
   const baseNews = createBaseNews({ basics, agent, keeper })
   work.onBaseChanged(lane => baseNews.baseChanged(lane))
-  const hotReload = holdHotReload({ session, live })
   // Commands are received only from `startControl`, after `recover`.
   const listener = Control.listen(exchange)
   const cardPort = startCards({ exchange, store, session })
@@ -585,12 +570,10 @@ export async function startHost({
       await provenance.sweep()
     },
   })
-  // A run's end: hot reload may reload the page, then the lane drains and
-  // the session compacts. A thread whose banner failed tries again. The
+  // A run's end: the lane drains and the session compacts. A thread whose banner failed tries again. The
   // final digest is for the run's prompt: the drain queued before it may
   // append to the lane or start its next run.
   runs.onEnded((lane, prompt) => {
-    hotReload.runEnded()
     void settle([lane])
     banners?.due(lane).catch(failed(basics, "banner"))
     const root = docs.rootOfLane(lane)
@@ -648,7 +631,6 @@ export async function startHost({
     key,
     tools: toolsIn !== null,
     serverTransport,
-    hotReload,
     blobs,
     offers: work.offers,
     log,

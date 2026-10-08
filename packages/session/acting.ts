@@ -15,9 +15,8 @@ import type { Outcome } from "@pinetrie/protocol/codec"
 import type { SnapshotStore } from "./store.ts"
 
 /**
- * A command's answer the page says (`outcomeWords`): refused, with the code
- * a view may act on (the publish toast's "resolve with the agent"), or
- * failed.
+ * A command's answer the page says (`outcomeWords`): refused, with its
+ * code, or failed.
  */
 export type Unsuccessful =
   | {

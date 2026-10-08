@@ -61,7 +61,7 @@ export interface BoardDeps {
 /** The lanes of their own that work in `root`, from their records. */
 const lanesIn = (session: SessionDocHandle, root: RootId): LaneName[] =>
   [...readLaneRecords(session).values()]
-    .filter(r => r.root === root && r.work?.kind === "own")
+    .filter(r => r.root === root && r.ownCopy)
     .map(r => r.lane)
 
 /** The roots the board shows: every root in the directory with a message. */

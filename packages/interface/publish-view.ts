@@ -4,7 +4,7 @@
 // (`publishToast`). Whether a command may run is `@pinetrie/rules`'
 // `acceptedActionState`, the rule the host decides by.
 
-import { type AcceptedRecord, ERR, type ProjectRecord } from "@pinetrie/core"
+import type { AcceptedRecord } from "@pinetrie/core"
 import {
   type AcceptedActionState,
   acceptedActionState,
@@ -15,7 +15,6 @@ import {
 } from "@pinetrie/rules"
 import type { AcceptedActing } from "@pinetrie/session"
 import { count } from "./counts.ts"
-import type { Intent } from "./intent.ts"
 import { outcomeWords } from "./outcome-words.ts"
 
 /** The publish button as the footer shows it. */
@@ -97,7 +96,7 @@ function publishSays(record: AcceptedRecord, work: PublishWork): string {
         ? ""
         : `; ${count(preview.heads, "other line", "other lines")} of your work ${preview.heads === 1 ? "moves" : "move"} with it`
     steps.push(
-      `catches your files up with accepted work (changes ${count(preview?.changes ?? 0, "file", "files")}${moves})`,
+      `catches the working copy up with accepted work (changes ${count(preview?.changes ?? 0, "file", "files")}${moves})`,
     )
     jj.push(`jj rebase -b @ -d ${acceptedBookmark}`)
   }
@@ -114,12 +113,12 @@ function publishSays(record: AcceptedRecord, work: PublishWork): string {
     steps.length === 1
       ? steps.join("")
       : `${steps.slice(0, -1).join(", ")}, then ${steps.at(-1) ?? ""}`
-  // With the setting off, your files behind or your commits below `@` would
+  // With the setting off, the working copy behind or your commits below `@` would
   // otherwise read as left out by mistake.
   const { behind, ahead } = record.yours
   const unmoved =
     !record.publishCatchesUp && (behind > 0 || ahead > 0)
-      ? "; your files do not move (publish.catchUp is off)"
+      ? "; the working copy does not move (publish.catchUp is off)"
       : ""
   return `${said}${unmoved} · ${jj.join("; ")}`
 }
@@ -157,11 +156,13 @@ export function publishWords(
   }
 }
 
-/** What a toast says of your last setup or publish command: its refusal or failure. */
+/**
+ * What a toast says of your last setup or publish command: its refusal or
+ * failure. A conflict in the working copy is said, and left to jj
+ * (ADR-0102).
+ */
 export interface PublishToast {
   readonly text: string
-  /** Offer "resolve with the agent": your files conflict. */
-  readonly resolve: boolean
 }
 
 /**
@@ -174,41 +175,4 @@ export const publishToast = (
 ): PublishToast | null =>
   acting === null || acting.kind === "sent"
     ? null
-    : {
-        text: outcomeWords(acting),
-        resolve:
-          acting.kind === "refused" && acting.code === ERR.YOURS_CONFLICT,
-      }
-
-/**
- * "Resolve with the agent" (ADR-0061, ADR-0090): a new agent tab whose
- * thread works in your files, its box holding the `resolve-conflicts` skill
- * and what to resolve, for you to send. Null without a project root to work
- * in, or a line.
- */
-export function resolveIntent(
-  project: ProjectRecord | null,
-  record: AcceptedRecord | null,
-): Intent | null {
-  if (project === null || record === null) return null
-  const { acceptedBookmark, yours } = record
-  const { files } = yours.conflicts
-  const would = yours.catchUp?.conflicts ?? []
-  // Conflicted files now come first; else, behind, the conflict is the
-  // catch-up's, before or after a reverted one; else your commits'.
-  const text =
-    files.length > 0
-      ? `My files have conflicts in ${files.join(", ")}. Resolve them in my working copy.`
-      : yours.behind > 0
-        ? `Catching my files up with accepted work (${acceptedBookmark}) conflicts${would.length === 0 ? "" : ` in ${would.join(", ")}`}. Rebase my work onto it (jj rebase -b @ -d ${acceptedBookmark}) and resolve the conflicts in my working copy.`
-        : "My commits have conflicts. Resolve them in my working copy."
-  return {
-    kind: "newTab",
-    asksAgent: true,
-    prefill: {
-      text: `/pinetrie:skill:resolve-conflicts ${text}`,
-      blank: false,
-      work: { kind: "direct", dir: project.root },
-    },
-  }
-}
+    : { text: outcomeWords(acting) }

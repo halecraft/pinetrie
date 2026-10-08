@@ -4,8 +4,8 @@
 // Each entry is proven by a suite mutation (`scripts/mutations/`), or its
 // check deleted once a unit test proves its rule (`AGENTS.md`, Gates).
 //
-// `lanes/*` need `container`, so their mutations are written and run on
-// the Mac.
+// `lanes/*` run on Docker, in a lane as on the Mac: their mutations are run
+// as any suite's. The `contract` scenario's Mac checks need the lane VM.
 
 export const UNPROVEN: Readonly<Record<string, readonly string[]>> = {
   "browser/banner": [
@@ -78,39 +78,12 @@ export const UNPROVEN: Readonly<Record<string, readonly string[]>> = {
     'Stop ends a running command, shown as ✗ "Command aborted"',
     "typing /hel offers /fixture:skill:hello; Tab inserts it, and the sent message shows it",
     "the column's header names the thread, its star shown with no banner",
-    "the offer's line opens its review beside the thread, which keeps its 28rem: a row per file, and a file's diff",
-    "the review closes, and after the acceptance there is none to open",
     "an aligned column that runs past its end keeps its alignment as its thread grows",
   ],
-  "lanes/commands": [
-    "in a lane of its own, an expanded skill names its files at /mnt/host",
-    "the system prompt lists the skills the model may use at /mnt/host",
-    "a lane of its own is told it is in a lane, and of its browser",
-    "the lane reads the skill's references and runs its scripts there",
-    "pi's agent directory is never mounted",
-  ],
-  "lanes/images": [
-    "and its turn is committed and snapshotted",
-    "an image with no git cannot host a lane, and says so",
-  ],
   "lanes/main": [
-    "the host finds container and gives threads lanes of their own",
-    "two lanes serve :5173 at once, each its own",
-    "two lanes write the same file, each on its own disk, and your working copy is untouched",
-    "a person's path to your working copy is stored as the lane sees it, under /mnt/host-working-copy",
-    "your home directory is not in a lane; your working copy is, at /mnt/host-working-copy",
-    "with ssh granted, the lane has SSH_AUTH_SOCK",
-    "each turn of a lane of its own records a snapshot, and your repo fetches its commits",
-    "a lane's commits in your repo are immutable",
-    "a branch at a turn has that turn's tracked files, node_modules and .vite cache, byte for byte",
     "a branch's writes never reach its parent, nor its parent's its",
-    "a branch of a branch starts from its parent's turn, and leaves it alone",
-    "your repo holds every lane's commits with no divergent change",
-    "rewriting an inherited commit in a fork is refused",
     "a branch at the turn the agent committed in has its file",
-    "a bash timeout and an aborted run leave no process in the guest",
     "a turn's work is an offer in your repo, described, and its turns are not in your log",
-    "every lane has a two-word name, unique; the offer's bookmark and trailer carry it",
     "the offer's record names its commit as it is now, after jj rebased it under the host, and the host wrote nothing",
     "a run that moves the lane keeps the offer's change id; it is a WIP line until each run ends",
     "after an acceptance, the next offer holds only the new work",
@@ -118,12 +91,5 @@ export const UNPROVEN: Readonly<Record<string, readonly string[]>> = {
     "accepting a parent's offer shrinks its branch's offer to its own work, in place",
     "accepting a branch that holds all its parent's work withdraws the parent's offer: no record, no bookmark",
     "archiving a root deletes its lanes' containers and all but each lane's newest snapshot",
-    "after restoring, a lane runs again on its newest snapshot",
-    "a lane with no disk and no snapshot says it predates lane containers",
-  ],
-  "lanes/shared": [
-    "the user's shared directories apply, and a refused one is logged with its reason",
-    "another lane reads it",
-    "after a restart, an existing lane has the newly shared directory, with its disk as it was",
   ],
 }
