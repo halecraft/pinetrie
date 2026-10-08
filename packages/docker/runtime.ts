@@ -87,6 +87,12 @@ export interface DockerRuntime extends LaneRuntime {
    * host address (Linux), and nothing is done.
    */
   grantHostPorts(ports: readonly number[]): Promise<boolean>
+  /**
+   * The VM started again (a new lease): the disks helper and the project's
+   * network are made again at the next disk operation, as they were at the
+   * first.
+   */
+  vmRestarted(): void
 }
 
 /** Docker, at `target`, keeping the lanes of the project at `root` under `lanesDir`. */
@@ -272,6 +278,9 @@ export function dockerRuntime(input: {
         ])
       }
       return planned.projects
+    },
+    vmRestarted() {
+      helper = null
     },
     async grantHostPorts(ports) {
       if (target.hostAddress === null) return false

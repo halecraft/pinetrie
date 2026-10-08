@@ -16,6 +16,7 @@ export {
   gvproxyPath,
   readGvproxyPin,
 } from "./gvproxy.ts"
+export { type Endable, type Kept, keepLease } from "./keep.ts"
 export { buildLauncher, gatherLauncher, launcherName } from "./launcher.ts"
 export {
   type Lease,
@@ -35,10 +36,13 @@ export {
   parseSums,
   planShares,
   planVm,
+  planVmVersion,
   SHARES_ROOT,
+  staleVmWords,
   type VmFacts,
   type VmPlan,
   type VmRefusal,
+  type VmVersion,
   vmMemory,
   vmStateDir,
   vmWords,

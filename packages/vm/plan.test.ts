@@ -8,6 +8,8 @@ import {
   parseSums,
   planShares,
   planVm,
+  planVmVersion,
+  staleVmWords,
   type VmFacts,
   vmMemory,
   vmStateDir,
@@ -141,5 +143,27 @@ describe("planVm: start, join, or the reason it cannot", () => {
     expect(words({ darwin: 21 })).toContain("macOS 13")
     expect(words({ image: false })).toContain("pnpm vm:build")
     expect(words({ launcher: "no-swiftc" })).toContain("xcode-select --install")
+  })
+})
+
+describe("planVmVersion: join a current VM; replace an old one only when no other host holds it", () => {
+  const want = { image: "new", launcher: "launcher-new" }
+  test("current", () => {
+    expect(planVmVersion({ ...want, leases: 3 }, want)).toEqual({
+      kind: "current",
+    })
+  })
+  test("an older image or launcher, this host its only lease: retire it", () => {
+    expect(planVmVersion({ ...want, image: "old", leases: 1 }, want)).toEqual({
+      kind: "retire",
+    })
+    expect(
+      planVmVersion({ ...want, launcher: "launcher-old", leases: 1 }, want),
+    ).toEqual({ kind: "retire" })
+  })
+  test("older, with other hosts on it: join it, and say so", () => {
+    const v = planVmVersion({ ...want, image: "old", leases: 3 }, want)
+    expect(v).toEqual({ kind: "stale", leases: 3 })
+    expect(staleVmWords(3, "new")).toContain("2 other hosts hold leases")
   })
 })

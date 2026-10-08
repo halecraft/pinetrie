@@ -28,7 +28,12 @@ import {
   type RuntimeChoice,
   type WrittenMachine,
 } from "@pinetrie/lanes"
-import { GVPROXY_HOST_ADDRESS, leaseVm, vmStateDir } from "@pinetrie/vm"
+import {
+  GVPROXY_HOST_ADDRESS,
+  keepLease,
+  leaseVm,
+  vmStateDir,
+} from "@pinetrie/vm"
 import { type Convert, converter } from "./convert.ts"
 
 /** What the host found where it runs: the project, and its lanes' runtime when they have their own. */
@@ -279,38 +284,52 @@ async function vmFound(
   log: (line: string) => void,
   ownPort: number | null,
 ): Promise<Found> {
-  const lease = await leaseVm({
-    stateDir: vmStateDir(process.env, homedir()),
-    slots,
-    agent: process.env.SSH_AUTH_SOCK ?? null,
-    log,
-  }).catch(error => {
+  const leaseNow = () =>
+    leaseVm({
+      stateDir: vmStateDir(process.env, homedir()),
+      slots,
+      agent: process.env.SSH_AUTH_SOCK ?? null,
+      log,
+    })
+  const first = await leaseNow().catch(error => {
     throw new RuntimeRefused(
       error instanceof Error ? error.message : String(error),
     )
   })
+  /** The lease held now: a new one after the VM stopped under this host. */
+  let current = first
   let pathOf: ((source: string) => string) | null = null
+  // What follows the slot is read through `current`, each time a lane is
+  // made, so a lane made after a new lease is on the new slot.
   const target: DockerTarget = {
-    socket: lease.docker,
+    socket: first.docker,
     pathOf: source => {
       if (pathOf === null)
         throw new Error("this host's slot in the lane VM is not filled yet")
       return pathOf(source)
     },
-    labels: { [SLOT_LABEL]: String(lease.slot) },
-    sshAgent: `/run/pinetrie/ssh-${lease.slot}.sock`,
+    get labels() {
+      return { [SLOT_LABEL]: String(current.slot) }
+    },
+    get sshAgent() {
+      return `/run/pinetrie/ssh-${current.slot}.sock`
+    },
     hostAddress: GVPROXY_HOST_ADDRESS,
   }
   const refusal = planDockerHost(await gatherDockerHost(target, null))
   if (refusal !== null) {
-    await lease.close()
+    await first.close()
     throw new RuntimeRefused(dockerWords(refusal))
   }
-  const left = await sweepSlot(target, lease.slot)
-  if (left.length > 0)
-    log(
-      `[host] removed ${left.length} containers left in slot ${lease.slot} by a host that stopped holding it`,
-    )
+  /** A slot's containers left by a host that died holding it (S130). */
+  const sweep = async (lease: typeof first) => {
+    const left = await sweepSlot(target, lease.slot)
+    if (left.length > 0)
+      log(
+        `[host] removed ${left.length} containers left in slot ${lease.slot} by a host that stopped holding it`,
+      )
+  }
+  await sweep(first)
   const runtime = dockerRuntime({ target, lanesDir, root })
   // pre-docker: lanes made under `container` move over at their first start,
   // while `container` runs to read them.
@@ -319,26 +338,49 @@ async function vmFound(
     log(
       "[host] Apple's container is not running: a lane made under it cannot move to Docker until it does",
     )
+  /** What setup gave `ready`, for each lease after the first. */
+  let given: { mounts: readonly Mount[]; hostPorts: readonly number[] } | null =
+    null
+  /** The slot filled with every directory lanes mount, and the project's grant. */
+  async function fillAndGrant(lease: typeof first): Promise<void> {
+    if (given === null) return
+    const filled = await lease.fill(
+      given.mounts.map(m => ({ source: m.source, readOnly: m.readonly })),
+    )
+    pathOf = filled.pathOf
+    // Before any lane starts: the grant replaces whatever a host of this
+    // project set before.
+    const { grant, refused } = planHostPortGrant(given.hostPorts, ownPort)
+    for (const r of refused) log(`[host] ${r}`)
+    await runtime.grantHostPorts(grant)
+    if (grant.length > 0)
+      log(
+        `[host] lanes may reach these ports of your Mac's loopback, at ${GVPROXY_HOST_ADDRESS}: ${grant.join(", ")}`,
+      )
+  }
+  const kept = keepLease({
+    first,
+    lease: leaseNow,
+    // A new VM: its slot swept and filled as the first was, and the grant
+    // written again. Each lane is made again at its next start.
+    async settle(next) {
+      current = next
+      pathOf = null
+      runtime.vmRestarted()
+      await sweep(next)
+      await fillAndGrant(next)
+    },
+    log,
+  })
   return {
     project,
     runtime,
     async ready({ mounts, hostPorts }) {
-      const filled = await lease.fill(
-        mounts.map(m => ({ source: m.source, readOnly: m.readonly })),
-      )
-      pathOf = filled.pathOf
+      given = { mounts, hostPorts }
+      await fillAndGrant(current)
       sweptLog(await runtime.sweepProjects(), log)
-      // Before any lane starts: the grant replaces whatever a host of this
-      // project set before.
-      const { grant, refused } = planHostPortGrant(hostPorts, ownPort)
-      for (const r of refused) log(`[host] ${r}`)
-      await runtime.grantHostPorts(grant)
-      if (grant.length > 0)
-        log(
-          `[host] lanes may reach these ports of your Mac's loopback, at ${GVPROXY_HOST_ADDRESS}: ${grant.join(", ")}`,
-        )
     },
-    close: () => lease.close(),
+    close: () => kept.close(),
     convert: paths === null ? null : converter({ paths, docker: runtime, log }),
   }
 }

@@ -22,6 +22,10 @@
 //   ← {"kind":"slot","slot":<i>,"docker":<docker.sock>} | refused
 //   → {"kind":"fill","entries":[{"name","source","readOnly"}]}
 //   ← {"kind":"filled"} | refused
+//   → {"kind":"retire"}: stop the VM and exit, if this is the only lease
+//   ← the connection's end | {"kind":"refused","reason":"busy",…}
+// The slot reply also names the image and launcher the VM was started from,
+// and the leases it holds.
 // A refusal is {"kind":"refused","reason":<code>, …}. When the connection
 // ends, the slot's share goes back to empty/ and the slot is free. A slot is
 // filled once: replacing a share cuts every bind mount into it (S130), and
@@ -431,7 +435,14 @@ func grant(_ lease: Lease) {
   lease.slot = i
   idle?.cancel()
   log("slot \(i) leased")
-  lease.send(["kind": "slot", "slot": i, "docker": "\(state)/docker.sock"])
+  // What this VM was started from, and its leases: a host whose image or
+  // launcher is newer replaces it when it holds the only lease.
+  lease.send([
+    "kind": "slot", "slot": i, "docker": "\(state)/docker.sock",
+    "image": url(image).lastPathComponent,
+    "launcher": url(CommandLine.arguments[0]).lastPathComponent,
+    "leases": slots.filter { $0 != nil }.count,
+  ])
 }
 
 func handle(_ lease: Lease, _ message: [String: Any]?) {
@@ -474,6 +485,14 @@ func handle(_ lease: Lease, _ message: [String: Any]?) {
     lease.filled = true
     log("slot \(i) filled: \(dirs.count) directories")
     lease.send(["kind": "filled"])
+  case "retire":
+    // Only the last lease may: another host's lanes run on this VM.
+    let held = slots.filter { $0 != nil }.count
+    guard lease.slot != nil, held == 1 else {
+      lease.refuse("busy", ["leases": held])
+      return
+    }
+    stopVM("retired by a host with a newer image or launcher")
   default:
     lease.refuse("unreadable")
   }

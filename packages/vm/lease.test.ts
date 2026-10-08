@@ -21,9 +21,23 @@ afterEach(async () => {
   for (const c of closers.splice(0)) await c()
 })
 
-/** A launcher that answers each message with `answer`'s reply, and a Docker that pings. */
+/** A slot's reply, the VM's identity included. */
+const slotReply = (slot: number, leases = 1): FromLauncher => ({
+  kind: "slot",
+  slot,
+  docker: "",
+  image: "img",
+  launcher: "launcher-x",
+  leases,
+})
+
+/**
+ * A launcher that answers each message with `answer`'s reply, or ends the
+ * connection (`"end"`), and a Docker that pings. `drop` ends every lease, as
+ * a launcher that stops does.
+ */
 async function standIn(
-  answer: (m: ToLauncher, seen: ToLauncher[]) => FromLauncher | null,
+  answer: (m: ToLauncher, seen: ToLauncher[]) => FromLauncher | "end" | null,
 ) {
   const dir = await mkdtemp(path.join(tmpdir(), "pinetrie-lease-"))
   const docker = path.join(dir, "docker.sock")
@@ -32,13 +46,16 @@ async function standIn(
   await new Promise<void>(r => pinger.listen(docker, r))
   const seen: ToLauncher[] = []
   let ended = false
+  const sockets: net.Socket[] = []
   const launcher = net.createServer(s => {
+    sockets.push(s)
     createInterface({ input: s }).on("line", line => {
       const m = decodeToLauncher(line)
       if (m === null) return
       seen.push(m)
       const reply = answer(m, seen)
-      if (reply !== null)
+      if (reply === "end") s.end()
+      else if (reply !== null)
         s.write(encode(reply.kind === "slot" ? { ...reply, docker } : reply))
     })
     s.on("close", () => {
@@ -51,16 +68,21 @@ async function standIn(
     pinger.close()
     await rm(dir, { recursive: true, force: true })
   })
-  return { control, seen, ended: () => ended }
+  return {
+    control,
+    seen,
+    ended: () => ended,
+    drop: () => {
+      for (const s of sockets) s.end()
+    },
+  }
 }
 
 const log = () => {}
 
 test("a lease: a slot, then one fill with the slot's entries, then the end frees it", async () => {
   const l = await standIn(m =>
-    m.kind === "lease"
-      ? { kind: "slot", slot: 2, docker: "" }
-      : { kind: "filled" },
+    m.kind === "lease" ? slotReply(2) : { kind: "filled" },
   )
   const socket = await connect(l.control)
   if (socket === null) throw new Error("no stand-in")
@@ -90,5 +112,51 @@ test("a full VM refuses the lease, naming the limit and lanes.vm.slots", async (
   if (socket === null) throw new Error("no stand-in")
   await expect(leaseOn(socket, { agent: null, log })).rejects.toThrow(
     /all 16 slots .* `lanes\.vm\.slots`/,
+  )
+})
+
+const leaseFrom = async (l: { control: string }) => {
+  const socket = await connect(l.control)
+  if (socket === null) throw new Error("no stand-in")
+  return leaseOn(socket, { agent: null, log })
+}
+const settled = (p: Promise<unknown>, ms = 200) =>
+  Promise.race([
+    p.then(() => true),
+    new Promise<boolean>(r => setTimeout(() => r(false), ms)),
+  ])
+
+test("a lease's end is told when the launcher drops it, and not after the host closed it", async () => {
+  const l = await standIn(m => (m.kind === "lease" ? slotReply(0) : null))
+  const dropped = await leaseFrom(l)
+  expect(dropped.identity).toEqual({
+    image: "img",
+    launcher: "launcher-x",
+    leases: 1,
+  })
+  l.drop()
+  expect(await settled(dropped.ended)).toBe(true)
+  const closed = await leaseFrom(l)
+  await closed.close()
+  expect(await settled(closed.ended)).toBe(false)
+})
+
+test("retire: the launcher stops and ends the lease, or refuses while others hold leases", async () => {
+  const alone = await standIn(m =>
+    m.kind === "lease" ? slotReply(0) : m.kind === "retire" ? "end" : null,
+  )
+  const lease = await leaseFrom(alone)
+  await lease.retire()
+  expect(alone.seen.map(m => m.kind)).toEqual(["lease", "retire"])
+  expect(await settled(lease.ended)).toBe(false)
+  const shared = await standIn(m =>
+    m.kind === "lease"
+      ? slotReply(0, 3)
+      : m.kind === "retire"
+        ? { kind: "refused", reason: "busy", leases: 3 }
+        : null,
+  )
+  await expect((await leaseFrom(shared)).retire()).rejects.toThrow(
+    "2 other hosts hold leases",
   )
 })

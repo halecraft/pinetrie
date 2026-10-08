@@ -13,6 +13,11 @@ export type ToLauncher =
   | { readonly kind: "lease"; readonly agent: string | null }
   /** Fill the slot, once: the host has removed every container labelled with it. */
   | { readonly kind: "fill"; readonly entries: readonly ShareEntry[] }
+  /**
+   * Stop the VM and exit, so a newer one can start: done only when this
+   * lease is the only one, else refused as `busy`.
+   */
+  | { readonly kind: "retire" }
 
 /** Why the launcher refused a message. */
 export type LauncherRefusal =
@@ -27,10 +32,26 @@ export type LauncherRefusal =
   | { readonly reason: "share" }
   /** The VM did not start. */
   | { readonly reason: "boot"; readonly detail: string }
+  /** A retire while other hosts hold leases. */
+  | { readonly reason: "busy"; readonly leases: number }
   | { readonly reason: "unreadable" }
 
+/** What a running VM was started from, and who holds it. */
+export interface VmIdentity {
+  /** The image's key: its directory's name (`imageKey`). */
+  readonly image: string
+  /** The launcher binary's name (`launcherName`). */
+  readonly launcher: string
+  /** Leases held, this one included. */
+  readonly leases: number
+}
+
 export type FromLauncher =
-  | { readonly kind: "slot"; readonly slot: number; readonly docker: string }
+  | ({
+      readonly kind: "slot"
+      readonly slot: number
+      readonly docker: string
+    } & VmIdentity)
   | { readonly kind: "filled" }
   | ({ readonly kind: "refused" } & LauncherRefusal)
 
@@ -51,8 +72,19 @@ export function decodeFromLauncher(line: string): FromLauncher | null {
   if (!isRecord(v)) return null
   switch (v.kind) {
     case "slot":
-      return Number.isInteger(v.slot) && typeof v.docker === "string"
-        ? { kind: "slot", slot: Number(v.slot), docker: v.docker }
+      return Number.isInteger(v.slot) &&
+        typeof v.docker === "string" &&
+        typeof v.image === "string" &&
+        typeof v.launcher === "string" &&
+        Number.isInteger(v.leases)
+        ? {
+            kind: "slot",
+            slot: Number(v.slot),
+            docker: v.docker,
+            image: v.image,
+            launcher: v.launcher,
+            leases: Number(v.leases),
+          }
         : null
     case "filled":
       return { kind: "filled" }
@@ -61,6 +93,10 @@ export function decodeFromLauncher(line: string): FromLauncher | null {
         case "full":
           return Number.isInteger(v.slots)
             ? { kind: "refused", reason: "full", slots: Number(v.slots) }
+            : null
+        case "busy":
+          return Number.isInteger(v.leases)
+            ? { kind: "refused", reason: "busy", leases: Number(v.leases) }
             : null
         case "boot":
           return {
@@ -91,6 +127,7 @@ export function decodeToLauncher(line: string): ToLauncher | null {
     return null
   }
   if (!isRecord(v)) return null
+  if (v.kind === "retire") return { kind: "retire" }
   if (v.kind === "lease")
     return v.agent === null || typeof v.agent === "string"
       ? { kind: "lease", agent: v.agent }

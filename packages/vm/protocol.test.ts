@@ -11,6 +11,7 @@ test("each message is one line, and decodes to itself", () => {
   const to: ToLauncher[] = [
     { kind: "lease", agent: "/tmp/ssh/agent" },
     { kind: "lease", agent: null },
+    { kind: "retire" },
     {
       kind: "fill",
       entries: [{ name: "a1", source: "/p", readOnly: true }],
@@ -23,7 +24,15 @@ test("each message is one line, and decodes to itself", () => {
     expect(decodeToLauncher(line)).toEqual(m)
   }
   const from: FromLauncher[] = [
-    { kind: "slot", slot: 3, docker: "/s/docker.sock" },
+    {
+      kind: "slot",
+      slot: 3,
+      docker: "/s/docker.sock",
+      image: "a70b862afa160d67",
+      launcher: "launcher-c6fb456ce1458f03",
+      leases: 2,
+    },
+    { kind: "refused", reason: "busy", leases: 2 },
     { kind: "filled" },
     { kind: "refused", reason: "full", slots: 16 },
     { kind: "refused", reason: "filled" },

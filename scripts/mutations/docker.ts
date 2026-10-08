@@ -310,4 +310,14 @@ export const mutations: readonly Mutation[] = [
     scenario: "contract",
     expect: "a container run on the Mac leaves running lanes on the network",
   },
+  {
+    name: "(Mac) a host whose VM stopped does not lease again",
+    file: "packages/vm/keep.ts",
+    from: "      if (!closing && held === lease) return again()",
+    to: "      if (!closing && held === lease) return",
+    suite: "lanes",
+    scenario: "contract",
+    expect:
+      "a host whose lane VM stops leases again, and a new lane runs and reads its working copy",
+  },
 ]

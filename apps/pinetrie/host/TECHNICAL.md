@@ -312,6 +312,10 @@ any refresh they queued.
     takes a restart, as ADR-0035 has it.
   - **Docker's startup sweep** (`sweepProjects`, after the fill) removes the
     containers and disks of every project whose folder is gone.
+  - **The lease is kept** (`keepLease`): if the VM stops under the host, it
+    leases again, sweeps and fills the slot, and writes the grant again.
+    After an update, a host holding the only lease on an out-of-date VM
+    replaces it (`planVmVersion`).
 
 ## Shutdown
 

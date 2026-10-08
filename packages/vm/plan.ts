@@ -173,3 +173,35 @@ export function vmWords(r: VmRefusal): string {
       return "the lane VM's launcher is built with Xcode's command line tools, which are not installed: `xcode-select --install`"
   }
 }
+
+/** What a host does with the VM it found running (`planVmVersion`). */
+export type VmVersion =
+  | { readonly kind: "current" }
+  /** Out of date, and this host its only lease holder: replace it. */
+  | { readonly kind: "retire" }
+  /** Out of date, but other hosts' lanes run on it: join it, and say so. */
+  | { readonly kind: "stale"; readonly leases: number }
+
+/**
+ * Whether a running VM is the one this host would start: its image and its
+ * launcher. One out of date is replaced only when no other host holds a
+ * lease on it, so no other host's lanes are cut off.
+ */
+export function planVmVersion(
+  running: {
+    readonly image: string
+    readonly launcher: string
+    readonly leases: number
+  },
+  want: { readonly image: string; readonly launcher: string },
+): VmVersion {
+  if (running.image === want.image && running.launcher === want.launcher)
+    return { kind: "current" }
+  return running.leases <= 1
+    ? { kind: "retire" }
+    : { kind: "stale", leases: running.leases }
+}
+
+/** A host joining an out-of-date VM, in its log. */
+export const staleVmWords = (leases: number, image: string): string =>
+  `the lane VM runs an older image or launcher, and ${leases - 1} other ${leases === 2 ? "host holds a lease" : "hosts hold leases"} on it: this host joins it, and the VM is replaced with ${image} when the last of them stops`

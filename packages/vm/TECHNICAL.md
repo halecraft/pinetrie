@@ -119,7 +119,24 @@ only `@pinetrie/core` and knows nothing of lanes (`workspace.test.ts`).
   stops the VM, and exits. A running VM keeps the image and launcher it
   started with until then.
 
-## A host's lease (`lease.ts`)
+## A host's lease (`lease.ts`, `keep.ts`)
+
+- **A host joins only a current VM** (`planVmVersion`). The `slot` reply
+  names the image and launcher the VM was started from, and its leases. A
+  host whose `imageKey` or launcher name differs, holding the only lease,
+  sends `retire`: the launcher syncs, stops the VM and exits, and the host
+  starts the current one. With other hosts' leases on it, the host joins it
+  and logs so, and the VM is replaced when the last of them stops. A host
+  that cannot start the current VM (no image, no Xcode tools) joins the old
+  one and says what is missing. Without this, a host after an update joined
+  the VM left running by the last one, for up to its 10 idle minutes.
+- **A host keeps its lease** (`keepLease`): one that ends without the host
+  closing it (its launcher stopped or died) is leased again, which starts a
+  VM, with a wait doubling from 1 s to 30 s; the slot is swept and filled
+  again, and the grant written again. The Docker target reads the slot
+  through the lease held now, so each lane is made again at its next
+  start. Without this, a host whose launcher was killed failed every lane's
+  step until it restarted.
 
 `leaseVm` gathers (the state directory, the image for the current
 `imageKey`, the launcher, the Mac's version and chip, whether

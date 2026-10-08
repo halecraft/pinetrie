@@ -602,6 +602,36 @@ async function dockerContract(
       runCost < 150 && snapCost < 50 && (coldMs === null || coldMs < 2000),
       `run -d ${runCost} ms, snapshot ${snapCost} ms, cold start ${formatted ? `${cold} ms, not held: the data disk's first format` : coldMs === null ? "n/a" : `${coldMs} ms on a formatted data disk`}, the launcher's open files ${files}`,
     )
+
+    // ── the VM stops under a running host: it leases again ──
+    if (own !== null) {
+      const before = logs.length
+      quietSh(`pkill -TERM -f 'launcher-.* ${own.state}' || true`)
+      const again = await waitFor(
+        () =>
+          logs.slice(before).some(l => l.includes("leased the lane VM again")),
+        120_000,
+      ).catch(() => -1)
+      const relaned = again < 0 ? null : await lane(ALPINE_IMAGE)
+      const read =
+        relaned === null
+          ? "no new lease"
+          : (
+              await exec(relaned, "cat /mnt/host-working-copy/README.md")
+            ).stdout.trim()
+      check(
+        "a host whose lane VM stops leases again, and a new lane runs and reads its working copy",
+        read === "a",
+        `${read} | ${logs
+          .slice(before)
+          .filter(l => l.includes("lane VM"))
+          .join(" | ")}`,
+      )
+    } else
+      skip(
+        "a host whose lane VM stops leases again, and a new lane runs and reads its working copy",
+        "the Mac's lane VM only",
+      )
   } finally {
     for (const l of lanes) {
       const on = laneRuntimes.get(l) ?? runtime

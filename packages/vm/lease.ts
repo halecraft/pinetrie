@@ -19,6 +19,8 @@ import {
   imageKey,
   planShares,
   planVm,
+  planVmVersion,
+  staleVmWords,
   type VmRefusal,
   vmMemory,
   vmWords,
@@ -28,6 +30,7 @@ import {
   encode,
   type FromLauncher,
   type LauncherRefusal,
+  type VmIdentity,
 } from "./protocol.ts"
 
 export interface Lease {
@@ -41,6 +44,18 @@ export interface Lease {
   fill(
     dirs: readonly { readonly source: string; readonly readOnly: boolean }[],
   ): Promise<{ readonly pathOf: (source: string) => string }>
+  /** What the VM was started from, and how many leases it holds. */
+  readonly identity: VmIdentity
+  /**
+   * Settles when the lease ends without `close`: the launcher stopped or
+   * died, and the VM with it.
+   */
+  readonly ended: Promise<void>
+  /**
+   * Ask the launcher to stop the VM and exit, when this is its only lease
+   * (else refused as `busy`); settles when the lease has ended.
+   */
+  retire(): Promise<void>
   /** Ends the lease; the slot empties. */
   close(): Promise<void>
 }
@@ -63,6 +78,8 @@ export function launcherWords(r: LauncherRefusal): string {
       return "the lane VM's launcher could not share this host's directories"
     case "boot":
       return `the lane VM did not start: ${r.detail}`
+    case "busy":
+      return `the lane VM was not replaced: ${r.leases - 1} other hosts hold leases on it`
     case "unreadable":
       return "the lane VM's launcher could not read this host's message"
   }
@@ -114,7 +131,32 @@ async function until<T>(
  * A lease on this user's lane VM, starting it if it is not running. Refuses
  * with `VmRefused`, worded with what would let it.
  */
-export async function leaseVm(input: {
+export async function leaseVm(input: LeaseInput): Promise<Lease> {
+  const { lease, want, canStart } = await leaseOnce(input)
+  const version = planVmVersion(lease.identity, want)
+  if (version.kind === "current") return lease
+  if (version.kind === "stale") {
+    input.log(`[vm] ${staleVmWords(version.leases, want.image)}`)
+    return lease
+  }
+  if (canStart !== null) {
+    input.log(
+      `[vm] the lane VM runs an older image or launcher, kept: ${canStart}`,
+    )
+    return lease
+  }
+  input.log("[vm] replacing the lane VM, which runs an older image or launcher")
+  await lease.retire()
+  const control = path.join(input.stateDir, "control.sock")
+  await until("the old lane VM stopping", 60_000, async () => {
+    const s = await connect(control)
+    s?.destroy()
+    return s === null
+  })
+  return (await leaseOnce(input)).lease
+}
+
+interface LeaseInput {
   /** `vmStateDir`. */
   readonly stateDir: string
   /** The slots a VM this host starts boots with. */
@@ -122,7 +164,18 @@ export async function leaseVm(input: {
   /** This host's SSH_AUTH_SOCK, or null. */
   readonly agent: string | null
   readonly log: (line: string) => void
-}): Promise<Lease> {
+}
+
+/**
+ * One lease: on the running VM, else on one this host starts. With what the
+ * host would start (`want`), and why it could not start it now (`canStart`,
+ * null when it can).
+ */
+async function leaseOnce(input: LeaseInput): Promise<{
+  readonly lease: Lease
+  readonly want: { readonly image: string; readonly launcher: string }
+  readonly canStart: string | null
+}> {
   const { stateDir } = input
   await mkdir(stateDir, { recursive: true })
   const control = path.join(stateDir, "control.sock")
@@ -163,7 +216,20 @@ export async function leaseVm(input: {
     input.log(
       `[vm] Docker answered ${Date.now() - started} ms after the launcher started`,
     )
-  return lease
+  const imageMissing = await checkImageDir(image)
+  return {
+    lease,
+    want: {
+      image: path.basename(image),
+      launcher: path.basename(launcher.binary),
+    },
+    canStart:
+      imageMissing !== null
+        ? vmWords("no-image")
+        : launcher.state === "no-swiftc"
+          ? vmWords("no-swiftc")
+          : null,
+  }
 }
 
 const refusedBy = (r: VmRefusal) => new VmRefused(vmWords(r))
@@ -242,9 +308,30 @@ export async function leaseOn(
     pings(slot.docker),
   )
   let filled = false
+  let closing = false
+  // Not `close`'s: the launcher stopped or died, and the VM with it.
+  const endedUnasked = closed.then(() =>
+    closing ? new Promise<void>(() => {}) : undefined,
+  )
   return {
     slot: slot.slot,
     docker: slot.docker,
+    identity: {
+      image: slot.image,
+      launcher: slot.launcher,
+      leases: slot.leases,
+    },
+    ended: endedUnasked,
+    async retire() {
+      closing = true
+      socket.write(encode({ kind: "retire" }))
+      const m = await next()
+      if (m?.kind === "refused") {
+        closing = false
+        throw new VmRefused(launcherWords(m))
+      }
+      await closed
+    },
     async fill(dirs) {
       if (filled) throw new Error("a slot is filled once")
       filled = true
@@ -256,6 +343,7 @@ export async function leaseOn(
       return { pathOf: shares.pathOf }
     },
     async close() {
+      closing = true
       socket.end()
       await closed
     },

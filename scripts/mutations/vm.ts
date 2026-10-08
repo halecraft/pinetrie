@@ -126,4 +126,28 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a fetch whose hash is not the pin's is refused",
   },
+  {
+    name: "a lease that ends is not leased again",
+    file: "packages/vm/keep.ts",
+    from: "      if (!closing && held === lease) return again()",
+    to: "      if (!closing && held === lease) return",
+    command: unit,
+    expect: "a lease that ends is leased again and settled",
+  },
+  {
+    name: "a VM other hosts hold is retired",
+    file: "packages/vm/plan.ts",
+    from: "  return running.leases <= 1",
+    to: "  return true",
+    command: unit,
+    expect: "older, with other hosts on it: join it, and say so",
+  },
+  {
+    name: "a retire is not read",
+    file: "packages/vm/protocol.ts",
+    from: '  if (v.kind === "retire") return { kind: "retire" }\n',
+    to: "",
+    command: unit,
+    expect: "each message is one line, and decodes to itself",
+  },
 ]
