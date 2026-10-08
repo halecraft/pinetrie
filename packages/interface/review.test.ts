@@ -95,7 +95,7 @@ describe("reviewView", () => {
       title(target, [ready(one), ready(two)]),
     ]).toEqual(["feat: two", undefined, undefined])
   })
-  test("an ask's range, with no description, is headed by the ask (ADR-0056)", () => {
+  test("an ask's range, with no description, is headed by the ask (ADR-0106)", () => {
     const ask: ReviewTarget = {
       ...target,
       spans: [{ kind: "range", from: C1, to: C2 }],

@@ -1,9 +1,12 @@
 # ADR-0071 — Digests are on by default; the user config turns them off
 
-**Status:** Accepted. Amends ADR-0056 (a summary written by a model is no
-longer opt-in). Amended by ADR-0075: only a long ask is digested, so a short
-one costs no request. Amended by ADR-0077: a short ask's end costs a request
-again, for its verdict alone.
+- **Status:** Accepted
+- **Area:** `apps/pinetrie/host/TECHNICAL.md`, `docs/06-interface.md`
+- **Amends:**
+  - ADR-0056: digests are on by default, and the user config turns them off.
+- **Amended by:**
+  - ADR-0075: only a long ask is digested, so a short one costs no request.
+  - ADR-0077: a short ask's end costs a request again, for its verdict alone.
 
 **Context.** ADR-0056 made each ask's digest opt-in: only
 `{ "digests": { "enabled": true } }` in `~/.config/pinetrie/config.json` turned

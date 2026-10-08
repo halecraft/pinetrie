@@ -1,5 +1,8 @@
 # S33 — picking a message from the rail, and whether it lands in view
 
+- **Status:** Answered
+- **Led to:** ADR-0031
+
 **Answers.**
 1. **Picking a message a column already shows did nothing** (measured). The
    column was at its end, 2,453 px below the picked message, and stayed there.

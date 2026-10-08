@@ -1,5 +1,8 @@
 # S89 — where a take waits, and what a refresh costs
 
+- **Status:** Answered
+- **Led to:** ADR-0065, ADR-0067, ADR-0104, ADR-0105
+
 **Question.** Sometimes a take ("add to the project") took 30–60 s, and
 the page showed nothing while it waited. Is the cause the offers' one
 queue for your repo? That means: refreshes queued as jobs, with nothing

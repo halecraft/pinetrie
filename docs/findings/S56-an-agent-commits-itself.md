@@ -1,5 +1,8 @@
 # S56 — an agent that commits in its lane
 
+- **Status:** Answered
+- **Led to:** ADR-0032, ADR-0046
+
 After each assistant message whose tools changed tracked files, the host
 commits the lane's working copy (`commitTurn`, ADR-0032) and moves the lane's
 bookmark, `pinetrie/<lane>`, to the commit. The offer is fetched from that

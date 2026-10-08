@@ -128,7 +128,7 @@ beside it (ADR-0081, turned sideways).
     icon.
   - **＋** stands over its ▾.
 
-### The footer: you, your inbox, and the board (ADR-0077, ADR-0085, ADR-0091, ADR-0098)
+### The footer: you, your inbox, and the board (ADR-0069, ADR-0077, ADR-0085, ADR-0091, ADR-0098)
 
 One row along the bottom. Its own cell, under your list and as wide, is
 yours: your avatar and name on the left, then your inbox and your inventory
@@ -185,7 +185,7 @@ While the page syncs, "syncing…" leads its right end.
   session": the messages in the roots this browser tab holds, of every
   root's. Nothing in the footer animates: your list, the column, the rail
   and the board show where the agent works.
-- **Publish** (ADR-0060, ADR-0076, ADR-0090, ADR-0099): one button, no
+- **Publish** (ADR-0104, ADR-0076, ADR-0090, ADR-0099): one button, no
   menu. **Accepted work** is where finished work goes (ADR-0100,
   `docs/glossary.md`); its bookmark (`accepted.bookmark`) is in titles only. Before accepted work
   exists, any host shows **set up**, which opens what it writes: the
@@ -308,7 +308,7 @@ tab's; with nothing in your list and nothing you are on, it opens by itself.
   shows nothing there, since a message goes to people. Its second row, for a column
   that forks, names the fork, `↰ Ada: “Say exactly…”`, and clicking it brings
   the fork point into view. A thread that started from a WIP says so, "on
-  wip/search", or "wip/search is gone" once it is (ADR-0060); one on the
+  wip/search", or "wip/search is gone" once it is (ADR-0104); one on the
   line says nothing.
 - **A thread's name opens its details** (ADR-0073), under the header, and a
   second click on it closes them; a chevron after the name turns as they
@@ -356,7 +356,7 @@ tab's; with nothing in your list and nothing you are on, it opens by itself.
 - **Above the composer, a work strip says what became of the agent's files**
   (ADR-0040): an agent on its own copy shows its offer in plain words ("2
   files ready"), with **accept** and its bookmark, which a press copies. The
-  button names a WIP the work goes into (ADR-0060, ADR-0090): "accept", or
+  button names a WIP the work goes into (ADR-0104, ADR-0090): "accept", or
   "accept into wip/search" for a thread on a WIP, whose menu also offers
   "accept, with your 2 commits beneath it" into accepted work; its title
   names the bookmark it moves. Accepting the offer (an *acceptance*,
@@ -411,7 +411,7 @@ tab's; with nothing in your list and nothing you are on, it opens by itself.
   command (one unqueued, say) says so above its box, with a × that sends it
   as a plain message instead, and its button reads "catch up", or "catch up
   and send"; what you write is what the agent should do with the new work
-  (ADR-0055).
+  (ADR-0108).
 - **The thread hears what was done to its work** (ADR-0080). An
   acceptance, a rewrite of the description, a squash and a refresh each add a line to
   the thread: "✓ accepted as k1a2b3c4", "✎ a new description
@@ -455,7 +455,7 @@ tab's; with nothing in your list and nothing you are on, it opens by itself.
 - On a narrow screen, columns stack as a back-navigable sequence (the macOS
   Finder column view on a phone), with a breadcrumb of fork points.
 
-### Asks: a message to the agent, and what was done for it (ADR-0056)
+### Asks: a message to the agent, and what was done for it (ADR-0106)
 
 An **ask** is a message that started a run, together with that run: a
 person's message to the agent, a land message or a stack message. A message
@@ -467,7 +467,7 @@ the tree.
 
   | density | an ask shows |
   |---|---|
-  | **outline** | its message, and one line: how it ended, or what it is doing, and its digest; the column's last ended ask also its last word (ADR-0070) |
+  | **outline** | its message, and one line: how it ended, or what it is doing, and its digest; the column's last ended ask also its last word (ADR-0106) |
   | **story** | its message, a digest line folding its work, and its last word |
   | **raw** | every message and tool row, under its digest line |
 
@@ -524,7 +524,7 @@ the tree.
   on screen and where they sit in the whole.
 - **Clicking a message in the rail brings it into view**: in the column that
   shows it, or in a new column opened beside it.
-- **Uneventful stretches are capsules** (ADR-0031, ADR-0056). A message is
+- **Uneventful stretches are capsules** (ADR-0031, ADR-0106). A message is
   always its own dot if it is the root's first message, a branch's first
   message, a fork, a thread end, a thread end someone else is reading, where
   the agent is replying, the end of a column you have open, or the message
@@ -581,7 +581,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   they are ▾", or "edits your files directly"), and opens the choices, the
   current one checked (ADR-0061). When you have WIP bookmarks, a second
   section says where its copy **starts from**: accepted work, or a WIP,
-  with how far that is behind accepted work (ADR-0060).
+  with how far that is behind accepted work (ADR-0104).
 - **Who else is here** (ADR-0024) shows where there is room for it:
   - the **rail** rings the dot at the end of each thread someone else is reading,
     in their colour, with a count when several do; hovering names them. The
@@ -633,7 +633,7 @@ The rail is E; the column is T. Seeing both at once is the product.
 
 - The speaker's name heads each human message; the agent's messages are marked
   as the agent's.
-- **Tool calls are rows under the agent's message** (ADR-0022): what the call
+- **Tool calls are rows under the agent's message** (ADR-0107): what the call
   touched (`read packages/core/tree.ts`, `bash pnpm test`), then ✓, ✗, or …
   while it has no result, with the result folded away. A long or multi-line
   command is cut in the label, and the opened row shows it whole in its
@@ -651,7 +651,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   place, and a column at its end does not get shorter while the agent works
   (ADR-0044).
   **Stop** ends the turn, and records who pressed it under the ask
-  (ADR-0056); cards queued are then held, until someone presses
+  (ADR-0106); cards queued are then held, until someone presses
   **release** (ADR-0048 step 7). Once it has stopped, **Resume**
   takes its place: it starts a new turn with a message from the host,
   "↻ resumed by <name>" (ADR-0082), until anything else is written at the
@@ -659,7 +659,7 @@ The rail is E; the column is T. Seeing both at once is the product.
 - **A column says what its agent is doing** (ADR-0054), and none of it moves
   the column. While the agent works, the mark before the thread's name in the
   header (its `✦`, or its banner, ADR-0053) pulses, titled with the ask it
-  works on, "the agent is working on Ada: "Fix the rail…"" (ADR-0056). In
+  works on, "the agent is working on Ada: "Fix the rail…"" (ADR-0106). In
   outline, the running ask's own line pulses instead of accepted work below. A
   short line pulses at the
   end of the column, centred, where its next text will appear. While a

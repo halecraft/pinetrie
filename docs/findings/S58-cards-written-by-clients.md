@@ -1,5 +1,8 @@
 # S58 — can clients write cards, and can the host spend them?
 
+- **Status:** Answered
+- **Led to:** ADR-0048, ADR-0059
+
 **Answers.**
 1. **Yes: clients can write the cards document on Yjs.** Two clients creating
    cards at once under unique keys both keep theirs, on every replica

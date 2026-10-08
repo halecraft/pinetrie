@@ -1,4 +1,4 @@
-// repo/accepted — accepted work in your repo (ADR-0060): what it is now,
+// repo/accepted — accepted work in your repo (ADR-0104): what it is now,
 // read as values for the host to plan from, and what catching your files up
 // with it would do (S80). Reads only; the host's steps that set it up and
 // publish it are `planSetup`, `planPublishCatchUp`, `planPublishMove` and
@@ -235,7 +235,7 @@ async function wipFacts(
 }
 
 /**
- * A WIP base's state (ADR-0060): landed when its bookmark points into the
+ * A WIP base's state (ADR-0104): landed when its bookmark points into the
  * line (moved there, or squashed into accepted work, which keeps the bookmark and
  * drops the WIP's change, S77 item 2), or, with the bookmark gone, when the
  * commit the lane's `Pinetrie-Base` names, or its change, is on accepted work.

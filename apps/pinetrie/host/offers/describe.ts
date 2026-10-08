@@ -1,5 +1,5 @@
 // host/offers/describe — an agent's commit message for a single offer
-// (ADR-0038): a one-shot model request outside the thread.
+// (ADR-0105): a one-shot model request outside the thread.
 
 import { type LaneName, projectTranscript } from "@pinetrie/core"
 import { readTreeIndex } from "@pinetrie/reads"

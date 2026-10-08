@@ -66,7 +66,7 @@ export const laneTipRef = (lane: LaneName): string =>
 export const laneTipName = (lane: LaneName): string => `tip@${laneRemote(lane)}`
 
 /**
- * A split's stack (ADR-0038): the bookmark its run leaves in the lane's own
+ * A split's stack (ADR-0105): the bookmark its run leaves in the lane's own
  * repo, and the remote bookmark it arrives as in yours.
  */
 export const stackBookmark = (lane: LaneName): string =>
@@ -78,8 +78,8 @@ export const laneStackName = (lane: LaneName): string =>
   `stack@${laneRemote(lane)}`
 
 /**
- * A lane's offer in your repo (ADR-0038). Not under `pinetrie/`, whose
- * bookmarks were immutable before ADR-0038 (S48 item 14).
+ * A lane's offer in your repo (ADR-0105). Not under `pinetrie/`, whose
+ * bookmarks were immutable when offers began (S48 item 14).
  */
 export const OFFER_PREFIX = "pinetrie-offer/"
 export const offerBookmark = (name: ThreadName): string =>
@@ -549,7 +549,7 @@ export function machineConfig(user: WrittenMachine): {
 
 /**
  * How pine·trie uses your repo (ADR-0100): accepted work's bookmark, the WIP
- * bookmarks' prefix (ADR-0060), the bookmark publishing moves to accepted
+ * bookmarks' prefix (ADR-0104), the bookmark publishing moves to accepted
  * work (ADR-0076), and whether a publish catches your files up and accepts
  * your commits first (ADR-0099).
  */
@@ -862,7 +862,7 @@ export const planAcceptedStart = (commit: CommitId): LaneStep[] => [
 ]
 
 /**
- * The lane steps that make a copy of a WIP (ADR-0060): a commit on `on`
+ * The lane steps that make a copy of a WIP (ADR-0104): a commit on `on`
  * with the WIP's files and a change id of its own, left as `@-`. Never the
  * WIP's own commits: the lane's tip, immutable in your repo, would make them
  * immutable (S48 item 11). Fetches nothing: the lane must hold both commits.
@@ -906,7 +906,7 @@ export interface MergePlan {
 }
 
 /**
- * An update's steps (ADR-0060). A WIP's copy fetches only the WIP's commit:
+ * An update's steps (ADR-0104). A WIP's copy fetches only the WIP's commit:
  * the copy's parent is the lane's own. The thread it branched from is merged
  * as accepted work's commit is, with no `Pinetrie-Base`: it is no base, and what
  * the lane holds of it is its history (ADR-0072).
@@ -994,7 +994,7 @@ export function planJoins(
  * its parent's change id, and your repo sees a divergent change. A base with
  * several parents is committed once, empty, so the bookmark names one commit.
  * A lane starting on accepted work or a WIP's copy is based on the commit that
- * names it (ADR-0060), installing dependencies when a WIP's lockfile differs
+ * names it (ADR-0104), installing dependencies when a WIP's lockfile differs
  * from the base disk's, which is accepted work's (`install`).
  */
 export function planForkSetup(
@@ -1234,7 +1234,7 @@ export interface BaseFacts {
  * changed.
  *
  * When the commit was rewritten rather than built on (a line moved with
- * `--ignore-immutable`, or your `@-` before ADR-0060), the fetched ref moves
+ * `--ignore-immutable`, or your `@-` before accepted work existed), the fetched ref moves
  * sideways: the import abandons the commit it named, and rebases the base's
  * working-copy commit, a child of it, with `--ignore-working-copy`. The
  * working copy is then stale, and `jj new` refuses until `jj workspace

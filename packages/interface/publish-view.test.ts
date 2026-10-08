@@ -219,7 +219,7 @@ describe("publishToast and resolveIntent (ADR-0090)", () => {
   })
 })
 
-describe("the thread's base in its header, and the bases a new lane may start from (ADR-0060)", () => {
+describe("the thread's base in its header, and the bases a new lane may start from (ADR-0104)", () => {
   const lane = laneNameForThread("1")
   const base = (state: "ok" | "landed" | "gone") =>
     ({

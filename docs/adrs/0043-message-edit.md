@@ -1,10 +1,17 @@
 # ADR-0043 — A message's edit is a branch at its parent, and its note sits below it; references are withdrawn
 
-**Status:** Accepted. Implementation: `PLAN-2026-09-29-message-tools`.
-Supersedes ADR-0006 and ADR-0017. Amends ADR-0025 (where a note is drawn, and
-what one opened on a message starts with). Amended by ADR-0048 (step 3,
-`PLAN-2026-10-01-notes-removed`): no note sits below a message, and the
-row of tools is copy, edit (or new tab), `→`.
+- **Status:** Accepted
+- **Area:** `docs/06-interface.md`
+- **Evidence:** S27
+- **Supersedes:**
+  - ADR-0006: references are withdrawn.
+  - ADR-0017: references are withdrawn.
+- **Amends:**
+  - ADR-0025: a note is drawn below its message, and one opened on a message
+    starts empty.
+- **Amended by:**
+  - ADR-0048: no note sits below a message, and the row of tools is copy, edit
+    (or new tab), `→`.
 
 **Context.** A message's tools were cite, edit and `→`, and none of them did
 what it seemed to.

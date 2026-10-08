@@ -1,13 +1,17 @@
 # ADR-0039 — A thread has a name you can say, and its offer is a work in progress until its run ends
 
-**Status:** Accepted. Evidence: S49. Implementation:
-`PLAN-2026-09-29-thread-names`. Amends ADR-0038 (the offer's bookmark, its
-placeholder line, and how it follows the lane and where it starts).
-**Amended by ADR-0040:** the header shows the name alone, as who works in the
-column; where the lane works moves to the work strip, as an effect.
-**Amended by ADR-0057:** a thread is named when its column first
-wants an agent, under a lane id the client makes, and its lane is created
-under that id at the first send.
+- **Status:** Accepted
+- **Area:** `apps/pinetrie/host/TECHNICAL.md`, `packages/rules/TECHNICAL.md`
+- **Evidence:** S49
+- **Amends:**
+  - ADR-0038: the offer's bookmark, its placeholder line, and how it follows
+    the lane and where it starts.
+- **Amended by:**
+  - ADR-0040: the header shows the name alone, as who works in the column;
+    where the lane works moves to the work strip, as an effect.
+  - ADR-0057: a thread is named when its column first wants an agent, under a
+    lane id the client makes, and its lane is created under that id at the
+    first send.
 
 **Context.** A thread's lane is named by a UUID, `t-01a0ed41-5f73-…`
 (ADR-0019). It names the offer's bookmark, so two threads made a minute

@@ -2,7 +2,7 @@
 //
 // A dot per message, a capsule per stretch of uneventful messages, and a line
 // per parent link, drawn from `compactRail`. A long ask is a dot and a
-// capsule of its own (ADR-0056). The rail is E (everything in this
+// capsule of its own (ADR-0106). The rail is E (everything in this
 // root); the lit column is T (what the agent reads). A track's colour comes
 // from the palette, seeded by the root (`useTrackColors`, ADR-0089), and the
 // column headers and fork dots take the same, so a branch looks the same

@@ -114,7 +114,7 @@ export type Outcome =
   | { readonly kind: "marked" }
   /** A model is asked for a root's title, which arrives as its mark (ADR-0074). */
   | { readonly kind: "retitling" }
-  /** The lane's offer is accepted into accepted work or a WIP now (ADR-0060). */
+  /** The lane's offer is accepted into accepted work or a WIP now (ADR-0104). */
   | { readonly kind: "accepted" }
   /** An offer action was carried out (squash, describe, refresh). */
   | { readonly kind: "offered" }
@@ -122,7 +122,7 @@ export type Outcome =
   | { readonly kind: "reserved" }
   /** Traces the sender has seen are gone (ADR-0048). */
   | { readonly kind: "seen" }
-  /** Accepted work was set up, or published (ADR-0060, ADR-0090). */
+  /** Accepted work was set up, or published (ADR-0104, ADR-0090). */
   | { readonly kind: "accepted-moved" }
   | Refusal
   /**

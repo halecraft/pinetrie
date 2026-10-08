@@ -1,5 +1,8 @@
 # S43 — pi's tools in a lane's container, moving commits, a turn's cost, and what a lane reaches
 
+- **Status:** Answered
+- **Led to:** ADR-0034
+
 ADR-0034 (proposed) runs every lane's tools in a Linux container on its own
 disk, and moves work between repos as commits. Its "Not measured" list held
 the pieces the plan depends on: pi's tools through `container exec`, how the

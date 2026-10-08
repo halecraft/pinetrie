@@ -1,5 +1,8 @@
 # S18 — can pi's values be stored nested, `values[namespace][key]`?
 
+- **Status:** Answered
+- **Led to:** ADR-0016, ADR-0017, ADR-0095
+
 **Answer: no.** A child container created lazily under a record key LOSES one
 writer's contents when two replicas create it concurrently. Probe:
 `sandbox/s18-nested-values/probe.ts`.

@@ -1,6 +1,7 @@
 # S1 — Dissolve the global dense `seq`
 
-**Status:** Answered. Led to ADR-0013.
+- **Status:** Answered
+- **Led to:** ADR-0013
 
 ## Brief
 

@@ -1,19 +1,23 @@
 # ADR-0030 — Your tabs are yours; the header shows who is here, and your inbox of mentions
 
-**Status:** Accepted. Implemented by `PLAN-2026-09-27-your-tabs-inbox`.
-Amends ADR-0029 (the tab bar is each person's; closing a tab is yours) and
-ADR-0027 (a stored layout holds your open roots, and the device keeps which
-mentions you have seen). Amended by ADR-0037: you are your email, so your
-other tabs and devices are you, and your tabs are yours per device. Amended
-by ADR-0069: `@` is the header's activity menu's mentions, and its count
-part of that menu's badge, with open offers. Amended by ADR-0077: which
-mentions you have seen is kept per person, in your attention document, not
-per device. Amended by ADR-0081: the header holds your tabs, and the
-message count moved to the Archive tab.
-Amended by ADR-0085: your tabs are your list, kept per person; the header's
-people go, and who is where shows on your list's items and the board's.
-Amended by ADR-0091: your inbox sits beside your avatar, and holds what
-the threads you follow raise as well as your mentions.
+- **Status:** Accepted
+- **Area:** `docs/06-interface.md`, `packages/interface/TECHNICAL.md`
+- **Amends:**
+  - ADR-0027: it also holds your open roots.
+  - ADR-0029: the tab bar is each person's, and a tab closes for you.
+- **Amended by:**
+  - ADR-0037: you are your email, so your other tabs and devices are you, and
+    your tabs are yours per device.
+  - ADR-0069: `@` is the header's activity menu's mentions, and its count part
+    of that menu's badge, with open offers.
+  - ADR-0077: which mentions you have seen is kept per person, in your
+    attention document, not per device.
+  - ADR-0081: the header holds your tabs, and the message count moved to the
+    Archive tab.
+  - ADR-0085: your tabs are your list, kept per person; the header's people
+    go, and who is where shows on your list's items and the board's.
+  - ADR-0091: your inbox sits beside your avatar, and holds what the threads
+    you follow raise as well as your mentions.
 
 **Context.** ADR-0029 gave everyone the same tab bar, every root not archived,
 and rejected tabs each person opens and closes: a collaborator's new root would

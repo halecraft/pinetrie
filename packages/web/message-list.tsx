@@ -1,6 +1,6 @@
 // web/message-list — a column's messages, memoised as a whole
 // (`message-list-props.ts`): the part of a column that grows with its thread.
-// Each ask's work is drawn together, folded or open (`AskWork`, ADR-0056).
+// Each ask's work is drawn together, folded or open (`AskWork`, ADR-0106).
 
 import { ancestry, type EntryId } from "@pinetrie/core"
 import {

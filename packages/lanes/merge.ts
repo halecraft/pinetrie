@@ -1,4 +1,4 @@
-// lanes/merge — a thread's base merged into its lane (ADR-0033, ADR-0060).
+// lanes/merge — a thread's base merged into its lane (ADR-0033, ADR-0104).
 //
 // The lane merges accepted work's commit, or a fresh copy of its WIP (`planMerge`),
 // into itself, in its own repo: jj records conflicts in the merge rather than
@@ -186,7 +186,7 @@ export async function mergeBase(
 /**
  * An empty commit on the lane's bookmark, described `message`: a thread
  * moved to accepted work when accepted work has nothing the lane lacks still needs its
- * newest `Pinetrie-Base` to say so (ADR-0060). Returns it.
+ * newest `Pinetrie-Base` to say so (ADR-0104). Returns it.
  */
 async function markBase(
   jj: Runner,
@@ -197,7 +197,7 @@ async function markBase(
 }
 
 /**
- * A lane's base as its history says it (ADR-0060): the newest commit in
+ * A lane's base as its history says it (ADR-0104): the newest commit in
  * `::rev` whose message carries a base trailer, read with `jj` (the lane's,
  * or your repo's on the lane's tip). Its value names accepted work, or a WIP
  * by its bookmark (`baseOf`, by `wipPrefix`), and the commit it pointed at;
@@ -375,7 +375,7 @@ const withoutAcceptedOfferCommits = (
   joined.length === 0 ? range : `(${range}) ~ (${joined.join(" | ")})`
 
 /**
- * An update in a lane, after its edits are committed (ADR-0060): `plan`'s
+ * An update in a lane, after its edits are committed (ADR-0104): `plan`'s
  * steps, the accepted-offer commits it holds joined and the merge (`mergeBase`), a mark when
  * the plan asks and nothing merged, then what the merge left. The caller
  * runs it on the lane's queue.

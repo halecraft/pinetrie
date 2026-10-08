@@ -1,13 +1,14 @@
 // scripts/numbering — no two files in a numbered docs directory share a
 // number, and each file's title carries its file's number. Pure, apart from
-// `readDocs`: the files come in, and what breaks the rule comes out.
+// `readRecord`: the files come in, and what breaks the rule comes out.
 //
 // Spikes (`docs/findings`) and ADRs (`docs/adrs`) each take the next number
-// free on the trunk. Two lanes can take the same one, and their files merge
-// without a conflict because their slugs differ, so only this check sees it.
-// The file that landed second renumbers (`docs/adrs/README.md`, Numbering).
+// free on the trunk, counting their `archive/` folders. Two lanes can take
+// the same one, and their files merge without a conflict because their
+// slugs differ, so only this check sees it. The file that landed second
+// renumbers (`docs/adrs/README.md`, Numbering).
 
-import { readdirSync, readFileSync } from "node:fs"
+import { existsSync, readdirSync, readFileSync } from "node:fs"
 import path from "node:path"
 
 /** A numbered docs directory: how its files and titles carry a number. */
@@ -34,10 +35,10 @@ export const ADRS: Numbering = {
 
 export const NUMBERINGS: readonly Numbering[] = [FINDINGS, ADRS]
 
-/** A Markdown file, as the check sees it. */
-export interface DocFile {
-  readonly name: string
-  readonly firstLine: string
+/** A file of the record: its repo-relative path, and its text. */
+export interface RecordFile {
+  readonly path: string
+  readonly text: string
 }
 
 export interface NumberingGaps {
@@ -54,17 +55,22 @@ export interface NumberingGaps {
 }
 
 /**
- * Which of `files` are numbered, which numbers clash, and which titles
- * disagree with their file. Numbers compare as integers, so `S7` and `S72`
- * differ.
+ * Which of `files` in `n.dir` or below are numbered, which numbers clash,
+ * and which titles disagree with their file. A file is named by its path
+ * under `n.dir` (`archive/0011-lane-identity.md`). Numbers compare as
+ * integers, so `S7` and `S72` differ.
  */
 export function numberingGaps(
   n: Numbering,
-  files: readonly DocFile[],
+  files: readonly RecordFile[],
 ): NumberingGaps {
   const numbered = files.flatMap(f => {
-    const digits = n.file.exec(f.name)?.[1]
-    return digits === undefined ? [] : [{ ...f, digits }]
+    if (!f.path.startsWith(`${n.dir}/`)) return []
+    const digits = n.file.exec(path.basename(f.path))?.[1]
+    if (digits === undefined) return []
+    const name = f.path.slice(n.dir.length + 1)
+    const firstLine = f.text.split("\n", 1)[0] ?? ""
+    return [{ name, firstLine, digits }]
   })
   const clashes = [...Map.groupBy(numbered, f => Number(f.digits))]
     .filter(([, same]) => same.length > 1)
@@ -79,14 +85,20 @@ export function numberingGaps(
   return { clashes, mismatches }
 }
 
-/** Every `*.md` in `n.dir` under `root`, with its first line. */
-export const readDocs = (root: string, n: Numbering): readonly DocFile[] =>
-  readdirSync(path.join(root, n.dir))
-    .filter(name => name.endsWith(".md"))
-    .toSorted()
-    .map(name => ({
-      name,
-      firstLine:
-        readFileSync(path.join(root, n.dir, name), "utf8").split("\n", 1)[0] ??
-        "",
-    }))
+/** The folders of the record, repo-relative: each numbering's, and its archive. */
+export const RECORD_DIRS: readonly string[] = NUMBERINGS.flatMap(n => [
+  n.dir,
+  `${n.dir}/archive`,
+])
+
+/** Every `*.md` in the record's folders under `root`, with its text. */
+export const readRecord = (root: string): readonly RecordFile[] =>
+  RECORD_DIRS.filter(dir => existsSync(path.join(root, dir))).flatMap(dir =>
+    readdirSync(path.join(root, dir))
+      .filter(name => name.endsWith(".md"))
+      .toSorted()
+      .map(name => ({
+        path: `${dir}/${name}`,
+        text: readFileSync(path.join(root, dir, name), "utf8"),
+      })),
+  )

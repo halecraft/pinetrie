@@ -1,8 +1,11 @@
 # ADR-0050 — A thread's column has a banner: drawn from the thread after its first run, or set by the person through the agent
 
-**Status:** Accepted. Implementation: `PLAN-2026-09-30-column-banners`.
-Measured in S60. Amended by ADR-0053: the banner is a square icon drawn
-from the thread's name alone, as the thread is named, with no crop.
+- **Status:** Accepted
+- **Area:** `apps/pinetrie/host/TECHNICAL.md`
+- **Evidence:** S60
+- **Amended by:**
+  - ADR-0053: the banner is a square icon drawn from the thread's name alone,
+    as the thread is named, with no crop.
 
 **Context.** A tab can hold many columns, and each header shows the same
 things: a colour stripe, a two-word name (ADR-0039), avatars. Threads are

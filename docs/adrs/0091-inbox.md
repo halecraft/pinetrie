@@ -1,15 +1,23 @@
 # ADR-0091 — Your inbox sits by your avatar; the board shows where the agent works and what is ready to accept
 
-**Status:** Accepted (Duane, 2026-10-05). Implemented by
-`PLAN-2026-10-05-inbox-by-you`. Amends ADR-0030 (the inbox holds what the
-threads you follow raise as well as mentions), ADR-0069 (the activity menu
-goes: its personal sections are the inbox, its runs a count on the strip,
-and the trigger is always drawn), ADR-0077 (an open offer is marked on the
-board for everyone, and listed and counted in your inbox for its
-followers) and ADR-0085 (the footer: the inbox under your list, the strip
-counts running work and work ready to accept). Builds on ADR-0090.
-Amended by ADR-0098: the inbox is an icon button in the
-corner; folded, it is in the account menu.
+- **Status:** Accepted (Duane, 2026-10-05)
+- **Area:** `docs/06-interface.md`, `packages/interface/TECHNICAL.md`
+- **Amends:**
+  - ADR-0030: your inbox sits beside your avatar, and holds what the threads
+    you follow raise as well as your mentions.
+  - ADR-0069: the activity menu goes; its personal sections are your inbox,
+    beside your avatar, which is always drawn, and running work is a count on
+    the board's strip.
+  - ADR-0077: an open offer is marked on the board for everyone, and listed
+    and counted in your inbox for its followers.
+  - ADR-0085: under your list, your inbox sits between your avatar and your
+    inventory; the activity menu goes, and each state on the strip counts its
+    roots where the agent works and those with work ready to accept.
+- **Amended by:**
+  - ADR-0098: the inbox is an icon button in the corner; folded, it is in the
+    account menu.
+
+Builds on ADR-0090.
 
 **Context.** The footer splits where your list's edge does: what is yours
 under your list, what is everyone's to the right (ADR-0085). The activity

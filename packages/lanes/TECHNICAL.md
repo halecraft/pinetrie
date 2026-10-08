@@ -91,7 +91,7 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
 ## Forks
 
 - **A fork with no revision above it starts from its thread's base**
-  (`planForkSetup`, ADR-0060): on accepted work, an empty commit on accepted work's
+  (`planForkSetup`, ADR-0104): on accepted work, an empty commit on accepted work's
   commit (`planAcceptedStart`); on a WIP, a copy of the WIP made in the lane
   (`planWipCopy`): a commit on accepted commit under the WIP, with the WIP's
   files restored. Never the WIP's own commits: the lane's tip, a remote
@@ -151,7 +151,7 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   history is 1.1 MB and 253 ms on pine·trie's repo, against 8 KB and 29 ms for
   one commit (S43 item 8).
 - **In your repo a lane's history is a remote bookmark**, `tip@pinetrie-<lane>`
-  (ADR-0038). jj imports a ref under `refs/remotes/` with no git remote
+  (ADR-0105). jj imports a ref under `refs/remotes/` with no git remote
   configured, keeps its commits out of your default log, and treats them,
   and their ancestors, as immutable with its builtin config (S48 items 11 and
   19). `laneRefSteps` (`@pinetrie/repo`) is the one writer of the ref besides
@@ -393,7 +393,7 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   a lane: `jj commit`, read `@-`, move the lane's bookmark. `commitTurn`,
   `mergeBase` and the mark of a move to accepted work all end with it.
 - **`changedPaths`** is a turn's paths, from the bookmark before it to its
-  commit, made or adopted, which its revision records (ADR-0056): `jj diff
+  commit, made or adopted, which its revision records (ADR-0106): `jj diff
   -T PATH_LINE`, `json(path)` a line, which is from the repo's root
   whatever the process's directory, and quotes any character (S70). An
   update's changed files use it too. **Not git:** git reads a conflicted jj
@@ -404,7 +404,7 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   files (`jj file list -T 'if(conflict, …)'`), in a lane and in your repo;
   it throws, and a caller that reads none on failure says so at the call.
   `conflictsIn` snapshots the lane first, then reads `@`.
-- **An update merges the thread's base** (`mergeBase`, ADR-0060): the
+- **An update merges the thread's base** (`mergeBase`, ADR-0104): the
   line's commit, or a fresh copy of the WIP (`planWipCopy`) made on the
   lane's previous copy, so conflicts the lane already resolved do not come
   back. Or the newest commit of the thread it branched from (`planMerge`'s

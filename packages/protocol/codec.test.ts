@@ -89,7 +89,7 @@ test("decode: queue is the host's own mode, never a client's (ADR-0048)", () => 
   )
 })
 
-test("decode: the update command is gone (ADR-0055): an unknown kind", () => {
+test("decode: the update command is gone (ADR-0108): an unknown kind", () => {
   assert.equal(
     refusalCode(decodeCommand({ kind: "update", lane: "lane:abc" })),
     ERR.UNKNOWN_KIND,

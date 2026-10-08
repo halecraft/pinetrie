@@ -571,7 +571,7 @@ one on any entry, since the rule is the same everywhere.
   decide by it. The decoder checks only the shape (a non-empty title): the
   host is the session's one writer, and stores only parsed titles.
 
-# Stops (`stop.ts`, ADR-0056)
+# Stops (`stop.ts`, ADR-0106)
 
 Who stopped an ask's run: a host-written `pinetrie.stop` value keyed by the
 ask's prompt, holding who and when. pi's entries say only that a run was
@@ -601,7 +601,7 @@ Ada"). It is a prompt, so its run is an ask of its own (`PROMPT_ROLES`).
   once (`refusedCarryOn`). It takes the lane with its tree and asks, or
   null for a lane no root holds, which it refuses `UNKNOWN_TARGET`.
 
-# Digests (`digest.ts`, ADR-0056, ADR-0075)
+# Digests (`digest.ts`, ADR-0106, ADR-0075)
 
 A model's headline and few points for a long ask's work, unless
 `{ "digests": { "enabled": false } }` is in the user config
@@ -726,7 +726,7 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
     the lane above, and the walk passes it.
   - A record from before lane containers has no `snapshot` key, which decodes
     as null.
-  - Only a turn's own commit carries `paths` (`changedPaths`, ADR-0056): a
+  - Only a turn's own commit carries `paths` (`changedPaths`, ADR-0106): a
     prompt's newest revision is what came before it. A record from before
     paths decodes with none. An ask's file count is the union of its turns'
     paths (`workStats`), so it is what its review lists.
@@ -748,7 +748,7 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
   message's text when its thread works, or will work, in its own copy, so
   people and the model read the same stored text (ADR-0034).
 
-# Offers (`offer.ts`, `offer-view.ts`, `review.ts`, ADR-0038)
+# Offers (`offer.ts`, `offer-view.ts`, `review.ts`, ADR-0105)
 
 A lane's work reaches you as an offer: one revision, or a stack, in your
 repo. Its record is `OFFER` (`offer.ts`):
@@ -840,14 +840,14 @@ commit-message request `request.ts` (`describeRequest`).
   is `open` whatever its files.
   The host's records not yet accepted, open or held, are `isNotYetAccepted`: the lanes it
   marks on a full observation, and the records `@` rewrites.
-- **An offer's record is the page's cache** (ADR-0060): written from the
+- **An offer's record is the page's cache** (ADR-0104): written from the
   repo after each of the host's steps, never read back to decide. Its
   `commits` are the revisions' commits at that read, what a review may
   read. A divergent offer is recorded only once repaired.
 
 ## What the page reads (`offer-view.ts`, `accepted.ts`)
 
-- **`offerView`** is ADR-0038's state table as a decision, from an
+- **`offerView`** is the work strip's states (ADR-0105) as a decision, from an
   `OfferStatus`: the offer's state, its buttons, its menu, which of those
   are `quiet` (listed, but changing nothing now), and the facts its words
   are made from (`OfferFacts`: files, size, conflicts, bookmark, held, the
@@ -899,7 +899,7 @@ commit-message request `request.ts` (`describeRequest`).
 
 - **The review's wire** (ADR-0047) is here, since the host and the page both
   import it:
-  - Every read is of a span (`DiffSpan`, ADR-0056): a revision, or a range
+  - Every read is of a span (`DiffSpan`, ADR-0106): a revision, or a range
     from one commit to another. `reviewUrl` and `diffUrl` build
     `/offer/<OFFER_WIRE>/review/<span>` and
     `/offer/<OFFER_WIRE>/diff/<span>?path=…`, the span as `spanKey` writes
@@ -917,7 +917,7 @@ commit-message request `request.ts` (`describeRequest`).
     `answerReview` and `answerDiff` settle what was read: 502 when the
     read failed, 413 past `MAX_DIFF_BYTES`.
 
-# Accepted work and a thread's base (`accepted.ts`, ADR-0060, ADR-0061, ADR-0072)
+# Accepted work and a thread's base (`accepted.ts`, ADR-0104, ADR-0061, ADR-0072)
 
 | record | namespace | key | written |
 |---|---|---|---|
@@ -961,7 +961,7 @@ commit-message request `request.ts` (`describeRequest`).
   to do", which the page's hidden button reads too. `acceptedRefusal` words
   each refusal once, naming files with `named`, for the host's answer and
   the button's title.
-- **`pinetrie.accepted` and `pinetrie.base` are caches** (ADR-0060): the repo is
+- **`pinetrie.accepted` and `pinetrie.base` are caches** (ADR-0104): the repo is
   the ledger, and the host rewrites each from it. A lost one costs a read.
   A `pinetrie.accepted` from before `publish` and `published` (ADR-0076), or
   before `yours.catchUp` and a numeric `yours.ahead` (ADR-0090), does not
@@ -1062,14 +1062,14 @@ and the total `decodePinned` are the only code that builds or reads it, and
 - **`PINNED_RULE`** is the line every agent thread's `<rules>` holds
   (`packages/pi`).
 
-# Updates and stacks (`update.ts`, ADR-0038)
+# Updates and stacks (`update.ts`, ADR-0105)
 
 Two pi `CustomMessage`s in `land.ts`'s pattern, as is the carry-on message
 (`stop.ts`, above). An update (`pinetrie.update`,
 role `update`) is a fact in the thread, never a prompt: which of your commits
 came in and which files changed, so the agent's next run reads them again.
 The card that brought the thread up to date carries what the person wants
-done with it (ADR-0055); its text is sent after the update. A stack message (`pinetrie.stack`, role `stack`) is the prompt of the run that
+done with it (ADR-0108); its text is sent after the update. A stack message (`pinetrie.stack`, role `stack`) is the prompt of the run that
 splits an offer: the `offer-stack` skill, the commit the stack starts from,
 the tip it must match, and the bookmark to leave on it.
 
@@ -1157,7 +1157,7 @@ Gotchas:
   the prompt's size.
 
 - **`planResolution`**'s prompt names the project's work, and ends with the
-  card's text, whole, under its own heading (ADR-0055).
+  card's text, whole, under its own heading (ADR-0108).
 - **A resolution has no record** (ADR-0080, S104): in progress, it is a
   running lane whose prompt is a land message; ended, it ended as any run
   does. What it left conflicted is the offer's, and whether the agent asked

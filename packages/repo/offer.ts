@@ -1,4 +1,4 @@
-// repo/offer — the separate reads of an offer in your repo (ADR-0038).
+// repo/offer — the separate reads of an offer in your repo (ADR-0105).
 //
 // Reads only, each a query over jj on your repo (a step's, or a pinned read's)
 // returning values: the facts an offer step plans from (`readOffer`,

@@ -1,17 +1,23 @@
 # ADR-0040 — A column's header says who works in it and where it came from; its work shows at its foot
 
-**Status:** Accepted. Implementation: `PLAN-2026-09-29-column-header`.
-Amends ADR-0032 (a direct lane's column says where it works and that it is
-shared), ADR-0038 (the column's offer table, and where the offer is shown)
-and ADR-0039 (the header's "amber-fox · own copy").
-**Amended by ADR-0047:** the offer's line opens its review, and its bookmark
-copies on a press.
-**Amended by ADR-0057:** a fresh column that wants an agent is
-named at once, so `✦ new agent` shows only until its name arrives.
-**Amended by ADR-0073:** the name opens the thread's details; the reveal of
-where its lane started is in them, offered only below the path's first
-message.
-**Amended by ADR-0102:** there is no direct lane, and no direct work strip.
+- **Status:** Accepted
+- **Area:** `docs/06-interface.md`, `packages/interface/TECHNICAL.md`
+- **Amends:**
+  - ADR-0032: a direct lane's column no longer says where it works and that
+    the directory is shared; its work strip says where its changes land, and
+    warns only while another lane runs there.
+  - ADR-0038: the offer moves from the column's header to its work strip, and
+    its lines become plain words, with the bookmark shown apart.
+  - ADR-0039: the header shows the name alone, as who works in the column;
+    where the lane works moves to the work strip, as an effect.
+- **Amended by:**
+  - ADR-0047: the offer's line opens its review, and its bookmark copies on a
+    press.
+  - ADR-0057: a fresh column that wants an agent is named at once, so `✦ new
+    agent` shows only until its name arrives.
+  - ADR-0073: the name opens the thread's details; the reveal of where its
+    lane started is in them, offered only below the path's first message.
+  - ADR-0102: there is no direct lane, and no direct work strip.
 
 **Context.** A column's header was one row holding everything the column knew
 about itself: the grip, "from Ada: …" (or "thread", "new chat", "new · with

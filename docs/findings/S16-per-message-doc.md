@@ -1,6 +1,9 @@
 # S16 — Can a disposable per-message doc remove the streaming residue?
 
-**Status:** Moot since ADR-0023: compaction removes the residue.
+- **Status:** Moot
+- **Led to:** ADR-0014
+
+Moot since ADR-0023: compaction removes the residue.
 
 > **Resolved without the spike.** The residue was Loro keeping each finished
 > stream's history. Since ADR-0023 the session is `json.bind` and is compacted

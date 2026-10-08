@@ -1,0 +1,4 @@
+# Search skips the record's archive unless its path is named: superseded
+# ADRs, and spikes no ADR in force rests on (docs/adrs/README.md).
+docs/adrs/archive/
+docs/findings/archive/

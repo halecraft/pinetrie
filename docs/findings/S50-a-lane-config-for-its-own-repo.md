@@ -1,5 +1,8 @@
 # S50 — a lane's jj config, for its own repo only
 
+- **Status:** Answered
+- **Led to:** ADR-0034
+
 A lane's container sets `JJ_CONFIG=/workspace/.pinetrie-lane/jj.toml`, which
 makes the fork's inherited history immutable (S42 item 4, ADR-0034). The
 variable reaches every jj command in the container, not only the lane's repo.

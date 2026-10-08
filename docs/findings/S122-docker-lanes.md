@@ -1,6 +1,9 @@
 # S122 — Docker in a Colima VM can run lanes on the Mac: btrfs snapshots branch a lane in 2 ms, `docker exec` takes 32 ms, but lanes share one kernel and the Mac reaches them only through published ports
 
-**Status:** Answered. Follows S132. No ADR yet.
+- **Status:** Answered
+- **Led to:** ADR-0102, ADR-0103
+
+Follows S132.
 
 **Question.** Could Docker run lanes on the Mac, given that it already runs
 on Linux, so that one lane runtime serves both? In a Colima VM:

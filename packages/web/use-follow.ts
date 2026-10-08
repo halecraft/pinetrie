@@ -37,7 +37,7 @@ export interface Follow {
  * With `seen`, it starts with ↓ new below showing when `seen.unseen` (read
  * at mount only), and tells `seen.leave` whether it was showing, and the
  * tip it was released from: on unmount, and when the page is hidden, since
- * most context switches leave the browser, not the tab (ADR-0056).
+ * most context switches leave the browser, not the tab (ADR-0106).
  * The first placement keeps it only short of the end: nothing clears it
  * before then, since a scroller's first resize comes after `alignOnOpen`.
  * `tip` is the column's tip now, which a release keeps (`releasedTip`).

@@ -62,11 +62,11 @@ describe("immutableHeads: accepted work and its offers added to yours", () => {
   })
 })
 
-describe("offers (ADR-0038)", () => {
+describe("offers (ADR-0105)", () => {
   const op = (...args: string[]) => `jj as host: ${args.join(" ")}`
-  /** A rewrite of an offer, which may be immutable on accepted work (ADR-0060). */
+  /** A rewrite of an offer, which may be immutable on accepted work (ADR-0104). */
   const rw = (...args: string[]) => op("--ignore-immutable", ...args)
-  test("offerStart: the base's commit, and the history of each accepted source (ADR-0060)", () => {
+  test("offerStart: the base's commit, and the history of each accepted source (ADR-0104)", () => {
     expect(offerStart({ tip: C1, start: C2, sources: [] })).toBe(
       "heads(::c1 & (c2))",
     )
@@ -155,7 +155,7 @@ describe("offers (ADR-0038)", () => {
       rw("describe", "-r", "ch", "-m", "WIP (amber-fox): x"),
     )
   })
-  test("planOfferAcceptanceSteps: the destination moved forward to the top, as the host, never with --allow-backwards (ADR-0060)", () => {
+  test("planOfferAcceptanceSteps: the destination moved forward to the top, as the host, never with --allow-backwards (ADR-0104)", () => {
     expect(
       argvs(
         planOfferAcceptanceSteps({
@@ -199,7 +199,7 @@ describe("offers (ADR-0038)", () => {
       `git fetch -q /tmp/b.bundle +refs/heads/pinetrie/${LANE}-stack:refs/remotes/pinetrie-${LANE}/stack`,
     )
   })
-  test("accepted work's setup is the host's bookmark and your config (ADR-0060)", () => {
+  test("accepted work's setup is the host's bookmark and your config (ADR-0104)", () => {
     expect(
       argvs(
         planSetup({
@@ -535,7 +535,7 @@ describe("planLaneRead: what one lane's rows say", () => {
   })
 })
 
-describe("wipState: landed, gone, or ok (ADR-0060, S77 item 2)", () => {
+describe("wipState: landed, gone, or ok (ADR-0104, S77 item 2)", () => {
   const W = commitId("w1")
   test.each([
     [

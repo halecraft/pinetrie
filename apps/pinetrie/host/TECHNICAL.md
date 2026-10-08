@@ -22,7 +22,7 @@ wires them.
 | `pinned.ts` | what a run reads of its thread's pinned cards (ADR-0048 step 5): `readPinned` gathers, waits a bounded time for the sender's text (`waitFor`), and plans the cards entry |
 | `base-news.ts` | what a thread is told of its base's new work (ADR-0080): `atStart`, a chat's run's behind entry; `baseChanged`, a steer into a running lane, at most once per base commit (`told`), heard from lane work's `onBaseChanged`; `runEnded` forgets what was steered. Made after the agent, whose lanes it steers |
 | `split-call.ts` | `split_offer` (ADR-0080): a split card queued on the thread, popped when its run ends: pi calls it only during a run, so its step is queued before the run's end queues the drain, which the keeper runs after it |
-| `queued-card-pop.ts` | popping a lane's queued cards to send them (ADR-0048, ADR-0083): `popNextQueuedCard`, and `drain`, which carries each out as `planCarry` decides: a fact appended, a catch-up, a split's run, a message sent (ADR-0055, ADR-0080); and `createWaits`, the drain's waits for its top card's text or for someone's typing in it to stop (ADR-0048 step 7) |
+| `queued-card-pop.ts` | popping a lane's queued cards to send them (ADR-0048, ADR-0083): `popNextQueuedCard`, and `drain`, which carries each out as `planCarry` decides: a fact appended, a catch-up, a split's run, a message sent (ADR-0108, ADR-0080); and `createWaits`, the drain's waits for its top card's text or for someone's typing in it to stop (ADR-0048 step 7) |
 | `settle.ts` | what happens between runs: drains, then the compaction and sweep as upkeep (the keeper's `later`) |
 | `housekeeping.ts` | which documents a run's end compacts (`planCompaction`: its roots, the session, the places, `pinetrie:live`), deleting images nothing shows, retiring histories of moves (`sweepHistories`), and deleting holds on queues nobody can use (`sweepHolds`, ADR-0048 step 7) |
 | `docs.ts` | `HostDocuments`: every document the host holds, a root's opened as it is asked for, `onOpened`, which replays the roots already held to a listener that joins late, and `onReleasing`, whose listeners `unload` awaits, in order, before it lets a root go; `planLoads` |
@@ -43,7 +43,7 @@ wires them.
 | `offers/` | each lane's offer in your repo, on the owner of your repo (§ Offers); accepted work's record and commands are `work/accepted.ts`'s |
 | `names.ts` | every thread's name (ADR-0039): `ensure` for the lanes pi holds, `reserve` for a lane id a column reserved before its lane exists (ADR-0057), on one queue |
 | `banners.ts` | each thread's column banner (ADR-0050, ADR-0053): made as the thread is named, at reservation or creation, set by `set_banner` |
-| `digests.ts` | each ask's digest (ADR-0056), unless the user config turns them off (ADR-0071) |
+| `digests.ts` | each ask's digest (ADR-0106), unless the user config turns them off (ADR-0071) |
 | `outside.ts` | `requestOutside`: a model request outside a keeper, its answer written in a step of its own |
 | `fakes.ts` | test support: `record<T>()`, `fakeLane`, `row`, `putValue` and `applyWrites` (each write to the document its target names, through the real `applyRecordWrites`), `writesOf`, `basics` (one root, `ROOT_ID`, in `fakeDocuments`), `putLane`, `writeDirectory` |
 
@@ -482,7 +482,7 @@ rejects `shutdown()`.
 - **Shutdown disposes them, then flushes,** so a stack's open step is
   stored before the Exchange stops.
 
-## The queue (`queued-card-pop.ts`, ADR-0048, ADR-0055)
+## The queue (`queued-card-pop.ts`, ADR-0048, ADR-0108)
 
 - **Popping the next queued card is one synchronous step** (`popNextQueuedCard`): read that the card is
   queued and on top, read its text, remove its record (raising `rev`). A
@@ -546,7 +546,7 @@ rejects `shutdown()`.
 - **`reserve` is answered `reserved`** whether it named the id or the id
   had a name already, so a column may send it again; an id pi holds is
   refused `lane_id_in_use`.
-- **Stop records who pressed it before it aborts** (ADR-0056): `planStop`
+- **Stop records who pressed it before it aborts** (ADR-0106): `planStop`
   (`@pinetrie/rules`) gives the `pinetrie.stop` record for the running ask's prompt, unless one is
   there, and `handleStop` writes it, then asks pi to abort, in one step. So
   the record is there when the run's end is drawn, and the first press is
@@ -590,7 +590,7 @@ message an owner command), after that step decides it is still wanted (`bannerSt
 failure is logged, never thrown. With `held`, a key is in a set while the
 request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 
-## Digests and verdicts (`digests.ts`, ADR-0056, ADR-0077)
+## Digests and verdicts (`digests.ts`, ADR-0106, ADR-0077)
 
 - **Always made.** The user config's `digests` (`enabled`) turns off live
   digests and the final digest; a run's end still asks for its verdict.
@@ -820,7 +820,7 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   for one import, S78, must not withdraw a live offer), the last catch-up
   read (`pinetrie.base`, a memo `readCatchUp` keeps at the same tip and base
   commit, never read to decide), the lane's tip entry and the WIP line.
-  Everything else is read from your repo (ADR-0060), and where an offer
+  Everything else is read from your repo (ADR-0104), and where an offer
   sits is decided once there (`OfferPlace`): a WIP gone moves nothing and
   writes only its base record; an untraced start builds nothing, so squash,
   refresh, describe and a split's span refuse it, while an acceptance, a

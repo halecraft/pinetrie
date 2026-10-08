@@ -1,9 +1,13 @@
 # ADR-0089 — Each root's branches start from a colour of their own: a larger palette, seeded by the root's id
 
-**Status:** Proposed. Evidence: S110. Implementation:
-`PLAN-2026-10-05-pane-fits-strip`. Amends ADR-0068 (a track is still a
-branch's rank, but its colour now depends on its root) and ADR-0029
-(trunks no longer share a colour).
+- **Status:** Accepted (Duane, 2026-10-08)
+- **Area:** `docs/06-interface.md`, `packages/web/TECHNICAL.md`
+- **Evidence:** S110
+- **Amends:**
+  - ADR-0029: tracks still start at 0, but trunks no longer share a colour:
+    each root's id seeds its palette.
+  - ADR-0068: a track is still a branch's rank, but its colour starts from a
+    slot its root's id picks, in a larger palette.
 
 **Context.**
 

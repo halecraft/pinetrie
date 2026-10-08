@@ -1,14 +1,16 @@
 # ADR-0027 — Open columns are kept per tab, with the device's latest as a fallback, and never in the document
 
-**Status:** Accepted. Evidence: S29. Implemented by `PLAN-2026-09-26-persist-columns`.
-Amended by ADR-0028, proposed (a stored layout holds the focused piece of
-work), and by ADR-0029, which replaces that: a stored layout holds
-the active root tab and each root's columns; and by ADR-0030: it
-also holds your open roots. ADR-0037 makes a person their email, so a tab is
-no longer a writer.
-Amended by ADR-0085: your open roots leave the stored layout for your own
-document, on every device; the layout keeps which root you are on, each
-root's columns, new tabs and whether the board is open.
+- **Status:** Accepted
+- **Area:** `docs/06-interface.md`, `packages/interface/TECHNICAL.md`
+- **Evidence:** S29
+- **Amended by:**
+  - ADR-0029: a stored layout holds the active root tab and each root's
+    columns, in place of ADR-0028's change.
+  - ADR-0030: it also holds your open roots.
+  - ADR-0037: a person is their email, so a tab is no longer a writer.
+  - ADR-0085: your open roots leave the stored layout for your own document,
+    on every device; the layout keeps which root you are on, each root's
+    columns, new tabs and whether the board is open.
 
 **Context.** Which columns are open is view state, never written (ADR-0024's
 reasoning: which paths a person reads is theirs). Nothing else kept it either,

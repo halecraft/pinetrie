@@ -1,4 +1,4 @@
-// stop — who stopped an ask's run (ADR-0056), and carrying on after it
+// stop — who stopped an ask's run (ADR-0106), and carrying on after it
 // (ADR-0082). pi's entries say that a run was aborted, never by whom (S70),
 // so the host records it under the ask's prompt as it asks pi to abort
 // (`planStop`). The first press is the one recorded: `planStop` writes no
@@ -66,7 +66,7 @@ type StopPlan =
 
 /**
  * What stopping a thread's lane does: abort its running turn, recording who
- * stopped its ask (ADR-0056), unless someone's stop is recorded already, so
+ * stopped its ask (ADR-0106), unless someone's stop is recorded already, so
  * the first press is the one named; and hold its queue when a message card
  * waits there, so the run's end does not send the next one (ADR-0048 step
  * 7). Nothing when it is idle (stopping is idempotent). Pure.

@@ -1,5 +1,8 @@
 # S72 — where a branch's offer starts, after its parent is taken
 
+- **Status:** Answered
+- **Led to:** ADR-0038, ADR-0060, ADR-0104, ADR-0105
+
 A branch's offer (ADR-0038) came out conflicted in 23 of its 26 files,
 though the branch had changed only 7. This finding records why, and the rule
 that fixes it (`PLAN-2026-10-02-offer-start-beside`). It extends S51

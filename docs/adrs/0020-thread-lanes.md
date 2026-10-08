@@ -1,10 +1,18 @@
 # ADR-0020 — Lanes belong to threads and never move; people own none
 
-**Status:** Accepted. Supersedes ADR-0011. Amends ADR-0018 and ADR-0019.
-Evidence: S19, S20, S21. Amended by ADR-0021 (the lane is also the thread's
-mode), and by ADR-0048 (step 3) with ADR-0055: what waits for a busy lane is
-a queued card, written by clients and taken by the host; nothing waits in
-`pinetrie.outbox`, which is gone. (ADR-0026 said a note, and was never built.)
+- **Status:** Accepted
+- **Area:** `docs/01-architecture.md`, `docs/06-interface.md`
+- **Evidence:** S19, S20, S21
+- **Supersedes:**
+  - ADR-0011: lanes belong to threads; people own none.
+- **Amends:**
+  - ADR-0018: lanes belong to threads.
+  - ADR-0019: people own no lanes, so there are no conversation lanes.
+- **Amended by:**
+  - ADR-0021: the lane is also the thread's mode.
+  - ADR-0026: what waits for a busy lane is a queued note, not the outbox.
+  - ADR-0048: what waits for a busy lane is a queued card, written by clients
+    and taken by the host; nothing waits in `pinetrie.outbox`, which is gone.
 
 **Context.** ADR-0011 gave every writer a lane, so two writers never contend for
 a tip; ADR-0018 then ran every model turn on one agent lane that travelled to

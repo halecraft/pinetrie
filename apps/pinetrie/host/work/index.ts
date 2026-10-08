@@ -1,5 +1,5 @@
 // host/work — lanes' containers and disks, as the host carries them out
-// (ADR-0032 to ADR-0034, ADR-0038).
+// (ADR-0032 to ADR-0034, ADR-0105).
 //
 // The decisions are pure and live in `@pinetrie/core`, `@pinetrie/rules`,
 // `@pinetrie/lanes` and `@pinetrie/repo`; these modules gather what they need, call them, and
@@ -49,7 +49,7 @@ export type LaneWork = Pick<
     readonly hooks: Omit<LaneHooks, "askSplit">
     /** Each lane's offer in your repo; null with no lanes of their own. */
     readonly offers: Offers | null
-    /** Accepted work in your repo (ADR-0060); null with no lanes of their own. */
+    /** Accepted work in your repo (ADR-0104); null with no lanes of their own. */
     readonly accepted: AcceptedWork | null
     /** The one writer of your repo (ADR-0065); null with no lanes of their own. Shutdown closes it. */
     readonly owner: RepoOwner | null
@@ -100,7 +100,7 @@ export async function startLaneWork(input: {
   const { owner, runtime } = setup
   const registry = createRegistry({ session, runtime })
   const repoConfig = setup.lanes?.repoConfig ?? DEFAULT_REPO
-  /** Accepted work in your repo (ADR-0060); none without lanes of their own. */
+  /** Accepted work in your repo (ADR-0104); none without lanes of their own. */
   const accepted: AcceptedWork | null =
     owner === null
       ? null
@@ -115,7 +115,7 @@ export async function startLaneWork(input: {
   owner?.onMoved(moved => {
     if (moved.acceptedMoved) setup.refreshBaseSoon()
   })
-  /** Each lane's offer in your repo (ADR-0038); none without lanes of their own. */
+  /** Each lane's offer in your repo (ADR-0105); none without lanes of their own. */
   const offers: Offers | null =
     owner === null || accepted === null
       ? null

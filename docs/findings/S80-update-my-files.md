@@ -1,5 +1,8 @@
 # S80 — "update my files": which rebase, a preview, and conflicts
 
+- **Status:** Answered
+- **Led to:** ADR-0061, ADR-0104
+
 `PLAN-2026-10-03-jj-ux`, task 6, asks for an action that brings the
 project's work (the integration line, `pinetrie-onto`) into your own work: a
 rebase of your commits onto the line, run only when you ask, after a

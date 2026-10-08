@@ -1,9 +1,13 @@
 # ADR-0015 — Entries are a TYPED schema; `Schema.any()` only where the pi boundary forces it
 
-**Status:** Accepted. Supersedes the unstated `Schema.any()` choice in
-`packages/schema/index.ts`. Blocks `PLAN-2026-09-24-tree-read`, which was
-written against untyped entries. Amended by ADR-0051: a message's image
-parts in `payload` are references to the blob store.
+- **Status:** Accepted
+- **Area:** `packages/pi/TECHNICAL.md`, `packages/schema/TECHNICAL.md`
+- **Evidence:** S17
+- **Amended by:**
+  - ADR-0051: a message's image parts in `payload` are references to the blob
+    store.
+
+Supersedes the unstated `Schema.any()` choice in `packages/schema/index.ts`.
 
 **Context.** `SessionDoc` declares the primary content of the document as an
 opaque blob:

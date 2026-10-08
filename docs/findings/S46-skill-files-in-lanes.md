@@ -1,5 +1,8 @@
 # S46 — skill files in a lane, under `/mnt/host`
 
+- **Status:** Answered
+- **Led to:** ADR-0036
+
 pi lists skills by their host paths, and an expanded skill names its file and
 its directory. Neither exists in a lane: your home directory is not mounted
 (ADR-0034). The next change mounts each skill's files read-only in every lane

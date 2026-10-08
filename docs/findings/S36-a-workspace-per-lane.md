@@ -1,5 +1,8 @@
 # S36 — what a jj workspace per lane costs, and where it breaks
 
+- **Status:** Answered
+- **Led to:** ADR-0032, ADR-0033
+
 **Answers.**
 1. **`jj workspace add` is cheap: 0.2 s for this repo's 178 tracked files.**
    The expensive part is dependencies.

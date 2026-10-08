@@ -1,4 +1,4 @@
-// host/work/fetch — a lane's history into your repo (ADR-0038): bundled in
+// host/work/fetch — a lane's history into your repo (ADR-0105): bundled in
 // the lane, on its queue, then imported by the owner of your repo as the
 // lane's remote bookmark. The owner observes the import, which marks the
 // lane's offer.

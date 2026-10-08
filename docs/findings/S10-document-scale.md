@@ -1,8 +1,9 @@
 # S10 — Does the document shape scale?
 
-**Status:** Open, not blocking. Partly discharged by S14: writes stay linear
-to n=50 000 (`docs/findings/S14-revalidate-fixed-kyneta.md`). Snapshot size
-and sync payload remain.
+- **Status:** Open
+
+Not blocking. Partly discharged by S14: writes stay linear to n=50 000.
+Snapshot size and sync payload remain.
 
 ## Brief
 

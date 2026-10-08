@@ -163,7 +163,7 @@ describe("executeChat", () => {
     expect(seen).toEqual([pinned, pinned])
   })
 
-  test("createAndRun from a base that cannot begin refuses, and never creates the lane (ADR-0060)", async () => {
+  test("createAndRun from a base that cannot begin refuses, and never creates the lane (ADR-0104)", async () => {
     const { pi, started, deps, context } = setUp(null, ERR.BAD_BASE)
     const out = await executeChat(
       deps,

@@ -1,7 +1,12 @@
 # ADR-0044 — Live work hands over to its entry on screen: a reply is current while its lane's tip is where it opened, a tool's output is in its row, and a following column only grows while its agent works
 
-**Status:** Accepted. Evidence: S35, S55. Implementation:
-`PLAN-2026-09-29-live-work-handover`. Amends ADR-0022 (when a stream goes).
+- **Status:** Accepted
+- **Area:** `packages/web/TECHNICAL.md`, `docs/06-interface.md`
+- **Evidence:** S17, S35, S55
+- **Amends:**
+  - ADR-0022: a stream no longer closes when its message or tool ends.
+- **Amended by:**
+  - ADR-0049: when a tool's row opens and closes, and the floor's height.
 
 **Context.** An agent's column jumped five or six times per tool call, too fast
 to see without a recording (S35). The column drew the agent's current step

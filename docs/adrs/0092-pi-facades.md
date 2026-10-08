@@ -1,12 +1,19 @@
 # ADR-0092 — pi is three things to the host: the scribe, the person's pi setup, and the agent
 
-**Status:** Proposed. Evidence: S113. Implemented by
-`PLAN-2026-10-05-pi-in-three`. Amends ADR-0062 (the scribe carries the
-host's writes, not the agent) and ADR-0063 (a root is released through the
-scribe, which closes the agent's harness over it). Sits beside ADR-0003:
-no pi type crosses `packages/pi/index.ts`. Amended by ADR-0095: the scribe
-has no `writeValues` and no session over the session's document; the host
-writes its records directly.
+- **Status:** Accepted (Duane, 2026-10-08)
+- **Area:** `apps/pinetrie/host/TECHNICAL.md`, `docs/01-architecture.md`
+- **Evidence:** S113
+- **Amends:**
+  - ADR-0062: the scribe (`Scribe.writeValues`) carries the writes, not the
+    agent; what is written, and the guard on its namespace, do not change.
+  - ADR-0063: a root is released through the scribe, which closes the agent's
+    harness over the root's one pi session, then the session; the session
+    document has a session and no harness.
+- **Amended by:**
+  - ADR-0095: the scribe has no `writeValues` and no session over the
+    session's document; the host writes its records directly.
+
+Sits beside ADR-0003: no pi type crosses `packages/pi/index.ts`.
 
 **Context.** `Agent` (`packages/pi/agent.ts`) was the host's one door into
 pi, and it did three jobs that need different things:

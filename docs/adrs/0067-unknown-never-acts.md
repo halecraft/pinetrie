@@ -1,14 +1,24 @@
 # ADR-0067 — What the host cannot tell, it does not act on
 
-**Status:** Accepted. Evidence: S89, S97. Implemented by
-`PLAN-2026-10-03-offer-certainty`. Amends ADR-0038 (an offer is built only
-from work known to change a file, from a known start; the page reads one
-status per offer), ADR-0060 (a take that names no source makes its lane's
-start untraced; `pinetrie.base` records what catching up would change) and
-ADR-0065 (every named lane whose root is not archived is still refreshed
-on a full observation, which this makes safe).
-Amended by ADR-0083: a take above the base is an *integrated-offer
-commit*.
+- **Status:** Accepted
+- **Area:** `packages/rules/TECHNICAL.md`, `packages/repo/TECHNICAL.md`
+- **Evidence:** S89, S97
+- **Amends:**
+  - ADR-0038: an offer is built only from work known to change a file, from a
+    known start; what jj cannot say never builds one. The page reads one
+    status per offer, and one the line already holds is `held`: nothing counts
+    it or warns about it.
+  - ADR-0060: a take above the lane's base that names no source makes its
+    start untraced, and nothing is offered until it catches up past it;
+    `pinetrie.base` records what catching up would change, and where it was
+    read.
+  - ADR-0065: whether a lane's work changes any file is `none`, `some` or
+    `unknown`, and an untraced start or an unknown answer builds no offer, so
+    refreshing every named lane on a full observation wakes none from before
+    `Pinetrie-Source`; a lane whose base moved runs two more jj processes,
+    once per move.
+- **Amended by:**
+  - ADR-0083: a take above the base is an *integrated-offer commit*.
 
 **Context.** On pine·trie's own repo the page contradicted itself: vernal-pine's
 strip said "nothing to add yet" while its tab warned that archiving drops

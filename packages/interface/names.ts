@@ -11,7 +11,7 @@ import { displayName } from "@pinetrie/rules"
 
 /**
  * A message written together names its sender, then the others who wrote it
- * (ADR-0025, ADR-0048): "Ada, with Bea". Each by their current name.
+ * (ADR-0048): "Ada, with Bea". Each by their current name.
  */
 export const withContributors = (speaker: string, others: readonly string[]) =>
   others.length === 0 ? speaker : `${speaker}, with ${others.join(", ")}`

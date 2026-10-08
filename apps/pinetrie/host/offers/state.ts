@@ -4,7 +4,7 @@
 // (`@pinetrie/repo`, ADR-0065). Every read of your repo is `@pinetrie/repo`'s
 // (`gatherOffer`, `gatherRefresh`, …), and every decision `@pinetrie/rules`': the
 // documents are read here only for what your repo cannot say, and a record
-// only to skip a write that changes nothing (ADR-0060).
+// only to skip a write that changes nothing (ADR-0104).
 
 import {
   type BaseRecord,
@@ -55,7 +55,7 @@ export interface OfferDocs {
   wipLine(lane: LaneName, name: ThreadName): string
 }
 
-/** The records the host writes from your repo, the page's cache (ADR-0060). */
+/** The records the host writes from your repo, the page's cache (ADR-0104). */
 export interface OfferRecords {
   /** An offer's record, when it changed. */
   write(record: OfferRecord): Promise<void>
@@ -72,7 +72,7 @@ export interface OfferRecords {
 export interface OfferDeps {
   /** The one writer of your repo: commands, refreshes as upkeep, pinned reads. */
   readonly owner: RepoOwner
-  /** Accepted work's names (ADR-0060). */
+  /** Accepted work's names (ADR-0104). */
   readonly repoConfig: RepoConfig
   readonly basics: Basics
   /** What a description asks of the model. */

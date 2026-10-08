@@ -1,6 +1,8 @@
 # ADR-0007 — Host↔client transport is a Kyneta Line plus replicated docs
 
-**Status:** Accepted
+- **Status:** Accepted
+- **Area:** `docs/01-architecture.md`
+- **Evidence:** S4
 
 **Context.** `pi-client` ships unix transport only — there is no browser path in
 pi. Kyneta already has `Line` (`packages/exchange/src/line.ts`): a reliable

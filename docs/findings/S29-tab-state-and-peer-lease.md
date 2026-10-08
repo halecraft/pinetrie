@@ -1,5 +1,8 @@
 # S29 — state per tab, and Kyneta's peer-id lease
 
+- **Status:** Answered
+- **Led to:** ADR-0027, ADR-0037
+
 **Answers.**
 1. **Kyneta keeps a tab's peer id in a tab slot and a device slot.**
    `persistentPeerId(key)` (`@kyneta/exchange`, `src/persistent-peer-id.ts`)

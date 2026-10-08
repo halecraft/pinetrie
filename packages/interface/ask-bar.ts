@@ -1,5 +1,5 @@
 // interface/ask-bar — which ask the work at the top of a column belongs to
-// (ADR-0056). Pure: `use-ask-bar.ts` measures, this decides.
+// (ADR-0106). Pure: `use-ask-bar.ts` measures, this decides.
 
 import type { EntryId } from "@pinetrie/core"
 

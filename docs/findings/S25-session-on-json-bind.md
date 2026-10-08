@@ -1,5 +1,8 @@
 # S25 — the session document on `json.bind`
 
+- **Status:** Answered
+- **Led to:** ADR-0023
+
 **Answers.**
 1. **The session document runs on `json.bind` with no other change.** Switching
    `SessionDoc` from `loro.bind` to `json.bind`, and `batch` from

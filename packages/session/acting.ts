@@ -41,7 +41,7 @@ export type Acting<A> =
 
 /** An offer command of yours on a lane. */
 export type OfferActing = Acting<OfferAction>
-/** A setup or publish of yours: setting up, or publishing (ADR-0060, ADR-0090). */
+/** A setup or publish of yours: setting up, or publishing (ADR-0104, ADR-0090). */
 export type AcceptedActing = Acting<AcceptedAction>
 
 export type ActingEvent<A> =

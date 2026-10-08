@@ -1,5 +1,5 @@
-// repo/plan — every decision about your repo, as values (ADR-0038,
-// ADR-0060, ADR-0061, ADR-0090).
+// repo/plan — every decision about your repo, as values (ADR-0105,
+// ADR-0104, ADR-0061, ADR-0090).
 //
 // Each function here is pure and returns `RepoStep`s (`step.ts`), carried out
 // by `executeRepo`. What is gathered is read by `offer.ts` and `line.ts`. So
@@ -31,7 +31,7 @@ import { git, host, type RepoStep, you } from "./step.ts"
 
 /**
  * Your repo's `immutable_heads()` with accepted work and the offers on it added
- * (ADR-0060): `current` is the definition the repo has, null for jj's
+ * (ADR-0104): `current` is the definition the repo has, null for jj's
  * builtin. `present()`, or a repo with no line fails every jj command
  * (S77). An offer is immutable only while its parent is accepted work, so nothing
  * of yours above accepted work is frozen. Given its own output, it returns it.
@@ -52,7 +52,7 @@ export const acceptedHeads = (bookmark: string): string => {
 }
 
 /**
- * Your repo's `revsets.log` with the offers added (ADR-0060): `current` is
+ * Your repo's `revsets.log` with the offers added (ADR-0104): `current` is
  * the definition the repo has, null for jj's default. An offer on accepted work is
  * an immutable head, which `builtin_log()` leaves out, so jj and jjui would
  * not show it (S77 item 8). Given its own output, it returns it.
@@ -64,7 +64,7 @@ export function logRevset(current: string | null): string {
 }
 
 /**
- * Set up accepted work (ADR-0060): its bookmark at your `@-`, as the
+ * Set up accepted work (ADR-0104): its bookmark at your `@-`, as the
  * host, then your repo's `immutable_heads()` (`immutableHeads`), written in
  * the repo's own config. Run only on your command, after you saw `heads`.
  */
@@ -204,7 +204,7 @@ export const laneRefSteps = (
 export const ACCEPTED_OFFER_COMMITS = trailerRevset(["source", "thread"])
 
 /**
- * Where an offer starts, as a revset (ADR-0060): the newest ancestors of the
+ * Where an offer starts, as a revset (ADR-0104): the newest ancestors of the
  * lane's tip you already have. That is the commit the lane's base names
  * (`start`: accepted work's commit, or the WIP's copy), and every lane commit a
  * accepted offer's `Pinetrie-Source` names above what the base holds
@@ -326,7 +326,7 @@ export function walkToHost(
 
 /**
  * A host operation that rewrites an offer. An offer on accepted work is immutable
- * (ADR-0060), so the host's own rewrites of it pass `--ignore-immutable`; a
+ * (ADR-0104), so the host's own rewrites of it pass `--ignore-immutable`; a
  * bookmark move rewrites no commit and needs none (S77 item 7).
  */
 const rewrite = (...args: string[]): RepoStep =>
@@ -346,7 +346,7 @@ export const nonceRevset = (nonce: string, i: number): string =>
  * files restored into it; the whole of it rebased onto `target`; the top
  * bookmarked; then each described, which retires its nonce. A single offer
  * has one source, the lane's tip; a stack has one per lane revision
- * (ADR-0038, S48 items 16 and 18). Every step is the host's, by nonce, never
+ * (ADR-0105, S48 items 16 and 18). Every step is the host's, by nonce, never
  * a commit id kept across steps (S48 item 2).
  */
 export function planOffer(input: {
@@ -454,7 +454,7 @@ export const planRepair = (input: {
 ]
 
 /**
- * Accept an offer (ADR-0060): its destination bookmark moved forward to its
+ * Accept an offer (ADR-0104): its destination bookmark moved forward to its
  * top (`moveForward`), as the host, then the offer's bookmark deleted. Never
  * a rebase, and never your `@`.
  */

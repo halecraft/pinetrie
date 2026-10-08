@@ -24,7 +24,7 @@ import { firstLine } from "./tree.ts"
 /**
  * The trailers the host writes into commit messages: a turn names its entry
  * and lane (ADR-0032), an offer its thread too (ADR-0039). The ledger
- * (ADR-0060): a lane's start or update names its base, `<bookmark>@<commit>`;
+ * (ADR-0104): a lane's start or update names its base, `<bookmark>@<commit>`;
  * an offer names the lane tip it holds and where it starts.
  */
 export const TRAILERS = {
@@ -134,7 +134,7 @@ export function entryOfMessage(description: string): EntryId | null {
   return entry === undefined ? null : entryId(entry)
 }
 
-// ── a lane's base (ADR-0060) ──────────────────────────────────────────────
+// ── a lane's base (ADR-0104) ──────────────────────────────────────────────
 
 /** A base as its trailer names it (ADR-0100): accepted work, or a WIP by its bookmark. */
 export type BaseTrailer =
@@ -152,7 +152,7 @@ export type BaseTrailer =
 const ACCEPTED_BASE = "accepted"
 
 /**
- * A commit's message that names a lane's base (ADR-0060): accepted work or a
+ * A commit's message that names a lane's base (ADR-0104): accepted work or a
  * WIP bookmark, and the commit it pointed at. The newest such commit in a
  * lane's history is the thread's base (`laneBase`).
  */
@@ -184,7 +184,7 @@ export function baseOf(message: string, wipPrefix: string): BaseTrailer | null {
     : { kind: "accepted", commit }
 }
 
-// ── an offer's message (ADR-0038, ADR-0060) ───────────────────────────────
+// ── an offer's message (ADR-0105, ADR-0104) ───────────────────────────────
 
 /**
  * The one line an offer carries until an agent describes it: a work in
@@ -210,7 +210,7 @@ export const withTrailers = (
   `${message.trim()}\n\n${TRAILERS.thread}: ${at.name}\n${TRAILERS.lane}: ${at.lane}\n${TRAILERS.entry}: ${at.entry}\n`
 
 /**
- * A message with the offer's ledger (ADR-0060): the lane commit it holds
+ * A message with the offer's ledger (ADR-0104): the lane commit it holds
  * (`Pinetrie-Source`) and where it starts (`Pinetrie-Start`, one per commit).
  * Added to the host's trailer paragraph when the message ends in one, else
  * as a paragraph of its own. Accepted, the offer keeps them: they say what you
@@ -231,7 +231,7 @@ export function withLedger(message: string, ledger: OfferLedger): string {
  * trailers, then the offer's ledger, in one trailer paragraph. Every revision
  * carries both: the thread's trailer is how the host finds the offer's
  * revisions in your repo, and the ledger names the lane tip the whole offer
- * holds, so an accepted stack says you have that tip (ADR-0060).
+ * holds, so an accepted stack says you have that tip (ADR-0104).
  */
 export const offerMessage = (
   message: string,
@@ -255,7 +255,7 @@ export function withoutTrailers(message: string): string {
 }
 
 /**
- * An offer's ledger as its message carries it (ADR-0060): the lane tip it
+ * An offer's ledger as its message carries it (ADR-0104): the lane tip it
  * holds (`Pinetrie-Source`) and where it starts (`Pinetrie-Start`), from the
  * last paragraph that names a source, so a message holding an older ledger
  * above it reads as the newest. Null when no paragraph names one, as after
@@ -273,7 +273,7 @@ export function offerLedger(message: string): OfferLedger | null {
   return { source: commitId(source), start: start.map(commitId) }
 }
 
-// ── an accepted-offer commit on accepted work (ADR-0060, S97) ────────────────
+// ── an accepted-offer commit on accepted work (ADR-0104, S97) ────────────────
 
 /**
  * Every `Pinetrie-Source` an accepted-offer commit's message names, from

@@ -1,25 +1,38 @@
 # ADR-0085 — Your open roots run down the left; a board in the footer shows where everyone's work stands
 
-**Status:** Accepted (Duane, 2026-10-05). Implemented by
-`PLAN-2026-10-05-board`. Supersedes the Archive tab
-(ADR-0029, ADR-0063's search) and the tab bar's place in the header
-(ADR-0081). Amends ADR-0029 (archiving becomes the closed workflow state),
-ADR-0030 (your tabs become your list, kept per person; the header's people
-go), ADR-0027 (a stored layout no longer holds your open roots), ADR-0063
-(the archive record's key and its readers), ADR-0077 (a third person
-document; the Archive tab's mark moves to the board), ADR-0080 (the
-`archive` command becomes `move-root` and `workflow`) and ADR-0081 (the
-header row goes; the message count moves to the board). Amended by
-ADR-0088 (proposed): your list folds to icons, and the footer's corner to
-your avatar, which answers this ADR's deferred narrow screens. Evidence:
-screenshots of the client restyled into this layout, at 1440 and 860 pixels
-wide, made while deciding.
-Amended by ADR-0091: under your list, your inbox sits between your avatar
-and your inventory; the activity menu goes, and each state on the strip
-counts its roots where the agent works and those with work ready to
-accept.
-Amended by ADR-0098: the corner is you, with your name, then
-your inbox and inventory as icon buttons of one style.
+- **Status:** Accepted (Duane, 2026-10-05)
+- **Area:** `docs/06-interface.md`, `packages/interface/TECHNICAL.md`
+- **Evidence:** S69
+- **Amends:**
+  - ADR-0027: your open roots leave the stored layout for your own document,
+    on every device; the layout keeps which root you are on, each root's
+    columns, new tabs and whether the board is open.
+  - ADR-0029: the tab bar becomes your list down the left, and the Archive tab
+    the board; archiving is moving a root to the closed workflow state, whose
+    place replaces the archive record.
+  - ADR-0030: your tabs are your list, kept per person; the header's people
+    go, and who is where shows on your list's items and the board's.
+  - ADR-0063: the archive record goes; a root is archived while its board
+    place, keyed by its `RootId`, is in the closed state, and the Archive
+    tab's search over labels is the closed state's.
+  - ADR-0077: your open roots are a third person document (`open:`), and ▦
+    carries the mark the Archive tab did.
+  - ADR-0080: the `archive` command is gone; `move-root` and `workflow` change
+    the workspace people share in its place.
+  - ADR-0081: the header row goes; your list runs down the left, its root you
+    are on joined to the page sideways, and the footer holds the indicators,
+    with the message count on ▦.
+- **Amended by:**
+  - ADR-0088: your list folds to icons, and the footer's corner to your
+    avatar, which answers this ADR's deferred narrow screens.
+  - ADR-0091: under your list, your inbox sits between your avatar and your
+    inventory; the activity menu goes, and each state on the strip counts its
+    roots where the agent works and those with work ready to accept.
+  - ADR-0098: the corner is you, with your name, then your inbox and inventory
+    as icon buttons of one style.
+
+Evidence: screenshots of the client restyled into this layout, at 1440 and 860
+pixels wide, made while deciding.
 
 **Context.**
 

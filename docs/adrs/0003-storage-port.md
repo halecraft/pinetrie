@@ -1,6 +1,8 @@
 # ADR-0003 — Implement pi's `Storage` port rather than forking session internals
 
-**Status:** Accepted
+- **Status:** Accepted
+- **Area:** `packages/pi/TECHNICAL.md`, `AGENTS.md`
+- **Evidence:** S2
 
 **Context.** `pi-agent-core` exposes `interface Storage` (10 methods) at
 `harness/session/types.d.ts:386`, ships a conformance test suite, and already

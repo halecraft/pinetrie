@@ -1,5 +1,8 @@
 # S27 — rendering messages as markdown
 
+- **Status:** Answered
+- **Led to:** ADR-0017, ADR-0043
+
 **Answers.**
 1. **react-markdown can render a message and still let a selection be cited.**
    A rehype plugin wraps each rendered text run in a span that carries the

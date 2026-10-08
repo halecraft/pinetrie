@@ -446,7 +446,7 @@ describe("drain", () => {
   })
 })
 
-describe("drain: bring up to date (ADR-0055)", () => {
+describe("drain: bring up to date (ADR-0108)", () => {
   const CMD = "bring-up-to-date" as const
 
   test("clean: the update, then the card's text as a message", async () => {

@@ -1,6 +1,6 @@
 // host/work/update — a thread's base, or the thread it branched from,
 // merged into its lane, when the host pops a queued card with a command
-// (ADR-0055, ADR-0060, ADR-0072) or its agent calls `catch_up`, and whether
+// (ADR-0108, ADR-0104, ADR-0072) or its agent calls `catch_up`, and whether
 // its agent may ask about a conflict (ADR-0080). One step on the lane's
 // queue gathers, plans and merges; then `planSettle` decides what the thread
 // gets, and `applySettle` writes it.
@@ -83,7 +83,7 @@ import type { LaneRegistry } from "./registry.ts"
 import type { Setup } from "./setup.ts"
 import type { Turns } from "./turns.ts"
 
-/** Why an update was refused, worded once (ADR-0060). */
+/** Why an update was refused, worded once (ADR-0104). */
 function updateRefusal(code: UpdateRefusal): string {
   switch (code) {
     case ERR.NOT_SET_UP:
@@ -159,7 +159,7 @@ export function reasonOf(index: TreeIndex, description: string): string {
 }
 
 /**
- * What popping an update's card comes to (ADR-0055): the update written in
+ * What popping an update's card comes to (ADR-0108): the update written in
  * the thread, a resolution run's prompt, nothing new, or why not.
  */
 export type Prepared =
@@ -225,7 +225,7 @@ const touching = (revisions: readonly TouchedRevision[], path: string) =>
   revisions.filter(r => r.paths.includes(path)).map(r => r.description)
 
 /**
- * What a merge comes to (ADR-0060, ADR-0033). Clean: the update, written in
+ * What a merge comes to (ADR-0104, ADR-0033). Clean: the update, written in
  * the thread, and the merge fetched. Nothing: a mark naming accepted work, when
  * one was made, fetched. Conflicted: the resolution's prompt, within the
  * floor's budget, each file with why each side changed it, and the card's
@@ -331,7 +331,7 @@ export async function applySettle(
 export interface Updates {
   /**
    * Merge what `command` names into the lane `handle` names, whose handle the
-   * caller holds: the thread's base (ADR-0060),
+   * caller holds: the thread's base (ADR-0104),
    * accepted work's commit or a fresh copy of its WIP; with `continue-on-accepted`,
    * accepted work, moving the thread there; with `catch-up-with-parent`, the
    * newest commit of the thread it branched from (ADR-0072).

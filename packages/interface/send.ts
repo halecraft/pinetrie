@@ -113,7 +113,7 @@ export function settleSend(
  * What a composer sends: its text trimmed, or null for nothing to send. A
  * text that is only its column's blank prefill is nothing: `@agent ` alone
  * would ask the agent with no question. A card with a command is sent with
- * no text: the command alone is something to do (ADR-0055). Nothing is sent
+ * no text: the command alone is something to do (ADR-0108). Nothing is sent
  * while an image is uploading: its markdown is not in the text yet.
  */
 export function sendable(
@@ -155,7 +155,7 @@ export interface SendPlan {
   /** The thread's queue is held: a queued send waits for a release (ADR-0048 step 7). */
   readonly held: boolean
   /**
-   * The card's command (ADR-0055), and whether it has text to send after
+   * The card's command (ADR-0108), and whether it has text to send after
    * it: the button then names the command.
    */
   readonly command: {
@@ -174,7 +174,7 @@ export interface SendPlan {
  * - A fresh column sends `branch`. Elsewhere, a send to a busy lane, plain or
  *   asking the agent, queues its card behind the others; so does a card with
  *   a command, even on an idle lane, since only the host's pop carries a
- *   command out (ADR-0055).
+ *   command out (ADR-0108).
  * - A send that asks the agent creates a lane where there is none, and in a
  *   fresh column always, since a branch never continues a lane: then a chip
  *   says where that lane will work (ADR-0032).
@@ -186,7 +186,7 @@ export function planSend(input: {
   readonly asksAgent: boolean
   readonly participants: readonly string[]
   readonly reader: Reader
-  /** The card's command (ADR-0055), or null. */
+  /** The card's command (ADR-0108), or null. */
   readonly command: CardCommand | null
 }): SendPlan {
   const { fresh, lane } = input
@@ -278,7 +278,7 @@ export function recipientWords(to: Address): ButtonWords {
 }
 
 /**
- * The send button of a card with a command (ADR-0055): the command, then
+ * The send button of a card with a command (ADR-0108): the command, then
  * the card's text if it has some. Where it waits goes in its title.
  */
 export function commandSendWords(
@@ -367,7 +367,7 @@ export function raceWords(by: WriterId | null, reader: Reader): string {
 /**
  * Where a new thread's agent works, and what that means for your files: the
  * line under the box, which opens the where menu. A lane of its own starts
- * from accepted work unless it starts from a WIP (ADR-0060).
+ * from accepted work unless it starts from a WIP (ADR-0104).
  */
 export function whereWords(
   work: WorkSetting,
@@ -475,7 +475,7 @@ export function whereChoices(
   ]
 }
 
-// ── where a new lane starts (ADR-0060) ────────────────────────────────────
+// ── where a new lane starts (ADR-0104) ────────────────────────────────────
 
 /** A row of the where menu that picks a new lane's base. */
 export interface BaseChoice {

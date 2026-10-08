@@ -90,6 +90,10 @@ and version-locked across seven packages — treat all of it as churning.**
 experimental session worker. We embed `pi-agent-core` directly and own the
 replication boundary. (ADR-0001)
 
+Kyneta is the storage of record: pi's sessions are written there alone, and
+pi's JSONL file is not kept beside it, so terminal `pi` cannot resume them
+(ADR-0002).
+
 ## The thin waist
 
 Five contracts. Fix these and everything else proceeds in parallel.
@@ -199,7 +203,8 @@ The host owns one pi harness and is **not a writer**. Each connected client is
 a writer, identified by the transport's `LineSender.peer` and recorded in every
 message it sends; writers own no lanes. A lane belongs to a thread: created
 where agent work is first wanted there, never moved, never written while it
-runs (ADR-0020). Threads run concurrently. Decisions are pure (`planChat`,
+runs (ADR-0020). A lane is a line of agent work, with its own state on disk,
+not a way to answer two people at once (ADR-0019). Threads run concurrently. Decisions are pure (`planChat`,
 `planArchive` and the rest in `@pinetrie/rules`, over facts read by `@pinetrie/reads`);
 the host gathers, plans and executes each command in one serial step. A
 decision that acts on your repo (an offer, accepted work) is a value typed in
@@ -388,7 +393,7 @@ thirds of it.** Kept here because the refutation is the useful part.
 
 ## Fold (context merge)
 
-Destination-aware and lazy. pi summarizes on *leaving* a branch, with no
+Destination-aware and lazy (ADR-0005). pi summarizes on *leaving* a branch, with no
 knowledge of where the summary will land. We summarize on *landing*, knowing the
 destination — strictly more information, and it preserves optionality (an eager
 summary can never be re-folded differently).
@@ -405,6 +410,10 @@ task   = "summarize `theirs` so it is useful at E"
 This is git's three-way merge structure. Sending `A` once (not twice) both saves
 tokens and tells the model what is common ground versus what diverged — the
 distinction it needs to judge relevance.
+
+The `ours` leg is mandatory (ADR-0010): in S5's ablation, a fold without it
+had the model confidently recommend a design the destination had already
+rejected. Dropping it is a correctness regression, not a quality one.
 
 **Output is a merge node**: a new entry on E's branch with `fromId: B` alongside
 `parentId: E`. This buys provenance, re-foldability, double-fold detection, and

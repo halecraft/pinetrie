@@ -1,4 +1,4 @@
-// host/work/accepted — accepted work in your repo (ADR-0060, ADR-0090):
+// host/work/accepted — accepted work in your repo (ADR-0104, ADR-0090):
 // its record, read whenever the owner observes a move that changes it, and
 // setup and publish. Gather (the shared facts' `acceptedFacts`), decide
 // (`planAcceptedRecord`, `planAcceptedAction`, `planPublishFinish`), translate
@@ -55,7 +55,7 @@ export interface AcceptedWork {
 export function createAcceptedWork(deps: {
   readonly owner: Pick<RepoOwner, "later" | "command">
   readonly basics: Pick<Basics, "session">
-  /** Accepted work's names and `publish.catchUp` (ADR-0060, ADR-0099). */
+  /** Accepted work's names and `publish.catchUp` (ADR-0104, ADR-0099). */
   readonly repoConfig: RepoConfig
   readonly writeValues: (writes: readonly ValueWrite[]) => Promise<void>
 }): AcceptedWork {

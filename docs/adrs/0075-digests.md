@@ -1,10 +1,15 @@
 # ADR-0075 — A digest is a headline and a few points, written only for a long ask, and only when it adds something
 
-**Status:** Accepted. Implementation: `PLAN-2026-10-05-digest-headlines`.
-Amends ADR-0056 (what a digest says, which asks have one, and where it is
-drawn) and ADR-0071 (short asks cost no request). Amended by ADR-0077: the
-final request also asks for the run's verdict, first, and its reply is read
-by `endReplyOf`.
+- **Status:** Accepted
+- **Area:** `packages/interface/TECHNICAL.md`, `packages/pi/TECHNICAL.md`
+- **Amends:**
+  - ADR-0056: only a long ask has a digest, which is a headline leading the
+    fold line and a few points under it, or nothing when the model has nothing
+    to add.
+  - ADR-0071: only a long ask is digested, so a short one costs no request.
+- **Amended by:**
+  - ADR-0077: the final request also asks for the run's verdict, first, and
+    its reply is read by `endReplyOf`.
 
 **Context.** ADR-0056 asked a model for "two or three plain sentences: what
 was asked, what has been done, and what is happening now" for every ask

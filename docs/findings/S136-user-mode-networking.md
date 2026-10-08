@@ -1,7 +1,9 @@
 # S136 — On gvproxy, the lane VM's network survives a `container run`, and Docker answers 1.1 s into a boot; lanes must be fenced from gvproxy's own network, or they reach the Mac's loopback
 
-**Status:** Answered. Follows S135, item 2. Serves
-`PLAN-2026-10-07-lane-runtime` (ADR-0103).
+- **Status:** Answered
+- **Led to:** ADR-0103
+
+Follows S135, item 2.
 
 **Question.** The lane VM's network is Virtualization's NAT, which macOS
 runs for every VM on the Mac: one `container run` removed its Mac side,

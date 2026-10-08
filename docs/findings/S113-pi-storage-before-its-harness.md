@@ -1,8 +1,7 @@
 # S113 — pi's storage can come before its harnesses if each document has one session, which its harness closes
 
-**Status:** Answered. Led to ADR-0092 (pi is three things to the host:
-the scribe, the person's pi setup, and the agent). Served
-`PLAN-2026-10-05-pi-in-three`.
+- **Status:** Answered
+- **Led to:** ADR-0092
 
 **Question.** `Agent` is three things with different needs: the sessions
 over each document (`writeValues`, `appendToTree`), what the model setup

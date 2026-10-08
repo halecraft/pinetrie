@@ -1,4 +1,4 @@
-// review — the review's wire (ADR-0047, ADR-0056): its URLs, what a request
+// review — the review's wire (ADR-0047, ADR-0106): its URLs, what a request
 // may read, and how it is answered, here since the host and the page both
 // import it. The reads are `@pinetrie/repo`'s (`revisionRead`, `fileDiff`).
 
@@ -131,7 +131,7 @@ const CONTROL = /[\u0000-\u001f\u007f]/
  * What a request may read, so it reaches nothing of your repo but what a
  * thread made: a revision an open offer holds now (what accepting it would bring),
  * or a range between two commits one lane's turns recorded (an ask's work,
- * ADR-0056). The commits read are the records', never the request's strings.
+ * ADR-0106). The commits read are the records', never the request's strings.
  */
 export function planOfferRead(
   facts: {

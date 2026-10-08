@@ -1,18 +1,31 @@
 # ADR-0083 — Every domain term names what it acts on and where that goes: take into the inventory, integrate an offer, pop the next queued card
 
-**Status:** Accepted (Duane, 2026-10-04). Implemented by
-`PLAN-2026-10-04-take-vocabulary`. Amends the words of ADR-0038 and
-ADR-0060 (a take of an offer is an **integration**), ADR-0048 and ADR-0055
-(the host **pops** a queued card; a person **takes** a card **into the
-inventory**), ADR-0065 (what an integration was shown), ADR-0067 and
-ADR-0079 (an **integrated-offer commit** on the line, which a catch-up
-joins), and ADR-0072 (the parent commit a lane last **caught up with**).
-None of their decisions change. Their texts stay as written, and keep the
-old word.
-Amended by ADR-0090: the page's word for an offer integration is
-*accept*; the code's stays *integrate*, and "land" folds into it.
-Amended by ADR-0100: the code's verb for an offer integration is *accept*,
-and an integrated-offer commit is an accepted-offer commit.
+- **Status:** Accepted (Duane, 2026-10-04)
+- **Area:** `docs/glossary.md`, `docs/06-interface.md`
+- **Evidence:** S69, S75, S102
+- **Amends:**
+  - ADR-0038: in code and docs, taking an offer is *integrating* it, into the
+    line or a WIP; the page still says "add".
+  - ADR-0048: a person *takes a card into the inventory*, and the host *pops
+    the next queued card* to send it; "take" alone names neither.
+  - ADR-0055: the host *pops* a queued card, and carries out its command then.
+  - ADR-0060: a take is an *offer integration*, and the commit it leaves on
+    the line an *integrated-offer commit*; the record's `taken` is
+    `integratedAs`.
+  - ADR-0065: a take is an *offer integration*; it names what it was shown.
+  - ADR-0067: a take above the base is an *integrated-offer commit*.
+  - ADR-0072: the parent commit a lane last took is the one it last *caught up
+    with* (`caughtUpWith`).
+  - ADR-0079: each take the lane holds is an *integrated-offer commit*; the
+    code joins those.
+- **Amended by:**
+  - ADR-0090: the page's word for an offer integration is *accept*; the code's
+    stays *integrate*, and "land" folds into it.
+  - ADR-0100: the code's verb for an offer integration is *accept*, and an
+    integrated-offer commit is an accepted-offer commit.
+
+None of their decisions change. Their texts stay as written, and keep the old
+word.
 
 **Context.** "Take" had come to mean five things in the code and docs,
 three of them acts in the domain:

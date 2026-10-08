@@ -1,12 +1,14 @@
 # ADR-0024 — Presence is ephemeral, per open column, written by each client
 
-**Status:** Accepted. Implemented by `PLAN-2026-09-27-presence`. Amended by
-ADR-0029: only the columns of the root tab you are on report; and by
-ADR-0037: every key is per seat, so a person here from two tabs has two sets
-of entries, shown once. Amended by ADR-0048 (step 3,
-`PLAN-2026-10-01-notes-removed`): `editing`, the note a seat was editing, is
-removed with notes. Amended by ADR-0077: presence's verb is *reading*; a
-person follows a thread they have written on, and a column follows its end.
+- **Status:** Accepted
+- **Area:** `docs/06-interface.md`, `packages/interface/TECHNICAL.md`
+- **Amended by:**
+  - ADR-0029: only the columns of the root tab you are on report.
+  - ADR-0037: every key is per seat, so a person here from two tabs has two
+    sets of entries, shown once.
+  - ADR-0048: `editing`, the note a seat was editing, is removed with notes.
+  - ADR-0077: presence's verb is *reading*; a person follows a thread they
+    have written on, and a column follows its end.
 
 **Context.** Several people share a session, each with their own columns, and
 nothing showed who else was there. The composer's "seen by" was removed because,

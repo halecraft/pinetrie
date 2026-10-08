@@ -1,5 +1,5 @@
-// repo/offer-gather — every read an offer step plans from (ADR-0038,
-// ADR-0060), each returning values in core's words (`core/offers.ts`).
+// repo/offer-gather — every read an offer step plans from (ADR-0105,
+// ADR-0104), each returning values in core's words (`core/offers.ts`).
 //
 // The host reads what only the documents know (the thread's name, whether
 // its root is archived, the last catch-up read) and passes it in; everything
@@ -79,7 +79,7 @@ export type RefreshGather =
       readonly facts: RefreshFacts
     }
 
-/** The lane's base record, as the repo says it now (ADR-0060). */
+/** The lane's base record, as the repo says it now (ADR-0104). */
 const baseRecord = (
   lane: LaneName,
   input: {

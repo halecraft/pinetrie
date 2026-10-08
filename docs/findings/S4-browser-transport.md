@@ -1,6 +1,9 @@
 # S4 — Browser ↔ Node host over a Kyneta Line
 
-**Status:** Answered. Led to ADR-0014; spawned S16.
+- **Status:** Answered
+- **Led to:** ADR-0007, ADR-0014
+
+Spawned S16.
 
 ## Brief
 

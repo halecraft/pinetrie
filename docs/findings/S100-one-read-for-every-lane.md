@@ -1,9 +1,9 @@
 # S100 — Can one parameterized read give every offer its facts, a lane on a WIP's included?
 
-**Status:** Open. Opened from `PLAN-2026-10-04-offers-one-home`, which
-puts every offer read behind one entry point in `@pinetrie/repo`, and
-leaves what is read unchanged. Serves the plan that would replace the
-separate reads.
+- **Status:** Open
+
+Opened from a plan that puts every offer read behind one entry point in
+`@pinetrie/repo`, and leaves what is read unchanged.
 
 **Question.** `gatherLane` (`packages/repo/lane-read.ts`, ADR-0065, S89)
 reads a lane on the line in one `jj log`, about 3 jj processes per

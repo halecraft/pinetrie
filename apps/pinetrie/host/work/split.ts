@@ -1,5 +1,5 @@
 // host/work/split — an offer split into a stack by a run on its lane
-// (ADR-0038): the run's prompt, and what its end does.
+// (ADR-0105): the run's prompt, and what its end does.
 
 import {
   type CommitId,

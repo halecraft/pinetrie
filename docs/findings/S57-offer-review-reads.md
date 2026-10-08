@@ -1,5 +1,8 @@
 # S57 — reading an offer's revisions and diffs from jj
 
+- **Status:** Answered
+- **Led to:** ADR-0047, ADR-0105
+
 **Question.** A column's review (ADR-0047) shows each revision of an offer:
 its description, its files with their line counts, and each file's diff. Can
 the host read these from your repo with jj alone, in a shape a program can

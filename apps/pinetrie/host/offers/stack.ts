@@ -1,4 +1,4 @@
-// host/offers/stack — a split's stack (ADR-0038): where it starts and ends,
+// host/offers/stack — a split's stack (ADR-0105): where it starts and ends,
 // and whether the stack a split's run made may replace the offer
 // (`planStackEnded`).
 

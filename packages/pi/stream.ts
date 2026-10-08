@@ -1,4 +1,4 @@
-// pi/stream — pi's harness events as pinetrie's `StreamEvent`s (ADR-0022).
+// pi/stream — pi's harness events as pinetrie's `StreamEvent`s (ADR-0107).
 // Nothing else of pi's events leaves this package. Which events are mapped,
 // and why the end events are not, is in `TECHNICAL.md`, "Streaming".
 

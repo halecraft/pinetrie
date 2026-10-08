@@ -416,7 +416,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   clamp keeps the column there. If a run ends shorter than its floor, the
   column moves once, then. A column that shrinks mid-run for another reason,
   such as a column opened to its left, keeps its floor until the run ends.
-- **A release keeps the tip it left at** (`releasedTip`, ADR-0056): set by
+- **A release keeps the tip it left at** (`releasedTip`, ADR-0106): set by
   the first scroll up, kept while released however the run grows, and
   cleared by following again. `SeenEnd.released` carries it across an
   unmount; `seen.leave` also runs when the page is hidden. An ask whose
@@ -428,7 +428,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   still takes up is a row the reader folds mid-run, and columns opened to the
   left.
 
-## Tools and live work (ADR-0022)
+## Tools and live work (ADR-0107)
 
 - **A tool call is a row under the agent's message** (`ToolRow` in
   `message.tsx`): its label (`toolLabel`), ✓, ✗ or …, and its result folded in
@@ -496,7 +496,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   stop (`carryOnState`, ADR-0082), sending `carry-on`. `columnView` decides
   it (`run`) and `runWords` words it. It is the column's, not a card's, and
   never shows read-only. The host records who stopped under the ask
-  (`pinetrie.stop`, ADR-0056). The button is `.stop` or `.resume`: the
+  (`pinetrie.stop`, ADR-0106). The button is `.stop` or `.resume`: the
   browser suite reads `.stop` as "the lane runs" (`page.ts`), and a
   carry-on message's row is `.msg.carry-on`.
 - **What the agent is doing shows in three places, none taking layout**
@@ -504,7 +504,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   `Column`.
   - The mark before the thread's name (`.thread-mark`: the `✦`, or the
     banner over it) pulses while it is true, titled by `workingWords`, which
-    names the running ask (`askWords`, ADR-0056). The square pulses, not
+    names the running ask (`askWords`, ADR-0106). The square pulses, not
     the star, which a banner hides.
   - A live row the work opened carries `data-revealed`, and
     `.tool.live[data-revealed]::after` draws a ring around it. A call
@@ -548,7 +548,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   `✦ new agent`, or nothing in a conversation), then, in a second row, where
   it forks. It shows no commit and nothing of where the lane works.
 - **The work strip** (`WorkStripView`, above the composer) is the lane's
-  offer for its own copy (ADR-0038): `offerWords`' line, which opens the
+  offer for its own copy (ADR-0105): `offerWords`' line, which opens the
   review while the offer is open and holds files (ADR-0047, below), the
   bookmark apart, which a press copies to find it in jj or jjui, its
   buttons, and a `⋯` menu for the rest
@@ -557,7 +557,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   prompt's role) comes first: while it runs, accepted work counts files so far
   and offers nothing. A lane that works directly says so ("edits your files
   directly"), and names other lanes running in the same directory now.
-- **Catching up and splitting are a card queued at once** (ADR-0055,
+- **Catching up and splitting are a card queued at once** (ADR-0108,
   ADR-0061, ADR-0080): the button is the `queueCommand` act, which creates a
   card at the thread's end with the command and no text, then queues it,
   two effects in that order. A split waits while the thread works, and a
@@ -618,7 +618,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
 ## Reviewing an offer (`review.ts`, `review-pane.tsx`, `use-fetched.ts`, ADR-0047)
 
 The offer's line opens a review in the column's pane ("A column's pane",
-below). So does an ask's file count (ADR-0056): every review is of spans
+below). So does an ask's file count (ADR-0106): every review is of spans
 (`DiffSpan`), an offer's revisions or an ask's range from its prompt's
 commit to its last turn's (`askReviewTarget`), and `ReviewTarget.title`
 heads a range, which has no description.

@@ -1,18 +1,22 @@
 # ADR-0046 — A lane's agent is told where it is: a short block in every prompt, and a note it reads when it needs it
 
-**Status:** Accepted. Implementation: `PLAN-2026-09-30-lane-orientation`.
-Amends ADR-0034 (what a lane's prompt says; the port proxy it describes is
-not built).
-**Amended by ADR-0064:** every lane of its own is also told to search with
-the `grep` and `find` tools and that rg, fd and sd are on `PATH`; the
-browser fact is `defaultImage`, and its line names python3 too.
-**Amended by ADR-0048** (step 5, `PLAN-2026-10-03-pinned-cards`): every
-agent thread's `<rules>`, a lane of its own or not, holds one more fixed line,
-first: the team pins cards to say what it wants from the thread, they appear
-in `<pinned-cards>` blocks, and the latest block holds. It is constant, so a
-lane's prompt still stays the same between runs.
-**Amended by ADR-0103:** a lane's servers are reached from the Mac through
-ports published on the VM's address.
+- **Status:** Accepted
+- **Area:** `packages/lanes/TECHNICAL.md`, `packages/pi/TECHNICAL.md`
+- **Evidence:** S23, S56
+- **Amends:**
+  - ADR-0034: a lane's agent is told what holds in every lane, and no port
+    proxy is built.
+- **Amended by:**
+  - ADR-0048: every agent thread's `<rules>`, a lane of its own or not, holds
+    one more fixed line, first: the team pins cards to say what it wants from
+    the thread, they appear in `<pinned-cards>` blocks, and the latest block
+    holds. It is constant, so a lane's prompt still stays the same between
+    runs.
+  - ADR-0064: every lane of its own is also told to search with the `grep` and
+    `find` tools and that rg, fd and sd are on `PATH`; the browser fact is
+    `defaultImage`, and its line names python3 too.
+  - ADR-0103: a lane's servers are reached from the Mac through ports
+    published on the VM's address.
 
 **Context.** An agent in a lane of its own (ADR-0034) was told two things: its
 copy is at `/workspace`, and your working copy is at `/mnt/host-working-copy`,

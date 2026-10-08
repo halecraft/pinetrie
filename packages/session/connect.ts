@@ -313,7 +313,7 @@ export interface SessionClient {
     action: OfferAction,
     to?: string | null,
   ): Promise<Outcome>
-  /** Set up accepted work, or publish it (ADR-0060, ADR-0090). Tracked in `acting`. */
+  /** Set up accepted work, or publish it (ADR-0104, ADR-0090). Tracked in `acting`. */
   actOnAccepted(action: AcceptedAction): Promise<Outcome>
   /** Your offer, setup and publish commands out now, or refused or failed (`acting.ts`). */
   readonly acting: Readable<ActingState>

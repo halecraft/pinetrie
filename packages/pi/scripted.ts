@@ -91,7 +91,7 @@ export function scriptedModel(
     /** Given whenever nothing is queued, and never used up. Without it, such a request gets an error reply. */
     readonly answer?: ScriptStep
     /**
-     * Commit messages (ADR-0038), answered by a provider of their own, so a
+     * Commit messages (ADR-0105), answered by a provider of their own, so a
      * describe request never takes a reply from the run's script (S48 item 22).
      */
     readonly describe?: ScriptStep

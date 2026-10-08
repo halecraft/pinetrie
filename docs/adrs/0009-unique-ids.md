@@ -1,6 +1,8 @@
 # ADR-0009 — Entry id uniqueness is a safety invariant, not a convenience
 
-**Status:** Accepted (from S7)
+- **Status:** Accepted
+- **Area:** `packages/schema/TECHNICAL.md`, `docs/01-architecture.md`
+- **Evidence:** S3, S7, S9
 
 **Context.** Entries are stored in `Schema.record`, a Loro map. A Loro map is a
 **per-key LWW register**. Grow-only-set semantics emerge only because each key

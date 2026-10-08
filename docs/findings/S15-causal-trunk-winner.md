@@ -1,6 +1,8 @@
 # S15 — Should the trunk winner rule be causal rather than wall-clock?
 
-**Status:** Open, not urgent: replicas converge either way.
+- **Status:** Open
+
+Not urgent: replicas converge either way.
 
 ## Brief
 

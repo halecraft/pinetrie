@@ -1,5 +1,5 @@
 // host/queued-card-pop — popping a lane's queued cards, top first, to send
-// them (ADR-0048, ADR-0055, ADR-0083).
+// them (ADR-0048, ADR-0108, ADR-0083).
 //
 // People queue and unqueue cards through handoffs (ADR-0059); the host pops
 // them, and only when the lane is not running, since a lane is never written
@@ -238,7 +238,7 @@ async function appendFact(
 }
 
 /**
- * A card that catches the thread up (ADR-0055): the update, then the card's
+ * A card that catches the thread up (ADR-0108): the update, then the card's
  * text sent, or carried into the resolution run when the merge conflicts.
  */
 async function catchUpThenSend(

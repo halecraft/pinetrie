@@ -304,7 +304,7 @@ export const ERR = {
   BUSY: "busy",
   /** Landing a lane that has no copy of its own: it works directly. */
   NOT_OWN_COPY: "not_own_copy",
-  /** An offer action on a lane with no offer in your repo (ADR-0038). */
+  /** An offer action on a lane with no offer in your repo (ADR-0105). */
   NO_OFFER: "no_offer",
   /** A lane asked to work directly in a directory that is not one. */
   BAD_DIRECTORY: "bad_directory",
@@ -322,7 +322,7 @@ export const ERR = {
   LANE_ID_IN_USE: "lane_id_in_use",
   /** A new root's id that names a root the session already holds (ADR-0063). */
   ROOT_ID_IN_USE: "root_id_in_use",
-  /** An offer accepted, or a publish, before accepted work is set up (ADR-0060). */
+  /** An offer accepted, or a publish, before accepted work is set up (ADR-0104). */
   NOT_SET_UP: "not_set_up",
   /** Publishing in a repo with no publish bookmark (ADR-0076). */
   NO_PUBLISH: "no_publish",
@@ -334,7 +334,7 @@ export const ERR = {
   BAD_DESTINATION: "bad_destination",
   /** A new thread's base that is not a WIP bookmark above accepted work. */
   BAD_BASE: "bad_base",
-  /** Bringing a thread up to date with a WIP bookmark that is gone (ADR-0060). */
+  /** Bringing a thread up to date with a WIP bookmark that is gone (ADR-0104). */
   BASE_GONE: "base_gone",
   /** Catching up with the thread it branched from, for a thread that began at its base (ADR-0072). */
   NO_PARENT: "no_parent",
@@ -465,7 +465,7 @@ export type Intent =
       readonly reserved: LaneName | null
       /**
        * The WIP bookmark a lane this message creates starts from; null for the
-       * line (ADR-0060). Read only when the message creates a lane.
+       * line (ADR-0104). Read only when the message creates a lane.
        */
       readonly base: string | null
       /**
@@ -520,8 +520,8 @@ export type Intent =
   /** Ask a model for a root's title, from its messages (ADR-0074). */
   | { readonly kind: "retitle"; readonly root: RootId }
   /**
-   * Act on a lane's offer in your repo (ADR-0038). An acceptance names its
-   * destination bookmark, null for the default (ADR-0060), and what it was
+   * Act on a lane's offer in your repo (ADR-0105). An acceptance names its
+   * destination bookmark, null for the default (ADR-0104), and what it was
    * shown (`seen`, ADR-0065); every other action, null.
    */
   | {
@@ -531,7 +531,7 @@ export type Intent =
       readonly to: string | null
       readonly seen: OfferSeen | null
     }
-  /** Set up accepted work, or publish it (ADR-0060, ADR-0090). */
+  /** Set up accepted work, or publish it (ADR-0104, ADR-0090). */
   | { readonly kind: AcceptedAction }
   /**
    * Move cards, create one, or remove one (ADR-0059): one move, or a keep's
@@ -550,7 +550,7 @@ export type Intent =
       readonly root: RootId
       readonly direction: MoveDirection
     }
-  /** Set a card's command, or clear it with null (ADR-0055). */
+  /** Set a card's command, or clear it with null (ADR-0108). */
   | {
       readonly kind: "set-command"
       readonly card: CardId
@@ -564,9 +564,9 @@ export type Intent =
 
 /**
  * What can be done with an offer: accept it into accepted work or a WIP
- * (ADR-0060, ADR-0083), squash a stack back to one revision, have the agent
+ * (ADR-0104, ADR-0083), squash a stack back to one revision, have the agent
  * write its description again, or rebuild it, discarding your edits
- * (ADR-0038). Splitting it is a card's command, `split`, popped when the
+ * (ADR-0105). Splitting it is a card's command, `split`, popped when the
  * thread is free (ADR-0080).
  */
 export type OfferAction = "accept" | "squash" | "describe" | "refresh"
@@ -579,7 +579,7 @@ export const OFFER_ACTIONS: readonly OfferAction[] = [
 
 /**
  * What can be done with accepted work: set it up at your `@-`,
- * writing your repo's immutable heads (ADR-0060), or publish it (ADR-0090).
+ * writing your repo's immutable heads (ADR-0104), or publish it (ADR-0090).
  */
 export type AcceptedAction = "setup" | "publish"
 export const ACCEPTED_ACTIONS: readonly AcceptedAction[] = ["setup", "publish"]
@@ -700,7 +700,7 @@ export interface MarkRecord {
   readonly at: number
 }
 
-// --- stops (ADR-0056) --------------------------------------------------------
+// --- stops (ADR-0106) --------------------------------------------------------
 
 /**
  * Who stopped an ask's run: a host-written `pinetrie.stop` value keyed by the
@@ -831,7 +831,7 @@ export const PRODUCT_NAME = "pine·trie"
 export const HOST_OPERATOR = "pinetrie-host"
 
 /**
- * Where a thread's lane starts and is brought up to date from (ADR-0060):
+ * Where a thread's lane starts and is brought up to date from (ADR-0104):
  * accepted work, or a WIP bookmark you chose at its first message.
  */
 export type ThreadBase =
@@ -859,7 +859,7 @@ export interface CopyFacts {
 /** What a catch-up merges from: the thread's base, or the thread it branched from. */
 export type CatchUpFrom = ThreadBase | ParentThread
 
-/** A lane's base, read from its history (`@pinetrie/lanes`' `laneBase`, ADR-0060). */
+/** A lane's base, read from its history (`@pinetrie/lanes`' `laneBase`, ADR-0104). */
 export interface LaneBase {
   readonly base: ThreadBase
   /**
@@ -950,7 +950,7 @@ declare const snapshotIdBrand: unique symbol
  */
 export type SnapshotId = string & { readonly [snapshotIdBrand]: true }
 export const snapshotId = (id: string): SnapshotId => id as SnapshotId
-/** The project's disk at accepted work's commit, which root lanes fork from (ADR-0060). */
+/** The project's disk at accepted work's commit, which root lanes fork from (ADR-0104). */
 export const BASE_SNAPSHOT = snapshotId("base")
 
 /** Where a lane's tools work: its own container and disk, or directly in a directory. */
@@ -992,7 +992,7 @@ export interface RevisionRecord {
   readonly snapshot: SnapshotId | null
   /**
    * The paths the turn's commit changed, from the repository's root; none
-   * for a prompt's record or a turn with no commit (ADR-0056).
+   * for a prompt's record or a turn with no commit (ADR-0106).
    */
   readonly paths: readonly string[]
   /** The files conflicted in `commit`: what a branch from here starts with (ADR-0072). */
@@ -1016,7 +1016,7 @@ export type ProjectRecord =
 
 /**
  * A lane's offer: one revision, or a stack, in your repo, holding the lane's
- * work you do not have yet (ADR-0038). A host-written `pinetrie.offer` value
+ * work you do not have yet (ADR-0105). A host-written `pinetrie.offer` value
  * keyed by lane: the page's cache, written from the repo after each of the
  * host's steps (`offerRecord`, `@pinetrie/rules`). The host never decides from it: it reads the
  * offer from your repo (`OfferInRepo`), so a record lost or stale changes
@@ -1102,7 +1102,7 @@ export interface RevisionReview {
 }
 
 /**
- * What a review reads (ADR-0047, ADR-0056): one revision, the diff from its
+ * What a review reads (ADR-0047, ADR-0106): one revision, the diff from its
  * parent to it, or a range, the diff from one commit to another, such as an
  * ask's work across its turns' revisions. Commit ids name their content, so
  * a review of either never changes.
@@ -1120,7 +1120,7 @@ export const spanKey = (s: DiffSpan): string =>
   s.kind === "revision" ? s.commit : `${s.from}..${s.to}`
 
 /**
- * What a fork starts on (ADR-0060): a commit a lane recorded (a branch below
+ * What a fork starts on (ADR-0104): a commit a lane recorded (a branch below
  * agent work), accepted work's commit, or a copy of a WIP bookmark made on the
  * accepted commit under it, so the lane freezes nothing of yours.
  */
@@ -1138,7 +1138,7 @@ export type ForkStart =
 
 /**
  * What bringing a thread up to date merges into its lane: accepted work's
- * commit, or a fresh copy of a WIP (ADR-0060); or the newest commit of the
+ * commit, or a fresh copy of a WIP (ADR-0104); or the newest commit of the
  * thread it branched from (ADR-0072).
  */
 export type BaseMerge =
@@ -1194,7 +1194,7 @@ export interface BannerRecord {
 }
 
 /**
- * Accepted work in your repo, as the host last read it (ADR-0060): a
+ * Accepted work in your repo, as the host last read it (ADR-0104): a
  * host-written `pinetrie.accepted` value, a cache the page reads. The repo is the
  * truth; the host rewrites this whenever your repo's operation head moves.
  */
@@ -1267,7 +1267,7 @@ export interface AcceptedRecord {
 }
 
 /**
- * A thread's base as its lane's history says it (ADR-0060): a host-written
+ * A thread's base as its lane's history says it (ADR-0104): a host-written
  * `pinetrie.base` value keyed by lane, a cache the page reads. `start` is the
  * commit the lane's newest `Pinetrie-Base` trailer names, or accepted commit it
  * forked from when it has none.
@@ -1310,9 +1310,9 @@ export interface CatchUpRead {
 // --- cards (ADR-0048) --------------------------------------------------------
 
 /**
- * The commands that catch a thread up (ADR-0055). The first two bring the
+ * The commands that catch a thread up (ADR-0108). The first two bring the
  * thread up to date with its base, `continue-on-accepted` moving a thread whose
- * WIP is gone to accepted work first (ADR-0060); `catch-up-with-parent` merges
+ * WIP is gone to accepted work first (ADR-0104); `catch-up-with-parent` merges
  * the thread it branched from (ADR-0072).
  */
 export type CatchUpCommand =
@@ -1326,7 +1326,7 @@ export const CATCH_UP_COMMANDS: readonly CatchUpCommand[] = [
 ]
 
 /**
- * A command a card is sent through (ADR-0055); a plain card has none. The
+ * A command a card is sent through (ADR-0108); a plain card has none. The
  * catch-up commands, and `split`, which splits the thread's offer into a
  * stack in a run of its own, its text the person's intent (ADR-0080).
  */
@@ -1806,7 +1806,7 @@ export interface CardRecord {
    * When someone else moves the card, the trace is for them (ADR-0048).
    */
   readonly placer: WriterId
-  /** A message, and the command it is sent through when popped (ADR-0055); or a fact (ADR-0080). */
+  /** A message, and the command it is sent through when popped (ADR-0108); or a fact (ADR-0080). */
   readonly carries: CardCarries
   /** Why the host could not send it, until it is queued again; null when it never failed. */
   readonly unsent: string | null

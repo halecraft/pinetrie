@@ -1,5 +1,8 @@
 # S85 — earlier thinking is dropped when a lane's tools or prompt change
 
+- **Status:** Answered
+- **Led to:** ADR-0063, ADR-0080
+
 Measured on a copy of the person's `.pinetrie/pinetrie.db` (2026-10-03), against
 pi-ai 0.87.1's `api/anthropic-messages.js` and pi-agent-core 0.87.1's harness.
 The probes ran in a lane, read only the stored session, and were not committed.

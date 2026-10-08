@@ -237,7 +237,7 @@ export function createCardCommands(deps: CardCommandDeps) {
       }
     },
 
-    /** Set a card's command, or clear it (ADR-0055). */
+    /** Set a card's command, or clear it (ADR-0108). */
     setCommand(card: CardId, command: CardCommand | null): Promise<Settled> {
       return carry(planSetCommand(readPlaces(places), card, command), [], null)
     },

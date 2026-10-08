@@ -1,20 +1,28 @@
 # ADR-0065 — One owner for your repo
 
-**Status:** Accepted. Evidence: S87, S89. Implementation:
-`PLAN-2026-10-03-repo-owner`. Amends ADR-0038 (an offer is refreshed on an
-observed move, not a poll), ADR-0060 (a take names the offer it was shown)
-and ADR-0034 (a lane's fetch is imported by the owner).
-**Amended by ADR-0067:** whether a lane's work changes any file is `none`,
-`some` or `unknown`, and an untraced start or an unknown answer builds no
-offer, so refreshing every named lane on a full observation wakes none from
-before `Pinetrie-Source`; a lane whose base moved runs two more jj processes,
-once per move.
-Amended by ADR-0083: a take is an *offer integration*; it names what it
-was shown.
-Amended by `PLAN-2026-10-05-quiet-startup`: a full observation refreshes
-every named lane whose root is not archived, and every open record. An
-archived lane has no base to follow, and its ref, its offer bookmark or an
-open record still marks it.
+- **Status:** Accepted
+- **Area:** `apps/pinetrie/host/TECHNICAL.md`, `packages/repo/TECHNICAL.md`
+- **Evidence:** S87, S89
+- **Amends:**
+  - ADR-0034: a lane's bundle is imported into your repo by its owner, as the
+    host's operation.
+  - ADR-0038: an offer is refreshed when the owner of your repo observes a
+    move it depends on (the watched heads), not on a 2 s poll; a refresh is
+    keyed upkeep, and every write to your repo is the owner's.
+  - ADR-0060: a take names the offer it was shown (its ledger, and whether it
+    conflicted), and is refused `offer_changed` when the offer now brings
+    other work or newly conflicts.
+- **Revised:**
+  - 2026-10-05: a full observation refreshes every named lane whose root is
+    not archived, and every open record. An archived lane has no base to
+    follow, and its ref, its offer bookmark or an open record still marks it.
+- **Amended by:**
+  - ADR-0067: whether a lane's work changes any file is `none`, `some` or
+    `unknown`, and an untraced start or an unknown answer builds no offer, so
+    refreshing every named lane on a full observation wakes none from before
+    `Pinetrie-Source`; a lane whose base moved runs two more jj processes,
+    once per move.
+  - ADR-0083: a take is an *offer integration*; it names what it was shown.
 
 **Context.** A take ("add to the project") sometimes took 30–60 s, and the
 page showed nothing meanwhile. S89 measured it on a clone of pine·trie's repo:

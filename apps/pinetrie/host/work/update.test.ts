@@ -134,7 +134,7 @@ describe("planCatchUp: whether a catch-up may merge (ADR-0084)", () => {
   })
 })
 
-describe("planSettle: what a merge comes to (ADR-0060, ADR-0033)", () => {
+describe("planSettle: what a merge comes to (ADR-0104, ADR-0033)", () => {
   const ctx = {
     lane: LANE,
     by: ADA,

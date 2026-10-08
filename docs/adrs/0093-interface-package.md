@@ -1,7 +1,8 @@
 # ADR-0093 — What a person sees and does is `@pinetrie/interface`'s, for any client; the web page is `@pinetrie/web`
 
-**Status:** Accepted (Duane, 2026-10-05). Evidence: S115. Implemented by
-`PLAN-2026-10-05-interface-package`.
+- **Status:** Accepted (Duane, 2026-10-05)
+- **Area:** `packages/interface/TECHNICAL.md`, `ARCHITECTURE.md`
+- **Evidence:** S54, S59, S115
 
 **Context.** `@pinetrie/core` is a dependency of every package, `lanes`,
 `repo`, `pi` and the host among them, yet it held the columns' paths, the

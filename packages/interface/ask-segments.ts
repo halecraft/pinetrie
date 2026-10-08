@@ -1,4 +1,4 @@
-// interface/ask-segments — what a column draws of each ask (ADR-0056): its
+// interface/ask-segments — what a column draws of each ask (ADR-0106): its
 // work folded, and what that work holds. The column folds each ask's work
 // (`segmentPath`), and the rail compacts the same stretches (`compactRail`):
 // both draw `railLandmarks` apart, so a fold never hides what the rail draws

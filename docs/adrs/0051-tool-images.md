@@ -1,10 +1,14 @@
 # ADR-0051 — A tool's image is a blob; what pi stores holds its reference, and the rejoin restores its bytes
 
-**Status:** Accepted. Evidence: S93. Implementation:
-`PLAN-2026-09-30-tool-images`. Extends ADR-0042, whose "Other images are
-unchanged here" left tool results for later. Amends ADR-0015 (a message's
-image parts in `payload` are references) and ADR-0049 (a row whose result has
-an image opens capped, and draws the image in place of its text).
+- **Status:** Accepted
+- **Area:** `packages/pi/TECHNICAL.md`, `docs/01-architecture.md`
+- **Evidence:** S22, S53, S93
+- **Amends:**
+  - ADR-0015: a message's image parts in `payload` are references to the blob
+    store.
+  - ADR-0042: a tool's images are blobs too.
+  - ADR-0049: a row whose result has an image opens capped too, and draws the
+    image in place of its text.
 
 **Context.** A `read` of an image showed only its caption, "Read image file
 [image/png]". pi's `read` returns the image as a base64 part, and

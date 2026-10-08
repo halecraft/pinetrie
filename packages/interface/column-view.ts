@@ -68,7 +68,7 @@ export const AGENT_MARK = "✦"
 
 /**
  * A column's mark's tooltip: whether its lane is running, and on which ask
- * (`askWords`, ADR-0056), when its message is known.
+ * (`askWords`, ADR-0106), when its message is known.
  */
 export const workingWords = (
   running: boolean,
@@ -87,15 +87,15 @@ export interface WorkFacts {
   readonly commands: readonly CommandSummary[]
   readonly lanes: ReadonlyMap<LaneName, LaneRecord>
   readonly revisions: ReadonlyMap<EntryId, RevisionRecord>
-  /** Each lane's offer in your repo (ADR-0038). */
+  /** Each lane's offer in your repo (ADR-0105). */
   readonly offers: ReadonlyMap<LaneName, OfferRecord>
   /** Each lane's name (ADR-0039). */
   readonly names: ReadonlyMap<LaneName, ThreadName>
   /** Each thread's column banner. */
   readonly banners: ReadonlyMap<LaneName, BannerRecord>
-  /** Accepted work, as the host last read it (ADR-0060). */
+  /** Accepted work, as the host last read it (ADR-0104). */
   readonly accepted: AcceptedRecord | null
-  /** Each lane's base, as its history says it (ADR-0060). */
+  /** Each lane's base, as its history says it (ADR-0104). */
   readonly bases: ReadonlyMap<LaneName, BaseRecord>
 }
 
@@ -240,7 +240,7 @@ export interface LabelledButton {
 
 /**
  * What a review is read from (ADR-0047): an offer's revisions, or an ask's
- * range (ADR-0056), each a span, and which of their files to flag. `title`
+ * range (ADR-0106), each a span, and which of their files to flag. `title`
  * heads a review whose spans have no description: an ask's line.
  */
 export type ReviewTarget = Pick<
@@ -264,7 +264,7 @@ export type WorkStrip =
       readonly waiting: boolean
       readonly bookmark: string | null
       readonly review: ReviewTarget | null
-      /** Where `accept` and `accept-into-accepted` go (ADR-0060). */
+      /** Where `accept` and `accept-into-accepted` go (ADR-0104). */
       readonly destinations: OfferView["destinations"]
     }
   | {
@@ -310,7 +310,7 @@ export interface ColumnShows {
   readonly strip: WorkStrip
   /** What `Column` does to have its thread named before it starts. */
   readonly reserve: ReserveStep
-  /** The thread's base when it is not accepted work (ADR-0060), worded; null otherwise. */
+  /** The thread's base when it is not accepted work (ADR-0104), worded; null otherwise. */
   readonly base: string | null
   /** Catching up would change files in the thread (`catchUpOf`'s `brings`). */
   readonly behind: { readonly mark: string; readonly title: string } | null
@@ -470,7 +470,7 @@ const bannerOf = (
 ): HeadBanner | null => (url === null ? null : { url, fade: url !== mounted })
 
 /**
- * A thread's base in its header (ADR-0060): the WIP it is on, or that the
+ * A thread's base in its header (ADR-0104): the WIP it is on, or that the
  * WIP is gone; nothing for accepted work, or a WIP that landed on it.
  */
 export function baseWords(base: BaseRecord | undefined): string | null {

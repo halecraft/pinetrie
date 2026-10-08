@@ -2,9 +2,12 @@
 
 Numbered 0072 until 2026-10-04, when two files held that number.
 
-**Status:** Accepted. Implementation: `PLAN-2026-10-05-auto-titles`. Amends
-ADR-0045 (the agent may write a root's mark, and a root no agent works in is
-labelled `Chat`).
+- **Status:** Accepted
+- **Area:** `packages/rules/TECHNICAL.md`, `docs/06-interface.md`
+- **Amends:**
+  - ADR-0045: a model titles a root when its first lane starts, or when a
+    person asks (Auto-update title), and an untitled root no agent works in is
+    labelled `Chat`.
 
 **Context.** A root tab's label is its title, else its first message's first
 line (ADR-0045). The first line is often a preamble ("I'd like to start

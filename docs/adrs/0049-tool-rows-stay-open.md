@@ -1,13 +1,20 @@
 # ADR-0049 — A tool row opens, capped, only for work that lasts, and only the reader closes it or shows it whole; the floor is capped
 
-**Status:** Accepted. Amends ADR-0044 (when a tool's row opens and closes,
-and the floor's height), and adopts an alternative it rejected (keeping a
-finished tool's output open). Implementation: `PLAN-2026-09-30-column-end`.
-Amended by ADR-0051: a row whose result has an image opens capped too, and
-draws the image in place of its text. Amended by ADR-0054: a row keeps what
-it decided across an unmount, and `data-revealed` marks a row the work
-opened. Evidence for that amendment: S67. Amended by ADR-0058: a column
-also keeps where it was left, by message, and comes back there.
+- **Status:** Accepted
+- **Area:** `packages/web/TECHNICAL.md`, `docs/06-interface.md`
+- **Evidence:** S35, S67
+- **Amends:**
+  - ADR-0044: when a tool's row opens and closes, and the floor's height.
+- **Amended by:**
+  - ADR-0051: a row whose result has an image opens capped too, and draws the
+    image in place of its text.
+  - ADR-0054: a row keeps what it decided across an unmount, and
+    `data-revealed` marks a row the work opened.
+  - ADR-0058: a column also keeps where it was left, by message, and comes
+    back there.
+
+Adopts an alternative ADR-0044 rejected: keeping a finished tool's output
+open.
 
 **Context.** ADR-0044 kept a following column from getting shorter while its
 agent works: a shrink is taken up by a floor below the content. But a tool's

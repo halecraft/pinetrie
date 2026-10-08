@@ -1,6 +1,7 @@
 # ADR-0001 — Embed `pi-agent-core`; do not use chord or the experimental server
 
-**Status:** Accepted
+- **Status:** Accepted
+- **Area:** `docs/01-architecture.md`
 
 **Context.** pi 0.85 is mid-rewrite into a distributed architecture:
 coordinator → replaceable server → one worker process per session → N attached

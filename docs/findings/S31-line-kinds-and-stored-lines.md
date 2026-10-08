@@ -1,5 +1,8 @@
 # S31 — a new command kind, and a store holding the old Lines
 
+- **Status:** Answered
+- **Led to:** ADR-0029, ADR-0045
+
 **Answers.**
 1. **A store written before a kind is added opens, and serves, after it**
    (measured). The host stores each client's command Line (ADR-0023), and

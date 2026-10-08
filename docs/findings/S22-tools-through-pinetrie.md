@@ -1,5 +1,8 @@
 # S22 — a tool run through pine·trie's storage
 
+- **Status:** Answered
+- **Led to:** ADR-0022, ADR-0023, ADR-0051, ADR-0107
+
 **Answers.**
 1. **Tool calls and results store and reload intact**, but pine·trie's projections
    hide them. An assistant message's tool calls render as nothing, and tool

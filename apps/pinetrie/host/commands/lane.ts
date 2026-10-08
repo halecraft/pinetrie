@@ -1,6 +1,6 @@
 // host/commands/lane — the commands that act on one thread's lane: stop it,
 // carry it on after a Stop (ADR-0082), hold or release its queue (ADR-0048
-// step 7), or act on its offer (ADR-0038), which leaves a fact in the thread
+// step 7), or act on its offer (ADR-0105), which leaves a fact in the thread
 // (ADR-0080).
 
 import {
@@ -94,7 +94,7 @@ async function laneAt(
 }
 
 /**
- * Stop a thread's turn, recording who stopped its ask first (ADR-0056), and
+ * Stop a thread's turn, recording who stopped its ask first (ADR-0106), and
  * holding its queue when a message card waits there (ADR-0048 step 7):
  * both are written before the run is stopped, so they are there when the
  * run's end is drawn and drains the lane, which then pops nothing. A chat's
@@ -202,7 +202,7 @@ export async function handleCarryOn(
 }
 
 /**
- * An offer action (ADR-0038), the offer shell's, on your repo. A split is a
+ * An offer action (ADR-0105), the offer shell's, on your repo. A split is a
  * card's command, not an action (ADR-0080).
  */
 export async function actOnOffer(
@@ -275,7 +275,7 @@ export function offerRefusal(code: ErrCode): string {
 }
 
 /**
- * A setup or publish: set up accepted work (ADR-0060), or publish it
+ * A setup or publish: set up accepted work (ADR-0104), or publish it
  * (ADR-0076, ADR-0090).
  */
 export async function actOnAccepted(

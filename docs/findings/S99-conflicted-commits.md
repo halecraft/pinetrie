@@ -1,6 +1,7 @@
 # S99 — git reads a conflicted jj commit as every side's tree, and an offer that starts conflicted keeps the conflict
 
-**Status:** Answered. Served `PLAN-2026-10-04-catch-up-parent`.
+- **Status:** Answered
+- **Led to:** ADR-0056, ADR-0072, ADR-0079, ADR-0080, ADR-0104, ADR-0106
 
 **Question.** A thread's resolution turn counted "2084 files", in a repo of
 694 tracked files. A branch of that thread, cloned while its parent's

@@ -1,11 +1,15 @@
 # ADR-0042 — A pasted image is a blob; a message holds its reference, and the model reads the bytes when its context is built
 
-**Status:** Accepted. Evidence: S53. Implementation:
-`PLAN-2026-09-29-pasted-images`. Amends ADR-0022 (admission checks where a
-request comes from) and ADR-0023 (image bytes are never part of the
-compacted document). Extended by ADR-0051: a tool's images are blobs too.
-Amended by ADR-0098: a person's picture is a blob, and the
-sweep counts it as a reference.
+- **Status:** Accepted
+- **Area:** `docs/01-architecture.md`, `packages/pi/TECHNICAL.md`
+- **Evidence:** S47, S53
+- **Amends:**
+  - ADR-0022: admission also checks where a request comes from.
+  - ADR-0023: image bytes are never part of the compacted document.
+- **Amended by:**
+  - ADR-0051: a tool's images are blobs too.
+  - ADR-0098: a person's picture is a blob, and the sweep counts it as a
+    reference.
 
 **Context.** A person cannot show the agent or a collaborator an image: a
 screenshot, a mockup, an error dialog. The session document is replicated

@@ -3,8 +3,8 @@
 The host serves one jj repo: the project's working copy on the machine the
 host runs on. This page is for someone who works in that repo with jj or
 jjui beside pine·trie. It says what pine·trie puts there, what it expects, and
-what to configure. Why each piece is shaped as it is: ADR-0038 (offers),
-ADR-0039 (thread names), ADR-0060 (accepted work and the ledger),
+what to configure. Why each piece is shaped as it is: ADR-0105 (offers),
+ADR-0039 (thread names), ADR-0104 (accepted work and the ledger),
 ADR-0076 and ADR-0090 (publishing).
 
 Two parties act on the repo. **The host** runs its jj commands as the

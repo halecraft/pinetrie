@@ -1,6 +1,8 @@
 # ADR-0012 — The trunk is a derived value over an append-only promotion DAG
 
-**Status:** Accepted (from S12)
+- **Status:** Accepted
+- **Area:** `docs/01-architecture.md`, `packages/schema/TECHNICAL.md`
+- **Evidence:** S12
 
 **Context.** ADR-0011 gives every writer its own lane, so no lane is canonical —
 yet the product is built on a trunk (`docs/00-vision.md`: *"fold an exploration back

@@ -336,7 +336,7 @@ describe("planIntent", () => {
 
   test.each([
     [
-      "density (ADR-0056)",
+      "density (ADR-0106)",
       { kind: "density", density: "outline" },
       { kind: "density", key: "col-k", density: "outline" },
     ],
@@ -396,7 +396,7 @@ describe("planIntent", () => {
       expect(effects.some(e => e.kind === "armFocus")).toBe(false)
     })
 
-    test("a pick into an ask's work opens its fold before it is revealed (ADR-0056)", () => {
+    test("a pick into an ask's work opens its fold before it is revealed (ADR-0106)", () => {
       const asks: AskIndex = {
         askOf: new Map([[entryId("4-c"), entryId("2-a")]]),
         work: new Map([[entryId("2-a"), [entryId("4-c")]]]),
@@ -445,7 +445,7 @@ describe("planIntent", () => {
     })
   })
 
-  describe("cards (ADR-0048, ADR-0055)", () => {
+  describe("cards (ADR-0048, ADR-0108)", () => {
     const lane = laneNameForThread("x")
     const where = atEntry(entryId("3-b"))
     const ada = writerId("ada@x.test")
@@ -630,7 +630,7 @@ describe("planIntent", () => {
         plan(column({ kind: "offer", lane, action: "squash", to: null })),
       ).toEqual([{ kind: "offer", lane, action: "squash", to: null }])
     })
-    test("continue on accepted work queues its own command (ADR-0060)", () => {
+    test("continue on accepted work queues its own command (ADR-0104)", () => {
       expect(
         plan(
           column({

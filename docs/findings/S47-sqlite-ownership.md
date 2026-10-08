@@ -1,5 +1,8 @@
 # S47 — owning a SQLite file through `node:sqlite`
 
+- **Status:** Answered
+- **Led to:** ADR-0037, ADR-0042
+
 Kyneta v4's `SqliteAdapter` must own its database file: the store reuses one
 seat on every open, which is sound only if no other connection writes the
 file. Kyneta's own adapters (`fromBetterSqlite3`, `fromBunSqlite`) take

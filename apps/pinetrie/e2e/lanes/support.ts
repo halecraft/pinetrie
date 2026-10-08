@@ -47,7 +47,7 @@ export const at = (id: string | null): Position =>
   id === null ? ROOT : atEntry(entryId(id))
 
 /**
- * Bring a thread up to date (ADR-0055), as its button and a send do: a card
+ * Bring a thread up to date (ADR-0108), as its button and a send do: a card
  * at the lane's tip with the command and `text`, queued. On an idle lane the
  * host pops it at once.
  */

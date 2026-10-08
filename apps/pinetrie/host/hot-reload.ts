@@ -5,9 +5,10 @@
 // and hot reload stays on (ADR-0034). A lane working directly in your working
 // copy may edit the client this host serves, mid-run: an update to a file
 // inside a running direct lane's directory is held, and the run's end
-// reloads the page once (ADR-0022's reason). Whether the project is pinetrie
-// does not come into it: Vite reports only the files it serves, so a lane
-// working in another project holds nothing.
+// reloads the page once, so an agent's edit never reaches an open page
+// mid-run. Whether the project is pinetrie does not come into it: Vite
+// reports only the files it serves, so a lane working in another project
+// holds nothing.
 
 import { realpathSync } from "node:fs"
 import { isWithin } from "@pinetrie/core"

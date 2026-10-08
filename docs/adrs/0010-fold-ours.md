@@ -1,7 +1,11 @@
 # ADR-0010 — A fold is destination-relative; the `ours` leg is mandatory
 
-**Status:** Accepted (from S5). Applied to files by ADR-0033: resolving a
-merge's conflicts gets labelled sides, and never loses the destination's.
+- **Status:** Accepted
+- **Area:** `docs/01-architecture.md`, `packages/schema/TECHNICAL.md`
+- **Evidence:** S5
+- **Amended by:**
+  - ADR-0033: resolving a merge's conflicts gets labelled sides, and never
+    loses the destination's.
 
 **Context.** S5's ablation A ran the fold with only the `theirs` leg. The output
 was not a *degraded* fold — it was **confidently wrong**, recommending a design

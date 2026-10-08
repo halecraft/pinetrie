@@ -1,6 +1,7 @@
 # S90 — Places on Yjs over time, stacks that come and go, and a swap stack
 
-**Status:** Answered. With S82 and S91, led to ADR-0066.
+- **Status:** Answered
+- **Led to:** ADR-0048, ADR-0066
 
 Asked after S82, while planning undo of moves on the host (ADR-0066): three
 questions S82 left open. Can a Yjs places document be trimmed at startup?

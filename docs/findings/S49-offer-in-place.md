@@ -1,5 +1,8 @@
 # S49 — an offer updated in place while its thread works
 
+- **Status:** Answered
+- **Led to:** ADR-0039, ADR-0105
+
 ADR-0038 builds a thread's offer afresh whenever the lane moves under an
 unedited single offer: abandon the old commit, make a new one at the start,
 restore the lane tip's files into it, rebase it onto the target, set the

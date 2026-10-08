@@ -1,5 +1,8 @@
 # S30 — what a root is, for a thread started at the root
 
+- **Status:** Answered
+- **Led to:** ADR-0029, ADR-0045, ADR-0063
+
 **Answers.**
 1. **A thread started at the root is rooted at its first message**, whether
    it is a conversation or agent work (measured). Start Chat appends the chat

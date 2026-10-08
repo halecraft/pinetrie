@@ -1,7 +1,9 @@
 # S135 — In a nested lane, setuid `newuidmap` cannot write a uid map: it needs file capabilities. And a lane of the switched host has no network past the VM
 
-**Status:** Answered: item 2 on the Mac below, and its fix in S136. Serves
-`PLAN-2026-10-07-lane-runtime` (ADR-0103), Phase 9.
+- **Status:** Answered
+- **Led to:** ADR-0103
+
+Item 2 is answered on the Mac below, and fixed in S136.
 
 **Question.** After the switch, in pine·trie's own lane on Docker, granted
 `lanes.nested`:

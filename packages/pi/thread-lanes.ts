@@ -111,7 +111,7 @@ export interface ThreadLaneHandle {
   /**
    * Append with no run, through the pi `Lane`: it plans from its own cached
    * tip, so a write that bypasses it would be dropped from its next turn (S19).
-   * A chat, or a host's fact: an update (ADR-0038), or what a command on the
+   * A chat, or a host's fact: an update (ADR-0105), or what a command on the
    * thread's offer did (ADR-0080).
    */
   append(

@@ -1,5 +1,8 @@
 # S82 — Kyneta undo stacks on the host, one per seat, over host-written places
 
+- **Status:** Answered
+- **Led to:** ADR-0048, ADR-0066
+
 Asked while planning undo of moves (ADR-0052, ADR-0059): can the host keep a
 Kyneta undo stack per seat over a places document only it writes, and so
 give moves Kyneta's undo instead of pine·trie's own reverse handoffs? Measured

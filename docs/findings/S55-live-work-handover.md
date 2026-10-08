@@ -1,6 +1,7 @@
 # S55 — the order a turn's streams and entries are written in
 
-**Status:** Answered. With S35, led to ADR-0044.
+- **Status:** Answered
+- **Led to:** ADR-0044
 
 **Question.** S35 found that live work closes before its entry arrives. To
 hand a stream over to its entry on screen in one render, the reader must be

@@ -1,5 +1,5 @@
 // live — what each stream event, and a run's start and end, do to
-// `pinetrie:live` (ADR-0014, ADR-0022, S55). Pure: the host gathers the
+// `pinetrie:live` (ADR-0014, ADR-0107, S55). Pure: the host gathers the
 // streams, these return `LiveOp`s, and `applyLiveOps` (@pinetrie/schema)
 // writes them.
 

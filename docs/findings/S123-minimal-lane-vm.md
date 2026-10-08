@@ -1,6 +1,9 @@
 # S123 — Alpine in Lima runs lanes on btrfs snapshots end to end, with a seventh of Ubuntu's disk and less memory, but boots no faster
 
-**Status:** Answered. Follows S122. No ADR yet.
+- **Status:** Answered
+- **Led to:** ADR-0102, ADR-0103
+
+Follows S122.
 
 **Question.** S122 ran lanes in Colima's Ubuntu 24.04 VM (316 MB download,
 20 s boot). Its AppArmor setting was one of the three layers that blocked

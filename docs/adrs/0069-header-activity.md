@@ -1,16 +1,20 @@
 # ADR-0069 — The header counts only what needs you, in one activity menu
 
-**Status:** Accepted (Duane, 2026-10-04). Implemented by
-`PLAN-2026-10-04-header-activity`. Amends ADR-0030 (`@` becomes the activity
-menu's mentions, and its count part of the menu's badge) and ADR-0061 (the ⇣
-trigger goes; its threads are the menu's "Ready to add"). Amended by
-ADR-0076: the project's trigger counts unpublished commits, and no longer
-marks your files being behind. Amended by ADR-0077: the badge counts
-verdicts that need you, offers of threads you follow and unseen mentions;
-the menu gains "Needs you" and "Worth a read". Amended by ADR-0091: the
-activity menu goes; its personal sections are your inbox, beside your
-avatar, which is always drawn, and running work is a count on the board's
-strip.
+- **Status:** Accepted (Duane, 2026-10-04)
+- **Area:** `docs/06-interface.md`
+- **Amends:**
+  - ADR-0030: `@` is the header's activity menu's mentions, and its count part
+    of that menu's badge, with open offers.
+  - ADR-0061: the header's ⇣ goes; its threads are the activity menu's "Ready
+    to add", counted on its badge.
+- **Amended by:**
+  - ADR-0076: the project's trigger counts unpublished commits, and no longer
+    marks your files being behind.
+  - ADR-0077: the badge counts verdicts that need you, offers of threads you
+    follow and unseen mentions; the menu gains "Needs you" and "Worth a read".
+  - ADR-0091: the activity menu goes; its personal sections are your inbox,
+    beside your avatar, which is always drawn, and running work is a count on
+    the board's strip.
 
 **Context.** Using the header alone, with the agent working most of the time,
 Duane found its right end noisy and unclear:

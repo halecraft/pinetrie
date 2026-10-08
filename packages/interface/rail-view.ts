@@ -34,7 +34,7 @@ export function railKeep(input: {
 const NO_RINGS: ReadonlyMap<EntryId, unknown> = new Map()
 
 /**
- * What a root's columns draw apart from any fold (ADR-0056): the rail's
+ * What a root's columns draw apart from any fold (ADR-0106): the rail's
  * landmarks, kept as `railKeep` keeps them but for the rings. A ring is a
  * thread end, and a thread end on a column's path is the column's own end,
  * kept already; leaving presence out keeps a presence write from redrawing
@@ -48,7 +48,7 @@ export function columnLandmarks(
 }
 
 /**
- * A capsule's tooltip: its ask, when it is one long ask's work (ADR-0056),
+ * A capsule's tooltip: its ask, when it is one long ask's work (ADR-0106),
  * then what it holds (`workWords`), then its digest as the model wrote it
  * (`digestText`), when it has a headline.
  */

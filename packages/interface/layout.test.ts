@@ -534,7 +534,7 @@ describe("encodeLayout / decodeLayout", () => {
     expect(trip(initialLayout())).toEqual(initialLayout())
   })
 
-  test("a column's density is kept, and a layout stored before densities still decodes (ADR-0056)", () => {
+  test("a column's density is kept, and a layout stored before densities still decodes (ADR-0106)", () => {
     const l: Layout = {
       active: { kind: "root", root: entryId("1-r1") },
       open: [],

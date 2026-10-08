@@ -1,5 +1,8 @@
 # S21 — conversation threads with no lane, and a lane that is running
 
+- **Status:** Answered
+- **Led to:** ADR-0020, ADR-0026, ADR-0056, ADR-0080, ADR-0106
+
 **Answers.**
 1. **A message appended with no lane is a full member of the tree.** Another
    lane can navigate to it, a lane can be created there, and that lane's agent

@@ -1,11 +1,17 @@
 # ADR-0100 — One vocabulary: accepted work, accept, publish, catch up; `pinetrie-accepted`, and config by concept
 
-**Status:** Accepted (Duane, 2026-10-07). Implemented by
-`PLAN-2026-10-07-accepted-work`. Amends ADR-0060 (the integration line is
-*accepted work* in code, and its bookmark is `pinetrie-accepted`), ADR-0083
-(the code's verb for an offer integration is *accept*, not *integrate*),
-ADR-0090 (the code keeps no word the page does not use) and ADR-0099
-(`offers.catchUp` is `publish.catchUp`).
+- **Status:** Accepted (Duane, 2026-10-07)
+- **Area:** `docs/glossary.md`, `docs/the-jujutsu-repo.md`
+- **Evidence:** S121
+- **Amends:**
+  - ADR-0060: the line is *accepted work* in code too, and its bookmark is
+    `pinetrie-accepted`; a base names accepted work by kind.
+  - ADR-0083: the code's verb for an offer integration is *accept*, and an
+    integrated-offer commit is an accepted-offer commit.
+  - ADR-0090: the code says *accepted work* and *accept* as the page does;
+    `offers` is replaced by `accepted`, `wip` and `publish`.
+  - ADR-0099: `offers.catchUp` is `publish.catchUp`, and `publishCatchesUp` in
+    code.
 
 **Context.** ADR-0090 made the page say **accepted work** and **accept**,
 and left the code saying *the line* and *integrate*, and the repo and the

@@ -143,7 +143,7 @@ function treeOf(node: SpineNode): Root {
 }
 
 /**
- * An ask's files as a review (ADR-0056): the range from its prompt's commit
+ * An ask's files as a review (ADR-0106): the range from its prompt's commit
  * to its last turn's, titled with its line. Null when it changed nothing, or
  * its lane recorded no revision.
  */

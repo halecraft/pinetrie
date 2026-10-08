@@ -1,6 +1,6 @@
 // host/work/create — a new lane: where it works, its record and name, and,
 // for a lane of its own, its fork from where it branched, or from accepted work
-// or a WIP's copy where nothing is above (ADR-0032, ADR-0034, ADR-0060).
+// or a WIP's copy where nothing is above (ADR-0032, ADR-0034, ADR-0104).
 
 import { stat } from "node:fs/promises"
 import {
@@ -69,7 +69,7 @@ export interface NewLanes {
   /**
    * Whether a new lane of its own can begin at `at` from `base` (a WIP
    * bookmark, null for accepted work), checked before the lane is made: null, or
-   * why not (ADR-0060). A lane with agent work above inherits it, and needs
+   * why not (ADR-0104). A lane with agent work above inherits it, and needs
    * neither.
    */
   checkBegin(

@@ -1,9 +1,13 @@
 # ADR-0019 — A lane is a line of work, not a unit of parallelism
 
-**Status:** Accepted. Refines ADR-0011 and ADR-0018; shapes ADR-0010. Amended by
-ADR-0020 (people own no lanes, so there are no conversation lanes), and by
-ADR-0032 (every lane has a workspace; no line of work is on the main working
-copy).
+- **Status:** Accepted
+- **Area:** `docs/01-architecture.md`
+- **Amended by:**
+  - ADR-0020: people own no lanes, so there are no conversation lanes.
+  - ADR-0032: every lane has a workspace; no line of work is on the main
+    working copy.
+
+Refines ADR-0011 and ADR-0018; shapes ADR-0010.
 
 **Context.** A pi lane is a named cursor into the session tree: a tip where the
 next entry attaches, and its own run state, one model turn at a time

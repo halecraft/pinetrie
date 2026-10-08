@@ -1,5 +1,8 @@
 # S23 — a person's pi configuration inside pine·trie
 
+- **Status:** Answered
+- **Led to:** ADR-0022, ADR-0036, ADR-0046, ADR-0107
+
 **Answers.**
 1. **pi's own loader loads a person's pi packages unchanged.**
    `SettingsManager` and `DefaultResourceLoader` loaded all six extensions

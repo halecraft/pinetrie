@@ -1,4 +1,4 @@
-// interface/left — where you last left a thread (ADR-0056): the furthest entry
+// interface/left — where you last left a thread (ADR-0106): the furthest entry
 // you have read on its lane, on any device of yours, from your attention
 // document (ADR-0077, `@pinetrie/session`'s `attention-doc.ts`). Pure.
 

@@ -1,6 +1,7 @@
 # ADR-0004 — Entries are immutable; merges are additive nodes with a second parent
 
-**Status:** Accepted
+- **Status:** Accepted
+- **Area:** `packages/schema/TECHNICAL.md`, `docs/05-stack.md`
 
 **Context.** pi's v4 model is already append-only with UUIDv7 IDs and
 `parentId`. Immutability is what makes structural convergence trivial and

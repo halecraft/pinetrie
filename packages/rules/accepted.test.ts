@@ -29,7 +29,7 @@ import {
   publishWork,
 } from "./index.ts"
 
-describe("accepted work (ADR-0060)", () => {
+describe("accepted work (ADR-0104)", () => {
   const facts = {
     commit: null,
     heads: "trunk()",
@@ -326,7 +326,7 @@ describe("accepted work (ADR-0060)", () => {
   })
 })
 
-describe("planBegin: accepted work, or a WIP's copy (ADR-0060)", () => {
+describe("planBegin: accepted work, or a WIP's copy (ADR-0104)", () => {
   const L = commitId("l1")
   const wip = { commit: commitId("w1"), under: commitId("l0") }
   const begin = (
@@ -469,7 +469,7 @@ describe("parentNow and planParentUpdate: the thread a lane branched from (ADR-0
   })
 })
 
-describe("planUpdateFrom: always the base the thread follows (ADR-0060)", () => {
+describe("planUpdateFrom: always the base the thread follows (ADR-0104)", () => {
   const L = commitId("l1")
   const W = commitId("w1")
   const COPY = commitId("c1")

@@ -1,29 +1,37 @@
 # ADR-0032 — A lane works in its own jj workspace, and each turn that changes files is a revision
 
-**Status:** Accepted. Evidence: S36. Implemented by
-`PLAN-2026-09-27-workspaces`. Amends ADR-0019 (the trunk is no longer
-a line of work on the main working copy), ADR-0021 (a workspace is no longer
-its own step) and ADR-0022 (the agent no longer works in the repo the host
-runs from). Changes the vision's branch kinds (`docs/00-vision.md`): every
-agent lane is a Worktree. **Amended by ADR-0034:** its workspaces, the
-rewrite of the history the model is sent, the refusal of other lanes' paths,
-and dependency setup are replaced by a container per lane on its own disk.
-Amended in place (`PLAN-2026-09-29-send-button`): where a new lane works is
-said by a chip beside the send button, not by the button.
-**Amended by ADR-0038:** a lane with no revision above its fork
-point starts from a copy of your `@`, not your `@-`, and lanes' bookmarks
-leave your repo's config. **Amended by ADR-0040:** a direct lane's column no
-longer says where it works and that the directory is shared; its work strip
-says where its changes land, and warns only while another lane runs there.
-Amended in place (`PLAN-2026-09-30-agent-commits`, S56): a commit the
-agent made itself in a turn is that turn's revision.
-**Amended by ADR-0060:** a lane with no revision above it starts at the
-integration line, or a copy of a WIP bookmark, not your `@-`.
-Amended by ADR-0061: where a new thread's agent works is a line left of
-the send button, saying what it does to your files, and its menu marks the
-choice.
-**Amended by ADR-0102:** working directly goes; every thread's agent works
-in a lane of its own.
+- **Status:** Accepted
+- **Area:** `docs/00-vision.md`, `packages/lanes/TECHNICAL.md`
+- **Evidence:** S36, S56
+- **Amends:**
+  - ADR-0019: every lane has a workspace; no line of work is on the main
+    working copy.
+  - ADR-0021: a workspace is created with the lane, not as its own step.
+  - ADR-0022: the agent's tools run in its lane's workspace, never in the repo
+    the host runs from.
+- **Revised:**
+  - 2026-09-29: where a new lane works is said by a chip beside the send
+    button, not by the button.
+  - 2026-09-30 (S56): a commit the agent made itself in a turn is that turn's
+    revision.
+- **Amended by:**
+  - ADR-0034: its workspaces, the rewrite of the history the model is sent,
+    the refusal of other lanes' paths, and dependency setup are replaced by a
+    container per lane on its own disk.
+  - ADR-0038: a lane with no revision above its fork point starts from a copy
+    of your `@`, not your `@-`, and lanes' bookmarks leave your repo's config.
+  - ADR-0040: a direct lane's column no longer says where it works and that
+    the directory is shared; its work strip says where its changes land, and
+    warns only while another lane runs there.
+  - ADR-0060: a lane with no revision above it starts at the integration line,
+    or a copy of a WIP bookmark, not your `@-`.
+  - ADR-0061: where a new thread's agent works is a line left of the send
+    button, saying what it does to your files, and its menu marks the choice.
+  - ADR-0102: working directly goes; every thread's agent works in a lane of
+    its own.
+
+Changes the vision's branch kinds (`docs/00-vision.md`): every agent lane is a
+Worktree.
 
 **Context.** The agent's tools run in the repo the host runs from, so two
 threads running tools at once share one directory and can collide. ADR-0022

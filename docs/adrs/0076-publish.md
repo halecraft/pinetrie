@@ -1,16 +1,22 @@
 # ADR-0076 — The project is published to main; the project menu says only what applies where the host runs
 
-**Status:** Accepted (Duane, 2026-10-05). Implemented by
-`PLAN-2026-10-05-project-publish`. Amends ADR-0060 (a second bookmark the
-host moves: the publish bookmark, forward only, never your `@`), ADR-0061
-(the project menu's two sections, and its words) and ADR-0069 (the
-project's mark counts unpublished commits, not your files being behind).
-Amended by ADR-0090: the menu goes, for one publish button; on the host's
-own machine a publish also catches your files up and integrates your
-commits; a refusal is a toast.
-Amended by ADR-0099: a publish moves `main` alone when
-`offers.catchUp` is off, on any host, not because the host admits others.
-**Amended by ADR-0102:** "your files" is "the working copy".
+- **Status:** Accepted (Duane, 2026-10-05)
+- **Area:** `packages/repo/TECHNICAL.md`, `packages/rules/TECHNICAL.md`
+- **Amends:**
+  - ADR-0060: the host also moves the publish bookmark (`main`) forward to the
+    line, as itself, on anyone's command; never your `@`.
+  - ADR-0061: the project menu has two sections, the project's (publishing it
+    to main) and your files' (only on the host's own machine), and lists no
+    files but those that would conflict.
+  - ADR-0069: the project's trigger counts unpublished commits, and no longer
+    marks your files being behind.
+- **Amended by:**
+  - ADR-0090: the menu goes, for one publish button; on the host's own machine
+    a publish also catches your files up and integrates your commits; a
+    refusal is a toast.
+  - ADR-0099: a publish moves `main` alone when `offers.catchUp` is off, on
+    any host, not because the host admits others.
+  - ADR-0102: "your files" is "the working copy".
 
 **Context.** The header's **◆ project** menu (ADR-0061) had grown confusing
 (Duane, 2026-10-04):

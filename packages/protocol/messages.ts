@@ -64,7 +64,7 @@ export const HOST_PRINCIPAL = "pinetrie-host"
  *     acceptance names its destination bookmark in `targetId`, `""` for the default,
  *     and what it was shown in `seen`.
  *   - `line` sets up accepted work (`mode` `setup`) or lands your
- *     work on it (`land`), ADR-0060.
+ *     work on it (`land`), ADR-0104.
  *   - `reserve` asks the host to name the thread whose lane will be `lane`,
  *     a new id the sender's column made, before the lane exists (ADR-0057).
  *   - `move` hands cards from place to place (ADR-0059): `moves` lists
@@ -78,7 +78,7 @@ export const HOST_PRINCIPAL = "pinetrie-host"
  *   - `undo-move` undoes (`mode` `undo`) or redoes (`redo`) the sender's
  *     newest move in the root `root` (ADR-0066).
  *   - `set-command` sets the card `cardId`'s command to `mode`, or
- *     clears it with `""` (ADR-0055).
+ *     clears it with `""` (ADR-0108).
  *   - `traces-seen` names the sender's traces they have seen, a JSON list
  *     of ids in `text`; the host deletes them (ADR-0048).
  */
@@ -181,7 +181,7 @@ export interface Command {
   readonly reserved: string
   /**
    * `chat`: the WIP bookmark a lane it creates starts from, or `""` for the
-   * line (ADR-0060).
+   * line (ADR-0104).
    */
   readonly base: string
   /**

@@ -1,19 +1,24 @@
 # ADR-0033 — Conflicts are resolved by the agent in its lane, by a policy you can replace, and the repository decides the outcome
 
-**Status:** Accepted. Implemented by `PLAN-2026-09-27-workspaces` (landing;
-the fold's merge comes with `PLAN-2026-09-27-fold`). **Amended by ADR-0038
-(proposed):** landing becomes "update from my work", which runs the agent
-only when the merge conflicts. Builds on ADR-0032 (folds
-and landing are jj merges in a
-lane's workspace) and ADR-0010 (labelled legs, and the destination's is
-mandatory).
-Amended by ADR-0080: a resolution ends like any run. `ask_for_guidance` is
-renamed `ask_about_conflict`, and is accepted while jj finds conflicts in
-the lane's copy; the strip's "needs you" is read from the thread's newest
-ask, conflicts left are the offer's, and `pinetrie.landing` goes (S104).
-**Amended by ADR-0084:** a resolution's prompt fits what pi keeps
-when it compacts; over it, the hunks give way to conflict sections, then
-names, then a count, before the reasons do.
+- **Status:** Accepted
+- **Area:** `packages/pi/TECHNICAL.md`
+- **Evidence:** S36, S104
+- **Amends:**
+  - ADR-0010: resolving a merge's conflicts gets labelled sides, and never
+    loses the destination's.
+- **Amended by:**
+  - ADR-0038: landing becomes "update from my work", which runs the agent only
+    when the merge conflicts.
+  - ADR-0080: a resolution ends like any run. `ask_for_guidance` is renamed
+    `ask_about_conflict`, and is accepted while jj finds conflicts in the
+    lane's copy; the strip's "needs you" is read from the thread's newest ask,
+    conflicts left are the offer's, and `pinetrie.landing` goes (S104).
+  - ADR-0084: a resolution's prompt fits what pi keeps when it compacts; over
+    it, the hunks give way to conflict sections, then names, then a count,
+    before the reasons do.
+
+Builds on ADR-0032 (folds and landing are jj merges in a lane's workspace) and
+ADR-0010 (labelled legs, and the destination's is mandatory).
 
 **Context.** A fold of files and a landing are jj merges in a lane's
 workspace (ADR-0032). jj records conflicts rather than failing, so a merge

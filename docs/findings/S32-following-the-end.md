@@ -1,5 +1,8 @@
 # S32 — following a column's end, and the browser's order within a frame
 
+- **Status:** Answered
+- **Led to:** ADR-0054, ADR-0077
+
 **Answers.**
 1. **A column did not follow a reply being written** (measured). With a
    scripted reply of 40 paragraphs at 60 tokens/s, the gap between the

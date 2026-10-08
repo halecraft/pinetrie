@@ -202,7 +202,7 @@ export const lateFor = (docId: string, ms: number): typeof WebSocket => {
 
 /**
  * Set up accepted work at your `@-`, as the footer's set up button does
- * (ADR-0060): a new thread with no history of its own starts there. Waits for
+ * (ADR-0104): a new thread with no history of its own starts there. Waits for
  * the host's line record; does nothing when accepted work is set up already.
  */
 export async function setUpAccepted(

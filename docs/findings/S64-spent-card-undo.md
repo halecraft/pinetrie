@@ -1,5 +1,8 @@
 # S64 — does Kyneta's new undo skip a spent card, and how does a client know one was spent?
 
+- **Status:** Answered
+- **Led to:** ADR-0048, ADR-0052, ADR-0059
+
 **Answers.**
 1. **Redo of a step of several commits to one text is fixed** in the Kyneta
    build pine·trie links (`needed-by-pinetrie`, "a step of several commits to one

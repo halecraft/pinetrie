@@ -1,9 +1,14 @@
 # ADR-0014 — Token deltas ride the DURABLE document, not ephemeral presence
 
-**Status:** Accepted for v1 (from S4). Revisit when the notification defect is
-fixed. **Corrected post-review** — one supporting claim was retracted; the
-decision stands on the remaining two. Amended by ADR-0023: the accepted residue
-per message is gone, since the session is compacted when every run ends.
+- **Status:** Accepted (for v1)
+- **Area:** `docs/01-architecture.md`, `packages/rules/TECHNICAL.md`
+- **Evidence:** S2, S4, S14, S16
+- **Amended by:**
+  - ADR-0023: the accepted residue per message is gone, since the session is
+    compacted when every run ends.
+
+Revisit when the notification defect is fixed. Corrected after review: one
+supporting claim was retracted; the decision stands on the remaining two.
 
 **Context.** The open question in ADR-0007 was whether high-rate streaming
 (`text_delta`) should use ephemeral presence — cheap, no history — or the durable

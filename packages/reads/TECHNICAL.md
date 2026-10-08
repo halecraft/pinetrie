@@ -44,7 +44,7 @@ behind it, `promptAuthor`, ADR-0080),
 `readBoardPlaces` and `readArchived` (the board, ADR-0085: the roots in the
 closed state, derived and kept while the same, since every write to the
 session's values wakes it), `readMarks` (ADR-0045), `readStops` and
-`readDigests` (ADR-0056), and
+`readDigests` (ADR-0106), and
 where lanes work (ADR-0032, ADR-0034): `readLaneRecords`, `readRevisions`, `readLandings`,
 `readProject` (`lanes`, or `direct` and why). `workAt` is where a lane created
 at an entry would work, and the commit and snapshot it would start from: the
@@ -109,7 +109,7 @@ Kyneta has let go.
   a read that needs only runs and tips uses `readRunning` and
   `readLaneNames`, as `readAgentActivity` does.
 - **`readLanes`' `askedBy`** is the writer of the message a running lane is
-  answering, its run's prompt (`promptOf`, the ask, ADR-0056), when a
+  answering, its run's prompt (`promptOf`, the ask, ADR-0106), when a
   person's message started it; or else who queued its first card. A land,
   stack or carry-on message names no one. It is what a `conflict` names.
 - **`readLanes`' `lastWaiting`** is who queued the lane's last card: a card

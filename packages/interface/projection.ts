@@ -80,7 +80,7 @@ export interface HeldView {
 
 export interface SessionFacts {
   readonly index: TreeIndex
-  /** Every ask (ADR-0056), from `index`: the rail and the columns read one. */
+  /** Every ask (ADR-0106), from `index`: the rail and the columns read one. */
   readonly asks: AskIndex
   /** Who stopped each ask, by its prompt. */
   readonly stops: ReadonlyMap<EntryId, StopRecord>

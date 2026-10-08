@@ -1,7 +1,7 @@
 # S104 — A run's last turn is recorded however the run ends, except when the host closes under it, which the next host's resume records
 
-**Status:** Answered. Led to ADR-0080 (a resolution run ends like any
-run: no `pinetrie.landing`).
+- **Status:** Answered
+- **Led to:** ADR-0033, ADR-0080, ADR-0105
 
 **Question.** ADR-0033's outcome of a resolution is read once, at the end
 of a run whose prompt is a land message (`landingEnded`,

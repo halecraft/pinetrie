@@ -21,7 +21,7 @@
 //
 // Released, it keeps the column's tip from when the reader left the end
 // (`releasedTip`): an ask whose run ended after it stays open under the
-// reader until they come back down (ADR-0056).
+// reader until they come back down (ADR-0106).
 
 import type { EntryId } from "@pinetrie/core"
 

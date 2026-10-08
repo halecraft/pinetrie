@@ -1,6 +1,9 @@
 # S8 — Is `pi.branch.tip` a contended LWW register, and what are the right semantics?
 
-**Status:** Answered. Led to ADR-0011; spawned S12.
+- **Status:** Answered
+- **Led to:** ADR-0011, ADR-0016
+
+Spawned S12.
 
 ## Brief
 

@@ -1,9 +1,12 @@
 # S107 — a real model follows a pinned card, keeps to it with no new block, takes an edit, and drops it when unpinned
 
-**Status:** Answered. ADR-0048, step 5's open question after S92, for
-`PLAN-2026-10-03-pinned-cards`. Nothing in the design changes. Numbered
-S101 until 2026-10-05, when another spike held that number, then S102
-until 2026-10-05, when two files held that number.
+Numbered S101 until 2026-10-05, when another spike held that number, then
+S102 until 2026-10-05, when two files held that number.
+
+- **Status:** Answered
+- **Led to:** ADR-0048
+
+ADR-0048, step 5's open question after S92. Nothing in the design changes.
 
 **Question.** S92 measured what the model is *given*: a `<pinned-cards>`
 block written with a run's prompt only when the cards changed, restating

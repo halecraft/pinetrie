@@ -1,7 +1,10 @@
 # S127 — Lanes inside lanes work on the directly booted VM; a lane with CAP_SYS_ADMIN writes to the Mac through vfkit's share, which only the guest holds read-only
 
-**Status:** Answered. No ADR yet. Follows S125 (lanes inside lanes, on Lima's Alpine) and
-S126 (the VM booted directly by vfkit).
+- **Status:** Answered
+- **Led to:** ADR-0102, ADR-0103
+
+Follows S125 (lanes inside lanes, on Lima's Alpine) and S126 (the VM booted
+directly by vfkit).
 
 **Question.** S125 ran lanes inside an unprivileged lane on Lima's Alpine
 ISO. S126 boots a smaller VM directly with vfkit: Docker answers in under a

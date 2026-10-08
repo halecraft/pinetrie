@@ -1,6 +1,8 @@
 # S6 — Do `file-range` references survive a jj change?
 
-**Status:** Open. Lowest priority: v1 has no Worktree branches.
+- **Status:** Open
+
+Lowest priority: v1 has no Worktree branches.
 
 ## Brief
 

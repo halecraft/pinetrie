@@ -1,5 +1,8 @@
 # S74 — a stale base after your `@-` was rewritten
 
+- **Status:** Answered
+- **Led to:** ADR-0060, ADR-0104
+
 After your `@-` was rewritten in place (a `jj squash` into it, and a
 `jj edit` of its parent), every lane failed to start, with:
 

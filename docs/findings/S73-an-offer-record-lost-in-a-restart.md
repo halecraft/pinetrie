@@ -1,5 +1,8 @@
 # S73 — an offer's record lost in a host restart
 
+- **Status:** Answered
+- **Led to:** ADR-0038, ADR-0060, ADR-0104, ADR-0105
+
 An offer (ADR-0038) stopped following its lane for twenty minutes, said
 "you edited this offer" though no one had, and was taken with conflicts in
 11 files that its column never named. This finding records why

@@ -109,7 +109,7 @@ export interface Setup {
   /**
    * The base snapshot at accepted work's commit now, after the refreshes queued
    * before: a fork from it waits for this, since accepted work may have been set
-   * up or moved since the last refresh (ADR-0060).
+   * up or moved since the last refresh (ADR-0104).
    */
   baseAtAccepted(): Promise<void>
 }
@@ -219,7 +219,7 @@ export async function startSetup(input: {
   }
 
   /**
-   * The base snapshot at accepted work's commit (ADR-0060): every lane starts
+   * The base snapshot at accepted work's commit (ADR-0104): every lane starts
    * from accepted work, or from a WIP's copy on it. Nothing to do before accepted work
    * is set up.
    */

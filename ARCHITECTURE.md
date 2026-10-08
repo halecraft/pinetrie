@@ -20,7 +20,8 @@ browser ──commands (Kyneta Line)──▶ host ──▶ pi agent core
 - **The tree** is entries linked by `parentId`. A branch is a new entry with an
   earlier parent. What the model sees is the path to a tip.
 - **A lane** is a thread's line of agent work: a Linux container on its own
-  disk, where pi's tools run. A branch clones its parent's disk. Lanes run
+  disk, where pi's tools run. Every thread's agent works in one; none works
+  directly in a directory (ADR-0102). A branch clones its parent's disk. Lanes run
   on Docker, on btrfs snapshots: in pine·trie's own VM on the Mac, on the
   host on Linux (ADR-0103), or on Apple's `container` where the user config
   says so, until it is removed. A lane's work

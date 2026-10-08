@@ -1,6 +1,7 @@
 # S60 — a wide image for a column's header
 
-**Status:** Answered. Led to ADR-0050.
+- **Status:** Answered
+- **Led to:** ADR-0050, ADR-0053
 
 A column's header is to get a generated banner, drawn with
 `background-size: cover`. The header is `28rem` (448px) wide and one or two

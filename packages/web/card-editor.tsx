@@ -123,7 +123,7 @@ export interface Where {
   readonly project: ProjectRecord | null
   /** Directories other lanes work in directly: offered again. */
   readonly usedDirs: readonly string[]
-  /** Accepted work, for the bases a new lane may start from (ADR-0060). */
+  /** Accepted work, for the bases a new lane may start from (ADR-0104). */
   readonly accepted: AcceptedRecord | null
   /** Files conflicted in the commit a new lane here would be cloned from (ADR-0072). */
   readonly forkConflicts: number
@@ -142,7 +142,7 @@ export interface Where {
  * Either way, and after a refusal, the card is still there: nothing is put
  * back, because nothing was taken away. A send to a busy lane, or of a card
  * with a command, queues the card instead: this client asks the host to, and
- * the host pops it in turn (ADR-0055, ADR-0059).
+ * the host pops it in turn (ADR-0108, ADR-0059).
  *
  * A box whose `place` is pinned is the one "+ pin" opens: it makes a pinned
  * card at the first keystroke worth keeping and goes on editing it, the same
@@ -242,7 +242,7 @@ export function CardEditor(p: {
   const [choice, setChoice] = useState<WorkSetting | null>(
     prefill?.work ?? null,
   )
-  /** The WIP a new lane of its own starts from; null for accepted work (ADR-0060). */
+  /** The WIP a new lane of its own starts from; null for accepted work (ADR-0104). */
   const [base, setBase] = useState<string | null>(null)
   const command = card === undefined ? null : commandOf(card)
   const plan = planSend({
@@ -1023,7 +1023,7 @@ export function PinnedCardEditor(p: {
 /**
  * The line under the box that says where a new thread's agent works, and
  * what that does to your files; it opens the menu that changes it. A lane of
- * its own may start from a WIP instead of accepted work (ADR-0060), offered
+ * its own may start from a WIP instead of accepted work (ADR-0104), offered
  * only when there is one.
  */
 function WhereMenu(p: {

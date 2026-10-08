@@ -1,7 +1,9 @@
 # S131 — Share devices are apart: replacing one leaves bind mounts into the others working; a VM boots with 20 of them, and they cost almost nothing
 
-**Status:** Answered. Follows S130. Serves `PLAN-2026-10-07-lane-runtime`,
-before its launcher phase.
+- **Status:** Answered
+- **Led to:** ADR-0103
+
+Follows S130.
 
 **Question.** S130 found that replacing a virtiofs share while the VM runs
 breaks every container's bind mount into it, while a bind of its root

@@ -1,4 +1,4 @@
-// offer-view — a lane's offer as the page shows it (ADR-0038): its state,
+// offer-view — a lane's offer as the page shows it (ADR-0105): its state,
 // its buttons and menu, and the facts its words are made from
 // (`offerView`), from the record (`offerStatus`), accepted work's and the base's
 // records (`catchUpOf`, `line.ts`) and the thread it branched from
@@ -31,7 +31,7 @@ import {
  * A button beside the offer, or in its menu. `accept` accepts it into
  * its default destination; `accept-into-accepted` into accepted work, from a WIP
  * thread; `continue`
- * moves a thread whose WIP is gone to accepted work (ADR-0060).
+ * moves a thread whose WIP is gone to accepted work (ADR-0104).
  */
 export type OfferButton =
   | "accept"
@@ -56,8 +56,8 @@ export type OfferActivity =
   | "catch-up"
 
 /**
- * One state of a lane's offer, what can be done in it (ADR-0038's table), and
- * the facts its words are made from. The words are the client's
+ * One state of a lane's offer, what can be done in it (the work strip's
+ * states, ADR-0105), and the facts its words are made from. The words are the client's
  * (`offerWords`, `@pinetrie/interface`).
  */
 export interface OfferView {
@@ -101,7 +101,7 @@ interface OfferFacts {
   /** The change id it was accepted as, or null. */
   readonly acceptedAs: string | null
   /**
-   * The thread's base, as it is brought up to date and accepted into (ADR-0060): its
+   * The thread's base, as it is brought up to date and accepted into (ADR-0104): its
    * WIP, or accepted work once the WIP landed or for a thread on accepted work.
    */
   readonly base: ThreadBase

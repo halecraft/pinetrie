@@ -1,9 +1,13 @@
 # ADR-0073 — A thread's name opens its details, under the header: its icon magnified, who started it, where it works
 Numbered 0071 until 2026-10-04, when two files held that number.
 
-**Status:** Accepted. Implementation: `PLAN-2026-10-04-thread-details`.
-Amends ADR-0040 (the name revealed where the lane started) and ADR-0053
-(the icon was only ever drawn in the header's square).
+- **Status:** Accepted
+- **Area:** `packages/interface/TECHNICAL.md`, `docs/06-interface.md`
+- **Amends:**
+  - ADR-0040: the name opens the thread's details; the reveal of where its
+    lane started is in them, offered only below the path's first message.
+  - ADR-0053: the icon is also drawn magnified, in the thread's details, where
+    it spins in as they are opened.
 
 **Context.** A column's header names the agent working in it, `✦ amber-fox`,
 or its banner icon in the star's place (ADR-0040, ADR-0053). Clicking the

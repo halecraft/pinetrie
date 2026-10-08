@@ -1,14 +1,20 @@
 # ADR-0021 — A thread's mode is its lane; a mention picks the addressee
 
-**Status:** Accepted. Amends ADR-0018 and ADR-0020. Amended by ADR-0029
-(Start Chat and Start Agent become the add tab), by ADR-0032 (a workspace
-is created with the lane, not as its own step), and in place below (a branch
-from agent work starts with `@agent ` typed; the send button's words, and a
-chip beside it for where a new agent works, `PLAN-2026-09-29-send-button`;
-who a queued message waits behind, `PLAN-2026-09-29-queue-words`). Amended by
-ADR-0063: a session is a document per root, a session document of its
-records, and one of what is streaming; it is still the boundary of who is in
-it.
+- **Status:** Accepted
+- **Area:** `docs/06-interface.md`, `packages/interface/TECHNICAL.md`
+- **Amends:**
+  - ADR-0018: a thread's mode is its lane; a mention picks the addressee.
+  - ADR-0020: the lane is also the thread's mode.
+- **Revised:**
+  - 2026-09-29: a branch from agent work starts with `@agent ` typed; the send
+    button's words, and a chip beside it for where a new agent works; who a
+    queued message waits behind.
+- **Amended by:**
+  - ADR-0029: Start Chat and Start Agent become the add tab.
+  - ADR-0032: a workspace is created with the lane, not as its own step.
+  - ADR-0063: a session is a document per root, a session document of its
+    records, and one of what is streaming; it is still the boundary of who is
+    in it.
 
 **Context.** ADR-0018 stored a default at an entry (`pinetrie.thread`): below a
 *working session* entry the agent answers every message, below a

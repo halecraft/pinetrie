@@ -1,6 +1,9 @@
 # S124 — The Alpine ISO boots fastest (15 s): Docker is not reinstalled at boot, and the time goes before ssh answers; the cloud image and a clone of it take 27 s
 
-**Status:** Answered. Follows S123. No ADR yet.
+- **Status:** Answered
+- **Led to:** ADR-0102, ADR-0103
+
+Follows S123.
 
 **Question.** S123's Alpine ISO keeps its root in RAM (329 MB) and booted no
 faster than Ubuntu (16.0 s against 14.8 s), perhaps because it reinstalls

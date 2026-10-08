@@ -1,67 +1,78 @@
 # ADR-0048 — Everything unsent is a card, and a card stays where you put it
 
-**Status:** Accepted. Evidence: S58, S69. Step 2, marks for your unsent cards,
-implemented by `PLAN-2026-09-30-card-marks`. Step 1, the drafting card,
-implemented by `PLAN-2026-09-30-drafting-card`: shared drafts and "compose together" are
-withdrawn from ADR-0025, ADR-0023 gains "tabs write cards", and ADR-0037
-gains "the host writes down each seat's person". Step 3's first part,
-notes removed, implemented by `PLAN-2026-10-01-notes-removed`: it supersedes
-the rest of ADR-0025 and amends ADR-0043 (no notes below messages) and
-ADR-0024 (no `editing` presence); its second part, queued cards and the
-take/unqueue race, implemented by `PLAN-2026-10-01-queued-cards`: it
-supersedes ADR-0026 (queued notes become queued cards), with ADR-0055, and
-amends ADR-0020 (nothing waits in `pinetrie.outbox`, which is gone). Probe 2
-is answered by S69, probes 1 and 4, for the inventory, by S75 and S76,
-and probe 5 by S92; S107 found a real model acts on the pinned cards it
-reads, a retired one included. A later step would amend ADR-0046 (a fixed line about
-pinned cards in the prompt). Amended in place (2026-10-02): a queued card is
-*unqueued*, not stopped; "stop" is a run's word (ADR-0056). Amended in
-place (2026-10-02, with Duane): the drawer is the *inventory*, a floating
-panel that snaps left, centre or right; take is Ctrl+Shift+I and put
-Ctrl+Shift+O; it crosses sessions, a page per session. They also replace the
-fold plan's private inventory (`PLAN-2026-09-27-fold`), and Phases 2–7 of
-`PLAN-2026-09-29-branch-prefill-and-composers`. Amended by ADR-0052: Cmd+Z
-in a card undoes only that card's steps, never the tab's last step
-wherever it is, and undoing a move first shows where it acts. Who contributed to a card is
-a projection of its history (step 6); step 1's attribution from the text's
-operations is provisional until then. Amended by ADR-0059: a card's place
-has one owner at a time, the session's host or a person's inventory; the
-host writes places, and moves between owners are handoffs it applies or
-refuses; the inventory is a document of slots that only its person's tabs
-write; the cards document goes. Places written by the host, for the
-places there are now, implemented by `PLAN-2026-10-02-card-places`. Step 4,
-the inventory, implemented by `PLAN-2026-10-03-inventory`, with these
-amended in place (2026-10-03, with Duane): closing a fresh column keeps its
-cards in your inventory by default, and discard stays final (*Closing a
-column*); a fresh column's first send carries its other cards to the new
-message, the host's write (*Physics*, 1); clipboard copy and cut of cards
-wait for the key system's redesign (*Input*). Amended by ADR-0066: moves are
-undone by the host's Kyneta stacks, one per person and root, whole or
-refused (*Undo is Kyneta's* covers moves too, on the host); step 4's
-decision 11, the page's own history of moves, is withdrawn. Step 5's first
-part, pinned cards, implemented by `PLAN-2026-10-03-pinned-cards`, with S92
-as its evidence, and *Pinned cards and the agent* amended in place
-(2026-10-04, with Duane): each run's cards entry restates every pinned card
-and names those unpinned since; it goes in with the run's prompt, only when
-the cards changed; pi's compaction carries it; the run waits for its
-sender's text; a branch starts with no pinned cards. Its second part, "+ card"
-and "+ pin", implemented by `PLAN-2026-10-04-cards-per-place`, with "+ pin"
-in the column's header while a thread has no pinned card (2026-10-05, with
-Duane). Amended in place (2026-10-05, with Duane): who contributed to a card
-waits for Kyneta. Step 1's attribution stays until Kyneta can name the
-writers whose text still stands without pine·trie unwrapping Yjs; step 6
-goes on with traces and card history (*Who contributed*). Step 6's traces
-and card history implemented by `PLAN-2026-10-05-card-history-traces`, with
-*Other people* amended in place (2026-10-05): where history and traces
-live, an unpin treated as an unqueue, "on your screen" as an open column,
-a trace seen as deleted by the host, and the 30-day sweep.
-Amended by ADR-0083: a person *takes a card into the inventory*, and the
-host *pops the next queued card* to send it; "take" alone names neither.
-Step 7, queue control, implemented by `PLAN-2026-10-05-queue-control`, with
-*The column, read as time*, *Physics* and *Input* amended in place
-(2026-10-05, with Duane): a held queue, Stop holding it, unqueue all,
-reordering queued and pinned cards, and the wait while someone types in the
-next card; it amends ADR-0056 and ADR-0082, and builds ADR-0026's hold.
+- **Status:** Accepted
+- **Area:** `apps/pinetrie/host/TECHNICAL.md`, `packages/rules/TECHNICAL.md`
+- **Evidence:** S19, S24, S28, S58, S64, S69, S75, S76, S82, S90, S92, S101,
+  S107
+- **Supersedes:**
+  - ADR-0025: notes on messages are removed, with their records, done and
+    reopen, the notes index and the rail's squares; what you write is a card.
+  - ADR-0026: a queued message is a queued card, which anyone can edit or
+    unqueue; the take is one synchronous step on the host (S69).
+- **Amends:**
+  - ADR-0020: what waits for a busy lane is a queued card, written by clients
+    and taken by the host; nothing waits in `pinetrie.outbox`, which is gone.
+  - ADR-0023: clients write cards, the cards document and each card's text,
+    directly; the host writes pi's tree, and a card only to spend it.
+  - ADR-0024: `editing`, the note a seat was editing, is removed with notes.
+  - ADR-0037: the host writes a record of each seat's person (`pinetrie.seat`)
+    as it connects, so a text's writers can be named after they leave.
+  - ADR-0043: no note sits below a message, and the row of tools is copy, edit
+    (or new tab), `→`.
+  - ADR-0046: every agent thread's `<rules>`, a lane of its own or not, holds
+    one more fixed line, first: the team pins cards to say what it wants from
+    the thread, they appear in `<pinned-cards>` blocks, and the latest block
+    holds. It is constant, so a lane's prompt still stays the same between
+    runs.
+  - ADR-0056: a Stop with a message card queued holds the thread's queue, so
+    the run's end sends nothing until someone releases it.
+  - ADR-0082: a held queue does not hide Resume. Its cards wait for a release,
+    not for this turn; cards queued and not held still do.
+- **Revised:**
+  - 2026-10-02: a queued card is *unqueued*, not stopped; "stop" is a run's
+    word (ADR-0056).
+  - 2026-10-02 (with Duane): the drawer is the *inventory*, a floating panel
+    that snaps left, centre or right; take is Ctrl+Shift+I and put
+    Ctrl+Shift+O; it crosses sessions, a page per session; it replaces the
+    fold plan's private inventory.
+  - 2026-10-03 (with Duane): closing a fresh column keeps its cards in your
+    inventory by default, and discard stays final (*Closing a column*); a
+    fresh column's first send carries its other cards to the new message, the
+    host's write (*Physics*, 1); clipboard copy and cut of cards wait for the
+    key system's redesign (*Input*).
+  - 2026-10-04 (S92, with Duane): *Pinned cards and the agent*: each run's
+    cards entry restates every pinned card and names those unpinned since; it
+    goes in with the run's prompt, only when the cards changed; pi's
+    compaction carries it; the run waits for its sender's text; a branch
+    starts with no pinned cards.
+  - 2026-10-05 (with Duane): "+ pin" is in the column's header while a thread
+    has no pinned card.
+  - 2026-10-05 (with Duane): who contributed to a card waits for Kyneta: step
+    1's attribution stays until Kyneta can name the writers whose text still
+    stands without pine·trie unwrapping Yjs (*Who contributed*).
+  - 2026-10-05: *Other people*: where history and traces live, an unpin
+    treated as an unqueue, "on your screen" as an open column, a trace seen as
+    deleted by the host, and the 30-day sweep.
+  - 2026-10-05 (with Duane): step 7, in *The column, read as time*, *Physics*
+    and *Input*: a held queue, Stop holding it, unqueue all, reordering queued
+    and pinned cards, and the wait while someone types in the next card.
+- **Amended by:**
+  - ADR-0052: Cmd+Z in a card undoes only that card's steps, never the tab's
+    last step wherever it is, and undoing a move first shows where it acts.
+  - ADR-0059: a card's place has one owner at a time, the session's host or a
+    person's inventory; the host writes places, and moves between owners are
+    handoffs it applies or refuses; the inventory is a document of slots that
+    only its person's tabs write; the cards document goes.
+  - ADR-0066: moves are undone by the host's Kyneta stacks, one per person and
+    root, whole or refused (*Undo is Kyneta's* covers moves too, on the host);
+    step 4's decision 11, the page's own history of moves, is withdrawn.
+  - ADR-0083: a person *takes a card into the inventory*, and the host *pops
+    the next queued card* to send it; "take" alone names neither.
+
+Steps 1 to 7 are built, but for step 6's contributors, which wait for Kyneta.
+Probe 2 is answered by S69, probes 1 and 4, for the inventory, by S75 and S76,
+and probe 5 by S92; S107 found a real model acts on the pinned cards it reads,
+a retired one included.
 
 **Context.**
 

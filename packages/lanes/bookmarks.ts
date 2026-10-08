@@ -3,7 +3,7 @@
 // The bookmark moves with every revision (`commitTurn`, `mergeBase`). In your
 // repo a lane's history is not a bookmark of yours but a remote bookmark,
 // `tip@pinetrie-<lane>` (`@pinetrie/repo`'s `laneTipIn` and `laneRefSteps`),
-// which jj keeps out of your default log and immutable (ADR-0038, S48 item
+// which jj keeps out of your default log and immutable (ADR-0105, S48 item
 // 11).
 
 import { type CommitId, commitId, type LaneName } from "@pinetrie/core"

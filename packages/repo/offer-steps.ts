@@ -1,5 +1,5 @@
 // repo/offer-steps — what a decision about an offer runs on your repo, and
-// what the host does after (ADR-0038, ADR-0060).
+// what the host does after (ADR-0105, ADR-0104).
 //
 // `@pinetrie/rules` decides (`planRefresh`, `planOfferAcceptance`, `planStackEnded`,
 // `planRebuild`, `planDescribeSettle`); these turn each decision into
@@ -146,7 +146,7 @@ export function offerEffects(
       )
     case "rebuild": {
       // It holds more now: a work in progress again, its ledger the new tip
-      // and start (ADR-0060).
+      // and start (ADR-0104).
       const { place, offer } = decision
       const [bottom] = changesOf(offer)
       if (bottom === undefined) return NOTHING
@@ -195,7 +195,7 @@ export function offerEffects(
   }
 }
 
-/** An acceptance (ADR-0060): the destination moved forward to the offer's top, the offer's bookmark deleted, then its record marked accepted. */
+/** An acceptance (ADR-0104): the destination moved forward to the offer's top, the offer's bookmark deleted, then its record marked accepted. */
 export const offerAcceptanceEffects = (
   decision: Extract<OfferAcceptanceDecision, { readonly kind: "accept" }>,
 ): OfferEffects => ({

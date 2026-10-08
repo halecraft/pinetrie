@@ -1,4 +1,4 @@
-// land — the prompt of a resolution run (ADR-0033, ADR-0038, ADR-0055,
+// land — the prompt of a resolution run (ADR-0033, ADR-0105, ADR-0108,
 // ADR-0084).
 //
 // Bringing a thread up to date merges accepted work, or the work of the
@@ -28,7 +28,7 @@ export const LAND_TYPE = "pinetrie.land"
 
 const LandDetailsSchema = Type.Object({
   lane: Type.String({ minLength: 1 }),
-  /** The base's commit that was merged: accepted work's, or a WIP's copy (ADR-0060). */
+  /** The base's commit that was merged: accepted work's, or a WIP's copy (ADR-0104). */
   yours: Type.Array(CommitSchema),
   /** The files that conflicted when it merged. */
   files: Type.Array(Type.String()),
@@ -232,7 +232,7 @@ function introOf(
   }
 }
 
-/** The person's text under its own heading, after everything else (ADR-0055). */
+/** The person's text under its own heading, after everything else (ADR-0108). */
 const askedOf = (intent: string): string =>
   intent === "" ? "" : `\n\n## What the person asked\n\n${intent}`
 
@@ -310,7 +310,7 @@ const renderFile = (f: ConflictFile, shown: FileShown, k: number): string =>
  * The land message for a resolution: the skill's text, then the conflicted
  * files with both sides labelled (ADR-0010: the labels are always present and
  * the destination's side is never dropped), then what the person asked, the
- * text of the card that brought the thread up to date (ADR-0055).
+ * text of the card that brought the thread up to date (ADR-0108).
  *
  * It fits `floor.budget`, measured on the whole message (ADR-0084). The
  * files are shown the fullest way that fits with each side's newest reason

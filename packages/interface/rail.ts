@@ -41,7 +41,7 @@ export interface RailStretch extends RailItemBase {
   readonly kind: "stretch"
   readonly stats: WorkStats
   /**
-   * The ask whose work it is, when it is all one long ask's work (ADR-0056);
+   * The ask whose work it is, when it is all one long ask's work (ADR-0106);
    * null for short exchanges merged together.
    */
   readonly ask: EntryId | null
@@ -94,7 +94,7 @@ export interface RailAsks {
  * uneventful messages drawn as one capsule.
  *
  * A row is uneventful when it is not one of `railLandmarks`, and not the
- * prompt of a long ask (`isLongAsk`, ADR-0056). A stretch never crosses a
+ * prompt of a long ask (`isLongAsk`, ADR-0106). A stretch never crosses a
  * long ask's edge, so a long ask is a dot and a capsule of its own, while
  * short exchanges still merge. A message steered into a run is in its
  * ask's capsule (`runOf`).

@@ -1,7 +1,7 @@
 # S120 — the host's records can live apart from pi's values, and a schema change that drops a field loses its data silently
 
-**Status:** Answered. Serves `PLAN-2026-10-06-schema-boundaries`. Led to
-ADR-0095 and ADR-0096.
+- **Status:** Answered
+- **Led to:** ADR-0095, ADR-0096
 
 Measured in a lane (Linux, Node 24), Kyneta read at `kyneta/workspace/pineta`,
 on synthetic documents and on a copy of a real store (397 MB, 108 roots). The

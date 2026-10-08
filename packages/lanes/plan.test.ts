@@ -567,7 +567,7 @@ test("planForkSetup: a base with several parents is committed once, so the bookm
   ])
 })
 
-test("planForkSetup: on accepted work, an empty commit naming it; its id read for the config (ADR-0060)", () => {
+test("planForkSetup: on accepted work, an empty commit naming it; its id read for the config (ADR-0104)", () => {
   const steps = argvs(
     planForkSetup(LANE, {
       kind: "accepted",
@@ -583,7 +583,7 @@ test("planForkSetup: on accepted work, an empty commit naming it; its id read fo
   )
 })
 
-test("planForkSetup: a WIP's copy on accepted commit under it, never the WIP's own commits (ADR-0060)", () => {
+test("planForkSetup: a WIP's copy on accepted commit under it, never the WIP's own commits (ADR-0104)", () => {
   const W = commitId("w1")
   const steps = argvs(
     planForkSetup(
@@ -642,7 +642,7 @@ describe("planJoins: the accepted-offer commits a lane holds, joined before it c
   })
 })
 
-describe("planMerge: an update's steps (ADR-0060)", () => {
+describe("planMerge: an update's steps (ADR-0104)", () => {
   const W = commitId("w1")
   const COPY = commitId("copy1")
   test("accepted work's merge names its base, and lists what came in since the lane", () => {

@@ -1,5 +1,5 @@
 // interface/card-words — what a card says about its place and its command
-// (ADR-0048, ADR-0055), each label in one function. Pure.
+// (ADR-0048, ADR-0108), each label in one function. Pure.
 
 import type {
   CardCommand,
@@ -32,7 +32,7 @@ export interface CatchUps {
 
 /**
  * What a command merges: the base for `bring-up-to-date`, accepted work for
- * `continue-on-accepted` (ADR-0060), the thread it branched from for
+ * `continue-on-accepted` (ADR-0104), the thread it branched from for
  * `catch-up-with-parent` (ADR-0072). Null for that one without a parent.
  */
 const commandFrom = (

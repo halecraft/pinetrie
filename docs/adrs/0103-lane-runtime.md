@@ -1,17 +1,28 @@
 # ADR-0103 — Lanes are Docker containers on btrfs snapshots: in a VM of pine·trie's own on the Mac, on the host on Linux
 
-**Status:** Accepted (Duane, 2026-10-07). Evidence: S122, S123, S124,
-S125, S126, S127, S128, S129, S130, S131, S132.
-Implemented by `PLAN-2026-10-07-lane-runtime`, then
-`PLAN-2026-10-07-containers-only` (Apple's `container` goes).
-Amended in place (`PLAN-2026-10-07-lane-runtime`, S130, S131): one VM per
-user, not per host. Each host's directories are a slot of their own,
-filled once and never replaced while it runs, 16 by default. The VM's
-memory is a quarter of the Mac's, between 4 and 16 GiB.
-Amended again (S135, S136): the VM's network is `gvproxy`'s, run by the
-launcher, not Virtualization's NAT, which another tool's VM can take away;
-lanes are fenced from `gvproxy`'s own addresses, and a project may grant
-ports of the Mac's loopback (`lanes.hostPorts`).
+- **Status:** Accepted (Duane, 2026-10-07)
+- **Area:** `packages/lanes/TECHNICAL.md`, `packages/docker/TECHNICAL.md`,
+  `packages/vm/TECHNICAL.md`
+- **Evidence:** S39, S122, S123, S124, S125, S127, S128, S129, S130, S131,
+  S132, S133, S134, S135, S136
+- **Amends:**
+  - ADR-0034: its runtime is superseded: lanes are Docker containers on btrfs
+    snapshots, in a VM of pine·trie's own on the Mac and on the host on Linux;
+    the trim container goes. The rest stands.
+  - ADR-0035: on the Mac, a shared directory is a read-write entry of its
+    host's slot in the lane VM, shared when the host starts.
+  - ADR-0046: a lane's servers are reached from the Mac through ports
+    published on the VM's address.
+- **Revised:**
+  - 2026-10-07 (S130, S131): one VM per user, not per host. Each host's
+    directories are a slot of their own, filled once and never replaced while
+    it runs, 16 by default. The VM's memory is a quarter of the Mac's, between
+    4 and 16 GiB.
+  - 2026-10-07 (S135, S136): the VM's network is `gvproxy`'s, run by the
+    launcher, not Virtualization's NAT, which another tool's VM can take away;
+    lanes are fenced from `gvproxy`'s own addresses, and a project may grant
+    ports of the Mac's loopback (`lanes.hostPorts`).
+
 Supersedes ADR-0034's runtime:
 - a VM per lane, by Apple's `container`;
 - an ext4 volume per lane, cloned with APFS;
@@ -29,9 +40,7 @@ Keeps the rest of ADR-0034:
 - snapshots kept as long as their root;
 - the project's image, and grants.
 
-Amends ADR-0035 (a shared directory is a read-write share of the VM) and
-ADR-0046 (a lane's servers are reached through ports published on the
-VM's address). Part of ADR-0102.
+Part of ADR-0102.
 
 **Context.** ADR-0034 made each lane a VM of its own, by Apple's
 `container`, on an ext4 volume cloned with APFS:

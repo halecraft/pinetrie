@@ -233,7 +233,7 @@ describe("forkPoint: a snapshot to clone, and what to start on", () => {
       start: { kind: "commits", commits: [C2] },
     })
   })
-  test("from nothing: the base snapshot, and where agent work begins (ADR-0060)", () => {
+  test("from nothing: the base snapshot, and where agent work begins (ADR-0104)", () => {
     expect(
       forkPoint({
         above: { lane: null, commit: null, commitLane: null, snapshot: null },

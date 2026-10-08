@@ -1,9 +1,12 @@
 # S106 — A resolution's prompt carried every conflicted file whole, and a large conflict made one no run could start
 
-**Status:** Answered. Led to ADR-0084, implemented by
-`PLAN-2026-10-05-resolution-budget`: `resolutionFloor` and `planResolution`
-(`packages/rules/land.ts`), `planCatchUp` (`apps/pinetrie/host/work/update.ts`)
-and `LAND_BUDGET` (`packages/pi/compaction.ts`).
+- **Status:** Answered
+- **Led to:** ADR-0084
+
+Implemented by `resolutionFloor` and `planResolution`
+(`packages/rules/land.ts`), `planCatchUp`
+(`apps/pinetrie/host/work/update.ts`) and `LAND_BUDGET`
+(`packages/pi/compaction.ts`).
 
 **Question.** The thread helpful-grove caught up with the project and
 reported 37 conflicted files. "Catch up and resolve" then left it at 38

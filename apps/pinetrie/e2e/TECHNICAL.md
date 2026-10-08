@@ -83,10 +83,26 @@ suite's own helpers are beside its scenarios: `host/support.ts`,
   the browser's at most ⌊√n⌋ of those. A scenario, like a `test()`, holds
   many checks; only scenarios count.
 - **Numbered docs** (`scripts/numbering.ts`, `scripts/numbering.test.ts`): no
-  two files in `docs/findings` or `docs/adrs` share a number, and each
-  title carries its file's number. Two lanes taking one number merge
-  without a conflict, so the test fails in the first `pnpm test` after both
-  land, not in either lane.
+  two files in `docs/findings` or `docs/adrs`, their `archive/` folders
+  included, share a number, and each title carries its file's number. Two
+  lanes taking one number merge without a conflict, so the test fails in
+  the first `pnpm test` after both land, not in either lane.
+- **The record** (`scripts/record.ts`, `scripts/record.test.ts`,
+  `docs/adrs/README.md`): every ADR's and spike's header is as `pnpm run
+  record` would write it (back links, a superseded status, each file in its
+  folder or `archive/`), and `recordGaps` finds nothing: no header that
+  fails to parse, no unknown or uncited Area, no id naming no record, no
+  cited record path that is missing, no code citing a superseded ADR. The
+  ADRs over the amendment limit are exactly `scripts/unconsolidated.ts`. It
+  runs in `pnpm test` because each rule is a fact about the tree, read in
+  milliseconds. An ADR added in the older prose Status format fails it
+  until its header is converted, by whoever resolves the landing that
+  brings it; an ADR that amends another fails it in its own lane until
+  `pnpm run record` writes the back link; and a landing that merges two
+  lanes' generated fields fails it until whoever resolves it runs `pnpm
+  run record`. `node scripts/record.ts` writes nothing
+  while any header fails to parse: a record that drops out of the plan
+  would take the spikes it rests on to the archive with it.
 
 ## What a run costs
 

@@ -1,7 +1,7 @@
 # S109 — `#strip` can be a size container: `100cqw` is its client width, and a fixed popover inside it still places against the window
 
-**Status:** Answered. Led to ADR-0087, implemented by
-`PLAN-2026-10-05-pane-fits-strip`.
+- **Status:** Answered
+- **Led to:** ADR-0087
 
 **Question.** ADR-0087 sizes the pane against the strip with container
 query units. Containment level 3 once had `container-type: inline-size`

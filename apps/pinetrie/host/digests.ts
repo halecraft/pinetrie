@@ -1,4 +1,4 @@
-// host/digests — each long ask's digest (ADR-0056, ADR-0075), and each run's
+// host/digests — each long ask's digest (ADR-0106, ADR-0075), and each run's
 // verdict (ADR-0077). A digest is asked as its run goes, while someone reads
 // it, at most once a `DIGEST_EVERY`, unless the user config turns digests
 // off (ADR-0071). At a run's end one request asks for the verdict and the

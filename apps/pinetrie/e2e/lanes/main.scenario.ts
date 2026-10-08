@@ -146,7 +146,7 @@ async function mainSection(
       readProject(wh.session)?.kind === "lanes",
       `${JSON.stringify(readProject(wh.session))}`,
     )
-    // Threads start at accepted work (ADR-0060): set it up at the
+    // Threads start at accepted work (ADR-0104): set it up at the
     // project's commit, as the footer's set up button does.
     await setUpAccepted(wh.session, wu)
 
@@ -243,7 +243,7 @@ async function mainSection(
     // ── revisions: in the document, and in your repo by bundle ─────────────
     // Lane one's first run committed who.txt; its prompt and that message each
     // have a record with a snapshot, and your repo holds its history as a
-    // remote bookmark (ADR-0038).
+    // remote bookmark (ADR-0105).
     const ofOne = [...rootRecordsOf(wh, readRevisions).values()].filter(
       r => r.lane === one?.name,
     )
@@ -509,7 +509,7 @@ async function mainSection(
       `${left} left`,
     )
 
-    // ── 6. Offers: the thread's work as one commit you accept (ADR-0038) ─
+    // ── 6. Offers: the thread's work as one commit you accept (ADR-0105) ─
     const offerOf = () =>
       two === undefined ? undefined : readOffers(wh.session).get(two.name)
     const defaultLog = () =>
@@ -600,7 +600,7 @@ async function mainSection(
         .filter((l, i, all) => l !== all[i - 1])
     // You change the same line, commit, publish it, and keep editing: the
     // offer is rebuilt on accepted work and shows the conflict before you
-    // accept it (ADR-0060, ADR-0090). Publishing needs a main to move: it is
+    // accept it (ADR-0104, ADR-0090). Publishing needs a main to move: it is
     // set at the project's first commit.
     jj(
       project,
@@ -676,7 +676,7 @@ async function mainSection(
         offerOf()?.edited === false,
       `${JSON.stringify({ before: commitsBefore, commits: offerOf()?.commits, now: offerNow(), by: newestBy(), edited: offerOf()?.edited })}`,
     )
-    // The record is the page's cache (ADR-0060): lost, the next trigger, a
+    // The record is the page's cache (ADR-0104): lost, the next trigger, a
     // jj operation of yours that the offers depend on (a WIP bookmark, so
     // everything is refreshed, ADR-0065), writes it again from the repo, and
     // the offer is the same commit, not built anew.
@@ -773,7 +773,7 @@ async function mainSection(
       `${JSON.stringify(history)}`,
     )
     // Accept: accepted work moves forward to the offer, which stays one commit on
-    // your landed one; your working copy is untouched (ADR-0060).
+    // your landed one; your working copy is untouched (ADR-0104).
     const atBefore = jj(
       project,
       "log",
@@ -963,7 +963,7 @@ async function mainSection(
     )
 
     // A new root thread starts at accepted work: what you landed, not what you
-    // committed and have not landed, nor your working copy (ADR-0060).
+    // committed and have not landed, nor your working copy (ADR-0104).
     writeFileSync(path.join(project, "unlanded.txt"), "not landed\n")
     const aheadBefore = readAccepted(wh.session)?.yours.ahead ?? 0
     jj(project, "commit", "-m", "you add unlanded.txt")

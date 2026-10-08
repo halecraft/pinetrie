@@ -1,5 +1,8 @@
 # S45 — a host directory shared read-write into every lane
 
+- **Status:** Answered
+- **Led to:** ADR-0035
+
 The next change to ADR-0034 shares chosen directories, starting with a
 directory of plans, read-write between your working copy and every lane. It
 mounts them from the host inside the lane's own directory, for example at

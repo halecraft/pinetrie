@@ -1,6 +1,9 @@
 # S112 — Behind a tunnel, Firefox's `/ws` waited behind Vite's HMR socket on port 24678
 
-**Status:** Answered. Amends ADR-0022 (hot reload off loopback).
+- **Status:** Answered
+- **Led to:** ADR-0022, ADR-0107
+
+Amends ADR-0022 (hot reload off loopback).
 
 **Question.** A host bound off loopback, reached through a Cloudflare
 tunnel, loads in Firefox, but `connectSession` times out ("Timeout waiting

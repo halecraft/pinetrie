@@ -128,7 +128,7 @@ export const mutations: readonly Mutation[] = [
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: "    `(::${bookmark} ~ ::(${input.target})) & ${bookmark}`,",
     command: unit,
-    expect: "an offer on accepted work (ADR-0060)",
+    expect: "an offer on accepted work (ADR-0104)",
   },
   {
     name: "an offer's revisions include what is already under its base",
@@ -138,7 +138,7 @@ export const mutations: readonly Mutation[] = [
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the mutant is source text
     to: "    `(::${bookmark}) & (${thread} | ${bookmark})`,",
     command: unit,
-    expect: "an offer on accepted work (ADR-0060)",
+    expect: "an offer on accepted work (ADR-0104)",
   },
   {
     name: "setting up accepted work leaves your log as it was",
@@ -146,7 +146,7 @@ export const mutations: readonly Mutation[] = [
     from: '  you("config", "set", "--repo", "revsets.log", input.log),',
     to: '  you("config", "set", "--repo", "revsets.log", "builtin_log()"),',
     command: unit,
-    expect: "an offer on accepted work (ADR-0060)",
+    expect: "an offer on accepted work (ADR-0104)",
   },
   {
     name: "the offers are added to your log again at each setup",
@@ -314,7 +314,7 @@ export const mutations: readonly Mutation[] = [
     from: "    sources: [...new Set(accepted.flatMap(t => sourcesOf(t.description)))],\n",
     to: "    sources: [] as CommitId[],\n",
     command: unit,
-    expect: "an offer on accepted work (ADR-0060)",
+    expect: "an offer on accepted work (ADR-0104)",
   },
   {
     name: "a stale base working copy is not recovered",
@@ -339,7 +339,7 @@ export const mutations: readonly Mutation[] = [
     from: "  user.startsWith(`${HOST_OPERATOR}@`)",
     to: "  false",
     command: unit,
-    expect: "an offer on accepted work (ADR-0060)",
+    expect: "an offer on accepted work (ADR-0104)",
   },
   {
     name: "a turn that changed nothing is committed",
@@ -455,7 +455,7 @@ export const mutations: readonly Mutation[] = [
     from: '    rewrite("rebase", "-s", change, ...input.start.flatMap(c => ["-o", c])),',
     to: '    rewrite("rebase", "-s", change, "-o", input.target),',
     command: repoTest,
-    expect: "an offer on accepted work (ADR-0060)",
+    expect: "an offer on accepted work (ADR-0104)",
   },
   {
     name: "the repair keeps the host's commit",
@@ -463,7 +463,7 @@ export const mutations: readonly Mutation[] = [
     from: '  rewrite("abandon", input.hosts),',
     to: '  rewrite("abandon", input.yours),',
     command: unit,
-    expect: "an offer on accepted work (ADR-0060)",
+    expect: "an offer on accepted work (ADR-0104)",
   },
   {
     name: "a lane's tip is fetched as a local bookmark",
@@ -638,7 +638,7 @@ export const mutations: readonly Mutation[] = [
     from: "    files: found.length === 1 ? top.files : null,",
     to: "    files: top.files,",
     command: repoTest,
-    expect: "an offer on accepted work (ADR-0060)",
+    expect: "an offer on accepted work (ADR-0104)",
   },
   {
     name: "the offer's own files say whether the lane's work changes any",

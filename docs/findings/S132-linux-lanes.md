@@ -2,8 +2,11 @@
 
 Numbered S121 until 2026-10-07, when two files held that number.
 
-**Status:** Answered. No ADR yet. It serves the move to working only in
-containers, with Linux lanes beside the Mac's.
+- **Status:** Answered
+- **Led to:** ADR-0102, ADR-0103
+
+It serves the move to working only in containers, with Linux lanes beside the
+Mac's.
 
 **Question.** Can a host on Linux give each thread a lane of its own, with its
 own files, ports and processes, and a disk a branch can clone cheaply? In

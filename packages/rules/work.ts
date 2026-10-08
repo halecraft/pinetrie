@@ -59,7 +59,7 @@ const RevisionRecordSchema = Type.Object({
   snapshot: Type.Optional(
     Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
   ),
-  // Absent in records written before turns recorded their paths (ADR-0056).
+  // Absent in records written before turns recorded their paths (ADR-0106).
   paths: Type.Optional(Type.Array(Type.String())),
   // Absent in records written before they recorded conflicts (ADR-0072).
   conflicts: Type.Optional(Type.Array(Type.String())),
@@ -154,7 +154,7 @@ export const PROJECT: RecordSpec<ProjectRecord, typeof PROJECT_KEY, "session"> =
  * records the lane's newest revision, so a branch from it names the commit
  * its disk was at even after its base moved. A lane working directly records
  * its prompts only, with neither. Only a turn's own commit carries the paths
- * it changed: a prompt's newest revision is what came before it (ADR-0056).
+ * it changed: a prompt's newest revision is what came before it (ADR-0106).
  * Every record with a commit carries that commit's conflicts, so a branch
  * from any of them knows its copy's (ADR-0072). A turn whose `catch_up`
  * merged (ADR-0080) records the lane's newest revision, which the merge is,
@@ -206,7 +206,7 @@ export function planTurnRecord(input: {
  * Where a new lane of its own starts. With a revision above it: the nearest
  * snapshot above, else the base snapshot, and that revision's commit. With
  * none (a root thread, or a branch above any agent work): the base snapshot,
- * which is accepted work's, and `begin`: accepted work, or a WIP's copy (ADR-0060).
+ * which is accepted work's, and `begin`: accepted work, or a WIP's copy (ADR-0104).
  * Either way the fork starts on a commit of its own, because a cloned disk
  * carries its parent's working-copy change, which the fork must leave (S42
  * item 2).

@@ -1,11 +1,16 @@
 # ADR-0079 — A catch-up joins each take the lane holds to its source, so the lane's own work does not come in twice
 
-**Status:** Accepted. Evidence: S102. Implementation:
-`PLAN-2026-10-04-catch-up-past-take`. Amends ADR-0060 (how a thread
-catches up with the line), and with it ADR-0072's catch-up with a parent,
-which merges the same way.
-Amended by ADR-0083: each take the lane holds is an *integrated-offer
-commit*; the code joins those.
+- **Status:** Accepted
+- **Area:** `apps/pinetrie/host/TECHNICAL.md`, `packages/lanes/TECHNICAL.md`
+- **Evidence:** S99, S102
+- **Amends:**
+  - ADR-0060: a catch-up first joins each take the lane holds to its source,
+    so the lane's work is not merged twice.
+  - ADR-0072: a catch-up with a parent merges as a catch-up with the line
+    does, joining each take the lane holds to its source first.
+- **Amended by:**
+  - ADR-0083: each take the lane holds is an *integrated-offer commit*; the
+    code joins those.
 
 **Context.** A thread catches up by merging the line's commit into its lane
 (ADR-0060), and jj chooses the merge's base from history. A take puts a

@@ -22,7 +22,8 @@
     "build": "pnpm --filter @pinetrie/web run build",
     "verify": "pnpm run lint && pnpm run typecheck && pnpm test && pnpm run conformance && pnpm run e2e",
     "verify:all": "pnpm run verify && pnpm run e2e:live && pnpm run e2e:browser && pnpm run e2e:lanes",
-    "mutate": "node scripts/mutate.ts"
+    "mutate": "node scripts/mutate.ts",
+    "record": "node scripts/record.ts"
   },
   "devDependencies": {
     "@biomejs/biome": "2.4.8",

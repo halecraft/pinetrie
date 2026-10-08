@@ -1,24 +1,32 @@
 # ADR-0034 — A lane is a Linux container on its own disk, and a branch clones that disk
 
-**Status:** Accepted. Implemented by `PLAN-2026-09-28-lane-containers`.
-Evidence: S38, S39, S40, S41, S42, S43, S44. **Amended by ADR-0038
-(proposed):** work reaches your repo as an offer, and a lane's history as
-remote bookmarks. **Amended by ADR-0065:** a lane's bundle is imported into
-your repo by its owner, as the host's operation. **Amended by ADR-0046:** a lane's agent is told what
-holds in every lane, and no port proxy is built. Amends ADR-0032:
-replaces its jj workspace per lane, the rewrite of the history the model is
-sent, the refusal of other lanes' paths, and dependency setup. Keeps its turn
-revisions, its fork-point rule, landing, working directly, and your working
-copy being yours.
-**Amended by ADR-0060:** the base snapshot is the integration line's
-commit, and work reaches your repo by a forward bookmark move.
-**Amended by ADR-0064:** the lane runtime carries rg, fd and sd beside
-jj, and the agent's `grep` and `find` tools run them.
-**Amended by ADR-0102:** where the lane runtime is missing, the host refuses
-to start; no lane works directly. **Its runtime superseded by ADR-0103:**
-lanes are Docker containers on btrfs snapshots, in a VM of pine·trie's own
-on the Mac and on the host on Linux; the trim container goes. The rest
-stands.
+- **Status:** Accepted
+- **Area:** `packages/lanes/TECHNICAL.md`
+- **Evidence:** S38, S39, S40, S41, S42, S43, S44, S50, S52
+- **Amends:**
+  - ADR-0032: its workspaces, the rewrite of the history the model is sent,
+    the refusal of other lanes' paths, and dependency setup are replaced by a
+    container per lane on its own disk.
+- **Amended by:**
+  - ADR-0035: a new kind of grant: a host directory shared read-write into
+    every lane.
+  - ADR-0036: skill files are a grant every lane of its own gets.
+  - ADR-0038: work reaches your repo as an offer, and a lane's history as
+    remote bookmarks.
+  - ADR-0041: the default image, and what a lane reaches on the host.
+  - ADR-0046: a lane's agent is told what holds in every lane, and no port
+    proxy is built.
+  - ADR-0060: the base snapshot is the integration line's commit, and work
+    reaches your repo by a forward bookmark move.
+  - ADR-0064: the lane runtime carries rg, fd and sd beside jj, and the
+    agent's `grep` and `find` tools run them.
+  - ADR-0065: a lane's bundle is imported into your repo by its owner, as the
+    host's operation.
+  - ADR-0102: where the lane runtime is missing, the host refuses to start; no
+    lane works directly.
+  - ADR-0103: its runtime is superseded: lanes are Docker containers on btrfs
+    snapshots, in a VM of pine·trie's own on the Mac and on the host on Linux;
+    the trim container goes. The rest stands.
 
 **Context.** ADR-0032 gave each lane a jj workspace on the host and made a
 branch's inherited history read as if it had always worked there, by

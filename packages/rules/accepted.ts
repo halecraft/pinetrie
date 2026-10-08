@@ -1,4 +1,4 @@
-// accepted — accepted work and a thread's base on it (ADR-0060,
+// accepted — accepted work and a thread's base on it (ADR-0104,
 // ADR-0061, ADR-0072, ADR-0076, ADR-0090): accepted work's and each lane's base's
 // records (`pinetrie.accepted`, `pinetrie.base`), accepted work's record from what the
 // host read (`planAcceptedRecord`), whether a setup or publish may run
@@ -205,7 +205,7 @@ export const BASE: RecordSpec<BaseRecord, LaneName, "session"> = {
 
 /**
  * Accepted work's record, the page's cache, from what the host read of it
- * (ADR-0060): what setting it up would write to your repo's config
+ * (ADR-0104): what setting it up would write to your repo's config
  * (`proposed`, `setupProposal`), and whether a publish catches your files up
  * (`publish.catchUp`, ADR-0099).
  */
@@ -423,7 +423,7 @@ export function publishUndone(
 }
 
 /**
- * The base a thread is brought up to date with and accepted into (ADR-0060): its
+ * The base a thread is brought up to date with and accepted into (ADR-0104): its
  * WIP while the WIP is there, else accepted work: for a thread on accepted work, a WIP that
  * landed, and one gone (which only "continue on accepted work" moves). Null, the
  * lane's base not yet read, is accepted work.
@@ -447,7 +447,7 @@ interface BaseMove {
 
 /**
  * How a thread's base has moved on since its lane last forked from it or
- * caught up (ADR-0060), or null: the commit its newest `Pinetrie-Base` names
+ * caught up (ADR-0104), or null: the commit its newest `Pinetrie-Base` names
  * (`start`) against where the base is now, accepted work's `commit` or the WIP's.
  * Never for a WIP gone, which only "continue on accepted work" moves. Commits
  * only: whether catching up would change a file is `catchUpOf`'s, which
@@ -520,7 +520,7 @@ export type ForkBegin = Extract<
 >
 
 /**
- * Where a new lane begins when it has no agent work to inherit (ADR-0060),
+ * Where a new lane begins when it has no agent work to inherit (ADR-0104),
  * from the thread's base and what the host read of your repo: accepted work's
  * commit, or a copy of the WIP on accepted commit under it. Refused with no
  * line (`not_set_up`), and for a base that is not a WIP bookmark above accepted work
@@ -549,7 +549,7 @@ export function planBegin(input: {
   return { kind: "wip", bookmark: base, ...facts.wip }
 }
 
-/** What an update merges into a lane (ADR-0060), or nothing. */
+/** What an update merges into a lane (ADR-0104), or nothing. */
 type UpdateFrom =
   | BaseMerge
   /** The WIP already holds nothing the lane lacks. */
@@ -566,7 +566,7 @@ export type UpdateRefusal =
   | typeof ERR.PARENT_RUNNING
 
 /**
- * What bringing a thread up to date merges (ADR-0060): the base the thread
+ * What bringing a thread up to date merges (ADR-0104): the base the thread
  * follows (`effectiveBase`), so the button that names it names what is
  * merged. A WIP thread merges a fresh copy of its WIP, on the lane's
  * previous copy, unless the lane's base already names the WIP's commit now. A

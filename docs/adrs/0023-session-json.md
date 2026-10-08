@@ -1,12 +1,26 @@
 # ADR-0023 — The session is authoritative JSON, compacted; CRDTs only where people type together
 
-**Status:** Accepted. Evidence: S24, S25. Amends ADR-0008, ADR-0016, ADR-0022.
-Amended by ADR-0048: clients write cards, the cards document and each card's
-text, directly; the host writes pi's tree, and a card only to spend it.
-Amended by ADR-0059: the host writes cards' places again (`places`, `json`),
-through handoffs clients ask for; clients write cards' texts and their own
-inventories. Amended by ADR-0063: the session is a `json` document per root,
-a session document and `pinetrie:live`, each compacted alone.
+- **Status:** Accepted
+- **Area:** `packages/schema/TECHNICAL.md`, `docs/01-architecture.md`
+- **Evidence:** S22, S24, S25
+- **Amends:**
+  - ADR-0008: the session document is no longer on Loro. The tree stays
+    explicit; replication and convergence need no CRDT history when one host
+    writes.
+  - ADR-0014: the accepted residue per message is gone, since the session is
+    compacted when every run ends.
+  - ADR-0016: the session document has one writer, so the race cannot arise
+    there; the rule still binds any collaborative document.
+  - ADR-0022: the session is compacted, on `json.bind`.
+- **Amended by:**
+  - ADR-0042: image bytes are never part of the compacted document.
+  - ADR-0048: clients write cards, the cards document and each card's text,
+    directly; the host writes pi's tree, and a card only to spend it.
+  - ADR-0059: the host writes cards' places again (`places`, `json`), through
+    handoffs clients ask for; clients write cards' texts and their own
+    inventories.
+  - ADR-0063: the session is a `json` document per root, a session document
+    and `pinetrie:live`, each compacted alone.
 
 **Context.** The session document was on Loro, a CRDT: every replica could write
 it and merge. None does. The host alone writes the session document (pi's

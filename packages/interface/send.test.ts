@@ -144,7 +144,7 @@ describe("sendable", () => {
     const edit = { text: "@agent try again ", blank: false }
     expect(sendable(edit.text, edit, false)).toBe("@agent try again")
   })
-  test("a card with a command is sent with no text (ADR-0055)", () => {
+  test("a card with a command is sent with no text (ADR-0108)", () => {
     expect(sendable("  ", blank, false, "bring-up-to-date")).toBe("")
     expect(sendable("@agent ", blank, false, "bring-up-to-date")).toBe("")
     expect(sendable("check it", blank, false, "bring-up-to-date")).toBe(
@@ -235,7 +235,7 @@ describe("planSend: what the send does, as the host will decide (ADR-0021)", () 
       held: true,
     })
   })
-  test("a card with a command is queued, even on an idle lane; with no lane it is not (ADR-0055)", () => {
+  test("a card with a command is queued, even on an idle lane; with no lane it is not (ADR-0108)", () => {
     expect(
       plan("check it", { lane: lane(), command: "bring-up-to-date" }).mode,
     ).toBe("queue")

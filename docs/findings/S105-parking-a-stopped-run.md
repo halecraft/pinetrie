@@ -1,7 +1,9 @@
 # S105 — a Stop can park a run as a pi deferred suspension, and Resume continue it
 
-**Status:** Answered. Evidence for ADR-0082, which chose a new run with a
-host message over a parked run; `PLAN-2026-10-05-resume-after-stop`.
+- **Status:** Answered
+- **Led to:** ADR-0082, ADR-0106
+
+ADR-0082 chose a new run with a host message over a parked run.
 
 Measured in a lane (Linux, Node 24, pi 0.87.1) with a disposable script,
 `sandbox/s105-park/probe.ts`: pi's harness over its `MemoryStorage`, and a

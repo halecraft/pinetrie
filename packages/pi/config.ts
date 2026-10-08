@@ -196,7 +196,7 @@ export interface ModelSetup {
   readonly model: Model
   readonly origin: ModelOrigin
   /**
-   * The model a commit message is asked of (ADR-0038): the run's, except for
+   * The model a commit message is asked of (ADR-0105): the run's, except for
    * a scripted model, whose describe requests have a provider of their own so
    * they never take a reply from the run's script (S48 item 22).
    */
@@ -370,7 +370,7 @@ export function titleModelOf(
 
 /**
  * One request outside every thread, on `model`: an offer's commit message
- * (ADR-0038), an ask's digest (ADR-0056) or a root's title (ADR-0074). No
+ * (ADR-0105), an ask's digest (ADR-0106) or a root's title (ADR-0074). No
  * tools, no session, so nothing enters the tree or a lane's context. Null
  * when it fails.
  */

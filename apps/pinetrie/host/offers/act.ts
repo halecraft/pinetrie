@@ -1,8 +1,8 @@
-// host/offers/act — an offer action other than a split (ADR-0038):
+// host/offers/act — an offer action other than a split (ADR-0105):
 // accept, squash, refresh, or describe again. Each is one owner command:
 // gather (`gatherOffer`, and `gatherOfferAcceptance` for an acceptance),
 // decide (`planOfferAcceptance`, `planRebuild`), translate and execute. An
-// acceptance moves one bookmark forward to the offer (ADR-0060). An
+// acceptance moves one bookmark forward to the offer (ADR-0104). An
 // action carried out answers with its fact, what the thread is told it did
 // (ADR-0080).
 

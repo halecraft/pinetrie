@@ -1,11 +1,19 @@
 # ADR-0095 — The host's records live apart from pi's values, written by the host; the session has its own schema
 
-**Status:** Proposed. Evidence: S120. Implemented by
-`PLAN-2026-10-06-schema-boundaries`. Amends ADR-0062 (pi no longer carries
-the host's writes), ADR-0063 (the session's document has its own schema)
-and ADR-0092 (the scribe has no `writeValues` and no session). Sits beside
-ADR-0003: `@pinetrie/schema` imports no pi, and defines how pi's data is
-laid out in our documents.
+- **Status:** Accepted (Duane, 2026-10-08)
+- **Area:** `apps/pinetrie/host/TECHNICAL.md`, `packages/pi/TECHNICAL.md`
+- **Evidence:** S17, S18, S120
+- **Amends:**
+  - ADR-0062: a record is stored in `records` (namespace, then key), not as a
+    pi value, and the host writes it directly; pi carries no host write, and
+    the namespace guard is structural.
+  - ADR-0063: the session's document has its own schema, `SessionDoc` (the
+    host's records alone), and a root's is pi's storage plus `records`.
+  - ADR-0092: the scribe has no `writeValues` and no session over the
+    session's document; the host writes its records directly.
+
+Sits beside ADR-0003: `@pinetrie/schema` imports no pi, and defines how pi's
+data is laid out in our documents.
 
 **Context.** The host's records (the directory, lanes, names, offers,
 marks, revisions and 15 more kinds) are pi values: each is wrapped as

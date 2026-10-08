@@ -1,5 +1,8 @@
 # S53: pasted images, pi's image path, and the model's seam
 
+- **Status:** Answered
+- **Led to:** ADR-0042, ADR-0051, ADR-0107
+
 Pasting an image into a composer (ADR-0042) needs three things from pi: to
 recognize an image from its bytes, to fit it to what a provider accepts, and a
 place to add the image's bytes to what the model reads without storing them in

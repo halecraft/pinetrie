@@ -1,5 +1,5 @@
 // update — a thread's base, or the thread it branched from, merged into it
-// (ADR-0060, ADR-0072), and the offer split into a stack (ADR-0038).
+// (ADR-0104, ADR-0072), and the offer split into a stack (ADR-0105).
 //
 // Two pi `CustomMessage`s in `land.ts`'s pattern: `content` is what the model
 // reads, `details` what the column shows. An update is a fact in the thread,
@@ -30,7 +30,8 @@ const UpdateDetailsSchema = Type.Object({
   /**
    * What the thread was brought up to date with: its WIP's bookmark, or for
    * accepted work its bookmark then, or `accepted` since ADR-0100, read by
-   * `line`. Absent in updates stored before ADR-0060, which merged your `@`.
+   * `line`. Absent in updates stored before accepted work existed, which merged your
+   * `@`.
    */
   base: Type.Optional(Type.String({ minLength: 1 })),
   /**
@@ -45,7 +46,10 @@ const UpdateDetailsSchema = Type.Object({
       name: Type.String({ minLength: 1 }),
     }),
   ),
-  /** The commit merged: accepted work's, or the WIP's copy; `copy` before ADR-0060. */
+  /**
+   * The commit merged: accepted work's, or the WIP's copy; `copy` before
+   * accepted work existed.
+   */
   copy: CommitSchema,
   /** The commits that came in, newest first: each one's first line. */
   commits: Type.Array(Type.String()),
@@ -61,7 +65,7 @@ const UpdateSchema = Type.Object({
 
 interface UpdateDetails {
   readonly lane: LaneName
-  /** What was merged in; null for an update stored before ADR-0060. */
+  /** What was merged in; null for an update stored before accepted work. */
   readonly from: CatchUpFrom | null
   /** The commit merged: accepted work's, or the WIP's copy. */
   readonly merged: CommitId

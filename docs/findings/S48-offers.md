@@ -1,5 +1,8 @@
 # S48 — offers: a thread's work as one commit in your repo, before you take it
 
+- **Status:** Answered
+- **Led to:** ADR-0038, ADR-0060, ADR-0104, ADR-0105
+
 Taking a landing today (ADR-0033, ADR-0034) rebases your `@` onto the lane's
 merge, so every turn commit the lane made becomes an ancestor of your work,
 and immutable there: `pinetrie/*` is in your repo's `immutable_heads()`, so

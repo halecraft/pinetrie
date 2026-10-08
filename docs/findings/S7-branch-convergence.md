@@ -1,6 +1,9 @@
 # S7 — Do divergent branches persist distinctly in one Kyneta doc?
 
-**Status:** Answered. Led to ADR-0009; spawned S8, S9 and S10.
+- **Status:** Answered
+- **Led to:** ADR-0008, ADR-0009, ADR-0011
+
+Spawned S8, S9 and S10.
 
 ## Brief
 

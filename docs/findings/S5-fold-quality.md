@@ -1,6 +1,7 @@
 # S5 — Destination-aware three-way conversation fold
 
-**Status:** Answered. Led to ADR-0010.
+- **Status:** Answered
+- **Led to:** ADR-0005, ADR-0010
 
 ## Brief
 

@@ -1,6 +1,7 @@
 # S101 — A person's read marks fit in a Yjs map without compaction for now; a write before the stored copy arrives can move a mark back
 
-**Status:** Answered. Served `PLAN-2026-10-05-attention` (ADR-0077).
+- **Status:** Answered
+- **Led to:** ADR-0048, ADR-0077, ADR-0106
 
 **Question.** ADR-0077 keeps, per person, the furthest entry read on each
 thread in `attention:<writer>`, a Yjs document. Each read overwrites a key.

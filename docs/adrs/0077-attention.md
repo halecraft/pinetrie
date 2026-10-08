@@ -1,20 +1,33 @@
 # ADR-0077 — A thread's followers are told how its runs end and what it has ready; what you have dealt with is yours on every device
 
-**Status:** Accepted (Duane, 2026-10-05). Evidence: S101. Implemented by
-`PLAN-2026-10-05-attention`. Amends ADR-0024 (presence's verb is
-*reading*; *follow* is a follower's), ADR-0030 (the inbox's seen state is
-per person, not per device), ADR-0056 ("since you were here" is per
-person; a run's end asks for a verdict even when digests are off),
-ADR-0059 (the inventory is one of a family of person documents), ADR-0063
-(a root's directory record holds who wrote on each of its threads), ADR-0069
-(the badge counts what is for the threads you follow, and the menu gains
-"Worth a read"), ADR-0071 (a short ask's end costs a request again, for
-its verdict) and ADR-0075 (the final digest request carries the verdict).
-Builds on ADR-0076, in flight.
-Amended by ADR-0085: your open roots are a third person document (`open:`),
-and ▦ carries the mark the Archive tab did.
-Amended by ADR-0091: an open offer is marked on the board for everyone,
-and listed and counted in your inbox for its followers.
+- **Status:** Accepted (Duane, 2026-10-05)
+- **Area:** `docs/06-interface.md`, `packages/interface/TECHNICAL.md`
+- **Evidence:** S32, S101
+- **Amends:**
+  - ADR-0024: presence's verb is *reading*; a person follows a thread they
+    have written on, and a column follows its end.
+  - ADR-0030: which mentions you have seen is kept per person, in your
+    attention document, not per device.
+  - ADR-0056: "since you were here" reads your attention document, so it is
+    the same on every device of yours, and a run's end asks for a verdict even
+    with digests off.
+  - ADR-0059: the inventory is one of a person's documents (`personDocId`),
+    which share one policy.
+  - ADR-0063: a root's directory record holds who has written on each of its
+    threads (`threads`), and the directory refreshes a root's record as the
+    host opens it.
+  - ADR-0069: the badge counts verdicts that need you, offers of threads you
+    follow and unseen mentions; the menu gains "Needs you" and "Worth a read".
+  - ADR-0071: a short ask's end costs a request again, for its verdict alone.
+  - ADR-0075: the final request also asks for the run's verdict, first, and
+    its reply is read by `endReplyOf`.
+- **Amended by:**
+  - ADR-0085: your open roots are a third person document (`open:`), and ▦
+    carries the mark the Archive tab did.
+  - ADR-0091: an open offer is marked on the board for everyone, and listed
+    and counted in your inbox for its followers.
+
+Builds on ADR-0076.
 
 **Context.** With several agents at work, Duane could not tell which tab
 needed him:

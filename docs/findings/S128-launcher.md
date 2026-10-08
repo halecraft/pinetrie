@@ -1,6 +1,10 @@
 # S128 — A launcher of our own closes vfkit's two gaps: shares read-only on the Mac's side, and a half-close carried; the system image compresses to 113 MB at no cost to the boot
 
-**Status:** Answered. Follows S126 and S127. Serves ADR-0103 (proposed). 
+- **Status:** Answered
+- **Led to:** ADR-0103
+
+Follows S126 and S127.
+
 **Question.** S126 and S127 booted the lane VM with vfkit, which shares
 every directory writable on the Mac's side and whose vsock bridge drops a
 half-close. A launcher of pine·trie's own on Virtualization.framework

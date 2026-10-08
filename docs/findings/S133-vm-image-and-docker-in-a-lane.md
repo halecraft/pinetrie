@@ -1,7 +1,7 @@
 # S133 — The lane VM's image builds in a lane, and Docker in a lane accepts a lane's arguments, but rootless Docker's `newuidmap` is refused under `container`
 
-**Status:** Answered. Serves `PLAN-2026-10-07-lane-runtime` (ADR-0103),
-Phases 2, 5 and 7.
+- **Status:** Answered
+- **Led to:** ADR-0103
 
 **Question.** Before the Mac runs them, from inside a pine·trie lane (Apple's
 `container`, aarch64, Debian trixie, no `CAP_SYS_ADMIN`):

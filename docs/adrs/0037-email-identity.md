@@ -1,12 +1,20 @@
 # ADR-0037 — A person is their email; each tab is a seat
 
-**Status:** Accepted. Implemented by `PLAN-2026-09-28-kyneta-v4`. Evidence:
-S29, S47. Amends ADR-0024 (presence keys per seat), ADR-0025 (authorship by
-seat), ADR-0027 and ADR-0030 (your other tabs are you). Amended by ADR-0048:
-the host writes a record of each seat's person (`pinetrie.seat`) as it
-connects, so a text's writers can be named after they leave.
-Amended by ADR-0098: you rename yourself on your profile page;
-your avatar opens a menu, not a dialog.
+- **Status:** Accepted
+- **Area:** `packages/interface/TECHNICAL.md`, `packages/rules/TECHNICAL.md`
+- **Evidence:** S29, S47
+- **Amends:**
+  - ADR-0024: every key is per seat, so a person here from two tabs has two
+    sets of entries, shown once.
+  - ADR-0025: a `clientID` names a seat, and the seat's principal the person.
+  - ADR-0027: a person is their email, so a tab is no longer a writer.
+  - ADR-0030: you are your email, so your other tabs and devices are you, and
+    your tabs are yours per device.
+- **Amended by:**
+  - ADR-0048: the host writes a record of each seat's person (`pinetrie.seat`)
+    as it connects, so a text's writers can be named after they leave.
+  - ADR-0098: you rename yourself on your profile page; your avatar opens a
+    menu, not a dialog.
 
 **Context.** pine·trie chose each client's Kyneta peer id and made its writer
 from it: a browser tab took one from Kyneta's `persistentPeerId`, a Node

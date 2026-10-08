@@ -206,14 +206,14 @@ export interface ColumnProps {
   asks: AskIndex
   /** What the rail draws apart in this column's root, sorted: no fold hides it. */
   landmarks: readonly EntryId[]
-  /** Who stopped each ask, by its prompt (ADR-0056). */
+  /** Who stopped each ask, by its prompt (ADR-0106). */
   stops: ReadonlyMap<EntryId, StopRecord>
   /** Each ask's fold, as the reader chose it, across unmounts. */
   folds: FoldMemory
-  /** Each ask's model-written digest, by its prompt (ADR-0056). */
+  /** Each ask's model-written digest, by its prompt (ADR-0106). */
   digests: ReadonlyMap<EntryId, DigestRecord>
   /**
-   * How far you have read each thread, on every device of yours (ADR-0056,
+   * How far you have read each thread, on every device of yours (ADR-0106,
    * ADR-0077).
    */
   attention: AttentionStore
@@ -300,7 +300,7 @@ export function Column(p: ColumnProps) {
   )
   // Where you last left the thread, on any device: read as the column
   // mounts and when the page shows again, so the line stays where it was
-  // while you read below it (ADR-0056, ADR-0077).
+  // while you read below it (ADR-0106, ADR-0077).
   const leftLane = p.column.lane ?? null
   const readLeft = useStable(() =>
     leftLane === null
@@ -383,7 +383,7 @@ export function Column(p: ColumnProps) {
   const lane: ThreadLane =
     thread.kind === "thread" ? thread.lane : { kind: "none" }
   const running = lane.kind === "lane" && lane.running
-  // The ask this column's lane is answering (ADR-0056).
+  // The ask this column's lane is answering (ADR-0106).
   const runningAsk =
     lane.kind === "lane" && lane.running ? promptOf(index, lane.tip) : null
   const density = p.column.density ?? "story"
@@ -393,7 +393,7 @@ export function Column(p: ColumnProps) {
     return prompt === null ? null : askWords(prompt, nameFn)
   }
   // Which ask the work at the top belongs to, while its message is out of
-  // sight (ADR-0056). Outline draws each ask's line under its message.
+  // sight (ADR-0106). Outline draws each ask's line under its message.
   const atTop = useAskBar(body, density !== "outline")
   // The cards queued for this thread's lane, above the line, in the order the
   // host pops them (ADR-0048).
@@ -477,7 +477,7 @@ export function Column(p: ColumnProps) {
     lanes: p.lanes,
     work: p.work,
   })
-  // What a card's command catches up with: the thread's base (ADR-0060),
+  // What a card's command catches up with: the thread's base (ADR-0104),
   // or the thread it branched from (ADR-0072). One object while what it
   // says is the same: the composer is memoised.
   const baseRecord =
@@ -550,9 +550,9 @@ export function Column(p: ColumnProps) {
   const paneId = `pane-${p.column.key}`
   const toggleReview = useStable(() => openPane({ kind: "offer" }))
   // Catching up and splitting are a card with the command and no text,
-  // queued at once (ADR-0055, ADR-0061, ADR-0080): the host pops it when
+  // queued at once (ADR-0108, ADR-0061, ADR-0080): the host pops it when
   // the lane is free. An acceptance names its destination: the default,
-  // or accepted work (ADR-0060).
+  // or accepted work (ADR-0104).
   const actOnOffer = (button: OfferButton) => {
     if (lane.kind !== "lane") return
     if (button === "accept" || button === "accept-into-accepted") {
@@ -1490,7 +1490,7 @@ function Bookmark({ name }: { name: string }) {
 
 /**
  * What became of the column's files, at its foot (ADR-0040): the lane's offer
- * in your repo (ADR-0038), or where a lane that works directly writes. An
+ * in your repo (ADR-0105), or where a lane that works directly writes. An
  * offer's line opens its review (ADR-0047); its bookmark, copied, finds it in
  * jj or jjui.
  */
@@ -1588,7 +1588,7 @@ function WorkStripView({
 }
 
 /**
- * How much of each ask the column draws (ADR-0056): outline, story or raw.
+ * How much of each ask the column draws (ADR-0106): outline, story or raw.
  * The reader's choice, kept with the column, never written.
  */
 function DensityControl({

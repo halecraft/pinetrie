@@ -43,7 +43,7 @@ test("trailerValues reads a trailer from every paragraph, as a squash leaves two
   expect(trailerValues(squashed, "base")).toEqual([])
 })
 
-test("offerLedger reads the newest paragraph that names a source; none without one (ADR-0060)", () => {
+test("offerLedger reads the newest paragraph that names a source; none without one (ADR-0104)", () => {
   const one =
     "offer: x\n\nPinetrie-Source: aaaa\nPinetrie-Start: s1\nPinetrie-Start: s2\n"
   expect(offerLedger(one)).toEqual({
@@ -191,7 +191,7 @@ describe("what is written reads back", () => {
   })
 })
 
-describe("withLedger (ADR-0060)", () => {
+describe("withLedger (ADR-0104)", () => {
   const ledger = {
     source: commitId("t1"),
     start: [commitId("s1"), commitId("s2")],

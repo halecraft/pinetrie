@@ -1,5 +1,8 @@
 # S44 — the lane runtime on any image, and fetching your `@-` by id
 
+- **Status:** Answered
+- **Led to:** ADR-0034, ADR-0064
+
 `PLAN-2026-09-28-lane-containers` runs pine·trie's helper on the project's image,
 whatever it is, from a runtime pine·trie mounts read-only at `/pinetrie-runtime`:
 Node started through a bundled glibc loader, and a static jj. Nothing had

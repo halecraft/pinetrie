@@ -1,5 +1,8 @@
 # S66 — what closes a modal `<dialog>`, in Chromium and Firefox
 
+- **Status:** Answered
+- **Led to:** ADR-0078
+
 Measured in a lane with Playwright 1.56: Chromium's headless shell (build
 1194) and Firefox (build 1495). The person who asked uses Zen, a Firefox
 browser. The probe opened a `<dialog>` with `showModal()` from inside a `<p>`

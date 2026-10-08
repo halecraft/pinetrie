@@ -255,7 +255,7 @@ export const col = (n: number) => `.column[data-position="${n}"]`
 export const msg = (text: string) =>
   `.msg:has(> .text > p:only-child:text-is(${JSON.stringify(text)}))`
 /**
- * Read column `n` raw (ADR-0056): every message and tool row, which the
+ * Read column `n` raw (ADR-0106): every message and tool row, which the
  * checks written before densities look at once a run has ended. A column
  * opens in story, folding each ask's work; the choice is kept with it. Its
  * control appears with its first message.

@@ -91,7 +91,7 @@ export interface ChatContext {
   readonly writer: WriterId
   /** Where the send asked a new lane to work, if anywhere. */
   readonly work: WorkSetting | null
-  /** The WIP bookmark a new lane begins from; null for accepted work (ADR-0060). */
+  /** The WIP bookmark a new lane begins from; null for accepted work (ADR-0104). */
   readonly base: string | null
   /** The thread's pinned cards as the sender had them: a run waits for them. */
   readonly pinned: readonly SentCard[]

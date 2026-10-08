@@ -1,6 +1,9 @@
 # S2 — Does a minimal `KynetaStorage` pass pi's conformance suite?
 
-**Status:** Answered. Confirmed ADR-0003; spawned S11.
+- **Status:** Answered
+- **Led to:** ADR-0003, ADR-0011, ADR-0013, ADR-0014
+
+Confirmed ADR-0003; spawned S11.
 
 ## Brief
 

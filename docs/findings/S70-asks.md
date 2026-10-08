@@ -1,5 +1,8 @@
 # S70 — what a stopped run leaves, and the facts ADR-0056's asks rest on
 
+- **Status:** Answered
+- **Led to:** ADR-0056, ADR-0082, ADR-0106
+
 Measured in a lane (Linux, Node 24, jj 0.44.0, pi 0.87.1), for
 `PLAN-2026-10-02-asks`. The run probes drove a real host, `startHost` with a
 `ScriptedModel` and tools in a throwaway project, as `apps/pinetrie/e2e/e2e.ts`

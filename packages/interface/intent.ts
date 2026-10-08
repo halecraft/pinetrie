@@ -74,7 +74,7 @@ export type ColumnAct =
   | { readonly kind: "takeIntoInventory"; readonly card: CardId }
   /** Move the column to index `to`. */
   | { readonly kind: "move"; readonly to: number }
-  /** Read the column at `density` (ADR-0056). */
+  /** Read the column at `density` (ADR-0106). */
   | { readonly kind: "density"; readonly density: Density }
   /** Open or close the thread's details under the header (ADR-0073). */
   | { readonly kind: "details"; readonly open: boolean }
@@ -124,7 +124,7 @@ export type ColumnAct =
     }
   /** Take every message card queued on the thread back below the line. */
   | { readonly kind: "unqueueAll"; readonly lane: LaneName }
-  /** Set a card's command, or clear it with null (ADR-0055). */
+  /** Set a card's command, or clear it with null (ADR-0108). */
   | {
       readonly kind: "setCommand"
       readonly card: CardId
@@ -132,7 +132,7 @@ export type ColumnAct =
     }
   /**
    * A command button: catching up, continuing on accepted work, or splitting the
-   * offer (ADR-0060, ADR-0061, ADR-0080): a new card, `create`, made at the
+   * offer (ADR-0104, ADR-0061, ADR-0080): a new card, `create`, made at the
    * thread's end with `command` and no text, and queued on `lane` at once,
    * so the host carries the command out when the lane is free. Your card in
    * the composer is left as it is.
@@ -144,7 +144,7 @@ export type ColumnAct =
       readonly lane: LaneName
       readonly at: Position
     }
-  /** Act on the lane's offer in your repo; an acceptance names its destination (ADR-0060). */
+  /** Act on the lane's offer in your repo; an acceptance names its destination (ADR-0104). */
   | {
       readonly kind: "offer"
       readonly lane: LaneName

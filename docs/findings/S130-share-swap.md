@@ -1,7 +1,9 @@
 # S130 — Replacing a virtiofs share while the VM runs breaks every container's bind mount into it; a bind of the share's root survives
 
-**Status:** Answered. Follows S128. Serves `PLAN-2026-10-07-lane-runtime`,
-before its launcher phase.
+- **Status:** Answered
+- **Led to:** ADR-0103
+
+Follows S128.
 
 **Question.** The plan runs one lane VM per user. Each host's directories
 (the working copy, pine·trie's install, the runtime, grants, shared

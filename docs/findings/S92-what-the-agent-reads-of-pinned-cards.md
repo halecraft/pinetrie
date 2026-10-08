@@ -1,8 +1,11 @@
 # S92 — what the agent reads of pinned cards
 
-**Status:** Answered. ADR-0048's probe 5, for `PLAN-2026-10-03-pinned-cards`.
-Numbered S82, then S87, until 2026-10-04, when other spikes held both
-numbers.
+Numbered S82, then S87, until 2026-10-04, when other spikes held both numbers.
+
+- **Status:** Answered
+- **Led to:** ADR-0048, ADR-0080
+
+ADR-0048's probe 5.
 
 Measured in a lane (Linux, Node 24, pi 0.87.1) for ADR-0048's step 5. This
 answers probe 5: writing a changed pinned card as an entry when a run starts,

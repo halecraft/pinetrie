@@ -1,5 +1,8 @@
 # S38 — can the path rewrite be limited to what a lane inherited?
 
+- **Status:** Answered
+- **Led to:** ADR-0034
+
 > Overtaken by ADR-0034: a lane runs in a container on its own disk at one
 > path, so nothing is rewritten. The measurements stand; the recommendations
 > in "What this means for the design" do not.

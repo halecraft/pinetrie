@@ -1,5 +1,5 @@
 // digest — a model's headline and few points for a long ask's work
-// (ADR-0056, ADR-0075), unless the user config turns digests off. The record
+// (ADR-0106, ADR-0075), unless the user config turns digests off. The record
 // is a host-written `pinetrie.digest` value keyed by the ask's prompt; no agent
 // reads it, so it puts no tokens in any context. The host carries the plan
 // out (`apps/pinetrie/host/digests.ts`).

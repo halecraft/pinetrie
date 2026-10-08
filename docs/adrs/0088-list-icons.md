@@ -1,12 +1,15 @@
 # ADR-0088 — Your list folds to icons, each root's sprite or initials, and the footer's corner to your avatar
 
-**Status:** Proposed. Implementation: `PLAN-2026-10-05-pane-fits-strip`.
-Amends ADR-0085 (your list and the footer's corner
-have a second, narrow width, which answers its deferred narrow screens).
+- **Status:** Accepted (Duane, 2026-10-08)
+- **Area:** `packages/web/TECHNICAL.md`, `packages/interface/TECHNICAL.md`
+- **Amends:**
+  - ADR-0085: your list folds to icons, and the footer's corner to your
+    avatar, which answers this ADR's deferred narrow screens.
+- **Amended by:**
+  - ADR-0098: folded, your avatar carries the inbox's badge and opens the
+    account menu, which holds the inbox and the inventory's toggle.
+
 Uses ADR-0089's root colour.
-Amended by ADR-0098: folded, your avatar carries the inbox's
-badge and opens the account menu, which holds the inbox and the
-inventory's toggle.
 
 **Context.**
 

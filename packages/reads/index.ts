@@ -297,7 +297,7 @@ export function readRunAuthor(
 
 /**
  * Who asked the run that wrote `tip`: the writer of its prompt
- * (`promptOf`, ADR-0056), when a person's message started it.
+ * (`promptOf`, ADR-0106), when a person's message started it.
  */
 function askerOf(index: TreeIndex, tip: EntryId | null): WriterId | undefined {
   const prompt = promptOf(index, tip)
@@ -633,12 +633,12 @@ export const readMarks = (
   doc: RootDocHandle,
 ): ReadonlyMap<EntryId, MarkRecord> => readRecords(doc, MARK)
 
-/** Each ask's digest (`pinetrie.digest`, ADR-0056), by its prompt. */
+/** Each ask's digest (`pinetrie.digest`, ADR-0106), by its prompt. */
 export const readDigests = (
   doc: RootDocHandle,
 ): ReadonlyMap<EntryId, DigestRecord> => readRecords(doc, DIGEST)
 
-/** Who stopped each ask (`pinetrie.stop`, ADR-0056), by its prompt. */
+/** Who stopped each ask (`pinetrie.stop`, ADR-0106), by its prompt. */
 export const readStops = (
   doc: RootDocHandle,
 ): ReadonlyMap<EntryId, StopRecord> => readRecords(doc, STOP)
@@ -670,16 +670,16 @@ export const readRevisions = (
   doc: RootDocHandle,
 ): ReadonlyMap<EntryId, RevisionRecord> => readRecords(doc, REVISION)
 
-/** Each lane's offer in your repo (ADR-0038), by lane. */
+/** Each lane's offer in your repo (ADR-0105), by lane. */
 export const readOffers = (
   doc: SessionDocHandle,
 ): ReadonlyMap<LaneName, OfferRecord> => readRecords(doc, OFFER)
 
-/** Accepted work as the host last read it (ADR-0060); null before it wrote one. */
+/** Accepted work as the host last read it (ADR-0104); null before it wrote one. */
 export const readAccepted = (doc: SessionDocHandle): AcceptedRecord | null =>
   readRecords(doc, ACCEPTED).get(ACCEPTED_KEY) ?? null
 
-/** Each lane's base as its history says it (ADR-0060), by lane. */
+/** Each lane's base as its history says it (ADR-0104), by lane. */
 export const readBases = (
   doc: SessionDocHandle,
 ): ReadonlyMap<LaneName, BaseRecord> => readRecords(doc, BASE)

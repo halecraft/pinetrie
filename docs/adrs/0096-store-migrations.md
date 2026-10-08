@@ -1,9 +1,12 @@
 # ADR-0096 — A starting host checks each stored document's schema before it opens any, and migrates or refuses
 
-**Status:** Proposed. Evidence: S120. Implemented by
-`PLAN-2026-10-06-schema-boundaries`. Formalizes the carry-overs of ADR-0066
-and ADR-0085, which ran at startup and were deleted once they had run, and
-replaces the one-off script of ADR-0063 (`scripts/split-session.ts`).
+- **Status:** Accepted (Duane, 2026-10-08)
+- **Area:** `apps/pinetrie/host/TECHNICAL.md`, `packages/rules/TECHNICAL.md`
+- **Evidence:** S120
+
+Formalizes the carry-overs of ADR-0066 and ADR-0085, which ran at startup and
+were deleted once they had run, and replaces the one-off script of ADR-0063
+(`scripts/split-session.ts`).
 
 **Context.** S120 measured what a changed schema does to a stored document.
 It opens without complaint, and Kyneta rewrites the document's recorded

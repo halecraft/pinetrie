@@ -490,7 +490,7 @@ const StoredColumn = Type.Object({
   reserved: Type.Optional(Type.String()),
   asksAgent: Type.Optional(Type.Literal(true)),
   // Optional, with no new `v`: absent is story, so a layout stored before
-  // densities decodes, and no one's tabs are dropped for it (ADR-0056).
+  // densities decodes, and no one's tabs are dropped for it (ADR-0106).
   density: Type.Optional(
     Type.Union([
       Type.Literal("outline"),

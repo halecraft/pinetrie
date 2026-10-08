@@ -1,8 +1,14 @@
 # ADR-0064 — The search tools run programs pine·trie carries into every lane
 
-**Status:** Accepted. Evidence: S88. Implementation:
-`PLAN-2026-10-03-lane-search`. Amends ADR-0034 (what the lane runtime
-carries) and ADR-0046 (what a lane is told).
+- **Status:** Accepted
+- **Area:** `packages/pi/TECHNICAL.md`, `packages/lanes/TECHNICAL.md`
+- **Evidence:** S44, S88
+- **Amends:**
+  - ADR-0034: the lane runtime carries rg, fd and sd beside jj, and the
+    agent's `grep` and `find` tools run them.
+  - ADR-0046: every lane of its own is also told to search with the `grep` and
+    `find` tools and that rg, fd and sd are on `PATH`; the browser fact is
+    `defaultImage`, and its line names python3 too.
 
 **Context.** pi's prompt builder adds "Use bash for file operations like ls,
 rg, find" whenever the tools it is given name `bash` and none of `grep`,

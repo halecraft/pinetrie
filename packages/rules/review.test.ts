@@ -92,7 +92,7 @@ describe("the review (ADR-0047)", () => {
     }
     expect([path(""), path("a\nb"), path("a\u007f")]).toEqual([400, 400, 400])
   })
-  test("planOfferRead: a range only between two commits one lane's turns recorded (ADR-0056)", () => {
+  test("planOfferRead: a range only between two commits one lane's turns recorded (ADR-0106)", () => {
     const OTHER = laneNameForThread("other")
     const record = (entry: string, lane: typeof LANE, commit: string) =>
       [

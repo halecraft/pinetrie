@@ -256,7 +256,7 @@ export const PATH_LINE = 'json(path) ++ "\\n"'
 
 /**
  * The paths changed from `from` to `to`, from the repo's root; those `to`
- * changed when there is no `from` (ADR-0056). Read with jj, not git: git
+ * changed when there is no `from` (ADR-0106). Read with jj, not git: git
  * reads a conflicted commit as every side's whole tree under
  * `.jjconflict-*` (S99).
  */

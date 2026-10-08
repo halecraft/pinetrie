@@ -1,9 +1,11 @@
 # S102 — A lane that holds work the line took as a copy conflicts when it catches up; joining each take to its source first makes the merge clean
 
-**Status:** Answered. Led to ADR-0079, implemented by
-`PLAN-2026-10-04-catch-up-past-take`: `planJoins` (`packages/lanes/plan.ts`)
-and `mergeBase` (`packages/lanes/merge.ts`), held by the tests "catching up
-past a take of the lane's work (S102)" in `packages/repo/repo.test.ts`.
+- **Status:** Answered
+- **Led to:** ADR-0079, ADR-0083, ADR-0104
+
+Implemented by `planJoins` (`packages/lanes/plan.ts`) and `mergeBase`
+(`packages/lanes/merge.ts`), held by the tests "catching up past a take of the
+lane's work (S102)" in `packages/repo/repo.test.ts`.
 
 **Question.** A thread caught up with the line and conflicted on lines it
 had not touched since the line last saw them. The thread had merged its

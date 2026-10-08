@@ -1,7 +1,7 @@
 # `@pinetrie/repo`: technical notes
 
 This package is your repo as the host reads and writes it: the offers, the
-accepted work, and lanes' refs in it (ADR-0038, ADR-0060, ADR-0061), all
+accepted work, and lanes' refs in it (ADR-0105, ADR-0104, ADR-0061), all
 through one owner (ADR-0065). It declares `@pinetrie/core`, `@pinetrie/keeper`
 and `@pinetrie/lanes` (`workspace.test.ts`); `lanes` never imports it. What a
 lane also runs, through a `Runner` it is given, stays in `lanes`
@@ -190,7 +190,7 @@ operation is read once and kept until the head moves.**
   lane setup's reads of your jj config (`user.name`) use `jjIn` too: config,
   not the repo.
 
-## Offers in your repo (`offer.ts`, `offer-gather.ts`, `offer-steps.ts`, `plan.ts`, ADR-0038, ADR-0039)
+## Offers in your repo (`offer.ts`, `offer-gather.ts`, `offer-steps.ts`, `plan.ts`, ADR-0105, ADR-0039)
 
 - **The host runs no jj on an offer.** Each of its offer steps is a gather
   here, a decision in `@pinetrie/rules`, a translation here (`offerEffects` and
@@ -242,7 +242,7 @@ operation is read once and kept until the head moves.**
   first on the start (a merge when the start names several heads), then all
   rebased onto the target. A stack's sources are the agent's revisions.
 - **Where an offer starts is read from the repo** (`startOfOffer`,
-  `offerStart`, ADR-0060): `heads(::tip & (<base start> | ::(<sources>)))`.
+  `offerStart`, ADR-0104): `heads(::tip & (<base start> | ::(<sources>)))`.
   The base start is the commit the lane's newest `Pinetrie-Base` names
   (`laneBase`); for a lane with none, from before accepted work, the newest line
   commit in the tip's history. The sources are the lane commits that
@@ -340,7 +340,7 @@ operation is read once and kept until the head moves.**
   a restore that changes nothing. `planOffer` and the rebuild both end with
   `planRefreshOffer`'s rebase.
 - **An acceptance is a forward bookmark move**
-  (`planOfferAcceptanceSteps`, ADR-0060): `jj bookmark move <destination>
+  (`planOfferAcceptanceSteps`, ADR-0104): `jj bookmark move <destination>
   --to <top>` as the host, then the offer's bookmark deleted. It never
   rebases and never touches your `@`. An acceptance and a publish each move bookmarks with `moveForward`, which never
   passes `--allow-backwards`: jj refuses a move that is not forward, so a
@@ -348,7 +348,7 @@ operation is read once and kept until the head moves.**
   repo's git ref follows a host move made with `--ignore-working-copy`
   (`repo.test.ts`, publish).
 - **`readOffer` reads an offer from your repo alone** (`OfferInRepo`,
-  ADR-0060): nothing the host remembers is needed, so a lost record costs
+  ADR-0104): nothing the host remembers is needed, so a lost record costs
   nothing. Its revisions (`offerRevisions`) are what is under the bookmark,
   not already under the target, and carries the thread's trailer:
   `(::<bookmark> ~ ::<target>) & (description(regex:"(?m)^Pinetrie-Thread:
@@ -380,7 +380,7 @@ operation is read once and kept until the head moves.**
   process's directory, and `root:` matches every file under a directory of
   that name. A commit id names one commit, so neither resolves a change id
   or meets a divergent one.
-- **A range reads in two commands** (ADR-0056, S70): `jj diff --from --to
+- **A range reads in two commands** (ADR-0106, S70): `jj diff --from --to
   -T RANGE_FILES` gives each file's path, display path and status, one JSON
   object a line, since a `TreeDiffEntry` has no line counts; `jj diff
   --from --to --git` gives the counts, one `diff --git` section per file in

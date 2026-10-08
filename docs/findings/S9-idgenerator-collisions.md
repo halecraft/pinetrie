@@ -1,6 +1,7 @@
 # S9 — Does pi's `IdGenerator` collide under concurrent multi-peer use?
 
-**Status:** Answered.
+- **Status:** Answered
+- **Led to:** ADR-0009, ADR-0029, ADR-0068
 
 ## Brief
 

@@ -1,5 +1,5 @@
-// offer — what the host decides about a lane's offer in your repo (ADR-0038,
-// ADR-0060, ADR-0067), pure, over the facts `@pinetrie/repo` gathers.
+// offer — what the host decides about a lane's offer in your repo (ADR-0105,
+// ADR-0104, ADR-0067), pure, over the facts `@pinetrie/repo` gathers.
 //
 // Each decision is a value typed in `@pinetrie/core` (`core/offers.ts`) that
 // carries the facts its steps need: what a trigger does (`planRefresh`), a
@@ -145,8 +145,8 @@ const offerEdited = (offer: OfferNow): boolean =>
 /**
  * Whether the lane, or where the offer starts, moved since it was built or
  * last followed: its ledger against the lane's tip and start now. An offer
- * with no ledger, built before ADR-0060, reads as moved, so it is followed
- * once, which writes one. A start is compared as a set: a merge's parents
+ * with no ledger, built before offers carried one, reads as moved, so it is
+ * followed once, which writes one. A start is compared as a set: a merge's parents
  * come in any order.
  */
 export const offerMoved = (
@@ -221,7 +221,7 @@ function acceptStack(input: {
 // ── where an acceptance goes, and what a record says ──────────────
 
 /**
- * Where an acceptance may move a bookmark to the offer (ADR-0060): a forward move,
+ * Where an acceptance may move a bookmark to the offer (ADR-0104): a forward move,
  * never a rebase, so every destination gives the same tree.
  */
 export interface OfferAcceptanceDestination {
@@ -234,7 +234,7 @@ export interface OfferAcceptanceDestination {
 }
 
 /**
- * The bookmarks an acceptance may move to the offer, the default first (ADR-0060):
+ * The bookmarks an acceptance may move to the offer, the default first (ADR-0104):
  * the one the lane is based on, and, for a WIP, accepted work too, landing the
  * WIP's commits with it. Only a clean offer lands on accepted work: accepted work is
  * immutable, and a conflict accepted into it would stay in its history. A WIP
@@ -302,10 +302,10 @@ export const isNotYetAccepted = (
 ): status is Extract<OfferStatus, { readonly kind: "open" | "held" }> =>
   status.kind === "open" || status.kind === "held"
 
-// ── its record, the page's cache (ADR-0060) ──────────────────────────────
+// ── its record, the page's cache (ADR-0104) ──────────────────────────────
 
 /**
- * An offer's record, from the offer as your repo holds it (ADR-0060): what it
+ * An offer's record, from the offer as your repo holds it (ADR-0104): what it
  * holds, whether an agent described it, whether you edited it, and whether
  * a stack's lane moved on (`offerMoved`, the rule `planRefresh` uses).
  * `commits` are what a review may read.
@@ -356,7 +356,7 @@ export const planYourEdits = (
     .filter(r => isNotYetAccepted(offerStatus(r)))
     .map(r => ({ ...r, yourEdits: r.files.filter(f => editing.has(f)) }))
 
-// ── an acceptance (ADR-0060, ADR-0065) ─────────────────────────────
+// ── an acceptance (ADR-0104, ADR-0065) ─────────────────────────────
 
 /** A gather with an offer and the thread's name: what an acceptance, a rebuild or a description acts on. */
 type NamedOffer = OfferGather & {
@@ -384,7 +384,7 @@ const offerChanged = (offer: OfferNow, seen: OfferSeen): boolean =>
   (offer.conflicts.length > 0 && !seen.conflicted)
 
 /**
- * An acceptance (ADR-0060), decided from the offer read in its own
+ * An acceptance (ADR-0104), decided from the offer read in its own
  * command: the destination asked for (`to`, else the default), which must be
  * one of the offer's destinations now (`offerAcceptanceDestinations`) and at
  * or below its bottom's parent, so the move is forward; and the record marked
@@ -457,7 +457,7 @@ export function planOfferAcceptance(input: {
   }
 }
 
-// ── an offer rebuilt (ADR-0038) ───────────────────────────────────────────
+// ── an offer rebuilt (ADR-0105) ───────────────────────────────────────────
 
 /** An offer rebuilt, or why not. */
 type RebuildDecision<Refusal> =
@@ -465,7 +465,7 @@ type RebuildDecision<Refusal> =
   | { readonly kind: "refused"; readonly why: Refusal }
 
 /**
- * A split's run ended (ADR-0038): its stack replaces the offer when it holds
+ * A split's run ended (ADR-0105): its stack replaces the offer when it holds
  * exactly the lane tip's files, built at the offer's place from the stack's
  * own start and tip, which its ledger names. An untraced place accepts it: the
  * stack brings its own start. Why not, in words the agent reads.
@@ -508,7 +508,7 @@ export function planStackEnded(input: {
 }
 
 /**
- * A squash or a refresh (ADR-0038): the offer rebuilt from the lane's tip as
+ * A squash or a refresh (ADR-0105): the offer rebuilt from the lane's tip as
  * one revision on its WIP line, which an untraced start cannot do.
  */
 export function planRebuild(
@@ -524,7 +524,7 @@ export function planRebuild(
   return { kind: "rebuild", name, place, changes: changesOf(offer), sources }
 }
 
-// ── its commit message (ADR-0038) ─────────────────────────────────────────
+// ── its commit message (ADR-0105) ─────────────────────────────────────────
 
 /**
  * Whether an offer is one to ask a commit message for: a single revision,

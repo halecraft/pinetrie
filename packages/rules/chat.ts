@@ -135,7 +135,7 @@ export interface ChatMessage {
 
 /**
  * What a run can start with: a compelled chat, a land message (ADR-0033), a
- * stack message (ADR-0038), or a carry-on message (ADR-0082).
+ * stack message (ADR-0105), or a carry-on message (ADR-0082).
  */
 export type PromptMessage =
   | ChatMessage
@@ -285,7 +285,7 @@ function toolResultFacts(
  * A stored message -> what the projections render. A chat becomes role `chat`
  * with its author; a land, update, stack or carry-on message becomes role
  * `land`, `update`, `stack` or `carry-on` with its one line (ADR-0033,
- * ADR-0038, ADR-0082), as a fact becomes role `fact` and a base's news role
+ * ADR-0105, ADR-0082), as a fact becomes role `fact` and a base's news role
  * `behind` (ADR-0080); a cards entry becomes role `pinned` with the cards it
  * read (ADR-0048); a host tool's result keeps its role and gains what it
  * says as a fact (`asked`, `merged`, ADR-0080); anything else passes

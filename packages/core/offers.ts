@@ -1,6 +1,6 @@
 // core/offers — an offer and accepted work in your repo: the facts
-// `@pinetrie/repo` reads, and the decisions it carries out (ADR-0038,
-// ADR-0060).
+// `@pinetrie/repo` reads, and the decisions it carries out (ADR-0105,
+// ADR-0104).
 //
 // A format or type that lanes or repo must read, write or name lives in core
 // too, since neither can declare @pinetrie/rules. This file holds the
@@ -96,7 +96,7 @@ export type OfferInRepo =
 export type WorkChanges = "none" | "some" | "unknown"
 
 /**
- * Where a lane's offer starts (ADR-0060), or `untraced`: an accepted-offer
+ * Where a lane's offer starts (ADR-0104), or `untraced`: an accepted-offer
  * commit of this lane above its base names no source (`untracedLanes`), so
  * no start can leave out what it brought, and nothing is offered until the
  * lane catches up past it (ADR-0067).
@@ -140,7 +140,7 @@ export interface Placed {
 }
 
 /**
- * Where a lane's offer sits and starts, read from your repo now (ADR-0060),
+ * Where a lane's offer sits and starts, read from your repo now (ADR-0104),
  * decided once by the gather.
  */
 export type OfferPlace =
@@ -169,7 +169,7 @@ export interface OfferGather {
   /**
    * The lane's base record as the repo says it now, what catching up would
    * change and its untraced accepted-offer commits with it: the host writes it when it
-   * differs from the page's (ADR-0060).
+   * differs from the page's (ADR-0104).
    */
   readonly base: BaseRecord
 }
@@ -199,7 +199,7 @@ export interface OfferAcceptanceFacts {
   readonly below: ReadonlySet<string>
 }
 
-/** A split's stack, as it is in your repo after its run (ADR-0038). */
+/** A split's stack, as it is in your repo after its run (ADR-0105). */
 export interface StackFacts {
   /** Bottom first, each with its message. */
   readonly revisions: readonly OfferSource[]
@@ -279,7 +279,7 @@ export interface DescribeDecision {
   readonly ledger: OfferLedger
 }
 
-// ── accepted work (ADR-0060, ADR-0061) ─────────────────────────────
+// ── accepted work (ADR-0104, ADR-0061) ─────────────────────────────
 
 /**
  * What the host reads of accepted work, each time it looks (`acceptedFacts` in

@@ -192,7 +192,7 @@ describe("planRefresh", () => {
     )
     expect(plan(facts(read(), TIP, [TIP]))).toBe("withdraw")
   })
-  test("an offer with no ledger, built before ADR-0060, reads as moved: it is followed once", () => {
+  test("an offer with no ledger, built before offers carried one, reads as moved: it is followed once", () => {
     expect(plan(facts(read({ ledger: null })))).toBe("rebuild")
   })
   test("you edited it: a version of yours that changed a revision, a commit of yours between, or its bottom moved (S48 item 7)", () => {
@@ -287,7 +287,7 @@ describe("isWipLine, offerMoved, describeWanted", () => {
 })
 
 describe("records", () => {
-  test("an offer, accepted work and a base round-trip (ADR-0060)", () => {
+  test("an offer, accepted work and a base round-trip (ADR-0104)", () => {
     const o = setRecord(OFFER, offer)
     expect([o.namespace, o.key]).toEqual(["pinetrie.offer", LANE])
     expect(OFFER.decode(structuredClone(o.value), LANE)).toEqual(offer)
@@ -425,7 +425,7 @@ describe("the update and stack messages", () => {
   })
 })
 
-describe("offerAcceptanceDestinations (ADR-0060)", () => {
+describe("offerAcceptanceDestinations (ADR-0104)", () => {
   const line = { kind: "accepted" } as const
   const wip = { kind: "wip", bookmark: "wip/x" } as const
   const of = (
@@ -460,7 +460,7 @@ describe("offerAcceptanceDestinations (ADR-0060)", () => {
   })
 })
 
-describe("the offer's policy over a gather (ADR-0038, ADR-0060)", () => {
+describe("the offer's policy over a gather (ADR-0105, ADR-0104)", () => {
   const NAME = "amber-fox" as ThreadName
   const NOT_YOURS = { reached: true, yoursChanged: false }
   const START = commitId("s0")
@@ -599,7 +599,7 @@ describe("the offer's policy over a gather (ADR-0038, ADR-0060)", () => {
     ])
   })
 
-  describe("planOfferAcceptance (ADR-0060, ADR-0065)", () => {
+  describe("planOfferAcceptance (ADR-0104, ADR-0065)", () => {
     const o = read({
       revisions: [
         { commit: commitId("b1"), change: "kbot", since: NOT_YOURS },
@@ -886,7 +886,7 @@ describe("the offer's policy over a gather (ADR-0038, ADR-0060)", () => {
     })
   })
 
-  describe("a commit message: asked, then settled (ADR-0038)", () => {
+  describe("a commit message: asked, then settled (ADR-0105)", () => {
     test("planDescribeAsk: the offer's one revision while it is on its WIP line, or forced", () => {
       expect(planDescribeAsk(gather(), false)).toBe(NOW_COMMIT)
       expect(

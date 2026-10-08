@@ -1,4 +1,4 @@
-// e2e/host/tools — the agent reads, writes, edits and runs, visibly (ADR-0022).
+// e2e/host/tools — the agent reads, writes, edits and runs, visibly (ADR-0107).
 
 import { existsSync, mkdtempSync, readFileSync } from "node:fs"
 import { tmpdir } from "node:os"
@@ -223,7 +223,7 @@ async function run(check: Checks["check"]): Promise<void> {
     )
     if (l5 !== undefined) await u.request({ kind: "stop", lane: l5.name })
     await u.request({ kind: "stop", lane: laneNameForThread("no-such-lane") })
-    // Who stopped it is recorded under the ask (ADR-0056): pi's entries say
+    // Who stopped it is recorded under the ask (ADR-0106): pi's entries say
     // only that the run was aborted. Stopping it again, idle, records nothing.
     const sleepAsk = idOfIn(th, "sleep")
     const stop =

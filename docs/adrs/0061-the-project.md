@@ -1,20 +1,32 @@
 # ADR-0061 — The integration line is "the project"; work moves between places, and archiving withdraws offers
 
-**Status:** Accepted (Duane, 2026-10-03). Evidence: S80. Implemented by
-`PLAN-2026-10-03-jj-ux`. Amends ADR-0060 (its
-words; and "pine·trie never touches your files or your `@`", for one act you
-ask for), ADR-0055 ("bring up to date" is "catch up", its button acts at once,
-and how a card with a command says so), ADR-0032 (where the composer says where an agent
-works), ADR-0029 and ADR-0038 (archiving a root withdraws its threads'
-offers). Amended by ADR-0076: the project menu has two sections, the
-project's (publishing it to main) and your files' (only on the host's own
-machine), and lists no files but those that would conflict. Amended by
-ADR-0069: the header's ⇣ goes; its threads are the
-activity menu's "Ready to add", counted on its badge.
-Amended by ADR-0090: the project menu and "update my files" go, for one
-publish button; the line is "accepted work", not "the project".
-**Amended by ADR-0102:** the composer no longer says what a send does to
-your files, and "resolve with the agent" in your files goes.
+- **Status:** Accepted (Duane, 2026-10-03)
+- **Area:** `docs/06-interface.md`, `packages/rules/TECHNICAL.md`
+- **Evidence:** S78, S80
+- **Amends:**
+  - ADR-0029: archiving a root withdraws its threads' offers from your repo,
+    and restoring builds them again.
+  - ADR-0032: where a new thread's agent works is a line left of the send
+    button, saying what it does to your files, and its menu marks the choice.
+  - ADR-0038: archiving a root withdraws its threads' offers, and a refresh
+    that finds no offer and none to build removes its record.
+  - ADR-0055: "bring up to date" is worded "catch up"; its button queues a
+    card with the command and no text at once, rather than giving your card
+    the command to send; a card with a command says above its box what sending
+    it does, and its button names the command.
+  - ADR-0060: the line is "the project" in every word the page shows, its
+    bookmark in titles; and "update my files", a rebase of your work onto the
+    line you ask for after a preview, is the one act that moves your `@`.
+- **Amended by:**
+  - ADR-0069: the header's ⇣ goes; its threads are the activity menu's "Ready
+    to add", counted on its badge.
+  - ADR-0076: the project menu has two sections, the project's (publishing it
+    to main) and your files' (only on the host's own machine), and lists no
+    files but those that would conflict.
+  - ADR-0090: the project menu and "update my files" go, for one publish
+    button; the line is "accepted work", not "the project".
+  - ADR-0102: the composer no longer says what a send does to your files, and
+    "resolve with the agent" in your files goes.
 
 **Context.** Using ADR-0060's build, Duane found:
 

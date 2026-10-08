@@ -1,5 +1,8 @@
 # S41 — a soak of mid-write clones, and forking a lane's jj workspace with its disk
 
+- **Status:** Answered
+- **Led to:** ADR-0034, ADR-0035
+
 S40 found a lane's disk image can be cloned at a turn boundary, and that
 clones taken mid-write are consistent on a journaled image (8 of 8). Two
 questions remained before building on it:

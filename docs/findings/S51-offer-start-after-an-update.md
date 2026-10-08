@@ -1,5 +1,8 @@
 # S51 — where an offer starts, after an update
 
+- **Status:** Answered
+- **Led to:** ADR-0038, ADR-0060, ADR-0104, ADR-0105
+
 A thread's offer (ADR-0038) came out conflicted in your repo, though the
 thread's lane was clean and so was your `@`. This finding records why, and
 the rule that fixes it (`PLAN-2026-09-29-offer-start`).

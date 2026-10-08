@@ -1,5 +1,8 @@
 # S54 — why the page's memory grew, and what re-rendered
 
+- **Status:** Answered
+- **Led to:** ADR-0093
+
 **Answers.**
 1. **The growth was React's dev-build timeline entries** (measured). Two
    Firefox heap snapshots of one session, about 3.4 minutes apart, held

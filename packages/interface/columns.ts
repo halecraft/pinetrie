@@ -66,7 +66,7 @@ export interface Column {
   /** A Start Agent column: a message with no mention asks the agent. */
   readonly asksAgent?: true
   /**
-   * How much of each ask is drawn (ADR-0056); absent is story. The reader's
+   * How much of each ask is drawn (ADR-0106); absent is story. The reader's
    * choice, never the document's.
    */
   readonly density?: Density
@@ -132,7 +132,7 @@ export type ColumnAction =
 
 /**
  * The reader's settings for column `key`: how much of each ask it draws
- * (ADR-0056), and whether its thread's details are open (ADR-0073). By key,
+ * (ADR-0106), and whether its thread's details are open (ADR-0073). By key,
  * so they reach a new tab's one column as they reach a root's.
  */
 export type ReaderAction =

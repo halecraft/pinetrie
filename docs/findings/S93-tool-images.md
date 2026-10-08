@@ -1,5 +1,8 @@
 # S93: a tool's image through pi, the session and the store
 
+- **Status:** Answered
+- **Led to:** ADR-0051
+
 Numbered S59 until 2026-10-03, when two spikes held that number.
 
 Before moving a `read`'s image out of the session (PLAN-2026-09-30-tool-images),

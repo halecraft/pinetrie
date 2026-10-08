@@ -1,8 +1,12 @@
 # ADR-0008 — The conversation tree is explicit; Loro version history is infrastructure
 
-**Status:** Accepted. Amended by ADR-0023: the session document is no longer on
-Loro. The tree stays explicit; replication and convergence need no CRDT history
-when one host writes.
+- **Status:** Accepted
+- **Area:** `docs/01-architecture.md`, `packages/schema/TECHNICAL.md`
+- **Evidence:** S7
+- **Amended by:**
+  - ADR-0023: the session document is no longer on Loro. The tree stays
+    explicit; replication and convergence need no CRDT history when one host
+    writes.
 
 **Context.** Tempting alternative: represent the tree implicitly with Loro
 frontiers — chat becomes a flat list, revisiting a node becomes

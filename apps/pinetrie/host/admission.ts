@@ -7,7 +7,7 @@
 // and nobody else gets anything. On loopback there is no key, so a request
 // must come from this machine's own names, and from a page of this host
 // (ADR-0042). It decides who gets in, not who is who: peer ids are chosen by
-// clients (ADR-0022).
+// clients (ADR-0107).
 
 import { randomBytes, timingSafeEqual } from "node:crypto"
 

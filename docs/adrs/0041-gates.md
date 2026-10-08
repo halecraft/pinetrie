@@ -1,8 +1,10 @@
 # ADR-0041 — Every gate runs in a lane with nothing from you: a browser in the image, a scripted model in the suites
 
-**Status:** Accepted. Evidence: S52. Implementation:
-`PLAN-2026-09-29-lane-browser`. Amends ADR-0034 (the default image, and what
-a lane reaches on the host).
+- **Status:** Accepted
+- **Area:** `packages/lanes/TECHNICAL.md`, `docs/05-stack.md`
+- **Evidence:** S52
+- **Amends:**
+  - ADR-0034: the default image, and what a lane reaches on the host.
 
 **Context.** Agents in lanes run the gates, and two of them could not pass
 there. `e2e:browser` drove Chromium through a `playwright run-server` on the

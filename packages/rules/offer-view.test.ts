@@ -50,7 +50,7 @@ test("offerSeen: what an acceptance was shown is the record's ledger and whether
   expect(offerSeen(undefined)).toEqual({ ledger: null, conflicted: false })
 })
 
-describe("offerView: ADR-0038's table", () => {
+describe("offerView: the work strip's states (ADR-0105)", () => {
   const MOVE = {
     base: { kind: "accepted" },
     bookmark: "pinetrie-accepted",
@@ -98,7 +98,7 @@ describe("offerView: ADR-0038's table", () => {
       ["accept", "split"],
       ["describe", "update"],
     ])
-    // Only a clean offer lands on accepted work (ADR-0060): no acceptance on a thread on accepted work.
+    // Only a clean offer lands on accepted work (ADR-0104): no acceptance on a thread on accepted work.
     expect(at(view({ ...offer, conflicts: ["a.txt"] }))).toEqual([
       "conflicts",
       ["update"],

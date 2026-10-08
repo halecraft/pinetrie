@@ -1,4 +1,4 @@
-// interface/ask-fold — whether an ask's work is drawn open (ADR-0056), what
+// interface/ask-fold — whether an ask's work is drawn open (ADR-0106), what
 // it draws (`planAskWork`), and the reader's choice for each ask, kept for
 // the page's life. Pure but for the memory's listeners.
 //

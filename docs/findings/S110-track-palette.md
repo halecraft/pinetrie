@@ -1,7 +1,7 @@
 # S110 — Twelve track colours at OKLCH lightness 0.72 and chroma 0.14 read apart, and apart from what already has a colour; a root steps through them by 7
 
-**Status:** Answered. Led to ADR-0089, implemented by
-`PLAN-2026-10-05-pane-fits-strip`.
+- **Status:** Answered
+- **Led to:** ADR-0089, ADR-0098
 
 **Question.** ADR-0089 seeds each root's tracks from a larger palette. Which
 colours, at one lightness and chroma in OKLCH, and how many:

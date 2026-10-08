@@ -1,8 +1,10 @@
 # ADR-0058 — The rail outlines what each column shows, and a column shown again is where its reader left it
 
-**Status:** Accepted. Implementation: `PLAN-2026-10-02-rail-viewport`.
-Amends ADR-0049: besides what it knew of its end, a column keeps where it
-was left, for the page's life.
+- **Status:** Accepted
+- **Area:** `docs/06-interface.md`, `packages/web/TECHNICAL.md`
+- **Amends:**
+  - ADR-0049: a column also keeps where it was left, by message, and comes
+    back there.
 
 **Context.** The rail draws the whole tree of a root (ADR-0029, ADR-0031).
 Nothing on it says which part of it is on screen: a long trunk's rail is a

@@ -1,5 +1,8 @@
 # S79 — a second tab's repair cleared a slot just taken into
 
+- **Status:** Answered
+- **Led to:** ADR-0059
+
 Found while building ADR-0048's step 4 (`PLAN-2026-10-03-inventory`), in
 the `host/cards` scenario and a probe beside it: two sessions of Ada's and
 one of Bea's, over a real host (Node 24, in a lane). S76's repair rule ran

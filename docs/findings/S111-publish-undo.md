@@ -1,6 +1,7 @@
 # S111 — Two bookmarks move in one operation, and `jj op revert` undoes a catch-up without losing an edit; `jj op restore` loses it
 
-**Status:** Answered. Led to ADR-0090. Served `PLAN-2026-10-05-publish-button`.
+- **Status:** Answered
+- **Led to:** ADR-0090, ADR-0104
 
 **Question.** A publish on the host's own machine runs up to two jj
 operations: your work rebased onto the line (`rebase -b @ -d <onto>`, as

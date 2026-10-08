@@ -1,5 +1,8 @@
 # S78 — your landed history abandoned when a lane's ref went missing
 
+- **Status:** Answered
+- **Led to:** ADR-0060, ADR-0061, ADR-0104
+
 On 2026-10-02 at 10:48:04, with no command of the user's running, the
 commits under `@` came back conflicted in 18 files. Three commits a take
 had landed (`wyymlxnv`, `yvmprzss`, `mwzqvmwq`) were no longer ancestors of

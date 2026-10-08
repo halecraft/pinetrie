@@ -1,7 +1,7 @@
 # S121 — renaming `pinetrie-onto` is one jj operation and one config file write, and the name also reaches the agent's words
 
-**Status:** Answered. Serves `PLAN-2026-10-07-accepted-work`. Evidence for
-ADR-0100.
+- **Status:** Answered
+- **Led to:** ADR-0100, ADR-0104
 
 Run in a lane (Linux, jj 0.45.1) on a disposable colocated repo; the code
 read at this revision. The probe was not committed.

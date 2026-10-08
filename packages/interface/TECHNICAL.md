@@ -578,7 +578,7 @@ pending.
   (`.working`, `.needs-you`, `.worth-a-read`, `.done`, `data-arrived`),
   `.here-thread.raised`, `.not-needed`.
 
-## Rail stretches (ADR-0031, ADR-0056)
+## Rail stretches (ADR-0031, ADR-0106)
 
 The rail draws `compactRail(index, projectRail(...), keep, { asks, revisions })`:
 a dot per landmark, and a capsule per stretch of three or more uneventful
@@ -596,7 +596,7 @@ else reads those rows (tab summaries, archive search, `branchColors`).
   rings: a ring is a thread end, which on a column's path is its own end,
   and leaving presence out keeps a presence write from redrawing every
   column (S59).
-- **A long ask is a dot and a capsule of its own** (ADR-0056): the prompt of
+- **A long ask is a dot and a capsule of its own** (ADR-0106): the prompt of
   an ask whose run holds `LONG_ASK` agent messages is a landmark, and a
   stretch never crosses its work's edge. Short exchanges merge as before,
   into a capsule when its span is fewer rows than its dots (`compactRail`'s
@@ -640,7 +640,7 @@ else reads those rows (tab summaries, archive search, `branchColors`).
 - **A capsule's background depends on its fill** (the panel's colour, the
   track's, or the two blended half and half), so a colour check reads a `.rail-dot`. Signals (`.pulse`, `[data-here]`, a `.card-pip`) are always on dots.
 
-## Asks, densities and folds (ADR-0056)
+## Asks, densities and folds (ADR-0106)
 
 An ask is a message that started a run, with that run (`indexAsks`, core,
 kept per index). `readSessionFacts` reads it with the index, so the rail and
@@ -680,7 +680,7 @@ the columns read one. `segmentPath` (`ask-segments.ts`) decides what a column fo
 - **What `askView` decides:** what its work holds (`work`, `workWords`
   over `askStats`), the outcome's words, the live line while it runs, the
   last word outline hides (none in the column's last ended ask,
-  `lastEndedAsk`, ADR-0070), its digest's headline and, once final, its
+  `lastEndedAsk`, ADR-0106), its digest's headline and, once final, its
   points (ADR-0075), and how many files a review of it shows: none when
   it has no span (`askSpan`), so its fold offers no review. The pane
   reads the span itself (`askReviewTarget`, `packages/web/pane.ts`).
@@ -830,7 +830,7 @@ became of its files (`strip`).
   offer that conflicts says so even when it is `edited` (S73), and its
   accept button reads "accept anyway" whatever the state, as it does when
   a resolution asked for you. Each accept button names a WIP the work
-  goes into (ADR-0060, ADR-0083, ADR-0090): "accept", "accept into
+  goes into (ADR-0104, ADR-0083, ADR-0090): "accept", "accept into
   wip/search", and, from a WIP thread's menu, "accept, with your 2 commits
   beneath it". A conflicted offer on the
   line offers "resolve in the thread", never an acceptance into it. The bookmark is

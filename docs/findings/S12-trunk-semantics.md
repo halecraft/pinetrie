@@ -1,6 +1,9 @@
 # S12 — What is "the trunk" when every writer has its own lane?
 
-**Status:** Answered. Led to ADR-0012; spawned S15.
+- **Status:** Answered
+- **Led to:** ADR-0011, ADR-0012
+
+Spawned S15.
 
 ## Brief
 

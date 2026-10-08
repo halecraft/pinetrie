@@ -2,7 +2,7 @@
 // answer written inside it. A request takes seconds, and no other command
 // may wait on it; what it answers is written in a step of its own, after
 // the step decides it is still wanted. Banners, commit messages and asks'
-// digests share it (ADR-0050, ADR-0038, ADR-0056); each keeps its decisions
+// digests share it (ADR-0050, ADR-0105, ADR-0106); each keeps its decisions
 // pure (`bannerDue`, `digestDue`, `digestToWrite`, the offer's checks).
 
 import type { Keeper } from "@pinetrie/keeper"

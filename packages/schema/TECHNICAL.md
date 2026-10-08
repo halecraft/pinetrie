@@ -118,7 +118,7 @@ deliberately not migrated: the value is a transient stream pointer and there
 were no users. Recorded precisely so it does not blur S17's finding that
 `Schema.record` and sums are the barrier, not root fields.
 
-## Streams: replies and tools alike (ADR-0022)
+## Streams: replies and tools alike (ADR-0107)
 
 `streams` (a record per stream: lane, `reply` or `tool`, call, `under`) and
 `streamText` (a `Schema.text()` per stream) replaced `pendingText`, which held

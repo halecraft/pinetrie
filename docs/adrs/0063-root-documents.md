@@ -1,22 +1,30 @@
 # ADR-0063 — A root is a document; what is streaming is another
 
-**Status:** Accepted (Duane, 2026-10-03). Evidence: S84, S85, S86.
-Implemented by `PLAN-2026-10-03-root-documents`. Amends ADR-0021 ("a session
-is one document"), ADR-0023 (the session is authoritative JSON, compacted)
-and ADR-0029 (the archive's key, and what the Archive tab searches). Amended
-by ADR-0066: a new tab mints its `RootId` as it opens, not at its first
-send; a fresh card's place carries a `Spot`; `places` is Yjs, not `json`.
-Amended by ADR-0077: a root's directory record holds who has written on each
-of its threads (`threads`), and the directory refreshes a root's record as
-the host opens it.
-Amended by ADR-0085: the archive record goes; a root is archived while its
-board place, keyed by its `RootId`, is in the closed state, and the Archive
-tab's search over labels is the closed state's.
-Amended by ADR-0092: a root is released through the scribe, which closes
-the agent's harness over the root's one pi session, then the session; the
-session document has a session and no harness.
-Amended by ADR-0095: the session's document has its own schema, `SessionDoc`
-(the host's records alone), and a root's is pi's storage plus `records`.
+- **Status:** Accepted (Duane, 2026-10-03)
+- **Area:** `packages/schema/TECHNICAL.md`, `docs/01-architecture.md`
+- **Evidence:** S30, S84, S85, S86
+- **Amends:**
+  - ADR-0021: a session is a document per root, a session document of its
+    records, and one of what is streaming; it is still the boundary of who is
+    in it.
+  - ADR-0023: the session is a `json` document per root, a session document
+    and `pinetrie:live`, each compacted alone.
+  - ADR-0029: the archive record is keyed by the root's `RootId`, and the
+    Archive tab searches labels only.
+- **Amended by:**
+  - ADR-0066: a new tab mints its `RootId` as it opens, not at its first send;
+    a fresh card's place carries a `Spot`; `places` is Yjs, not `json`.
+  - ADR-0077: a root's directory record holds who has written on each of its
+    threads (`threads`), and the directory refreshes a root's record as the
+    host opens it.
+  - ADR-0085: the archive record goes; a root is archived while its board
+    place, keyed by its `RootId`, is in the closed state, and the Archive
+    tab's search over labels is the closed state's.
+  - ADR-0092: a root is released through the scribe, which closes the agent's
+    harness over the root's one pi session, then the session; the session
+    document has a session and no harness.
+  - ADR-0095: the session's document has its own schema, `SessionDoc` (the
+    host's records alone), and a root's is pi's storage plus `records`.
 
 **Context.** The session was one Kyneta document, `pinetrie:session`: pi's
 storage for every root ever started, the host's records, and what is

@@ -1,14 +1,22 @@
 # ADR-0066 — The host undoes moves, one Kyneta stack per person and root
 
-**Status:** Accepted (Duane, 2026-10-03). Evidence: S82, S90, S91.
-Implemented by `PLAN-2026-10-03-moves-undone-on-host`. Amends ADR-0048
-(*Undo is Kyneta's*: moves too, on the host; decision 11 of step 4 is
-withdrawn), ADR-0052 (one history of moves per root per person, kept by the
-host; the place shown as the undo acts), ADR-0059 (a handoff's undo is
-Kyneta's, on the host; `places` is on Yjs; `rev` is raised apart from each
-move; a keep is one command) and ADR-0063 (a new tab's `RootId` is minted as
-it opens; a fresh place carries a `Spot`; `places` is Yjs, not `json`).
-Supersedes `PLAN-2026-10-03-history-at-send`.
+- **Status:** Accepted (Duane, 2026-10-03)
+- **Area:** `packages/schema/TECHNICAL.md`, `packages/rules/TECHNICAL.md`
+- **Evidence:** S82, S90, S91
+- **Amends:**
+  - ADR-0048: moves are undone by the host's Kyneta stacks, one per person and
+    root, whole or refused (*Undo is Kyneta's* covers moves too, on the host);
+    step 4's decision 11, the page's own history of moves, is withdrawn.
+  - ADR-0052: each person has one history of moves per root, kept by the host
+    and shared by their tabs; Cmd+Z undoes the newest move in the root you are
+    on, whole or refused, and the place is brought into view as the undo acts,
+    not before; no undo reaches into an archived root.
+  - ADR-0059: a handoff is undone by Kyneta on the host, not by the reverse
+    handoff, and a swap by this tab's own stack over the inventory; `places`
+    is on Yjs; `rev` is raised in a write of its own after each move; a keep's
+    several cards are one command, accepted whole or refused.
+  - ADR-0063: a new tab mints its `RootId` as it opens, not at its first send;
+    a fresh card's place carries a `Spot`; `places` is Yjs, not `json`.
 
 **Context.** Moves you can undo (ADR-0048 step 4) were built as pine·trie's own
 history in each browser tab: an undo sent the reverse handoff (ADR-0059),

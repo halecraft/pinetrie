@@ -1,5 +1,8 @@
 # S59 — is typing slower since drafting cards, or in a long thread?
 
+- **Status:** Answered
+- **Led to:** ADR-0056, ADR-0068, ADR-0093, ADR-0106
+
 **Answers.**
 1. **Drafting cards cost little per keystroke.** Against the code just before
    ADR-0048's step 1, the card editor adds about 1 ms of script per keystroke:

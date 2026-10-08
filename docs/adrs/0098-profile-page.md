@@ -1,13 +1,19 @@
 # ADR-0098 — Your avatar opens a menu, your profile is a page in the workspace's place, and a person may have a picture
 
-**Status:** Accepted (Duane, 2026-10-07). Implemented in two steps:
-`PLAN-2026-10-07-account-corner` (the corner, the menu and the profile
-page), then `PLAN-2026-10-07-person-pictures` (pictures); both built. Amends ADR-0037 (you
-rename yourself on your profile page), ADR-0042 (a person's picture is a
-blob the sweep keeps), ADR-0085 (the footer's corner), ADR-0088 (folded, the
-corner's avatar carries the inbox's badge, and the inventory's toggle is in
-the account menu) and ADR-0091 (the inbox is an icon in the corner; folded,
-it is in the account menu).
+- **Status:** Accepted (Duane, 2026-10-07)
+- **Area:** `packages/interface/TECHNICAL.md`, `packages/web/TECHNICAL.md`
+- **Evidence:** S110
+- **Amends:**
+  - ADR-0037: you rename yourself on your profile page; your avatar opens a
+    menu, not a dialog.
+  - ADR-0042: a person's picture is a blob, and the sweep counts it as a
+    reference.
+  - ADR-0085: the corner is you, with your name, then your inbox and inventory
+    as icon buttons of one style.
+  - ADR-0088: folded, your avatar carries the inbox's badge and opens the
+    account menu, which holds the inbox and the inventory's toggle.
+  - ADR-0091: the inbox is an icon button in the corner; folded, it is in the
+    account menu.
 
 **Context.**
 

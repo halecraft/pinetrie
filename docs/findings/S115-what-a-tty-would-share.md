@@ -1,7 +1,7 @@
 # S115 — Of the client's modules, all but the hooks and five others need no DOM and no React; core's display code moves as one closed set
 
-**Status:** Answered. Led to ADR-0093. Served
-`PLAN-2026-10-05-interface-package`.
+- **Status:** Answered
+- **Led to:** ADR-0093
 
 **Question.** If a second kind of client, a TTY, were written, which of
 `@pinetrie/client`'s modules, and which of `@pinetrie/core`'s exports that

@@ -1,19 +1,26 @@
 # ADR-0090 — One publish button: it catches your files up, accepts your work and moves main, or does nothing; the line is "accepted work"
 
-**Status:** Accepted (Duane, 2026-10-05). Evidence: S111. Implemented by
-`PLAN-2026-10-05-publish-button`. Amends ADR-0060 ("land my work" goes:
-publishing integrates your commits), ADR-0061 (the project menu and
-"update my files" go; the line is "accepted work", not "the project"),
-ADR-0076 (the menu's two sections go; on the host's own machine a publish
-also catches your files up and integrates your commits) and ADR-0083 (the
-page's verb for an offer integration is *accept*; the code's stays
-*integrate*).
-Amended by ADR-0099: whether a publish catches your files up
-and accepts your commits is `offers.catchUp` (default off), not whether the
-host admits others; any host shows **set up**.
-**Amended by ADR-0102:** "your files" is "the working copy".
-Amended by ADR-0100: the code says *accepted work* and *accept* as the
-page does; `offers` is replaced by `accepted`, `wip` and `publish`.
+- **Status:** Accepted (Duane, 2026-10-05)
+- **Area:** `packages/rules/TECHNICAL.md`, `packages/interface/TECHNICAL.md`
+- **Evidence:** S111
+- **Amends:**
+  - ADR-0060: "land my work" goes; a publish integrates your commits below `@`
+    and catches your files up first, on the host's own machine; the line is
+    "accepted work" in every word the page shows.
+  - ADR-0061: the project menu and "update my files" go, for one publish
+    button; the line is "accepted work", not "the project".
+  - ADR-0076: the menu goes, for one publish button; on the host's own machine
+    a publish also catches your files up and integrates your commits; a
+    refusal is a toast.
+  - ADR-0083: the page's word for an offer integration is *accept*; the code's
+    stays *integrate*, and "land" folds into it.
+- **Amended by:**
+  - ADR-0099: whether a publish catches your files up and accepts your commits
+    is `offers.catchUp` (default off), not whether the host admits others; any
+    host shows **set up**.
+  - ADR-0100: the code says *accepted work* and *accept* as the page does;
+    `offers` is replaced by `accepted`, `wip` and `publish`.
+  - ADR-0102: "your files" is "the working copy".
 
 **Context.** The footer's **◆ project** menu (ADR-0061, ADR-0076) showed
 the three places work sits: the line (`pinetrie-onto`), the publish

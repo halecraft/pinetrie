@@ -2,7 +2,7 @@
 // where the agent will work, the column's height while it works, commands,
 // widths, the thread's name and offer, the review, markdown, following, the
 // header's work, and the rail's capsules; first, each ask's work folded
-// and opened from the rail (ADR-0056), on a host of its own.
+// and opened from the rail (ADR-0106), on a host of its own.
 
 import { execFileSync } from "node:child_process"
 import { existsSync, rmSync } from "node:fs"
@@ -71,7 +71,7 @@ async function run(
 ): Promise<void> {
   const browser = await launchBrowser()
   try {
-    // ── asks: each ask's work folds, and the rail opens it (ADR-0056) ─────
+    // ── asks: each ask's work folds, and the rail opens it (ADR-0106) ─────
     // No containers. The column is read in story, as a new one opens. A
     // column is read raw in the blocks below (`readRaw`).
     {
@@ -387,7 +387,7 @@ async function run(
       // do not.
       const project = readProject(toolHost.session)
       const noContainers = project?.kind === "direct" ? project.reason : null
-      // A new thread of its own starts at accepted work (ADR-0060).
+      // A new thread of its own starts at accepted work (ADR-0104).
       if (noContainers === null) {
         const owner = await join(toolHost, "owner", "tools")
         await setUpAccepted(toolHost.session, owner)
@@ -902,7 +902,7 @@ async function run(
             "the header's mark pulses while the agent works, and stops when it ends",
             pulsing &&
               starShows?.animation === "pulse-mark" &&
-              // It names the ask it works on (ADR-0056).
+              // It names the ask it works on (ADR-0106).
               starShows.title?.startsWith(`${workingWords(true, null)} on `) ===
                 true &&
               ended.pulsing === 0,
@@ -1237,7 +1237,7 @@ async function run(
         )
 
         // ── the thread's name in its header, and its offer at its foot ──────
-        // (ADR-0038, ADR-0039, ADR-0040). The name is as the host stored it.
+        // (ADR-0105, ADR-0039, ADR-0040). The name is as the host stored it.
         const nameText = await tp.textContent(
           `${col(0)} .column-head .agent-name`,
         )
@@ -1394,7 +1394,7 @@ async function run(
             .catch(() => {})
           const closed = await appears(`${col(0)}:not(:has(.review))`, 5_000)
           if (acceptShown) await tp.click(`${col(0)} .work .offer-accept`)
-          // The acceptance moves accepted work forward to the offer (ADR-0060).
+          // The acceptance moves accepted work forward to the offer (ADR-0104).
           const onAccepted = () => {
             try {
               return execFileSync(

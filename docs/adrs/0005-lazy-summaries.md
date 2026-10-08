@@ -1,6 +1,8 @@
 # ADR-0005 — Summarization is lazy and destination-aware
 
-**Status:** Accepted
+- **Status:** Accepted
+- **Area:** `docs/01-architecture.md`
+- **Evidence:** S5
 
 **Context.** pi generates `BranchSummaryEntry` on *leaving* a branch — it
 summarizes without knowing where the summary will land, and destroys the raw

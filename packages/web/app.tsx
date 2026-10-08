@@ -587,7 +587,7 @@ export function App({
   )
   // Each column's end, for the rail: one array while the views are the same.
   const ends = useMemo(() => views.map(v => v.tipId), [views])
-  // What no fold hides in this tab's columns: the rail's landmarks (ADR-0056).
+  // What no fold hides in this tab's columns: the rail's landmarks (ADR-0106).
   const landmarks = useMemo(
     () =>
       columnLandmarks(rail, {
@@ -820,7 +820,7 @@ export function App({
   // its rows as they were left (ADR-0049). Never pruned: a call id is not
   // reused.
   const [rows] = useState(() => screenMemory<RowMemory>())
-  // Each ask's fold as its reader chose it (ADR-0056), kept as rows are.
+  // Each ask's fold as its reader chose it (ADR-0106), kept as rows are.
   const [folds] = useState(() => foldMemory())
 
   // After the alignment above: a picked message the alignment left out of

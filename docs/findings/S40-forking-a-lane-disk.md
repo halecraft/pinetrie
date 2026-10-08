@@ -1,5 +1,8 @@
 # S40 — forking a lane's whole disk, copy-on-write
 
+- **Status:** Answered
+- **Led to:** ADR-0034
+
 S39 item 8 found that a VM's disk image clones with APFS `clonefile` in 50 ms.
 The design that follows: a lane's whole working directory (tracked files,
 dependencies, caches, build output) lives on its own disk image, and a fork

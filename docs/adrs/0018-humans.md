@@ -1,8 +1,11 @@
 # ADR-0018 — Humans in the tree: chat is a pi `CustomMessage`, and only an agent can be compelled
 
-**Status:** Accepted. Roadmap step 5. Evidence: S19. Amended by ADR-0020 (lanes
-belong to threads) and ADR-0021 (a thread's mode is its lane; a mention picks
-the addressee).
+- **Status:** Accepted
+- **Area:** `docs/06-interface.md`, `packages/interface/TECHNICAL.md`
+- **Evidence:** S19
+- **Amended by:**
+  - ADR-0020: lanes belong to threads.
+  - ADR-0021: a thread's mode is its lane; a mention picks the addressee.
 
 **Context.** People working with an agent also talk to each other, and that
 talk is part of the work: an invited agent needs it, in order and by speaker.

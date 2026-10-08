@@ -1,8 +1,12 @@
 # ADR-0084 — A resolution's prompt always fits what pi keeps when it compacts
 
-**Status:** Accepted. Evidence: S106. Implementation:
-`PLAN-2026-10-05-resolution-budget`. Amends ADR-0033 (the host fixes what
-the agent is given; "never the hunks").
+- **Status:** Accepted
+- **Area:** `apps/pinetrie/host/TECHNICAL.md`, `packages/pi/TECHNICAL.md`
+- **Evidence:** S106
+- **Amends:**
+  - ADR-0033: a resolution's prompt fits what pi keeps when it compacts; over
+    it, the hunks give way to conflict sections, then names, then a count,
+    before the reasons do.
 
 **Context.** A resolution run starts with a land message carrying every
 conflicted file whole (ADR-0033). A 37-file conflict made one of about

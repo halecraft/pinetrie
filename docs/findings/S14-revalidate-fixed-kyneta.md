@@ -1,6 +1,9 @@
 # S14 — Re-validate the evidence base against FIXED Kyneta + the new loro floor
 
-**Status:** Answered. Closed S13, and partly discharged S10.
+- **Status:** Answered
+- **Led to:** ADR-0014
+
+Closed S13, and partly discharged S10.
 
 **Date:** 2026-09-20 · **Sandbox:** `sandbox/s14-revalidate` · **Node:** v24.19.0
 

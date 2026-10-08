@@ -303,7 +303,7 @@ function renderableMessage(entry: EntryLike): TranscriptMessage | null {
 /**
  * The host's own messages, which a column shows as one line: a resolution's
  * prompt (`land`, ADR-0033), an update and a split's prompt (`update`,
- * `stack`, ADR-0038), a Resume's carry-on (`carry-on`, ADR-0082), and the
+ * `stack`, ADR-0105), a Resume's carry-on (`carry-on`, ADR-0082), and the
  * host's facts, what a command on the offer did (`fact`) and that the base
  * has new work (`behind`, ADR-0080).
  */

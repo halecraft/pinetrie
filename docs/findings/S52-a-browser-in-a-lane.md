@@ -1,5 +1,8 @@
 # S52 — a browser in a lane, the host's browser server, and the suites' model
 
+- **Status:** Answered
+- **Led to:** ADR-0034, ADR-0041
+
 Agents in lanes kept trying to reach the Playwright server on the Mac at
 `:3100`, which `e2e:browser` connected to because pi-jail's Seatbelt denied
 Chromium `mach-register` (WS1). pine·trie applies no sandbox of its own. This

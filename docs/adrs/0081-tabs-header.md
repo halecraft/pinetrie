@@ -1,12 +1,16 @@
 # ADR-0081 — The tab bar is the header, and the tab you are on is the page
 
-**Status:** Accepted (Duane, 2026-10-04). Implemented by
-`PLAN-2026-10-04-tabs-header`. Amends ADR-0029 (where the tab bar sits,
-and how the tab you are on is drawn) and ADR-0030 (the header holds your
-tabs; the message count moves to the Archive tab).
-Amended by ADR-0085: the header row goes; your list runs down the left, its
-root you are on joined to the page sideways, and the footer holds the
-indicators, with the message count on ▦.
+- **Status:** Accepted (Duane, 2026-10-04)
+- **Area:** `docs/06-interface.md`, `packages/web/TECHNICAL.md`
+- **Amends:**
+  - ADR-0029: the tab bar is the header, and the tab you are on is drawn as
+    part of the page.
+  - ADR-0030: the header holds your tabs, and the message count moved to the
+    Archive tab.
+- **Amended by:**
+  - ADR-0085: the header row goes; your list runs down the left, its root you
+    are on joined to the page sideways, and the footer holds the indicators,
+    with the message count on ▦.
 
 **Context.** Duane could not tell which tab was selected, nor that the
 columns belonged to it:

@@ -1,5 +1,5 @@
 // core/asks — an ask is a message that started a run, with that run
-// (ADR-0056). Derived from the tree, never stored.
+// (ADR-0106). Derived from the tree, never stored.
 //
 // A run's entries are the agent's messages and their tool results below its
 // prompt (`startsRun`), up to the next prompt. A lane is never written while

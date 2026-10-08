@@ -1,5 +1,8 @@
 # S24 — compaction by substrate: json, Loro, Yjs
 
+- **Status:** Answered
+- **Led to:** ADR-0023, ADR-0025, ADR-0026, ADR-0028, ADR-0048
+
 **Answers.**
 1. **`json.bind` (authoritative) compacts a live document, and loses nothing
    that matters.** Kyneta's `compact()` replaced 327 KB of records with the

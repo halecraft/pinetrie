@@ -130,7 +130,7 @@ export type Effect =
   | { readonly kind: "openWhenHeld"; readonly entry: EntryId }
   /** Scroll to entry `entry` once it is drawn (`useReveal`). */
   | { readonly kind: "reveal"; readonly entry: EntryId }
-  /** Open ask `ask`'s fold, so what is revealed in it is drawn (ADR-0056). */
+  /** Open ask `ask`'s fold, so what is revealed in it is drawn (ADR-0106). */
   | { readonly kind: "openFold"; readonly ask: EntryId }
   /** The column keyed `key` takes focus when it mounts (`claimFocus`). */
   | { readonly kind: "armFocus"; readonly key: string }
@@ -212,7 +212,7 @@ export const showRoot = (
  * Show entry `id` (`planOpen`): in view in the column that shows it, or in a
  * new column beside the one sharing most of its path. An entry of an ask's work opens the ask's
  * fold first, whatever the column's density, so it is drawn to be revealed
- * (ADR-0056): forks, branch starts and people's messages are never in one.
+ * (ADR-0106): forks, branch starts and people's messages are never in one.
  */
 export function planOpenAt(
   id: EntryId,

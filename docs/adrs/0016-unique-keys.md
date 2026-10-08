@@ -1,9 +1,13 @@
 # ADR-0016 — Never race a child container: lazily created containers need globally unique keys
 
-**Status:** Accepted. From probe S18 (`docs/findings/S18-nested-values.md`).
-Same family as ADR-0009: a per-key register whose violation is silent. Amended by
-ADR-0023: the session document has one writer, so the race cannot arise there;
-the rule still binds any collaborative document.
+- **Status:** Accepted
+- **Area:** `packages/schema/TECHNICAL.md`
+- **Evidence:** S8, S18
+- **Amended by:**
+  - ADR-0023: the session document has one writer, so the race cannot arise
+    there; the rule still binds any collaborative document.
+
+Same family as ADR-0009: a per-key register whose violation is silent.
 
 **Context.** Kyneta records are per-key last-writer-wins maps on Loro. A leaf
 under a record key is one register. A *child container* under a record key (a

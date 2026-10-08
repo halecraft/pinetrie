@@ -1,5 +1,8 @@
 # S17 — typed entry schema
 
+- **Status:** Answered
+- **Led to:** ADR-0015, ADR-0044, ADR-0095
+
 **Question.** Can the entry envelope be a real Kyneta schema rather than
 `Schema.any()`, without coupling us to pi's shape or breaking the `Storage`
 port?

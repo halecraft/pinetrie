@@ -1,25 +1,42 @@
 # ADR-0059 — A card's place has one owner at a time, and moves between owners are handoffs
 
-**Status:** Accepted (Duane, 2026-10-02). Evidence: S75, S76. Amends
-ADR-0048 (storage: places are no longer written by clients into a CRDT, and
-the inventory is a document of its own, of slots), ADR-0052 (how a move is
-undone), ADR-0023 (the host writes places again) and ADR-0055 (where a
-card's command lives). For ADR-0048's step 4, and it changes how step 3's
-queue and unqueue are written. Amended in place (2026-10-02, with Duane): a
-tab knows its copy holds its move by a revision watermark, not by the reply
-alone (*A move is drawn at once*); a card's command is in the host's place
-record, set by a request, not in the card's own document. Implemented by
-`PLAN-2026-10-02-card-places`, for the places there are now (drafting,
-queued, fresh); the inventory by `PLAN-2026-10-03-inventory`, with three
-more amended in place (2026-10-03, with Duane): you can remove a card from
-your own inventory; a swap is undone by swapping back, not by Kyneta's undo;
-and the repair acts on a card only once it is steady (S79). Amended by
-ADR-0066: a handoff is undone by Kyneta on the host, not by the reverse
-handoff, and a swap by this tab's own stack over the inventory; `places` is
-on Yjs; `rev` is raised in a write of its own after each move; a keep's
-several cards are one command, accepted whole or refused. Amended by
-ADR-0077: the inventory is one of a person's documents (`personDocId`),
-which share one policy.
+- **Status:** Accepted (Duane, 2026-10-02)
+- **Area:** `apps/pinetrie/host/TECHNICAL.md`, `packages/schema/TECHNICAL.md`
+- **Evidence:** S28, S58, S64, S69, S75, S76, S79, S96
+- **Amends:**
+  - ADR-0023: the host writes cards' places again (`places`, `json`), through
+    handoffs clients ask for; clients write cards' texts and their own
+    inventories.
+  - ADR-0048: a card's place has one owner at a time, the session's host or a
+    person's inventory; the host writes places, and moves between owners are
+    handoffs it applies or refuses; the inventory is a document of slots that
+    only its person's tabs write; the cards document goes.
+  - ADR-0052: a move between owners is undone by the reverse handoff, which
+    the host refuses if the card has moved since; your inventory's own moves
+    by Kyneta's undo on your inventory document. An undo past a card's
+    creation empties its text and keeps its record, which only the host
+    writes, so the box stays bound to it and Cmd+Shift+Z there brings the text
+    back (*The box remembers its card…* no longer applies).
+  - ADR-0055: a card's command is in the host's place record, set by a
+    request, and the cards document goes.
+- **Revised:**
+  - 2026-10-02 (with Duane): a tab knows its copy holds its move by a revision
+    watermark, not by the reply alone (*A move is drawn at once*); a card's
+    command is in the host's place record, set by a request, not in the card's
+    own document.
+  - 2026-10-03 (S79, with Duane): you can remove a card from your own
+    inventory; a swap is undone by swapping back, not by Kyneta's undo; and
+    the repair acts on a card only once it is steady.
+- **Amended by:**
+  - ADR-0066: a handoff is undone by Kyneta on the host, not by the reverse
+    handoff, and a swap by this tab's own stack over the inventory; `places`
+    is on Yjs; `rev` is raised in a write of its own after each move; a keep's
+    several cards are one command, accepted whole or refused.
+  - ADR-0077: the inventory is one of a person's documents (`personDocId`),
+    which share one policy.
+
+For ADR-0048's step 4, and it changes how step 3's queue and unqueue are
+written.
 
 **Context.**
 

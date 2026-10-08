@@ -332,7 +332,7 @@ describe("a lane's repo, with jj", () => {
     expect(committed.stdout).toContain("shared.txt")
     expect(committed.stdout).not.toContain(".plans")
     // The turn's paths, from the lane's root, as its revision records them
-    // (ADR-0056): what jj says changed, from the bookmark before it.
+    // (ADR-0106): what jj says changed, from the bookmark before it.
     expect(await changedPaths(laneJj, base[0] ?? null, r1)).toEqual([
       "shared.txt",
     ])
@@ -359,7 +359,7 @@ describe("a lane's repo, with jj", () => {
       (await laneJj(["describe", "-r", base[0] ?? "", "-m", "x"])).ok,
     ).toBe(false)
 
-    // You change the same line on a WIP (ADR-0060), and commit.
+    // You change the same line on a WIP (ADR-0104), and commit.
     await yoursJj(["new"])
     await writeFile(
       path.join(yoursDir, "shared.txt"),
@@ -385,7 +385,7 @@ describe("a lane's repo, with jj", () => {
     expect(
       (await laneJj(["file", "show", "-r", copy, 'root:"shared.txt"'])).stdout,
     ).toContain("two (you)")
-    // The copy is no commit of yours: your WIP stays yours (ADR-0060).
+    // The copy is no commit of yours: your WIP stays yours (ADR-0104).
     expect(await commitsOf(laneJj, `${copy} & ${wip1.commit}`)).toEqual([])
     expect(await newestBase(laneJj, copy, "wip/")).toEqual({
       at: copy,
@@ -496,7 +496,7 @@ describe("a lane's repo, with jj", () => {
     // The fork cannot rewrite what it inherited.
     expect((await forkJj(["describe", "-r", point, "-m", "x"])).ok).toBe(false)
 
-    // A root fork from a copy of the WIP (ADR-0060): it sees the WIP's
+    // A root fork from a copy of the WIP (ADR-0104): it sees the WIP's
     // files, and its work back in your repo makes nothing divergent.
     await cp(laneDir, rootDir, { recursive: true, verbatimSymlinks: true })
     await inLane(
@@ -588,7 +588,7 @@ describe("a lane's repo, with jj", () => {
       expect(await readFile(path.join(forkDir, "b.txt"), "utf8")).toBe("b\n")
     }, 60_000)
 
-  test("an update in jj, end to end (ADR-0060): clean, conflicted, nothing, a move to accepted work, and a WIP's copies", async () => {
+  test("an update in jj, end to end (ADR-0104): clean, conflicted, nothing, a move to accepted work, and a WIP's copies", async () => {
     const {
       yoursDir,
       laneDir,
@@ -910,7 +910,7 @@ describe("a lane's repo, with jj", () => {
     expect(await fileDiff(ops, span, "dir/f.txt")).toContain("+under")
 
     // A range reads the same files, with no description, its counts from
-    // the range's git diff (ADR-0056, S70): here the range is the revision.
+    // the range's git diff (ADR-0106, S70): here the range is the revision.
     const [parent] = await commitsOf(ops, `${w}-`)
     if (parent === undefined) throw new Error("no parent")
     const range = { kind: "range", from: parent, to: w } as const
@@ -956,7 +956,7 @@ describe("a lane's repo, with jj", () => {
   /**
    * Your repo and one lane's, in `top/<tag>-…`, with the lane's steps run on
    * the host, and an offer built as the host builds it, on accepted work
-   * (ADR-0060).
+   * (ADR-0104).
    */
   const offerRig = async (tag: string) => {
     const yoursDir = path.join(top, `${tag}-yours`)
@@ -1207,7 +1207,7 @@ describe("a lane's repo, with jj", () => {
     return { ...rig, base, first }
   }
 
-  test("an offer on accepted work (ADR-0060): built, immutable, refreshed, followed, accepted by a forward move, and the next one", async () => {
+  test("an offer on accepted work (ADR-0104): built, immutable, refreshed, followed, accepted by a forward move, and the next one", async () => {
     const {
       yoursDir,
       laneDir,
@@ -1248,7 +1248,7 @@ describe("a lane's repo, with jj", () => {
       files: ["a.txt"],
       onTarget: true,
       placed: true,
-      // Its ledger, read from its message: no record needed (ADR-0060).
+      // Its ledger, read from its message: no record needed (ADR-0104).
       ledger: { source: t1, start: base },
     })
     expect((await yoursJj(["describe", "-r", c1, "-m", "mine"])).ok).toBe(false)
@@ -2476,7 +2476,7 @@ describe("a lane's repo, with jj", () => {
     ).toBe("unknown")
   }, 60_000)
 
-  test("a thread on a WIP starts from its copy, and freezes nothing of yours (ADR-0060)", async () => {
+  test("a thread on a WIP starts from its copy, and freezes nothing of yours (ADR-0104)", async () => {
     const rig = await offerRig("wipcopy")
     await rig.edit(rig.yoursDir, "base.txt", "base\n")
     await rig.yoursJj(["commit", "-m", "your base"])

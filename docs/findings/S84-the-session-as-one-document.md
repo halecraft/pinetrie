@@ -1,5 +1,8 @@
 # S84 — the session as one document: what compaction rewrites, and why
 
+- **Status:** Answered
+- **Led to:** ADR-0063
+
 Measured on a copy of the person's `.pinetrie/pinetrie.db` (2026-10-03, mid-run),
 read with `node:sqlite` in a lane. Kyneta read at
 `kyneta/workspace/pineta`. Disposable probes, not committed. ADR-0063 acts on

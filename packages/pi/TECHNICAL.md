@@ -224,7 +224,7 @@ have codes of their own; anything else is `refused`. The host never writes to
 a running lane, but after a crash pi holds the interrupted operation open, and
 the lane is `LaneBusy` until resumed (below).
 
-### Streaming, in pine·trie's words (ADR-0022)
+### Streaming, in pine·trie's words (ADR-0107)
 
 `createAgent` takes one `onStream(event: StreamEvent)`. `StreamEvent` is
 declared in `@pinetrie/core`, so pi's events never leave this package. Every pi
@@ -523,8 +523,8 @@ item 18, and in `lanes.test.ts` against the harness.
 - **pine·trie's own skills** are in `skills/`, loaded after yours and the repo's
   (`additionalSkillPaths`; pi's loader keeps the first of a name):
   `resolve-conflicts` (ADR-0033), `commit-message` and `offer-stack`
-  (ADR-0038), `column-banner` (ADR-0053), whose whole body is the image
-  model's prompt, and `ask-digest` (ADR-0056), whose reply has a shape the
+  (ADR-0105), `column-banner` (ADR-0053), whose whole body is the image
+  model's prompt, and `ask-digest` (ADR-0106), whose reply has a shape the
   host reads (`digestOf`, ADR-0075): a replacement must ask for it too. So
   one of yours or the repo's of the same name replaces pine·trie's. All five are
   `disable-model-invocation: true`: only the host asks for them.
@@ -707,7 +707,7 @@ Note what it does **not** do: it detects change, it does not design for it.
 Probes P1 and P2 in `sandbox/s17-typed-entries/` could each have failed while
 conformance stayed green, which is why they ran first.
 
-### Requests outside every thread (`PiSetup.complete`, ADR-0038, ADR-0056, ADR-0074)
+### Requests outside every thread (`PiSetup.complete`, ADR-0105, ADR-0106, ADR-0074)
 
 `complete({ system, user, purpose })` is one `completeSimple` request, with
 no tools and no session: nothing enters the tree or a lane's context. It

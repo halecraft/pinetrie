@@ -1,6 +1,7 @@
 # ADR-0002 — Kyneta is the storage of record; JSONL becomes an exporter
 
-**Status:** Accepted
+- **Status:** Accepted
+- **Area:** `docs/01-architecture.md`
 
 **Context.** Initially framed as "dual-write to pi's v4 JSONL for interop, or
 single-write to Kyneta and fork the ecosystem." Investigation showed the second

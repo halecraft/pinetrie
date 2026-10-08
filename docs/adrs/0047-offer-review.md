@@ -1,12 +1,18 @@
 # ADR-0047 — A column widens to review its offer: every file's diff in one scroll, named by commit
 
-**Status:** Accepted. Evidence: S57. Implementation:
-`PLAN-2026-09-29-offer-review`. Amends ADR-0038 (the offer as a preview) and
-ADR-0040 (the work strip's line and bookmark).
-Amended by ADR-0078: the review is one of the column's pane's subjects,
-which owns its width, head, Escape and focus, and covers a narrow screen.
-Amended by ADR-0087 (proposed): a review can wrap its long lines and fold
-its file list, both kept per device.
+- **Status:** Accepted
+- **Area:** `docs/06-interface.md`, `packages/web/TECHNICAL.md`
+- **Evidence:** S57
+- **Amends:**
+  - ADR-0038: the preview is in pine·trie too: the column widens to show each
+    revision's description, files and diffs.
+  - ADR-0040: the offer's line opens its review, and its bookmark copies on a
+    press.
+- **Amended by:**
+  - ADR-0078: the review is one of the column's pane's subjects, which owns
+    its width, head, Escape and focus, and covers a narrow screen.
+  - ADR-0087: a review can wrap its long lines and fold its file list, both
+    kept per device.
 
 **Context.** The work strip counts an offer's files ("2 files ready",
 "conflicts with your edits in 1 file"), and its line could not be opened.

@@ -1,4 +1,4 @@
-// web/ask-work — one ask's work in a column, folded or open (ADR-0056), laid
+// web/ask-work — one ask's work in a column, folded or open (ADR-0106), laid
 // out from `planAskWork`, which decides every row and word. It reads the
 // reader's choice for its own ask (`FoldMemory`), so opening or closing one
 // redraws it alone, as a tool row does (ADR-0049).
@@ -56,7 +56,7 @@ export function AskWork({
   message: (id: EntryId) => ReactNode
 }) {
   const { ask } = view
-  // Its files open their review in the column's pane (ADR-0056, ADR-0078).
+  // Its files open their review in the column's pane (ADR-0106, ADR-0078).
   const pane = useContext(PaneReach)
   const choice = useSyncExternalStore(
     folds.subscribe,

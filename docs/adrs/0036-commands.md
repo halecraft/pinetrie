@@ -1,11 +1,15 @@
 # ADR-0036 — Your pi skills and prompts are commands, qualified by package, expanded at send
 
-**Status:** Accepted. Implemented by `PLAN-2026-09-28-commands`. Evidence:
-S46. Amends ADR-0034: skill files are a grant every lane of its own gets.
-**Amended by ADR-0055:** a second kind of command, which acts on a card, is
-named last and is not typed (`bring-up-to-date` first). Typed commands stay
-as decided here.
-**Amended by ADR-0102:** no branch works directly.
+- **Status:** Accepted
+- **Area:** `packages/rules/TECHNICAL.md`, `packages/interface/TECHNICAL.md`
+- **Evidence:** S23, S46
+- **Amends:**
+  - ADR-0034: skill files are a grant every lane of its own gets.
+- **Amended by:**
+  - ADR-0055: a second kind of command, which acts on a card, is named last
+    and is not typed (`bring-up-to-date` first). Typed commands stay as
+    decided here.
+  - ADR-0102: no branch works directly.
 
 **Context.** pine·trie loads your pi configuration (ADR-0022, S23), and pi's
 loader finds your skills and prompt templates: yours, the project's, and

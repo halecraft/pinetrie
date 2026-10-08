@@ -1,14 +1,18 @@
 # ADR-0099 — Config decides what the host does, not where it listens: `offers.catchUp`, and setup on any host
 
-**Status:** Accepted (Duane, 2026-10-07). Implemented by
-`PLAN-2026-10-07-config-not-bind`. Amends ADR-0090 (a publish's first two
-steps run when `offers.catchUp` is on, not on "the host's own machine";
-any host shows **set up**), ADR-0076 (a publish that moves `main` alone is
-the setting turned off, not a host that admits others) and ADR-0060, "As
-built" (`line` commands are anyone's: no `not_yours`).
-**Amended by ADR-0102:** "your files" is "the working copy".
-Amended by ADR-0100: `offers.catchUp` is `publish.catchUp`, and
-`publishCatchesUp` in code.
+- **Status:** Accepted (Duane, 2026-10-07)
+- **Area:** `docs/the-jujutsu-repo.md`, `packages/rules/TECHNICAL.md`
+- **Amends:**
+  - ADR-0060: As built: `line` commands are anyone's, with no `not_yours`.
+  - ADR-0076: a publish moves `main` alone when `offers.catchUp` is off, on
+    any host, not because the host admits others.
+  - ADR-0090: whether a publish catches your files up and accepts your commits
+    is `offers.catchUp` (default off), not whether the host admits others; any
+    host shows **set up**.
+- **Amended by:**
+  - ADR-0100: `offers.catchUp` is `publish.catchUp`, and `publishCatchesUp` in
+    code.
+  - ADR-0102: "your files" is "the working copy".
 
 **Context.** ADR-0090 made a publish three steps on the host's own machine
 (your files catch up, your commits below `@` are accepted, `main` moves)

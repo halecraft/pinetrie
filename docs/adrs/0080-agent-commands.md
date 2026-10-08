@@ -1,19 +1,34 @@
 # ADR-0080 — Commands are host-only or agent-callable, and every command on a thread leaves a fact in it
 
-**Status:** Accepted (Duane, 2026-10-05). Evidence: S103 (a catch-up in
-the middle of a run), S104 (a run's last turn is recorded however it
-ends). Implementation: `PLAN-2026-10-05-agent-commands`. Amends ADR-0033
-(a resolution's outcome is no longer a step of its own at its run's end),
-ADR-0038 (catching up was "only when you ask";
-a take, a description and a split wrote nothing into the thread), ADR-0055
-(its rejected "tool the agent calls to pull" is taken up, beside the card
-command), ADR-0060 and ADR-0072 (the catch-up commands get a tool), and
-`packages/pi/TECHNICAL.md`'s "A running lane is never written" (a tool's
-own result carries a merge, and a steer carries a host's fact; see
-Decision).
+- **Status:** Accepted (Duane, 2026-10-05)
+- **Area:** `apps/pinetrie/host/TECHNICAL.md`, `packages/pi/TECHNICAL.md`
+- **Evidence:** S21, S85, S92, S99, S103, S104
+- **Amends:**
+  - ADR-0033: a resolution ends like any run. `ask_for_guidance` is renamed
+    `ask_about_conflict`, and is accepted while jj finds conflicts in the
+    lane's copy; the strip's "needs you" is read from the thread's newest ask,
+    conflicts left are the offer's, and `pinetrie.landing` goes (S104).
+  - ADR-0038: the agent can catch up when its base has new work, and ask for a
+    split, as tools; "split into a stack" queues a card, taken when the thread
+    is free; a lane whose work changes no file is caught up before its run; a
+    take, a description, a squash and a refresh each leave a fact in the
+    thread.
+  - ADR-0055: the rejected "tool the agent calls to pull" is taken up beside
+    the card command, as `catch_up`, acting only when there is new work; and
+    splitting an offer becomes a card command, `split`, which its button
+    queues, as the catch-up button does.
+  - ADR-0060: a take leaves a fact in its thread, queued as a card while the
+    thread runs; the agent catches up with its base through a tool;
+    `continue-on-line` stays a person's.
+  - ADR-0072: the agent catches up with its parent through `catch_up`, refused
+    as the button's command is.
+- **Amended by:**
+  - ADR-0085: the `archive` command is gone; `move-root` and `workflow` change
+    the workspace people share in its place.
 
-Amended by ADR-0085: the `archive` command is gone; `move-root` and
-`workflow` change the workspace people share in its place.
+Also changes `packages/pi/TECHNICAL.md`'s "A running lane is never written": a
+tool's own result carries a merge, and a steer carries a host's fact; see
+Decision.
 
 **Context.** pine·trie has grown commands the host carries out, each started
 by a button and nothing else (`packages/core/index.ts`):

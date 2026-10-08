@@ -1,12 +1,18 @@
 # ADR-0057 — A thread is named when its column first wants an agent, and its lane is created under that name at the first send
 
-**Status:** Accepted. Implementation: `PLAN-2026-10-02-named-early`.
-Amends ADR-0039 (a name is planned for a lane that does not exist yet, and
-the host, not pi, decides a new thread's lane id, taking the client's),
-ADR-0040 (`✦ new agent` lasts only until the name arrives) and ADR-0053 (the
-icon starts as the column opens, not at the first send).
-Amended by ADR-0060: the first send carries the thread's base, which the
-host checks before it creates the lane.
+- **Status:** Accepted
+- **Area:** `apps/pinetrie/host/TECHNICAL.md`, `packages/rules/TECHNICAL.md`
+- **Amends:**
+  - ADR-0039: a thread is named when its column first wants an agent, under a
+    lane id the client makes, and its lane is created under that id at the
+    first send.
+  - ADR-0040: a fresh column that wants an agent is named at once, so `✦ new
+    agent` shows only until its name arrives.
+  - ADR-0053: the icon starts when the column first wants an agent, before the
+    first send.
+- **Amended by:**
+  - ADR-0060: the first send carries the thread's base, which the host checks
+    before it creates the lane.
 
 **Context.** A thread's name (ADR-0039) and its icon (ADR-0053) are keyed by
 its lane, and the lane is made only by the first send: `createThreadLane`

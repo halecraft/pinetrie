@@ -1,24 +1,33 @@
 # ADR-0029 — A tab per root, an archive shared by everyone
 
-**Status:** Accepted. Implemented by `PLAN-2026-09-27-root-tabs`. Evidence:
-S30, S31. Amended by ADR-0030: the tab bar is each person's, and a
-tab closes for you; and by ADR-0045: a root's label is its mark's title,
-else its first message's first line; and by ADR-0063: the archive record is
-keyed by the root's `RootId`, and the Archive tab searches labels only. Amends ADR-0027 (a stored layout holds a
-tab and columns per root), ADR-0028 (marks stay inside a root; focus is
-withdrawn), ADR-0021 (where Start Chat and Start Agent live) and ADR-0024
-(which columns report presence).
-Amended by ADR-0061: archiving a root withdraws its threads' offers from
-your repo, and restoring builds them again.
-Amended by ADR-0089 (proposed): tracks still start at 0, but trunks no
-longer share a colour: each root's id seeds its palette.
-Amended by ADR-0068: a track is a branch's colour, by creation order, not
-its place on the rail.
-Amended by ADR-0081: the tab bar is the header, and the tab you are on is
-drawn as part of the page.
-Amended by ADR-0085: the tab bar becomes your list down the left, and the
-Archive tab the board; archiving is moving a root to the closed workflow
-state, whose place replaces the archive record.
+- **Status:** Accepted
+- **Area:** `docs/06-interface.md`, `packages/interface/TECHNICAL.md`
+- **Evidence:** S9, S28, S30, S31
+- **Amends:**
+  - ADR-0021: Start Chat and Start Agent become the add tab.
+  - ADR-0024: only the columns of the root tab you are on report.
+  - ADR-0027: a stored layout holds the active root tab and each root's
+    columns, in place of ADR-0028's change.
+  - ADR-0028: marks stay inside a root, and focus, its breadcrumb and the
+    whole-session rail sections are withdrawn, along with this ADR's change to
+    ADR-0027.
+- **Amended by:**
+  - ADR-0030: the tab bar is each person's, and a tab closes for you.
+  - ADR-0045: a root's label is its mark's title, else its first message's
+    first line.
+  - ADR-0061: archiving a root withdraws its threads' offers from your repo,
+    and restoring builds them again.
+  - ADR-0063: the archive record is keyed by the root's `RootId`, and the
+    Archive tab searches labels only.
+  - ADR-0068: a track is a branch's colour, by creation order, not its place
+    on the rail.
+  - ADR-0081: the tab bar is the header, and the tab you are on is drawn as
+    part of the page.
+  - ADR-0085: the tab bar becomes your list down the left, and the Archive tab
+    the board; archiving is moving a root to the closed workflow state, whose
+    place replaces the archive record.
+  - ADR-0089: tracks still start at 0, but trunks no longer share a colour:
+    each root's id seeds its palette.
 
 **Context.** The rail draws every tree in one strip, one after another, and
 columns from different trees sit side by side. `projectRail` starts each

@@ -1,18 +1,22 @@
 # ADR-0102 — Every thread's agent works in a lane of its own: no direct work, and no "your files"
 
-**Status:** Accepted (Duane, 2026-10-07). Evidence: S122–S127 and S132 (lanes
-on Linux and in a lane, ADR-0103). Implemented by
-`PLAN-2026-10-07-containers-only`. Amends:
-- ADR-0032: working directly goes;
-- ADR-0034: where its runtime is missing, the host refuses to start, and
-  lanes do not work directly;
-- ADR-0036: no branch works directly;
-- ADR-0040: no direct lane's work strip;
-- ADR-0061: the composer's line no longer says what a send does to your
-  files, and "resolve with the agent" in your files goes;
-- ADR-0086: a host started outside `pnpm host` no longer works directly;
-- ADR-0076, ADR-0090 and ADR-0099: their words, not their behaviour: "your
-  files" becomes "the working copy".
+- **Status:** Accepted (Duane, 2026-10-07)
+- **Area:** `ARCHITECTURE.md`
+- **Evidence:** S122, S123, S124, S125, S127, S132
+- **Amends:**
+  - ADR-0032: working directly goes; every thread's agent works in a lane of
+    its own.
+  - ADR-0034: where the lane runtime is missing, the host refuses to start; no
+    lane works directly.
+  - ADR-0036: no branch works directly.
+  - ADR-0040: there is no direct lane, and no direct work strip.
+  - ADR-0061: the composer no longer says what a send does to your files, and
+    "resolve with the agent" in your files goes.
+  - ADR-0076: "your files" is "the working copy".
+  - ADR-0086: a host started outside `pnpm host` refuses to start without a
+    lane runtime; it never works directly.
+  - ADR-0090: "your files" is "the working copy".
+  - ADR-0099: "your files" is "the working copy".
 
 **Context.** An agent had two places to work: a lane of its own (ADR-0034),
 or directly in a directory, by default the host's working copy.

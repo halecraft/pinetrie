@@ -1,7 +1,7 @@
 # S97 — why the host built offers that bring nothing, or bring back what you took
 
-**Status:** Answered. Led to ADR-0067. Served
-`PLAN-2026-10-03-offer-certainty`.
+- **Status:** Answered
+- **Led to:** ADR-0067, ADR-0104, ADR-0105
 
 **Question.** On 2026-10-03, on pine·trie's own repo, the page contradicted
 itself about vernal-pine. Its tab's ⋯ warned that archiving drops "work not

@@ -1,9 +1,14 @@
 # ADR-0087 — A column's pane fills the strip's free width, and a review can wrap its lines and fold its file list
 
-**Status:** Proposed. Evidence: S109. Implementation:
-`PLAN-2026-10-05-pane-fits-strip`. Amends ADR-0078 (the pane's width and the narrow
-line come from the strip, not the window) and ADR-0047 (a review wraps
-long lines and folds its file list on request).
+- **Status:** Accepted (Duane, 2026-10-08)
+- **Area:** `packages/web/TECHNICAL.md`, `docs/06-interface.md`
+- **Evidence:** S109
+- **Amends:**
+  - ADR-0047: a review can wrap its long lines and fold its file list, both
+    kept per device.
+  - ADR-0078: the pane's width and the narrow line come from the strip's free
+    width, not the window's, which no longer fits since your list took the
+    left edge (ADR-0085).
 
 **Context.**
 

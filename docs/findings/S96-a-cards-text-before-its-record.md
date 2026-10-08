@@ -1,5 +1,8 @@
 # S96 — a card's text can reach the host after its record
 
+- **Status:** Answered
+- **Led to:** ADR-0059
+
 Numbered S72 until 2026-10-03, when two spikes held that number.
 
 Measured in a lane (Linux, Node 24) for `PLAN-2026-10-01-queued-cards`,

@@ -1,4 +1,4 @@
-// interface/ask-words — how an ask, its work and its outcome read (ADR-0056).
+// interface/ask-words — how an ask, its work and its outcome read (ADR-0106).
 // Pure. Each label is decided as a value elsewhere and worded here, once.
 
 import {
@@ -120,7 +120,7 @@ export function outcomeWords(
   }
 }
 
-/** How much of a column is drawn (ADR-0056). */
+/** How much of a column is drawn (ADR-0106). */
 export type Density = "outline" | "story" | "raw"
 
 export const DENSITIES: readonly Density[] = ["outline", "story", "raw"]

@@ -1,7 +1,7 @@
 # S108 — `pnpm host <folder>` reaches the host, a relative folder can only be read from pine·trie's root, and a store in a project needs `/.pinetrie/` excluded first
 
-**Status:** Answered. Led to ADR-0086, implemented by
-`PLAN-2026-10-05-host-project-arg`.
+- **Status:** Answered
+- **Led to:** ADR-0086, ADR-0107
 
 **Question.** Can `pnpm host <folder>` name the project the host serves?
 What does the host see of the argument and of the directory it was typed

@@ -4,9 +4,15 @@ pine·trie is a collaborative agentic harness: pi's agent core over a Kyneta CRD
 document, where the conversation is a tree. Start with `docs/pinetrie.md` (the
 handoff) and `docs/README.md` (the map of the docs). The words for the work
 in your repo (accepted work, accept, offer, WIP, publish, catch up) are
-`docs/glossary.md`: use them, and no others. Decisions and their
-reasons are the ADRs, one file each in `docs/adrs/`. Each package has a
-`TECHNICAL.md` with its gotchas: read the one nearest the code you change.
+`docs/glossary.md`: use them, and no others. What is true now is in the
+living docs: `ARCHITECTURE.md`, `docs/01-architecture.md`,
+`docs/06-interface.md`, `docs/the-jujutsu-repo.md`, and each package's
+`TECHNICAL.md` with its gotchas: read the one nearest the code you change,
+before any ADR. Decisions and their reasons are the ADRs, one file each in
+`docs/adrs/`, and the spikes they rest on are in `docs/findings/`;
+`pnpm run record` writes `docs/record.md`, an index of both by living doc.
+`docs/adrs/archive/` and `docs/findings/archive/` hold superseded ADRs and
+spent spikes: history, which search skips unless you name the folder.
 
 ## Tools and environment
 
@@ -43,6 +49,11 @@ reasons are the ADRs, one file each in `docs/adrs/`. Each package has a
 - Verify, don't assume: read the source of pi and Kyneta, or measure with a
   disposable probe, before planning on a belief. Record probes in
   `docs/findings/`, one file per spike (`docs/findings/README.md`).
+- A decision that lands edits its living doc in the same change, and an ADR
+  or spike you add or change is followed by `pnpm run record`, which writes
+  every back link and moves what is spent to the archive
+  (`docs/adrs/README.md`). Whoever resolves a landing that adds one runs it
+  too.
 
 ## Gates
 

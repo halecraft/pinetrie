@@ -1,5 +1,8 @@
 # S81 — where an offer starts, after a catch-up past what you took
 
+- **Status:** Answered
+- **Led to:** ADR-0060, ADR-0104
+
 A thread's offer came out conflicted in your repo, in the same four files its
 lane had just resolved, though the lane was clean. This finding records why,
 and the rule that fixes it (`PLAN-2026-10-02-offer-start-after-catch-up`).

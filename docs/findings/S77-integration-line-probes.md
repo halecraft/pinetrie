@@ -1,5 +1,8 @@
 # S77 — what jj does under an integration line
 
+- **Status:** Answered
+- **Led to:** ADR-0060, ADR-0104
+
 ADR-0060 (proposed) puts takes on an immutable bookmark, `pinetrie-onto`,
 starts threads from a `wip/` bookmark through a copy, and keeps pine·trie's
 ledger in trailers on the commits it makes. This finding measures the jj

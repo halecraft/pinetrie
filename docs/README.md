@@ -17,23 +17,38 @@ with a conversation **tree** as the primary object rather than a transcript.
 | `pinetrie.md` | Handoff: where the project is, and how to pick it up. |
 | `glossary.md` | The words: accepted work, accept, offer, WIP, publish, catch up, base (ADR-0100). |
 | `findings/` | Spikes, one file each: the open unknowns with their kill criteria, and the answers with their evidence. |
+| `record.md` | Not tracked: the index of the ADRs in force by living doc, the open spikes, and the archive, written by `pnpm run record`. |
 
 ## How to use this
 
+Two kinds of document, kept apart:
+
+- **The living docs say what is true now:** `ARCHITECTURE.md`, `AGENTS.md`,
+  `00-vision.md`, `01-architecture.md`, `05-stack.md`, `06-interface.md`,
+  `the-jujutsu-repo.md`, `glossary.md`, and every package's `TECHNICAL.md`.
+  They are edited in place whenever a decision lands. Read the living doc
+  first.
+- **The record says why:** ADRs in `adrs/` and spikes in `findings/`. A
+  record's body is not edited to follow later changes. An ADR names the living docs
+  it changes, and they cite it. A superseded ADR, and a spike no ADR in force
+  rests on, move to `archive/`, which search skips unless you name it.
+  `pnpm run record` writes `record.md`, an index of the record by living
+  doc.
+
 Nothing stays an open unknown. Every uncertainty is either:
 
-- **a decision** → goes in `adrs/` as an ADR, one file each, or
-- **an unknown** → goes in `findings/` as its own file, with a kill criterion.
+- **a decision** → an ADR, one file each, or
+- **an unknown** → a spike, its own file, with a kill criterion.
 
 When a spike resolves, its file gets its answers, and an ADR if it decides
 something. How a spike is written and numbered: `findings/README.md`. How an
-ADR is written, amended and superseded: `adrs/README.md`.
+ADR is written, amended, restated and archived: `adrs/README.md`.
 
 ## Status
 
 The walking skeleton runs end to end and the stack is complete (TypeScript,
-pnpm workspace, Vite, React, Vitest, Biome, Playwright). Three spikes are
-open, none blocking: S6, S10 and S15. `rg -l '^\*\*Status:\*\* Open' docs/findings`
+pnpm workspace, Vite, React, Vitest, Biome, Playwright). Four spikes are
+open, none blocking: S6, S10, S15 and S100. `rg -l '^- \*\*Status:\*\* Open' docs/findings`
 lists them. Next is the roadmap's thickening sequence in `04-roadmap.md`.
 
 ## Where documents live

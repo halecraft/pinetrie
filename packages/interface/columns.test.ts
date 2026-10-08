@@ -235,7 +235,7 @@ describe("columnsReducer", () => {
     })
   })
 
-  describe("a reader's settings (ADR-0056, ADR-0073)", () => {
+  describe("a reader's settings (ADR-0106, ADR-0073)", () => {
     const ab: readonly Column[] = [
       { key: "a", anchor: entryId("1-a") },
       { key: "b", anchor: entryId("1-a") },

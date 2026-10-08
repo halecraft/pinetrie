@@ -1,5 +1,8 @@
 # S76 — a card's place with one owner, and what a card's document costs
 
+- **Status:** Answered
+- **Led to:** ADR-0048, ADR-0059
+
 Measured in a lane (Linux, Node 24), for ADR-0048's step 4, after S75 showed
 that a card's place should not be merged. The model under test: a card's
 text is its own Yjs document; its place in a session is written only by the

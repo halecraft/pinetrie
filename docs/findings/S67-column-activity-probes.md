@@ -1,5 +1,8 @@
 # S67 — a running command's row after a tab switch, and what the line's `:has()` costs
 
+- **Status:** Answered
+- **Led to:** ADR-0049, ADR-0054
+
 Measured in a lane (Linux, Node 24, Chromium 141's headless shell, no
 `container` runtime), for `PLAN-2026-10-01-column-activity`.
 
