@@ -10,7 +10,8 @@
     "e2e:live": "PINETRIE_LIVE=1 PINETRIE_SCENARIO=live node e2e/e2e.ts",
     "e2e:browser": "node e2e/browser.ts",
     "e2e:lanes": "node e2e/lanes.ts",
-    "vm:build": "node scripts/vm-build.ts"
+    "vm:build": "node scripts/vm-build.ts",
+    "lanes:convert": "node scripts/lanes-convert.ts"
   },
   "dependencies": {
     "@kyneta/exchange": "link:../../../kyneta/workspace/pineta/packages/exchange",

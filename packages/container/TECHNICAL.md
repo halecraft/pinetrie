@@ -62,8 +62,9 @@ Apple's `container` as a lane runtime (ADR-0034): `containerRuntime`, the
 `openContainerDisk` (`convert.ts`) opens a lane's volume, or restores its
 newest snapshot into one, in a throwaway `debian:trixie-slim` container
 whose `tar` the app pipes into Docker's disks helper
-(`apps/pinetrie/host/work/convert.ts`). The volume stays. Deleted with the
-package.
+(`apps/pinetrie/host/work/convert.ts`), at a lane's first start under
+Docker, or for every lane at once by `pnpm lanes:convert`. The volume
+stays. Deleted with the package.
 
 ## Tests
 

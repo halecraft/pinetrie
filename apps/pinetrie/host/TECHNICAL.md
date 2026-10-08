@@ -713,7 +713,7 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
 | `split.ts` | a split's prompt, and its end (`finishSplit`, which moves the lane back to its tip even when a step before it throws: left on the stack, the lane refuses every catch-up) |
 | `archive.ts` | a close's or a reopen's teardown (`planArchive`'s), off the documents' keeper |
 | `runtime.ts` | the composition root, the one place that picks the runtime: gathers, plans (`planRuntime`, `planBuilder` for `pnpm vm:build`), and builds the `LaneRuntime` lanes of their own get (`Setup.runtime`), wiring `@pinetrie/vm`'s lease to `@pinetrie/docker` on the Mac |
-| `convert.ts` | pre-docker: a lane made under `container` moved to Docker at its first start there, its disk piped as a tar from a `container` into Docker's disks helper; the one module that holds both runtimes |
+| `convert.ts` | pre-docker: a lane made under `container` moved to Docker at its first start there, its disk piped as a tar from a `container` into Docker's disks helper; the one module that holds both runtimes. `pnpm lanes:convert` (`apps/pinetrie/scripts/lanes-convert.ts`) moves every lane at once, archived ones too, with the host stopped |
 | `disk.ts` | the snapshot on a lane's queue, and the lockfile's hash |
 
 - **State lives where it changes.** What startup found is `Setup`'s, fixed

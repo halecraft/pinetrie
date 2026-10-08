@@ -24,7 +24,7 @@ import {
   specHashOf,
 } from "@pinetrie/lanes"
 import type { LaneAccess } from "@pinetrie/pi"
-import { readRevisions, readThreadName } from "@pinetrie/reads"
+import { readLaneSnapshots, readThreadName } from "@pinetrie/reads"
 import { type Basics, failed } from "../basics.ts"
 import type { Offers } from "../offers/index.ts"
 import type { LaneRegistry } from "./registry.ts"
@@ -65,11 +65,7 @@ export function createContainers(deps: {
   /** The snapshots of `lane`'s own records, newest first. */
   async function ownSnapshots(lane: LaneName): Promise<SnapshotId[]> {
     const doc = await docs.laneDoc(lane)
-    if (doc === null) return []
-    return [...readRevisions(doc).values()]
-      .filter(r => r.lane === lane)
-      .sort((a, b) => (a.entry < b.entry ? 1 : -1))
-      .flatMap(r => (r.snapshot === null ? [] : [r.snapshot]))
+    return doc === null ? [] : readLaneSnapshots(doc, lane)
   }
 
   /** The newest snapshot of `lane`'s own records that is still there. */

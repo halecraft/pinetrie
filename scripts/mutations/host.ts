@@ -4,6 +4,33 @@ import type { Mutation } from "../mutate.ts"
 const unit = ["pnpm", "exec", "vitest", "run", "apps/pinetrie/host"]
 
 export const mutations: readonly Mutation[] = [
+  // ── pre-docker: pnpm lanes:convert (delete with host/work/convert.ts) ──
+  {
+    name: "lanes:convert tries lanes with no work",
+    file: "apps/pinetrie/host/work/convert.ts",
+    from: '  return [...records].flatMap(r => (r.work?.kind === "own" ? [r.lane] : []))',
+    to: "  return [...records].map(r => r.lane)",
+    command: unit,
+    expect:
+      "lanes:convert tries every lane of its own, and no lane without work",
+  },
+  {
+    name: "lanes:convert does not say a lane will read as retired",
+    file: "apps/pinetrie/host/work/convert.ts",
+    from: "no container volume or snapshot; it will read as retired`",
+    to: "no container volume or snapshot`",
+    command: unit,
+    expect:
+      "lanes:convert says which lanes will read as retired, and is silent on those on Docker",
+  },
+  {
+    name: "lanes:convert's summary counts every outcome as converted",
+    file: "apps/pinetrie/host/work/convert.ts",
+    from: "    const n = all.filter(c => c.kind === kind).length\n",
+    to: '    const n = all.filter(c => kind === "converted" || c.kind === kind).length\n',
+    command: unit,
+    expect: "lanes:convert's summary counts each outcome it came to",
+  },
   {
     name: "a move jj refuses after a publish's catch-up leaves it",
     file: "apps/pinetrie/host/work/accepted.ts",

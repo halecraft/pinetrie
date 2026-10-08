@@ -3,7 +3,9 @@
 // volume or its newest snapshot, is read as a tar in a `container` and
 // written into a new subvolume through Docker's disks helper: two host
 // processes piped together, with no capability and no shared disk image.
-// The one module that holds both runtimes. Delete with `@pinetrie/container`.
+// `pnpm lanes:convert` converts every lane at once, archived ones too
+// (`apps/pinetrie/scripts/lanes-convert.ts`). The one module that holds both
+// runtimes. Delete with `@pinetrie/container`, and that script with it.
 
 import { spawn } from "node:child_process"
 import { type DiskPaths, openContainerDisk } from "@pinetrie/container"
@@ -73,4 +75,57 @@ export function converter(input: {
     )
     return true
   }
+}
+
+/** What `pnpm lanes:convert` came to for one lane. */
+export type Conversion =
+  | { readonly kind: "on-docker" }
+  | { readonly kind: "would-convert" }
+  | { readonly kind: "converted" }
+  | { readonly kind: "nothing" }
+  | { readonly kind: "failed"; readonly error: string }
+
+/**
+ * The lanes `pnpm lanes:convert` tries: every lane of its own with no Docker
+ * disk yet. A lane with no work of its own has no disk to move. Pure.
+ */
+export function planConversions(
+  records: Iterable<{
+    readonly lane: LaneName
+    readonly work: { readonly kind: string } | null
+  }>,
+): readonly LaneName[] {
+  return [...records].flatMap(r => (r.work?.kind === "own" ? [r.lane] : []))
+}
+
+/** One lane's line, or null for one already on Docker. */
+export function conversionLine(thread: string, c: Conversion): string | null {
+  switch (c.kind) {
+    case "on-docker":
+      return null
+    case "would-convert":
+      return `${thread}: has no Docker disk yet`
+    case "converted":
+      return `${thread}: converted`
+    case "nothing":
+      return `${thread}: nothing to convert, no container volume or snapshot; it will read as retired`
+    case "failed":
+      return `${thread}: failed: ${c.error}`
+  }
+}
+
+/** The closing line: how many lanes came to each outcome, those with any. */
+export function conversionSummary(all: readonly Conversion[]): string {
+  const words: Record<Conversion["kind"], string> = {
+    "on-docker": "already on Docker",
+    "would-convert": "to convert",
+    converted: "converted",
+    nothing: "with nothing to convert",
+    failed: "failed",
+  }
+  const parts = Object.entries(words).flatMap(([kind, said]) => {
+    const n = all.filter(c => c.kind === kind).length
+    return n === 0 ? [] : [`${n} ${said}`]
+  })
+  return `${all.length} lanes${parts.length === 0 ? "" : `: ${parts.join(", ")}`}`
 }

@@ -58,6 +58,7 @@ import {
   type RootRecord,
   type SeatRecord,
   type Sha256,
+  type SnapshotId,
   type StopRecord,
   summarizeRoots,
   type ThreadLane,
@@ -669,6 +670,16 @@ export const readLaneRecords = (
 export const readRevisions = (
   doc: RootDocHandle,
 ): ReadonlyMap<EntryId, RevisionRecord> => readRecords(doc, REVISION)
+
+/** The snapshots of `lane`'s own revision records in `doc`, newest first. */
+export const readLaneSnapshots = (
+  doc: RootDocHandle,
+  lane: LaneName,
+): SnapshotId[] =>
+  [...readRevisions(doc).values()]
+    .filter(r => r.lane === lane)
+    .sort((a, b) => (a.entry < b.entry ? 1 : -1))
+    .flatMap(r => (r.snapshot === null ? [] : [r.snapshot]))
 
 /** Each lane's offer in your repo (ADR-0105), by lane. */
 export const readOffers = (
