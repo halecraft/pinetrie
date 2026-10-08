@@ -1144,6 +1144,26 @@ export const mutations: readonly Mutation[] = [
       "a card dropped on a state in the footer's strip becomes a thread there, and the undo key lifts it back into the card",
   },
   {
+    name: "Enter on an empty notes cell makes nothing",
+    file: "packages/web/card-grid.tsx",
+    from: "          creates: p.onCreate !== null,",
+    to: "          creates: false,",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "Enter on an empty cell of the notes board makes a note there, open over its cell, ready to write in",
+  },
+  {
+    name: "the open card is as short as its text",
+    file: "packages/web/index.html",
+    from: "        min-height: 100%; display: flex; flex-direction: column;",
+    to: "        display: flex; flex-direction: column;",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "Enter on an empty cell of the notes board makes a note there, open over its cell, ready to write in",
+  },
+  {
     name: "the dock grows past a third of the column",
     file: "packages/web/index.html",
     from: "      .dock { flex: 0 0 auto; max-height: 33%;",

@@ -1,7 +1,8 @@
 // web/notes-board — a thread's notes board (ADR-0113), in its column's pane:
 // its notes on a card grid 4 wide and growing (`notesBoardView`), each in its
 // cell, gaps kept. A drop on a cell, or Alt+arrows, puts a note there, a note
-// in it swapping with it; the host gives every cell (`placeAt`). The open
+// in it swapping with it; the host gives every cell (`placeAt`). Enter or the
+// "+" on a selected empty cell makes a new note there (`newNote`). The open
 // note is a `NoteCardEditor`. A narrow pane scrolls the grid sideways rather
 // than reflowing it.
 
@@ -15,7 +16,7 @@ import {
   type Reader,
   type ReadOnly,
 } from "@pinetrie/interface"
-import type { SessionClient } from "@pinetrie/session"
+import { newCardId, type SessionClient } from "@pinetrie/session"
 import { useState } from "react"
 import { NoteCardEditor } from "./card-editor.tsx"
 import { CardGrid } from "./card-grid.tsx"
@@ -57,6 +58,11 @@ export function NotesBoard(p: {
         put(card.id, cell)
         setSelected(cell)
       }}
+      onCreate={
+        p.readOnly !== null
+          ? null
+          : cell => p.onAct({ kind: "newNote", card: newCardId(), cell })
+      }
       onSelect={setSelected}
       reader={p.reader}
       renderOpen={card => (

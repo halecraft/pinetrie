@@ -774,3 +774,29 @@ describe("a card made a thread (ADR-0111)", () => {
     ).toEqual([])
   })
 })
+
+describe("a new note on the notes board (ADR-0113)", () => {
+  test("Enter or + on an empty cell makes an empty note in that cell, at the column's thread end; a fresh column has no board", () => {
+    const s = state()
+    expect(
+      plan(inColumn({ kind: "newNote", card: C1, cell: 5 }, threadKey), s),
+    ).toEqual([
+      {
+        kind: "createCard",
+        card: {
+          id: C1,
+          owner: ADA,
+          placer: ADA,
+          place: { ...atEnd, kind: "note", cell: 5 },
+          carries: { kind: "message", command: null },
+          unsent: null,
+        },
+        text: "",
+        how: { actedAt: { kind: "column", key: threadKey }, slot: null },
+      },
+    ])
+    expect(plan(inColumn({ kind: "newNote", card: C1, cell: 5 }), s)).toEqual(
+      [],
+    )
+  })
+})

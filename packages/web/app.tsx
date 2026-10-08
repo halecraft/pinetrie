@@ -1173,6 +1173,7 @@ export function App({
     digests,
     colorOf,
     cards,
+    blank,
     composers,
     index,
     lanes,

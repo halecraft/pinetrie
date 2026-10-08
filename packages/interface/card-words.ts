@@ -195,6 +195,8 @@ export const NEW_PIN_PLACEHOLDER =
 /** A column's notes line (ADR-0113): how many notes the thread has. */
 export const notesLineWords = (n: number): string =>
   n === 0 ? "notes" : `notes (${n})`
+/** The "+" on a selected empty cell of a notes board, and Enter there. */
+export const NEW_NOTE_TITLE = "a new note here (Enter)"
 export const NOTES_LINE_TITLE =
   "the thread's notes board, beside it; drop a card here to make it a note"
 /** The pinned strip with no cards: where a drop pins one. */

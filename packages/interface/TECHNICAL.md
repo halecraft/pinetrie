@@ -1390,7 +1390,13 @@ empty one (`firstEmpty`), a step (`step`) and the rows drawn (`rowsShown`).
   made (`@pinetrie/rules`, *Cards*), so two can claim one cell.
 - **`gridKeyAct`** is a grid's keys while it has focus: arrows and `hjkl`
   select, Alt+arrows move the selected card (a put on that cell or slot,
-  which swaps), Enter opens it, and Escape folds it, from its box too.
+  which swaps), Enter opens it, or on an empty cell of a grid that makes
+  cards (`creates`) makes one (`create`), and Escape folds it, from its
+  box too.
+- **A new note is a creation in a cell** (`newNote`, `planNewNote`): an
+  empty note at the column's thread end (its composer's place, as a note),
+  in that cell, in no history. The host refuses it when a note took the
+  cell first (`cellClash`).
 - **A move in a notes board is a put on a cell** (`putInCell`): an empty
   cell takes the card; on a note, a note or a card from your inventory
   swaps with it in one move of the two, and a card from anywhere else

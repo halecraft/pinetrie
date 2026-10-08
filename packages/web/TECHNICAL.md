@@ -517,14 +517,14 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   (`.the-line`), the column's notices, then what `Column` puts in it: your
   message (`Composer`) and the notes line. CSS caps it at a third of the
   column (`.dock`'s `max-height`) and it scrolls within. It reads presence
-  (`readTypingIn`) and which queued cards are blank (`useBlankQueued`)
-  itself, for `queueHead`, so typing redraws the dock and not the column
-  (S59).
+  (`readTypingIn`) itself, for `queueHead`, so typing redraws the dock and
+  not the column (S59).
 - **Which queued cards are blank** is `useBlankQueued` (`blankQueued` over
-  the page's copies of their texts), in `App` for the lanes (`readHeldLanes`:
-  a blank card does not wait, so it draws no ring) and in the dock. It
+  the page's copies of their texts), read once in `App`: the lanes take it
+  (`readHeldLanes`: a blank card does not wait, so it draws no ring), and
+  each column's dock is given it, so ▸ and the ring cannot disagree. It
   changes only when the set does, so typing in a queued card redraws
-  neither.
+  nothing that reads it.
   - **The header's one button** (`.next-button`) is `.stop` (sending
     `stop`), `.resume` (`carry-on`) or `.release-queue` ("send queue (n)",
     the `holdQueue` act). Its ⋯ (`.queue-menu-trigger`) holds `.resume`,
@@ -833,7 +833,12 @@ the session sends moves and draws them until its copy holds them
   cell a button (the drop target, `dropProps`, and the card's drag) holding
   its `CardFace`. Its keys are `gridKeyAct`'s, on the grid; the open card
   is the caller's (`renderOpen`), drawn over its neighbours from its cell,
-  towards the grid's middle (`data-side`). A face's owner is an `Initial`,
+  towards the grid's middle (`data-side`), at least as tall as the cell,
+  which it hides (`data-open`, by opacity so Escape can focus it again),
+  carrying the selection's ring itself. A grid that makes cards
+  (`onCreate`, the notes board's `newNote`; never the inventory's) draws a
+  "+" in a selected empty cell (`.card-grid-new`) and makes one there on
+  it or on Enter, then opens it once it is drawn, its box focused. A face's owner is an `Initial`,
   not an `Avatar`: the suites count people by `.avatar`. A cell's text
   comes from `useCardTexts`.
 - **One editor for every card: `card-editor.tsx`, in one frame:

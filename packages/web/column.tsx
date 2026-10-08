@@ -166,6 +166,8 @@ export interface ColumnProps {
   onTyping: (card: CardId | null) => void
   /** Every card's record (ADR-0048). */
   cards: readonly CardRecord[]
+  /** The queued cards that are blank messages (`useBlankQueued`): they do not wait. */
+  blank: ReadonlySet<CardId>
   /** Every seat the host has seen: who wrote in a card. */
   seats: readonly SeatRecord[]
   /** Every lane the agent is replying on. Several threads can run at once. */
@@ -1031,6 +1033,7 @@ export function Column(p: ColumnProps) {
           )}
           <Dock
             asks={p.asks}
+            blank={p.blank}
             cards={p.cards}
             catchUps={catchUps}
             index={index}
@@ -1101,7 +1104,14 @@ export function Column(p: ColumnProps) {
                 <Avatars
                   colorOf={p.colorOf}
                   nameOf={p.nameOf}
-                  writers={[...new Set(notes.map(c => c.owner))]}
+                  // Others' notes: the page draws no avatar of you.
+                  writers={[
+                    ...new Set(
+                      notes
+                        .map(c => c.owner)
+                        .filter(w => w !== p.session.writer),
+                    ),
+                  ]}
                 />
               </div>
             )}

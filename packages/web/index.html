@@ -808,8 +808,19 @@
         overflow: hidden; background: #1b1e24; border: 1px solid #2c313a; border-radius: 4px; }
       .card-grid-cell > button.empty { border-style: dashed; background: none; }
       .card-grid-cell > button[aria-pressed="true"] { outline: 2px solid #9ecbff; }
+      /* The open card covers its cell whole, however short its text, and
+         carries the selection's ring itself: the cell under it is hidden. */
       .card-grid-open { position: absolute; top: 0; z-index: 3; width: 22rem;
+        min-height: 100%; display: flex; flex-direction: column;
+        outline: 2px solid #9ecbff; border-radius: 6px;
         box-shadow: 0 8px 24px rgb(0 0 0 / .5); }
+      .card-grid-open > .card-frame { flex: 1; }
+      .card-grid-cell[data-open] > button { opacity: 0; }
+      /* A selected empty cell of a notes board: a new note there. */
+      .card-grid-new { position: absolute; inset: 0; margin: auto; width: 2rem; height: 2rem;
+        padding: 0; border-radius: 50%; border: 1px solid #3a3f47; background: #1b1e24;
+        color: #9ecbff; font-size: 1.1rem; line-height: 1; cursor: pointer; }
+      .card-grid-new:hover { border-color: #9ecbff; }
       .card-grid-open[data-side="left"] { left: 0; }
       .card-grid-open[data-side="right"] { right: 0; }
       .card-grid-open .card-frame { margin: 0; }

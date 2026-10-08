@@ -4,8 +4,9 @@
 // notes line). CSS keeps it to a third of the column, scrolling within, its
 // header in view.
 //
-// It reads presence (who types in which card) and the queued cards' texts
-// itself, so a keystroke anywhere redraws the dock, not the column (S59).
+// It reads presence (who types in which card) itself, so a keystroke anywhere
+// redraws the dock, not the column (S59); which queued cards are blank is
+// `App`'s, one set for every reader.
 
 import { useSelector } from "@kyneta/react"
 import type {
@@ -40,7 +41,6 @@ import { newCardId, type SessionClient } from "@pinetrie/session"
 import { type ReactNode, useEffect, useRef, useState } from "react"
 import { QueuedCardEditor } from "./card-editor.tsx"
 import { Menu } from "./menu.tsx"
-import { useBlankQueued } from "./use-blank-queued.ts"
 
 export function Dock(p: {
   session: SessionClient
@@ -49,6 +49,8 @@ export function Dock(p: {
   /** Its lane's queue, in the order the host pops it. */
   queued: readonly QueuedCard[]
   cards: readonly CardRecord[]
+  /** The queued cards that are blank messages (`useBlankQueued`, in `App`). */
+  blank: ReadonlySet<CardId>
   index: TreeIndex
   asks: AskIndex
   stops: ReadonlyMap<EntryId, StopRecord>
@@ -66,14 +68,13 @@ export function Dock(p: {
 }) {
   const { lane, queued } = p
   const typing = useSelector(p.session.presence, readTypingIn)
-  const blank = useBlankQueued(p.session, queued)
   const head =
     lane === null || p.readOnly !== null
       ? null
       : queueHead(lane, {
           cards: p.cards,
           typing,
-          blank,
+          blank: p.blank,
           index: p.index,
           asks: p.asks,
           stops: p.stops,

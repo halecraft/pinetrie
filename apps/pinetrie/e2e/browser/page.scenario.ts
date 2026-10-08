@@ -3633,6 +3633,61 @@ async function run(check: Checks["check"]): Promise<void> {
         emptied && drawnAsNote && back,
         `emptied ${emptied}, a note ${drawnAsNote}, back ${back}`,
       )
+      // Enter on a selected empty cell makes a note there, open over the
+      // cell it covers whole, its box focused, so you write in it at once.
+      const notesBefore = new Set(
+        readPlaces(host.places)
+          .filter(c => c.place.kind === "note")
+          .map(c => c.id),
+      )
+      const emptyCell = ".pane-notes .note-cell.empty"
+      await page
+        .locator(emptyCell)
+        .first()
+        .dispatchEvent("click")
+        .catch(() => {})
+      await page.keyboard.press("Enter")
+      const writing = await page
+        .waitForFunction(
+          () => {
+            const box = document.activeElement
+            const open = box?.closest(".card-grid-open")
+            const cell = open?.parentElement?.querySelector(".note-cell")
+            if (!(box instanceof HTMLTextAreaElement) || cell == null)
+              return false
+            const o = open?.getBoundingClientRect()
+            const c = cell.getBoundingClientRect()
+            return (
+              o !== undefined &&
+              o.top <= c.top + 1 &&
+              o.left <= c.left + 1 &&
+              o.bottom >= c.bottom - 1
+            )
+          },
+          undefined,
+          { timeout: 10_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        )
+      await page.keyboard.type("jot")
+      const jotted = await waitFor(
+        () =>
+          readPlaces(host.places).some(
+            c =>
+              c.place.kind === "note" &&
+              !notesBefore.has(c.id) &&
+              host.cardText(c.id) === "jot",
+          ),
+        10_000,
+      )
+      check(
+        "Enter on an empty cell of the notes board makes a note there, open over its cell, ready to write in",
+        writing && jotted >= 0,
+        `writing ${writing}; jotted ${jotted} ms`,
+      )
+      await page.keyboard.press("Escape")
       await closeNotes(page)
 
       // "+ pin" (ADR-0048), in the conversation below, which has no pinned

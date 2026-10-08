@@ -814,9 +814,12 @@ The rail is E; the column is T. Seeing both at once is the product.
 - **The notes board is a grid in the column's pane**, 4 wide, with one
   empty row below its last note to grow into, opened and closed by the
   column's **notes (n)** line under your message, beside the circles of
-  whose notes are there. A narrow pane scrolls it sideways. Each note sits
+  whose notes are there, other than yours. A narrow pane scrolls it sideways. Each note sits
   in a cell, folded to its first three lines, and keeps it, gaps included,
-  for everyone: a cell is an address. Click a note, or Enter on it, and it
+  for everyone: a cell is an address. **Enter on a selected empty cell, or
+  the "+" drawn in it, makes a new note there**, open with the cursor in
+  it; one left empty is swept when the host next starts. Click a note, or
+  Enter on it, and it
   opens whole in place, over its neighbours, headed "Ada's note · with
   Bea"; Escape folds it. Arrows and `hjkl` move the selection, and
   Alt+arrows the selected note a cell. A card dropped on an empty cell goes

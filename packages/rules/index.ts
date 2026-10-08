@@ -103,7 +103,6 @@ export {
   decodeCard,
   encodeCard,
   historyOf,
-  isBlankMessage,
   type MoveStep,
   type MovesStep,
   type NextQueuedCardPopStep,

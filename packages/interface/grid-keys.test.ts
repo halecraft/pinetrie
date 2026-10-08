@@ -16,6 +16,7 @@ const at = (over: Partial<GridKeyState> = {}): GridKeyState => ({
   rows: 3,
   selected: 7,
   hasCard: true,
+  creates: false,
   open: false,
   inText: false,
   ...over,
@@ -47,6 +48,14 @@ describe("gridKeyAct (ADR-0113)", () => {
     expect(
       gridKeyAct(key("ArrowUp", { altKey: true }), at({ selected: 1 })),
     ).toBeNull()
+  })
+
+  test("Enter on an empty cell of a notes board makes a note there; never in your inventory, nor with Alt", () => {
+    const empty = at({ grid: NOTES_GRID, hasCard: false, creates: true })
+    expect(gridKeyAct(key("Enter"), empty)).toEqual({ kind: "create" })
+    expect(gridKeyAct(key("Enter", { altKey: true }), empty)).toBeNull()
+    expect(gridKeyAct(key("Enter"), at({ hasCard: false }))).toBeNull()
+    expect(gridKeyAct(key("Enter"), { ...empty, inText: true })).toBeNull()
   })
 
   test("Enter opens a card; Escape folds an open one", () => {

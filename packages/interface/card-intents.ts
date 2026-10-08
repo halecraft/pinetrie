@@ -358,6 +358,37 @@ export function planToNote(
 }
 
 /**
+ * A new, empty note made in `cell` of column `key`'s notes board, at the
+ * thread end its composer writes at (ADR-0113): a creation, in no history.
+ * The host refuses it when a note took the cell first (`cellClash`). Nothing
+ * for a column with no thread end: a fresh column has no notes board.
+ */
+export function planNewNote(
+  card: CardId,
+  cell: number,
+  key: string,
+  state: IntentState,
+): readonly Effect[] {
+  const place = state.cards.composers.get(key)?.place
+  if (place?.kind !== "composing") return []
+  return [
+    {
+      kind: "createCard",
+      card: {
+        id: card,
+        owner: state.cards.me,
+        placer: state.cards.me,
+        place: { ...place, kind: "note", cell },
+        carries: { kind: "message", command: null },
+        unsent: null,
+      },
+      text: "",
+      how: IN_COLUMN(key),
+    },
+  ]
+}
+
+/**
  * Pin `card`, your message, a note or a queued card, at the top of its
  * thread's column. A move like any other: the host records it, and an undo
  * of moves reverses it (ADR-0066).

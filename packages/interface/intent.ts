@@ -34,6 +34,7 @@ import {
   moveCard,
   planDiscard,
   planKeep,
+  planNewNote,
   planOpenTrace,
   planPin,
   planPut,
@@ -111,6 +112,8 @@ export type ColumnAct =
   | { readonly kind: "unpin"; readonly card: CardId }
   /** Your message to the notes at its thread's end (ADR-0113). */
   | { readonly kind: "toNote"; readonly card: CardId }
+  /** A new, empty note in `cell` of this column's notes board (ADR-0113). */
+  | { readonly kind: "newNote"; readonly card: CardId; readonly cell: number }
   /** A card into this column's composer, as your message (`planPut`). */
   | { readonly kind: "toMessage"; readonly card: CardId }
   /** A card made a new thread in `state` on the board (ADR-0111). */
@@ -580,6 +583,8 @@ function planColumn(
       return planUnpin(act.card, key, state)
     case "toNote":
       return planToNote(act.card, key, state)
+    case "newNote":
+      return planNewNote(act.card, act.cell, key, state)
     case "toMessage":
       return planPut(act.card, { kind: "composer", key }, state, newRoot)
     case "spinOff":
