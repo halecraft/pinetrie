@@ -6,8 +6,9 @@
 //
 // pi cannot continue a run Stop ended (S105), so carrying on is a new run
 // whose prompt is a carry-on message, a history message (`history.ts`):
-// `content` is what the model reads, `details` what the column shows. `carryOnState` is the one rule for when a lane may carry on, read
-// by the host's `planCarryOn` and the column's run button.
+// `content` is what the model reads, `details` what the column shows.
+// `carryOnState` is the one rule for when a lane may carry on, read by the
+// host's `planCarryOn` and the dock's `nextOf` (`@pinetrie/interface`).
 
 import {
   type AskIndex,

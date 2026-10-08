@@ -434,7 +434,24 @@ rejects `shutdown()`.
 - **`undo-move` undoes or redoes the sender's newest move in a root**
   (§ Moves' history). It answers `undone` with each card it moved and its
   place now, `unmoved` (shaped as a refused move) when someone moved a card
-  since, or `nothing`.
+  since, or `nothing`. An undo first reads the cards its step moves
+  (`MoveHistories.top`, S139): one spun into a thread lifts that thread
+  back (`planLiftRoot`) only while it holds its first message alone, with
+  no lane and no other card; else it answers `unmoved` `replied`, naming
+  who wrote second, and reverts nothing. A lift deletes the thread after
+  the revert (`deleteRoot`, `planRootDelete`): its directory record and
+  board place, any card in it, its document (`HostDocuments.destroy`, which
+  tells every peer), and its stacks, unloaded for the startup sweep to
+  retire. A redo after a lift moves the card back to gone, its thread
+  deleted: a discard in all but name.
+- **`spin-off` makes a text card a thread** (ADR-0111, `spinOff`), in one
+  keeper step: the card's text loaded whole, `planSpinOff` (refused for a
+  blank card, a root id in use, or as `planMove` refuses the move), then a
+  chat at the root of the new root its tab minted (`sendChat`, never asking
+  the agent, the card's writers its contributors) and its board place
+  (`placeNewRoot`), then the card's move to gone, spun into it, in the
+  history its move names. The answer is the chat's: `appended`, with the
+  first message's id.
 - **A person's documents are clients' documents the host only keeps**
   (ADR-0059, ADR-0077, ADR-0112): their inventory, their attention and
   their list. `resolveDoc` names a `<kind>:<writer>` id's kind, and the host
@@ -536,7 +553,11 @@ rejects `shutdown()`.
 - **The drain waits for its top card** (`createWaits`, one wait per card):
   for its text as its queuer had it (`behind`, S96), or for the typing in it
   to stop (`typing`, `untilNotTyped`, which watches presence; a decay
-  reaches the host's subscribers, S28). A wait is given up when its card
+  reaches the host's subscribers, S28), or, when every card queued is a
+  blank message, for the first to be written in (`blank`, `whenWritten`).
+  A blank message (`isBlankMessage`: no command, only whitespace) is passed
+  over and stays queued (ADR-0113); one whose text is behind is not blank,
+  or the cards behind it would go first. A wait is given up when its card
   leaves the queue (`givenUp`), and its end drains the lane again. `runs.start` marks a lane
   running at once (a `begin`), so a drain behind a started run pops
   nothing.
@@ -564,7 +585,9 @@ rejects `shutdown()`.
   (`queueCard`, `planQueueCard`, ADR-0113): the hold is written first, then
   the move carried as `move` carries one, so its drain finds the queue held
   or released as planned. The move is in the sender's history; the hold is
-  not, so an undo takes the card back and leaves the hold.
+  not, so an undo takes the card back and leaves the hold. One with no
+  `from` makes the card in the queue with its command (`targetId` on the
+  wire), in no history, as any creation.
 - **Discarded cards are swept** (`sweepGone`, `housekeeping.ts`): a card
   gone more than `GONE_KEEP_MS` loses its record, then its text, at startup
   and in `settle`'s sweep, before the provenance's sweep deletes its history.

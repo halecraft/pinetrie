@@ -121,7 +121,9 @@ session or someone else's inventory throws before it is made.
 - **Every move is a request to the host**: creating a card (its text in one
   undo step, then a `move` from nowhere, then its command), unqueueing,
   discarding, and setting a command; and queueing, which is `queue-card`
-  alone (`queueCard`, ADR-0113): the host refuses a `move` into a queue. The
+  alone (`queueCard`, ADR-0113): the host refuses a `move` into a queue. A
+  card made in the queue is drawn there at once as `queuedDraft` (empty,
+  with its command), never in another place first. The
   host applies each in arrival order or refuses it. A queue gets its text's
   version as this client has it as it is sent (`stampSeen`, S96); nothing
   else changes the move the page planned.

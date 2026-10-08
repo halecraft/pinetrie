@@ -28,6 +28,7 @@ import {
   CLEAR_FILTER,
   type Count,
   clickClosesBoard,
+  dropProps,
   filterTitle,
   filterWords,
   type Intent,
@@ -37,7 +38,6 @@ import {
   type MessageCount,
   messageCountTitle,
   nameStateIntent,
-  readyWords,
   rootDropProps,
   rootGroupProps,
   rootsWords,
@@ -54,11 +54,11 @@ import {
   ReaderMenus,
   Readers,
   type ReadersProps,
-  RootStatus,
   StatusMark,
 } from "./root-signals.tsx"
 import { AddButton } from "./sidebar.tsx"
 import { isTextBox } from "./text-box.ts"
+import { ThreadHead } from "./thread-card.tsx"
 import { startRootDrag } from "./use-root-drag.ts"
 
 /** ▦'s mark's title: what the roots not in the sidebar raise. */
@@ -257,6 +257,8 @@ function StripStateButton({
       data-state={state.id}
       onClick={onOpen}
       type="button"
+      // A card dropped on an open state becomes a thread there (ADR-0111).
+      {...(state.closed ? {} : dropProps({ kind: "state", state: state.id }))}
     >
       <span className="strip-name">{state.name}</span>{" "}
       <b className="strip-count">{state.count}</b>
@@ -431,6 +433,7 @@ export function Board({
               state: column.state.id,
               before: null,
             })}
+            {...dropProps({ kind: "state", state: column.state.id })}
           >
             <div className="board-head">
               <StateName
@@ -602,25 +605,14 @@ function ItemCard({
         title={item.label}
         type="button"
       >
-        <RootStatus
-          arrived={null}
-          done={null}
+        <ThreadHead
+          head={item.head}
+          labelClass="board-label"
           nameOf={readers.nameOf}
-          status={item.status}
+          pip={pip}
         />
-        <span className="board-label">{item.label}</span>
-        {item.ready.length > 0 && (
-          <span
-            aria-label={readyWords(item.ready)}
-            className="root-ready"
-            role="img"
-            title={readyWords(item.ready)}
-          >
-            ⇡
-          </span>
-        )}
-        {item.card && pip}
       </button>
+      {item.body !== null && <span className="board-body">{item.body}</span>}
       <span className="board-meta">
         <Writers nameOf={readers.nameOf} writers={item.writers} />
         <ReaderMenus {...readers} root={item.entry} thread={thread} />

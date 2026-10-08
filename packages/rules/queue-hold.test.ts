@@ -134,6 +134,7 @@ describe("planQueueCard (ADR-0113)", () => {
       holds: over.holds ?? new Map(),
       move,
       hold,
+      command: null,
       by: BEA,
       now: 7,
       running: () => over.running ?? false,
@@ -164,6 +165,67 @@ describe("planQueueCard (ADR-0113)", () => {
     expect(planned.step.kind).toBe("steps")
     expect(planned.holds).toEqual(holds)
     expect(planned.drain).toEqual("running" in over ? [] : [L])
+  })
+  test("a card made in the queue carries its command from its first write, and hold-if-idle holds an idle queue first", () => {
+    const made = (command: "split" | null, running: boolean) =>
+      planQueueCard({
+        cards: [],
+        holds: new Map(),
+        move: { ...move, from: null },
+        hold: "hold-if-idle",
+        command,
+        by: BEA,
+        now: 7,
+        running: () => running,
+      })
+    expect(made("split", false)).toEqual({
+      step: {
+        kind: "steps",
+        steps: [
+          {
+            kind: "write",
+            record: {
+              id: card.id,
+              owner: BEA,
+              placer: BEA,
+              place: {
+                kind: "queued",
+                root: ROOT_A,
+                at,
+                lane: L,
+                order: expect.any(String),
+                by: BEA,
+                seen: "",
+              },
+              carries: { kind: "message", command: "split" },
+              unsent: null,
+            },
+          },
+        ],
+      },
+      drain: [L],
+      holds: [setRecord(QUEUE_HOLD, { lane: L, by: BEA, at: 7 })],
+    })
+    expect(made(null, true)).toMatchObject({
+      step: { steps: [{ record: { carries: PLAIN } }] },
+      drain: [],
+      holds: [],
+    })
+  })
+  test("a command names only a card made in the queue: one that exists keeps its own", () => {
+    const planned = planQueueCard({
+      cards: [card],
+      holds: new Map(),
+      move,
+      hold: "keep",
+      command: "split",
+      by: BEA,
+      now: 7,
+      running: () => false,
+    })
+    expect(planned.step).toMatchObject({
+      steps: [{ record: { carries: PLAIN } }],
+    })
   })
   test("a move the host refuses changes no hold", () => {
     expect(plan("release", { holds: held, cards: [] })).toMatchObject({

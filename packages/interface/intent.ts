@@ -9,7 +9,6 @@
 import {
   type CardCommand,
   type CardId,
-  type CardRecord,
   type EntryId,
   type LaneName,
   type MoveDirection,
@@ -44,6 +43,7 @@ import {
   planUndoMove,
   planUnpin,
   queueMove,
+  queueNew,
   reorderOf,
 } from "./card-intents.ts"
 import type { Pending, Prefill, ReaderAction } from "./columns.ts"
@@ -62,6 +62,7 @@ import { otherWidth } from "./list-width.ts"
 import type { MessageAct } from "./message-tools.ts"
 import type { PageName } from "./page.ts"
 import type { PutTarget } from "./put-target.ts"
+import { planSpinOff } from "./spin-off.ts"
 
 /** What a reader asks of one column. A message's acts are among them. */
 export type ColumnAct =
@@ -112,6 +113,12 @@ export type ColumnAct =
   | { readonly kind: "toNote"; readonly card: CardId }
   /** A card into this column's composer, as your message (`planPut`). */
   | { readonly kind: "toMessage"; readonly card: CardId }
+  /** A card made a new thread in `state` on the board (ADR-0111). */
+  | {
+      readonly kind: "spinOff"
+      readonly card: CardId
+      readonly state: WorkflowStateId
+    }
   /** Take a queued card back below the line; `by` queued it. */
   | {
       readonly kind: "unqueue"
@@ -144,18 +151,23 @@ export type ColumnAct =
       readonly command: CardCommand | null
     }
   /**
-   * A command button: catching up, continuing on accepted work, or splitting the
-   * offer (ADR-0104, ADR-0061, ADR-0080): a new card, `create`, made at the
-   * thread's end with `command` and no text, and queued on `lane` at once,
-   * so the host carries the command out when the lane is free. Your card in
-   * the composer is left as it is.
+   * A card made in `lane`'s queue, with no text, never drawn anywhere first
+   * (ADR-0113). A command button's (catching up, continuing on accepted
+   * work, splitting the offer: ADR-0104, ADR-0061, ADR-0080) carries its
+   * `command` and keeps the hold, so the host carries the command out when
+   * the lane is free; "+ add to queue"'s has none and holds an idle queue
+   * (`hold-if-idle`), so it waits while you type. Your message is left as
+   * it is.
    */
   | {
-      readonly kind: "queueCommand"
-      readonly create: CardRecord
-      readonly command: CardCommand
+      readonly kind: "queueNew"
+      readonly card: CardId
+      /** The column's root, for a lane whose record has not arrived. */
+      readonly root: RootId
       readonly lane: LaneName
       readonly at: Position
+      readonly command: CardCommand | null
+      readonly hold: Extract<QueueHoldChange, "keep" | "hold-if-idle">
     }
   /** Act on the lane's offer in your repo; an acceptance names its destination (ADR-0104). */
   | {
@@ -396,7 +408,7 @@ function planOf(
     case "takeIntoInventory":
       return planTakeIntoInventory(intent.card, state)
     case "put":
-      return planPut(intent.card, intent.target, state)
+      return planPut(intent.card, intent.target, state, newRoot)
     case "discard":
       return planDiscard(
         intent.card,
@@ -523,7 +535,15 @@ function planColumn(
       const move = now === undefined ? null : queueMove(now, act, state.cards)
       return move === null
         ? []
-        : [{ kind: "queueCard", move, hold: act.hold, how: IN_COLUMN(key) }]
+        : [
+            {
+              kind: "queueCard",
+              move,
+              hold: act.hold,
+              command: null,
+              how: IN_COLUMN(key),
+            },
+          ]
     }
     case "unqueue": {
       // If the host popped the card first, the refusal says it was sent.
@@ -561,7 +581,14 @@ function planColumn(
     case "toNote":
       return planToNote(act.card, key, state)
     case "toMessage":
-      return planPut(act.card, { kind: "composer", key }, state)
+      return planPut(act.card, { kind: "composer", key }, state, newRoot)
+    case "spinOff":
+      return planSpinOff(
+        act.card,
+        { kind: "state", state: act.state },
+        newRoot,
+        state,
+      )
     case "setCommand":
       return [
         {
@@ -569,32 +596,16 @@ function planColumn(
           intent: { kind: "set-command", card: act.card, command: act.command },
         },
       ]
-    case "queueCommand": {
-      const queued = queueMove(act.create, act, state.cards)
-      // Made, then queued: the host sets the command before the queue's
-      // move, so the drain that move starts pops it with its command.
+    case "queueNew":
       return [
         {
-          kind: "createCard",
-          card: {
-            ...act.create,
-            carries: { kind: "message", command: act.command },
-          },
-          text: "",
+          kind: "queueCard",
+          move: queueNew(act.card, act.root, act, state.cards),
+          hold: act.hold,
+          command: act.command,
           how: IN_COLUMN(key),
         },
-        ...(queued === null
-          ? []
-          : [
-              {
-                kind: "queueCard",
-                move: queued,
-                hold: "keep",
-                how: IN_COLUMN(key),
-              } as const,
-            ]),
       ]
-    }
     case "offer":
       return [{ kind: "offer", lane: act.lane, action: act.action, to: act.to }]
   }

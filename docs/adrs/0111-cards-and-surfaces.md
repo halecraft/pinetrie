@@ -2,6 +2,7 @@
 
 - **Status:** Accepted (Duane, 2026-10-08)
 - **Area:** `docs/06-interface.md`
+- **Evidence:** S139
 - **Amends:**
   - ADR-0048: a card has one anatomy in every place (header, body, footer),
     coloured by its place; its moves are one "Move to ▸" in its ⋯; × discards
@@ -11,6 +12,10 @@
     becomes a conversation root there, which the undo key lifts back into the
     card while the root holds only that message; "your list" is the sidebar,
     which shows your open threads.
+- **Revised:**
+  - 2026-10-08 (S139): a queued card's primary action is none, since ADR-0113
+    put the one control in the queue's header; the undo key's lift reads the
+    cards its step moves before it reverts them.
 - **Amended by:**
   - ADR-0113: the drafts leave the column for the notes board; the column's
     foot is a dock of the queue, the line and your message, whose queue header
@@ -79,7 +84,7 @@ three rings):
 |---|---|---|---|
 | your inventory | yours | bag | put |
 | drafting, below the line | neutral | pencil | send, or queue: its label says where the card goes |
-| queued, above the line | blue: the agent reads it once | its place in line | send now, while the thread is idle |
+| queued, above the line | blue: the agent reads it once | its place in line | none: the queue's header holds the one control (ADR-0113) |
 | pinned | violet: the agent reads it every run | pin | none |
 
 A command is a chip in the header, not a colour. A fact (ADR-0080) stays a

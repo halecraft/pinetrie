@@ -1,7 +1,6 @@
 import {
   type AcceptedRecord,
   type AgentMessageLike,
-  atEntry,
   type BaseRecord,
   type CardCommand,
   cardId,
@@ -45,8 +44,6 @@ import {
   pinnedMarker,
   pinnedMarkers,
   pinnedStatus,
-  queueControlWords,
-  runWords,
   startedWords,
   tokensOf,
   type WorkFacts,
@@ -60,7 +57,6 @@ const _C = laneNameForThread("c")
 const AMBER = "amber-fox" as ThreadName
 const COPPER = "copper-owl" as ThreadName
 const ADA = writerId("ada@x.io")
-const BEA = writerId("bea@x.io")
 
 type Line = readonly [
   id: string,
@@ -1133,124 +1129,4 @@ test.each([
   [{ canPin: false, pinning: false, pinned: 2 }, null],
 ] as const)("newPinAt(%o): %s", (facts, want) => {
   expect(newPinAt(facts)).toBe(want)
-})
-
-describe("columnView: the queue's controls (ADR-0048 step 7)", () => {
-  const controls = (over: Partial<ColumnFacts>) =>
-    columnView(facts(0, over)).queue
-  test("a writable thread with a lane: hold, and unqueue all while a message card waits", () => {
-    expect(controls({ lane: onLane(laneView(A, "6")) })).toEqual({
-      lane: A,
-      heldBy: null,
-      messages: 0,
-    })
-    expect(
-      controls({
-        lane: onLane({ ...laneView(A, "6"), heldBy: BEA }),
-        queued: [
-          {
-            id: cardId("c-1"),
-            owner: ADA,
-            placer: ADA,
-            place: {
-              kind: "queued",
-              root: TEST_ROOT,
-              at: atEntry(entryId("6")),
-              lane: A,
-              order: "a",
-              by: ADA,
-              seen: "",
-            },
-            carries: { kind: "message", command: null },
-            unsent: null,
-          },
-        ],
-      }),
-    ).toEqual({ lane: A, heldBy: BEA, messages: 1 })
-  })
-  test("none read-only, nor with no lane", () => {
-    expect(controls({ lane: { kind: "none" } })).toBeNull()
-    expect(
-      controls({ lane: onLane(laneView(A, "6")), writable: false }),
-    ).toBeNull()
-  })
-  test("words: hold, or who holds it and send queue (n), which releases it; unqueue all only when offered", () => {
-    const reader = { me: ADA, nameOf: new Map([[BEA, "Bea"]]) }
-    const free = queueControlWords(
-      { lane: A, heldBy: null, messages: 0 },
-      reader,
-    )
-    expect(free.held).toBeNull()
-    expect(free.hold.label).toBe("hold queue")
-    expect(free.unqueueAll).toBeNull()
-    const held = queueControlWords(
-      { lane: A, heldBy: BEA, messages: 2 },
-      reader,
-    )
-    expect(held.held).toBe("queue held by Bea")
-    expect(held.hold.label).toBe("send queue (2)")
-    expect(held.unqueueAll?.label).toBe("unqueue all")
-    expect(
-      queueControlWords({ lane: A, heldBy: ADA, messages: 0 }, reader),
-    ).toMatchObject({ held: "queue held by you", hold: { label: "release" } })
-  })
-})
-
-describe("columnView: the run button (ADR-0082)", () => {
-  /** A thread of a prompt and its reply, `tail` after; its lane's tip the last. */
-  const thread = (
-    reply: AgentMessageLike,
-    tail: readonly AgentMessageLike[] = [],
-    lane: Partial<LaneView> = {},
-  ) => {
-    const messages = [{ role: "chat", content: "go" }, reply, ...tail]
-    const index = indexOf(
-      messages.map((m, n) =>
-        entry(`${n + 1}`, n === 0 ? null : `${n}`, m as AgentMessageLike),
-      ),
-    )
-    const tip = `${messages.length}`
-    return columnView(
-      facts(0, {
-        index,
-        lane: onLane({ ...laneView(A, tip), ...lane }),
-      }),
-    ).run
-  }
-  const stopped: AgentMessageLike = {
-    role: "assistant",
-    content: [{ type: "text", text: "half" }],
-    stopReason: "aborted",
-  }
-  test("Stop while the lane runs; Resume once it stopped, idle", () => {
-    expect(thread(stopped, [], { running: true })).toEqual({ kind: "stop" })
-    expect(thread(stopped)).toEqual({ kind: "carry-on" })
-    expect(runWords({ kind: "carry-on" }).label).toBe("Resume")
-  })
-  test("nothing once a message follows the stop, a card waits, or the ask answered", () => {
-    expect(thread(stopped, [{ role: "chat", content: "to Bea" }])).toBeNull()
-    expect(thread(stopped, [], { waiting: 1 })).toBeNull()
-    // A held queue waits for a release: Resume shows beside it.
-    expect(thread(stopped, [], { waiting: 1, heldBy: ADA })).toEqual({
-      kind: "carry-on",
-    })
-    expect(thread({ ...stopped, stopReason: "stop" })).toBeNull()
-  })
-  test("an update after the stop leaves Resume", () => {
-    expect(thread(stopped, [{ role: "update", content: "caught up" }])).toEqual(
-      { kind: "carry-on" },
-    )
-  })
-  test("read-only, no button at all", () => {
-    const index = indexOf([entry("1", null, { role: "chat", content: "go" })])
-    expect(
-      columnView(
-        facts(0, {
-          index,
-          writable: false,
-          lane: onLane(laneView(A, "1", true)),
-        }),
-      ).run,
-    ).toBeNull()
-  })
 })

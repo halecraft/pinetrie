@@ -30,6 +30,7 @@ import {
   decodeCard,
   encodeCard,
   historyOf,
+  isBlankMessage,
   ownsPlace,
   placeEnd,
   planCardSweep,
@@ -146,7 +147,6 @@ describe("planCarry (ADR-0080)", () => {
       { kind: "split", intent: "tests apart" },
     ],
     ["a message", queued(PLAIN), "hi", { kind: "send" }],
-    ["an empty card", queued(PLAIN), " \n", { kind: "discard" }],
   ] as const)("%s", (_, c, text, plan) => {
     expect(planCarry(c, text)).toEqual(plan)
   })
@@ -565,7 +565,12 @@ describe("the queue", () => {
     expect(first < second && second < third).toBe(true)
   })
 
-  const idle = { running: false, held: false, typing: new Set<CardId>() }
+  const idle = {
+    running: false,
+    held: false,
+    typing: new Set<CardId>(),
+    blank: new Set<CardId>(),
+  }
 
   test("planNextQueuedCardPop: nothing while the lane runs; else its top queued card", () => {
     const cards = [queued("c-2", "b"), queued("c-1", "a")]
@@ -606,7 +611,7 @@ describe("the queue", () => {
     }
     expect(
       planNextQueuedCardPop([fact, ...cards], LANE, {
-        running: false,
+        ...idle,
         held: true,
         typing: new Set([fact.id]),
       }),
@@ -617,6 +622,67 @@ describe("the queue", () => {
         running: true,
       }),
     ).toEqual({ kind: "idle" })
+  })
+
+  describe("planNextQueuedCardPop passes over a blank message, which stays where it is (ADR-0113)", () => {
+    const empty = queued("c-1", "a")
+    const next = queued("c-2", "b")
+    const fact: QueuedCard = {
+      ...queued("c-3", "c"),
+      carries: { kind: "fact", fact: ACCEPTED },
+    }
+    test.each([
+      [
+        "a blank top card with a card behind: the second pops",
+        [empty, next],
+        idle,
+        { kind: "pop", card: next },
+      ],
+      [
+        "blank alone: it waits to be written in",
+        [empty],
+        idle,
+        { kind: "blank", card: empty },
+      ],
+      [
+        "blank alone, held: held",
+        [empty],
+        { ...idle, held: true },
+        { kind: "held" },
+      ],
+      [
+        "a fact behind a blank card pops",
+        [empty, fact],
+        idle,
+        { kind: "pop", card: fact },
+      ],
+      [
+        "typing in the card behind a blank one: it waits for them",
+        [empty, next],
+        { ...idle, typing: new Set([next.id]) },
+        { kind: "typing", card: next },
+      ],
+    ] as const)("%s", (_, cards, facts, step) => {
+      expect(
+        planNextQueuedCardPop(cards, LANE, {
+          ...facts,
+          blank: new Set([empty.id]),
+        }),
+      ).toEqual(step)
+    })
+    test.each([
+      ["whitespace", PLAIN, " \n\t", true],
+      ["text", PLAIN, "go", false],
+      [
+        "a command with no text",
+        { kind: "message", command: "split" },
+        "",
+        false,
+      ],
+      ["a fact", { kind: "fact", fact: ACCEPTED }, "", false],
+    ] as const)("isBlankMessage: %s is %s", (_, carries, text, blank) => {
+      expect(isBlankMessage({ ...empty, carries }, text)).toBe(blank)
+    })
   })
 
   test("planUnqueueAll: every message card queued on the lane, back where it was queued, in order; a fact and another lane's stay", () => {

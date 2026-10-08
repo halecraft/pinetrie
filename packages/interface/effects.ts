@@ -6,6 +6,7 @@
 
 import type {
   AskIndex,
+  CardCommand,
   CardId,
   CardRecord,
   EntryId,
@@ -58,6 +59,16 @@ export type Effect =
   /** Change the sidebar, in your own document (`openThreads`, ADR-0112). */
   | { readonly kind: "list"; readonly act: ListAct }
   /**
+   * Make a card a thread (ADR-0111); `afterSpinOff` decides from its
+   * answer what follows: for the sidebar, the new root placed and shown.
+   */
+  | {
+      readonly kind: "spinOff"
+      readonly request: Extract<HostRequest, { kind: "spin-off" }>
+      readonly thread: RootId
+      readonly sidebar: { readonly before: RootId | null } | null
+    }
+  /**
    * Move a root on the board; `afterRootMove` decides from its answer
    * whether `moved` runs.
    */
@@ -88,11 +99,15 @@ export type Effect =
       /** Whether the card animates to where it lands (`ports.fly`). */
       readonly fly: boolean
     }
-  /** A card queued, and its queue's hold changed with it (ADR-0113). */
+  /**
+   * A card queued, and its queue's hold changed with it (ADR-0113). A move
+   * with no `from` makes the card there, carrying `command`.
+   */
   | {
       readonly kind: "queueCard"
       readonly move: Move
       readonly hold: QueueHoldChange
+      readonly command: CardCommand | null
       readonly how: MoveHow
     }
   /** A reorder (ADR-0048 step 7), drawn at once, as a move is. */
@@ -140,6 +155,8 @@ export type Effect =
   | { readonly kind: "openWhenHeld"; readonly entry: EntryId }
   /** Scroll to entry `entry` once it is drawn (`useReveal`). */
   | { readonly kind: "reveal"; readonly entry: EntryId }
+  /** Scroll a queued card into view in its column's dock (ADR-0113). */
+  | { readonly kind: "revealCard"; readonly card: CardId }
   /** Open ask `ask`'s fold, so what is revealed in it is drawn (ADR-0106). */
   | { readonly kind: "openFold"; readonly ask: EntryId }
   /** The column keyed `key` takes focus when it mounts (`claimFocus`). */

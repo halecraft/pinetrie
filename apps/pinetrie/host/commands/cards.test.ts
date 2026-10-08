@@ -12,13 +12,21 @@ import {
 } from "@pinetrie/core"
 import { PLACES_DOC_ID } from "@pinetrie/protocol/messages"
 import {
+  readBoardPlaces,
   readCardHistories,
   readPlaces,
   readPlacesRev,
   readQueueHolds,
+  readRoots,
   readTraces,
 } from "@pinetrie/reads"
-import { QUEUE_HOLD, setRecord, type UndoResult } from "@pinetrie/rules"
+import {
+  BOARD,
+  QUEUE_HOLD,
+  ROOT as ROOT_RECORD,
+  setRecord,
+  type UndoResult,
+} from "@pinetrie/rules"
 import { newPresenceDoc, readingKey, seatKey } from "@pinetrie/schema"
 import { beginRun, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
@@ -58,8 +66,12 @@ function setUp() {
   const b = basics()
   writeEntry(b.root, row(E1, null))
   writeLaneTip(b.root, LANE, E1)
-  const cards = record<{ destroy: (id: string) => Promise<void> }>({
+  // Each card's text as the host holds it.
+  const texts = new Map<string, string>()
+  const cards = record<CardCommandDeps["cards"]>({
     destroy: async () => {},
+    hydrate: async () => {},
+    textNow: id => texts.get(id) ?? "",
   })
   const drains: string[] = []
   // Which history each move was recorded in; an undo answers `undoing`.
@@ -76,6 +88,10 @@ function setUp() {
       reverting()
       return undoing as never
     },
+    // The step an undo would try: the one it answers with.
+    top: async () =>
+      (undoing.kind === "none" ? undefined : undoing.step) as never,
+    unloadRoot: async () => {},
   })
   const presence = newPresenceDoc()
   const provenance = createProvenance({
@@ -113,6 +129,7 @@ function setUp() {
   return {
     b,
     cards,
+    texts,
     drains,
     commands,
     put,
@@ -218,6 +235,7 @@ describe("queue-card (ADR-0113)", () => {
       ADA,
       { card: C1, from: atEnd, to: queuedKey },
       "release",
+      null,
     )
     expect(done.outcome).toEqual({ kind: "moved" })
     expect(readQueueHolds(b.session).has(LANE)).toBe(false)
@@ -236,6 +254,7 @@ describe("queue-card (ADR-0113)", () => {
       ADA,
       { card: C1, from: atEnd, to: queuedKey },
       "hold-if-idle",
+      null,
     )
     expect(readQueueHolds(b.session).get(LANE)?.by).toBe(ADA)
     const other = setUp()
@@ -243,10 +262,31 @@ describe("queue-card (ADR-0113)", () => {
       ADA,
       { card: C1, from: atEnd, to: queuedKey },
       "hold-if-idle",
+      null,
     )
     expect(refused.outcome).toMatchObject({ kind: "unmoved", code: "gone" })
     expect(readQueueHolds(other.b.session).size).toBe(0)
   })
+})
+
+test("a card made in the queue is written there with its command, never in another place, and drains", async () => {
+  const { b, commands, drains, recorded } = setUp()
+  const done = await commands.queueCard(
+    ADA,
+    { card: C1, from: null, to: queuedKey },
+    "keep",
+    "bring-up-to-date",
+  )
+  expect(done.outcome).toEqual({ kind: "moved" })
+  expect(readPlaces(b.places)).toMatchObject([
+    {
+      id: C1,
+      place: { kind: "queued", by: ADA },
+      carries: { kind: "message", command: "bring-up-to-date" },
+    },
+  ])
+  expect(drains).toEqual([LANE])
+  expect(recorded).toEqual([])
 })
 
 describe("moves' history (ADR-0066)", () => {
@@ -600,5 +640,146 @@ describe("every command that moves a card records it (ADR-0048 step 6)", () => {
       rev: null,
     })
     expect(tracesOf(b)).toEqual([])
+  })
+})
+
+describe("a card made a thread, and lifted back (ADR-0111, S139)", () => {
+  const THREAD = rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff")
+  const spun = {
+    kind: "gone",
+    root: TEST_ROOT,
+    why: { kind: "spun", thread: THREAD },
+  } as const
+  const spinMove = { card: C1, from: atEnd, to: spun }
+  /** The thread as the directory names it, with `writers`' messages in it. */
+  const thread = async (
+    b: ReturnType<typeof setUp>["b"],
+    writers: readonly (typeof ADA)[],
+  ) => {
+    applyWrites(b, [
+      setRecord(ROOT_RECORD, {
+        root: THREAD,
+        entry: entryId("t-1"),
+        first: entryId("t-1"),
+        firstLine: "plan",
+        title: null,
+        messages: writers.length,
+        newest: null,
+        writers: [...writers],
+        threads: {},
+        mentions: [],
+        images: [],
+      }),
+      setRecord(BOARD, {
+        root: THREAD,
+        state: "s-1" as never,
+        rank: "m",
+        by: ADA,
+        at: 1,
+      }),
+    ])
+    const doc = await b.docs.root(THREAD)
+    for (const [i, w] of writers.entries())
+      writeEntry(
+        doc,
+        row(`t-${i + 1}`, i === 0 ? null : `t-${i}`, {
+          role: "chat",
+          content: "x",
+          writer: w,
+        }),
+      )
+  }
+
+  test("the thread is started with the card's text, never asking the agent; the card goes gone, spun, in its root's history", async () => {
+    const { b, commands, put, texts, recorded } = setUp()
+    put()
+    texts.set(C1, "  plan this @agent with @Bea ")
+    const chats: unknown[] = []
+    const done = await commands.spinOff(
+      ADA,
+      { move: spinMove, state: null },
+      async chat => {
+        chats.push(chat)
+        return { kind: "appended", id: entryId("t-1") }
+      },
+    )
+    expect(done.outcome).toEqual({ kind: "appended", id: entryId("t-1") })
+    expect(chats).toMatchObject([
+      {
+        text: "plan this @agent with @Bea",
+        root: THREAD,
+        at: ROOT,
+        lane: null,
+        asksAgent: false,
+        mentions: [{ kind: "person", name: "Bea" }],
+        card: { id: C1 },
+        state: null,
+      },
+    ])
+    expect(readPlaces(b.places)[0]?.place).toEqual({ ...spun, by: ADA })
+    expect(recorded).toEqual([[ADA, TEST_ROOT]])
+  })
+
+  test("a thread that is not started leaves the card where it was; a blank card starts none", async () => {
+    const { b, commands, put, texts } = setUp()
+    put()
+    texts.set(C1, "plan")
+    const refused = await commands.spinOff(
+      ADA,
+      { move: spinMove, state: null },
+      async () => ({ kind: "refused", code: "refused", message: "no" }),
+    )
+    expect(refused.outcome.kind).toBe("refused")
+    expect(readPlaces(b.places)[0]?.place).toEqual(atEnd)
+    texts.set(C1, " ")
+    let started = false
+    const blank = await commands.spinOff(
+      ADA,
+      { move: spinMove, state: null },
+      async () => {
+        started = true
+        return { kind: "appended", id: entryId("t-1") }
+      },
+    )
+    expect(blank.outcome.kind).toBe("refused")
+    expect(started).toBe(false)
+  })
+
+  const spunStep = {
+    kind: "undone",
+    step: { parts: [{ docId: PLACES_DOC_ID, footprint: [["cards", C1]] }] },
+  } as const
+
+  test("an undo while the thread holds its first message alone lifts it back: the card where it was, the thread deleted", async () => {
+    const { b, commands, put, undoes } = setUp()
+    put({ place: { ...spun, by: ADA } })
+    await thread(b, [ADA])
+    undoes(spunStep, () => put())
+    const done = await commands.undoMove(ADA, TEST_ROOT, "undo")
+    expect(done.outcome).toEqual({
+      kind: "undone",
+      cards: [{ card: C1, place: atEnd }],
+    })
+    expect(readRoots(b.session).has(THREAD)).toBe(false)
+    expect(readBoardPlaces(b.session).has(THREAD)).toBe(false)
+    expect(b.docs.loaded()).not.toContain(THREAD)
+  })
+
+  test("once someone replied, the undo is refused, naming them, and nothing is reverted", async () => {
+    const { b, commands, put, undoes } = setUp()
+    put({ place: { ...spun, by: ADA } })
+    await thread(b, [ADA, BEA])
+    let reverted = false
+    undoes(spunStep, () => {
+      reverted = true
+    })
+    expect((await commands.undoMove(ADA, TEST_ROOT, "undo")).outcome).toEqual({
+      kind: "unmoved",
+      code: "replied",
+      place: null,
+      by: BEA,
+    })
+    expect(reverted).toBe(false)
+    expect(readRoots(b.session).has(THREAD)).toBe(true)
   })
 })

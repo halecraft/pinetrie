@@ -851,8 +851,9 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         }
 
         // While the lane runs, its header's mark pulses and a line at the
-        // column's end says more is coming. Accepted work takes no height, whether
-        // it is the content's last child or sits above a queued card.
+        // column's end says more is coming. It takes no height, and stays the
+        // content's last child with a card queued: the queue is in the dock,
+        // below the thread (ADR-0113).
         {
           const thinking = script.pause("think a while")
           script.use([{ text: "thought" }, { text: "after the thought" }])
@@ -901,10 +902,13 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           await waitFor(() => thinking.reached)
           await twoFrames(tp)
           const last = await lineShows()
-          // A message sent now is a card queued behind the paused run, below
-          // accepted work.
+          // A message sent now is a card queued behind the paused run, in the
+          // dock.
           await say("wait behind it")
-          await appears(`${col(0)} .card-editor.queued`, 10_000)
+          const queuedInDock = await appears(
+            `${col(0)} .dock .card-editor.queued`,
+            10_000,
+          )
           await twoFrames(tp)
           const above = await lineShows()
           thinking.resume()
@@ -934,7 +938,8 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             placed(last) &&
               last?.next === null &&
               placed(above) &&
-              above?.next?.includes("queued") === true &&
+              above?.next === null &&
+              queuedInDock &&
               ended.line === 0,
             `${JSON.stringify({ last, above, ended })}`,
           )

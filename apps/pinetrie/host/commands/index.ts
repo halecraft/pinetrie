@@ -205,8 +205,20 @@ export function createCommands(deps: CommandDeps): Commands {
       }
       case "move":
         return cardCommands.move(writer, intent.moves)
+      case "spin-off":
+        return cardCommands.spinOff(writer, intent, async chat => {
+          const sent = await sendChat(deps, writer, newId(), chat)
+          // Its board place, as a chat that starts a root takes (ADR-0112).
+          if (spendsCard(sent)) await placeNewRoot(deps, writer, chat)
+          return sent
+        })
       case "queue-card":
-        return cardCommands.queueCard(writer, intent.move, intent.hold)
+        return cardCommands.queueCard(
+          writer,
+          intent.move,
+          intent.hold,
+          intent.command,
+        )
       case "reorder":
         return cardCommands.reorder(writer, intent.reorder)
       case "unqueue-all":

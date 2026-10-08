@@ -27,6 +27,17 @@ function show(container: HTMLElement, id: string): boolean {
 }
 
 /**
+ * Scroll a queued card into view in its column's dock (ADR-0113), which
+ * scrolls apart from the thread. False when the card is not drawn.
+ */
+function showCard(container: HTMLElement, card: string): boolean {
+  const frame = container.querySelector(`.dock [data-queued="${card}"]`)
+  if (frame === null) return false
+  frame.scrollIntoView({ block: "nearest" })
+  return true
+}
+
+/**
  * Bring entry `id` into view in `container`: now, if it is drawn, or once it
  * is. Picking a message a column already draws changes no state, so no
  * render follows (S33); a message in a column that is opening, or in another
@@ -50,6 +61,29 @@ export function useReveal(
     (id: string) => {
       const el = container.current
       pending.current = el !== null && show(el, id) ? null : id
+    },
+    [container],
+  )
+}
+
+/**
+ * Bring the queued card `card` into view in its dock: now, if it is drawn,
+ * or once it is, as `useReveal` waits for an entry.
+ */
+export function useRevealCard(
+  container: RefObject<HTMLElement | null>,
+): (card: string) => void {
+  const pending = useRef<string | null>(null)
+  useLayoutEffect(() => {
+    const card = pending.current
+    const el = container.current
+    if (card === null || el === null) return
+    if (showCard(el, card)) pending.current = null
+  })
+  return useCallback(
+    (card: string) => {
+      const el = container.current
+      pending.current = el !== null && showCard(el, card) ? null : card
     },
     [container],
   )

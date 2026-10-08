@@ -265,6 +265,9 @@ function setUp(
     typing: card => {
       events.push(`typing ${card.id}`)
     },
+    blank: card => {
+      events.push(`blank ${card.id}`)
+    },
     provenance: createProvenance({
       basics: b,
       presence,
@@ -289,6 +292,28 @@ describe("drain", () => {
     await drain(deps, LANE)
     expect(events).toEqual(["hydrate c-1,c-2", "typing c-1"])
     expect(readPlaces(b.places)).toHaveLength(2)
+  })
+
+  test("a blank message is passed over and stays queued; with only blank cards left, the drain waits for one to be written in (ADR-0113)", async () => {
+    const { b, events, deps } = setUp({ "c-1": " ", "c-2": "go" }, [])
+    queue(b.places, "c-1", "a")
+    queue(b.places, "c-2", "b")
+    await drain(deps, LANE)
+    expect(events).toEqual([
+      "hydrate c-1,c-2",
+      "send c-2: go",
+      "destroy c-2",
+      "blank c-1",
+    ])
+    expect(readPlaces(b.places).map(c => c.id)).toEqual(["c-1"])
+  })
+
+  test("a card whose text is behind is not blank: the cards behind it wait for it", async () => {
+    const { b, events, deps } = setUp({ "c-2": "go" }, [], undefined, ["c-1"])
+    queue(b.places, "c-1", "a")
+    queue(b.places, "c-2", "b")
+    await drain(deps, LANE)
+    expect(events).toEqual(["hydrate c-1,c-2", "behind c-1"])
   })
 
   test("a top card whose text is behind stops the drain and asks to be drained again; the cards behind it wait", async () => {
@@ -439,13 +464,6 @@ describe("drain", () => {
       "send c-2: second",
       "destroy c-2",
     ])
-  })
-
-  test("an empty plain card starts nothing and is spent", async () => {
-    const { b, events, deps } = setUp({ "c-1": "  " }, [])
-    queue(b.places, "c-1", "a")
-    await drain(deps, LANE)
-    expect(events).toEqual(["hydrate c-1", "destroy c-1"])
   })
 })
 

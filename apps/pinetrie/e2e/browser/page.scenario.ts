@@ -883,9 +883,9 @@ async function run(check: Checks["check"]): Promise<void> {
       const drawn = await page
         .waitForFunction(
           ([c, id]) => {
-            const thread = document.querySelector(`${c} .column-content`)
+            const dock = document.querySelector(`${c} .dock`)
             const cards = [
-              ...(thread?.querySelectorAll(".card-editor.queued") ?? []),
+              ...(dock?.querySelectorAll(".card-editor.queued") ?? []),
             ]
             const last = cards.at(-1)
             return (
@@ -906,6 +906,37 @@ async function run(check: Checks["check"]): Promise<void> {
         "your queued card is drawn above the line, last in its queue, and another writer's edit to it shows",
         queuedHere >= 0 && drawn,
         `${queuedHere} ms`,
+      )
+      // The dock (ADR-0113): grown past a third of the column, by a tall
+      // message, it scrolls within, its queue header still in view.
+      const dockHolds = await page.$eval(col(0), c => {
+        const dock = c.querySelector<HTMLElement>(".dock")
+        const thread = c.querySelector<HTMLElement>(".column-thread")
+        const head = c.querySelector<HTMLElement>(".dock .queue-head")
+        const box = c.querySelector<HTMLElement>(".composer .input")
+        if (dock === null || thread === null || head === null || box === null)
+          return null
+        const was = box.style.height
+        box.style.height = `${thread.offsetHeight}px`
+        dock.scrollTop = dock.scrollHeight
+        const d = dock.getBoundingClientRect()
+        const h = head.getBoundingClientRect()
+        const seen = {
+          share: dock.offsetHeight / thread.offsetHeight,
+          scrolled: dock.scrollTop > 0,
+          headIn: h.top >= d.top - 1 && h.bottom <= d.bottom + 1,
+        }
+        box.style.height = was
+        dock.scrollTop = 0
+        return seen
+      })
+      check(
+        "the dock keeps the queue's header in view past a third of the column",
+        dockHolds !== null &&
+          dockHolds.share <= 0.34 &&
+          dockHolds.scrolled &&
+          dockHolds.headIn,
+        JSON.stringify(dockHolds),
       )
       check(
         "with your own message last in line, it says it will queue after yours",
@@ -957,13 +988,17 @@ async function run(check: Checks["check"]): Promise<void> {
       // Hold, then unqueue all: both cards go below the line, the queue held.
       // The undo key puts them back, and a release lets them go when Bea's
       // turn ends.
-      await page.click(`${col(0)} .queue-controls .hold-queue`)
+      await chooseFromMenu(page, `${col(0)} .queue-menu-trigger`, ".hold-queue")
       await waitFor(
         () =>
           beaLane !== undefined && readQueueHolds(host.session).has(beaLane),
         15_000,
       )
-      await page.click(`${col(0)} .queue-controls .unqueue-all`)
+      await chooseFromMenu(
+        page,
+        `${col(0)} .queue-menu-trigger`,
+        ".unqueue-all",
+      )
       const unqueued = await waitFor(
         () =>
           [again, yours?.id].every(
@@ -973,14 +1008,14 @@ async function run(check: Checks["check"]): Promise<void> {
           ),
         15_000,
       )
-      const releaseShown = await page
-        .waitForSelector(`${col(0)} .queue-controls .release-queue`, {
-          timeout: 15_000,
-        })
-        .then(
-          () => true,
-          () => false,
-        )
+      // Held while Bea's turn runs: the header's ⋯ offers the release.
+      const releaseShown =
+        (await seeInMenu(
+          page,
+          `${col(0)} .queue-menu-trigger`,
+          ".release-queue",
+        ).catch(() => null)) !== null
+      await page.keyboard.press("Escape")
       check(
         "hold queue holds the thread's queue, and unqueue all puts every queued card below the line",
         unqueued >= 0 && releaseShown,
@@ -999,7 +1034,11 @@ async function run(check: Checks["check"]): Promise<void> {
           ),
         15_000,
       )
-      await page.click(`${col(0)} .queue-controls .release-queue`)
+      await chooseFromMenu(
+        page,
+        `${col(0)} .queue-menu-trigger`,
+        ".release-queue",
+      )
       await waitFor(
         () =>
           beaLane !== undefined && !readQueueHolds(host.session).has(beaLane),
@@ -3363,6 +3402,44 @@ async function run(check: Checks["check"]): Promise<void> {
         "a card's × discards it, and the undo key outside a box brings it back",
         discardUndone >= 0,
         `${discardUndone} ms; ${placeOf(parked)?.kind}`,
+      )
+      // Dropped on a state in the footer's strip, a card becomes a thread
+      // there, its first message the card's text; the undo key lifts it back
+      // into the card while it holds that message alone (ADR-0111).
+      const stateEl = "#bottom .strip-state[data-put-state]"
+      const target = await page
+        .getAttribute(stateEl, "data-put-state")
+        .catch(() => null)
+      const rootsBefore = new Set(readRoots(host.session).keys())
+      const spunInto = () =>
+        [...readRoots(host.session).values()].find(
+          r => !rootsBefore.has(r.root) && r.firstLine === "for later: a plan",
+        )
+      await page.dragAndDrop(slotOf(parked), stateEl).catch(() => undefined)
+      const spun = await waitFor(
+        () => spunInto() !== undefined && placeOf(parked)?.kind === "gone",
+        15_000,
+      )
+      const thread = spunInto()?.root
+      const landed =
+        thread === undefined
+          ? undefined
+          : readBoardPlaces(host.session).get(thread)?.state
+      await page.evaluate(() =>
+        (document.activeElement as HTMLElement | null)?.blur(),
+      )
+      await page.keyboard.press("ControlOrMeta+z")
+      const lifted = await waitFor(
+        () =>
+          placeOf(parked)?.kind === "inventory" &&
+          thread !== undefined &&
+          !readRoots(host.session).has(thread),
+        15_000,
+      )
+      check(
+        "a card dropped on a state in the footer's strip becomes a thread there, and the undo key lifts it back into the card",
+        spun >= 0 && landed === target && lifted >= 0,
+        `spun ${spun} ms into ${thread} in ${landed}, not ${target}; lifted ${lifted} ms, ${placeOf(parked)?.kind}`,
       )
       // Selected, a card opens whole in place, over its neighbours, its box
       // focusable; Escape there folds it, and focus is back on its slot

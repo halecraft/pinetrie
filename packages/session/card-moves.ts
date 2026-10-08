@@ -17,6 +17,7 @@
 // (`intentsOf`): the repair leaves it alone (`inventory.ts`).
 
 import type {
+  CardCommand,
   CardId,
   CardPlace,
   CardRecord,
@@ -340,6 +341,27 @@ export function drawnPlace(key: PlaceKey, me: WriterId): CardPlace {
       return key
   }
 }
+
+/**
+ * The record a `queue-card` with no `from` is drawn as until the host
+ * answers: empty, in the queue, carrying `command`, as the host writes it.
+ * Null for a move of a card that exists.
+ */
+export const queuedDraft = (
+  move: Move,
+  me: WriterId,
+  command: CardCommand | null,
+): CardRecord | null =>
+  move.from === null
+    ? {
+        id: move.card,
+        owner: me,
+        place: drawnPlace(move.to, me),
+        placer: me,
+        carries: { kind: "message", command },
+        unsent: null,
+      }
+    : null
 
 /**
  * The host's records, with this tab's moves its copy does not yet hold drawn

@@ -5,13 +5,14 @@ import {
   laneNameForThread,
   type RootId,
   type RootSummary,
+  type RootWork,
   rootIdFor,
   type Workflow,
   type WriterId,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
-import { orderKeys } from "@pinetrie/rules"
+import { boardOf, orderKeys } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import type { Status } from "./attention.ts"
 import {
@@ -36,6 +37,7 @@ import {
   stateWords,
 } from "./board-view.ts"
 import type { KeyLike } from "./inventory-keys.ts"
+import { threadCardHeads } from "./thread-card.ts"
 
 const ADA = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
@@ -74,39 +76,75 @@ const summary = (
   writers,
 })
 // r1, r2 in Doing (r2 first); r3 in Backlog; r4, r5 in Done (r5 newer).
-const input = (over: Partial<BoardViewInput> = {}): BoardViewInput => ({
-  workflow: WORKFLOW,
-  places: new Map(
-    [
-      place(1, DOING, 1),
-      place(2, DOING, 0),
-      place(3, BACKLOG),
-      place(4, DONE),
-      place(5, DONE, 1),
-    ].map(p => [p.root, p]),
-  ),
-  rootEntries: new Map<RootId, EntryId>(
-    [1, 2, 3, 4, 5].map(n => [ID(n), E(n)]),
-  ),
-  summaries: [
-    summary(1, [ADA], "1"),
-    summary(2, [BEA], "2"),
-    summary(3, [ADA], "3"),
-    summary(4, [ADA], "4"),
-    summary(5, [BEA], "5"),
-  ],
-  labels: new Map([
-    [E(4), "Old spike about SQLite"],
-    [E(5), "Palette work"],
-  ]),
-  status: new Map(),
-  cardRoots: new Set(),
-  ready: new Map(),
-  search: null,
-  me: ADA,
-  work: new Map(),
-  ...over,
-})
+/** What the board is read from, its thread cards' facts among them. */
+type Facts = Omit<BoardViewInput, "heads"> & {
+  readonly labels: ReadonlyMap<EntryId, string>
+  readonly status: ReadonlyMap<EntryId, Status>
+  readonly cardRoots: ReadonlySet<EntryId>
+  readonly ready: ReadonlyMap<EntryId, readonly string[]>
+  readonly work: ReadonlyMap<string, RootWork>
+}
+const input = (over: Partial<Facts> = {}): BoardViewInput => {
+  const f: Facts = {
+    workflow: WORKFLOW,
+    places: new Map(
+      [
+        place(1, DOING, 1),
+        place(2, DOING, 0),
+        place(3, BACKLOG),
+        place(4, DONE),
+        place(5, DONE, 1),
+      ].map(p => [p.root, p]),
+    ),
+    rootEntries: new Map<RootId, EntryId>(
+      [1, 2, 3, 4, 5].map(n => [ID(n), E(n)]),
+    ),
+    summaries: [
+      summary(1, [ADA], "1"),
+      summary(2, [BEA], "2"),
+      summary(3, [ADA], "3"),
+      summary(4, [ADA], "4"),
+      summary(5, [BEA], "5"),
+    ],
+    labels: new Map([
+      [E(4), "Old spike about SQLite"],
+      [E(5), "Palette work"],
+    ]),
+    status: new Map(),
+    cardRoots: new Set(),
+    ready: new Map(),
+    search: null,
+    me: ADA,
+    work: new Map(),
+    lines: new Map([[E(5), "can we try warmer colours?"]]),
+    ...over,
+  }
+  const board = boardOf(f.workflow, f.places, f.rootEntries.keys())
+  return {
+    workflow: f.workflow,
+    places: f.places,
+    rootEntries: f.rootEntries,
+    summaries: f.summaries,
+    search: f.search,
+    me: f.me,
+    lines: f.lines,
+    heads: threadCardHeads(f.rootEntries.values(), {
+      workflow: f.workflow,
+      rootIds: new Map([...f.rootEntries].map(([id, e]) => [e, id])),
+      stateOf: new Map(
+        [...f.rootEntries].flatMap(([id, e]) => {
+          const state = board.stateOf.get(id)
+          return state === undefined ? [] : [[e, state] as const]
+        }),
+      ),
+      labels: f.labels,
+      status: f.status,
+      pips: f.cardRoots,
+      offered: f.ready,
+      work: f.work,
+    }),
+  }
+}
 
 describe("boardView", () => {
   test("each open state a column, in order, by rank; the closed state apart; the strip says each", () => {
@@ -125,10 +163,18 @@ describe("boardView", () => {
     ])
   })
 
+  test("a titled card's body is its first line; an untitled card, or one titled by it, has none (ADR-0111)", () => {
+    const done = boardView(input()).closed.rows
+    expect(done.map(t => [t.label, t.body])).toEqual([
+      ["Palette work", "can we try warmer colours?"],
+      ["Old spike about SQLite", null],
+    ])
+  })
+
   test("an item holds your card exactly when its root does; ＋ on a column lands in its state", () => {
     const view = boardView(input({ cardRoots: new Set([E(1)]) }))
     const doing = view.open[1]
-    expect(doing?.items.map(t => t.card)).toEqual([false, true])
+    expect(doing?.items.map(t => t.pip)).toEqual([false, true])
     expect(doing?.add.agent).toEqual({
       kind: "newTab",
       asksAgent: true,

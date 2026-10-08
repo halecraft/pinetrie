@@ -10,6 +10,7 @@ import { afterRootMove, type Intent } from "./intent.ts"
 import type { LayoutAction } from "./layout.ts"
 import type { ListWidth } from "./list-width.ts"
 import type { PageName } from "./page.ts"
+import { afterSpinOff } from "./spin-off.ts"
 
 export interface AppPorts {
   readonly dispatch: (action: LayoutAction) => void
@@ -45,6 +46,8 @@ export interface AppPorts {
   readonly openWhenHeld: (entry: EntryId) => void
   /** Scroll to an entry once it is drawn (`useReveal`). */
   readonly reveal: (entry: string) => void
+  /** Scroll to a queued card in its dock once it is drawn (`useReveal`). */
+  readonly revealCard: (card: CardId) => void
   /** Open an ask's fold (`FoldMemory`). */
   readonly openFold: (ask: string) => void
   /** The column keyed `key` takes focus when it mounts. */
@@ -89,6 +92,13 @@ function performOne(effect: Effect, ports: AppPorts): void {
       else openThreads.close(act.root)
       return
     }
+    case "spinOff":
+      void ports.session
+        .request(effect.request)
+        .then(outcome =>
+          perform(afterSpinOff(outcome, effect.thread, effect.sidebar), ports),
+        )
+      return
     case "moveRoot":
       void ports.session
         .request(effect.move)
@@ -114,8 +124,14 @@ function performOne(effect: Effect, ports: AppPorts): void {
       void ports.session.moveCard(effect.move, effect.how, effect.queuedBy)
       return
     case "queueCard":
-      ports.fly(effect.move.card)
-      void ports.session.queueCard(effect.move, effect.hold, effect.how)
+      // A card made in the queue comes from nowhere on the page.
+      if (effect.move.from !== null) ports.fly(effect.move.card)
+      void ports.session.queueCard(
+        effect.move,
+        effect.hold,
+        effect.how,
+        effect.command,
+      )
       return
     case "reorderCard":
       void ports.session.reorderCard(effect.reorder, effect.how)
@@ -148,6 +164,9 @@ function performOne(effect: Effect, ports: AppPorts): void {
       return
     case "openFold":
       ports.openFold(effect.ask)
+      return
+    case "revealCard":
+      ports.revealCard(effect.card)
       return
     case "reveal":
       ports.reveal(effect.entry)

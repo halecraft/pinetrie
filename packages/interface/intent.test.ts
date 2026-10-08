@@ -517,7 +517,13 @@ describe("planIntent", () => {
           to: { kind: "queued", root: OTHER_ROOT, at: where, lane, seen: "" },
         }
         expect(plan(queue, state)).toEqual([
-          { kind: "queueCard", move, hold: "release", how: inColumn },
+          {
+            kind: "queueCard",
+            move,
+            hold: "release",
+            command: null,
+            how: inColumn,
+          },
         ])
       }
       const fresh = withCard(
@@ -607,35 +613,29 @@ describe("planIntent", () => {
         },
       ])
     })
-    test("catching up makes a card with the command and no text, and queues it at once; nothing takes focus", () => {
+    test("catching up makes its card in the queue, with the command and no text, never drawn as a note; nothing takes focus", () => {
       expect(
         plan(
           column({
-            kind: "queueCommand",
-            create: fresh,
+            kind: "queueNew",
+            card: fresh.id,
+            root: TEST_ROOT,
             command: "bring-up-to-date",
+            hold: "keep",
             lane,
             at: where,
           }),
         ),
       ).toEqual([
         {
-          kind: "createCard",
-          card: {
-            ...fresh,
-            carries: { kind: "message", command: "bring-up-to-date" },
-          },
-          text: "",
-          how: inColumn,
-        },
-        {
           kind: "queueCard",
           move: {
             card: fresh.id,
-            from: fresh.place,
+            from: null,
             to: { kind: "queued", root: TEST_ROOT, at: where, lane, seen: "" },
           },
           hold: "keep",
+          command: "bring-up-to-date",
           how: inColumn,
         },
       ])
@@ -649,17 +649,16 @@ describe("planIntent", () => {
       expect(
         plan(
           column({
-            kind: "queueCommand",
-            create: fresh,
+            kind: "queueNew",
+            card: fresh.id,
+            root: TEST_ROOT,
             command: "continue-on-accepted",
+            hold: "keep",
             lane,
             at: where,
           }),
         )[0],
-      ).toMatchObject({
-        kind: "createCard",
-        card: { carries: { kind: "message", command: "continue-on-accepted" } },
-      })
+      ).toMatchObject({ kind: "queueCard", command: "continue-on-accepted" })
     })
   })
 

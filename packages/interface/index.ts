@@ -102,6 +102,7 @@ export {
   cardFaceWords,
   cardFrame,
   cardFrameWords,
+  moveKey,
   moveWords,
   type QueueOn,
 } from "./card-frame.ts"
@@ -175,12 +176,8 @@ export {
   type PinnedMarker,
   pinnedMarkers,
   pinnedStatus,
-  type QueueControls,
-  queueControlWords,
   type ReserveStep,
   type ReviewTarget,
-  type RunButton,
-  runWords,
   START_WORDS,
   startedWords,
   type ThreadDetails,
@@ -295,6 +292,17 @@ export {
   speakerLabel,
   withContributors,
 } from "./names.ts"
+export {
+  ADD_TO_QUEUE,
+  type NextButton,
+  type NextItem,
+  nextButtonWords,
+  nextItemWords,
+  nextWords,
+  type QueueHead,
+  queueHead,
+  queueHeadPlan,
+} from "./next.ts"
 export { notesBoardView, notesPlaced } from "./notes-board-view.ts"
 export {
   BACK,
@@ -456,6 +464,11 @@ export {
   type SidebarView,
   sidebarView,
 } from "./sidebar-view.ts"
+export {
+  type ThreadCardHead,
+  type ThreadMove,
+  threadCardHeads,
+} from "./thread-card.ts"
 export {
   CALL_MARK,
   callStatus,

@@ -4,10 +4,11 @@
 // People queue and unqueue cards through handoffs (ADR-0059); the host pops
 // them, and only when the lane is not running, since a lane is never written
 // while it runs (S21), its queue is not held, and nobody is typing in the
-// top card (ADR-0048 step 7). Popping the next queued card is where the cards
-// people still edit meet the tree. What a popped card comes to is decided
-// first (`planCarry`): a fact appended, a catch-up then the card's text, a
-// split's run, a message sent, or nothing (ADR-0080); `carryOut` carries it
+// top card (ADR-0048 step 7). A blank message is passed over, left where it
+// is (ADR-0113). Popping the next queued card is where the cards people
+// still edit meet the tree. What a popped card comes to is decided first
+// (`planCarry`): a fact appended, a catch-up then the card's text if it has
+// any, a split's run, or a message sent (ADR-0080); `carryOut` carries it
 // out.
 
 import { subscribe } from "@kyneta/schema"
@@ -34,6 +35,7 @@ import {
   type CarryPlan,
   displayName,
   encodeFact,
+  isBlankMessage,
   planCarry,
   planNextQueuedCardPop,
   planUnsent,
@@ -60,12 +62,14 @@ const hostFailedWords = (why: string): string => `the host failed: ${why}`
 
 /**
  * What a pop found: nothing to pop, a held queue, a top card someone is
- * typing in, a top card whose text is behind, or a card popped.
+ * typing in, only blank cards, a top card whose text is behind, or a card
+ * popped.
  */
 export type NextQueuedCardPop =
   | { readonly kind: "idle" }
   | { readonly kind: "held" }
   | { readonly kind: "typing"; readonly card: QueuedCard }
+  | { readonly kind: "blank"; readonly card: QueuedCard }
   | { readonly kind: "behind"; readonly card: QueuedCard }
   | { readonly kind: "popped"; readonly popped: PoppedQueuedCard }
 
@@ -74,19 +78,31 @@ export type NextQueuedCardPop =
  * text, and remove its record. Synchronous: an unqueue is a step on the same
  * keeper as the drain, so it runs before the pop or after it, never
  * between, and one after it is refused as gone. Idle when the lane runs or
- * nothing is queued; `held` and `typing` as `planNextQueuedCardPop` says
- * (ADR-0048 step 7). A card whose text the host does not yet hold as its
- * queuer had it is `behind`, and stays: Kyneta keeps no order between
- * documents, so its record can arrive before its text (S96). `texts` must
- * answer from texts already loaded.
+ * nothing is queued; `held`, `typing` and `blank` as `planNextQueuedCardPop`
+ * says (ADR-0048 step 7, ADR-0113). A card whose text the host does not yet
+ * hold as its queuer had it is `behind`, and stays: Kyneta keeps no order
+ * between documents, so its record can arrive before its text (S96). Such a
+ * card is not blank, though its text reads empty so far: passing over it
+ * would send the cards behind it first. `texts` must answer from texts
+ * already loaded.
  */
 export function popNextQueuedCard(
   places: PlacesDocHandle,
   lane: LaneName,
-  facts: Parameters<typeof planNextQueuedCardPop>[2],
+  facts: Omit<Parameters<typeof planNextQueuedCardPop>[2], "blank">,
   texts: Pick<CardPort, "textNow" | "holds">,
 ): NextQueuedCardPop {
-  const step = planNextQueuedCardPop(readPlaces(places), lane, facts)
+  const cards = readPlaces(places)
+  const blank = new Set(
+    queuedOn(cards, lane)
+      .filter(
+        c =>
+          texts.holds(c.id, c.place.seen) &&
+          isBlankMessage(c, texts.textNow(c.id)),
+      )
+      .map(c => c.id),
+  )
+  const step = planNextQueuedCardPop(cards, lane, { ...facts, blank })
   if (step.kind !== "pop") return step
   const { card } = step
   if (!texts.holds(card.id, card.place.seen)) return { kind: "behind", card }
@@ -127,6 +143,8 @@ export interface QueuedCardPopDeps {
   readonly behind: (card: QueuedCard) => void
   /** Someone is typing in the top card: drain the lane again once they stop. */
   readonly typing: (card: QueuedCard) => void
+  /** Only blank cards are queued: drain the lane again once `card` is written in. */
+  readonly blank: (card: QueuedCard) => void
   /** Each card's history (ADR-0048 step 6). */
   readonly provenance: Pick<Provenance, "before" | "after">
 }
@@ -138,7 +156,8 @@ export interface QueuedCardPopDeps {
  * one that could not be sent goes back below the line, saying why
  * (`planUnsent`, S69 answer 5). A held queue ends the drain; a top card
  * whose text is behind, or that someone types in, ends it with a wait that
- * drains again. A run's end, startup, a move that queues a card on an idle
+ * drains again; so does a queue of blank cards alone, until one is written
+ * in. A run's end, startup, a move that queues a card on an idle
  * lane, and a release each drain again.
  */
 export async function drain(
@@ -173,6 +192,7 @@ export async function drain(
     // The queue waits for its top card: those behind it keep their turn.
     if (top.kind === "behind") return deps.behind(top.card)
     if (top.kind === "typing") return deps.typing(top.card)
+    if (top.kind === "blank") return deps.blank(top.card)
     const done = await carryOut(deps, lane, top.popped)
     // Popped, written back or below the line again: the host's own write.
     await deps.provenance.after({ kind: "host" }, before)
@@ -200,9 +220,6 @@ async function carryOut(
       return splitThen(deps, lane, popped, plan.intent)
     case "send":
       return sendCard(deps, popped, popped.card)
-    case "discard":
-      await deps.texts.destroy(popped.card.id)
-      return "next"
   }
 }
 

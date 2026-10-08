@@ -495,15 +495,29 @@ export type Intent =
     }
   /**
    * Queue a card (ADR-0113): `move` into a lane's queue, and what it does to
-   * that queue's hold, decided with the move in one step.
+   * that queue's hold, decided with the move in one step. A move with no
+   * `from` creates the card there, carrying `command`, so the drain the
+   * queueing starts pops it with its command.
    */
   | {
       readonly kind: "queue-card"
       readonly move: Move
       readonly hold: QueueHoldChange
+      /** The created card's command; null for a move of a card that exists. */
+      readonly command: CardCommand | null
     }
   /** Take every message card queued on a thread back below the line. */
   | { readonly kind: "unqueue-all"; readonly lane: LaneName }
+  /**
+   * Make a text card a thread (ADR-0111): a conversation root, the one its
+   * move names (`spun`), whose first message is the card's text, in
+   * `state`, or the first open state for null; the card goes to gone.
+   */
+  | {
+      readonly kind: "spin-off"
+      readonly move: Move
+      readonly state: WorkflowStateId | null
+    }
   /**
    * Move a root on the board (ADR-0112): from the state its sender saw it in,
    * to `to`, before `before` there, or at its end. Into the closed state it
@@ -1468,8 +1482,15 @@ export type CardPlace =
       readonly why: GoneWhy
     }
 
-/** Why a card is gone: the stored kind of its place. */
-export type GoneWhy = { readonly kind: "discarded" }
+/**
+ * Why a card is gone: the stored kind of its place. Discarded; or spun off
+ * into `thread`, a conversation root it started (ADR-0111), whose undo
+ * lifts the root back into the card while it holds that first message
+ * alone.
+ */
+export type GoneWhy =
+  | { readonly kind: "discarded" }
+  | { readonly kind: "spun"; readonly thread: RootId }
 
 /**
  * The card a chat is sent from, with its text's version as its sender had it
@@ -1552,7 +1573,13 @@ export function sameKey(a: PlaceKey, b: PlaceKey): boolean {
     case "inventory":
       return b.kind === "inventory" && a.holder === b.holder
     case "gone":
-      return b.kind === "gone" && a.root === b.root && a.why.kind === b.why.kind
+      return (
+        b.kind === "gone" &&
+        a.root === b.root &&
+        a.why.kind === b.why.kind &&
+        (a.why.kind !== "spun" ||
+          (b.why.kind === "spun" && a.why.thread === b.why.thread))
+      )
   }
 }
 
@@ -1683,6 +1710,11 @@ export type MoveRefusal =
    * in another place, or the two out of order.
    */
   | "order-changed"
+  /**
+   * An undo that would lift back a thread a card was spun into (ADR-0111),
+   * after someone wrote there, or the agent started on it.
+   */
+  | "replied"
 
 /**
  * A place as flat strings, "" for none: how the places document stores it,
@@ -1775,14 +1807,15 @@ export function placeFields(place: CardPlace | PlaceKey): PlaceFields {
         seen: "",
         holder: place.holder,
       }
-    // Stored under its reason, with who discarded it as its holder.
+    // Stored under its reason, with who discarded it as its holder, and a
+    // spun card's thread in `column`.
     case "gone":
       return {
         kind: place.why.kind,
         root: place.root ?? "",
         at: "",
         lane: "",
-        column: "",
+        column: place.why.kind === "spun" ? place.why.thread : "",
         order: "",
         by: "",
         seen: "",
@@ -1790,6 +1823,14 @@ export function placeFields(place: CardPlace | PlaceKey): PlaceFields {
       }
   }
 }
+
+/** A gone place's stored kind -> why it is gone; undefined for a spun one with no thread. */
+const goneWhyOf = (f: PlaceFields): GoneWhy | undefined =>
+  f.kind === "spun"
+    ? isRootId(f.column)
+      ? { kind: "spun", thread: f.column }
+      : undefined
+    : { kind: "discarded" }
 
 /** A note's stored `order` -> its cell: "" is none; undefined for no cell. */
 const cellOfOrder = (order: string): number | null | undefined => {
@@ -1824,14 +1865,19 @@ export function placeOfFields(f: PlaceFields): CardPlace | undefined {
         ? undefined
         : { kind: "inventory", holder: f.holder as WriterId }
     case "discarded":
-      return f.holder === "" || (f.root !== "" && !isRootId(f.root))
+    case "spun": {
+      const why = goneWhyOf(f)
+      return f.holder === "" ||
+        (f.root !== "" && !isRootId(f.root)) ||
+        why === undefined
         ? undefined
         : {
             kind: "gone",
             root: f.root === "" ? null : f.root,
             by: f.holder as WriterId,
-            why: { kind: "discarded" },
+            why,
           }
+    }
     case "drafting":
       return f.at === "" || !isRootId(f.root)
         ? undefined
@@ -1899,14 +1945,12 @@ export function keyOfFields(f: PlaceFields): PlaceKey | undefined {
           at: atEntry(entryId(f.at)),
           lane: isLaneName(f.lane) ? f.lane : null,
         }
-  if (f.kind === "discarded")
-    return f.root !== "" && !isRootId(f.root)
+  if (f.kind === "discarded" || f.kind === "spun") {
+    const why = goneWhyOf(f)
+    return (f.root !== "" && !isRootId(f.root)) || why === undefined
       ? undefined
-      : {
-          kind: "gone",
-          root: f.root === "" ? null : f.root,
-          why: { kind: "discarded" },
-        }
+      : { kind: "gone", root: f.root === "" ? null : f.root, why }
+  }
   if (f.kind !== "queued") return placeOfFields(f)
   return f.at === "" || !isRootId(f.root) || !isLaneName(f.lane)
     ? undefined

@@ -10,11 +10,15 @@
 import {
   type CardId,
   type CardPlace,
+  type EntryId,
+  entryId,
+  isWorkflowStateId,
   keyOf,
   noteOf,
   type PlaceKey,
   pinnedOf,
   sameKey,
+  type WorkflowStateId,
   type WriterId,
 } from "@pinetrie/core"
 
@@ -29,6 +33,10 @@ export type PutTarget =
   | { readonly kind: "pinned"; readonly key: string }
   /** A slot of your inventory. */
   | { readonly kind: "inventory"; readonly slot: number }
+  /** A workflow state, on the board or the footer's strip: a new thread there (ADR-0111). */
+  | { readonly kind: "state"; readonly state: WorkflowStateId }
+  /** A place in the sidebar, before a root's entry or at its end: a new thread there. */
+  | { readonly kind: "sidebar"; readonly before: EntryId | null }
 
 /** The drag data type a card's id travels under, pinetrie's own. */
 export const CARD_MIME = "application/x-pinetrie-card"
@@ -43,9 +51,14 @@ const PUT_PINNED = "data-put-pinned"
 const PUT_SLOT = "data-put-slot"
 /** The attribute a notes board's cell carries: its column's key and its cell, as `key:cell`. */
 const PUT_CELL = "data-put-cell"
+/** The attribute a workflow state carries, on the board and the footer's strip: its id. */
+const PUT_STATE = "data-put-state"
+/** The attribute a place in the sidebar carries: the root entry it goes before, or `end`. */
+const PUT_SIDEBAR = "data-put-sidebar"
+const END = "end"
 
 /** What an element a drop may land on matches: any mark. */
-export const DROP_ZONE = `[${PUT_COLUMN}],[${PUT_COMPOSER}],[${PUT_PINNED}],[${PUT_SLOT}],[${PUT_CELL}]`
+export const DROP_ZONE = `[${PUT_COLUMN}],[${PUT_COMPOSER}],[${PUT_PINNED}],[${PUT_SLOT}],[${PUT_CELL}],[${PUT_STATE}],[${PUT_SIDEBAR}]`
 
 /** The attributes that mark an element as `target`, spread onto it by the page. */
 export function dropProps(target: PutTarget): Readonly<Record<string, string>> {
@@ -60,6 +73,10 @@ export function dropProps(target: PutTarget): Readonly<Record<string, string>> {
       return { [PUT_SLOT]: String(target.slot) }
     case "cell":
       return { [PUT_CELL]: `${target.key}:${target.cell}` }
+    case "state":
+      return { [PUT_STATE]: target.state }
+    case "sidebar":
+      return { [PUT_SIDEBAR]: target.before ?? END }
   }
 }
 
@@ -74,6 +91,12 @@ export function targetOfElement(el: {
     return { kind: "composer", key: composer }
   const pinned = el.getAttribute(PUT_PINNED)
   if (pinned !== null && pinned !== "") return { kind: "pinned", key: pinned }
+  const state = el.getAttribute(PUT_STATE)
+  if (state !== null && isWorkflowStateId(state))
+    return { kind: "state", state }
+  const before = el.getAttribute(PUT_SIDEBAR)
+  if (before !== null && before !== "")
+    return { kind: "sidebar", before: before === END ? null : entryId(before) }
   const cell = /^(.+):(\d+)$/.exec(el.getAttribute(PUT_CELL) ?? "")
   if (cell?.[1] !== undefined && cell[2] !== undefined)
     return { kind: "cell", key: cell[1], cell: Number(cell[2]) }
@@ -111,7 +134,8 @@ export const intoMessage = (
  * of its board or the first empty one, its composer's place, the same
  * thread end pinned (`pinnedOf`), or your inventory; null for a column no
  * composer publishes, and for a fresh column's strip or board, which it
- * has none of.
+ * has none of; and for a state or the sidebar, which name a new thread,
+ * not a place (`planSpinOff`).
  */
 export function placeOfTarget(
   target: PutTarget,
@@ -119,6 +143,7 @@ export function placeOfTarget(
   me: WriterId,
 ): PlaceKey | null {
   if (target.kind === "inventory") return { kind: "inventory", holder: me }
+  if (target.kind === "state" || target.kind === "sidebar") return null
   const place = places.get(target.key)?.place
   if (place === undefined) return null
   if (target.kind === "pinned") return pinnedOf(place)

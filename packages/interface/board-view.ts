@@ -16,51 +16,39 @@ import type {
   EntryId,
   RootId,
   RootSummary,
-  RootWork,
   Workflow,
   WorkflowState,
   WorkflowStateId,
   WriterId,
 } from "@pinetrie/core"
 import { boardOf } from "@pinetrie/rules"
-import { type Level, markOf, type Status } from "./attention.ts"
+import { type Level, markOf } from "./attention.ts"
 import { count } from "./counts.ts"
 import type { Intent } from "./intent.ts"
 import type { KeyLike } from "./inventory-keys.ts"
 import { NO_TEXT } from "./root-label.ts"
 import { stepsIn } from "./root-target.ts"
+import type { ThreadCardHead } from "./thread-card.ts"
 
 /** A root on the board. */
-export interface ThreadCard {
+/**
+ * A root on the board, a thread card (ADR-0111): its header, the one the
+ * sidebar draws too (`ThreadCardHead`), spread here and kept whole as
+ * `head`, with what only the board adds.
+ */
+export interface ThreadCard extends Omit<ThreadCardHead, "root" | "state"> {
+  readonly head: ThreadCardHead
   readonly root: RootId
-  readonly entry: EntryId
-  readonly label: string
-  /** What its mark draws (`rootStatus`), or null for none. */
-  readonly status: Status | null
-  /** An unsent card of yours is in it (`CardMarks.roots`). */
-  readonly card: boolean
-  /** Its threads with work ready to accept (`offeredByRoot`): ⇡, for everyone (ADR-0091). */
-  readonly ready: readonly string[]
-  /** Everyone who wrote a chat in it, in order of first message. */
-  readonly writers: readonly WriterId[]
   /** The state it is in: what its drag carries. */
   readonly state: WorkflowStateId
+  /** Everyone who wrote a chat in it, in order of first message. */
+  readonly writers: readonly WriterId[]
+  /** Its body: its first line, under a title that differs from it; null for none. */
+  readonly body: string | null
   readonly show: Intent
-  /** Its ⋯'s "Move to ▸", one per other state: the keyboard's way to every move. */
-  readonly moves: readonly BoardMove[]
   /** Its ⋯'s Move up and Move down within its state; null at an end. */
   readonly up: Intent | null
   readonly down: Intent | null
-}
-
-/** A move to another state, as an item's ⋯ offers it. */
-export interface BoardMove {
-  readonly name: string
-  /** To the closed state: it archives the root. */
-  readonly closes: boolean
-  /** Why it is refused now (`ROOT_BUSY_REASON`'s key), into the closed state only. */
-  readonly busy: RootWork | null
-  readonly intent: Intent
 }
 
 /** A state's roots: every one, or those a filter keeps of every one. */
@@ -159,28 +147,42 @@ export interface BoardViewInput {
   readonly rootEntries: ReadonlyMap<RootId, EntryId>
   /** Each root, by its root entry (`summariesOf`). */
   readonly summaries: readonly RootSummary[]
-  /** Each root's label (`labelsOf`). */
-  readonly labels: ReadonlyMap<EntryId, string>
-  /** Each root's status (`rootStatus`). */
-  readonly status: ReadonlyMap<EntryId, Status>
-  /** Roots holding an unsent card of yours (`CardMarks.roots`). */
-  readonly cardRoots: ReadonlySet<EntryId>
-  /** Each root's threads with an open offer (`offeredByRoot`). */
-  readonly ready: ReadonlyMap<EntryId, readonly string[]>
+  /** Each root's thread card header (`threadCardHeads`), which the sidebar reads too. */
+  readonly heads: ReadonlyMap<EntryId, ThreadCardHead>
+  /** Each root's first line (`firstLinesOf`): a titled card's body. */
+  readonly lines: ReadonlyMap<EntryId, string>
   /** The board's filter (`parseSearch`), or null for none. */
   readonly search: BoardSearch | null
   readonly me: WriterId
-  /** The agent's work in each root, held or not (`workAnywhere`): a root it works in is not closed. */
-  readonly work: ReadonlyMap<string, RootWork>
 }
+
+/** A card's body: its first line, when its label is a title that says something else. */
+const bodyOf = (label: string, line: string | undefined): string | null =>
+  line === undefined || line === "" || line === label ? null : line
 
 export function boardView(input: BoardViewInput): BoardView {
   const { workflow, search } = input
   const board = boardOf(workflow, input.places, input.rootEntries.keys())
   const summaries = new Map(input.summaries.map(s => [s.root, s]))
   const keeps = search === null ? null : boardFilter(search, input.me)
-  const states = [...workflow.open, workflow.closed]
-  const labelOf = (entry: EntryId) => input.labels.get(entry) ?? NO_TEXT
+  const _states = [...workflow.open, workflow.closed]
+  const headOf = (entry: EntryId): ThreadCardHead =>
+    input.heads.get(entry) ?? {
+      root: null,
+      entry,
+      label: NO_TEXT,
+      status: null,
+      ready: [],
+      pip: false,
+      state: null,
+      moves: [],
+    }
+  const labelOf = (entry: EntryId) => headOf(entry).label
+  const status = new Map(
+    [...input.heads].flatMap(([entry, head]) =>
+      head.status === null ? [] : [[entry, head.status] as const],
+    ),
+  )
   const writersOf = (entry: EntryId) => summaries.get(entry)?.writers ?? []
   /** A move within `state`, before `before` there, or to its end. */
   const within = (
@@ -197,9 +199,8 @@ export function boardView(input: BoardViewInput): BoardView {
   })
   /** The signals of the roots `entries`, from each root's status and offers. */
   const stateSignals = (entries: readonly EntryId[]): StateSignals => ({
-    working: entries.filter(e => input.status.get(e)?.kind === "working")
-      .length,
-    ready: entries.filter(e => (input.ready.get(e)?.length ?? 0) > 0).length,
+    working: entries.filter(e => status.get(e)?.kind === "working").length,
+    ready: entries.filter(e => headOf(e).ready.length > 0).length,
     roots: entries,
   })
   /** A kept root's card, whose Move up and Move down step among the roots `isShown` keeps. */
@@ -211,37 +212,17 @@ export function boardView(input: BoardViewInput): BoardView {
     isShown: (root: RootId) => boolean,
   ): ThreadCard => {
     const steps = stepsIn(column, root, isShown)
+    const head = headOf(entry)
     return {
+      ...head,
+      head,
       root,
-      entry,
-      label: labelOf(entry),
-      status: input.status.get(entry) ?? null,
-      card: input.cardRoots.has(entry),
-      ready: input.ready.get(entry) ?? [],
-      writers: writersOf(entry),
       state,
+      writers: writersOf(entry),
+      body: bodyOf(head.label, input.lines.get(entry)),
       show: { kind: "show", here: { kind: "root", root: entry } },
       up: steps.up === null ? null : within(root, state, steps.up.before),
       down: steps.down === null ? null : within(root, state, steps.down.before),
-      moves: states.flatMap(to => {
-        if (to.id === state) return []
-        const closes = to.id === workflow.closed.id
-        return [
-          {
-            name: to.name,
-            closes,
-            busy: closes ? (input.work.get(entry) ?? null) : null,
-            intent: {
-              kind: "moveRoot",
-              root,
-              from: state,
-              to: to.id,
-              before: null,
-              closes,
-            },
-          },
-        ]
-      }),
     }
   }
   /**
@@ -290,7 +271,7 @@ export function boardView(input: BoardViewInput): BoardView {
     const next = board.open[i + 1]
     const afterNext = board.open[i + 2]
     const previous = board.open[i - 1]
-    const mark = markOf(input.status, entries)
+    const mark = markOf(status, entries)
     const view: BoardColumnView = {
       state,
       items: cards,

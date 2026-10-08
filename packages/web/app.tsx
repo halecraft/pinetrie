@@ -30,6 +30,7 @@ import {
   pathIds,
   type RootId,
   rootWork,
+  type WorkflowState,
   type WorkflowStateId,
 } from "@pinetrie/core"
 import {
@@ -97,6 +98,7 @@ import {
   summariesOf,
   type TypedLast,
   targetOfElement,
+  threadCardHeads,
   typingDue,
   viewportStore,
   workAnywhere,
@@ -147,6 +149,7 @@ import {
 import { Sidebar } from "./sidebar.tsx"
 import type { DeviceState, TabState } from "./tab-state.ts"
 import { isTextBox } from "./text-box.ts"
+import { ThreadStates } from "./thread-states.ts"
 import { useAttention } from "./use-attention.ts"
 import { useColumnDrag } from "./use-column-drag.ts"
 import { useFilledCards } from "./use-filled-cards.ts"
@@ -155,7 +158,7 @@ import { PLACED } from "./use-follow.ts"
 import { useInbox } from "./use-inbox.ts"
 import { NarrowContext, useStripNarrow } from "./use-narrow.ts"
 import { goTo, usePage } from "./use-page.ts"
-import { useReveal } from "./use-reveal.ts"
+import { useReveal, useRevealCard } from "./use-reveal.ts"
 import { useRootDrag } from "./use-root-drag.ts"
 import { useSmallWindow } from "./use-small-window.ts"
 import { useStable } from "./use-stable.ts"
@@ -281,6 +284,9 @@ function place(
 
 /** How often a visible page refreshes its presence: well inside its 30 s decay. */
 const PRESENCE_REFRESH_MS = 10_000
+
+/** No open states: the workflow has not arrived. */
+const NO_STATES: readonly WorkflowState[] = []
 
 export function App({
   session,
@@ -507,6 +513,26 @@ export function App({
         known: new Set(labels.keys()),
       })
   }, [settled])
+  // A root the directory stops naming (a thread lifted back into its card,
+  // ADR-0111) is pruned as at settle: its columns go, and a page on it
+  // moves to the sidebar's last root.
+  const known = useRef<ReadonlySet<EntryId> | null>(null)
+  // biome-ignore lint/correctness/useExhaustiveDependencies: on the directory changing, with the facts of that render
+  useEffect(() => {
+    if (!settled) return
+    const now = new Set(labels.keys())
+    const before = known.current
+    known.current = now
+    if (before !== null && [...before].some(r => !now.has(r)))
+      dispatch({
+        kind: "prune",
+        index,
+        lanes,
+        archived: archivedRoots,
+        list,
+        known: now,
+      })
+  }, [settled, labels])
 
   const active = layout.active
   // The tab's columns: a root's, or a new tab's one fresh column.
@@ -712,24 +738,45 @@ export function App({
     () => rootSprites(index, lanes, workFacts.banners),
     [index, lanes, workFacts.banners],
   )
+  // Every thread card's header, once per root: the board and the sidebar
+  // draw the same one (ADR-0111).
+  const heads = useMemo(
+    () =>
+      threadCardHeads(new Set([...rootEntries.values(), ...layout.open]), {
+        workflow,
+        rootIds,
+        stateOf,
+        labels,
+        status: attention.status,
+        pips: unsent.roots,
+        offered,
+        work,
+      }),
+    [
+      rootEntries,
+      layout.open,
+      workflow,
+      rootIds,
+      stateOf,
+      labels,
+      attention.status,
+      unsent.roots,
+      offered,
+      work,
+    ],
+  )
   const listView =
     active === null
       ? null
       : sidebarView({
           layout,
           active,
-          labels,
+          heads,
           lines,
           marks,
           archived: archivedRoots,
-          work,
-          offered,
           unsent,
-          status: attention.status,
           arrivals: attention.arrivals,
-          workflow,
-          stateOf,
-          rootIds,
           sprites,
         })
   const title = pageTitle(needsYou, listView?.selected ?? null, page)
@@ -756,26 +803,20 @@ export function App({
             places,
             rootEntries,
             summaries,
-            labels,
-            status: attention.status,
-            cardRoots: unsent.roots,
-            ready: offered,
+            heads,
+            lines,
             search: boardSearch,
             me: session.writer,
-            work,
           }),
     [
       workflow,
       places,
       rootEntries,
       summaries,
-      labels,
-      attention.status,
-      unsent.roots,
-      offered,
+      heads,
+      lines,
       boardSearch,
       session.writer,
-      work,
     ],
   )
   useEffect(() => {
@@ -834,6 +875,7 @@ export function App({
   // After the alignment above: a picked message the alignment left out of
   // view is scrolled to.
   const reveal = useReveal(strip)
+  const revealCard = useRevealCard(strip)
 
   // Your inventory (ADR-0048 step 4): this tab's moves and your slots, the
   // panel's selection, whether it is open (never stored), and its dock
@@ -903,6 +945,7 @@ export function App({
     session,
     attention: session.attention,
     reveal,
+    revealCard,
     openWhenHeld: setWhenHeld,
     openFold: ask => {
       folds.set(ask, "open")
@@ -1003,11 +1046,12 @@ export function App({
   }, [])
   // A card's drag (HTML drag and drop: it crosses elements and roots). A
   // drop lands only where put can (`targetOfElement`); held over a root in
-  // the sidebar, the drag opens it. A root's drag is not a card's: it is
+  // the sidebar, the drag opens it, and held over ▦, the board, to drop it
+  // on a state there (ADR-0111). A root's drag is not a card's: it is
   // `ROOT_MIME`, and lands by `useRootDrag`.
   useEffect(() => {
     let hover: {
-      readonly root: EntryId
+      readonly over: EntryId | "board"
       readonly timer: ReturnType<typeof setTimeout>
     } | null = null
     const carriesCard = (e: DragEvent) =>
@@ -1025,23 +1069,25 @@ export function App({
         e.target instanceof Element
           ? e.target.closest<HTMLElement>(".open-root[data-root]")?.dataset.root
           : undefined
-      // The item's root, as the sidebar holds it.
-      const root = layout.open.find(r => r === item)
-      if (root !== hover?.root) {
+      // The item's root, as the sidebar holds it, or ▦.
+      const board =
+        e.target instanceof Element &&
+        e.target.closest(".board-toggle") !== null
+      const over = board ? "board" : layout.open.find(r => r === item)
+      if (over !== hover?.over) {
         if (hover !== null) clearTimeout(hover.timer)
+        const opens: Intent | null =
+          over === undefined
+            ? null
+            : over === "board"
+              ? { kind: "board", open: true, focus: false }
+              : { kind: "show", here: { kind: "root", root: over } }
         hover =
-          root === undefined
+          over === undefined || opens === null
             ? null
             : {
-                root,
-                timer: setTimeout(
-                  () =>
-                    onIntent({
-                      kind: "show",
-                      here: { kind: "root", root },
-                    }),
-                  ITEM_HOVER_MS,
-                ),
+                over,
+                timer: setTimeout(() => onIntent(opens), ITEM_HOVER_MS),
               }
       }
       if (targetOf(e) !== null) e.preventDefault()
@@ -1199,85 +1245,87 @@ export function App({
             root's colours, whether the pane covers the page, how you read a
             review. Each changes rarely, and only its readers redraw. */}
           <TrackSeed value={seed}>
-            <NarrowContext value={narrow}>
-              <ReviewPrefsContext value={reviewReach}>
-                {listView === null || workspace.kind === "connecting" ? (
-                  <p className="connecting">connecting…</p>
-                ) : workspace.kind === "nothing" ? (
-                  <p className="nothing-here">
-                    Open a thread from the board, or start one with ＋.
-                  </p>
-                ) : (
-                  <>
-                    {workspace.kind === "root" ? (
-                      <LiveRail
-                        activity={activity}
-                        asks={asks}
-                        digests={digests}
-                        revisions={workFacts.revisions}
-                        colorOf={colorOf}
-                        ends={ends}
-                        index={index}
-                        names={nameOf}
-                        onPick={openAt}
-                        open={shown}
-                        rows={rail}
-                        session={session}
-                        viewports={viewports}
-                        yours={yours}
-                      />
-                    ) : (
-                      <EmptyRail />
-                    )}
-                    {/* A column's header is its drag handle; its grip is the
+            <ThreadStates value={workflow?.open ?? NO_STATES}>
+              <NarrowContext value={narrow}>
+                <ReviewPrefsContext value={reviewReach}>
+                  {listView === null || workspace.kind === "connecting" ? (
+                    <p className="connecting">connecting…</p>
+                  ) : workspace.kind === "nothing" ? (
+                    <p className="nothing-here">
+                      Open a thread from the board, or start one with ＋.
+                    </p>
+                  ) : (
+                    <>
+                      {workspace.kind === "root" ? (
+                        <LiveRail
+                          activity={activity}
+                          asks={asks}
+                          digests={digests}
+                          revisions={workFacts.revisions}
+                          colorOf={colorOf}
+                          ends={ends}
+                          index={index}
+                          names={nameOf}
+                          onPick={openAt}
+                          open={shown}
+                          rows={rail}
+                          session={session}
+                          viewports={viewports}
+                          yours={yours}
+                        />
+                      ) : (
+                        <EmptyRail />
+                      )}
+                      {/* A column's header is its drag handle; its grip is the
                   keyboard's way to move it. */}
-                    <div id="strip" onPointerDown={dragColumn} ref={strip}>
-                      {workspace.slots.map(slot => {
-                        const column = columns[slot.position]
-                        const columnView = views[slot.position]
-                        if (column === undefined || columnView === undefined)
-                          return null
-                        return (
-                          <Column
-                            {...shared}
-                            closable={slot.closable}
-                            column={column}
-                            count={workspace.slots.length}
-                            landmarks={landmarks}
-                            seenEnd={seenEnds}
-                            forks={colors.forks}
-                            key={slot.key}
-                            onIntent={onIntent}
-                            onTyping={card => typing(columnView.tipId, card)}
-                            path={paths[slot.position] ?? new Set()}
-                            position={slot.position}
-                            readOnly={
-                              workspace.kind === "root"
-                                ? workspace.readOnly
-                                : null
-                            }
-                            shown={shown}
-                            track={slot.track}
-                            view={columnView}
-                          />
-                        )
-                      })}
-                    </div>
-                  </>
-                )}
-                {layout.board && boardShown !== null && (
-                  <Board
-                    onClearFilter={clearBoardFilter}
-                    onIntent={onIntent}
-                    pip={pip}
-                    readers={readers}
-                    searchRef={boardSearchField}
-                    thread={(end, root) => thread(end, end, root)}
-                    view={boardShown}
-                  />
-                )}
-              </ReviewPrefsContext>
-            </NarrowContext>
+                      <div id="strip" onPointerDown={dragColumn} ref={strip}>
+                        {workspace.slots.map(slot => {
+                          const column = columns[slot.position]
+                          const columnView = views[slot.position]
+                          if (column === undefined || columnView === undefined)
+                            return null
+                          return (
+                            <Column
+                              {...shared}
+                              closable={slot.closable}
+                              column={column}
+                              count={workspace.slots.length}
+                              landmarks={landmarks}
+                              seenEnd={seenEnds}
+                              forks={colors.forks}
+                              key={slot.key}
+                              onIntent={onIntent}
+                              onTyping={card => typing(columnView.tipId, card)}
+                              path={paths[slot.position] ?? new Set()}
+                              position={slot.position}
+                              readOnly={
+                                workspace.kind === "root"
+                                  ? workspace.readOnly
+                                  : null
+                              }
+                              shown={shown}
+                              track={slot.track}
+                              view={columnView}
+                            />
+                          )
+                        })}
+                      </div>
+                    </>
+                  )}
+                  {layout.board && boardShown !== null && (
+                    <Board
+                      onClearFilter={clearBoardFilter}
+                      onIntent={onIntent}
+                      pip={pip}
+                      readers={readers}
+                      searchRef={boardSearchField}
+                      thread={(end, root) => thread(end, end, root)}
+                      view={boardShown}
+                    />
+                  )}
+                </ReviewPrefsContext>
+              </NarrowContext>
+            </ThreadStates>
           </TrackSeed>
         </main>
         {page !== null && (

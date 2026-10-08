@@ -203,6 +203,11 @@ export function fakeDocuments(input: {
       for (const listener of releasing) await listener(root)
       roots.delete(root)
     },
+    destroy: async root => {
+      if (roots.has(root))
+        for (const listener of releasing) await listener(root)
+      roots.delete(root)
+    },
     loaded: () => [...roots.keys()],
     onOpened(listener) {
       for (const [root, doc] of roots) listener(root, doc)

@@ -283,7 +283,8 @@ would refuse each whole undo of a move (S82).
   opens; delete them by hand. The startup sweep removes the texts no record
   names.
 - **A gone card is stored under its reason** (ADR-0111): kind `discarded`,
-  its history's root in `root` ("" for none), and who discarded it in
+  or `spun` for a card made a thread, with that thread's root in `column`;
+  its history's root in `root` ("" for none), and who moved it there in
   `holder`. No new field, so no migration.
 - **`holder`** is whose inventory holds a card (`CardPlace` `inventory`);
   rows written before it existed do not decode, and no stored session held

@@ -1065,8 +1065,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the column does not know who you are",
     file: "packages/web/column.tsx",
-    from: "            reader={{ me: p.session.writer, nameOf: p.nameOf }}\n            prefill={p.column.fresh?.prefill}",
-    to: '            reader={{ me: "w-nobody" as WriterId, nameOf: p.nameOf }}\n            prefill={p.column.fresh?.prefill}',
+    from: "              reader={{ me: p.session.writer, nameOf: p.nameOf }}\n              prefill={p.column.fresh?.prefill}",
+    to: '              reader={{ me: "w-nobody" as WriterId, nameOf: p.nameOf }}\n              prefill={p.column.fresh?.prefill}',
     suite: "browser",
     scenario: "page",
     expect:
@@ -1132,6 +1132,36 @@ export const mutations: readonly Mutation[] = [
     scenario: "tools",
     expect:
       "the header's mark pulses while the agent works, and stops when it ends",
+  },
+  {
+    name: "the footer's states take no card",
+    file: "packages/web/board.tsx",
+    from: '      {...(state.closed ? {} : dropProps({ kind: "state", state: state.id }))}',
+    to: "      {...{}}",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "a card dropped on a state in the footer's strip becomes a thread there, and the undo key lifts it back into the card",
+  },
+  {
+    name: "the dock grows past a third of the column",
+    file: "packages/web/index.html",
+    from: "      .dock { flex: 0 0 auto; max-height: 33%;",
+    to: "      .dock { flex: 0 0 auto; max-height: none;",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "the dock keeps the queue's header in view past a third of the column",
+  },
+  {
+    name: "the queue's header scrolls away in the dock",
+    file: "packages/web/index.html",
+    from: "      .queue-head { position: sticky;",
+    to: "      .queue-head { position: static;",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "the dock keeps the queue's header in view past a third of the column",
   },
   {
     name: "the working line takes height",
@@ -1735,9 +1765,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "queued cards are not drawn",
-    file: "packages/web/column.tsx",
-    from: "              {queued.map(c =>",
-    to: "              {queued.slice(0, 0).map(c =>",
+    file: "packages/web/dock.tsx",
+    from: "          {queued.map(c =>",
+    to: "          {queued.slice(0, 0).map(c =>",
     suite: "browser",
     scenario: "page",
     expect:
@@ -1855,8 +1885,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a client cannot read a full inventory",
     file: "packages/protocol/codec.ts",
-    from: '  "full",\n  "not-yours",\n  "fact",\n  "order-changed",\n]',
-    to: '  "not-yours",\n  "fact",\n  "order-changed",\n]',
+    from: '  "full",\n  "not-yours",\n  "fact",\n  "order-changed",\n  "replied",\n]',
+    to: '  "not-yours",\n  "fact",\n  "order-changed",\n  "replied",\n]',
     suite: "host",
     scenario: "cards",
     expect: "the nineteenth card is refused: the inventory is full",
@@ -2134,9 +2164,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a queued card's box is keyed by its place in line",
-    file: "packages/web/column.tsx",
-    from: "                    held={(shows.queue?.heldBy ?? null) !== null}\n                    key={c.id}\n",
-    to: "                    held={(shows.queue?.heldBy ?? null) !== null}\n                    key={queued.indexOf(c)}\n",
+    file: "packages/web/dock.tsx",
+    from: "                }\n                key={c.id}\n",
+    to: "                }\n                key={queued.indexOf(c)}\n",
     suite: "browser",
     scenario: "page",
     expect:
@@ -2144,9 +2174,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "unqueue all does nothing on the page",
-    file: "packages/web/column.tsx",
-    from: '          onClick={() => p.onAct({ kind: "unqueueAll", lane })}',
-    to: "          onClick={() => {}}",
+    file: "packages/web/dock.tsx",
+    from: '  else if (item === "unqueue-all") onAct({ kind: "unqueueAll", lane })',
+    to: '  else if (item === "unqueue-all") void 0',
     suite: "browser",
     scenario: "page",
     expect:

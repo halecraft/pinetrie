@@ -317,10 +317,12 @@
          it loads. */
       .initial img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
       .initial.more { background: #3a3f48; color: #bbb; }
-      /* What became of a column's files, above its composer (ADR-0040): the offer
+      /* What became of a column's files, in its header (ADR-0040): the offer
          in your repo (ADR-0038), or where a lane that works directly writes. */
       .work { display: flex; flex-wrap: wrap; align-items: center; gap: .35rem .5rem;
         padding: .35rem .75rem; border-top: 1px solid #23272e; font-size: .75rem; color: #8b93a1; }
+      /* A row of the column's header (ADR-0113). */
+      .column-head .work { padding: .15rem 0 0; border-top: 0; user-select: text; }
       .work .work-space { flex: 1; }
       .work button { padding: .1rem .5rem; font-size: .75rem; background: none;
         border: 1px solid #444; color: #bbb; }
@@ -642,17 +644,36 @@
         padding: 0 .3rem; font-size: .65rem; line-height: 1.1rem; color: #e0c080; background: var(--page); }
       /* In outline, the running ask's own line says the agent works. */
       .column[data-density="outline"] .working-line { display: none; }
-      .stop, .resume { margin: 0 .75rem .35rem; padding: .1rem .6rem;
-        font-size: .75rem; background: none; border: 1px solid #f28b82;
-        color: #f28b82; }
-      .resume { border-color: #8ab4f8; color: #8ab4f8; }
-      /* A thread's queue (ADR-0048 step 7): quiet until it is held. */
-      .queue-controls { display: flex; gap: .5rem; align-items: center;
-        margin: 0 .75rem .35rem; font-size: .72rem; color: #8b949e; }
-      .queue-controls button { padding: .05rem .45rem; font-size: .72rem;
-        background: none; border: 1px solid #3a3f47; color: #8b949e; }
-      .queue-controls[data-held] .queue-held { color: #e8c07a; }
-      .queue-controls[data-held] .release-queue { border-color: #e8c07a; color: #e8c07a; }
+      /* A column's dock (ADR-0113): the queue's header, the queued cards, the
+         line, your message and the notes line, pinned to the column's foot.
+         At most a third of the column: past that it scrolls within, its
+         queue header kept in view. */
+      .dock { flex: 0 0 auto; max-height: 33%; overflow-y: auto; border-top: 1px solid #23272e; }
+      .queue-head { position: sticky; top: 0; z-index: 1; display: flex; gap: .5rem;
+        align-items: center; padding: .3rem .75rem; font-size: .72rem; color: #8b949e;
+        background: var(--page); }
+      .queue-head .next-state { flex: 1; }
+      .queue-head .next-state[data-next="held"] { color: #e8c07a; }
+      .queue-head .next-state[data-next="running"] { color: #8ab4f8; }
+      .queue-head[data-next="run"] .next-state::before { content: "▸ "; }
+      .next-button { padding: .05rem .55rem; font-size: .72rem; background: none;
+        border: 1px solid #3a3f47; color: #c3c8d0; }
+      .next-button.stop { border-color: #f28b82; color: #f28b82; }
+      .next-button.resume { border-color: #8ab4f8; color: #8ab4f8; }
+      .next-button.release-queue { border-color: #e8c07a; color: #e8c07a; }
+      .queue-menu-trigger { padding: 0 .35rem; background: none; border: 0; color: #8b93a1; }
+      .queue-cards { padding: 0 .75rem; }
+      /* A queued card at rest is folded to its header and first line; it
+         opens while it holds the focus. ▸ marks the one that goes next. */
+      .queued-card { position: relative; }
+      .queued-card[data-next]::before { content: "▸"; position: absolute; left: -.65rem; top: .2rem;
+        font-size: .72rem; color: #58a6ff; }
+      .dock .card-editor.queued { margin-bottom: .3rem; }
+      .add-to-queue { margin: 0 .75rem .3rem; padding: 0; background: none; border: 0;
+        font-size: .72rem; color: #8b93a1; cursor: pointer; }
+      .add-to-queue:hover { color: #ddd; }
+      .the-line { margin: 0 .75rem; border: 0; border-top: 1px dashed #3a3f47; }
+      .dock[data-next="message"] .composer .send::before { content: "▸ "; }
       /* Someone else asked first: the sender chooses to wait or to branch. */
       .conflict { font-size: .8rem; color: #d0a15f; margin-bottom: .35rem; }
       .conflict button { padding: .1rem .5rem; font-size: .75rem; }
@@ -664,18 +685,21 @@
         padding: .15rem .6rem; font-size: .75rem; background: #1d2a3a; color: #9ecbff;
         border: 1px solid #9ecbff; border-radius: 1rem; white-space: nowrap; }
 
-      .composer { padding: .5rem .75rem .75rem; border-top: 1px solid #23272e; }
+      .composer { padding: .5rem .75rem .75rem; }
       /* An archived root, or a send on its way: what was typed
          stays, and nothing more is typed. */
       .card-editor .input[readonly] { opacity: .5; }
-      /* The notes at this end (ADR-0113), above your composer. With none, a
-         drop zone shown only while a card is dragged, as the empty pinned
-         strip is. */
+      /* The notes at this end (ADR-0113), under your message, opening the
+         notes board; a drop on it makes a note. */
       .notes-line { display: flex; align-items: center; gap: .5rem; padding: .3rem .75rem;
         border-top: 1px solid #23272e; font-size: .75rem; }
       .notes-toggle { background: none; border: 0; padding: .1rem 0; color: #8b93a1; cursor: pointer; }
       .notes-toggle[aria-expanded="true"] { color: #ddd; }
       body[data-card-drag] .notes-line { outline: 1px dashed #6f7784; outline-offset: -2px; }
+      /* While a card is dragged, the places it can become a thread (ADR-0111):
+         a workflow state, on the board or the footer's strip, and the sidebar. */
+      body[data-card-drag] [data-put-state],
+      body[data-card-drag] .sidebar-items { outline: 1px dashed #6f7784; outline-offset: -2px; }
       /* A text card's frame (ADR-0111), coloured by its place, which says who
          reads it: your inventory yours, a draft neutral, queued blue (the
          agent reads it once), pinned violet (on every run). */
@@ -715,6 +739,11 @@
 
       .typing { font-size: .75rem; color: #8b93a1; margin-bottom: .3rem; font-style: italic; }
       .card-editor .input { display: block; width: 100%; resize: vertical; }
+      /* A queued card in the dock, at rest: its header and one line. */
+      .dock .card-editor.queued:not(:focus-within) .card-foot { display: none; }
+      .dock .card-editor.queued:not(:focus-within) .input { height: 1.9rem;
+        padding: .2rem .7rem; line-height: 1.4rem; overflow: hidden; resize: none;
+        white-space: nowrap; text-overflow: ellipsis; }
       /* Commands matching what is typed (ADR-0036), above the input. */
       .card-editor .command-menu { margin: 0 0 .25rem; padding: .25rem 0; max-height: 12rem; overflow-y: auto; background: #1b1f25; border: 1px solid #2d333b; border-radius: 4px; }
       .card-editor .command { padding: .15rem .5rem; cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -728,11 +757,11 @@
         margin-top: .4rem; }
       .compose-row .send { max-width: 14rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
       .card-foot .compose-row { flex: 1; margin-top: 0; }
-      /* Queued for the thread's lane, above the line: not in the tree yet,
-         and editable by anyone until the host takes it (ADR-0048). */
       /* Something of yours refused, said where you acted (ADR-0059). */
       .refused-move { font-size: .75rem; color: #d0a15f; margin: 0 0 1rem; }
-      .queued-fact { font-size: .75rem; color: #8b949e; margin: 0 0 .5rem; }
+      .dock > .refused-move { margin: .3rem .75rem 0; }
+      /* A host's fact in the queue: nobody edits or moves it (ADR-0080). */
+      .queued-fact { font-size: .75rem; color: #8b949e; margin: 0 0 .3rem; }
       /* Pinned cards (ADR-0048 step 5): the thread's direction, at the top of
          its column and outside its scrolling body; the agent reads them on
          every run. Empty, a slim drop zone. */
@@ -985,6 +1014,9 @@
       .board-open { display: flex; gap: .35rem; align-items: center; padding: 0; background: none;
         color: #e6e6e6; text-align: left; line-height: 1.25; }
       .board-label { flex: 1; min-width: 0; }
+      /* A titled card's first line, under its header (ADR-0111). */
+      .board-body { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+        font-size: .75rem; color: #8b949e; }
       .board-meta { display: flex; align-items: center; gap: .4rem; min-height: 22px; }
       .board-writers { color: #8b949e; font-size: .72rem; }
       .readers { display: inline-flex; gap: .1rem; margin-left: auto; }

@@ -43,6 +43,40 @@ export const mutations: readonly Mutation[] = [
     expect: "release, held: released",
   },
   {
+    name: "a card made in the queue loses its command",
+    file: "packages/rules/queue-hold.ts",
+    from: "    move.from === null && input.command !== null\n",
+    to: "    false && input.command !== null\n",
+    command: unit,
+    expect:
+      "a card made in the queue carries its command from its first write, and hold-if-idle holds an idle queue first",
+  },
+  {
+    name: "a reply does not stop the lift",
+    file: "packages/rules/spin-off.ts",
+    from: '    if (second !== undefined) return { kind: "replied", by: second }\n',
+    to: "",
+    command: unit,
+    expect: "a reply: refused, naming who wrote second",
+  },
+  {
+    name: "a card made a thread asks the agent",
+    file: "packages/rules/spin-off.ts",
+    from: '    mentions: parseMentions(text).filter(m => m.kind !== "agent"),',
+    to: "    mentions: parseMentions(text),",
+    command: unit,
+    expect:
+      "the thread's first message is the card's text, trimmed, naming no agent; the card goes gone, spun into it",
+  },
+  {
+    name: "a blank message holds up the queue",
+    file: "packages/rules/card.ts",
+    from: "  const top = queue.find(c => !facts.blank.has(c.id))\n",
+    to: "  const top = queue[0]\n",
+    command: unit,
+    expect: "a blank top card with a card behind: the second pops",
+  },
+  {
     name: "a discarded card is kept for good",
     file: "packages/rules/card-history.ts",
     from: "      return last === undefined || input.now - last.at > GONE_KEEP_MS",
@@ -1226,8 +1260,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a plain card is planned as a catch-up",
     file: "packages/rules/card.ts",
-    from: '  return blank ? { kind: "discard" } : { kind: "send" }',
-    to: '  return { kind: "catch-up", command: "bring-up-to-date", after: blank ? "discard" : "send" }',
+    from: '  return { kind: "send" }\n}',
+    to: '  return { kind: "catch-up", command: "bring-up-to-date", after: "send" }\n}',
     command: unit,
     expect: "a message",
   },

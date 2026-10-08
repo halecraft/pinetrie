@@ -19,6 +19,7 @@ import {
   NO_MOVES,
   type Pending,
   pendingOf,
+  queuedDraft,
   slotOnAccept,
   stampSeen,
   withPending,
@@ -177,6 +178,24 @@ describe("the tab's moves (ADR-0059)", () => {
       order: "\uffff",
       by: ME,
     })
+  })
+
+  test("a card made in the queue is drawn there at once, with its command, and nowhere else", () => {
+    const made = { card: C1, from: null, to: queuedKey } as const
+    const draft = queuedDraft(made, ME, "split")
+    expect(draft).toEqual({
+      id: C1,
+      owner: ME,
+      placer: ME,
+      place: { ...queuedKey, order: "\uffff", by: ME },
+      carries: { kind: "message", command: "split" },
+      unsent: null,
+    })
+    const s = run([
+      sent(pendingOf("m-2", made, { actedAt: COLUMN, slot: null }, draft)),
+    ])
+    expect(withPending([], s, ME).map(c => c.place.kind)).toEqual(["queued"])
+    expect(queuedDraft(queueIt.move, ME, "split")).toBeNull()
   })
 
   test("a reorder is drawn where the host would put it, its queuer kept, until the copy reaches its rev (ADR-0048 step 7)", () => {

@@ -420,11 +420,15 @@ which are swept.
   (`orderAfter`), so string order is numeric order and there is room before
   and between; `orderBetween` is a step from one open end or the midpoint,
   null when none fits. Only the host assigns them (`planMove`,
-  `planReorder`). `planNextQueuedCardPop` answers `idle` while the lane runs
-  or nothing is queued; `held` when its queue is held and its top card is a
-  message; `typing` when someone types in its top card (presence
-  `typingIn`); else `pop`. A fact on top is popped whatever the hold or the
-  typing: it is nobody's instruction, and starts no run. `planUnsent` is the
+  `planReorder`). `planNextQueuedCardPop` passes over blank messages
+  (`isBlankMessage`: no command, only whitespace; the caller names them,
+  ADR-0113), which stay where they are; of the rest, the top card is the
+  one it speaks of. It answers `idle` while the lane runs or nothing is
+  queued; `held` when its queue is held and its top card is a message;
+  `typing` when someone types in its top card (presence `typingIn`);
+  `blank` when every card queued is blank; else `pop`. A fact on top is
+  popped whatever the hold or the typing: it is nobody's instruction, and
+  starts no run. `planUnsent` is the
   step a refused pop writes back: a note where it was queued, saying why,
   never queued.
 - **`planCardSweep`**: records whose text is empty and that carry no
@@ -458,7 +462,34 @@ not `pinetrie:live`, so it lasts until a release, across a restart.
   if it is accepted, `planQueueHold` for the hold. `hold-if-idle` holds
   nothing on a running lane. The host writes the hold before it carries the
   move, so the move's drain finds the queue as planned. A send on an idle
-  held thread is `release`: sending removes the hold.
+  held thread is `release`: sending removes the hold. A move with no `from`
+  makes the card in the queue, carrying the request's `command` in its
+  first write: a command sent as `set-command` after it could arrive after
+  the drain popped the card plain. A card is never made elsewhere to be
+  queued: a note is a place of its own, not a step on the way.
+
+# A card made a thread (`spin-off.ts`, `root.ts`, ADR-0111)
+
+- **`planSpinOff`** checks a spin-off before anything is written: its move
+  must be to gone, spun into a root (`GoneWhy` `spun`, the thread in it);
+  that root's id must be free; the card's text, trimmed, not blank; and the
+  move as `planMove` decides it, so a card someone moved first, or one in
+  another's inventory, is refused as any move is. It returns the thread's
+  first message (the text, its mentions without the agent: a conversation
+  root has no lane) and the card's write.
+- **`planLiftRoot`** decides an undo that would move cards spun into
+  threads (S139: the host reads them from the stack's `top` first). Each
+  thread the directory still names must hold its first message alone (its
+  tree's writers, oldest first), with no lane and no card in it but those
+  the undo moves; otherwise `replied`, naming who wrote second (null for
+  the agent, a lane or a card). A thread already gone lifts nothing.
+- **`planRootDelete`** (`root.ts`) is what deleting a lifted thread
+  writes: its directory record (`ROOT`) and board place (`BOARD`) deleted,
+  every card still in it removed, its document named for destruction, and
+  its root for its stacks to be unloaded; `planHistorySweep` retires those
+  stacks at the next start, as for any root the directory lacks.
+- **The history's verb is `spun`** (`verbOf`): "spun off into a thread by
+  Ada", and a trace "Ada made a thread of this".
 
 # Card history and traces (`card-history.ts`, ADR-0048 step 6)
 
@@ -635,7 +666,7 @@ who resumed and their name then, for the column's line ("↻ resumed by
 Ada"). It is a prompt, so its run is an ask of its own (`PROMPT_ROLES`).
 
 - **`carryOnState` is the one rule**, read by the host's `planCarryOn` and
-  the column's run button: the lane does not run and has no cards waiting,
+  the dock's `nextOf` (`@pinetrie/interface`): the lane does not run and has no cards waiting,
   unless its queue is held (ADR-0048 step 7: held cards wait for a release,
   not this turn), and the ask at its tip ended stopped (`askOutcome`). A message written after the stop is
   the tip's ask, with no work, so it refuses; an update is no ask, so it
@@ -1160,7 +1191,7 @@ the tip it must match, and the bookmark to leave on it.
   running one. It is never written into a running lane.
 - **The drain plans before it acts** (`planCarry`, `card.ts`): a fact, a
   catch-up and what follows it (`after`: the text, or nothing), a split
-  with its brief, a message, or a discard. A property named `then` is
+  with its brief, or a message. A property named `then` is
   forbidden by the linter, hence `after`.
 - **`planBaseNews` is one decision** for a lane whose base has new work:
   `tell` (a behind entry, `pinetrie.behind`, before the run's prompt and its

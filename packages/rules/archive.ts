@@ -162,6 +162,10 @@ export function writesIn(
     // A card queued writes in its queue's root.
     case "queue-card":
       return only(intent.move.to.kind === "queued" ? intent.move.to.root : null)
+    // A spin-off writes a new root, in no archive, and the card's move in
+    // the root its gone place names.
+    case "spin-off":
+      return only(intent.move.to.kind === "gone" ? intent.move.to.root : null)
     // A reorder stays in the place it names.
     case "reorder":
       return [intent.reorder.at.root]

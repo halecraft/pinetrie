@@ -12,6 +12,7 @@
 import {
   createUndoStack,
   type Exchange,
+  type Step,
   type UndoneWhole,
   type UndoStack,
 } from "@kyneta/exchange"
@@ -28,6 +29,15 @@ import type { Gesture } from "./places.ts"
 export interface MoveHistories {
   /** One step of `writer`'s history in `root`, its stack loaded first. */
   gestureOf(writer: WriterId, root: RootId): Promise<Gesture>
+  /**
+   * The step `step` would try first, without reverting it: its parts name
+   * the cards it moves (S139). Undefined for none.
+   */
+  top(
+    writer: WriterId,
+    root: RootId,
+    direction: MoveDirection,
+  ): Promise<Step | undefined>
   /** Undo or redo `writer`'s newest step in `root`, whole or refused. */
   step(
     writer: WriterId,
@@ -82,6 +92,9 @@ export function createMoveHistories(exchange: Exchange): MoveHistories {
     async gestureOf(writer, root) {
       const stack = await stackOf(writer, root)
       return write => stack.gesture(write)
+    },
+    async top(writer, root, direction) {
+      return (await stackOf(writer, root)).top(direction)
     },
     async step(writer, root, direction) {
       const stack = await stackOf(writer, root)

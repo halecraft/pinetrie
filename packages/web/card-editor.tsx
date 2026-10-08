@@ -82,6 +82,7 @@ import {
 } from "react"
 import { CardFrame } from "./card-frame.tsx"
 import { Menu } from "./menu.tsx"
+import { useThreadStates } from "./thread-states.ts"
 import { useStable } from "./use-stable.ts"
 
 /**
@@ -191,6 +192,7 @@ export function CardEditor(p: {
   onLeave: (() => void) | undefined
 }) {
   const { session, prefill, pending } = p
+  const threadIn = useThreadStates()
   const pins = p.place?.kind === "pinned"
   const box = useRef<HTMLTextAreaElement>(null)
   const [state, setState] = useState<EditorState>(() =>
@@ -464,6 +466,7 @@ export function CardEditor(p: {
         ? { lane: p.lane.name, at: p.at }
         : null,
     readOnly: readOnly !== null,
+    threadIn,
   })
 
   return (
@@ -790,6 +793,7 @@ export function NoteCardEditor(p: {
     me: p.session.writer,
     queueOn: p.queueOn,
     readOnly: p.readOnly !== null,
+    threadIn: useThreadStates(),
   })
   return (
     <BoundCardEditor

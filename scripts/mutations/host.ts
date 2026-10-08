@@ -1086,6 +1086,15 @@ export const mutations: readonly Mutation[] = [
     expect: "its card is queued behind the others",
   },
   {
+    name: "a lifted thread is kept",
+    file: "apps/pinetrie/host/commands/cards.ts",
+    from: "          for (const thread of lift.delete) await deleteRoot(thread)\n",
+    to: "",
+    command: unit,
+    expect:
+      "an undo while the thread holds its first message alone lifts it back: the card where it was, the thread deleted",
+  },
+  {
     name: "a spent card keeps its text",
     file: "apps/pinetrie/host/commands/cards.ts",
     from: '      if (s.kind === "remove") await deps.cards.destroy(s.id)',
@@ -1447,7 +1456,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an aborted wait never ends",
     file: "apps/pinetrie/host/cards.ts",
-    from: '        signal?.addEventListener("abort", done, { once: true })',
+    from: '    signal?.addEventListener("abort", done, { once: true })',
     to: "",
     command: unit,
     expect: "an aborted whenHolds resolves",

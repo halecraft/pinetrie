@@ -38,7 +38,6 @@ import {
 import {
   baseMovedOn,
   type CatchUpNow,
-  carryOnState,
   catchUpName,
   catchUpOf,
   displayName,
@@ -55,13 +54,12 @@ import {
   type QueuedCard,
 } from "@pinetrie/rules"
 import type { OfferActing } from "@pinetrie/session"
-import { type ControlWords, commandWords } from "./card-words.ts"
+import { commandWords } from "./card-words.ts"
 import type { ColumnView } from "./column-paths.ts"
 import type { Column } from "./columns.ts"
 import { ago, count } from "./counts.ts"
 import { speakerLabel } from "./names.ts"
 import { outcomeWords } from "./outcome-words.ts"
-import type { Reader } from "./send.ts"
 
 /** The agent's mark, wherever the agent or a lane of it is named. */
 export const AGENT_MARK = "✦"
@@ -305,52 +303,6 @@ export interface ColumnShows {
   readonly behind: { readonly mark: string; readonly title: string } | null
   /** The thread this one branched from, and where both stand (ADR-0072); null for none. */
   readonly parent: ParentNow | null
-  /** The button for the thread's run, above the composer; null for none. */
-  readonly run: RunButton | null
-  /** Its queue's hold and unqueue all, beside the run button; null for none. */
-  readonly queue: QueueControls | null
-}
-
-/**
- * A thread's queue controls (ADR-0048 step 7): hold it, or release it, and
- * unqueue every card. A column that cannot be written, or whose thread has no
- * lane, has none: there is no queue.
- */
-export interface QueueControls {
-  readonly lane: LaneName
-  /** Who holds the queue; null when it is not held. */
-  readonly heldBy: WriterId | null
-  /** The message cards queued: what a release sends, and unqueue all takes back. */
-  readonly messages: number
-}
-
-function queueControls(f: ColumnFacts): QueueControls | null {
-  const { lane } = f
-  if (!f.writable || lane.kind !== "lane") return null
-  const messages = f.queued.filter(c => c.carries.kind === "message").length
-  return {
-    lane: lane.name,
-    heldBy: lane.heldBy,
-    messages,
-  }
-}
-
-/**
- * Stop while the thread's lane runs; Resume while it may carry on after a
- * stop (`carryOnState`, ADR-0082), each named by the request it sends. One
- * needs the lane running, the other idle, so the two never hold at once.
- */
-export interface RunButton {
-  readonly kind: "stop" | "carry-on"
-}
-
-function runButton(f: ColumnFacts): RunButton | null {
-  const { lane } = f
-  if (!f.writable || lane.kind !== "lane") return null
-  if (lane.running) return { kind: "stop" }
-  return carryOnState(lane, { index: f.index, asks: f.asks }).kind === "ok"
-    ? { kind: "carry-on" }
-    : null
 }
 
 /**
@@ -408,8 +360,6 @@ export function columnView(f: ColumnFacts): ColumnShows {
     base: baseWords(head === null ? undefined : work.bases.get(head)),
     behind,
     parent,
-    run: runButton(f),
-    queue: queueControls(f),
   }
 }
 
@@ -648,69 +598,6 @@ export function activityOf(
 }
 
 // ── words ─────────────────────────────────────────────────────────────────
-
-/** The run button's label, title and class. */
-export const runWords = (run: RunButton): ControlWords =>
-  run.kind === "stop"
-    ? {
-        label: "Stop",
-        title: "end the agent's turn here; cards queued are then held",
-        className: "stop",
-      }
-    : {
-        label: "Resume",
-        title:
-          "carry on from where the agent was stopped: a new turn, with a message from the host",
-        className: "resume",
-      }
-
-/**
- * The queue controls in words (ADR-0048 step 7): "hold queue", or who holds
- * it and "send queue (n)", which releases it ("release" with nothing to
- * send, ADR-0113); and "unqueue all" when a card waits.
- */
-export function queueControlWords(
-  controls: QueueControls,
-  reader: Reader,
-): {
-  /** Who holds the queue, said beside the release; null when it is not held. */
-  readonly held: string | null
-  readonly hold: ControlWords
-  readonly unqueueAll: ControlWords | null
-} {
-  const { heldBy } = controls
-  return {
-    held:
-      heldBy === null
-        ? null
-        : heldBy === reader.me
-          ? "queue held by you"
-          : `queue held by ${displayName(heldBy, reader.nameOf.get(heldBy))}`,
-    hold:
-      heldBy === null
-        ? {
-            label: "hold queue",
-            title: "nothing queued here is sent until someone releases it",
-            className: "hold-queue",
-          }
-        : {
-            label:
-              controls.messages === 0
-                ? "release"
-                : `send queue (${controls.messages})`,
-            title: "release the hold: what is queued here is sent, in order",
-            className: "release-queue",
-          },
-    unqueueAll:
-      controls.messages > 0
-        ? {
-            label: "unqueue all",
-            title: "take every queued card back below the line",
-            className: "unqueue-all",
-          }
-        : null,
-  }
-}
 
 const BUTTON_LABEL: Record<
   Exclude<

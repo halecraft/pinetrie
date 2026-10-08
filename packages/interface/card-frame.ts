@@ -10,6 +10,7 @@ import type {
   CardRecord,
   LaneName,
   Position,
+  WorkflowState,
   WriterId,
 } from "@pinetrie/core"
 import { commandOf } from "@pinetrie/core"
@@ -46,8 +47,14 @@ export type CardState =
 /** The footer's one primary action: put for the inventory, send for your message. */
 export type CardPrimary = "put" | "send"
 
-/** Where a Move to ▸ item takes a card. */
-export type CardMoveTo = "message" | "note" | "queue" | "pinned" | "inventory"
+/** Where a Move to ▸ item takes a card: a place, or a new thread in a state (ADR-0111). */
+export type CardMoveTo =
+  | "message"
+  | "note"
+  | "queue"
+  | "pinned"
+  | "inventory"
+  | { readonly kind: "thread"; readonly state: WorkflowState }
 
 /** One Move to ▸ item: the move a drag makes there. */
 export interface CardMoveItem {
@@ -93,6 +100,8 @@ export interface CardFrameFacts {
   readonly held?: boolean
   /** A pinned card's standing (`pinnedStatus`); absent or null for none. */
   readonly pinned?: PinnedStatus | null
+  /** The board's open states, where a note or your message may start a thread; absent for none. */
+  readonly threadIn?: readonly WorkflowState[]
 }
 
 const moveItems = (
@@ -122,6 +131,12 @@ const moveItems = (
     to: "inventory",
     act: { kind: "takeIntoInventory", card: id },
   }
+  const threads = (facts.threadIn ?? []).map(
+    (state): CardMoveItem => ({
+      to: { kind: "thread", state },
+      act: { kind: "spinOff", card: id, state: state.id },
+    }),
+  )
   switch (place.kind) {
     case "composing":
       return [
@@ -129,6 +144,7 @@ const moveItems = (
         ...queue,
         pin,
         take,
+        ...threads,
       ]
     case "note":
       return [
@@ -136,6 +152,7 @@ const moveItems = (
         ...queue,
         pin,
         take,
+        ...threads,
       ]
     case "queued":
       return [
@@ -278,7 +295,7 @@ const ICON: Readonly<Record<Exclude<CardTone, "queued">, string>> = {
   pinned: "⚑",
 }
 
-const MOVE: Readonly<Record<CardMoveTo, MoveWords>> = {
+const MOVE: Readonly<Record<Exclude<CardMoveTo, object>, MoveWords>> = {
   queue: {
     label: "Move to the queue",
     title: "queue it on this thread: the agent reads it once",
@@ -303,7 +320,17 @@ const MOVE: Readonly<Record<CardMoveTo, MoveWords>> = {
 }
 
 /** A Move to ▸ item in words. */
-export const moveWords = (to: CardMoveTo): MoveWords => MOVE[to]
+export const moveWords = (to: CardMoveTo): MoveWords =>
+  typeof to === "string"
+    ? MOVE[to]
+    : {
+        label: `Move to a new thread in ${to.state.name}`,
+        title: `a conversation of its own, its first message this card, in ${to.state.name} on the board`,
+      }
+
+/** A Move to ▸ item's key, and its `data-to`: a place, or `thread:` and a state. */
+export const moveKey = (to: CardMoveTo): string =>
+  typeof to === "string" ? to : `thread:${to.state.id}`
 
 const stateWords = (state: CardState): string | null => {
   switch (state.kind) {

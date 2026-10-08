@@ -510,14 +510,33 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   `.msg.assistant.streaming`, and its mark is a 2px bar in the gutter, drawn
   by a border image outside the box, which takes no width: text wraps as its
   entry will.
-- **The run button** shows above the composer: **Stop** while the thread's
-  lane runs, sending `stop`; **Resume** while the lane may carry on after a
-  stop (`carryOnState`, ADR-0082), sending `carry-on`. `columnView` decides
-  it (`run`) and `runWords` words it. It is the column's, not a card's, and
-  never shows read-only. The host records who stopped under the ask
-  (`pinetrie.stop`, ADR-0106). The button is `.stop` or `.resume`: the
-  browser suite reads `.stop` as "the lane runs" (`page.ts`), and a
-  carry-on message's row is `.msg.carry-on`.
+- **The dock** (`dock.tsx`, ADR-0113) is the column's foot, after the
+  scrolling body: the queue's header (`.queue-head`, sticky), the queued
+  cards (`.queue-cards`, each a `QueuedCardEditor` in a `.queued-card`, a
+  fact a `.queued-fact`), "+ add to queue" (`.add-to-queue`), the line
+  (`.the-line`), the column's notices, then what `Column` puts in it: your
+  message (`Composer`) and the notes line. CSS caps it at a third of the
+  column (`.dock`'s `max-height`) and it scrolls within. It reads presence
+  (`readTypingIn`) and the queued cards' texts (`useCardTexts`) itself, for
+  `queueHead`, so typing redraws the dock and not the column (S59).
+  - **The header's one button** (`.next-button`) is `.stop` (sending
+    `stop`), `.resume` (`carry-on`) or `.release-queue` ("send queue (n)",
+    the `holdQueue` act). Its ⋯ (`.queue-menu-trigger`) holds `.resume`,
+    `.hold-queue`, `.release-queue` ("release hold") and `.unqueue-all`.
+    The browser suite reads `.stop` as "the lane runs" (`page.ts`), and a
+    carry-on message's row is `.msg.carry-on`. No header is drawn
+    read-only, nor for a thread with no lane.
+  - **▸** is a `data-next`: on `.queue-head` (the run), on the
+    `.queued-card` that goes next, or on `.dock` (`message`: your send).
+  - **A queued card folds by CSS alone**: its box stays mounted, one line
+    high, its footer hidden, until it holds the focus
+    (`.card-editor.queued:not(:focus-within)`). A component that swapped a
+    face for the editor would remount the box and lose the caret, which
+    Alt+↑ must keep.
+  - **"+ add to queue"** is the `queueNew` act with `hold-if-idle`; the dock
+    focuses the new card's box once it is drawn.
+  - **A queued card revealed** (an undo, a trace) is scrolled to in its
+    dock (`revealCard`, `useRevealCard`), apart from the thread's scroll.
 - **What the agent is doing shows in three places, none taking layout**
   (ADR-0054). `running` (`lane.running`, Stop's fact) is computed once in
   `Column`.
@@ -558,7 +577,8 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
 - **A column's header** (ADR-0040) names who works in it (`✦ amber-fox`,
   `✦ new agent`, or nothing in a conversation), then, in a second row, where
   it forks. It shows no commit and nothing of where the lane works.
-- **The work strip** (`WorkStripView`, above the composer) is the lane's
+- **The work strip** (`WorkStripView`, a row of the column's header,
+  ADR-0113) is the lane's
   offer for its own copy (ADR-0105): `offerWords`' line, which opens the
   review while the offer is open and holds files (ADR-0047, below), the
   bookmark apart, which a press copies to find it in jj or jjui, its
@@ -568,14 +588,13 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   prompt's role) comes first: while it runs, accepted work counts files so far
   and offers nothing. A lane with no copy of its own has no strip.
 - **Catching up and splitting are a card queued at once** (ADR-0108,
-  ADR-0061, ADR-0080): the button is the `queueCommand` act, which creates a
-  card at the thread's end with the command and no text, then queues it,
-  two effects in that order. A split waits while the thread works, and a
+  ADR-0061, ADR-0080): the button is the `queueNew` act, which makes a card
+  in the queue with the command and no text, in one `queue-card` request:
+  it is never drawn as a note. A split waits while the thread works, and a
   queued one makes the strip's split button quiet (`offerView`'s
-  `queued`); only a catch-up makes the offer busy. The
-  host handles the two in order, so the command is set before the queue's
-  move starts the drain that pops the card. Your card in the composer is not
-  touched. A card that carries a command anyway (one unqueued) says above its box what
+  `queued`); only a catch-up makes the offer busy. The card carries its
+  command from its first write, so the drain the queueing starts pops it
+  with it. Your message in the composer is not touched. A card that carries a command anyway (one unqueued) says above its box what
   sending it does first (`commandNote`), its placeholder says its text is
   optional, and its button names the command (`commandSendWords`: "catch
   up", "catch up and send", "split"), its queue place in the title. The card is
@@ -966,6 +985,24 @@ stays in view; the strip scrolls past 30vh.
 - **Selectors for the browser suite:** `.trace` (with `data-trace`, its ids)
   inside `.traces`; `.card-history-box` and its `li[data-event]`;
   `.moved-back`.
+
+## Thread cards (`thread-card.tsx`, ADR-0111)
+
+- **`ThreadHead` draws a thread card's header** for the board's cards and
+  the sidebar's items from the same `ThreadCardHead`: the mark, the label
+  (`.board-label` or `.open-label`, what each place's CSS and checks read),
+  ⇡ and your pip. A board card's body is `.board-body`.
+- **A card's drag reaches the board and the sidebar.** Board columns and
+  the footer strip's open states carry `data-put-state`, the sidebar's
+  items and its end `data-put-sidebar`, beside the root's own marks; while
+  a card is dragged (`body[data-card-drag]`) they are outlined. A card held
+  over ▦ for `ITEM_HOVER_MS` opens the board (`App`'s card drag).
+- **The open states reach a card's ⋯ through a context** (`ThreadStates`,
+  `thread-states.ts`), which `App` provides from the workflow: the
+  composer's and a note's editors read it for their Move to a new thread.
+- **A root the directory stops naming is pruned** as at settle (`App`): a
+  thread lifted back into its card loses its columns, and a page on it
+  moves to the sidebar's last root.
 
 ## Selectors in the browser suite
 

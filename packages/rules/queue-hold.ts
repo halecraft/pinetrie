@@ -10,6 +10,7 @@
 // must not drain when the host starts.
 
 import type {
+  CardCommand,
   CardRecord,
   LaneName,
   Move,
@@ -69,13 +70,17 @@ export function planQueueHold(input: {
  * accepted, the hold's writes. The hold goes first when the host carries it
  * out, so the drain the move asks for finds the queue as this says: held
  * before a staged card can be popped, released before the drain. A move
- * that queues nothing changes no hold. Pure.
+ * that queues nothing changes no hold. A card created in the queue carries
+ * `command` from its first write: a command set by a later request could
+ * come after the drain popped the card. Pure.
  */
 export function planQueueCard(input: {
   readonly cards: readonly CardRecord[]
   readonly holds: ReadonlyMap<LaneName, QueueHold>
   readonly move: Move
   readonly hold: QueueHoldChange
+  /** The created card's command; ignored for a card that exists. */
+  readonly command: CardCommand | null
   readonly by: WriterId
   readonly now: number
   readonly running: (lane: LaneName) => boolean
@@ -85,12 +90,12 @@ export function planQueueCard(input: {
   readonly holds: readonly ValueWrite[]
 } {
   const { move, hold } = input
-  const { step, drain } = planMoveCommand(
-    input.cards,
-    [move],
-    input.by,
-    input.running,
-  )
+  const planned = planMoveCommand(input.cards, [move], input.by, input.running)
+  const { drain } = planned
+  const step =
+    move.from === null && input.command !== null
+      ? withCommand(planned.step, input.command)
+      : planned.step
   if (step.kind === "refused" || move.to.kind !== "queued" || hold === "keep")
     return { step, drain, holds: [] }
   const { lane } = move.to
@@ -105,6 +110,22 @@ export function planQueueCard(input: {
   })
   return { step, drain, holds }
 }
+
+/** A creation's write, carrying `command`. */
+const withCommand = (step: MovesStep, command: CardCommand): MovesStep =>
+  step.kind === "refused"
+    ? step
+    : {
+        kind: "steps",
+        steps: step.steps.map(s =>
+          s.kind === "write" && s.record.carries.kind === "message"
+            ? {
+                kind: "write",
+                record: { ...s.record, carries: { kind: "message", command } },
+              }
+            : s,
+        ),
+      }
 
 /**
  * The hold a Stop leaves on its lane's queue: one when a message card is

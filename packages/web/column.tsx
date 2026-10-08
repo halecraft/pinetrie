@@ -10,7 +10,6 @@ import {
   conflictsAt,
   type DigestRecord,
   type EntryId,
-  type LaneName,
   type LaneView,
   messageAt,
   nearestRevision,
@@ -71,14 +70,9 @@ import {
   noticeKey,
   noticeWords,
   type Pending,
-  type QueueControls,
-  queueControlWords,
-  type Reader,
   type ReadOnly,
   type ReserveStep,
   type RowMemory,
-  type RunButton,
-  runWords,
   type ScreenMemory,
   type SeenEnd,
   type SpotStore,
@@ -99,7 +93,6 @@ import {
 import {
   cardsAt,
   effectiveBase,
-  factLine,
   type OfferButton,
   placeEnd,
   queuedOn,
@@ -122,9 +115,10 @@ import {
   useState,
   useSyncExternalStore,
 } from "react"
-import { CardEditor, QueuedCardEditor } from "./card-editor.tsx"
+import { CardEditor } from "./card-editor.tsx"
 import { Composer } from "./composer.tsx"
 import { COPIED, useCopy } from "./copy.ts"
+import { Dock } from "./dock.tsx"
 import { Menu } from "./menu.tsx"
 import { MessageList } from "./message-list.tsx"
 import { MessageText } from "./message-text.tsx"
@@ -554,8 +548,8 @@ export function Column(p: ColumnProps) {
   const toggleReview = useStable(() => openPane({ kind: "offer" }))
   const toggleNotes = useStable(() => openPane({ kind: "notes" }))
   // Catching up and splitting are a card with the command and no text,
-  // queued at once (ADR-0108, ADR-0061, ADR-0080): the host pops it when
-  // the lane is free. An acceptance names its destination: the default,
+  // made in the queue (ADR-0108, ADR-0061, ADR-0080, ADR-0113): the host
+  // pops it when the lane is free. An acceptance names its destination: the default,
   // or accepted work (ADR-0104).
   const actOnOffer = (button: OfferButton) => {
     if (lane.kind !== "lane") return
@@ -585,7 +579,10 @@ export function Column(p: ColumnProps) {
     const root = p.session.rootOf(at.id)
     if (root === undefined) return
     act({
-      kind: "queueCommand",
+      kind: "queueNew",
+      card: newCardId(),
+      root,
+      hold: "keep",
       command:
         button === "continue"
           ? "continue-on-accepted"
@@ -596,14 +593,6 @@ export function Column(p: ColumnProps) {
               : "bring-up-to-date",
       lane: lane.name,
       at,
-      create: {
-        id: newCardId(),
-        owner: p.session.writer,
-        place: { kind: "note", root, at, lane: lane.name, cell: null },
-        placer: p.session.writer,
-        carries: { kind: "message", command: null },
-        unsent: null,
-      },
     })
   }
   // What a lane this column's next send creates would start with.
@@ -653,6 +642,12 @@ export function Column(p: ColumnProps) {
   // Where a queue from a card's ⋯ puts it: on this thread's lane, at its end.
   const queueOn =
     lane.kind === "lane" && at.kind === "entry" ? { lane: lane.name, at } : null
+  // Where "+ add to queue" makes its card: this thread's end, in its root.
+  const queueRoot = at.kind === "entry" ? p.session.rootOf(at.id) : undefined
+  const queueAt =
+    queueOn === null || queueRoot === undefined
+      ? null
+      : { at: queueOn.at, root: queueRoot }
   // Where a drop lands: exactly where a put can.
   const putColumn = writable && place !== undefined ? key : null
   const pinKey = writable && place !== undefined ? pinnedOf(place) : null
@@ -824,6 +819,16 @@ export function Column(p: ColumnProps) {
               )}
             </div>
             <Origin onOpen={openAt} origin={shows.origin} />
+            {/* The work strip, a row of the header (ADR-0113). */}
+            <WorkStripView
+              act={actOnOffer}
+              review={{
+                id: paneId,
+                open: pane?.kind === "offer",
+                toggle: toggleReview,
+              }}
+              strip={shows.strip}
+            />
             {askClose !== null && (
               <div className="close-ask">
                 {closeAskWords(askClose.length)}{" "}
@@ -984,35 +989,6 @@ export function Column(p: ColumnProps) {
             CSS hides it while a row the work opened runs, and in outline,
             where the running ask's own line pulses. */}
               {running && <div aria-hidden className="working-line" />}
-              {/* Cards queued for this thread's lane, in the order the host pops
-            them: not in the tree yet, and editable by anyone until popped. */}
-              {queued.map(c =>
-                c.carries.kind === "fact" ? (
-                  // The host's fact, waiting for the run's end: nobody edits
-                  // or moves it (ADR-0080).
-                  <div className="queued-fact" key={c.id}>
-                    {factLine(c.carries.fact)}
-                  </div>
-                ) : (
-                  <QueuedCardEditor
-                    among={queued}
-                    card={c}
-                    held={(shows.queue?.heldBy ?? null) !== null}
-                    key={c.id}
-                    onAct={act}
-                    onTyping={p.onTyping}
-                    readOnly={p.readOnly}
-                    reader={reader}
-                    session={p.session}
-                    catchUps={catchUps}
-                  />
-                ),
-              )}
-              {refused.map(r => (
-                <div className="refused-move" key={noticeKey(r)}>
-                  {noticeWords(r, reader)}
-                </div>
-              ))}
             </div>
             {/* What the content shrank by while the agent works, up to a third
           of the view (`useFollow`). Not the spacer above: that one lines the
@@ -1053,85 +1029,83 @@ export function Column(p: ColumnProps) {
               })}
             </div>
           )}
-          {/* The notes line (ADR-0113): how many notes there are and whose,
-          opening the thread's notes board in the pane. A drop on it makes a
-          note, in the board's first empty cell. */}
-          {!fresh && threadEnd !== null && (
-            <div
-              className="notes-line"
-              {...(putColumn === null
-                ? {}
-                : dropProps({ kind: "column", key: putColumn }))}
-            >
-              <button
-                aria-controls={pane?.kind === "notes" ? paneId : undefined}
-                aria-expanded={pane?.kind === "notes"}
-                className="notes-toggle"
-                onClick={toggleNotes}
-                title={NOTES_LINE_TITLE}
-                type="button"
-              >
-                {notesLineWords(notes.length)}
-              </button>
-              <Avatars
-                colorOf={p.colorOf}
-                nameOf={p.nameOf}
-                writers={[...new Set(notes.map(c => c.owner))]}
-              />
-            </div>
-          )}
-          <WorkStripView
-            act={actOnOffer}
-            review={{
-              id: paneId,
-              open: pane?.kind === "offer",
-              toggle: toggleReview,
-            }}
-            strip={shows.strip}
-          />
-          {shows.run !== null && lane.kind === "lane" && (
-            <RunButtonView
-              lane={lane.name}
-              run={shows.run}
+          <Dock
+            asks={p.asks}
+            cards={p.cards}
+            catchUps={catchUps}
+            index={index}
+            lane={lane.kind === "lane" ? lane : null}
+            notices={refused.map(r => (
+              <div className="refused-move" key={noticeKey(r)}>
+                {noticeWords(r, reader)}
+              </div>
+            ))}
+            onAct={act}
+            onTyping={p.onTyping}
+            queueAt={queueAt}
+            queued={queued}
+            readOnly={p.readOnly}
+            reader={reader}
+            session={p.session}
+            stops={p.stops}
+          >
+            <Composer
+              card={mine}
+              place={place}
+              where={{
+                accepted: p.work.accepted,
+                forkConflicts: forkConflicts.length,
+              }}
+              commands={p.work.commands}
+              at={at}
+              how={how}
+              fresh={fresh}
+              reader={{ me: p.session.writer, nameOf: p.nameOf }}
+              prefill={p.column.fresh?.prefill}
+              lane={lane}
+              onBranchInstead={branchInstead}
+              onSend={onSend}
+              onAct={act}
+              onCreatesLane={setCreatesLane}
+              onIntent={p.onIntent}
+              onTyping={p.onTyping}
+              takeFocus={() => p.takeFocus(p.column.key)}
+              catchUps={catchUps}
+              putColumn={putColumn}
+              participants={p.participants}
+              pending={p.column.fresh?.pending}
+              readOnly={p.readOnly}
+              typingAt={view.tipId}
               session={p.session}
             />
-          )}
-          {shows.queue !== null && (
-            <QueueControlsView
-              controls={shows.queue}
-              onAct={act}
-              reader={reader}
-            />
-          )}
-          <Composer
-            card={mine}
-            place={place}
-            where={{
-              accepted: p.work.accepted,
-              forkConflicts: forkConflicts.length,
-            }}
-            commands={p.work.commands}
-            at={at}
-            how={how}
-            fresh={fresh}
-            reader={{ me: p.session.writer, nameOf: p.nameOf }}
-            prefill={p.column.fresh?.prefill}
-            lane={lane}
-            onBranchInstead={branchInstead}
-            onSend={onSend}
-            onAct={act}
-            onCreatesLane={setCreatesLane}
-            onIntent={p.onIntent}
-            onTyping={p.onTyping}
-            takeFocus={() => p.takeFocus(p.column.key)}
-            catchUps={catchUps}
-            putColumn={putColumn}
-            participants={p.participants}
-            pending={p.column.fresh?.pending}
-            readOnly={p.readOnly}
-            typingAt={view.tipId}
-            session={p.session}
-          />
+            {/* The notes line (ADR-0113): how many notes there are and whose,
+            opening the thread's notes board in the pane. A drop on it makes a
+            note, in the board's first empty cell. */}
+            {!fresh && threadEnd !== null && (
+              <div
+                className="notes-line"
+                {...(putColumn === null
+                  ? {}
+                  : dropProps({ kind: "column", key: putColumn }))}
+              >
+                <button
+                  aria-controls={pane?.kind === "notes" ? paneId : undefined}
+                  aria-expanded={pane?.kind === "notes"}
+                  className="notes-toggle"
+                  onClick={toggleNotes}
+                  title={NOTES_LINE_TITLE}
+                  type="button"
+                >
+                  {notesLineWords(notes.length)}
+                </button>
+                <Avatars
+                  colorOf={p.colorOf}
+                  nameOf={p.nameOf}
+                  writers={[...new Set(notes.map(c => c.owner))]}
+                />
+              </div>
+            )}
+          </Dock>
         </div>
         {pane !== null && paneShows !== null && (
           <Pane
@@ -1169,67 +1143,6 @@ export function Column(p: ColumnProps) {
  * Others reading this column's thread, in its header. It reads presence
  * itself, so a presence write redraws this and not the column.
  */
-/**
- * Stop or Resume (`RunButton`): the column's, not a card's. Each is a
- * request on the thread's lane; the host decides it again.
- */
-function RunButtonView(p: {
-  run: RunButton
-  lane: LaneName
-  session: SessionClient
-}) {
-  const words = runWords(p.run)
-  return (
-    <button
-      className={words.className}
-      onClick={() => void p.session.request({ kind: p.run.kind, lane: p.lane })}
-      title={words.title}
-      type="button"
-    >
-      {words.label}
-    </button>
-  )
-}
-
-/**
- * A thread's queue controls (ADR-0048 step 7): hold it or release it, and
- * unqueue all. Each is a column act; the host decides it again.
- */
-function QueueControlsView(p: {
-  controls: QueueControls
-  reader: Reader
-  onAct: (act: ColumnAct) => void
-}) {
-  const { lane, heldBy } = p.controls
-  const words = queueControlWords(p.controls, p.reader)
-  const { unqueueAll } = words
-  return (
-    <div className="queue-controls" data-held={heldBy ?? undefined}>
-      {words.held !== null && <span className="queue-held">{words.held}</span>}
-      <button
-        className={words.hold.className}
-        onClick={() =>
-          p.onAct({ kind: "holdQueue", lane, held: heldBy === null })
-        }
-        title={words.hold.title}
-        type="button"
-      >
-        {words.hold.label}
-      </button>
-      {unqueueAll !== null && (
-        <button
-          className={unqueueAll.className}
-          onClick={() => p.onAct({ kind: "unqueueAll", lane })}
-          title={unqueueAll.title}
-          type="button"
-        >
-          {unqueueAll.label}
-        </button>
-      )}
-    </div>
-  )
-}
-
 function SeenBy(p: {
   session: SessionClient
   index: TreeIndex

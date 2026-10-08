@@ -25,6 +25,7 @@ import { type CommitOptions, subscribe } from "@kyneta/schema"
 import { WebsocketClientTransport } from "@kyneta/websocket-transport/browser"
 import {
   type AcceptedAction,
+  type CardCommand,
   type CardId,
   type CardRecord,
   commandOf,
@@ -99,6 +100,7 @@ import {
   OFF_PAGE,
   type Pending,
   pendingOf,
+  queuedDraft,
   type SlotMove,
   slotOnAccept,
   stampSeen,
@@ -245,12 +247,15 @@ export interface SessionClient {
    * Ask the host to queue a card (ADR-0113): `move` into a queue, sent with
    * its text's version as this client has it then (S96), and what it does to
    * that queue's hold, which the host decides with the move in one step.
-   * Drawn queued at once; resolves with the host's answer.
+   * A move with no `from` makes the card in the queue, empty, carrying
+   * `command`: it never passes through another place. Drawn queued at once;
+   * resolves with the host's answer.
    */
   queueCard(
     move: Move,
     hold: QueueHoldChange,
     how?: MoveHow,
+    command?: CardCommand | null,
   ): Promise<MoveAnswer>
   /**
    * Ask the host to move a queued or pinned card among its neighbours, as
@@ -632,11 +637,17 @@ export async function connectSession(
     moveCard(move, how = OFF_PAGE, queuedBy = null) {
       return sendMove(move, how, queuedBy, null)
     },
-    queueCard(planned, hold, how = OFF_PAGE) {
+    queueCard(planned, hold, how = OFF_PAGE, command = null) {
       const move = stampSeen(planned, versionOf(planned.card))
+      const draft = queuedDraft(move, me, command)
       return tracked(
-        { kind: "queue-card", move, hold },
-        [pendingOf(crypto.randomUUID(), move, how, null)],
+        {
+          kind: "queue-card",
+          move,
+          hold,
+          command: move.from === null ? command : null,
+        },
+        [pendingOf(crypto.randomUUID(), move, how, draft)],
         null,
       ).then(r => r.answer)
     },

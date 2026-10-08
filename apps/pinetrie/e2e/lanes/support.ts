@@ -29,8 +29,9 @@ export const bringUpToDate = (
 
 /**
  * A card with `command` and `text`, made at the thread's end once the
- * session holds it (`composeAt`) and queued, as a command button does
- * (ADR-0080).
+ * session holds it (`composeAt`), then queued: a command button makes its
+ * card in the queue, empty (ADR-0113); this one carries text, which a card
+ * made in the queue cannot.
  */
 export async function queueCommand(
   session: SessionClient,

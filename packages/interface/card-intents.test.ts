@@ -5,7 +5,9 @@ import {
   cardId,
   entryId,
   indexAsks,
+  laneNameForThread,
   rootIdFor,
+  workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
@@ -21,6 +23,7 @@ import {
   resolveLayout,
 } from "./layout.ts"
 import type { ComposerSpot } from "./put-target.ts"
+import { afterSpinOff } from "./spin-off.ts"
 
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
@@ -545,6 +548,26 @@ describe("afterUndo: what an undo's answer brings into view (ADR-0052)", () => {
     ).toContainEqual({ kind: "reveal", entry: A })
   })
 
+  test("a discarded queued card back in its queue: its thread shown, and the card scrolled to in the dock (ADR-0113)", () => {
+    const effects = answered({
+      kind: "undone",
+      cards: [
+        {
+          card: C1,
+          place: {
+            kind: "queued",
+            root: TEST_ROOT,
+            at: atEntry(A),
+            lane: laneNameForThread("x"),
+            seen: "",
+          },
+        },
+      ],
+    })
+    expect(effects).toContainEqual({ kind: "reveal", entry: A })
+    expect(effects.at(-1)).toEqual({ kind: "revealCard", card: C1 })
+  })
+
   test("back in your inventory: the panel", () => {
     expect(
       answered({ kind: "undone", cards: [{ card: C1, place: inventory }] }),
@@ -655,5 +678,99 @@ describe("openTrace: where a trace leads (ADR-0048, Other people)", () => {
     const theirs = { kind: "inventory", holder: BEA } as const
     expect(follow(state({ cards: [card(C1, theirs)] }, onR1), null)).toEqual([])
     expect(follow(state({}, onR1), null)).toEqual([])
+  })
+})
+
+describe("a card made a thread (ADR-0111)", () => {
+  const S1 = workflowStateIdFor("s-1")
+  const spun = (root: typeof TEST_ROOT | null) => ({
+    kind: "gone",
+    root,
+    why: { kind: "spun", thread: NEW_ROOT },
+  })
+  test.each([
+    [
+      "a note dropped on a state: its thread there, the move in the note's root",
+      card(C1, note),
+      { kind: "state", state: S1 },
+      { from: note, history: TEST_ROOT, state: S1, sidebar: null },
+    ],
+    [
+      "an inventory card dropped in the sidebar: the move in the new root, placed before the root it was dropped on",
+      card(C1, { kind: "inventory", holder: ADA }),
+      { kind: "sidebar", before: R1 },
+      {
+        from: inventory,
+        history: NEW_ROOT,
+        state: null,
+        sidebar: { before: TEST_ROOT },
+      },
+    ],
+    [
+      "an inventory card dropped on a state: the move in the root you are on",
+      card(C1, { kind: "inventory", holder: ADA }),
+      { kind: "state", state: S1 },
+      { from: inventory, history: TEST_ROOT, state: S1, sidebar: null },
+    ],
+  ] as const)("%s", (_, c, target, want) => {
+    expect(
+      plan({ kind: "put", card: C1, target }, state({ cards: [c] })),
+    ).toEqual([
+      {
+        kind: "spinOff",
+        request: {
+          kind: "spin-off",
+          move: { card: C1, from: want.from, to: spun(want.history) },
+          state: want.state,
+        },
+        thread: NEW_ROOT,
+        sidebar: want.sidebar,
+      },
+    ])
+  })
+
+  test("a note's ⋯ Move to a new thread in a state is the same as its drop there", () => {
+    const s = state({ cards: [card(C1, note)] })
+    expect(
+      plan(inColumn({ kind: "spinOff", card: C1, state: S1 }, threadKey), s),
+    ).toEqual(
+      plan({ kind: "put", card: C1, target: { kind: "state", state: S1 } }, s),
+    )
+  })
+
+  test("nothing for someone else's inventory card", () => {
+    const theirs = card(C1, { kind: "inventory", holder: writerId("bea@x.io") })
+    expect(
+      plan(
+        { kind: "put", card: C1, target: { kind: "state", state: S1 } },
+        state({ cards: [theirs] }),
+      ),
+    ).toEqual([])
+  })
+
+  test("afterSpinOff: a sidebar drop places and shows the new root once its first message is written; nothing else", () => {
+    const sidebar = { before: TEST_ROOT }
+    expect(
+      afterSpinOff({ kind: "appended", id: entryId("t-1") }, NEW_ROOT, sidebar),
+    ).toEqual([
+      {
+        kind: "list",
+        act: { kind: "place", root: NEW_ROOT, before: TEST_ROOT },
+      },
+      {
+        kind: "layout",
+        action: { kind: "show", here: { kind: "root", root: entryId("t-1") } },
+      },
+    ])
+    expect(
+      afterSpinOff({ kind: "appended", id: entryId("t-1") }, NEW_ROOT, null),
+    ).toEqual([])
+    expect(
+      afterSpinOff(
+        { kind: "refused", code: "refused", message: "no" },
+        NEW_ROOT,
+        sidebar,
+      ),
+    ).toEqual([])
   })
 })

@@ -51,6 +51,11 @@ export interface CardPort {
    * either way it unsubscribes, so a wait given up leaves nothing behind.
    */
   whenHolds(id: CardId, seen: string, signal?: AbortSignal): Promise<void>
+  /**
+   * Resolves once a card's text holds more than whitespace, or once
+   * `signal` aborts, unsubscribing either way.
+   */
+  whenWritten(id: CardId, signal?: AbortSignal): Promise<void>
   /** These cards' texts, with who wrote in each. */
   texts(ids: readonly CardId[]): Promise<readonly GatheredText[]>
   /** Every stored card text document, by id. */
@@ -98,18 +103,11 @@ export function startCards(input: {
     holds: (id, seen) => textHolds(exchange.get(cardDocId(id), TextDoc), seen),
     whenHolds(id, seen, signal) {
       const t = exchange.get(cardDocId(id), TextDoc)
-      return new Promise(resolve => {
-        if (textHolds(t, seen) || signal?.aborted === true) return resolve()
-        const done = () => {
-          stop()
-          signal?.removeEventListener("abort", done)
-          resolve()
-        }
-        const stop = subscribe(t, () => {
-          if (textHolds(t, seen)) done()
-        })
-        signal?.addEventListener("abort", done, { once: true })
-      })
+      return until(t, () => textHolds(t, seen), signal)
+    },
+    whenWritten(id, signal) {
+      const t = exchange.get(cardDocId(id), TextDoc)
+      return until(t, () => t.text().trim() !== "", signal)
     },
     async texts(ids) {
       const out: GatheredText[] = []
@@ -124,4 +122,28 @@ export function startCards(input: {
     },
     destroyDocs,
   }
+}
+
+/**
+ * Resolves once `ok()` holds of `doc`, checked on each change, or once
+ * `signal` aborts: either way it unsubscribes, so a wait given up leaves
+ * nothing behind.
+ */
+function until(
+  doc: Parameters<typeof subscribe>[0],
+  ok: () => boolean,
+  signal?: AbortSignal,
+): Promise<void> {
+  return new Promise(resolve => {
+    if (ok() || signal?.aborted === true) return resolve()
+    const done = () => {
+      stop()
+      signal?.removeEventListener("abort", done)
+      resolve()
+    }
+    const stop = subscribe(doc, () => {
+      if (ok()) done()
+    })
+    signal?.addEventListener("abort", done, { once: true })
+  })
 }

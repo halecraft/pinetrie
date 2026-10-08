@@ -8,13 +8,9 @@ import type {
   LaneName,
   LaneView,
   MarkRecord,
-  RootId,
-  RootWork,
   Sha256,
   ThreadName,
   TreeIndex,
-  Workflow,
-  WorkflowStateId,
 } from "@pinetrie/core"
 import { blobUrl, PRODUCT_NAME, rootOf } from "@pinetrie/core"
 import { threadNameOf } from "@pinetrie/rules"
@@ -25,6 +21,7 @@ import { type Here, type Layout, listOf, sameHere } from "./layout.ts"
 import { type PageName, pageWords } from "./page.ts"
 import { type ColorSlot, rootSlot } from "./palette.ts"
 import { initialsOf, NO_TEXT } from "./root-label.ts"
+import type { ThreadCardHead, ThreadMove } from "./thread-card.ts"
 
 /** What a root's ⋯ in the sidebar offers. */
 export type ItemMenuItem =
@@ -34,19 +31,12 @@ export type ItemMenuItem =
   /** Ask a model for a title from the root's messages (ADR-0074). */
   | { readonly kind: "retitle"; readonly intent: Intent }
   /**
-   * Move the root on the board to another workflow state (ADR-0112). Into
-   * the closed state it is archived: refused while its agent works there
-   * (`busy`), and it withdraws the offers of its threads named in `drops`
-   * (ADR-0061).
+   * Move the root on the board to another workflow state (ADR-0112), its
+   * thread card's (`ThreadMove`). Into the closed state it is archived:
+   * refused while its agent works there (`busy`), and it withdraws the
+   * offers of its threads named in `drops` (ADR-0061).
    */
-  | {
-      readonly kind: "moveTo"
-      readonly name: string
-      readonly closes: boolean
-      readonly busy: RootWork | null
-      readonly drops: readonly string[]
-      readonly intent: Intent
-    }
+  | ({ readonly kind: "moveTo" } & ThreadMove)
 
 /**
  * What an item draws while the sidebar is folded (ADR-0088): the sprite of the
@@ -79,6 +69,8 @@ export type ItemView =
   | (ItemCommon & {
       readonly kind: "root"
       readonly root: EntryId
+      /** Its thread card's header, the board's too (`threadCardHead`). */
+      readonly head: ThreadCardHead
       /** Its first line: the rename field's placeholder. */
       readonly line: string
       /** Its stored title, or null: what the rename field starts with. */
@@ -110,28 +102,17 @@ export interface SidebarView {
 export interface SidebarViewInput {
   readonly layout: Layout
   readonly active: Here
-  /** Each root's label (`labelsOf`). */
-  readonly labels: ReadonlyMap<EntryId, string>
+  /** Each root's thread card header (`threadCardHeads`), which the board reads too. */
+  readonly heads: ReadonlyMap<EntryId, ThreadCardHead>
   /** Each root's first line (`firstLinesOf`). */
   readonly lines: ReadonlyMap<EntryId, string>
   readonly marks: ReadonlyMap<EntryId, MarkRecord>
   /** Roots in the closed state, by root entry. */
   readonly archived: ReadonlySet<EntryId>
-  /** The agent's work in each root, held or not (`workAnywhere`). */
-  readonly work: ReadonlyMap<string, RootWork>
-  /** The threads with an open offer, by root (`offeredByRoot`). */
-  readonly offered: ReadonlyMap<EntryId, readonly string[]>
+  /** Your unsent text: a new tab's pip. */
   readonly unsent: CardMarks
-  /** Each root's status (`rootStatus`, ADR-0077). */
-  readonly status: ReadonlyMap<EntryId, Status>
   /** When each root's mark last arrived as you watched (`useAttention`). */
   readonly arrivals: Moments
-  /** The board's states, or null before the host wrote them. */
-  readonly workflow: Workflow | null
-  /** Each root's state on the board, by root entry (`boardOf`). */
-  readonly stateOf: ReadonlyMap<EntryId, WorkflowStateId>
-  /** Each root's id, by root entry. */
-  readonly rootIds: ReadonlyMap<EntryId, RootId>
   /** Each root's sprite, by root entry (`rootSprites`). */
   readonly sprites: ReadonlyMap<EntryId, Sha256>
 }
@@ -174,39 +155,46 @@ function itemView(here: Here, input: SidebarViewInput): ItemView {
     case "root": {
       const { root } = here
       const archived = input.archived.has(root)
-      const status = input.status.get(root) ?? null
-      const label = input.labels.get(root) ?? NO_TEXT
+      const head = input.heads.get(root) ?? noHead(root)
       return {
         ...common,
         kind: "root",
         root,
-        label,
-        icon: iconOf(root, label, input),
+        head,
+        label: head.label,
+        icon: iconOf(head, input),
         line: input.lines.get(root) ?? NO_TEXT,
         title: input.marks.get(root)?.title ?? null,
-        status,
+        status: head.status,
         arrived: input.arrivals.arrived.get(root) ?? null,
         done: input.arrivals.done.get(root) ?? null,
         archived,
-        menu: archived ? [] : menuOf(root, status, input),
-        pip: input.unsent.roots.has(root),
+        menu: archived ? [] : menuOf(root, head),
+        pip: head.pip,
       }
     }
   }
 }
 
-function iconOf(
-  root: EntryId,
-  label: string,
-  input: SidebarViewInput,
-): ItemIcon {
-  const sprite = input.sprites.get(root)
+/** A root the heads lack: drawn with no signals, as a root not yet in the directory. */
+const noHead = (entry: EntryId): ThreadCardHead => ({
+  root: null,
+  entry,
+  label: NO_TEXT,
+  status: null,
+  ready: [],
+  pip: false,
+  state: null,
+  moves: [],
+})
+
+function iconOf(head: ThreadCardHead, input: SidebarViewInput): ItemIcon {
+  const sprite = input.sprites.get(head.entry)
   if (sprite !== undefined) return { kind: "sprite", src: blobUrl(sprite) }
-  const id = input.rootIds.get(root)
   return {
     kind: "initials",
-    letters: initialsOf(label),
-    slot: id === undefined ? "pending" : rootSlot(id),
+    letters: initialsOf(head.label),
+    slot: head.root === null ? "pending" : rootSlot(head.root),
   }
 }
 
@@ -234,11 +222,8 @@ export function rootSprites(
   return sprites
 }
 
-function menuOf(
-  root: EntryId,
-  status: Status | null,
-  input: SidebarViewInput,
-): readonly ItemMenuItem[] {
+function menuOf(root: EntryId, head: ThreadCardHead): readonly ItemMenuItem[] {
+  const { status } = head
   return [
     ...(status === null || status.kind === "working"
       ? []
@@ -254,40 +239,8 @@ function menuOf(
         ]),
     { kind: "rename" },
     { kind: "retitle", intent: { kind: "retitle", root } },
-    ...movesOf(root, input),
+    ...head.moves.map(m => ({ kind: "moveTo", ...m }) as const),
   ]
-}
-
-/** "Move to ▸" each state but the one the root is in. */
-function movesOf(
-  root: EntryId,
-  input: SidebarViewInput,
-): readonly ItemMenuItem[] {
-  const { workflow } = input
-  const id = input.rootIds.get(root)
-  const from = input.stateOf.get(root)
-  if (workflow === null || id === undefined || from === undefined) return []
-  return [...workflow.open, workflow.closed].flatMap(state => {
-    if (state.id === from) return []
-    const closes = state.id === workflow.closed.id
-    return [
-      {
-        kind: "moveTo",
-        name: state.name,
-        closes,
-        busy: closes ? (input.work.get(root) ?? null) : null,
-        drops: closes ? (input.offered.get(root) ?? []) : [],
-        intent: {
-          kind: "moveRoot",
-          root: id,
-          from,
-          to: state.id,
-          before: null,
-          closes,
-        },
-      } as const,
-    ]
-  })
 }
 
 /** An item's key in the sidebar: its React key, and what the list scrolls to. */

@@ -355,19 +355,36 @@ export function queuedOn(
 }
 
 /** What a lane's queue gives up next. */
-type NextQueuedCardPopStep =
+export type NextQueuedCardPopStep =
   /** It runs, or nothing is queued. */
   | { readonly kind: "idle" }
   /** Its queue is held, and its top card is a message (ADR-0048 step 7). */
   | { readonly kind: "held" }
   /** Someone is typing in its top card: it waits until they stop. */
   | { readonly kind: "typing"; readonly card: QueuedCard }
+  /**
+   * Every card queued is a blank message (`isBlankMessage`), passed over:
+   * it waits for `card`, the first, to be written in.
+   */
+  | { readonly kind: "blank"; readonly card: QueuedCard }
   | { readonly kind: "pop"; readonly card: QueuedCard }
 
 /**
+ * A message with no command and nothing but whitespace (ADR-0113): "+ add
+ * to queue"'s card before anyone writes in it. The drain passes over it,
+ * leaving it where it is, rather than send nothing.
+ */
+export const isBlankMessage = (card: CardRecord, text: string): boolean =>
+  card.carries.kind === "message" &&
+  card.carries.command === null &&
+  text.trim() === ""
+
+/**
  * The next queued card to pop for a lane: none while it runs; else its top
- * card, unless the queue is held or someone is typing in that card. A fact
- * on top is popped whatever the hold or the typing: it is nobody's
+ * card that is not blank (`blank`, each `isBlankMessage`), unless the queue
+ * is held or someone is typing in that card. A blank card is passed over
+ * and stays where it is, so the cards behind it are not stuck behind
+ * nothing. A fact is popped whatever the hold or the typing: it is nobody's
  * instruction, and starts no run. Pure.
  */
 export function planNextQueuedCardPop(
@@ -378,11 +395,18 @@ export function planNextQueuedCardPop(
     readonly held: boolean
     /** The cards someone is typing in now (`typingIn`). */
     readonly typing: ReadonlySet<CardId>
+    /** The queued cards that are blank messages now. */
+    readonly blank: ReadonlySet<CardId>
   },
 ): NextQueuedCardPopStep {
   if (facts.running) return { kind: "idle" }
-  const top = queuedOn(cards, lane)[0]
-  if (top === undefined) return { kind: "idle" }
+  const queue = queuedOn(cards, lane)
+  const top = queue.find(c => !facts.blank.has(c.id))
+  if (top === undefined) {
+    const first = queue[0]
+    if (first === undefined) return { kind: "idle" }
+    return facts.held ? { kind: "held" } : { kind: "blank", card: first }
+  }
   if (top.carries.kind === "fact") return { kind: "pop", card: top }
   if (facts.held) return { kind: "held" }
   if (facts.typing.has(top.id)) return { kind: "typing", card: top }
@@ -467,7 +491,8 @@ export function planFactCard(input: {
 /**
  * What the drain does with a popped card (ADR-0080), decided before it acts:
  * append a fact; catch up through a command, then send the text or, with
- * none, nothing; send a plain message; or discard an empty card.
+ * none, nothing; or send a plain message. A blank plain message is never
+ * popped (`isBlankMessage`).
  */
 export type CarryPlan =
   | { readonly kind: "fact"; readonly fact: OfferFact }
@@ -480,7 +505,6 @@ export type CarryPlan =
   /** Split the offer in a run of its own, the card's text its intent. */
   | { readonly kind: "split"; readonly intent: string }
   | { readonly kind: "send" }
-  | { readonly kind: "discard" }
 
 /** A popped card and its text -> what the drain does with it. Pure. */
 export function planCarry(card: CardRecord, text: string): CarryPlan {
@@ -491,7 +515,7 @@ export function planCarry(card: CardRecord, text: string): CarryPlan {
   if (command === "split") return { kind: "split", intent: text.trim() }
   if (command !== null)
     return { kind: "catch-up", command, after: blank ? "discard" : "send" }
-  return blank ? { kind: "discard" } : { kind: "send" }
+  return { kind: "send" }
 }
 
 // ── handoffs (ADR-0059) ───────────────────────────────────────────────────
@@ -995,8 +1019,12 @@ type UndoAnswer =
   /** Someone moved one of its cards since: the first such card as it is now. */
   | Extract<MoveStep, { kind: "refused" }>
 
-/** The cards `parts` wrote in the places document `placesId`, each once. */
-function cardsOfParts(
+/**
+ * The cards `parts` wrote in the places document `placesId`, each once.
+ * Read from a stack's `top` before an undo, they are the cards that undo
+ * would move (S139). Pure.
+ */
+export function cardsOfParts(
   parts: readonly StepPart[],
   placesId: string,
 ): readonly CardId[] {

@@ -35,6 +35,7 @@ import {
   type SidebarViewInput,
   sidebarView,
 } from "./sidebar-view.ts"
+import { type ThreadCardFacts, threadCardHeads } from "./thread-card.ts"
 
 const R1: Here = { kind: "root", root: entryId("r1") }
 const R2: Here = { kind: "root", root: entryId("r2") }
@@ -80,40 +81,56 @@ const WORKFLOW: Workflow = {
   closed: { id: DONE, name: "Done" },
 }
 const ID = (n: number) => rootIdFor(`01a0ffd2-0000-7000-8000-00000000000${n}`)
-const input = (over: Partial<SidebarViewInput> = {}): SidebarViewInput => ({
-  layout,
-  active: R1,
-  labels: new Map([
-    [entryId("r1"), "Tab names"],
-    [entryId("r2"), "second"],
-  ]),
-  lines: new Map([
-    [entryId("r1"), "first"],
-    [entryId("r2"), "second"],
-  ]),
-  marks: new Map([[entryId("r1"), mark]]),
-  archived: new Set(),
-  work: new Map(),
-  offered: new Map(),
-  unsent: none,
-  status: new Map(),
-  arrivals: { arrived: new Map(), done: new Map() },
-  workflow: WORKFLOW,
-  stateOf: new Map([
-    [entryId("r1"), DOING],
-    [entryId("r2"), DOING],
-    [entryId("r3"), BACKLOG],
-  ]),
-  rootIds: new Map([
-    [entryId("r1"), ID(1)],
-    [entryId("r2"), ID(2)],
-    [entryId("r3"), ID(3)],
-  ]),
-  sprites: new Map(),
-  ...over,
-})
-const items = (over: Partial<SidebarViewInput> = {}) =>
-  sidebarView(input(over)).items
+/** What the sidebar's items are read from, its thread cards' facts among them. */
+type Facts = Omit<SidebarViewInput, "heads"> &
+  Omit<ThreadCardFacts, "pips"> & { readonly entries: readonly EntryId[] }
+const input = (over: Partial<Facts> = {}): SidebarViewInput => {
+  const f: Facts = {
+    layout,
+    active: R1,
+    labels: new Map([
+      [entryId("r1"), "Tab names"],
+      [entryId("r2"), "second"],
+    ]),
+    lines: new Map([
+      [entryId("r1"), "first"],
+      [entryId("r2"), "second"],
+    ]),
+    marks: new Map([[entryId("r1"), mark]]),
+    archived: new Set(),
+    work: new Map(),
+    offered: new Map(),
+    unsent: none,
+    status: new Map(),
+    arrivals: { arrived: new Map(), done: new Map() },
+    workflow: WORKFLOW,
+    stateOf: new Map([
+      [entryId("r1"), DOING],
+      [entryId("r2"), DOING],
+      [entryId("r3"), BACKLOG],
+    ]),
+    rootIds: new Map([
+      [entryId("r1"), ID(1)],
+      [entryId("r2"), ID(2)],
+      [entryId("r3"), ID(3)],
+    ]),
+    sprites: new Map(),
+    entries: [entryId("r1"), entryId("r2"), entryId("r3")],
+    ...over,
+  }
+  return {
+    layout: f.layout,
+    active: f.active,
+    heads: threadCardHeads(f.entries, { ...f, pips: f.unsent.roots }),
+    lines: f.lines,
+    marks: f.marks,
+    archived: f.archived,
+    unsent: f.unsent,
+    arrivals: f.arrivals,
+    sprites: f.sprites,
+  }
+}
+const items = (over: Partial<Facts> = {}) => sidebarView(input(over)).items
 const kinds = (
   r:
     | (typeof items extends (...a: never) => infer T ? T : never)[number]

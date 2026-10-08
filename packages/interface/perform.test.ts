@@ -4,6 +4,7 @@ import {
   cardId,
   entryId,
   laneNameForThread,
+  rootIdFor,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -49,6 +50,7 @@ const ports = () => {
     fly: vi.fn(),
     intent: vi.fn(),
     reveal: vi.fn(),
+    revealCard: vi.fn(),
     openWhenHeld: vi.fn(),
     openFold: vi.fn(),
     arm: vi.fn(),
@@ -116,6 +118,11 @@ test.each<Row>([
     effect: { kind: "reveal", entry: entryId("e") },
     port: p => p.reveal,
     args: ["e"],
+  },
+  {
+    effect: { kind: "revealCard", card: cardId("c") },
+    port: p => p.revealCard,
+    args: [cardId("c")],
   },
   {
     effect: { kind: "openWhenHeld", entry: entryId("e") },
@@ -269,6 +276,35 @@ test("a move on the board runs what follows it only once the host accepts it (AD
   perform([effect], q)
   await new Promise(r => setTimeout(r, 0))
   expect(q.dispatch).not.toHaveBeenCalled()
+})
+
+test("a spin-off into the sidebar places and shows its thread only once the host started it (ADR-0111)", async () => {
+  const thread = rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff")
+  const request = {
+    kind: "spin-off",
+    move: {
+      card: cardId("c"),
+      from: { kind: "inventory", holder: writerId("ada@x.io") },
+      to: { kind: "gone", root: thread, why: { kind: "spun", thread } },
+    },
+    state: null,
+  } as const
+  const effect: Effect = {
+    kind: "spinOff",
+    request,
+    thread,
+    sidebar: { before: null },
+  }
+  const p = ports()
+  p.session.request.mockImplementationOnce(async () => ({
+    kind: "appended",
+    id: entryId("t-1"),
+  }))
+  perform([effect], p)
+  expect(p.session.request).toHaveBeenCalledWith(request)
+  await vi.waitFor(() =>
+    expect(p.session.openThreads.open).toHaveBeenCalledWith(thread, null),
+  )
 })
 
 test("a move flies only when its plan says so", () => {

@@ -155,6 +155,7 @@ export type Verb =
   | "took-into-inventory"
   | "put"
   | "discarded"
+  | "spun"
   | "moved"
 
 /**
@@ -192,7 +193,7 @@ export function verbOf(from: PlaceKey | null, to: PlaceKey | null): Verb {
   if (from === null) return "created"
   const back = movedBack(from, to)
   if (back !== null) return back
-  if (to.kind === "gone") return "discarded"
+  if (to.kind === "gone") return to.why.kind === "spun" ? "spun" : "discarded"
   if (to.kind === "queued") return "queued"
   if (to.kind === "pinned") return "pinned"
   if (to.kind === "inventory") return "took-into-inventory"

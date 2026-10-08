@@ -49,6 +49,7 @@ import {
 } from "./effects.ts"
 import { intoMessage, type PutTarget, placeOfTarget } from "./put-target.ts"
 import { revealOf } from "./reveal.ts"
+import { planSpinOff } from "./spin-off.ts"
 
 /** A move to send; `fly`: whether its card animates to where it lands. */
 export const moveCard = (
@@ -73,6 +74,28 @@ export function queueMove(
     ? null
     : moveOf(card, { kind: "queued", root, at: to.at, lane: to.lane, seen: "" })
 }
+
+/**
+ * A card made in `to.lane`'s queue (ADR-0113): a move with no `from`, so
+ * it is never drawn anywhere before the queue. `root` is the column's, for
+ * a lane whose record has not arrived.
+ */
+export const queueNew = (
+  card: CardId,
+  root: RootId,
+  to: { readonly lane: LaneName; readonly at: Position },
+  facts: Pick<CardFacts, "laneRecords">,
+): Move => ({
+  card,
+  from: null,
+  to: {
+    kind: "queued",
+    root: facts.laneRecords.get(to.lane)?.root ?? root,
+    at: to.at,
+    lane: to.lane,
+    seen: "",
+  },
+})
 
 /**
  * A queued or pinned card moved one place up (`step` -1) or down (1) in
@@ -192,7 +215,8 @@ export function planTakeCopyIntoInventory(
 }
 
 /**
- * Put `card` at `target`. A column: a note at its end. A composer, or a
+ * Put `card` at `target`. A state or a place in the sidebar: a new thread
+ * there (`planSpinOff`). A column: a note at its end. A composer, or a
  * fresh column: your message there (`putInMessage`). A slot: a card already
  * in your inventory swaps with what is there; any other card is taken into
  * the inventory, into that slot if it is empty.
@@ -201,10 +225,13 @@ export function planPut(
   card: CardId,
   target: PutTarget,
   state: IntentState,
+  newRoot: RootId,
 ): readonly Effect[] {
   const facts = state.cards
   const now = cardOf(facts, card)
   if (now === undefined) return []
+  if (target.kind === "state" || target.kind === "sidebar")
+    return planSpinOff(card, target, newRoot, state)
   if (target.kind === "cell") return putInCell(now, target, state)
   if (target.kind !== "inventory" && intoMessage(target, facts.composers))
     return putInMessage(now, target.key, state)
@@ -420,7 +447,7 @@ export const afterKeep = (
  * tab minted as it opened (ADR-0066). None on nothing, or for a root the
  * directory does not name yet.
  */
-function rootOfTab(state: IntentState): RootId | null {
+export function rootOfTab(state: IntentState): RootId | null {
   const active = state.layout.active
   if (active === null || active.kind === "nothing") return null
   if (active.kind === "new")
@@ -457,11 +484,13 @@ export function afterUndo(
 ): readonly Effect[] {
   switch (outcome.kind) {
     case "undone": {
-      const places: PlaceKey[] = []
-      for (const { place } of outcome.cards)
-        if (place !== null && !places.some(p => sameKey(p, place)))
-          places.push(place)
-      return places.flatMap(place => revealOf(place, state, fresh).effects)
+      const places: { readonly place: PlaceKey; readonly card: CardId }[] = []
+      for (const { card, place } of outcome.cards)
+        if (place !== null && !places.some(p => sameKey(p.place, place)))
+          places.push({ place, card })
+      return places.flatMap(
+        p => revealOf(p.place, state, fresh, p.card).effects,
+      )
     }
     case "unmoved": {
       const shown =
@@ -505,5 +534,5 @@ export function planOpenTrace(
     return trace.message === null ? [] : planOpenAt(trace.message, state, fresh)
   if (now.place.kind === "inventory" && now.place.holder !== state.cards.me)
     return []
-  return revealOf(keyOf(now.place), state, fresh).effects
+  return revealOf(keyOf(now.place), state, fresh, now.id).effects
 }

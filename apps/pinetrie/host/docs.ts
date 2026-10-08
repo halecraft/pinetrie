@@ -42,6 +42,11 @@ export interface HostDocuments {
    * (`onReleasing`'s listeners); it stays in the store.
    */
   unload(root: RootId): Promise<void>
+  /**
+   * Destroy a root's document, in memory and in the store, telling every
+   * peer; what holds it lets go first, as for `unload` (ADR-0111).
+   */
+  destroy(root: RootId): Promise<void>
   /** The roots whose documents are held now. */
   loaded(): readonly RootId[]
   /**
@@ -139,6 +144,11 @@ export function hostDocuments(input: {
       if (!held.delete(root)) return
       for (const listener of releasing) await listener(root)
       exchange.unload(rootDocId(root))
+    },
+    async destroy(root) {
+      if (held.delete(root))
+        for (const listener of releasing) await listener(root)
+      exchange.destroy(rootDocId(root))
     },
     loaded: () => [...held.keys()],
     onOpened(listener) {

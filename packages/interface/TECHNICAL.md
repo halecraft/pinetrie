@@ -368,6 +368,24 @@ and each item's signals.
   presence write redraws them and not `App` (S59).
 - **The board is `#board`, absolutely placed in `#workspace`** from its
   foot: it covers the columns and moves none of them.
+- **A root is a thread card** (ADR-0111): `threadCardHeads` builds each
+  root's header once in `App` (label, status, ⇡, your pip, its state and
+  its Move to ▸ moves, with the busy reason and the offers a close
+  withdraws), and `boardView` and `sidebarView` both read it from `heads`.
+  A board card spreads its head and keeps it whole as `head`, adding Move
+  up and Move down, its writers, and its body (`bodyOf`: its first line
+  under a title that says something else); a sidebar item keeps it as
+  `head`, adding Rename, Auto-update title and Not needed. A root whose
+  directory record has not arrived has a head with no id and no moves.
+- **A card dropped on a state, or in the sidebar, becomes a thread**
+  (`spin-off.ts`): `PutTarget`'s `state` and `sidebar`, marked by
+  `data-put-state` and `data-put-sidebar` beside the root's own marks, are
+  planned by `planSpinOff`: the new root's id is `planIntent`'s `newRoot`,
+  and the card's move goes to gone, spun into it, in the history of the
+  new root (sidebar) or of the card's own root, else the root you are on.
+  `afterSpinOff` places and shows a sidebar drop's root once the host has
+  written its first message. A note's and your message's ⋯ offer the same
+  per open state (`CardMoveTo`'s `thread`, the `spinOff` act).
 
 ## The column model (`columns.ts`)
 
@@ -796,7 +814,9 @@ them in one row: *copy*, *edit* or *new tab*, `→`.
 `Column` gathers the facts (`ColumnFacts`), `columnView` decides, and
 `Column` draws what it returns: who works in the column (`identity`), where
 it forks (`origin`), where lanes start on its path (`joins`), and what
-became of its files (`strip`).
+became of its files (`strip`, a row of the column's header, ADR-0113).
+What the thread does next is the dock's (`nextOf`, *Threads, lanes and the
+composer*).
 
 - **`lanesAlong` is the one model of which lane worked where.** It walks the
   column's whole path, root first, and starts a stretch at each asked message
@@ -1073,13 +1093,15 @@ draws it.
   refusal, but `failedWords` never says "not sent": the host may have written
   the message before it failed. The profile page words a failed rename with
   the same function, through `renameProblem` (`identity.ts`).
-- **Queued cards** (ADR-0048) are drawn after the thread's last message and
-  its working line, above the line, in the order the host pops them
-  (`queuedOn`), each a `QueuedCardEditor`: always bound, editable by anyone
-  here, in its frame (*Card frames*, below). They are not in the tree yet.
-  Below the line, the column shows the notes at its end (`cardsAt("note",
-  …)`), and the composer your message alone (`yourCard`, ADR-0113): an
-  unqueued card is a note, so it never takes your composer.
+- **Queued cards** (ADR-0048) are drawn in the column's dock, above the
+  line, in the order the host pops them (`queuedOn`), each a
+  `QueuedCardEditor`: always bound, editable by anyone here, in its frame
+  (*Card frames*, below). They are not in the tree yet, and leave the
+  scrolling body alone: queueing a card changes no height `useFollow`
+  measures. Below the line, the composer shows your message alone
+  (`yourCard`, ADR-0113), and the notes are on the notes board
+  (`cardsAt("note", …)`): an unqueued card is a note, so it never takes
+  your composer.
 - **A queue sends the text's version too** (`seen`, `textVersion`), in the
   queued key, and so does a chat sent from a card (`SentCard`), which the
   host queues when the lane is busy: the host pops the card only once it
@@ -1094,17 +1116,28 @@ draws it.
   next send, queue or unqueue in its lane, and the column says "already
   sent".
 - **A card the host could not send** carries `unsent` until it is queued
-  again; its editor's status says it (`cardStatus`).
-- **The queue's controls** (ADR-0048 step 7) are the column's, beside Stop
-  and Resume: `columnView`'s `queue` (`QueueControls`) for a writable column
-  whose thread has a lane, worded by `queueControlWords`: "hold queue", or
-  "queue held by Bea" and "send queue (n)", which releases it ("release"
-  with no message card queued); and "unqueue all" while a message card
-  waits. Each is a `ColumnAct` (`holdQueue`, `unqueueAll`) that
-  `planIntent` turns into one `request`.
-- **Every queue is a `queueCard` effect** (ADR-0113): the `queue` act and a
-  command button's queue carry what the queue does to its hold, and the
-  session sends one `queue-card` request. `planSend` decides the hold: on
+  again; its frame's header says it (`cardFrame`'s `unsent` state).
+- **What happens next is `nextOf`** (`next.ts`, ADR-0113), read from the
+  host's own rules so the dock and the host cannot disagree: running; else
+  held (with the card a release sends first, `planNextQueuedCardPop` with
+  no hold, and whether the turn may also carry on, `carryOnState`); else
+  the pop the drain would make now (`sending`, or waiting on typing), a
+  blank message passed over (`isBlankMessage`, the page's texts; a card
+  not read yet is not blank); else stopped (who, from `stops`); else idle.
+  `queueHead` adds the lane, the holder and the message cards queued, and
+  `queueHeadPlan` decides the one button (stop, send queue, resume), the
+  ⋯ items (resume, hold, release, unqueue all) and where ▸ sits.
+  `nextWords`, `nextButtonWords` and `nextItemWords` word them. The dock
+  computes it, not `columnView`: it needs presence's typing (S59). Each
+  button and item is a `ColumnAct` (`holdQueue`, `unqueueAll`) or a
+  request (`stop`, `carry-on`).
+- **Every queue is a `queueCard` effect** (ADR-0113): the `queue` act and
+  `queueNew` carry what the queue does to its hold, and the session sends
+  one `queue-card` request. `queueNew` makes the card in the queue
+  (`queueNew` in `card-intents.ts`, a move with no `from`) with its
+  command: a command button's (`keep`) and "+ add to queue"'s
+  (`hold-if-idle`). Neither is made as a note first, which would draw it
+  on the notes board until the queue's move landed. `planSend` decides the hold: on
   an idle lane whose queue is held, `release`, and the queue place is
   `releases`, which `queueWords` words "send all (n)"; else `keep`.
 - **A discard is a move to gone** (ADR-0111): the `discard` act (a card's
@@ -1285,7 +1318,9 @@ closed is `App`'s state, never stored.
   host knows no slots.
 - **One landing rule** (`put-target.ts`). A put and a drop name a
   `PutTarget`: a column by key (a note there), its composer (your
-  message), a cell of its notes board, its pinned strip, or a slot. Each
+  message), a cell of its notes board, its pinned strip, a slot, or a new
+  thread: a workflow state or a place in the sidebar (`data-put-state`,
+  `data-put-sidebar`, *The board*). Each
   writable `Column` publishes its composer as it renders
   (`ComposerSpot`: its place, `composerPlace` in `column-view.ts`, your
   message there, and its notes board's cells as drawn); reading it redraws

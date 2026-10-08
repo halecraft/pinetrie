@@ -4,6 +4,7 @@ import {
   laneNameForThread,
   ROOT,
   rootIdFor,
+  workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
@@ -50,6 +51,9 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
     { kind: "pinned", key: "k-thread" },
     { kind: "pinned", key: "k-fresh" },
     { kind: "cell", key: "k-thread", cell: 6 },
+    { kind: "state", state: workflowStateIdFor("s-1") },
+    { kind: "sidebar", before: entryId("1-r1") },
+    { kind: "sidebar", before: null },
   ]
 
   test.each(targets)("a drop on %o lands where a put to it lands", target => {

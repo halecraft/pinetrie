@@ -71,6 +71,13 @@ export const HOST_PRINCIPAL = "pinetrie-host"
  *     each card, where its sender saw it and where it goes, each an encoded
  *     key or null: no `from` creates the card, and no `to` removes it.
  *     The list is accepted whole or refused (a keep's several cards).
+ *   - `queue-card` moves one card into a queue, as `move` does, and
+ *     changes that queue's hold (`mode`: `keep`, `hold-if-idle` or
+ *     `release`) in the same step (ADR-0113). A card it creates carries the
+ *     command `targetId`.
+ *   - `spin-off` makes a card a thread (ADR-0111): `moves` is its one move,
+ *     to gone, spun into the new root it names; `state` is the workflow
+ *     state the root lands in, `""` for the first open state.
  *   - `reorder` moves the card `cardId` among its neighbours in its queue
  *     or among the pinned cards: `moves` is `{ at, after, before }`, the
  *     key of where it is and the cards it goes after and before, `""` for
@@ -99,6 +106,7 @@ export const COMMAND_KINDS = [
   "reorder",
   "queue-hold",
   "unqueue-all",
+  "spin-off",
   "set-command",
   "setup",
   "publish",
@@ -144,7 +152,8 @@ export interface Command {
   readonly asksAgent: boolean
   /**
    * `mark`: the entry; `offer` `accept`: the destination bookmark, `""`
-   * for the default; `workflow`: the state. Separate from `parentId` on
+   * for the default; `workflow`: the state; `queue-card`: the command of
+   * the card it creates, `""` for none. Separate from `parentId` on
    * purpose.
    */
   readonly targetId: string
@@ -180,8 +189,8 @@ export interface Command {
    */
   readonly base: string
   /**
-   * `chat`: the workflow state a root it starts lands in, or `""` for the
-   * first open state (ADR-0112).
+   * `chat` and `spin-off`: the workflow state a root it starts lands in,
+   * or `""` for the first open state (ADR-0112).
    */
   readonly state: string
 }

@@ -523,13 +523,15 @@ export async function startHost({
     provenance,
     keeper,
   })
-  // The drain's waits for its top card: its text (S96), or someone's
-  // typing in it to stop (ADR-0048 step 7).
+  // The drain's waits for its top card: its text (S96), someone's typing in
+  // it to stop (ADR-0048 step 7), or a blank card to be written in (ADR-0113).
   const wait = createWaits({ places, drain: lane => queueDrain(lane) })
   const behind = (card: QueuedCard) =>
     wait(card, signal => cardPort.whenHolds(card.id, card.place.seen, signal))
   const typing = (card: QueuedCard) =>
     wait(card, signal => untilNotTyped(presence, card.id, signal))
+  const blank = (card: QueuedCard) =>
+    wait(card, signal => cardPort.whenWritten(card.id, signal))
   const drain = (lane: LaneName) =>
     drainQueue(
       {
@@ -547,6 +549,7 @@ export async function startHost({
         presence,
         behind,
         typing,
+        blank,
         provenance,
       },
       lane,

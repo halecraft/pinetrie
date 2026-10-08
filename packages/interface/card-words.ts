@@ -147,6 +147,10 @@ export function noticeWords(notice: CardNotice, reader: Reader): string {
       return "not moved: a note the thread will read keeps its place"
     case "order-changed":
       return "not moved: the cards around it changed first"
+    case "replied":
+      return by === null
+        ? "not lifted back: its thread has more in it"
+        : `not lifted back: ${who(by, reader)} replied`
     case "exists":
       return "not moved"
   }
@@ -240,6 +244,7 @@ const PARTICIPLE: Readonly<Record<Verb, string>> = {
   "took-into-inventory": "taken",
   put: "put",
   discarded: "discarded",
+  spun: "spun off into a thread",
   moved: "moved",
 }
 
@@ -279,6 +284,7 @@ const ACTIVE: Readonly<Record<Verb, string>> = {
   "took-into-inventory": "took",
   put: "put",
   discarded: "discarded",
+  spun: "made a thread of",
   moved: "moved",
 }
 

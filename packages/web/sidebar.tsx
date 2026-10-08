@@ -12,6 +12,7 @@
 
 import { MAX_TITLE, type TreeIndex, type WriterId } from "@pinetrie/core"
 import {
+  dropProps,
   dropsWords,
   type Intent,
   type ItemIcon,
@@ -42,6 +43,7 @@ import { CardPip } from "./card-pip.tsx"
 import { slotColor } from "./colors.ts"
 import { Menu, type MenuItem } from "./menu.tsx"
 import { Readers, type ReadersProps, RootStatus } from "./root-signals.tsx"
+import { ThreadHead } from "./thread-card.tsx"
 import { startRootDrag } from "./use-root-drag.ts"
 
 /** Up and Down move focus between items. */
@@ -195,6 +197,7 @@ export function Sidebar({
               data-selected={item.selected || undefined}
               key={key}
               {...rootDropProps({ kind: "list", before: root })}
+              {...dropProps({ kind: "sidebar", before: root })}
             >
               <button
                 aria-current={item.selected || undefined}
@@ -208,14 +211,14 @@ export function Sidebar({
                 title={item.label}
                 type="button"
               >
-                <RootStatus
+                <ThreadHead
                   arrived={item.arrived}
                   done={item.done}
+                  head={item.head}
+                  labelClass="open-label"
                   nameOf={nameOf}
-                  status={item.status}
+                  pip={pip}
                 />
-                <span className="open-label">{item.label}</span>
-                {item.pip && pip}
                 <Readers {...readers} roots={[root]} />
               </button>
               {item.menu.length > 0 && (
@@ -249,6 +252,7 @@ export function Sidebar({
         <span
           className="open-end"
           {...rootDropProps({ kind: "list", before: null })}
+          {...dropProps({ kind: "sidebar", before: null })}
         />
       </div>
       <AddButton
@@ -372,7 +376,10 @@ function FoldedItem({
       ref={wrap}
       {...(root === undefined
         ? {}
-        : rootDropProps({ kind: "list", before: root }))}
+        : {
+            ...rootDropProps({ kind: "list", before: root }),
+            ...dropProps({ kind: "sidebar", before: root }),
+          })}
     >
       <Menu
         className="open-icon-menu"

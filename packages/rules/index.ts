@@ -98,11 +98,14 @@ export {
   type CarryPlan,
   cardEnd,
   cardsAt,
+  cardsOfParts,
   decodeCard,
   encodeCard,
   historyOf,
+  isBlankMessage,
   type MoveStep,
   type MovesStep,
+  type NextQueuedCardPopStep,
   type PlaceStep,
   placeEnd,
   planCardSweep,
@@ -300,6 +303,7 @@ export {
   planOfferRead,
   reviewUrl,
 } from "./review.ts"
+export { planRootDelete, type RootDelete } from "./root.ts"
 export { ROOT } from "./roots.ts"
 export { planSeatSweep, planSeats, SEAT, writersOfClients } from "./seat.ts"
 export {
@@ -308,6 +312,15 @@ export {
   RECORD_SPECS,
   type StoredRecords,
 } from "./specs.ts"
+export {
+  type LiftPlan,
+  planLiftRoot,
+  planSpinOff,
+  type SpinOff,
+  type SpinOffPlan,
+  type SpinOffRefusal,
+  type SpunThread,
+} from "./spin-off.ts"
 export { decodeStack, planStack, type StackMessage } from "./stack.ts"
 export { planStartup } from "./startup.ts"
 export {

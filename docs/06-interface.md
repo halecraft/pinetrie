@@ -266,12 +266,14 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
 - **Every root is in one workflow state.** Each open state is a column of
   the board, in order; the closed state is last. A new session has
   **Backlog**, **Doing** and **Done**.
-- **A thread card** shows its root's label, its status (as in the sidebar,
-  with the agent's ring in any root, opened in this browser tab or not), a
+- **A thread card** (ADR-0111) is a root, on the board and in the sidebar
+  alike: its header, the same in both, shows its label, its status (with
+  the agent's ring in any root, opened in this browser tab or not), a
   blue **⇡** for everyone when a thread of it has work ready to accept (its
-  title names the threads; the thread's followers have it in their inbox), a
-  dot in your colour when it holds something you typed, who wrote in it,
-  and the others reading there: each reader's avatar is a menu of the
+  title names the threads; the thread's followers have it in their inbox),
+  and a dot in your colour when it holds something you typed. On the board,
+  a titled root's first line is its body, and its foot shows who wrote in
+  it and the others reading there: each reader's avatar is a menu of the
   threads they read there, a row of which opens that thread in the sidebar.
   Selecting the item opens the root in the sidebar and shows it.
 - **Anyone moves a root, for everyone**: drag an item to another column, or
@@ -317,6 +319,17 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
 - **A backlog item is a conversation root**: an idea not started is a root
   with no agent (ADR-0021); people discuss it below its first message, and
   asking `@agent` in it starts the work.
+- **A text card becomes a thread** (ADR-0111): dropped on an open state, in
+  the board's column or the footer's strip, or among the sidebar's roots,
+  it starts a conversation root there whose first message is its text, by
+  you; a note's and your message's ⋯ have **Move to a new thread in
+  Backlog** (and each open state) for the keyboard. Dropped in the
+  sidebar, the new root opens there for you. It never asks the agent,
+  even with `@agent` in it. While a card is dragged, those places are
+  outlined, and a card held over ▦ opens the board. The undo key lifts the
+  thread back into the card, where it was, while the thread holds that
+  first message alone; once someone replied, it says "not lifted back: Bea
+  replied". A blank card starts nothing.
 
 ### Columns: a path each
 
@@ -371,13 +384,38 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   branch is still in the rail. A root's only column has no close, since the
   root would show that path again; a new tab's closes the new tab. The
   cards at a thread's end stay with the thread.
-- Each column's composer sits at its foot. The rail scrolls on its own, and
+- **Each column's foot is its dock** (ADR-0113), pinned there while the
+  messages scroll above it: the queue's header, which says what happens
+  next, the cards queued, **+ add to queue**, the line, your message, and
+  the notes line. It takes at most a third of the column and scrolls within
+  itself past that, its queue header kept in view.
+- **The queue's header says what happens next**, with one button. ▸ marks
+  what goes next: the run, the queued card the host sends next (a blank
+  one is passed over, as the host passes it), or your message's send.
+
+  | the thread | header | button |
+  |---|---|---|
+  | running | ◉ running | stop |
+  | idle, queue held, cards queued | held by Bea | send queue (2) |
+  | stopped, nothing queued | stopped by Bea | resume |
+  | a card due | sending, or "sends when the typing stops" | none |
+  | idle, nothing queued | idle | none |
+
+  Its ⋯ holds the rest: **resume** while the queue is held and the turn
+  may carry on, **hold queue** (or **release hold** while it is held with
+  nothing to send), and **unqueue all** while a card waits.
+- **Queued cards are folded** to their header and first line, and open
+  while one holds the focus. **+ add to queue** makes an empty card at the
+  queue's end, never a note first, and focuses it; on an idle thread it
+  holds the queue first, so the card is not sent as you type it. The host
+  passes over a blank message (no command, nothing typed) and sends the
+  cards behind it; the blank card stays until someone writes in it. The rail scrolls on its own, and
   follows the column you move (below).
 - **A column shown again is where you left it** (ADR-0058): the same message
   at the same height, or its end if you were following it. If its thread
   grew meanwhile, it comes back at its old end, with ↓ new below.
-- **Above the composer, a work strip says what became of the agent's files**
-  (ADR-0040): an agent on its own copy shows its offer in plain words ("2
+- **A row of the column's header, the work strip, says what became of the
+  agent's files** (ADR-0040, ADR-0113): an agent on its own copy shows its offer in plain words ("2
   files ready"), with **accept** and its bookmark, which a press copies. The
   button names a WIP the work goes into (ADR-0104, ADR-0090): "accept", or
   "accept into wip/search" for a thread on a WIP, whose menu also offers
@@ -438,7 +476,7 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   the thread: "✓ accepted as k1a2b3c4", "✎ a new description
   was asked for", "⇣ the stack was squashed into one revision", "↻ the
   offer was rebuilt from this thread's work". While the agent works, the
-  line waits above the composer as a quiet row, and joins the thread when
+  line waits in the dock's queue as a quiet row, and joins the thread when
   the run ends. When accepted work has moved on with work the thread
   lacks, its next run, or its run in progress, begins with "↓ accepted
   work has moved on: 2 files, 1 this thread changed too". A thread with no work of its own is
@@ -674,13 +712,13 @@ The rail is E; the column is T. Seeing both at once is the product.
   its end as a column does. Each becomes the committed message or result in
   place, and a column at its end does not get shorter while the agent works
   (ADR-0044).
-  **Stop** ends the turn, and records who pressed it under the ask
-  (ADR-0106); cards queued are then held, until someone presses
-  **send queue (n)**, or sends a message there (ADR-0048 step 7,
-  ADR-0113). Once it has stopped, **Resume**
-  takes its place: it starts a new turn with a message from the host,
-  "↻ resumed by <name>" (ADR-0082), until anything else is written at the
-  thread's end.
+  **stop**, the queue header's button, ends the turn, and records who
+  pressed it under the ask (ADR-0106); cards queued are then held, until
+  someone presses **send queue (n)**, or sends a message there (ADR-0048
+  step 7, ADR-0113). Once it has stopped, **resume** takes its place (in
+  the header's ⋯ while the queue is held): it starts a new turn with a
+  message from the host, "↻ resumed by <name>" (ADR-0082), until anything
+  else is written at the thread's end.
 - **A column says what its agent is doing** (ADR-0054), and none of it moves
   the column. While the agent works, the mark before the thread's name in the
   header (its `✦`, or its banner, ADR-0053) pulses, titled with the ask it
@@ -773,7 +811,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   a column are notes.
 - **The notes board is a grid in the column's pane**, 4 wide, with one
   empty row below its last note to grow into, opened and closed by the
-  column's **notes (n)** line above the composer, beside the circles of
+  column's **notes (n)** line under your message, beside the circles of
   whose notes are there. A narrow pane scrolls it sideways. Each note sits
   in a cell, folded to its first three lines, and keeps it, gaps included,
   for everyone: a cell is an address. Click a note, or Enter on it, and it
@@ -796,7 +834,7 @@ The rail is E; the column is T. Seeing both at once is the product.
 - **A send to a busy thread queues your card above the line** (ADR-0048), as
   does a card with a command, even on an idle thread. Every move shows at
   once and is the host's to make (ADR-0059). A queued card is drawn
-  after the thread's last message, headed by its place in line ("next",
+  in the column's dock, headed by its place in line ("next",
   "2nd in line", "held · next" while the queue is held) and "queued by Bea",
   with its command's chip when it has one; its ⋯'s **Move to notes**
   unqueues it. Anyone here
@@ -806,11 +844,10 @@ The rail is E; the column is T. Seeing both at once is the product.
   before you unqueued it". A move someone else made first is undone on your
   screen, saying "not moved: Bea moved it first". A card the host could not
   send is back below the line saying "not sent: …" until it is queued again.
-- **The queue has its own controls** (ADR-0048 step 7), beside Stop and
-  Resume on any thread with an agent: **hold queue**, and once held "queue
-  held by Bea" and **send queue (n)**, which releases it (**release** with
-  nothing queued); and **unqueue all** while a card waits. While the queue
-  is held nothing in it is sent, so you can line up several steps on a
+- **The queue's controls are its header's** (ADR-0048 step 7, ADR-0113),
+  on any thread with an agent: **send queue (n)** releases a held queue;
+  **hold queue**, **release hold** and **unqueue all** are in its ⋯. While
+  the queue is held nothing in it is sent, so you can line up several steps on a
   quiet thread and let them go together. Notes the thread will read (a
   fact, ADR-0080) still go. **Sending removes the hold** (ADR-0113): on an
   idle thread whose queue is held, your send button reads **send all (n)**,
@@ -991,18 +1028,11 @@ board's records (ADR-0112); a card's text is its own document (ADR-0048).
 
 ## Deferred, but designed for
 
-- **Cards and surfaces** (ADR-0111), accepted and partly built: every text
-  card is drawn in one frame (*A card's frame*). Not yet built: the line
-  drawn between a thread's queue and your message; thread cards as thread
-  cards, which a text card put on a board state becomes; and "the sidebar"
-  renamed the sidebar, which shows your open threads. Until they are built,
-  this document describes what is.
-- **Notes and the dock** (ADR-0113), accepted and partly built: a card
-  below the line is a note, on the thread's notes board; the composer is
-  yours alone; sending removes a queue's hold (*Your message and notes*).
-  Not yet built: the column's foot as a dock of the queue, the line and
-  your message, whose queue header says what happens next; the work strip
-  in the column's header.
+- **What is left of cards and the dock** (ADR-0111, ADR-0113): a thread
+  card's body on the board drawn from its pinned cards' first lines (today
+  its first line, under a title); and the notes line's avatars as the
+  people on the notes board now (today the notes' owners), which needs a
+  presence field of its own.
 - **Narrow screens**: the stacked sequence described above, with the sidebar
   collapsed to each root's banner (ADR-0050, ADR-0053) and the footer to ▦,
   what needs you and you (ADR-0112); built after the wide layout works. The

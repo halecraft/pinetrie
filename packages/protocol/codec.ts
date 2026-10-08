@@ -266,9 +266,35 @@ export function decodeCommand(
         "a queue-card names one move into a queue",
       )
     const hold = text(wire?.mode)
-    return isQueueHoldChange(hold)
-      ? { kind, move, hold }
-      : refused(ERR.UNKNOWN_KIND, `unknown queue hold change: ${hold}`)
+    if (!isQueueHoldChange(hold))
+      return refused(ERR.UNKNOWN_KIND, `unknown queue hold change: ${hold}`)
+    const name = text(wire?.targetId)
+    if (name === "") return { kind, move, hold, command: null }
+    if (!isCardCommand(name))
+      return refused(ERR.UNKNOWN_KIND, `unknown card command: ${name}`)
+    // A command rides only on a creation: a card that exists keeps its own.
+    return move.from === null
+      ? { kind, move, hold, command: name }
+      : refused(ERR.UNKNOWN_TARGET, "only a card queued new names a command")
+  }
+  if (kind === "spin-off") {
+    const moves = decodeMoves(text(wire?.moves))
+    if (typeof moves === "string") return refused(ERR.UNKNOWN_TARGET, moves)
+    const [move, ...more] = moves
+    if (
+      move === undefined ||
+      more.length > 0 ||
+      move.to.kind !== "gone" ||
+      move.to.why.kind !== "spun"
+    )
+      return refused(
+        ERR.UNKNOWN_TARGET,
+        "a spin-off names one move, into a new thread",
+      )
+    const state = text(wire?.state)
+    if (state !== "" && !isWorkflowStateId(state))
+      return refused(ERR.UNKNOWN_TARGET, `not a workflow state: ${state}`)
+    return { kind, move, state: state === "" ? null : state }
   }
   if (kind === "undo-move") {
     const root = text(wire?.root)
@@ -620,6 +646,7 @@ const MOVE_REFUSALS: readonly MoveRefusal[] = [
   "not-yours",
   "fact",
   "order-changed",
+  "replied",
 ]
 const isMoveRefusal = (c: string): c is MoveRefusal =>
   (MOVE_REFUSALS as readonly string[]).includes(c)
@@ -746,6 +773,14 @@ export function encodeIntent(id: string, intent: Intent): Command {
         kind: "queue-card",
         moves: encodeMoves([intent.move]),
         mode: intent.hold,
+        targetId: intent.command ?? "",
+      })
+    case "spin-off":
+      return command({
+        id,
+        kind: "spin-off",
+        moves: encodeMoves([intent.move]),
+        state: intent.state ?? "",
       })
     case "undo-move":
       return command({

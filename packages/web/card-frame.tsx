@@ -24,6 +24,7 @@ import {
   DISCARD_CARD_TITLE,
   HISTORY_TITLE,
   historyItemWords,
+  moveKey,
   moveWords,
   type Reader,
 } from "@pinetrie/interface"
@@ -72,10 +73,11 @@ export function CardFrame(p: {
       key: "moves",
       items: view.moves.map(m => {
         const w = moveWords(m.to)
+        const key = moveKey(m.to)
         return {
-          key: m.to,
+          key,
           className: "move-to",
-          data: { to: m.to },
+          data: { to: key },
           label: w.label,
           title: w.title,
           onChoose: () => p.onAct(m.act),

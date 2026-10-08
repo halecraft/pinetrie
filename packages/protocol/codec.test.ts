@@ -284,6 +284,23 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
         },
       },
       hold: "release",
+      command: null,
+    },
+    {
+      kind: "queue-card",
+      move: {
+        card: cardId("c-8"),
+        from: null,
+        to: {
+          kind: "queued",
+          root: TEST_ROOT,
+          at: atEntry(entryId("e-5")),
+          lane: laneNameForThread("abc"),
+          seen: "",
+        },
+      },
+      hold: "keep",
+      command: "split",
     },
     {
       kind: "move",
@@ -304,6 +321,22 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
           to: { kind: "gone", root: null, why: { kind: "discarded" } },
         },
       ],
+    },
+    {
+      kind: "spin-off",
+      move: {
+        card: cardId("c-9"),
+        from: { kind: "inventory", holder: writerId("ada@example.com") },
+        to: {
+          kind: "gone",
+          root: TEST_ROOT,
+          why: {
+            kind: "spun",
+            thread: rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff"),
+          },
+        },
+      },
+      state: null,
     },
     {
       kind: "move",
@@ -585,6 +618,26 @@ test("decodeReply: an unrecognised code stays inside the ErrCode set", () => {
   assert.equal(out.kind === "refused" ? out.code : "", ERR.UNKNOWN_KIND)
 })
 
+test("decode: a spin-off names one move, into a new thread, and a known state or none (ADR-0111)", () => {
+  const spunTo = {
+    kind: "spun",
+    root: TEST_ROOT,
+    column: rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff"),
+  }
+  const from = { kind: "inventory", holder: "ada@example.com" }
+  const moves = (to: unknown) => JSON.stringify([{ card: "c-1", from, to }])
+  assert.equal(
+    decodeCommand({ kind: "spin-off", moves: moves(spunTo) }).kind,
+    "spin-off",
+  )
+  for (const wire of [
+    { kind: "spin-off", moves: moves({ ...spunTo, kind: "discarded" }) },
+    { kind: "spin-off", moves: moves({ ...spunTo, column: "" }) },
+    { kind: "spin-off", moves: moves(spunTo), state: "not a state" },
+  ])
+    assert.equal(decodeCommand(wire).kind, "refused")
+})
+
 test("decode: a malformed reorder or queue hold is refused (ADR-0048 step 7)", () => {
   const queued = {
     kind: "queued",
@@ -605,6 +658,26 @@ test("decode: a malformed reorder or queue hold is refused (ADR-0048 step 7)", (
     decodeCommand({ kind: "queue-card", moves, mode: "later" }).kind,
     "refused",
   )
+  // A command rides only on a card made in the queue, and must be one.
+  assert.equal(
+    decodeCommand({ kind: "queue-card", moves, mode: "keep", targetId: "x" })
+      .kind,
+    "refused",
+  )
+  const lane = laneNameForThread("abc")
+  const at = atEntry(entryId("e-1"))
+  const moved = encodeIntent("c", {
+    kind: "queue-card",
+    move: {
+      card: cardId("c-1"),
+      from: { kind: "composing", root: TEST_ROOT, at, lane },
+      to: { kind: "queued", root: TEST_ROOT, at, lane, seen: "" },
+    },
+    hold: "keep",
+    command: "split",
+  })
+  assert.equal(decodeCommand(moved).kind, "refused")
+  assert.equal(decodeCommand({ ...moved, targetId: "" }).kind, "queue-card")
   assert.equal(
     decodeCommand({
       kind: "queue-card",

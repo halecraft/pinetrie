@@ -478,6 +478,27 @@ describe("moves, built once (ADR-0059)", () => {
     ).toBe(false)
   })
 
+  test("a spun card is stored as spun, its thread in its column; a spun place with no thread is malformed", () => {
+    const place = {
+      kind: "gone",
+      root: TEST_ROOT,
+      by: ADA,
+      why: { kind: "spun", thread: OTHER },
+    } as const
+    const fields = placeFields(place)
+    expect(fields).toMatchObject({ kind: "spun", column: OTHER, holder: ADA })
+    expect(placeOfFields(fields)).toEqual(place)
+    expect(keyOfFields({ ...fields, holder: "" })).toEqual(keyOf(place))
+    expect(placeOfFields({ ...fields, column: "" })).toBeUndefined()
+    expect(
+      sameKey(keyOf(place), {
+        kind: "gone",
+        root: TEST_ROOT,
+        why: { kind: "spun", thread: TEST_ROOT },
+      }),
+    ).toBe(false)
+  })
+
   test("an unqueue puts a card back where it was queued, in its root", () => {
     expect(
       noteOf({
