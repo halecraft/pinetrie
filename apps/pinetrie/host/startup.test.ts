@@ -276,7 +276,7 @@ test("recover sweeps empty cards, texts no record names, and seats no text names
   ).toEqual([[deleteRecord(SEAT, "p-22"), deleteRecord(SEAT, "p-33")]])
 })
 
-test("recover gives a new store the default workflow first, before it names lanes (ADR-0085)", async () => {
+test("recover gives a new store the default workflow first, before it names lanes (ADR-0112)", async () => {
   const events: string[] = []
   await recover(
     deps({

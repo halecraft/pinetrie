@@ -2,7 +2,7 @@
 
 - **Status:** Answered
 - **Led to:** ADR-0026, ADR-0048, ADR-0055, ADR-0059, ADR-0083, ADR-0085,
-  ADR-0108
+  ADR-0108, ADR-0112
 
 **Answers.**
 1. **Once the host's take is written, it wins.** The take reads the top

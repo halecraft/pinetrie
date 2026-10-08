@@ -148,7 +148,7 @@ async function run(check: Checks["check"]): Promise<void> {
         )
         await qp.goto(imageHost.httpUrl, { waitUntil: "domcontentloaded" })
         // A window with nothing in its list opens on the board, where the
-        // other window's reader avatar leads to its thread (ADR-0085).
+        // other window's reader avatar leads to its thread (ADR-0112).
         await qp
           .waitForSelector("#board .reader-trigger", { timeout: 20_000 })
           .catch(() => null)

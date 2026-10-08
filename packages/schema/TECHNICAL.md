@@ -280,7 +280,7 @@ would refuse each whole undo of a move (S82).
   rows written before it existed do not decode, and no stored session held
   any.
 
-## A person's documents (`inventory.ts`, `attention.ts`, `open.ts`, ADR-0059, ADR-0077, ADR-0085)
+## A person's documents (`inventory.ts`, `attention.ts`, `open.ts`, ADR-0059, ADR-0077, ADR-0112)
 
 A person has one document of each kind in `PERSON_DOC_KINDS`, at
 `<kind>:<writer>` (`personDocId`, `ownerOfPersonDoc` in
@@ -323,7 +323,7 @@ panel draws a slot whose card is not held as empty.
   the `ledger.source` whose offer, was marked "not needed".
 - A key that is no lane name is left out when read.
 
-`OpenDoc` is the roots the person has open, their list (ADR-0085): each
+`OpenDoc` is the roots the person has open, their list (ADR-0112): each
 root's `RootId` to an order key, read by `readOpenKeys` (a key that is no
 root is left out) and ordered by `orderOpen` (by key, then id, in
 `packages/session/open-repair.ts`). A record,

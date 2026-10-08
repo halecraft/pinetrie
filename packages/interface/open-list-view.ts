@@ -1,5 +1,5 @@
 // interface/open-list-view — what your list shows and offers (ADR-0030,
-// ADR-0085), full or folded to icons (ADR-0088), decided. PURE: `OpenList`
+// ADR-0112), full or folded to icons (ADR-0088), decided. PURE: `OpenList`
 // (`open-list.tsx`) draws it, and each click sends the intent it names.
 
 import type {
@@ -33,7 +33,7 @@ export type ItemMenuItem =
   /** Ask a model for a title from the root's messages (ADR-0074). */
   | { readonly kind: "retitle"; readonly intent: Intent }
   /**
-   * Move the root on the board to another workflow state (ADR-0085). Into
+   * Move the root on the board to another workflow state (ADR-0112). Into
    * the closed state it is archived: refused while its agent works there
    * (`busy`), and it withdraws the offers of its threads named in `drops`
    * (ADR-0061).

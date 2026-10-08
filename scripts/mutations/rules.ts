@@ -2184,7 +2184,7 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "an idle lane whose queue is held: busy",
   },
-  // ── the board (ADR-0085) ──
+  // ── the board (ADR-0112) ──
   {
     name: "the board leaves out a root with no place",
     file: "packages/rules/board.ts",

@@ -1,4 +1,4 @@
-// session/open-repair — what your list's document should say (ADR-0085).
+// session/open-repair — what your list's document should say (ADR-0112).
 // Pure: `open-list.ts` writes what these decide.
 
 import type { RootId } from "@pinetrie/core"

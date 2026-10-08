@@ -1,38 +1,26 @@
-# ADR-0085 — Your open roots run down the left; a board in the footer shows where everyone's work stands
+# ADR-0112 — Your open roots run down the left; a board in the footer shows where everyone's work stands
 
-- **Status:** Accepted (Duane, 2026-10-05)
+- **Status:** Accepted
 - **Area:** `docs/06-interface.md`, `packages/interface/TECHNICAL.md`
 - **Evidence:** S69
-- **Amends:**
-  - ADR-0027: your open roots leave the stored layout for your own document,
-    on every device; the layout keeps which root you are on, each root's
-    columns, new tabs and whether the board is open.
-  - ADR-0029: the tab bar becomes your list down the left, and the Archive tab
-    the board; archiving is moving a root to the closed workflow state, whose
-    place replaces the archive record.
-  - ADR-0030: your tabs are your list, kept per person; the header's people
-    go, and who is where shows on your list's items and the board's.
-  - ADR-0063: the archive record goes; a root is archived while its board
-    place, keyed by its `RootId`, is in the closed state, and the Archive
-    tab's search over labels is the closed state's.
-  - ADR-0077: your open roots are a third person document (`open:`), and ▦
-    carries the mark the Archive tab did.
-  - ADR-0080: the `archive` command is gone; `move-root` and `workflow` change
-    the workspace people share in its place.
-  - ADR-0081: the header row goes; your list runs down the left, its root you
-    are on joined to the page sideways, and the footer holds the indicators,
-    with the message count on ▦.
+- **Supersedes:**
+  - ADR-0085: restated whole, with what ADR-0088, ADR-0091 and ADR-0098
+    changed in it folded in.
 - **Amended by:**
-  - ADR-0088: your list folds to icons, and the footer's corner to your
-    avatar, which answers this ADR's deferred narrow screens.
-  - ADR-0091: under your list, your inbox sits between your avatar and your
-    inventory; the activity menu goes, and each state on the strip counts its
-    roots where the agent works and those with work ready to accept.
-  - ADR-0098: the corner is you, with your name, then your inbox and inventory
-    as icon buttons of one style.
+  - ADR-0111: a board item is a thread card; a text card put on a board state
+    becomes a conversation root there, which the undo key lifts back into the
+    card while the root holds only that message; "your list" is the sidebar,
+    which shows your open threads.
+  - ADR-0113: a note dropped on a workflow state in the footer's strip, or in
+    the sidebar, becomes a new thread; a held queue is not work, so it draws
+    no ring.
 
-Evidence: screenshots of the client restyled into this layout, at 1440 and 860
-pixels wide, made while deciding.
+Restates ADR-0085 as amended by ADR-0088, ADR-0091 and ADR-0098; decides
+nothing new. ADR-0085's changes to ADR-0027, ADR-0029, ADR-0030, ADR-0063,
+ADR-0077, ADR-0080 and ADR-0081 stand as ADR-0085 made them. Only what
+those three ADRs changed in ADR-0085 is folded in here: how your list
+folds is ADR-0088's, the inbox's sections ADR-0091's, and the account menu
+and pages ADR-0098's.
 
 **Context.**
 
@@ -56,6 +44,12 @@ pixels wide, made while deciding.
   surfaces.
 - **"Lane", "column", "track", "card" and "tab" are taken.** A board's
   divisions need a word of their own.
+- **Narrow screens** need the list and the footer's corner to give up
+  width: 15rem of list is most of a phone, and decides whether a column's
+  pane (ADR-0087) sits beside the thread or covers it (ADR-0088).
+- **The activity menu sat on everyone's side of the footer** yet counted
+  only what is yours, and listed runs and offers the board could show
+  (ADR-0091).
 
 **Decision.**
 
@@ -69,11 +63,9 @@ pixels wide, made while deciding.
   It replaces the Archive tab. It is drawn as a strip in the footer, and
   slides up over the columns when opened.
 - **The footer splits where the sidebar does.** Below your list, at its
-  width, is what is yours: your avatar, which opens your profile
-  (ADR-0037), and your inventory. To the right of that line is what is
-  everyone's: ▦ **Board**, then each workflow state's name and count, then
-  what needs you (the activity menu, ADR-0069, ADR-0077), the project
-  (ADR-0060) and "syncing…" while pending.
+  width, is what is yours: the corner (below). To the right of that line is
+  what is everyone's: ▦ **Board**, then each workflow state's name and
+  count, then the publish button (ADR-0090) and "syncing…" while pending.
 - **There is no header row.** The columns, their heads and their pinned
   cards start at the top of the window.
 
@@ -84,13 +76,12 @@ pixels wide, made while deciding.
   write it, the host stores it and shares it with you alone, and it is the
   same on every device of yours.
 - **Opening a root adds it at the bottom.** You open a root from the board,
-  the activity menu, a mention or a link. A root you start opens at the
-  bottom too. Nothing opens a root in your list by itself (principle 6 of
+  your inbox, a mention or a link. A root you start opens at the bottom
+  too. Nothing opens a root in your list by itself (principle 6 of
   `docs/06-interface.md`): a root someone else starts appears on the board.
 - **Dragging reorders it**, and so does a keyboard move in an item's `⋯`.
-- **× closes a root for you** and writes nothing shared, as a tab's ×
-  did (ADR-0030). Its columns stay kept, so opening it again brings them
-  back.
+- **× closes a root for you** and writes nothing shared, as a tab's × did
+  (ADR-0030). Its columns stay kept, so opening it again brings them back.
 - **Which root you are on, and each root's columns, stay as they are**:
   per browser tab, with the device's latest as a fallback (ADR-0027). Only
   the list moves to the person.
@@ -103,10 +94,41 @@ pixels wide, made while deciding.
   on included.
 - **An item keeps a tab's signals** (ADR-0077): the blue ring while the
   agent works there, amber when something needs you or is worth a read,
-  the ✓ that fades, readers' avatars, and your pip for unsent text.
+  the ✓ that fades, readers' avatars, and your pip for unsent text. The
+  agent's work is read in every root, from every running lane as well as
+  the lanes this tab holds, so a root's ring, in your list and on the
+  board, and the closed state's refusal while the agent works read the
+  same facts.
 - **＋ agent, with conversation in its menu**, sits at the bottom of the
   list. What each starts is ADR-0021's.
 - **The window's title names the root you are on**, as ADR-0081 has it.
+
+*Your list, folded.*
+
+- **The list is full, or icons**, about 3rem wide, the rail's `min-width`.
+  A control at its foot switches between them, and so does Ctrl+Shift+L.
+  The choice is view state, per browser tab, with the device's latest as a
+  new tab's fallback. With no choice stored, the list shows icons below
+  56rem and is full otherwise. It never folds by itself.
+- **An item's icon** is the sprite of its root's earliest thread that has
+  one (ADR-0053), else a tile in the root's colour (ADR-0089) with two
+  initials. Its signals stay on it: the ring around it, the amber or dim
+  dot and the fading ✓ on its top-right corner, your pip on its
+  bottom-right. Hover and focus show its label and who is reading there.
+  The root you are on is drawn as in the full list.
+- **⋯ and × become one menu**, opened by a right-click, Shift+F10 or the
+  Menu key: ⋯'s items, then Close. Rename opens its field in a popover
+  beside the icon. ＋ agent becomes ＋, with its ▾ menu.
+
+*The corner.*
+
+- **With your list full, the corner is you**, then your inbox and your
+  inventory. You are your avatar and your name, as one button that opens
+  the account menu (ADR-0098). The inbox (ADR-0091) and the inventory
+  (ADR-0048) are icon buttons of one style, the inbox with its amber badge,
+  the inventory with a muted count.
+- **With your list folded, the corner is only your avatar**, carrying the
+  inbox's badge; the account menu then holds the inbox and the inventory.
 
 *The board.*
 
@@ -124,9 +146,9 @@ pixels wide, made while deciding.
   state; finer kinds of done wait for tags.
 - **Anyone can move a root**, between states and within one, by dragging
   it or from its `⋯` ("Move to ▸", Move up, Move down), so the keyboard
-  reaches every move.
-  Nothing moves a root by itself: an offer that is ready, or a run that
-  needs you, shows as a mark on the root, never as a move.
+  reaches every move. Nothing moves a root by itself: an offer that is
+  ready, or a run that needs you, shows as a mark on the root, never as a
+  move.
 - **Where a new root lands:** ＋ in your list puts it at the end of the
   first open state; ＋ on a board column puts it at the end of that state.
   Each ＋ is the same split button: ＋ agent, or conversation.
@@ -135,8 +157,10 @@ pixels wide, made while deciding.
   discuss it below, and starting the work is asking `@agent` in it. The
   board holds one kind of item, and no new storage is needed for ideas.
 - **An item on the board shows** the root's label (its title, ADR-0045,
-  ADR-0074), the same signals as in your list, who is reading there
-  (presence, ADR-0024), and who has written in it.
+  ADR-0074), the same signals as in your list, **⇡** for everyone when a
+  thread of it has an open offer (its title names the threads; not amber,
+  since it asks nothing), who is reading there (presence, ADR-0024), and
+  who has written in it.
 - **Selecting an item opens the root in your list and shows it.** A closed
   root opens read-only, with **Restore** in its composer's place, as the
   Archive tab's preview did; it leaves your list when you switch away
@@ -146,10 +170,13 @@ pixels wide, made while deciding.
   The filters the Archive tab had ("mine": roots you wrote in) are on that
   search.
 - **The strip summarises the board while it is closed**: each state's name
-  and count, avatars of the people in its roots, and an amber dot when a
-  root there needs you. ▦ carries the highest mark of the roots not in your
-  list, as the Archive tab did (ADR-0077). Its tooltip carries the message
-  count ADR-0081 gave the Archive tab.
+  and count, avatars of the people in its roots, an amber dot when a root
+  there needs you, and counts of its roots where the agent works (`◌n`) and
+  of those with work ready (`⇡n`), each only when there are any. ▦ carries
+  the highest mark of the roots not in your list, as the Archive tab did
+  (ADR-0077). Its tooltip carries the message count ADR-0081 gave the
+  Archive tab. Nothing on the right of the footer has a badge or animates:
+  the inbox carries the page's only badge.
 - **The board opens over the columns** and does not move them. ▦ or Esc
   closes it, and so does choosing a root or a new tab to work in, which it
   lay over. Whether it is open is view state, kept per browser tab; with
@@ -172,32 +199,32 @@ pixels wide, made while deciding.
   the root in; if the root has moved since, the host refuses and says where
   it is ("not moved: Bea moved it to Doing first"), as a card's handoff
   does (ADR-0059).
-- **A starting host carries a store over once**: it writes the three
-  default states, puts every archived root in Done and every other root in
-  Doing, and drops the archive records. The carry-over code is deleted once
-  it has run, as ADR-0066's was.
+- **A starting host carried a store over once**: it wrote the three
+  default states, put every archived root in Done and every other root in
+  Doing, and dropped the archive records. The carry-over code was deleted
+  once it had run, as ADR-0066's was.
 
 **Consequences.**
 
-- `docs/06-interface.md` is rewritten for your list, the footer, the board
-  and the closed state. Its sections on the tab bar, the Archive tab and the
-  add tab go, and ADR-0081's browser check (the tab you are on is the
-  page's colour and meets it) turns sideways.
 - With the default states, ＋ agent in your list starts work in Backlog. A
   team that starts most work with the agent moves it to Doing, or removes
   Backlog.
-- The list costs width: about 15rem beside the rail and 28rem columns. At
-  1440 pixels two columns fit with room to spare; at 860, one and part of
-  another.
+- The full list costs width: about 15rem beside the rail and 28rem
+  columns, 11.5rem below 56rem. At 1440 pixels two columns fit with room to
+  spare; at 860, one and part of another. Folded, the list and the rail
+  are two narrow strips side by side.
 - A board move by someone else leaves no trace on your screen yet, and Cmd+Z
   does not reach it: a move is reversed by moving back. ADR-0048's traces
   and ADR-0066's host undo could cover board moves later.
-- The activity menu (ADR-0069, ADR-0077) keeps counting what needs you; the
-  board shows the same marks per root, to everyone in the state's summary.
+- Someone else's offer is found by scanning the board for ⇡. Choosing the
+  item opens its root, not the thread with the offer; the thread's
+  followers have a row in their inbox that opens the thread.
+- A run in a root you do not hold shows only as a ring on the board and a
+  count on the strip. No menu lists the runs.
 - A root opened from the closed state is held by the host only while it is
   shown (ADR-0063's load on request).
-- Narrow screens wait: the list should collapse to each root's banner
-  (ADR-0050, ADR-0053), and the footer to ▦, what needs you and you.
+- Two folded roots with no sprite, the same initials and the same colour
+  look alike; the tooltip tells them apart.
 
 **Alternatives rejected.**
 
@@ -213,7 +240,11 @@ pixels wide, made while deciding.
   well, but ▦ sat above the list of personal roots and read as one of them.
   In the footer, the board sits apart from them.
 - **▦ in the footer's left corner, below your list.** The corner belongs to
-  you (profile and inventory), and the board is everyone's.
+  you, and the board is everyone's.
+- **The activity menu, under your list or on the right.** Under your list
+  it would put everyone's runs and offers in your corner; on the right it
+  is a second shared way in besides the board, with a badge on everyone's
+  side.
 - **Fixed states.** Not every team needs the same ones, pine·trie's own team
   included.
 - **Several closed states** (Done, Dropped). One is enough; tags can say
@@ -226,6 +257,9 @@ pixels wide, made while deciding.
   what exists. Cards can be added if a frozen first message proves to hurt.
 - **Your list kept per device.** An order of priorities is the person's,
   on every device, as the inventory and attention are.
+- **Your list folding by itself when a pane would not fit**, or one
+  device-wide choice of width. The page would jump as a pane opened, and
+  two windows side by side want different widths.
 - **"Stage" as the name.** "Workflow state" says what it is in a team's
   process; "state" alone is avoided, since the archive record, offers and
   `tab-state.ts` already use it.

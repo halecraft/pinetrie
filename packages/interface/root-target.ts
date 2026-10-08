@@ -1,4 +1,4 @@
-// interface/root-target — where a root moves to, by drag or by key (ADR-0085).
+// interface/root-target — where a root moves to, by drag or by key (ADR-0112).
 // Pure.
 //
 // A root is dragged from the board or from your list. A drop names a target

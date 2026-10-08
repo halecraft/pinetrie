@@ -1,5 +1,5 @@
 // web/root-signals — what a root shows wherever it is drawn: in your list
-// and on the board (ADR-0077, ADR-0085). Its status before its label (a
+// and on the board (ADR-0077, ADR-0112). Its status before its label (a
 // still ring while its agent works, an amber dot when something needs you, a
 // dim one when something is worth a read, a ✓ that fades), and the others
 // reading in it. Each reads presence itself, so a presence write redraws it

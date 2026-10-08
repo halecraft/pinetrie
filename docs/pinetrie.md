@@ -257,7 +257,7 @@ string union `"pending" | "empty" | "populated"`, not an object.
 
 **The interface is your list of roots down the left, and the root you are
 on, a rail beside columns** (`docs/06-interface.md`,
-`packages/interface/TECHNICAL.md`, ADR-0029, ADR-0085), over a footer showing
+`packages/interface/TECHNICAL.md`, ADR-0029, ADR-0112), over a footer showing
 who is here, what needs you and the board, which slides up over the columns
 with every root in its workflow state: each
 column is one path on its own scroll, a branch opens beside its parent in its

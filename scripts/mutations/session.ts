@@ -383,7 +383,7 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a reorder is drawn where the host would put it",
   },
-  // ── your list (ADR-0085) ──
+  // ── your list (ADR-0112) ──
   {
     name: "the repair drops the root you are on",
     file: "packages/session/open-repair.ts",

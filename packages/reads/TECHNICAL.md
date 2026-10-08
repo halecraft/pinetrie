@@ -41,7 +41,7 @@ behind it, `promptAuthor`, ADR-0080),
 `readParticipantNames`, `readParticipantPictures` (ADR-0098), `readParticipants`, `readReading`, `readTyping`,
 `readTypingIn` and `readQueueHolds` (ADR-0048 step 7), `readAgentActivity`,
 `readSeats`, `readPlaces` and `readPlacesRev` (ADR-0059), `readWorkflow`,
-`readBoardPlaces` and `readArchived` (the board, ADR-0085: the roots in the
+`readBoardPlaces` and `readArchived` (the board, ADR-0112: the roots in the
 closed state, derived and kept while the same, since every write to the
 session's values wakes it), `readMarks` (ADR-0045), `readStops` and
 `readDigests` (ADR-0106), and

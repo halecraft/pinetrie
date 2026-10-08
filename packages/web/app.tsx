@@ -3,7 +3,7 @@
 // The screen is your list down the left, the root you are on beside it, a
 // rail beside a strip of columns, and the footer along the bottom: you, the
 // board's strip, what needs you and publish (docs/06-interface.md,
-// ADR-0085). The rail draws the root's tree; each column is one path, read on
+// ADR-0112). The rail draws the root's tree; each column is one path, read on
 // its own scroll; the board opens over them. What is drawn is a read of the
 // document, through `@pinetrie/reads` and `projection.ts`. Your list is your
 // own document, on every device (`openList`). Which root you are on, each
@@ -356,7 +356,7 @@ export function App({
   const pictures = useSelector(doc, readParticipantPictures)
 
   // Each root, for the board and its label: its title, else its first line
-  // (ADR-0045). Which roots are in your list is yours (`openList`, ADR-0085).
+  // (ADR-0045). Which roots are in your list is yours (`openList`, ADR-0112).
   const summaries = useMemo(() => summariesOf(directory), [directory])
   const lines = useMemo(() => firstLinesOf(directory), [directory])
   const labels = useMemo(
@@ -382,7 +382,7 @@ export function App({
     () => new Map([...rootEntries].map(([id, entry]) => [entry, id] as const)),
     [rootEntries],
   )
-  // The roots in the closed state (ADR-0085), by root entry: the layout, the
+  // The roots in the closed state (ADR-0112), by root entry: the layout, the
   // marks and attention are keyed by it.
   const archivedEntries = useMemo(() => {
     const out = new Map<EntryId, ArchivedRoot>()
@@ -396,7 +396,7 @@ export function App({
     () => new Set(archivedEntries.keys()),
     [archivedEntries],
   )
-  // Your list (ADR-0085): your own document, by root entry; a root the
+  // Your list (ADR-0112): your own document, by root entry; a root the
   // directory does not name yet is left out until it does.
   const listIds = useSyncExternalStore(
     session.openList.roots.subscribe,
@@ -410,7 +410,7 @@ export function App({
       }),
     [listIds, rootEntries],
   )
-  // The board (ADR-0085): each root's state, by root entry.
+  // The board (ADR-0112): each root's state, by root entry.
   const board = useMemo(
     () =>
       workflow === null ? null : boardOf(workflow, places, rootEntries.keys()),
@@ -1069,7 +1069,7 @@ export function App({
       document.removeEventListener("drop", onDrop)
     }
   }, [onIntent, layout.open])
-  // A root's drag, from the board or your list (ADR-0085).
+  // A root's drag, from the board or your list (ADR-0112).
   useRootDrag(onIntent, workflow?.closed.id ?? null)
   /** A root's drag from your list: its id and state, or null with no id yet. */
   const dragOf = (root: string): RootDrag | null => {

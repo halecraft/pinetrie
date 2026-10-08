@@ -286,5 +286,5 @@ export const mutations: readonly Mutation[] = [
   // ── attention (ADR-0077) ──
   // ── the publish button (ADR-0076, ADR-0090) ──
   // ── queue control (ADR-0048 step 7) ──
-  // ── your list and the board (ADR-0085) ──
+  // ── your list and the board (ADR-0112) ──
 ]

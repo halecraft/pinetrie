@@ -46,7 +46,7 @@ export interface ChatHow {
   readonly base?: string
   /**
    * The workflow state a root this send starts lands in; absent, the first
-   * open state (ADR-0085).
+   * open state (ADR-0112).
    */
   readonly state?: WorkflowStateId
 }
@@ -140,7 +140,7 @@ export function planChatRequest(input: {
 
 /**
  * Whether a send's answer started a root: a thread at the root written, as
- * a conversation or a run (ADR-0085). The session then puts the root in your
+ * a conversation or a run (ADR-0112). The session then puts the root in your
  * list, so a root you start is yours.
  */
 export const startsRoot = (at: Position, outcome: Outcome): boolean =>

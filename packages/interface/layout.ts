@@ -1,5 +1,5 @@
 // interface/layout — which root you are on, your list, and each root's columns
-// (ADR-0029, ADR-0030, ADR-0085).
+// (ADR-0029, ADR-0030, ADR-0112).
 //
 // The root you are on shows one root: its rail and its columns. Your list is
 // the roots you have open, in your order: it is your own document, the same
@@ -66,7 +66,7 @@ export interface Layout {
   readonly roots: ReadonlyMap<EntryId, readonly Column[]>
   /** New tabs: each one fresh column at the root, local until its first send. */
   readonly newTabs: readonly Column[]
-  /** Whether the board is open over the columns (ADR-0085). */
+  /** Whether the board is open over the columns (ADR-0112). */
   readonly board: boolean
 }
 
@@ -122,7 +122,7 @@ export type LayoutAction =
 export interface LayoutFacts {
   readonly index: TreeIndex
   readonly lanes: readonly LaneView[]
-  /** The roots in the closed workflow state, by root entry (ADR-0085). */
+  /** The roots in the closed workflow state, by root entry (ADR-0112). */
   readonly archived: ReadonlySet<EntryId>
   /** Your list (`openList`), by root entry: a root the directory lacks is left out. */
   readonly list: readonly EntryId[]
@@ -408,7 +408,7 @@ export function listOf(layout: Layout): readonly Here[] {
 
 /**
  * The roots among `roots` not in your list and not archived: what ▦ marks
- * for them (ADR-0077, ADR-0085). An archived root's work is done, so it marks
+ * for them (ADR-0077, ADR-0112). An archived root's work is done, so it marks
  * only its own row on the board.
  */
 export const unlisted = (
@@ -532,7 +532,7 @@ const StoredHere = Type.Union([
 
 /**
  * `v` changes when the shape does; an older layout is dropped, not migrated.
- * `v: 5` (ADR-0085): your list left for your own document, and the board's
+ * `v: 5` (ADR-0112): your list left for your own document, and the board's
  * state came in.
  */
 const StoredLayout = Type.Object({

@@ -36,7 +36,7 @@ const Command = Schema.struct({
   seen: Schema.string(),
   moves: Schema.string(),
   pinned: Schema.string(),
-  /** A chat's workflow state for a root it starts, or "" (ADR-0085). */
+  /** A chat's workflow state for a root it starts, or "" (ADR-0112). */
   state: Schema.string(),
 })
 

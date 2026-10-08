@@ -166,19 +166,19 @@ export type Intent =
       readonly kind: "newTab"
       readonly asksAgent: boolean
       readonly prefill?: Prefill
-      /** The workflow state its root lands in: the board column it came from (ADR-0085). */
+      /** The workflow state its root lands in: the board column it came from (ADR-0112). */
       readonly state?: WorkflowStateId
     }
   /** Close a root of your list, or a new tab, for you: nothing shared is written. */
   | { readonly kind: "close"; readonly here: Here }
-  /** Move a root of your list before `before`, or to its end (ADR-0085). */
+  /** Move a root of your list before `before`, or to its end (ADR-0112). */
   | {
       readonly kind: "moveInList"
       readonly root: EntryId
       readonly before: EntryId | null
     }
   /**
-   * Move a root on the board (ADR-0085). Into the closed state it is archived,
+   * Move a root on the board (ADR-0112). Into the closed state it is archived,
    * and closed for you once the host accepts; out of it, restored.
    */
   | {
@@ -190,7 +190,7 @@ export type Intent =
       /** `to` is the closed state. */
       readonly closes: boolean
     }
-  /** Change the board's workflow states (ADR-0085). */
+  /** Change the board's workflow states (ADR-0112). */
   | { readonly kind: "editWorkflow"; readonly edit: WorkflowEdit }
   /** Open or close the board. */
   | { readonly kind: "board"; readonly open: boolean }
@@ -591,7 +591,7 @@ function closeRoot(
 }
 
 /**
- * After a move on the board is answered (ADR-0085): `moved` runs only once
+ * After a move on the board is answered (ADR-0112): `moved` runs only once
  * the host accepts. A root you move into the closed state leaves your list,
  * the one you are on too; only a root someone else archives stays while you
  * are on it (`resolveLayout`). A refusal changes nothing.

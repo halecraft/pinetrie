@@ -90,7 +90,7 @@ async function run(check: Checks["check"]): Promise<void> {
     console.log(`  host              : ${host.httpUrl}\n`)
     /**
      * The page's message count, on ▦, reaches the host's directory's: it has
-     * every root's record, held or not (ADR-0063, ADR-0085).
+     * every root's record, held or not (ADR-0063, ADR-0112).
      */
     const countIsHosts = (p: Page) =>
       waitFor(async () => {
@@ -301,7 +301,7 @@ async function run(check: Checks["check"]): Promise<void> {
         )
       }
       // The board opens over the columns, from the footer's edge, and moves
-      // none of them (ADR-0085). A click on a column above it closes it.
+      // none of them (ADR-0112). A click on a column above it closes it.
       {
         const rects = () =>
           page.$$eval(".column", cs =>
@@ -1370,7 +1370,7 @@ async function run(check: Checks["check"]): Promise<void> {
         undefined,
         { timeout: 15_000 },
       )
-      // Your list is your own document (ADR-0085): another device of yours,
+      // Your list is your own document (ADR-0112): another device of yours,
       // a browser context of its own, has it, in your order. A reload reads
       // it the same way.
       {
@@ -1422,7 +1422,7 @@ async function run(check: Checks["check"]): Promise<void> {
         { timeout: 15_000 },
       )
 
-      // ── your list, the board and the inbox (ADR-0030, ADR-0085) ───────────
+      // ── your list, the board and the inbox (ADR-0030, ADR-0112) ───────────
       const downRoot = treeOf(host).roots.at(-1) ?? ""
       const selectedRoot = (p: Page) =>
         p
@@ -1787,7 +1787,7 @@ async function run(check: Checks["check"]): Promise<void> {
         )
         await rename("", "Enter")
 
-        // 4d. The board (ADR-0085): a root dragged to another state moves
+        // 4d. The board (ADR-0112): a root dragged to another state moves
         // there for everyone, and the other window's board shows it.
         {
           const workflow = readWorkflow(host.session)
@@ -2095,7 +2095,7 @@ async function run(check: Checks["check"]): Promise<void> {
 
         // 7. Moved to Done, a root is archived and leaves every list: the
         // window that moved it closes it, and the page someone else is on
-        // reads it (ADR-0085).
+        // reads it (ADR-0112).
         await page.click(itemSel(thirdRoot))
         await page.waitForSelector(`${col(0)} .composer .send`, {
           timeout: 15_000,
@@ -3058,7 +3058,7 @@ async function run(check: Checks["check"]): Promise<void> {
           unmarked && readPlaces(host.places).length === records,
           `${unmarked}; ${readPlaces(host.places).length} records, ${records} before`,
         )
-        // A root you closed is marked on ▦ and on its board item (ADR-0085).
+        // A root you closed is marked on ▦ and on its board item (ADR-0112).
         await page.keyboard.type("back tomorrow")
         await pipIn(page, itemSel(here))
         const columnsHere = await page.locator(".column").count()

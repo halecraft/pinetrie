@@ -282,7 +282,7 @@ export const connected = (p: Page, timeout = 20_000) =>
     undefined,
     { timeout },
   )
-/** A root in your list (ADR-0085). */
+/** A root in your list (ADR-0112). */
 export const itemSel = (root: string) =>
   `#open-list .open-root[data-root="${root}"]`
 /** A root on the board, by its root entry: inside `#board`. */
@@ -317,7 +317,7 @@ export async function openBoard(p: Page): Promise<void> {
 /** The messages the rail on `p` accounts for: dots, and each stretch's count. */
 export const railCount = (p: Page) => p.evaluate(RAIL_MESSAGES)
 /**
- * Open root `r` from the board (ADR-0085): select its item, which shows it
+ * Open root `r` from the board (ADR-0112): select its item, which shows it
  * and puts it in your list, and wait until you are on it. An archived root
  * is found in the closed state's rows, by its label's search.
  */

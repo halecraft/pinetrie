@@ -1,4 +1,4 @@
-// interface/board-view — what the board shows and offers (ADR-0085), decided.
+// interface/board-view — what the board shows and offers (ADR-0112), decided.
 // PURE: `Board` and `BoardStrip` (`board.tsx`) draw it.
 //
 // The board is everyone's: every root with a message, in its workflow state.
@@ -296,7 +296,7 @@ export function closedRows(input: {
   return needle === "" ? kept.slice(0, CLOSED_RECENT) : kept
 }
 
-/** Why an open state cannot be removed, or null when it can (ADR-0085). */
+/** Why an open state cannot be removed, or null when it can (ADR-0112). */
 export function removeWords(roots: number, openStates: number): string | null {
   if (roots > 0)
     return `holds ${roots === 1 ? "a root" : `${roots} roots`}: move ${roots === 1 ? "it" : "them"} first`

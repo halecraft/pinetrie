@@ -104,11 +104,11 @@ export type Outcome =
   | { readonly kind: "pictured" }
   | { readonly kind: "stopped" }
   /**
-   * A root moved on the board, or already there (ADR-0085): into the closed
+   * A root moved on the board, or already there (ADR-0112): into the closed
    * state it is archived, and out of it restored.
    */
   | { readonly kind: "moved-root" }
-  /** The workflow's states changed, or already were as asked (ADR-0085). */
+  /** The workflow's states changed, or already were as asked (ADR-0112). */
   | { readonly kind: "workflow-changed" }
   /** An entry's title is set or cleared (ADR-0045); also when it already was. */
   | { readonly kind: "marked" }

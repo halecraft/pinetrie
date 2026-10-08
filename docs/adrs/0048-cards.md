@@ -68,6 +68,14 @@
     step 4's decision 11, the page's own history of moves, is withdrawn.
   - ADR-0083: a person *takes a card into the inventory*, and the host *pops
     the next queued card* to send it; "take" alone names neither.
+  - ADR-0111: a card has one anatomy in every place (header, body, footer),
+    coloured by its place; its moves are one "Move to ▸" in its ⋯; × discards
+    it, and the undo key brings it back; the composer is your open drafting
+    card, and the line is drawn.
+  - ADR-0113: a card below the line is a note, laid out on its thread's notes
+    board, a shared grid; a composer shows only its owner's card; "add to
+    queue" on an idle thread holds the queue, and a send from the composer
+    releases it.
 
 Steps 1 to 7 are built, but for step 6's contributors, which wait for Kyneta.
 Probe 2 is answered by S69, probes 1 and 4, for the inventory, by S75 and S76,

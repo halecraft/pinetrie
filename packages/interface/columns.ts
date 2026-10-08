@@ -84,7 +84,7 @@ export interface Column {
    * `prefill` is what its composer starts with. `root` is a new tab's
    * root, minted as it opens (ADR-0066): its cards and its first send name
    * it. A branch's root is its tab's. `state` is the workflow state a new
-   * tab opened from a board column lands its root in (ADR-0085).
+   * tab opened from a board column lands its root in (ADR-0112).
    */
   readonly fresh?: {
     readonly sendId?: string

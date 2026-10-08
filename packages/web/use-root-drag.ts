@@ -1,5 +1,5 @@
 // web/use-root-drag — a root's drag, from the board or your list
-// (ADR-0085).
+// (ADR-0112).
 //
 // The shell of `root-target.ts`: a drop lands only where a key could move it
 // (`planRootDrop`), at the place in a group the pointer is nearest

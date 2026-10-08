@@ -170,7 +170,7 @@ function is proven by a unit test in a second.
   are, connects, and mounts `App({ session, stores })`. `app.tsx` touches no
   browser global as it loads.
 
-## Your list and the layout (`layout.ts`, ADR-0029, ADR-0030, ADR-0085)
+## Your list and the layout (`layout.ts`, ADR-0029, ADR-0030, ADR-0112)
 
 The stored layout is `{ active, roots, newTabs, board }`, and
 `layoutReducer` is pure. `active` is a `Here`: a root (by its root entry: a
@@ -214,7 +214,7 @@ and each item's signals.
   themselves (S59, `root-signals.tsx`). `selected` is the item you are on,
   decided there once: `App` titles the window from it (`pageTitle`) and
   `OpenList` scrolls it into view, keyed by `listKey`.
-- **The chrome is your list, then the footer** (ADR-0085): the body is a
+- **The chrome is your list, then the footer** (ADR-0112): the body is a
   grid, `--side` wide on the left, the workspace beside it, and `#bottom`
   under both. `#open-list` holds `.open-item` wraps, each around its
   `.open-root` (or `.open-new`) button, ⋯ and ×; the selected wrap carries
@@ -302,7 +302,7 @@ and each item's signals.
   knew of its end (`SeenEnd`, Following a column's end, `packages/web/TECHNICAL.md`), and each tool row what it decided
   (`RowMemory`, Tools and live work).
 
-## The board (`board-view.ts`, `board.tsx`, ADR-0085)
+## The board (`board-view.ts`, `board.tsx`, ADR-0112)
 
 - **What the board shows is `boardView`'s**, over `boardOf` (`@pinetrie/rules`):
   the strip (each state's name, count, roots and `markOf`), each open state
@@ -419,7 +419,7 @@ with ANY column to its left, so a shared stretch of paths is drawn once, in the
 leftmost column that shows it. Anything looking for a message on screen (the
 rail's scroll-to, the alignment) must search every column.
 
-## Who is here, and your inbox (ADR-0030, ADR-0085, ADR-0091)
+## Who is here, and your inbox (ADR-0030, ADR-0112, ADR-0091)
 
 The footer (`footer.tsx`, `#bottom`) is you, then the rest of the session,
 from live data; nothing in it opens a root until you choose. Its right end
@@ -430,7 +430,7 @@ pending.
   person, in `writerOrder`. An end's root is found in the index, else in
   the root its column reported (`readingRoot`, `readReadingRoots`), so a
   person in a root this tab does not hold is shown, and opens it. "Never you" is `readingAt`'s rule, not
-  repeated here. There is no group of people of its own (ADR-0085): a board
+  repeated here. There is no group of people of its own (ADR-0112): a board
   item's readers are those people in its root (`peopleIn`), each avatar
   (`Avatar`) a `Menu` of the threads that person reads there
   (`ReaderMenus`); your list's items and the strip's states show avatars

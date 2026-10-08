@@ -9,6 +9,8 @@
 - **Amended by:**
   - ADR-0048: a held queue does not hide Resume. Its cards wait for a release,
     not for this turn; cards queued and not held still do.
+  - ADR-0113: Resume is in the dock's queue header; with a held queue there,
+    sending the queue is the header's button and Resume is in its ⋯.
 
 **Context.** Stop ends a thread's turn and records who pressed it
 (ADR-0056). To go on, someone had to write a message to the agent, even

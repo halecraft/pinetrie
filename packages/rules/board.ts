@@ -1,5 +1,5 @@
 // board — the session's workflow and each root's place on the board
-// (ADR-0085).
+// (ADR-0112).
 //
 // The workflow is one host-written singleton: the open states in order, then
 // the closed state, which is always there and always last. A root's place is
@@ -99,7 +99,7 @@ export const defaultWorkflow = (newId: () => string): Workflow => ({
 
 /**
  * A store with no workflow gets the default one: a new store's first start
- * (ADR-0085). Nothing else writes the first workflow, and a root started
+ * (ADR-0112). Nothing else writes the first workflow, and a root started
  * before there is one gets no place. Pure.
  */
 export const planWorkflowSeed = (

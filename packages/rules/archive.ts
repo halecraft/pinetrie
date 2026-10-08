@@ -1,5 +1,5 @@
 // archive — what crossing the closed workflow state's edge does (ADR-0029,
-// ADR-0085), and the gate that keeps a closed root read-only.
+// ADR-0112), and the gate that keeps a closed root read-only.
 //
 // A root is archived while its board place is in the closed state
 // (`board.ts`). Moving it there or out writes only its place: entries are

@@ -542,7 +542,7 @@ export const mutations: readonly Mutation[] = [
     expect:
       "the strip's working count and the thread's item are still while the agent works",
   },
-  // ── the board and your list (ADR-0085) ──
+  // ── the board and your list (ADR-0112) ──
   {
     name: "the board opens in the flow, before the columns",
     file: "packages/web/index.html",

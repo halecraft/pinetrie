@@ -96,7 +96,7 @@ export interface SessionFacts {
   readonly live: LiveWork
   /** Every seat the host has seen: who wrote in a card (ADR-0048). */
   readonly seats: readonly SeatRecord[]
-  /** The board's workflow states (ADR-0085), or null before the host wrote them. */
+  /** The board's workflow states (ADR-0112), or null before the host wrote them. */
   readonly workflow: Workflow | null
   /** Each root's place on the board, by its id. */
   readonly places: ReadonlyMap<RootId, BoardPlace>

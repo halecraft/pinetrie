@@ -1,4 +1,4 @@
-// web/footer — the page's one row of chrome, along its bottom (ADR-0085).
+// web/footer — the page's one row of chrome, along its bottom (ADR-0112).
 // It splits where your list's edge does. Below your list, what is yours
 // (ADR-0098): you, whose avatar and name open the account menu
 // (`account-menu.tsx`), then your inbox (`inbox-view.ts`, ADR-0091) and your

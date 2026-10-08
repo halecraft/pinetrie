@@ -18,6 +18,8 @@
   - ADR-0073: the name opens the thread's details; the reveal of where its
     lane started is in them, offered only below the path's first message.
   - ADR-0102: there is no direct lane, and no direct work strip.
+  - ADR-0113: the work strip moves from the column's foot to a row of its
+    header.
 
 **Context.** A column's header was one row holding everything the column knew
 about itself: the grip, "from Ada: …" (or "thread", "new chat", "new · with

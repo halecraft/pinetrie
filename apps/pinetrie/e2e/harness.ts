@@ -414,7 +414,7 @@ function drawnCard(client: SessionClient, id: CardId): CardRecord {
 
 /**
  * Move the root whose root entry is `entry` to the closed workflow state, or
- * out of it to the first open one, as the board does (ADR-0085): archive or
+ * out of it to the first open one, as the board does (ADR-0112): archive or
  * restore it. The state it is in is read from `client`'s copy of the board.
  */
 export function moveRootTo(

@@ -122,7 +122,7 @@ describe("planIntent", () => {
     expect(plan({ kind: "close", here: { kind: "nothing" } })).toEqual([])
   })
 
-  test("showing a root opens it in your list; reordering your list places it by id (ADR-0085)", () => {
+  test("showing a root opens it in your list; reordering your list places it by id (ADR-0112)", () => {
     expect(
       plan({ kind: "show", here: { kind: "root", root: entryId("5-r2") } }),
     ).toEqual(shown("5-r2", R2_ID))
@@ -145,7 +145,7 @@ describe("planIntent", () => {
     ])
   })
 
-  test("a move on the board asks the host; into the closed state it closes the root for you once accepted (ADR-0085)", () => {
+  test("a move on the board asks the host; into the closed state it closes the root for you once accepted (ADR-0112)", () => {
     const [from, to] = [workflowStateIdFor("d"), workflowStateIdFor("x")]
     const move = (closes: boolean) =>
       plan({ kind: "moveRoot", root: R1_ID, from, to, before: null, closes })

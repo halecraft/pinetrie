@@ -52,7 +52,7 @@ it.
 | one `snapshotStore<LocalState>` | the host's records, this tab's moves, the cards drawn | `localStep` (`card-moves.ts`) |
 | `inventorySlots` (`inventory-slots.ts`) | your inventory's slots, the repair's alarm | `repairStep`, `takeIntoInventoryWrites`, `swapWrites` (`inventory.ts`) |
 | `attentionStore` (`attention-doc.ts`) | what you have dealt with, the read marks' alarm | `readStep` (`read-marks.ts`) |
-| `openList` (`open-list.ts`) | your list: the roots you have open, in your order (ADR-0085) | `placeInList`, `planOpenRepair` (`open-repair.ts`) |
+| `openList` (`open-list.ts`) | your list: the roots you have open, in your order (ADR-0112) | `placeInList`, `planOpenRepair` (`open-repair.ts`) |
 | `presenceSeat` (`presence-seat.ts`) | this seat's reading and typing | none |
 | `hostLine` (`host-line.ts`) | the requests waiting for their replies | `encodeIntent`, `decodeReply` |
 | one `snapshotStore<ActingState>` | your offer and setup and publish commands out | `nextActing` (`acting.ts`) |
@@ -206,7 +206,7 @@ session or someone else's inventory throws before it is made.
   the repair changed is refused, `slots-changed` (S90). The text stack, on
   the same document under `cards`, never takes a swap step.
 
-## A person's documents (`person-doc.ts`, ADR-0059, ADR-0077, ADR-0085)
+## A person's documents (`person-doc.ts`, ADR-0059, ADR-0077, ADR-0112)
 
 Your inventory, your attention and your list are each a document of yours
 (`personDocId`), written only by your tabs and relayed by the host to you
@@ -233,7 +233,7 @@ the two merge (S101), so a writer asks `ready()` first.
   `ready()`, losing nothing reported meanwhile. Each write stays in the
   document's history, about 10 bytes (S101).
 
-## Your list (`open-list.ts`, `open-repair.ts`, ADR-0085)
+## Your list (`open-list.ts`, `open-repair.ts`, ADR-0112)
 
 - **Your list is `OpenList`**: your `OpenDoc` read in order (`roots`, the
   same array until the document changes, since the page reads it in

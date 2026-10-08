@@ -186,7 +186,7 @@ export function createCommands(deps: CommandDeps): Commands {
         const sendId = id === "" ? newId() : id
         const sent = await sendChat(deps, writer, sendId, intent)
         // A thread at the root that was written started a root: it takes its
-        // place on the board in the same step (ADR-0085).
+        // place on the board in the same step (ADR-0112).
         if (intent.at.kind === "root" && spendsCard(sent))
           await placeNewRoot(deps, writer, intent)
         const card = intent.card
@@ -269,7 +269,7 @@ export function createCommands(deps: CommandDeps): Commands {
   }
 }
 
-/** A root a chat started, put at the end of the state its sender chose (ADR-0085). */
+/** A root a chat started, put at the end of the state its sender chose (ADR-0112). */
 async function placeNewRoot(
   deps: Pick<CommandDeps, "basics" | "records">,
   writer: WriterId,
@@ -295,7 +295,7 @@ async function placeNewRoot(
 
 /**
  * A command that would write in an archived root, one in the closed
- * workflow state, is refused, naming who moved it there (ADR-0029, ADR-0085). `sendChat`'s only callers are this dispatcher and
+ * workflow state, is refused, naming who moved it there (ADR-0029, ADR-0112). `sendChat`'s only callers are this dispatcher and
  * `sendPoppedQueuedCard`, both behind it, so it needs no check of its own.
  * `root` is the roots the command writes in (`writesIn`), which names them,
  * so no root's document is opened to check. Null when the command may go on.

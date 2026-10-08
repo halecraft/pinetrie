@@ -151,7 +151,7 @@ export const parseNewRoot = (s: string): RootId | undefined =>
 
 declare const workflowStateIdBrand: unique symbol
 /**
- * A workflow state's id (ADR-0085): `w-` and an id the host mints as the
+ * A workflow state's id (ADR-0112): `w-` and an id the host mints as the
  * state is added. A state is named apart from its id, so a rename keeps
  * every root's place.
  */
@@ -279,24 +279,24 @@ export const ERR = {
   /** A display name is empty or too long. */
   INVALID_NAME: "invalid_name",
   /**
-   * A write in a root in the closed workflow state (ADR-0029, ADR-0085). The
+   * A write in a root in the closed workflow state (ADR-0029, ADR-0112). The
    * message names who moved it there.
    */
   ARCHIVED: "archived",
   /** Moving a root into the closed state while its agent works or cards are queued. */
   ROOT_BUSY: "root_busy",
   /**
-   * Moving a root from a state it has left (ADR-0085). The message names who
+   * Moving a root from a state it has left (ADR-0112). The message names who
    * moved it, and where.
    */
   ROOT_MOVED: "root_moved",
-  /** A workflow state the session's workflow does not hold (ADR-0085). */
+  /** A workflow state the session's workflow does not hold (ADR-0112). */
   UNKNOWN_STATE: "unknown_state",
-  /** Removing a workflow state that still holds a root (ADR-0085). */
+  /** Removing a workflow state that still holds a root (ADR-0112). */
   STATE_NOT_EMPTY: "state_not_empty",
-  /** Moving or removing the closed workflow state (ADR-0085). */
+  /** Moving or removing the closed workflow state (ADR-0112). */
   STATE_CLOSED: "state_closed",
-  /** A workflow state named with nothing but spaces (ADR-0085). */
+  /** A workflow state named with nothing but spaces (ADR-0112). */
   EMPTY_NAME: "empty_name",
   /** Removing the only open workflow state: a new root needs one to land in. */
   LAST_STATE: "last_state",
@@ -470,7 +470,7 @@ export type Intent =
       readonly base: string | null
       /**
        * The workflow state a root this message starts lands in, at its end;
-       * null for the first open state (ADR-0085). Read only when it starts one.
+       * null for the first open state (ADR-0112). Read only when it starts one.
        */
       readonly state: WorkflowStateId | null
     }
@@ -496,7 +496,7 @@ export type Intent =
   /** Take every message card queued on a thread back below the line. */
   | { readonly kind: "unqueue-all"; readonly lane: LaneName }
   /**
-   * Move a root on the board (ADR-0085): from the state its sender saw it in,
+   * Move a root on the board (ADR-0112): from the state its sender saw it in,
    * to `to`, before `before` there, or at its end. Into the closed state it
    * archives the root, and out of it restores the root.
    */
@@ -507,7 +507,7 @@ export type Intent =
       readonly to: WorkflowStateId
       readonly before: RootId | null
     }
-  /** Change the session's workflow states (ADR-0085). */
+  /** Change the session's workflow states (ADR-0112). */
   | { readonly kind: "workflow"; readonly edit: WorkflowEdit }
   /** Title an entry, or clear its title with null (ADR-0045). */
   | {
@@ -584,7 +584,7 @@ export const OFFER_ACTIONS: readonly OfferAction[] = [
 export type AcceptedAction = "setup" | "publish"
 export const ACCEPTED_ACTIONS: readonly AcceptedAction[] = ["setup", "publish"]
 
-// --- the board (ADR-0085) ---------------------------------------------------
+// --- the board (ADR-0112) ---------------------------------------------------
 
 /** A workflow state: a column of the board. */
 export interface WorkflowState {

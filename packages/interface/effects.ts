@@ -53,7 +53,7 @@ export type Effect =
     }
   /** Ask the host for something that moves no card (`HostRequest`). */
   | { readonly kind: "request"; readonly intent: HostRequest }
-  /** Change your list, in your own document (`openList`, ADR-0085). */
+  /** Change your list, in your own document (`openList`, ADR-0112). */
   | { readonly kind: "list"; readonly act: ListAct }
   /**
    * Move a root on the board; `afterRootMove` decides from its answer
@@ -138,7 +138,7 @@ export type Effect =
   | { readonly kind: "forgetIdentity" }
   | { readonly kind: "reload" }
 
-/** A change to your list, by root id: your document's key (ADR-0085). */
+/** A change to your list, by root id: your document's key (ADR-0112). */
 export type ListAct =
   /** At its end, unless it is in your list already. */
   | { readonly kind: "ensure"; readonly root: RootId }

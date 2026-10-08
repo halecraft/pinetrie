@@ -1,5 +1,5 @@
 // session/open-list — your list: the roots you have open, in your order
-// (ADR-0085), in your own document, the same on every device of yours.
+// (ADR-0112), in your own document, the same on every device of yours.
 // Every write waits for the host's copy (`PersonDoc.ready`, S101), and the
 // list is repaired on every change: a root moved to the closed state leaves
 // it (`planOpenRepair`). Runs in a browser and in Node alike.
