@@ -1,4 +1,4 @@
-import { laneNameForThread, NOBODY, writerId } from "@pinetrie/core"
+import { NOBODY, threadIdFor, writerId } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
 import { readRoots } from "@pinetrie/reads"
 import { encodeChat } from "@pinetrie/rules"
@@ -68,7 +68,7 @@ test("a change the record does not show writes nothing", async () => {
 
 test("a compaction queued while refreshes and drains wait runs after all of them, and compacts records that show every change", async () => {
   const { b, keeper } = setUp()
-  const lane = laneNameForThread("l")
+  const lane = threadIdFor("l")
   const done: string[] = []
   const settle = createSettle({
     basics: b,

@@ -5,11 +5,11 @@ import { createHash } from "node:crypto"
 import { deflateSync } from "node:zlib"
 import {
   type ImageRef,
-  laneNameForThread,
   ROOT,
   type Sha256,
   type StoredImage,
   THE_AGENT,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { encodeChat } from "@pinetrie/rules"
@@ -148,7 +148,7 @@ test("the model reads a chat's text, then its image's bytes, from the store", as
   ])
   const made = await agent.createThreadLane(
     { root: ONE_ROOT, at: ROOT },
-    laneNameForThread(newId()),
+    threadIdFor(newId()),
   )
   if (made.kind !== "created") throw new Error("no lane")
   const text = `what colour? ![red](/blob/${sha})`

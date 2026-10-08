@@ -13,6 +13,7 @@ import {
   type MoveRefusal,
   parseMentions,
   type RootId,
+  type ThreadId,
   type WorkflowStateId,
   type WriterId,
 } from "@pinetrie/core"
@@ -32,12 +33,14 @@ export interface SpinOff {
 export interface SpinOffPlan {
   readonly kind: "spin"
   /** The new conversation root. */
-  readonly thread: RootId
+  readonly root: RootId
+  /** The thread its first message starts (ADR-0117). */
+  readonly thread: ThreadId
   /** Its first message: the card's text, by the sender. */
   readonly text: string
   /** The people it names; never the agent: a conversation root has no lane. */
   readonly mentions: readonly Mention[]
-  /** The card's move to gone, spun into `thread`. */
+  /** The card's move to gone, spun into `root`. */
   readonly step: Extract<MoveStep, { kind: "write" }>
 }
 
@@ -67,8 +70,8 @@ export function planSpinOff(input: {
   const to = move.to
   if (to.kind !== "gone" || to.why.kind !== "spun" || move.from === null)
     return { kind: "refused", code: "moved" }
-  const thread = to.why.thread
-  if (input.roots.has(thread)) return { kind: "root-in-use" }
+  const { into, thread } = to.why
+  if (input.roots.has(into)) return { kind: "root-in-use" }
   const text = input.text.trim()
   if (text === "") return { kind: "blank" }
   const step = planMove(input.cards, move, input.sender)
@@ -76,6 +79,7 @@ export function planSpinOff(input: {
   if (step.kind !== "write") return { kind: "refused", code: "moved" }
   return {
     kind: "spin",
+    root: into,
     thread,
     text,
     mentions: parseMentions(text).filter(m => m.kind !== "agent"),
@@ -120,7 +124,7 @@ export function planLiftRoot(input: {
   const deleting: RootId[] = []
   for (const card of spun) {
     if (card.place.kind !== "gone" || card.place.why.kind !== "spun") continue
-    const thread = input.threads.get(card.place.why.thread)
+    const thread = input.threads.get(card.place.why.into)
     if (thread === undefined || !thread.known) continue
     const second = thread.writers[1]
     if (second !== undefined) return { kind: "replied", by: second }

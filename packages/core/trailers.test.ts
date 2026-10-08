@@ -7,13 +7,13 @@ import {
   entryOfMessage,
   hasTrailer,
   isWipLine,
-  laneNameForThread,
   offerLedger,
   offerMessage,
   revisionMessage,
   sourcesOf,
   type ThreadName,
   TRAILERS,
+  threadIdFor,
   trailerRevset,
   trailerValues,
   untracedLanes,
@@ -23,7 +23,7 @@ import {
   withTrailers,
 } from "./index.ts"
 
-const LANE = laneNameForThread("1")
+const LANE = threadIdFor("1")
 const NAME = "amber-fox" as ThreadName
 const C1 = commitId("c1")
 

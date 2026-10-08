@@ -5,10 +5,10 @@
 import type {
   BannerRecord,
   EntryId,
-  LaneName,
   LaneView,
   MarkRecord,
   Sha256,
+  ThreadId,
   ThreadName,
   TreeIndex,
 } from "@pinetrie/core"
@@ -32,7 +32,7 @@ export type ItemMenuItem =
   | { readonly kind: "retitle"; readonly intent: Intent }
   /**
    * Move the root on the board to another workflow state (ADR-0122), its
-   * thread card's (`ThreadMove`). Into the closed state it is archived:
+   * thread card's (`ThreadMove`). Into the archive it is archived:
    * refused while its agent works there (`busy`), and it withdraws the
    * offers of its threads named in `drops` (ADR-0061).
    */
@@ -107,7 +107,7 @@ export interface SidebarViewInput {
   /** Each root's first line (`firstLinesOf`). */
   readonly lines: ReadonlyMap<EntryId, string>
   readonly marks: ReadonlyMap<EntryId, MarkRecord>
-  /** Roots in the closed state, by root entry. */
+  /** Roots in the archive, by root entry. */
   readonly archived: ReadonlySet<EntryId>
   /** Your unsent text: a new tab's pip. */
   readonly unsent: CardMarks
@@ -207,7 +207,7 @@ function iconOf(head: ThreadCardHead, input: SidebarViewInput): ItemIcon {
 export function rootSprites(
   index: TreeIndex,
   lanes: readonly LaneView[],
-  banners: ReadonlyMap<LaneName, BannerRecord>,
+  banners: ReadonlyMap<ThreadId, BannerRecord>,
 ): ReadonlyMap<EntryId, Sha256> {
   const sprites = new Map<EntryId, Sha256>()
   const byName = [...lanes].sort((a, b) =>
@@ -270,8 +270,8 @@ export const pageTitle = (
  * (`appView`'s).
  */
 export function offeredByRoot(
-  offers: readonly { readonly lane: LaneName; readonly root: EntryId }[],
-  names: ReadonlyMap<LaneName, ThreadName>,
+  offers: readonly { readonly lane: ThreadId; readonly root: EntryId }[],
+  names: ReadonlyMap<ThreadId, ThreadName>,
 ): ReadonlyMap<EntryId, readonly string[]> {
   const byRoot = new Map<EntryId, string[]>()
   for (const { lane, root } of offers)

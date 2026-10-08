@@ -2,10 +2,10 @@ import {
   commitId,
   type EntryId,
   entryId,
-  type LaneName,
-  laneNameForThread,
   type OfferRecord,
   type RevisionRecord,
+  type ThreadId,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
@@ -19,7 +19,7 @@ import {
 } from "./index.ts"
 import { MAX_DIFF_BYTES, OFFER_WIRE } from "./review.ts"
 
-const LANE = laneNameForThread("1")
+const LANE = threadIdFor("1")
 const _ADA = writerId("ada@x.io")
 const _TIP = commitId("t1")
 const _T2 = commitId("t2")
@@ -49,7 +49,7 @@ describe("the review (ADR-0047)", () => {
   const open: OfferRecord = { ...offer, commits: [C1, C2] }
   const offers = new Map([[LANE, open]])
   const facts = (
-    o: ReadonlyMap<LaneName, OfferRecord>,
+    o: ReadonlyMap<ThreadId, OfferRecord>,
     revisions: ReadonlyMap<EntryId, RevisionRecord> = new Map(),
   ) => ({ offers: o, revisions })
   const rev = (c: string) => ({ kind: "revision", commit: c }) as const
@@ -67,7 +67,7 @@ describe("the review (ADR-0047)", () => {
         path: "a b.txt",
       }),
     ).toEqual({ kind: "diff", span: rev(C1), path: "a b.txt" })
-    const status = (o: ReadonlyMap<LaneName, OfferRecord>, commit: string) => {
+    const status = (o: ReadonlyMap<ThreadId, OfferRecord>, commit: string) => {
       const read = planOfferRead(facts(o), {
         kind: "review",
         span: rev(commit),
@@ -93,7 +93,7 @@ describe("the review (ADR-0047)", () => {
     expect([path(""), path("a\nb"), path("a\u007f")]).toEqual([400, 400, 400])
   })
   test("planOfferRead: a range only between two commits one lane's turns recorded (ADR-0106)", () => {
-    const OTHER = laneNameForThread("other")
+    const OTHER = threadIdFor("other")
     const record = (entry: string, lane: typeof LANE, commit: string) =>
       [
         entryId(entry),

@@ -1,4 +1,4 @@
-import { commitId, laneNameForThread } from "@pinetrie/core"
+import { commitId, threadIdFor } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
 import { createQueue, type Ran } from "@pinetrie/lanes"
 import type { RepoOwner } from "@pinetrie/repo"
@@ -7,7 +7,7 @@ import { basics, record } from "../fakes.ts"
 import { createFetches } from "./fetch.ts"
 import type { LaneRegistry } from "./registry.ts"
 
-const LANE = laneNameForThread("1")
+const LANE = threadIdFor("1")
 const ok = (stdout: string): Ran => ({ ok: true, code: 0, stdout, stderr: "" })
 
 /**

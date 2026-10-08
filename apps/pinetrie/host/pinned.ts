@@ -6,23 +6,20 @@
 // result, so a run's lifecycle knows nothing of cards.
 
 import {
-  type LaneName,
   pinnedInView,
   type SentCard,
+  type ThreadId,
   type WriterId,
 } from "@pinetrie/core"
 import {
-  readLanes,
   readParticipantNames,
   readPlaces,
-  readQueueHolds,
   readTreeIndex,
 } from "@pinetrie/reads"
 import {
   cardsAt,
   displayName,
   encodePinned,
-  NONE_BLANK,
   type PinnedMessage,
   pinnedReads,
   planPinnedRead,
@@ -54,29 +51,21 @@ export async function waitFor(
 }
 
 export function createPinned(deps: {
-  readonly basics: Pick<Basics, "docs" | "live" | "places" | "session" | "now">
+  readonly basics: Pick<Basics, "docs" | "places" | "session" | "now">
   readonly cards: Pick<CardPort, "hydrate" | "textNow" | "whenHolds">
   readonly waitMs?: number
 }) {
-  const { docs, live, places, session, now } = deps.basics
+  const { docs, places, session, now } = deps.basics
   const { cards } = deps
 
   /** The pinned cards at the lane's tip: its thread's end. */
-  function pinnedAt(lane: LaneName) {
+  function pinnedAt(lane: ThreadId) {
     const doc = docs.docOfLane(lane)
     const tip = doc === null ? null : readLaneTip(doc, lane)
     if (doc === null || tip === null) return null
     const index = readTreeIndex(doc)
     const records = readPlaces(places)
-    const lanes = readLanes(
-      { doc, live },
-      index,
-      records,
-      readQueueHolds(session),
-      // Only the lanes' tips are read here: their thread ends.
-      NONE_BLANK,
-    )
-    return { index, tip, pinned: cardsAt("pinned", tip, records, lanes, index) }
+    return { index, tip, pinned: cardsAt("pinned", tip, records, index) }
   }
 
   /**
@@ -85,7 +74,7 @@ export function createPinned(deps: {
    * card's version as the sender had it.
    */
   async function readPinned(
-    lane: LaneName,
+    lane: ThreadId,
     seen: readonly SentCard[],
     signal: AbortSignal,
   ): Promise<PinnedMessage | null> {

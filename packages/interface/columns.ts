@@ -7,11 +7,12 @@
 import {
   type CardId,
   type EntryId,
-  followTip,
-  type LaneName,
   type LaneView,
   type RootId,
+  type ThreadId,
   type TreeIndex,
+  threadAt,
+  threadEnd,
   type WorkflowStateId,
 } from "@pinetrie/core"
 import type { Density } from "./ask-words.ts"
@@ -35,28 +36,32 @@ export interface Pending {
   readonly card?: CardId
 }
 
+/**
+ * What the shell mints for one intent, as `columnsReducer` takes keys in its
+ * actions: a column key, a root a new tab keeps (ADR-0066), and the thread a
+ * fresh column's first send starts (ADR-0117).
+ */
+export interface Minted {
+  readonly key: string
+  readonly root: RootId
+  readonly thread: ThreadId
+}
+
 export interface Column {
   /** React key; stable when columns move. */
   readonly key: string
   /**
-   * The entry the column follows from (`followTip`); a bound column's is its
-   * lane's tip. Null only for a fresh column at the root: a new tab's.
+   * Where the column's path ends: its thread's end (`threadEnd`), or a fresh
+   * column's fork. Null only for a fresh column at the root: a new tab's.
    */
   readonly anchor: EntryId | null
   /**
-   * The lane this column's thread is (ADR-0021). Set once its reserved lane
-   * has a tip, or else once the column's end is exactly one lane's tip; from
-   * then on the column follows the lane, never the newest leaf, and its sends
-   * name it, because a conversation forked at the lane's tip is newer and is
-   * another thread.
+   * The thread it shows (ADR-0117), which names its lane when it has one
+   * (`laneOf`). A fresh column's is minted as it opens, for its first send to
+   * start. Absent only for a column opened at an entry, until `sync` reads
+   * whose thread that is (`threadAt`).
    */
-  readonly lane?: LaneName
-  /**
-   * The id of the lane this column's next send would create, made before the
-   * lane exists so its thread is named at once (ADR-0057). Dropped as the
-   * column binds.
-   */
-  readonly reserved?: LaneName
+  readonly thread?: ThreadId
   /** A Start Agent column: a message with no mention asks the agent. */
   readonly asksAgent?: true
   /**
@@ -101,6 +106,8 @@ export type ColumnAction =
   | {
       readonly kind: "openFresh"
       readonly key: string
+      /** The thread its first send starts, minted with its key. */
+      readonly thread: ThreadId
       readonly at: EntryId
       readonly after: number
       /** A first message the column sends as soon as it opens. */
@@ -110,8 +117,6 @@ export type ColumnAction =
     }
   /** A fresh column sent its first message, as send `sendId`. */
   | { readonly kind: "sent"; readonly key: string; readonly sendId: string }
-  /** Column `key` keeps `lane` as the id its next send creates a lane under. */
-  | { readonly kind: "reserve"; readonly key: string; readonly lane: LaneName }
   | { readonly kind: "close"; readonly index: number }
   /** Move column `from` to index `to` (`reorder.ts`); the rest keep their order. */
   | { readonly kind: "move"; readonly from: number; readonly to: number }
@@ -136,10 +141,6 @@ export type ReaderAction =
       readonly density: Density
     }
   | { readonly kind: "details"; readonly key: string; readonly open: boolean }
-
-/** Whether a column's path ends at its anchor (`ColumnSpec.anchored`). */
-export const isAnchored = (c: Column): boolean =>
-  c.fresh !== undefined || c.lane !== undefined
 
 /** Insert `column` after position `after`, clamped to the list. */
 const placeAfter = (
@@ -169,6 +170,7 @@ export function columnsReducer(
       return placeAfter(state, action.after, {
         key: action.key,
         anchor: action.at,
+        thread: action.thread,
         fresh: {
           ...(action.pending === undefined ? {} : { pending: action.pending }),
           ...(action.prefill === undefined ? {} : { prefill: action.prefill }),
@@ -180,16 +182,6 @@ export function columnsReducer(
           ? { ...c, fresh: { sendId: action.sendId } }
           : c,
       )
-    case "reserve": {
-      // The same state when no column takes it: a root with no stored columns
-      // would otherwise store its first one.
-      const at = state.findIndex(
-        c => c.key === action.key && c.lane === undefined,
-      )
-      const column = state[at]
-      if (column === undefined || column.reserved === action.lane) return state
-      return state.with(at, { ...column, reserved: action.lane })
-    }
     case "close":
       return state.filter((_, i) => i !== action.index)
     case "move": {
@@ -240,13 +232,13 @@ function withColumn(
 /**
  * Settle columns against the tree, once per change.
  *
- * - A column whose reserved lane has a tip binds to it, by id (ADR-0057).
- * - A fresh column waits for the entry its send wrote, then anchors there.
- * - A bound column follows its lane: its anchor is the lane's tip.
- * - Any other column follows its own path: its anchor ADVANCES to its tip
- *   (`followTip`), so a reply below its last message moves it on, and a branch
- *   off an earlier message never does. When the tip is exactly one lane's,
- *   the column binds.
+ * - A fresh column waits for the entry its send wrote (`TreeIndex.bySend`),
+ *   or for its thread's first entry, sent from another browser tab, then
+ *   follows its thread.
+ * - A column opened at an entry takes the thread that entry is in.
+ * - Every other column's anchor is its thread's end (`threadEnd`, ADR-0117):
+ *   a reply moves it on, and a branch, which starts another thread, never
+ *   does.
  *
  * Returns `state` itself when nothing changes, so React skips the render.
  */
@@ -269,35 +261,28 @@ function settle(
   index: TreeIndex,
   lanes: readonly LaneView[],
 ): Column {
-  const { fresh, lane, reserved, ...rest } = column
-  if (reserved !== undefined) {
-    // Its own lane, known by id: no waiting for its tip to be one lane's.
-    const tip = lanes.find(l => l.name === reserved)?.tip ?? null
-    if (tip !== null) return { ...rest, anchor: tip, lane: reserved }
-  }
-  // Kept until the column binds: a conversation may yet ask the agent.
-  const kept = reserved === undefined ? {} : { reserved }
+  const { fresh, ...rest } = column
   if (fresh !== undefined) {
     const own =
       fresh.sendId === undefined ? undefined : index.bySend.get(fresh.sendId)
-    // Anchored at its own message, it follows like any column from here.
-    return own === undefined
+    // Its thread started from another browser tab holding the same column.
+    const started =
+      column.thread !== undefined && index.firstOf.has(column.thread)
+    // Anchored at its own message, it follows its thread from here.
+    return own === undefined && !started
       ? column
-      : settle({ ...rest, ...kept, anchor: own }, index, lanes)
+      : settle({ ...rest, anchor: own ?? column.anchor }, index, lanes)
   }
-  if (lane !== undefined) {
-    const tip = lanes.find(l => l.name === lane)?.tip ?? null
-    return tip === null || tip === column.anchor
-      ? column
-      : { ...column, anchor: tip }
-  }
-  // Only a fresh column has no anchor, and it was settled above.
-  if (column.anchor === null) return column
-  const tip = followTip(index, column.anchor)
-  const ending = lanes.filter(l => l.tip === tip)
-  const bound = ending.length === 1 ? ending[0]?.name : undefined
-  if (tip === column.anchor && bound === undefined) return column
-  return bound === undefined
-    ? { ...rest, ...kept, anchor: tip }
-    : { ...rest, anchor: tip, lane: bound }
+  const thread =
+    column.thread ??
+    (column.anchor === null ? null : threadAt(index, column.anchor))
+  if (thread === null) return column
+  // Before its first entry is written, a thread's lane holds its fork.
+  const end =
+    threadEnd(index, thread) ??
+    lanes.find(l => l.name === thread)?.tip ??
+    column.anchor
+  return thread === column.thread && end === column.anchor
+    ? column
+    : { ...column, thread, anchor: end }
 }

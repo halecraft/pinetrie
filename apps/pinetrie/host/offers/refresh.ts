@@ -4,7 +4,7 @@
 // (`executeOffer`). The record is written from the repo after each step,
 // never read back to decide.
 
-import type { LaneName, Placed, Rebuild, ThreadName } from "@pinetrie/core"
+import type { Placed, Rebuild, ThreadId, ThreadName } from "@pinetrie/core"
 import { offerBookmark } from "@pinetrie/lanes"
 import { readThreadName } from "@pinetrie/reads"
 import {
@@ -21,11 +21,11 @@ import type { OfferDeps } from "./state.ts"
 
 export interface Refresh {
   /** What a trigger does to one lane's offer: "built" when its content changed. */
-  refresh(ops: RepoOps, lane: LaneName): Promise<"built" | "other">
+  refresh(ops: RepoOps, lane: ThreadId): Promise<"built" | "other">
   /** An offer rebuilt (`planStackEnded`, `planRebuild`), then its record. */
-  rebuild(ops: RepoOps, lane: LaneName, rebuild: Rebuild): Promise<void>
+  rebuild(ops: RepoOps, lane: ThreadId, rebuild: Rebuild): Promise<void>
   /** The ports an offer step's effects run over, for `lane`'s offer under `name`. */
-  ports(ops: RepoOps, lane: LaneName, name: ThreadName): OfferPorts
+  ports(ops: RepoOps, lane: ThreadId, name: ThreadName): OfferPorts
 }
 
 /** A fresh nonce a build names its commits by (`nonceRevset`). */
@@ -37,7 +37,7 @@ export function createRefresh(
   const { basics, docs, records } = deps
   const { session, log } = basics
 
-  function ports(ops: RepoOps, lane: LaneName, name: ThreadName): OfferPorts {
+  function ports(ops: RepoOps, lane: ThreadId, name: ThreadName): OfferPorts {
     const read = (place: Placed) =>
       readOffer(ops.jj, { name, target: place.target })
     return {

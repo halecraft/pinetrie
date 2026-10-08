@@ -8,8 +8,8 @@
 import type {
   CardCommand,
   CardRecord,
-  LaneName,
   Position,
+  ThreadId,
   WorkflowState,
   WriterId,
 } from "@pinetrie/core"
@@ -84,7 +84,7 @@ export interface CardFrameView {
 
 /** Where a queue from a column puts a card: as the composer's queue does. */
 export interface QueueOn {
-  readonly lane: LaneName
+  readonly lane: ThreadId
   readonly at: Position
 }
 

@@ -2,13 +2,15 @@ import {
   BASE_SNAPSHOT,
   baseMessage,
   commitId,
-  laneNameForThread,
   shellWord,
   snapshotId,
   type ThreadName,
+  threadIdFor,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
+  BASE_LANE,
+  bookmarkName,
   DEFAULT_REPO,
   decodeLaneConfig,
   FETCHED_REF,
@@ -18,6 +20,7 @@ import {
   isBookmarkName,
   type LaneSpec,
   type LaneStep,
+  laneContainer,
   laneGitConfig,
   laneIgnores,
   machineConfig,
@@ -49,7 +52,7 @@ import {
   specHashOf,
 } from "./index.ts"
 
-const LANE = laneNameForThread("1")
+const LANE = threadIdFor("1")
 const C1 = commitId("c1")
 const C2 = commitId("c2")
 const HOME = "/Users/ada"
@@ -680,7 +683,7 @@ describe("planMerge: an update's steps (ADR-0104)", () => {
     expect(
       planMerge({
         kind: "parent",
-        lane: laneNameForThread("p"),
+        lane: threadIdFor("p"),
         name: "amber-fox" as ThreadName,
         commit: C2,
         caughtUpWith: C1,
@@ -1025,4 +1028,13 @@ describe("pre-rename: planOldNamesOnDisk, for a disk cloned from a snapshot take
       [],
     )
   })
+})
+
+test("the base's scratch lane is no thread's: nothing that takes a thread takes it (ADR-0117)", () => {
+  // @ts-expect-error: a bookmark, a remote and a stack are a thread's lane's
+  const bookmark = bookmarkName(BASE_LANE)
+  expect([laneContainer(BASE_LANE), bookmark]).toEqual([
+    "pinetrie-base-scratch",
+    "pinetrie/base-scratch",
+  ])
 })

@@ -3,7 +3,7 @@
 // (`packages/rules/live.ts`), and `@pinetrie/schema` writes them.
 
 import type { TextEdit } from "./edits.ts"
-import type { EntryId, LaneName, RunId } from "./index.ts"
+import type { EntryId, RunId, ThreadId } from "./index.ts"
 
 /**
  * What a running turn streams, in pine·trie's own words (ADR-0003: no pi type
@@ -12,16 +12,16 @@ import type { EntryId, LaneName, RunId } from "./index.ts"
  */
 export type StreamEvent =
   /** Text the model is writing, as a delta. */
-  | { readonly kind: "text"; readonly lane: LaneName; readonly delta: string }
+  | { readonly kind: "text"; readonly lane: ThreadId; readonly delta: string }
   | {
       readonly kind: "toolStart"
-      readonly lane: LaneName
+      readonly lane: ThreadId
       readonly callId: string
     }
   /** The tool's output so far: a whole snapshot, not a delta. */
   | {
       readonly kind: "toolOutput"
-      readonly lane: LaneName
+      readonly lane: ThreadId
       readonly callId: string
       readonly text: string
     }
@@ -35,14 +35,14 @@ export const streamId = (id: string): StreamId => id as StreamId
 export type StreamRecord =
   | {
       readonly id: StreamId
-      readonly lane: LaneName
+      readonly lane: ThreadId
       readonly kind: "reply"
       /** The lane's tip when the reply opened. */
       readonly under: EntryId | null
     }
   | {
       readonly id: StreamId
-      readonly lane: LaneName
+      readonly lane: ThreadId
       readonly kind: "tool"
       readonly callId: string
     }
@@ -60,6 +60,6 @@ export type LiveOp =
     }
   /** Deletes the stream's record and its text, either of which may be gone. */
   | { readonly kind: "close"; readonly id: StreamId }
-  | { readonly kind: "begin"; readonly lane: LaneName; readonly run: RunId }
+  | { readonly kind: "begin"; readonly lane: ThreadId; readonly run: RunId }
   /** The lane is idle: its key is deleted, never set to "". */
-  | { readonly kind: "end"; readonly lane: LaneName }
+  | { readonly kind: "end"; readonly lane: ThreadId }

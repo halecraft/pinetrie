@@ -20,16 +20,16 @@ import {
   firstPromptOf,
   forkParent,
   type LaneBase,
-  type LaneName,
   nearestRevision,
   type ParentThread,
   type RevisionRecord,
   type ThreadBase,
+  type ThreadId,
   type ThreadName,
   type TreeIndex,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { CommitSchema, decodeAt, laneKey } from "./decode.ts"
+import { CommitSchema, decodeAt, threadKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 const BaseRecordSchema = Type.Object({
@@ -63,7 +63,7 @@ const BaseRecordSchema = Type.Object({
 })
 
 /** Each lane's base, as its history says it, at the lane. */
-export const BASE: RecordSpec<BaseRecord, LaneName, "session"> = {
+export const BASE: RecordSpec<BaseRecord, ThreadId, "session"> = {
   namespace: "pinetrie.base",
   home: "session",
   keyOf: r => r.lane,
@@ -77,7 +77,7 @@ export const BASE: RecordSpec<BaseRecord, LaneName, "session"> = {
     untraced: [...contents.untraced],
   }),
   decode: (contents, key) =>
-    decodeAt(BaseRecordSchema, contents, laneKey(key), (r, lane) => ({
+    decodeAt(BaseRecordSchema, contents, threadKey(key), (r, lane) => ({
       lane,
       base: r.base,
       start: commitId(r.start),
@@ -302,12 +302,12 @@ export interface ParentNow extends ParentThread {
 export function parentNow(input: {
   readonly index: TreeIndex
   readonly revisions: ReadonlyMap<EntryId, RevisionRecord>
-  readonly lane: LaneName
+  readonly lane: ThreadId
   /** The lane's thread's end. */
   readonly tip: EntryId | null
   /** Each lane's thread's end. */
-  readonly tipOf: (lane: LaneName) => EntryId | null
-  readonly names: ReadonlyMap<LaneName, ThreadName>
+  readonly tipOf: (lane: ThreadId) => EntryId | null
+  readonly names: ReadonlyMap<ThreadId, ThreadName>
 }): ParentNow | null {
   const { index, revisions, tip } = input
   const fork = forkParent(index, revisions, input.lane, tip)

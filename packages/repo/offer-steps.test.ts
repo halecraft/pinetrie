@@ -1,11 +1,11 @@
 import {
   commitId,
-  laneNameForThread,
   type OfferNow,
   offerMessage,
   type Placed,
   type RefreshDecision,
   type ThreadName,
+  threadIdFor,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
@@ -23,7 +23,7 @@ import {
   planRefreshOffer,
 } from "./plan.ts"
 
-const LANE = laneNameForThread("0123456789abcdef")
+const LANE = threadIdFor("0123456789abcdef")
 const NAME = "amber-fox" as ThreadName
 const TIP = commitId("11111111")
 const NEW_TIP = commitId("22222222")

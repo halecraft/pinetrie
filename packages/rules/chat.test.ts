@@ -8,15 +8,18 @@ import {
   commitId,
   ERR,
   entryId,
-  laneNameForThread,
   NOBODY,
   PLAIN,
+  type PlanMode,
+  type Position,
   parseMentions,
   type Responder,
   rootIdFor,
+  type SendAt,
   type Sha256,
   THE_AGENT,
   type ThreadLane,
+  threadIdFor,
   type WriterId,
   writerId,
 } from "@pinetrie/core"
@@ -58,7 +61,7 @@ const BO: WriterId = writerId("bo")
 const E1 = entryId("e-1")
 const E2 = entryId("e-2")
 const AGENT: Responder = { kind: "agent", agent: THE_AGENT }
-const LANE = laneNameForThread("1")
+const LANE = threadIdFor("1")
 const lane = (
   over: Partial<Extract<ThreadLane, { kind: "lane" }>> = {},
 ): ThreadLane => ({
@@ -73,12 +76,17 @@ const lane = (
   ...over,
 })
 const NONE: ThreadLane = { kind: "none" }
-const SPARE = laneNameForThread("spare")
-const RESERVED = laneNameForThread("reserved")
+/** The thread a test's branch starts. */
+const NEW = threadIdFor("new")
 const ASK = parseMentions("@agent please")
 
-type PlanInput = Omit<Parameters<typeof planChat>[0], "thread"> &
-  Parameters<typeof planChat>[0]["thread"]
+type PlanInput = Omit<Parameters<typeof planChat>[0], "thread" | "at"> &
+  Parameters<typeof planChat>[0]["thread"] & {
+    /** How the send goes: at the end of thread `LANE`, a branch starting `NEW`, or a queued card's pop on `LANE`. */
+    readonly mode: PlanMode
+    /** What the sender saw, or a branch's fork: a branch lands there. */
+    readonly at: Position
+  }
 const plan = (over: Partial<PlanInput>) => {
   const i: PlanInput = {
     author: ALICE,
@@ -97,13 +105,27 @@ const plan = (over: Partial<PlanInput>) => {
     participants: ["Alice", "Bo"],
     asksAgent: false,
     sendId: "s-1",
-    newLane: { reserved: null, held: new Set(), spare: SPARE },
     news: "nothing",
     caughtUp: false,
     ...over,
   }
-  const { end, race, lane: l, ...rest } = i
-  return planChat({ ...rest, thread: { end, race, lane: l } })
+  const { end, race, lane: l, mode, at, ...rest } = i
+  const sendAt: SendAt =
+    mode === "queue"
+      ? { kind: "queue", thread: LANE }
+      : mode === "branch"
+        ? {
+            kind: "branch",
+            thread: NEW,
+            at: at.kind === "entry" ? at.id : null,
+          }
+        : { kind: "end", thread: LANE, seen: at.kind === "entry" ? at.id : E1 }
+  return planChat({
+    ...rest,
+    at: sendAt,
+    // A branch lands where it forks (`threadOfSend`).
+    thread: { end: mode === "branch" ? at : end, race, lane: l },
+  })
 }
 const kind = (d: ReturnType<typeof planChat>) => d.kind
 const textOf = (d: ReturnType<typeof planChat>) =>
@@ -249,21 +271,20 @@ describe("planChat: a compelled message", () => {
       at: atEntry(E2),
     })
   })
-  test("a new lane takes its column's reserved id, unless pi holds it, else the host's spare (ADR-0057)", () => {
+  test("a new lane is named by its thread's id: the thread a send continues, or the one a branch starts (ADR-0117)", () => {
     const laneOf = (d: ReturnType<typeof plan>) =>
       d.kind === "createAndRun" ? d.lane : d.kind
-    const ids = (reserved: typeof RESERVED | null, held: string[] = []) => ({
-      newLane: { reserved, held: new Set(held), spare: SPARE },
-    })
-    for (const mode of ["reply", "branch"] as const) {
-      expect(laneOf(plan({ mode, mentions: ASK, ...ids(RESERVED) }))).toBe(
-        RESERVED,
-      )
-      expect(
-        laneOf(plan({ mode, mentions: ASK, ...ids(RESERVED, [RESERVED]) })),
-      ).toBe(SPARE)
-      expect(laneOf(plan({ mode, mentions: ASK, ...ids(null) }))).toBe(SPARE)
-    }
+    expect(laneOf(plan({ mentions: ASK }))).toBe(LANE)
+    expect(laneOf(plan({ mode: "branch", mentions: ASK }))).toBe(NEW)
+  })
+  test("a branch's first message names the thread it starts; no other message does", () => {
+    const starts = (d: ReturnType<typeof plan>) =>
+      "details" in d ? d.details.starts : d.kind
+    expect(starts(plan({ mode: "branch" }))).toBe(NEW)
+    expect(starts(plan({ mode: "branch", mentions: ASK }))).toBe(NEW)
+    expect(starts(plan({}))).toBeUndefined()
+    expect(starts(plan({ mentions: ASK }))).toBeUndefined()
+    expect(starts(plan({ lane: lane() }))).toBeUndefined()
   })
   test("a thread with a lane, or a Start Agent column, compels without a mention", () => {
     expect(kind(plan({ lane: lane() }))).toBe("run")
@@ -474,8 +495,8 @@ test("participants: named writers and every writer in the tree, the unnamed by t
 })
 
 describe("settling and starting up", () => {
-  const LANE1 = laneNameForThread("1")
-  const LANE2 = laneNameForThread("2")
+  const LANE1 = threadIdFor("1")
+  const LANE2 = threadIdFor("2")
   const queuedOn = (lane: typeof LANE1, id: string) => ({
     id: cardId(id),
     owner: ALICE,
@@ -585,7 +606,7 @@ describe("promptAuthor (ADR-0080)", () => {
         planResolution({
           floor: floor(),
           files: [],
-          details: { lane: laneNameForThread("1"), yours: [], by: ADA },
+          details: { lane: threadIdFor("1"), yours: [], by: ADA },
           timestamp: 1,
         }),
       ),
@@ -596,7 +617,7 @@ describe("promptAuthor (ADR-0080)", () => {
           skill: null,
           bookmark: "pinetrie-stack/x",
           details: {
-            lane: laneNameForThread("1"),
+            lane: threadIdFor("1"),
             start: [],
             tip: commitId("t"),
             by: ADA,

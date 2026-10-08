@@ -2,8 +2,8 @@ import {
   type AskOutcome,
   type DigestRecord,
   entryId,
-  laneNameForThread,
   rootIdFor,
+  threadIdFor,
   type VerdictRecord,
   writerId,
 } from "@pinetrie/core"
@@ -23,7 +23,7 @@ import {
 import { REASON_WORDS } from "./verdict.ts"
 
 const ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
-const LANE = laneNameForThread("1")
+const LANE = threadIdFor("1")
 const ASK = entryId("p-1")
 const END = entryId("w-3")
 const ADA = writerId("ada@x.io")

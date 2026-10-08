@@ -7,8 +7,8 @@
 import {
   CATCH_UP_TOOL,
   type CommitId,
-  type LaneName,
   SPLIT_TOOL,
+  type ThreadId,
 } from "@pinetrie/core"
 import type { ToolAnswer } from "@pinetrie/rules"
 import { Type } from "typebox"
@@ -45,7 +45,7 @@ const NO_LANE: ToolAnswer = {
  * tool list never changes between runs (S85).
  */
 export function catchUpTool(
-  catchUp: (lane: LaneName, from: "base" | "parent") => Promise<ToolAnswer>,
+  catchUp: (lane: ThreadId, from: "base" | "parent") => Promise<ToolAnswer>,
 ) {
   return {
     name: CATCH_UP_TOOL,
@@ -81,7 +81,7 @@ export function catchUpTool(
  * `split_offer` (ADR-0080): the host queues a card that splits the offer when
  * the run ends, as the strip's button does.
  */
-export function splitTool(askSplit: (lane: LaneName) => Promise<ToolAnswer>) {
+export function splitTool(askSplit: (lane: ThreadId) => Promise<ToolAnswer>) {
   return {
     name: SPLIT_TOOL,
     label: "split the offer",

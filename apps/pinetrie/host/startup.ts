@@ -1,6 +1,6 @@
 // host/startup — what a starting host does before it accepts a command.
 
-import { type LaneName, type RootId, SESSION_TARGET } from "@pinetrie/core"
+import { type RootId, SESSION_TARGET, type ThreadId } from "@pinetrie/core"
 import type { Keeper } from "@pinetrie/keeper"
 import type { Agent, PiSetup } from "@pinetrie/pi"
 import {
@@ -62,7 +62,7 @@ export interface StartupDeps {
   readonly ensureNames: () => Promise<void>
   readonly keeper: Keeper
   readonly start: Runs["start"]
-  readonly settle: (lanes: readonly LaneName[]) => Promise<void>
+  readonly settle: (lanes: readonly ThreadId[]) => Promise<void>
   readonly cards: Pick<CardPort, "texts" | "stored" | "destroyDocs">
   /** Each card's history and traces (ADR-0048 step 6), swept with the cards. */
   readonly provenance: Pick<Provenance, "before" | "sweep">

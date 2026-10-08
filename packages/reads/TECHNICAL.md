@@ -42,7 +42,7 @@ behind it, `promptAuthor`, ADR-0080),
 `readTypingIn` and `readQueueHolds` (ADR-0048 step 7), `readAgentActivity`,
 `readSeats`, `readPlaces` and `readPlacesRev` (ADR-0059), `readWorkflow`,
 `readBoardPlaces` and `readArchived` (the board, ADR-0122: the roots in the
-closed state, derived and kept while the same, since every write to the
+archive, derived and kept while the same, since every write to the
 session's values wakes it), `readMarks` (ADR-0045), `readStops` and
 `readDigests` (ADR-0106), and
 where lanes work (ADR-0032, ADR-0034): `readLaneRecords`, `readRevisions`, `readLandings`,
@@ -150,8 +150,9 @@ Kyneta has let go.
   `EntryId`, so a key type left `string` compiles and leaves its lookups
   unchecked (S95).
 - **`readRenderableEntries` decodes chat** (`renderableMessage`), so the index
-  carries each chat's writer, whether it compelled the agent, and its send id:
-  `threadOf`'s race reads the first two, a fresh column the third.
+  carries each chat's writer, whether it compelled the agent, its send id,
+  and the thread it starts: `threadOfSend`'s race reads the first two, a
+  fresh column the third, and `threadEnd` the last (`TreeIndex.firstOf`).
 - **A compaction entry carries the pinned cards its retained tail holds**
   (`carried`, ADR-0048 step 5): the tail's newest cards entry, read from the
   row's payload (`rowRetainedTail`, `@pinetrie/schema`). pi stores the tail on

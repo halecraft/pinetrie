@@ -11,6 +11,7 @@ import {
   parseMentions,
   type QueueHoldChange,
   sendWaits,
+  type ThreadId,
   type ThreadLane,
   type WriterId,
 } from "@pinetrie/core"
@@ -25,12 +26,15 @@ import type { ChatHow } from "@pinetrie/session"
 import type { Prefill } from "./columns.ts"
 
 /** What every send from one column carries, whichever card it is sent from. */
-export type ColumnHow = Pick<
-  ChatHow,
-  "lane" | "reserved" | "base" | "root" | "pinned"
-> & {
+export type ColumnHow = Pick<ChatHow, "base" | "root" | "pinned"> & {
   readonly asksAgent: boolean
   readonly column: string
+  /**
+   * The column's thread (ADR-0117): the one a fresh column's first send
+   * starts. Null for a column opened at an entry, until it settles on the
+   * thread that entry is in: nothing is sent from it meanwhile.
+   */
+  readonly thread: ThreadId | null
 }
 
 /**

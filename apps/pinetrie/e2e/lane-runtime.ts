@@ -7,7 +7,7 @@ import { execFileSync } from "node:child_process"
 import { existsSync } from "node:fs"
 import { homedir } from "node:os"
 import path from "node:path"
-import type { LaneName, SnapshotId } from "@pinetrie/core"
+import type { SnapshotId, ThreadId } from "@pinetrie/core"
 import {
   DISKS_CONTAINER,
   NESTED_MOUNT,
@@ -18,7 +18,7 @@ import {
 import { vmStateDir } from "@pinetrie/vm"
 import { planRuntime } from "../host/work/runtime.ts"
 
-export const container = (lane: LaneName) => `pinetrie-${lane}`
+export const container = (lane: ThreadId) => `pinetrie-${lane}`
 
 /** The docker CLI, against the lane VM's socket on the Mac. */
 export function runtimeCli(): readonly string[] {
@@ -78,7 +78,7 @@ export function deleteSnapshot(root: string, id: SnapshotId): void {
 }
 
 /** Remove a lane's container and its disk. */
-export function removeLane(root: string, lane: LaneName): void {
+export function removeLane(root: string, lane: ThreadId): void {
   quietly(["rm", "-f", container(lane)])
   const disks = dockerDisks(root)
   inDisks(

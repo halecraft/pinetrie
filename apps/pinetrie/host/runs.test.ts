@@ -3,8 +3,8 @@ import {
   commitId,
   ERR,
   entryId,
-  laneNameForThread,
   NOBODY,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import type { Agent } from "@pinetrie/pi"
@@ -22,7 +22,7 @@ import { basics, deferred, fakeLane, methods, record, row } from "./fakes.ts"
 import { createRuns, planRunEnd, type ReadPinned, streamInto } from "./runs.ts"
 import type { LaneWork } from "./work/index.ts"
 
-const LANE = laneNameForThread("0123456789abcdef")
+const LANE = threadIdFor("0123456789abcdef")
 const chat = encodeChat(
   {
     author: writerId("alice@example.com"),

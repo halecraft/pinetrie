@@ -9,21 +9,21 @@
 
 import type {
   CatchUpFrom,
-  LaneName,
   OfferAcceptanceDecision,
   OfferFact,
+  ThreadId,
   WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
 import { Value } from "typebox/value"
 import { CatchUpFromSchema, catchUpName } from "./catch-up-from.ts"
-import { LaneNameSchema, WriterIdSchema } from "./decode.ts"
+import { ThreadIdSchema, WriterIdSchema } from "./decode.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"
 
 const OfferFactSchema = Type.Union([
   Type.Object({
     kind: Type.Literal("accepted"),
-    lane: LaneNameSchema,
+    lane: ThreadIdSchema,
     by: WriterIdSchema,
     as: Type.String({ minLength: 1 }),
     bookmark: Type.String({ minLength: 1 }),
@@ -35,7 +35,7 @@ const OfferFactSchema = Type.Union([
       Type.Literal("squashed"),
       Type.Literal("refreshed"),
     ]),
-    lane: LaneNameSchema,
+    lane: ThreadIdSchema,
     by: WriterIdSchema,
   }),
 ])
@@ -109,7 +109,7 @@ export const encodeFact = (
  * accepted work or a WIP. Pure.
  */
 export const acceptedFact = (input: {
-  readonly lane: LaneName
+  readonly lane: ThreadId
   readonly by: WriterId
   readonly decision: Extract<
     OfferAcceptanceDecision,
@@ -135,7 +135,7 @@ export const acceptedFact = (input: {
 /** The fact of an offer action that is not an acceptance: what it did, and who asked. Pure. */
 export const actionFact = (
   action: "describe" | "squash" | "refresh",
-  lane: LaneName,
+  lane: ThreadId,
   by: WriterId,
 ): OfferFact => ({
   kind:

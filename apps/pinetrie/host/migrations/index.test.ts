@@ -205,6 +205,8 @@ describe("migrate", () => {
           run: [{ migration, docIds: ["d"] }],
           unknown: [],
         },
+        records: [],
+        storedIds: [],
         exchange: ex,
         backup: opened.backup,
         log: line => lines.push(line),

@@ -11,6 +11,8 @@
 import type { Exchange, Store } from "@kyneta/exchange"
 import { PRODUCT_NAME } from "@pinetrie/core"
 import { SCHEMA_OF, type StoredKind, storedKind } from "../policy.ts"
+import { workflowArchive } from "./0003-workflow-archive.ts"
+import { threads } from "./0004-threads.ts"
 
 /** What a migration reads with, and writes with once every read loaded. */
 export interface MigrationRun {
@@ -44,6 +46,29 @@ export interface Migration {
  * from the revision that deleted it for a store still on its hash.
  */
 export const MIGRATIONS: readonly Migration[] = []
+
+/**
+ * A one-time change to stored records' contents. A record's contents are
+ * JSON in its document's `records`, so changing them moves no schema hash and
+ * `planOpen` never schedules one. Each decides from what it reads whether it
+ * is due, and is deleted once Duane's store has run it; the one store this
+ * build opens is his, so no other store is left behind.
+ */
+export interface RecordMigration {
+  /** A name for the log, as its file's. */
+  readonly name: string
+  /**
+   * Gather and plan, reading only: null when nothing it reads is in the old
+   * shape, else the step that writes.
+   */
+  readonly run: (input: MigrationRun) => Promise<(() => Promise<void>) | null>
+}
+
+/** Every one-time record migration this build carries, oldest first. */
+export const RECORD_MIGRATIONS: readonly RecordMigration[] = [
+  workflowArchive,
+  threads,
+]
 
 /** Each stored document's id and the hash of the schema it was written under. */
 export async function readStored(
@@ -136,16 +161,21 @@ const LOAD_FAILURE =
   /^\[runtime\] stored entry at .* for doc '(.*)' could not be loaded/
 
 /**
- * Run each planned migration on `exchange`: every read first, then, if every
- * stored record loaded, every write; then compact what they opened and let it
- * go. A record that failed to load stops this before anything is written,
- * since compacting would lose it for good (S120).
+ * Run each planned migration on `exchange`, and each record migration that
+ * finds its old shape: every read first, then, if every stored record loaded,
+ * every write; then compact what they opened and let it go. A record that
+ * failed to load stops this before anything is written, since compacting
+ * would lose it for good (S120).
  *
  * `backup` copies a file store, naming the copy for the first migration that
- * moves data; it is called only when one does.
+ * moves data; it is called only when one does, after the reads, which change
+ * nothing stored.
  */
 export async function migrate(input: {
   readonly plan: Extract<OpenPlan, { kind: "open" }>
+  readonly records: readonly RecordMigration[]
+  /** Every stored document's id: what a record migration may open. */
+  readonly storedIds: readonly string[]
   readonly exchange: Exchange
   readonly backup: ((name: string) => string) | null
   readonly log: (line: string) => void
@@ -155,22 +185,21 @@ export async function migrate(input: {
     log(
       `[host] stored documents no schema opens, left alone: ${plan.unknown.join(", ")}`,
     )
-  const moving = plan.run.filter(r => r.migration.run !== undefined)
   for (const { migration, docIds } of plan.run)
     if (migration.run === undefined)
       log(
         `[host] ${migration.name}: ${docIds.length} document(s), nothing to move`,
       )
-  const first = moving[0]
-  if (first === undefined) return
-  if (input.backup !== null)
-    log(`[host] store copied to ${input.backup(first.migration.name)}`)
 
   const failed: string[] = []
   const opened = new Set<string>()
+  const hydrated = async (docId: string) => {
+    opened.add(docId)
+    await exchange.whenHydrated(docId)
+  }
   const writes: {
     readonly name: string
-    readonly docs: number
+    readonly docs: number | null
     readonly write: () => Promise<void>
   }[] = []
   // Kyneta reports a record it could not load only as this warning.
@@ -181,20 +210,22 @@ export async function migrate(input: {
     warn(...args)
   }
   try {
-    for (const { migration, docIds } of moving)
+    for (const { migration, docIds } of plan.run)
       if (migration.run !== undefined)
         writes.push({
           name: migration.name,
           docs: docIds.length,
-          write: await migration.run({
-            exchange,
-            docIds,
-            hydrated: async docId => {
-              opened.add(docId)
-              await exchange.whenHydrated(docId)
-            },
-          }),
+          write: await migration.run({ exchange, docIds, hydrated }),
         })
+    for (const migration of input.records) {
+      const write = await migration.run({
+        exchange,
+        docIds: input.storedIds,
+        hydrated,
+      })
+      if (write !== null)
+        writes.push({ name: migration.name, docs: null, write })
+    }
   } finally {
     console.warn = warn
   }
@@ -202,9 +233,16 @@ export async function migrate(input: {
     throw new Error(
       `${PRODUCT_NAME} stopped a migration before it wrote anything: stored records of ${[...new Set(failed)].join(", ")} could not be loaded, and compacting would lose them.`,
     )
+  const first = writes[0]
+  if (first !== undefined && input.backup !== null)
+    log(`[host] store copied to ${input.backup(first.name)}`)
   for (const { name, docs, write } of writes) {
     await write()
-    log(`[host] ${name}: ${docs} document(s) migrated`)
+    log(
+      docs === null
+        ? `[host] ${name}: records migrated`
+        : `[host] ${name}: ${docs} document(s) migrated`,
+    )
   }
   await exchange.flush()
   for (const docId of opened) {

@@ -4,7 +4,6 @@
 
 import {
   type EntryId,
-  followTip,
   projectSpine,
   type RailRow,
   type SpineNode,
@@ -12,19 +11,15 @@ import {
 } from "@pinetrie/core"
 
 export interface ColumnSpec {
-  /** The entry the column follows from; null only for a fresh column at the root. */
-  readonly anchor: EntryId | null
   /**
-   * The path ends at `anchor` (nothing, when null) and follows nothing below
-   * it: a fresh column, which has nothing of its own yet, or a column bound to
-   * a lane, whose anchor is the lane's tip and whose thread goes on only
-   * through the lane.
+   * Where the column's path ends: its thread's end, or a fresh column's fork;
+   * null only for a fresh column at the root.
    */
-  readonly anchored?: boolean
+  readonly anchor: EntryId | null
 }
 
 export interface ColumnView {
-  /** Where this column's path ends: its anchor if anchored or null, else `followTip`. */
+  /** Where this column's path ends: its anchor. */
   readonly tipId: EntryId | null
   /**
    * The deepest message this path shares with ANY column to its left, or null
@@ -49,10 +44,7 @@ export function projectColumns(
 ): ColumnView[] {
   const shown = new Set<EntryId>()
   return columns.map(column => {
-    const tipId =
-      column.anchored === true || column.anchor === null
-        ? column.anchor
-        : followTip(index, column.anchor)
+    const tipId = column.anchor
     const { spine } = projectSpine(index, tipId)
     let cut = -1
     for (const [i, node] of spine.entries()) if (shown.has(node.id)) cut = i

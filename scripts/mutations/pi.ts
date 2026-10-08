@@ -62,8 +62,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "every lane runs in one root's session",
     file: "packages/pi/agent.ts",
-    from: "  async function ofLane(name: LaneName): Promise<Stack | undefined> {\n    const root = documents.rootOfLane(name)\n    return root === null ? undefined : ofRoot(root)",
-    to: "  let first: RootId | null = null\n  async function ofLane(name: LaneName): Promise<Stack | undefined> {\n    const root = documents.rootOfLane(name)\n    first ??= root\n    return root === null || first === null ? undefined : ofRoot(first)",
+    from: "  async function ofLane(name: ThreadId): Promise<Stack | undefined> {\n    const root = documents.rootOfLane(name)\n    return root === null ? undefined : ofRoot(root)",
+    to: "  let first: RootId | null = null\n  async function ofLane(name: ThreadId): Promise<Stack | undefined> {\n    const root = documents.rootOfLane(name)\n    first ??= root\n    return root === null || first === null ? undefined : ofRoot(first)",
     command: unit,
     expect:
       "each root's lane writes in its own document, and a later agent finds each by its record",

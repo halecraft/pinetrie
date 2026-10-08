@@ -23,7 +23,7 @@ words they were written with.
 |---|---|---|---|
 | **base** | Where a thread started: accepted work, or a copy of a WIP. Its first commit's `Pinetrie-Base` trailer says which (`accepted@<commit>`, or `<wip>@<commit>`). | `base`, `LaneBase`, `BaseTrailer` | the line (as a base) |
 | **catch up** | Bring the working copy, or a thread's copy, up to date with what it is based on. Its commit is titled `catch up: accepted work`, `catch up: <thread>`, or `copy of <wip>`. | `catchUp`, `CatchUpFrom`, `catchUpName` | update, follow, bring up to date |
-| **lane** | A thread's own copy of your repo, in a container of its own (ADR-0034). | `lane`, `LaneName` | |
+| **lane** | A thread's own copy of your repo, in a container of its own (ADR-0034), named by its thread's id (ADR-0117). | `lane`, `ThreadId`, `laneOf` | |
 
 ## Cards and where they are
 
@@ -43,12 +43,18 @@ words they were written with.
 | **the sidebar** | The column down the left of the page, of your open threads. | `Sidebar`, `sidebarView` | your list |
 | **your open threads** | The roots in the sidebar, yours on every device. | `open:<you>` (stored) | your list |
 
+## Threads
+
+| word | what it is | in code | retired |
+|---|---|---|---|
+| **thread** | A line of conversation, from where it forks to its end, with an id of its own, which its first message names and its lane is named by (ADR-0117). Its context is its path to its root. | `ThreadId`, `ThreadRecord`, `threadEnd`, `threadAt`, `ChatAt` | a thread known by its lane, or by its end; `LaneName` |
+
 ## The board
 
 | word | what it is | in code | retired |
 |---|---|---|---|
 | **workflow state** | A column of the board: Backlog, Doing, or any a team makes. Every root is in one. | `WorkflowState`, `Workflow`, `BoardPlace` | |
-| **the archive** | The board's last workflow state, always there, named Done in a new session and renamed as any state is. | `Workflow.closed` (to be renamed `archive`) | the closed state, the Archive tab |
+| **the archive** | The board's last workflow state, always there, named Done in a new session and renamed as any state is. | `Workflow.archive` | the closed state, the Archive tab |
 | **archived** | In the archive: read-only for everyone, unloaded by the host, its threads' offers withdrawn, until moved out (**restore**). | `archivedOf`, `archivedIn`, `planArchive`, `readArchived` | closed |
 
 ## Accepted, not yet built: tasks, the canvas and sources
@@ -62,7 +68,6 @@ code uses them yet; each becomes current as its part is built.
 | **canvas** | Where a task opens: its cards laid out as columns, in an order everyone shares. | ADR-0116 | |
 | **column** | A card opened on the canvas: a thread's path, a note column, a file or a medium. | ADR-0116 | a column as only a thread's path |
 | **fold** (a column) | Hide a column for yourself; it keeps its place as a narrow strip with its title. | ADR-0116 | close (a column) |
-| **thread** | A line of conversation, from where it forks to its end, with an id of its own. Its context is its path to its root. | ADR-0117 | a thread known by its lane, or by its end |
 | **thread card** | A thread, held by a task or by someone's inventory. | ADR-0117 | a root, as the board and the sidebar draw it |
 | **root** | A code word, not the interface's: the first message a thread's path leads back to, and the document of every thread that branched from it (`RootId`, `root:<RootId>`), which is also one pi session. Nothing a person reads says "root" (or "tree"): ＋ starts a thread. | ADR-0116 | the root as the board's item, and "root" on screen |
 | **copy** (a thread) | A new thread branched at a thread's end, put as its own card; its fork row leads back to the original. | ADR-0117 | |

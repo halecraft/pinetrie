@@ -16,11 +16,11 @@ import {
 import {
   type BlobStore,
   ERR,
-  isLaneName,
-  type LaneName,
+  isThreadId,
   type RootId,
   type Spot,
   type StreamEvent,
+  type ThreadId,
 } from "@pinetrie/core"
 import {
   type BannerAnswer,
@@ -72,7 +72,7 @@ export interface AgentDocuments {
   /** A root's document, held and loaded: opened if it is not. */
   root(root: RootId): Promise<RootDocHandle>
   /** The root a lane works in, from its record; null for a lane no root holds. */
-  rootOfLane(lane: LaneName): RootId | null
+  rootOfLane(lane: ThreadId): RootId | null
 }
 
 export interface CreateAgentOptions {
@@ -86,7 +86,7 @@ export interface CreateAgentOptions {
    */
   readonly tools: {
     /** How a lane's tools reach its files: its container (ADR-0034); null for a lane with no copy of its own. */
-    readonly access: (lane: LaneName) => LaneAccess | null
+    readonly access: (lane: ThreadId) => LaneAccess | null
     readonly hooks: LaneHooks
   } | null
   /**
@@ -100,7 +100,7 @@ export interface CreateAgentOptions {
    * Without it, or without tools, there is no `set_banner`.
    */
   readonly bannerAsks?: (
-    lane: LaneName,
+    lane: ThreadId,
     ask: BannerAsk,
   ) => Promise<BannerAnswer>
   /** What a running turn writes, in pinetrie's own words, per lane. */
@@ -109,7 +109,7 @@ export interface CreateAgentOptions {
    * A lane's request starts otherwise than its last one did: its earlier
    * thinking is dropped, and its prompt cached again (`prefix.ts`, S85).
    */
-  readonly onPrefixChange?: (lane: LaneName) => void
+  readonly onPrefixChange?: (lane: ThreadId) => void
 }
 
 /**
@@ -159,11 +159,11 @@ export interface Agent {
    * Create a thread's lane at `spot`, in its root, named `lane` (the host
    * decides the id, ADR-0057). Refused `lane_id_in_use` for an id pi holds.
    */
-  createThreadLane(spot: Spot, lane: LaneName): Promise<CreateOutcome>
+  createThreadLane(spot: Spot, lane: ThreadId): Promise<CreateOutcome>
   /** A thread's lane, in the root its record names. */
-  lane(name: LaneName): ThreadLaneHandle
+  lane(name: ThreadId): ThreadLaneHandle
   /** Lanes pi holds an operation open on, in `roots`: a crash interrupted them. */
-  interrupted(roots: readonly RootId[]): Promise<readonly LaneName[]>
+  interrupted(roots: readonly RootId[]): Promise<readonly ThreadId[]>
   /** Close every harness, which ends running runs. The scribe's sessions close after. */
   close(): Promise<void>
 }
@@ -194,14 +194,14 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
     tools === null ? [] : activeToolNames({ banners: bannerAsks !== undefined })
   // No tools, or a call with no lane named: no access, and every call is
   // refused (`toolContextOf`).
-  const accessFor = (lane: LaneName | undefined): LaneAccess | null =>
+  const accessFor = (lane: ThreadId | undefined): LaneAccess | null =>
     tools === null || lane === undefined ? null : tools.access(lane)
   const systemPrompt = systemPromptFor(setup, assembled.files)
   // Each lane's last request's prefix, in memory: a restart starts fresh.
   const prefixes = new Map<string, string>()
 
   /** The lane's last turn, recorded at its tip as its root's document has it. */
-  async function recordTurn(lane: LaneName): Promise<void> {
+  async function recordTurn(lane: ThreadId): Promise<void> {
     if (tools === null) return
     const root = documents.rootOfLane(lane)
     if (root === null) return
@@ -241,7 +241,7 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
       // inside its own drive, could wait on itself.
       harness.hooks.on("before_request", async event => {
         const lane = event.lane
-        if (event.step !== "assistant" || !isLaneName(lane)) return undefined
+        if (event.step !== "assistant" || !isThreadId(lane)) return undefined
         await recordTurn(lane)
         return undefined
       })
@@ -271,7 +271,7 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
       const next = prefixOf(event.payload)
       if (
         prefixChange(prefixes.get(event.lane), next) &&
-        isLaneName(event.lane)
+        isThreadId(event.lane)
       )
         options.onPrefixChange?.(event.lane)
       prefixes.set(event.lane, next)
@@ -303,13 +303,13 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
     inside.over(root, session => buildStack(session, root))
 
   /** A lane's stack, in the root its record names; undefined for none. */
-  async function ofLane(name: LaneName): Promise<Stack | undefined> {
+  async function ofLane(name: ThreadId): Promise<Stack | undefined> {
     const root = documents.rootOfLane(name)
     return root === null ? undefined : ofRoot(root)
   }
 
   /** A handle whose every call finds the lane's root when it is made. */
-  function laneHandle(name: LaneName): ThreadLaneHandle {
+  function laneHandle(name: ThreadId): ThreadLaneHandle {
     const on = async <T>(
       f: (h: ThreadLaneHandle) => Promise<T>,
       none: T,
@@ -335,7 +335,7 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
     },
 
     async interrupted(roots) {
-      const out: LaneName[] = []
+      const out: ThreadId[] = []
       for (const root of roots)
         out.push(...(await (await ofRoot(root)).lanes.interrupted()))
       return out

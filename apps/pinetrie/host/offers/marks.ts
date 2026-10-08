@@ -2,7 +2,7 @@
 // refreshes (ADR-0065), pure. It stays in the host: it picks from the
 // document's names and records.
 
-import type { LaneName, ThreadName } from "@pinetrie/core"
+import type { ThreadId, ThreadName } from "@pinetrie/core"
 import type { Moved } from "@pinetrie/repo"
 
 /**
@@ -20,21 +20,21 @@ import type { Moved } from "@pinetrie/repo"
  */
 export function planMarks(input: {
   readonly moved: Moved
-  readonly names: ReadonlyMap<LaneName, ThreadName>
+  readonly names: ReadonlyMap<ThreadId, ThreadName>
   /** The named lanes whose root is archived. */
-  readonly archived: ReadonlySet<LaneName>
+  readonly archived: ReadonlySet<ThreadId>
   /** Lanes with an open offer record: how an offer you abandoned is built again. */
-  readonly open: readonly LaneName[]
+  readonly open: readonly ThreadId[]
 }): {
   readonly accepted: boolean
   /** Rewrite what `@` changes: each open record's `yourEdits`, and accepted work's record. */
   readonly shared: boolean
-  readonly lanes: readonly LaneName[]
+  readonly lanes: readonly ThreadId[]
 } {
   const { moved } = input
   const every = moved.all
   const byName = new Map([...input.names].map(([lane, name]) => [name, lane]))
-  const lanes = new Set<LaneName>([
+  const lanes = new Set<ThreadId>([
     ...(every
       ? [
           ...[...input.names.keys()].filter(l => !input.archived.has(l)),

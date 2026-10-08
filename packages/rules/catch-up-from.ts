@@ -5,7 +5,7 @@
 
 import type { BaseMerge, CatchUpFrom } from "@pinetrie/core"
 import { Type } from "typebox"
-import { LaneNameSchema, ThreadNameSchema } from "./decode.ts"
+import { ThreadIdSchema, ThreadNameSchema } from "./decode.ts"
 
 /** `CatchUpFrom` as a thread's history stores it: as it is. */
 export const CatchUpFromSchema = Type.Union([
@@ -13,7 +13,7 @@ export const CatchUpFromSchema = Type.Union([
   Type.Object({ kind: Type.Literal("wip"), bookmark: Type.String() }),
   Type.Object({
     kind: Type.Literal("parent"),
-    lane: LaneNameSchema,
+    lane: ThreadIdSchema,
     name: ThreadNameSchema,
   }),
 ])

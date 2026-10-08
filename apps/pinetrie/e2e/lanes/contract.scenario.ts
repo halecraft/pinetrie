@@ -20,10 +20,10 @@ import {
 import { homedir, tmpdir } from "node:os"
 import path from "node:path"
 import {
-  type LaneName,
-  laneNameForThread,
   type SnapshotId,
   snapshotId,
+  type ThreadId,
+  threadIdFor,
 } from "@pinetrie/core"
 import {
   executeOrThrow,
@@ -154,7 +154,7 @@ async function dockerContract(
   const cold = /Docker answered (\d+) ms after the launcher started/.exec(
     logs.join("\n"),
   )?.[1]
-  const lanes: LaneName[] = []
+  const lanes: ThreadId[] = []
   const snapshots: SnapshotId[] = []
   /** A lane of host A's, on a new disk, with the working copy, a shared directory and the probe. */
   /** Host A's directories, as its slot shares them. */
@@ -172,8 +172,8 @@ async function dockerContract(
     image: string,
     on: LaneRuntime = runtime,
     mounts: readonly Mount[] = mountsOfA,
-  ): Promise<LaneName> => {
-    const name = laneNameForThread(`contract-${process.pid}-${lanes.length}`)
+  ): Promise<ThreadId> => {
+    const name = threadIdFor(`contract-${process.pid}-${lanes.length}`)
     lanes.push(name)
     laneRuntimes.set(name, on)
     await on.disk({ kind: "create", lane: name })
@@ -193,8 +193,8 @@ async function dockerContract(
     return name
   }
   const runMs: number[] = []
-  const laneRuntimes = new Map<LaneName, LaneRuntime>()
-  const exec = (name: LaneName, script: string) => {
+  const laneRuntimes = new Map<ThreadId, LaneRuntime>()
+  const exec = (name: ThreadId, script: string) => {
     const on = laneRuntimes.get(name) ?? runtime
     const [p = "docker", ...rest] = on.execArgv(laneContainer(name), [
       "sh",
@@ -340,7 +340,7 @@ async function dockerContract(
 
     // ── the fence (S136): the Mac's loopback and gvproxy's API ──
     /** What a lane got from `url`: the server's answer, or wget's error. */
-    const fetchFrom = async (name: LaneName, url: string) =>
+    const fetchFrom = async (name: ThreadId, url: string) =>
       (
         await exec(name, `wget -q -T 3 -O - '${url}' 2>&1 || echo "failed"`)
       ).stdout.trim()

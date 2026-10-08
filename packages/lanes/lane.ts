@@ -16,9 +16,8 @@
 // one and wraps it as runners.
 
 import path from "node:path"
-import type { LaneName } from "@pinetrie/core"
 import type { Runners } from "./execute.ts"
-import { laneContainer, PINETRIE_MOUNT } from "./plan.ts"
+import { type LaneOwner, laneContainer, PINETRIE_MOUNT } from "./plan.ts"
 import type { BytesRunner, Runner } from "./run.ts"
 import { runtimeNode } from "./runtime.ts"
 import type { LaneRuntime } from "./runtime-port.ts"
@@ -151,7 +150,7 @@ export function laneHandle<C>(
 /** Delete a lane's container and its disk; either may be missing. */
 export async function removeLane(
   runtime: LaneRuntime,
-  lane: LaneName,
+  lane: LaneOwner,
 ): Promise<void> {
   await runtime.remove(laneContainer(lane))
   await runtime.disk({ kind: "delete", lane })

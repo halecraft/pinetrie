@@ -225,13 +225,12 @@ export const mutations: readonly Mutation[] = [
     expect: "each take into the inventory in flight's slot, a creation's too",
   },
   {
-    name: "a send leaves out its column's reservation",
+    name: "a reply at an entry starts a thread",
     file: "packages/session/chat.ts",
-    from: "    reserved: how.reserved ?? null,",
-    to: "    reserved: null,",
+    from: '  mode === "reply" && at.kind === "entry"',
+    to: "  false",
     command: unit,
-    expect:
-      "a chat fills in what its column left out, carries its column's reservation",
+    expect: "chatAtOf: a reply continues its thread from the end it shows",
   },
   {
     name: "a request waiting when the host leaves hangs",

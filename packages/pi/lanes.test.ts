@@ -10,11 +10,11 @@ import { BACKGROUND_CONTEXT } from "@earendil-works/pi-agent-core"
 import {
   commitId,
   type EntryId,
-  type LaneName,
-  laneNameForThread,
   messageText,
   ROOT,
   THE_AGENT,
+  type ThreadId,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import {
@@ -139,7 +139,7 @@ describe("ask_about_conflict (ADR-0080)", () => {
       undefined,
       undefined,
       undefined,
-      laneContext(laneNameForThread("0123456789abcdef"), BACKGROUND_CONTEXT),
+      laneContext(threadIdFor("0123456789abcdef"), BACKGROUND_CONTEXT),
     )
 
   test("with a conflict in the copy, it asks, and its details say so; with none, there is nothing to ask", async () => {
@@ -268,7 +268,7 @@ describe("lanes in a harness", () => {
 
   /** An agent whose lanes work where `wheres` says, recording what happens. */
   async function setUp(
-    wheres: Map<LaneName, LaneAccess | null>,
+    wheres: Map<ThreadId, LaneAccess | null>,
     turns: string[] = [],
   ) {
     const doc = newRootDoc()
@@ -301,7 +301,7 @@ describe("lanes in a harness", () => {
     const newLane = async (where: LaneAccess | null) => {
       const made = await agent.createThreadLane(
         { root: ONE_ROOT, at: ROOT },
-        laneNameForThread(newId()),
+        threadIdFor(newId()),
       )
       if (made.kind !== "created") throw new Error("no lane")
       wheres.set(made.lane, where)

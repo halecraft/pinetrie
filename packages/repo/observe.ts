@@ -6,8 +6,8 @@ import type { ThreadName } from "@pinetrie/core"
 import {
   type CommitId,
   commitId,
-  isLaneName,
-  type LaneName,
+  isThreadId,
+  type ThreadId,
 } from "@pinetrie/core"
 import {
   LANE_REMOTE_PREFIX,
@@ -45,14 +45,14 @@ export interface Moved {
   readonly acceptedMoved: boolean
   readonly published: boolean
   readonly yours: boolean
-  readonly lanes: ReadonlySet<LaneName>
+  readonly lanes: ReadonlySet<ThreadId>
   readonly offers: ReadonlySet<ThreadName>
 }
 
 /** A lane's remote in your repo is `pinetrie-<lane>` (`laneTipName`). */
-const laneOfRemote = (remote: string): LaneName | null => {
+const laneOfRemote = (remote: string): ThreadId | null => {
   const lane = remote.slice(LANE_REMOTE_PREFIX.length)
-  return remote.startsWith(LANE_REMOTE_PREFIX) && isLaneName(lane) ? lane : null
+  return remote.startsWith(LANE_REMOTE_PREFIX) && isThreadId(lane) ? lane : null
 }
 
 /** Whether a local bookmark is one an offer or accepted work's record depends on. */
@@ -122,7 +122,7 @@ export function planObserve(
   next: Fingerprint,
   repoConfig: RepoConfig,
 ): Moved {
-  const lanes = new Set<LaneName>()
+  const lanes = new Set<ThreadId>()
   const offers = new Set<ThreadName>()
   let all = prev === null
   let published = false

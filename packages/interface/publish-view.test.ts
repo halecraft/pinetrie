@@ -1,9 +1,4 @@
-import {
-  type AcceptedRecord,
-  commitId,
-  ERR,
-  laneNameForThread,
-} from "@pinetrie/core"
+import { type AcceptedRecord, commitId, ERR, threadIdFor } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { baseWords } from "./column-view.ts"
 import { publishToast, publishView, publishWords } from "./publish-view.ts"
@@ -170,7 +165,7 @@ describe("publishToast (ADR-0090)", () => {
 })
 
 describe("the thread's base in its header, and the bases a new lane may start from (ADR-0104)", () => {
-  const lane = laneNameForThread("1")
+  const lane = threadIdFor("1")
   const base = (state: "ok" | "landed" | "gone") =>
     ({
       lane,

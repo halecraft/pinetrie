@@ -5,8 +5,7 @@
 import { batch, createDoc, json, Schema } from "@kyneta/schema"
 import {
   entryId,
-  isLaneName,
-  type LaneName,
+  isThreadId,
   type LiveOp,
   type RunId,
   runId,
@@ -15,6 +14,7 @@ import {
   type StreamRecord,
   streamId,
   type TextEdit,
+  type ThreadId,
 } from "@pinetrie/core"
 
 /**
@@ -61,7 +61,7 @@ const encodeStream = (s: StreamRecord): StoredStream =>
  * host writes streams, and a starting host closes every one (`planClear`).
  */
 function decodeStream(id: string, s: StoredStream): StreamRecord | undefined {
-  if (!isLaneName(s.lane)) return undefined
+  if (!isThreadId(s.lane)) return undefined
   return s.kind === "tool"
     ? { id: streamId(id), lane: s.lane, kind: "tool", callId: s.callId ?? "" }
     : {
@@ -122,15 +122,15 @@ export function applyLiveOps(
 /** The run a lane is running, or undefined when the lane is idle. */
 export function readActiveRun(
   live: LiveDocHandle,
-  lane: LaneName,
+  lane: ThreadId,
 ): RunId | undefined {
   const run = live.activeRuns.get(lane)
   return typeof run === "string" ? runId(run) : undefined
 }
 
 /** Every lane with a run, as stored; a key that is no lane is left out. */
-export const readActiveLanes = (live: LiveDocHandle): readonly LaneName[] =>
-  Object.keys(live.activeRuns()).filter(isLaneName)
+export const readActiveLanes = (live: LiveDocHandle): readonly ThreadId[] =>
+  Object.keys(live.activeRuns()).filter(isThreadId)
 
 /**
  * Every stream's record, or only `lane`'s, in id order, without reading any
@@ -138,7 +138,7 @@ export const readActiveLanes = (live: LiveDocHandle): readonly LaneName[] =>
  */
 export function readStreamRecords(
   live: LiveDocHandle,
-  lane?: LaneName,
+  lane?: ThreadId,
 ): readonly StreamRecord[] {
   return Object.entries(live.streams())
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
@@ -166,7 +166,7 @@ export const readStreamText = (live: LiveDocHandle, id: StreamId): string =>
 /** Every stream, or only `lane`'s, with its text. */
 export function readStreams(
   live: LiveDocHandle,
-  lane?: LaneName,
+  lane?: ThreadId,
 ): readonly Stream[] {
   return readStreamRecords(live, lane).map(s => ({
     ...s,

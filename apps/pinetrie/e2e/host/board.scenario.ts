@@ -1,5 +1,5 @@
 // e2e/host/board — moving a root on the board (ADR-0122), archiving it in
-// the closed state (ADR-0029), and titling one (ADR-0045), through the
+// the archive (ADR-0029), and titling one (ADR-0045), through the
 // command Line. What each decides is unit-tested (`@pinetrie/rules`'
 // `board.test.ts`, `archive.test.ts` and `mark.test.ts`, the host's
 // `commands/*.test.ts`); this proves the dispatcher routes each command to
@@ -40,7 +40,7 @@ async function run(check: Checks["check"]): Promise<void> {
       const bea = await join(host, "bea", "board")
       const workflow = readWorkflow(host.session)
       const [backlog, doing] = workflow?.open ?? []
-      const done = workflow?.closed
+      const done = workflow?.archive
       if (backlog === undefined || doing === undefined || done === undefined)
         throw new Error("a new host writes the default workflow")
 

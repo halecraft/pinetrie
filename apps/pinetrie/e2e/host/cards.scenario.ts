@@ -8,8 +8,8 @@ import {
   cardId,
   type EntryId,
   entryId,
-  type LaneName,
   ROOT,
+  type ThreadId,
 } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
 import { PLACES_DOC_ID } from "@pinetrie/protocol/messages"
@@ -32,7 +32,6 @@ import {
   idleNow,
   join,
   laneNamesOf,
-  lanesOf,
   lateFor,
   queueCard,
   refusedWrite,
@@ -89,7 +88,7 @@ async function run(check: Checks["check"]): Promise<void> {
     const noteAt = (end: EntryId | null) =>
       ({ ...drafting(end), kind: "note", cell: 0 }) as const
     const newCard = (
-      who: SessionClient,
+      who: Omit<SessionClient, "chat">,
       end: EntryId | null,
       text: string,
       place: "composing" | "note" = "composing",
@@ -136,7 +135,6 @@ async function run(check: Checks["check"]): Promise<void> {
       ada.writer,
       { kind: "end", end: grown ?? entryId("") },
       ada.cards.current(),
-      lanesOf(ch, idx, readPlaces(ch.places)),
       idx,
     )
     check(
@@ -210,7 +208,7 @@ async function run(check: Checks["check"]): Promise<void> {
     // 4. The busy lane's queue (ADR-0048, ADR-0059). Bea sends Ada's card
     // there: the host queues it in the same step, as Bea's. Ada edits it while
     // it waits; Ada queues another and unqueues it.
-    const lane = (laneNamesOf(ch)[0] ?? "") as LaneName
+    const lane = (laneNamesOf(ch)[0] ?? "") as ThreadId
     const c3 = newCard(ada, busyEnd, "@Ada the plan")
     await waitFor(
       () =>

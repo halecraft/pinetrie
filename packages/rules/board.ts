@@ -2,9 +2,9 @@
 // (ADR-0122).
 //
 // The workflow is one host-written singleton: the open states in order, then
-// the closed state, which is always there and always last. A root's place is
+// the archive, which is always there and always last. A root's place is
 // a host-written value keyed by its `RootId`: its state and its rank there.
-// A root in the closed state is archived (ADR-0029); `archive.ts` decides
+// A root in the archive is archived (ADR-0029); `archive.ts` decides
 // what crossing that state's edge does.
 //
 // The board is total: a root with no place, or a place in a state the
@@ -42,7 +42,7 @@ const StateSchema = Type.Object({
 
 const WorkflowSchema = Type.Object({
   open: Type.Array(StateSchema, { minItems: 1 }),
-  closed: StateSchema,
+  archive: StateSchema,
 })
 
 const stateOf = (s: { id: string; name: string }): WorkflowState | undefined =>
@@ -55,15 +55,15 @@ export const WORKFLOW: RecordSpec<Workflow, typeof WORKFLOW_KEY, "session"> = {
   keyOf: () => WORKFLOW_KEY,
   encode: w => ({
     open: w.open.map(s => ({ ...s })),
-    closed: { ...w.closed },
+    archive: { ...w.archive },
   }),
   decode: (contents, key) =>
     decodeAt(WorkflowSchema, contents, fixedKey(WORKFLOW_KEY, key), w => {
       const open = w.open.map(stateOf)
-      const closed = stateOf(w.closed)
-      if (closed === undefined || open.some(s => s === undefined))
+      const archive = stateOf(w.archive)
+      if (archive === undefined || open.some(s => s === undefined))
         return undefined
-      return { open: open.filter(s => s !== undefined), closed }
+      return { open: open.filter(s => s !== undefined), archive }
     }),
 }
 
@@ -88,13 +88,13 @@ export const BOARD: RecordSpec<BoardPlace, RootId, "session"> = {
     ),
 }
 
-/** A new session's workflow: Backlog and Doing, then Done, closed. */
+/** A new session's workflow: Backlog and Doing, then Done, the archive. */
 export const defaultWorkflow = (newId: () => string): Workflow => ({
   open: [
     { id: workflowStateIdFor(newId()), name: "Backlog" },
     { id: workflowStateIdFor(newId()), name: "Doing" },
   ],
-  closed: { id: workflowStateIdFor(newId()), name: "Done" },
+  archive: { id: workflowStateIdFor(newId()), name: "Done" },
 })
 
 /**
@@ -108,10 +108,10 @@ export const planWorkflowSeed = (
 ): readonly ValueWrite[] =>
   workflow === null ? [setRecord(WORKFLOW, defaultWorkflow(newId))] : []
 
-/** Every state, open then closed: the board's columns. */
+/** Every state, open then the archive: the board's columns. */
 export const statesOf = (w: Workflow): readonly WorkflowState[] => [
   ...w.open,
-  w.closed,
+  w.archive,
 ]
 
 /** The state `id` names, or undefined. */
@@ -129,7 +129,7 @@ export interface BoardColumn {
 /** Every root in its state, in order. */
 export interface Board {
   readonly open: readonly BoardColumn[]
-  readonly closed: BoardColumn
+  readonly archive: BoardColumn
   /** Each root's state. */
   readonly stateOf: ReadonlyMap<RootId, WorkflowStateId>
 }
@@ -141,7 +141,7 @@ const effectiveState = (
 ): WorkflowStateId =>
   place !== undefined && stateIn(w, place.state) !== undefined
     ? place.state
-    : (w.open[0]?.id ?? w.closed.id)
+    : (w.open[0]?.id ?? w.archive.id)
 
 /**
  * Every root in `roots` on the board: in its place's state, by rank, then by
@@ -175,7 +175,7 @@ export function boardOf(
   })
   return {
     open: workflow.open.map(column),
-    closed: column(workflow.closed),
+    archive: column(workflow.archive),
     stateOf: stateOfRoot,
   }
 }
@@ -205,29 +205,29 @@ const compareRoots = (
   return a < b ? -1 : a > b ? 1 : 0
 }
 
-/** The roots in the closed state: archived (ADR-0029). Pure. */
+/** The roots in the archive: archived (ADR-0029). Pure. */
 export function archivedOf(
   workflow: Workflow,
   places: ReadonlyMap<RootId, BoardPlace>,
 ): ReadonlyMap<RootId, ArchivedRoot> {
   const out = new Map<RootId, ArchivedRoot>()
   for (const p of places.values())
-    if (p.state === workflow.closed.id)
+    if (p.state === workflow.archive.id)
       out.set(p.root, { root: p.root, by: p.by, at: p.at })
   return out
 }
 
-/** Whether a move crosses the closed state's edge: what the host must gather. */
-export type Transition = "within" | "close" | "reopen"
+/** Whether a move crosses the archive's edge: what the host must gather. */
+export type Transition = "within" | "archive" | "restore"
 
 export function transitionOf(
   workflow: Workflow,
   from: WorkflowStateId,
   to: WorkflowStateId,
 ): Transition {
-  const closed = workflow.closed.id
-  if (from !== closed && to === closed) return "close"
-  if (from === closed && to !== closed) return "reopen"
+  const archive = workflow.archive.id
+  if (from !== archive && to === archive) return "archive"
+  if (from === archive && to !== archive) return "restore"
   return "within"
 }
 
@@ -248,7 +248,7 @@ export type RootMovePlan =
  * names the state it saw the root in; if the root has left it, the move is
  * refused, naming who moved it and where. `before` is the root it goes
  * before in `to`, null (or a root no longer there) for its end. A root moved
- * within the closed state keeps who archived it and when. Pure.
+ * within the archive keeps who archived it and when. Pure.
  */
 export function planRootMove(input: {
   readonly root: RootId
@@ -270,7 +270,7 @@ export function planRootMove(input: {
   if (!input.roots.includes(root))
     return refused(ERR.UNKNOWN_TARGET, "no such root")
   const board = boardOf(workflow, places, input.roots)
-  const now = board.stateOf.get(root) ?? workflow.closed.id
+  const now = board.stateOf.get(root) ?? workflow.archive.id
   if (now !== input.from) {
     const where = stateIn(workflow, now)?.name ?? ""
     const mover = places.get(root)?.by
@@ -282,7 +282,7 @@ export function planRootMove(input: {
     )
   }
   const column =
-    [...board.open, board.closed].find(c => c.state.id === to)?.roots ?? []
+    [...board.open, board.archive].find(c => c.state.id === to)?.roots ?? []
   const others = column.filter(r => r !== root)
   const at =
     input.before === null || !others.includes(input.before)
@@ -293,7 +293,7 @@ export function planRootMove(input: {
     return { kind: "unchanged" }
 
   const was = places.get(root)
-  const keep = now === workflow.closed.id && to === workflow.closed.id
+  const keep = now === workflow.archive.id && to === workflow.archive.id
   const moved = (rank: string): BoardPlace => ({
     root,
     state: to,
@@ -337,7 +337,7 @@ export function placeStarted(input: {
 }): BoardPlace {
   const { workflow } = input
   const open = workflow.open.find(s => s.id === input.state)
-  const state = open?.id ?? workflow.open[0]?.id ?? workflow.closed.id
+  const state = open?.id ?? workflow.open[0]?.id ?? workflow.archive.id
   const ranks = [...input.places.values()]
     .filter(p => p.state === state)
     .map(p => p.rank)
@@ -358,7 +358,7 @@ export type WorkflowPlan =
 
 /**
  * Decide a change to the workflow. Names are trimmed and may repeat. The
- * closed state is renamed, never moved or removed; a state holding a root is
+ * archive is renamed, never moved or removed; a state holding a root is
  * not removed, nor the only open state. Pure.
  */
 export function planWorkflowEdit(
@@ -368,7 +368,7 @@ export function planWorkflowEdit(
   newId: () => string,
 ): WorkflowPlan {
   const name = edit.name.trim()
-  const { open, closed } = workflow
+  const { open, archive } = workflow
   const place = (
     states: readonly WorkflowState[],
     s: WorkflowState,
@@ -381,7 +381,7 @@ export function planWorkflowEdit(
   const write = (next: Workflow): WorkflowPlan =>
     next.open.length === open.length &&
     next.open.every((s, i) => sameState(s, open[i])) &&
-    sameState(next.closed, closed)
+    sameState(next.archive, archive)
       ? { kind: "unchanged" }
       : { kind: "write", workflow: next }
 
@@ -389,38 +389,38 @@ export function planWorkflowEdit(
     if (name === "") return refused(ERR.EMPTY_NAME, "a state needs a name")
     return write({
       open: place(open, { id: workflowStateIdFor(newId()), name }),
-      closed,
+      archive,
     })
   }
   const target = edit.state === null ? undefined : stateIn(workflow, edit.state)
   if (target === undefined)
     return refused(ERR.UNKNOWN_STATE, "that workflow state is gone")
-  const isClosed = target.id === closed.id
+  const isArchive = target.id === archive.id
   switch (edit.action) {
     case "rename":
       if (name === "") return refused(ERR.EMPTY_NAME, "a state needs a name")
       return write(
-        isClosed
-          ? { open, closed: { ...closed, name } }
+        isArchive
+          ? { open, archive: { ...archive, name } }
           : {
               open: open.map(s => (s.id === target.id ? { ...s, name } : s)),
-              closed,
+              archive,
             },
       )
     case "move":
-      if (isClosed)
-        return refused(ERR.STATE_CLOSED, `${closed.name} is always last`)
+      if (isArchive)
+        return refused(ERR.STATE_ARCHIVE, `${archive.name} is always last`)
       if (edit.before === target.id) return { kind: "unchanged" }
       return write({
         open: place(
           open.filter(s => s.id !== target.id),
           target,
         ),
-        closed,
+        archive,
       })
     case "remove": {
-      if (isClosed)
-        return refused(ERR.STATE_CLOSED, `${closed.name} cannot be removed`)
+      if (isArchive)
+        return refused(ERR.STATE_ARCHIVE, `${archive.name} cannot be removed`)
       const held =
         board.open.find(c => c.state.id === target.id)?.roots.length ?? 0
       if (held > 0)
@@ -430,7 +430,7 @@ export function planWorkflowEdit(
         )
       if (open.length === 1)
         return refused(ERR.LAST_STATE, "the board needs one open state")
-      return write({ open: open.filter(s => s.id !== target.id), closed })
+      return write({ open: open.filter(s => s.id !== target.id), archive })
     }
   }
 }

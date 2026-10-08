@@ -5,11 +5,11 @@ import {
   entryId,
   indexAsks,
   indexTree,
-  laneNameForThread,
   projectRail,
   type RevisionRecord,
   startsRun,
   type TreeIndex,
+  threadIdFor,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { askStats, type Segment, segmentPath } from "./ask-segments.ts"
@@ -52,7 +52,7 @@ describe("workStats", () => {
     entryId(entry),
     {
       entry: entryId(entry),
-      lane: laneNameForThread("x"),
+      lane: threadIdFor("x"),
       commit: null,
       snapshot: null,
       paths,

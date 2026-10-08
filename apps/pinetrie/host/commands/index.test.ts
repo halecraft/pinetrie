@@ -4,7 +4,7 @@ import {
   ERR,
   entryId,
   type Intent,
-  laneNameForThread,
+  threadIdFor,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -24,7 +24,7 @@ import {
   putValue,
   ROOT_ID,
   record,
-  row,
+  threadRow,
   writeDirectory,
 } from "../fakes.ts"
 import type { Offers } from "../offers/index.ts"
@@ -35,9 +35,11 @@ import { type CommandDeps, createCommands, placeOfCommand } from "./index.ts"
 
 const ALICE = writerId("alice@example.com")
 const ROOT_ENTRY = entryId("e-1")
-const HELD = laneNameForThread("01a0f9eb-86e1-77ad-a822-2a306786223f")
-const NEW = laneNameForThread("01a0f9eb-86e1-77ad-a822-2a3067862240")
+const HELD = threadIdFor("01a0f9eb-86e1-77ad-a822-2a306786223f")
+const NEW = threadIdFor("01a0f9eb-86e1-77ad-a822-2a3067862240")
 const [DOING, DONE] = [workflowStateIdFor("d"), workflowStateIdFor("x")]
+/** The thread the test's root entry starts. */
+const THREAD = threadIdFor("root")
 
 /** The test's root in `state` on a board of Doing and Done (ADR-0122). */
 const placeRoot = (b: ReturnType<typeof basics>, state: typeof DOING) => {
@@ -45,7 +47,7 @@ const placeRoot = (b: ReturnType<typeof basics>, state: typeof DOING) => {
     b,
     setRecord(WORKFLOW, {
       open: [{ id: DOING, name: "Doing" }],
-      closed: { id: DONE, name: "Done" },
+      archive: { id: DONE, name: "Done" },
     }),
   )
   putValue(
@@ -70,7 +72,7 @@ function setUp(
     laneStarted: async () => {},
     asked: async () => ({ kind: "retitling" }),
   })
-  writeEntry(b.root, row(ROOT_ENTRY, null))
+  writeEntry(b.root, threadRow(ROOT_ENTRY, null, THREAD))
   writeDirectory(b)
   placeRoot(b, DOING)
   // The agent, the scribe, the records and the setup in one record, so the
@@ -100,6 +102,7 @@ function setUp(
     },
     names: record<CommandDeps["names"]>({
       reserve: async lane => (lane === HELD ? "held" : "name"),
+      ensure: async () => {},
     }).port,
     drain: lane => void drains.push(lane),
     histories: record<CommandDeps["histories"]>().port,
@@ -122,7 +125,7 @@ function setUp(
       parentId: ROOT_ENTRY,
       root: ROOT_ID,
       mode: "reply",
-      lane: "",
+      lane: THREAD,
       asksAgent: false,
     }) satisfies WireCommand
   return {
@@ -273,14 +276,11 @@ test("a popped queued card in an archived root is refused, and the agent is neve
   const out = await commands.sendPoppedQueuedCard(ALICE, "s-1", {
     text: "from the queue",
     root: ROOT_ID,
-    at: atEntry(ROOT_ENTRY),
-    mode: "queue",
-    lane: null,
+    at: { kind: "queue", thread: THREAD },
     asksAgent: false,
     mentions: [],
     card: null,
     pinned: [],
-    reserved: null,
     base: null,
     state: null,
   })

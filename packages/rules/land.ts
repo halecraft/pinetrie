@@ -13,14 +13,14 @@
 // offer's, and an ask is the agent's `ask_about_conflict` in the tree.
 
 import { type Static, Type } from "typebox"
-import { CommitSchema, LaneNameSchema, List, WriterIdSchema } from "./decode.ts"
+import { CommitSchema, List, ThreadIdSchema, WriterIdSchema } from "./decode.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"
 import { leftOut } from "./request.ts"
 
 export const LAND_TYPE = "pinetrie.land"
 
 const LandDetailsSchema = Type.Object({
-  lane: LaneNameSchema,
+  lane: ThreadIdSchema,
   /** The base's commit that was merged: accepted work's, or a WIP's copy (ADR-0104). */
   yours: List(CommitSchema),
   /** The files that conflicted when it merged. */

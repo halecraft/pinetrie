@@ -9,9 +9,9 @@
 import {
   ERR,
   type ErrCode,
-  type LaneName,
   type OfferFact,
   type OfferSeen,
+  type ThreadId,
   type WriterId,
 } from "@pinetrie/core"
 import { readThreadName } from "@pinetrie/reads"
@@ -37,9 +37,9 @@ export async function act(
   deps: Pick<
     OfferDeps,
     "owner" | "repoConfig" | "basics" | "docs" | "piSetup" | "running"
-  > & { readonly describing: Set<LaneName> },
+  > & { readonly describing: Set<ThreadId> },
   refresh: Pick<Refresh, "rebuild" | "ports">,
-  lane: LaneName,
+  lane: ThreadId,
   action: "accept" | "squash" | "describe" | "refresh",
   by: WriterId,
   to: string | null = null,

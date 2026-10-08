@@ -72,7 +72,12 @@ import {
 } from "@pinetrie/interface"
 import { type QueuedCard, writersOfClients } from "@pinetrie/rules"
 import { textClients } from "@pinetrie/schema"
-import { IN_COLUMN, newCardId, type SessionClient } from "@pinetrie/session"
+import {
+  chatAtOf,
+  IN_COLUMN,
+  newCardId,
+  type SessionClient,
+} from "@pinetrie/session"
 import {
   type KeyboardEvent,
   type ReactNode,
@@ -117,7 +122,7 @@ export interface Where {
 /**
  * Before sending, the button says what the message will do: who it is for,
  * and whether it will wait. `planSend` decides as the host will, over the
- * thread `threadOf` gives (ADR-0021), and `sendButton` words it. When the send
+ * column's thread and its lane (ADR-0021, ADR-0117), and `sendButton` words it. When the send
  * starts a thread and there is a WIP, a line beside it says what the thread
  * starts from, and changes it (`StartLine`).
  *
@@ -142,11 +147,11 @@ export function CardEditor(p: {
   place: CardPlace | undefined
   /** Where the message attaches: the column's end, or its branch point. */
   at: Position
-  /** The thread's lane, from `threadOf`: whether the agent is busy there. */
+  /** The thread's lane (`laneOf`): whether the agent is busy there. */
   lane: ThreadLane
   /**
-   * What every send from this column carries: its bound lane, whether it is a
-   * Start Agent column, and its reserved lane (ADR-0057).
+   * What every send from this column carries: its thread, whether it is a
+   * Start Agent column, and a new tab's root (ADR-0117).
    */
   how: ColumnHow
   /** A fresh column: its first message starts the thread (`branch`). */
@@ -375,11 +380,17 @@ export function CardEditor(p: {
       setStatus("")
       return
     }
+    const { thread, ...how } = p.how
+    // A column opened at an entry settles on its thread at once: until then
+    // there is no thread to send in.
+    if (thread === null) {
+      step({ kind: "settled", spent: false })
+      return
+    }
     setStatus("sending…")
     const id = p.onSend()
-    const outcome = await session.chat(message, p.at, {
-      ...p.how,
-      mode: as,
+    const outcome = await session.chat(message, chatAtOf(as, thread, p.at), {
+      ...how,
       ...(id === undefined ? {} : { id }),
       ...(plan.createsLane && base !== null ? { base } : {}),
       ...(from === null ? {} : { card: from }),

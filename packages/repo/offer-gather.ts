@@ -14,7 +14,6 @@ import type {
   CatchUpRead,
   CommitId,
   LaneBase,
-  LaneName,
   OfferAcceptanceFacts,
   OfferGather,
   OfferInRepo,
@@ -23,6 +22,7 @@ import type {
   RefreshFacts,
   StackFacts,
   StartRead,
+  ThreadId,
   ThreadName,
   WorkChanges,
 } from "@pinetrie/core"
@@ -49,7 +49,7 @@ import type { RepoOps, RepoReads } from "./owner.ts"
 
 /** What the documents say of a lane, read by the host before it gathers. */
 export interface OfferInput {
-  readonly lane: LaneName
+  readonly lane: ThreadId
   /** The thread's name: an offer is found by it. Undefined before it is named. */
   readonly name: ThreadName | undefined
   readonly repoConfig: RepoConfig
@@ -81,7 +81,7 @@ export type RefreshGather =
 
 /** The lane's base record, as the repo says it now (ADR-0104). */
 const baseRecord = (
-  lane: LaneName,
+  lane: ThreadId,
   input: {
     readonly base: LaneBase
     readonly state: BaseRecord["state"]

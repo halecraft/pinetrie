@@ -29,7 +29,6 @@ const Command = Schema.struct({
   asksAgent: Schema.boolean(),
   targetId: Schema.string(),
   cardId: Schema.string(),
-  reserved: Schema.string(),
   base: Schema.string(),
   seen: Schema.string(),
   moves: Schema.string(),

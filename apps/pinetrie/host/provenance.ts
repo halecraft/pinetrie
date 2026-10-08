@@ -10,16 +10,13 @@ import type {
   CardId,
   CardRecord,
   EntryId,
-  LaneView,
   RootId,
   TreeIndex,
   WriterId,
 } from "@pinetrie/core"
 import {
   readCardHistories,
-  readLanes,
   readPlaces,
-  readQueueHolds,
   readReading,
   readTraces,
   readTreeIndex,
@@ -28,7 +25,6 @@ import {
   CARD_HISTORY,
   type Cause,
   deleteRecord,
-  NONE_BLANK,
   type ProvenanceSteps,
   placeEnd,
   planProvenance,
@@ -59,10 +55,7 @@ export interface Provenance {
 }
 
 export interface ProvenanceDeps {
-  readonly basics: Pick<
-    Basics,
-    "docs" | "live" | "places" | "session" | "now" | "newId"
-  >
+  readonly basics: Pick<Basics, "docs" | "places" | "session" | "now" | "newId">
   readonly presence: PresenceDocHandle
   readonly records: Pick<Records, "writeValues">
 }
@@ -74,9 +67,7 @@ export interface ProvenanceDeps {
  */
 export function endsOf(
   cards: readonly CardRecord[],
-  view: (
-    root: RootId,
-  ) => { index: TreeIndex; lanes: readonly LaneView[] } | null,
+  view: (root: RootId) => TreeIndex | null,
 ): ReadonlyMap<CardId, EntryId | null> {
   const ends = new Map<CardId, EntryId | null>()
   for (const c of cards) {
@@ -88,15 +79,14 @@ export function endsOf(
       p.kind !== "pinned"
     )
       continue
-    const root = view(p.root)
-    if (root !== null)
-      ends.set(c.id, placeEnd(p, c.owner, root.lanes, root.index))
+    const index = view(p.root)
+    if (index !== null) ends.set(c.id, placeEnd(p, index))
   }
   return ends
 }
 
 export function createProvenance(deps: ProvenanceDeps): Provenance {
-  const { docs, live, places, session } = deps.basics
+  const { docs, places, session } = deps.basics
 
   const write = async (steps: ProvenanceSteps): Promise<void> => {
     const writes = [
@@ -117,27 +107,12 @@ export function createProvenance(deps: ProvenanceDeps): Provenance {
   return {
     before() {
       const cards = readPlaces(places)
-      // One index and one lane read per root, however many cards it holds.
-      const roots = new Map<
-        RootId,
-        { index: TreeIndex; lanes: readonly LaneView[] } | null
-      >()
+      // One index per root, however many cards it holds.
+      const roots = new Map<RootId, TreeIndex | null>()
       const view = (root: RootId) => {
         if (!roots.has(root)) {
           const held = docs.view(root)
-          if (held === null) roots.set(root, null)
-          else {
-            const index = readTreeIndex(held.doc)
-            const lanes = readLanes(
-              { doc: held.doc, live },
-              index,
-              cards,
-              readQueueHolds(session),
-              // Only the lanes' tips are read here: their thread ends.
-              NONE_BLANK,
-            )
-            roots.set(root, { index, lanes })
-          }
+          roots.set(root, held === null ? null : readTreeIndex(held.doc))
         }
         return roots.get(root) ?? null
       }

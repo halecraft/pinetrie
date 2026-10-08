@@ -6,12 +6,7 @@ import { stat } from "node:fs/promises"
 import { createRequire } from "node:module"
 import { homedir } from "node:os"
 import path from "node:path"
-import {
-  errorText,
-  type LaneName,
-  PRODUCT_NAME,
-  type ProjectRecord,
-} from "@pinetrie/core"
+import { errorText, PRODUCT_NAME, type ProjectRecord } from "@pinetrie/core"
 import { createKeeper, type Keeper } from "@pinetrie/keeper"
 import {
   BASE_LANE,
@@ -22,6 +17,7 @@ import {
   ensureRuntime,
   gatherLinks,
   jjIn,
+  type LaneOwner,
   type LaneRuntime,
   type LaneSpec,
   type Mount,
@@ -103,7 +99,11 @@ export interface Setup {
    */
   readonly hostPaths: readonly string[]
   /** A lane's spec. The base lane gets no shared directories and no host paths. */
-  specOf(lane: LaneName, ready: Ready, base?: boolean): LaneSpec
+  specOf<L extends LaneOwner>(
+    lane: L,
+    ready: Ready,
+    base?: boolean,
+  ): LaneSpec<L>
   /** Refresh the base snapshot after the refreshes queued before, in the background. */
   refreshBaseSoon(): void
   /**
@@ -170,7 +170,11 @@ export async function startSetup(input: {
     log(`[host] ${r.path} is not readable in lanes: ${r.reason}`)
   const hostPaths = hostMounts.mounts
 
-  const specOf = (lane: LaneName, r: Ready, base = false): LaneSpec => {
+  const specOf = <L extends LaneOwner>(
+    lane: L,
+    r: Ready,
+    base = false,
+  ): LaneSpec<L> => {
     const grants = lanes.config.grants
     return {
       lane,

@@ -3,7 +3,6 @@ import {
   type CommitId,
   commitId,
   ERR,
-  laneNameForThread,
   type OfferAcceptanceDecision,
   type OfferGather,
   type OfferInRepo,
@@ -15,6 +14,7 @@ import {
   type StackFacts,
   type StartRead,
   type ThreadName,
+  threadIdFor,
   type WorkChanges,
   writerId,
 } from "@pinetrie/core"
@@ -42,7 +42,7 @@ import {
 import { offerAcceptanceDestinations, offerMoved } from "./offer.ts"
 import { decodeUpdate } from "./update.ts"
 
-const LANE = laneNameForThread("1")
+const LANE = threadIdFor("1")
 const ADA = writerId("ada@x.io")
 const TIP = commitId("t1")
 const T2 = commitId("t2")
@@ -380,7 +380,7 @@ describe("the update and stack messages", () => {
       ...details,
       from: {
         kind: "parent" as const,
-        lane: laneNameForThread("p"),
+        lane: threadIdFor("p"),
         name: "amber-fox" as ThreadName,
       },
     }
@@ -415,7 +415,7 @@ describe("the update and stack messages", () => {
     [
       {
         kind: "parent",
-        lane: laneNameForThread("p"),
+        lane: threadIdFor("p"),
         name: "amber-fox" as ThreadName,
       },
       "The work of the thread this one branched from (amber-fox)",
@@ -611,13 +611,13 @@ describe("the offer's policy over a gather (ADR-0105, ADR-0104)", () => {
     const open = { ...offer, files: ["a.txt", "b.txt"], yourEdits: [] }
     const held = {
       ...offer,
-      lane: laneNameForThread("2"),
+      lane: threadIdFor("2"),
       files: [],
       yourEdits: ["x"],
     }
     const accepted = {
       ...offer,
-      lane: laneNameForThread("3"),
+      lane: threadIdFor("3"),
       acceptedAs: "kt",
     }
     expect(

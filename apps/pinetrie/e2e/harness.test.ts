@@ -1,8 +1,8 @@
 import {
   type CardRecord,
   entryId,
-  laneNameForThread,
   rootIdFor,
+  threadIdFor,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { composeAt, rootHolding, waitForRootHolding } from "./harness.ts"
@@ -63,7 +63,7 @@ test("composeAt: a composing card at the entry, in the root the client came to h
       return Promise.resolve({ kind: "moved" })
     },
   } as unknown as Parameters<typeof composeAt>[0]
-  const lane = laneNameForThread("1")
+  const lane = threadIdFor("1")
   await composeAt(client, { entry: E, lane, command: "split" }, "hi")
   expect(made.map(c => [c.place, c.carries])).toEqual([
     [

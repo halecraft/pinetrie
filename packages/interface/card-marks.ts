@@ -15,7 +15,6 @@ import {
   type CardId,
   type CardRecord,
   type EntryId,
-  type LaneView,
   type RootId,
   rootOf,
   type TreeIndex,
@@ -80,9 +79,8 @@ export function cardMarks(input: {
   /** Cards that hold text (`holdsText`), by id. */
   readonly filled: ReadonlySet<CardId>
   readonly layout: Layout
-  /** Roots in the closed workflow state (ADR-0029, ADR-0122), by root entry. */
+  /** Roots in the archive (ADR-0029, ADR-0122), by root entry. */
   readonly archived: ReadonlySet<EntryId>
-  readonly lanes: readonly LaneView[]
   readonly index: TreeIndex
   /**
    * Each root's root entry, by its id, from the directory: a message or a
@@ -98,7 +96,7 @@ export function cardMarks(input: {
     switch (card.place.kind) {
       case "composing":
       case "note": {
-        const end = placeEnd(card.place, card.owner, input.lanes, input.index)
+        const end = placeEnd(card.place, input.index)
         const root =
           (end === null ? null : rootOf(input.index, end)) ??
           input.rootEntries.get(card.place.root) ??

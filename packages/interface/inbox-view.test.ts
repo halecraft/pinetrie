@@ -1,4 +1,4 @@
-import { entryId, laneNameForThread } from "@pinetrie/core"
+import { entryId, threadIdFor } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import type { Item, Level } from "./attention.ts"
 import {
@@ -10,7 +10,7 @@ import {
 
 const R = entryId("r1")
 const verdict = (lane: string, level: Level): Item => ({
-  lane: laneNameForThread(lane),
+  lane: threadIdFor(lane),
   root: R,
   end: entryId(`e-${lane}`),
   level,
@@ -21,7 +21,7 @@ const verdict = (lane: string, level: Level): Item => ({
   },
 })
 const offer = (lane: string): Item => ({
-  lane: laneNameForThread(lane),
+  lane: threadIdFor(lane),
   root: R,
   end: entryId(`e-${lane}`),
   level: "needsYou",

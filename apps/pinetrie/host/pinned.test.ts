@@ -4,8 +4,8 @@ import {
   type CardRecord,
   cardId,
   entryId,
-  laneNameForThread,
   type SentCard,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import {
@@ -17,11 +17,19 @@ import {
 import { writeEntry } from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
 import type { CardPort } from "./cards.ts"
-import { basics, putLane, putValue, ROOT_ID, record, row } from "./fakes.ts"
+import {
+  basics,
+  putLane,
+  putValue,
+  ROOT_ID,
+  record,
+  row,
+  threadRow,
+} from "./fakes.ts"
 import { createPinned, waitFor } from "./pinned.ts"
 import { applyPlaceSteps } from "./places.ts"
 
-const LANE = laneNameForThread("0123456789abcdef")
+const LANE = threadIdFor("0123456789abcdef")
 const ADA = writerId("ada@x.io")
 const pinnedCard = (id: string, order: string): CardRecord => ({
   id: cardId(id),
@@ -40,7 +48,7 @@ const pinnedCard = (id: string, order: string): CardRecord => ({
 
 function setUp(texts: Record<string, string>, port: Partial<CardPort> = {}) {
   const b = basics()
-  writeEntry(b.root, row("e-1", null, { role: "user", content: "hi" }))
+  writeEntry(b.root, threadRow("e-1", null, LANE))
   putLane(b, LANE, entryId("e-1"))
   putValue(b, setRecord(PARTICIPANT, { writer: ADA, name: "Ada" }))
   const waits: [CardId, string][] = []

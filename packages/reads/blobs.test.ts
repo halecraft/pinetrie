@@ -1,9 +1,4 @@
-import {
-  laneNameForThread,
-  NOBODY,
-  type Sha256,
-  writerId,
-} from "@pinetrie/core"
+import { NOBODY, type Sha256, threadIdFor, writerId } from "@pinetrie/core"
 import { encodeChat } from "@pinetrie/rules"
 import { expect, test } from "vitest"
 import { planSweep, referencedBlobs } from "./index.ts"
@@ -40,7 +35,7 @@ test("referencedBlobs: chats, tool results, typed texts and banners each keep th
       `a queued card ![](/blob/${sha("b")})`,
       "`![](/blob/dd)` no",
     ],
-    banners: [{ lane: laneNameForThread("1"), sha: sha("g"), at: 1 }],
+    banners: [{ lane: threadIdFor("1"), sha: sha("g"), at: 1 }],
   })
   expect([...referenced].sort()).toEqual([
     sha("a"),

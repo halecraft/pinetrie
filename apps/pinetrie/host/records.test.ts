@@ -1,16 +1,11 @@
-import {
-  entryId,
-  laneNameForThread,
-  type ThreadName,
-  writerId,
-} from "@pinetrie/core"
+import { entryId, type ThreadName, threadIdFor, writerId } from "@pinetrie/core"
 import { deleteRecord, MARK, NAME, setRecord } from "@pinetrie/rules"
 import { readNamespace } from "@pinetrie/schema"
 import { expect, test } from "vitest"
 import { basics, ROOT_ID } from "./fakes.ts"
 import { createRecords } from "./records.ts"
 
-const LANE_1 = laneNameForThread("0190a0a0-0000-7000-8000-000000000001")
+const LANE_1 = threadIdFor("0190a0a0-0000-7000-8000-000000000001")
 
 test("writes sets and deletes, each in the document its target names (ADR-0063, ADR-0095)", async () => {
   const b = basics()

@@ -1,10 +1,10 @@
 import {
   address,
   entryId,
-  laneNameForThread,
   parseMentions,
   type ThreadLane,
   type TranscriptMessage,
+  threadIdFor,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
@@ -16,7 +16,7 @@ import {
 
 const agentWork: ThreadLane = {
   kind: "lane",
-  name: laneNameForThread("t"),
+  name: threadIdFor("t"),
   tip: entryId("9-t"),
   running: false,
   waiting: 0,

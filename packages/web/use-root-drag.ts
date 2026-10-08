@@ -83,7 +83,7 @@ function landingAt(
 
 export function useRootDrag(
   onIntent: (intent: Intent) => void,
-  closed: WorkflowStateId | null,
+  archive: WorkflowStateId | null,
 ): void {
   useEffect(() => {
     // A drag begun in this page: what it carries, its item, and the place
@@ -134,12 +134,12 @@ export function useRootDrag(
     }
     const onOver = (e: DragEvent) => {
       if (!carriesRoot(e)) return
-      const landing = closed === null ? null : landingAt(e)
-      if (closed === null || landing === null) return mark(null)
+      const landing = archive === null ? null : landingAt(e)
+      if (archive === null || landing === null) return mark(null)
       e.preventDefault()
       const moves =
         from === null ||
-        planRootDrop(from.drag, landing.target, closed, from.home) !== null
+        planRootDrop(from.drag, landing.target, archive, from.home) !== null
       mark(moves ? landing.el : null)
     }
     // Off the page: no line is left behind.
@@ -147,14 +147,14 @@ export function useRootDrag(
       if (carriesRoot(e) && e.relatedTarget === null) mark(null)
     }
     const onDrop = (e: DragEvent) => {
-      if (!carriesRoot(e) || closed === null) return
+      if (!carriesRoot(e) || archive === null) return
       const home = from?.home ?? null
       finish()
       const landing = landingAt(e)
       const drag = parseRootDrag(e.dataTransfer?.getData(ROOT_MIME) ?? "")
       if (landing === null || drag === null) return
       e.preventDefault()
-      const intent = planRootDrop(drag, landing.target, closed, home)
+      const intent = planRootDrop(drag, landing.target, archive, home)
       if (intent !== null) onIntent(intent)
     }
     document.addEventListener("dragstart", onStart)
@@ -170,5 +170,5 @@ export function useRootDrag(
       document.removeEventListener("dragend", finish)
       document.removeEventListener("drop", onDrop)
     }
-  }, [onIntent, closed])
+  }, [onIntent, archive])
 }

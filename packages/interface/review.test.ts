@@ -1,9 +1,9 @@
 import type { ThreadName } from "@pinetrie/core"
 import {
   commitId,
-  laneNameForThread,
   type ReviewFile,
   type RevisionReview,
+  threadIdFor,
   withTrailers,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
@@ -17,7 +17,7 @@ import {
   sectionState,
 } from "./review.ts"
 
-const LANE = laneNameForThread("1")
+const LANE = threadIdFor("1")
 const C1 = commitId("c1")
 const C2 = commitId("c2")
 const file = (path: string, added: number, removed: number): ReviewFile => ({

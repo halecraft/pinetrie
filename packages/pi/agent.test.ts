@@ -9,13 +9,13 @@ import {
   cardId,
   commitId,
   ERR,
-  type LaneName,
-  laneNameForThread,
   NOBODY,
   ROOT,
   type RootId,
   rootIdFor,
   THE_AGENT,
+  type ThreadId,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import {
@@ -82,7 +82,7 @@ describe("createThreadLane (ADR-0057)", () => {
   test("creates the lane under the id it is given, and refuses one pi holds", async () => {
     const doc = newRootDoc()
     const agent = await over(doc)
-    const lane = laneNameForThread(newId())
+    const lane = threadIdFor(newId())
     expect(
       await agent.createThreadLane({ root: ONE_ROOT, at: ROOT }, lane),
     ).toEqual({
@@ -111,7 +111,7 @@ describe("createThreadLane (ADR-0057)", () => {
 
   test("a lane that does not exist refuses every write as unknown", async () => {
     const agent = await over(newRootDoc())
-    const lane = agent.lane(laneNameForThread(newId()))
+    const lane = agent.lane(threadIdFor(newId()))
     const unknown = { kind: "refused", code: ERR.UNKNOWN_TARGET }
     const message = encodeChat(
       {
@@ -154,7 +154,7 @@ describe("a pi session per root (ADR-0063)", () => {
       if (known === undefined) throw new Error(`no root ${id}`)
       return known
     },
-    rootOfLane: (lane: LaneName) =>
+    rootOfLane: (lane: ThreadId) =>
       recordsIn(LANE, readNamespace(session, LANE.namespace)).get(lane)?.root ??
       null,
   })
@@ -170,7 +170,7 @@ describe("a pi session per root (ADR-0063)", () => {
       replicaId: "first",
       model: { kind: "scripted", script },
     })
-    const lanes = [laneNameForThread(newId()), laneNameForThread(newId())]
+    const lanes = [threadIdFor(newId()), threadIdFor(newId())]
     for (const [i, root] of [ONE_ROOT, OTHER].entries()) {
       const lane = lanes[i]
       if (lane === undefined) throw new Error("no lane")
@@ -229,7 +229,7 @@ describe("pinned cards: what the model reads (ADR-0048, S92)", () => {
       },
       1,
     )
-  const cardsOf = (lane: LaneName, text: string) =>
+  const cardsOf = (lane: ThreadId, text: string) =>
     encodePinned(
       { lane, cards: [{ id: cardId("c-1"), text, by: ADA }], retired: [] },
       () => "Ada",
@@ -252,7 +252,7 @@ describe("pinned cards: what the model reads (ADR-0048, S92)", () => {
     })
     const made = await agent.createThreadLane(
       { root: ONE_ROOT, at: ROOT },
-      laneNameForThread(newId()),
+      threadIdFor(newId()),
     )
     if (made.kind !== "created") throw new Error("no lane")
     return { agent, doc, lane: made.lane }

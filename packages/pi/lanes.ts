@@ -21,9 +21,9 @@ import {
   HOST_WORKING_COPY,
   hostPathInLane,
   isWithin,
-  type LaneName,
   PRODUCT_NAME,
   type RuntimeProgram,
+  type ThreadId,
 } from "@pinetrie/core"
 import { PINNED_RULE, type ToolAnswer } from "@pinetrie/rules"
 import { Type } from "typebox"
@@ -140,29 +140,29 @@ export interface LaneHooks {
    * turn left. `tip` is the lane's tip then: on a run's first request, its
    * prompt.
    */
-  turnDone(lane: LaneName, tip: EntryId): Promise<void>
+  turnDone(lane: ThreadId, tip: EntryId): Promise<void>
   /**
    * `ask_about_conflict` was called. True when the lane's copy has a
    * conflict to ask about, which then needs the person; false when it has
    * none, and nothing is asked (ADR-0080).
    */
-  askedAboutConflict(lane: LaneName, question: string): Promise<boolean>
+  askedAboutConflict(lane: ThreadId, question: string): Promise<boolean>
   /** `catch_up` was called (ADR-0080): the host's answer. */
-  catchUp(lane: LaneName, from: "base" | "parent"): Promise<ToolAnswer>
+  catchUp(lane: ThreadId, from: "base" | "parent"): Promise<ToolAnswer>
   /** `split_offer` was called (ADR-0080): the host's answer. */
-  askSplit(lane: LaneName): Promise<ToolAnswer>
+  askSplit(lane: ThreadId): Promise<ToolAnswer>
 }
 
 type Context = Parameters<typeof withContextValue>[2]
 
-const LANE = createContextKey<LaneName>("pinetrie.lane")
+const LANE = createContextKey<ThreadId>("pinetrie.lane")
 
 /** `base` with the lane named: pass it to every call that drives the lane. */
-export const laneContext = (lane: LaneName, base: Context): Context =>
+export const laneContext = (lane: ThreadId, base: Context): Context =>
   withContextValue(LANE, lane, base)
 
 /** The lane a `Context` was given, if any. */
-export const laneOf = (context: Context): LaneName | undefined =>
+export const laneOf = (context: Context): ThreadId | undefined =>
   context.value(LANE)
 
 /**
@@ -276,7 +276,7 @@ export const NO_CONFLICTS =
  * changes between runs (S85).
  */
 export function conflictTool(
-  onAsk: (lane: LaneName, question: string) => Promise<boolean>,
+  onAsk: (lane: ThreadId, question: string) => Promise<boolean>,
 ) {
   return {
     name: CONFLICT_TOOL,

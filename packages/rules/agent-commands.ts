@@ -11,9 +11,9 @@ import {
   type CommitId,
   type CopyFacts,
   commandOf,
-  type LaneName,
   type Position,
   type RootId,
+  type ThreadId,
   type WriterId,
 } from "@pinetrie/core"
 import { type CatchUpNow, type ParentNow, parentAhead } from "./base.ts"
@@ -195,7 +195,7 @@ export const SPLIT_QUEUED =
 export function planSplitCall(input: {
   readonly offer: OfferStatus
   readonly cards: readonly CardRecord[]
-  readonly lane: LaneName
+  readonly lane: ThreadId
   /** The role of the lane's latest prompt, and whether it runs. */
   readonly prompt: string | undefined
   readonly running: boolean

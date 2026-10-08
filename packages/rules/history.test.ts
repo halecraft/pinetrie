@@ -3,8 +3,8 @@ import path from "node:path"
 import {
   cardId,
   commitId,
-  laneNameForThread,
   type ThreadName,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
@@ -31,7 +31,7 @@ const MESSAGE_SPECS = [
 
 type CustomType = (typeof MESSAGE_SPECS)[number]["customType"]
 
-const LANE = laneNameForThread("1")
+const LANE = threadIdFor("1")
 const ADA = writerId("ada@x.io")
 const C = commitId("c1")
 
@@ -41,7 +41,7 @@ const SAMPLES: Record<CustomType, unknown> = {
     lane: LANE,
     from: {
       kind: "parent",
-      lane: laneNameForThread("p"),
+      lane: threadIdFor("p"),
       name: "amber-fox" as ThreadName,
     },
     merged: C,
@@ -140,7 +140,7 @@ describe("history messages (history.ts)", () => {
     )
   })
 
-  test("a lane that is no lane does not decode: the schema checks it as isLaneName does", () => {
+  test("a lane that is no lane does not decode: the schema checks it as isThreadId does", () => {
     const message = CARRY_ON.encode(
       SAMPLES["pinetrie.carry-on"] as never,
       "",

@@ -2,11 +2,11 @@ import {
   type BoardPlace,
   type EntryId,
   entryId,
-  laneNameForThread,
   type RootId,
   type RootSummary,
   type RootWork,
   rootIdFor,
+  threadIdFor,
   type Workflow,
   type WriterId,
   workflowStateIdFor,
@@ -16,15 +16,15 @@ import { boardOf, orderKeys } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import type { Status } from "./attention.ts"
 import {
+  ARCHIVE_RECENT,
   addStateIntent,
+  archiveRows,
   type BoardKeyFocus,
   type BoardSearch,
   type BoardViewInput,
   boardKeyAct,
   boardView,
-  CLOSED_RECENT,
   clickClosesBoard,
-  closedRows,
   filterTitle,
   filterWords,
   keptWords,
@@ -51,7 +51,7 @@ const WORKFLOW: Workflow = {
     { id: BACKLOG, name: "Backlog" },
     { id: DOING, name: "Doing" },
   ],
-  closed: { id: DONE, name: "Done" },
+  archive: { id: DONE, name: "Done" },
 }
 const ID = (n: number) =>
   rootIdFor(`01a0ffd2-0000-7000-8000-${String(n).padStart(12, "0")}`)
@@ -147,7 +147,7 @@ const input = (over: Partial<Facts> = {}): BoardViewInput => {
 }
 
 describe("boardView", () => {
-  test("each open state a column, in order, by rank; the closed state apart; the strip says each", () => {
+  test("each open state a column, in order, by rank; the archive apart; the strip says each", () => {
     const view = boardView(input())
     expect(
       view.open.map(c => [c.state.name, c.items.map(t => t.entry)]),
@@ -155,8 +155,8 @@ describe("boardView", () => {
       ["Backlog", [E(3)]],
       ["Doing", [E(2), E(1)]],
     ])
-    expect(view.closed.count).toEqual({ kind: "all", total: 2 })
-    expect(view.strip.map(s => [s.name, s.count, s.closed])).toEqual([
+    expect(view.archive.count).toEqual({ kind: "all", total: 2 })
+    expect(view.strip.map(s => [s.name, s.count, s.archive])).toEqual([
       ["Backlog", 1, false],
       ["Doing", 2, false],
       ["Done", 2, true],
@@ -164,7 +164,7 @@ describe("boardView", () => {
   })
 
   test("a titled card's body is its first line; an untitled card, or one titled by it, has none (ADR-0111)", () => {
-    const done = boardView(input()).closed.rows
+    const done = boardView(input()).archive.rows
     expect(done.map(t => [t.label, t.body])).toEqual([
       ["Palette work", "can we try warmer colours?"],
       ["Old spike about SQLite", null],
@@ -182,9 +182,9 @@ describe("boardView", () => {
     })
   })
 
-  test("a column's mark and the strip's are its roots' highest; the closed state has none", () => {
+  test("a column's mark and the strip's are its roots' highest; the archive has none", () => {
     const item = {
-      lane: laneNameForThread("a"),
+      lane: threadIdFor("a"),
       root: E(1),
       end: E(1),
       level: "needsYou" as const,
@@ -200,7 +200,7 @@ describe("boardView", () => {
     expect(view.strip.map(s => s.mark)).toEqual([null, "needsYou", null])
   })
 
-  test("an item's ⇡ names its threads with work ready; a column counts its items working (a pending verdict is working, `rootStatus`), and its items ready, not threads; the strip copies them, the closed state 0 (ADR-0091)", () => {
+  test("an item's ⇡ names its threads with work ready; a column counts its items working (a pending verdict is working, `rootStatus`), and its items ready, not threads; the strip copies them, the archive 0 (ADR-0091)", () => {
     const status = new Map<EntryId, Status>([
       [E(1), { kind: "working" }],
       [E(3), { kind: "working" }],
@@ -236,7 +236,7 @@ describe("boardView", () => {
     )
   })
 
-  test("an item's ⋯ moves it to every other state; into the closed state, refused while its agent works", () => {
+  test("an item's ⋯ moves it to every other state; into the archive, refused while its agent works", () => {
     const view = boardView(input({ work: new Map([[E(2), "running"]]) }))
     const [first] = view.open[1]?.items ?? []
     expect(first?.moves.map(m => [m.name, m.closes, m.busy])).toEqual([
@@ -318,13 +318,13 @@ describe("the board's search (ADR-0109)", () => {
     const view = boardView(input({ labels, ...over }))
     return [
       ...view.open.map(c => c.items.map(t => t.entry)),
-      view.closed.rows.map(t => t.entry),
+      view.archive.rows.map(t => t.entry),
     ]
   }
   const find = (query: string, mine = false) => ({
     search: parseSearch(query, mine),
   })
-  test("with none, every root shows, the closed state's newest first, and every count is of all", () => {
+  test("with none, every root shows, the archive's newest first, and every count is of all", () => {
     expect(kept({})).toEqual([[E(3)], [E(2), E(1)], [E(5), E(4)]])
     const view = boardView(input())
     expect(view.shown).toEqual({ kind: "all", total: 5 })
@@ -348,7 +348,7 @@ describe("the board's search (ADR-0109)", () => {
     ])
     const ready = new Map([[E(2), ["amber-fox"]]])
     const item = {
-      lane: laneNameForThread("a"),
+      lane: threadIdFor("a"),
       root: E(2),
       end: E(2),
       level: "needsYou" as const,
@@ -370,7 +370,7 @@ describe("the board's search (ADR-0109)", () => {
     expect(doing?.remove.why).not.toBeNull()
     expect(view.open[0]?.items).toEqual([])
     expect(view.open[0]?.remove.why).not.toBeNull()
-    expect(view.closed.count).toEqual({ kind: "kept", kept: 0, total: 2 })
+    expect(view.archive.count).toEqual({ kind: "kept", kept: 0, total: 2 })
     expect(
       view.strip.map(s => [s.count, s.signals.ready, s.signals.roots.length]),
     ).toEqual([
@@ -384,22 +384,22 @@ describe("the board's search (ADR-0109)", () => {
     const [only, ...rest] = view.open[1]?.items ?? []
     expect([only?.up, only?.down, rest]).toEqual([null, null, []])
   })
-  test("with no words, the closed state shows only its most recent few, mine alone included", () => {
+  test("with no words, the archive shows only its most recent few, mine alone included", () => {
     const item = (n: number) =>
       ({
-        ...boardView(input()).closed.rows[0],
+        ...boardView(input()).archive.rows[0],
         entry: E(n),
         root: ID(n),
         label: `r${n}`,
         writers: [],
       }) as never
-    const many = Array.from({ length: CLOSED_RECENT + 3 }, (_, n) => item(n))
+    const many = Array.from({ length: ARCHIVE_RECENT + 3 }, (_, n) => item(n))
     const summaries = new Map()
     const rows = (search: BoardSearch | null) =>
-      closedRows({ items: many, summaries, search }).length
-    expect(rows(null)).toBe(CLOSED_RECENT)
-    expect(rows(parseSearch("", true))).toBe(CLOSED_RECENT)
-    expect(rows(parseSearch("r", false))).toBe(CLOSED_RECENT + 3)
+      archiveRows({ items: many, summaries, search }).length
+    expect(rows(null)).toBe(ARCHIVE_RECENT)
+    expect(rows(parseSearch("", true))).toBe(ARCHIVE_RECENT)
+    expect(rows(parseSearch("r", false))).toBe(ARCHIVE_RECENT + 3)
   })
 })
 

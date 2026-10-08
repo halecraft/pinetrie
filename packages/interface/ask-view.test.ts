@@ -4,8 +4,8 @@ import {
   type EntryLike,
   entryId,
   indexAsks,
-  laneNameForThread,
   type RevisionRecord,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
@@ -176,7 +176,7 @@ describe("askView", () => {
       entryId(at),
       {
         entry: entryId(at),
-        lane: laneNameForThread("x"),
+        lane: threadIdFor("x"),
         commit: commit === null ? null : commitId(commit),
         snapshot: null,
         paths,

@@ -12,8 +12,8 @@ import {
   type CopyFacts,
   commitId,
   type EntryId,
-  type LaneName,
   revisionMessage,
+  type ThreadId,
 } from "@pinetrie/core"
 import { bookmarkOf, setBookmark } from "./bookmarks.ts"
 import {
@@ -97,7 +97,7 @@ export async function commitTurn(
   input: {
     readonly title: string
     readonly entry: EntryId
-    readonly lane: LaneName
+    readonly lane: ThreadId
     readonly bookmark: CommitId | null
   },
 ): Promise<TurnCommitted> {
@@ -161,7 +161,7 @@ export async function commitTurn(
  */
 export async function copyFacts(
   jj: Runner,
-  lane: LaneName,
+  lane: ThreadId,
 ): Promise<CopyFacts> {
   const at = await jj([
     "log",
@@ -221,7 +221,7 @@ export async function oldNamesOnDisk(lane: Runner): Promise<OldNamesOnDisk> {
  */
 export async function commitToBookmark(
   jj: Runner,
-  lane: LaneName,
+  lane: ThreadId,
   message: string,
 ): Promise<CommitId> {
   const commit = await jj(["commit", "-m", message])

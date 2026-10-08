@@ -1,4 +1,4 @@
-import { commitId, laneNameForThread, type ThreadName } from "@pinetrie/core"
+import { commitId, type ThreadName, threadIdFor } from "@pinetrie/core"
 import { DEFAULT_REPO } from "@pinetrie/lanes"
 import { describe, expect, test } from "vitest"
 import { wipState } from "./accepted.ts"
@@ -25,7 +25,7 @@ import {
 import { repoCommand } from "./run.ts"
 import type { RepoStep } from "./step.ts"
 
-const LANE = laneNameForThread("1")
+const LANE = threadIdFor("1")
 const NAME = "amber-fox" as ThreadName
 const C1 = commitId("c1")
 const C2 = commitId("c2")
@@ -332,7 +332,7 @@ describe("the runner factory: what each runner adds to a command on your repo", 
 })
 
 describe("planObserve: what moved between two fingerprints", () => {
-  const LANE_B = laneNameForThread("b")
+  const LANE_B = threadIdFor("b")
   const fp = (
     bookmarks: Record<string, string>,
     at: string | null = "c-at",

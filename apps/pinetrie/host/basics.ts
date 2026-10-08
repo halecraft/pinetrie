@@ -1,7 +1,7 @@
 // host/basics — what nearly every module of the host's shell takes, and how
 // it reports a failure.
 
-import { errorText, type LaneName, type RootId } from "@pinetrie/core"
+import { errorText, type RootId, type ThreadId } from "@pinetrie/core"
 import { type Keeper, KeeperClosed, type SlowStep } from "@pinetrie/keeper"
 import { readThreadName } from "@pinetrie/reads"
 import type {
@@ -32,7 +32,7 @@ export interface Basics {
  * What the documents' keeper merges by: a lane's drain, a root's directory
  * record, and the compaction.
  */
-export type HostKey = `drain:${LaneName}` | `root:${RootId}` | "compact"
+export type HostKey = `drain:${ThreadId}` | `root:${RootId}` | "compact"
 
 /** The documents' keeper: every command, drain and write of the host's. */
 export type HostKeeper = Keeper<HostKey>
@@ -45,7 +45,7 @@ export type HostKeeper = Keeper<HostKey>
 export function failed(
   basics: Pick<Basics, "session" | "log">,
   what: string,
-  lane?: LaneName,
+  lane?: ThreadId,
 ): (error: unknown) => void {
   return error => {
     if (error instanceof KeeperClosed) return

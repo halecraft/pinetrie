@@ -1,4 +1,4 @@
-import { entryId, laneNameForThread } from "@pinetrie/core"
+import { entryId, threadIdFor } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import {
   pickAt,
@@ -13,7 +13,7 @@ import {
 test("railKeep: rings, running tips, open columns' ends and your cards' ends", () => {
   const keep = railKeep({
     rings: new Map([[entryId("r"), []]]),
-    activity: [{ lane: laneNameForThread("s"), tip: entryId("t") }],
+    activity: [{ lane: threadIdFor("s"), tip: entryId("t") }],
     ends: [entryId("e"), null],
     cards: new Set([entryId("c")]),
   })

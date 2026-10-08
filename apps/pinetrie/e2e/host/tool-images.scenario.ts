@@ -131,7 +131,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     script.use([{ text: "still red" }])
     const tip = lanesOf(th, treeOf(th), readPlaces(th.places))[0]
     await tv.chat("@agent and now?", at(tip?.tip ?? null), {
-      lane: tip?.name,
+      thread: tip?.name,
     })
     await tidle()
     await th.quiet()

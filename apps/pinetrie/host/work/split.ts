@@ -5,7 +5,7 @@ import {
   type CommitId,
   type EntryId,
   errorText,
-  type LaneName,
+  type ThreadId,
   type WriterId,
 } from "@pinetrie/core"
 import {
@@ -35,11 +35,11 @@ import type { LaneRegistry } from "./registry.ts"
 export async function finishSplit(
   ports: {
     readonly fetchLane: Fetches["fetchLane"]
-    readonly stackTop: (lane: LaneName) => Promise<CommitId | null>
+    readonly stackTop: (lane: ThreadId) => Promise<CommitId | null>
     readonly stackEnded: Offers["stackEnded"]
-    readonly backToTip: (lane: LaneName) => Promise<void>
+    readonly backToTip: (lane: ThreadId) => Promise<void>
   },
-  lane: LaneName,
+  lane: ThreadId,
   stack: { readonly start: readonly CommitId[]; readonly tip: CommitId },
 ): Promise<string | null> {
   try {
@@ -54,13 +54,13 @@ export async function finishSplit(
 export interface Splits {
   /** The prompt of a split's run: the stack's span and the skill. */
   prepareSplit(
-    lane: LaneName,
+    lane: ThreadId,
     by: WriterId,
     /** The split card's text: what the person asked of it (ADR-0080). */
     intent: string,
   ): Promise<StackMessage | { readonly refused: string }>
   /** A split's run ended: its stack, checked, becomes the offer, or why not. */
-  splitEnded(lane: LaneName, prompt: EntryId): Promise<string | null>
+  splitEnded(lane: ThreadId, prompt: EntryId): Promise<string | null>
 }
 
 export function createSplits(deps: {

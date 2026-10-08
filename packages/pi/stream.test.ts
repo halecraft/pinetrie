@@ -1,10 +1,10 @@
 // pi's harness events as `StreamEvent`s, mapped without a harness.
 
-import { laneNameForThread } from "@pinetrie/core"
+import { threadIdFor } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import { type StreamSource, streamEventOf } from "./stream.ts"
 
-const lane = laneNameForThread("0190a0a0-0000-7000-8000-000000000001")
+const lane = threadIdFor("0190a0a0-0000-7000-8000-000000000001")
 const event = (e: object) => e as StreamSource
 
 test("a text delta, a tool's start and its output's first text", () => {

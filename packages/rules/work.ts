@@ -13,14 +13,14 @@ import {
   type EntryId,
   type ForkStart,
   HOST_WORKING_COPY,
-  isLaneName,
   isRootId,
-  type LaneName,
+  isThreadId,
   type LaneRecord,
   type ProjectRecord,
   type RevisionRecord,
   type SnapshotId,
   snapshotId,
+  type ThreadId,
   type WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
@@ -30,7 +30,7 @@ import {
   decodeAt,
   entryKey,
   fixedKey,
-  laneKey,
+  threadKey,
 } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
@@ -72,7 +72,7 @@ const ProjectRecordSchema = Type.Object({
  * (ADR-0063), and whether it has a copy of its own, stored as its work
  * (`{ kind: "own" }`, or null for none) as records before ADR-0102 hold it.
  */
-export const LANE: RecordSpec<LaneRecord, LaneName, "session"> = {
+export const LANE: RecordSpec<LaneRecord, ThreadId, "session"> = {
   namespace: "pinetrie.lane",
   home: "session",
   keyOf: r => r.lane,
@@ -81,7 +81,7 @@ export const LANE: RecordSpec<LaneRecord, LaneName, "session"> = {
     work: ownCopy ? { kind: "own" } : null,
   }),
   decode: (contents, key) =>
-    decodeAt(LaneRecordSchema, contents, laneKey(key), (r, lane) =>
+    decodeAt(LaneRecordSchema, contents, threadKey(key), (r, lane) =>
       isRootId(r.root)
         ? {
             lane,
@@ -106,7 +106,7 @@ export const REVISION: RecordSpec<RevisionRecord, EntryId, "root"> = {
   }),
   decode: (contents, key) =>
     decodeAt(RevisionRecordSchema, contents, entryKey(key), (r, entry) =>
-      isLaneName(r.lane)
+      isThreadId(r.lane)
         ? {
             entry,
             lane: r.lane,
@@ -156,7 +156,7 @@ export const PROJECT: RecordSpec<ProjectRecord, typeof PROJECT_KEY, "session"> =
  */
 export function planTurnRecord(input: {
   readonly entry: EntryId
-  readonly lane: LaneName
+  readonly lane: ThreadId
   readonly isPrompt: boolean
   /** The message made tool calls. */
   readonly toolCalls: boolean
@@ -234,7 +234,7 @@ export function planRetention(input: {
   readonly archived: boolean
 }): readonly SnapshotId[] {
   if (!input.archived) return []
-  const newest = new Map<LaneName, SnapshotId>()
+  const newest = new Map<ThreadId, SnapshotId>()
   const all: SnapshotId[] = []
   for (const r of input.records) {
     if (r.snapshot === null || r.snapshot === BASE_SNAPSHOT) continue

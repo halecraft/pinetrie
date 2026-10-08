@@ -21,11 +21,11 @@ import {
   firstLine,
   hasTrailer,
   type LaneBase,
-  type LaneName,
-  laneNameForThread,
   NO_EDITOR,
   type OfferSource,
+  type ThreadId,
   type ThreadName,
+  threadIdFor,
   trailerRevset,
   WORKSPACE_ROOT,
 } from "@pinetrie/core"
@@ -113,10 +113,10 @@ import {
 import { executeRepo, hostJj, hostOps, runnerFor } from "./run.ts"
 import { readShared } from "./shared.ts"
 
-const LANE = laneNameForThread("1")
+const LANE = threadIdFor("1")
 const NAME = "amber-fox" as ThreadName
-const FORK = laneNameForThread("2")
-const ROOT = laneNameForThread("3")
+const FORK = threadIdFor("2")
+const ROOT = threadIdFor("3")
 const TURN = { lane: LANE, title: "a turn" }
 
 /** Where `LANE`'s offer starts, as commits: a test of an untraced start reads `startOfOffer` itself. */
@@ -139,7 +139,7 @@ const turnOn = async (
   input: {
     readonly title: string
     readonly entry: EntryId
-    readonly lane: LaneName
+    readonly lane: ThreadId
   },
 ) =>
   (
@@ -169,7 +169,7 @@ const fetchLane = async (
   runners: LaneRunners,
   yours: string,
   input: {
-    readonly lane: LaneName
+    readonly lane: ThreadId
     readonly have: readonly CommitId[]
     readonly bundle: string
   },
@@ -1068,7 +1068,7 @@ describe("a lane's repo, with jj", () => {
      * `dir`: `planMerge`, then `mergeUpdate`, which joins the accepted-offer commits it holds
      * first (S102).
      */
-    const catchUp = async (dir = laneDir, lane: LaneName = LANE) => {
+    const catchUp = async (dir = laneDir, lane: ThreadId = LANE) => {
       const commit = await acceptedNow()
       const plan = planMerge({
         kind: "accepted",

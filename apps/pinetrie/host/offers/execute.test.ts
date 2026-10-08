@@ -1,10 +1,10 @@
 import {
   type BaseRecord,
   commitId,
-  laneNameForThread,
   type OfferNow,
   type Placed,
   type ThreadName,
+  threadIdFor,
 } from "@pinetrie/core"
 import { offerAcceptanceEffects, offerEffects } from "@pinetrie/repo"
 import { offerRecord } from "@pinetrie/rules"
@@ -12,7 +12,7 @@ import { describe, expect, test } from "vitest"
 import { methods, record } from "../fakes.ts"
 import { executeOffer, type OfferPorts } from "./execute.ts"
 
-const LANE = laneNameForThread("0123456789abcdef")
+const LANE = threadIdFor("0123456789abcdef")
 const NAME = "amber-fox" as ThreadName
 const TIP = commitId("11111111")
 const offer = (commit: string): OfferNow => ({

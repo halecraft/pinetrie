@@ -12,16 +12,16 @@ import {
   type DigestRecord,
   type EntryId,
   entryId,
-  type LaneName,
   type RootId,
   type Said,
+  type ThreadId,
   type ValueWrite,
   type Verdict,
   type VerdictRecord,
   type WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { decodeAt, laneKey } from "./decode.ts"
+import { decodeAt, threadKey } from "./decode.ts"
 import {
   type Answer,
   type AskLines,
@@ -58,13 +58,13 @@ const VerdictSchema = Type.Object({
 })
 
 /** Each thread's last run's verdict, at its lane. */
-export const VERDICT: RecordSpec<VerdictRecord, LaneName, "session"> = {
+export const VERDICT: RecordSpec<VerdictRecord, ThreadId, "session"> = {
   namespace: "pinetrie.verdict",
   home: "session",
   keyOf: r => r.lane,
   encode: ({ lane, ...contents }) => contents,
   decode: (contents, key) =>
-    decodeAt(VerdictSchema, contents, laneKey(key), (r, lane) => ({
+    decodeAt(VerdictSchema, contents, threadKey(key), (r, lane) => ({
       lane,
       ask: entryId(r.ask),
       end: entryId(r.end),
@@ -211,7 +211,7 @@ export function planRunEnded(input: {
 
 /** What a run's end writes as it stops running, before the model is asked. */
 export const pendingVerdict = (
-  lane: LaneName,
+  lane: ThreadId,
   ask: EntryId,
   end: EntryId,
 ): VerdictRecord => ({ lane, ask, end, verdict: { kind: "pending" } })
@@ -225,7 +225,7 @@ export const pendingVerdict = (
  */
 export function runEndedToWrite(input: {
   readonly root: RootId
-  readonly lane: LaneName
+  readonly lane: ThreadId
   readonly ask: EntryId
   readonly end: EntryId
   readonly answer: Answer

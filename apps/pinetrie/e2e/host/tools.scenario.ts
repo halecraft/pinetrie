@@ -6,11 +6,11 @@ import path from "node:path"
 import type { Store } from "@kyneta/exchange"
 import { subscribe } from "@kyneta/schema"
 import {
-  laneNameForThread,
   projectSpine,
   ROOT,
   rootDocId,
   runId,
+  threadIdFor,
 } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
 import { SESSION_DOC_ID } from "@pinetrie/protocol/messages"
@@ -110,7 +110,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       { text: "done" },
     ])
     const lane = tlane()
-    await u.chat("make new.txt", at(lane?.tip ?? null), { lane: lane?.name })
+    await u.chat("make new.txt", at(lane?.tip ?? null), { thread: lane?.name })
     await tidle()
     // In its lane's own copy: the project is the person's working copy,
     // which no lane writes (ADR-0034).
@@ -138,7 +138,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     ])
     watched.length = 0
     const l3 = tlane()
-    await u.chat("run it", at(l3?.tip ?? null), { lane: l3?.name })
+    await u.chat("run it", at(l3?.tip ?? null), { thread: l3?.name })
     await tidle()
     await sleep(300)
     const toolTexts = watched
@@ -182,7 +182,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     ])
     watched.length = 0
     const l4 = tlane()
-    await u.chat("look again", at(l4?.tip ?? null), { lane: l4?.name })
+    await u.chat("look again", at(l4?.tip ?? null), { thread: l4?.name })
     await tidle()
 
     // 5. Stop ends a running command; a message for the busy thread is
@@ -195,13 +195,13 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     ])
     const l5 = tlane()
     const t0 = Date.now()
-    await u.chat("sleep", at(l5?.tip ?? null), { lane: l5?.name })
+    await u.chat("sleep", at(l5?.tip ?? null), { thread: l5?.name })
     await waitFor(
       () => readStreams(th.live).some(s => s.kind === "tool"),
       10_000,
     )
     const waiting = await bob.chat("@Uma noted", at(tlane()?.tip ?? null), {
-      lane: l5?.name,
+      thread: l5?.name,
     })
     const stopped =
       l5 === undefined
@@ -221,7 +221,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
       `${aborted?.result?.text.slice(-20) ?? "none"}`,
     )
     if (l5 !== undefined) await u.request({ kind: "stop", lane: l5.name })
-    await u.request({ kind: "stop", lane: laneNameForThread("no-such-lane") })
+    await u.request({ kind: "stop", lane: threadIdFor("no-such-lane") })
     // Who stopped it is recorded under the ask (ADR-0106): pi's entries say
     // only that the run was aborted. Stopping it again, idle, records nothing.
     const sleepAsk = idOfIn(th, "sleep")
@@ -355,7 +355,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
     script.use([{ text: "back again" }])
     const l7 = tlane()
     await u2.chat("still there?", at(l7?.tip ?? null), {
-      lane: l7?.name,
+      thread: l7?.name,
     })
     await tidle()
     unwatch()

@@ -28,19 +28,19 @@ import {
   type CardCommand,
   type CardId,
   type CardRecord,
+  type ChatAt,
   commandOf,
   type EntryId,
   type Intent,
   keyOf,
-  type LaneName,
   type Move,
   type MoveDirection,
   type OfferAction,
   PLAIN,
-  type Position,
   type QueueHoldChange,
   type Reorder,
   type RootId,
+  type ThreadId,
   type WriterId,
   writerOfPrincipal,
 } from "@pinetrie/core"
@@ -207,7 +207,7 @@ export interface SessionClient {
    * (only a `branch` starts at the root). It runs the agent only if the agent
    * is its addressee (`address`).
    */
-  chat(text: string, at: Position, how?: ChatHow): Promise<Outcome>
+  chat(text: string, at: ChatAt, how?: ChatHow): Promise<Outcome>
   /**
    * Ask the host for anything this tab does not track and that needs no
    * root found: a name, a stop, a reservation, an archive or a restore, a
@@ -305,7 +305,7 @@ export interface SessionClient {
   readonly attention: AttentionStore
   /**
    * The sidebar: the roots you have open, in your order, on every device of
-   * yours (ADR-0122). A root moved to the closed state leaves it, but the one
+   * yours (ADR-0122). A root moved to the archive leaves it, but the one
    * the page reports it shows (`here`).
    */
   readonly openThreads: OpenThreads
@@ -325,7 +325,7 @@ export interface SessionClient {
    * record shows it (`offerSeen`). Tracked in `acting`.
    */
   offer(
-    lane: LaneName,
+    lane: ThreadId,
     action: OfferAction,
     to?: string | null,
   ): Promise<Outcome>

@@ -5,7 +5,7 @@
 // The sidebar is yours, on every device: × closes a root for you and writes
 // nothing shared. Drag an item to reorder; a root dragged here from the
 // board opens there. In its ⋯, Rename titles a root for everyone (ADR-0045),
-// and Move to ▸ moves it on the board for everyone: to the closed state, it
+// and Move to ▸ moves it on the board for everyone: to the archive, it
 // is archived. A root someone else
 // starts is not added here. An item holding an unsent card of yours carries a
 // pip (ADR-0048, `cardMarks`), and before its label, its status (ADR-0077).

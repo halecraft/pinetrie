@@ -4,10 +4,10 @@ import {
   cardId,
   commitId,
   entryId,
-  laneNameForThread,
   type OfferRecord,
   rootIdFor,
   type ThreadName,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
@@ -37,7 +37,7 @@ function floor(): Floor {
   return found.floor
 }
 
-const LANE = laneNameForThread("1")
+const LANE = threadIdFor("1")
 const ADA = writerId("ada@x.io")
 const [B, C, D] = [commitId("b"), commitId("c"), commitId("d")]
 const MOVE = {
@@ -49,7 +49,7 @@ const MOVE = {
 
 const parent = (over: Partial<ParentNow> = {}): ParentNow => ({
   kind: "parent",
-  lane: laneNameForThread("p"),
+  lane: threadIdFor("p"),
   name: "amber-fox" as ThreadName,
   newest: D,
   caughtUpWith: C,

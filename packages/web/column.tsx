@@ -11,6 +11,7 @@ import {
   type DigestRecord,
   type EntryId,
   type LaneView,
+  laneOf,
   messageAt,
   nearestRevision,
   type Position,
@@ -24,7 +25,6 @@ import {
   type ThreadLane,
   type TraceRecord,
   type TreeIndex,
-  threadOf,
   type WriterId,
 } from "@pinetrie/core"
 import {
@@ -100,12 +100,7 @@ import {
 } from "@pinetrie/rules"
 import { type LiveDocHandle, readStreamText } from "@pinetrie/schema"
 import type { AttentionStore } from "@pinetrie/session"
-import {
-  drawnPlace,
-  newCardId,
-  newLaneName,
-  type SessionClient,
-} from "@pinetrie/session"
+import { drawnPlace, newCardId, type SessionClient } from "@pinetrie/session"
 import {
   useCallback,
   useEffect,
@@ -299,7 +294,7 @@ export function Column(p: ColumnProps) {
   // Where you last left the thread, on any device: read as the column
   // mounts and when the page shows again, so the line stays where it was
   // while you read below it (ADR-0106, ADR-0077).
-  const leftLane = p.column.lane ?? null
+  const leftLane = p.column.thread ?? null
   const readLeft = useStable(() =>
     leftLane === null
       ? undefined
@@ -372,14 +367,11 @@ export function Column(p: ColumnProps) {
   }, [attention, leftLane, view.tipId, end.releasedTip, visible])
   // This thread's lane, as the host will find it: busy means a compelled
   // message waits.
-  const thread = threadOf(p.index, p.lanes, {
-    at,
-    mode: fresh ? "branch" : "reply",
-    lane: p.column.lane ?? null,
-    me: p.session.writer,
-  })
+  // A fresh column's thread starts with its first send: it has no lane yet.
   const lane: ThreadLane =
-    thread.kind === "thread" ? thread.lane : { kind: "none" }
+    fresh || p.column.thread === undefined
+      ? { kind: "none" }
+      : laneOf(p.lanes, p.column.thread)
   const running = lane.kind === "lane" && lane.running
   // The ask this column's lane is answering (ADR-0106).
   const runningAsk =
@@ -409,12 +401,13 @@ export function Column(p: ColumnProps) {
   // Whether this column's next send would create a lane: the composer's to
   // decide, as it is typed.
   const [createsLane, setCreatesLane] = useState(false)
-  const reserved = p.column.reserved ?? null
+  const thread = p.column.thread ?? null
   // The banner drawn as the column mounts shows at once; one arriving later,
   // a new one, fades in. The composer reports `createsLane` only after the
-  // mount, so a reserved lane's banner counts as there already.
+  // mount, so the banner of the lane its next send creates counts as there
+  // already.
   const [mountedBanner] = useState(() =>
-    bannerUrl(headLane(lane, true, reserved), p.work.banners),
+    bannerUrl(headLane(lane, true, thread), p.work.banners),
   )
   // Whether the reader opened the thread's details here, since the column
   // mounted: they spin only then, and not when a reload or a tab switch
@@ -424,16 +417,12 @@ export function Column(p: ColumnProps) {
   // The cards at this column's end (ADR-0048): yours, which the composer
   // edits, and everyone else's, drawn above it. A thread's cards are found
   // by where its thread ends now; a fresh column's by its key.
-  const threadEnd =
-    thread.kind === "thread" && thread.end.kind === "entry"
-      ? thread.end.id
-      : null
+  const threadEnd = at.kind === "entry" ? at.id : null
   const mine = fresh
     ? yourCard(
         p.session.writer,
         { kind: "fresh", column: p.column.key },
         p.cards,
-        p.lanes,
         index,
       )
     : threadEnd === null
@@ -442,7 +431,6 @@ export function Column(p: ColumnProps) {
           p.session.writer,
           { kind: "end", end: threadEnd },
           p.cards,
-          p.lanes,
           index,
         )
   // The thread's pinned cards (ADR-0048 step 5), and what the agent reads of
@@ -451,7 +439,7 @@ export function Column(p: ColumnProps) {
   const pinned =
     fresh || threadEnd === null
       ? []
-      : cardsAt("pinned", threadEnd, p.cards, p.lanes, index)
+      : cardsAt("pinned", threadEnd, p.cards, index)
   const inView = threadEnd === null ? null : pinnedInView(index, threadEnd)
   // Your last offer command on this lane: in flight, refused or failed.
   const acting = useSyncExternalStore(
@@ -469,7 +457,7 @@ export function Column(p: ColumnProps) {
     lane,
     createsLane,
     detailsOpen: p.column.details === true,
-    reserved,
+    thread,
     writable,
     nameOf: p.nameOf,
     lanes: p.lanes,
@@ -496,9 +484,7 @@ export function Column(p: ColumnProps) {
   // with the person's typing (`createsLane`) and as the name arrives, so the
   // effect runs once per step, not once per render.
   const carryOut = useStable((step: ReserveStep) => {
-    if (step.kind === "mint")
-      act({ kind: "reserve", key: p.column.key, lane: newLaneName() })
-    else if (step.kind === "ask")
+    if (step.kind === "ask")
       void p.session.request({ kind: "reserve", lane: step.lane })
   })
   const reserve = shows.reserve
@@ -509,8 +495,7 @@ export function Column(p: ColumnProps) {
   const how: ColumnHow = {
     column: p.column.key,
     asksAgent: p.column.asksAgent === true,
-    ...(p.column.lane === undefined ? {} : { lane: p.column.lane }),
-    ...(reserved === null ? {} : { reserved }),
+    thread,
     ...(p.column.fresh?.root === undefined
       ? {}
       : { root: p.column.fresh.root }),
@@ -607,7 +592,7 @@ export function Column(p: ColumnProps) {
   const notes =
     fresh || threadEnd === null
       ? []
-      : cardsAt("note", threadEnd, p.cards, p.lanes, index)
+      : cardsAt("note", threadEnd, p.cards, index)
   const cells = useMemo(
     () => new Map([...notesPlaced(notes)].map(([n, c]) => [n, c.id] as const)),
     [notes],
@@ -617,6 +602,7 @@ export function Column(p: ColumnProps) {
       p.column,
       at,
       at.kind === "entry" ? p.session.rootOf(at.id) : undefined,
+      p.lanes,
     ) ?? undefined
   // Where this composer creates your message, and the message there: what
   // a put here reads (`ComposerSpot`). A column that can be written
@@ -678,16 +664,12 @@ export function Column(p: ColumnProps) {
   const traces =
     !watches || threadEnd === null
       ? []
-      : tracesAt(
-          p.traces.values(),
-          p.session.writer,
-          threadEnd,
-          (from, placer) =>
-            from.kind === "note" ||
-            from.kind === "queued" ||
-            from.kind === "pinned"
-              ? placeEnd(from, placer, p.lanes, index)
-              : null,
+      : tracesAt(p.traces.values(), p.session.writer, threadEnd, from =>
+          from.kind === "note" ||
+          from.kind === "queued" ||
+          from.kind === "pinned"
+            ? placeEnd(from, index)
+            : null,
         )
   const [keptHere, setKeptHere] = useState<ReadonlyMap<string, TraceRecord>>(
     () => new Map(),

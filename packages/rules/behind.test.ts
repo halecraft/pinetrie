@@ -3,8 +3,8 @@ import {
   type BaseRecord,
   type BehindView,
   commitId,
-  laneNameForThread,
   type OfferRecord,
+  threadIdFor,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
@@ -16,7 +16,7 @@ import {
   renderableMessage,
 } from "./index.ts"
 
-const LANE = laneNameForThread("1")
+const LANE = threadIdFor("1")
 const [L1, L2] = [commitId("l1"), commitId("l2")]
 
 const line = (commit = L2): AcceptedRecord => ({

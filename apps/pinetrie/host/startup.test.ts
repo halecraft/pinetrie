@@ -2,12 +2,12 @@ import {
   atEntry,
   cardId,
   entryId,
-  type LaneName,
-  laneNameForThread,
   type ProjectRecord,
   rootIdFor,
   runId,
   SESSION_TARGET,
+  type ThreadId,
+  threadIdFor,
   type ValueWrite,
   writerId,
 } from "@pinetrie/core"
@@ -74,8 +74,8 @@ const deps = (over: Partial<StartupDeps> = {}): StartupDeps => ({
 })
 
 test("recover resumes each interrupted lane before it settles the others, and names lanes first", async () => {
-  const LANE = laneNameForThread("0123456789abcdef")
-  const OTHER = laneNameForThread("fedcba9876543210")
+  const LANE = threadIdFor("0123456789abcdef")
+  const OTHER = threadIdFor("fedcba9876543210")
   const placesDoc = newPlacesDoc()
   placesDoc.cards.set(
     "c-1",
@@ -130,11 +130,11 @@ test("recover resumes each interrupted lane before it settles the others, and na
 
 test("recover logs a stored lane whose name is not a thread's, and only such a lane", async () => {
   const b = basics()
-  writeLaneTip(b.root, laneNameForThread("0123456789abcdef"), null)
+  writeLaneTip(b.root, threadIdFor("0123456789abcdef"), null)
   await recover(deps({ basics: b }))
   expect(b.lines.filter(l => l.includes("ignoring"))).toEqual([])
 
-  writeLaneTip(b.root, "main" as LaneName, null)
+  writeLaneTip(b.root, "main" as ThreadId, null)
   await recover(deps({ basics: b }))
   expect(b.lines.filter(l => l.includes("ignoring"))).toEqual([
     "[host] ignoring stored lanes that are no thread's: main",
@@ -208,7 +208,7 @@ test("recover writes the project record only when it changed, in one write", asy
 })
 
 test("recover writes unclassified over a verdict a stopped host left pending (ADR-0077)", async () => {
-  const LANE = laneNameForThread("0123456789abcdef")
+  const LANE = threadIdFor("0123456789abcdef")
   const b = basics()
   const pending = pendingVerdict(LANE, entryId("p-1"), entryId("w-1"))
   putValue(b, setRecord(VERDICT, pending))

@@ -30,7 +30,7 @@ const WORKFLOW: Workflow = {
     { id: BACKLOG, name: "Backlog" },
     { id: DOING, name: "Doing" },
   ],
-  closed: { id: DONE, name: "Done" },
+  archive: { id: DONE, name: "Done" },
 }
 const facts = (over: Partial<ThreadCardFacts> = {}): ThreadCardFacts => ({
   workflow: WORKFLOW,
@@ -45,7 +45,7 @@ const facts = (over: Partial<ThreadCardFacts> = {}): ThreadCardFacts => ({
 })
 
 describe("threadCardHead (ADR-0111)", () => {
-  test("its label, ⇡, your pip, and Move to ▸ each other state; into the closed state refused while the agent works, naming the offers it withdraws", () => {
+  test("its label, ⇡, your pip, and Move to ▸ each other state; into the archive refused while the agent works, naming the offers it withdraws", () => {
     const head = threadCardHead(R1, facts())
     expect(head).toMatchObject({
       root: ID1,

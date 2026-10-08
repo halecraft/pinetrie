@@ -1,4 +1,4 @@
-import { commitId, entryId, laneNameForThread, runId } from "@pinetrie/core"
+import { commitId, entryId, runId, threadIdFor } from "@pinetrie/core"
 import type { ThreadLaneHandle } from "@pinetrie/pi"
 import { ACCEPTED, BASE, setRecord } from "@pinetrie/rules"
 import { beginRun, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
@@ -7,7 +7,7 @@ import { createBaseNews } from "./base-news.ts"
 import { basics, putLane, putValue, record, row } from "./fakes.ts"
 import { endRun } from "./runs.ts"
 
-const LANE = laneNameForThread("0123456789abcdef")
+const LANE = threadIdFor("0123456789abcdef")
 
 /** A lane with work of its own whose base, accepted work, moved to `to`. */
 function behind(to = "l2") {

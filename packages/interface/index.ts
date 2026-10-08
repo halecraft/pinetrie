@@ -187,11 +187,10 @@ export {
   type WorkStrip,
   workingWords,
 } from "./column-view.ts"
-export {
-  type Column,
-  isAnchored,
-  type Pending,
-  type Prefill,
+export type {
+  Column,
+  Pending,
+  Prefill,
 } from "./columns.ts"
 export { matchCommands } from "./commands.ts"
 export { copyIntoInventoryText } from "./copy-into-inventory-text.ts"
@@ -265,6 +264,7 @@ export { inventoryView } from "./inventory-view.ts"
 export {
   columnsOf,
   decodeLayout,
+  drawnColumns,
   encodeLayout,
   initialLayout,
   type Layout,

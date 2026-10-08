@@ -11,9 +11,9 @@ import {
   commitId,
   HOST_OPERATOR,
   type LaneBase,
-  type LaneName,
   type OfferSource,
   type PublishMove,
+  type ThreadId,
   type ThreadName,
   trailerRevset,
 } from "@pinetrie/core"
@@ -161,7 +161,7 @@ export const IMPORT: RepoStep = host("git", "import")
  * it.
  */
 export function planImport(input: {
-  readonly lane: LaneName
+  readonly lane: ThreadId
   /** A host file holding the bundle. */
   readonly bundle: string
   /** A split's stack instead of the lane's tip (`stackBookmark`). */
@@ -185,7 +185,7 @@ export function planImport(input: {
  */
 export const laneRefSteps = (
   updates: readonly {
-    readonly lane: LaneName
+    readonly lane: ThreadId
     readonly commit: CommitId | null
   }[],
 ): RepoStep[] =>

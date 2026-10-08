@@ -7,7 +7,7 @@
 // earlier can win over a further one written on another device (S101).
 // `attention-doc.ts` carries it out. Pure.
 
-import type { EntryId, LaneName } from "@pinetrie/core"
+import type { EntryId, ThreadId } from "@pinetrie/core"
 
 /** The least time between two writes of one lane's mark. */
 export const READ_EVERY = 5_000
@@ -15,9 +15,9 @@ export const READ_EVERY = 5_000
 /** What `readStep` remembers between calls. */
 export interface ReadMemory {
   /** When each lane's mark was last written. */
-  readonly written: ReadonlyMap<LaneName, number>
+  readonly written: ReadonlyMap<ThreadId, number>
   /** Marks reported and not yet written. */
-  readonly waiting: ReadonlyMap<LaneName, EntryId>
+  readonly waiting: ReadonlyMap<ThreadId, EntryId>
 }
 
 export const NO_READS: ReadMemory = { written: new Map(), waiting: new Map() }
@@ -36,15 +36,15 @@ const after = (a: EntryId, b: EntryId | undefined): boolean =>
 export function readStep(
   memory: ReadMemory,
   input: {
-    readonly stored: ReadonlyMap<LaneName, EntryId>
-    readonly next: { readonly lane: LaneName; readonly entry: EntryId } | null
+    readonly stored: ReadonlyMap<ThreadId, EntryId>
+    readonly next: { readonly lane: ThreadId; readonly entry: EntryId } | null
     readonly ready: boolean
     readonly leaving: boolean
     readonly now: number
   },
 ): {
   readonly memory: ReadMemory
-  readonly write: ReadonlyMap<LaneName, EntryId>
+  readonly write: ReadonlyMap<ThreadId, EntryId>
   readonly wake: number | null
 } {
   const { stored, next, now } = input
@@ -56,7 +56,7 @@ export function readStep(
   if (!input.ready)
     return { memory: { ...memory, waiting }, write: new Map(), wake: null }
   const written = new Map(memory.written)
-  const write = new Map<LaneName, EntryId>()
+  const write = new Map<ThreadId, EntryId>()
   let wake: number | null = null
   for (const [lane, entry] of waiting) {
     const due = (written.get(lane) ?? -Infinity) + READ_EVERY

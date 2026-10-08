@@ -16,14 +16,14 @@ import {
   ancestry,
   type EntryId,
   entryId,
-  isLaneName,
   isWorkflowStateId,
   type LaneView,
-  parseNewLane,
   parseNewRoot,
   pathIds,
   type RootId,
   rootOf,
+  THREAD_PATTERN,
+  type ThreadId,
   type TreeIndex,
   type WorkflowStateId,
 } from "@pinetrie/core"
@@ -34,7 +34,6 @@ import {
   type Column,
   type ColumnAction,
   columnsReducer,
-  isAnchored,
   type Prefill,
   type ReaderAction,
 } from "./columns.ts"
@@ -77,6 +76,8 @@ export type LayoutAction =
       readonly key: string
       /** Its root, minted with its key (ADR-0066). */
       readonly root: RootId
+      /** The thread its first send starts, minted with its key (ADR-0117). */
+      readonly thread: ThreadId
       readonly asksAgent: boolean
       /** What its composer starts with. */
       readonly prefill?: Prefill
@@ -122,7 +123,7 @@ export type LayoutAction =
 export interface LayoutFacts {
   readonly index: TreeIndex
   readonly lanes: readonly LaneView[]
-  /** The roots in the closed workflow state, by root entry (ADR-0122). */
+  /** The roots in the archive, by root entry (ADR-0122). */
   readonly archived: ReadonlySet<EntryId>
   /** The sidebar (`openThreads`), by root entry: a root the directory lacks is left out. */
   readonly list: readonly EntryId[]
@@ -143,6 +144,20 @@ export const initialLayout = (): Layout => ({
 export function columnsOf(layout: Layout, root: EntryId): readonly Column[] {
   return layout.roots.get(root) ?? [{ key: `first-${root}`, anchor: root }]
 }
+
+/**
+ * A root's columns as drawn: its first column, never stored, settled on its
+ * thread's end as stored ones are when the layout resolves.
+ */
+export const drawnColumns = (
+  layout: Layout,
+  root: EntryId,
+  index: TreeIndex,
+  lanes: readonly LaneView[],
+): readonly Column[] =>
+  layout.roots.has(root)
+    ? columnsOf(layout, root)
+    : columnsReducer(columnsOf(layout, root), { kind: "sync", index, lanes })
 
 /**
  * Where a column is, by its key: a new tab's, or a root's, whether or not
@@ -237,6 +252,7 @@ export function layoutReducer(state: Layout, action: LayoutAction): Layout {
           {
             key: action.key,
             anchor: null,
+            thread: action.thread,
             fresh: {
               root: action.root,
               ...(action.prefill === undefined
@@ -460,10 +476,10 @@ export function planOpen(
 ): OpenPlan | null {
   const root = rootOf(index, id)
   if (root === null) return null
-  const columns = columnsOf(layout, root)
+  const columns = drawnColumns(layout, root, index, [])
   const views = projectColumns(
     index,
-    columns.map(c => ({ anchor: c.anchor, anchored: isAnchored(c) })),
+    columns.map(c => ({ anchor: c.anchor })),
   )
   const paths = views.map(v =>
     v.tipId === null ? new Set<EntryId>() : pathIds(index, v.tipId),
@@ -478,19 +494,21 @@ export function planOpen(
 // Kept per browser tab through `tab-state.ts`. Built field by field both ways,
 // so a field the schema does not name is never stored or restored.
 // `fresh.pending` is one: restoring it would send its message again.
-// `fresh.prefill` is stored: only `pending` is sent on opening. `reserved` is
-// stored, so a reload keeps the thread's name (ADR-0057). It is optional, so
-// a v4 layout stored without it still decodes. So are the reader's settings,
-// `density` and `details`, kept so a reload shows the column as it was left.
+// `fresh.prefill` is stored: only `pending` is sent on opening. `thread` is
+// stored, so a reload keeps a fresh column's thread and its name (ADR-0057,
+// ADR-0117). The reader's settings, `density` and `details`, are kept so a
+// reload shows the column as it was left.
+
+/** A thread's id as stored: `isThreadId`'s pattern. */
+const StoredThread = Type.Unsafe<ThreadId>(
+  Type.String({ pattern: THREAD_PATTERN }),
+)
 
 const StoredColumn = Type.Object({
   key: Type.String(),
   anchor: Type.Union([Type.String(), Type.Null()]),
-  lane: Type.Optional(Type.String()),
-  reserved: Type.Optional(Type.String()),
+  thread: Type.Optional(StoredThread),
   asksAgent: Type.Optional(Type.Literal(true)),
-  // Optional, with no new `v`: absent is story, so a layout stored before
-  // densities decodes, and no one's tabs are dropped for it (ADR-0106).
   density: Type.Optional(
     Type.Union([
       Type.Literal("outline"),
@@ -498,7 +516,6 @@ const StoredColumn = Type.Object({
       Type.Literal("raw"),
     ]),
   ),
-  // Optional too, and for the same reason: absent is closed (ADR-0073).
   details: Type.Optional(Type.Literal(true)),
   fresh: Type.Optional(
     Type.Object({
@@ -523,11 +540,10 @@ const StoredHere = Type.Union([
 
 /**
  * `v` changes when the shape does; an older layout is dropped, not migrated.
- * `v: 5` (ADR-0122): the sidebar left for your own document, and the board's
- * state came in.
+ * `v: 6` (ADR-0117): a column names its thread, not a lane or a reserved id.
  */
 const StoredLayout = Type.Object({
-  v: Type.Literal(5),
+  v: Type.Literal(6),
   active: Type.Union([StoredHere, Type.Null()]),
   roots: Type.Record(Type.String(), Type.Array(StoredColumn, { minItems: 1 })),
   newTabs: Type.Array(StoredColumn),
@@ -539,8 +555,7 @@ type Stored = Static<typeof StoredColumn>
 const toStored = (c: Column): Stored => ({
   key: c.key,
   anchor: c.anchor,
-  ...(c.lane === undefined ? {} : { lane: c.lane }),
-  ...(c.reserved === undefined ? {} : { reserved: c.reserved }),
+  ...(c.thread === undefined ? {} : { thread: c.thread }),
   ...(c.asksAgent ? { asksAgent: true } : {}),
   ...(c.density === undefined ? {} : { density: c.density }),
   ...(c.details ? { details: true } : {}),
@@ -564,56 +579,51 @@ const toStored = (c: Column): Stored => ({
 })
 
 /**
- * A stored column. A new tab keeps its root (`newTab`); `mintRoot` gives
- * one to a new tab stored before it had one, and is null for a root's
- * columns, whose root is their tab's.
+ * A stored column, or undefined for one that cannot be restored: a fresh
+ * column with no thread to start, or a new tab's with no root of its own
+ * (`newTab`). `newTab` says which this is: a root's fresh column takes its
+ * tab's root.
  */
-const fromStored = (s: Stored, mintRoot: (() => RootId) | null): Column => ({
-  key: s.key,
-  anchor: s.anchor === null ? null : entryId(s.anchor),
-  // Unrecognised, it is left off: `sync` binds the column again once its tip
-  // is exactly one lane's.
-  ...(s.lane !== undefined && isLaneName(s.lane) ? { lane: s.lane } : {}),
-  ...reservedFromStored(s.reserved),
-  ...(s.asksAgent ? { asksAgent: true } : {}),
-  ...(s.density === undefined ? {} : { density: s.density }),
-  ...(s.details ? { details: true } : {}),
-  ...(s.fresh === undefined
-    ? {}
-    : {
-        fresh: {
-          ...(s.fresh.sendId === undefined ? {} : { sendId: s.fresh.sendId }),
-          ...(mintRoot === null
-            ? {}
-            : {
-                root:
-                  (s.fresh.root === undefined
-                    ? undefined
-                    : parseNewRoot(s.fresh.root)) ?? mintRoot(),
-              }),
-          ...(s.fresh.state !== undefined && isWorkflowStateId(s.fresh.state)
-            ? { state: s.fresh.state }
-            : {}),
-          ...(s.fresh.prefill === undefined
-            ? {}
-            : {
-                prefill: {
-                  text: s.fresh.prefill.text,
-                  blank: s.fresh.prefill.blank,
-                },
-              }),
-        },
-      }),
-})
-
-/** A stored reservation, kept only in the shape the host accepts. */
-const reservedFromStored = (stored: string | undefined) => {
-  const reserved = stored === undefined ? undefined : parseNewLane(stored)
-  return reserved === undefined ? {} : { reserved }
+const fromStored = (s: Stored, newTab: boolean): Column | undefined => {
+  const { thread } = s
+  const root =
+    s.fresh?.root === undefined ? undefined : parseNewRoot(s.fresh.root)
+  if (
+    s.fresh !== undefined &&
+    (thread === undefined || (newTab && root === undefined))
+  )
+    return undefined
+  return {
+    key: s.key,
+    anchor: s.anchor === null ? null : entryId(s.anchor),
+    ...(thread === undefined ? {} : { thread }),
+    ...(s.asksAgent ? { asksAgent: true } : {}),
+    ...(s.density === undefined ? {} : { density: s.density }),
+    ...(s.details ? { details: true } : {}),
+    ...(s.fresh === undefined
+      ? {}
+      : {
+          fresh: {
+            ...(s.fresh.sendId === undefined ? {} : { sendId: s.fresh.sendId }),
+            ...(newTab && root !== undefined ? { root } : {}),
+            ...(s.fresh.state !== undefined && isWorkflowStateId(s.fresh.state)
+              ? { state: s.fresh.state }
+              : {}),
+            ...(s.fresh.prefill === undefined
+              ? {}
+              : {
+                  prefill: {
+                    text: s.fresh.prefill.text,
+                    blank: s.fresh.prefill.blank,
+                  },
+                }),
+          },
+        }),
+  }
 }
 
 export const encodeLayout = (layout: Layout): Static<typeof StoredLayout> => ({
-  v: 5,
+  v: 6,
   active: layout.active,
   roots: Object.fromEntries(
     [...layout.roots].map(([root, columns]) => [root, columns.map(toStored)]),
@@ -622,29 +632,37 @@ export const encodeLayout = (layout: Layout): Static<typeof StoredLayout> => ({
   board: layout.board,
 })
 
+/** Every column restored, or undefined when any cannot be. */
+const allStored = (
+  stored: readonly Stored[],
+  newTab: boolean,
+): readonly Column[] | undefined => {
+  const columns = stored.map(c => fromStored(c, newTab))
+  return columns.every(c => c !== undefined) ? columns : undefined
+}
+
 /**
  * A stored layout, whole or not at all: only this build writes it, so a
- * half-valid one is not worth keeping. Total. `mintRoot` mints a root for a
- * new tab stored without one.
+ * half-valid one is not worth keeping. Total.
  */
-export const decodeLayout = (
-  raw: unknown,
-  mintRoot: () => RootId,
-): Layout | undefined =>
-  Value.Check(StoredLayout, raw)
-    ? {
-        active:
-          raw.active?.kind === "root"
-            ? { kind: "root", root: entryId(raw.active.root) }
-            : raw.active,
-        open: [],
-        roots: new Map(
-          Object.entries(raw.roots).map(([root, columns]) => [
-            entryId(root),
-            columns.map(c => fromStored(c, null)),
-          ]),
-        ),
-        newTabs: raw.newTabs.map(c => fromStored(c, mintRoot)),
-        board: raw.board,
-      }
-    : undefined
+export function decodeLayout(raw: unknown): Layout | undefined {
+  if (!Value.Check(StoredLayout, raw)) return undefined
+  const roots = new Map<EntryId, readonly Column[]>()
+  for (const [root, stored] of Object.entries(raw.roots)) {
+    const columns = allStored(stored, false)
+    if (columns === undefined) return undefined
+    roots.set(entryId(root), columns)
+  }
+  const newTabs = allStored(raw.newTabs, true)
+  if (newTabs === undefined) return undefined
+  return {
+    active:
+      raw.active?.kind === "root"
+        ? { kind: "root", root: entryId(raw.active.root) }
+        : raw.active,
+    open: [],
+    roots,
+    newTabs,
+    board: raw.board,
+  }
+}

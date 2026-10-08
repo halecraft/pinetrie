@@ -4,10 +4,10 @@ import {
   type EntryId,
   entryId,
   indexAsks,
-  laneNameForThread,
   type RevisionRecord,
   type Sha256,
   type SpineNode,
+  threadIdFor,
 } from "@pinetrie/core"
 import type { ReviewTarget } from "@pinetrie/interface"
 import { entry, indexOf } from "@pinetrie/interface/fixtures"
@@ -32,7 +32,7 @@ import {
 } from "./pane.ts"
 
 const SHA = "a".repeat(64) as Sha256
-const lane = laneNameForThread("x")
+const lane = threadIdFor("x")
 const target: ReviewTarget = {
   lane,
   spans: [{ kind: "range", from: commitId("a0"), to: commitId("a1") }],

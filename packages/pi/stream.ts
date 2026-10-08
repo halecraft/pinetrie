@@ -3,7 +3,7 @@
 // and why the end events are not, is in `TECHNICAL.md`, "Streaming".
 
 import type { HarnessEvent } from "@earendil-works/pi-agent-core"
-import { isLaneName, type StreamEvent } from "@pinetrie/core"
+import { isThreadId, type StreamEvent } from "@pinetrie/core"
 
 /** The harness events a stream is made of. */
 export const STREAM_SOURCES = [
@@ -35,7 +35,7 @@ function firstText(result: unknown): string {
  */
 export function streamEventOf(event: StreamSource): StreamEvent | null {
   const lane = event.lane
-  if (!isLaneName(lane)) return null
+  if (!isThreadId(lane)) return null
   switch (event.type) {
     case "message_update": {
       const inner = event.event

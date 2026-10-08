@@ -6,8 +6,8 @@
 import {
   type EntryId,
   firstLine,
-  type LaneName,
   messageText,
+  type ThreadId,
   type ThreadName,
   type TreeIndex,
   type WriterId,
@@ -71,7 +71,7 @@ export interface InboxMenuProps {
   readonly mentions: readonly InboxItem[]
   readonly inbox: InboxSeen
   readonly thread: ThreadRow
-  readonly names: ReadonlyMap<LaneName, ThreadName>
+  readonly names: ReadonlyMap<ThreadId, ThreadName>
   readonly labelOf: (root: EntryId) => string
   readonly nameOf: ReadonlyMap<WriterId, string>
   readonly onOpen: (id: EntryId, root: EntryId) => void

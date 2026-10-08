@@ -20,6 +20,7 @@ import type { RecordSpec } from "./records.ts"
 import { ROOT } from "./roots.ts"
 import { SEAT } from "./seat.ts"
 import { STOP } from "./stop.ts"
+import { THREAD } from "./thread.ts"
 import { VERDICT } from "./verdict.ts"
 import { LANE, PROJECT, REVISION } from "./work.ts"
 
@@ -46,6 +47,7 @@ export const RECORD_SPECS: readonly AnyRecordSpec[] = [
   PICTURE,
   PROJECT,
   QUEUE_HOLD,
+  THREAD,
   REVISION,
   ROOT,
   SEAT,

@@ -3,13 +3,13 @@
 
 import {
   type EntryId,
-  type LaneName,
   type LaneRecord,
   NO_TEXT,
   parseTitle,
   type RootId,
   type RootRecord,
   type RootSummary,
+  type ThreadId,
 } from "@pinetrie/core"
 
 export { NO_TEXT }
@@ -85,7 +85,7 @@ export const CHAT_LABEL = "Chat"
  */
 export function labelsOf(
   directory: ReadonlyMap<RootId, RootRecord>,
-  lanes: ReadonlyMap<LaneName, LaneRecord>,
+  lanes: ReadonlyMap<ThreadId, LaneRecord>,
 ): ReadonlyMap<EntryId, string> {
   const worked = new Set([...lanes.values()].map(l => l.root))
   return new Map(

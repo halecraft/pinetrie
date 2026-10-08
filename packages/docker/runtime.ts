@@ -5,8 +5,8 @@
 import { createHash } from "node:crypto"
 import { readFile } from "node:fs/promises"
 import path from "node:path"
-import type { LaneName } from "@pinetrie/core"
 import {
+  type LaneOwner,
   type LaneRuntime,
   planContainer,
   SPEC_LABEL,
@@ -80,7 +80,7 @@ export interface DockerRuntime extends LaneRuntime {
    * pre-docker: a host command that reads a tar on its stdin into `lane`'s
    * disk, which must exist (`create`).
    */
-  importArgv(lane: LaneName): readonly string[]
+  importArgv(lane: LaneOwner): readonly string[]
   /**
    * The project's grant of the host's ports (`lanes.hostPorts`), in the
    * lane VM's firewall, replacing the last. False where the target has no

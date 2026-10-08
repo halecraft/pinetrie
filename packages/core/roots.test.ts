@@ -4,10 +4,10 @@ import {
   entryId,
   indexTree,
   type LaneView,
-  laneNameForThread,
   projectRail,
   rootWork,
   summarizeRoots,
+  threadIdFor,
   type WriterId,
   writerId,
 } from "./index.ts"
@@ -33,7 +33,7 @@ const entries = entriesOf([
 const index = indexTree(entries)
 
 const lane = (tip: string | null, over: Partial<LaneView> = {}): LaneView => ({
-  name: laneNameForThread(tip ?? "none"),
+  name: threadIdFor(tip ?? "none"),
   tip: tip === null ? null : entryId(tip),
   running: false,
   waiting: 0,

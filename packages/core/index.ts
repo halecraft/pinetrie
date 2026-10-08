@@ -90,47 +90,68 @@ export const emailLocalPart = (writer: WriterId): string => {
   return at < 0 ? email : email.slice(0, at)
 }
 
-declare const laneNameBrand: unique symbol
+declare const threadIdBrand: unique symbol
 /**
- * A thread's lane: a line of work (ADR-0019), never moved (ADR-0120). Its id
- * can exist before the lane does: a column reserves it, and the thread is
- * named under it (ADR-0057). `laneNameForThread()` and `parseNewLane()` mint
- * one, and every reader of a stored or sent name checks it with `isLaneName()`,
- * so no writer's id or `"main"` is one.
+ * A thread's id (ADR-0117): `t-` and a uuidv7, minted by the column that opens
+ * the thread, before anything is written (ADR-0057). It also names the
+ * thread's lane, when it has one (ADR-0120): a lane has no id of its own, so
+ * no lane can be named by anything but a thread. `newThreadId()` mints one
+ * (`@pinetrie/session`), `parseNewThread()` checks one a client sends, and
+ * every reader of a stored one checks it with `isThreadId()`, so no writer's
+ * id or `"main"` is one. `threadIdFor()` is for fixtures and parsers alone:
+ * Biome refuses its import elsewhere.
  */
-export type LaneName = string & { readonly [laneNameBrand]: true }
+export type ThreadId = string & { readonly [threadIdBrand]: true }
 
-const LANE_PREFIX = "t-"
+const THREAD_PREFIX = "t-"
 
-/** A new thread lane's name, from a fresh coordination-free id. */
-export const laneNameForThread = (id: string): LaneName =>
-  `${LANE_PREFIX}${id}` as LaneName
-
-/**
- * A lane name as a regular expression's source: the prefix and at least one
- * character more. `@pinetrie/rules`' `LaneNameSchema` checks stored lanes
- * with it, so a schema and `isLaneName` cannot disagree.
- */
-export const LANE_PATTERN = `^${LANE_PREFIX}[\\s\\S]`
-
-const LANE_RE = new RegExp(LANE_PATTERN)
+/** A thread's id from the text after its prefix. */
+export const threadIdFor = (id: string): ThreadId =>
+  `${THREAD_PREFIX}${id}` as ThreadId
 
 /**
- * Whether text names a thread's lane: the check wherever a lane name is read,
- * in the codec, the schema's readers, `@pinetrie/rules`' decoders and the pi adapter.
+ * A thread's id as a regular expression's source: the prefix and at least
+ * one character more. `@pinetrie/rules`' `ThreadIdSchema` checks stored ids
+ * with it, so a schema and `isThreadId` cannot disagree.
  */
-export const isLaneName = (s: string): s is LaneName => LANE_RE.test(s)
+export const THREAD_PATTERN = `^${THREAD_PREFIX}[\\s\\S]`
 
-const NEW_LANE =
+const THREAD_RE = new RegExp(THREAD_PATTERN)
+
+/**
+ * Whether text names a thread: the check wherever a thread's id, or a lane
+ * named by one, is read, in the codec, the schema's readers,
+ * `@pinetrie/rules`' decoders and the pi adapter.
+ */
+export const isThreadId = (s: string): s is ThreadId => THREAD_RE.test(s)
+
+const NEW_THREAD =
   /^t-[0-9a-f]{8}-[0-9a-f]{4}-7[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
 
 /**
- * A new thread's lane id as a client makes it, `t-` and a lowercase uuidv7;
- * undefined for anything else. Stricter than `isLaneName`: a lane's
- * container and volume are named after its id (ADR-0057).
+ * A new thread's id as a client makes it, `t-` and a lowercase uuidv7;
+ * undefined for anything else. Stricter than `isThreadId`: a lane's
+ * container and volume are named after its thread's id (ADR-0057).
  */
-export const parseNewLane = (s: string): LaneName | undefined =>
-  NEW_LANE.test(s) ? (s as LaneName) : undefined
+export const parseNewThread = (s: string): ThreadId | undefined =>
+  NEW_THREAD.test(s) ? (s as ThreadId) : undefined
+
+/**
+ * A thread as the host records it, keyed by its id in the session
+ * (`pinetrie.thread`, ADR-0117), written with its first message. Its first
+ * entry and its end are the tree's: its first message names it
+ * (`ChatDetails.starts`).
+ */
+export interface ThreadRecord {
+  readonly thread: ThreadId
+  readonly root: RootId
+  /** Who started it. */
+  readonly by: WriterId
+  /** When, in ms since the epoch. */
+  readonly createdAt: number
+  /** A copy's fork entry, before its first message is written; else null. */
+  readonly fork: EntryId | null
+}
 
 declare const rootIdBrand: unique symbol
 /**
@@ -287,11 +308,11 @@ export const ERR = {
   /** A display name is empty or too long. */
   INVALID_NAME: "invalid_name",
   /**
-   * A write in a root in the closed workflow state (ADR-0029, ADR-0122). The
+   * A write in a root in the archive (ADR-0029, ADR-0122). The
    * message names who moved it there.
    */
   ARCHIVED: "archived",
-  /** Moving a root into the closed state while its agent works or cards are queued. */
+  /** Moving a root into the archive while its agent works or cards are queued. */
   ROOT_BUSY: "root_busy",
   /**
    * Moving a root from a state it has left (ADR-0122). The message names who
@@ -302,8 +323,8 @@ export const ERR = {
   UNKNOWN_STATE: "unknown_state",
   /** Removing a workflow state that still holds a root (ADR-0122). */
   STATE_NOT_EMPTY: "state_not_empty",
-  /** Moving or removing the closed workflow state (ADR-0122). */
-  STATE_CLOSED: "state_closed",
+  /** Moving or removing the archive (ADR-0122). */
+  STATE_ARCHIVE: "state_archive",
   /** A workflow state named with nothing but spaces (ADR-0122). */
   EMPTY_NAME: "empty_name",
   /** Removing the only open workflow state: a new root needs one to land in. */
@@ -407,15 +428,38 @@ export type ValueWrite =
 /**
  * How a client's message means to join the tree.
  *
- * - `reply`: continue the thread I am reading; I saw it end at `at`. If
- *   another writer compelled the agent there since, that is a race, and the
- *   sender is told (`conflict`) rather than guessed for.
- * - `branch`: start a thread at `at`, the root or any message. Every thread
+ * - `reply`: continue the thread I am reading. If another writer compelled
+ *   the agent there since I saw it, that is a race, and the sender is told
+ *   (`conflict`) rather than guessed for.
+ * - `branch`: start a thread, at the root or any message. Every thread
  *   starts this way, and a branch never continues an existing lane: a
  *   compelled one is a new line of work (ADR-0021).
  */
 export type ChatMode = "reply" | "branch"
-export const CHAT_MODES: readonly ChatMode[] = ["reply", "branch"]
+
+/**
+ * Where a message goes (ADR-0117). A send at a thread's `end` names the
+ * thread and the entry its sender saw as its end; the host finds the end
+ * (`threadEnd`). A `branch` names the new thread the sender's column minted
+ * and where it forks: an entry, or null for a thread at the root. So no send
+ * can land anywhere but a thread's end without starting a thread, and no
+ * thread's end ever gets two continuations.
+ */
+export type ChatAt =
+  | {
+      readonly kind: "end"
+      readonly thread: ThreadId
+      readonly seen: EntryId
+    }
+  | {
+      readonly kind: "branch"
+      readonly thread: ThreadId
+      readonly at: EntryId | null
+    }
+
+/** A send's mode, from where it goes. */
+export const modeOf = (at: ChatAt): ChatMode =>
+  at.kind === "end" ? "reply" : "branch"
 
 /**
  * How the host plans a message: a client's mode, or `queue`, for a queued
@@ -424,6 +468,18 @@ export const CHAT_MODES: readonly ChatMode[] = ["reply", "branch"]
  * client never sends it: it queues a card instead.
  */
 export type PlanMode = ChatMode | "queue"
+
+/**
+ * Where the host sends a message: where a client's goes (`ChatAt`), or the
+ * end of the thread whose queued card it pops.
+ */
+export type SendAt =
+  | ChatAt
+  | { readonly kind: "queue"; readonly thread: ThreadId }
+
+/** How the host plans a send, from where it goes. */
+export const planModeOf = (at: SendAt): PlanMode =>
+  at.kind === "queue" ? "queue" : modeOf(at)
 
 /**
  * A command whose SHAPE is already known to be valid. The protocol codec
@@ -437,14 +493,11 @@ export type Intent =
       readonly kind: "chat"
       readonly text: string
       /**
-       * The root it is written in (ADR-0063), with `at` a `Spot`: a new one
-       * the sender's tab minted for a thread at the root.
+       * The root it is written in (ADR-0063): a new one the sender's tab
+       * minted for a thread at the root.
        */
       readonly root: RootId
-      readonly at: Position
-      readonly mode: ChatMode
-      /** The lane the sender's column is bound to: its thread, named. */
-      readonly lane: LaneName | null
+      readonly at: ChatAt
       /** A Start Agent column: with no mention, the agent is asked. */
       readonly asksAgent: boolean
       readonly mentions: readonly Mention[]
@@ -459,11 +512,6 @@ export type Intent =
        */
       readonly pinned: readonly SentCard[]
       /**
-       * The lane id the sender's column reserved: the id a lane this message
-       * creates is created under, unless pi holds it (ADR-0057).
-       */
-      readonly reserved: LaneName | null
-      /**
        * The WIP bookmark a lane this message creates starts from; null for the
        * line (ADR-0104). Read only when the message creates a lane.
        */
@@ -475,22 +523,22 @@ export type Intent =
       readonly state: WorkflowStateId | null
     }
   /** Name a thread before its lane exists (ADR-0057). */
-  | { readonly kind: "reserve"; readonly lane: LaneName }
+  | { readonly kind: "reserve"; readonly lane: ThreadId }
   /** Set the sender's display name: a label, never an identity. */
   | { readonly kind: "name"; readonly name: string }
   /** Set the sender's picture to a stored blob, or with null remove it (ADR-0098). */
   | { readonly kind: "picture"; readonly sha256: Sha256 | null }
   /** End a thread's running turn. Idempotent: an idle lane is already stopped. */
-  | { readonly kind: "stop"; readonly lane: LaneName }
+  | { readonly kind: "stop"; readonly lane: ThreadId }
   /** Start a new turn on a thread whose last ask was stopped (ADR-0082). */
-  | { readonly kind: "carry-on"; readonly lane: LaneName }
+  | { readonly kind: "carry-on"; readonly lane: ThreadId }
   /**
    * Hold a thread's queue, or release it (ADR-0048 step 7): while it is
    * held, no message card queued there is popped.
    */
   | {
       readonly kind: "queue-hold"
-      readonly lane: LaneName
+      readonly lane: ThreadId
       readonly held: boolean
     }
   /**
@@ -507,7 +555,7 @@ export type Intent =
       readonly command: CardCommand | null
     }
   /** Take every message card queued on a thread back below the line. */
-  | { readonly kind: "unqueue-all"; readonly lane: LaneName }
+  | { readonly kind: "unqueue-all"; readonly lane: ThreadId }
   /**
    * Make a text card a thread (ADR-0111): a conversation root, the one its
    * move names (`spun`), whose first message is the card's text, in
@@ -520,7 +568,7 @@ export type Intent =
     }
   /**
    * Move a root on the board (ADR-0122): from the state its sender saw it in,
-   * to `to`, before `before` there, or at its end. Into the closed state it
+   * to `to`, before `before` there, or at its end. Into the archive it
    * archives the root, and out of it restores the root.
    */
   | {
@@ -549,7 +597,7 @@ export type Intent =
    */
   | {
       readonly kind: "offer"
-      readonly lane: LaneName
+      readonly lane: ThreadId
       readonly action: OfferAction
       readonly to: string | null
       readonly seen: OfferSeen | null
@@ -617,12 +665,12 @@ export interface WorkflowState {
 
 /**
  * The session's workflow: a host-written `pinetrie.workflow` singleton. The
- * open states in board order, then the one closed state, which is always
- * there and always last: a root in it is archived (ADR-0029).
+ * open states in board order, then the archive, which is always there
+ * and always last: a root in it is archived (ADR-0029).
  */
 export interface Workflow {
   readonly open: readonly WorkflowState[]
-  readonly closed: WorkflowState
+  readonly archive: WorkflowState
 }
 
 /**
@@ -659,7 +707,7 @@ export interface BoardPlace {
 }
 
 /**
- * A root in the closed state, derived from its place and never stored: who
+ * A root in the archive, derived from its place and never stored: who
  * moved it there, and when. Its readers ask only whether a root is archived,
  * and by whom.
  */
@@ -697,7 +745,7 @@ export interface RootRecord {
    * tip, in order of first message: its followers (ADR-0077). A record
    * written before the field holds none.
    */
-  readonly threads: Readonly<Record<LaneName, readonly WriterId[]>>
+  readonly threads: Readonly<Record<ThreadId, readonly WriterId[]>>
   /** Its chats that name someone (`@`), for the inbox to resolve. */
   readonly mentions: readonly {
     readonly id: EntryId
@@ -742,7 +790,7 @@ export interface StopRecord {
  * there no message card is popped, only facts, until someone releases it.
  */
 export interface QueueHold {
-  readonly lane: LaneName
+  readonly lane: ThreadId
   readonly by: WriterId
   /** When it was held, in ms since the epoch. */
   readonly at: number
@@ -794,7 +842,7 @@ export type Verdict =
 
 /** A thread's last run's verdict: a session record keyed by its lane. */
 export interface VerdictRecord {
-  readonly lane: LaneName
+  readonly lane: ThreadId
   /** The run's prompt. */
   readonly ask: EntryId
   /**
@@ -864,7 +912,7 @@ export type ThreadBase =
 /** The thread a lane's copy was cloned from, by its lane and its name (ADR-0072). */
 export interface ParentThread {
   readonly kind: "parent"
-  readonly lane: LaneName
+  readonly lane: ThreadId
   readonly name: ThreadName
 }
 
@@ -982,7 +1030,7 @@ export const BASE_SNAPSHOT = snapshotId("base")
  * a lane's files would stop matching its conversation (ADR-0032).
  */
 export interface LaneRecord {
-  readonly lane: LaneName
+  readonly lane: ThreadId
   /** The root the lane works in (ADR-0063). */
   readonly root: RootId
   /**
@@ -1003,7 +1051,7 @@ export interface LaneRecord {
  */
 export interface RevisionRecord {
   readonly entry: EntryId
-  readonly lane: LaneName
+  readonly lane: ThreadId
   /** The turn's commit; null when nothing tracked changed, or the lane has no copy of its own. */
   readonly commit: CommitId | null
   /**
@@ -1040,7 +1088,7 @@ export interface ProjectRecord {
  * (`RevisionReview`, ADR-0047).
  */
 export interface OfferRecord {
-  readonly lane: LaneName
+  readonly lane: ThreadId
   /** Its revisions: 1 for a single offer, more for a stack. */
   readonly size: number
   /** The lane turned since the stack was made: it no longer holds all of it. */
@@ -1192,7 +1240,7 @@ export type ThreadName = string & { readonly [threadNameBrand]: true }
 
 /** A lane's name: a host-written `pinetrie.name` value keyed by the lane (ADR-0039). */
 export interface NameRecord {
-  readonly lane: LaneName
+  readonly lane: ThreadId
   readonly name: ThreadName
   readonly at: number
 }
@@ -1203,7 +1251,7 @@ export interface NameRecord {
  * no longer referenced, and the blob sweep deletes it.
  */
 export interface BannerRecord {
-  readonly lane: LaneName
+  readonly lane: ThreadId
   readonly sha: Sha256
   readonly at: number
 }
@@ -1288,7 +1336,7 @@ export interface AcceptedRecord {
  * forked from when it has none.
  */
 export interface BaseRecord {
-  readonly lane: LaneName
+  readonly lane: ThreadId
   readonly base: ThreadBase
   readonly start: CommitId
   /** A WIP base: on accepted work now (landed), gone without landing, or neither. */
@@ -1364,7 +1412,7 @@ export const isCatchUp = (command: CardCommand): command is CatchUpCommand =>
 export type OfferFact =
   | {
       readonly kind: "accepted"
-      readonly lane: LaneName
+      readonly lane: ThreadId
       readonly by: WriterId
       /** The change id the offer was added as. */
       readonly as: string
@@ -1373,7 +1421,7 @@ export type OfferFact =
     }
   | {
       readonly kind: "described" | "squashed" | "refreshed"
-      readonly lane: LaneName
+      readonly lane: ThreadId
       readonly by: WriterId
     }
 
@@ -1397,9 +1445,9 @@ export const commandOf = (card: {
 
 /**
  * Where a card is (ADR-0113). Composing: your message, in your composer at a
- * thread's end, which only you see; kept as a send carries it (where it
- * started, and its column's lane) and resolved through `threadOf` whenever
- * it is needed, so it follows its thread as the thread grows. Note: below
+ * thread's end, which only you see; kept as where it started, and resolved
+ * to its thread's end (`placeEnd`) whenever it is needed, so it follows its
+ * thread as the thread grows. Note: below
  * the line at a thread's end, shared, kept and resolved as a composing card
  * is. Pinned: at the top of a thread's column, kept and resolved the same
  * way; the agent reads it on every run. Queued: above the line, waiting for
@@ -1415,14 +1463,14 @@ export type CardPlace =
       /** The root its thread is in (ADR-0063), with `at` a `Spot`. */
       readonly root: RootId
       readonly at: Position
-      readonly lane: LaneName | null
+      readonly lane: ThreadId | null
     }
   | {
       readonly kind: "note"
       /** The root its thread is in (ADR-0063), with `at` a `Spot`. */
       readonly root: RootId
       readonly at: Position
-      readonly lane: LaneName | null
+      readonly lane: ThreadId | null
       /**
        * Its cell on the thread's notes board (`NOTES_GRID`, ADR-0113); null
        * for none yet: a move's target asking the host for the first empty
@@ -1435,7 +1483,7 @@ export type CardPlace =
       /** The root its thread is in (ADR-0063), with `at` a `Spot`. */
       readonly root: RootId
       readonly at: Position
-      readonly lane: LaneName | null
+      readonly lane: ThreadId | null
       /** Sorts the thread's pinned cards, in the order they were pinned. */
       readonly order: string
     }
@@ -1445,7 +1493,7 @@ export type CardPlace =
       readonly root: RootId
       /** Where it was queued: an unqueue puts it back here. */
       readonly at: Position
-      readonly lane: LaneName
+      readonly lane: ThreadId
       /** Sorts the lane's queue; ties go by id (S69). */
       readonly order: string
       /** Who queued it: its message's author. */
@@ -1490,7 +1538,12 @@ export type CardPlace =
  */
 export type GoneWhy =
   | { readonly kind: "discarded" }
-  | { readonly kind: "spun"; readonly thread: RootId }
+  /** Spun into a new root, `into`, as the first message of `thread`. */
+  | {
+      readonly kind: "spun"
+      readonly into: RootId
+      readonly thread: ThreadId
+    }
 
 /**
  * The card a chat is sent from, with its text's version as its sender had it
@@ -1578,7 +1631,9 @@ export function sameKey(a: PlaceKey, b: PlaceKey): boolean {
         a.root === b.root &&
         a.why.kind === b.why.kind &&
         (a.why.kind !== "spun" ||
-          (b.why.kind === "spun" && a.why.thread === b.why.thread))
+          (b.why.kind === "spun" &&
+            a.why.into === b.why.into &&
+            a.why.thread === b.why.thread))
       )
   }
 }
@@ -1695,9 +1750,9 @@ export const pinnedOf = (place: CardPlace | PlaceKey): PlaceKey | null =>
  * root its thread is in. Undefined for a card at no thread.
  */
 export function queueRoot(
-  lane: LaneName,
+  lane: ThreadId,
   card: CardRecord,
-  lanes: ReadonlyMap<LaneName, LaneRecord>,
+  lanes: ReadonlyMap<ThreadId, LaneRecord>,
 ): RootId | undefined {
   const own =
     card.place.kind === "composing" ||
@@ -1832,8 +1887,8 @@ export function placeFields(place: CardPlace | PlaceKey): PlaceFields {
         kind: place.why.kind,
         root: place.root ?? "",
         at: "",
-        lane: "",
-        column: place.why.kind === "spun" ? place.why.thread : "",
+        lane: place.why.kind === "spun" ? place.why.thread : "",
+        column: place.why.kind === "spun" ? place.why.into : "",
         order: "",
         by: "",
         seen: "",
@@ -1845,8 +1900,8 @@ export function placeFields(place: CardPlace | PlaceKey): PlaceFields {
 /** A gone place's stored kind -> why it is gone; undefined for a spun one with no thread. */
 const goneWhyOf = (f: PlaceFields): GoneWhy | undefined =>
   f.kind === "spun"
-    ? isRootId(f.column)
-      ? { kind: "spun", thread: f.column }
+    ? isRootId(f.column) && isThreadId(f.lane)
+      ? { kind: "spun", into: f.column, thread: f.lane }
       : undefined
     : { kind: "discarded" }
 
@@ -1903,7 +1958,7 @@ export function placeOfFields(f: PlaceFields): CardPlace | undefined {
             kind: "composing",
             root: f.root,
             at: atEntry(entryId(f.at)),
-            lane: isLaneName(f.lane) ? f.lane : null,
+            lane: isThreadId(f.lane) ? f.lane : null,
           }
     case "note": {
       const cell = cellOfOrder(f.order)
@@ -1913,7 +1968,7 @@ export function placeOfFields(f: PlaceFields): CardPlace | undefined {
             kind: "note",
             root: f.root,
             at: atEntry(entryId(f.at)),
-            lane: isLaneName(f.lane) ? f.lane : null,
+            lane: isThreadId(f.lane) ? f.lane : null,
             cell,
           }
     }
@@ -1924,13 +1979,13 @@ export function placeOfFields(f: PlaceFields): CardPlace | undefined {
             kind: "pinned",
             root: f.root,
             at: atEntry(entryId(f.at)),
-            lane: isLaneName(f.lane) ? f.lane : null,
+            lane: isThreadId(f.lane) ? f.lane : null,
             order: f.order,
           }
     case "queued":
       return f.at === "" ||
         !isRootId(f.root) ||
-        !isLaneName(f.lane) ||
+        !isThreadId(f.lane) ||
         f.order === "" ||
         f.by === ""
         ? undefined
@@ -1961,7 +2016,7 @@ export function keyOfFields(f: PlaceFields): PlaceKey | undefined {
           kind: "pinned",
           root: f.root,
           at: atEntry(entryId(f.at)),
-          lane: isLaneName(f.lane) ? f.lane : null,
+          lane: isThreadId(f.lane) ? f.lane : null,
         }
   if (f.kind === "discarded" || f.kind === "spun") {
     const why = goneWhyOf(f)
@@ -1970,7 +2025,7 @@ export function keyOfFields(f: PlaceFields): PlaceKey | undefined {
       : { kind: "gone", root: f.root === "" ? null : f.root, why }
   }
   if (f.kind !== "queued") return placeOfFields(f)
-  return f.at === "" || !isRootId(f.root) || !isLaneName(f.lane)
+  return f.at === "" || !isRootId(f.root) || !isThreadId(f.lane)
     ? undefined
     : {
         kind: "queued",
@@ -2222,7 +2277,7 @@ export function normalizeName(name: string): string | undefined {
  * A deleted `LocalSeq` brand used to be credited with this. It could never
  * have worked: brands constrain how a value is CREATED, while the risk for seq
  * is how it is SERIALIZED, and a branded number drops into any `number` field
- * with no error. Contrast `LaneName`, where creation IS the danger (a writer's
+ * with no error. Contrast `ThreadId`, where creation IS the danger (a writer's
  * id or "main" used as a lane, ADR-0120) and the brand therefore does real
  * work.
  */

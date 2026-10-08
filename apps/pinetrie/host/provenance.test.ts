@@ -3,23 +3,23 @@ import {
   type CardPlace,
   cardId,
   entryId,
-  laneNameForThread,
   PLAIN,
   rootIdFor,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { newPresenceDoc } from "@pinetrie/schema"
 import { writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
-import { applyWrites, basics, ROOT_ID, row } from "./fakes.ts"
+import { applyWrites, basics, ROOT_ID, threadRow } from "./fakes.ts"
 import { applyPlaceSteps } from "./places.ts"
 import { createProvenance } from "./provenance.ts"
 
 test("before: a shared card's thread end in a loaded root; none for a root not loaded, or a card in an inventory", () => {
   const b = basics()
   const E1 = entryId("e-1")
-  const LANE = laneNameForThread("0123456789abcdef")
-  writeEntry(b.root, row(E1, null))
+  const LANE = threadIdFor("0123456789abcdef")
+  writeEntry(b.root, threadRow(E1, null, LANE))
   writeLaneTip(b.root, LANE, E1)
   const ADA = writerId("ada@x.io")
   const card = (id: string, place: CardPlace) => ({

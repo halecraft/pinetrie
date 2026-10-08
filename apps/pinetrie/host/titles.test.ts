@@ -1,8 +1,8 @@
 import {
   entryId,
-  laneNameForThread,
   ROOT,
   THE_AGENT,
+  threadIdFor,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -27,8 +27,8 @@ import type { Records } from "./records.ts"
 import { createTitles } from "./titles.ts"
 
 const ADA = writerId("ada@example.com")
-const L1 = laneNameForThread("01a0f9eb-86e1-77ad-a822-2a306786223f")
-const L2 = laneNameForThread("01a0f9eb-86e1-77ad-a822-2a3067862240")
+const L1 = threadIdFor("01a0f9eb-86e1-77ad-a822-2a306786223f")
+const L2 = threadIdFor("01a0f9eb-86e1-77ad-a822-2a3067862240")
 const E1 = entryId("e-1")
 const started = {
   root: ROOT_ID,
@@ -150,7 +150,7 @@ test("a reply that is not a title, or a root archived meanwhile, writes nothing"
     archived.b,
     setRecord(WORKFLOW, {
       open: [{ id: workflowStateIdFor("d"), name: "Doing" }],
-      closed: { id: DONE, name: "Done" },
+      archive: { id: DONE, name: "Done" },
     }),
   )
   archived.reply.resolve("Rail layout")

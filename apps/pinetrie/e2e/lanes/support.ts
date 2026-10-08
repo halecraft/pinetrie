@@ -7,9 +7,9 @@ import {
   type CardCommand,
   type CardId,
   entryId,
-  type LaneName,
   PRODUCT_NAME,
   type SnapshotId,
+  type ThreadId,
 } from "@pinetrie/core"
 import type { SessionClient } from "@pinetrie/session"
 import { composeAt, queueCard } from "../harness.ts"
@@ -21,8 +21,8 @@ import type { LaneHosts } from "../lane-hosts.ts"
  * host pops it at once.
  */
 export const bringUpToDate = (
-  session: SessionClient,
-  lane: LaneName,
+  session: Omit<SessionClient, "chat">,
+  lane: ThreadId,
   tip: string | null,
   text: string,
 ): Promise<CardId> => queueCommand(session, lane, tip, text, "bring-up-to-date")
@@ -34,8 +34,8 @@ export const bringUpToDate = (
  * made in the queue cannot.
  */
 export async function queueCommand(
-  session: SessionClient,
-  lane: LaneName,
+  session: Omit<SessionClient, "chat">,
+  lane: ThreadId,
   tip: string | null,
   text: string,
   command: CardCommand,

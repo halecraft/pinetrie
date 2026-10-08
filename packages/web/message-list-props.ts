@@ -28,7 +28,7 @@ import { type PropRule, sameProps } from "./same-props.ts"
 export interface MessageListProps {
   view: ColumnView
   index: TreeIndex
-  /** The column's thread (`threadOf`). */
+  /** The column's thread's lane (`laneOf`). */
   lane: ThreadLane
   writable: boolean
   /** Where a lane starts on this path (`columnView`). */

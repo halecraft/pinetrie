@@ -367,7 +367,7 @@ export const railCount = (p: Page) => p.evaluate(RAIL_MESSAGES)
 /**
  * Open root `r` from the board (ADR-0122): select its item, which shows it
  * and puts it in the sidebar, and wait until you are on it. An archived root
- * is found in the closed state's rows, by its label's search.
+ * is found in the archive's rows, by its label's search.
  */
 export const openFromBoard = async (p: Page, r: string) => {
   await openBoard(p)

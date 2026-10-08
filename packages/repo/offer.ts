@@ -16,7 +16,6 @@ import {
   commitId,
   type DiffSpan,
   type LaneBase,
-  type LaneName,
   type NonEmpty,
   nonEmpty,
   type OfferInRepo,
@@ -26,6 +25,7 @@ import {
   type RevisionFacts,
   type StartRead,
   sourcesOf,
+  type ThreadId,
   type ThreadName,
   trailerRevset,
   untracedLanes,
@@ -84,7 +84,7 @@ export const offerFiles = async (
 /** The lane's tip in your repo, its remote bookmark; null before its first fetch. */
 export async function laneTipIn(
   jj: Runner,
-  lane: LaneName,
+  lane: ThreadId,
 ): Promise<CommitId | null> {
   const [tip] = await commitsOf(jj, `present(${laneTipName(lane)})`)
   return tip ?? null
@@ -102,7 +102,7 @@ async function acceptedOfferCommitFacts(
   input: {
     readonly repoConfig: RepoConfig
     readonly base: LaneBase
-    readonly lane: LaneName
+    readonly lane: ThreadId
   },
 ): Promise<{ readonly sources: CommitId[]; readonly untraced: CommitId[] }> {
   const ran = await jj([
@@ -138,7 +138,7 @@ export async function startOfOffer(
     readonly tip: CommitId
     readonly base: LaneBase
     readonly repoConfig: RepoConfig
-    readonly lane: LaneName
+    readonly lane: ThreadId
   },
 ): Promise<StartRead> {
   const { sources, untraced } = await acceptedOfferCommitFacts(jj, input)

@@ -8,10 +8,10 @@ import {
   entryId,
   handleOf,
   keyOf,
-  type LaneName,
   pinnedOf,
   projectRail,
   ROOT,
+  type ThreadId,
   writerId,
 } from "@pinetrie/core"
 import {
@@ -841,7 +841,7 @@ async function run(check: Checks["check"]): Promise<void> {
         15_000,
       )
       const beaLane = Object.keys(host.live.activeRuns())[0] as
-        | LaneName
+        | ThreadId
         | undefined
       const beaTip = entryId(await tipOf0())
       const again = await composeAt(
@@ -2279,7 +2279,7 @@ async function run(check: Checks["check"]): Promise<void> {
           )
         await openBoard(page)
         await page.waitForSelector(
-          `#board .board-closed ${boardSel(thirdRoot)}`,
+          `#board .board-archive ${boardSel(thirdRoot)}`,
           { timeout: 15_000 },
         )
         await openFromBoard(page, thirdRoot)
@@ -3211,7 +3211,7 @@ async function run(check: Checks["check"]): Promise<void> {
             () => false,
           )
         check(
-          "a closed root holding your card marks ▦ and its thread card, and comes back as it was",
+          "an archived root holding your card marks ▦ and its thread card, and comes back as it was",
           archiveMarked && rowMarked && columnsBack,
           `▦ ${archiveMarked}, item ${rowMarked}, columns ${columnsBack}`,
         )
@@ -3231,7 +3231,7 @@ async function run(check: Checks["check"]): Promise<void> {
         await openBoard(page)
         const archivedRow = await pipIn(
           page,
-          `#board .board-closed ${boardSel(here)}`,
+          `#board .board-archive ${boardSel(here)}`,
         )
         await openFromBoard(page, here)
         await page.click(`${col(0)} .read-only-action`)
@@ -3731,8 +3731,8 @@ async function run(check: Checks["check"]): Promise<void> {
       )
 
       // A trace (ADR-0048 step 6): someone else pins Ada's card in the
-      // conversation below while she is on the Archive tab, which reports no
-      // column. Back on her tab, a trace says so where the card was, leads to
+      // conversation below while she is on a new tab, which reports no column.
+      // Back on her tab, a trace says so where the card was, leads to
       // it, and the card's history names who pinned it.
       const traceBox = `${col(1)} .composer .input`
       await page.click(traceBox)
@@ -3906,7 +3906,7 @@ async function run(check: Checks["check"]): Promise<void> {
         "a reload keeps the root you were on",
         (await selectedRoot(page)) === downRoot,
       )
-      await moveRootTo(api, entryId(downRoot), "closed")
+      await moveRootTo(api, entryId(downRoot), "archive")
       await page.reload({ waitUntil: "domcontentloaded" })
       await page
         .waitForFunction(

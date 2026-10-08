@@ -15,8 +15,8 @@ import {
   type BaseTrailer,
   baseOf,
   type CommitId,
-  type LaneName,
   sourcesOf,
+  type ThreadId,
   trailerRevset,
 } from "@pinetrie/core"
 import { executeOrThrow, type LaneRunners } from "./execute.ts"
@@ -40,7 +40,7 @@ import {
 import { describeFailure, lines, type Runner } from "./run.ts"
 
 /** The lane's bookmark's commit; throws when it has none. */
-async function laneHead(jj: Runner, lane: LaneName): Promise<CommitId> {
+async function laneHead(jj: Runner, lane: ThreadId): Promise<CommitId> {
   const [ours] = await commitsOf(jj, bookmarkRevset(bookmarkName(lane)))
   if (ours === undefined) throw new Error(`lane ${lane} has no bookmark`)
   return ours
@@ -65,7 +65,7 @@ async function newOn(
  */
 async function commitOn(
   jj: Runner,
-  lane: LaneName,
+  lane: ThreadId,
   parents: readonly CommitId[],
   message: string,
 ): Promise<CommitId> {
@@ -162,7 +162,7 @@ async function joinAcceptedOfferCommits(
  */
 export async function mergeBase(
   jj: Runner,
-  lane: LaneName,
+  lane: ThreadId,
   from: CommitId,
   message: string,
 ): Promise<{
@@ -190,7 +190,7 @@ export async function mergeBase(
  */
 async function markBase(
   jj: Runner,
-  lane: LaneName,
+  lane: ThreadId,
   message: string,
 ): Promise<CommitId> {
   return commitOn(jj, lane, [await laneHead(jj, lane)], message)
@@ -383,7 +383,7 @@ const withoutAcceptedOfferCommits = (
 export async function mergeUpdate(
   jj: Runner,
   runners: LaneRunners,
-  lane: LaneName,
+  lane: ThreadId,
   plan: MergePlan,
 ): Promise<Merged> {
   await executeOrThrow(plan.steps, runners)

@@ -1,19 +1,25 @@
 import {
   atEntry,
   type CardRecord,
+  type ChatAt,
   cardId,
   entryId,
-  laneNameForThread,
   ROOT,
   runId,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import { IN_COLUMN, sendPendingOf } from "./card-moves.ts"
-import { planChatRequest, startsRoot } from "./chat.ts"
+import { chatAtOf, planChatRequest, startsRoot } from "./chat.ts"
 import { TEST_ROOT } from "./fixtures.ts"
 
 const at = atEntry(entryId("e-1"))
+const END: ChatAt = {
+  kind: "end",
+  thread: threadIdFor("x"),
+  seen: entryId("e-1"),
+}
 const ADA = writerId("ada@x.io")
 const card: CardRecord = {
   id: cardId("c-1"),
@@ -24,12 +30,13 @@ const card: CardRecord = {
   unsent: null,
 }
 
-test("a chat fills in what its column left out, carries its column's reservation, and each card's version as this client has it", () => {
-  const lane = laneNameForThread("x")
+test("a chat fills in what its column left out, and carries each card's version as this client has it", () => {
+  const thread = threadIdFor("x")
+  const end: ChatAt = { kind: "end", thread, seen: entryId("e-1") }
   expect(
     planChatRequest({
       text: "hi @bea",
-      at,
+      at: end,
       how: {},
       root: TEST_ROOT,
       card: null,
@@ -39,27 +46,23 @@ test("a chat fills in what its column left out, carries its column's reservation
   ).toMatchObject({
     kind: "chat",
     root: TEST_ROOT,
-    mode: "reply",
-    lane: null,
+    at: end,
     asksAgent: false,
     card: null,
     pinned: [],
-    reserved: null,
     base: null,
   })
   const pinned = [
     { id: cardId("p-1"), seen: "v-p-1" },
     { id: cardId("p-2"), seen: "v-p-2" },
   ]
+  const branch: ChatAt = { kind: "branch", thread, at: entryId("e-1") }
   expect(
     planChatRequest({
       text: "go",
-      at,
+      at: branch,
       how: {
-        mode: "branch",
-        lane,
         asksAgent: true,
-        reserved: lane,
         base: "wip",
         pinned: pinned.map(p => p.id),
       },
@@ -69,20 +72,37 @@ test("a chat fills in what its column left out, carries its column's reservation
       freshId: "f-1",
     }).intent,
   ).toMatchObject({
-    mode: "branch",
-    lane,
+    at: branch,
     asksAgent: true,
     card: { id: "c-1", seen: "v-c-1" },
     pinned,
-    reserved: lane,
     base: "wip",
+  })
+})
+
+test("chatAtOf: a reply continues its thread from the end it shows; a branch, or a send at the root, starts it", () => {
+  const thread = threadIdFor("x")
+  expect(chatAtOf("reply", thread, at)).toEqual({
+    kind: "end",
+    thread,
+    seen: "e-1",
+  })
+  expect(chatAtOf("branch", thread, at)).toEqual({
+    kind: "branch",
+    thread,
+    at: "e-1",
+  })
+  expect(chatAtOf("reply", thread, ROOT)).toEqual({
+    kind: "branch",
+    thread,
+    at: null,
   })
 })
 
 test("a send with no card is not drawn; one from a card draws the card out of its composer, under the send's id", () => {
   const plain = planChatRequest({
     text: "hi",
-    at,
+    at: END,
     how: { id: "s-1" },
     root: TEST_ROOT,
     card: null,
@@ -92,7 +112,7 @@ test("a send with no card is not drawn; one from a card draws the card out of it
   expect([plain.id, plain.pending]).toEqual(["s-1", null])
   const fromCard = planChatRequest({
     text: "hi",
-    at,
+    at: END,
     how: { card: card.id, column: "col-1" },
     root: TEST_ROOT,
     card: { record: card, seen: "v" },
@@ -106,11 +126,15 @@ test("a send with no card is not drawn; one from a card draws the card out of it
 })
 
 test("startsRoot: a thread at the root written, as a conversation or a run; nothing else", () => {
-  const at = { kind: "entry", id: entryId("e-1") } as const
-  expect(startsRoot(ROOT, { kind: "appended", id: entryId("e-1") })).toBe(true)
-  expect(startsRoot(ROOT, { kind: "started", runId: runId("r-1") })).toBe(true)
+  const atRoot: ChatAt = { kind: "branch", thread: threadIdFor("x"), at: null }
+  expect(startsRoot(atRoot, { kind: "appended", id: entryId("e-1") })).toBe(
+    true,
+  )
+  expect(startsRoot(atRoot, { kind: "started", runId: runId("r-1") })).toBe(
+    true,
+  )
   expect(
-    startsRoot(ROOT, { kind: "refused", code: "x", message: "" } as never),
+    startsRoot(atRoot, { kind: "refused", code: "x", message: "" } as never),
   ).toBe(false)
-  expect(startsRoot(at, { kind: "appended", id: entryId("e-2") })).toBe(false)
+  expect(startsRoot(END, { kind: "appended", id: entryId("e-2") })).toBe(false)
 })

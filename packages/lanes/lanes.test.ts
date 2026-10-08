@@ -8,7 +8,7 @@ import {
 } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { entryId, laneNameForThread, snapshotId } from "@pinetrie/core"
+import { entryId, snapshotId, threadIdFor } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   bookmarkOf,
@@ -35,7 +35,7 @@ import {
 // it, is `@pinetrie/repo`'s `repo.test.ts`: every such test fetches into your
 // repo.
 
-const LANE = laneNameForThread("1")
+const LANE = threadIdFor("1")
 
 /** A runtime that records each call it is asked to make, and makes none. */
 function recordingRuntime(seen: string[]): LaneRuntime {
@@ -168,7 +168,7 @@ test("copyFacts (S103, ADR-0080): the copy on its bookmark, on the merge whose t
     }
     await run("jj", ["git", "init", "--colocate", dir], { env })
     const jj: Runner = args => run("jj", ["-R", dir, ...args], { env })
-    const lane = laneNameForThread("0123456789abcdef")
+    const lane = threadIdFor("0123456789abcdef")
     const head = async (rev: string) => {
       const [id] = await commitsOf(jj, rev)
       if (id === undefined) throw new Error(`no ${rev}`)

@@ -17,10 +17,10 @@ import {
   HOST_WORKING_COPY,
   hostPathInLane,
   isWithin,
-  type LaneName,
   NO_EDITOR,
   type SnapshotId,
   shellWord,
+  type ThreadId,
   type ThreadName,
   WORKSPACE_ROOT,
 } from "@pinetrie/core"
@@ -44,7 +44,7 @@ export const FETCHED_REF = "refs/heads/pinetrie/fetched"
 export const PROJECT_DIR = ".pinetrie"
 
 /** The bookmark that holds a lane's newest revision, in the lane's own repo. */
-export const bookmarkName = (lane: LaneName): string => `pinetrie/${lane}`
+export const bookmarkName = (lane: ThreadId): string => `pinetrie/${lane}`
 
 /** A revset string literal, so a bookmark name is never parsed as a revset. */
 export const revsetName = (name: string): string => JSON.stringify(name)
@@ -59,22 +59,22 @@ export const bookmarkRevset = (name: string): string =>
  * config, ancestors included (S48 items 11 and 19). No git remote is added.
  */
 export const LANE_REMOTE_PREFIX = "pinetrie-"
-const laneRemote = (lane: LaneName): string => `${LANE_REMOTE_PREFIX}${lane}`
+const laneRemote = (lane: ThreadId): string => `${LANE_REMOTE_PREFIX}${lane}`
 /** Where git keeps a lane's history in your repo: `laneTipName`'s ref. */
-export const laneTipRef = (lane: LaneName): string =>
+export const laneTipRef = (lane: ThreadId): string =>
   `refs/remotes/${laneRemote(lane)}/tip`
-export const laneTipName = (lane: LaneName): string => `tip@${laneRemote(lane)}`
+export const laneTipName = (lane: ThreadId): string => `tip@${laneRemote(lane)}`
 
 /**
  * A split's stack (ADR-0105): the bookmark its run leaves in the lane's own
  * repo, and the remote bookmark it arrives as in yours.
  */
-export const stackBookmark = (lane: LaneName): string =>
+export const stackBookmark = (lane: ThreadId): string =>
   `pinetrie/${lane}-stack`
 /** Where git keeps a split's stack in your repo: `laneStackName`'s ref. */
-export const laneStackRef = (lane: LaneName): string =>
+export const laneStackRef = (lane: ThreadId): string =>
   `refs/remotes/${laneRemote(lane)}/stack`
-export const laneStackName = (lane: LaneName): string =>
+export const laneStackName = (lane: ThreadId): string =>
   `stack@${laneRemote(lane)}`
 
 /**
@@ -87,8 +87,22 @@ export const offerBookmark = (name: ThreadName): string =>
 /** Every offer's bookmark, as a revset. */
 export const OFFER_BOOKMARKS = `bookmarks(glob:${revsetName(`${OFFER_PREFIX}*`)})`
 
+declare const baseLaneBrand: unique symbol
+/**
+ * The scratch lane a base is made in (`base.ts`): no thread's, so no
+ * `ThreadId`, and nothing that takes a thread can be given it.
+ */
+export type BaseLane = "base-scratch" & { readonly [baseLaneBrand]: true }
+export const BASE_LANE = "base-scratch" as BaseLane
+
+/**
+ * What a lane's container, disk and snapshots are named by: a thread, whose
+ * id names its lane (ADR-0117), or the base's scratch lane.
+ */
+export type LaneOwner = ThreadId | BaseLane
+
 /** A lane's container's name. */
-export const laneContainer = (lane: LaneName): string => `pinetrie-${lane}`
+export const laneContainer = (lane: LaneOwner): string => `pinetrie-${lane}`
 
 /** What a project lets cross a lane's boundary (ADR-0034), from `pinetrie.json`. */
 export interface LaneGrants {
@@ -126,8 +140,9 @@ export interface Install {
   readonly lockfile: string
 }
 
-export interface LaneSpec {
-  readonly lane: LaneName
+/** A lane's spec: a thread's, unless `L` says the base's scratch lane. */
+export interface LaneSpec<L extends LaneOwner = ThreadId> {
+  readonly lane: L
   readonly image: string
   /** The image's own `PATH`; the runtime's `bin` is added after it. */
   readonly imagePath: string
@@ -242,7 +257,7 @@ export interface ContainerShape {
   /** `laneContainer(lane)`. */
   readonly name: string
   /** Its disk, at `/workspace`. */
-  readonly lane: LaneName
+  readonly lane: LaneOwner
   readonly image: string
   readonly memory: string
   /** Host paths, from `planMounts`. */
@@ -263,7 +278,7 @@ export interface ContainerShape {
  * from `env`, first, so pinetrie's own come after them.
  */
 export function planShape(
-  spec: LaneSpec,
+  spec: LaneSpec<LaneOwner>,
   env: Readonly<Record<string, string | undefined>>,
 ): ContainerShape {
   const passed = spec.grants.env.flatMap(name => {
@@ -978,7 +993,7 @@ export function planJoins(
  * from the base disk's, which is accepted work's (`install`).
  */
 export function planForkSetup(
-  lane: LaneName,
+  lane: ThreadId,
   start: ForkStart,
   install: string | null = null,
 ): LaneStep[] {
@@ -1025,7 +1040,7 @@ export function planForkSetup(
 
 /** Make and start a lane's container on its existing disk. */
 export const planStart = (
-  spec: LaneSpec,
+  spec: LaneSpec<LaneOwner>,
   env: Readonly<Record<string, string | undefined>>,
 ): Step => onRuntime({ kind: "run", shape: planShape(spec, env) })
 
@@ -1034,7 +1049,7 @@ export const planStart = (
  * snapshot `from`.
  */
 export const planDisk = (input: {
-  readonly spec: LaneSpec
+  readonly spec: LaneSpec<LaneOwner>
   readonly env: Readonly<Record<string, string | undefined>>
   readonly from: SnapshotId | null
 }): Step[] => {
@@ -1075,7 +1090,7 @@ export interface OldNamesOnDisk {
  */
 export function planOldNamesOnDisk(
   facts: OldNamesOnDisk,
-  lane: LaneName,
+  lane: ThreadId,
 ): LaneStep[] {
   const { configDir, bookmarks } = facts
   const has = new Set(bookmarks)
@@ -1191,7 +1206,7 @@ export function planTurnCommit(facts: {
  * it, unflushed files clone empty, S41), then the snapshot.
  */
 export const planSnapshot = (input: {
-  readonly lane: LaneName
+  readonly lane: LaneOwner
   readonly snapshot: SnapshotId
 }): Step[] => [
   inLane("sync"),

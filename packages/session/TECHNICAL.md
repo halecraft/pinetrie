@@ -111,6 +111,12 @@ tracked as a move of its card when it has one, else a plain request. The
 plan never refuses: the root a send at the root mints is held before it,
 so a refusal added to the plan must move the minting after it.
 
+A chat goes to a `ChatAt` (ADR-0117): the end of a thread its sender saw, or
+a branch starting a thread its column minted (`newThreadId`, `ids.ts`, the
+one minter of a thread's id). `chatAtOf` makes one from a column's mode, its
+thread and where it is: a reply continues its thread from the end it shows;
+a branch, or a send at the root, starts it.
+
 ## This tab's moves (`card-moves.ts`, ADR-0048, ADR-0059)
 
 The page reads the cards' records as `session.cards`, a snapshot store; it

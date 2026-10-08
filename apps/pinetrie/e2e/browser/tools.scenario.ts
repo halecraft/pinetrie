@@ -295,7 +295,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           "@agent anything new?",
           atEntry(entryId(lane?.tip ?? "")),
           {
-            lane: lane?.name,
+            thread: lane?.name,
           },
         )
         await idle()

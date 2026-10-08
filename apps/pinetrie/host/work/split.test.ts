@@ -1,4 +1,4 @@
-import { commitId, laneNameForThread, writerId } from "@pinetrie/core"
+import { commitId, threadIdFor, writerId } from "@pinetrie/core"
 import type { PiSetup } from "@pinetrie/pi"
 import type { RepoOwner } from "@pinetrie/repo"
 import { expect, test } from "vitest"
@@ -8,7 +8,7 @@ import type { LaneRegistry } from "./registry.ts"
 import { createSplits, finishSplit } from "./split.ts"
 
 test("a split's end fetches the stack before stackEnded, then moves the lane back to its own tip", async () => {
-  const lane = laneNameForThread("0123456789abcdef")
+  const lane = threadIdFor("0123456789abcdef")
   const [start, tip, top] = [
     commitId("aaaa0000"),
     commitId("bbbb0000"),
@@ -43,7 +43,7 @@ test("a split's end fetches the stack before stackEnded, then moves the lane bac
 })
 
 test("a split's end that throws still moves the lane back to its tip", async () => {
-  const lane = laneNameForThread("0123456789abcdef")
+  const lane = threadIdFor("0123456789abcdef")
   const order: string[] = []
   const ports = record<Parameters<typeof finishSplit>[0]>({
     fetchLane: async () => {},
@@ -65,7 +65,7 @@ test("a split's end that throws still moves the lane back to its tip", async () 
 })
 
 test("a split whose skill read fails starts no container", async () => {
-  const lane = laneNameForThread("0123456789abcdef")
+  const lane = threadIdFor("0123456789abcdef")
   const started: string[] = []
   const piSetup = record<PiSetup>({
     skill: async () => {

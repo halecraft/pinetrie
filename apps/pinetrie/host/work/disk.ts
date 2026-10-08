@@ -1,7 +1,7 @@
 // host/work/disk — the steps two lane operations share.
 
 import { createHash } from "node:crypto"
-import { type EntryId, type LaneName, snapshotId } from "@pinetrie/core"
+import { type EntryId, snapshotId, type ThreadId } from "@pinetrie/core"
 import {
   executeOrThrow,
   type LaneHandle,
@@ -17,7 +17,7 @@ import type { LaneChannel } from "@pinetrie/pi"
  */
 export const snapshotOnQueue = (
   handle: LaneHandle<LaneChannel>,
-  lane: LaneName,
+  lane: ThreadId,
   entry: EntryId,
 ): Promise<true> =>
   handle.queue.enqueue(async () => {

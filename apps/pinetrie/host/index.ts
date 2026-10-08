@@ -13,7 +13,7 @@ import {
 } from "@kyneta/exchange"
 import { Interpret, Reject } from "@kyneta/schema"
 import { WebsocketServerTransport } from "@kyneta/websocket-transport/server"
-import type { BlobStore, CardId, LaneName } from "@pinetrie/core"
+import type { BlobStore, CardId, ThreadId } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
 import {
   configJson,
@@ -100,6 +100,7 @@ import { lineDocPrefix } from "./lines.ts"
 import {
   migrate,
   planStoredOpen,
+  RECORD_MIGRATIONS,
   readStored,
   refusalLine,
 } from "./migrations/index.ts"
@@ -276,7 +277,8 @@ export async function startHost({
   // Each stored document's schema, checked before anything opens one: opened
   // under a changed schema, a dropped field's data goes at the next
   // compaction (S120, ADR-0096).
-  const openPlan = planStoredOpen(await readStored(store))
+  const stored = await readStored(store)
+  const openPlan = planStoredOpen(stored)
   if (openPlan.kind === "refuse") {
     await store.close()
     throw new Error(refusalLine(openPlan))
@@ -306,6 +308,8 @@ export async function startHost({
 
   await migrate({
     plan: openPlan,
+    records: RECORD_MIGRATIONS,
+    storedIds: [...stored.keys()],
     exchange,
     backup: opened.backup,
     log,
@@ -407,7 +411,7 @@ export async function startHost({
     piSetup,
     enabled: decodeDigestConfig(userJson),
   })
-  const digestFailed = (lane: LaneName) =>
+  const digestFailed = (lane: ThreadId) =>
     failed(basics, "summarizing its ask", lane)
   // Each root's title, unasked as its first lane starts unless the user
   // config turns that off, or when a person asks (ADR-0074).
@@ -532,7 +536,7 @@ export async function startHost({
     wait(card, signal => untilNotTyped(presence, card.id, signal))
   const blank = (card: QueuedCard) =>
     wait(card, signal => cardPort.whenWritten(card.id, signal))
-  const drain = (lane: LaneName) =>
+  const drain = (lane: ThreadId) =>
     drainQueue(
       {
         basics,
@@ -588,7 +592,7 @@ export async function startHost({
   // `once`: queued once until its step starts, and a move while it runs
   // queues one more, which finds what that one missed. It keeps its place
   // among the commands, so a late message still goes after the queued cards.
-  const queueDrain = (lane: LaneName) => {
+  const queueDrain = (lane: ThreadId) => {
     if (readRunning(live, lane)) return
     void keeper.once(`drain:${lane}`, () => drain(lane))
   }

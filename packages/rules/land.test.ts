@@ -1,4 +1,4 @@
-import { commitId, laneNameForThread, writerId } from "@pinetrie/core"
+import { commitId, threadIdFor, writerId } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { planResolution, renderableMessage } from "./index.ts"
 import {
@@ -10,7 +10,7 @@ import {
   resolutionFloor,
 } from "./land.ts"
 
-const LANE = laneNameForThread("1")
+const LANE = threadIdFor("1")
 const ADA = writerId("ada")
 const C1 = commitId("c1")
 

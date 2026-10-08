@@ -1,4 +1,4 @@
-import { entryId, laneNameForThread, runId, streamId } from "@pinetrie/core"
+import { entryId, runId, streamId, threadIdFor } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   applyLiveOps,
@@ -10,8 +10,8 @@ import {
   readStreams,
 } from "./index.ts"
 
-const L = laneNameForThread("lane")
-const M = laneNameForThread("other")
+const L = threadIdFor("lane")
+const M = threadIdFor("other")
 
 describe("applyLiveOps, the one writer of pinetrie:live", () => {
   test("a reply and a tool round-trip, null fields included, in id order", () => {

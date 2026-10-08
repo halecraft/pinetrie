@@ -4,12 +4,12 @@ import {
   entryId,
   indexTree,
   type LaneRecord,
-  laneNameForThread,
   type MarkRecord,
   ROOT,
   rootIdFor,
   THE_AGENT,
   type TreeIndex,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
@@ -24,8 +24,8 @@ import {
 const ADA = writerId("ada@example.com")
 const R = rootIdFor("1")
 const OTHER = rootIdFor("2")
-const L1 = laneNameForThread("1")
-const L2 = laneNameForThread("2")
+const L1 = threadIdFor("1")
+const L2 = threadIdFor("2")
 
 const at = (
   id: string,

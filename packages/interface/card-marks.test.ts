@@ -75,7 +75,6 @@ const marks = (
     filled: new Set(filled.map(cardId)),
     layout: over.layout ?? layout,
     archived: over.archived ?? new Set(),
-    lanes: [],
     index: over.index ?? tree(),
     rootEntries: new Map([[FAR_ROOT, entryId("f1")]]),
   })
@@ -206,7 +205,7 @@ describe("cardMarks", () => {
     )
   })
 
-  test("an archived root marks its row, never the Archive tab", () => {
+  test("an archived root marks its row, never ▦", () => {
     const m = marks([atEnd("c", "g1")], ["c"], {
       archived: new Set([entryId("g1")]),
     })

@@ -4,10 +4,10 @@
 import {
   type CardId,
   cardId,
-  type LaneName,
-  laneNameForThread,
   type RootId,
   rootIdFor,
+  type ThreadId,
+  threadIdFor,
 } from "@pinetrie/core"
 
 /** A uuidv7: 48 bits of milliseconds, the version, the variant, randomness. */
@@ -25,9 +25,9 @@ export const newCardId = (): CardId => cardId(newUuidv7())
 
 /**
  * A new thread's lane id, reserved by a column before the lane exists
- * (ADR-0057). The host accepts only this shape (`parseNewLane`).
+ * (ADR-0057). The host accepts only this shape (`parseNewThread`).
  */
-export const newLaneName = (): LaneName => laneNameForThread(newUuidv7())
+export const newThreadId = (): ThreadId => threadIdFor(newUuidv7())
 
 /**
  * A new root's id, minted by the tab whose first message starts it

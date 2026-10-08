@@ -40,7 +40,7 @@ wires them.
 | `admission.ts`, `policy.ts`, `lines.ts`, `blobs.ts`, `store.ts` | the invite key and links, the write policy, departed seats, the image store, the SQLite store |
 | `work/` | lane containers and disks (§ Lane work) |
 | `offers/` | each lane's offer in your repo, on the owner of your repo (§ Offers); accepted work's record and commands are `work/accepted.ts`'s |
-| `names.ts` | every thread's name (ADR-0039): `ensure` for the lanes pi holds, `reserve` for a lane id a column reserved before its lane exists (ADR-0057), on one queue |
+| `names.ts` | every thread's name (ADR-0039, ADR-0117): `ensure` for the lanes pi holds and the threads recorded, `reserve` for a thread a column opened before its first message (ADR-0057), on one queue |
 | `banners.ts` | each thread's column banner (ADR-0050, ADR-0053): made as the thread is named, at reservation or creation, set by `set_banner` |
 | `digests.ts` | each ask's digest (ADR-0106), unless the user config turns them off (ADR-0071) |
 | `outside.ts` | `requestOutside`: a model request outside a keeper, its answer written in a step of its own |
@@ -55,7 +55,7 @@ wires them.
   split, and a setup or publish, go straight to the owner of your repo after
   the archive gate (a synchronous read), and hold no other command; a move
   on the board is up to three parts (`commands/board.ts`): its place on the
-  keeper, and, when it crosses the closed state's edge, its teardown
+  keeper, and, when it crosses the archive's edge, its teardown
   (containers, refs through the owner, snapshots) off it, tracked, and, for
   a close, its unload on the keeper again, the reply after all of it.
   Between the place and the unload, the gate refuses any write into the
@@ -221,6 +221,17 @@ until the next compaction (S120), and the host compacts at startup. So
   migration with no `run`: registering it is the acknowledgement. None is
   registered now: `0001-live-row` and `0002-records` (ADR-0095) ran, and
   were deleted.
+- **A change to a record's contents moves no hash**: records are JSON in a
+  document's `records`. A `RecordMigration` (`RECORD_MIGRATIONS`) is
+  one-time: `migrate` runs each one's reads with the hash migrations', and
+  it returns a write only when what it read is in the old shape, so a
+  second start finds nothing to do. It writes under the document's current
+  schema, so its hash stays. The backup is taken after the reads, before
+  the first write. Each is deleted, with its mutations, once Duane's store
+  has run it: `0003-workflow-archive` renames the workflow's `closed`
+  state `archive`; `0004-threads` names each thread in its first message
+  (`starts`, guessed by `deriveThreads`) and writes its `THREAD` record, run
+  when the session has none.
 
 ## Startup
 
@@ -231,7 +242,7 @@ each run's end, in `settle`'s sweep.
 
 `recover` runs, in order: the clear of `pinetrie:live` (`planClear`: no
 stream survives a process), a
-log of the stored lane names, in the roots opened, that fail `isLaneName`
+log of the stored lane names, in the roots opened, that fail `isThreadId`
 (`readStoredLanes`: no reader is given them, so the log is where one shows;
 it never throws, and nothing is deleted), `ensureNames` (ADR-0039),
 `planStartup` over the queued cards and `interrupted(roots)`, each
@@ -362,7 +373,7 @@ rejects `shutdown()`.
 - **A command's id is its send's id.** The column that sent a chat finds its
   message by it (`TreeIndex.bySend`).
 - **The archive gate is in the dispatcher** (`refuseInArchive`), over
-  `readArchived`: a root in the closed workflow state. Only the
+  `readArchived`: a root in the archive. Only the
   `chat` command and `sendPoppedQueuedCard` call `sendChat`, both behind the gate, so
   `sendChat` has no gate of its own.
 - **A root a chat starts takes its place on the board in the same step**
@@ -370,7 +381,7 @@ rejects `shutdown()`.
   (`Command.state`, a board column's ＋), else of the first open state.
 - **A move on the board** (`handleRootMove`): `planRootMove` over the
   workflow and the places; a move within open states writes its place and
-  answers; one that crosses the closed state's edge gathers the root's
+  answers; one that crosses the archive's edge gathers the root's
   document (`docs.root` loads an unloaded one, S86) and `planArchive`s the
   crossing first. **A change to the states** (`handleWorkflow`) is one
   keeper step, `planWorkflowEdit` over the workflow and the board.
@@ -558,7 +569,7 @@ rejects `shutdown()`.
   A blank message (`blankQueued`: no command, only whitespace) is passed
   over and stays queued (ADR-0113), and does not wait: a command that reads
   lanes for who waits (a chat, a queue, a stop, a carry-on, a move to the
-  closed state) gathers the blank cards first (`CardPort.blankQueued`,
+  archive) gathers the blank cards first (`CardPort.blankQueued`,
   which loads each queued card's text). One whose text is behind is not blank,
   or the cards behind it would go first. A wait is given up when its card
   leaves the queue (`givenUp`), and its end drains the lane again. `runs.start` marks a lane
@@ -567,9 +578,10 @@ rejects `shutdown()`.
 - **`executeChat` still checks where a new lane begins and asks pi for the
   lane.** Both are ports that may refuse, not facts to gather. The begin is
   checked first (`checkBegin`), so a refused send creates no lane.
-- **The new lane's id is decided before that, in `planChat`** (ADR-0057).
-  `sendChat` gathers `newLane` beside `sendId`: the column's reserved id,
-  the lanes pi holds, and a spare made with `newId`. pi makes no ids.
+- **The new lane's id is its thread's** (ADR-0117): `planChat` names it from
+  where the send goes, and neither the host nor pi makes one. A thread's
+  first message is preceded by its `THREAD` record, written in
+  `executeChat`.
 - **`reserve` is answered `reserved`** whether it named the id or the id
   had a name already, so a column may send it again; an id pi holds is
   refused `lane_id_in_use`.
@@ -676,9 +688,10 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   write a pasted image. A new image is a `keeper.track`ed task: the image takes seconds,
   outside the queue, then the write is a step of its own, only while
   `bannerStillWanted`. A missing `column-banner` skill is logged.
-- **A thread is due one as it is named** (`createNames`' `onNamed`): as a
-  column reserves its lane (ADR-0057), or as a lane with no reservation is
-  created. It is due again at each run's end, which draws only when it still has none: the
+- **A thread is due one as it is named for its lane** (`createNames`'
+  `onNamed`): as a column about to create its lane asks for its name
+  (ADR-0057), or as a lane is created. A conversation's thread is named and
+  draws none. It is due again at each run's end, which draws only when it still has none: the
   retry for a failed one. `recover` does not: turning banners on must not
   draw one for every thread that ever ran. Banners are made before
   `createNames`, whose `onNamed` asks them.

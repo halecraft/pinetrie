@@ -1,9 +1,9 @@
 import {
   entryId,
   type LaneRecord,
-  laneNameForThread,
   type RootRecord,
   rootIdFor,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
@@ -46,7 +46,7 @@ const directory = new Map(
 
 describe("labels and summaries, from the directory (ADR-0063)", () => {
   const laneIn = (n: string): [LaneRecord["lane"], LaneRecord] => {
-    const lane = laneNameForThread(n)
+    const lane = threadIdFor(n)
     return [
       lane,
       {

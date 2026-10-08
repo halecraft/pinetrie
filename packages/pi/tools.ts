@@ -16,9 +16,9 @@ import {
   EDIT_TOOL,
   FIND_TOOL,
   GREP_TOOL,
-  type LaneName,
   READ_TOOL,
   SPLIT_TOOL,
+  type ThreadId,
   TOOL_IDS,
   type ToolId,
   WRITE_TOOL,
@@ -35,7 +35,7 @@ export interface ToolsInput {
   readonly blobs: Pick<BlobStore, "put"> | undefined
   /** Where `set_banner` sends its asks; undefined while banners are off. */
   readonly bannerAsks:
-    | ((lane: LaneName, ask: BannerAsk) => Promise<BannerAnswer>)
+    | ((lane: ThreadId, ask: BannerAsk) => Promise<BannerAnswer>)
     | undefined
 }
 

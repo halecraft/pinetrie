@@ -3,7 +3,7 @@
 // imports it.
 
 import { createDoc } from "@kyneta/schema"
-import type { EntryId, LaneName, RunId } from "@pinetrie/core"
+import type { EntryId, RunId, ThreadId } from "@pinetrie/core"
 import {
   applyLiveOps,
   LANE_TIP,
@@ -37,7 +37,7 @@ export function writeEntry(doc: RootDocHandle, row: StoredEntryRow): void {
  */
 export function writeLaneTip(
   doc: RootDocHandle,
-  lane: LaneName,
+  lane: ThreadId,
   tip: EntryId | null,
 ): void {
   const record: StoredValueRecord = {
@@ -51,6 +51,6 @@ export function writeLaneTip(
 /** Mark `lane` as running `run`, as a starting run does. */
 export const beginRun = (
   live: LiveDocHandle,
-  lane: LaneName,
+  lane: ThreadId,
   run: RunId,
 ): void => applyLiveOps(live, [{ kind: "begin", lane, run }])

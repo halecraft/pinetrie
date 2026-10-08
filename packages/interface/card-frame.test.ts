@@ -4,7 +4,7 @@ import {
   type CardRecord,
   cardId,
   entryId,
-  laneNameForThread,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
@@ -23,7 +23,7 @@ const ME = writerId("ada@x.test")
 const BEA = writerId("bea@x.test")
 const READER = { me: ME, nameOf: new Map([[BEA, "Bea"]]) }
 const CATCH_UPS = { base: { kind: "accepted" }, parent: null } as const
-const LANE = laneNameForThread("x")
+const LANE = threadIdFor("x")
 const at = atEntry(entryId("e-1"))
 const C1 = cardId("c-1")
 

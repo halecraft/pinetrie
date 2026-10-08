@@ -1,4 +1,4 @@
-import { laneNameForThread, rootIdFor } from "@pinetrie/core"
+import { rootIdFor, threadIdFor } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
 import { readThreadName } from "@pinetrie/reads"
 import { expect, test } from "vitest"
@@ -8,7 +8,7 @@ import { createSettle } from "./settle.ts"
 
 /** A settle over lanes `a` and `b`, recording what it does. */
 function setUp() {
-  const [a, b] = [laneNameForThread("a"), laneNameForThread("b")]
+  const [a, b] = [threadIdFor("a"), threadIdFor("b")]
   const roots = new Map([
     [a, rootIdFor("ra")],
     [b, rootIdFor("rb")],
@@ -98,7 +98,7 @@ test("a failed compaction is logged, and the sweep still runs", async () => {
 })
 
 test("a failed drain is logged; the other lanes drain, and the next settle compacts", async () => {
-  const [a, b] = [laneNameForThread("a"), laneNameForThread("b")]
+  const [a, b] = [threadIdFor("a"), threadIdFor("b")]
   const bs = basics()
   const done: string[] = []
   const settle = createSettle({

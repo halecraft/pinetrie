@@ -15,9 +15,9 @@ import {
   errorText,
   firstLine,
   indexTree,
-  type LaneName,
   messageText,
   snapshotId,
+  type ThreadId,
   type TreeIndex,
   toolCallsOf,
   turnEntry,
@@ -228,7 +228,7 @@ const touching = (revisions: readonly TouchedRevision[], path: string) =>
 export function planSettle(
   facts: SettleFacts,
   ctx: {
-    readonly lane: LaneName
+    readonly lane: ThreadId
     readonly by: WriterId
     readonly from: BaseMerge
     readonly index: TreeIndex
@@ -348,14 +348,14 @@ export interface Updates {
    * and nothing appended: the tool's answer is the update. Refused unless
    * the call is the only one in its turn and there is something new.
    */
-  catchUpInRun(lane: LaneName, from: "base" | "parent"): Promise<ToolAnswer>
+  catchUpInRun(lane: ThreadId, from: "base" | "parent"): Promise<ToolAnswer>
   /**
    * pi's hook: the lane's agent asked about a conflict. Taken while jj finds
    * a conflict in the lane's copy, in any run (ADR-0080, S104): read on the
    * lane's queue, never from a revision record, which can be late. A lane
    * with no copy of its own has nothing to ask about.
    */
-  askedAboutConflict(lane: LaneName): Promise<boolean>
+  askedAboutConflict(lane: ThreadId): Promise<boolean>
 }
 
 export function createUpdates(deps: {
@@ -376,7 +376,7 @@ export function createUpdates(deps: {
    * snapshot, so a branch below it starts with the merged files.
    */
   async function recordUpdate(
-    lane: LaneName,
+    lane: ThreadId,
     entry: EntryId,
     merge: CommitId,
   ): Promise<void> {
@@ -397,7 +397,7 @@ export function createUpdates(deps: {
   }
 
   /** Anything edited in the lane since its last run, committed as a turn. */
-  async function commitEdits(lane: LaneName, jj: Runner): Promise<void> {
+  async function commitEdits(lane: ThreadId, jj: Runner): Promise<void> {
     // The lane's own root's document (ADR-0063).
     const doc = await docs.laneDoc(lane)
     const tip = doc === null ? null : readLaneTip(doc, lane)
@@ -415,7 +415,7 @@ export function createUpdates(deps: {
    * (`parentNow`), and whether its agent runs (ADR-0072).
    */
   async function parentOf(
-    lane: LaneName,
+    lane: ThreadId,
   ): Promise<{ readonly now: ParentNow | null; readonly running: boolean }> {
     const doc = await docs.laneDoc(lane)
     if (doc === null) return { now: null, running: false }
@@ -442,7 +442,7 @@ export function createUpdates(deps: {
    * or has nothing to merge, the edits committed and the merge.
    */
   const updateOnQueue = (
-    lane: LaneName,
+    lane: ThreadId,
     owner: RepoOwner,
     command: CatchUpCommand,
     resolution: Parameters<typeof planCatchUp>[1],

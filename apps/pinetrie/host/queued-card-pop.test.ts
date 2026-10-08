@@ -6,9 +6,9 @@ import {
   commitId,
   ERR,
   entryId,
-  laneNameForThread,
   rootIdFor,
   runId,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import type { ThreadLaneHandle } from "@pinetrie/pi"
@@ -43,7 +43,7 @@ import {
 
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
-const LANE = laneNameForThread("0123456789abcdef")
+const LANE = threadIdFor("0123456789abcdef")
 const ADA = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
 const E1 = entryId("e-1")
@@ -188,9 +188,7 @@ test("chatOfPoppedQueuedCard: the queuer's message, in the queue's mode, from th
   expect(popped === null ? null : chatOfPoppedQueuedCard(popped)).toMatchObject(
     {
       text: "@agent go",
-      at: atEntry(E1),
-      mode: "queue",
-      lane: LANE,
+      at: { kind: "queue", thread: LANE },
       card: { id: "c-1", seen: "" },
       mentions: [{ kind: "agent" }],
     },

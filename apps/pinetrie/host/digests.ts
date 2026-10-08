@@ -17,9 +17,9 @@ import {
   askOutcome,
   type EntryId,
   indexAsks,
-  type LaneName,
   promptOf,
   type RootId,
+  type ThreadId,
 } from "@pinetrie/core"
 import type { Keeper } from "@pinetrie/keeper"
 import type { PiSetup } from "@pinetrie/pi"
@@ -69,11 +69,11 @@ export interface Digests {
    * Written before the run's end closes it (`planRunEnd`), so no reader sees
    * the lane stopped beside the last run's verdict.
    */
-  pending(lane: LaneName, prompt: EntryId): Promise<void>
+  pending(lane: ThreadId, prompt: EntryId): Promise<void>
   /** That run, in `root`, has ended: its verdict and its ask's final digest. */
   ended(
     root: RootId,
-    lane: LaneName,
+    lane: ThreadId,
     prompt: EntryId,
     failed: Failed,
   ): Promise<void>
@@ -186,7 +186,7 @@ export function createDigests(deps: {
    */
   const ended = (
     root: RootId,
-    lane: LaneName,
+    lane: ThreadId,
     prompt: EntryId,
     failed: Failed,
   ) =>

@@ -2,9 +2,9 @@ import {
   atEntry,
   cardId,
   entryId,
-  type LaneName,
-  laneNameForThread,
   runId,
+  type ThreadId,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import type { Agent } from "@pinetrie/pi"
@@ -48,7 +48,7 @@ const bea = writerId("bea@example.com")
 /** A lane running an ask: Ada's prompt `e-1`, the agent's `e-2`. */
 function running() {
   const b = basics()
-  const lane = laneNameForThread("0123456789abcdef")
+  const lane = threadIdFor("0123456789abcdef")
   writeEntry(b.root, row(entryId("e-1"), null))
   writeEntry(
     b.root,
@@ -201,7 +201,7 @@ test("a hold is written once, its release deleted and the lane drained, each ans
         applyWrites(b, w)
       },
     },
-    drain: (l: LaneName) => void drained.push(l),
+    drain: (l: ThreadId) => void drained.push(l),
     cards: NO_BLANK_CARDS,
   }
   expect(await handleQueueHold(deps, lane, true, ada)).toEqual({
@@ -220,13 +220,13 @@ test("a hold is written once, its release deleted and the lane drained, each ans
   expect(writes.at(-1)).toEqual([deleteRecord(QUEUE_HOLD, lane)])
   expect(drained).toEqual([lane])
   expect(
-    (await handleQueueHold(deps, laneNameForThread("ffff"), true, ada)).kind,
+    (await handleQueueHold(deps, threadIdFor("ffff"), true, ada)).kind,
   ).toBe("refused")
 })
 
 test("an offer's fact is queued as a card at the thread's end, after the cards there, and the lane's drain asked for (ADR-0080)", async () => {
   const b = basics()
-  const lane = laneNameForThread("0123456789abcdef")
+  const lane = threadIdFor("0123456789abcdef")
   putLane(b, lane, entryId("e-2"))
   writeEntry(b.root, row(entryId("e-2"), null))
   writeLaneTip(b.root, lane, entryId("e-2"))
@@ -277,7 +277,7 @@ test("an offer's fact is queued as a card at the thread's end, after the cards t
 /** A lane whose ask Ada stopped mid-reply: her prompt `e-1`, the partial `e-2`. */
 function stopped() {
   const b = basics()
-  const lane = laneNameForThread("0123456789abcdef")
+  const lane = threadIdFor("0123456789abcdef")
   writeEntry(b.root, row(entryId("e-1"), null))
   writeEntry(
     b.root,
@@ -334,7 +334,7 @@ test("a carry-on the rule refuses is answered with its refusal, and starts nothi
   expect(
     await handleCarryOn(
       { basics: b, start, cards: NO_BLANK_CARDS },
-      laneNameForThread("fedcba9876543210"),
+      threadIdFor("fedcba9876543210"),
       ada,
     ),
   ).toMatchObject({ kind: "refused", code: "unknown_target" })

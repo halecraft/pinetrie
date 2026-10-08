@@ -8,9 +8,9 @@
 
 import type { Exchange } from "@kyneta/exchange"
 import {
+  type ChatAt,
   type EntryId,
   ERR,
-  type Position,
   type RootId,
   rootDocId,
   rootOfDocId,
@@ -41,7 +41,7 @@ export interface RootDocs {
    * root a new tab minted as it opened (ADR-0066), or, for a send at the
    * root that names none (a script's), one minted here.
    */
-  rootFor(at: Position, minting?: RootId): RootId | undefined
+  rootFor(at: ChatAt, minting?: RootId): RootId | undefined
 }
 
 export function rootDocs(exchange: Exchange): RootDocs {
@@ -85,7 +85,8 @@ export function rootDocs(exchange: Exchange): RootDocs {
     },
     rootOf,
     rootFor(at, minting) {
-      if (at.kind === "entry") return rootOf(at.id)
+      const entry = at.kind === "end" ? at.seen : at.at
+      if (entry !== null) return rootOf(entry)
       const root = minting ?? newRootId()
       minted = new Set([...minted, root])
       hold()

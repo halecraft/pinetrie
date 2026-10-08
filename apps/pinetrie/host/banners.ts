@@ -5,9 +5,9 @@
 import {
   type BlobStore,
   errorText,
-  type LaneName,
   type Sha256,
   type StoredImage,
+  type ThreadId,
 } from "@pinetrie/core"
 import type { Keeper } from "@pinetrie/keeper"
 import type { PiSetup } from "@pinetrie/pi"
@@ -30,9 +30,9 @@ import type { Records } from "./records.ts"
 
 export interface Banners {
   /** A lane was named, or its run ended: make its banner if it has none. */
-  due(lane: LaneName): Promise<void>
+  due(lane: ThreadId): Promise<void>
   /** `set_banner`'s ask, answered once planned; a new image arrives later. */
-  request(lane: LaneName, ask: BannerAsk): Promise<BannerAnswer>
+  request(lane: ThreadId, ask: BannerAsk): Promise<BannerAnswer>
 }
 
 export function createBanners(deps: {
@@ -46,14 +46,14 @@ export function createBanners(deps: {
   const { basics, keeper, blobs } = deps
   const { session: doc, log } = basics
   // Lanes whose banner is being made: a run's end does not start a second.
-  const generating = new Set<LaneName>()
+  const generating = new Set<ThreadId>()
 
-  const write = (lane: LaneName, sha: Sha256) =>
+  const write = (lane: ThreadId, sha: Sha256) =>
     deps.records.writeValues([
       setRecord(BANNER, { lane, sha, at: basics.now() }),
     ])
 
-  const failedFor = (lane: LaneName) => (why: string) =>
+  const failedFor = (lane: ThreadId) => (why: string) =>
     log(`[host] no banner for ${readNames(doc).get(lane) ?? lane}: ${why}`)
 
   /**
@@ -61,7 +61,7 @@ export function createBanners(deps: {
    * write, only if still wanted (`requestOutside`). A failure is logged, and
    * the thread's next run's end tries again.
    */
-  const start = (lane: LaneName, direction: string | null, asked: boolean) =>
+  const start = (lane: ThreadId, direction: string | null, asked: boolean) =>
     void requestOutside({
       keeper,
       held: { set: generating, key: lane },
@@ -75,7 +75,7 @@ export function createBanners(deps: {
 
   /** The image to write, or null: no name yet, no key, no skill, or every draw failed. */
   async function generate(
-    lane: LaneName,
+    lane: ThreadId,
     direction: string | null,
   ): Promise<StoredImage | null> {
     const { piSetup } = deps

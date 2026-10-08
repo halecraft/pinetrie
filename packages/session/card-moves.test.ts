@@ -3,7 +3,7 @@ import {
   type CardRecord,
   cardId,
   entryId,
-  laneNameForThread,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
@@ -28,7 +28,7 @@ import { TEST_ROOT } from "./fixtures.ts"
 
 const ME = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
-const LANE = laneNameForThread("x")
+const LANE = threadIdFor("x")
 const C1 = cardId("c-1")
 const at = atEntry(entryId("e-1"))
 const atEnd = { kind: "composing", root: TEST_ROOT, at, lane: LANE } as const

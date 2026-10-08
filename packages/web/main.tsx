@@ -13,7 +13,7 @@ import {
   listWidthCodec,
 } from "@pinetrie/interface"
 import { SESSION_DOC_ID } from "@pinetrie/protocol/messages"
-import { connectSession, newRootId } from "@pinetrie/session"
+import { connectSession } from "@pinetrie/session"
 import { StrictMode } from "react"
 import { createRoot } from "react-dom/client"
 import { App, type AppStores } from "./app.tsx"
@@ -32,7 +32,7 @@ const stores: AppStores = {
     key: `pinetrie-columns:${SESSION_DOC_ID}`,
     codec: {
       encode: encodeLayout,
-      decode: raw => decodeLayout(raw, newRootId),
+      decode: decodeLayout,
     },
     tab: sessionStorage,
     device: localStorage,

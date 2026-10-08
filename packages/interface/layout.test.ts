@@ -1,13 +1,21 @@
 import {
   type EntryId,
   entryId,
+  indexTree,
   type LaneView,
-  laneNameForThread,
-  rootIdFor,
+  threadIdFor,
   workflowStateIdFor,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
-import { NEW_ROOT, tree } from "./fixtures.ts"
+import {
+  entriesOf,
+  entry,
+  NEW_ROOT,
+  NEW_THREAD,
+  threadOfEntry,
+  tree,
+  withThreads,
+} from "./fixtures.ts"
 import {
   columnsOf,
   decodeLayout,
@@ -111,11 +119,18 @@ describe("layoutReducer", () => {
       kind: "newTab",
       key: "n",
       root: NEW_ROOT,
+      thread: NEW_THREAD,
       asksAgent: true,
     })
     expect(opened.active).toEqual({ kind: "new", key: "n" })
     expect(opened.newTabs).toEqual([
-      { key: "n", anchor: null, fresh: { root: NEW_ROOT }, asksAgent: true },
+      {
+        key: "n",
+        anchor: null,
+        thread: NEW_THREAD,
+        fresh: { root: NEW_ROOT },
+        asksAgent: true,
+      },
     ])
     expect(layoutReducer(opened, { kind: "closeNewTab", key: "n" })).toEqual(
       before,
@@ -128,6 +143,7 @@ describe("layoutReducer", () => {
       kind: "newTab",
       key: "n",
       root: NEW_ROOT,
+      thread: NEW_THREAD,
       asksAgent: true,
       prefill,
     })
@@ -135,6 +151,7 @@ describe("layoutReducer", () => {
       {
         key: "n",
         anchor: null,
+        thread: NEW_THREAD,
         fresh: { root: NEW_ROOT, prefill },
         asksAgent: true,
       },
@@ -146,6 +163,7 @@ describe("layoutReducer", () => {
       kind: "newTab",
       key: "n",
       root: NEW_ROOT,
+      thread: NEW_THREAD,
       asksAgent: false,
     })
     const sent = layoutReducer(opened, {
@@ -162,7 +180,7 @@ describe("layoutReducer", () => {
     // it is drawn as the root you are on.
     expect(synced.open).toEqual(["7-r3"])
     expect(columnsOf(synced, entryId("7-r3"))).toEqual([
-      { key: "n", anchor: entryId("7-r3") },
+      { key: "n", anchor: entryId("7-r3"), thread: NEW_THREAD },
     ])
   })
 
@@ -171,6 +189,7 @@ describe("layoutReducer", () => {
       kind: "newTab",
       key: "n",
       root: NEW_ROOT,
+      thread: NEW_THREAD,
       asksAgent: true,
     })
     const shown = layoutReducer(opened, {
@@ -190,37 +209,44 @@ describe("layoutReducer", () => {
     )
   })
 
-  test("a new tab bound by its reserved lane becomes that root's tab, in every browser tab holding it (ADR-0057)", () => {
-    const R = laneNameForThread("r")
+  test("a new tab whose thread starts becomes that root's tab, in every browser tab holding it (ADR-0117)", () => {
     const opened = layoutReducer(at(initialLayout()), {
       kind: "newTab",
       key: "n",
       root: NEW_ROOT,
+      thread: NEW_THREAD,
       asksAgent: true,
     })
-    const reserved = layoutReducer(opened, {
-      kind: "newTabColumn",
-      key: "n",
-      action: { kind: "reserve", key: "n", lane: R },
+    // Sent from another browser tab: no send id here, only its thread's
+    // first message.
+    const written = indexTree(
+      withThreads(
+        entriesOf([
+          ...Object.entries(parents).map(([id, parent]) =>
+            entry(id, parent, { role: "chat", content: id }),
+          ),
+        ]),
+      ),
+    )
+    const started = indexTree({
+      ...written.entries,
+      ...entriesOf([
+        entry("7-r3", null, {
+          role: "chat",
+          content: "7-r3",
+          starts: NEW_THREAD,
+        }),
+      ]),
     })
-    expect(reserved.newTabs[0]?.reserved).toBe(R)
-    // Sent from another browser tab: no send id here, only the lane.
-    const written = tree({ ...parents, "7-r3": null })
-    const lanes = [
-      {
-        name: R,
-        tip: entryId("7-r3"),
-        running: true,
-        waiting: 0,
-        askedBy: null,
-        lastWaiting: null,
-        heldBy: null,
-      },
-    ]
-    const synced = resolve(reserved, written, new Set(), lanes)
+    const synced = resolve(opened, started)
     expect(synced.newTabs).toEqual([])
     expect(columnsOf(synced, entryId("7-r3"))).toEqual([
-      { key: "n", anchor: entryId("7-r3"), lane: R, asksAgent: true },
+      {
+        key: "n",
+        anchor: entryId("7-r3"),
+        thread: NEW_THREAD,
+        asksAgent: true,
+      },
     ])
   })
 
@@ -301,6 +327,7 @@ describe("layoutReducer", () => {
       kind: "newTab",
       key: "n",
       root: NEW_ROOT,
+      thread: NEW_THREAD,
       asksAgent: false,
     })
     expect(
@@ -333,6 +360,7 @@ describe("layoutReducer", () => {
         kind: "newTab",
         key: "n",
         root: NEW_ROOT,
+        thread: NEW_THREAD,
         asksAgent: true,
       }).board,
     ).toBe(false)
@@ -369,26 +397,14 @@ describe("layoutReducer", () => {
     expect(stored).toEqual(shown)
   })
 
-  test("a bound column's anchor moves with its lane's tip in the layout drawn", () => {
-    const L = laneNameForThread("l")
-    const lane = (tip: string): LaneView => ({
-      name: L,
-      tip: entryId(tip),
-      running: true,
-      waiting: 0,
-      askedBy: null,
-      lastWaiting: null,
-      heldBy: null,
-    })
-    const bound = resolve(withColumn(at(initialLayout())), index, new Set(), [
-      lane("4-c"),
-    ])
-    expect(columnsOf(bound, entryId("1-r1"))[1]).toMatchObject({
+  test("a column's anchor moves with its thread's end in the layout drawn", () => {
+    const drawn = resolve(withColumn(at(initialLayout())), index)
+    expect(columnsOf(drawn, entryId("1-r1"))[1]).toMatchObject({
       anchor: entryId("4-c"),
-      lane: L,
+      thread: threadOfEntry("4-c"),
     })
     const replied = tree({ ...parents, "8-e": "4-c" })
-    const next = resolve(bound, replied, new Set(), [lane("8-e")])
+    const next = resolve(drawn, replied)
     expect(columnsOf(next, entryId("1-r1"))[1]?.anchor).toBe("8-e")
   })
 
@@ -452,6 +468,7 @@ describe("listOf", () => {
         kind: "newTab",
         key: "n",
         root: NEW_ROOT,
+        thread: NEW_THREAD,
         asksAgent: false,
       },
     )
@@ -474,7 +491,7 @@ test("unlisted: the roots not in the sidebar, and not archived (ADR-0077, ADR-01
 describe("planOpen", () => {
   const l = at(initialLayout())
   test("scrolls to a message a column of its root already shows", () => {
-    // The root's first column follows its newest leaf, 4-c, through 2-a.
+    // The root's first column follows its thread, through 2-a to 3-b.
     expect(planOpen(l, index, entryId("2-a"))).toEqual({
       kind: "scroll",
       root: "1-r1",
@@ -482,7 +499,8 @@ describe("planOpen", () => {
     })
   })
   test("opens beside the column sharing most of its path, in its own root", () => {
-    expect(planOpen(l, index, entryId("3-b"))).toEqual({
+    // 4-c is a branch at 2-a: another thread, which no column shows.
+    expect(planOpen(l, index, entryId("4-c"))).toEqual({
       kind: "open",
       root: "1-r1",
       after: 0,
@@ -499,13 +517,11 @@ describe("planOpen", () => {
 })
 
 describe("encodeLayout / decodeLayout", () => {
-  const L = laneNameForThread("l")
+  const T = threadIdFor("01a0ffd2-0000-7000-8000-0000000000bb")
   const trip = (l: Layout) =>
-    decodeLayout(JSON.parse(JSON.stringify(encodeLayout(l))), () =>
-      rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff"),
-    )
+    decodeLayout(JSON.parse(JSON.stringify(encodeLayout(l))))
 
-  test("a round trip keeps what you are on, each root's columns, new tabs and the board; never the sidebar, which is your document's", () => {
+  test("a round trip keeps what you are on, each root's columns and threads, new tabs and the board; never the sidebar, which is your document's", () => {
     const l: Layout = {
       active: { kind: "new", key: "n" },
       open: [],
@@ -515,8 +531,13 @@ describe("encodeLayout / decodeLayout", () => {
           entryId("1-r1"),
           [
             { key: "a", anchor: entryId("1-r1") },
-            { key: "b", anchor: entryId("2-a"), lane: L },
-            { key: "d", anchor: entryId("2-a"), fresh: { sendId: "s-1" } },
+            { key: "b", anchor: entryId("2-a"), thread: T },
+            {
+              key: "d",
+              anchor: entryId("2-a"),
+              thread: NEW_THREAD,
+              fresh: { sendId: "s-1" },
+            },
           ],
         ],
       ]),
@@ -524,6 +545,7 @@ describe("encodeLayout / decodeLayout", () => {
         {
           key: "n",
           anchor: null,
+          thread: NEW_THREAD,
           asksAgent: true,
           fresh: { root: NEW_ROOT, state: workflowStateIdFor("d") },
         },
@@ -534,7 +556,7 @@ describe("encodeLayout / decodeLayout", () => {
     expect(trip(initialLayout())).toEqual(initialLayout())
   })
 
-  test("a column's density is kept, and a layout stored before densities still decodes (ADR-0106)", () => {
+  test("a column's density and open details are kept (ADR-0106, ADR-0073)", () => {
     const l: Layout = {
       active: { kind: "root", root: entryId("1-r1") },
       open: [],
@@ -544,45 +566,13 @@ describe("encodeLayout / decodeLayout", () => {
           entryId("1-r1"),
           [
             { key: "a", anchor: entryId("1-r1"), density: "outline" },
-            { key: "b", anchor: entryId("2-a") },
+            { key: "b", anchor: entryId("2-a"), details: true },
           ],
         ],
       ]),
       newTabs: [],
     }
     expect(trip(l)).toEqual(l)
-    const before = JSON.parse(JSON.stringify(encodeLayout(l)))
-    delete before.roots["1-r1"][0].density
-    expect(
-      decodeLayout(before, () => NEW_ROOT)?.roots.get(entryId("1-r1"))?.[0],
-    ).toEqual({
-      key: "a",
-      anchor: entryId("1-r1"),
-    })
-  })
-
-  test("a column's open details are kept, and a layout stored before them decodes closed (ADR-0073)", () => {
-    const l: Layout = {
-      active: { kind: "root", root: entryId("1-r1") },
-      open: [],
-      board: false,
-      roots: new Map([
-        [
-          entryId("1-r1"),
-          [
-            { key: "a", anchor: entryId("1-r1"), details: true },
-            { key: "b", anchor: entryId("2-a") },
-          ],
-        ],
-      ]),
-      newTabs: [],
-    }
-    expect(trip(l)).toEqual(l)
-    const before = JSON.parse(JSON.stringify(encodeLayout(l)))
-    delete before.roots["1-r1"][0].details
-    expect(
-      decodeLayout(before, () => NEW_ROOT)?.roots.get(entryId("1-r1"))?.[0],
-    ).toEqual({ key: "a", anchor: entryId("1-r1") })
   })
 
   test("a message waiting to be sent is never stored, nor restored: it would be sent again", () => {
@@ -595,6 +585,7 @@ describe("encodeLayout / decodeLayout", () => {
             {
               key: "a",
               anchor: entryId("1-r1"),
+              thread: NEW_THREAD,
               fresh: { pending: { text: "hello" } },
             },
           ],
@@ -603,19 +594,24 @@ describe("encodeLayout / decodeLayout", () => {
     })
     expect(JSON.stringify(stored)).not.toContain("hello")
     const raw = {
-      v: 5,
+      v: 6,
       active: null,
       roots: {
         "1-r1": [
-          { key: "a", anchor: entryId("1-r1"), fresh: { pending: "hello" } },
+          {
+            key: "a",
+            anchor: entryId("1-r1"),
+            thread: NEW_THREAD,
+            fresh: { pending: "hello" },
+          },
         ],
       },
       newTabs: [],
       board: false,
     }
-    expect(
-      decodeLayout(raw, () => NEW_ROOT)?.roots.get(entryId("1-r1")),
-    ).toEqual([{ key: "a", anchor: entryId("1-r1"), fresh: {} }])
+    expect(decodeLayout(raw)?.roots.get(entryId("1-r1"))).toEqual([
+      { key: "a", anchor: entryId("1-r1"), thread: NEW_THREAD, fresh: {} },
+    ])
   })
 
   test("a prefill, blank or content, is stored and restored: only pending sends on opening", () => {
@@ -629,28 +625,20 @@ describe("encodeLayout / decodeLayout", () => {
             {
               key: "b",
               anchor: entryId("1-r1"),
+              thread: NEW_THREAD,
               fresh: { prefill: { text: "@agent ", blank: true } },
             },
             {
               key: "c",
               anchor: entryId("1-r1"),
+              thread: T,
               fresh: { prefill: { text: "say it again", blank: false } },
-            },
-            {
-              key: "d",
-              anchor: entryId("1-r1"),
-              fresh: {
-                prefill: {
-                  text: "resolve them",
-                  blank: false,
-                },
-              },
             },
           ],
         ],
       ]),
     }
-    expect(decodeLayout(encodeLayout(l), () => NEW_ROOT)).toEqual(l)
+    expect(decodeLayout(encodeLayout(l))).toEqual(l)
   })
 
   test("a layout that is another version, or partly malformed, restores nothing", () => {
@@ -658,91 +646,60 @@ describe("encodeLayout / decodeLayout", () => {
     for (const raw of [
       { v: 1, columns: [good] },
       { v: 2, active: null, roots: {}, newTabs: [] },
-      // A layout of this shape under the previous version is dropped too.
       { v: 3, active: null, open: [], roots: {}, newTabs: [] },
-      // v3 stored a prefill as a string.
-      {
-        v: 3,
-        active: null,
-        open: [],
-        roots: {
-          r: [
-            {
-              key: "a",
-              anchor: entryId("1-r1"),
-              fresh: { prefill: "@agent " },
-            },
-          ],
-        },
-        newTabs: [],
-      },
-      // v4 held the sidebar (ADR-0122), and an Archive tab; one in v5's shape
-      // under v4 is dropped too.
       { v: 4, active: null, roots: {}, newTabs: [], board: false },
-      { v: 4, active: { kind: "archive" }, open: [], roots: {}, newTabs: [] },
-      { v: 5, active: null, roots: { r: [] }, newTabs: [], board: false },
+      // v5 named a column's lane and reserved id (ADR-0117); one in v6's
+      // shape under v5 is dropped too.
+      { v: 5, active: null, roots: { r: [good] }, newTabs: [], board: false },
+      { v: 6, active: null, roots: { r: [] }, newTabs: [], board: false },
       {
-        v: 5,
+        v: 6,
         active: { kind: "archive" },
         roots: {},
         newTabs: [],
         board: false,
       },
       {
-        v: 5,
+        v: 6,
         active: null,
         roots: { r: [good, { key: 3 }] },
         newTabs: [],
         board: false,
       },
-      { v: 5, active: null, roots: {}, newTabs: [] },
+      {
+        v: 6,
+        active: null,
+        roots: { r: [{ ...good, thread: "w-someone" }] },
+        newTabs: [],
+        board: false,
+      },
+      { v: 6, active: null, roots: {}, newTabs: [] },
       "layout",
       null,
     ])
-      expect(decodeLayout(raw, () => NEW_ROOT)).toBeUndefined()
+      expect(decodeLayout(raw)).toBeUndefined()
   })
 
-  test("a reservation is stored, and one not in the host's shape is left off (ADR-0057)", () => {
-    const R = laneNameForThread("01a0f9eb-86e1-77ad-a822-2a306786223f")
-    const l: Layout = {
-      ...initialLayout(),
-      newTabs: [
-        { key: "n", anchor: null, reserved: R, fresh: { root: NEW_ROOT } },
-      ],
-    }
-    expect(trip(l)).toEqual(l)
-    const raw = {
-      ...encodeLayout(l),
-      newTabs: [{ key: "n", anchor: null, reserved: "t-x" }],
-    }
-    expect(decodeLayout(raw, () => NEW_ROOT)?.newTabs).toEqual([
-      { key: "n", anchor: null },
-    ])
-  })
-
-  test("a new tab keeps its root; one stored without one, or with one not in the host's shape, is given one (ADR-0066)", () => {
-    const minted = rootIdFor("01a0ffd2-0000-7000-8000-00000000000c")
-    const stored = (fresh: object) => ({
+  test("a fresh column with no thread, or a new tab with no root of its own, restores nothing (ADR-0066, ADR-0117)", () => {
+    const stored = (column: object) => ({
       ...encodeLayout(initialLayout()),
-      newTabs: [{ key: "n", anchor: null, fresh }],
+      newTabs: [column],
     })
-    const rootOf = (fresh: object) =>
-      decodeLayout(stored(fresh), () => minted)?.newTabs[0]?.fresh?.root
-    expect(rootOf({ root: NEW_ROOT })).toBe(NEW_ROOT)
-    expect(rootOf({})).toBe(minted)
-    expect(rootOf({ root: "r-x" })).toBe(minted)
-  })
-
-  test("a lane that is not a lane name is left off, and the column kept", () => {
-    const raw = {
-      v: 5,
-      active: null,
-      roots: { r: [{ key: "a", anchor: entryId("1-a"), lane: "w-someone" }] },
-      newTabs: [],
-      board: false,
-    }
-    expect(decodeLayout(raw, () => NEW_ROOT)?.roots.get(entryId("r"))).toEqual([
-      { key: "a", anchor: entryId("1-a") },
+    expect(
+      decodeLayout(
+        stored({
+          key: "n",
+          anchor: null,
+          thread: NEW_THREAD,
+          fresh: { root: NEW_ROOT },
+        }),
+      )?.newTabs[0]?.fresh?.root,
+    ).toBe(NEW_ROOT)
+    for (const column of [
+      { key: "n", anchor: null, fresh: { root: NEW_ROOT } },
+      { key: "n", anchor: null, thread: NEW_THREAD, fresh: {} },
+      { key: "n", anchor: null, thread: NEW_THREAD, fresh: { root: "r-x" } },
     ])
+      expect(decodeLayout(stored(column))).toBeUndefined()
   })
 })

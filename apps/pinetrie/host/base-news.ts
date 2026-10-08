@@ -8,7 +8,7 @@
 // next run plans from the tree alone: a steer placed counts there, and one
 // pi's abort dropped is told again.
 
-import { baseKnown, type CommitId, type LaneName } from "@pinetrie/core"
+import { baseKnown, type CommitId, type ThreadId } from "@pinetrie/core"
 import type { Agent } from "@pinetrie/pi"
 import {
   readAccepted,
@@ -23,15 +23,15 @@ import { type Basics, failed, type HostKeeper } from "./basics.ts"
 
 export interface BaseNews {
   /** What a chat's run on `lane` is told first: its base's new work, or null. */
-  atStart(lane: LaneName): Promise<BehindMessage | null>
+  atStart(lane: ThreadId): Promise<BehindMessage | null>
   /**
    * A refresh rewrote `lane`'s base record: a running lane whose base now has
    * news is told by a steer, in a keeper step of its own. Never awaited from
    * the owner's command, which would wait on itself.
    */
-  baseChanged(lane: LaneName): void
+  baseChanged(lane: ThreadId): void
   /** `lane`'s run ended: what was steered is the tree's to say now. */
-  runEnded(lane: LaneName): void
+  runEnded(lane: ThreadId): void
 }
 
 export function createBaseNews(deps: {
@@ -42,10 +42,10 @@ export function createBaseNews(deps: {
   const { basics } = deps
   const { docs, session, live } = basics
   /** The base commit steered into each running lane, until its run ends. */
-  const told = new Map<LaneName, CommitId>()
+  const told = new Map<ThreadId, CommitId>()
 
   /** Gather and plan: what `lane`'s base has for it now. */
-  async function newsOf(lane: LaneName) {
+  async function newsOf(lane: ThreadId) {
     const doc = await docs.laneDoc(lane)
     if (doc === null) return null
     const bases = readBases(session)

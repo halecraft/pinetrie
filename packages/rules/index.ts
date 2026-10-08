@@ -331,6 +331,7 @@ export {
   planStop,
   STOP,
 } from "./stop.ts"
+export { deriveThreads, type LaneTip, THREAD } from "./thread.ts"
 export {
   decodeTitleConfig,
   planTitling,

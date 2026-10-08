@@ -1,8 +1,8 @@
 import {
   type EntryId,
   entryId,
-  type LaneName,
-  laneNameForThread,
+  type ThreadId,
+  threadIdFor,
   type Verdict,
   type VerdictRecord,
   writerId,
@@ -26,8 +26,8 @@ import {
 
 const ADA = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
-const A = laneNameForThread("a")
-const B = laneNameForThread("b")
+const A = threadIdFor("a")
+const B = threadIdFor("b")
 const R1 = entryId("r1")
 const R2 = entryId("r2")
 
@@ -37,7 +37,7 @@ const said = (s: "needsYou" | "worthARead" | "done"): Verdict => ({
   reason: s === "done" ? null : `why ${s}`,
 })
 const verdict = (
-  lane: LaneName,
+  lane: ThreadId,
   v: Verdict,
   end = "e-5",
   ask = "p-1",
@@ -71,7 +71,7 @@ const input = (over: Partial<AttentionInput> = {}): AttentionInput => ({
   ...over,
 })
 
-const offer = (lane: LaneName, source: string | null): OpenOffer => ({
+const offer = (lane: ThreadId, source: string | null): OpenOffer => ({
   lane,
   root: lane === A ? R1 : R2,
   end: entryId("t"),
@@ -306,7 +306,7 @@ test("attentionWords: each reason, as a value worded once", () => {
 
 test("markOf: the highest level among the roots it covers; working raises nothing", () => {
   const item = (level: "needsYou" | "worthARead") => ({
-    lane: laneNameForThread("m"),
+    lane: threadIdFor("m"),
     root: entryId("r"),
     end: entryId("e"),
     level,

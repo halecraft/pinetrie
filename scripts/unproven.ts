@@ -54,7 +54,7 @@ export const UNPROVEN: Readonly<Record<string, readonly string[]>> = {
     "a new branch's text is kept across a tab switch",
     "closing a new branch that holds text asks first, and discarding takes its card away",
     "a card of yours with text marks its root's item in the sidebar and its thread's end on the rail",
-    "a closed root holding your card marks ▦ and its thread card, and comes back as it was",
+    "an archived root holding your card marks ▦ and its thread card, and comes back as it was",
     "a reload keeps who you are: your name",
     "a reload focuses no box: only a column you open takes focus",
     "what you type is still there after a reload",

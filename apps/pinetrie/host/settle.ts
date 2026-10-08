@@ -1,7 +1,7 @@
 // host/settle — what happens between runs: each lane drained, then the
 // session compacted as upkeep.
 
-import type { LaneName, RootId } from "@pinetrie/core"
+import type { RootId, ThreadId } from "@pinetrie/core"
 import { type Basics, failed, type HostKeeper } from "./basics.ts"
 
 /**
@@ -17,12 +17,12 @@ import { type Basics, failed, type HostKeeper } from "./basics.ts"
 export function createSettle(input: {
   readonly basics: Pick<Basics, "session" | "log">
   readonly keeper: HostKeeper
-  readonly drain: (lane: LaneName) => Promise<void>
+  readonly drain: (lane: ThreadId) => Promise<void>
   /** The root a lane works in: its document is compacted with the session's. */
-  readonly rootOf: (lane: LaneName) => RootId | null
+  readonly rootOf: (lane: ThreadId) => RootId | null
   readonly compact: (roots: ReadonlySet<RootId>) => Promise<void>
   readonly sweep: () => Promise<void>
-}): (lanes: readonly LaneName[]) => Promise<void> {
+}): (lanes: readonly ThreadId[]) => Promise<void> {
   const { basics, keeper } = input
   // The roots the next compaction covers: every settle's until it starts.
   // Roots added while it runs are the next one's, which their settle queued.

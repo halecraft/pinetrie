@@ -37,7 +37,6 @@ import {
   entryId,
   firstLineOf,
   indexTree,
-  type LaneName,
   type LaneRecord,
   type LaneView,
   type MarkRecord,
@@ -58,8 +57,10 @@ import {
   type SnapshotId,
   type StopRecord,
   summarizeRoots,
+  type ThreadId,
   type ThreadLane,
   type ThreadName,
+  type ThreadRecord,
   type TraceRecord,
   type TreeIndex,
   type VerdictRecord,
@@ -102,6 +103,7 @@ import {
   renderableMessage,
   SEAT,
   STOP,
+  THREAD,
   TRACE,
   threadNameOf,
   VERDICT,
@@ -241,7 +243,7 @@ export function readHeld<K, V>(
 }
 
 /** Whether a lane is running now: `pinetrie:live` records its active run. */
-export const readRunning = (live: LiveDocHandle, lane: LaneName): boolean =>
+export const readRunning = (live: LiveDocHandle, lane: ThreadId): boolean =>
   readActiveRun(live, lane) !== undefined
 
 /**
@@ -262,7 +264,7 @@ export interface RootView {
  */
 export function readLatestPrompt(
   doc: RootDocHandle,
-  lane: LaneName,
+  lane: ThreadId,
 ): { readonly id: EntryId; readonly role: string | undefined } | null {
   const index = readTreeIndex(doc)
   const id = promptOf(index, readLaneTip(doc, lane))
@@ -277,7 +279,7 @@ export function readLatestPrompt(
 export function readRunAuthor(
   doc: RootDocHandle,
   session: SessionDocHandle,
-  lane: LaneName,
+  lane: ThreadId,
 ): WriterId | null {
   const latest = readLatestPrompt(doc, lane)
   const stored =
@@ -315,7 +317,7 @@ export function readLanes(
   view: Pick<RootView, "doc" | "live">,
   index: TreeIndex,
   cards: readonly CardRecord[],
-  holds: ReadonlyMap<LaneName, QueueHold>,
+  holds: ReadonlyMap<ThreadId, QueueHold>,
   blank: ReadonlySet<CardId>,
 ): readonly LaneView[] {
   const { doc, live } = view
@@ -390,7 +392,7 @@ export const readRoots = (
 export function readRunningLanes(
   session: SessionDocHandle,
   live: LiveDocHandle,
-): readonly { readonly lane: LaneName; readonly root: RootId }[] {
+): readonly { readonly lane: ThreadId; readonly root: RootId }[] {
   return [...readLaneRecords(session).values()]
     .filter(r => readRunning(live, r.lane))
     .map(r => ({ lane: r.lane, root: r.root }))
@@ -545,8 +547,8 @@ export const readTypingIn = keptWhileSame(
 
 /** Whether two holds say the same: who, and since when. */
 const sameHolds = (
-  a: ReadonlyMap<LaneName, QueueHold>,
-  b: ReadonlyMap<LaneName, QueueHold>,
+  a: ReadonlyMap<ThreadId, QueueHold>,
+  b: ReadonlyMap<ThreadId, QueueHold>,
 ): boolean =>
   a.size === b.size &&
   [...a].every(([lane, h]) => {
@@ -558,8 +560,13 @@ const sameHolds = (
  * Each held queue (`pinetrie.queue-hold`, ADR-0048 step 7), by lane. The same
  * map while the holds are, since every session write wakes it.
  */
+/** Every thread's record (ADR-0117), by its id. */
+export const readThreads = (
+  doc: SessionDocHandle,
+): ReadonlyMap<ThreadId, ThreadRecord> => readRecords(doc, THREAD)
+
 export const readQueueHolds = keptWhileSame(
-  (doc: SessionDocHandle): ReadonlyMap<LaneName, QueueHold> =>
+  (doc: SessionDocHandle): ReadonlyMap<ThreadId, QueueHold> =>
     readRecords(doc, QUEUE_HOLD),
   sameHolds,
 )
@@ -607,7 +614,7 @@ export const readBoardPlaces = (
 ): ReadonlyMap<RootId, BoardPlace> => readRecords(doc, BOARD)
 
 /**
- * The roots in the closed workflow state, archived (ADR-0029, ADR-0122), by
+ * The roots in the archive, archived (ADR-0029, ADR-0122), by
  * id; none before a host wrote the workflow. The same map while the same
  * roots are archived by the same writers at the same times: every write to
  * the session's values wakes it, the directory's included.
@@ -655,14 +662,14 @@ export const readTraces = (
 
 export const readVerdicts = (
   doc: SessionDocHandle,
-): ReadonlyMap<LaneName, VerdictRecord> => readRecords(doc, VERDICT)
+): ReadonlyMap<ThreadId, VerdictRecord> => readRecords(doc, VERDICT)
 
 // ── where lanes work (ADR-0032, ADR-0033) ─────────────────────────────────
 
 /** Every lane's record (`pinetrie.lane`): where it works, by lane. */
 export const readLaneRecords = (
   doc: SessionDocHandle,
-): ReadonlyMap<LaneName, LaneRecord> => readRecords(doc, LANE)
+): ReadonlyMap<ThreadId, LaneRecord> => readRecords(doc, LANE)
 
 /** Every revision record (`pinetrie.revision`), by the entry it is at. */
 export const readRevisions = (
@@ -672,7 +679,7 @@ export const readRevisions = (
 /** The snapshots of `lane`'s own revision records in `doc`, newest first. */
 export const readLaneSnapshots = (
   doc: RootDocHandle,
-  lane: LaneName,
+  lane: ThreadId,
 ): SnapshotId[] =>
   [...readRevisions(doc).values()]
     .filter(r => r.lane === lane)
@@ -682,7 +689,7 @@ export const readLaneSnapshots = (
 /** Each lane's offer in your repo (ADR-0105), by lane. */
 export const readOffers = (
   doc: SessionDocHandle,
-): ReadonlyMap<LaneName, OfferRecord> => readRecords(doc, OFFER)
+): ReadonlyMap<ThreadId, OfferRecord> => readRecords(doc, OFFER)
 
 /** Accepted work as the host last read it (ADR-0104); null before it wrote one. */
 export const readAccepted = (doc: SessionDocHandle): AcceptedRecord | null =>
@@ -691,21 +698,21 @@ export const readAccepted = (doc: SessionDocHandle): AcceptedRecord | null =>
 /** Each lane's base as its history says it (ADR-0104), by lane. */
 export const readBases = (
   doc: SessionDocHandle,
-): ReadonlyMap<LaneName, BaseRecord> => readRecords(doc, BASE)
+): ReadonlyMap<ThreadId, BaseRecord> => readRecords(doc, BASE)
 
 /** Each lane's name (`pinetrie.name`, ADR-0039), by lane. */
 export const readNames = (
   doc: SessionDocHandle,
-): ReadonlyMap<LaneName, ThreadName> =>
+): ReadonlyMap<ThreadId, ThreadName> =>
   new Map([...readRecords(doc, NAME).values()].map(r => [r.lane, r.name]))
 
 /** Each thread's banner (`pinetrie.banner`), by lane. */
 export const readBanners = (
   doc: SessionDocHandle,
-): ReadonlyMap<LaneName, BannerRecord> => readRecords(doc, BANNER)
+): ReadonlyMap<ThreadId, BannerRecord> => readRecords(doc, BANNER)
 
 /** A lane as people read it (`threadNameOf`). */
-export const readThreadName = (doc: SessionDocHandle, lane: LaneName): string =>
+export const readThreadName = (doc: SessionDocHandle, lane: ThreadId): string =>
   threadNameOf(readNames(doc), lane)
 
 /** What the host found where it runs (`pinetrie.project`); null with no tools. */

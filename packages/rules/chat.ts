@@ -27,22 +27,24 @@ import {
   IMAGE_MIMES,
   type ImageMime,
   type ImageRef,
-  type LaneName,
   type Mention,
   type PlanMode,
   type Position,
+  planModeOf,
   type Refusal,
   type Responder,
   refused,
+  type SendAt,
   type Sha256,
   sendWaits,
   THE_AGENT,
+  type ThreadId,
   type ThreadLane,
   type WriterId,
 } from "@pinetrie/core"
 import { type Static, Type } from "typebox"
 import { type BaseNews, behindLine, decodeBehind } from "./behind.ts"
-import { decodeWith } from "./decode.ts"
+import { decodeWith, ThreadIdSchema } from "./decode.ts"
 import { decodeFact, factLine } from "./fact.ts"
 import { decodeLand, type LandMessage, landLine } from "./land.ts"
 import { decodePinned } from "./pinned.ts"
@@ -88,6 +90,8 @@ const DetailsSchema = Type.Object({
   ),
   /** The images its text shows, by reference (ADR-0042). */
   images: Type.Optional(Type.Array(ImageRefSchema)),
+  /** The thread it starts, on a thread's first message alone (ADR-0117). */
+  starts: Type.Optional(ThreadIdSchema),
 })
 
 const ChatSchema = Type.Object({
@@ -116,6 +120,12 @@ export interface ChatDetails {
    * their bytes after `content`. Absent when it shows none.
    */
   readonly images?: readonly ImageRef[]
+  /**
+   * The thread whose first message this is (ADR-0117); absent on every other.
+   * Written in the same commit as the entry, so the tree alone says where
+   * each thread starts (`threadEnd`).
+   */
+  readonly starts?: ThreadId
 }
 
 /** The pi `CustomMessage` a chat is stored as. */
@@ -237,6 +247,7 @@ export const detailsFromStored = (
     : {
         images: d.images.map(i => ({ ...i, sha256: i.sha256 as Sha256 })),
       }),
+  ...(d.starts === undefined ? {} : { starts: d.starts }),
 })
 
 /** A stored message -> its chat details, or undefined if it is not a chat. */
@@ -328,6 +339,7 @@ export function renderableMessage(message: unknown): AgentMessageLike {
           : { contributors: chat.contributors }),
         ...(chat.command === undefined ? {} : { command: chat.command.name }),
         ...(chat.images === undefined ? {} : { images: chat.images }),
+        ...(chat.starts === undefined ? {} : { starts: chat.starts }),
       }
 }
 
@@ -361,23 +373,23 @@ export type ChatDecision =
   /** The thread's lane is idle: append through it. */
   | {
       readonly kind: "appendToLane"
-      readonly lane: LaneName
+      readonly lane: ThreadId
       readonly details: ChatDetails
     }
   /** The thread's lane is idle and the agent is compelled: run. */
   | {
       readonly kind: "run"
-      readonly lane: LaneName
+      readonly lane: ThreadId
       readonly details: ChatDetails
     }
   /**
    * The agent is compelled here for the first time: create the thread's lane
-   * at `at`, under the id `lane`, then run.
+   * at `at`, named by the thread's id, then run.
    */
   | {
       readonly kind: "createAndRun"
       readonly at: Position
-      readonly lane: LaneName
+      readonly lane: ThreadId
       readonly details: ChatDetails
     }
   /**
@@ -389,7 +401,7 @@ export type ChatDecision =
    * changes no file and its base has new work (ADR-0080): catch it up, then
    * plan the chat again.
    */
-  | { readonly kind: "catch-up-first"; readonly lane: LaneName }
+  | { readonly kind: "catch-up-first"; readonly lane: ThreadId }
   | { readonly kind: "busy" }
   /** Another writer wrote at the slot first. Nothing is written; the sender chooses. */
   | { readonly kind: "conflict"; readonly by: WriterId | null }
@@ -440,16 +452,19 @@ export function addressChat(input: {
  * one serial step, so each decision names exactly where to write.
  *
  * - Who it is for is `addressChat`, which the composer runs too.
- * - `branch` starts a thread at `at` and never continues a lane: plain, it is
- *   appended there with no lane; compelled, it creates a new lane there.
+ * - A `branch` starts its thread at its fork and never continues a lane:
+ *   plain, it is appended there with no lane; compelled, it creates the
+ *   thread's lane there. Its message names the thread it starts (`starts`).
  * - A thread lane that is running, or has cards queued, is busy: a message
  *   is not written, and its card is queued behind them, since a lane is never
  *   written while it runs (S21).
- * - A compelled `reply` that another writer raced, or that finds the lane busy,
- *   is a conflict: the sender chooses to queue or to branch. Plain chat never
- *   conflicts.
+ * - A compelled `end` send that another writer raced, or that finds the lane
+ *   busy, is a conflict: the sender chooses to queue or to branch. Plain chat
+ *   never conflicts.
  * - `queue` is the host popping a queued card: it is the queue's turn, so
  *   only a run makes the lane busy.
+ * - A lane is always named by its thread's id (ADR-0117): no other name is
+ *   ever chosen.
  * - A run on a lane whose work changes no file, and whose base has new work,
  *   catches the lane up first (`catch-up-first`, ADR-0080), once per send.
  */
@@ -457,10 +472,9 @@ export function planChat(input: {
   readonly author: WriterId
   readonly authorName: string
   readonly text: string
-  readonly mode: PlanMode
-  /** What the sender saw: the end they read, or the branch point. */
-  readonly at: Position
-  /** The thread, from `threadOf`. */
+  /** Where it goes. */
+  readonly at: SendAt
+  /** The thread, from `threadOfSend`. */
   readonly thread: {
     readonly end: Position
     readonly lane: ThreadLane
@@ -472,16 +486,6 @@ export function planChat(input: {
   readonly asksAgent: boolean
   /** The command's id. */
   readonly sendId: string
-  /**
-   * The ids a lane this message creates may take (ADR-0057): the one its
-   * sender's column reserved, unless pi holds it already (`held`), else
-   * `spare`, which the host made.
-   */
-  readonly newLane: {
-    readonly reserved: LaneName | null
-    readonly held: ReadonlySet<string>
-    readonly spare: LaneName
-  }
   /** The other people who wrote in its card; empty for a message written alone. */
   readonly contributors: readonly WriterId[]
   /** The images its text shows, as `planImages` found them in the store. */
@@ -511,7 +515,9 @@ export function planChat(input: {
   readonly caughtUp: boolean
 }): ChatDecision {
   const { lane, end, race } = input.thread
-  const branch = input.mode === "branch"
+  const { at } = input
+  const mode = planModeOf(at)
+  const branch = at.kind === "branch"
   const { command } = input
   if (command !== null && "unknown" in command)
     return refused(ERR.UNKNOWN_COMMAND, `no command /${command.unknown}`)
@@ -523,7 +529,7 @@ export function planChat(input: {
   const { compels } = addressChat({
     mentions: input.mentions,
     participants: input.participants,
-    mode: input.mode,
+    mode,
     lane,
     asksAgent: input.asksAgent,
     command: command !== null,
@@ -542,32 +548,31 @@ export function planChat(input: {
       : { contributors: input.contributors }),
     ...(command === null ? {} : { command }),
     ...(input.images.length === 0 ? {} : { images: input.images }),
+    ...(branch ? { starts: at.thread } : {}),
   }
   const compelled = compels.kind === "agent"
-  const { reserved, held, spare } = input.newLane
-  const created = reserved === null || held.has(reserved) ? spare : reserved
 
   if (branch) {
     return compelled
-      ? { kind: "createAndRun", at: input.at, lane: created, details }
-      : { kind: "appendToTree", parent: input.at, details }
+      ? { kind: "createAndRun", at: end, lane: at.thread, details }
+      : { kind: "appendToTree", parent: end, details }
   }
 
   if (lane.kind === "none") {
     if (!compelled) return { kind: "appendToTree", parent: end, details }
-    if (input.mode === "reply" && race !== null)
+    if (mode === "reply" && race !== null)
       return { kind: "conflict", by: race.by }
-    return { kind: "createAndRun", at: end, lane: created, details }
+    return { kind: "createAndRun", at: end, lane: at.thread, details }
   }
 
-  const name: LaneName = lane.name
-  const busy = input.mode === "queue" ? lane.running : sendWaits(lane)
+  const name: ThreadId = lane.name
+  const busy = mode === "queue" ? lane.running : sendWaits(lane)
   if (!compelled) {
     return busy
       ? { kind: "busy" }
       : { kind: "appendToLane", lane: name, details }
   }
-  if (input.mode === "reply" && (race !== null || busy)) {
+  if (mode === "reply" && (race !== null || busy)) {
     return { kind: "conflict", by: race?.by ?? lane.askedBy }
   }
   if (busy) return { kind: "busy" }

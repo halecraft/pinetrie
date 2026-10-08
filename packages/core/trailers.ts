@@ -14,8 +14,8 @@ import {
   commitId,
   type EntryId,
   entryId,
-  isLaneName,
-  type LaneName,
+  isThreadId,
+  type ThreadId,
   type ThreadName,
 } from "./index.ts"
 import type { OfferLedger } from "./offers.ts"
@@ -121,7 +121,7 @@ function ourLastParagraph(text: string): number | null {
 export const revisionMessage = (input: {
   readonly title: string
   readonly entry: EntryId
-  readonly lane: LaneName
+  readonly lane: ThreadId
 }): string =>
   `${input.title}\n\n${TRAILERS.entry}: ${input.entry}\n${TRAILERS.lane}: ${input.lane}\n`
 
@@ -202,7 +202,7 @@ export const isWipLine = (name: ThreadName, line: string): boolean =>
 export const withTrailers = (
   message: string,
   at: {
-    readonly lane: LaneName
+    readonly lane: ThreadId
     readonly name: ThreadName
     readonly entry: string
   },
@@ -236,7 +236,7 @@ export function withLedger(message: string, ledger: OfferLedger): string {
 export const offerMessage = (
   message: string,
   at: {
-    readonly lane: LaneName
+    readonly lane: ThreadId
     readonly name: ThreadName
     readonly entry: string
     readonly ledger: OfferLedger
@@ -291,7 +291,7 @@ export const sourcesOf = (message: string): CommitId[] =>
  * lane's history. A turn's commit carries no
  * `Pinetrie-Thread`, so it is never one.
  */
-export function untracedLanes(message: string): LaneName[] {
+export function untracedLanes(message: string): ThreadId[] {
   return message
     .split("\n\n")
     .filter(
@@ -300,5 +300,5 @@ export function untracedLanes(message: string): LaneName[] {
         trailerValues(p, "source").length === 0,
     )
     .flatMap(p => trailerValues(p, "lane"))
-    .filter(isLaneName)
+    .filter(isThreadId)
 }

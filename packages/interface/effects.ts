@@ -10,7 +10,6 @@ import type {
   CardId,
   CardRecord,
   EntryId,
-  LaneName,
   LaneRecord,
   LaneView,
   Move,
@@ -19,6 +18,7 @@ import type {
   QueueHoldChange,
   Reorder,
   RootId,
+  ThreadId,
   TreeIndex,
   WriterId,
 } from "@pinetrie/core"
@@ -51,7 +51,7 @@ export type Effect =
   /** Mark what `lane` raised "not needed", in your attention document. */
   | {
       readonly kind: "notNeeded"
-      readonly lane: LaneName
+      readonly lane: ThreadId
       readonly raised: Raised
     }
   /** Ask the host for something that moves no card (`HostRequest`). */
@@ -147,7 +147,7 @@ export type Effect =
   /** An offer action, which the session tracks (`acting`). */
   | {
       readonly kind: "offer"
-      readonly lane: LaneName
+      readonly lane: ThreadId
       readonly action: OfferAction
       readonly to: string | null
     }
@@ -201,7 +201,7 @@ export interface CardFacts {
   readonly cards: readonly CardRecord[]
   readonly lanes: readonly LaneView[]
   /** Every lane's record: a queue takes its lane's root (`queueRoot`). */
-  readonly laneRecords: ReadonlyMap<LaneName, LaneRecord>
+  readonly laneRecords: ReadonlyMap<ThreadId, LaneRecord>
   readonly me: WriterId
   /** Your cards that hold text (`holdsText`): an empty message gives way to a put. */
   readonly filled: ReadonlySet<CardId>

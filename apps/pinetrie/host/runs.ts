@@ -8,11 +8,11 @@
 
 import {
   type EntryId,
-  type LaneName,
   type RunId,
   runId,
   type SentCard,
   type StreamEvent,
+  type ThreadId,
 } from "@pinetrie/core"
 import type { Agent } from "@pinetrie/pi"
 import { readLatestPrompt } from "@pinetrie/reads"
@@ -51,7 +51,7 @@ export type RunStart =
 
 /** The cards entry a run on `lane` starts with, or null (`pinned.ts`). */
 export type ReadPinned = (
-  lane: LaneName,
+  lane: ThreadId,
   seen: readonly SentCard[],
   signal: AbortSignal,
 ) => Promise<PinnedMessage | null>
@@ -61,13 +61,13 @@ export interface Runs {
    * Start one turn on a thread's lane, streaming into the document. A
    * prompt's run reads its pinned cards first, which may wait for their text.
    */
-  start(lane: LaneName, start: RunStart): RunId
+  start(lane: ThreadId, start: RunStart): RunId
   /**
    * Stop a chat's run that has not reached pi yet: it is waiting for its
    * pinned cards' text, where pi's `abort` reaches nothing. Its message is
    * kept, unrun. False when no such run waits on `lane`.
    */
-  cancel(lane: LaneName): boolean
+  cancel(lane: ThreadId): boolean
   /**
    * Set once: called after each run's end has closed its streams and stopped
    * its lane. Set after `createRuns`, since what it calls starts runs.
@@ -75,7 +75,7 @@ export interface Runs {
    * when the lane has none. A listener uses it rather than the lane's tip,
    * which a drain may already have moved on to the next ask.
    */
-  onEnded(ended: (lane: LaneName, prompt: EntryId | null) => void): void
+  onEnded(ended: (lane: ThreadId, prompt: EntryId | null) => void): void
 }
 
 /** One step of a run's end, in the order `planRunEnd` returns them. */
@@ -125,7 +125,7 @@ export const streamInto =
   }
 
 /** `lane`'s run `run` ended: gather, plan (`planEndRun`), write. */
-export const endRun = (live: LiveDocHandle, lane: LaneName, run: RunId): void =>
+export const endRun = (live: LiveDocHandle, lane: ThreadId, run: RunId): void =>
   applyLiveOps(
     live,
     planEndRun({
@@ -144,23 +144,23 @@ export function createRuns(deps: {
   /** What a chat's run is told first of its base's new work, and forgetting what was steered once the lane stops. */
   readonly baseNews: Pick<BaseNews, "atStart" | "runEnded">
   /** Write `lane`'s run's verdict as pending (`Digests.pending`). */
-  readonly pending: (lane: LaneName, prompt: EntryId) => Promise<void>
+  readonly pending: (lane: ThreadId, prompt: EntryId) => Promise<void>
 }): Runs {
   const { basics, agent, work, readPinned, baseNews } = deps
   const { docs, live, log } = basics
-  let ended: (lane: LaneName, prompt: EntryId | null) => void = () => {}
+  let ended: (lane: ThreadId, prompt: EntryId | null) => void = () => {}
   /**
    * A chat's run between its start and pi's, by lane. Only a chat's: a land
    * or stack run cancelled here would write no prompt, and `end` would read
    * the lane's previous one, and could check an old split's stack again.
    */
-  const waiting = new Map<LaneName, AbortController>()
+  const waiting = new Map<ThreadId, AbortController>()
 
   /**
    * Carry out `planRunEnd`. The steps before `endRun` may fail, and a failure
    * is logged; `endRun` and every step after it always run.
    */
-  async function end(lane: LaneName, id: RunId): Promise<void> {
+  async function end(lane: ThreadId, id: RunId): Promise<void> {
     const doc = docs.docOfLane(lane)
     const prompt = doc === null ? null : readLatestPrompt(doc, lane)
     const steps = planRunEnd(prompt?.role)

@@ -3,9 +3,9 @@ import {
   type CardRecord,
   cardId,
   entryId,
-  laneNameForThread,
   rootIdFor,
   runId,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { encodePinned } from "@pinetrie/rules"
@@ -50,7 +50,7 @@ test("readTreeIndex keeps the index, and each unchanged entry, until entries cha
 
 test("a compaction carries the newest cards entry of its retained tail; one with none carries nothing", () => {
   const doc = newRootDoc()
-  const lane = laneNameForThread("0123456789abcdef")
+  const lane = threadIdFor("0123456789abcdef")
   const view = (text: string) => ({
     lane,
     cards: [{ id: cardId("c-1"), text, by: writerId("ada@x.io") }],
@@ -84,7 +84,7 @@ test("readLanes: a lane's queued cards are what waits; askedBy is who queued the
   const doc = newRootDoc()
   const live = newLiveDoc()
   const view = { doc, live }
-  const lane = laneNameForThread("0123456789abcdef")
+  const lane = threadIdFor("0123456789abcdef")
   writeEntry(doc, row("e1", null))
   writeLaneTip(doc, lane, entryId("e1"))
   const queued = (id: string, order: string, email: string): CardRecord => ({

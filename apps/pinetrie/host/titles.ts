@@ -9,11 +9,11 @@
 import { subscribe } from "@kyneta/schema"
 import {
   type EntryId,
-  type LaneName,
   type Position,
   type Refusal,
   type RootId,
   summarizeRoots,
+  type ThreadId,
   type WriterId,
 } from "@pinetrie/core"
 import type { Keeper } from "@pinetrie/keeper"
@@ -58,7 +58,7 @@ export interface Titles {
    */
   laneStarted(input: {
     readonly root: RootId
-    readonly lane: LaneName
+    readonly lane: ThreadId
     readonly at: Position
     readonly prompt: { readonly author: string; readonly text: string }
   }): Promise<void>

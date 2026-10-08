@@ -14,11 +14,11 @@ import {
   commitId,
   hasTrailer,
   type LaneBase,
-  type LaneName,
   type OfferInRepo,
   type OfferRevision,
   offerLedger,
   type StartRead,
+  type ThreadId,
   type ThreadName,
   trailerRevset,
   type WorkChanges,
@@ -74,7 +74,7 @@ export interface LaneRow {
 
 /** The revset and template of the one read, for `lane`'s offer under `name`. */
 function laneRead(input: {
-  readonly lane: LaneName
+  readonly lane: ThreadId
   readonly name: ThreadName | undefined
   readonly repoConfig: RepoConfig
   readonly acceptedOfferCommits: readonly CommitId[]
@@ -322,7 +322,7 @@ export interface LaneGather {
 export async function gatherLane(
   jj: Runner,
   input: {
-    readonly lane: LaneName
+    readonly lane: ThreadId
     readonly name: ThreadName | undefined
     readonly repoConfig: RepoConfig
     readonly shared: SharedFacts

@@ -21,12 +21,12 @@ import {
   type EntryId,
   entryId,
   HOST_OPERATOR,
-  type LaneName,
   messageText,
   nearestRevision,
   projectTranscript,
   ROOT,
   rootOf,
+  type ThreadId,
 } from "@pinetrie/core"
 import { DEFAULT_REPO, laneBase, type Runner, run } from "@pinetrie/lanes"
 import { scriptedModel } from "@pinetrie/pi"
@@ -126,11 +126,11 @@ async function mainSection(
     )
   }
   const tipOf = (text: string) => laneWith(text)?.tip ?? null
-  const laneTip = (lane: LaneName) =>
+  const laneTip = (lane: ThreadId) =>
     lanesOf(wh, tree(), readPlaces(wh.places)).find(l => l.name === lane)
       ?.tip ?? null
   /** Every tool result's text in a lane's thread, oldest first. */
-  const toolResults = (lane: LaneName | undefined): string[] => {
+  const toolResults = (lane: ThreadId | undefined): string[] => {
     if (lane === undefined) return []
     const index = tree()
     const tip =
@@ -206,7 +206,7 @@ async function mainSection(
     ])
     const asked = `check the boundary, and ${project}/shared.txt`
     await wu.chat(asked, at(tipOf("lane one: who are you?")), {
-      lane: one?.name,
+      thread: one?.name,
     })
     await idle()
     check(
@@ -242,7 +242,7 @@ async function mainSection(
     const ofOne = [...rootRecordsOf(wh, readRevisions).values()].filter(
       r => r.lane === one?.name,
     )
-    const bookmark = (lane: LaneName | undefined) =>
+    const bookmark = (lane: ThreadId | undefined) =>
       lane === undefined
         ? ""
         : jj(
@@ -288,11 +288,11 @@ async function mainSection(
       "set up deps",
       at(tipOf("check the boundary, and /mnt/host-working-copy/shared.txt")),
       {
-        lane: one?.name,
+        thread: one?.name,
       },
     )
     await idle()
-    const sums = (lane: LaneName) =>
+    const sums = (lane: ThreadId) =>
       inLane(
         lane,
         "sha256sum shared.txt node_modules/dep/index.bin .vite/cache.bin",
@@ -304,7 +304,7 @@ async function mainSection(
       { tool: "bash", args: { command: "echo parent-later > shared.txt" } },
       { text: "parent moved on" },
     ])
-    await wu.chat("move on", at(setUp), { lane: one?.name })
+    await wu.chat("move on", at(setUp), { thread: one?.name })
     await idle()
     script.use([
       { tool: "bash", args: { command: "echo branch > shared.txt" } },
@@ -378,7 +378,7 @@ async function mainSection(
       { text: "tried" },
     ])
     await wu.chat("try to rewrite", at(tipOf("@agent go deeper")), {
-      lane: deeper?.name,
+      thread: deeper?.name,
     })
     await idle()
     const rewrite = toolResults(deeper?.name).at(-1) ?? ""
@@ -457,7 +457,7 @@ async function mainSection(
       { text: "wrote big" },
     ])
     await wu.chat("write something big", at(tipOf("try to rewrite")), {
-      lane: deeper?.name,
+      thread: deeper?.name,
     })
     // At once, while the snapshot may still be running.
     await waitFor(() => idOf("wrote big") !== null, 60_000)
@@ -484,7 +484,7 @@ async function mainSection(
       { text: "never" },
     ])
     await wu.chat("sleep a while", at(tipOf("have a look")), {
-      lane: atOnce?.name,
+      thread: atOnce?.name,
     })
     // The second command is running: stop it, as a person does.
     await waitFor(
@@ -516,7 +516,7 @@ async function mainSection(
       { text: "edited" },
     ])
     await wu.chat("edit line two", at(tipOf("lane two: who are you?")), {
-      lane: two?.name,
+      thread: two?.name,
     })
     await idle()
     const offered = await waitFor(
@@ -536,7 +536,7 @@ async function mainSection(
     // bookmark and its message's trailer carry it (ADR-0039).
     const names = readNames(wh.session)
     const twoName = two === undefined ? undefined : names.get(two.name)
-    const offerBookmarkOf = (lane: LaneName | undefined) =>
+    const offerBookmarkOf = (lane: ThreadId | undefined) =>
       lane === undefined
         ? ""
         : `pinetrie-offer/${readNames(wh.session).get(lane) ?? ""}`
@@ -805,7 +805,7 @@ async function mainSection(
       "one more",
       at(two === undefined ? null : laneTip(two.name)),
       {
-        lane: two?.name,
+        thread: two?.name,
       },
     )
     await idle()
@@ -1001,11 +1001,11 @@ async function mainSection(
     // Accepting the parent's shrinks it to its own, in place; accepting a
     // branch that holds all of its parent's withdraws the parent's
     // (ADR-0039).
-    const offerFor = (lane: LaneName | undefined) =>
+    const offerFor = (lane: ThreadId | undefined) =>
       lane === undefined ? undefined : readOffers(wh.session).get(lane)
-    const filesOf = (lane: LaneName | undefined) =>
+    const filesOf = (lane: ThreadId | undefined) =>
       JSON.stringify(offerFor(lane)?.files)
-    const changeOf = (lane: LaneName | undefined) =>
+    const changeOf = (lane: ThreadId | undefined) =>
       jj(
         project,
         "log",
@@ -1033,7 +1033,7 @@ async function mainSection(
     }
     const branchA = await branchWriting("@agent branch a", "branch-a.txt")
     const aBefore = { files: filesOf(branchA), change: changeOf(branchA) }
-    await wu.offer(lane2 ?? ("" as LaneName), "accept", "pinetrie-accepted")
+    await wu.offer(lane2 ?? ("" as ThreadId), "accept", "pinetrie-accepted")
     const shrunk = await waitFor(
       () => filesOf(branchA) === JSON.stringify(["branch-a.txt"]),
       30_000,
@@ -1054,7 +1054,7 @@ async function mainSection(
       "still more",
       at(lane2 === undefined ? null : laneTip(lane2)),
       {
-        lane: lane2,
+        thread: lane2,
       },
     )
     await idle()
@@ -1062,7 +1062,7 @@ async function mainSection(
     const branchB = await branchWriting("@agent branch b", "branch-b.txt")
     await wh.quiet()
     const acceptedB = await wu.offer(
-      branchB ?? ("" as LaneName),
+      branchB ?? ("" as ThreadId),
       "accept",
       "pinetrie-accepted",
     )
@@ -1122,7 +1122,7 @@ async function mainSection(
             "commit_id",
           ) !== "",
       )
-    if (rootOne !== null) await moveRootTo(wu, entryId(rootOne), "closed")
+    if (rootOne !== null) await moveRootTo(wu, entryId(rootOne), "archive")
     await wh.quiet()
     const kept = before.filter(
       r => r.snapshot !== null && snapshotExists(project, r.snapshot),
@@ -1165,7 +1165,7 @@ async function mainSection(
       { tool: "bash", args: { command: "cat shared.txt" } },
       { text: "back" },
     ])
-    await wu.chat("still there?", at(tipOf("move on")), { lane: one?.name })
+    await wu.chat("still there?", at(tipOf("move on")), { thread: one?.name })
     await idle()
     check(
       "after restoring, a lane runs again on its newest snapshot",
@@ -1185,7 +1185,7 @@ async function mainSection(
       { tool: "bash", args: { command: "echo still" } },
       { text: "retired" },
     ])
-    await wu.chat("are you there?", at(two?.tip ?? null), { lane: two?.name })
+    await wu.chat("are you there?", at(two?.tip ?? null), { thread: two?.name })
     await idle()
     check(
       "a lane with no disk and no snapshot is retired, and its tools say to branch from it",

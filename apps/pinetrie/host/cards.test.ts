@@ -5,8 +5,8 @@ import {
   type CardRecord,
   cardId,
   entryId,
-  laneNameForThread,
   rootIdFor,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { cardDocId, TextDoc, textVersion } from "@pinetrie/schema"
@@ -65,7 +65,7 @@ test("blankQueued: a queued card made empty is blank; one queued with text is no
       kind: "queued",
       root: rootIdFor("01a0ffd2-0000-7000-8000-00000000000a"),
       at: atEntry(entryId("e-1")),
-      lane: laneNameForThread("x"),
+      lane: threadIdFor("x"),
       order: "a",
       by: ADA,
       seen: s,

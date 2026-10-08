@@ -5,11 +5,11 @@
 import {
   type DiffSpan,
   type EntryId,
-  type LaneName,
   type OfferRecord,
   type RevisionRecord,
   type RevisionReview,
   spanKey,
+  type ThreadId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
 import { decodeWith } from "./decode.ts"
@@ -135,7 +135,7 @@ const CONTROL = /[\u0000-\u001f\u007f]/
  */
 export function planOfferRead(
   facts: {
-    readonly offers: ReadonlyMap<LaneName, OfferRecord>
+    readonly offers: ReadonlyMap<ThreadId, OfferRecord>
     readonly revisions: ReadonlyMap<EntryId, RevisionRecord>
   },
   ask: OfferAsk,

@@ -1,7 +1,7 @@
 // host/work/registry — each lane's handle while the host may run it: its
 // queue, and its channel once open. Only this module touches the handles.
 
-import type { LaneName, LaneRecord } from "@pinetrie/core"
+import type { LaneRecord, ThreadId } from "@pinetrie/core"
 import {
   helperCommand,
   type LaneHandle,
@@ -35,14 +35,14 @@ export const openLinkOf =
   }
 
 export interface LaneRegistry {
-  handleOf(lane: LaneName): LaneHandle<LaneChannel>
+  handleOf(lane: ThreadId): LaneHandle<LaneChannel>
   /** The lane's own jj, through its channel. */
-  laneJjOf(lane: LaneName): Runner
-  recordOf(lane: LaneName): LaneRecord | undefined
+  laneJjOf(lane: ThreadId): Runner
+  recordOf(lane: ThreadId): LaneRecord | undefined
   /** A lane that has its own container here. */
-  isOwn(lane: LaneName): boolean
+  isOwn(lane: ThreadId): boolean
   /** Drop a lane's handle, stopping it: an archived lane. */
-  forget(lane: LaneName): Promise<void>
+  forget(lane: ThreadId): Promise<void>
   /** Stop every handle: the host's shutdown. */
   stopAll(): Promise<void>
 }
@@ -53,10 +53,10 @@ export function createRegistry(input: {
   readonly runtime: LaneRuntime
 }): LaneRegistry {
   const { runtime } = input
-  const handles = new Map<LaneName, LaneHandle<LaneChannel>>()
-  const recordOf = (lane: LaneName) => readLaneRecords(input.session).get(lane)
+  const handles = new Map<ThreadId, LaneHandle<LaneChannel>>()
+  const recordOf = (lane: ThreadId) => readLaneRecords(input.session).get(lane)
   const open = openLinkOf(runtime)
-  function handleOf(lane: LaneName): LaneHandle<LaneChannel> {
+  function handleOf(lane: ThreadId): LaneHandle<LaneChannel> {
     let handle = handles.get(lane)
     if (handle === undefined) {
       handle = laneHandle(runtime, laneContainer(lane), open)

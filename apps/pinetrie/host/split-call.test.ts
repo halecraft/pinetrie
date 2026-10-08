@@ -1,4 +1,4 @@
-import { entryId, laneNameForThread, runId, writerId } from "@pinetrie/core"
+import { entryId, runId, threadIdFor, writerId } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
 import { readCardHistories, readPlaces } from "@pinetrie/reads"
 import { OFFER, SPLIT_QUEUED, setRecord, splitRefusal } from "@pinetrie/rules"
@@ -10,7 +10,7 @@ import { applyWrites, basics, putLane, putValue, row } from "./fakes.ts"
 import { createProvenance } from "./provenance.ts"
 import { createSplitCall } from "./split-call.ts"
 
-const LANE = laneNameForThread("0123456789abcdef")
+const LANE = threadIdFor("0123456789abcdef")
 const ADA = writerId("ada@x.io")
 
 /** A running lane, its prompt by Ada, with an open offer: what `split_offer` splits. */

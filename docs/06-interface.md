@@ -95,7 +95,7 @@ beside it (ADR-0081, turned sideways).
   small dot in your colour when the root holds something you typed and have
   not sent.
 - **Move to ▸** in an item's `⋯` moves the root on the board, for everyone
-  (below). Moved to the closed state, it is archived: the item says so
+  (below). Moved to the archive, it is archived: the item says so
   ("archive: read-only for everyone until moved out"), is disabled while
   the agent works in that root or cards are queued there, with the reason,
   and names the threads whose offers it withdraws from your repo ("work not
@@ -264,7 +264,7 @@ cleared), or a click outside it and its strip closes it, and so does choosing so
 tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
 
 - **Every root is in one workflow state.** Each open state is a column of
-  the board, in order; the closed state is last. A new session has
+  the board, in order; the archive is last. A new session has
   **Backlog**, **Doing** and **Done**.
 - **A thread card** (ADR-0111) is a root, on the board and in the sidebar
   alike: its header, the same in both, shows its label, its status (with
@@ -301,7 +301,7 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   focuses the field; the board opening by itself does not. `/` focuses it
   while the board is open; Escape clears the filter before it closes the
   board. The filter outlives closing the board, not a reload.
-- **The closed state archives** (ADR-0029): a root there is read-only for
+- **A root in the archive is archived** (ADR-0029): it is read-only for
   everyone until it is moved out, the host lets go of it, and its threads'
   offers leave your repo. Its column, as wide as the others and marked ✓,
   shows a count and its most recent roots, or every root the search keeps,
@@ -314,7 +314,7 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   moves it left or right, adds a state left or right of it (a name field
   stands where it will go), or removes it, which is refused, with the
   reason, while it holds a root or is the only open state. Adding a state is
-  rare, so it takes no room on the board. The closed state can be renamed, never moved or
+  rare, so it takes no room on the board. The archive can be renamed, never moved or
   removed.
 - **A backlog item is a conversation root**: an idea not started is a root
   with no agent (ADR-0021); people discuss it below its first message, and
@@ -370,10 +370,9 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
 - **The shared part of paths is shown once.** A column shows only what follows
   the deepest entry it shares with any column to its left; its header says where
   it came from.
-- **A column grows as replies arrive.** It follows its own tip to the newest
-  message below it, including the agent's reply, which may have been written on
-  another lane (`followTip`). A branch off an earlier message, however new,
-  never pulls it away. This replaces "follow the newest".
+- **A column grows as replies arrive.** It shows one thread to its end,
+  including the agent's reply (`threadEnd`, ADR-0117). A branch, which
+  starts another thread, however new, never pulls it away.
 - **Columns are reordered by dragging their headers.** Whichever column is
   first shows its whole path, so moving a branch to the far left makes it read
   as the trunk. Nothing in the document changes: which path reads as the trunk
@@ -411,7 +410,7 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   passes over a blank message (no command, nothing typed) and sends the
   cards behind it; the blank card stays until someone writes in it. It does
   not keep the thread working: a thread with only blank cards queued draws
-  no ring, can be resumed, and can be moved to the closed state. The rail scrolls on its own, and
+  no ring, can be resumed, and can be moved to the archive. The rail scrolls on its own, and
   follows the column you move (below).
 - **A column shown again is where you left it** (ADR-0058): the same message
   at the same height, or its end if you were following it. If its thread
@@ -636,7 +635,7 @@ The rail is E; the column is T. Seeing both at once is the product.
   ("send to Ada +2" for three), "send to agent", or, while the agent is busy,
   "queue up next", "queue after Bea" or "queue after yours", naming who
   queued the last card already waiting. It uses the host's own decision (`addressChat`,
-  over `threadOf`), so it cannot promise a reply that will not come. When the
+  over the column's thread), so it cannot promise a reply that will not come. When the
   send starts a thread and you have WIP bookmarks, a line left of the
   button says what its copy **starts from** ("starts from accepted work ▾"),
   and opens the choices: accepted work, or a WIP, with how far that is
@@ -1005,9 +1004,9 @@ a lane, the `navigate` command had no caller and was deleted with `prompt` and
 Every part of this is a read of what the document already holds, except the
 board's records (ADR-0122); a card's text is its own document (ADR-0048).
 
-- **A column** is a client-local anchor entry. Its path is `projectTranscript`
-  of `followTip(anchor)`, or, once it is bound to a lane, of the lane's tip;
-  the part after its fork point is the suffix below the column to its left.
+- **A column** shows a thread (ADR-0117). Its path is `projectTranscript` of
+  the thread's end (`threadEnd`); the part after its fork point is the
+  suffix below the column to its left.
 - **The rail** is the tree itself, from `parentId`, drawn in id order, which is
   creation order (uuidv7).
 - **A thread's mode** is its lane; **names** are `pinetrie.participant` values.
@@ -1022,9 +1021,9 @@ board's records (ADR-0122); a card's text is its own document (ADR-0048).
   yours: an entry id (`mentionsSince`), at or before which every mention is
   seen, and the ids of later ones you have seen.
 - **The board** is two host-written records (ADR-0122): the workflow
-  (`pinetrie.workflow`, the open states in order and the closed one) and each
+  (`pinetrie.workflow`, the open states in order, then the archive) and each
   root's place (`pinetrie.board`, by its id: its state, its rank there, who
-  moved it and when). A root in the closed state is archived; the host
+  moved it and when). A root in the archive is archived; the host
   refuses commands that would write in it (ADR-0029).
 - **Which root you are on, each root's columns, new tabs and whether the
   board is open** are view state, kept in the browser per browser tab, with

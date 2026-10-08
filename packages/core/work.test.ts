@@ -12,13 +12,13 @@ import {
   hostPathInLane,
   indexTree,
   isBusy,
-  laneNameForThread,
   nearestRevision,
   promptOf,
   type RevisionRecord,
   ROOT,
   sendWaits,
   snapshotId,
+  threadIdFor,
   turnEntry,
   writerId,
 } from "./index.ts"
@@ -31,10 +31,10 @@ const at = (
   extra: object = {},
 ) => entry(id, parentId, { role, content: id, ...extra })
 
-const A = laneNameForThread("a")
-const B = laneNameForThread("b")
-const D = laneNameForThread("d")
-const E = laneNameForThread("e")
+const A = threadIdFor("a")
+const B = threadIdFor("b")
+const D = threadIdFor("d")
+const E = threadIdFor("e")
 const C1 = commitId("c1")
 const C2 = commitId("c2")
 const CB = commitId("cb")

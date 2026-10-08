@@ -1,9 +1,9 @@
-import { entryId, laneNameForThread } from "@pinetrie/core"
+import { entryId, threadIdFor } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { NO_READS, READ_EVERY, readStep } from "./read-marks.ts"
 
-const A = laneNameForThread("a")
-const B = laneNameForThread("b")
+const A = threadIdFor("a")
+const B = threadIdFor("b")
 const e = (n: number) =>
   entryId(`0190${n.toString(16).padStart(8, "0")}-0000-7000-8000-000000000000`)
 

@@ -4,10 +4,10 @@ import {
   type CardRecord,
   cardId,
   entryId,
-  laneNameForThread,
   ROOT,
   rootIdFor,
   runId,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { PLACES_DOC_ID } from "@pinetrie/protocol/messages"
@@ -30,7 +30,14 @@ import {
 import { newPresenceDoc, readingKey, seatKey } from "@pinetrie/schema"
 import { beginRun, writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
-import { applyWrites, basics, NO_BLANK_CARDS, record, row } from "../fakes.ts"
+import {
+  applyWrites,
+  basics,
+  NO_BLANK_CARDS,
+  record,
+  row,
+  threadRow,
+} from "../fakes.ts"
 import { applyPlaceSteps } from "../places.ts"
 import { createProvenance } from "../provenance.ts"
 import { popNextQueuedCard } from "../queued-card-pop.ts"
@@ -40,7 +47,7 @@ const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
 const ADA = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
-const LANE = laneNameForThread("0123456789abcdef")
+const LANE = threadIdFor("0123456789abcdef")
 const E1 = entryId("e-1")
 const C1 = cardId("c-1")
 const atEnd = {
@@ -64,7 +71,7 @@ const queuedKey = {
 
 function setUp() {
   const b = basics()
-  writeEntry(b.root, row(E1, null))
+  writeEntry(b.root, threadRow(E1, null, LANE))
   writeLaneTip(b.root, LANE, E1)
   // Each card's text as the host holds it.
   const texts = new Map<string, string>()
@@ -435,14 +442,11 @@ describe("a chat from a card that found its lane busy", () => {
   const chat = {
     text: "@bob look",
     root: TEST_ROOT,
-    at: atEntry(E1),
-    mode: "reply",
-    lane: LANE,
+    at: { kind: "end", thread: LANE, seen: E1 },
     asksAgent: false,
     mentions: [],
     card: { id: C1, seen: "" },
     pinned: [],
-    reserved: null,
     base: null,
     state: null,
   } as const
@@ -484,14 +488,11 @@ test("setCommand: the command set, its place and placer kept", async () => {
 const sentChat = {
   text: "hi",
   root: TEST_ROOT,
-  at: atEntry(E1),
-  mode: "reply",
-  lane: null,
+  at: { kind: "end", thread: LANE, seen: E1 },
   asksAgent: false,
   mentions: [],
   card: { id: C1, seen: "" },
   pinned: [],
-  reserved: null,
   base: null,
   state: null,
 } as const
@@ -532,7 +533,14 @@ test("spend: a fresh column's first send leaves its other cards notes at the new
     b.root,
     row(sent, E1, { role: "user", content: "hi", sendId: "s-1" }),
   )
-  const rev = await commands.spend(ADA, C1, { sendId: "s-1", chat: sentChat })
+  // A fresh column's first send starts its thread: a branch, with no lane.
+  const rev = await commands.spend(ADA, C1, {
+    sendId: "s-1",
+    chat: {
+      ...sentChat,
+      at: { kind: "branch", thread: threadIdFor("new"), at: E1 },
+    },
+  })
   expect(rev).toBe(readPlacesRev(b.places))
   expect(readPlaces(b.places)).toEqual([
     expect.objectContaining({
@@ -646,10 +654,11 @@ describe("every command that moves a card records it (ADR-0048 step 6)", () => {
 
 describe("a card made a thread, and lifted back (ADR-0111, S139)", () => {
   const THREAD = rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff")
+  const STARTS = threadIdFor("spun")
   const spun = {
     kind: "gone",
     root: TEST_ROOT,
-    why: { kind: "spun", thread: THREAD },
+    why: { kind: "spun", into: THREAD, thread: STARTS },
   } as const
   const spinMove = { card: C1, from: atEnd, to: spun }
   /** The thread as the directory names it, with `writers`' messages in it. */
@@ -709,8 +718,7 @@ describe("a card made a thread, and lifted back (ADR-0111, S139)", () => {
       {
         text: "plan this @agent with @Bea",
         root: THREAD,
-        at: ROOT,
-        lane: null,
+        at: { kind: "branch", thread: STARTS, at: null },
         asksAgent: false,
         mentions: [{ kind: "person", name: "Bea" }],
         card: { id: C1 },

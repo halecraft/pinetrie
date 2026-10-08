@@ -35,8 +35,8 @@ describe("projectColumns", () => {
   test("a branch starts after the deepest message it shares with ANY column to its left", () => {
     const [, a, b] = projectColumns(i, [
       { anchor: entryId("3-t3") },
-      { anchor: entryId("4-a1") },
-      { anchor: entryId("6-b1") },
+      { anchor: entryId("5-a2") },
+      { anchor: entryId("7-b2") },
     ])
     expect([a?.forkFrom, ids(a?.nodes ?? [])]).toEqual([
       "1-t1",
@@ -50,7 +50,7 @@ describe("projectColumns", () => {
   })
   test("making a branch main recomputes every fork point", () => {
     const [a, trunk] = projectColumns(i, [
-      { anchor: entryId("4-a1") },
+      { anchor: entryId("5-a2") },
       { anchor: entryId("3-t3") },
     ])
     expect(ids(a?.nodes ?? [])).toEqual(["1-t1", "4-a1", "5-a2"])
@@ -66,14 +66,14 @@ describe("projectColumns", () => {
     })
     const [, c] = projectColumns(other, [
       { anchor: entryId("3-t3") },
-      { anchor: entryId("8-r1") },
+      { anchor: entryId("9-r2") },
     ])
     expect([c?.forkFrom, ids(c?.nodes ?? [])]).toEqual([null, ["8-r1", "9-r2"]])
   })
-  test("an anchored column (fresh, or bound to a lane) ends at its anchor and follows nothing", () => {
+  test("a column ends at its anchor: a fresh column has nothing of its own", () => {
     const [, c] = projectColumns(i, [
       { anchor: entryId("3-t3") },
-      { anchor: entryId("2-t2"), anchored: true },
+      { anchor: entryId("2-t2") },
     ])
     expect([c?.tipId, c?.forkFrom, ids(c?.nodes ?? [])]).toEqual([
       "2-t2",
@@ -83,7 +83,7 @@ describe("projectColumns", () => {
     // A fresh column at the root: nothing at all, and no fork.
     const [, root] = projectColumns(i, [
       { anchor: entryId("3-t3") },
-      { anchor: null, anchored: true },
+      { anchor: null },
     ])
     expect([root?.tipId, root?.forkFrom, root?.nodes]).toEqual([null, null, []])
   })
@@ -95,8 +95,8 @@ describe("branchColors", () => {
   test("a column's colour is its last message's track; its fork dot matches", () => {
     const cols = projectColumns(i, [
       { anchor: entryId("3-t3") },
-      { anchor: entryId("4-a1") },
-      { anchor: entryId("6-b1") },
+      { anchor: entryId("5-a2") },
+      { anchor: entryId("7-b2") },
     ])
     const c = branchColors(rail, cols)
     expect(c.track).toEqual([0, 1, 2])
@@ -108,7 +108,7 @@ describe("branchColors", () => {
   test("a fresh branch is pending until it has a message", () => {
     const cols = projectColumns(i, [
       { anchor: entryId("3-t3") },
-      { anchor: entryId("2-t2"), anchored: true },
+      { anchor: entryId("2-t2") },
     ])
     expect(branchColors(rail, cols).track).toEqual([0, PENDING_TRACK])
   })

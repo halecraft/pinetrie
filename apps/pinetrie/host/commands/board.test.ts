@@ -1,8 +1,8 @@
 import {
   ERR,
   entryId,
-  laneNameForThread,
   runId,
+  threadIdFor,
   type Workflow,
   workflowStateIdFor,
   writerId,
@@ -28,7 +28,7 @@ import { type BoardDeps, handleRootMove, handleWorkflow } from "./board.ts"
 const [DOING, DONE] = [workflowStateIdFor("d"), workflowStateIdFor("x")]
 const WORKFLOW_NOW: Workflow = {
   open: [{ id: DOING, name: "Doing" }],
-  closed: { id: DONE, name: "Done" },
+  archive: { id: DONE, name: "Done" },
 }
 const ADA = writerId("ada@example.com")
 
@@ -72,9 +72,9 @@ const toDone = {
   before: null,
 } as const
 
-test("a root the agent works in is not closed, and nothing is written", async () => {
+test("a root the agent works in is not archived, and nothing is written", async () => {
   const { b, root, records, deps } = setUp()
-  const lane = laneNameForThread("0123456789abcdef")
+  const lane = threadIdFor("0123456789abcdef")
   putLane(b, lane, root)
   writeLaneTip(b.root, lane, root)
   beginRun(b.live, lane, runId("r-1"))
@@ -125,6 +125,6 @@ test("a workflow edit writes the workflow; a refusal writes nothing", async () =
     }),
   ).toEqual({ kind: "workflow-changed" })
   expect(writesOf(records.calls)).toMatchObject([
-    { namespace: "pinetrie.workflow", value: { closed: { name: "Shipped" } } },
+    { namespace: "pinetrie.workflow", value: { archive: { name: "Shipped" } } },
   ])
 })

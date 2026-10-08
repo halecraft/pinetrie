@@ -980,12 +980,12 @@
         font-size: .8rem; color: #c9d1d9; --surface: #111317; }
       .board-states { display: flex; align-items: flex-start; gap: .75rem; min-height: 0; overflow: auto;
         padding: .35rem; margin: -.35rem; }
-      /* Every state's column one width, the closed one's too: on a narrow
+      /* Every state's column one width, the archive's too: on a narrow
          window they keep it and the board scrolls sideways. */
-      .board-column, .board-closed { display: flex; flex-direction: column; gap: .4rem;
+      .board-column, .board-archive { display: flex; flex-direction: column; gap: .4rem;
         flex: 1 1 0; min-width: 14rem; }
-      .closed-mark { color: #8b949e; font-size: .75rem; line-height: 1; }
-      /* As tall as a head with its ⋯, so the closed state's, without one, lines up. */
+      .archive-mark { color: #8b949e; font-size: .75rem; line-height: 1; }
+      /* As tall as a head with its ⋯, so the archive's, without one, lines up. */
       .board-head { display: flex; align-items: center; gap: .4rem; min-height: 20px; }
       .state-name { padding: 0; background: none; color: #8b949e; font-size: .7rem; font-weight: 600;
         letter-spacing: .06em; text-transform: uppercase; }
@@ -1011,7 +1011,7 @@
         border-radius: 6px; --surface: var(--page); }
       /* Where a dragged root would land (use-root-drag.ts): a line in the gap
          above the card it goes before, or below a column's last card. The
-         closed state keeps no order of its own, so it is outlined whole. The
+         archive keeps no order of its own, so it is outlined whole. The
          card dragged stays, dimmed, in its place until it is dropped. */
       .thread-card[data-root-drop]::before, .board-column[data-root-drop] > .board-cards::after {
         content: ""; position: absolute; left: -1px; right: -1px; height: 3px;
@@ -1019,7 +1019,7 @@
       .thread-card[data-root-drop]::before { top: calc(-.2rem - 2.5px); }
       .board-column[data-root-drop] > .board-cards::after { bottom: calc(-.2rem - 1.5px); }
       .board-column[data-root-drop] > .board-cards:empty::after { top: calc(50% - 1.5px); bottom: auto; }
-      .board-closed[data-root-drop] { outline: 2px solid #8ab4f8; outline-offset: .3rem;
+      .board-archive[data-root-drop] { outline: 2px solid #8ab4f8; outline-offset: .3rem;
         border-radius: 4px; }
       .thread-card[data-root-dragging] { opacity: .4; border-style: dashed; }
       .board-open { display: flex; gap: .35rem; align-items: center; padding: 0; background: none;

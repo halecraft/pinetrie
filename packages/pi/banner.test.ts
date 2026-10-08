@@ -6,12 +6,12 @@ import { tmpdir } from "node:os"
 import path from "node:path"
 import {
   BANNER_TOOL,
-  type LaneName,
-  laneNameForThread,
   messageText,
   ROOT,
   type Sha256,
   THE_AGENT,
+  type ThreadId,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import {
@@ -111,7 +111,7 @@ describe("banners in a harness", () => {
   const agentOver = (
     doc: RootDocHandle,
     script: ScriptedModel,
-    asks?: { lane: LaneName; ask: BannerAsk }[],
+    asks?: { lane: ThreadId; ask: BannerAsk }[],
   ) =>
     startPi(oneRoot(doc), {
       model: { kind: "scripted", script },
@@ -134,7 +134,7 @@ describe("banners in a harness", () => {
         : {
             banner: DEFAULT_BANNER,
             bannerAsks: async (
-              lane: LaneName,
+              lane: ThreadId,
               ask: BannerAsk,
             ): Promise<BannerAnswer> => {
               asks.push({ lane, ask })
@@ -152,11 +152,11 @@ describe("banners in a harness", () => {
   test("the tool sends the calling thread's ask, and tells the agent the answer", async () => {
     const doc = newRootDoc()
     const script = scriptedModel()
-    const asks: { lane: LaneName; ask: BannerAsk }[] = []
+    const asks: { lane: ThreadId; ask: BannerAsk }[] = []
     const agent = await agentOver(doc, script, asks)
     const made = await agent.agent.createThreadLane(
       { root: ONE_ROOT, at: ROOT },
-      laneNameForThread(newId()),
+      threadIdFor(newId()),
     )
     if (made.kind !== "created") throw new Error("no lane")
     script.use([
@@ -180,12 +180,12 @@ describe("banners in a harness", () => {
     const before = await agentOver(doc, scriptedModel())
     const made = await before.agent.createThreadLane(
       { root: ONE_ROOT, at: ROOT },
-      laneNameForThread(newId()),
+      threadIdFor(newId()),
     )
     if (made.kind !== "created") throw new Error("no lane")
     await before.close()
     const script = scriptedModel()
-    const asks: { lane: LaneName; ask: BannerAsk }[] = []
+    const asks: { lane: ThreadId; ask: BannerAsk }[] = []
     const after = await agentOver(doc, script, asks)
     script.use([{ tool: BANNER_TOOL, args: {} }, { text: "done" }])
     await after.agent.lane(made.lane).run(prompt("a banner, please"), [])
@@ -198,7 +198,7 @@ describe("banners in a harness", () => {
     const before = await agentOver(doc, scriptedModel(), [])
     const made = await before.agent.createThreadLane(
       { root: ONE_ROOT, at: ROOT },
-      laneNameForThread(newId()),
+      threadIdFor(newId()),
     )
     if (made.kind !== "created") throw new Error("no lane")
     await before.close()

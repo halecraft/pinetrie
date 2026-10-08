@@ -3,9 +3,9 @@ import {
   type CardRecord,
   cardId,
   entryId,
-  laneNameForThread,
   PLAIN,
   rootIdFor,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
@@ -21,7 +21,7 @@ import { deleteRecord, setRecord } from "./records.ts"
 
 const ADA = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
-const L = laneNameForThread("1")
+const L = threadIdFor("1")
 const ROOT_A = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const ROOT_B = rootIdFor("01a0ffd2-0000-7000-8000-00000000000b")
 const held = new Map([[L, { lane: L, by: ADA, at: 1 }]])
@@ -93,8 +93,8 @@ describe("holdOnStop", () => {
 })
 
 test("planHoldSweep: a hold whose lane no root holds, or whose root is archived, goes; a live one stays", () => {
-  const L2 = laneNameForThread("2")
-  const L3 = laneNameForThread("3")
+  const L2 = threadIdFor("2")
+  const L3 = threadIdFor("3")
   const holds = new Map([
     [L, { lane: L, by: ADA, at: 1 }],
     [L2, { lane: L2, by: ADA, at: 1 }],

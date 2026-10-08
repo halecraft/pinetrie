@@ -15,8 +15,7 @@ import {
   CARD_COMMANDS,
   type CardCommand,
   type CardId,
-  CHAT_MODES,
-  type ChatMode,
+  type ChatAt,
   type CommitId,
   cardId,
   commitId,
@@ -25,9 +24,9 @@ import {
   type ErrCode,
   entryId,
   type Intent,
-  isLaneName,
   isRootId,
   isSha256,
+  isThreadId,
   isWorkflowStateId,
   keyOfFields,
   MAX_TITLE,
@@ -35,6 +34,7 @@ import {
   type Move,
   type MoveDirection,
   type MoveRefusal,
+  modeOf,
   normalizeName,
   OFFER_ACTIONS,
   type OfferAction,
@@ -42,8 +42,8 @@ import {
   type PlaceKey,
   type Position,
   parseMentions,
-  parseNewLane,
   parseNewRoot,
+  parseNewThread,
   parseTitle,
   placeFields,
   QUEUE_HOLD_CHANGES,
@@ -178,13 +178,13 @@ export function decodeCommand(
   }
   if (kind === "stop" || kind === "carry-on" || kind === "unqueue-all") {
     const lane = text(wire?.lane)
-    return isLaneName(lane)
+    return isThreadId(lane)
       ? { kind, lane }
       : refused(ERR.UNKNOWN_TARGET, `not a thread's lane: ${lane}`)
   }
   if (kind === "queue-hold") {
     const lane = text(wire?.lane)
-    if (!isLaneName(lane))
+    if (!isThreadId(lane))
       return refused(ERR.UNKNOWN_TARGET, `not a thread's lane: ${lane}`)
     const mode = text(wire?.mode)
     return mode === "hold" || mode === "release"
@@ -201,19 +201,31 @@ export function decodeCommand(
     const body = text(wire?.text)
     if (body === "") return refused(ERR.EMPTY_MESSAGE, "message text is empty")
     const mode = text(wire?.mode)
-    if (!isChatMode(mode)) {
+    if (mode !== "reply" && mode !== "branch") {
       return refused(ERR.UNKNOWN_KIND, `unknown chat mode: ${mode}`)
     }
     if (at.kind === "root" && mode !== "branch") {
       return refused(ERR.NO_ANCHOR, "only a branch starts a thread at the root")
     }
-    const lane = text(wire?.lane)
-    if (lane !== "" && !isLaneName(lane)) {
-      return refused(ERR.UNKNOWN_TARGET, `not a thread's lane: ${lane}`)
-    }
-    const reserved = text(wire?.reserved)
-    const reservedLane = reserved === "" ? null : parseNewLane(reserved)
-    if (reservedLane === undefined) return notNewLane(reserved)
+    const threadText = text(wire?.lane)
+    // A branch names the thread its column minted, in the shape a client
+    // mints; a reply names a thread that may be older than that shape.
+    const thread =
+      mode === "branch"
+        ? parseNewThread(threadText)
+        : isThreadId(threadText)
+          ? threadText
+          : undefined
+    if (thread === undefined)
+      return mode === "branch"
+        ? notNewLane(threadText)
+        : refused(ERR.UNKNOWN_TARGET, `not a thread: ${threadText}`)
+    const chatAt: ChatAt =
+      mode === "branch"
+        ? { kind: "branch", thread, at: at.kind === "root" ? null : at.id }
+        : at.kind === "entry"
+          ? { kind: "end", thread, seen: at.id }
+          : { kind: "branch", thread, at: null }
     const base = text(wire?.base)
     const pinned = pinnedFromWire(text(wire?.pinned))
     if (pinned === undefined)
@@ -235,14 +247,11 @@ export function decodeCommand(
       kind: "chat",
       text: body,
       root,
-      at,
-      mode,
-      lane: isLaneName(lane) ? lane : null,
+      at: chatAt,
       asksAgent: wire?.asksAgent === true,
       mentions: parseMentions(body),
       card: cardFromWire(text(wire?.cardId), text(wire?.seen)),
       pinned,
-      reserved: reservedLane,
       base: base === "" ? null : base,
       state: stateText === "" ? null : (stateText as WorkflowStateId),
     }
@@ -329,14 +338,14 @@ export function decodeCommand(
   }
   if (kind === "reserve") {
     const lane = text(wire?.lane)
-    const reserved = parseNewLane(lane)
+    const reserved = parseNewThread(lane)
     return reserved === undefined
       ? notNewLane(lane)
       : { kind: "reserve", lane: reserved }
   }
   if (kind === "offer") {
     const lane = text(wire?.lane)
-    if (!isLaneName(lane))
+    if (!isThreadId(lane))
       return refused(ERR.UNKNOWN_TARGET, `not a thread's lane: ${lane}`)
     const action = text(wire?.mode)
     const to = text(wire?.targetId)
@@ -676,9 +685,6 @@ export function rootMoveFromWire(s: string): {
   return { from, to, before }
 }
 
-const isChatMode = (mode: string): mode is ChatMode =>
-  (CHAT_MODES as readonly string[]).includes(mode)
-
 /** Intent -> the flat wire command. The client's half of `decodeCommand`. */
 export function encodeIntent(id: string, intent: Intent): Command {
   switch (intent.kind) {
@@ -687,15 +693,15 @@ export function encodeIntent(id: string, intent: Intent): Command {
         id,
         kind: "chat",
         text: intent.text,
-        parentId: positionToWire(intent.at),
+        parentId:
+          intent.at.kind === "end" ? intent.at.seen : (intent.at.at ?? ""),
         root: intent.root,
-        mode: intent.mode,
-        lane: intent.lane ?? "",
+        mode: modeOf(intent.at),
+        lane: intent.at.thread,
         asksAgent: intent.asksAgent,
         cardId: intent.card?.id ?? "",
         seen: intent.card?.seen ?? "",
         pinned: pinnedToWire(intent.pinned),
-        reserved: intent.reserved ?? "",
         base: intent.base ?? "",
         state: intent.state ?? "",
       })
@@ -955,7 +961,6 @@ export function decodeReply(wire: Reply): Outcome {
 export const revOfReply = (wire: Reply): number | null =>
   wire.rev > 0 ? wire.rev : null
 
-const positionToWire = (p: Position): string => (p.kind === "root" ? "" : p.id)
 const positionFromWire = (s: string): Position =>
   s === "" ? ROOT : atEntry(entryId(s))
 

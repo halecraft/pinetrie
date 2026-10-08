@@ -1,10 +1,10 @@
 import {
   type CardId,
   cardId,
-  laneNameForThread,
   type PinnedCardRead,
   type PinnedView,
   PLAIN,
+  threadIdFor,
   type WriterId,
   writerId,
 } from "@pinetrie/core"
@@ -22,8 +22,8 @@ import {
 
 const ADA = writerId("ada@example.com")
 const BEA = writerId("bea@example.com")
-const LANE = laneNameForThread("x")
-const PARENT = laneNameForThread("p")
+const LANE = threadIdFor("x")
+const PARENT = threadIdFor("p")
 const names: Record<string, string> = { [ADA]: "Ada", [BEA]: "Bea" }
 const nameOf = (w: WriterId) => names[w] ?? w
 

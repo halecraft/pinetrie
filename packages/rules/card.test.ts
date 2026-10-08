@@ -10,8 +10,6 @@ import {
   INVENTORY_SLOTS,
   indexTree,
   keyOf,
-  type LaneView,
-  laneNameForThread,
   type Move,
   movesDocId,
   type OfferFact,
@@ -21,8 +19,10 @@ import {
   type RootRecord,
   rootIdFor,
   type TreeIndex,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
+import { entriesOf, withThreads } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   blankQueued,
@@ -69,13 +69,20 @@ const entry = (id: string, parentId: string | null): EntryLike => ({
   type: "message",
   message: { role: "user", content: `text of ${id}` },
 })
-/** e1 -> e2, with a sibling fork e1 -> f1. */
+/**
+ * e1 -> e2, with a branch e1 -> f1: thread `t-e1` is e1 and e2, thread `t-f1`
+ * is f1, and each entry `more` adds that is no oldest child starts a thread
+ * (`withThreads`).
+ */
 const tree = (...more: EntryLike[]): TreeIndex =>
   indexTree(
-    Object.fromEntries(
-      [entry("e1", null), entry("e2", "e1"), entry("f1", "e1"), ...more].map(
-        e => [e.id, e],
-      ),
+    withThreads(
+      entriesOf([
+        entry("e1", null),
+        entry("e2", "e1"),
+        entry("f1", "e1"),
+        ...more,
+      ]),
     ),
   )
 const OTHER = rootIdFor("01a0ffd2-0000-7000-8000-00000000000b")
@@ -100,7 +107,7 @@ const note = (over: Partial<CardRecord> = {}): CardRecord =>
     },
     ...over,
   })
-const LANE = laneNameForThread("x")
+const LANE = threadIdFor("x")
 const queuedPlace = {
   kind: "queued",
   root: TEST_ROOT,
@@ -238,49 +245,35 @@ const pinned = (
     order,
   },
 })
-const laneAt = (tip: string): LaneView[] => [
-  {
-    name: laneNameForThread("x"),
-    tip: entryId(tip),
-    running: false,
-    waiting: 0,
-    askedBy: null,
-    lastWaiting: null,
-    heldBy: null,
-  },
-]
 
 describe("where a card sits", () => {
-  test("placeEnd: a reply from the place, as a send would go", () => {
-    // Unbound, a reply from e1 continues its newest leaf, f1.
-    expect(placeEnd({ at: atEntry(E1), lane: null }, ADA, [], tree())).toBe(F1)
-    // Bound to a lane, it follows the lane.
-    expect(
-      placeEnd(
-        { at: atEntry(E1), lane: laneNameForThread("x") },
-        ADA,
-        laneAt("e2"),
-        tree(),
-      ),
-    ).toBe(E2)
+  test("placeEnd: the end of the thread its place is in", () => {
+    expect(placeEnd({ at: atEntry(E1) }, tree())).toBe(E2)
+    expect(placeEnd({ at: atEntry(F1) }, tree())).toBe(F1)
+    expect(placeEnd({ at: ROOT }, tree())).toBeNull()
   })
 
   test("cardEnd follows its thread as the thread grows", () => {
     const grown = tree(entry("e3", "e2"), entry("e4", "e3"))
-    expect(cardEnd(card(), [], grown)).toBe("e4")
+    expect(cardEnd(card(), grown)).toBe("e4")
   })
 
-  test("cardEnd: a lane card follows its lane after a conversation forks at the lane's old tip", () => {
-    const lane = laneNameForThread("x")
+  test("cardEnd: a card follows its thread past a branch at its old end", () => {
     const onLane = card({
-      place: { kind: "composing", root: TEST_ROOT, at: atEntry(E2), lane },
+      place: {
+        kind: "composing",
+        root: TEST_ROOT,
+        at: atEntry(E2),
+        lane: threadIdFor("e1"),
+      },
     })
+    // e3 continues the thread; g1, newer, is a branch.
     const forked = tree(entry("e3", "e2"), entry("g1", "e2"))
-    expect(cardEnd(onLane, laneAt("e3"), forked)).toBe("e3")
+    expect(cardEnd(onLane, forked)).toBe("e3")
   })
 
   test("cardEnd: null for a fresh card, and for a place that is gone", () => {
-    expect(cardEnd(card({ place: freshPlace("k-1") }), [], tree())).toBeNull()
+    expect(cardEnd(card({ place: freshPlace("k-1") }), tree())).toBeNull()
     expect(
       cardEnd(
         card({
@@ -291,7 +284,6 @@ describe("where a card sits", () => {
             lane: null,
           },
         }),
-        [],
         tree(),
       ),
     ).toBeNull()
@@ -311,17 +303,17 @@ describe("where a card sits", () => {
       },
     })
     expect(
-      cardsAt("note", entryId("e2"), [mine, beas, sibling], [], tree()),
+      cardsAt("note", entryId("e2"), [mine, beas, sibling], tree()),
     ).toEqual([mine, beas])
   })
 
   test("yourCard: your message only, never a note of yours at the same end (ADR-0113)", () => {
     const yours = note({ id: cardId("c-9") })
     expect(
-      yourCard(ADA, { kind: "end", end: E2 }, [card(), yours], [], tree())?.id,
+      yourCard(ADA, { kind: "end", end: E2 }, [card(), yours], tree())?.id,
     ).toBe("c-1")
     expect(
-      yourCard(ADA, { kind: "end", end: E2 }, [yours], [], tree()),
+      yourCard(ADA, { kind: "end", end: E2 }, [yours], tree()),
     ).toBeUndefined()
   })
 
@@ -333,7 +325,7 @@ describe("where a card sits", () => {
     })
     const cards = [beas, card(), fresh]
     const at = (where: Parameters<typeof yourCard>[1], me = ADA) =>
-      yourCard(me, where, cards, [], tree())?.id
+      yourCard(me, where, cards, tree())?.id
     expect(at({ kind: "end", end: entryId("e2") })).toBe("c-1")
     expect(at({ kind: "end", end: entryId("e2") }, BEA)).toBe("c-2")
     expect(at({ kind: "fresh", column: "k-1" })).toBe("c-3")
@@ -345,32 +337,22 @@ describe("where a card sits", () => {
     const older = card({ id: cardId("c-1") })
     const newer = card({ id: cardId("c-9") })
     expect(
-      yourCard(
-        ADA,
-        { kind: "end", end: entryId("e2") },
-        [newer, older],
-        [],
-        tree(),
-      )?.id,
+      yourCard(ADA, { kind: "end", end: entryId("e2") }, [newer, older], tree())
+        ?.id,
     ).toBe("c-9")
     expect(
-      yourCard(
-        ADA,
-        { kind: "end", end: entryId("e2") },
-        [older, newer],
-        [],
-        tree(),
-      )?.id,
+      yourCard(ADA, { kind: "end", end: entryId("e2") }, [older, newer], tree())
+        ?.id,
     ).toBe("c-9")
   })
 
   test("cardEnd and cardsAt note see their own kind: a queued card is above the line, your message no note", () => {
     const q = queued("c-2", "a")
     // Its lane ends at e2, where it was queued: it is still not a note there.
-    expect(cardEnd(q, laneAt("e2"), tree())).toBeNull()
-    expect(
-      cardsAt("note", entryId("e2"), [card(), note(), q], laneAt("e2"), tree()),
-    ).toEqual([note()])
+    expect(cardEnd(q, tree())).toBeNull()
+    expect(cardsAt("note", entryId("e2"), [card(), note(), q], tree())).toEqual(
+      [note()],
+    )
   })
 })
 
@@ -391,11 +373,7 @@ describe("notes' cells (ADR-0113)", () => {
     }) as const
 
   test("a note with no cell takes the first empty one on its board; another lane's board does not count", () => {
-    const taken = [
-      at(0, "c-7"),
-      at(2, "c-8"),
-      at(1, "c-9", laneNameForThread("y")),
-    ]
+    const taken = [at(0, "c-7"), at(2, "c-8"), at(1, "c-9", threadIdFor("y"))]
     const step = planMove(
       [...taken, card()],
       { card: cardId("c-1"), from: keyOf(card().place), to: key(null) },
@@ -514,7 +492,7 @@ describe("pinned cards", () => {
       pinned("p-4", "a", F1),
       card(),
     ]
-    expect(cardsAt("pinned", E2, cards, [], tree()).map(c => c.id)).toEqual([
+    expect(cardsAt("pinned", E2, cards, tree()).map(c => c.id)).toEqual([
       "p-2",
       "p-3",
       "p-1",
@@ -524,7 +502,7 @@ describe("pinned cards", () => {
   test("a pinned card follows its thread as the thread grows", () => {
     const grown = tree(entry("e3", "e2"))
     expect(
-      cardsAt("pinned", entryId("e3"), [pinned("p-1", "a")], [], grown).map(
+      cardsAt("pinned", entryId("e3"), [pinned("p-1", "a")], grown).map(
         c => c.id,
       ),
     ).toEqual(["p-1"])
@@ -532,22 +510,22 @@ describe("pinned cards", () => {
 
   test("cardsAt note and yourCard never return a pinned card at the same end", () => {
     const mine = pinned("p-9", "a")
-    expect(cardEnd(mine, [], tree())).toBeNull()
+    expect(cardEnd(mine, tree())).toBeNull()
+    expect(cardsAt("note", E2, [note(), mine], tree()).map(c => c.id)).toEqual([
+      "c-1",
+    ])
     expect(
-      cardsAt("note", E2, [note(), mine], [], tree()).map(c => c.id),
-    ).toEqual(["c-1"])
-    expect(
-      yourCard(ADA, { kind: "end", end: E2 }, [card(), mine], [], tree())?.id,
+      yourCard(ADA, { kind: "end", end: E2 }, [card(), mine], tree())?.id,
     ).toBe("c-1")
     expect(
-      yourCard(ADA, { kind: "end", end: E2 }, [mine], [], tree()),
+      yourCard(ADA, { kind: "end", end: E2 }, [mine], tree()),
     ).toBeUndefined()
   })
 })
 
 describe("the queue", () => {
   test("queuedOn: a lane's queued cards by order key, then id; not another lane's, nor notes", () => {
-    const other = laneNameForThread("y")
+    const other = threadIdFor("y")
     const cards = [
       queued("c-3", "b"),
       queued("c-1", "c"),
@@ -582,7 +560,7 @@ describe("the queue", () => {
       kind: "pop",
       card: cards[1],
     })
-    expect(planNextQueuedCardPop(cards, laneNameForThread("y"), idle)).toEqual({
+    expect(planNextQueuedCardPop(cards, threadIdFor("y"), idle)).toEqual({
       kind: "idle",
     })
   })
@@ -712,7 +690,7 @@ describe("the queue", () => {
       queued("c-2", "b"),
       fact,
       queued("c-1", "a"),
-      queued("c-3", "c", laneNameForThread("y")),
+      queued("c-3", "c", threadIdFor("y")),
     ]
     expect(planUnqueueAll(cards, LANE)).toEqual(
       ["c-1", "c-2"].map(id => ({
@@ -1429,7 +1407,7 @@ describe("planReorder (ADR-0048 step 7)", () => {
 
 describe("storage", () => {
   test("a record round-trips through its flat stored form", () => {
-    const lane = laneNameForThread("x")
+    const lane = threadIdFor("x")
     for (const c of [
       card(),
       card({

@@ -4,23 +4,21 @@
 import {
   type CardId,
   type CardRecord,
+  type ChatAt,
   type ChatMode,
   type Intent,
-  type LaneName,
   type Position,
   parseMentions,
   type RootId,
   type SentCard,
+  type ThreadId,
   type WorkflowStateId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import { IN_COLUMN, type Pending, sendPendingOf } from "./card-moves.ts"
 
-/** How a chat is sent: its mode, its column's lane, and its send id. */
+/** How a chat is sent: from what column and card, and its send id. */
 export interface ChatHow {
-  readonly mode?: ChatMode
-  /** The lane the sender's column is bound to. */
-  readonly lane?: LaneName
   /** A Start Agent column. */
   readonly asksAgent?: boolean
   /** The send's id, minted by a fresh column so it can find its message. */
@@ -34,8 +32,6 @@ export interface ChatHow {
   readonly pinned?: readonly CardId[]
   /** The column it is sent from, where a refusal of its card's move is said. */
   readonly column?: string
-  /** The lane id the column reserved: what a lane this send creates is called (ADR-0057). */
-  readonly reserved?: LaneName
   /** The root a new tab minted as it opened: where its first send starts (ADR-0066). */
   readonly root?: RootId
   /** The WIP bookmark a lane this send creates starts from; absent, accepted work (ADR-0104). */
@@ -47,10 +43,23 @@ export interface ChatHow {
   readonly state?: WorkflowStateId
 }
 
+/**
+ * Where a send from a column goes (`ChatAt`): a fresh column's starts its
+ * thread at its fork; any other continues its thread from the end it shows.
+ */
+export const chatAtOf = (
+  mode: ChatMode,
+  thread: ThreadId,
+  at: Position,
+): ChatAt =>
+  mode === "reply" && at.kind === "entry"
+    ? { kind: "end", thread, seen: at.id }
+    : { kind: "branch", thread, at: at.kind === "entry" ? at.id : null }
+
 /** A chat as the host is asked for it: `how`'s defaults filled in. */
 function chatIntent(input: {
   readonly text: string
-  readonly at: Position
+  readonly at: ChatAt
   readonly how: ChatHow
   readonly root: RootId
   readonly card: SentCard | null
@@ -62,13 +71,10 @@ function chatIntent(input: {
     text,
     root: input.root,
     at: input.at,
-    mode: how.mode ?? "reply",
-    lane: how.lane ?? null,
     asksAgent: how.asksAgent === true,
     mentions: parseMentions(text),
     card: input.card,
     pinned: input.pinned,
-    reserved: how.reserved ?? null,
     base: how.base ?? null,
     state: how.state ?? null,
   }
@@ -96,7 +102,7 @@ export interface ChatRequestPlan {
  */
 export function planChatRequest(input: {
   readonly text: string
-  readonly at: Position
+  readonly at: ChatAt
   readonly how: ChatHow
   readonly root: RootId
   /** The card `how.card` names as drawn, with its text's version now; null when none is drawn. */
@@ -133,6 +139,7 @@ export function planChatRequest(input: {
  * a conversation or a run (ADR-0122). The session then puts the root in your
  * list, so a root you start is yours.
  */
-export const startsRoot = (at: Position, outcome: Outcome): boolean =>
-  at.kind === "root" &&
+export const startsRoot = (at: ChatAt, outcome: Outcome): boolean =>
+  at.kind === "branch" &&
+  at.at === null &&
   (outcome.kind === "appended" || outcome.kind === "started")

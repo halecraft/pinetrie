@@ -2,9 +2,9 @@ import {
   type BaseRecord,
   type CardCommand,
   commitId,
-  laneNameForThread,
   type OfferRecord,
   type ThreadName,
+  threadIdFor,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
@@ -17,7 +17,7 @@ import {
 } from "./index.ts"
 import { conflictCause } from "./offer-view.ts"
 
-const LANE = laneNameForThread("1")
+const LANE = threadIdFor("1")
 const TIP = commitId("t1")
 const T2 = commitId("t2")
 const BASE = commitId("b0")
@@ -360,7 +360,7 @@ describe("offerView: the work strip's states (ADR-0105)", () => {
 })
 
 describe("a conflict that came with the copy, and the thread it branched from (ADR-0072)", () => {
-  const P = laneNameForThread("p")
+  const P = threadIdFor("p")
   const parent = (over: Partial<ParentNow> = {}): ParentNow => ({
     kind: "parent",
     lane: P,

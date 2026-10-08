@@ -1,18 +1,14 @@
-import {
-  type LaneName,
-  laneNameForThread,
-  type ThreadName,
-} from "@pinetrie/core"
+import { type ThreadId, type ThreadName, threadIdFor } from "@pinetrie/core"
 import type { Moved } from "@pinetrie/repo"
 import { describe, expect, test } from "vitest"
 import { planMarks } from "./marks.ts"
 
 describe("planMarks: what a move the owner observed refreshes", () => {
-  const A = laneNameForThread("a")
-  const B = laneNameForThread("b")
-  const C = laneNameForThread("c")
+  const A = threadIdFor("a")
+  const B = threadIdFor("b")
+  const C = threadIdFor("c")
   // D's root is archived.
-  const D = laneNameForThread("d")
+  const D = threadIdFor("d")
   const names = new Map([
     [A, "amber-fox" as ThreadName],
     [B, "brave-owl" as ThreadName],
@@ -28,7 +24,7 @@ describe("planMarks: what a move the owner observed refreshes", () => {
     offers: new Set(),
     ...over,
   })
-  const marks = (m: Moved, open: readonly LaneName[] = [C]) =>
+  const marks = (m: Moved, open: readonly ThreadId[] = [C]) =>
     planMarks({ moved: m, names, archived, open })
   test("everything moved marks accepted work, every named lane not archived and every open record", () => {
     expect(marks(moved({ all: true, yours: true }))).toEqual({

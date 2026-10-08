@@ -100,6 +100,11 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
   `Pinetrie-Base: <bookmark>@<commit>` (`baseMessage`), the lane's ledger of
   its base. The base disk is accepted work's, so a WIP whose lockfile differs
   from accepted work's installs (`installIfLockMoved`).
+- **The base snapshot is made in a scratch lane that is no thread's**
+  (`BASE_LANE`, a `BaseLane`): a container, a disk and snapshots are named by
+  a `LaneOwner`, a thread's id or the base's, while a bookmark, a remote and
+  a stack take a `ThreadId` alone, so the base cannot be given one
+  (ADR-0117).
 - **The base snapshot is accepted work's commit** (`refreshBase`), and
   refreshes after an acceptance or a land. A fork from it first waits for a
   refresh (`baseAtAccepted`): accepted work may have been set up or moved since.

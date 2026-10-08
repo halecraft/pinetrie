@@ -6,16 +6,16 @@ import {
   type EntryId,
   entryId,
   indexAsks,
-  laneNameForThread,
   type RootId,
   rootIdFor,
+  threadIdFor,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { BOARD_SEARCH } from "./board-view.ts"
 import type { CardFacts, Effect, IntentState } from "./effects.ts"
-import { NEW_ROOT, tree } from "./fixtures.ts"
+import { NEW_ROOT, NEW_THREAD, tree } from "./fixtures.ts"
 import {
   afterRootMove,
   claimFocus,
@@ -64,6 +64,7 @@ const onNewTab: Layout = layoutReducer(initialLayout(), {
   kind: "newTab",
   key: "t",
   root: NEW_ROOT,
+  thread: NEW_THREAD,
   asksAgent: false,
 })
 const at = (
@@ -101,7 +102,7 @@ const NO_CARDS: CardFacts = {
 }
 const R1 = at(onRoot("1-r1"))
 const plan = (intent: Intent, state: IntentState = R1) =>
-  planIntent(intent, state, "k", NEW_ROOT)
+  planIntent(intent, state, { key: "k", root: NEW_ROOT, thread: NEW_THREAD })
 const column = (
   act: Extract<Intent, { kind: "column" }>["act"],
   position = 0,
@@ -147,7 +148,7 @@ describe("planIntent", () => {
     ])
   })
 
-  test("a move on the board asks the host; into the closed state it closes the root for you once accepted (ADR-0122)", () => {
+  test("a move on the board asks the host; into the archive it closes the root for you once accepted (ADR-0122)", () => {
     const [from, to] = [workflowStateIdFor("d"), workflowStateIdFor("x")]
     const move = (closes: boolean) =>
       plan({ kind: "moveRoot", root: R1_ID, from, to, before: null, closes })
@@ -206,6 +207,7 @@ describe("planIntent", () => {
         kind: "newTab",
         key: "k",
         root: NEW_ROOT,
+        thread: NEW_THREAD,
         asksAgent: true,
         state,
       },
@@ -230,7 +232,13 @@ describe("planIntent", () => {
         action: {
           kind: "columns",
           root: "1-r1",
-          action: { kind: "openFresh", key: "k", at: "2-a", after: 1 },
+          action: {
+            kind: "openFresh",
+            key: "k",
+            thread: NEW_THREAD,
+            at: "2-a",
+            after: 1,
+          },
         },
       },
     ])
@@ -247,7 +255,14 @@ describe("planIntent", () => {
         action: {
           kind: "columns",
           root: "1-r1",
-          action: { kind: "openFresh", key: "k", at: "3-b", after: 2, pending },
+          action: {
+            kind: "openFresh",
+            key: "k",
+            thread: NEW_THREAD,
+            at: "3-b",
+            after: 2,
+            pending,
+          },
         },
       },
     ])
@@ -263,6 +278,7 @@ describe("planIntent", () => {
           kind: "newTab",
           key: "k",
           root: NEW_ROOT,
+          thread: NEW_THREAD,
           asksAgent: true,
           prefill,
         },
@@ -275,7 +291,13 @@ describe("planIntent", () => {
       { kind: "armFocus", key: "k" },
       {
         kind: "layout",
-        action: { kind: "newTab", key: "k", root: NEW_ROOT, asksAgent: false },
+        action: {
+          kind: "newTab",
+          key: "k",
+          root: NEW_ROOT,
+          thread: NEW_THREAD,
+          asksAgent: false,
+        },
       },
     ])
   })
@@ -334,10 +356,6 @@ describe("planIntent", () => {
 
   test.each([
     ["first send", { kind: "sent", key: "t", sendId: "s" }],
-    [
-      "reservation (ADR-0057)",
-      { kind: "reserve", key: "t", lane: laneNameForThread("r") },
-    ],
   ] as const)("a column's %s is its root's, or its new tab's", (_, action) => {
     expect(plan(column(action))).toEqual([
       {
@@ -392,21 +410,22 @@ describe("planIntent", () => {
 
   describe("openAt", () => {
     test("an entry a column shows is scrolled to, on its root's tab", () => {
-      expect(plan({ kind: "openAt", entry: entryId("4-c") })).toEqual([
-        { kind: "reveal", entry: "4-c" },
+      expect(plan({ kind: "openAt", entry: entryId("3-b") })).toEqual([
+        { kind: "reveal", entry: "3-b" },
         ...shown("1-r1", R1_ID),
       ])
     })
 
     test("an entry no column shows opens one, revealed, which takes no focus", () => {
-      const effects = plan({ kind: "openAt", entry: entryId("3-b") })
-      expect(effects[0]).toEqual({ kind: "reveal", entry: "3-b" })
+      // 4-c is a branch at 2-a: the root's first column follows 3-b.
+      const effects = plan({ kind: "openAt", entry: entryId("4-c") })
+      expect(effects[0]).toEqual({ kind: "reveal", entry: "4-c" })
       expect(effects.at(-1)).toEqual({
         kind: "layout",
         action: {
           kind: "columns",
           root: "1-r1",
-          action: { kind: "open", key: "k", after: 0, anchor: "3-b" },
+          action: { kind: "open", key: "k", after: 0, anchor: "4-c" },
         },
       })
       expect(effects.some(e => e.kind === "armFocus")).toBe(false)
@@ -462,7 +481,7 @@ describe("planIntent", () => {
   })
 
   describe("cards (ADR-0048, ADR-0108)", () => {
-    const lane = laneNameForThread("x")
+    const lane = threadIdFor("x")
     const where = atEntry(entryId("3-b"))
     const ada = writerId("ada@x.test")
     const c = cardId("c-1")

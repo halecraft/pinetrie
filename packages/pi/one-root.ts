@@ -2,7 +2,7 @@
 // the scribe and the agent are over, the session's document and that root's
 // (ADR-0063). Every lane is in it unless its record names another.
 
-import { type LaneName, type RootId, rootIdFor } from "@pinetrie/core"
+import { type RootId, rootIdFor, type ThreadId } from "@pinetrie/core"
 import { LANE, recordsIn } from "@pinetrie/rules"
 import {
   type RootDocHandle,
@@ -30,7 +30,7 @@ export function oneRoot(
       roots.set(id, made)
       return made
     },
-    rootOfLane: (lane: LaneName) =>
+    rootOfLane: (lane: ThreadId) =>
       recordsIn(LANE, readNamespace(session, LANE.namespace)).get(lane)?.root ??
       ONE_ROOT,
   }

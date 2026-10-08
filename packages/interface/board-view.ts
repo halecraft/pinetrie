@@ -6,7 +6,7 @@
 // and how many of its roots the agent works in and have work ready to
 // accept (ADR-0091); opened, each open state is a column of cards, each ⇡
 // when a thread of it has work ready, whose head says what the strip's
-// button did, and the closed state is a count and its most recent roots.
+// button did, and the archive is a count and its most recent roots.
 // One search over labels, and "mine", filter every state in place
 // (ADR-0109), and what the board shows says whether a filter is on
 // (`BoardShown`, ADR-0115).
@@ -66,7 +66,7 @@ export interface StateSignals {
   readonly roots: readonly EntryId[]
 }
 
-/** The closed state's: it shows none. */
+/** The archive's: it shows none. */
 const NO_SIGNALS: StateSignals = { working: 0, ready: 0, roots: [] }
 
 /** An open state's column. */
@@ -93,11 +93,11 @@ export interface BoardColumnView {
   readonly remove: { readonly intent: Intent; readonly why: string | null }
 }
 
-/** The closed state: collapsed to its count and its rows. */
-export interface ClosedView {
+/** The archive: collapsed to its count and its rows. */
+export interface ArchiveView {
   readonly state: WorkflowState
   readonly count: Count
-  /** The kept roots, newest first; with no words, the most recent few (`closedRows`). */
+  /** The kept roots, newest first; with no words, the most recent few (`archiveRows`). */
   readonly rows: readonly ThreadCard[]
 }
 
@@ -108,7 +108,7 @@ export interface StripState {
   readonly count: number
   readonly mark: Level | null
   readonly signals: StateSignals
-  readonly closed: boolean
+  readonly archive: boolean
 }
 
 /** The board's filter: the words typed, lowercased, and "mine". */
@@ -130,12 +130,12 @@ export type BoardShown =
 export interface BoardView {
   readonly strip: readonly StripState[]
   readonly open: readonly BoardColumnView[]
-  readonly closed: ClosedView
+  readonly archive: ArchiveView
   readonly shown: BoardShown
 }
 
-/** How many of the closed state's roots it shows with no words to search. */
-export const CLOSED_RECENT = 8
+/** How many of the archive's roots it shows with no words to search. */
+export const ARCHIVE_RECENT = 8
 
 /** The board's search field, as the key `armFocus` arms when you open the board. */
 export const BOARD_SEARCH = "board-search"
@@ -165,7 +165,7 @@ export function boardView(input: BoardViewInput): BoardView {
   const board = boardOf(workflow, input.places, input.rootEntries.keys())
   const summaries = new Map(input.summaries.map(s => [s.root, s]))
   const keeps = search === null ? null : boardFilter(search, input.me)
-  const _states = [...workflow.open, workflow.closed]
+  const _states = [...workflow.open, workflow.archive]
   const headOf = (entry: EntryId): ThreadCardHead =>
     input.heads.get(entry) ?? {
       root: null,
@@ -299,36 +299,36 @@ export function boardView(input: BoardViewInput): BoardView {
       count: entries.length,
       mark,
       signals: stateSignals(entries),
-      closed: false,
+      archive: false,
     }
     return { view, strip }
   })
-  const closedRoots = rootsOf(board.closed)
-  const closed: ClosedView = {
-    state: board.closed.state,
-    count: closedRoots.count,
-    rows: closedRows({ items: closedRoots.cards, summaries, search }),
+  const archiveRoots = rootsOf(board.archive)
+  const archive: ArchiveView = {
+    state: board.archive.state,
+    count: archiveRoots.count,
+    rows: archiveRows({ items: archiveRoots.cards, summaries, search }),
   }
   const strip: readonly StripState[] = [
     ...columns.map(c => c.strip),
     {
-      id: closed.state.id,
-      name: closed.state.name,
-      count: closedRoots.entries.length,
+      id: archive.state.id,
+      name: archive.state.name,
+      count: archiveRoots.entries.length,
       mark: null,
       signals: NO_SIGNALS,
-      closed: true,
+      archive: true,
     },
   ]
   const total = strip.reduce((n, s) => n + s.count, 0)
   const kept = columns.reduce(
     (n, c) => n + c.view.items.length,
-    closedRoots.cards.length,
+    archiveRoots.cards.length,
   )
   return {
     strip,
     open: columns.map(c => c.view),
-    closed,
+    archive,
     shown:
       search === null
         ? { kind: "all", total }
@@ -369,11 +369,11 @@ function boardFilter(
 }
 
 /**
- * The closed state's rows, of the roots the search kept: newest activity
+ * The archive's rows, of the roots the search kept: newest activity
  * first, and with no words to search (none, or "mine" alone) only the most
  * recent few.
  */
-export function closedRows(input: {
+export function archiveRows(input: {
   readonly items: readonly ThreadCard[]
   readonly summaries: ReadonlyMap<EntryId, RootSummary>
   readonly search: BoardSearch | null
@@ -383,7 +383,7 @@ export function closedRows(input: {
     newest(a) < newest(b) ? 1 : newest(a) > newest(b) ? -1 : 0,
   )
   return (input.search?.words.length ?? 0) === 0
-    ? sorted.slice(0, CLOSED_RECENT)
+    ? sorted.slice(0, ARCHIVE_RECENT)
     : sorted
 }
 

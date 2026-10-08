@@ -1,11 +1,11 @@
 import {
   type ArchivedRoot,
   entryId,
-  type LaneName,
   type LaneView,
-  laneNameForThread,
   type OfferRecord,
   rootIdFor,
+  type ThreadId,
+  threadIdFor,
   type Workflow,
   workflowStateIdFor,
   writerId,
@@ -31,7 +31,7 @@ const WORKFLOW: Workflow = {
     { id: workflowStateIdFor("b"), name: "Backlog" },
     { id: workflowStateIdFor("d"), name: "Doing" },
   ],
-  closed: { id: workflowStateIdFor("x"), name: "Done" },
+  archive: { id: workflowStateIdFor("x"), name: "Done" },
 }
 const columns = (...keys: string[]): Column[] =>
   keys.map(key => ({ key, anchor: entryId("r") }))
@@ -85,7 +85,7 @@ describe("appView's workspace", () => {
         intent: {
           kind: "moveRoot",
           root: R_ID,
-          from: WORKFLOW.closed.id,
+          from: WORKFLOW.archive.id,
           to: WORKFLOW.open[0]?.id,
           before: null,
           closes: false,
@@ -106,13 +106,13 @@ test("readOnlyWords offers no Restore before the board has states", () => {
 })
 
 test("the header's offers are the open ones, never one accepted work already holds: a held lane's at its tip, if it has one; another's at its root (ADR-0063)", () => {
-  const A = laneNameForThread("a")
-  const B = laneNameForThread("b")
-  const C = laneNameForThread("c")
-  const D = laneNameForThread("d")
-  const E = laneNameForThread("e")
+  const A = threadIdFor("a")
+  const B = threadIdFor("b")
+  const C = threadIdFor("c")
+  const D = threadIdFor("d")
+  const E = threadIdFor("e")
   const offer = (
-    lane: LaneName,
+    lane: ThreadId,
     acceptedAs: string | null,
     files = ["a.txt"],
   ) =>
@@ -123,7 +123,7 @@ test("the header's offers are the open ones, never one accepted work already hol
       edited: false,
       ledger: lane === A ? { source: "c-a", start: [] } : null,
     }) as unknown as OfferRecord
-  const lane = (name: LaneName, tip: string | null) =>
+  const lane = (name: ThreadId, tip: string | null) =>
     ({ name, tip }) as unknown as LaneView
   const { offers } = appView(
     input({
@@ -169,9 +169,9 @@ test("workAnywhere: the held roots' work, and each lane running in a root this t
     workAnywhere({
       held: new Map([[entryId("r1"), "waiting"]]),
       running: [
-        { lane: laneNameForThread("a"), root: held },
-        { lane: laneNameForThread("b"), root: unheld },
-        { lane: laneNameForThread("c"), root: unknown },
+        { lane: threadIdFor("a"), root: held },
+        { lane: threadIdFor("b"), root: unheld },
+        { lane: threadIdFor("c"), root: unknown },
       ],
       rootEntries: new Map([
         [held, entryId("r1")],

@@ -1,6 +1,6 @@
 // startup — what a starting host does with the lanes it finds, pure.
 
-import type { CardRecord, LaneName, VerdictRecord } from "@pinetrie/core"
+import type { CardRecord, ThreadId, VerdictRecord } from "@pinetrie/core"
 import { queuedOn } from "./card.ts"
 
 /**
@@ -15,15 +15,15 @@ import { queuedOn } from "./card.ts"
 export function planStartup(input: {
   readonly cards: readonly CardRecord[]
   /** Lanes a crash interrupted, as pi reports them. */
-  readonly interrupted: readonly LaneName[]
+  readonly interrupted: readonly ThreadId[]
   readonly verdicts: readonly VerdictRecord[]
 }): {
-  readonly resume: readonly LaneName[]
-  readonly drain: readonly LaneName[]
+  readonly resume: readonly ThreadId[]
+  readonly drain: readonly ThreadId[]
   readonly unclassified: readonly VerdictRecord[]
 } {
   const resume = [...new Set(input.interrupted)]
-  const lanes = new Set<LaneName>()
+  const lanes = new Set<ThreadId>()
   for (const c of input.cards)
     if (c.place.kind === "queued") lanes.add(c.place.lane)
   const drain = [...lanes]

@@ -13,6 +13,7 @@ import {
 import type { Outcome } from "@pinetrie/protocol/codec"
 import type { HostRequest } from "@pinetrie/session"
 import { cardOf, rootOfTab } from "./card-intents.ts"
+import type { Minted } from "./columns.ts"
 import { type Effect, type IntentState, layout, list } from "./effects.ts"
 
 /** Where a card becomes a thread: a state on the board, or a place in the sidebar. */
@@ -22,8 +23,8 @@ export type SpinTarget =
   | { readonly kind: "sidebar"; readonly before: EntryId | null }
 
 /**
- * Make `card` a thread at `to`, the root `thread` (minted by the page): a
- * `spin-off` request, and for the sidebar, the new root placed there and
+ * Make `card` a thread at `to`, the first message of the thread and the root
+ * `minted` names (minted by the page): a `spin-off` request, and for the sidebar, the new root placed there and
  * shown once the host answers. Its move goes in the history of the root you
  * will be on: the new one, for the sidebar; else the card's own root, or
  * for a card in no root (your inventory) the root you are on. Nothing for a
@@ -32,9 +33,10 @@ export type SpinTarget =
 export function planSpinOff(
   card: CardId,
   to: SpinTarget,
-  thread: RootId,
+  minted: Minted,
   state: IntentState,
 ): readonly Effect[] {
+  const { root: thread } = minted
   const now = cardOf(state.cards, card)
   if (now === undefined || now.carries.kind === "fact") return []
   const { place } = now
@@ -49,7 +51,7 @@ export function planSpinOff(
   const move = moveOf(now, {
     kind: "gone",
     root: history,
-    why: { kind: "spun", thread },
+    why: { kind: "spun", into: thread, thread: minted.thread },
   })
   const request: Extract<HostRequest, { kind: "spin-off" }> = {
     kind: "spin-off",

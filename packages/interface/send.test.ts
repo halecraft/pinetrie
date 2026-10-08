@@ -4,11 +4,11 @@ import {
   commitId,
   ERR,
   entryId,
-  laneNameForThread,
   NOBODY,
   runId,
   THE_AGENT,
   type ThreadLane,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
@@ -44,7 +44,7 @@ const lane = (
   over: Partial<Extract<ThreadLane, { kind: "lane" }>> = {},
 ): ThreadLane => ({
   kind: "lane",
-  name: laneNameForThread("1"),
+  name: threadIdFor("1"),
   tip: entryId("e-1"),
   running: false,
   waiting: 0,

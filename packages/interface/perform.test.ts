@@ -3,8 +3,8 @@ import {
   type CardRecord,
   cardId,
   entryId,
-  laneNameForThread,
   rootIdFor,
+  threadIdFor,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -65,7 +65,7 @@ type Ports = ReturnType<typeof ports>
 const root = entryId("r")
 const identity = { email: "a@x.test", name: "Ada" }
 const show = { kind: "show", here: { kind: "nothing" } } as const
-const lane = laneNameForThread("x")
+const lane = threadIdFor("x")
 const at = atEntry(entryId("e"))
 const ada = writerId("ada@x.test")
 const move = {
@@ -285,7 +285,11 @@ test("a spin-off into the sidebar places and shows its thread only once the host
     move: {
       card: cardId("c"),
       from: { kind: "inventory", holder: writerId("ada@x.io") },
-      to: { kind: "gone", root: thread, why: { kind: "spun", thread } },
+      to: {
+        kind: "gone",
+        root: thread,
+        why: { kind: "spun", into: thread, thread: threadIdFor("spun") },
+      },
     },
     state: null,
   } as const
@@ -316,7 +320,7 @@ test("a move flies only when its plan says so", () => {
 
 test("not needed marks a verdict by its ask, an offer by its source, and an offer with none not at all (ADR-0077)", () => {
   const p: Ports = ports()
-  const lane = laneNameForThread("a")
+  const lane = threadIdFor("a")
   perform(
     [
       {

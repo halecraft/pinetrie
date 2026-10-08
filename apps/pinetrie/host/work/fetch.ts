@@ -6,7 +6,7 @@
 import { mkdtemp, rm } from "node:fs/promises"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import type { CommitId, LaneName } from "@pinetrie/core"
+import type { CommitId, ThreadId } from "@pinetrie/core"
 import type { Keeper } from "@pinetrie/keeper"
 import {
   bookmarkName,
@@ -35,7 +35,7 @@ export interface Fetches {
    * it back. Resolves once imported.
    */
   fetchLane(
-    lane: LaneName,
+    lane: ThreadId,
     have: readonly (CommitId | null)[],
     stack?: boolean,
   ): Promise<void>

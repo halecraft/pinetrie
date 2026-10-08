@@ -18,14 +18,14 @@ export {
   type MoveHow,
   type SlotMove,
 } from "./card-moves.ts"
-export type { ChatHow } from "./chat.ts"
+export { type ChatHow, chatAtOf } from "./chat.ts"
 export {
   type ConnectOptions,
   connectSession,
   type HostRequest,
   type SessionClient,
 } from "./connect.ts"
-export { newCardId, newLaneName, newRootId } from "./ids.ts"
+export { newCardId, newRootId, newThreadId } from "./ids.ts"
 export {
   firstEmpty,
   heldBy,

@@ -8,7 +8,6 @@
 import {
   type ArchivedRoot,
   type EntryId,
-  type LaneName,
   type LaneRecord,
   type LaneView,
   type OfferRecord,
@@ -16,6 +15,7 @@ import {
   type RailRow,
   type RootId,
   type RootWork,
+  type ThreadId,
   type TreeIndex,
   type Workflow,
   type WriterId,
@@ -74,22 +74,22 @@ export interface AppViewInput {
   readonly columns: readonly Column[]
   /** `branchColors(rail, views).track`, memoised by `App`. */
   readonly tracks: readonly number[]
-  /** The roots in the closed state, by root entry (ADR-0122). */
+  /** The roots in the archive, by root entry (ADR-0122). */
   readonly archived: ReadonlyMap<EntryId, ArchivedRoot>
   readonly workflow: Workflow | null
   readonly nameOf: ReadonlyMap<WriterId, string>
-  readonly offers: ReadonlyMap<LaneName, OfferRecord>
+  readonly offers: ReadonlyMap<ThreadId, OfferRecord>
   /** The lanes of the roots this tab holds. */
   readonly lanes: readonly LaneView[]
   /** Every lane's root entry (`laneRootsOf`), held or not. */
-  readonly laneRoots: ReadonlyMap<LaneName, EntryId>
+  readonly laneRoots: ReadonlyMap<ThreadId, EntryId>
 }
 
 /** Every lane's root entry: its `LaneRecord`'s root, through `rootEntries` (ADR-0063). */
 export const laneRootsOf = (
-  records: ReadonlyMap<LaneName, LaneRecord>,
+  records: ReadonlyMap<ThreadId, LaneRecord>,
   rootEntries: ReadonlyMap<RootId, EntryId>,
-): ReadonlyMap<LaneName, EntryId> =>
+): ReadonlyMap<ThreadId, EntryId> =>
   new Map(
     [...records.values()].flatMap(r => {
       const entry = rootEntries.get(r.root)
@@ -101,7 +101,7 @@ export const laneRootsOf = (
  * The agent's work in each root, held by this tab or not: the held lanes'
  * (`rootWork`), and every lane running in the session, by its root's entry
  * (ADR-0063, ADR-0091); running wins over waiting, and a root with no entry
- * yet is left out. What refuses a root's move to the closed state, and, but
+ * yet is left out. What refuses a root's move to the archive, and, but
  * for `held`, what rings it in the sidebar and on the board (`rootStatus`).
  */
 export function workAnywhere(input: {
@@ -109,7 +109,7 @@ export function workAnywhere(input: {
   readonly held: ReadonlyMap<EntryId, RootWork>
   /** Lanes running in any root (`readRunningLanes`). */
   readonly running: readonly {
-    readonly lane: LaneName
+    readonly lane: ThreadId
     readonly root: RootId
   }[]
   readonly rootEntries: ReadonlyMap<RootId, EntryId>
@@ -128,7 +128,7 @@ export function workAnywhere(input: {
  * entry in a root this tab does not hold.
  */
 export interface OpenOffer {
-  readonly lane: LaneName
+  readonly lane: ThreadId
   readonly root: EntryId
   readonly end: EntryId
   /**
@@ -203,7 +203,7 @@ export const hereRail = (
 
 /**
  * What an archived root's column says and offers (ADR-0122): who moved it to
- * the closed state, and Restore, which moves it to the first open state.
+ * the archive, and Restore, which moves it to the first open state.
  */
 export function readOnlyWords(
   archived: ArchivedRoot,
@@ -221,7 +221,7 @@ export function readOnlyWords(
             intent: {
               kind: "moveRoot",
               root: archived.root,
-              from: workflow.closed.id,
+              from: workflow.archive.id,
               to: to.id,
               before: null,
               closes: false,

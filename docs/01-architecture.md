@@ -291,7 +291,7 @@ presence         ephemeral                who reads which thread, in which root
 ```
 
 The host holds the session, `live`, the places and every root not archived
-(not in the board's closed state, ADR-0122).
+(not in the board's archive, ADR-0122).
 A client holds the session, `live`, the places and only the roots its tabs
 show; it reads every other root through its directory record. pi runs one
 session and one harness per root (ADR-0092, ADR-0095).

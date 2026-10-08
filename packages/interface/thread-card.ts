@@ -17,11 +17,11 @@ import { NO_TEXT } from "./root-label.ts"
 /** A move to another workflow state, as a thread card's ⋯ offers it. */
 export interface ThreadMove {
   readonly name: string
-  /** To the closed state: it archives the root. */
+  /** To the archive: it archives the root. */
   readonly closes: boolean
-  /** Why it is refused now (`ROOT_BUSY_REASON`'s key), into the closed state only. */
+  /** Why it is refused now (`ROOT_BUSY_REASON`'s key), into the archive only. */
   readonly busy: RootWork | null
-  /** Into the closed state, the threads whose offers it withdraws (ADR-0061). */
+  /** Into the archive, the threads whose offers it withdraws (ADR-0061). */
   readonly drops: readonly string[]
   readonly intent: Intent
 }
@@ -92,9 +92,9 @@ function movesOf(
 ): readonly ThreadMove[] {
   const { workflow } = facts
   if (workflow === null || root === null || from === null) return []
-  return [...workflow.open, workflow.closed].flatMap(to => {
+  return [...workflow.open, workflow.archive].flatMap(to => {
     if (to.id === from) return []
-    const closes = to.id === workflow.closed.id
+    const closes = to.id === workflow.archive.id
     return [
       {
         name: to.name,

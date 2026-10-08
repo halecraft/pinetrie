@@ -83,7 +83,7 @@ async function commandsSection(
       "@agent follow it",
       atEntry(entryId(h.laneWith("read it")?.tip ?? "")),
       {
-        lane: h.laneWith("read it")?.name,
+        thread: h.laneWith("read it")?.name,
       },
     )
     const ran = (await h.results("ran it")).at(-1) ?? ""

@@ -8,8 +8,8 @@ import { Schema } from "@kyneta/schema"
 import {
   type EntryId,
   entryId,
-  isLaneName,
-  type LaneName,
+  isThreadId,
+  type ThreadId,
 } from "@pinetrie/core"
 import type { RootDocHandle } from "./storage.ts"
 
@@ -102,14 +102,14 @@ const asStored = (v: unknown): StoredAddress | undefined =>
  * entry, so `readLaneTip` returns null for both. Measured, not assumed: see
  * `packages/pi/TECHNICAL.md`.
  */
-export function hasLaneRecord(doc: RootDocHandle, lane: LaneName): boolean {
+export function hasLaneRecord(doc: RootDocHandle, lane: ThreadId): boolean {
   return doc.values.get(physicalKey(LANE_TIP, lane)) !== undefined
 }
 
 /** A lane's tip entry id, or null if the lane has none (or does not exist). */
 export function readLaneTip(
   doc: RootDocHandle,
-  lane: LaneName,
+  lane: ThreadId,
 ): EntryId | null {
   const value = asStored(doc.values.get(physicalKey(LANE_TIP, lane)))?.value
   return typeof value === "string" ? entryId(value) : null
@@ -122,24 +122,24 @@ export function readLaneTip(
  * never by splitting the record key.
  */
 export function readStoredLanes(doc: RootDocHandle): {
-  readonly lanes: readonly LaneName[]
+  readonly lanes: readonly ThreadId[]
   /**
-   * Stored lane keys that fail `isLaneName`, or whose tip is neither an entry
+   * Stored lane keys that fail `isThreadId`, or whose tip is neither an entry
    * id nor null: never a thread's lane, and never read as one at the root.
    */
   readonly malformed: readonly string[]
 } {
-  const lanes: LaneName[] = []
+  const lanes: ThreadId[] = []
   const malformed: string[] = []
   for (const { key, value } of readValues(doc, LANE_TIP))
-    if (isLaneName(key) && (value === null || typeof value === "string"))
+    if (isThreadId(key) && (value === null || typeof value === "string"))
       lanes.push(key)
     else malformed.push(key)
   return { lanes: lanes.toSorted(), malformed: malformed.toSorted() }
 }
 
 /** Every thread's lane the document records, in name order (`readStoredLanes`). */
-export const readLaneNames = (doc: RootDocHandle): readonly LaneName[] =>
+export const readLaneNames = (doc: RootDocHandle): readonly ThreadId[] =>
   readStoredLanes(doc).lanes
 
 /**

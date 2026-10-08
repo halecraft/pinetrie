@@ -1,15 +1,10 @@
 import { Exchange } from "@kyneta/exchange"
-import {
-  entryId,
-  laneNameForThread,
-  type RootRecord,
-  writerId,
-} from "@pinetrie/core"
+import { entryId, type RootRecord, threadIdFor, writerId } from "@pinetrie/core"
 import { expect, test } from "vitest"
 import { attentionStore, EARLIEST, startOf } from "./attention-doc.ts"
 
 const ME = writerId("ada@x.io")
-const LANE = laneNameForThread("a")
+const LANE = threadIdFor("a")
 
 test("before the host's copy arrives, your attention document is not written: an early write could undo another device's (S101)", () => {
   const exchange = new Exchange({ principal: "ada@x.io" })

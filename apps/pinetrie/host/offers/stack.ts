@@ -2,7 +2,7 @@
 // and whether the stack a split's run made may replace the offer
 // (`planStackEnded`).
 
-import type { CommitId, LaneName } from "@pinetrie/core"
+import type { CommitId, ThreadId } from "@pinetrie/core"
 import { gatherOffer, gatherPlace, gatherStack } from "@pinetrie/repo"
 import { planStackEnded } from "@pinetrie/rules"
 import type { Refresh } from "./refresh.ts"
@@ -11,7 +11,7 @@ import type { OfferDeps } from "./state.ts"
 /** Where a split's stack starts and ends: the offer's start and the lane's tip; null where nothing is built. */
 export function stackSpan(
   deps: Pick<OfferDeps, "owner" | "docs">,
-  lane: LaneName,
+  lane: ThreadId,
 ): Promise<{ readonly start: CommitId[]; readonly tip: CommitId } | null> {
   return deps.owner.command(async ops => {
     const place = await gatherPlace(ops, deps.docs.input(lane))
@@ -28,7 +28,7 @@ export function stackSpan(
 export function stackEnded(
   deps: Pick<OfferDeps, "owner" | "docs">,
   refresh: Pick<Refresh, "rebuild">,
-  lane: LaneName,
+  lane: ThreadId,
   stack: {
     readonly start: readonly CommitId[]
     readonly tip: CommitId

@@ -11,10 +11,10 @@ import {
   type ErrCode,
   type Intent,
   indexAsks,
-  type LaneName,
   type LaneView,
   type OfferFact,
   type RootId,
+  type ThreadId,
   type TreeIndex,
   type WriterId,
 } from "@pinetrie/core"
@@ -57,7 +57,7 @@ export interface LaneDeps {
   /** Stop a chat's run that has not reached pi yet (`Runs.cancel`). */
   readonly cancel: Runs["cancel"]
   /** Drain a lane whose queue a card joined, unless it runs (`queueDrain`). */
-  readonly drain: (lane: LaneName) => void
+  readonly drain: (lane: ThreadId) => void
   /** The documents' keeper: a fact's card is written in a step of its own. */
   readonly keeper: Pick<HostKeeper, "run">
   /** Each card's history: a fact's card is the host's write. */
@@ -80,7 +80,7 @@ interface LaneHere {
  */
 async function laneAt(
   deps: Pick<LaneDeps, "basics" | "cards">,
-  lane: LaneName,
+  lane: ThreadId,
 ): Promise<LaneHere | null> {
   const { docs, live, places, session } = deps.basics
   const root = docs.rootOfLane(lane)
@@ -109,7 +109,7 @@ async function laneAt(
  */
 export async function handleStop(
   deps: Pick<LaneDeps, "basics" | "cards" | "agent" | "records" | "cancel">,
-  lane: LaneName,
+  lane: ThreadId,
   by: WriterId,
 ): Promise<Outcome> {
   const { agent } = deps
@@ -150,7 +150,7 @@ export async function handleStop(
  */
 export async function handleQueueHold(
   deps: Pick<LaneDeps, "basics" | "cards" | "drain" | "records">,
-  lane: LaneName,
+  lane: ThreadId,
   held: boolean,
   by: WriterId,
 ): Promise<Outcome> {
@@ -183,7 +183,7 @@ export async function handleQueueHold(
  */
 export async function handleCarryOn(
   deps: Pick<LaneDeps, "basics" | "cards" | "start">,
-  lane: LaneName,
+  lane: ThreadId,
   by: WriterId,
 ): Promise<Outcome> {
   const { basics } = deps

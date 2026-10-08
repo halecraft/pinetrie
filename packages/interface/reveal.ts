@@ -9,6 +9,7 @@
 import type { CardId, PlaceKey } from "@pinetrie/core"
 import { placeEnd } from "@pinetrie/rules"
 import { type ActedAt, AT_INVENTORY } from "@pinetrie/session"
+import type { Minted } from "./columns.ts"
 import { type Effect, type IntentState, planOpenAt, show } from "./effects.ts"
 import { columnsOf, hereOfColumn, planOpen } from "./layout.ts"
 
@@ -26,7 +27,7 @@ const at = (key: string): ActedAt => ({ kind: "column", key })
 export function revealOf(
   place: PlaceKey,
   state: IntentState,
-  fresh: string,
+  minted: Minted,
   card: CardId | null = null,
 ): { readonly effects: readonly Effect[]; readonly actedAt: ActedAt } {
   switch (place.kind) {
@@ -53,6 +54,7 @@ export function revealOf(
               action: {
                 kind: "openFresh",
                 key: place.column,
+                thread: minted.thread,
                 at: place.at.id,
                 after: columnsOf(state.layout, root).length - 1,
               },
@@ -70,13 +72,13 @@ export function revealOf(
     case "pinned":
     case "queued": {
       const end =
-        placeEnd(place, state.cards.me, state.cards.lanes, state.index) ??
+        placeEnd(place, state.index) ??
         (place.at.kind === "entry" ? place.at.id : null)
       if (end === null) return { effects: [], actedAt: AT_INVENTORY }
       const plan = planOpen(state.layout, state.index, end)
       return {
         effects: [
-          ...planOpenAt(end, state, fresh),
+          ...planOpenAt(end, state, minted.key),
           ...(place.kind === "queued" && card !== null
             ? [{ kind: "revealCard", card } as const]
             : []),
@@ -85,7 +87,7 @@ export function revealOf(
           plan?.kind === "scroll"
             ? at(plan.key)
             : plan?.kind === "open"
-              ? at(fresh)
+              ? at(minted.key)
               : AT_INVENTORY,
       }
     }

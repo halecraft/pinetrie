@@ -3,11 +3,11 @@
 
 import {
   entryId,
-  laneNameForThread,
   NOBODY,
   rootIdFor,
   SESSION_TARGET,
   type Sha256,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { encodeChat, MARK, PARTICIPANT, setRecord } from "@pinetrie/rules"
@@ -133,9 +133,9 @@ describe("readRootRecord", () => {
       row("e4", "e3", agent("done")),
       row("e5", "e2", chat("another way", CY)),
     )
-    const a = laneNameForThread("a")
-    const b = laneNameForThread("b")
-    const empty = laneNameForThread("c")
+    const a = threadIdFor("a")
+    const b = threadIdFor("b")
+    const empty = threadIdFor("c")
     writeLaneTip(doc, a, entryId("e4"))
     writeLaneTip(doc, b, entryId("e5"))
     writeLaneTip(doc, empty, null)

@@ -3,9 +3,9 @@
 // a name computed at every read could collide unseen, and a changed list
 // would rename every thread.
 
-import type { LaneName, NameRecord, ThreadName } from "@pinetrie/core"
+import type { NameRecord, ThreadId, ThreadName } from "@pinetrie/core"
 import { Type } from "typebox"
-import { decodeAt, laneKey } from "./decode.ts"
+import { decodeAt, threadKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 /**
@@ -550,7 +550,7 @@ const pairAt = (index: number): string =>
  * wrapping. Throws only when all 65,536 are in use.
  */
 export function threadNameFor(
-  lane: LaneName,
+  lane: ThreadId,
   inUse: ReadonlySet<string>,
 ): ThreadName {
   const first = fnv1a(lane) % PAIRS
@@ -567,8 +567,8 @@ export function threadNameFor(
  * sentence or a mark, on the host and the page.
  */
 export const threadNameOf = (
-  names: ReadonlyMap<LaneName, ThreadName>,
-  lane: LaneName,
+  names: ReadonlyMap<ThreadId, ThreadName>,
+  lane: ThreadId,
 ): string => names.get(lane) ?? lane.slice(-8)
 
 /**
@@ -577,12 +577,12 @@ export const threadNameOf = (
  * when it creates a lane, and when a column reserves one (`planReserve`).
  */
 export function planNames(
-  lanes: readonly { readonly lane: LaneName; readonly createdAt: number }[],
-  names: ReadonlyMap<LaneName, ThreadName>,
+  lanes: readonly { readonly lane: ThreadId; readonly createdAt: number }[],
+  names: ReadonlyMap<ThreadId, ThreadName>,
   now: number,
 ): readonly NameRecord[] {
   const inUse = new Set<string>(names.values())
-  const named = new Set<LaneName>(names.keys())
+  const named = new Set<ThreadId>(names.keys())
   const planned: NameRecord[] = []
   for (const { lane } of [...lanes].sort((a, b) => a.createdAt - b.createdAt)) {
     if (named.has(lane)) continue
@@ -608,9 +608,9 @@ export type ReservePlan =
  * holds.
  */
 export function planReserve(
-  lane: LaneName,
+  lane: ThreadId,
   held: ReadonlySet<string>,
-  names: ReadonlyMap<LaneName, ThreadName>,
+  names: ReadonlyMap<ThreadId, ThreadName>,
   now: number,
 ): ReservePlan {
   if (names.has(lane)) return { kind: "known" }
@@ -625,13 +625,13 @@ const NameRecordSchema = Type.Object({
 })
 
 /** Each thread's name, `word-word`, at its lane (ADR-0039). */
-export const NAME: RecordSpec<NameRecord, LaneName, "session"> = {
+export const NAME: RecordSpec<NameRecord, ThreadId, "session"> = {
   namespace: "pinetrie.name",
   home: "session",
   keyOf: r => r.lane,
   encode: ({ lane, ...contents }) => contents,
   decode: (contents, key) =>
-    decodeAt(NameRecordSchema, contents, laneKey(key), (r, lane) => ({
+    decodeAt(NameRecordSchema, contents, threadKey(key), (r, lane) => ({
       lane,
       name: r.name as ThreadName,
       at: r.at,

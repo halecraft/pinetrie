@@ -31,10 +31,11 @@ export const HOST_PRINCIPAL = "pinetrie-host"
  * array is the only place a kind is declared: adding one here reaches the
  * wire, and nothing else needs editing.
  *
- *   - `chat` is a human message. `parentId` is where its sender was reading,
- *     or the branch point (`""`: the root, where only a `branch` may start);
- *     `mode` says how it joins the tree (`CHAT_MODES` in @pinetrie/core); `lane`
- *     names the thread's lane when the sender's column is bound to one;
+ *   - `chat` is a human message. `mode` says how it joins the tree:
+ *     `reply` at the end of the thread `lane` names, whose end its sender saw
+ *     at `parentId`; `branch` starts the thread `lane` names, minted by the
+ *     sender's column, at `parentId` (`""`: the root). See `ChatAt` in
+ *     @pinetrie/core;
  *     `asksAgent` marks a Start Agent column; `cardId` names the card its text
  *     was sent from, which the host spends once it is sent (ADR-0048), and
  *     `pinned` the versions of the thread's pinned cards its run waits for.
@@ -146,7 +147,11 @@ export interface Command {
    * otherwise.
    */
   readonly mode: string
-  /** `chat`: the lane the sender's column is bound to, or `""`. */
+  /**
+   * `chat`: its thread (ADR-0117), which names its lane too; `stop`,
+   * `carry-on`, `unqueue-all`, `queue-hold`, `reserve`: the thread whose lane
+   * it acts on.
+   */
   readonly lane: string
   /** `chat`: a Start Agent column, where no mention asks the agent. */
   readonly asksAgent: boolean
@@ -178,12 +183,6 @@ export interface Command {
    */
   readonly pinned: string
   /**
-   * `chat`: the lane id the sender's column reserved, or `""`: what a lane
-   * it creates is called (ADR-0057). Apart from `lane`, which decides where
-   * the message goes.
-   */
-  readonly reserved: string
-  /**
    * `chat`: the WIP bookmark a lane it creates starts from, or `""` for the
    * line (ADR-0104).
    */
@@ -205,6 +204,7 @@ export const OUTCOME_KINDS = [
   "busy",
   "conflict",
   "named",
+  "reserved",
   "pictured",
   "stopped",
   "moved-root",
@@ -213,7 +213,6 @@ export const OUTCOME_KINDS = [
   "retitling",
   "accepted",
   "offered",
-  "reserved",
   "seen",
   "accepted-moved",
   "moved",
@@ -273,7 +272,6 @@ export const EMPTY_COMMAND: Command = Object.freeze({
   asksAgent: false,
   targetId: "",
   cardId: "",
-  reserved: "",
   base: "",
   seen: "",
   moves: "",

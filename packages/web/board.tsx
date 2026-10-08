@@ -10,11 +10,11 @@
 //
 // Opened, each open state is a column: drag an item to another column, or
 // within one, or use its ⋯'s Move to ▸, to move it for everyone. To the
-// closed state it is archived (ADR-0029). An item with a thread whose work
+// archive it is archived (ADR-0029). An item with a thread whose work
 // is ready to accept carries ⇡, for everyone. Selecting an item opens it in your
 // list; dragged onto the sidebar, it opens there. A state's name is edited in
-// place, and its ⋯ moves or removes it, or adds one beside it. The closed
-// state, marked ✓, shows its count and its most recent roots. The search and
+// place, and its ⋯ moves or removes it, or adds one beside it. The
+// archive, marked ✓, shows its count and its most recent roots. The search and
 // "mine" filter every state in place (ADR-0109); a banner at the board's foot
 // names the filter, `/` focuses the search, and Escape clears the filter
 // before it closes the board. What it shows is `boardView`'s.
@@ -253,12 +253,12 @@ function StripStateButton({
   return (
     <button
       className="strip-state"
-      data-closed={state.closed || undefined}
+      data-archive={state.archive || undefined}
       data-state={state.id}
       onClick={onOpen}
       type="button"
       // A card dropped on an open state becomes a thread there (ADR-0111).
-      {...(state.closed ? {} : dropProps({ kind: "state", state: state.id }))}
+      {...(state.archive ? {} : dropProps({ kind: "state", state: state.id }))}
     >
       <span className="strip-name">{state.name}</span>{" "}
       <b className="strip-count">{state.count}</b>
@@ -392,8 +392,8 @@ export function Board({
         </div>
       </div>
     ) : null
-  // An open column's item is a place to drop before; a closed row is not,
-  // since the closed state shows its roots by activity, not by place.
+  // An open column's item is a place to drop before; an archive row is not,
+  // since the archive shows its roots by activity, not by place.
   const item = (t: ThreadCard, place: boolean) => (
     <ItemCard
       drop={
@@ -501,29 +501,29 @@ export function Board({
         ])}
         {newState(null)}
         <div
-          className="board-closed"
-          data-state={view.closed.state.id}
+          className="board-archive"
+          data-state={view.archive.state.id}
           {...rootGroupProps}
           {...rootDropProps({
             kind: "state",
-            state: view.closed.state.id,
+            state: view.archive.state.id,
             before: null,
           })}
         >
           <div className="board-head">
-            <span aria-hidden className="closed-mark">
+            <span aria-hidden className="archive-mark">
               ✓
             </span>
             <StateName
-              name={view.closed.state.name}
+              name={view.archive.state.name}
               onName={name =>
-                onIntent(nameStateIntent(view.closed.state.id, name))
+                onIntent(nameStateIntent(view.archive.state.id, name))
               }
             />
-            {stateCount(view.closed.count)}
+            {stateCount(view.archive.count)}
           </div>
           <div className="board-cards">
-            {view.closed.rows.map(t => item(t, false))}
+            {view.archive.rows.map(t => item(t, false))}
           </div>
         </div>
       </div>

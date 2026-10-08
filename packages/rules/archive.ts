@@ -1,7 +1,7 @@
-// archive — what crossing the closed workflow state's edge does (ADR-0029,
-// ADR-0122), and the gate that keeps a closed root read-only.
+// archive — what crossing the archive's edge does (ADR-0029, ADR-0122), and
+// the gate that keeps an archived root read-only.
 //
-// A root is archived while its board place is in the closed state
+// A root is archived while its board place is in the archive
 // (`board.ts`). Moving it there or out writes only its place: entries are
 // immutable (ADR-0004), so a root is hidden and made read-only, never
 // removed. What follows the place is planned here: the busy check, the
@@ -13,7 +13,6 @@ import {
   type EntryId,
   ERR,
   type Intent,
-  type LaneName,
   type LaneView,
   nearestRevision,
   type Refusal,
@@ -24,23 +23,24 @@ import {
   rootOf,
   rootWork,
   type SnapshotId,
+  type ThreadId,
   type TreeIndex,
 } from "@pinetrie/core"
 import { planRetention } from "./work.ts"
 
-/** Into the closed state, or out of it: `transitionOf`'s crossings. */
-export type Crossing = "close" | "reopen"
+/** Into the archive, or out of it: `transitionOf`'s crossings. */
+export type Crossing = "archive" | "restore"
 
 /**
- * What a close or reopen does off the documents' keeper, after the root's
+ * What archiving or restoring does off the documents' keeper, after the root's
  * place is written (ADR-0065): lanes to forget and remove (their containers
- * and disks), their refs in your repo moved (null deletes, close), and
+ * and disks), their refs in your repo moved (null deletes, on archiving), and
  * snapshots to delete. Empty on a host without lanes of their own.
  */
 export interface ArchiveTeardown {
-  readonly forget: readonly LaneName[]
+  readonly forget: readonly ThreadId[]
   readonly refs: readonly {
-    readonly lane: LaneName
+    readonly lane: ThreadId
     readonly commit: CommitId | null
   }[]
   readonly snapshots: readonly SnapshotId[]
@@ -52,11 +52,11 @@ type ArchivePlan =
       readonly kind: "cross"
       /** Off the keeper, after the place is written. */
       readonly teardown: ArchiveTeardown
-      /** On the keeper again, after the teardown: a close only. */
+      /** On the keeper again, after the teardown: archiving only. */
       readonly unload: boolean
     }
 
-/** Why a root cannot be closed now, as the board and the host both say it. */
+/** Why a root cannot be archived now, as the board and the host both say it. */
 export const ROOT_BUSY_REASON = {
   running: "the agent is working here",
   waiting: "cards are queued here",
@@ -64,10 +64,10 @@ export const ROOT_BUSY_REASON = {
 } as const satisfies Record<RootWork, string>
 
 /**
- * Decide what crossing the closed state's edge does. A root the agent works
- * in, or where cards are queued, is not closed: stopping the run or holding
+ * Decide what crossing the archive's edge does. A root the agent works in,
+ * or where cards are queued, is not archived: stopping the run or holding
  * the queue would do work nobody asked for, so the person chooses
- * (ADR-0029). Reopening is never busy.
+ * (ADR-0029). Restoring is never busy.
  */
 export function planArchive(input: {
   readonly crossing: Crossing
@@ -79,7 +79,7 @@ export function planArchive(input: {
    * the root's document; empty on a host without lanes of their own.
    */
   readonly own: readonly {
-    readonly lane: LaneName
+    readonly lane: ThreadId
     readonly tip: EntryId | null
   }[]
   /** The root's revision records: what its lanes' turns recorded. */
@@ -90,18 +90,18 @@ export function planArchive(input: {
   if (rootOf(index, root) !== root)
     return refused(ERR.UNKNOWN_TARGET, "no such root")
   const busy = rootWork(index, input.lanes).get(root)
-  if (crossing === "close" && busy !== undefined)
+  if (crossing === "archive" && busy !== undefined)
     return refused(ERR.ROOT_BUSY, ROOT_BUSY_REASON[busy])
   return {
     kind: "cross",
     teardown: planTeardown(crossing, input),
-    unload: crossing === "close",
+    unload: crossing === "archive",
   }
 }
 
 /**
- * Close: every own lane forgotten, its ref deleted, and every snapshot but
- * each lane's newest (`planRetention`). Reopen: each lane's ref back at its
+ * Archive: every own lane forgotten, its ref deleted, and every snapshot but
+ * each lane's newest (`planRetention`). Restore: each lane's ref back at its
  * tip's nearest revision (`nearestRevision`), none for a lane with no tip or
  * no revision yet.
  */
@@ -110,7 +110,7 @@ function planTeardown(
   input: Pick<Parameters<typeof planArchive>[0], "index" | "own" | "revisions">,
 ): ArchiveTeardown {
   const lanes = input.own.map(o => o.lane)
-  if (crossing === "close") {
+  if (crossing === "archive") {
     const inRoot = new Set<string>(lanes)
     return {
       forget: lanes,
@@ -144,13 +144,17 @@ function planTeardown(
  */
 export function writesIn(
   intent: Intent,
-  rootOfLane: (lane: LaneName) => RootId | null,
+  rootOfLane: (lane: ThreadId) => RootId | null,
 ): readonly RootId[] {
   const only = (root: RootId | null): readonly RootId[] =>
     root === null ? [] : [root]
   switch (intent.kind) {
     case "chat":
-      return only(intent.at.kind === "root" ? null : intent.root)
+      return only(
+        intent.at.kind === "branch" && intent.at.at === null
+          ? null
+          : intent.root,
+      )
     // An offer acts at its lane's tip: an archived root's lanes offer no
     // work out. A carry-on writes its message there.
     case "offer":
@@ -182,8 +186,8 @@ export function writesIn(
     case "name":
     case "picture":
     case "stop":
-    // The board is the session's: a move into or out of the closed state
-    // writes in no root, so a closed root can be reopened.
+    // The board is the session's: a move into or out of the archive writes
+    // in no root, so an archived root can be restored.
     case "move-root":
     case "workflow":
     case "reserve":

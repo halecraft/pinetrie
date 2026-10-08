@@ -6,16 +6,17 @@
 import {
   type CardId,
   type EntryId,
-  type LaneName,
+  NOBODY,
   type RootId,
   rootIdFor,
   type Target,
+  type ThreadId,
   type ValueWrite,
   writerId,
 } from "@pinetrie/core"
 import type { ThreadLaneHandle, WriteOutcome } from "@pinetrie/pi"
 import { readLaneRecords, readRootRecord, readRoots } from "@pinetrie/reads"
-import { byTarget, LANE, ROOT, setRecord } from "@pinetrie/rules"
+import { byTarget, encodeChat, LANE, ROOT, setRecord } from "@pinetrie/rules"
 import {
   applyRecordWrites,
   type LiveDocHandle,
@@ -93,7 +94,7 @@ export function deferred<T>(): {
  * progress for as long as it needs.
  */
 export function fakeLane(
-  name: LaneName,
+  name: ThreadId,
   impl: Partial<ThreadLaneHandle> = {},
 ): {
   readonly lane: ThreadLaneHandle
@@ -123,6 +124,33 @@ export const row = (
   fromId: null,
   payload: { message },
 })
+
+/**
+ * A stored chat that starts `thread` (ADR-0117), as a branch's first message
+ * does: what `threadEnd` finds a thread by.
+ */
+export const threadRow = (
+  id: string,
+  parentId: string | null,
+  thread: ThreadId,
+): StoredEntryRow =>
+  row(
+    id,
+    parentId,
+    encodeChat(
+      {
+        author: STARTER,
+        authorName: "Starter",
+        text: id,
+        compels: NOBODY,
+        sendId: `send-${id}`,
+        starts: thread,
+      },
+      0,
+    ),
+  )
+
+const STARTER = writerId("starter@example.com")
 
 /** The documents a write may go to: the session's, and the test's root. */
 export type WriteDocs = Pick<FakeBasics, "session" | "root">
@@ -170,7 +198,7 @@ export function fakeDocuments(input: {
   readonly roots: Map<RootId, RootDocHandle>
 }): HostDocuments {
   const { session, live, places, roots } = input
-  const rootOfLane = (lane: LaneName): RootId =>
+  const rootOfLane = (lane: ThreadId): RootId =>
     readLaneRecords(session).get(lane)?.root ?? ROOT_ID
   const listeners: ((root: RootId, doc: RootDocHandle) => void)[] = []
   const releasing: ((root: RootId) => Promise<void>)[] = []
@@ -240,7 +268,7 @@ export function writeDirectory(b: WriteDocs): void {
  */
 export function putLane(
   b: WriteDocs,
-  lane: LaneName,
+  lane: ThreadId,
   tip: EntryId | null = null,
 ): void {
   putValue(

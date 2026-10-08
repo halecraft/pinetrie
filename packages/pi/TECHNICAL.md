@@ -151,11 +151,11 @@ for this reason.
 
 The host owns one harness. A lane is a thread's line of work: created by
 `Agent.createThreadLane(at, lane)` where agent work is first wanted in a
-thread, under the id the host decided (`t-…`: the one a column reserved, or
-one the host made, ADR-0057), and never navigated. People own no lanes;
-a message records its writer (`details.author`, from the transport). A lane's
-tip is therefore always its thread's end, and `threadOf` finds a thread's
-lane from its end with no stored mapping.
+thread, under its thread's id (`t-…`, minted by the column that opened the
+thread, ADR-0057, ADR-0117), and never navigated. People own no lanes; a
+message records its writer (`details.author`, from the transport). A lane's
+tip is therefore always its thread's end, and a thread's lane is the one its
+id names (`laneOf`), with no stored mapping.
 
 The facade has no way to move a lane: `ThreadLaneHandle` offers `append`,
 `run`, `resume` and `abort`, none of which navigates. Nor is

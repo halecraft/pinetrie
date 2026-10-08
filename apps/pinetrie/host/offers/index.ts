@@ -17,9 +17,9 @@
 import type {
   CommitId,
   ErrCode,
-  LaneName,
   OfferFact,
   OfferSeen,
+  ThreadId,
   WriterId,
 } from "@pinetrie/core"
 import type { RepoConfig } from "@pinetrie/lanes"
@@ -59,19 +59,19 @@ export interface Offers {
    */
   moveLanes(
     updates: readonly {
-      readonly lane: LaneName
+      readonly lane: ThreadId
       readonly commit: CommitId | null
     }[],
   ): Promise<void>
   /** A run on `lane` ended: refresh its offer, then describe it if it is still a WIP. */
-  runEnded(lane: LaneName): void
+  runEnded(lane: ThreadId): void
   /**
    * An offer action other than a split; an acceptance names its destination, null
    * for the default, and what it was shown (ADR-0065). Carried out, it
    * answers with its fact, which the thread is told (ADR-0080).
    */
   act(
-    lane: LaneName,
+    lane: ThreadId,
     action: "accept" | "squash" | "describe" | "refresh",
     by: WriterId,
     to?: string | null,
@@ -82,14 +82,14 @@ export interface Offers {
   >
   /** Where a split's stack starts and ends: the offer's start and the lane's tip. */
   stackSpan(
-    lane: LaneName,
+    lane: ThreadId,
   ): Promise<{ readonly start: CommitId[]; readonly tip: CommitId } | null>
   /**
    * A split's run ended: its stack, fetched into your repo as `stack`, replaces
    * the offer if it holds exactly the lane tip's files. Returns why not.
    */
   stackEnded(
-    lane: LaneName,
+    lane: ThreadId,
     stack: {
       readonly start: readonly CommitId[]
       readonly tip: CommitId
@@ -114,13 +114,13 @@ export function startOffers(input: {
   /** What a description asks of the model. */
   readonly piSetup: Pick<PiSetup, "skill" | "complete">
   /** Whether a lane is running now: an offer is described once it stops. */
-  readonly running: (lane: LaneName) => boolean
+  readonly running: (lane: ThreadId) => boolean
   /** A lane's base record changed: lane work announces it (`onBaseChanged`). */
-  readonly baseChanged: (lane: LaneName) => void
+  readonly baseChanged: (lane: ThreadId) => void
   /** Accepted work's record and commands (`host/work/accepted.ts`): its record is rewritten when the owner observes accepted work or your `@` move. */
   readonly acceptedWork: AcceptedWork
 }): Offers {
-  const deps = { ...createOfferDeps(input), describing: new Set<LaneName>() }
+  const deps = { ...createOfferDeps(input), describing: new Set<ThreadId>() }
   const { owner, basics, records } = deps
   const refresh = createRefresh(deps)
 
@@ -128,7 +128,7 @@ export function startOffers(input: {
    * Refresh `lane`'s offer as upkeep, once however often it is marked
    * before it starts; resolves with whether it built.
    */
-  function mark(lane: LaneName): Promise<boolean> {
+  function mark(lane: ThreadId): Promise<boolean> {
     let built = false
     return owner
       .later(`refresh:${lane}`, async ops => {
@@ -143,7 +143,7 @@ export function startOffers(input: {
       )
   }
   /** A refresh, then its description when it built and the lane is idle. */
-  const touch = (lane: LaneName) =>
+  const touch = (lane: ThreadId) =>
     void mark(lane).then(built => {
       // Tracked, and logged on failure, by `describe`.
       if (built && !deps.running(lane))

@@ -7,6 +7,7 @@ import {
   atEntry,
   type CardPlace,
   type CardRecord,
+  type ChatAt,
   cardId,
   discardedOf,
   emailLocalPart,
@@ -17,7 +18,6 @@ import {
   keyOf,
   keyOfFields,
   type LaneRecord,
-  laneNameForThread,
   latestTip,
   messageText,
   moveOf,
@@ -27,7 +27,7 @@ import {
   normalizeName,
   noteOf,
   parseMentions,
-  parseNewLane,
+  parseNewThread,
   parseTitle,
   pinnedOf,
   placeFields,
@@ -40,6 +40,8 @@ import {
   seenAt,
   shellWord,
   THE_AGENT,
+  type ThreadId,
+  threadIdFor,
   writerId,
   writerOfPrincipal,
 } from "@pinetrie/core"
@@ -100,18 +102,18 @@ test("latestTip: the newest tip by id, independent of input order", () => {
   assert.equal(latestTip([]), null, "an empty session has no view")
 })
 
-test("writerId and laneNameForThread: a person and a thread are never confused", () => {
+test("writerId and threadIdFor: a person and a thread are never confused", () => {
   assert.equal(writerId("abc"), "w-abc")
   assert.throws(() => writerId(""), /non-empty/)
   assert.throws(() => writerId("a\u0000b"), /u0000/)
   // Different prefixes: a writer's id can never name a thread's lane.
-  assert.equal(laneNameForThread("abc"), "t-abc")
-  assert.notEqual(String(laneNameForThread("abc")), String(writerId("abc")))
+  assert.equal(threadIdFor("abc"), "t-abc")
+  assert.notEqual(String(threadIdFor("abc")), String(writerId("abc")))
 })
 
-test("parseNewLane: only t- and a lowercase uuidv7, since a container is named after it (ADR-0057)", () => {
+test("parseNewThread: only t- and a lowercase uuidv7, since a container is named after it (ADR-0057)", () => {
   const ok = "t-01a0f9eb-86e1-77ad-a822-2a306786223f"
-  assert.equal(parseNewLane(ok), ok)
+  assert.equal(parseNewThread(ok), ok)
   for (const bad of [
     "t-abc",
     ok.toUpperCase(),
@@ -120,7 +122,7 @@ test("parseNewLane: only t- and a lowercase uuidv7, since a container is named a
     `${ok};rm -rf`,
     ` ${ok}`,
   ])
-    assert.equal(parseNewLane(bad), undefined, bad)
+    assert.equal(parseNewThread(bad), undefined, bad)
 })
 
 test("findSeqKeys: ADR-0013 — seq must not ride the wire", () => {
@@ -326,7 +328,7 @@ describe("a card's place as flat fields (ADR-0059)", () => {
       kind: "queued",
       root: TEST_ROOT,
       at: atEntry(entryId("e-1")),
-      lane: laneNameForThread("x"),
+      lane: threadIdFor("x"),
       order: "a",
       by: ADA,
       seen: "v",
@@ -335,7 +337,7 @@ describe("a card's place as flat fields (ADR-0059)", () => {
       kind: "pinned",
       root: TEST_ROOT,
       at: atEntry(entryId("e-1")),
-      lane: laneNameForThread("x"),
+      lane: threadIdFor("x"),
       order: "b",
     },
     { kind: "fresh", column: "k", root: TEST_ROOT, at: ROOT },
@@ -363,7 +365,7 @@ describe("a card's place as flat fields (ADR-0059)", () => {
       kind: "pinned",
       root: TEST_ROOT,
       at: atEntry(entryId("e-1")),
-      lane: laneNameForThread("x"),
+      lane: threadIdFor("x"),
     })
   })
 
@@ -425,7 +427,7 @@ describe("a card's place as flat fields (ADR-0059)", () => {
 
 describe("moves, built once (ADR-0059)", () => {
   const ADA = writerId("ada@example.com")
-  const LANE = laneNameForThread("x")
+  const LANE = threadIdFor("x")
   const OTHER = rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff")
   const at = atEntry(entryId("e-1"))
   const card = (place: CardPlace): CardRecord => ({
@@ -495,23 +497,30 @@ describe("moves, built once (ADR-0059)", () => {
     ).toBe(false)
   })
 
-  test("a spun card is stored as spun, its thread in its column; a spun place with no thread is malformed", () => {
+  test("a spun card is stored as spun, its root in its column and its thread in its lane; a spun place with neither is malformed", () => {
+    const thread = threadIdFor("spun")
     const place = {
       kind: "gone",
       root: TEST_ROOT,
       by: ADA,
-      why: { kind: "spun", thread: OTHER },
+      why: { kind: "spun", into: OTHER, thread },
     } as const
     const fields = placeFields(place)
-    expect(fields).toMatchObject({ kind: "spun", column: OTHER, holder: ADA })
+    expect(fields).toMatchObject({
+      kind: "spun",
+      column: OTHER,
+      lane: thread,
+      holder: ADA,
+    })
     expect(placeOfFields(fields)).toEqual(place)
     expect(keyOfFields({ ...fields, holder: "" })).toEqual(keyOf(place))
     expect(placeOfFields({ ...fields, column: "" })).toBeUndefined()
+    expect(placeOfFields({ ...fields, lane: "" })).toBeUndefined()
     expect(
       sameKey(keyOf(place), {
         kind: "gone",
         root: TEST_ROOT,
-        why: { kind: "spun", thread: TEST_ROOT },
+        why: { kind: "spun", into: TEST_ROOT, thread },
       }),
     ).toBe(false)
   })
@@ -569,4 +578,16 @@ describe("moves, built once (ADR-0059)", () => {
 test("nonEmpty: a list with one element or more, or null", () => {
   expect(nonEmpty([])).toBeNull()
   expect(nonEmpty(["a", "b"])).toEqual(["a", "b"])
+})
+
+describe("threads, by construction (ADR-0117)", () => {
+  test("a thread's id is no bare string, and a branch names the thread it starts", () => {
+    // @ts-expect-error: a lane is named by a thread's id, never a string
+    const lane: ThreadId = "t-x"
+    // @ts-expect-error: a branch without the thread its column minted
+    const branch: ChatAt = { kind: "branch", at: null }
+    // @ts-expect-error: a send at an end names its thread
+    const end: ChatAt = { kind: "end", seen: entryId("e-1") }
+    expect([lane, branch.kind, end.kind]).toEqual(["t-x", "branch", "end"])
+  })
 })

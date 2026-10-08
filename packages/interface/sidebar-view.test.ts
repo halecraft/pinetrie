@@ -3,13 +3,13 @@ import {
   blobUrl,
   type EntryId,
   entryId,
-  type LaneName,
   type LaneView,
-  laneNameForThread,
   type MarkRecord,
   rootIdFor,
   type Sha256,
+  type ThreadId,
   type ThreadName,
+  threadIdFor,
   type Workflow,
   workflowStateIdFor,
   writerId,
@@ -17,7 +17,7 @@ import {
 import { describe, expect, test } from "vitest"
 import type { Item, Status } from "./attention.ts"
 import type { CardMarks } from "./card-marks.ts"
-import { NEW_ROOT, tree } from "./fixtures.ts"
+import { NEW_ROOT, NEW_THREAD, tree } from "./fixtures.ts"
 import {
   type Here,
   initialLayout,
@@ -46,7 +46,13 @@ const reduce = (l: Layout, ...actions: Parameters<typeof layoutReducer>[1][]) =>
 const layout = resolveLayout(
   reduce(
     initialLayout(),
-    { kind: "newTab", key: "t", root: NEW_ROOT, asksAgent: true },
+    {
+      kind: "newTab",
+      key: "t",
+      root: NEW_ROOT,
+      thread: NEW_THREAD,
+      asksAgent: true,
+    },
     { kind: "show", here: R1 },
   ),
   {
@@ -78,7 +84,7 @@ const WORKFLOW: Workflow = {
     { id: BACKLOG, name: "Backlog" },
     { id: DOING, name: "Doing" },
   ],
-  closed: { id: DONE, name: "Done" },
+  archive: { id: DONE, name: "Done" },
 }
 const ID = (n: number) => rootIdFor(`01a0ffd2-0000-7000-8000-00000000000${n}`)
 /** What the sidebar's items are read from, its thread cards' facts among them. */
@@ -215,7 +221,7 @@ describe("sidebarView", () => {
   })
 
   test("offeredByRoot: each open offer's thread, under its root; one the host has not named yet by its id's end", () => {
-    const lane = (n: string) => n as LaneName
+    const lane = (n: string) => n as ThreadId
     const names = new Map([
       [lane("l1"), "amber-fox" as ThreadName],
       [lane("l2"), "cozy-mallard" as ThreadName],
@@ -254,7 +260,7 @@ describe("sidebarView", () => {
 
   test("a root draws its status, and what arrived as you watched (ADR-0077)", () => {
     const item: Item = {
-      lane: laneNameForThread("a"),
+      lane: threadIdFor("a"),
       root: entryId("r2"),
       end: entryId("e"),
       level: "needsYou",
@@ -274,7 +280,7 @@ describe("sidebarView", () => {
 
   test("a root that raises something offers not needed first in its ⋯; a working one does not", () => {
     const item: Item = {
-      lane: laneNameForThread("a"),
+      lane: threadIdFor("a"),
       root: entryId("r1"),
       end: entryId("e"),
       level: "worthARead",
@@ -371,7 +377,7 @@ describe("icons (ADR-0088)", () => {
 
 describe("rootSprites", () => {
   const lane = (n: number, tip: string): LaneView => ({
-    name: laneNameForThread(`01a0ffd2-0000-7000-8000-00000000000${n}`),
+    name: threadIdFor(`01a0ffd2-0000-7000-8000-00000000000${n}`),
     tip: entryId(tip),
     running: false,
     waiting: 0,
@@ -379,7 +385,7 @@ describe("rootSprites", () => {
     lastWaiting: null,
     heldBy: null,
   })
-  const banner = (l: LaneView, c: string): [LaneName, BannerRecord] => [
+  const banner = (l: LaneView, c: string): [ThreadId, BannerRecord] => [
     l.name,
     { lane: l.name, sha: c.repeat(64) as Sha256, at: 1 },
   ]

@@ -9,11 +9,11 @@ import {
   type CommitId,
   type EntryId,
   entryId,
-  isLaneName,
   isRootId,
-  LANE_PATTERN,
-  type LaneName,
+  isThreadId,
   type RootId,
+  THREAD_PATTERN,
+  type ThreadId,
   type ThreadName,
   type WriterId,
 } from "@pinetrie/core"
@@ -24,7 +24,7 @@ import { Value } from "typebox/value"
  * Check `value` against `schema`, then brand it with `build`; undefined if it
  * does not match. `build` may refuse it too, by returning undefined: a
  * schema without the branded ids below checks each lane there with
- * `isLaneName`. A history message needs no `build` (`history.ts`).
+ * `isThreadId`. A history message needs no `build` (`history.ts`).
  */
 export function decodeWith<S extends TSchema, T>(
   schema: S,
@@ -62,8 +62,8 @@ export const entryKey = (key: string): EntryId | undefined =>
 export const writerKey = (key: string): WriterId | undefined =>
   key === "" ? undefined : (key as WriterId)
 
-export const laneKey = (key: string): LaneName | undefined =>
-  isLaneName(key) ? key : undefined
+export const threadKey = (key: string): ThreadId | undefined =>
+  isThreadId(key) ? key : undefined
 
 export const rootKey = (key: string): RootId | undefined =>
   isRootId(key) ? key : undefined
@@ -76,14 +76,14 @@ export const fixedKey = <K extends string>(
 
 // Branded ids as stored: each schema's `Static` is the brand, so a value that
 // passes `Value.Check` is already the code's own type. A lane is checked with
-// core's `LANE_PATTERN`, the pattern `isLaneName` tests.
+// core's `THREAD_PATTERN`, the pattern `isThreadId` tests.
 
 /** A commit id as stored: never empty. */
 export const CommitSchema = Type.Unsafe<CommitId>(Type.String({ minLength: 1 }))
 
-/** A lane's name as stored (`LANE_PATTERN`). */
-export const LaneNameSchema = Type.Unsafe<LaneName>(
-  Type.String({ pattern: LANE_PATTERN }),
+/** A lane's name as stored (`THREAD_PATTERN`). */
+export const ThreadIdSchema = Type.Unsafe<ThreadId>(
+  Type.String({ pattern: THREAD_PATTERN }),
 )
 
 /** Who wrote something, as stored: never empty. */

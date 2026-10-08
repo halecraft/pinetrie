@@ -44,10 +44,10 @@ import {
   cardMarks,
   claimFocus,
   columnLandmarks,
-  columnsOf,
   composerPlacesStore,
   type Dock,
   DROP_ZONE,
+  drawnColumns,
   type Effect,
   firstLinesOf,
   foldMemory,
@@ -57,7 +57,6 @@ import {
   type Intent,
   inboxCount,
   initialLayout,
-  isAnchored,
   keyAct,
   type Layout,
   type ListWidth,
@@ -115,6 +114,7 @@ import {
   heldBy,
   intentsOf,
   newRootId,
+  newThreadId,
   type SessionClient,
   settleSlots,
 } from "@pinetrie/session"
@@ -390,7 +390,7 @@ export function App({
     () => new Map([...rootEntries].map(([id, entry]) => [entry, id] as const)),
     [rootEntries],
   )
-  // The roots in the closed state (ADR-0122), by root entry: the layout, the
+  // The roots in the archive (ADR-0122), by root entry: the layout, the
   // marks and attention are keyed by it.
   const archivedEntries = useMemo(() => {
     const out = new Map<EntryId, ArchivedRoot>()
@@ -465,8 +465,8 @@ export function App({
     if (layout !== stored)
       dispatch({ kind: "resolve", index, lanes, archived: archivedRoots, list })
   }, [layout, stored, index, lanes, archivedRoots, list])
-  // Every change is saved, the document's too: restored from an older
-  // anchor, `followTip` could land on a newer branch below it.
+  // Every change is saved, the document's too, so a restored column's anchor
+  // is never older than the tree it was drawn from.
   useEffect(() => stores.layout.save(layout), [stores, layout])
   // Restored anchors the document lacks are dropped once, when it has
   // settled, and the tab to show is chosen then: before, missing means not
@@ -539,18 +539,18 @@ export function App({
 
   const active = layout.active
   // The tab's columns: a root's, or a new tab's one fresh column.
-  // Memoised: `columnsOf` gives a root with no stored columns a new list on
-  // each call, and every projection below is keyed on this one.
+  // Memoised: `drawnColumns` gives a root with no stored columns a new list
+  // on each call, and every projection below is keyed on this one.
   const columns: readonly ColumnSpec[] = useMemo(
     () =>
       active === null
         ? []
         : active.kind === "root"
-          ? columnsOf(layout, active.root)
+          ? drawnColumns(layout, active.root, index, lanes)
           : active.kind === "new"
             ? layout.newTabs.filter(c => c.key === active.key)
             : [],
-    [layout, active],
+    [layout, active, index, lanes],
   )
 
   // The column you just opened, whose composer takes focus once when it
@@ -567,7 +567,7 @@ export function App({
     () =>
       projectColumns(
         index,
-        columns.map(c => ({ anchor: c.anchor, anchored: isAnchored(c) })),
+        columns.map(c => ({ anchor: c.anchor })),
       ),
     [index, columns],
   )
@@ -603,11 +603,10 @@ export function App({
         filled,
         layout,
         archived: archivedRoots,
-        lanes,
         index,
         rootEntries,
       }),
-    [mine, filled, layout, archivedRoots, lanes, index, rootEntries],
+    [mine, filled, layout, archivedRoots, index, rootEntries],
   )
   const yours = useMemo(
     () => ({ ends: unsent.ends, color: colorOf(session.writer) }),
@@ -1003,8 +1002,11 @@ export function App({
           listWidth,
           page,
         },
-        crypto.randomUUID(),
-        newRootId(),
+        {
+          key: crypto.randomUUID(),
+          root: newRootId(),
+          thread: newThreadId(),
+        },
       ),
     ),
   )
@@ -1127,7 +1129,7 @@ export function App({
     }
   }, [onIntent, layout.open])
   // A root's drag, from the board or the sidebar (ADR-0122).
-  useRootDrag(onIntent, workflow?.closed.id ?? null)
+  useRootDrag(onIntent, workflow?.archive.id ?? null)
   /** A root's drag from the sidebar: its id and state, or null with no id yet. */
   const dragOf = (root: string): RootDrag | null => {
     const entry = root as EntryId

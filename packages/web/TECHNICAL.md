@@ -146,20 +146,19 @@ error.
 
 - **Every change is saved, the document's too:** the resolved layout, each
   time it changes. Saving only what a person does
-  would store older anchors, and `followTip` from an older anchor can land on
-  a newer branch below it. So with two tabs open, the device slot holds
+  would store older anchors. So with two tabs open, the device slot holds
   whichever changed last: both move their columns as messages arrive.
 - **The codec is the edge** (`encodeLayout`, `decodeLayout`), in the house
   shape: a TypeBox schema, then a build step field by field. A layout decodes
   whole or not at all, and `v` rejects an older one: a `v: 2` layout (before
   your tabs were yours, ADR-0030) is dropped once and overwritten by the first
-  save; so is a `v: 4` one (before the sidebar was your own document,
-  ADR-0122), and the page opens on the sidebar's last root, else the board. A lane that is not a lane name
-  is left off; `sync` binds the column again.
-- **`reserved` is stored** (ADR-0057), and decoded only in the shape the host
-  accepts (`parseNewLane`), so a reload keeps the thread's name. The device
-  slot copies it into a new browser tab, where the column binds to the lane
-  once either copy sends.
+  save; so is a `v: 5` one (before a column named its thread, ADR-0117),
+  and the page opens on the sidebar's last root, else the board.
+- **A column's `thread` is stored** (ADR-0117), as `isThreadId`'s pattern,
+  so a reload keeps a fresh column's thread and its name. The device slot
+  copies it into a new browser tab, where the column follows the thread once
+  either copy sends. A fresh column with no thread, or a new tab with no
+  root, fails the whole layout.
 - **`fresh.pending` is never stored**, by either side: restoring it would send
   its message again. A "branch here" column comes back empty. `fresh.prefill`
   is stored, blank or content: only `pending` is sent on opening. What was
@@ -813,8 +812,8 @@ the session sends moves and draws them until its copy holds them
   someone made first names them. A column draws its own, and the panel the
   inventory's.
 
-- **Where the column's cards are.** `Column` resolves its thread's end with
-  `threadOf`, as a reply would go, and finds your message there with
+- **Where the column's cards are.** `Column`'s anchor is its thread's end
+  (`threadEnd`), where a reply goes, and it finds your message there with
   `yourCard` (`composing` only) and the notes with `cardsAt("note", …)`. A
   fresh column's cards are found by its key (`CardPlace` `fresh`), and
   every one there but your message is drawn as a note. So a tab switch, a
@@ -1199,14 +1198,14 @@ leaving treats the history, are `page.ts`'s (`@pinetrie/interface`).
   `aria-current="true"` and its wrap `data-selected`, its × is the
   `.open-close` after it, its `⋯` (`.open-menu`) holds `.rename-root`,
   `.retitle-root` and `.move-to` (`.closes` for
-  the closed state), a root being renamed is `.open-title-input`, new tabs
+  the archive), a root being renamed is `.open-title-input`, new tabs
   are `.open-new`, and ＋'s buttons are `.add-agent`, `.add-menu` and
   `.add-conversation`. Folded, an item's `.open-root` or `.open-new` holds
   `.open-icon` (`.open-sprite`, `.open-initials` or `.open-fresh`), its
   menu ends in `.open-close-item`, its tooltip is `.open-tip` and its
   rename field sits in `.open-rename`; the fold control is `.list-fold`, and
   the inventory's toggle is the account menu's `.account-inventory`. The board is `#board`: a `.board-column[data-state]`
-  per open state and `.board-closed` for the closed one, each item a
+  per open state and `.board-archive` for the archive, each item a
   `.thread-card[data-root][data-entry]` with `.board-open`, `.board-label`,
   `.reader-trigger` per reader (its menu `.reader`, `.open` while open),
   `.root-ready` when a thread has work ready, and `.item-menu`; the states

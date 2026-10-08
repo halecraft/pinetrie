@@ -7,8 +7,8 @@
 import {
   type AcceptedFacts,
   type CommitId,
-  type LaneName,
   sourcesOf,
+  type ThreadId,
   untracedLanes,
 } from "@pinetrie/core"
 import {
@@ -33,7 +33,7 @@ export interface AcceptedOfferCommit {
 /** An accepted-offer commit on accepted work whose sources are not named, for the lanes it names (S97). */
 export interface Untraced {
   readonly commit: CommitId
-  readonly lanes: readonly LaneName[]
+  readonly lanes: readonly ThreadId[]
 }
 
 /** What accepted work's record and every lane's refresh read, as one operation left your repo. */

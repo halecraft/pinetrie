@@ -3,20 +3,20 @@
 //
 // A move runs in up to three parts (ADR-0065). On the documents' keeper:
 // gather the workflow and the places, plan the move (`planRootMove`); if it
-// crosses the closed state's edge, gather the root's document and plan the
+// crosses the archive's edge, gather the root's document and plan the
 // crossing (`planArchive`); then write the place, from which moment the
-// archive gate refuses writes into a closed root. Off the keeper: the
+// archive gate refuses writes into an archived root. Off the keeper: the
 // crossing's teardown (its lanes' containers, their refs in your repo through
-// the owner, snapshots). Then, for a close, the root's document unloaded on
+// the owner, snapshots). Then, on archiving, the root's document unloaded on
 // the keeper again. The sender's reply comes after all of it.
 
 import {
   type EntryId,
   ERR,
   type Intent,
-  type LaneName,
   type RootId,
   refused,
+  type ThreadId,
   type WriterId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
@@ -62,7 +62,7 @@ export interface BoardDeps {
 }
 
 /** The lanes of their own that work in `root`, from their records. */
-const lanesIn = (session: SessionDocHandle, root: RootId): LaneName[] =>
+const lanesIn = (session: SessionDocHandle, root: RootId): ThreadId[] =>
   [...readLaneRecords(session).values()]
     .filter(r => r.root === root && r.ownCopy)
     .map(r => r.lane)
@@ -131,7 +131,7 @@ async function record(
     await deps.records.writeValues(writes)
     return done(MOVED)
   }
-  // gather what crossing the closed state's edge needs, and plan it (pure)
+  // gather what crossing the archive's edge needs, and plan it (pure)
   const entry = readRoots(session).get(intent.root)?.entry ?? null
   if (entry === null) return done(refused(ERR.UNKNOWN_TARGET, "no such root"))
   const crossed = await planCrossing(deps, intent.root, entry, moved.transition)

@@ -19,17 +19,16 @@ import {
   type EntryId,
   ERR,
   keyOf,
-  type LaneName,
   type Move,
   type MoveDirection,
   moveOf,
   type QueueHoldChange,
   type Reorder,
-  ROOT,
   type RootId,
   type SentCard,
+  type ThreadId,
   type TreeIndex,
-  threadOf,
+  threadOfSend,
   type WriterId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
@@ -94,7 +93,7 @@ export interface CardCommandDeps {
     "destroy" | "hydrate" | "textNow" | "blankQueued"
   >
   /** Queue a drain of the lane on the documents' keeper, not awaited. */
-  readonly drain: (lane: LaneName) => void
+  readonly drain: (lane: ThreadId) => void
   readonly histories: Pick<
     MoveHistories,
     "gestureOf" | "step" | "top" | "unloadRoot"
@@ -116,7 +115,7 @@ const writersOf = (index: TreeIndex): readonly (WriterId | null)[] =>
 
 export function createCardCommands(deps: CardCommandDeps) {
   const { docs, live, places, session } = deps.basics
-  const running = (lane: LaneName) => readRunning(deps.basics.live, lane)
+  const running = (lane: ThreadId) => readRunning(deps.basics.live, lane)
 
   /** A refused move: where the card is now and who put it there. */
   const unmoved = (refusal: Extract<MoveStep, { kind: "refused" }>): Settled =>
@@ -139,7 +138,7 @@ export function createCardCommands(deps: CardCommandDeps) {
    */
   async function carry(
     step: MovesStep | MoveStep,
-    drain: readonly LaneName[],
+    drain: readonly ThreadId[],
     cause: Cause | null,
     gesture?: Gesture,
   ): Promise<Settled> {
@@ -169,12 +168,12 @@ export function createCardCommands(deps: CardCommandDeps) {
     for (const card of readPlaces(places)) {
       if (!lifting.includes(card.id)) continue
       if (card.place.kind !== "gone" || card.place.why.kind !== "spun") continue
-      const { thread } = card.place.why
-      const held = known.has(thread)
-      threads.set(thread, {
-        thread,
+      const { into } = card.place.why
+      const held = known.has(into)
+      threads.set(into, {
+        thread: into,
         known: held,
-        writers: held ? writersOf(readTreeIndex(await docs.root(thread))) : [],
+        writers: held ? writersOf(readTreeIndex(await docs.root(into))) : [],
       })
     }
     return planLiftRoot({
@@ -209,8 +208,8 @@ export function createCardCommands(deps: CardCommandDeps) {
 
   /**
    * Where a fresh column's other cards go once its first message is written:
-   * that message, by the send's id, on the column's lane, or the lane its send
-   * reserved once pi holds it, else none.
+   * that message, by the send's id, on its thread's lane once pi holds it,
+   * else on none.
    */
   async function followers(
     cards: readonly CardRecord[],
@@ -225,26 +224,18 @@ export function createCardCommands(deps: CardCommandDeps) {
     const index = readTreeIndex(doc)
     const at = index.bySend.get(sent.sendId)
     if (at === undefined) return { message: null, steps: [] }
-    const { lane, reserved } = sent.chat
-    const held =
-      reserved !== null &&
-      readLanes(
-        { doc, live },
-        index,
-        cards,
-        readQueueHolds(session),
-        // Only the lanes' names are read here.
-        NONE_BLANK,
-      ).some(l => l.name === reserved)
+    const { thread } = sent.chat.at
+    const held = readLanes(
+      { doc, live },
+      index,
+      cards,
+      readQueueHolds(session),
+      // Only the lanes' names are read here.
+      NONE_BLANK,
+    ).some(l => l.name === thread)
     return {
       message: at,
-      steps: planFreshFollow(
-        cards,
-        card,
-        root,
-        at,
-        lane ?? (held ? reserved : null),
-      ),
+      steps: planFreshFollow(cards, card, root, at, held ? thread : null),
     }
   }
 
@@ -328,7 +319,7 @@ export function createCardCommands(deps: CardCommandDeps) {
      * is now (`planUnqueueAll`): one move, so one undo queues them again.
      * `nothing` when none is queued.
      */
-    unqueueAll(writer: WriterId, lane: LaneName): Promise<Settled> {
+    unqueueAll(writer: WriterId, lane: ThreadId): Promise<Settled> {
       const moves = planUnqueueAll(readPlaces(places), lane)
       return moves.length === 0
         ? Promise.resolve(settled({ kind: "nothing" }))
@@ -418,15 +409,12 @@ export function createCardCommands(deps: CardCommandDeps) {
       // execute: the thread, then the card's move
       const sent = await start({
         text: plan.text,
-        root: plan.thread,
-        at: ROOT,
-        mode: "branch",
-        lane: null,
+        root: plan.root,
+        at: { kind: "branch", thread: plan.thread, at: null },
         asksAgent: false,
         mentions: plan.mentions,
         card: { id: move.card, seen: "" },
         pinned: [],
-        reserved: null,
         base: null,
         state: request.state,
       })
@@ -487,15 +475,10 @@ export function createCardCommands(deps: CardCommandDeps) {
       const index = readTreeIndex(doc)
       const cards = readPlaces(places)
       const blank = await deps.cards.blankQueued(cards)
-      const thread = threadOf(
+      const thread = threadOfSend(
         index,
         readLanes({ doc, live }, index, cards, readQueueHolds(session), blank),
-        {
-          at: chat.at,
-          mode: chat.mode,
-          lane: chat.lane,
-          me: writer,
-        },
+        { at: chat.at, me: writer },
       )
       const now = cards.find(c => c.id === chat.card.id)
       if (
@@ -510,7 +493,7 @@ export function createCardCommands(deps: CardCommandDeps) {
           moveOf(now, {
             kind: "queued",
             root: chat.root,
-            at: chat.at,
+            at: thread.end,
             lane: thread.lane.name,
             seen: chat.card.seen,
           }),

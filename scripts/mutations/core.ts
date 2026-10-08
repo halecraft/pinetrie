@@ -297,14 +297,6 @@ export const mutations: readonly Mutation[] = [
       "cards behind a held queue are held, below waiting and running in the same root",
   },
   {
-    name: "followTip has no cycle guard going down",
-    file: tree,
-    from: "    if (seen.has(id)) continue\n    seen.add(id)\n    const children = index.childrenOf.get(id) ?? []",
-    to: "    seen.add(id)\n    const children = index.childrenOf.get(id) ?? []",
-    command: unit,
-    timeoutMs: 30_000,
-  },
-  {
     name: "compel the agent on any mention",
     file: core,
     from: 'const agent = input.mentions.find(m => m.kind === "agent")',
@@ -345,20 +337,22 @@ export const mutations: readonly Mutation[] = [
     expect: "an unknown handle is ignored",
   },
   {
-    name: "a named lane is looked up again by its tip",
-    file: tree,
-    from: "    lane = lanes.find(l => l.name === send.lane)",
-    to: "    lane = lanes.find(l => l.tip === lanes.find(n => n.name === send.lane)?.tip)",
+    name: "a thread's lane is found by any lane with a tip",
+    file: "packages/core/tree.ts",
+    from: "  const lane = lanes.find(l => l.name === thread)",
+    to: "  const lane = lanes.find(l => l.tip !== null)",
     command: unit,
-    expect: "even while another shares its tip",
+    expect:
+      "threadOfSend: an end send lands at its thread's end, in its lane; a branch starts at its fork",
   },
   {
-    name: "two lanes at one end are not ambiguous",
-    file: tree,
-    from: '    if (ending.length > 1) return { kind: "ambiguous" }',
-    to: '    if (ending.length > 2) return { kind: "ambiguous" }',
+    name: "a branch may name a thread that has started",
+    file: "packages/core/tree.ts",
+    from: "    if (index.firstOf.has(at.thread) || lanes.some(l => l.name === at.thread))",
+    to: "    if (false)",
     command: unit,
-    expect: "two are ambiguous",
+    expect:
+      "threadOfSend: an end send lands at its thread's end, in its lane; a branch starts at its fork",
   },
 
   {
@@ -581,12 +575,12 @@ export const mutations: readonly Mutation[] = [
     expect: "a granted host path sits under /mnt/host",
   },
   {
-    name: "threadOf ignores the lane a send names",
+    name: "threadEnd steps into a branch",
     file: "packages/core/tree.ts",
-    from: "  if (send.lane !== null) {",
-    to: "  if (send.lane !== null && send.lane === undefined) {",
+    from: "      c => startsAt(index, c) === null,",
+    to: "      c => startsAt(index, c) !== null,",
     command: unit,
-    expect: "threadOf: a named lane is its thread",
+    expect: "threadEnd steps down the child that starts no thread",
   },
   {
     name: "messageImages admits a part with its bytes inline",
@@ -605,12 +599,12 @@ export const mutations: readonly Mutation[] = [
     expect: "a result's stored images are on its call",
   },
   {
-    name: "parseNewLane accepts any t- id",
+    name: "parseNewThread accepts any t- id",
     file: "packages/core/index.ts",
-    from: "  NEW_LANE.test(s) ? (s as LaneName) : undefined",
-    to: '  s.startsWith("t-") ? (s as LaneName) : undefined',
+    from: "  NEW_THREAD.test(s) ? (s as ThreadId) : undefined",
+    to: '  s.startsWith("t-") ? (s as ThreadId) : undefined',
     command: unit,
-    expect: "parseNewLane: only t- and a lowercase uuidv7",
+    expect: "parseNewThread: only t- and a lowercase uuidv7",
   },
   {
     name: "a run that ends on a result answered",
@@ -785,5 +779,13 @@ export const mutations: readonly Mutation[] = [
     to: "  false ? error.message : String(error)",
     command: unit,
     expect: "errorText reads an Error's message",
+  },
+  {
+    name: "a thread's newer claimant is its first entry",
+    file: "packages/core/tree.ts",
+    from: "      if (known === undefined || id < known) firstOf.set(starts, id)",
+    to: "      firstOf.set(starts, id)",
+    command: unit,
+    expect: "an id two entries claim keeps the older",
   },
 ]

@@ -1,8 +1,8 @@
 import {
   type BaseRecord,
   commitId,
-  laneNameForThread,
   type OfferRecord,
+  threadIdFor,
 } from "@pinetrie/core"
 import { DEFAULT_REPO } from "@pinetrie/lanes"
 import type { PiSetup } from "@pinetrie/pi"
@@ -13,7 +13,7 @@ import { applyWrites, basics, record } from "../fakes.ts"
 import type { Records } from "../records.ts"
 import { createOfferDeps } from "./state.ts"
 
-const LANE = laneNameForThread("1")
+const LANE = threadIdFor("1")
 const BASE: BaseRecord = {
   lane: LANE,
   base: { kind: "accepted" },

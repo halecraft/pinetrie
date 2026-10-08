@@ -8,11 +8,12 @@
 //   <lanesDir>/projects/<projectKey>/nested/<lane>   a nested lane's inner lanes
 
 import { createHash } from "node:crypto"
-import { type LaneName, type SnapshotId, WORKSPACE_ROOT } from "@pinetrie/core"
+import { type SnapshotId, WORKSPACE_ROOT } from "@pinetrie/core"
 import type {
   ContainerFacts,
   ContainerShape,
   DiskOp,
+  LaneOwner,
   Mount,
 } from "@pinetrie/lanes"
 import type { DockerTarget } from "./target.ts"
@@ -55,8 +56,8 @@ export function projectDisks(lanesDir: string, key: string) {
   return {
     dir,
     root: `${dir}/root`,
-    lane: (lane: LaneName) => `${dir}/lanes/${lane}`,
-    nested: (lane: LaneName) => `${dir}/nested/${lane}`,
+    lane: (lane: LaneOwner) => `${dir}/lanes/${lane}`,
+    nested: (lane: LaneOwner) => `${dir}/nested/${lane}`,
     snapshot: (id: SnapshotId) => `${dir}/snapshots/${id}`,
   }
 }
@@ -259,7 +260,7 @@ export const isSubvolume = (statOut: string): boolean =>
 /** A nested lane's inner lanes' subvolume, made if missing, owned by the rootless user. */
 export const planNestedDisk = (
   disks: ProjectDisks,
-  lane: LaneName,
+  lane: LaneOwner,
 ): readonly string[] =>
   sh(
     `mkdir -p "$(dirname "$1")"\n[ -e "$1" ] || btrfs -q subvolume create "$1"\nchown ${ROOTLESS_UID}:${ROOTLESS_UID} "$1"`,

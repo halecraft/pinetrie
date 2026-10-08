@@ -5,11 +5,11 @@
 import {
   type EntryId,
   firstLine,
-  type LaneName,
   messageText,
   promptOf,
   type RevisionRecord,
   snapshotId,
+  type ThreadId,
   type TreeIndex,
   toolCallsOf,
   turnEntry,
@@ -82,7 +82,7 @@ export function createTurns(deps: {
     pendingRecords: async () => {
       await Promise.all([...recording])
     },
-    async turnDone(lane: LaneName, tip: EntryId) {
+    async turnDone(lane: ThreadId, tip: EntryId) {
       try {
         const record = registry.recordOf(lane)
         if (record === undefined) return

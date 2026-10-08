@@ -1,4 +1,4 @@
-import { laneNameForThread, type Sha256, type ThreadName } from "@pinetrie/core"
+import { type Sha256, type ThreadName, threadIdFor } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
 import { type Drawn, type PiSetup, sha256Of } from "@pinetrie/pi"
 import { readBanners } from "@pinetrie/reads"
@@ -16,7 +16,7 @@ import {
 } from "./fakes.ts"
 import type { Records } from "./records.ts"
 
-const LANE = laneNameForThread("1")
+const LANE = threadIdFor("1")
 const NAME = "clear-zebra" as ThreadName
 const BYTES = new Uint8Array([1, 2, 3])
 const SHA = sha256Of(BYTES)

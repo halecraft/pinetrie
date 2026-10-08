@@ -6,10 +6,10 @@ import type { Exchange } from "@kyneta/exchange"
 import {
   type ArchivedRoot,
   type EntryId,
-  type LaneName,
   type RootId,
   type RootRecord,
   rootDocId,
+  type ThreadId,
 } from "@pinetrie/core"
 import type { RootView } from "@pinetrie/reads"
 import { readLaneRecords, readRoots } from "@pinetrie/reads"
@@ -30,11 +30,11 @@ export interface HostDocuments {
   /** A loaded root's documents, or null: a synchronous step plans from what it holds. */
   view(root: RootId): RootView | null
   /** The root a lane works in, from its record (`LANE`); null for none. */
-  rootOfLane(lane: LaneName): RootId | null
+  rootOfLane(lane: ThreadId): RootId | null
   /** The loaded document of the root a lane works in, or null. */
-  docOfLane(lane: LaneName): RootDocHandle | null
+  docOfLane(lane: ThreadId): RootDocHandle | null
   /** The document of the root a lane works in, opened if it is not; null for a lane no root holds. */
-  laneDoc(lane: LaneName): Promise<RootDocHandle | null>
+  laneDoc(lane: ThreadId): Promise<RootDocHandle | null>
   /** The root whose root entry is `entry` (`ROOT.entry`); null for none. */
   rootOfEntry(entry: EntryId): RootId | null
   /**
@@ -79,7 +79,7 @@ export const rootsOpenedWords = (counts: {
 
 /**
  * The roots a starting host opens: every root in the directory that is not
- * archived, in the closed workflow state. A busy root cannot be closed
+ * archived, in the archive. A busy root cannot be closed
  * (`planArchive`), so these hold every lane a crash could have interrupted.
  * Pure.
  */

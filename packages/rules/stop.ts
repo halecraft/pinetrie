@@ -17,19 +17,19 @@ import {
   ERR,
   type ErrCode,
   isBusy,
-  type LaneName,
   type LaneView,
   promptOf,
   type QueueHold,
   type Refusal,
   refused,
   type StopRecord,
+  type ThreadId,
   type TreeIndex,
   type WriterId,
 } from "@pinetrie/core"
 import { type Static, Type } from "typebox"
 import type { QueuedCard } from "./card.ts"
-import { decodeAt, entryKey, LaneNameSchema, WriterIdSchema } from "./decode.ts"
+import { decodeAt, entryKey, ThreadIdSchema, WriterIdSchema } from "./decode.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"
 import { holdOnStop } from "./queue-hold.ts"
 import type { RecordSpec } from "./records.ts"
@@ -78,7 +78,7 @@ export function planStop(
     readonly stops: ReadonlyMap<EntryId, StopRecord>
     /** The lane's queue, in order. */
     readonly queue: readonly QueuedCard[]
-    readonly holds: ReadonlyMap<LaneName, QueueHold>
+    readonly holds: ReadonlyMap<ThreadId, QueueHold>
     readonly by: WriterId
     readonly now: number
   },
@@ -100,7 +100,7 @@ export function planStop(
 const CARRY_ON_TYPE = "pinetrie.carry-on"
 
 const CarryOnDetailsSchema = Type.Object({
-  lane: LaneNameSchema,
+  lane: ThreadIdSchema,
   by: WriterIdSchema,
   /** Who resumed, as named when they did: the column's line shows it. */
   name: Type.String(),

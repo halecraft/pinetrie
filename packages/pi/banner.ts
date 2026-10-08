@@ -9,9 +9,9 @@ import {
   blobOfUrl,
   errorText,
   isSha256,
-  type LaneName,
   type Sha256,
   type StoredImage,
+  type ThreadId,
 } from "@pinetrie/core"
 import type { BannerAnswer, BannerAsk, BannerConfig } from "@pinetrie/rules"
 import { Type } from "typebox"
@@ -86,7 +86,7 @@ export function bannerAnswerText(answer: BannerAnswer): string {
  */
 export function bannerTool(
   request:
-    | ((lane: LaneName, ask: BannerAsk) => Promise<BannerAnswer>)
+    | ((lane: ThreadId, ask: BannerAsk) => Promise<BannerAnswer>)
     | undefined,
 ) {
   return {

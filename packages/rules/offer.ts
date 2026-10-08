@@ -20,7 +20,6 @@ import {
   ERR,
   type ErrCode,
   isWipLine,
-  type LaneName,
   type OfferAcceptanceDecision,
   type OfferAcceptanceFacts,
   type OfferGather,
@@ -36,10 +35,11 @@ import {
   type RevisionFacts,
   type StackFacts,
   type ThreadBase,
+  type ThreadId,
   type ThreadName,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { CommitSchema, decodeAt, laneKey } from "./decode.ts"
+import { CommitSchema, decodeAt, threadKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 const OfferRecordSchema = Type.Object({
@@ -78,7 +78,7 @@ const OfferRecordSchema = Type.Object({
 })
 
 /** Each lane's offer in your repo, at the lane. */
-export const OFFER: RecordSpec<OfferRecord, LaneName, "session"> = {
+export const OFFER: RecordSpec<OfferRecord, ThreadId, "session"> = {
   namespace: "pinetrie.offer",
   home: "session",
   keyOf: r => r.lane,
@@ -97,7 +97,7 @@ export const OFFER: RecordSpec<OfferRecord, LaneName, "session"> = {
   // Field by field: an older record has a `host` key, what the host once
   // kept for itself, which a spread would carry along.
   decode: (contents, key) =>
-    decodeAt(OfferRecordSchema, contents, laneKey(key), (r, lane) => ({
+    decodeAt(OfferRecordSchema, contents, threadKey(key), (r, lane) => ({
       lane,
       size: r.size,
       stale: r.stale,
@@ -311,7 +311,7 @@ export const isNotYetAccepted = (
  * `commits` are what a review may read.
  */
 export function offerRecord(input: {
-  readonly lane: LaneName
+  readonly lane: ThreadId
   readonly name: ThreadName
   readonly offer: OfferNow
   /** The lane's tip and where an offer starts now; none for an untraced start, where a stack reads as stale. */
@@ -394,7 +394,7 @@ const offerChanged = (offer: OfferNow, seen: OfferSeen): boolean =>
  * offer, other work than was shown, no such destination.
  */
 export function planOfferAcceptance(input: {
-  readonly lane: LaneName
+  readonly lane: ThreadId
   readonly gathered: OfferGather | null
   /** What the acceptance was shown (ADR-0065); null when it names none. */
   readonly seen: OfferSeen | null

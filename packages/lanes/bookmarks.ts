@@ -6,14 +6,14 @@
 // which jj keeps out of your default log and immutable (ADR-0105, S48 item
 // 11).
 
-import { type CommitId, commitId, type LaneName } from "@pinetrie/core"
+import { type CommitId, commitId, type ThreadId } from "@pinetrie/core"
 import { bookmarkName, bookmarkRevset } from "./plan.ts"
 import { describeFailure, lines, type Runner } from "./run.ts"
 
 /** The commit a lane's bookmark points at, or null. */
 export async function bookmarkOf(
   jj: Runner,
-  lane: LaneName,
+  lane: ThreadId,
 ): Promise<CommitId | null> {
   const ran = await jj([
     "log",
@@ -31,7 +31,7 @@ export async function bookmarkOf(
 /** Point a lane's bookmark at `commit`, creating it if need be. */
 export async function setBookmark(
   jj: Runner,
-  lane: LaneName,
+  lane: ThreadId,
   commit: CommitId,
 ): Promise<void> {
   const ran = await jj([
@@ -48,7 +48,7 @@ export async function setBookmark(
 /** Delete a lane's bookmark, if it has one; its commits stay. */
 export async function deleteBookmark(
   jj: Runner,
-  lane: LaneName,
+  lane: ThreadId,
 ): Promise<void> {
   if ((await bookmarkOf(jj, lane)) === null) return
   const ran = await jj(["bookmark", "delete", bookmarkName(lane)])

@@ -11,12 +11,12 @@ import {
   indexTree,
   isLongAsk,
   LONG_ASK,
-  laneNameForThread,
   lastWord,
   type RevisionRecord,
   runOf,
   startsRun,
   type TreeIndex,
+  threadIdFor,
   writerId,
 } from "./index.ts"
 
@@ -216,7 +216,7 @@ describe("askSpan", () => {
     entryId(entry),
     {
       entry: entryId(entry),
-      lane: laneNameForThread("x"),
+      lane: threadIdFor("x"),
       commit: commit === null ? null : commitId(commit),
       snapshot: null,
       paths: [],

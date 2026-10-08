@@ -76,7 +76,7 @@ are exactly what a type system checks.
   putting one in a protocol message a compile error rather than an e2e assertion.
 - ADR-0006 — references are a discriminated union; exhaustiveness checking is
   the entire benefit.
-- ADR-0011 — a branded `LaneName` derived from a peer id makes `"main"`
+- ADR-0011 — a branded `ThreadId` derived from a peer id makes `"main"`
   unassignable.
 - ADR-0004/0009 — `Entry` is immutable with a required unique id; `readonly`
   fields state that structurally.

@@ -11,24 +11,24 @@
 import type {
   CommitId,
   EntryId,
-  LaneName,
   Position,
   RevisionRecord,
   SnapshotId,
+  ThreadId,
 } from "./index.ts"
 import { ancestry, type TreeIndex } from "./tree.ts"
 
 /** What is above an entry: the lane it belongs to, its commit, and its disk. */
 export interface Above {
   /** The nearest record's lane; null where no run has been. */
-  readonly lane: LaneName | null
+  readonly lane: ThreadId | null
   /** The nearest recorded commit; null means the thread's base (ADR-0104). */
   readonly commit: CommitId | null
   /**
    * The lane of the record holding `commit`: the copy a fork clones. Not
    * `lane` when the nearest record's lane has no copy of its own and records none.
    */
-  readonly commitLane: LaneName | null
+  readonly commitLane: ThreadId | null
   /** The nearest recorded snapshot; null means the base snapshot. */
   readonly snapshot: SnapshotId | null
 }
@@ -45,9 +45,9 @@ export function nearestRevision(
   revisions: ReadonlyMap<EntryId, RevisionRecord>,
   at: Position,
 ): Above {
-  let lane: LaneName | null = null
+  let lane: ThreadId | null = null
   let commit: CommitId | null = null
-  let commitLane: LaneName | null = null
+  let commitLane: ThreadId | null = null
   let snapshot: SnapshotId | null = null
   if (at.kind === "root") return { lane, commit, commitLane, snapshot }
   for (const id of ancestry(index, at.id).path) {
@@ -66,7 +66,7 @@ export function nearestRevision(
 
 /** The thread a lane's copy was cloned from, and the commit it was cloned at. */
 export interface ForkParent {
-  readonly lane: LaneName
+  readonly lane: ThreadId
   readonly commit: CommitId
 }
 
@@ -79,7 +79,7 @@ export interface ForkParent {
 export function forkParent(
   index: TreeIndex,
   revisions: ReadonlyMap<EntryId, RevisionRecord>,
-  lane: LaneName,
+  lane: ThreadId,
   tip: EntryId | null,
 ): ForkParent | null {
   const first = firstPromptOf(index, revisions, lane, tip)
@@ -114,7 +114,7 @@ export function conflictsAt(
 export function firstPromptOf(
   index: TreeIndex,
   revisions: ReadonlyMap<EntryId, RevisionRecord>,
-  lane: LaneName,
+  lane: ThreadId,
   tip: EntryId | null,
 ): EntryId | null {
   if (tip === null) return null

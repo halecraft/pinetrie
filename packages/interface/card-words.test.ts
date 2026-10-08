@@ -3,10 +3,10 @@ import {
   type CardEvent,
   cardId,
   entryId,
-  laneNameForThread,
   type PlaceKey,
   rootIdFor,
   type ThreadName,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import type { CardNotice } from "@pinetrie/session"
@@ -80,7 +80,7 @@ describe("card words", () => {
         base: { kind: "accepted" },
         parent: {
           kind: "parent",
-          lane: laneNameForThread("p"),
+          lane: threadIdFor("p"),
           name: "amber-fox" as ThreadName,
         },
       }),
@@ -181,14 +181,14 @@ describe("history and traces (ADR-0048 step 6)", () => {
     kind: "note",
     root: ROOT,
     at: atEntry(entryId("e-1")),
-    lane: laneNameForThread("x"),
+    lane: threadIdFor("x"),
     cell: 0,
   }
   const queued: PlaceKey = {
     kind: "queued",
     root: ROOT,
     at: atEntry(entryId("e-1")),
-    lane: laneNameForThread("x"),
+    lane: threadIdFor("x"),
     seen: "",
   }
   const event = (over: Partial<CardEvent>): CardEvent => ({

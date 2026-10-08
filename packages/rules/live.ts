@@ -5,7 +5,6 @@
 
 import {
   type EntryId,
-  type LaneName,
   type LiveOp,
   type RunId,
   type Stream,
@@ -13,6 +12,7 @@ import {
   type StreamId,
   type StreamRecord,
   streamId,
+  type ThreadId,
   tailEdit,
 } from "@pinetrie/core"
 
@@ -113,7 +113,7 @@ export function planStream(input: {
  * no longer the lane's (`running` is another, or none) changes nothing.
  */
 export function planEndRun(input: {
-  readonly lane: LaneName
+  readonly lane: ThreadId
   readonly run: RunId
   /** The run the lane is running, as stored. */
   readonly running: RunId | undefined
@@ -134,7 +134,7 @@ export function planEndRun(input: {
 export function planClear(input: {
   /** Every stream id stored, with a record or only a text. */
   readonly streams: readonly StreamId[]
-  readonly running: readonly LaneName[]
+  readonly running: readonly ThreadId[]
 }): readonly LiveOp[] {
   return [
     ...closeStreams(input.streams.map(id => ({ id }))),

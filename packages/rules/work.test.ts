@@ -2,10 +2,10 @@ import {
   BASE_SNAPSHOT,
   commitId,
   entryId,
-  laneNameForThread,
   type RevisionRecord,
   rootIdFor,
   snapshotId,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
@@ -20,7 +20,7 @@ import {
 } from "./index.ts"
 import { planRetention, showHostWorkingCopy } from "./work.ts"
 
-const LANE = laneNameForThread("1")
+const LANE = threadIdFor("1")
 const ADA = writerId("ada")
 const C1 = commitId("c1")
 const C2 = commitId("c2")
@@ -85,7 +85,7 @@ describe("records: one spec each, total decoders", () => {
   })
   test("malformed values are dropped, never thrown: a lane stored as working directly among them", () => {
     const stored = LANE_RECORD.encode(lane) as Record<string, unknown>
-    const other = laneNameForThread("other")
+    const other = threadIdFor("other")
     expect([
       ...recordsOf(LANE_RECORD, [
         {
@@ -252,7 +252,7 @@ describe("forkPoint: a snapshot to clone, and what to start on", () => {
 })
 
 describe("planRetention: which snapshots go", () => {
-  const B = laneNameForThread("2")
+  const B = threadIdFor("2")
   const rec = (entry: string, lane = LANE): RevisionRecord => ({
     entry: entryId(entry),
     lane,

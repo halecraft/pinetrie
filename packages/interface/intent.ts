@@ -10,7 +10,6 @@ import {
   type CardCommand,
   type CardId,
   type EntryId,
-  type LaneName,
   type MoveDirection,
   moveOf,
   noteOf,
@@ -18,6 +17,7 @@ import {
   type Position,
   type QueueHoldChange,
   type RootId,
+  type ThreadId,
   type TraceRecord,
   type WorkflowEdit,
   type WorkflowStateId,
@@ -47,7 +47,7 @@ import {
   queueNew,
   reorderOf,
 } from "./card-intents.ts"
-import type { Pending, Prefill, ReaderAction } from "./columns.ts"
+import type { Minted, Pending, Prefill, ReaderAction } from "./columns.ts"
 import {
   type Effect,
   type IntentState,
@@ -87,8 +87,6 @@ export type ColumnAct =
   | { readonly kind: "details"; readonly open: boolean }
   /** A fresh column's first send, as send `sendId`. */
   | { readonly kind: "sent"; readonly key: string; readonly sendId: string }
-  /** Keep `lane` as the id this column's next send creates a lane under (ADR-0057). */
-  | { readonly kind: "reserve"; readonly key: string; readonly lane: LaneName }
   /** After a conflict: a fresh column at `at`, which sends `pending` there. */
   | {
       readonly kind: "branchInstead"
@@ -102,7 +100,7 @@ export type ColumnAct =
   | {
       readonly kind: "queue"
       readonly card: CardId
-      readonly lane: LaneName
+      readonly lane: ThreadId
       readonly at: Position
       readonly hold: QueueHoldChange
     }
@@ -126,7 +124,7 @@ export type ColumnAct =
   | {
       readonly kind: "unqueue"
       readonly card: CardId
-      readonly lane: LaneName
+      readonly lane: ThreadId
       readonly by: WriterId
     }
   /**
@@ -142,11 +140,11 @@ export type ColumnAct =
   /** Hold the thread's queue, or release it (ADR-0048 step 7). */
   | {
       readonly kind: "holdQueue"
-      readonly lane: LaneName
+      readonly lane: ThreadId
       readonly held: boolean
     }
   /** Take every message card queued on the thread back below the line. */
-  | { readonly kind: "unqueueAll"; readonly lane: LaneName }
+  | { readonly kind: "unqueueAll"; readonly lane: ThreadId }
   /** Set a card's command, or clear it with null (ADR-0108). */
   | {
       readonly kind: "setCommand"
@@ -167,7 +165,7 @@ export type ColumnAct =
       readonly card: CardId
       /** The column's root, for a lane whose record has not arrived. */
       readonly root: RootId
-      readonly lane: LaneName
+      readonly lane: ThreadId
       readonly at: Position
       readonly command: CardCommand | null
       readonly hold: Extract<QueueHoldChange, "keep" | "hold-if-idle">
@@ -175,7 +173,7 @@ export type ColumnAct =
   /** Act on the lane's offer in your repo; an acceptance names its destination (ADR-0104). */
   | {
       readonly kind: "offer"
-      readonly lane: LaneName
+      readonly lane: ThreadId
       readonly action: OfferAction
       readonly to: string | null
     }
@@ -206,7 +204,7 @@ export type Intent =
       readonly before: EntryId | null
     }
   /**
-   * Move a root on the board (ADR-0122). Into the closed state it is archived,
+   * Move a root on the board (ADR-0122). Into the archive it is archived,
    * and closed for you once the host accepts; out of it, restored.
    */
   | {
@@ -215,7 +213,7 @@ export type Intent =
       readonly from: WorkflowStateId
       readonly to: WorkflowStateId
       readonly before: RootId | null
-      /** `to` is the closed state. */
+      /** `to` is the archive. */
       readonly closes: boolean
     }
   /** Change the board's workflow states (ADR-0122). */
@@ -242,7 +240,7 @@ export type Intent =
   /** What `lane` raised for you is not needed (ADR-0077): it clears on every device. */
   | {
       readonly kind: "notNeeded"
-      readonly lane: LaneName
+      readonly lane: ThreadId
       readonly raised: Raised
     }
   /** Show entry `entry`, wherever it is (`planOpen`). */
@@ -279,18 +277,16 @@ export type Intent =
 type RootColumnAction = Extract<LayoutAction, { kind: "columns" }>["action"]
 
 /**
- * The effects of `intent`. `fresh` is a new column key from the shell, as
- * `columnsReducer` takes keys in its actions: a column opened with it takes
- * focus, except one `openAt` opens, which only shows an entry. `newRoot` is
- * a new root's id from the shell, which a new tab keeps (ADR-0066).
+ * The effects of `intent`. `minted` holds the ids the shell made for it
+ * (`Minted`): a column opened with its key takes focus, except one `openAt`
+ * opens, which only shows an entry.
  */
 export function planIntent(
   intent: Intent,
   state: IntentState,
-  fresh: string,
-  newRoot: RootId,
+  minted: Minted,
 ): readonly Effect[] {
-  return leavingPage(state.page, planOf(intent, state, fresh, newRoot))
+  return leavingPage(state.page, planOf(intent, state, minted))
 }
 
 /**
@@ -314,19 +310,12 @@ function leavingPage(
 function planOf(
   intent: Intent,
   state: IntentState,
-  fresh: string,
-  newRoot: RootId,
+  minted: Minted,
 ): readonly Effect[] {
+  const fresh = minted.key
   switch (intent.kind) {
     case "column":
-      return planColumn(
-        intent.position,
-        intent.key,
-        intent.act,
-        state,
-        fresh,
-        newRoot,
-      )
+      return planColumn(intent.position, intent.key, intent.act, state, minted)
     case "show":
       return show(intent.here, state)
     case "newTab":
@@ -335,7 +324,8 @@ function planOf(
         layout({
           kind: "newTab",
           key: fresh,
-          root: newRoot,
+          root: minted.root,
+          thread: minted.thread,
           asksAgent: intent.asksAgent,
           ...(intent.prefill === undefined ? {} : { prefill: intent.prefill }),
           ...(intent.state === undefined ? {} : { state: intent.state }),
@@ -361,7 +351,7 @@ function planOf(
       return [list({ kind: "place", root, before })]
     }
     case "moveRoot": {
-      // Into the closed state: it leaves the sidebar once the host accepts.
+      // Into the archive: it leaves the sidebar once the host accepts.
       const entry = state.rootEntries.get(intent.root)
       return [
         {
@@ -411,7 +401,7 @@ function planOf(
     case "takeIntoInventory":
       return planTakeIntoInventory(intent.card, state)
     case "put":
-      return planPut(intent.card, intent.target, state, newRoot)
+      return planPut(intent.card, intent.target, state, minted)
     case "discard":
       return planDiscard(
         intent.card,
@@ -423,9 +413,9 @@ function planOf(
     case "undoMove":
       return planUndoMove(intent.direction, intent.inPanel, state)
     case "undoAnswered":
-      return afterUndo(intent.outcome, state, fresh)
+      return afterUndo(intent.outcome, state, minted)
     case "openTrace":
-      return planOpenTrace(intent.trace, state, fresh)
+      return planOpenTrace(intent.trace, state, minted)
   }
 }
 
@@ -446,17 +436,17 @@ export function readerAction(act: ColumnAct, key: string): ReaderAction | null {
 
 /**
  * A column's act. One that changes the columns is the column action of the
- * root whose tab you are on; a new tab's one column can only send, reserve
- * its lane, take a reader's setting, and close, which closes the tab.
+ * root whose tab you are on; a new tab's one column can only send, take a
+ * reader's setting, and close, which closes the tab.
  */
 function planColumn(
   position: number,
   key: string,
   act: ColumnAct,
   state: IntentState,
-  fresh: string,
-  newRoot: RootId,
+  minted: Minted,
 ): readonly Effect[] {
+  const fresh = minted.key
   const active = state.layout.active
   const onRoot = (action: RootColumnAction): readonly Effect[] =>
     active?.kind === "root"
@@ -481,8 +471,7 @@ function planColumn(
       return planOf(
         { kind: "newTab", asksAgent: act.asksAgent, prefill: act.prefill },
         state,
-        fresh,
-        newRoot,
+        minted,
       )
     case "branch":
       return opened(
@@ -490,6 +479,7 @@ function planColumn(
         onRoot({
           kind: "openFresh",
           key: fresh,
+          thread: minted.thread,
           at: act.branch.at,
           after: position,
           ...(act.branch.prefill === undefined
@@ -503,6 +493,7 @@ function planColumn(
         onRoot({
           kind: "openFresh",
           key: fresh,
+          thread: minted.thread,
           at: act.at,
           after: position,
           pending: act.pending,
@@ -531,8 +522,6 @@ function planColumn(
     }
     case "sent":
       return onColumn({ kind: "sent", key: act.key, sendId: act.sendId })
-    case "reserve":
-      return onColumn({ kind: "reserve", key: act.key, lane: act.lane })
     case "queue": {
       const now = cardOf(state.cards, act.card)
       const move = now === undefined ? null : queueMove(now, act, state.cards)
@@ -586,12 +575,12 @@ function planColumn(
     case "newNote":
       return planNewNote(act.card, act.cell, key, state)
     case "toMessage":
-      return planPut(act.card, { kind: "composer", key }, state, newRoot)
+      return planPut(act.card, { kind: "composer", key }, state, minted)
     case "spinOff":
       return planSpinOff(
         act.card,
         { kind: "state", state: act.state },
-        newRoot,
+        minted,
         state,
       )
     case "setCommand":
@@ -650,7 +639,7 @@ function closeRoot(
 
 /**
  * After a move on the board is answered (ADR-0122): `moved` runs only once
- * the host accepts. A root you move into the closed state leaves the sidebar,
+ * the host accepts. A root you move into the archive leaves the sidebar,
  * the one you are on too; only a root someone else archives stays while you
  * are on it (`resolveLayout`). A refusal changes nothing.
  */

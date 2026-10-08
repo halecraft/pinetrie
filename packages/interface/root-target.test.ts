@@ -133,7 +133,7 @@ describe("placeAfter", () => {
     expect(placeAfter(["a", "b"], "b", "end")).toBe("end")
   })
 
-  test("an item that is no place, a closed row, is at the end", () => {
+  test("an item that is no place, an archive row, is at the end", () => {
     expect(placeAfter(["a", "b"], "z", "end")).toBe("end")
   })
 })

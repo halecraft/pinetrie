@@ -448,16 +448,16 @@ value as pi does, for tests and fixtures; in the host, only pi writes it.
 
 ## Lane names, tips and runs are branded here
 
-The lane and run functions take and give `LaneName`, `EntryId` and `RunId`
+The lane and run functions take and give `ThreadId`, `EntryId` and `RunId`
 (`@pinetrie/core`), so a `begin` cannot take its lane and run swapped. The readers mint them: `readLaneTip` an `EntryId`, `readActiveRun` a
 `RunId`, and `readStoredLanes` the lane names.
 
-- **`readStoredLanes` sets aside a stored name that fails `isLaneName`**, in
+- **`readStoredLanes` sets aside a stored name that fails `isThreadId`**, in
   `malformed`, and `readLaneNames` gives only `lanes`, so no reader is
   handed a name like `"main"`, which would become a container's or a
   bookmark's name. The host logs the malformed ones at startup (`recover`).
   Every lane name in a measured store passed (S95).
-- **`readStreamRecords` drops a stream whose lane fails `isLaneName`.** Only
+- **`readStreamRecords` drops a stream whose lane fails `isThreadId`.** Only
   the host writes streams, and the clear at startup (`planClear` over
   `readStreamIds`, which reads the raw keys) deletes them all.
 

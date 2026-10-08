@@ -80,12 +80,12 @@
               "options": {
                 "paths": {
                   "@pinetrie/core": {
-                    "importNames": ["entryId", "runId"],
-                    "message": "Mint an id only where it enters: here it arrives branded from a read (packages/core/index.ts)."
+                    "importNames": ["entryId", "runId", "threadIdFor"],
+                    "message": "Mint an id only where it enters: here it arrives branded from a read (packages/core/index.ts). A thread's id is minted by `newThreadId` (@pinetrie/session) alone."
                   },
                   "./index.ts": {
-                    "importNames": ["entryId", "runId"],
-                    "message": "Mint an id only where it enters: here it arrives branded from a read (packages/core/index.ts)."
+                    "importNames": ["entryId", "runId", "threadIdFor"],
+                    "message": "Mint an id only where it enters: here it arrives branded from a read (packages/core/index.ts). A thread's id is minted by `newThreadId` (@pinetrie/session) alone."
                   }
                 }
               }
@@ -111,12 +111,12 @@
               "options": {
                 "paths": {
                   "@pinetrie/core": {
-                    "importNames": ["entryId"],
-                    "message": "Mint an id only where it enters: here it arrives branded from a read (packages/core/index.ts)."
+                    "importNames": ["entryId", "threadIdFor"],
+                    "message": "Mint an id only where it enters: here it arrives branded from a read (packages/core/index.ts). A thread's id is minted by `newThreadId` (@pinetrie/session) alone."
                   },
                   "./index.ts": {
-                    "importNames": ["entryId"],
-                    "message": "Mint an id only where it enters: here it arrives branded from a read (packages/core/index.ts)."
+                    "importNames": ["entryId", "threadIdFor"],
+                    "message": "Mint an id only where it enters: here it arrives branded from a read (packages/core/index.ts). A thread's id is minted by `newThreadId` (@pinetrie/session) alone."
                   }
                 }
               }

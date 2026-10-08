@@ -1,7 +1,7 @@
 // host/offers/describe — an agent's commit message for a single offer
 // (ADR-0105): a one-shot model request outside the thread.
 
-import { type LaneName, projectTranscript } from "@pinetrie/core"
+import { projectTranscript, type ThreadId } from "@pinetrie/core"
 import { readTreeIndex } from "@pinetrie/reads"
 import { describeEffects, gatherDescribe, gatherOffer } from "@pinetrie/repo"
 import {
@@ -31,10 +31,10 @@ const DESCRIBE_BUDGET = 24_000
  */
 export function describe(
   deps: Pick<OfferDeps, "owner" | "basics" | "docs" | "piSetup"> & {
-    readonly describing: Set<LaneName>
+    readonly describing: Set<ThreadId>
   },
   refresh: Pick<Refresh, "ports">,
-  lane: LaneName,
+  lane: ThreadId,
   force: boolean,
 ): Promise<void> {
   const { owner, describing, docs } = deps

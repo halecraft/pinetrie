@@ -6,7 +6,7 @@
 // after it (`packages/keeper/TECHNICAL.md`), even when a Stop ends the run
 // while the step waits.
 
-import { atEntry, cardId, type LaneName } from "@pinetrie/core"
+import { atEntry, cardId, type ThreadId } from "@pinetrie/core"
 import {
   readLatestPrompt,
   readOffers,
@@ -43,7 +43,7 @@ export const createSplitCall =
     /** Each card's history: the split's card is the host's write. */
     readonly provenance: Pick<Provenance, "before" | "after">
   }) =>
-  (lane: LaneName): Promise<ToolAnswer> =>
+  (lane: ThreadId): Promise<ToolAnswer> =>
     deps.keeper.run(async () => {
       const { docs, session, live, places, newId } = deps.basics
       // gather

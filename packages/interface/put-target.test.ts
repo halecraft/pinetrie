@@ -1,9 +1,9 @@
 import {
   atEntry,
   entryId,
-  laneNameForThread,
   ROOT,
   rootIdFor,
+  threadIdFor,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -26,13 +26,35 @@ const ME = writerId("ada@x.io")
 const marked = (attrs: Readonly<Record<string, string>>) => ({
   getAttribute: (name: string) => attrs[name] ?? null,
 })
-const LANE = laneNameForThread("x")
+const LANE = threadIdFor("x")
+/** Thread `LANE` has a lane, named by its id. */
+const LANES = [
+  {
+    name: LANE,
+    tip: entryId("e-1"),
+    running: false,
+    waiting: 0,
+    askedBy: null,
+    lastWaiting: null,
+    heldBy: null,
+  },
+]
 const E1 = atEntry(entryId("e-1"))
 
 describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
   const store = composerPlacesStore()
-  const thread = composerPlace({ key: "k-thread", lane: LANE }, E1, TEST_ROOT)
-  const fresh = composerPlace({ key: "k-fresh", fresh: {} }, E1, TEST_ROOT)
+  const thread = composerPlace(
+    { key: "k-thread", thread: LANE },
+    E1,
+    TEST_ROOT,
+    LANES,
+  )
+  const fresh = composerPlace(
+    { key: "k-fresh", fresh: {} },
+    E1,
+    TEST_ROOT,
+    LANES,
+  )
   store.set(
     "k-thread",
     thread === null ? null : { place: thread, message: null, cells: new Map() },
@@ -109,21 +131,23 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
   })
 })
 
-test("composerPlace: your message at the end with the lane, in its root; fresh by key, in its root; none at the root, nor in no root", () => {
-  expect(composerPlace({ key: "k", lane: LANE }, E1, TEST_ROOT)).toEqual({
+test("composerPlace: your message at the end with its thread's lane, in its root; fresh by key, in its root; none at the root, nor in no root", () => {
+  expect(
+    composerPlace({ key: "k", thread: LANE }, E1, TEST_ROOT, LANES),
+  ).toEqual({
     kind: "composing",
     root: TEST_ROOT,
     at: E1,
     lane: LANE,
   })
-  expect(composerPlace({ key: "k" }, E1, TEST_ROOT)).toEqual({
+  expect(composerPlace({ key: "k" }, E1, TEST_ROOT, LANES)).toEqual({
     kind: "composing",
     root: TEST_ROOT,
     at: E1,
     lane: null,
   })
   // A branch: its tab's root, at its branch point.
-  expect(composerPlace({ key: "k", fresh: {} }, E1, TEST_ROOT)).toEqual({
+  expect(composerPlace({ key: "k", fresh: {} }, E1, TEST_ROOT, LANES)).toEqual({
     kind: "fresh",
     column: "k",
     root: TEST_ROOT,
@@ -135,11 +159,14 @@ test("composerPlace: your message at the end with the lane, in its root; fresh b
       { key: "k", fresh: { root: NEW_ROOT } },
       { kind: "root" },
       undefined,
+      LANES,
     ),
   ).toEqual({ kind: "fresh", column: "k", root: NEW_ROOT, at: ROOT })
   expect(
-    composerPlace({ key: "k", fresh: {} }, { kind: "root" }, undefined),
+    composerPlace({ key: "k", fresh: {} }, { kind: "root" }, undefined, LANES),
   ).toBeNull()
-  expect(composerPlace({ key: "k" }, { kind: "root" }, undefined)).toBeNull()
-  expect(composerPlace({ key: "k" }, E1, undefined)).toBeNull()
+  expect(
+    composerPlace({ key: "k" }, { kind: "root" }, undefined, LANES),
+  ).toBeNull()
+  expect(composerPlace({ key: "k" }, E1, undefined, LANES)).toBeNull()
 })

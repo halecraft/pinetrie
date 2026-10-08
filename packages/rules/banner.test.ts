@@ -1,8 +1,8 @@
 import {
   type BannerRecord,
-  laneNameForThread,
   type Sha256,
   type ThreadName,
+  threadIdFor,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
@@ -18,7 +18,7 @@ import {
   setRecord,
 } from "./index.ts"
 
-const LANE = laneNameForThread("1")
+const LANE = threadIdFor("1")
 const A = "a".repeat(64) as Sha256
 const B = "b".repeat(64) as Sha256
 const NAME = "vernal-crane" as ThreadName

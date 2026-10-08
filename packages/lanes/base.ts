@@ -18,14 +18,15 @@ import {
   type CommitId,
   commitId,
   type LaneBase,
-  laneNameForThread,
 } from "@pinetrie/core"
 import { executeOrThrow } from "./execute.ts"
 import { laneHandle, type OpenLink, removeLane } from "./lane.ts"
 import { newestBase } from "./merge.ts"
 import {
+  BASE_LANE,
   type BaseFacts,
   type Install,
+  type LaneOwner,
   type LaneSpec,
   laneContainer,
   pinetrieDir,
@@ -38,9 +39,6 @@ import {
 import { commitsOf } from "./revisions.ts"
 import type { Runner } from "./run.ts"
 import type { LaneRuntime } from "./runtime-port.ts"
-
-/** The scratch lane a base is made in; never a thread's. */
-export const BASE_LANE = laneNameForThread("base-scratch")
 
 const factsFile = (root: string) =>
   path.join(pinetrieDir(root).snapshots, `${BASE_SNAPSHOT}.json`)
@@ -78,7 +76,7 @@ export async function refreshBase<C>(input: {
   readonly runtime: LaneRuntime
   /** The project's root, whose `.pinetrie/snapshots/` holds `base.json`. */
   readonly root: string
-  readonly spec: LaneSpec
+  readonly spec: LaneSpec<LaneOwner>
   readonly env: Readonly<Record<string, string | undefined>>
   readonly yours: readonly CommitId[]
   /** The lockfile's hash at `yours`; null with no install. */

@@ -9,12 +9,12 @@ import {
   type Intent,
   indexTree,
   type LaneView,
-  laneNameForThread,
   type RevisionRecord,
   ROOT,
   type RootId,
   rootIdFor,
   snapshotId,
+  threadIdFor,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -49,7 +49,7 @@ const index = indexTree(
 const archived = (root: RootId): ArchivedRoot => ({ root, by: BEA, at: 1 })
 
 const lane = (tip: string, over: Partial<LaneView> = {}): LaneView => ({
-  name: laneNameForThread(tip),
+  name: threadIdFor(tip),
   tip: entryId(tip),
   running: false,
   waiting: 0,
@@ -63,7 +63,7 @@ const plan = (
   over: Partial<Parameters<typeof planArchive>[0]> = {},
 ): ReturnType<typeof planArchive> =>
   planArchive({
-    crossing: "close",
+    crossing: "archive",
     root: entryId("r1"),
     index,
     lanes: [],
@@ -104,14 +104,14 @@ describe("planArchive", () => {
       message: "cards are queued here",
     })
   })
-  test("work in another root does not stop it, and reopening is never busy", () => {
+  test("work in another root does not stop it, and restoring is never busy", () => {
     expect(plan({ lanes: [lane("c", { running: true })] }).kind).toBe("cross")
     expect(
-      plan({ crossing: "reopen", lanes: [lane("b", { running: true })] }),
+      plan({ crossing: "restore", lanes: [lane("b", { running: true })] }),
     ).toMatchObject({ kind: "cross", unload: false })
   })
   describe("what follows the record, off the documents' keeper (ADR-0065)", () => {
-    const [A, B] = [laneNameForThread("la"), laneNameForThread("lb")]
+    const [A, B] = [threadIdFor("la"), threadIdFor("lb")]
     const revision = (
       entry: string,
       lane: typeof A,
@@ -154,7 +154,7 @@ describe("planArchive", () => {
     test("restore: each lane's ref back at its tip's nearest revision; none without a tip; nothing forgotten or deleted, nor unloaded", () => {
       expect(
         plan({
-          crossing: "reopen",
+          crossing: "restore",
           own: [
             { lane: A, tip: entryId("b") },
             { lane: B, tip: null },
@@ -174,7 +174,7 @@ describe("planArchive", () => {
 })
 
 const OTHER_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000b")
-const LANE_X = laneNameForThread("x")
+const LANE_X = threadIdFor("x")
 
 describe("writesIn: the root a command writes in (ADR-0063)", () => {
   const at = (intent: Intent) =>
@@ -187,14 +187,11 @@ describe("writesIn: the root a command writes in (ADR-0063)", () => {
         kind: "chat",
         text: "x",
         root: TEST_ROOT,
-        at: atEntry(entryId("a")),
-        mode: "reply",
-        lane: null,
+        at: { kind: "end", thread: threadIdFor("a"), seen: entryId("a") },
         asksAgent: false,
         mentions: [],
         card: null,
         pinned: [],
-        reserved: null,
         base: null,
         state: null,
       }),
@@ -206,21 +203,18 @@ describe("writesIn: the root a command writes in (ADR-0063)", () => {
         kind: "chat",
         text: "x",
         root: OTHER_ROOT,
-        at: ROOT,
-        mode: "branch",
-        lane: null,
+        at: { kind: "branch", thread: threadIdFor("new"), at: null },
         asksAgent: false,
         mentions: [],
         card: null,
         pinned: [],
-        reserved: null,
         base: null,
         state: null,
       }),
       [],
     ],
     ["a name", { kind: "name", name: "Ada" }, []],
-    ["a stop", { kind: "stop", lane: laneNameForThread("x") }, []],
+    ["a stop", { kind: "stop", lane: threadIdFor("x") }, []],
     [
       "a carry-on: its lane's root",
       { kind: "carry-on", lane: LANE_X },
@@ -255,7 +249,7 @@ describe("writesIn: the root a command writes in (ADR-0063)", () => {
       },
       [TEST_ROOT],
     ],
-    ["a reservation", { kind: "reserve", lane: laneNameForThread("x") }, []],
+    ["a reservation", { kind: "reserve", lane: threadIdFor("x") }, []],
     [
       "a move on the board",
       {

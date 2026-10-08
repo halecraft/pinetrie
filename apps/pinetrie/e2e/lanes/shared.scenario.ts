@@ -137,7 +137,7 @@ async function sharedSection(
       { text: "noted" },
     ])
     await h.user.chat("take a note", atEntry(entryId(writer?.tip ?? "")), {
-      lane: writer?.name,
+      thread: writer?.name,
     })
     const noted = (await h.results("take a note")).at(-1) ?? ""
     check(

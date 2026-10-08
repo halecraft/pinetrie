@@ -12,17 +12,17 @@
 import type {
   CardCommand,
   CardRecord,
-  LaneName,
   Move,
   QueueHold,
   QueueHoldChange,
   RootId,
+  ThreadId,
   ValueWrite,
   WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
 import { type MovesStep, planMoveCommand, type QueuedCard } from "./card.ts"
-import { decodeAt, laneKey } from "./decode.ts"
+import { decodeAt, threadKey } from "./decode.ts"
 import { deleteRecord, type RecordSpec, setRecord } from "./records.ts"
 
 const QueueHoldSchema = Type.Object({
@@ -31,13 +31,13 @@ const QueueHoldSchema = Type.Object({
 })
 
 /** Each held queue, at its lane. */
-export const QUEUE_HOLD: RecordSpec<QueueHold, LaneName, "session"> = {
+export const QUEUE_HOLD: RecordSpec<QueueHold, ThreadId, "session"> = {
   namespace: "pinetrie.queue-hold",
   home: "session",
   keyOf: r => r.lane,
   encode: ({ lane, ...contents }) => contents,
   decode: (contents, key) =>
-    decodeAt(QueueHoldSchema, contents, laneKey(key), (r, lane) => ({
+    decodeAt(QueueHoldSchema, contents, threadKey(key), (r, lane) => ({
       lane,
       by: r.by as WriterId,
       at: r.at,
@@ -50,8 +50,8 @@ export const QUEUE_HOLD: RecordSpec<QueueHold, LaneName, "session"> = {
  * either way, when the queue is already so. Pure.
  */
 export function planQueueHold(input: {
-  readonly holds: ReadonlyMap<LaneName, QueueHold>
-  readonly lane: LaneName
+  readonly holds: ReadonlyMap<ThreadId, QueueHold>
+  readonly lane: ThreadId
   readonly by: WriterId
   readonly now: number
   readonly held: boolean
@@ -76,17 +76,17 @@ export function planQueueHold(input: {
  */
 export function planQueueCard(input: {
   readonly cards: readonly CardRecord[]
-  readonly holds: ReadonlyMap<LaneName, QueueHold>
+  readonly holds: ReadonlyMap<ThreadId, QueueHold>
   readonly move: Move
   readonly hold: QueueHoldChange
   /** The created card's command; ignored for a card that exists. */
   readonly command: CardCommand | null
   readonly by: WriterId
   readonly now: number
-  readonly running: (lane: LaneName) => boolean
+  readonly running: (lane: ThreadId) => boolean
 }): {
   readonly step: MovesStep
-  readonly drain: readonly LaneName[]
+  readonly drain: readonly ThreadId[]
   readonly holds: readonly ValueWrite[]
 } {
   const { move, hold } = input
@@ -134,8 +134,8 @@ const withCommand = (step: MovesStep, command: CardCommand): MovesStep =>
  */
 export function holdOnStop(input: {
   readonly queue: readonly QueuedCard[]
-  readonly holds: ReadonlyMap<LaneName, QueueHold>
-  readonly lane: LaneName
+  readonly holds: ReadonlyMap<ThreadId, QueueHold>
+  readonly lane: ThreadId
   readonly by: WriterId
   readonly now: number
 }): QueueHold | null {
@@ -152,10 +152,10 @@ export function holdOnStop(input: {
  * holds nothing. Pure.
  */
 export function planHoldSweep(input: {
-  readonly holds: ReadonlyMap<LaneName, QueueHold>
-  readonly rootOf: (lane: LaneName) => RootId | null
+  readonly holds: ReadonlyMap<ThreadId, QueueHold>
+  readonly rootOf: (lane: ThreadId) => RootId | null
   readonly archived: (root: RootId) => boolean
-}): readonly LaneName[] {
+}): readonly ThreadId[] {
   return [...input.holds.keys()].filter(lane => {
     const root = input.rootOf(lane)
     return root === null || input.archived(root)

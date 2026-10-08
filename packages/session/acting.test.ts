@@ -1,4 +1,4 @@
-import { laneNameForThread, type OfferAction } from "@pinetrie/core"
+import { type OfferAction, threadIdFor } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import { describe, expect, test } from "vitest"
 import {
@@ -11,8 +11,8 @@ import {
 } from "./acting.ts"
 import { snapshotStore } from "./store.ts"
 
-const A = laneNameForThread("a")
-const B = laneNameForThread("b")
+const A = threadIdFor("a")
+const B = threadIdFor("b")
 const sent = (
   id: string,
   action: OfferAction = "accept",

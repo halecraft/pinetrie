@@ -62,7 +62,7 @@ export function rootDropProps(
     : { [LIST_BEFORE]: target.before ?? END }
 }
 
-/** What a group of places matches: a board column, the closed state, the sidebar. */
+/** What a group of places matches: a board column, the archive, the sidebar. */
 export const ROOT_GROUP_ZONE = `[${ROOT_GROUP}]`
 
 /** The attribute that marks an element as a group of places. */
@@ -114,7 +114,7 @@ export function landingIn<Z>(
 
 /**
  * The place just after `item` in a group: where a drop of it moves nothing.
- * An item that is no place (a closed row) is at the group's end.
+ * An item that is no place (an archive row) is at the group's end.
  */
 export function placeAfter<Z>(zones: readonly Z[], item: Z, end: Z): Z {
   const at = zones.indexOf(item)
@@ -181,7 +181,7 @@ export function parseRootDrag(text: string): RootDrag | null {
 export function planRootDrop(
   drag: RootDrag,
   target: RootTarget,
-  closed: WorkflowStateId,
+  archive: WorkflowStateId,
   home: RootTarget | null,
 ): Intent | null {
   if (home !== null && sameTarget(target, home)) return null
@@ -196,6 +196,6 @@ export function planRootDrop(
     from: drag.state,
     to: target.state,
     before: target.before,
-    closes: target.state === closed && drag.state !== closed,
+    closes: target.state === archive && drag.state !== archive,
   }
 }

@@ -6,9 +6,9 @@ import {
   BASE_SNAPSHOT,
   type ErrCode,
   type ForkStart,
-  type LaneName,
   nearestRevision,
   type Position,
+  type ThreadId,
   type WriterId,
 } from "@pinetrie/core"
 import type { Keeper } from "@pinetrie/keeper"
@@ -65,7 +65,7 @@ export interface NewLanes {
   /** Record a new lane in its root (ADR-0063), name it, and queue its fork. */
   prepareLane(
     view: RootView,
-    lane: LaneName,
+    lane: ThreadId,
     at: Position,
     by: WriterId,
     base: string | null,
@@ -83,7 +83,7 @@ export async function recordLane(
     readonly ensureNames: () => Promise<void>
   },
   view: Pick<RootView, "root">,
-  lane: LaneName,
+  lane: ThreadId,
   ownCopy: boolean,
   by: WriterId,
 ): Promise<void> {

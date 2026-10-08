@@ -2,10 +2,10 @@ import {
   atEntry,
   cardId,
   entryId,
-  laneNameForThread,
   type PlaceKey,
   rootIdFor,
   type TraceRecord,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { expect, test } from "vitest"
@@ -27,7 +27,7 @@ const queued: PlaceKey = {
   kind: "queued",
   root: ROOT,
   at: atEntry(HERE),
-  lane: laneNameForThread("x"),
+  lane: threadIdFor("x"),
   seen: "",
 }
 const trace = (over: Partial<TraceRecord>): TraceRecord => ({

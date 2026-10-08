@@ -10,7 +10,7 @@
 // flag). Your repo is its owner's (`Setup.owner`, `@pinetrie/repo`); offers are
 // `host/offers/`'s, and accepted work `line.ts`'s.
 
-import type { LaneName, ProjectRecord } from "@pinetrie/core"
+import type { ProjectRecord, ThreadId } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
 import type { LaneHooks, PiSetup } from "@pinetrie/pi"
 import { readRunning } from "@pinetrie/reads"
@@ -67,7 +67,7 @@ export type LaneWork = Pick<
      */
     quiet(): Promise<void>
     /** `listener` hears each lane whose base record changed (ADR-0080). */
-    onBaseChanged(listener: (lane: LaneName) => void): void
+    onBaseChanged(listener: (lane: ThreadId) => void): void
   }
 
 /**
@@ -119,7 +119,7 @@ export async function startLaneWork(input: {
           by,
         ),
     }
-  const baseListeners: ((lane: LaneName) => void)[] = []
+  const baseListeners: ((lane: ThreadId) => void)[] = []
   const { owner, runtime } = setup
   const registry = createRegistry({ session, runtime })
   const { repoConfig } = setup.lanes

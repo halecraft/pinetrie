@@ -21,7 +21,7 @@
 import { type FSWatcher, watch } from "node:fs"
 import { readdir, readFile, stat } from "node:fs/promises"
 import path from "node:path"
-import type { LaneName } from "@pinetrie/core"
+import type { ThreadId } from "@pinetrie/core"
 import { createKeeper, type SlowStep } from "@pinetrie/keeper"
 import type { RepoConfig, Runner } from "@pinetrie/lanes"
 import {
@@ -57,7 +57,7 @@ export interface RepoOps {
 export type RepoReads = Pick<RepoOps, "jj" | "git">
 
 /** What the owner's upkeep is keyed by. */
-export type RepoKey = `refresh:${LaneName}` | "accepted" | "observe" | "shared"
+export type RepoKey = `refresh:${ThreadId}` | "accepted" | "observe" | "shared"
 
 /** What a step on the owner may read and run: at the head, unpinned. */
 export type OwnedStep<T> = (ops: RepoOps) => Promise<T>
@@ -70,7 +70,7 @@ export interface RepoOwner {
   /** Pure reads at the head the owner last observed: never queued, never a write. */
   read<T>(go: (ops: RepoReads) => Promise<T>): Promise<T>
   /** A lane's bundle into your repo (`planImport`), as the host, as a command. */
-  importLane(lane: LaneName, bundle: string, stack: boolean): Promise<void>
+  importLane(lane: ThreadId, bundle: string, stack: boolean): Promise<void>
   /** What moved, each time an observation finds a new head. */
   onMoved(listener: (moved: Moved) => void): () => void
   /** Hold `work` in `idle` until it settles: a request outside the owner, say. */

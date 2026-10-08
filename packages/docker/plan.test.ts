@@ -1,4 +1,4 @@
-import { BASE_SNAPSHOT, laneNameForThread, snapshotId } from "@pinetrie/core"
+import { BASE_SNAPSHOT, snapshotId, threadIdFor } from "@pinetrie/core"
 import {
   type ContainerShape,
   type LaneSpec,
@@ -29,7 +29,7 @@ import {
 } from "./plan.ts"
 import type { DockerTarget } from "./target.ts"
 
-const LANE = laneNameForThread("1")
+const LANE = threadIdFor("1")
 const spec: LaneSpec = {
   lane: LANE,
   image: "pinetrie-lane:abc",

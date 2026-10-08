@@ -23,8 +23,6 @@ import {
   firstEmpty,
   INVENTORY_SLOTS,
   keyOf,
-  type LaneName,
-  type LaneView,
   type Move,
   type MoveRefusal,
   moveOf,
@@ -42,8 +40,10 @@ import {
   type RootRecord,
   sameKey,
   seenAt,
+  type ThreadId,
   type TreeIndex,
-  threadOf,
+  threadAt,
+  threadEnd,
   type WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
@@ -150,26 +150,17 @@ export const decodeCard = (
   })
 
 /**
- * Where a place kept as a send carries it (where it started, and its column's
- * lane) resolves now: the end of its thread, as a reply from there would find
- * it, so it follows its thread as the thread grows. Null when there is no
- * such thread, or two.
+ * Where a place kept at a thread's end resolves now: the end of the thread
+ * its `at` is in (`threadAt`, `threadEnd`), so it follows its thread as the
+ * thread grows. Null when `at` is in no thread.
  */
 export function placeEnd(
-  place: { readonly at: Position; readonly lane: LaneName | null },
-  me: WriterId,
-  lanes: readonly LaneView[],
+  place: { readonly at: Position },
   index: TreeIndex,
 ): EntryId | null {
-  const thread = threadOf(index, lanes, {
-    at: place.at,
-    mode: "reply",
-    lane: place.lane,
-    me,
-  })
-  return thread.kind === "thread" && thread.end.kind === "entry"
-    ? thread.end.id
-    : null
+  if (place.at.kind !== "entry") return null
+  const thread = threadAt(index, place.at.id)
+  return thread === null ? null : threadEnd(index, thread)
 }
 
 /**
@@ -177,16 +168,10 @@ export function placeEnd(
  * place gone. A note's or a pinned card's end is `cardsAt`'s alone: resolved
  * here, it could take your composer (`yourCard`).
  */
-export const cardEnd = (
-  card: CardRecord,
-  lanes: readonly LaneView[],
-  index: TreeIndex,
-): EntryId | null =>
-  card.place.kind === "composing"
-    ? placeEnd(card.place, card.owner, lanes, index)
-    : null
+export const cardEnd = (card: CardRecord, index: TreeIndex): EntryId | null =>
+  card.place.kind === "composing" ? placeEnd(card.place, index) : null
 
-/** The shared kinds of place at a thread's end, resolved through `threadOf`. */
+/** The shared kinds of place at a thread's end, resolved through `placeEnd`. */
 type EndKind = "note" | "pinned"
 
 /**
@@ -199,15 +184,10 @@ export function cardsAt(
   kind: EndKind,
   end: EntryId,
   cards: readonly CardRecord[],
-  lanes: readonly LaneView[],
   index: TreeIndex,
 ): readonly CardRecord[] {
   return cards
-    .filter(
-      c =>
-        c.place.kind === kind &&
-        placeEnd(c.place, c.owner, lanes, index) === end,
-    )
+    .filter(c => c.place.kind === kind && placeEnd(c.place, index) === end)
     .sort(byOrder)
 }
 
@@ -236,7 +216,7 @@ type NotePlace = Extract<CardPlace, { kind: "note" }>
 const boardOf = (p: {
   readonly root: RootId
   readonly at: Position
-  readonly lane: LaneName | null
+  readonly lane: ThreadId | null
 }): string => `${p.root} ${p.lane ?? (p.at.kind === "entry" ? p.at.id : "")}`
 
 const isNote = (
@@ -314,7 +294,6 @@ export function yourCard(
   me: WriterId,
   where: CardWhere,
   cards: readonly CardRecord[],
-  lanes: readonly LaneView[],
   index: TreeIndex,
 ): CardRecord | undefined {
   let found: CardRecord | undefined
@@ -322,7 +301,7 @@ export function yourCard(
     if (c.owner !== me) continue
     const here =
       where.kind === "end"
-        ? cardEnd(c, lanes, index) === where.end
+        ? cardEnd(c, index) === where.end
         : c.place.kind === "fresh" && c.place.column === where.column
     if (here && (found === undefined || c.id > found.id)) found = c
   }
@@ -347,7 +326,7 @@ const isPinned = (
 /** A lane's queued cards, in the order they are popped: by `order`, then id. */
 export function queuedOn(
   cards: readonly CardRecord[],
-  lane: LaneName,
+  lane: ThreadId,
 ): QueuedCard[] {
   return cards
     .filter(isQueued)
@@ -422,7 +401,7 @@ export const NONE_BLANK: ReadonlySet<CardId> = new Set()
  */
 export function planNextQueuedCardPop(
   cards: readonly CardRecord[],
-  lane: LaneName,
+  lane: ThreadId,
   facts: {
     readonly running: boolean
     readonly held: boolean
@@ -455,7 +434,7 @@ export function planNextQueuedCardPop(
  */
 export const planUnqueueAll = (
   cards: readonly CardRecord[],
-  lane: LaneName,
+  lane: ThreadId,
 ): readonly Move[] =>
   queuedOn(cards, lane)
     .filter(c => c.carries.kind === "message")
@@ -797,7 +776,7 @@ export function planFreshFollow(
   sent: CardId,
   root: RootId,
   at: EntryId,
-  lane: LaneName | null,
+  lane: ThreadId | null,
 ): readonly PlaceStep[] {
   const place = cards.find(c => c.id === sent)?.place
   if (place?.kind !== "fresh" || place.root !== root) return []
@@ -934,8 +913,8 @@ export function planMoveCommand(
   cards: readonly CardRecord[],
   moves: readonly Move[],
   sender: WriterId,
-  running: (lane: LaneName) => boolean,
-): { readonly step: MovesStep; readonly drain: readonly LaneName[] } {
+  running: (lane: ThreadId) => boolean,
+): { readonly step: MovesStep; readonly drain: readonly ThreadId[] } {
   const step = planMoves(cards, moves, sender)
   if (step.kind === "refused") return { step, drain: [] }
   const lanes = step.steps.flatMap(s =>

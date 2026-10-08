@@ -15,7 +15,6 @@ import {
   type CardRecord,
   discardedOf,
   keyOf,
-  type LaneName,
   type Move,
   type MoveDirection,
   moveOf,
@@ -27,6 +26,7 @@ import {
   type Reorder,
   type RootId,
   sameKey,
+  type ThreadId,
   type TraceRecord,
   type WriterId,
 } from "@pinetrie/core"
@@ -41,6 +41,7 @@ import {
   type MoveHow,
   type Slots,
 } from "@pinetrie/session"
+import type { Minted } from "./columns.ts"
 import {
   type CardFacts,
   type Effect,
@@ -66,7 +67,7 @@ export const moveCard = (
  */
 export function queueMove(
   card: CardRecord,
-  to: { readonly lane: LaneName; readonly at: Position },
+  to: { readonly lane: ThreadId; readonly at: Position },
   facts: Pick<CardFacts, "laneRecords">,
 ): Move | null {
   const root = queueRoot(to.lane, card, facts.laneRecords)
@@ -83,7 +84,7 @@ export function queueMove(
 export const queueNew = (
   card: CardId,
   root: RootId,
-  to: { readonly lane: LaneName; readonly at: Position },
+  to: { readonly lane: ThreadId; readonly at: Position },
   facts: Pick<CardFacts, "laneRecords">,
 ): Move => ({
   card,
@@ -225,13 +226,13 @@ export function planPut(
   card: CardId,
   target: PutTarget,
   state: IntentState,
-  newRoot: RootId,
+  minted: Minted,
 ): readonly Effect[] {
   const facts = state.cards
   const now = cardOf(facts, card)
   if (now === undefined) return []
   if (target.kind === "state" || target.kind === "sidebar")
-    return planSpinOff(card, target, newRoot, state)
+    return planSpinOff(card, target, minted, state)
   if (target.kind === "cell") return putInCell(now, target, state)
   if (target.kind !== "inventory" && intoMessage(target, facts.composers))
     return putInMessage(now, target.key, state)
@@ -511,7 +512,7 @@ export function planUndoMove(
 export function afterUndo(
   outcome: Outcome,
   state: IntentState,
-  fresh: string,
+  minted: Minted,
 ): readonly Effect[] {
   switch (outcome.kind) {
     case "undone": {
@@ -520,7 +521,7 @@ export function afterUndo(
         if (place !== null && !places.some(p => sameKey(p.place, place)))
           places.push({ place, card })
       return places.flatMap(
-        p => revealOf(p.place, state, fresh, p.card).effects,
+        p => revealOf(p.place, state, minted, p.card).effects,
       )
     }
     case "unmoved": {
@@ -530,7 +531,7 @@ export function afterUndo(
               effects: [{ kind: "showInventory", brief: false }] as const,
               actedAt: AT_INVENTORY,
             }
-          : revealOf(outcome.place, state, fresh)
+          : revealOf(outcome.place, state, minted)
       return [
         ...shown.effects,
         {
@@ -558,12 +559,14 @@ export function afterUndo(
 export function planOpenTrace(
   trace: TraceRecord,
   state: IntentState,
-  fresh: string,
+  minted: Minted,
 ): readonly Effect[] {
   const now = state.cards.cards.find(c => c.id === trace.card)
   if (now === undefined)
-    return trace.message === null ? [] : planOpenAt(trace.message, state, fresh)
+    return trace.message === null
+      ? []
+      : planOpenAt(trace.message, state, minted.key)
   if (now.place.kind === "inventory" && now.place.holder !== state.cards.me)
     return []
-  return revealOf(keyOf(now.place), state, fresh, now.id).effects
+  return revealOf(keyOf(now.place), state, minted, now.id).effects
 }

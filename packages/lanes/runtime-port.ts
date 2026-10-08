@@ -2,8 +2,8 @@
 // return values (`ContainerShape`, `DiskOp`); a runtime turns them into
 // commands. The host picks the runtime and hands it in.
 
-import type { LaneName, SnapshotId } from "@pinetrie/core"
-import type { ContainerShape, ImagePlan } from "./plan.ts"
+import type { SnapshotId } from "@pinetrie/core"
+import type { ContainerShape, ImagePlan, LaneOwner } from "./plan.ts"
 import type { Ran } from "./run.ts"
 
 /**
@@ -11,18 +11,18 @@ import type { Ran } from "./run.ts"
  * and `deleteSnapshots` succeed when there is nothing to delete.
  */
 export type DiskOp =
-  | { readonly kind: "create"; readonly lane: LaneName }
+  | { readonly kind: "create"; readonly lane: LaneOwner }
   | {
       readonly kind: "restore"
-      readonly lane: LaneName
+      readonly lane: LaneOwner
       readonly from: SnapshotId
     }
   | {
       readonly kind: "snapshot"
-      readonly lane: LaneName
+      readonly lane: LaneOwner
       readonly snapshot: SnapshotId
     }
-  | { readonly kind: "delete"; readonly lane: LaneName }
+  | { readonly kind: "delete"; readonly lane: LaneOwner }
   | { readonly kind: "deleteSnapshots"; readonly ids: readonly SnapshotId[] }
 
 /** What a step asks of the runtime: a disk operation, or a lane's container made and started. */
@@ -40,7 +40,7 @@ export interface ContainerFacts {
 /** Every call the host makes to a runtime. Each throws on failure, naming the command. */
 export interface LaneRuntime {
   disk(op: DiskOp): Promise<void>
-  diskExists(lane: LaneName): Promise<boolean>
+  diskExists(lane: LaneOwner): Promise<boolean>
   snapshotExists(id: SnapshotId): Promise<boolean>
   /** The container's arguments, without its label: pure. Their hash is its spec label. */
   runArgs(shape: ContainerShape): readonly string[]

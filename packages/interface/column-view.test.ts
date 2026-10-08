@@ -8,19 +8,19 @@ import {
   type EntryId,
   entryId,
   indexAsks,
-  type LaneName,
   type LaneRecord,
   type LaneView,
-  laneNameForThread,
   type OfferRecord,
   type PinnedView,
   PLAIN,
   type ProjectRecord,
   type RevisionRecord,
   type Sha256,
+  type ThreadId,
   type ThreadLane,
   type ThreadName,
   type TreeIndex,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import {
@@ -51,9 +51,9 @@ import {
 } from "./column-view.ts"
 import { entry, indexOf, TEST_ROOT } from "./fixtures.ts"
 
-const A = laneNameForThread("a")
-const B = laneNameForThread("b")
-const _C = laneNameForThread("c")
+const A = threadIdFor("a")
+const B = threadIdFor("b")
+const _C = threadIdFor("c")
 const AMBER = "amber-fox" as ThreadName
 const COPPER = "copper-owl" as ThreadName
 const ADA = writerId("ada@x.io")
@@ -77,7 +77,7 @@ const reply = (text: string): AgentMessageLike => ({
 const tree = (lines: readonly Line[]): TreeIndex =>
   indexOf(lines.map(([id, parentId, message]) => entry(id, parentId, message)))
 const revisions = (
-  owners: Record<string, LaneName>,
+  owners: Record<string, ThreadId>,
 ): ReadonlyMap<EntryId, RevisionRecord> =>
   new Map(
     Object.entries(owners).map(([id, lane]) => [
@@ -95,8 +95,8 @@ const revisions = (
 const stretches = (
   index: TreeIndex,
   tip: string,
-  owners: Record<string, LaneName>,
-  lane: LaneName | null = null,
+  owners: Record<string, ThreadId>,
+  lane: ThreadId | null = null,
 ) =>
   lanesAlong(index, entryId(tip), revisions(owners), lane).map(s => [
     s.start,
@@ -197,7 +197,7 @@ const ACCEPTED = {
   publishCatchesUp: true,
 } satisfies AcceptedRecord
 const BASE: BaseRecord = {
-  lane: laneNameForThread("1"),
+  lane: threadIdFor("1"),
   base: { kind: "accepted" as const },
   start: commitId("aaaaaaaaaaaa"),
   state: "ok" as const,
@@ -209,7 +209,7 @@ const BASE: BaseRecord = {
   untraced: [],
   work: "some",
 }
-const laneView = (name: LaneName, tip: string, running = false): LaneView => ({
+const laneView = (name: ThreadId, tip: string, running = false): LaneView => ({
   name,
   tip: entryId(tip),
   running,
@@ -219,7 +219,7 @@ const laneView = (name: LaneName, tip: string, running = false): LaneView => ({
   heldBy: null,
 })
 const onLane = (view: LaneView): ThreadLane => ({ kind: "lane", ...view })
-const record = (lane: LaneName, ownCopy: boolean): LaneRecord => ({
+const record = (lane: ThreadId, ownCopy: boolean): LaneRecord => ({
   lane,
   root: TEST_ROOT,
   ownCopy,
@@ -237,8 +237,8 @@ const facts = (
 ): ColumnFacts => {
   const index = tree(BRANCH)
   const views = projectColumns(index, [
-    { anchor: entryId("6"), anchored: true },
-    { anchor: entryId("b2"), anchored: true },
+    { anchor: entryId("6") },
+    { anchor: entryId("b2") },
   ])
   const view = views[n]
   if (view === undefined) throw new Error("no view")
@@ -249,7 +249,7 @@ const facts = (
     lane: { kind: "none" },
     createsLane: false,
     detailsOpen: false,
-    reserved: null,
+    thread: null,
     mountedBanner: null,
     writable: true,
     nameOf: new Map([[ADA, "Ada"]]),
@@ -286,13 +286,13 @@ describe("columnView: the header", () => {
     })
     expect(columnView(facts(1)).identity).toEqual({ kind: "none" })
   })
-  test("a lane about to start is named by its reserved id, and only while the next send creates it (ADR-0057)", () => {
+  test("a lane about to start is named by its thread's id, and only while the next send creates it (ADR-0057, ADR-0117)", () => {
     const sha = "a".repeat(64) as Sha256
     const banners = new Map([[B, { lane: B, sha, at: 1 }]])
     const about = (over: Partial<ColumnFacts>) =>
       columnView(
         facts(1, {
-          reserved: B,
+          thread: B,
           work: work({ names: NAMES, banners }),
           ...over,
         }),
@@ -311,25 +311,29 @@ describe("columnView: the header", () => {
     expect(about({ createsLane: false }).identity).toEqual({ kind: "none" })
     expect(about({ createsLane: false }).banner).toBeNull()
     expect(
-      columnView(facts(1, { createsLane: true, reserved: B })).identity,
+      columnView(facts(1, { createsLane: true, thread: B })).identity,
     ).toEqual({ kind: "pending" })
   })
   test.each([
-    ["no lane to create", { createsLane: false }, { kind: "none" }],
-    ["read-only", { createsLane: true, writable: false }, { kind: "none" }],
+    ["no lane to create", { thread: B, createsLane: false }, { kind: "none" }],
+    ["no thread yet", { createsLane: true }, { kind: "none" }],
+    [
+      "read-only",
+      { thread: B, createsLane: true, writable: false },
+      { kind: "none" },
+    ],
     [
       "a lane already, as the composer's report lags",
-      { createsLane: true, lane: onLane(laneView(B, "b2")) },
+      { thread: B, createsLane: true, lane: onLane(laneView(B, "b2")) },
       { kind: "none" },
     ],
-    ["no reservation", { createsLane: true }, { kind: "mint" }],
-    ["unnamed", { createsLane: true, reserved: B }, { kind: "ask", lane: B }],
+    ["unnamed", { thread: B, createsLane: true }, { kind: "ask", lane: B }],
     [
       "named",
-      { createsLane: true, reserved: A, work: work({ names: NAMES }) },
+      { thread: A, createsLane: true, work: work({ names: NAMES }) },
       { kind: "none" },
     ],
-  ] as const)("the reserve step: %s (ADR-0057)", (_, over, step) => {
+  ] as const)("the reserve step: %s (ADR-0057, ADR-0117)", (_, over, step) => {
     expect(columnView(facts(1, over)).reserve).toEqual(step)
   })
   test("the banner is the thread's at the column's end; a conversation has none", () => {
@@ -366,8 +370,8 @@ describe("columnView: the header", () => {
     // Column 1 shows only the branch; lane A started at 3, in column 0.
     const index = tree([...BRANCH, ["b3", "b2", chat("more", true)]])
     const view = projectColumns(index, [
-      { anchor: entryId("6"), anchored: true },
-      { anchor: entryId("b3"), anchored: true },
+      { anchor: entryId("6") },
+      { anchor: entryId("b3") },
     ])[1]
     if (view === undefined) throw new Error("no view")
     const shows = columnView({
@@ -397,8 +401,8 @@ describe("columnView: the header", () => {
     expect(columnView(facts(0)).origin).toEqual({ kind: "none" })
     const index = tree(TRUNK)
     const [, fromChat] = projectColumns(index, [
-      { anchor: entryId("6"), anchored: true },
-      { anchor: entryId("2"), anchored: true },
+      { anchor: entryId("6") },
+      { anchor: entryId("2") },
     ])
     if (fromChat === undefined) throw new Error("no view")
     expect(
@@ -460,9 +464,7 @@ describe("columnView: a thread's details (ADR-0073)", () => {
   ] as const)("a lane that started %s", (_, lines, start) => {
     const index = tree(lines)
     const tip = lines.at(-1)?.[0] ?? ""
-    const [view] = projectColumns(index, [
-      { anchor: entryId(tip), anchored: true },
-    ])
+    const [view] = projectColumns(index, [{ anchor: entryId(tip) }])
     if (view === undefined) throw new Error("no view")
     const shows = columnView({
       ...facts(0),
@@ -1051,7 +1053,7 @@ describe("startedWords", () => {
 describe("where the agent read pinned cards (ADR-0048)", () => {
   const card = (id: string, text: string) => ({ id: cardId(id), text, by: ADA })
   const read = (
-    lane: LaneName,
+    lane: ThreadId,
     cards: PinnedView["cards"],
     retired: PinnedView["retired"] = [],
   ): PinnedView => ({ lane, cards, retired })

@@ -72,7 +72,7 @@ export const laneWork = (lane: LaneView): RootWork =>
  * The agent's work in each root, by the root that holds each lane's tip. A
  * lane with no tip is in no root; running wins over waiting, and waiting
  * over held. The one rule for when a root cannot be archived: `planArchive`
- * refuses from any of them, and Move to the closed state is disabled from
+ * refuses from any of them, and Move to the archive is disabled from
  * it. Only running and waiting ring a root (`rootStatus`): a held queue
  * waits for a person.
  */

@@ -1,4 +1,4 @@
-import { entryId, laneNameForThread, runId, writerId } from "@pinetrie/core"
+import { entryId, runId, threadIdFor, writerId } from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
 import {
   type PiSetup,
@@ -30,7 +30,7 @@ import {
 import type { Records } from "./records.ts"
 import { endRun } from "./runs.ts"
 
-const lane = laneNameForThread("0123456789abcdef")
+const lane = threadIdFor("0123456789abcdef")
 /** A failure in a test is the test's failure. */
 const failed = (error: unknown) => {
   throw error

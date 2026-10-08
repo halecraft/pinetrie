@@ -1,8 +1,8 @@
 import {
-  laneNameForThread,
   type OfferFact,
   type OfferRecord,
   type ThreadName,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
@@ -18,7 +18,7 @@ import {
   renderableMessage,
 } from "./index.ts"
 
-const LANE = laneNameForThread("1")
+const LANE = threadIdFor("1")
 const ADA = writerId("ada@x.io")
 const ACCEPTED: OfferFact = {
   kind: "accepted",

@@ -1,4 +1,4 @@
-import { laneNameForThread } from "@pinetrie/core"
+import { threadIdFor } from "@pinetrie/core"
 import { KeeperClosed } from "@pinetrie/keeper"
 import { expect, test } from "vitest"
 import { failed } from "./basics.ts"
@@ -6,7 +6,7 @@ import { basics } from "./fakes.ts"
 
 test("failed logs the host's line, with the thread when it names a lane", () => {
   const b = basics()
-  const lane = laneNameForThread("0123456789abcdef")
+  const lane = threadIdFor("0123456789abcdef")
   failed(b, "compaction")(new Error("disk full"))
   failed(b, "forking", lane)("no volume")
   expect(b.lines).toEqual([

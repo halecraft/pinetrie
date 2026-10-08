@@ -37,7 +37,7 @@ const WORKFLOW: Workflow = {
     { id: BACKLOG, name: "Backlog" },
     { id: DOING, name: "Doing" },
   ],
-  closed: { id: DONE, name: "Done" },
+  archive: { id: DONE, name: "Done" },
 }
 const place = (
   root: RootId,
@@ -49,7 +49,7 @@ const place = (
 const placesOf = (...ps: BoardPlace[]) => new Map(ps.map(p => [p.root, p]))
 const columns = (board: ReturnType<typeof boardOf>) =>
   Object.fromEntries(
-    [...board.open, board.closed].map(c => [c.state.name, c.roots]),
+    [...board.open, board.archive].map(c => [c.state.name, c.roots]),
   )
 
 describe("boardOf", () => {
@@ -76,7 +76,7 @@ describe("boardOf", () => {
   })
 })
 
-test("archivedOf: only the closed state's roots, with who closed them and when", () => {
+test("archivedOf: only the archive's roots, with who archived them and when", () => {
   expect(
     archivedOf(
       WORKFLOW,
@@ -87,8 +87,8 @@ test("archivedOf: only the closed state's roots, with who closed them and when",
 
 test.each([
   [BACKLOG, DOING, "within"],
-  [DOING, DONE, "close"],
-  [DONE, BACKLOG, "reopen"],
+  [DOING, DONE, "archive"],
+  [DONE, BACKLOG, "restore"],
   [DONE, DONE, "within"],
 ] as const)("transitionOf %s to %s: %s", (from, to, want) => {
   expect(transitionOf(WORKFLOW, from, to)).toBe(want)
@@ -130,17 +130,23 @@ describe("planRootMove", () => {
     expect(plan.places).toHaveLength(1)
     expect((plan.places[0]?.rank ?? "") < orderKey(10)).toBe(true)
   })
-  test("into the closed state closes it, and out of it reopens it", () => {
-    expect(move({ to: DONE })).toMatchObject({ transition: "close" })
+  test("into the archive archives it, and out of it restores it", () => {
+    expect(move({ to: DONE })).toMatchObject({ transition: "archive" })
     expect(move({ root: R(3), from: DONE, to: DOING })).toMatchObject({
-      transition: "reopen",
+      transition: "restore",
       places: [{ root: R(3), by: ADA, at: 9 }],
     })
   })
-  test("a reorder within the closed state keeps who closed it and when", () => {
-    const closed = placesOf(...places.values(), place(R(2), DONE, 9, BEA, 4))
+  test("a reorder within the archive keeps who archived it and when", () => {
+    const archived = placesOf(...places.values(), place(R(2), DONE, 9, BEA, 4))
     expect(
-      move({ root: R(3), from: DONE, to: DONE, before: null, places: closed }),
+      move({
+        root: R(3),
+        from: DONE,
+        to: DONE,
+        before: null,
+        places: archived,
+      }),
     ).toMatchObject({ places: [{ root: R(3), by: ADA, at: 3 }] })
   })
   test("moved first: refused, naming who moved it and where", () => {
@@ -194,7 +200,7 @@ describe("planWorkflowEdit", () => {
     )
   const names = (plan: ReturnType<typeof edit>) =>
     plan.kind === "write"
-      ? [...plan.workflow.open.map(s => s.name), plan.workflow.closed.name]
+      ? [...plan.workflow.open.map(s => s.name), plan.workflow.archive.name]
       : plan.kind
   test.each([
     [
@@ -213,7 +219,7 @@ describe("planWorkflowEdit", () => {
       ["Backlog", "Now", "Done"],
     ],
     [
-      "rename the closed state",
+      "rename the archive",
       { action: "rename", state: DONE, name: "Shipped" },
       ["Backlog", "Doing", "Shipped"],
     ],
@@ -242,15 +248,11 @@ describe("planWorkflowEdit", () => {
       { action: "rename", state: workflowStateIdFor("gone"), name: "x" },
       ERR.UNKNOWN_STATE,
     ],
+    ["moving the archive", { action: "move", state: DONE }, ERR.STATE_ARCHIVE],
     [
-      "moving the closed state",
-      { action: "move", state: DONE },
-      ERR.STATE_CLOSED,
-    ],
-    [
-      "removing the closed state",
+      "removing the archive",
       { action: "remove", state: DONE },
-      ERR.STATE_CLOSED,
+      ERR.STATE_ARCHIVE,
     ],
     [
       "removing a state that holds a root",
@@ -266,7 +268,7 @@ describe("planWorkflowEdit", () => {
   test("refuses removing the only open state", () => {
     const one: Workflow = {
       open: [WORKFLOW.open[0] ?? { id: BACKLOG, name: "" }],
-      closed: WORKFLOW.closed,
+      archive: WORKFLOW.archive,
     }
     expect(
       planWorkflowEdit(
@@ -295,18 +297,18 @@ describe("placeStarted", () => {
     expect(p).toMatchObject({ state: DOING, by: ADA, at: 4 })
     expect(p.rank > orderKey(10)).toBe(true)
   })
-  test("in the first open state when it names none, one gone, or the closed one", () => {
+  test("in the first open state when it names none, one gone, or the archive", () => {
     for (const s of [null, workflowStateIdFor("gone"), DONE])
       expect(start(s).state).toBe(BACKLOG)
   })
 })
 
-test("defaultWorkflow: Backlog and Doing, then Done, closed", () => {
+test("defaultWorkflow: Backlog and Doing, then Done, the archive", () => {
   let n = 0
   const w = defaultWorkflow(() => `${n++}`)
   expect(w.open.map(s => s.name)).toEqual(["Backlog", "Doing"])
-  expect(w.closed.name).toBe("Done")
-  expect(new Set([...w.open.map(s => s.id), w.closed.id]).size).toBe(3)
+  expect(w.archive.name).toBe("Done")
+  expect(new Set([...w.open.map(s => s.id), w.archive.id]).size).toBe(3)
 })
 
 test("planWorkflowSeed: a store with no workflow gets the default one, and one with a workflow nothing", () => {

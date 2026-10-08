@@ -1,12 +1,21 @@
-import { laneNameForThread } from "@pinetrie/core"
+import { threadIdFor, writerId } from "@pinetrie/core"
+import { readNames } from "@pinetrie/reads"
+import { setRecord, THREAD } from "@pinetrie/rules"
 import { expect, test } from "vitest"
-import { applyWrites, basics, putLane, record, writesOf } from "./fakes.ts"
+import {
+  applyWrites,
+  basics,
+  putLane,
+  ROOT_ID,
+  record,
+  writesOf,
+} from "./fakes.ts"
 import { createNames } from "./names.ts"
 import type { Records } from "./records.ts"
 
 test("two ensures called together write each lane's name once, and no two lanes get one name", async () => {
   const b = basics()
-  const lanes = [laneNameForThread("a"), laneNameForThread("b")]
+  const lanes = [threadIdFor("a"), threadIdFor("b")]
   for (const lane of lanes) putLane(b, lane)
   const scribe = record<Pick<Records, "writeValues">>({
     // Written a moment later, as the scribe's session does: a second plan made
@@ -34,8 +43,8 @@ test("two ensures called together write each lane's name once, and no two lanes 
 
 test("a reservation is named on the same queue as new lanes, and starts its banner (ADR-0057)", async () => {
   const b = basics()
-  const lane = laneNameForThread("a")
-  const reserved = laneNameForThread("r")
+  const lane = threadIdFor("a")
+  const reserved = threadIdFor("r")
   putLane(b, lane)
   const scribe = record<Pick<Records, "writeValues">>({
     writeValues: async writes => {
@@ -63,7 +72,33 @@ test("a reservation is named on the same queue as new lanes, and starts its bann
   expect(new Set(all).size).toBe(2)
   expect(named.sort()).toEqual([lane, reserved].sort())
   // A lane pi holds, not yet named, is no thread to come.
-  const other = laneNameForThread("b")
+  const other = threadIdFor("b")
   putLane(b, other)
   expect(await names.reserve(other)).toBe("held")
+})
+
+test("a conversation thread is named as a lane is, and draws no banner: every thread has a name (ADR-0117)", async () => {
+  const b = basics()
+  const thread = threadIdFor("conversation")
+  applyWrites(b, [
+    setRecord(THREAD, {
+      thread,
+      root: ROOT_ID,
+      by: writerId("ada@x.io"),
+      createdAt: 1,
+      fork: null,
+    }),
+  ])
+  const scribe = record<Pick<Records, "writeValues">>({
+    writeValues: async writes => applyWrites(b, writes),
+  })
+  const named: string[] = []
+  const names = createNames({
+    basics: b,
+    records: scribe.port,
+    onNamed: lane => named.push(lane),
+  })
+  await names.ensure()
+  expect(readNames(b.session).has(thread)).toBe(true)
+  expect(named).toEqual([])
 })

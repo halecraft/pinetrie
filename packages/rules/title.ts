@@ -7,7 +7,6 @@ import {
   type AgentId,
   type EntryId,
   ERR,
-  type LaneName,
   type LaneRecord,
   type MarkRecord,
   type Position,
@@ -18,6 +17,7 @@ import {
   refused,
   summarizeRoots,
   THE_AGENT,
+  type ThreadId,
   type TreeIndex,
   type WriterId,
 } from "@pinetrie/core"
@@ -62,7 +62,7 @@ export type TitleTrigger =
    */
   | {
       readonly kind: "lane"
-      readonly lane: LaneName
+      readonly lane: ThreadId
       readonly at: Position
       readonly prompt: { readonly author: string; readonly text: string }
     }

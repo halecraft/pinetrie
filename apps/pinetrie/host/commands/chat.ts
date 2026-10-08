@@ -9,11 +9,11 @@ import {
   baseKnown,
   ERR,
   type Intent,
-  type LaneName,
-  laneNameForThread,
-  type PlanMode,
+  planModeOf,
+  type SendAt,
   type SentCard,
-  threadOf,
+  type ThreadId,
+  threadOfSend,
   type WriterId,
 } from "@pinetrie/core"
 import type { Agent, PiSetup, Scribe } from "@pinetrie/pi"
@@ -22,7 +22,6 @@ import {
   type RootView,
   readAccepted,
   readBases,
-  readLaneRecords,
   readLanes,
   readOffers,
   readParticipantNames,
@@ -45,16 +44,20 @@ import {
   planChat,
   planImages,
   resolveCommand,
+  setRecord,
+  THREAD,
 } from "@pinetrie/rules"
 import type { Basics } from "../basics.ts"
 import type { CardPort } from "../cards.ts"
+import type { Names } from "../names.ts"
+import type { Records } from "../records.ts"
 import type { Runs } from "../runs.ts"
 import type { Titles } from "../titles.ts"
 import type { LaneWork } from "../work/index.ts"
 
 /** A chat to send: a `chat` command's, or a popped queued card's, in mode `queue`. */
-export type Chat = Omit<Extract<Intent, { kind: "chat" }>, "kind" | "mode"> & {
-  readonly mode: PlanMode
+export type Chat = Omit<Extract<Intent, { kind: "chat" }>, "kind" | "at"> & {
+  readonly at: SendAt
 }
 
 export interface ChatDeps {
@@ -74,6 +77,10 @@ export interface ChatDeps {
   readonly start: Runs["start"]
   /** A new lane may title its root (ADR-0074). */
   readonly titles: Pick<Titles, "laneStarted">
+  /** A thread's record, written with its first message (ADR-0117). */
+  readonly records: Pick<Records, "writeValues">
+  /** Every thread is named once recorded (ADR-0117). */
+  readonly names: Pick<Names, "ensure">
 }
 
 /** What `executeChat` needs besides the decision: the facts the send was planned from. */
@@ -96,7 +103,7 @@ export const spendsCard = (sent: Outcome): boolean =>
   sent.kind === "appended" || sent.kind === "started"
 
 /**
- * Gather, `threadOf` and `planChat`, then `executeChat`. A message sent from
+ * Gather, `threadOfSend` and `planChat`, then `executeChat`. A message sent from
  * a card carries its other writers as contributors ("Ada, with Bea"). It
  * spends nothing: whether the card goes is the caller's (`spendsCard`).
  */
@@ -109,11 +116,15 @@ export async function sendChat(
   caughtUp = false,
 ): Promise<Outcome> {
   const { work, blobs, cards } = deps
-  const { docs, session, live, newId } = deps.basics
+  const { docs, session, live } = deps.basics
 
   // A thread at the root starts a root (ADR-0063), under the id its tab
   // minted: one the session already holds is another's.
-  if (chat.at.kind === "root" && readRoots(session).has(chat.root))
+  if (
+    chat.at.kind === "branch" &&
+    chat.at.at === null &&
+    readRoots(session).has(chat.root)
+  )
     return {
       kind: "refused",
       code: ERR.ROOT_ID_IN_USE,
@@ -138,32 +149,34 @@ export async function sendChat(
   const blank = await cards.blankQueued(placed)
 
   // plan (pure)
-  const thread = threadOf(
+  const thread = threadOfSend(
     index,
     readLanes(view, index, placed, readQueueHolds(session), blank),
-    {
-      at: chat.at,
-      mode: chat.mode,
-      lane: chat.lane,
-      me: writer,
-    },
+    { at: chat.at, me: writer },
   )
-  // An entry or lane this document does not hold has nowhere to go: refused
+  // A thread or entry this document does not hold has nowhere to go: refused
   // before anything is written, as pi would refuse a lane there.
   if (thread.kind === "unknown") {
     return {
       kind: "refused",
       code: ERR.UNKNOWN_TARGET,
-      message: "no such entry or lane to write at",
+      message: "no such thread or entry to write at",
     }
   }
-  // Two lanes end here for a moment (a new one, just branched): which thread
-  // the sender meant cannot be told, so they are asked, as for a race.
-  if (thread.kind === "ambiguous") return { kind: "conflict", by: null }
+  // A branch starts a new thread: one with an entry or a lane is another's.
+  if (thread.kind === "taken")
+    return {
+      kind: "refused",
+      code: ERR.LANE_ID_IN_USE,
+      message: "that thread has started already",
+    }
   // A thread that works, or will work, in its own copy is sent paths as
   // its lane sees them: your working copy's (ADR-0034), and a command's
   // files (ADR-0036).
-  const own = worksOwn(view.session, { lane: thread.lane, mode: chat.mode })
+  const own = worksOwn(view.session, {
+    lane: thread.lane,
+    mode: planModeOf(chat.at),
+  })
   // gather: the command its first word names, from its file as it is now
   const typed = parseCommand(chat.text)
   const source =
@@ -216,20 +229,12 @@ export async function sendChat(
     author: writer,
     authorName: nameOf(writer),
     text: chat.text,
-    mode: chat.mode,
     at: chat.at,
     thread,
     mentions: chat.mentions,
     participants: readParticipants(session, index),
     asksAgent: chat.asksAgent,
     sendId,
-    // The ids a lane this creates may take (ADR-0057): the column's, unless
-    // pi holds it, else a new one.
-    newLane: {
-      reserved: chat.reserved,
-      held: new Set(readLaneRecords(session).keys()),
-      spare: laneNameForThread(newId()),
-    },
     contributors,
   })
 
@@ -256,7 +261,7 @@ async function catchUpFirst(
   writer: WriterId,
   sendId: string,
   chat: Chat,
-  lane: LaneName,
+  lane: ThreadId,
 ): Promise<Outcome> {
   const prepared = await deps.work.prepareUpdate(
     deps.agent.lane(lane),
@@ -296,6 +301,25 @@ export async function executeChat(
   const { view, writer } = context
   const { root } = view
   const message = (details: ChatDetails) => encodeChat(details, now())
+  // A thread's first message: its record first, so a reader that finds the
+  // message finds its thread's root (ADR-0117).
+  if (
+    (planned.kind === "appendToTree" || planned.kind === "createAndRun") &&
+    planned.details.starts !== undefined
+  ) {
+    await deps.records.writeValues([
+      setRecord(THREAD, {
+        thread: planned.details.starts,
+        root,
+        by: writer,
+        createdAt: now(),
+        fork: null,
+      }),
+    ])
+    // A conversation's thread is named once its record is (ADR-0117); a new
+    // lane's is named as its lane is made, which draws its banner.
+    if (planned.kind === "appendToTree") void deps.names.ensure()
+  }
   switch (planned.kind) {
     case "refused":
     case "conflict":

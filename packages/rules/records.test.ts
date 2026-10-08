@@ -6,7 +6,6 @@ import {
   cardId,
   commitId,
   entryId,
-  laneNameForThread,
   type OfferRecord,
   type RootRecord,
   rootIdFor,
@@ -14,6 +13,7 @@ import {
   type Sha256,
   snapshotId,
   type ThreadName,
+  threadIdFor,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -52,7 +52,7 @@ import {
 } from "./index.ts"
 
 const ADA = writerId("ada@x.io")
-const L = laneNameForThread("1")
+const L = threadIdFor("1")
 const E = entryId("e-1")
 const C = commitId("c1")
 
@@ -116,7 +116,7 @@ const SAMPLES: readonly Sample[] = [
     WORKFLOW,
     {
       open: [{ id: workflowStateIdFor("1"), name: "Doing" }],
-      closed: { id: workflowStateIdFor("2"), name: "Done" },
+      archive: { id: workflowStateIdFor("2"), name: "Done" },
     },
     null,
   ),
@@ -481,7 +481,7 @@ describe("every spec, and writes by document", () => {
   test("byTarget groups writes by their document, in the order each first appears", () => {
     const root = rootIdFor("r-1")
     const name = setRecord(NAME, {
-      lane: laneNameForThread("t-1"),
+      lane: threadIdFor("t-1"),
       name: "amber-fox" as ThreadName,
       at: 1,
     })

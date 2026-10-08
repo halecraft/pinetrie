@@ -23,10 +23,10 @@ export function tracesAt(
   traces: Iterable<TraceRecord>,
   me: WriterId,
   end: EntryId,
-  endOf: (from: PlaceKey, placer: WriterId) => EntryId | null,
+  endOf: (from: PlaceKey) => EntryId | null,
 ): readonly TraceRecord[] {
   return [...traces]
-    .filter(t => t.for === me && endOf(t.from, t.for) === end)
+    .filter(t => t.for === me && endOf(t.from) === end)
     .sort((a, b) => a.at - b.at)
 }
 

@@ -11,7 +11,6 @@
 import {
   changesOf,
   type DescribeDecision,
-  type LaneName,
   type OfferAcceptanceDecision,
   type OfferRecord,
   type OfferSource,
@@ -19,6 +18,7 @@ import {
   type Placed,
   type Rebuild,
   type RefreshDecision,
+  type ThreadId,
   type ThreadName,
 } from "@pinetrie/core"
 import {
@@ -33,7 +33,7 @@ import type { RepoStep } from "./step.ts"
 
 /** Who an offer's messages name: the host's trailers (`offerMessage`). */
 export interface OfferAt {
-  readonly lane: LaneName
+  readonly lane: ThreadId
   readonly name: ThreadName
   /** The lane's tip entry, for `Pinetrie-Entry`. */
   readonly entry: string

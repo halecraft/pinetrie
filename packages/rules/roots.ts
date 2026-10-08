@@ -9,11 +9,11 @@
 import {
   type EntryId,
   entryId,
-  isLaneName,
-  type LaneName,
+  isThreadId,
   type RootId,
   type RootRecord,
   type Sha256,
+  type ThreadId,
   type WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
@@ -44,10 +44,10 @@ const idOrNull = (id: string | null): EntryId | null =>
 /** Each thread's writers, a key that is no lane name dropped. */
 const threadsOf = (
   threads: Readonly<Record<string, readonly string[]>> | undefined,
-): Readonly<Record<LaneName, readonly WriterId[]>> =>
+): Readonly<Record<ThreadId, readonly WriterId[]>> =>
   Object.fromEntries(
     Object.entries(threads ?? {}).flatMap(([lane, writers]) =>
-      isLaneName(lane) ? [[lane, writers as WriterId[]]] : [],
+      isThreadId(lane) ? [[lane, writers as WriterId[]]] : [],
     ),
   )
 

@@ -1,27 +1,27 @@
 import {
   type AgentRun,
   entryId,
-  type LaneName,
-  laneNameForThread,
   type StreamRecord,
   streamId,
+  type ThreadId,
+  threadIdFor,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { callStreams, liveWork } from "./live.ts"
 
-const L = laneNameForThread("l")
-const M = laneNameForThread("m")
+const L = threadIdFor("l")
+const M = threadIdFor("m")
 const run = (lane: typeof L, tip: string): AgentRun => ({
   lane,
   tip: entryId(tip),
 })
-const reply = (id: string, lane: LaneName, under: string): StreamRecord => ({
+const reply = (id: string, lane: ThreadId, under: string): StreamRecord => ({
   id: streamId(id),
   lane,
   kind: "reply",
   under: entryId(under),
 })
-const tool = (id: string, lane: LaneName, callId: string): StreamRecord => ({
+const tool = (id: string, lane: ThreadId, callId: string): StreamRecord => ({
   id: streamId(id),
   lane,
   kind: "tool",

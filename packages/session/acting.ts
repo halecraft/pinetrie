@@ -8,8 +8,8 @@
 import type {
   AcceptedAction,
   ErrCode,
-  LaneName,
   OfferAction,
+  ThreadId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import type { SnapshotStore } from "./store.ts"
@@ -81,7 +81,7 @@ export function nextActing<A>(
 
 /** Every command of yours this tab has out or was refused: per lane, and accepted work. */
 export interface ActingState {
-  readonly offers: ReadonlyMap<LaneName, OfferActing>
+  readonly offers: ReadonlyMap<ThreadId, OfferActing>
   readonly accepted: AcceptedActing | null
 }
 
@@ -91,7 +91,7 @@ export const NO_ACTING: ActingState = { offers: new Map(), accepted: null }
 type ActingOn =
   | {
       readonly kind: "offer"
-      readonly lane: LaneName
+      readonly lane: ThreadId
       readonly event: ActingEvent<OfferAction>
     }
   | { readonly kind: "accepted"; readonly event: ActingEvent<AcceptedAction> }
@@ -111,7 +111,7 @@ function actingStep(state: ActingState, on: ActingOn): ActingState {
 export type ActingCommand =
   | {
       readonly kind: "offer"
-      readonly lane: LaneName
+      readonly lane: ThreadId
       readonly action: OfferAction
       readonly to: string | null
     }

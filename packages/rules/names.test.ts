@@ -1,4 +1,4 @@
-import { laneNameForThread, type ThreadName } from "@pinetrie/core"
+import { type ThreadName, threadIdFor } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   NAME,
@@ -10,7 +10,7 @@ import {
 } from "./index.ts"
 import { ADJECTIVES, NOUNS, threadNameFor } from "./names.ts"
 
-const lane = (id: string) => laneNameForThread(id)
+const lane = (id: string) => threadIdFor(id)
 const A = lane("01a0ed41-5f73-7461-b1ae-4572a17a15f3")
 const B = lane("01a0ed45-4157-7461-b1ae-45f9bfeb4818")
 

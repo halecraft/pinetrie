@@ -17,7 +17,6 @@ import {
   type DiffSpan,
   type EntryId,
   firstLine,
-  type LaneName,
   type LaneRecord,
   type LaneView,
   messageText,
@@ -30,6 +29,7 @@ import {
   promptOf,
   type RevisionRecord,
   type RootId,
+  type ThreadId,
   type ThreadLane,
   type ThreadName,
   type TreeIndex,
@@ -83,18 +83,18 @@ export interface WorkFacts {
   readonly project: ProjectRecord | null
   /** The commands the host's pi loaded (ADR-0036). */
   readonly commands: readonly CommandSummary[]
-  readonly lanes: ReadonlyMap<LaneName, LaneRecord>
+  readonly lanes: ReadonlyMap<ThreadId, LaneRecord>
   readonly revisions: ReadonlyMap<EntryId, RevisionRecord>
   /** Each lane's offer in your repo (ADR-0105). */
-  readonly offers: ReadonlyMap<LaneName, OfferRecord>
+  readonly offers: ReadonlyMap<ThreadId, OfferRecord>
   /** Each lane's name (ADR-0039). */
-  readonly names: ReadonlyMap<LaneName, ThreadName>
+  readonly names: ReadonlyMap<ThreadId, ThreadName>
   /** Each thread's column banner. */
-  readonly banners: ReadonlyMap<LaneName, BannerRecord>
+  readonly banners: ReadonlyMap<ThreadId, BannerRecord>
   /** Accepted work, as the host last read it (ADR-0104). */
   readonly accepted: AcceptedRecord | null
   /** Each lane's base, as its history says it (ADR-0104). */
-  readonly bases: ReadonlyMap<LaneName, BaseRecord>
+  readonly bases: ReadonlyMap<ThreadId, BaseRecord>
 }
 
 /**
@@ -105,9 +105,9 @@ const parentOfLane = (
   index: TreeIndex,
   work: Pick<WorkFacts, "revisions" | "names">,
   lanes: readonly LaneView[],
-  lane: LaneName,
+  lane: ThreadId,
 ): ParentNow | null => {
-  const tipOf = (name: LaneName) =>
+  const tipOf = (name: ThreadId) =>
     lanes.find(l => l.name === name)?.tip ?? null
   return parentNow({
     index,
@@ -124,7 +124,7 @@ const parentOfLane = (
 /** A run of a path worked by one lane, from the asked message that started it. */
 export interface LaneStretch {
   readonly start: EntryId
-  readonly lane: LaneName
+  readonly lane: ThreadId
 }
 
 /**
@@ -138,7 +138,7 @@ export function lanesAlong(
   index: TreeIndex,
   tip: EntryId | null,
   revisions: ReadonlyMap<EntryId, RevisionRecord>,
-  lane: LaneName | null,
+  lane: ThreadId | null,
 ): readonly LaneStretch[] {
   const path = ancestry(index, tip).path
   const stretches: LaneStretch[] = []
@@ -267,14 +267,14 @@ export interface ColumnFacts {
   /** Every ask (`indexAsks`), from the same moment as `index`. */
   readonly asks: AskIndex
   readonly view: ColumnView
-  /** The column's thread's lane (`threadOf`). */
+  /** The column's thread's lane (`laneOf`). */
   readonly lane: ThreadLane
   /** The composer's next send would create a lane. */
   readonly createsLane: boolean
   /** The reader has the thread's details open (`Column.details`). */
   readonly detailsOpen: boolean
-  /** The id this column reserved for the lane its next send creates (ADR-0057). */
-  readonly reserved: LaneName | null
+  /** The column's thread (ADR-0117); null for a column not yet settled on one. */
+  readonly thread: ThreadId | null
   /** The banner's URL as the column mounted (`bannerUrl`), or null. */
   readonly mountedBanner: string | null
   readonly writable: boolean
@@ -306,28 +306,26 @@ export interface ColumnShows {
 }
 
 /**
- * How a column whose next send creates a lane gets its thread named before
- * the send (ADR-0057). Asking again is harmless: the host does nothing for an
- * id it has named.
+ * How a column gets its thread named before its first send (ADR-0057,
+ * ADR-0117). Asking again is harmless: the host does nothing for an id it has
+ * named.
  */
 export type ReserveStep =
   | { readonly kind: "none" }
-  /** Keep a new lane id on the column. */
-  | { readonly kind: "mint" }
-  /** Ask the host to name the thread under `lane`. */
-  | { readonly kind: "ask"; readonly lane: LaneName }
+  /** Ask the host to name the thread `lane`. */
+  | { readonly kind: "ask"; readonly lane: ThreadId }
 
 /**
  * The lane whose name and banner the header shows: the thread's, or the one
- * this column's next send creates, by its reserved id.
+ * this column's next send creates, named by the thread's id.
  */
 export function headLane(
   lane: ThreadLane,
   createsLane: boolean,
-  reserved: LaneName | null,
-): LaneName | null {
+  thread: ThreadId | null,
+): ThreadId | null {
   if (lane.kind === "lane") return lane.name
-  return createsLane ? reserved : null
+  return createsLane ? thread : null
 }
 
 export function columnView(f: ColumnFacts): ColumnShows {
@@ -338,7 +336,7 @@ export function columnView(f: ColumnFacts): ColumnShows {
     work.revisions,
     lane.kind === "lane" ? lane.name : null,
   )
-  const head = headLane(lane, f.createsLane, f.reserved)
+  const head = headLane(lane, f.createsLane, f.thread)
   const behind = behindMark(
     head === null ? undefined : work.bases.get(head),
     work.accepted,
@@ -382,23 +380,28 @@ export function behindMark(
 }
 
 /**
- * Only where the thread has no lane: `createsLane` is the composer's report,
- * a render behind, so a column that has just bound to its lane may still
- * carry it.
+ * Only where the next send creates the thread's lane: a conversation's thread
+ * is named by the host as its first message is recorded, and draws no
+ * banner. `createsLane` is the composer's report, a render behind, so a
+ * column whose thread has just got its lane may still carry it.
  */
 function reserveStep(f: ColumnFacts): ReserveStep {
-  if (!f.writable || !f.createsLane || f.lane.kind !== "none")
+  if (
+    !f.writable ||
+    f.thread === null ||
+    !f.createsLane ||
+    f.lane.kind !== "none"
+  )
     return { kind: "none" }
-  if (f.reserved === null) return { kind: "mint" }
-  return f.work.names.has(f.reserved)
+  return f.work.names.has(f.thread)
     ? { kind: "none" }
-    : { kind: "ask", lane: f.reserved }
+    : { kind: "ask", lane: f.thread }
 }
 
 /** The banner of the thread `headLane` gives, as a URL; null for none. */
 export function bannerUrl(
-  lane: LaneName | null,
-  banners: ReadonlyMap<LaneName, BannerRecord>,
+  lane: ThreadId | null,
+  banners: ReadonlyMap<ThreadId, BannerRecord>,
 ): string | null {
   const banner = lane === null ? undefined : banners.get(lane)
   return banner === undefined ? null : blobUrl(banner.sha)
@@ -445,9 +448,9 @@ export const detailsTitle = (open: boolean): string =>
 
 /** `head` is `headLane`'s. Only a named agent carries `details`. */
 function identityOf(
-  head: LaneName | null,
+  head: ThreadId | null,
   createsLane: boolean,
-  names: ReadonlyMap<LaneName, ThreadName>,
+  names: ReadonlyMap<ThreadId, ThreadName>,
   details: ThreadDetails,
 ): HeadIdentity {
   if (head === null) return createsLane ? { kind: "pending" } : { kind: "none" }
@@ -462,7 +465,7 @@ function identityOf(
  */
 function detailsOf(
   f: ColumnFacts,
-  head: LaneName | null,
+  head: ThreadId | null,
   stretches: readonly LaneStretch[],
   behind: ColumnShows["behind"],
 ): ThreadDetails {
@@ -518,7 +521,7 @@ function originOf(
 function joinsOf(
   view: ColumnView,
   stretches: readonly LaneStretch[],
-  names: ReadonlyMap<LaneName, ThreadName>,
+  names: ReadonlyMap<ThreadId, ThreadName>,
 ): ReadonlyMap<EntryId, LaneJoin> {
   const shown = new Set(view.nodes.map(n => n.id))
   const joins = new Map<EntryId, LaneJoin>()
@@ -834,9 +837,10 @@ export function joinWords(join: LaneJoin): string {
  * a new tab: a column there has no end yet.
  */
 export function composerPlace(
-  column: Pick<Column, "key" | "fresh" | "lane">,
+  column: Pick<Column, "key" | "fresh" | "thread">,
   at: Position,
   root: RootId | undefined,
+  lanes: readonly LaneView[],
 ): CardPlace | null {
   if (column.fresh !== undefined) {
     const its = column.fresh.root ?? root
@@ -845,7 +849,16 @@ export function composerPlace(
       : { kind: "fresh", column: column.key, root: its, at }
   }
   return at.kind === "entry" && root !== undefined
-    ? { kind: "composing", root, at, lane: column.lane ?? null }
+    ? {
+        kind: "composing",
+        root,
+        at,
+        lane:
+          column.thread !== undefined &&
+          lanes.some(l => l.name === column.thread)
+            ? column.thread
+            : null,
+      }
     : null
 }
 

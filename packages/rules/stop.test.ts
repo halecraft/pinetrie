@@ -9,9 +9,9 @@ import {
   indexAsks,
   indexTree,
   type LaneView,
-  laneNameForThread,
   rootIdFor,
   type StopRecord,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
@@ -35,7 +35,7 @@ describe("planStop", () => {
   const i = indexTree({ [prompt.id]: prompt, [work.id]: work })
   const ada = writerId("ada")
   const lane = (running: boolean) => ({
-    name: laneNameForThread("s"),
+    name: threadIdFor("s"),
     tip: entryId("2-a"),
     running,
     waiting: 0,
@@ -62,7 +62,7 @@ describe("planStop", () => {
     })
   })
   test("with a message card queued, a stop holds the queue, so the run's end sends nothing (ADR-0048 step 7)", () => {
-    const name = laneNameForThread("s")
+    const name = threadIdFor("s")
     const queued: QueuedCard = {
       id: cardId("c-1"),
       owner: ada,
@@ -100,7 +100,7 @@ describe("planStop", () => {
 })
 
 describe("carrying on (ADR-0082)", () => {
-  const s = laneNameForThread("s")
+  const s = threadIdFor("s")
   const ada = writerId("ada")
   /** A lane over a chain of messages, oldest first: its tip is the last. */
   const over = (

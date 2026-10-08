@@ -8,9 +8,9 @@ import {
   entryId,
   indexTree,
   type LaneBase,
-  laneNameForThread,
   type RevisionRecord,
   type ThreadName,
+  threadIdFor,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
@@ -361,8 +361,8 @@ describe("planBegin: accepted work, or a WIP's copy (ADR-0104)", () => {
 })
 
 describe("parentNow and planParentUpdate: the thread a lane branched from (ADR-0072)", () => {
-  const P = laneNameForThread("p")
-  const L = laneNameForThread("l")
+  const P = threadIdFor("p")
+  const L = threadIdFor("l")
   const C = (n: number) => commitId(`c${n}`)
   const node = (
     id: string,

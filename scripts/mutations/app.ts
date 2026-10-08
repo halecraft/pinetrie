@@ -719,8 +719,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a root's drag lands nowhere",
     file: "packages/web/use-root-drag.ts",
-    from: "      if (closed === null || landing === null) return mark(null)\n      e.preventDefault()\n",
-    to: "      if (closed === null || landing === null) return mark(null)\n",
+    from: "      if (archive === null || landing === null) return mark(null)\n      e.preventDefault()\n",
+    to: "      if (archive === null || landing === null) return mark(null)\n",
     suite: "browser",
     scenario: "page",
     expect:
@@ -1136,7 +1136,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the footer's states take no card",
     file: "packages/web/board.tsx",
-    from: '      {...(state.closed ? {} : dropProps({ kind: "state", state: state.id }))}',
+    from: '      {...(state.archive ? {} : dropProps({ kind: "state", state: state.id }))}',
     to: "      {...{}}",
     suite: "browser",
     scenario: "page",
@@ -1489,8 +1489,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the marks are given no archived roots",
     file: "packages/web/app.tsx",
-    from: "        archived: archivedRoots,\n        lanes,",
-    to: "        archived: new Set(),\n        lanes,",
+    from: "        archived: archivedRoots,\n        index,\n        rootEntries,",
+    to: "        archived: new Set(),\n        index,\n        rootEntries,",
     suite: "browser",
     scenario: "page",
     expect: "an archived root holding your card marks its thread card, not ▦",
@@ -1508,8 +1508,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a started root is never placed",
     file: "apps/pinetrie/host/commands/index.ts",
-    from: '        if (intent.at.kind === "root" && spendsCard(sent))',
-    to: '        if (intent.at.kind === "root" && spendsCard(sent) && false)',
+    from: "        if (startsRoot(intent.at) && spendsCard(sent))",
+    to: "        if (startsRoot(intent.at) && spendsCard(sent) && false)",
     suite: "host",
     scenario: "board",
     expect:
@@ -1519,7 +1519,7 @@ export const mutations: readonly Mutation[] = [
     name: "a root moved out of Done keeps its place there",
     file: "apps/pinetrie/host/commands/board.ts",
     from: "  // execute\n  await deps.records.writeValues(writes)\n",
-    to: '  // execute\n  if (moved.transition === "close") await deps.records.writeValues(writes)\n',
+    to: '  // execute\n  if (moved.transition === "archive") await deps.records.writeValues(writes)\n',
     suite: "host",
     scenario: "board",
     expect:
@@ -1686,9 +1686,9 @@ export const mutations: readonly Mutation[] = [
       "a new agent is named before anything is typed, and its lane keeps that name",
   },
   {
-    name: "the wire drops a chat's reserved lane",
-    file: "packages/protocol/line.ts",
-    from: "  reserved: Schema.string(),\n",
+    name: "a column never asks for its thread's name",
+    file: "packages/web/column.tsx",
+    from: '      void p.session.request({ kind: "reserve", lane: step.lane })\n',
     to: "",
     suite: "browser",
     scenario: "page",
@@ -2096,7 +2096,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a column draws no notes",
     file: "packages/web/column.tsx",
-    from: '      : cardsAt("note", threadEnd, p.cards, p.lanes, index)',
+    from: '      : cardsAt("note", threadEnd, p.cards, index)',
     to: "      : []",
     suite: "browser",
     scenario: "page",

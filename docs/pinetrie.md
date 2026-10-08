@@ -227,7 +227,7 @@ the root declares only tooling, so a package can import only what it declares.
 `workspace.test.ts` checks the manifests. See `docs/01-architecture.md`.
 
 **ADRs are encoded as types where possible.** Entry ids, run ids and lane
-names are branded (`EntryId`, `RunId`, `LaneName`), so a swapped argument is
+names are branded (`EntryId`, `RunId`, `ThreadId`), so a swapped argument is
 a compile error. They are minted where they enter: the protocol codec, the
 reads (`renderableEntry`), the schema's readers, `@pinetrie/rules`' decoders, a
 commit's trailer (`packages/lanes`), the pi adapter, the client's stored forms,

@@ -20,8 +20,8 @@ import { yjs } from "@kyneta/yjs-schema"
 import {
   type EntryId,
   entryId,
-  isLaneName,
-  type LaneName,
+  isThreadId,
+  type ThreadId,
 } from "@pinetrie/core"
 
 export const AttentionDoc = yjs.bind(
@@ -63,20 +63,20 @@ export interface Attention {
   readonly since: string
   /** "" before the first write. */
   readonly mentionsSince: string
-  readonly read: ReadonlyMap<LaneName, EntryId>
-  readonly dismissed: ReadonlyMap<LaneName, EntryId>
+  readonly read: ReadonlyMap<ThreadId, EntryId>
+  readonly dismissed: ReadonlyMap<ThreadId, EntryId>
   /** Lane to the offer's `ledger.source`, a commit id. */
-  readonly dismissedOffers: ReadonlyMap<LaneName, string>
+  readonly dismissedOffers: ReadonlyMap<ThreadId, string>
   readonly seen: ReadonlySet<string>
 }
 
 const byLane = <V>(
   record: Readonly<Record<string, string>>,
   value: (s: string) => V,
-): ReadonlyMap<LaneName, V> =>
+): ReadonlyMap<ThreadId, V> =>
   new Map(
     Object.entries(record).flatMap(([lane, v]) =>
-      isLaneName(lane) ? [[lane, value(v)] as const] : [],
+      isThreadId(lane) ? [[lane, value(v)] as const] : [],
     ),
   )
 

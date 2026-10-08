@@ -18,10 +18,10 @@ import {
   type CardCommand,
   type CardId,
   type CardRecord,
+  type ChatMode,
   cardId,
   type EntryId,
   entryId,
-  type LaneName,
   type LaneView,
   moveOf,
   noteOf,
@@ -29,7 +29,9 @@ import {
   queueRoot,
   ROOT,
   type RootId,
+  type ThreadId,
   type TreeIndex,
+  threadAt,
 } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
 import type { Outcome } from "@pinetrie/protocol/codec"
@@ -58,8 +60,11 @@ import {
   type StoredEntryRow,
 } from "@pinetrie/schema"
 import {
+  type ChatHow,
   type ConnectOptions,
+  chatAtOf,
   connectSession,
+  newThreadId,
   type SessionClient,
 } from "@pinetrie/session"
 import {
@@ -71,6 +76,13 @@ import {
 /** A message's position, or the root's for null. */
 export const at = (id: string | null): Position =>
   id === null ? ROOT : atEntry(entryId(id))
+
+/** How a scenario's client sends a message (`join`'s `chat`). */
+export type ScenarioHow = ChatHow & {
+  readonly mode?: ChatMode
+  /** The thread it starts or continues; else a new one, or its entry's. */
+  readonly thread?: ThreadId
+}
 
 /** How the two starts send at the root (ADR-0021), and a branch's. */
 export const START_AGENT = { mode: "branch", asksAgent: true } as const
@@ -153,7 +165,7 @@ export const join = async (
   name: string,
   scenario: string,
   options: Partial<Omit<ConnectOptions, "url" | "principal">> = {},
-): Promise<SessionClient> => {
+): Promise<ScenarioClient> => {
   const client = await connectSession({
     url: host.wsUrl,
     WebSocket,
@@ -170,15 +182,44 @@ export const join = async (
       : rootHeldWithin(client, at.id, 10_000)
   const { chat, mark } = client
   return Object.assign(client, {
-    chat: async (...args: Parameters<SessionClient["chat"]>) => {
-      await holds(args[1])
-      return chat(...args)
+    /**
+     * A message as a column sends it, from where a scenario reads: a branch
+     * (or a send at the root) starts a thread under a new id, or `thread`;
+     * a reply continues the thread its entry is in, or `thread`.
+     */
+    chat: async (
+      text: string,
+      at: Position,
+      how: ScenarioHow = {},
+    ): Promise<Outcome> => {
+      await holds(at)
+      const { mode, thread, ...rest } = how
+      const branch = mode === "branch" || at.kind === "root"
+      const resolved =
+        thread ??
+        (branch
+          ? newThreadId()
+          : (threadAt(treeOf(client), at.id) ?? newThreadId()))
+      return chat(
+        text,
+        chatAtOf(branch ? "branch" : "reply", resolved, at),
+        rest,
+      )
     },
     mark: async (...args: Parameters<SessionClient["mark"]>) => {
       await holds({ kind: "entry", id: args[0] })
       return mark(...args)
     },
   })
+}
+
+/** A session client whose `chat` sends as a column would (`join`). */
+export type ScenarioClient = Omit<SessionClient, "chat"> & {
+  readonly chat: (
+    text: string,
+    at: Position,
+    how?: ScenarioHow,
+  ) => Promise<Outcome>
 }
 
 /**
@@ -347,10 +388,13 @@ export const lanesOf = (
 /** Every lane name pi holds, in the roots `x` holds. */
 export const laneNamesOf = (
   x: Parameters<typeof held>[0],
-): readonly LaneName[] => held(x).roots.flatMap(readLaneNames)
+): readonly ThreadId[] => held(x).roots.flatMap(readLaneNames)
 
 /** `id` as `client` draws it now; a scenario that names a card expects it there. */
-function drawnCard(client: SessionClient, id: CardId): CardRecord {
+function drawnCard(
+  client: Omit<SessionClient, "chat">,
+  id: CardId,
+): CardRecord {
   const card = client.cards.current().find(c => c.id === id)
   if (card === undefined)
     throw new Error(`${client.writer} draws no card ${id}`)
@@ -358,14 +402,14 @@ function drawnCard(client: SessionClient, id: CardId): CardRecord {
 }
 
 /**
- * Move the root whose root entry is `entry` to the closed workflow state, or
+ * Move the root whose root entry is `entry` to the archive, or
  * out of it to the first open one, as the board does (ADR-0122): archive or
  * restore it. The state it is in is read from `client`'s copy of the board.
  */
 export function moveRootTo(
   client: Pick<SessionClient, "session" | "request">,
   entry: EntryId,
-  to: "closed" | "open",
+  to: "archive" | "open",
 ): Promise<Outcome> {
   const workflow = readWorkflow(client.session)
   const root = [...readRoots(client.session).values()].find(
@@ -379,7 +423,7 @@ export function moveRootTo(
     kind: "move-root",
     root,
     from,
-    to: to === "closed" ? workflow.closed.id : first.id,
+    to: to === "archive" ? workflow.archive.id : first.id,
     before: null,
   })
 }
@@ -390,9 +434,9 @@ export function moveRootTo(
  * version as `client` has it (S96). Throws for a card with no position.
  */
 export function queueCard(
-  client: SessionClient,
+  client: Omit<SessionClient, "chat">,
   id: CardId,
-  lane: LaneName,
+  lane: ThreadId,
 ): ReturnType<SessionClient["queueCard"]> {
   const card = drawnCard(client, id)
   if (!("at" in card.place))
@@ -408,7 +452,7 @@ export function queueCard(
 
 /** Take queued card `id` back below the line, as a column's unqueue does. */
 export function unqueueCard(
-  client: SessionClient,
+  client: Omit<SessionClient, "chat">,
   id: CardId,
 ): ReturnType<SessionClient["moveCard"]> {
   const card = drawnCard(client, id)
@@ -425,7 +469,7 @@ export function unqueueCard(
  * scenario's session reads and writes in any root, as a page holds the roots
  * of its tabs (ADR-0063).
  */
-export function holdEvery(client: SessionClient): () => void {
+export function holdEvery(client: Omit<SessionClient, "chat">): () => void {
   const follow = () =>
     client.holdRoots(new Set(readRoots(client.session).keys()))
   follow()
@@ -435,7 +479,7 @@ export function holdEvery(client: SessionClient): () => void {
 /** A lane's tip, in whichever root `x` holds it. */
 export const tipIn = (
   x: Parameters<typeof held>[0],
-  lane: LaneName,
+  lane: ThreadId,
 ): EntryId | null => {
   for (const doc of held(x).roots)
     if (hasLaneRecord(doc, lane)) return readLaneTip(doc, lane)
@@ -515,7 +559,7 @@ export async function composeAt(
   client: Pick<SessionClient, "rootOf" | "createCard">,
   place: {
     readonly entry: EntryId | null
-    readonly lane: LaneName | null
+    readonly lane: ThreadId | null
     readonly command?: CardCommand | null
   },
   text: string,

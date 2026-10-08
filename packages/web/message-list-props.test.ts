@@ -1,4 +1,4 @@
-import type { EntryId, LaneName } from "@pinetrie/core"
+import type { EntryId, ThreadId } from "@pinetrie/core"
 import { entryId } from "@pinetrie/core"
 import {
   type ColumnView,
@@ -16,7 +16,7 @@ import {
 const view: ColumnView = { tipId: entryId("e2"), forkFrom: null, nodes: [] }
 const lane = (running = false): MessageListProps["lane"] => ({
   kind: "lane",
-  name: "lane-1" as LaneName,
+  name: "lane-1" as ThreadId,
   tip: entryId("e2"),
   running,
   waiting: 0,

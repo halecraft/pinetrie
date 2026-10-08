@@ -52,7 +52,7 @@ page's (`storage-keys.ts`, `tab-state.ts`, `same-props.ts`, `colors.ts`).
   `ask-segments.ts` (`segmentPath`, `askStats`); `presence.ts` reads who
   else is here. Core keeps what its own exports use: `projectRail`, since
   `summarizeRoots` counts a root's messages by its rows, `projectSpine`,
-  `followTip` and the tree's reads. A capsule's span is the client's
+  `threadEnd` and the tree's reads. A capsule's span is the client's
   (`compactRail`'s `spanOf`, the page's `stretchSpan`); a long ask is core's
   (`LONG_ASK`), since the host digests it.
 - **The projections stay separate functions** (`projectColumns`, `pathIds`,
@@ -111,7 +111,7 @@ whose selector changes with the cards. `resolveLayout` takes the index, the
 lanes and the archive together.
 
 **Ids arrive branded.** Every entry id the client holds came from the reads
-as an `EntryId`, and every lane as a `LaneName` (`packages/reads/TECHNICAL.md`),
+as an `EntryId`, and every lane as a `ThreadId` (`packages/reads/TECHNICAL.md`),
 so the client never mints one but where an id comes back in from elsewhere:
 its stored form (`layout.ts`'s `decodeLayout`), your attention document
 (`readAttention`, in `@pinetrie/schema`), and ids read back from the page (`use-ask-bar.ts`, from `data-ask-of`; `root-target.ts`, from a root's drag and its drop marks).
@@ -255,7 +255,7 @@ and each item's signals.
   and while the board is open, the search field, its × and "mine" (which
   stand in the state buttons' place then, ADR-0115) keep it open.
 - **Moving a root on the board** is a `moveRoot` effect: the host's
-  `move-root`, and, into the closed state, the effects that close it for you
+  `move-root`, and, into the archive, the effects that close it for you
   (`moved`), which `afterRootMove` runs only once the host answers
   `moved-root`, as `afterKeep` does for a keep.
 - **`hereOfColumn` is the one lookup from a column's key to where it is**: a
@@ -275,11 +275,11 @@ and each item's signals.
   new tab opened from a board column keeps that column's state
   (`fresh.state`), which its first send carries (`ChatHow.state`).
 - **A new tab mints its root's id as it opens** (`fresh.root`, ADR-0066),
-  from the shell, beside its key (`planIntent`'s `newRoot`), as a column
-  reserves its lane's id. Its cards' fresh places name it, the host keeps
-  its moves' history under it, and its first send starts it
-  (`ChatHow.root`). Stored with the layout; one restored without it is
-  given one (`decodeLayout`'s `mintRoot`).
+  from the shell, beside its key and its thread's id (`planIntent`'s
+  `Minted`). Its cards' fresh places name it, the host keeps its moves'
+  history under it, and its first send starts it (`ChatHow.root`). Stored
+  with the layout; a layout with a new tab stored without it restores
+  nothing.
 - **`sync` runs on every root's columns**, not only the active one's: an anchor
   left behind can later follow a newer branch below it (ADR-0027).
 - **The layout drawn is `resolveLayout(stored, facts)`, computed in render**
@@ -308,11 +308,11 @@ and each item's signals.
 
 - **What the board shows is `boardView`'s**, over `boardOf` (`@pinetrie/rules`):
   the strip (each state's name, count, `markOf` and signals), each open state
-  as a column of the cards the search keeps, the closed state's
+  as a column of the cards the search keeps, the archive's
   `closedRows`, and `shown`, what the whole board shows (`BoardShown`: all,
   or filtered with the search, kept and total). A card's
   `moves` are its `⋯`'s Move to ▸, one per other state, with the busy reason
-  into the closed state; `up` and `down` its Move up and Move down within
+  into the archive; `up` and `down` its Move up and Move down within
   its state, among the cards shown (`stepsIn`, given a predicate, so the
   shown cards are always cut from the state's order), so the keyboard
   reaches every move a drag makes. Its words are worded beside it, one
@@ -326,7 +326,7 @@ and each item's signals.
   `RootSummary.writers` holds you in. A state's roots are listed with their
   entries, filtered, and only the kept ones become cards, steps and all, so
   no card exists with placeholder moves. A state's head reads its `Count`
-  (all, or kept of total) and its `signals`; the closed state's
+  (all, or kept of total) and its `signals`; the archive's
   `closedRows` are its kept cards newest first, and with no words (none, or
   "mine" alone) its `CLOSED_RECENT` newest.
 - **A state's signals are counted by one function**, `stateSignals`
@@ -342,7 +342,7 @@ and each item's signals.
   card's; `App`'s card handlers ignore it, and `useRootDrag`'s ignore
   `CARD_MIME`.
 - **A drag shows where it lands** (`use-root-drag.ts`). A board column,
-  the closed state and the sidebar are each a group of places
+  the archive and the sidebar are each a group of places
   (`rootGroupProps`), and anywhere in a group lands by the pointer's height
   alone (`landingIn`): before the first item whose centre is below it, or
   at the group's end. Landing by the element under the pointer instead
@@ -352,7 +352,7 @@ and each item's signals.
   carries `data-root-dragging`, set a tick after `dragstart` so the drag's
   image is not dimmed. The place just after the item dragged is its `home`
   (`placeAfter`), where a drop moves nothing (`planRootDrop`), so over the
-  item itself no line is drawn. The closed state is one target: its rows are a search, newest
+  item itself no line is drawn. The archive is one target: its rows are a search, newest
   activity first, so no row is a place to drop before, and the panel is
   outlined instead. One drag start, `startRootDrag`, serves the board and
   the sidebar; its image is the whole item, held where the pointer took it
@@ -389,32 +389,29 @@ and each item's signals.
 
 ## The column model (`columns.ts`)
 
-A column is `{ key, anchor, lane?, reserved?, asksAgent?, fresh? }`, and `columnsReducer`
-is pure: keys come from the shell in the action, so the reducer has no hidden
-counter.
+A column is `{ key, anchor, thread?, asksAgent?, fresh? }`, and `columnsReducer`
+is pure: keys and thread ids come from the shell in the action (`Minted`),
+so the reducer has no hidden counter.
 
-- **A column follows its own tip.** `sync` runs on every change and advances
-  each anchor to `followTip(anchor)`. A reply below a column's last message
-  moves it on; a branch off an earlier message, however new, never does.
-  Following from a fixed anchor instead would jump to any newer branch below
-  it. Leaves, because a conversation has no lane at all.
-- **Until it is agent work.** When a column's tip is exactly one lane's tip,
-  `sync` binds it (`lane`), and from then on its anchor is the lane's tip and
-  its sends name the lane. A conversation stepped down at the lane's tip is
-  newer, so following leaves would slide the agent's column into it, and send
-  the agent's next message there. Binding waits while two lanes share the tip
-  (a compelled branch at a lane's tip, until its prompt commits).
-- **A column that reserved its lane binds to it by id** (ADR-0057), as a
-  fresh column finds its message by `sendId`: as soon as that lane has a tip,
-  before the other rules, whatever else ends there. A lane created at the
-  root has no tip until its prompt, so a new tab waits for it. `reserved` is
-  kept as the column follows a conversation, and dropped as it binds. A copy
-  of the column in another browser tab binds too, and a copied new tab moves
-  into the new root, as the sender's does.
-- **`reserve` returns the same list when no column takes it.** A root with
-  no stored columns would otherwise store its `first-<root>` column, and a
-  new tab moving into that root would land beside it, as a second column. A bound or
-  fresh column is `anchored` in `projectColumns`: its path ends at its anchor.
+- **A column shows a thread** (ADR-0117). `sync` runs on every change and
+  sets each anchor to its thread's end (`threadEnd`, core): a reply below
+  its last message moves it on, and a branch, which starts another thread
+  however new, never does. Its lane is the one named by its thread's id
+  (`laneOf`), so there is no binding to do, and no newest leaf to follow.
+- **A column opened at an entry** (`open`: the rail, `openAt`) has no
+  thread until `sync` reads whose that entry is (`threadAt`). Its composer
+  sends nothing meanwhile (`ColumnHow.thread` null), which lasts one render.
+- **A fresh column carries the thread its first send starts**, minted with
+  its key (`newThreadId`, `@pinetrie/session`), in `openFresh` and `newTab`.
+  It waits for the entry its send wrote (`bySend`), or for its thread's first
+  entry from another browser tab holding the same column, then follows its
+  thread. Before that entry is written, a lane created for the thread holds
+  its fork: there the column ends. `thread` is stored, so a reload keeps it
+  and its name.
+- **A root's first column is never stored** (`columnsOf`): `drawnColumns`
+  settles it on its thread's end as `sync` does the stored ones, so `App` and
+  `planOpen` draw it as everyone else's. Every column's path ends at its
+  anchor in `projectColumns`.
 - **A null anchor** belongs only to a fresh column at the root: a new tab's.
 - **A fresh column** (`openFresh`: `→`, or "branch here" after a conflict; or
   a new tab) has nothing of its own yet. Its first send mints the
@@ -717,7 +714,7 @@ the columns read one. `segmentPath` (`ask-segments.ts`) decides what a column fo
   change. Whether its thread's details are open (`Column.details`,
   ADR-0073) is kept the same way.
 - **Both are `ReaderAction`s, by the column's key** (`readerAction`,
-  `intent.ts`), as `sent` and `reserve` are: `planColumn` sends them
+  `intent.ts`), as `sent` is: `planColumn` sends them
   through `onColumn`, so a new tab's one column takes them
   (`newTabColumn`).
 - **What `askView` decides:** what its work holds (`work`, `workWords`
@@ -967,93 +964,22 @@ composer*).
   next send would create a lane, so the header can say `✦ new agent`. It is a
   boolean, not the text lifted up: `Column` redraws only when it flips, not
   on every keystroke.
-- **The thread to come is named before the send** (ADR-0057). `headLane` is
-  the lane the header names and draws the banner of: the thread's, or the
-  column's reserved one while `createsLane`. `columnView` decides the
-  `reserve` step: `mint` a lane id (`newLaneName`, `@pinetrie/session`) for a column
-  with none, `ask` the host to name it, else `none`. `Column` carries it out
-  in an effect keyed on the step. Asking again (a remount, StrictMode) is
-  harmless: the host does nothing for an id it has named.
-  - **Only where the thread has no lane.** `createsLane` is the composer's
-    report, a render behind: a column that has just bound still carries it
-    for that render. Its effect runs before `App`'s stores the layout, so a
-    `mint` then would act on a root whose columns are not stored yet.
-
-## Words come from values
-
-A label is decided as a value and worded in one function: `offerView` and
-`offerWords`, `queuePlace` and `queueWords`, `planSend` and `sendButton`. A
-change of wording then touches the words function, its one test, and
-`docs/06-interface.md`.
-
-- **One verb, one meaning** (ADR-0077): a person follows a thread they wrote
-  on, reads one now (presence), and a column follows its end (Presence,
-  below).
-- **Tests check the value.** A test about who a message is for checks
-  `SendPlan.to`, not the label. One table per words function (`test.each`, as
-  `describe("offerWords")` and `describe("sendButton")` are) pins the words.
-- **Suites compare with the words function**, never a literal: the browser
-  suite builds its labels from `recipientWords`, `queueWords` and `UPLOADING`
-  (`@pinetrie/interface`), as it does a tool row's from `rowSummary` and
-  `toolWord`. A check
-  that is about the words themselves (a run's tooltip, a refusal's reason)
-  keeps its literal.
-- **A tool has an id and a word** (ADR-0114, `tool-words.ts`). The model
-  calls `bash`, `grep` and `ask_about_conflict` (`TOOL_IDS`, core), and a
-  person reads "shell", "search" and "ask" (`toolWord`). Core holds what a
-  call is (`ToolCall`: id, name, subject, result); every line of words about
-  a call is `callLabel`'s, cut to its preview (`previewEnd`) or whole, for
-  revision titles, an ask's live line and copied calls. A row's summary is
-  `rowSummary` (`tool-row.ts`): the word as a tag, and what the call
-  touched, previewed and whole, in runs by role. Its views are one table by
-  tool id, `VIEWS`: `bash` reads through `@pinetrie/shell`, and a later
-  tool's own view (a read's range, an edit's diff) joins it there.
-- **Docs quote labels in `docs/06-interface.md` only.** An ADR states the rule
-  ("the button says what the send does, and to whom"), and this file names the
-  function.
-
-## Card frames (`card-frame.ts`, ADR-0111)
-
-Every text card is drawn in one frame, decided as a value: `cardFrame(card,
-tone, facts)` gives its tone (its place's colour), its state, who put it
-there, its command, its primary action, its tools and its Move to ▸, and
-`cardFrameWords` words them. `CardFrame` (`packages/web/card-frame.tsx`)
-draws it.
-
-- **The tone is the caller's.** Each editor knows what it draws: the
-  composer is `composing`, notes `note`, the "+ pin" box and pinned
-  cards `pinned`, queued cards `queued`, the inventory's selected card
-  `inventory`. With no card yet (the composer before its first keystroke,
-  the "+ pin" box) the frame has its tone and place alone: no state, no
-  moves, no ×.
-- **Move to ▸ is the moves a drag makes from where the card is**, each an
-  existing `ColumnAct`: a queue is `queue` with `hold: "keep"`
-  (`queue-card`), a pin `pin` (from a draft or a queued card: `pinnedOf`),
-  back below the line `unqueue` or `unpin`, a take `takeIntoInventory`. A
-  queue needs the column's lane and an entry to queue at (`queueOn`); a
-  fresh column's card goes only to your inventory, and an inventory card
-  has none (put, ×, a drag). A fact or a read-only column moves nothing.
-- **The primary** is put in the inventory and send on a draft, the editor's
-  own button (`sendButton`); a queued card has none, since the queue's
-  controls send it (ADR-0113), and a pinned card none.
-- **The state** is a queued card's place in line (`lineWords`, "next" on
-  top, "held · …" while its queue is held), a pinned card's `pinnedStatus`,
-  or why the host could not send it (`unsentWords`).
-- **A command is a chip** (`commandWords`, `commandNote` its title). In
-  your inventory `catchUps` is null, since a command there has no thread
-  to name, and no chip is drawn.
-- **A face is the card folded** (`cardFace`): its tone, its owner, its
-  command (a short chip, `cardFaceWords`, since a face names no thread),
-  its first three lines, and its slot's 1–9 in your inventory.
-
-## Threads, lanes and the composer (ADR-0120)
+- **A thread about to get its lane is named before the send** (ADR-0057).
+  `headLane` is the lane the header names and draws the banner of: the
+  thread's, or, while `createsLane`, the one its next send creates, named by
+  the thread's id. `columnView` decides the `reserve` step: `ask` the host to
+  name it while it has no name, else `none`. `Column` carries it out in an
+  effect keyed on the step. Asking again (a remount, StrictMode) is harmless:
+  the host does nothing for an id it has named. A conversation's thread is
+  named by the host as its first message is recorded (ADR-0117), with no
+  banner.
 
 - **The agent can reply in several threads at once**: `readAgentActivity`
   returns every running lane. The rail pulses at each tip, and each column
   streams the runs whose tip is on its path.
-- **The composer decides before sending, as the host will.** `threadOf` finds
-  the thread (the column's bound lane, or its end), over `readLanes` and
-  `readParticipants`, the reads the host decides from. `planSend` (`send.ts`)
+- **The composer decides before sending, as the host will.** The column's
+  thread names its lane (`laneOf`), over `readLanes` and `readParticipants`,
+  the reads the host decides from; its end is the column's anchor. `planSend` (`send.ts`)
   decides the rest: who the message is for is `addressChat`
   (`@pinetrie/rules`), the function `planChat` runs on the host, so the
   button cannot promise a reply the host will not start. `SendPlan.to` is
@@ -1067,8 +993,8 @@ draws it.
   `sendButton` words the plan (labels: `docs/06-interface.md`), and
   `placeholderWords` gives the box's placeholder: the composer holds only its
   state and draws.
-- **Every send from a column carries its `ColumnHow`**: its bound lane,
-  whether it is a Start Agent column, and its reserved lane, built once by
+- **Every send from a column carries its `ColumnHow`**: its thread, whether
+  it is a Start Agent column, and its new tab's root, built once by
   `Column` for its composer and for everyone else's cards at its end, since
   sending any of them here creates this column's lane.
 - **The queue names who queued the last card,** not who the agent is

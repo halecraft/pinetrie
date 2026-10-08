@@ -8,9 +8,9 @@
 
 import type {
   EntryId,
-  LaneName,
   RootRecord,
   RootWork,
+  ThreadId,
   Verdict,
   VerdictRecord,
   WriterId,
@@ -65,10 +65,10 @@ export function levelOf(verdict: Verdict, me: WriterId): Level | null {
 /** Each thread's writers, from every root's directory record. */
 export const threadWriters = (
   directory: ReadonlyMap<string, RootRecord>,
-): ReadonlyMap<LaneName, readonly WriterId[]> =>
+): ReadonlyMap<ThreadId, readonly WriterId[]> =>
   new Map(
     [...directory.values()].flatMap(
-      r => Object.entries(r.threads) as [LaneName, readonly WriterId[]][],
+      r => Object.entries(r.threads) as [ThreadId, readonly WriterId[]][],
     ),
   )
 
@@ -88,7 +88,7 @@ export type Raised =
 
 /** One thing a thread raises for you. */
 export interface Item {
-  readonly lane: LaneName
+  readonly lane: ThreadId
   /** Its root entry: its tab's key. */
   readonly root: EntryId
   /** Where choosing it opens the thread. */
@@ -100,15 +100,15 @@ export interface Item {
 export interface AttentionInput {
   readonly me: WriterId
   /** Each thread's writers (`threadWriters`). */
-  readonly writers: ReadonlyMap<LaneName, readonly WriterId[]>
-  readonly verdicts: ReadonlyMap<LaneName, VerdictRecord>
+  readonly writers: ReadonlyMap<ThreadId, readonly WriterId[]>
+  readonly verdicts: ReadonlyMap<ThreadId, VerdictRecord>
   readonly offers: readonly OpenOffer[]
   /** Your attention document, read. */
   readonly person: Attention
   /** Lanes running or with cards queued, in any root. */
-  readonly busy: ReadonlySet<LaneName>
+  readonly busy: ReadonlySet<ThreadId>
   /** Each lane's root entry (`laneRootsOf`). */
-  readonly laneRoots: ReadonlyMap<LaneName, EntryId>
+  readonly laneRoots: ReadonlyMap<ThreadId, EntryId>
   readonly archived: ReadonlySet<EntryId>
 }
 
@@ -117,7 +117,7 @@ const latest = (a: string, b: string | undefined): string =>
   b !== undefined && b > a ? b : a
 
 /** `lane`'s root entry, when you follow it and its root is not archived. */
-function followedRoot(input: AttentionInput, lane: LaneName): EntryId | null {
+function followedRoot(input: AttentionInput, lane: ThreadId): EntryId | null {
   const root = input.laneRoots.get(lane)
   if (root === undefined || input.archived.has(root)) return null
   return follows(input.me, input.writers.get(lane) ?? []) ? root : null
@@ -132,7 +132,7 @@ function followedRoot(input: AttentionInput, lane: LaneName): EntryId | null {
 export function attentionOf(input: AttentionInput): readonly Item[] {
   const { me, person } = input
   if (person.since === "") return []
-  const yours = (lane: LaneName): EntryId | null =>
+  const yours = (lane: ThreadId): EntryId | null =>
     input.busy.has(lane) ? null : followedRoot(input, lane)
   const items: Item[] = []
   for (const v of input.verdicts.values()) {
@@ -196,8 +196,8 @@ export function rootStatus(input: {
   readonly items: readonly Item[]
   /** Roots where the agent works, held by this tab or not (`workAnywhere`). */
   readonly work: ReadonlyMap<EntryId, RootWork>
-  readonly verdicts: ReadonlyMap<LaneName, VerdictRecord>
-  readonly laneRoots: ReadonlyMap<LaneName, EntryId>
+  readonly verdicts: ReadonlyMap<ThreadId, VerdictRecord>
+  readonly laneRoots: ReadonlyMap<ThreadId, EntryId>
 }): ReadonlyMap<EntryId, Status> {
   const out = new Map<EntryId, Status>()
   for (const [root, work] of input.work)

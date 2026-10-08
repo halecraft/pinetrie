@@ -6,12 +6,12 @@
 import {
   type EntryId,
   isBusy,
-  type LaneName,
   type LaneView,
   laneWork,
   type RootId,
   type RootRecord,
   type RootWork,
+  type ThreadId,
   type VerdictRecord,
   type WriterId,
 } from "@pinetrie/core"
@@ -54,13 +54,13 @@ export function useAttention(input: {
   readonly me: WriterId
   readonly attention: AttentionStore
   readonly directory: ReadonlyMap<RootId, RootRecord>
-  readonly verdicts: ReadonlyMap<LaneName, VerdictRecord>
+  readonly verdicts: ReadonlyMap<ThreadId, VerdictRecord>
   readonly offers: readonly OpenOffer[]
   /** Lanes running in any root (`readRunningLanes`). */
-  readonly running: readonly { readonly lane: LaneName }[]
+  readonly running: readonly { readonly lane: ThreadId }[]
   /** The held roots' lanes, with their queues. */
   readonly lanes: readonly LaneView[]
-  readonly laneRoots: ReadonlyMap<LaneName, EntryId>
+  readonly laneRoots: ReadonlyMap<ThreadId, EntryId>
   readonly archived: ReadonlySet<EntryId>
   /** Roots whose agent works, held or not (`workAnywhere`). */
   readonly work: ReadonlyMap<EntryId, RootWork>

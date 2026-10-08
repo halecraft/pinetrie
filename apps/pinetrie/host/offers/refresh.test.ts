@@ -11,10 +11,10 @@ import {
   type CommitId,
   commitId,
   HOST_OPERATOR,
-  type LaneName,
-  laneNameForThread,
   NO_EDITOR,
+  type ThreadId,
   type ThreadName,
+  threadIdFor,
 } from "@pinetrie/core"
 import {
   DEFAULT_REPO,
@@ -33,7 +33,7 @@ import type { Records } from "../records.ts"
 import { createRefresh } from "./refresh.ts"
 import { createOfferDeps } from "./state.ts"
 
-const LANE = laneNameForThread("1")
+const LANE = threadIdFor("1")
 const THREAD = "vernal-pine" as ThreadName
 const ENV = { ...NO_EDITOR, JJ_USER: "Probe", JJ_EMAIL: "probe@example.com" }
 
@@ -79,7 +79,7 @@ async function yourRepo(tag: string) {
       "--allow-backwards",
     )
   /** The lane's tip in your repo, as a fetch leaves it. */
-  const setTip = async (lane: LaneName, tip: CommitId) => {
+  const setTip = async (lane: ThreadId, tip: CommitId) => {
     await run("git", ["update-ref", laneTipRef(lane), tip], { cwd: dir })
     await jj("git", "import")
   }
@@ -94,7 +94,7 @@ async function yourRepo(tag: string) {
  * Refresh `lane`'s offer as the host does, until a round writes nothing to
  * your repo: it must by the second. Then the offer's files, or null for none.
  */
-async function settles(dir: string, lane: LaneName, name: ThreadName) {
+async function settles(dir: string, lane: ThreadId, name: ThreadName) {
   const b = basics()
   putValue(b, setRecord(NAME, { lane, name, at: 1 }))
   const scribe = record<Records>({

@@ -8,10 +8,10 @@ import {
   CATCH_UP_TOOL,
   type EntryId,
   entryId,
-  type LaneName,
   messageText,
   projectTranscript,
   ROOT,
+  type ThreadId,
 } from "@pinetrie/core"
 import { scriptedModel } from "@pinetrie/pi"
 import { readPlaces, readRevisions } from "@pinetrie/reads"
@@ -65,7 +65,7 @@ async function catchUpSection(
     await waitFor(() => idleNow(wh), 180_000)
     await wh.quiet()
   }
-  const laneTip = (lane: LaneName) =>
+  const laneTip = (lane: ThreadId) =>
     lanesOf(wh, tree(), readPlaces(wh.places)).find(l => l.name === lane)
       ?.tip ?? null
   /** The lane whose thread's end holds `text`. */
@@ -80,7 +80,7 @@ async function catchUpSection(
     )
   }
   /** Every tool result's text in a lane's thread, oldest first. */
-  const toolResults = (lane: LaneName | undefined): string[] => {
+  const toolResults = (lane: ThreadId | undefined): string[] => {
     if (lane === undefined) return []
     const onPath = new Set(ancestry(tree(), laneTip(lane)).path)
     return Object.values(entriesOf(wh))
@@ -118,7 +118,7 @@ async function catchUpSection(
       { tool: "bash", args: { command: "cat landed.txt" } },
       { text: "caught up" },
     ])
-    await wu.chat("@agent catch up", at(laneTip(lane)), { lane })
+    await wu.chat("@agent catch up", at(laneTip(lane)), { thread: lane })
     await idle()
     const results = toolResults(lane)
     // The turn that called it records the merge (S103 item 3): a branch

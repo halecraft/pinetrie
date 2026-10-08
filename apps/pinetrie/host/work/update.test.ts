@@ -3,10 +3,10 @@ import {
   CATCH_UP_TOOL,
   commitId,
   entryId,
-  laneNameForThread,
   NOBODY,
   revisionMessage,
   type ThreadName,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import {
@@ -49,7 +49,7 @@ const LANES = {
   repoConfig: DEFAULT_REPO,
 }
 
-const LANE = laneNameForThread("0123456789abcdef")
+const LANE = threadIdFor("0123456789abcdef")
 
 describe("reasonOf", () => {
   test("a revision's reason is its message, attributed to its author or the agent; else its first line", () => {
@@ -97,7 +97,7 @@ const acceptedFrom: BaseMerge = {
 }
 const parentFrom: BaseMerge = {
   kind: "parent",
-  lane: laneNameForThread("p"),
+  lane: threadIdFor("p"),
   name: "amber-fox" as ThreadName,
   commit: ACCEPTED,
   caughtUpWith: OURS,

@@ -7,11 +7,11 @@
 // host reads back when the run ends.
 
 import { type Static, Type } from "typebox"
-import { CommitSchema, LaneNameSchema, List, WriterIdSchema } from "./decode.ts"
+import { CommitSchema, List, ThreadIdSchema, WriterIdSchema } from "./decode.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"
 
 const StackDetailsSchema = Type.Object({
-  lane: LaneNameSchema,
+  lane: ThreadIdSchema,
   /** Where the offer starts: the stack builds on it. */
   start: List(CommitSchema),
   /** The lane's tip: the stack's last revision must have exactly its files. */

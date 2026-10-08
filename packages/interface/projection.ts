@@ -23,12 +23,12 @@ import {
   type DigestRecord,
   type EntryId,
   indexAsks,
-  type LaneName,
   type LaneView,
   type MarkRecord,
   type RootId,
   type SeatRecord,
   type StopRecord,
+  type ThreadId,
   type TraceRecord,
   type TreeIndex,
   type VerdictRecord,
@@ -89,7 +89,7 @@ export interface SessionFacts {
   readonly activity: readonly AgentRun[]
   /** Every lane replying, in any root, held or not (`readRunningLanes`). */
   readonly running: readonly {
-    readonly lane: LaneName
+    readonly lane: ThreadId
     readonly root: RootId
   }[]
   /** The streams to draw, from the same moment as `index`. */
@@ -100,12 +100,12 @@ export interface SessionFacts {
   readonly workflow: Workflow | null
   /** Each root's place on the board, by its id. */
   readonly places: ReadonlyMap<RootId, BoardPlace>
-  /** The roots in the closed state, by id (`readArchived`). */
+  /** The roots in the archive, by id (`readArchived`). */
   readonly archived: ReadonlyMap<RootId, ArchivedRoot>
   /** Each entry's title (ADR-0045); a root's is its label. */
   readonly marks: ReadonlyMap<EntryId, MarkRecord>
   /** Each thread's last run's verdict, in any root (ADR-0077), by lane. */
-  readonly verdicts: ReadonlyMap<LaneName, VerdictRecord>
+  readonly verdicts: ReadonlyMap<ThreadId, VerdictRecord>
   /** Each card's history (ADR-0048 step 6), by card. */
   readonly histories: ReadonlyMap<CardId, CardHistoryRecord>
   /** Every trace, by id: each column draws its reader's own. */

@@ -12,13 +12,13 @@ import {
   type CardId,
   type CardRecord,
   firstLine,
-  type LaneName,
   type PinnedCardRead,
   type PinnedView,
+  type ThreadId,
   type WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { CardIdSchema, LaneNameSchema, List, WriterIdSchema } from "./decode.ts"
+import { CardIdSchema, List, ThreadIdSchema, WriterIdSchema } from "./decode.ts"
 import { type HistoryMessage, historyMessage } from "./history.ts"
 
 export const PINNED_TYPE = "pinetrie.pinned"
@@ -31,7 +31,7 @@ export const PINNED_RULE =
   "The team pins cards to say what it wants from this thread. They appear in the conversation in `<pinned-cards>` blocks, and the latest block is what holds."
 
 const PinnedDetailsSchema = Type.Object({
-  lane: LaneNameSchema,
+  lane: ThreadIdSchema,
   cards: List(
     Type.Object({
       id: CardIdSchema,
@@ -179,7 +179,7 @@ export function pinnedDiff(
 export function planPinnedRead(input: {
   readonly inView: PinnedView | null
   readonly now: readonly PinnedCardRead[]
-  readonly lane: LaneName
+  readonly lane: ThreadId
 }): PinnedView | null {
   const diff = pinnedDiff(input.inView, input.now)
   const unchanged =

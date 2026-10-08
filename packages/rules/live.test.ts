@@ -1,19 +1,19 @@
 import {
   type EntryId,
   entryId,
-  type LaneName,
   type LiveOp,
-  laneNameForThread,
   runId,
   type Stream,
   type StreamEvent,
   streamId,
+  type ThreadId,
+  threadIdFor,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { planClear, planEndRun, planStream } from "./live.ts"
 
-const L = laneNameForThread("lane")
-const M = laneNameForThread("other")
+const L = threadIdFor("lane")
+const M = threadIdFor("other")
 let n = 0
 const newId = () => {
   n += 1
@@ -49,7 +49,7 @@ function fold(streams: readonly Stream[], ops: readonly LiveOp[]): Stream[] {
 /** An entry written on `lane`: its tip moves, as pi's commit moves it. */
 interface Commit {
   readonly commit: string
-  readonly lane?: LaneName
+  readonly lane?: ThreadId
 }
 
 /**
@@ -58,7 +58,7 @@ interface Commit {
  * entry pi writes.
  */
 function drive(steps: readonly (StreamEvent | Commit)[], running = true) {
-  const tips = new Map<LaneName, EntryId | null>([
+  const tips = new Map<ThreadId, EntryId | null>([
     [L, entryId("p")],
     [M, entryId("q")],
   ])

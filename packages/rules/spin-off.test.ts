@@ -4,8 +4,8 @@ import {
   cardId,
   entryId,
   type LaneRecord,
-  laneNameForThread,
   rootIdFor,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
@@ -14,6 +14,7 @@ import { planLiftRoot, planSpinOff, type SpunThread } from "./spin-off.ts"
 
 const ROOT_A = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const THREAD = rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff")
+const STARTS = threadIdFor("spun")
 const ADA = writerId("p-ada")
 const BEA = writerId("p-bea")
 const C1 = cardId("c-1")
@@ -27,7 +28,7 @@ const note = {
 const spun = {
   kind: "gone",
   root: ROOT_A,
-  why: { kind: "spun", thread: THREAD },
+  why: { kind: "spun", into: THREAD, thread: STARTS },
 } as const
 const card = (over: Partial<CardRecord> = {}): CardRecord => ({
   id: C1,
@@ -59,7 +60,8 @@ describe("planSpinOff (ADR-0111)", () => {
   test("the thread's first message is the card's text, trimmed, naming no agent; the card goes gone, spun into it", () => {
     expect(plan()).toEqual({
       kind: "spin",
-      thread: THREAD,
+      root: THREAD,
+      thread: STARTS,
       text: "plan it @agent",
       mentions: [],
       step: {
@@ -158,7 +160,7 @@ describe("planLiftRoot (S139)", () => {
       {
         lanes: [
           {
-            lane: laneNameForThread("x"),
+            lane: threadIdFor("x"),
             root: THREAD,
             work: { kind: "own" },
             by: ADA,

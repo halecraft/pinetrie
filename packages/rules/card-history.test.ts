@@ -9,11 +9,11 @@ import {
   type EntryId,
   entryId,
   keyOf,
-  laneNameForThread,
   PLAIN,
   type PlaceKey,
   rootIdFor,
   type TraceRecord,
+  threadIdFor,
   type WriterId,
   writerId,
 } from "@pinetrie/core"
@@ -31,7 +31,7 @@ import {
 } from "./card-history.ts"
 
 const ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
-const LANE = laneNameForThread("x")
+const LANE = threadIdFor("x")
 const ADA = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
 const END = entryId("e-end")

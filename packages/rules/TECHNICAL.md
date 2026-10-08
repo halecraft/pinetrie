@@ -54,7 +54,7 @@ follow this list. A name only this package uses is imported from its module.
 - `card.ts`, `queue-hold.ts`, `seat.ts`, `startup.ts`: cards and their
   moves, a held queue, who wrote in a text, what a starting host resumes.
 - `board.ts`, `archive.ts`, `order.ts`: the board's workflow states and
-  each root's place, what crossing the closed state's edge does, and order
+  each root's place, what crossing the archive's edge does, and order
   keys (a queue's, the pinned cards' and the board's).
 - `roots.ts`, `mark.ts`, `title.ts`, `stop.ts`, `digest.ts`, `verdict.ts`:
   the directory of roots, titles, who stopped a run and carrying on after
@@ -77,8 +77,8 @@ total: a malformed value is dropped, never thrown. `recordsOf` and
 `recordsIn` do it for a namespace's stored records (`records.ts`, below).
 
 A decoder brands the ids it reads, and its `build` may refuse a value too.
-**Every lane is checked with `isLaneName`**: on a record's address for a
-record keyed by lane (`laneKey`), and in `build` for a lane in its
+**Every lane is checked with `isThreadId`**: on a record's address for a
+record keyed by lane (`threadKey`), and in `build` for a lane in its
 contents (as `BANNER` checks `isSha256`). A value whose lane fails is
 dropped. That is what keeps a malformed lane out of the host's writes:
 `agent.lane` finds any lane pi holds (S95). A card is the exception
@@ -134,7 +134,7 @@ address and decoder, for a check over every record, as a migration's
 - **The address holds the key; the contents never repeat it.** `encode`
   leaves the key field out (`entry`, `root`, `lane`, `id`, `prompt`,
   `peer`, `writer`), and `decode(contents, key)` reads the address with a
-  key reader (`entryKey`, `laneKey`, `textKey`, `writerKey`, or `fixedKey`
+  key reader (`entryKey`, `threadKey`, `textKey`, `writerKey`, or `fixedKey`
   for a singleton, in `decode.ts`) and sets the field from it: `decodeAt`
   drops the record when the reader finds no key. So a write and a read cannot disagree on a key, and
   `StopRecord`, `DigestRecord` and `SeatRecord` carry their key in memory
@@ -181,7 +181,8 @@ are the only code that builds or reads the shape.
   the composer's `planSend` (`packages/interface/send.ts`) runs it before a send,
   so the button's promise and the host's decision cannot drift apart.
 - **`planChat` decides what a message does** (ADR-0120), over the thread
-  `threadOf` gives, and names exactly where to write:
+  `threadOfSend` (core) gives for where it goes (`SendAt`), and names
+  exactly where to write:
 
   | a message… | no lane | idle lane | busy lane (running, cards queued, or its queue held: `sendWaits`) |
   |---|---|---|---|
@@ -193,15 +194,28 @@ are the only code that builds or reads the shape.
   `busy` writes nothing: the dispatcher queues the chat's card in the same step, and answers `queued` (ADR-0059).
   `queue` is the host's own mode (`PlanMode`; a client sends a `ChatMode`), for a card it pops, which heads the queue
   it is in: so only a run makes the lane busy, and a race does not count.
-  | `branch` | plain: `appendToTree` at `at`; compelled: `createAndRun` at `at` | the same: a branch never continues a lane | the same |
+  | `branch` | plain: `appendToTree` at its fork; compelled: `createAndRun` at its fork | the same: a branch never continues a lane | the same |
 
   A race is another writer's compelled message on the thread's path since what
   the sender saw; plain remarks, agent replies and sibling forks are not. A
   `branch` at a lane's tip is stepping down: a new thread there, the lane left
   where it is.
-- **`createAndRun` names the new lane's id**: the one the sender's column
-  reserved, unless pi holds it, else the spare the host made (`newLane`,
-  ADR-0057). The host decides every new lane's id here; pi makes none.
+- **A lane is named by its thread's id** (ADR-0117): `createAndRun` takes
+  the thread the send continues, or the one a branch starts. No other name is
+  chosen; pi makes none. A branch naming a thread that has an entry or a
+  lane is `taken` (core), refused before planning.
+- **A thread's first message names it** (`ChatDetails.starts`, ADR-0117):
+  `planChat` sets it on a branch's message alone, so it is written in the
+  same commit as the entry, and `threadEnd` finds every thread's end from
+  the tree with no stored end and no second source. The host writes the
+  thread's record (`THREAD`, `thread.ts`: its root, who started it, when,
+  and a copy's fork) just before the message, then names it.
+- **`deriveThreads`** (`thread.ts`) guesses the threads of a tree written
+  before `starts`, for the one-time migration that writes it
+  (`apps/pinetrie/host/migrations/0004-threads.ts`): a lane's tip ends its
+  thread; elsewhere the child on the path to the oldest lane's tip
+  continues, else the oldest child; a thread ending at a lane's tip takes
+  its name.
 - **Each chat stores its send's id** (`sendId`, the command's id), so the
   column that sent it finds it exactly (`TreeIndex.bySend`).
   `detailsFromStored` is the one conversion of stored details.
@@ -294,7 +308,7 @@ which are swept.
   `fact`: it is the host's. Your message (`composing`, ADR-0113) is stored
   under the kind `drafting` it had before notes, so no row changed with
   the split; a note is stored as `note`. A message or note whose lane fails
-  `isLaneName` keeps its place with no lane: dropped,
+  `isThreadId` keeps its place with no lane: dropped,
   it would be swept with its text at the next start (`planCardSweep`), and
   the lane only says which thread it follows. A queued card with such a
   lane does not decode: its lane is where it runs.
@@ -376,9 +390,9 @@ which are swept.
   only, those of a root the directory does not name. After a run's end that
   second rule would retire a new tab's history while it is open.
 - **A card at a thread's end is resolved, never stored as an end**: your
-  message, a note, a pinned card. `placeEnd` runs `threadOf` from where it
-  started and its column's lane, as a reply from there would go, so the
-  card follows its thread as the thread grows. `cardsAt(kind, end, …)` is
+  message, a note, a pinned card. `placeEnd` takes the thread its place's
+  entry is in (`threadAt`) and that thread's end (`threadEnd`), so the card
+  follows its thread as the thread grows. `cardsAt(kind, end, …)` is
   everyone's cards of a shared kind (`note` or `pinned`) whose end is
   `end`, by `order` when they have one, then by id. `cardEnd` is your
   message's end only (`composing`), and `yourCard` finds yours through it,
@@ -565,7 +579,7 @@ it, and when.
   state the workflow no longer holds, at the end of the first open state.
   A missing or stale record never hides a root.
 - **Archived is derived, never stored** (`archivedOf`): the roots whose
-  place is the closed state, with who moved them there and when
+  place is the archive, with who moved them there and when
   (`ArchivedRoot`), keyed by `RootId`. Every former reader of the archive
   record reads it (`readArchived`).
 - **`planRootMove` decides a move over the board alone.** The sender names
@@ -573,14 +587,14 @@ it, and when.
   `root_moved`, naming who moved it and where. `before` is the root it goes
   before, or the end. The new rank is `orderBetween` its neighbours; with no
   room, or a neighbour with no place yet, the whole state is renumbered,
-  the others keeping who put them there. A reorder within the closed state
+  the others keeping who put them there. A reorder within the archive
   keeps `by` and `at`, which say when the root was archived and so when its
   move histories retire (`planHistorySweep`).
-- **`transitionOf` says whether a move crosses the closed state's edge**:
+- **`transitionOf` says whether a move crosses the archive's edge**:
   `within`, `close` or `reopen`. The host gathers a root's document only to
   cross it (`apps/pinetrie/host/commands/board.ts`).
 - **`planWorkflowEdit`**: add (before a state, or after every open one),
-  rename (trimmed; names may repeat), move, remove. The closed state is
+  rename (trimmed; names may repeat), move, remove. The archive is
   renamed only; a state holding a root is not removed, nor the only open
   state.
 - **`placeStarted`** puts a new root at the end of the state its chat names,
@@ -592,7 +606,7 @@ it, and when.
 
 # The archive (`archive.ts`, ADR-0029, ADR-0122)
 
-A root put aside for everyone: one in the closed workflow state. Moving it
+A root put aside for everyone: one in the archive. Moving it
 there or out writes only its board place: entries are immutable, so a root
 is hidden and made read-only, never removed.
 
@@ -1077,11 +1091,11 @@ commit-message request `request.ts` (`describeRequest`).
 - **`threadNameFor`** hashes the lane's id (FNV-1a, 32 bits) into the 65,536
   pairs and takes the next free one, wrapping. The hash spreads ids that
   differ only near their end, as uuidv7s made a minute apart do.
-- **`planNames`** names every lane that has none, oldest first, each
-  avoiding the stored names and those planned before it. The host runs it
-  through one queue, at start and before a new lane's first run, so two
-  lanes never plan the same name.
-- **`planReserve`** names a lane id a column reserved before its lane exists
+- **`planNames`** names every thread that has none, a lane's or a
+  conversation's (ADR-0117), oldest first, each avoiding the stored names and
+  those planned before it. The host runs it through one queue, at start and
+  before a new lane's first run, so two threads never plan the same name.
+- **`planReserve`** names a thread a column opened before it has a message
   (ADR-0057), as `planNames` would: `known` for an id with a name, `held`
   for one pi holds. So a name can have no lane yet: read names by lane
   (`readNames(doc).get(lane)`), never list them as threads.
@@ -1158,10 +1172,10 @@ reads, `details` what pine·trie reads back.
   base's news once more (`baseKnown`), and a branch read its parent as
   ahead (`parentNow`) until the parent commits again.
 - **The schema is the type.** Ids are branded schemas (`decode.ts`:
-  `LaneNameSchema`, `WriterIdSchema`, `CommitSchema`, `ThreadNameSchema`,
+  `ThreadIdSchema`, `WriterIdSchema`, `CommitSchema`, `ThreadNameSchema`,
   `CardIdSchema`), whose `Static` is the brand, and `List` an array whose
-  `Static` is `readonly`. A lane is checked with core's `LANE_PATTERN`, the
-  pattern `isLaneName` tests, so no decoder checks a lane by hand.
+  `Static` is `readonly`. A lane is checked with core's `THREAD_PATTERN`, the
+  pattern `isThreadId` tests, so no decoder checks a lane by hand.
 - **Every kind is held to it** (`history.test.ts`): `MESSAGE_SPECS` must
   list every spec a module here exports, and each round-trips a sample and
   renders in its role.

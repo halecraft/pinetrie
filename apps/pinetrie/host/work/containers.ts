@@ -3,8 +3,8 @@
 
 import {
   errorText,
-  type LaneName,
   type SnapshotId,
+  type ThreadId,
   WORKSPACE_ROOT,
 } from "@pinetrie/core"
 import type { Keeper } from "@pinetrie/keeper"
@@ -34,18 +34,18 @@ const RETIRED =
 
 export interface Containers {
   /** Where a lane's tools run: its container; null for a lane with no copy of its own. */
-  access(lane: LaneName): LaneAccess | null
+  access(lane: ThreadId): LaneAccess | null
   /** Before any run: queue a lane of its own's container to start. */
-  beforeRun(lane: LaneName): void
+  beforeRun(lane: ThreadId): void
   /** After a run: stop its container, and follow its offer. */
-  runEnded(lane: LaneName): void
+  runEnded(lane: ThreadId): void
   /**
    * Start a lane's container, as `planContainer` decides. A container made
    * from another spec (image, mounts, grants) is recreated on the same
    * volume. A missing one starts from what `planStartFrom` decides; a disk
    * restored from a snapshot then gets the names the host reads now.
    */
-  startContainer(lane: LaneName): Promise<void>
+  startContainer(lane: ThreadId): Promise<void>
   /** Stop every running lane's container. */
   close(): Promise<void>
 }
@@ -62,20 +62,20 @@ export function createContainers(deps: {
   const { session, docs, log } = basics
 
   /** The snapshots of `lane`'s own records, newest first. */
-  async function ownSnapshots(lane: LaneName): Promise<SnapshotId[]> {
+  async function ownSnapshots(lane: ThreadId): Promise<SnapshotId[]> {
     const doc = await docs.laneDoc(lane)
     return doc === null ? [] : readLaneSnapshots(doc, lane)
   }
 
   /** The newest snapshot of `lane`'s own records that is still there. */
-  async function newestSnapshot(lane: LaneName): Promise<SnapshotId | null> {
+  async function newestSnapshot(lane: ThreadId): Promise<SnapshotId | null> {
     const { runtime } = setup
     for (const id of await ownSnapshots(lane))
       if (await runtime.snapshotExists(id)) return id
     return null
   }
 
-  async function startContainer(lane: LaneName): Promise<void> {
+  async function startContainer(lane: ThreadId): Promise<void> {
     const { ready, runtime } = setup
     const r = await ready
     const handle = registry.handleOf(lane)

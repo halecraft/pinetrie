@@ -16,10 +16,10 @@ import {
   type CardId,
   type CardRecord,
   errorText,
-  type LaneName,
   type OfferFact,
   PLAIN,
   parseMentions,
+  type ThreadId,
 } from "@pinetrie/core"
 import type { Agent } from "@pinetrie/pi"
 import type { Outcome } from "@pinetrie/protocol/codec"
@@ -88,7 +88,7 @@ export type NextQueuedCardPop =
  */
 export function popNextQueuedCard(
   places: PlacesDocHandle,
-  lane: LaneName,
+  lane: ThreadId,
   facts: Omit<Parameters<typeof planNextQueuedCardPop>[2], "blank">,
   texts: Pick<CardPort, "textNow" | "holds">,
 ): NextQueuedCardPop {
@@ -110,15 +110,12 @@ export function popNextQueuedCard(
 export const chatOfPoppedQueuedCard = (popped: PoppedQueuedCard): Chat => ({
   text: popped.text,
   root: popped.card.place.root,
-  at: popped.card.place.at,
-  mode: "queue",
-  lane: popped.card.place.lane,
+  at: { kind: "queue", thread: popped.card.place.lane },
   asksAgent: false,
   mentions: parseMentions(popped.text),
   card: { id: popped.card.id, seen: popped.card.place.seen },
   // Its thread's pinned cards were edited long before it was popped.
   pinned: [],
-  reserved: null,
   base: null,
   state: null,
 })
@@ -157,7 +154,7 @@ export interface QueuedCardPopDeps {
  */
 export async function drain(
   deps: QueuedCardPopDeps,
-  lane: LaneName,
+  lane: ThreadId,
 ): Promise<void> {
   const { places } = deps.basics
   const loaded = new Set<CardId>()
@@ -202,7 +199,7 @@ export async function drain(
  */
 async function carryOut(
   deps: QueuedCardPopDeps,
-  lane: LaneName,
+  lane: ThreadId,
   popped: PoppedQueuedCard,
 ): Promise<"ran" | "next"> {
   const plan = planCarry(popped.card, popped.text)
@@ -225,7 +222,7 @@ async function carryOut(
  */
 async function appendFact(
   deps: QueuedCardPopDeps,
-  lane: LaneName,
+  lane: ThreadId,
   popped: PoppedQueuedCard,
   fact: OfferFact,
 ): Promise<"next"> {
@@ -254,7 +251,7 @@ async function appendFact(
  */
 async function catchUpThenSend(
   deps: QueuedCardPopDeps,
-  lane: LaneName,
+  lane: ThreadId,
   popped: PoppedQueuedCard,
   plan: Extract<CarryPlan, { readonly kind: "catch-up" }>,
 ): Promise<"ran" | "next"> {
@@ -299,7 +296,7 @@ async function catchUpThenSend(
  */
 async function splitThen(
   deps: QueuedCardPopDeps,
-  lane: LaneName,
+  lane: ThreadId,
   popped: PoppedQueuedCard,
   intent: string,
 ): Promise<"ran" | "next"> {
@@ -393,7 +390,7 @@ export const givenUp = (
  */
 export function createWaits(deps: {
   readonly places: PlacesDocHandle
-  readonly drain: (lane: LaneName) => void
+  readonly drain: (lane: ThreadId) => void
 }): (card: QueuedCard, until: (signal: AbortSignal) => Promise<void>) => void {
   const awaiting = new Map<CardId, AbortController>()
   let unwatch: (() => void) | null = null

@@ -8,10 +8,10 @@ import {
   type CardId,
   type CardRecord,
   type EntryId,
-  type LaneName,
   type LaneView,
   promptOf,
   type StopRecord,
+  type ThreadId,
   type TreeIndex,
   type WriterId,
 } from "@pinetrie/core"
@@ -53,7 +53,7 @@ export type Next =
 
 /** A thread's queue header: what happens next, on which lane. */
 export interface QueueHead {
-  readonly lane: LaneName
+  readonly lane: ThreadId
   readonly next: Next
   /** Who holds the queue; null when it is not held. */
   readonly heldBy: WriterId | null

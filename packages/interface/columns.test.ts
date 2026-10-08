@@ -1,15 +1,10 @@
-import {
-  cardId,
-  entryId,
-  type LaneView,
-  laneNameForThread,
-} from "@pinetrie/core"
+import { cardId, entryId, type LaneView, threadIdFor } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { type Column, columnsReducer } from "./columns.ts"
-import { tree } from "./fixtures.ts"
+import { threadOfEntry, tree } from "./fixtures.ts"
 
 const anchors = (s: readonly Column[]) => s.map(c => c.anchor)
-const L = laneNameForThread("l")
+const L = threadIdFor("l")
 const lane = (tip: string | null, name = L): LaneView => ({
   name,
   tip: tip === null ? null : entryId(tip),
@@ -26,123 +21,74 @@ const sync = (
 ) => columnsReducer(s, { kind: "sync", index, lanes })
 
 describe("columnsReducer", () => {
-  test("sync follows a column's own tip, never a newer branch above it", () => {
+  // In `tree`, an entry with no parent, and each child but an entry's oldest,
+  // starts the thread `t-<its id>` (`withThreads`).
+  const A = threadOfEntry("1-a")
+  test("sync follows its thread to its end, never into a newer branch", () => {
     const col: readonly Column[] = [{ key: "k", anchor: entryId("2-b") }]
-    // A reply below the tip moves the column on.
+    // A reply below the end moves the column on, and it takes its thread.
     const replied = sync(col, tree({ "1-a": null, "2-b": "1-a", "3-c": "2-b" }))
-    expect(anchors(replied)).toEqual(["3-c"])
+    expect(replied).toEqual([{ key: "k", anchor: "3-c", thread: A }])
     // A newer branch off an earlier message does not.
     const branched = sync(
       replied,
       tree({ "1-a": null, "2-b": "1-a", "3-c": "2-b", "4-x": "1-a" }),
     )
     expect(branched).toBe(replied)
-  })
-
-  test("a column binds to the one lane ending at its tip, then follows the lane past a newer fork", () => {
-    const bound = sync(
-      [{ key: "k", anchor: entryId("1-a") }],
-      tree({ "1-a": null, "2-t": "1-a" }),
-      [lane("2-t")],
+    // A branch at its end, 5-x, is another thread too, newer as it is.
+    const forked = sync(
+      replied,
+      tree({
+        "1-a": null,
+        "2-b": "1-a",
+        "3-c": "2-b",
+        "4-d": "3-c",
+        "5-x": "3-c",
+      }),
     )
-    expect(bound[0]).toEqual({ key: "k", anchor: "2-t", lane: L })
-    // A conversation steps down at 2-t (4-conv, newest) while the lane moves on to 3-next.
-    const grown = tree({
-      "1-a": null,
-      "2-t": "1-a",
-      "3-next": "2-t",
-      "4-conv": "2-t",
-    })
-    expect(sync(bound, grown, [lane("3-next")])[0]).toEqual({
-      key: "k",
-      anchor: "3-next",
-      lane: L,
-    })
+    expect(anchors(forked)).toEqual(["4-d"])
   })
 
-  test("no binding while two lanes end at the tip: which thread it is cannot be told", () => {
+  test("a column opened at an entry takes the thread that entry is in", () => {
+    const i = tree({ "1-a": null, "2-b": "1-a", "3-x": "1-a", "4-y": "3-x" })
+    expect(sync([{ key: "k", anchor: entryId("3-x") }], i)).toEqual([
+      { key: "k", anchor: "4-y", thread: threadOfEntry("3-x") },
+    ])
+  })
+
+  test("a fresh column waits for its own message, then follows its thread; before that, a lane created for it holds its fork", () => {
+    const T = threadIdFor("new")
+    const fresh: readonly Column[] = [
+      {
+        key: "k",
+        anchor: entryId("2-t"),
+        thread: T,
+        fresh: { sendId: "s-1" },
+      },
+    ]
     const i = tree({ "1-a": null, "2-t": "1-a" })
-    const two = [lane("2-t"), lane("2-t", laneNameForThread("m"))]
-    expect(
-      sync([{ key: "k", anchor: entryId("2-t") }], i, two)[0]?.lane,
-    ).toBeUndefined()
-  })
-
-  describe("a reserved lane (ADR-0057)", () => {
-    const R = laneNameForThread("r")
-    const reserve = (s: readonly Column[], key: string) =>
-      columnsReducer(s, { kind: "reserve", key, lane: R })
-
-    test("reserve keeps the id on the column keyed, and not on a bound one", () => {
-      const s = reserve([{ key: "k", anchor: entryId("1-a") }], "k")
-      expect(s[0]?.reserved).toBe(R)
-      const bound: readonly Column[] = [
-        { key: "k", anchor: entryId("1-a"), lane: L },
-      ]
-      expect(reserve(bound, "k")).toBe(bound)
-      // No column takes it: the same list, so a root stores none of its own.
-      expect(reserve(s, "other")).toBe(s)
-    })
-
-    test("a fresh column binds to its reserved lane once the lane has a tip, before its message is indexed", () => {
-      const fresh = reserve(
-        [{ key: "k", anchor: entryId("2-t"), fresh: { sendId: "s-1" } }],
-        "k",
-      )
-      const i = tree({ "1-a": null, "2-t": "1-a" })
-      // Created at the root, a lane has no tip until its prompt.
-      expect(sync(fresh, i, [lane(null, R)])).toBe(fresh)
-      expect(sync(fresh, i, [lane("2-t", R)])).toEqual([
-        { key: "k", anchor: "2-t", lane: R },
-      ])
-    })
-
-    test("binds by id even while a second lane ends at the same tip", () => {
-      const s = reserve([{ key: "k", anchor: entryId("2-t") }], "k")
-      const i = tree({ "1-a": null, "2-t": "1-a" })
-      expect(sync(s, i, [lane("2-t"), lane("2-t", R)])[0]?.lane).toBe(R)
-    })
-
-    test("a reservation that is no lane yet is kept as the column follows, and dropped as it binds to another", () => {
-      const s = reserve([{ key: "k", anchor: entryId("1-a") }], "k")
-      const i = tree({ "1-a": null, "2-b": "1-a" })
-      expect(sync(s, i)).toEqual([{ key: "k", anchor: "2-b", reserved: R }])
-      expect(sync(s, i, [lane("2-b")])).toEqual([
-        { key: "k", anchor: "2-b", lane: L },
-      ])
-    })
-
-    test("a fresh column keeps it as it anchors at a message sent to people", () => {
-      const s = reserve(
-        [{ key: "k", anchor: entryId("1-a"), fresh: { sendId: "s-1" } }],
-        "k",
-      )
-      const i = tree({ "1-a": null, "2-m": "1-a" }, { "2-m": "s-1" })
-      expect(sync(s, i)).toEqual([{ key: "k", anchor: "2-m", reserved: R }])
-    })
-  })
-
-  test("a fresh column anchors at the message its send wrote, whatever came first", () => {
-    const start = columnsReducer([{ key: "k", anchor: entryId("2-t") }], {
-      kind: "openFresh",
-      key: "fresh",
-      at: entryId("2-t"),
-      after: 0,
-    })
-    expect(start[1]).toEqual({ key: "fresh", anchor: "2-t", fresh: {} })
-    const sent = columnsReducer(start, {
-      kind: "sent",
-      key: "fresh",
-      sendId: "s-1",
-    })
-    // The lane's own next message at 2-t arrives first, and is not ours.
-    const laneFirst = tree({ "1-a": null, "2-t": "1-a", "3-lane": "2-t" })
-    expect(sync(sent, laneFirst)[1]).toEqual(sent[1])
+    expect(sync(fresh, i, [lane("2-t", T)])).toBe(fresh)
     const ours = tree(
       { "1-a": null, "2-t": "1-a", "3-lane": "2-t", "4-ours": "2-t" },
       { "4-ours": "s-1" },
     )
-    expect(sync(sent, ours)[1]).toEqual({ key: "fresh", anchor: "4-ours" })
+    // `withThreads` gives 4-ours its own thread, as its send's `starts` would.
+    const t4 = threadOfEntry("4-ours")
+    expect(
+      sync([{ ...fresh[0], thread: t4 } as Column], ours, [lane("4-ours", t4)]),
+    ).toEqual([{ key: "k", anchor: "4-ours", thread: t4 }])
+  })
+
+  test("a thread with no entry yet follows its lane's tip", () => {
+    const T = threadIdFor("new")
+    const col: readonly Column[] = [
+      { key: "k", anchor: entryId("1-a"), thread: T },
+    ]
+    const i = tree({ "1-a": null, "2-t": "1-a" })
+    expect(sync(col, i, [lane("2-t", T)])).toEqual([
+      { key: "k", anchor: "2-t", thread: T },
+    ])
+    expect(sync(col, i)).toBe(col)
   })
 
   test("openFresh goes after the column it branches from", () => {
@@ -151,7 +97,13 @@ describe("columnsReducer", () => {
         { key: "a", anchor: entryId("x") },
         { key: "b", anchor: entryId("y") },
       ],
-      { kind: "openFresh", key: "f", at: entryId("x"), after: 0 },
+      {
+        kind: "openFresh",
+        key: "f",
+        thread: threadIdFor("f"),
+        at: entryId("x"),
+        after: 0,
+      },
     )
     expect(after.map(c => c.key)).toEqual(["a", "f", "b"])
   })
@@ -160,6 +112,7 @@ describe("columnsReducer", () => {
     const opened = columnsReducer([{ key: "k", anchor: entryId("2-t") }], {
       kind: "openFresh",
       key: "b",
+      thread: threadIdFor("b"),
       at: entryId("2-t"),
       after: 0,
       pending: { text: "@agent separately?", card: cardId("c-1") },
@@ -175,6 +128,7 @@ describe("columnsReducer", () => {
     const opened = columnsReducer([{ key: "k", anchor: entryId("2-t") }], {
       kind: "openFresh",
       key: "b",
+      thread: threadIdFor("b"),
       at: entryId("2-t"),
       after: 0,
       prefill: { text: "@agent ", blank: true },
@@ -183,7 +137,12 @@ describe("columnsReducer", () => {
       prefill: { text: "@agent ", blank: true },
     })
     const sent = columnsReducer(opened, { kind: "sent", key: "b", sendId: "s" })
-    expect(sent[1]).toEqual({ key: "b", anchor: "2-t", fresh: { sendId: "s" } })
+    expect(sent[1]).toEqual({
+      key: "b",
+      anchor: "2-t",
+      thread: threadIdFor("b"),
+      fresh: { sendId: "s" },
+    })
   })
 
   test("open inserts next to the column it forks from", () => {
@@ -267,14 +226,18 @@ describe("columnsReducer", () => {
         columnsReducer(ab, { kind: "density", key: "z", density: "raw" }),
       ).toBe(ab)
     })
-    test("open details survive the column binding to its lane", () => {
-      const bound = sync(
-        [{ key: "k", anchor: entryId("1-a"), details: true, reserved: L }],
+    test("open details survive the column settling on its thread", () => {
+      const settled = sync(
+        [{ key: "k", anchor: entryId("1-a"), details: true }],
         tree({ "1-a": null, "2-t": "1-a" }),
-        [lane("2-t")],
       )
-      expect(bound).toEqual([
-        { key: "k", anchor: entryId("2-t"), lane: L, details: true },
+      expect(settled).toEqual([
+        {
+          key: "k",
+          anchor: entryId("2-t"),
+          thread: threadOfEntry("1-a"),
+          details: true,
+        },
       ])
     })
   })

@@ -19,9 +19,9 @@ import {
   type CatchUpFrom,
   type CommitId,
   type EntryId,
-  type LaneName,
-  type PlanMode,
   type Position,
+  type SendAt,
+  type ThreadId,
   type WriterId,
 } from "./index.ts"
 import { subjectOf } from "./tools.ts"
@@ -73,7 +73,7 @@ export interface PinnedCardRead {
 /** The pinned cards a run read: a cards entry's details, decoded. */
 export interface PinnedView {
   /** The lane of the run that read them. */
-  readonly lane: LaneName
+  readonly lane: ThreadId
   /** Every card pinned at the run's start, in order. */
   readonly cards: readonly PinnedCardRead[]
   /** Cards the model had read that are no longer pinned, with their first line. */
@@ -100,6 +100,8 @@ export interface AgentMessageLike {
   readonly command?: string
   /** Role `chat` only: the `/blob/` images its text shows (ADR-0042). */
   readonly images?: readonly ImageRef[]
+  /** Role `chat` only: the thread this message starts (ADR-0117), on its first message alone. */
+  readonly starts?: ThreadId
   /** Role `toolResult` only: the call it answers, and whether it failed. */
   readonly toolCallId?: string
   readonly isError?: boolean
@@ -554,6 +556,11 @@ export interface TreeIndex {
    * id before the entry exists, so it finds its first message here, exactly.
    */
   readonly bySend: ReadonlyMap<string, EntryId>
+  /**
+   * Each thread's first entry, by the thread it `starts` (ADR-0117). An id
+   * two entries claim keeps the older: a thread has one first entry.
+   */
+  readonly firstOf: ReadonlyMap<ThreadId, EntryId>
 }
 
 const ascending = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
@@ -569,10 +576,16 @@ export function indexTree(
   const roots: EntryId[] = []
   const orphans: EntryId[] = []
   const bySend = new Map<string, EntryId>()
+  const firstOf = new Map<ThreadId, EntryId>()
   for (const entry of Object.values(entries)) {
     const id = entry.id
     const send = entry.message?.sendId
     if (send !== undefined) bySend.set(send, id)
+    const starts = entry.message?.starts
+    if (starts !== undefined) {
+      const known = firstOf.get(starts)
+      if (known === undefined || id < known) firstOf.set(starts, id)
+    }
     const parent = entry.parentId
     if (parent === null || parent === undefined) roots.push(id)
     else if (entries[parent] === undefined) orphans.push(id)
@@ -590,6 +603,7 @@ export function indexTree(
     roots: roots.sort(ascending),
     orphans: orphans.sort(ascending),
     bySend,
+    firstOf,
   }
 }
 
@@ -769,35 +783,6 @@ export function latestTip(tips: Iterable<EntryId | null>): EntryId | null {
   return latest
 }
 
-/**
- * What a reader sees: the newest leaf at or below `at`, or `at` itself.
- *
- * A reply to the thread, including the agent's, adds a leaf below `at`, so the
- * view moves on to it. A branch elsewhere is not below `at`, so the view never
- * jumps to it.
- *
- * Leaves, not lane tips: a conversation thread has no lane at all (ADR-0120),
- * so its end is its newest leaf, whoever wrote it. A thread that has a lane is
- * followed through the lane instead (`threadOf`, and a bound column), because
- * a conversation forked at the lane's tip is newer and is not its thread.
- */
-export function followTip(index: TreeIndex, at: EntryId): EntryId {
-  if (index.entries[at] === undefined) return at
-  // Walk DOWN from `at`: the leaves below it are the only candidates, so there
-  // is no need to walk up from every leaf in the tree to find them.
-  const leaves: EntryId[] = []
-  const seen = new Set<EntryId>([at])
-  const stack = [...(index.childrenOf.get(at) ?? [])]
-  for (let id = stack.pop(); id !== undefined; id = stack.pop()) {
-    if (seen.has(id)) continue
-    seen.add(id)
-    const children = index.childrenOf.get(id) ?? []
-    if (children.length === 0) leaves.push(id)
-    else stack.push(...children)
-  }
-  return latestTip([at, ...leaves]) ?? at
-}
-
 // ── the rail: one root's tree ─────────────────────────────────────────────
 
 export interface RailRow {
@@ -884,7 +869,7 @@ export function projectRail(
 
 /** A lane as the reads see it. */
 export interface LaneView {
-  readonly name: LaneName
+  readonly name: ThreadId
   readonly tip: EntryId | null
   readonly running: boolean
   /** Cards queued for it (ADR-0048). */
@@ -922,76 +907,119 @@ export const isBusy = (lane: LaneView): boolean =>
 export const sendWaits = (lane: LaneView): boolean =>
   isBusy(lane) || lane.heldBy !== null
 
-/** Which thread a send continues, as the host and the composer both decide it. */
-export type ThreadOf =
-  | {
-      readonly kind: "thread"
-      /** Where a `reply` lands: the thread's end, or `at` for a `branch`. */
-      readonly end: Position
-      readonly lane: ThreadLane
-      /** Another writer's compelled message on the thread since `at`. */
-      readonly race: { readonly by: WriterId } | null
-    }
-  /** `at`, or the named lane, is not in this tree, or `at` is not on the lane. */
-  | { readonly kind: "unknown" }
-  /** Two lanes end where the sender is: which one they meant cannot be told. */
-  | { readonly kind: "ambiguous" }
+/** The thread an entry starts (ADR-0117), or null. */
+const startsAt = (index: TreeIndex, id: EntryId): ThreadId | null => {
+  const thread = index.entries[id]?.message?.starts
+  return thread !== undefined && index.firstOf.get(thread) === id
+    ? thread
+    : null
+}
 
 /**
- * Which thread a send continues. Pure; the host decides from it and the
- * composer labels from it, so the promise and the decision cannot differ.
- *
- * - A `branch` starts a thread at `at`, with no lane and nothing to race.
- * - A send naming its lane continues that lane: its tip is the end, wherever
- *   the newest leaf below `at` is (ADR-0021: a conversation forked at the
- *   lane's tip is newer, and is another thread).
- * - Otherwise the thread is the newest leaf below `at` (`followTip`), and its
- *   lane is the one ending there, if exactly one does.
- *
- * A race is judged along the thread's own path, from `at` down to its end: a
- * compelled message in a sibling fork is someone else's thread.
+ * The thread `entry` is in: the nearest entry at or above it that starts one
+ * (ADR-0117). Null for an entry not in the tree, or above every thread's
+ * first entry. Pure.
  */
-export function threadOf(
+export function threadAt(index: TreeIndex, entry: EntryId): ThreadId | null {
+  for (const id of ancestry(index, entry).path) {
+    const thread = startsAt(index, id)
+    if (thread !== null) return thread
+  }
+  return null
+}
+
+/**
+ * A thread's end (ADR-0117): from its first entry, down the child that starts
+ * no thread, to an entry with none. Exact, since only a branch gives an entry
+ * a second child, and a branch's first message names the thread it starts
+ * (`ChatDetails.starts`), in the commit that writes it. Null for a thread
+ * with no entry yet. Pure.
+ */
+export function threadEnd(index: TreeIndex, thread: ThreadId): EntryId | null {
+  const first = index.firstOf.get(thread)
+  if (first === undefined) return null
+  // Each entry has one parent, so going down a cycle is reached only through
+  // the first entry, which starts the thread and so ends the walk.
+  let end = first
+  for (;;) {
+    const next = (index.childrenOf.get(end) ?? []).find(
+      c => startsAt(index, c) === null,
+    )
+    if (next === undefined) return end
+    end = next
+  }
+}
+
+/** A thread's lane: the one named by its id, if it has one (ADR-0120). */
+export const laneOf = (
+  lanes: readonly LaneView[],
+  thread: ThreadId,
+): ThreadLane => {
+  const lane = lanes.find(l => l.name === thread)
+  return lane === undefined ? { kind: "none" } : { kind: "lane", ...lane }
+}
+
+/** Where a send goes, as the host decides it and the composer foresees it. */
+export type ThreadSend =
+  | {
+      readonly kind: "thread"
+      /** Where it lands: the thread's end, or the branch point. */
+      readonly end: Position
+      readonly lane: ThreadLane
+      /** Another writer's compelled message on the thread since the sender saw it. */
+      readonly race: { readonly by: WriterId } | null
+    }
+  /** The thread has no entry, or what the sender saw is not on it. */
+  | { readonly kind: "unknown" }
+  /** A branch names a thread that has started already. */
+  | { readonly kind: "taken" }
+
+/**
+ * Which thread a send continues (ADR-0117). Pure; the host decides from it
+ * and the composer labels from it, so the promise and the decision cannot
+ * differ.
+ *
+ * - A `branch` starts its thread at `at`, with no lane and nothing to race;
+ *   a thread that has started already is `taken`.
+ * - An `end` send lands at its thread's end (`threadEnd`), in its lane if it
+ *   has one. Before its first entry is written, a lane created for it holds
+ *   its fork: there it lands.
+ *
+ * A race is judged along the thread's own path, from what the sender saw
+ * down to its end: a compelled message in a sibling fork is someone else's
+ * thread.
+ */
+export function threadOfSend(
   index: TreeIndex,
   lanes: readonly LaneView[],
-  send: {
-    readonly at: Position
-    readonly mode: PlanMode
-    readonly lane: LaneName | null
-    readonly me: WriterId
-  },
-): ThreadOf {
+  send: { readonly at: SendAt; readonly me: WriterId },
+): ThreadSend {
   const { at } = send
-  if (at.kind === "entry" && index.entries[at.id] === undefined)
-    return { kind: "unknown" }
-  if (send.mode === "branch")
-    return { kind: "thread", end: at, lane: { kind: "none" }, race: null }
-  if (at.kind === "root") return { kind: "unknown" }
-
-  let end: EntryId
-  let lane: LaneView | undefined
-  if (send.lane !== null) {
-    // Named, the lane is the thread: never looked up again by its tip, which
-    // a lane just branched there may share for a moment.
-    lane = lanes.find(l => l.name === send.lane)
-    if (lane?.tip == null || !pathIds(index, lane.tip).has(at.id))
+  if (at.kind === "branch") {
+    if (index.firstOf.has(at.thread) || lanes.some(l => l.name === at.thread))
+      return { kind: "taken" }
+    if (at.at !== null && index.entries[at.at] === undefined)
       return { kind: "unknown" }
-    end = lane.tip
-  } else {
-    // A lane's tip is its thread's end (ADR-0120), so the end names the
-    // thread's lane with no stored mapping. Two lanes share a tip for a moment
-    // after a compelled branch at a lane's tip, until the new one's prompt
-    // commits: then the end names neither.
-    end = followTip(index, at.id)
-    const ending = lanes.filter(l => l.tip === end)
-    if (ending.length > 1) return { kind: "ambiguous" }
-    lane = ending[0]
+    return {
+      kind: "thread",
+      end: at.at === null ? { kind: "root" } : atEntry(at.at),
+      lane: { kind: "none" },
+      race: null,
+    }
   }
+  const lane = laneOf(lanes, at.thread)
+  const end =
+    threadEnd(index, at.thread) ?? (lane.kind === "lane" ? lane.tip : null)
+  if (end === null) return { kind: "unknown" }
+  // A queued card's turn was decided by its queue: nothing races it.
+  if (at.kind === "queue")
+    return { kind: "thread", end: atEntry(end), lane, race: null }
+  if (!pathIds(index, end).has(at.seen)) return { kind: "unknown" }
   return {
     kind: "thread",
     end: atEntry(end),
-    lane: lane === undefined ? { kind: "none" } : { kind: "lane", ...lane },
-    race: raceAlong(index, at.id, end, send.me),
+    lane,
+    race: raceAlong(index, at.seen, end, send.me),
   }
 }
 
@@ -1024,7 +1052,7 @@ function raceAlong(
 
 /** One lane the agent is replying on. */
 export interface AgentRun {
-  readonly lane: LaneName
+  readonly lane: ThreadId
   /** The lane's tip: the message it is answering, then its reply. */
   readonly tip: EntryId
 }
@@ -1034,7 +1062,7 @@ export interface AgentRun {
  * several can run at once; an empty list is an idle agent.
  */
 export function agentActivity(
-  running: readonly { readonly lane: LaneName; readonly tip: EntryId | null }[],
+  running: readonly { readonly lane: ThreadId; readonly tip: EntryId | null }[],
 ): readonly AgentRun[] {
   return running.flatMap(r =>
     r.tip === null ? [] : [{ lane: r.lane, tip: r.tip }],

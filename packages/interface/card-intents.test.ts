@@ -5,8 +5,8 @@ import {
   cardId,
   entryId,
   indexAsks,
-  laneNameForThread,
   rootIdFor,
+  threadIdFor,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -14,7 +14,7 @@ import type { Outcome } from "@pinetrie/protocol/codec"
 import { describe, expect, test } from "vitest"
 import { afterKeep } from "./card-intents.ts"
 import type { CardFacts, IntentState } from "./effects.ts"
-import { NEW_ROOT, tree } from "./fixtures.ts"
+import { NEW_ROOT, NEW_THREAD, tree } from "./fixtures.ts"
 import { type Intent, planIntent } from "./intent.ts"
 import {
   initialLayout,
@@ -66,7 +66,13 @@ const onR1: Layout = resolveLayout(
 const withFresh: Layout = layoutReducer(onR1, {
   kind: "columns",
   root: R1,
-  action: { kind: "openFresh", key: "f-1", at: A, after: 0 },
+  action: {
+    kind: "openFresh",
+    key: "f-1",
+    thread: NEW_THREAD,
+    at: A,
+    after: 0,
+  },
 })
 const threadKey = onR1.roots.get(R1)?.[0]?.key ?? ""
 
@@ -106,7 +112,7 @@ const state = (
   page: null,
 })
 const plan = (intent: Intent, s: IntentState) =>
-  planIntent(intent, s, "new-k", NEW_ROOT)
+  planIntent(intent, s, { key: "new-k", root: NEW_ROOT, thread: NEW_THREAD })
 const inColumn = (
   act: Extract<Intent, { kind: "column" }>["act"],
   key = "f-1",
@@ -509,6 +515,7 @@ describe("undo and redo of moves (ADR-0066)", () => {
       kind: "newTab",
       key: "n",
       root: NEW_ROOT,
+      thread: NEW_THREAD,
       asksAgent: false,
     })
     expect(
@@ -558,7 +565,7 @@ describe("afterUndo: what an undo's answer brings into view (ADR-0052)", () => {
             kind: "queued",
             root: TEST_ROOT,
             at: atEntry(A),
-            lane: laneNameForThread("x"),
+            lane: threadIdFor("x"),
             seen: "",
           },
         },
@@ -609,7 +616,13 @@ describe("afterUndo: what an undo's answer brings into view (ADR-0052)", () => {
         action: {
           kind: "columns",
           root: R1,
-          action: { kind: "openFresh", key: "f-1", at: A, after: 0 },
+          action: {
+            kind: "openFresh",
+            key: "f-1",
+            thread: NEW_THREAD,
+            at: A,
+            after: 0,
+          },
         },
       },
     ])
@@ -686,7 +699,7 @@ describe("a card made a thread (ADR-0111)", () => {
   const spun = (root: typeof TEST_ROOT | null) => ({
     kind: "gone",
     root,
-    why: { kind: "spun", thread: NEW_ROOT },
+    why: { kind: "spun", into: NEW_ROOT, thread: NEW_THREAD },
   })
   test.each([
     [

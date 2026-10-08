@@ -9,8 +9,8 @@ import {
   ERR,
   type ErrCode,
   entryId,
-  type LaneName,
   type Position,
+  type ThreadId,
 } from "@pinetrie/core"
 import type {
   BehindMessage,
@@ -48,7 +48,7 @@ export type AppendOutcome =
   | LaneRefusal
 
 export type CreateOutcome =
-  | { readonly kind: "created"; readonly lane: LaneName }
+  | { readonly kind: "created"; readonly lane: ThreadId }
   | LaneRefusal
 
 /**
@@ -107,7 +107,7 @@ export type BeforePrompt = BehindMessage | PinnedMessage
  * while it is idle (S21).
  */
 export interface ThreadLaneHandle {
-  readonly name: LaneName
+  readonly name: ThreadId
   /**
    * Append with no run, through the pi `Lane`: it plans from its own cached
    * tip, so a write that bypasses it would be dropped from its next turn (S19).
@@ -149,10 +149,10 @@ export interface ThreadLanes {
    * ADR-0057). Called only where no lane is; refused `lane_id_in_use` for an id
    * pi holds, since `harness.lane` would return that lane instead.
    */
-  createThreadLane(at: Position, lane: LaneName): Promise<CreateOutcome>
-  lane(name: LaneName): ThreadLaneHandle
+  createThreadLane(at: Position, lane: ThreadId): Promise<CreateOutcome>
+  lane(name: ThreadId): ThreadLaneHandle
   /** Lanes pi holds an operation open on: a crash interrupted them. */
-  interrupted(): Promise<readonly LaneName[]>
+  interrupted(): Promise<readonly ThreadId[]>
 }
 
 export function threadLanes(input: {
@@ -160,12 +160,12 @@ export function threadLanes(input: {
   /** The root's document the harness is over: its lanes' records are there. */
   readonly doc: RootDocHandle
   /** Record the lane's last turn: awaited after each run. */
-  readonly recordTurn: (lane: LaneName) => Promise<void>
+  readonly recordTurn: (lane: ThreadId) => Promise<void>
   /** The tools every lane's runs may call; null when the agent has no tools. */
   readonly activeTools: readonly string[] | null
 }): ThreadLanes {
   const { harness, doc } = input
-  const held = new Map<LaneName, PiLane>()
+  const held = new Map<ThreadId, PiLane>()
 
   /**
    * A thread's pi lane: held, or restored after a restart. Checked against the
@@ -173,7 +173,7 @@ export function threadLanes(input: {
    * A restored lane stored with another tool list is given the current one,
    * once: a new lane takes it from the harness's seed.
    */
-  async function existing(name: LaneName): Promise<PiLane | undefined> {
+  async function existing(name: ThreadId): Promise<PiLane | undefined> {
     const cached = held.get(name)
     if (cached !== undefined) return cached
     if (!hasLaneRecord(doc, name)) return undefined
@@ -186,14 +186,14 @@ export function threadLanes(input: {
   }
 
   async function onLane<T>(
-    name: LaneName,
+    name: ThreadId,
     f: (lane: PiLane) => Promise<T | LaneRefusal>,
   ): Promise<T | LaneRefusal> {
     const lane = await existing(name)
     return lane === undefined ? UNKNOWN : f(lane)
   }
 
-  function handle(name: LaneName): ThreadLaneHandle {
+  function handle(name: ThreadId): ThreadLaneHandle {
     const ctx = laneContext(name, CTX)
     // A run that pi admitted and that then failed is still "ok" here: it
     // ran. Only an admission refusal is `refused`.
@@ -248,7 +248,7 @@ export function threadLanes(input: {
     },
 
     async interrupted() {
-      const out: LaneName[] = []
+      const out: ThreadId[] = []
       for (const name of readLaneNames(doc)) {
         const lane = await existing(name)
         if (lane === undefined) continue

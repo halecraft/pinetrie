@@ -6,7 +6,7 @@
 
 import type { Exchange } from "@kyneta/exchange"
 import { batch } from "@kyneta/schema"
-import type { EntryId, LaneName, RootRecord, WriterId } from "@pinetrie/core"
+import type { EntryId, RootRecord, ThreadId, WriterId } from "@pinetrie/core"
 import { personDocId } from "@pinetrie/protocol/writers"
 import { type Attention, AttentionDoc, readAttention } from "@pinetrie/schema"
 import { personDoc } from "./person-doc.ts"
@@ -41,13 +41,13 @@ export interface SeenMentions {
 export interface AttentionStore {
   readonly attention: Readable<Attention>
   /** A column of `lane` follows its end, at `entry`. */
-  read(lane: LaneName, entry: EntryId): void
+  read(lane: ThreadId, entry: EntryId): void
   /** A column has left its thread's end, or the page is hidden: write every waiting mark. */
   leave(): void
   /** Mark `lane`'s verdict, of the run `ask` started, "not needed". */
-  dismiss(lane: LaneName, ask: EntryId): void
+  dismiss(lane: ThreadId, ask: EntryId): void
   /** Mark `lane`'s offer "not needed" while it holds `source`. */
-  dismissOffer(lane: LaneName, source: string): void
+  dismissOffer(lane: ThreadId, source: string): void
   /** The mentions seen, as the inbox decided them next. */
   setInbox(next: SeenMentions): void
   dispose(): void
@@ -85,7 +85,7 @@ export function attentionStore(
   }
 
   const step = (
-    next: { lane: LaneName; entry: EntryId } | null,
+    next: { lane: ThreadId; entry: EntryId } | null,
     leaving: boolean,
   ) => {
     const out = readStep(memory, {

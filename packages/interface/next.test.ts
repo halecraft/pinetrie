@@ -8,9 +8,9 @@ import {
   entryId,
   indexAsks,
   type LaneView,
-  laneNameForThread,
   PLAIN,
   type StopRecord,
+  threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
@@ -26,7 +26,7 @@ import {
   queueHeadPlan,
 } from "./next.ts"
 
-const A = laneNameForThread("a")
+const A = threadIdFor("a")
 const ADA = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
 

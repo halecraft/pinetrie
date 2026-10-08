@@ -5,13 +5,7 @@ import {
   BACKGROUND_CONTEXT as CTX,
   type StorageBackedSession,
 } from "@earendil-works/pi-agent-core"
-import {
-  atEntry,
-  laneNameForThread,
-  NOBODY,
-  ROOT,
-  writerId,
-} from "@pinetrie/core"
+import { atEntry, NOBODY, ROOT, threadIdFor, writerId } from "@pinetrie/core"
 import { encodeChat } from "@pinetrie/rules"
 import { newRootDoc } from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
@@ -44,7 +38,7 @@ describe("one session per document (S113)", () => {
     expect(
       await pi.agent.createThreadLane(
         { root: ONE_ROOT, at: ROOT },
-        laneNameForThread(newId()),
+        threadIdFor(newId()),
       ),
     ).toMatchObject({ kind: "created" })
     const appended = await pi.scribe.appendToTree(chat("hello"), {
@@ -52,7 +46,7 @@ describe("one session per document (S113)", () => {
       at: ROOT,
     })
     if (appended.kind !== "appended") throw new Error("not appended")
-    const there = laneNameForThread(newId())
+    const there = threadIdFor(newId())
     expect(
       await pi.agent.createThreadLane(
         { root: ONE_ROOT, at: atEntry(appended.id) },
@@ -100,7 +94,7 @@ describe("one session per document (S113)", () => {
     })
     const made = await pi.agent.createThreadLane(
       { root: ONE_ROOT, at: ROOT },
-      laneNameForThread(newId()),
+      threadIdFor(newId()),
     )
     if (made.kind !== "created") throw new Error("no lane")
     expect(await pi.agent.lane(made.lane).run(chat("one"), [])).toEqual({

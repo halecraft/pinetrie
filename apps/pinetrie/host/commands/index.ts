@@ -8,6 +8,7 @@ import {
   errorText,
   type Intent,
   type RootId,
+  type SendAt,
   type WriterId,
 } from "@pinetrie/core"
 import {
@@ -73,7 +74,7 @@ export interface CommandDeps {
     BoardDeps["cards"]
   readonly start: ChatDeps["start"]
   readonly cancel: LaneDeps["cancel"]
-  readonly names: Pick<Names, "reserve">
+  readonly names: Pick<Names, "reserve" | "ensure">
   readonly titles: ChatDeps["titles"] & Pick<Titles, "asked">
   readonly drain: CardCommandDeps["drain"]
   readonly histories: CardCommandDeps["histories"]
@@ -190,7 +191,7 @@ export function createCommands(deps: CommandDeps): Commands {
         const sent = await sendChat(deps, writer, sendId, intent)
         // A thread at the root that was written started a root: it takes its
         // place on the board in the same step (ADR-0122).
-        if (intent.at.kind === "root" && spendsCard(sent))
+        if (startsRoot(intent.at) && spendsCard(sent))
           await placeNewRoot(deps, writer, intent)
         const card = intent.card
         if (card === null) return settled(sent)
@@ -277,14 +278,16 @@ export function createCommands(deps: CommandDeps): Commands {
     handle,
     async sendPoppedQueuedCard(writer, sendId, chat) {
       return (
-        refuseInArchive(
-          deps.basics,
-          chat.at.kind === "root" ? [] : [chat.root],
-        ) ?? (await sendChat(deps, writer, sendId, chat))
+        refuseInArchive(deps.basics, startsRoot(chat.at) ? [] : [chat.root]) ??
+        (await sendChat(deps, writer, sendId, chat))
       )
     },
   }
 }
+
+/** Whether a send starts a root: a branch at no entry. */
+const startsRoot = (at: SendAt): boolean =>
+  at.kind === "branch" && at.at === null
 
 /** A root a chat started, put at the end of the state its sender chose (ADR-0122). */
 async function placeNewRoot(

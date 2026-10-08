@@ -13,9 +13,9 @@ import path from "node:path"
 import {
   ancestry,
   entryId,
-  type LaneName,
   messageText,
   projectTranscript,
+  type ThreadId,
 } from "@pinetrie/core"
 import { dockerWords } from "@pinetrie/docker"
 import { scriptedModel } from "@pinetrie/pi"
@@ -209,7 +209,7 @@ export function cleanUp(
  * `script` run in a lane's container, as root, between runs: the container
  * is started for it and stopped after, as the host would.
  */
-export function inLane(lane: LaneName, script: string): string {
+export function inLane(lane: ThreadId, script: string): string {
   const name = container(lane)
   const wasRunning = isRunning(name)
   try {
@@ -226,7 +226,7 @@ export function inLane(lane: LaneName, script: string): string {
 }
 
 /** `inLane` for a lane that is running now; empty if it is not. */
-export function inLaneQuiet(lane: LaneName, script: string): string {
+export function inLaneQuiet(lane: ThreadId, script: string): string {
   try {
     return cli(["exec", container(lane), "sh", "-c", script])
   } catch {

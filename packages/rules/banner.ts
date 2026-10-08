@@ -5,13 +5,13 @@
 import {
   type BannerRecord,
   isSha256,
-  type LaneName,
   type Sha256,
+  type ThreadId,
   type ThreadName,
 } from "@pinetrie/core"
 import { Type } from "typebox"
 import { type ModelRef, modelRef, recordOf } from "./config.ts"
-import { decodeAt, laneKey } from "./decode.ts"
+import { decodeAt, threadKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 const BannerRecordSchema = Type.Object({
@@ -20,13 +20,13 @@ const BannerRecordSchema = Type.Object({
 })
 
 /** Each thread's column banner, the image's hash, at its lane. */
-export const BANNER: RecordSpec<BannerRecord, LaneName, "session"> = {
+export const BANNER: RecordSpec<BannerRecord, ThreadId, "session"> = {
   namespace: "pinetrie.banner",
   home: "session",
   keyOf: r => r.lane,
   encode: ({ lane, ...contents }) => contents,
   decode: (contents, key) =>
-    decodeAt(BannerRecordSchema, contents, laneKey(key), (r, lane) =>
+    decodeAt(BannerRecordSchema, contents, threadKey(key), (r, lane) =>
       isSha256(r.sha) ? { lane, sha: r.sha, at: r.at } : undefined,
     ),
 }

@@ -6,20 +6,16 @@ import {
   applyEdits,
   atEntry,
   baseKnown,
-  type ChatMode,
+  type ChatAt,
   cardId,
   conflictAskedAt,
   type EntryLike,
   entryId,
-  followTip,
   indexTree,
-  type LaneName,
-  laneNameForThread,
   messageAt,
   messageImages,
   newestOnPath,
   type PinnedView,
-  type Position,
   pinnedInView,
   projectRail,
   projectSpine,
@@ -29,9 +25,13 @@ import {
   rootOf,
   startsRun,
   subjectOf,
+  type ThreadId,
   TOOL_IDS,
   tailEdit,
-  threadOf,
+  threadAt,
+  threadEnd,
+  threadIdFor,
+  threadOfSend,
   toolIdOf,
   turnEntry,
   turnMerged,
@@ -90,35 +90,6 @@ describe("indexTree and ancestry", () => {
       path: ["x", "y"],
       cycleAt: "x",
     })
-  })
-})
-
-describe("followTip: the view follows the thread you are reading", () => {
-  const entries = tree({
-    "1-a1": null,
-    "2-a2": "1-a1",
-    "3-b2": "1-a1",
-    "4-a3": "2-a2",
-  })
-  test("follows a newer reply below what you read, whichever lane wrote it", () => {
-    expect(followTip(indexTree(entries), entryId("2-a2"))).toBe("4-a3")
-  })
-  test("never jumps to a branch that is not below you", () => {
-    const newer = { ...entries, ...tree({ "5-b3": "3-b2" }) }
-    expect(followTip(indexTree(newer), entryId("2-a2"))).toBe("4-a3")
-  })
-  test("a cycle stops the walk rather than spinning", () => {
-    expect(
-      followTip(indexTree(tree({ w: "x", x: "y", y: "x" })), entryId("z")),
-    ).toBe("z")
-  })
-  test("walking down from an entry on a cycle ends", () => {
-    // Going down, a cycle is reachable only from inside it: each entry has one
-    // parent, so no chain leaves a cycle to reach it from outside.
-    // Every entry on a cycle has a child, so there is no leaf below: `at` stands.
-    expect(followTip(indexTree(tree({ x: "y", y: "x" })), entryId("x"))).toBe(
-      "x",
-    )
   })
 })
 
@@ -222,9 +193,9 @@ describe("agentActivity", () => {
   test("the agent is idle with no running lane; a lane runs once it has a tip", () => {
     expect(agentActivity([])).toEqual([])
     const runs = agentActivity([
-      { lane: laneNameForThread("a"), tip: entryId("5-a2") },
-      { lane: laneNameForThread("b"), tip: entryId("7-b2") },
-      { lane: laneNameForThread("new"), tip: null },
+      { lane: threadIdFor("a"), tip: entryId("5-a2") },
+      { lane: threadIdFor("b"), tip: entryId("7-b2") },
+      { lane: threadIdFor("new"), tip: null },
     ])
     expect(runs.map(r => [r.lane, r.tip])).toEqual([
       ["t-a", "5-a2"],
@@ -233,21 +204,30 @@ describe("agentActivity", () => {
   })
 })
 
-describe("threads: where a message lands, and whether it raced", () => {
-  // 1-q is Wu's question; below it the agent's reply, a remark, and questions.
+describe("threads: where each starts and ends, and where a send lands", () => {
+  // 1-q is Wu's question, starting thread q; below it the agent's reply, a
+  // remark, and questions.
   const say = (
     id: string,
     parentId: string | null,
-    extra: { readonly writer: string; readonly compelled: boolean },
+    extra: {
+      readonly writer: string
+      readonly compelled: boolean
+      readonly starts?: string
+    },
   ) =>
     entry(id, parentId, {
       role: "chat",
       content: id,
       writer: writerId(extra.writer),
       compelled: extra.compelled,
+      ...(extra.starts === undefined
+        ? {}
+        : { starts: threadIdFor(extra.starts) }),
     })
+  const Q = threadIdFor("q")
   const entries = entriesOf([
-    say("1-q", null, { writer: "wu", compelled: true }),
+    say("1-q", null, { writer: "wu", compelled: true, starts: "q" }),
     entry("2-r", "1-q", { role: "assistant", content: "r" }),
     say("3-plain", "2-r", { writer: "bo", compelled: false }),
     say("4-mine", "3-plain", { writer: "wu", compelled: true }),
@@ -255,8 +235,8 @@ describe("threads: where a message lands, and whether it raced", () => {
   const at = (id: string) => atEntry(entryId(id))
 
   const me = writerId("wu")
-  const lane = (tip: string | null, name = "x") => ({
-    name: laneNameForThread(name),
+  const lane = (tip: string | null, name: ThreadId = Q) => ({
+    name,
     tip: tip === null ? null : entryId(tip),
     running: false,
     waiting: 0,
@@ -264,114 +244,145 @@ describe("threads: where a message lands, and whether it raced", () => {
     lastWaiting: null,
     heldBy: null,
   })
-  const send = (
-    at: Position,
-    mode: ChatMode = "reply",
-    named: LaneName | null = null,
-  ) => ({ at, mode, lane: named, me })
-
-  test("threadOf: a reply lands at the newest leaf; a branch starts at `at`, with no lane", () => {
-    const i = indexTree(entries)
-    const lanes = [lane("4-mine")]
-    expect(threadOf(i, lanes, send(at("1-q")))).toMatchObject({
-      end: at("4-mine"),
-      lane: { kind: "lane" },
-    })
-    expect(threadOf(i, lanes, send(at("4-mine"), "branch"))).toEqual({
-      kind: "thread",
-      end: at("4-mine"),
-      lane: { kind: "none" },
-      race: null,
-    })
-    // Only a branch starts at the root, and an unknown entry is no thread.
-    expect(threadOf(i, lanes, send(ROOT)).kind).toBe("unknown")
-    expect(threadOf(i, lanes, send(ROOT, "branch")).kind).toBe("thread")
-    expect(threadOf(i, lanes, send(at("9-gone"))).kind).toBe("unknown")
+  const end = (seen: string, thread: ThreadId = Q): ChatAt => ({
+    kind: "end",
+    thread,
+    seen: entryId(seen),
+  })
+  const branch = (thread: string, from: string | null): ChatAt => ({
+    kind: "branch",
+    thread: threadIdFor(thread),
+    at: from === null ? null : entryId(from),
   })
 
-  test("threadOf: a named lane is its thread, past a newer conversation forked at its tip", () => {
-    // 5-conv steps down at the lane's old tip; the lane then moved on to 6-next.
+  test("threadEnd steps down the child that starts no thread, past a newer branch", () => {
     const i = indexTree({
       ...entries,
       ...entriesOf([
-        say("6-next", "4-mine", { writer: "wu", compelled: false }),
-        say("7-conv", "4-mine", { writer: "bo", compelled: false }),
+        say("5-next", "4-mine", { writer: "wu", compelled: false }),
+        say("6-b", "4-mine", { writer: "bo", compelled: false, starts: "b" }),
+        say("7-b2", "6-b", { writer: "bo", compelled: false }),
       ]),
     })
-    const lanes = [lane("6-next")]
-    expect(threadOf(i, lanes, send(at("4-mine"))).kind).toBe("thread")
-    // Unnamed, the newest leaf wins: the conversation.
-    expect(threadOf(i, lanes, send(at("4-mine")))).toMatchObject({
-      end: at("7-conv"),
-    })
-    const named = threadOf(
-      i,
-      lanes,
-      send(at("4-mine"), "reply", lanes[0]?.name),
+    expect(threadEnd(i, Q)).toBe("5-next")
+    expect(threadEnd(i, threadIdFor("b"))).toBe("7-b2")
+    expect(threadEnd(i, threadIdFor("none"))).toBeNull()
+  })
+
+  test("threadEnd ends on a cycle through its first entry", () => {
+    const i = indexTree(
+      entriesOf([
+        say("1-x", "2-y", { writer: "wu", compelled: false, starts: "c" }),
+        say("2-y", "1-x", { writer: "wu", compelled: false }),
+      ]),
     )
-    expect(named).toMatchObject({ end: at("6-next"), lane: { kind: "lane" } })
-    // `at` off the lane's path, or a lane that does not exist: refused.
+    expect(threadEnd(i, threadIdFor("c"))).toBe("2-y")
+  })
+
+  test("threadAt: the nearest entry at or above that starts a thread", () => {
+    const i = indexTree({
+      ...entries,
+      ...entriesOf([
+        say("6-b", "2-r", { writer: "bo", compelled: false, starts: "b" }),
+        say("7-b2", "6-b", { writer: "bo", compelled: false }),
+      ]),
+    })
+    expect(threadAt(i, entryId("4-mine"))).toBe(Q)
+    expect(threadAt(i, entryId("2-r"))).toBe(Q)
+    expect(threadAt(i, entryId("7-b2"))).toBe(threadIdFor("b"))
+    expect(threadAt(i, entryId("9-gone"))).toBeNull()
+  })
+
+  test("an id two entries claim keeps the older as its first", () => {
+    const i = indexTree({
+      ...entries,
+      ...entriesOf([
+        say("5-dup", "4-mine", { writer: "bo", compelled: false, starts: "q" }),
+      ]),
+    })
+    expect(i.firstOf.get(Q)).toBe("1-q")
+    expect(threadEnd(i, Q)).toBe("5-dup")
+  })
+
+  test("threadOfSend: an end send lands at its thread's end, in its lane; a branch starts at its fork", () => {
+    const i = indexTree(entries)
+    const lanes = [lane("4-mine")]
+    expect(threadOfSend(i, lanes, { at: end("1-q"), me })).toMatchObject({
+      end: at("4-mine"),
+      lane: { kind: "lane", name: Q },
+    })
+    expect(threadOfSend(i, lanes, { at: branch("new", "4-mine"), me })).toEqual(
+      {
+        kind: "thread",
+        end: at("4-mine"),
+        lane: { kind: "none" },
+        race: null,
+      },
+    )
     expect(
-      threadOf(i, lanes, send(at("7-conv"), "reply", lanes[0]?.name)).kind,
+      threadOfSend(i, lanes, { at: branch("new", null), me }),
+    ).toMatchObject({ end: ROOT })
+    // A thread with an entry, or a lane, is taken; an unknown entry is none.
+    expect(threadOfSend(i, lanes, { at: branch("q", "4-mine"), me }).kind).toBe(
+      "taken",
+    )
+    expect(
+      threadOfSend(i, lanes, { at: branch("new", "9-gone"), me }).kind,
     ).toBe("unknown")
     expect(
-      threadOf(i, lanes, send(at("4-mine"), "reply", laneNameForThread("no")))
-        .kind,
+      threadOfSend(i, lanes, { at: end("1-q", threadIdFor("no")), me }).kind,
     ).toBe("unknown")
   })
 
-  test("threadOf: one lane ending at the end is its lane; two are ambiguous", () => {
-    const i = indexTree(entries)
-    const lane4 = (lanes: ReturnType<typeof lane>[]) =>
-      threadOf(i, lanes, send(at("4-mine")))
-    expect(lane4([lane("4-mine")])).toMatchObject({ lane: { kind: "lane" } })
-    expect(lane4([lane("3-plain")])).toMatchObject({ lane: { kind: "none" } })
-    expect(lane4([lane("4-mine", "x"), lane("4-mine", "y")]).kind).toBe(
-      "ambiguous",
-    )
-  })
-
-  test("threadOf: a named lane is that lane, even while another shares its tip", () => {
-    const i = indexTree(entries)
-    const y = laneNameForThread("y")
-    expect(
-      threadOf(
-        i,
-        [lane("4-mine", "x"), lane("4-mine", "y")],
-        send(at("4-mine"), "reply", y),
-      ),
-    ).toMatchObject({ lane: { kind: "lane", name: y } })
-  })
-
-  test("threadOf race: an agent reply, a plain remark and my own question are not a race", () => {
-    expect(threadOf(indexTree(entries), [], send(at("1-q")))).toMatchObject({
-      race: null,
+  test("threadOfSend: what the sender saw off its thread is refused", () => {
+    const i = indexTree({
+      ...entries,
+      ...entriesOf([
+        say("6-b", "2-r", { writer: "bo", compelled: false, starts: "b" }),
+      ]),
     })
+    expect(threadOfSend(i, [], { at: end("6-b"), me }).kind).toBe("unknown")
   })
 
-  test("threadOf race: another writer's compelled message on the thread is; in a sibling fork, not", () => {
+  test("threadOfSend: before its first entry, a thread's lane holds its fork", () => {
+    const i = indexTree(entries)
+    const b = threadIdFor("b")
+    expect(
+      threadOfSend(i, [lane("2-r", b)], { at: end("2-r", b), me }),
+    ).toMatchObject({ end: at("2-r"), lane: { kind: "lane", name: b } })
+  })
+
+  test("threadOfSend race: an agent reply, a plain remark and my own question are not a race", () => {
+    expect(
+      threadOfSend(indexTree(entries), [], { at: end("1-q"), me }),
+    ).toMatchObject({ race: null })
+  })
+
+  test("threadOfSend race: another writer's compelled message on the thread is; in a branch, not; a queued card's never", () => {
     const raced = indexTree({
       ...entries,
       ...entriesOf([
         say("5-theirs", "4-mine", { writer: "bo", compelled: true }),
       ]),
     })
-    expect(threadOf(raced, [], send(at("1-q")))).toMatchObject({
+    expect(threadOfSend(raced, [], { at: end("1-q"), me })).toMatchObject({
       race: { by: "w-bo" },
     })
-    // Nothing below the newest message: no race from there.
-    expect(threadOf(raced, [], send(at("5-theirs")))).toMatchObject({
+    expect(threadOfSend(raced, [], { at: end("5-theirs"), me })).toMatchObject({
       race: null,
     })
-    // Bob asks in a fork at 2-r; my thread continues through 6-mine, newer.
+    expect(
+      threadOfSend(raced, [], { at: { kind: "queue", thread: Q }, me }),
+    ).toMatchObject({ end: at("5-theirs"), race: null })
+    // Bob asks in a branch at 2-r; my thread continues through 6-mine.
     const forked = indexTree({
       ...entries,
       ...entriesOf([
-        say("5-fork", "2-r", { writer: "bo", compelled: true }),
+        say("5-fork", "2-r", { writer: "bo", compelled: true, starts: "b" }),
         say("6-mine", "4-mine", { writer: "wu", compelled: false }),
       ]),
     })
-    expect(threadOf(forked, [], send(at("1-q")))).toMatchObject({
+    expect(threadOfSend(forked, [], { at: end("1-q"), me })).toMatchObject({
       end: at("6-mine"),
       race: null,
     })
@@ -598,8 +609,8 @@ describe("pinned cards in the tree (ADR-0048)", () => {
     text,
     by: writerId("ada@example.com"),
   })
-  const LANE = laneNameForThread("x")
-  const OTHER = laneNameForThread("p")
+  const LANE = threadIdFor("x")
+  const OTHER = threadIdFor("p")
   const cards = (
     id: string,
     parent: string | null,

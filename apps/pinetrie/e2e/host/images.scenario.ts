@@ -3,7 +3,7 @@
 import { mkdtempSync } from "node:fs"
 import { tmpdir } from "node:os"
 import path from "node:path"
-import { type ImageRef, type LaneName, ROOT } from "@pinetrie/core"
+import { type ImageRef, ROOT, type ThreadId } from "@pinetrie/core"
 import { scriptedModel, sha256Of } from "@pinetrie/pi"
 import { openStore } from "../../host/store.ts"
 import type { Checks } from "../checks.ts"
@@ -111,7 +111,7 @@ async function run(check: Checks["check"]): Promise<void> {
     })
     await waitFor(() => paused.reached, 10_000)
     const queuedText = `@agent and this? ![green](/blob/${green.sha256})`
-    const lane = laneNamesOf(ih)[0] as LaneName | undefined
+    const lane = laneNamesOf(ih)[0] as ThreadId | undefined
     const queued = await composeAt(
       iu,
       { entry: replyId, lane: lane ?? null },
