@@ -70,7 +70,6 @@ export {
   threadWriters,
 } from "./attention.ts"
 export {
-  type BoardItem,
   type BoardSide,
   type BoardView,
   boardView,
@@ -80,8 +79,16 @@ export {
   readyWords,
   type StripState,
   stripWords,
+  type ThreadCard,
 } from "./board-view.ts"
-export { reorderOf } from "./card-intents.ts"
+export {
+  type CardFrameFacts,
+  type CardFrameView,
+  cardFrame,
+  cardFrameWords,
+  moveWords,
+  type QueueOn,
+} from "./card-frame.ts"
 export { cardKeyAct } from "./card-keys.ts"
 export {
   cardMarks,
@@ -95,51 +102,37 @@ export {
   type EditorStep,
   editorState,
   free,
-  needsCard,
-  shownBelow,
   shownBy,
   startText,
 } from "./card-state.ts"
 export {
   type CatchUps,
   CLEAR_COMMAND,
-  cardStatus,
   closeAskWords,
-  commandNote,
   DISCARD,
   DISCARD_CARD,
   DISCARD_CARD_TITLE,
-  HISTORY,
   HISTORY_TITLE,
+  historyItemWords,
   historyWords,
   INVENTORY,
   KEEP_IN_INVENTORY,
   movedBackWords,
-  NEW_CARD,
-  NEW_CARD_TITLE,
   NEW_PIN,
   NEW_PIN_PLACEHOLDER,
   NEW_PIN_TITLE,
+  NOTES_EMPTY,
   noticeKey,
   noticeWords,
-  PIN,
-  PIN_TITLE,
   PINNED_EMPTY,
   PUT,
   PUT_TITLE,
   pinnedMarkerWords,
-  pinnedStatusWords,
-  pinnedWords,
-  queuedWords,
-  reorderWords,
   retiredWords,
   sizeWords,
+  TAKE_COPY,
   TAKE_COPY_INTO_INVENTORY,
-  TAKE_INTO_INVENTORY,
-  TAKE_INTO_INVENTORY_TITLE,
   traceWords,
-  UNPIN,
-  UNQUEUE,
   writtenWords,
 } from "./card-words.ts"
 export type { Codec } from "./codec.ts"
@@ -280,22 +273,9 @@ export {
   showsText,
 } from "./message-tools.ts"
 export {
-  cardHeading,
   speakerLabel,
   withContributors,
 } from "./names.ts"
-export {
-  dropsWords,
-  type ItemIcon,
-  type ItemMenuItem,
-  listKey,
-  type OpenListView,
-  offeredByRoot,
-  openListView,
-  pageTitle,
-  renameIntent,
-  rootSprites,
-} from "./open-list-view.ts"
 export {
   BACK,
   hashOfPage,
@@ -445,6 +425,18 @@ export {
   whereChoices,
   whereWords,
 } from "./send.ts"
+export {
+  dropsWords,
+  type ItemIcon,
+  type ItemMenuItem,
+  listKey,
+  offeredByRoot,
+  pageTitle,
+  renameIntent,
+  rootSprites,
+  type SidebarView,
+  sidebarView,
+} from "./sidebar-view.ts"
 export {
   CALL_MARK,
   callStatus,

@@ -1,5 +1,5 @@
 // web/inbox-menu — your inbox's menu (ADR-0091): in the footer's corner as
-// an icon with its badge, and, while your list is folded, inside the account
+// an icon with its badge, and, while the sidebar is folded, inside the account
 // menu (`account-menu.tsx`, ADR-0098). One hook builds its sections for both.
 // A thread's row (`threadRow`) is here too: the board's readers' menus use it.
 
@@ -81,7 +81,7 @@ export interface InboxMenuProps {
 /**
  * Your inbox's menu (ADR-0091): what the threads you follow raise for you,
  * then mentions of you. What goes in which section is `inboxView`'s; this
- * turns them into rows. Both the corner's inbox and, while your list is
+ * turns them into rows. Both the corner's inbox and, while the sidebar is
  * folded, the account menu draw it, so its rows, "not needed", the filter
  * and "mark all seen" are one code path.
  */

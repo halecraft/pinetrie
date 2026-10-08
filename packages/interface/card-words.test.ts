@@ -12,7 +12,6 @@ import {
 import type { CardNotice } from "@pinetrie/session"
 import { describe, expect, test } from "vitest"
 import {
-  cardStatus,
   commandNote,
   commandWords,
   historyWords,
@@ -20,8 +19,6 @@ import {
   noticeWords,
   pinnedMarkerWords,
   pinnedStatusWords,
-  pinnedWords,
-  queuedWords,
   retiredWords,
   sizeWords,
   traceWords,
@@ -97,16 +94,6 @@ describe("card words", () => {
       }),
       "↓ catches up with the thread this one branched from first, then sends what you write",
     ],
-    [
-      "queuedWords, yours",
-      queuedWords(ME, 0, READER),
-      "queued by you · 1st in line",
-    ],
-    [
-      "queuedWords, Bea's",
-      queuedWords(BEA, 1, READER),
-      "queued by Bea · 2nd in line",
-    ],
     ["unsentWords", unsentWords("no such image"), "not sent: no such image"],
     [
       "noticeWords, an unqueue the pop beat, yours",
@@ -119,7 +106,7 @@ describe("card words", () => {
       "already sent as Bea's message, before you unqueued it",
     ],
     [
-      "noticeWords, gone from a drafting place",
+      "noticeWords, gone from a note",
       noticeWords(refusal({ fromQueue: false }), READER),
       "not moved: it was sent or discarded first",
     ],
@@ -151,17 +138,9 @@ describe("card words", () => {
   })
 })
 
-test("cardStatus: the send's own status first; else why the host could not send the card", () => {
-  expect(cardStatus("sending…", "no such image")).toBe("sending…")
-  expect(cardStatus("", "no such image")).toBe("not sent: no such image")
-  expect(cardStatus("", null)).toBe("")
-})
-
 describe("pinned card words (ADR-0048 step 5)", () => {
   const card = { id: cardId("p-1"), text: "x", by: ME }
   test.each([
-    ["pinned by you", pinnedWords(ME, READER), "pinned by you"],
-    ["pinned by another", pinnedWords(BEA, READER), "pinned by Bea"],
     ["read", pinnedStatusWords("read"), "read by the agent"],
     [
       "changed",
@@ -198,8 +177,8 @@ describe("pinned card words (ADR-0048 step 5)", () => {
 
 describe("history and traces (ADR-0048 step 6)", () => {
   const ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
-  const drafting: PlaceKey = {
-    kind: "drafting",
+  const atEnd: PlaceKey = {
+    kind: "note",
     root: ROOT,
     at: atEntry(entryId("e-1")),
     lane: laneNameForThread("x"),
@@ -214,7 +193,7 @@ describe("history and traces (ADR-0048 step 6)", () => {
   const event = (over: Partial<CardEvent>): CardEvent => ({
     kind: "moved",
     by: BEA,
-    from: drafting,
+    from: atEnd,
     to: queued,
     at: 1,
     ...over,
@@ -222,14 +201,14 @@ describe("history and traces (ADR-0048 step 6)", () => {
   test.each([
     [event({ kind: "created", by: ME, from: null }), "created by you"],
     [event({}), "queued by Bea"],
-    [event({ from: queued, to: drafting }), "unqueued by Bea"],
+    [event({ from: queued, to: atEnd }), "unqueued by Bea"],
     [event({ to: { kind: "inventory", holder: BEA } }), "taken by Bea"],
     [
-      event({ kind: "undone", from: queued, to: drafting }),
+      event({ kind: "undone", from: queued, to: atEnd }),
       "unqueued by Bea (an undo)",
     ],
     [
-      event({ kind: "unsent", by: null, from: queued, to: drafting }),
+      event({ kind: "unsent", by: null, from: queued, to: atEnd }),
       "not sent: back below the line",
     ],
     [event({ kind: "followed", by: null }), "moved to the new thread"],
@@ -242,7 +221,7 @@ describe("history and traces (ADR-0048 step 6)", () => {
     for: ME,
     card: cardId("c-1"),
     by: BEA,
-    from: drafting,
+    from: atEnd,
     to,
     message: null,
     at: 1,

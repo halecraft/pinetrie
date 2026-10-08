@@ -1,5 +1,5 @@
 // web/popover — a trigger button and the box it opens: every menu
-// (`menu.tsx`) and a card's history (`card-history.tsx`).
+// (`menu.tsx`).
 //
 // The box is `position: fixed`, placed under its trigger from the trigger's
 // rect when it opens (above it, for a trigger in the window's lower half): the
@@ -101,7 +101,7 @@ export function Popover({
   // Below its trigger; above it when the trigger is in the window's lower
   // half (a composer's, the footer's), or the box would open past the
   // window's foot. Its right edge at the trigger's; its left edge at the
-  // trigger's when the trigger is in the window's left half (your list's, your
+  // trigger's when the trigger is in the window's left half (the sidebar's, your
   // avatar's), or the box would open past the window's left.
   const [at, setAt] = useState<Placement | null>(null)
   const open = at !== null

@@ -1,4 +1,4 @@
-// session/open-list — your list: the roots you have open, in your order
+// session/open-threads — the sidebar: the roots you have open, in your order
 // (ADR-0112), in your own document, the same on every device of yours.
 // Every write waits for the host's copy (`PersonDoc.ready`, S101), and the
 // list is repaired on every change: a root moved to the closed state leaves
@@ -18,12 +18,12 @@ import {
 import { personDoc } from "./person-doc.ts"
 import type { Readable } from "./store.ts"
 
-export interface OpenList {
-  /** Your list, in order. A root the directory lacks is still listed. */
+export interface OpenThreads {
+  /** The sidebar, in order. A root the directory lacks is still listed. */
   readonly roots: Readable<readonly RootId[]>
   /** Put `root` before `before`, or at the end; a root already open moves there. */
   open(root: RootId, before: RootId | null): void
-  /** `root` at the end of your list, unless it is in it already. */
+  /** `root` at the end of the sidebar, unless it is in it already. */
   ensure(root: RootId): void
   close(root: RootId): void
   /** The root the page shows, or null: the repair keeps it while it is archived. */
@@ -33,13 +33,13 @@ export interface OpenList {
   dispose(): void
 }
 
-export function openList(
+export function openThreads(
   exchange: Exchange,
   me: WriterId,
   host: string,
   /** The roots archived now (`readArchived`). */
   archived: () => ReadonlySet<RootId>,
-): OpenList {
+): OpenThreads {
   const own = personDoc(
     exchange.get(personDocId("open", me), OpenDoc),
     host,

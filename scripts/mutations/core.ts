@@ -627,8 +627,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an unqueue loses its root",
     file: core,
-    from: '  kind: "drafting",\n  root: place.root,',
-    to: '  kind: "drafting",\n  root: place.root.slice(1) as RootId,',
+    from: '  kind: "note",\n  root: place.root,',
+    to: '  kind: "note",\n  root: place.root.slice(1) as RootId,',
     command: unit,
     expect: "an unqueue puts a card back where it was queued, in its root",
   },

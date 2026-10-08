@@ -250,10 +250,13 @@ would refuse each whole undo of a move (S82).
 - **A new id, not the old one** (ADR-0066), so a store's `json` places and
   the Yjs schema never meet under one id.
 - **A fresh row names its root and its branch point** (`root`, `at`, "" at
-  for a new tab), as a drafting one does (ADR-0066). One without a root does
+  for a new tab), as a note or a message does (ADR-0066). One without a root does
   not decode.
 - **A pinned row carries `order`**, as a queued one does, and no `by` or
-  `seen`: `kind`, `at` and `lane` are a drafting row's. No new field.
+  `seen`: `kind`, `at` and `lane` are a note's. No new field.
+- **Your message is stored as kind `drafting`**, the kind every card at a
+  thread's end had before notes (ADR-0113); a note as `note`, with a
+  message's fields. So no stored row changed with the split.
 - **A client cannot write it.** Every peer registers `writersPolicy`
   (`@pinetrie/protocol/writers`), Kyneta's `canWrite`, so a client's write
   throws before it is made, and the host refuses the same operations from

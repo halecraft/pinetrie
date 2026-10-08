@@ -42,14 +42,14 @@ describe("listFoldWords", () => {
     [
       "full",
       "«",
-      "fold your list to icons",
-      "fold your list to icons (Ctrl+Shift+L)",
+      "fold the sidebar to icons",
+      "fold the sidebar to icons (Ctrl+Shift+L)",
     ],
     [
       "icons",
       "»",
-      "show your list's titles",
-      "show your list's titles (Ctrl+Shift+L)",
+      "show the sidebar's titles",
+      "show the sidebar's titles (Ctrl+Shift+L)",
     ],
   ])("%s", (shown, glyph, label, title) => {
     expect(listFoldWords(shown)).toEqual({ glyph, label, title })

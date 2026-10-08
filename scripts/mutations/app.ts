@@ -8,7 +8,7 @@ import type { Mutation } from "../mutate.ts"
 export const mutations: readonly Mutation[] = [
   {
     name: "a card's × does nothing",
-    file: "packages/web/card-editor.tsx",
+    file: "packages/web/card-frame.tsx",
     from: "      onClick={p.onDiscard}",
     to: "      onClick={() => {}}",
     suite: "browser",
@@ -345,7 +345,7 @@ export const mutations: readonly Mutation[] = [
     to: '  return useMemo(() => readingAt(reading, "w-nobody" as never), [reading, me])',
     suite: "browser",
     scenario: "page",
-    expect: "another window shows on its root's board item, and you never do",
+    expect: "another window shows on its root's thread card, and you never do",
   },
   {
     name: "the browser suite runs against production React",
@@ -530,10 +530,10 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "page",
     expect:
-      "a root another writer starts is not added to your list, and the page stays where it is",
+      "a root another writer starts is not added to the sidebar, and the page stays where it is",
   },
   {
-    name: "a root's menu is drawn inside your list, which clips it",
+    name: "a root's menu is drawn inside the sidebar, which clips it",
     file: "packages/web/popover.tsx",
     from: '      position: "fixed" as const,',
     to: '      position: "absolute" as const,',
@@ -572,7 +572,7 @@ export const mutations: readonly Mutation[] = [
     expect:
       "the strip's working count and the thread's item are still while the agent works",
   },
-  // ── the board and your list (ADR-0112) ──
+  // ── the board and the sidebar (ADR-0112) ──
   {
     name: "the board opens in the flow, before the columns",
     file: "packages/web/index.html",
@@ -601,27 +601,27 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "page",
     expect:
-      "dragging a board item to another state moves it for the other window",
+      "dragging a thread card to another state moves it for the other window",
   },
   {
-    name: "the host neither stores nor relays your list",
+    name: "the host neither stores nor relays the sidebar",
     file: "apps/pinetrie/host/index.ts",
     from: "      return kind === undefined ? undefined : Interpret(SCHEMA_OF[kind])",
     to: '      return kind === undefined || kind === "open"\n        ? undefined\n        : Interpret(SCHEMA_OF[kind])',
     suite: "browser",
     scenario: "page",
     expect:
-      "your list is your own: another device of yours has it, in your order",
+      "the sidebar is your own: another device of yours has it, in your order",
   },
   {
-    name: "the root you are on is your list's colour",
+    name: "the root you are on is the sidebar's colour",
     file: "packages/web/index.html",
-    from: "      .open-item[data-selected] { background: var(--page); --surface: var(--page);",
-    to: "      .open-item[data-selected] { background: var(--chrome); --surface: var(--page);",
+    from: "      .sidebar-item[data-selected] { background: var(--page); --surface: var(--page);",
+    to: "      .sidebar-item[data-selected] { background: var(--chrome); --surface: var(--page);",
     suite: "browser",
     scenario: "page",
     expect:
-      "the root you are on is the page's colour, your list is not, and it meets the page",
+      "the root you are on is the page's colour, the sidebar is not, and it meets the page",
   },
   {
     name: "a root's mark pulses while its agent works",
@@ -740,7 +740,7 @@ export const mutations: readonly Mutation[] = [
     to: '          {avatar("avatar")}',
     suite: "browser",
     scenario: "page",
-    expect: "another window shows on its root's board item, and you never do",
+    expect: "another window shows on its root's thread card, and you never do",
   },
   // ── a person's picture (packages/web/presence.tsx, ADR-0098) ──
   {
@@ -1300,7 +1300,7 @@ export const mutations: readonly Mutation[] = [
     to: "        archived: new Set(),\n        lanes,",
     suite: "browser",
     scenario: "page",
-    expect: "an archived root holding your card marks its board item, not ▦",
+    expect: "an archived root holding your card marks its thread card, not ▦",
   },
   {
     name: "the dispatcher answers a move on the board without moving",
@@ -1603,8 +1603,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "queued cards are not drawn",
     file: "packages/web/column.tsx",
-    from: "              {queued.map((c, n) =>",
-    to: "              {queued.slice(0, 0).map((c, n) =>",
+    from: "              {queued.map(c =>",
+    to: "              {queued.slice(0, 0).map(c =>",
     suite: "browser",
     scenario: "page",
     expect:
@@ -1741,12 +1741,12 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a column publishes no composer place",
     file: "packages/web/column.tsx",
-    from: "    composers.set(key, writable ? (place ?? null) : null)",
-    to: "    composers.set(key, null)",
+    from: "      writable && place !== undefined\n        ? { place, message: mine?.id ?? null }\n        : null,",
+    to: "      null,",
     suite: "browser",
     scenario: "page",
     expect:
-      "Ctrl+Shift+O puts the selected card below the line in the column you were in, and its composer holds it again",
+      "Ctrl+Shift+O puts the selected card in the column you were in, as a note there",
   },
   {
     name: "the page undoes no move",
@@ -1874,7 +1874,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "Auto-update title in a root's ⋯ sends nothing",
-    file: "packages/web/open-list.tsx",
+    file: "packages/web/sidebar.tsx",
     from: '        label: "Auto-update title",\n        onChoose: () => onIntent(item.intent),',
     to: '        label: "Auto-update title",\n        onChoose: () => {},',
     suite: "browser",
@@ -1911,14 +1911,42 @@ export const mutations: readonly Mutation[] = [
       "pin draws the card in the strip at the top of its column, above the messages, and empties the composer",
   },
   {
-    name: "+ card leaves focus on its button",
-    file: "packages/web/card-editor.tsx",
-    from: '    setStatus("")\n    box.current?.focus()',
-    to: '    setStatus("")',
+    name: "a column draws no notes",
+    file: "packages/web/column.tsx",
+    from: '      : cardsAt("note", threadEnd, p.cards, p.lanes, index)',
+    to: "      : []",
     suite: "browser",
     scenario: "page",
     expect:
-      '"+ card" empties the focused composer, draws your card above it, and typing makes another',
+      "your message shows only in your window; moved to the notes, it shows in the other's column, above its composer",
+  },
+  {
+    name: "a note offers no way into your message",
+    file: "packages/interface/card-frame.ts",
+    from: '        { to: "message", act: { kind: "toMessage", card: id } },\n',
+    to: "",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "Move to notes takes your message above the composer, and the note's Move to your message brings it back into the box",
+  },
+  {
+    name: "a composer keeps showing the card a drop swapped away",
+    file: "packages/web/card-editor.tsx",
+    from: '      } else if (now.kind === "bound") {',
+    to: "      } else if (false) {",
+    suite: "browser",
+    scenario: "page",
+    expect: "dragging a slot onto another column's foot puts its card there",
+  },
+  {
+    name: "an unbound box keeps the readOnly Kyneta put back",
+    file: "packages/web/card-editor.tsx",
+    from: '      el.readOnly = p.readOnly !== null || current.current.kind === "sending"\n',
+    to: "",
+    suite: "browser",
+    scenario: "page",
+    expect: "what you type is still there after switching tabs",
   },
   {
     name: "Enter in a + pin box sends",
@@ -1964,8 +1992,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a queued card's box is keyed by its place in line",
     file: "packages/web/column.tsx",
-    from: "                    among={queued}\n                    card={c}\n                    key={c.id}\n",
-    to: "                    among={queued}\n                    card={c}\n                    key={n}\n",
+    from: "                    held={(shows.queue?.heldBy ?? null) !== null}\n                    key={c.id}\n",
+    to: "                    held={(shows.queue?.heldBy ?? null) !== null}\n                    key={queued.indexOf(c)}\n",
     suite: "browser",
     scenario: "page",
     expect:

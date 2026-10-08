@@ -1,5 +1,5 @@
 // web/use-small-window — whether the window is small (`SMALL`,
-// ADR-0088): your list shows icons there until you choose.
+// ADR-0088): the sidebar shows icons there until you choose.
 
 import { useSyncExternalStore } from "react"
 

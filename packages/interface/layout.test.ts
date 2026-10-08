@@ -36,7 +36,7 @@ const index = tree(parents)
 const R1: Here = { kind: "root", root: entryId("1-r1") }
 const at = (l: Layout, here: Here = R1): Layout =>
   layoutReducer(l, { kind: "show", here })
-/** Your list, as the session's document holds it, by root entry. */
+/** The sidebar, as the session's document holds it, by root entry. */
 const listed = (...roots: string[]) => roots.map(entryId)
 const resolve = (
   l: Layout,
@@ -46,7 +46,7 @@ const resolve = (
   list: readonly EntryId[] = [],
 ) => resolveLayout(l, { index: i, lanes, archived, list })
 const sync = (l: Layout, i = index) => resolve(l, i)
-/** `l` drawn with `list` as your list. */
+/** `l` drawn with `list` as the sidebar. */
 const drawn = (l: Layout, list: readonly EntryId[]) =>
   resolve(l, index, new Set(), [], list)
 const prune = (
@@ -141,7 +141,7 @@ describe("layoutReducer", () => {
     ])
   })
 
-  test("a sent new tab becomes its root's columns, and stays the one you are on, in your list", () => {
+  test("a sent new tab becomes its root's columns, and stays the one you are on, in the sidebar", () => {
     const opened = layoutReducer(at(initialLayout()), {
       kind: "newTab",
       key: "n",
@@ -158,7 +158,7 @@ describe("layoutReducer", () => {
     const synced = sync(sent, written)
     expect(synced.newTabs).toEqual([])
     expect(synced.active).toEqual({ kind: "root", root: "7-r3" })
-    // The session puts it in your list as its send is answered; until then
+    // The session puts it in the sidebar as its send is answered; until then
     // it is drawn as the root you are on.
     expect(synced.open).toEqual(["7-r3"])
     expect(columnsOf(synced, entryId("7-r3"))).toEqual([
@@ -233,7 +233,7 @@ describe("layoutReducer", () => {
       action: { kind: "open", key: "k", after: 0, anchor: entryId("4-c") },
     })
 
-  test("a root someone else starts is not in your list", () => {
+  test("a root someone else starts is not in the sidebar", () => {
     const l = withColumn(drawn(at(initialLayout()), listed("1-r1")))
     const grown = resolve(
       l,
@@ -246,7 +246,7 @@ describe("layoutReducer", () => {
     expect(grown.open).toEqual(["1-r1"])
   })
 
-  test("your list is the facts', in its order, and the root you are on wherever it lacks it", () => {
+  test("the sidebar is the facts', in its order, and the root you are on wherever it lacks it", () => {
     const l = at(initialLayout(), R2)
     expect(drawn(l, listed("1-r1", "5-r2")).open).toEqual(["1-r1", "5-r2"])
     expect(drawn(l, listed("5-r2", "1-r1")).open).toEqual(["5-r2", "1-r1"])
@@ -255,7 +255,7 @@ describe("layoutReducer", () => {
     expect(drawn(at(l, NOTHING), listed("1-r1")).open).toEqual(["1-r1"])
   })
 
-  test("a root that leaves your list keeps its columns, and opening it again brings them back", () => {
+  test("a root that leaves the sidebar keeps its columns, and opening it again brings them back", () => {
     const withColumn = layoutReducer(at(initialLayout()), {
       kind: "columns",
       root: entryId("1-r1"),
@@ -308,7 +308,7 @@ describe("layoutReducer", () => {
     ).toEqual(R1)
   })
 
-  test("archived roots leave your list as drawn, except the one you are on until you leave it", () => {
+  test("archived roots leave the sidebar as drawn, except the one you are on until you leave it", () => {
     const list = listed("1-r1", "5-r2")
     const archived = new Set(list)
     const l = at(initialLayout(), R2)
@@ -398,7 +398,7 @@ describe("layoutReducer", () => {
     expect(pruned.board).toBe(true)
   })
 
-  test("prune replaces a root you were on that is archived or gone with the last of your list, and drops a gone root's columns", () => {
+  test("prune replaces a root you were on that is archived or gone with the last of the sidebar, and drops a gone root's columns", () => {
     const onR1 = at(initialLayout())
     const archivedR1 = prune(
       onR1,
@@ -445,7 +445,7 @@ describe("layoutReducer", () => {
 })
 
 describe("listOf", () => {
-  test("your list as drawn, then new tabs", () => {
+  test("the sidebar as drawn, then new tabs", () => {
     const l = layoutReducer(
       drawn(at(initialLayout()), listed("5-r2", "1-r1")),
       {
@@ -460,7 +460,7 @@ describe("listOf", () => {
   })
 })
 
-test("unlisted: the roots not in your list, and not archived (ADR-0077, ADR-0112)", () => {
+test("unlisted: the roots not in the sidebar, and not archived (ADR-0077, ADR-0112)", () => {
   const open = { open: [entryId("1-r1")] }
   expect(
     unlisted(open, new Set([entryId("7-r3")]), [
@@ -505,7 +505,7 @@ describe("encodeLayout / decodeLayout", () => {
       rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff"),
     )
 
-  test("a round trip keeps what you are on, each root's columns, new tabs and the board; never your list, which is your document's", () => {
+  test("a round trip keeps what you are on, each root's columns, new tabs and the board; never the sidebar, which is your document's", () => {
     const l: Layout = {
       active: { kind: "new", key: "n" },
       open: [],
@@ -677,7 +677,7 @@ describe("encodeLayout / decodeLayout", () => {
         },
         newTabs: [],
       },
-      // v4 held your list (ADR-0112), and an Archive tab; one in v5's shape
+      // v4 held the sidebar (ADR-0112), and an Archive tab; one in v5's shape
       // under v4 is dropped too.
       { v: 4, active: null, roots: {}, newTabs: [], board: false },
       { v: 4, active: { kind: "archive" }, open: [], roots: {}, newTabs: [] },

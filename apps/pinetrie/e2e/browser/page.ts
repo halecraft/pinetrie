@@ -14,9 +14,8 @@ export const TO_AGENT = recipientWords({
 }).label
 export const TO_NOBODY = recipientWords({ compels: NOBODY, people: [] }).label
 
-/** The ⋯ of the root you are on in your list: every root has one, shown on hover or focus. */
-export const OWN_MENU =
-  '#open-list [aria-current="true"] ~ .open-more .open-menu'
+/** The ⋯ of the root you are on in the sidebar: every root has one, shown on hover or focus. */
+export const OWN_MENU = '#sidebar [aria-current="true"] ~ .open-more .open-menu'
 
 /**
  * Open the menu behind `trigger`, and find `item` in it if a person could see
@@ -25,12 +24,12 @@ export const OWN_MENU =
  * centre (`packages/web/TECHNICAL.md`, Gotchas). Null when not seen.
  */
 export async function seeInMenu(p: Page, trigger: string, item: string) {
-  // A ⋯ in your list or on the board shows only while its item is hovered.
+  // A ⋯ in the sidebar or on the board shows only while its item is hovered.
   const holder = p
     .locator(trigger)
     .first()
     .locator(
-      "xpath=ancestor::*[contains(@class,'open-item') or contains(@class,'board-item')][1]",
+      "xpath=ancestor::*[contains(@class,'sidebar-item') or contains(@class,'thread-card')][1]",
     )
   if ((await holder.count()) > 0) await holder.hover()
   await p.click(trigger)
@@ -69,6 +68,22 @@ export async function chooseFromMenu(
     () => true,
     () => false,
   )
+}
+
+/**
+ * Choose `item` in the ⋯ of the card framed by `frame` (ADR-0111). A column
+ * that scrolls as its cards change closes a menu it holds (`popover.tsx`),
+ * so the menu is opened again until the item is chosen. Whether it was.
+ */
+export async function chooseOnCard(
+  p: Page,
+  frame: string,
+  item: string,
+): Promise<boolean> {
+  for (let tries = 0; tries < 3; tries++)
+    if (await chooseFromMenu(p, `${frame} .card-menu-trigger`, item))
+      return true
+  return false
 }
 
 /** Your name as the page shows it: the one mentions resolve against. */
@@ -270,38 +285,38 @@ export async function readRaw(p: Page, n = 0): Promise<void> {
   if ((await p.getAttribute(raw, "aria-pressed")) !== "true") await p.click(raw)
 }
 /**
- * Wait until `p` has connected and synced: your list is drawn, which waits
+ * Wait until `p` has connected and synced: the sidebar is drawn, which waits
  * for the document to settle, and it shows no "syncing…". Rejects after
  * `timeout`.
  */
 export const connected = (p: Page, timeout = 20_000) =>
   p.waitForFunction(
     () =>
-      document.querySelector("#open-list .add-agent") !== null &&
+      document.querySelector("#sidebar .add-agent") !== null &&
       document.querySelector(".sync-note") === null,
     undefined,
     { timeout },
   )
-/** A root in your list (ADR-0112). */
+/** A root in the sidebar (ADR-0112). */
 export const itemSel = (root: string) =>
-  `#open-list .open-root[data-root="${root}"]`
+  `#sidebar .open-root[data-root="${root}"]`
 /** A root on the board, by its root entry: inside `#board`. */
-export const boardSel = (root: string) => `.board-item[data-entry="${root}"]`
+export const boardSel = (root: string) => `.thread-card[data-entry="${root}"]`
 /**
  * Step away from the root you are on, so its columns unmount: to a new tab,
- * which is closed again by `stepBack`. Your list has nothing else to step to
+ * which is closed again by `stepBack`. The sidebar has nothing else to step to
  * that every scenario holds.
  */
 export async function stepAway(p: Page): Promise<void> {
-  await p.click("#open-list .add-agent")
-  await p.waitForSelector('#open-list .open-new[aria-current="true"]', {
+  await p.click("#sidebar .add-agent")
+  await p.waitForSelector('#sidebar .open-new[aria-current="true"]', {
     timeout: 15_000,
   })
 }
 /** Back on `root` from `stepAway`, and the new tab closed. */
 export async function stepBack(p: Page, root: string): Promise<void> {
   await p.click(itemSel(root))
-  await p.$$eval("#open-list .open-new ~ .open-close", bs => {
+  await p.$$eval("#sidebar .open-new ~ .open-close", bs => {
     for (const b of bs) (b as HTMLButtonElement).click()
   })
 }
@@ -318,7 +333,7 @@ export async function openBoard(p: Page): Promise<void> {
 export const railCount = (p: Page) => p.evaluate(RAIL_MESSAGES)
 /**
  * Open root `r` from the board (ADR-0112): select its item, which shows it
- * and puts it in your list, and wait until you are on it. An archived root
+ * and puts it in the sidebar, and wait until you are on it. An archived root
  * is found in the closed state's rows, by its label's search.
  */
 export const openFromBoard = async (p: Page, r: string) => {

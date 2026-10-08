@@ -383,7 +383,7 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a reorder is drawn where the host would put it",
   },
-  // ── your list (ADR-0112) ──
+  // ── the sidebar (ADR-0112) ──
   {
     name: "the repair drops the root you are on",
     file: "packages/session/open-repair.ts",
@@ -393,7 +393,7 @@ export const mutations: readonly Mutation[] = [
     expect: "planOpenRepair: archived roots leave, but the one you are on",
   },
   {
-    name: "a refused send at the root opens a root in your list",
+    name: "a refused send at the root opens a root in the sidebar",
     file: "packages/session/chat.ts",
     from: '  (outcome.kind === "appended" || outcome.kind === "started")',
     to: '  outcome.kind !== "busy"',

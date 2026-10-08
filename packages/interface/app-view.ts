@@ -102,7 +102,7 @@ export const laneRootsOf = (
  * (`rootWork`), and every lane running in the session, by its root's entry
  * (ADR-0063, ADR-0091); running wins over waiting, and a root with no entry
  * yet is left out. What refuses a root's move to the closed state, and, but
- * for `held`, what rings it in your list and on the board (`rootStatus`).
+ * for `held`, what rings it in the sidebar and on the board (`rootStatus`).
  */
 export function workAnywhere(input: {
   /** The held roots' work (`rootWork`). */

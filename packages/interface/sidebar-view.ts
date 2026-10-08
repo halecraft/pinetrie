@@ -1,6 +1,6 @@
-// interface/open-list-view — what your list shows and offers (ADR-0030,
-// ADR-0112), full or folded to icons (ADR-0088), decided. PURE: `OpenList`
-// (`open-list.tsx`) draws it, and each click sends the intent it names.
+// interface/sidebar-view — what the sidebar shows and offers (ADR-0030,
+// ADR-0112), full or folded to icons (ADR-0088), decided. PURE: `Sidebar`
+// (`sidebar.tsx`) draws it, and each click sends the intent it names.
 
 import type {
   BannerRecord,
@@ -26,7 +26,7 @@ import { type PageName, pageWords } from "./page.ts"
 import { type ColorSlot, rootSlot } from "./palette.ts"
 import { initialsOf, NO_TEXT } from "./root-label.ts"
 
-/** What a root's ⋯ in your list offers. */
+/** What a root's ⋯ in the sidebar offers. */
 export type ItemMenuItem =
   | { readonly kind: "rename" }
   /** What the root raises is not needed (ADR-0077). */
@@ -49,7 +49,7 @@ export type ItemMenuItem =
     }
 
 /**
- * What an item draws while your list is folded (ADR-0088): the sprite of the
+ * What an item draws while the sidebar is folded (ADR-0088): the sprite of the
  * root's earliest thread with one (`rootSprites`), else its initials on its
  * colour (ADR-0089). A new tab has neither yet: a hollow tile, as its rail
  * has a hollow dot where its first message will be.
@@ -92,14 +92,14 @@ export type ItemView =
       readonly arrived: number | null
       /** When its agent last stopped with a run you follow done, or null: a ✓ fades. */
       readonly done: number | null
-      /** Only the root you are on can be archived and still in your list. */
+      /** Only the root you are on can be archived and still in the sidebar. */
       readonly archived: boolean
       /** On every root not archived, the one you are on or not. */
       readonly menu: readonly ItemMenuItem[]
     })
 
-export interface OpenListView {
-  /** Your list, then new tabs (`listOf`). */
+export interface SidebarView {
+  /** The sidebar, then new tabs (`listOf`). */
   readonly items: readonly ItemView[]
   /** The item you are on, or null when the list lacks it. */
   readonly selected: ItemView | null
@@ -107,7 +107,7 @@ export interface OpenListView {
   readonly add: { readonly agent: Intent; readonly conversation: Intent }
 }
 
-export interface OpenListViewInput {
+export interface SidebarViewInput {
   readonly layout: Layout
   readonly active: Here
   /** Each root's label (`labelsOf`). */
@@ -136,7 +136,7 @@ export interface OpenListViewInput {
   readonly sprites: ReadonlyMap<EntryId, Sha256>
 }
 
-export function openListView(input: OpenListViewInput): OpenListView {
+export function sidebarView(input: SidebarViewInput): SidebarView {
   const all = listOf(input.layout)
   const items = all.map(here => itemView(here, input))
   return {
@@ -149,7 +149,7 @@ export function openListView(input: OpenListViewInput): OpenListView {
   }
 }
 
-function itemView(here: Here, input: OpenListViewInput): ItemView {
+function itemView(here: Here, input: SidebarViewInput): ItemView {
   const common = {
     selected: sameHere(here, input.active),
     show: { kind: "show", here } as const,
@@ -198,7 +198,7 @@ function itemView(here: Here, input: OpenListViewInput): ItemView {
 function iconOf(
   root: EntryId,
   label: string,
-  input: OpenListViewInput,
+  input: SidebarViewInput,
 ): ItemIcon {
   const sprite = input.sprites.get(root)
   if (sprite !== undefined) return { kind: "sprite", src: blobUrl(sprite) }
@@ -237,7 +237,7 @@ export function rootSprites(
 function menuOf(
   root: EntryId,
   status: Status | null,
-  input: OpenListViewInput,
+  input: SidebarViewInput,
 ): readonly ItemMenuItem[] {
   return [
     ...(status === null || status.kind === "working"
@@ -261,7 +261,7 @@ function menuOf(
 /** "Move to ▸" each state but the one the root is in. */
 function movesOf(
   root: EntryId,
-  input: OpenListViewInput,
+  input: SidebarViewInput,
 ): readonly ItemMenuItem[] {
   const { workflow } = input
   const id = input.rootIds.get(root)
@@ -290,7 +290,7 @@ function movesOf(
   })
 }
 
-/** An item's key in your list: its React key, and what the list scrolls to. */
+/** An item's key in the sidebar: its React key, and what the list scrolls to. */
 export const listKey = (item: ItemView): string =>
   item.kind === "new" ? `new:${item.key}` : `root:${item.root}`
 
@@ -313,7 +313,7 @@ export const pageTitle = (
 /**
  * The threads with an open offer, by their root, each as people read it
  * (`threadNameOf`), named or not: what archiving that root withdraws, and
- * what a board item's ⇡ names (ADR-0091). `offers` are the open offers
+ * what a thread card's ⇡ names (ADR-0091). `offers` are the open offers
  * (`appView`'s).
  */
 export function offeredByRoot(

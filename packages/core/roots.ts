@@ -1,6 +1,6 @@
 // core/roots — each root's tree, summarized (ADR-0029, ADR-0030). Pure. The
 // host writes a root's summary into its directory record (`readRootRecord`
-// in @pinetrie/reads), which your list, your inbox and the board read
+// in @pinetrie/reads), which the sidebar, your inbox and the board read
 // (ADR-0063).
 //
 // A root is found by walking up (`rootOf`), and a thread started at the root

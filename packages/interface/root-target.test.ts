@@ -25,14 +25,14 @@ describe("a root's drop lands where a key could move it", () => {
   test.each<[string, RootTarget]>([
     ["a column's end", { kind: "state", state: DONE, before: null }],
     ["before a root in a column", { kind: "state", state: DOING, before: R2 }],
-    ["your list's end", { kind: "list", before: null }],
-    ["before a root in your list", { kind: "list", before: entryId("2-r") }],
+    ["the sidebar's end", { kind: "list", before: null }],
+    ["before a root in the sidebar", { kind: "list", before: entryId("2-r") }],
   ])("%s: the attributes read back as the target", (_, target) => {
     expect(rootTargetOfElement(element(rootDropProps(target)))).toEqual(target)
   })
 
   test("a drop and the keyboard's move give the same intent", () => {
-    // Move to ▸ Done, as `boardView` and `openListView` offer it.
+    // Move to ▸ Done, as `boardView` and `sidebarView` offer it.
     expect(
       planRootDrop(
         drag,
@@ -48,7 +48,7 @@ describe("a root's drop lands where a key could move it", () => {
       before: null,
       closes: true,
     })
-    // Before another in your list.
+    // Before another in the sidebar.
     expect(
       planRootDrop(drag, { kind: "list", before: entryId("2-r") }, DONE, null),
     ).toEqual({ kind: "moveInList", root: "1-r", before: "2-r" })

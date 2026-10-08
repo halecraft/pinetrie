@@ -1,7 +1,7 @@
 // host/directory — the directory of roots (ADR-0063): each root's `pinetrie.root`
 // record, refreshed whenever its document's entries, pi's values (a lane's
 // tip) or the host's records (a mark) change, so
-// what your list, the board, the inbox and the image sweep read of a
+// what the sidebar, the board, the inbox and the image sweep read of a
 // root follows it without any of them opening it.
 //
 // The directory follows every root the documents hold (`onOpened`), those

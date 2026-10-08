@@ -47,7 +47,7 @@ async function run(check: Checks["check"]): Promise<void> {
       await asPerson(qp, "quinn@browser.test", "Quinn")
       try {
         await pp.goto(imageHost.httpUrl, { waitUntil: "domcontentloaded" })
-        await pp.click("#open-list .add-agent")
+        await pp.click("#sidebar .add-agent")
         const box = `${col(0)} .composer .input`
         const sendButton = `${col(0)} .composer .send`
         await pp.fill(box, "what colour is this?")
@@ -200,7 +200,7 @@ async function run(check: Checks["check"]): Promise<void> {
           })
           .then(measure, () => null)
         // Folded to icons (ADR-0088), the strip widens and the pane with it.
-        await pp.click("#open-list .list-fold")
+        await pp.click("#sidebar .list-fold")
         const folded = await pp
           .waitForFunction(
             () => document.documentElement.dataset.list === "icons",
@@ -208,7 +208,7 @@ async function run(check: Checks["check"]): Promise<void> {
             { timeout: 5_000 },
           )
           .then(measure, () => null)
-        await pp.click("#open-list .list-fold")
+        await pp.click("#sidebar .list-fold")
         check(
           "a click on an image opens it beside the thread, which keeps its 28rem, inside the strip, and no new tab",
           [full, folded].every(
@@ -381,7 +381,7 @@ async function run(check: Checks["check"]): Promise<void> {
       await asPerson(ip, "ida@browser.test", "Ida")
       try {
         await ip.goto(imageHost.httpUrl, { waitUntil: "domcontentloaded" })
-        await ip.click("#open-list .add-agent")
+        await ip.click("#sidebar .add-agent")
         const say = async (text: string) => {
           await ip.fill(`${col(0)} .composer .input`, text)
           await ip.click(`${col(0)} .composer .send`)

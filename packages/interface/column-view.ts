@@ -969,10 +969,11 @@ export function joinWords(join: LaneJoin): string {
 
 /**
  * Where a column takes a card (ADR-0048): a fresh column's own key, at its
- * branch point or a new tab's root, else drafting at its end with its lane.
+ * branch point or a new tab's root, else your message at its end with its
+ * lane (ADR-0113).
  * `root` is the root `at` is in (ADR-0063); a new tab's is the one it
- * minted (`fresh.root`). The composer creates its card here, and a put or a
- * drop lands here. None where the root is not known, nor at the root but in
+ * minted (`fresh.root`). The composer creates its card here, and a drop on
+ * it lands here (`placeOfTarget`). None where the root is not known, nor at the root but in
  * a new tab: a column there has no end yet.
  */
 export function composerPlace(
@@ -987,7 +988,7 @@ export function composerPlace(
       : { kind: "fresh", column: column.key, root: its, at }
   }
   return at.kind === "entry" && root !== undefined
-    ? { kind: "drafting", root, at, lane: column.lane ?? null }
+    ? { kind: "composing", root, at, lane: column.lane ?? null }
     : null
 }
 

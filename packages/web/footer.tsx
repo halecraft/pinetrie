@@ -1,8 +1,8 @@
 // web/footer — the page's one row of chrome, along its bottom (ADR-0112).
-// It splits where your list's edge does. Below your list, what is yours
+// It splits where the sidebar's edge does. Below the sidebar, what is yours
 // (ADR-0098): you, whose avatar and name open the account menu
 // (`account-menu.tsx`), then your inbox (`inbox-view.ts`, ADR-0091) and your
-// inventory as icons; while your list is folded, your avatar alone, carrying
+// inventory as icons; while the sidebar is folded, your avatar alone, carrying
 // the inbox's badge, and both are in its menu. To the right, what is
 // everyone's: the board's strip (`board.tsx`), which counts where the agent
 // works and what is ready to accept, then "syncing…" while the document is
@@ -63,7 +63,7 @@ export function Footer({
   inventory: InventoryToggleProps
   me: Me
   /**
-   * Your list is folded to icons (ADR-0088): the corner, as narrow, holds
+   * The sidebar is folded to icons (ADR-0088): the corner, as narrow, holds
    * only your avatar, and your inbox and inventory are in its menu
    * (ADR-0098).
    */

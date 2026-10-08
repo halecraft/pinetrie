@@ -8,19 +8,19 @@
       /* --page is the paper the columns are on, --chrome the darker list and
          footer around it (ADR-0081, ADR-0112). --surface is whatever a thing
          sits on, set by its context: a ring that must read as a gap around a
-         dot uses it. --side is your list's width, which the footer's own
+         dot uses it. --side is the sidebar's width, which the footer's own
          cell shares, so the two split along one line; folded to icons, it is
          3rem (ADR-0088). */
       :root { color-scheme: dark; --page: #14161a; --chrome: #0e1013; --edge: #23272e;
         --on: #c9d1d9; --surface: var(--page); --side: 15rem; }
       @media (width < 56rem) { :root { --side: 11.5rem; } }
-      /* Your list folded to icons (ADR-0088), at any window width. */
+      /* The sidebar folded to icons (ADR-0088), at any window width. */
       :root[data-list="icons"] { --side: 3rem; }
       * { box-sizing: border-box; }
       button { padding: .5rem .9rem; border-radius: 6px; border: 0; background: #2f6feb; color: #fff; font: inherit; cursor: pointer; }
       .actions button, .tools button { background: none; border: 1px solid #3a3f48; color: #aaa;
         padding: .05rem .45rem; border-radius: 3px; }
-      /* Your list down the left, the workspace beside it, and the footer under
+      /* The sidebar down the left, the workspace beside it, and the footer under
          both (ADR-0112). There is no header: the columns start at the top. */
       body {
         margin: 0; height: 100vh; display: grid;
@@ -34,28 +34,28 @@
       h1 { font-size: 1rem; letter-spacing: .08em; text-transform: uppercase; color: #8b93a1; margin: 0 0 .25rem; }
 
 
-      /* Your list (ADR-0112): your open roots, in your order, then new tabs,
+      /* The sidebar (ADR-0112): your open roots, in your order, then new tabs,
          then ＋. Its right edge is an inset shadow: a descendant's fill paints
          over it, so the root you are on, filled with the page's colour,
          opens into the page beside it (ADR-0081, turned sideways). An item is
          its wrap: its button, ⋯ and ×. At rest it has no fill, and its
          border is there but clear, so it takes the same room chosen or not. */
-      #open-list { grid-column: 1; grid-row: 1; display: flex; flex-direction: column;
+      #sidebar { grid-column: 1; grid-row: 1; display: flex; flex-direction: column;
         gap: .6rem; min-height: 0; overflow-y: auto; padding: .6rem 0 .6rem .45rem;
         background: var(--chrome); --surface: var(--chrome);
         box-shadow: inset -1px 0 0 var(--edge); font-size: .8rem; --item-control: 1.4rem; }
-      .open-items { display: flex; flex-direction: column; gap: .1rem; }
-      .open-item { position: relative; display: flex; align-items: center; min-width: 0;
+      .sidebar-items { display: flex; flex-direction: column; gap: .1rem; }
+      .sidebar-item { position: relative; display: flex; align-items: center; min-width: 0;
         border: 1px solid transparent; border-left-width: 2px; border-right: 0;
         border-radius: 6px 0 0 6px; }
-      .open-item:hover { background: #1b1e24; --surface: #1b1e24; }
+      .sidebar-item:hover { background: #1b1e24; --surface: #1b1e24; }
       /* The root you are on is the page's colour, and covers the list's edge. */
-      .open-item[data-selected] { background: var(--page); --surface: var(--page);
+      .sidebar-item[data-selected] { background: var(--page); --surface: var(--page);
         border-color: var(--edge); border-left-color: var(--on); }
       .open-root, .open-new { flex: 1; display: flex; gap: .35rem; align-items: center;
         min-width: 0; padding: .45rem .6rem; border-radius: 0; background: none;
         color: #aab4c3; text-align: left; }
-      .open-item[data-selected] > .open-root, .open-item[data-selected] > .open-new {
+      .sidebar-item[data-selected] > .open-root, .sidebar-item[data-selected] > .open-new {
         color: #e6e6e6; font-weight: 600; }
       /* A title wraps to two lines before it is cut. */
       .open-label { flex: 1; min-width: 0; overflow: hidden; display: -webkit-box;
@@ -72,23 +72,23 @@
       /* ⋯ and × only while an item is hovered or focused, the one you are on
          too. Hidden with visibility, and laid over the label's end in the
          colour behind them, so the label keeps its room. */
-      .open-item .open-more, .open-item .open-close { visibility: hidden; }
-      .open-item > .open-close { position: absolute; top: 0; bottom: 0; right: 0;
+      .sidebar-item .open-more, .sidebar-item .open-close { visibility: hidden; }
+      .sidebar-item > .open-close { position: absolute; top: 0; bottom: 0; right: 0;
         background: var(--surface); }
-      .open-item > .open-more { position: absolute; top: 0; bottom: 0;
+      .sidebar-item > .open-more { position: absolute; top: 0; bottom: 0;
         right: var(--item-control); display: flex; background: var(--surface); }
-      .open-item:hover .open-more, .open-item:focus-within .open-more, .open-more.open,
-      .open-item:hover .open-close, .open-item:focus-within .open-close { visibility: visible; }
-      /* Where a root dragged to the end of your list lands. */
+      .sidebar-item:hover .open-more, .sidebar-item:focus-within .open-more, .open-more.open,
+      .sidebar-item:hover .open-close, .sidebar-item:focus-within .open-close { visibility: visible; }
+      /* Where a root dragged to the end of the sidebar lands. */
       .open-end { display: block; min-height: .6rem; }
       /* Where a dragged root would land (use-root-drag.ts): a line in the gap
          above the item it goes before, or at the list's end. */
-      .open-item[data-root-drop]::before { content: ""; position: absolute; z-index: 1;
+      .sidebar-item[data-root-drop]::before { content: ""; position: absolute; z-index: 1;
         left: 0; right: 0; top: calc(-.05rem - 1.5px); height: 3px; border-radius: 2px;
         background: #8ab4f8; pointer-events: none; }
       .open-end[data-root-drop] { box-shadow: inset 0 3px 0 #8ab4f8; }
-      .open-item[data-root-dragging] { opacity: .4; }
-      /* A root's status, before its label (ADR-0077), in your list and on the
+      .sidebar-item[data-root-dragging] { opacity: .4; }
+      /* A root's status, before its label (ADR-0077), in the sidebar and on the
          board. Working is a still ring: it needs nothing from you, so it does
          not move. What needs you is a filled amber dot, the colour of the
          "since you were here" line the root opens onto, which pulses three
@@ -107,14 +107,15 @@
       /* It ends taking no room, so nothing need be redrawn to remove it. */
       @keyframes done-fade { to { opacity: 0; width: 0; } }
       @media (prefers-reduced-motion: reduce) { .root-status { animation: none; } }
-      .popover { position: absolute; z-index: 4; top: 100%; right: 0; display: flex;
+      /* Above the floating inventory (5): a card's ⋯ opens over it. */
+      .popover { position: absolute; z-index: 6; top: 100%; right: 0; display: flex;
         flex-direction: column; min-width: 12rem; padding: .25rem; background: #1b1e24;
         border: 1px solid #3a3f48; border-radius: 6px; }
       .menu-items { display: flex; flex-direction: column; }
       .menu button { text-align: left; background: none; color: #ddd; padding: .3rem .5rem; }
       .menu button:disabled { color: #777; cursor: default; }
       .menu .why { font-size: .75rem; }
-      /* ＋: a split button, dashed, at the foot of your list and of each
+      /* ＋: a split button, dashed, at the foot of the sidebar and of each
          board column. */
       .add-root { position: relative; display: inline-flex; flex: 0 0 auto; align-self: flex-start;
         margin-left: .2rem; }
@@ -128,10 +129,10 @@
         color: #6f7784; font-size: .9rem; }
       .list-fold:hover, .list-fold:focus-visible { color: #e6e6e6; }
 
-      /* Your list folded (ADR-0088): an icon per item, the item's own menu
+      /* The sidebar folded (ADR-0088): an icon per item, the item's own menu
          behind a right-click, ＋ over its ▾. The item's wrap, its selected
          fill and its left edge are the full list's. */
-      :root[data-list="icons"] #open-list { padding-left: .3rem; }
+      :root[data-list="icons"] #sidebar { padding-left: .3rem; }
       .open-icon-menu { position: relative; flex: 1; min-width: 0; display: flex; }
       .open-icon-menu > .open-root, .open-icon-menu > .open-new { justify-content: center;
         padding: .35rem 0; }
@@ -668,10 +669,44 @@
       /* An archived root, or a send on its way: what was typed
          stays, and nothing more is typed. */
       .card-editor .input[readonly] { opacity: .5; }
-      /* Everyone else's cards at this end (ADR-0048), above your composer. */
+      /* The notes at this end (ADR-0113), above your composer. With none, a
+         drop zone shown only while a card is dragged, as the empty pinned
+         strip is. */
       .cards { padding: .5rem .75rem 0; border-top: 1px solid #23272e; }
-      .card-editor.others { margin-bottom: .5rem; padding-left: .5rem; border-left: 2px solid #3a3f48; }
-      .card-heading { font-size: .72rem; color: #8b93a1; margin-bottom: .25rem; }
+      .cards[data-empty] { display: none; }
+      body[data-card-drag] .cards[data-empty] { display: block; padding-bottom: .5rem; }
+      .notes-empty { display: block; font-size: .72rem; color: #6f7784; }
+      /* A text card's frame (ADR-0111), coloured by its place, which says who
+         reads it: your inventory yours, a draft neutral, queued blue (the
+         agent reads it once), pinned violet (on every run). */
+      .card-frame { --tone: #6f7784; margin: 0 0 .5rem; background: #181b20;
+        border: 1px solid #2d333b; border-left: 3px solid var(--tone); border-radius: 6px; }
+      .card-frame[data-tone="queued"] { --tone: #58a6ff; }
+      .card-frame[data-tone="pinned"] { --tone: #b392f0; }
+      .card-frame[data-tone="inventory"] { --tone: var(--you, #e3b341); }
+      .composer .card-frame { margin: 0; }
+      .card-head { display: flex; align-items: center; gap: .4rem; min-height: 1.6rem;
+        padding: .15rem .5rem; font-size: .72rem; color: #8b93a1; }
+      .card-head[draggable="true"] { cursor: grab; }
+      .card-icon, .card-place { color: var(--tone); }
+      .card-icon { font-weight: 600; }
+      .card-state { color: #c3c8d0; }
+      .card-state[data-state="unsent"], .card-state[data-status="changed"],
+      .card-state[data-status="unread"] { color: #e8c07a; }
+      .card-chip { padding: 0 .45rem; border-radius: .6rem; background: #2a2140; color: #d2a8ff; }
+      .card-chip button { background: none; border: 0; padding: 0 0 0 .3rem; color: inherit; cursor: pointer; }
+      /* Room for ⋯ and × before the card exists: the header does not shift. */
+      .card-head-acts { display: flex; gap: .15rem; justify-content: flex-end; min-width: 3rem; margin-left: auto; }
+      .card-head-acts button { padding: 0 .35rem; font-size: .8rem; background: none; border: 0;
+        color: #8b93a1; cursor: pointer; }
+      .card-head-acts button:hover { color: #ddd; }
+      .card-body { padding: 0 .5rem; }
+      .card-foot { display: flex; align-items: center; gap: .4rem; padding: .3rem .5rem .4rem; }
+      .card-foot:empty { display: none; }
+      .card-tools { display: flex; gap: .2rem; }
+      .card-tools button { width: 1.6rem; padding: .05rem 0; font-size: .72rem; }
+      .card-frame .primary { background: var(--tone); border-color: var(--tone); color: #0d1117; }
+      .card-frame .primary:disabled { opacity: .5; }
       /* Closing a new branch that holds text asks first. */
       .close-ask { font-size: .75rem; color: #d0a15f; margin-top: .25rem; }
       .close-ask button { padding: .05rem .45rem; font-size: .72rem; }
@@ -692,15 +727,12 @@
       .compose-row { display: flex; gap: .5rem; align-items: center; justify-content: flex-end;
         margin-top: .4rem; }
       .compose-row .send { max-width: 14rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      .card-foot .compose-row { flex: 1; margin-top: 0; }
       /* Queued for the thread's lane, above the line: not in the tree yet,
          and editable by anyone until the host takes it (ADR-0048). */
-      .card-editor.queued { margin: 0 0 1rem; padding-left: .5rem; border-left: 2px dashed #777; }
-      .card-editor.queued .compose-row { justify-content: flex-start; }
-      .unqueue, .reorder-up, .reorder-down { padding: .05rem .45rem; font-size: .72rem; }
       /* Something of yours refused, said where you acted (ADR-0059). */
       .refused-move { font-size: .75rem; color: #d0a15f; margin: 0 0 1rem; }
       .queued-fact { font-size: .75rem; color: #8b949e; margin: 0 0 .5rem; }
-      .take-into-inventory { padding: .05rem .45rem; font-size: .72rem; cursor: grab; }
       /* Pinned cards (ADR-0048 step 5): the thread's direction, at the top of
          its column and outside its scrolling body; the agent reads them on
          every run. Empty, a slim drop zone. */
@@ -709,13 +741,9 @@
       .pinned-empty { display: block; font-size: .72rem; color: #6f7784; }
       .pinned-strip[data-empty] { display: none; }
       body[data-card-drag] .pinned-strip[data-empty] { display: block; }
-      .card-editor.pinned { margin: 0 0 .5rem; padding-left: .5rem; border-left: 2px solid #8ab4f8; }
-      .card-editor.pinned .compose-row { justify-content: flex-start; }
-      .pinned-size, .pinned-status { font-size: .72rem; color: #8b93a1; }
-      .pinned-status[data-status="changed"], .pinned-status[data-status="unread"] { color: #e8c07a; }
-      .pin, .unpin, .new-card, .new-pin { padding: .05rem .45rem; font-size: .72rem; }
-      /* A card's history (ADR-0048 step 6): a quiet button, a small list. */
-      .card-history-trigger { padding: .05rem .45rem; font-size: .72rem; }
+      .pinned-size { font-size: .72rem; color: #8b93a1; }
+      .new-pin { padding: .05rem .45rem; font-size: .72rem; }
+      /* A card's history (ADR-0048 step 6): a small list in its body, from its ⋯. */
       .card-history-events { margin: 0; padding: .25rem .5rem .25rem 1.4rem; font-size: .75rem; }
       .card-history-at, .card-history-writers { color: #8b93a1; }
       .card-history-writers { list-style: none; margin-left: -1rem; padding-top: .25rem; }
@@ -732,7 +760,6 @@
       .pinned-read-by { color: #6f7784; }
       .pinned-read-text { white-space: pre-wrap; color: #c3c8d0; }
       .pinned-read-retired { margin: .3rem 0 0 .75rem; font-style: italic; }
-      .card-heading[draggable="true"] { cursor: grab; }
       /* Your inventory (ADR-0048): floating over the columns' middle, docked
          left, centre or right, a 3 × 6 grid beside the selected card. */
       .inventory { position: fixed; z-index: 5; top: 30vh; width: min(52rem, 94vw);
@@ -753,7 +780,6 @@
       .slot-label { position: absolute; top: .1rem; right: .25rem; color: #6f7784; font-size: .65rem; }
       .slot-line { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
       .inventory-card { flex: 1; min-width: 0; }
-      .inventory-card .compose-row { justify-content: flex-start; }
       .inventory-empty { color: #6f7784; font-size: .8rem; }
       dialog.restore-ask { background: #171a1f; color: inherit; border: 1px solid #3a3f48;
         border-radius: 8px; }
@@ -813,20 +839,20 @@
       #strip:has(.column-head[data-color="pending"]:hover) .fork-dot[data-color="pending"],
       #strip:has(.fork-dot[data-color="pending"]:hover) .column-head[data-color="pending"] {
         outline: 2px solid var(--track); outline-offset: 2px; }
-      /* The footer (ADR-0112): one row of chrome, split where your list's edge
+      /* The footer (ADR-0112): one row of chrome, split where the sidebar's edge
          is. Its own cell, at the list's width, is yours: you, your inbox
          (ADR-0091) and your inventory (ADR-0098). Then everyone's: the board's strip,
          with where the agent works and what is ready to accept, "syncing…"
          while pending, and the publish button (ADR-0090). Nothing here
-         animates: your list, the column and the rail show where the agent
+         animates: the sidebar, the column and the rail show where the agent
          works. */
       #bottom { grid-column: 1 / 3; grid-row: 2; display: flex; align-items: center;
         gap: 1rem; min-height: 42px; padding-right: .6rem; background: var(--chrome);
         --surface: var(--chrome); box-shadow: inset 0 1px 0 var(--edge); font-size: .8rem; }
       /* Your corner (ADR-0098): you on the left, your inbox and inventory as
-         icons of one style on the right, with your list's hover fill and no
+         icons of one style on the right, with the sidebar's hover fill and no
          borders. Amber, the inbox's badge, is its only colour beside yours.
-         Its left padding lines your avatar up with your list's items. */
+         Its left padding lines your avatar up with the sidebar's items. */
       .footer-you { flex: 0 0 var(--side); align-self: stretch; display: flex; align-items: center;
         gap: .5rem; min-width: 0; padding: 0 .4rem 0 .45rem; box-shadow: inset -1px 0 0 var(--edge); }
       .footer-you .account { display: flex; flex: 1 1 auto; min-width: 0; }
@@ -860,7 +886,7 @@
       .strip-count { color: #e6e6e6; font-weight: 600; }
       /* A state's roots the agent works in, and with work ready to accept
          (ADR-0091): facts, muted, never a badge, never moving. ⇡ is blue on
-         a board item, apart from the amber that asks something of you. */
+         a thread card, apart from the amber that asks something of you. */
       .strip-working, .strip-ready { font-size: .75rem; color: #8b93a1; }
       .root-ready { flex: 0 0 auto; color: #8ab4f8; font-size: .8rem; line-height: 1; }
       .reader-trigger { display: inline-flex; align-items: center; gap: .3rem;
@@ -885,24 +911,24 @@
       .board-count { color: #6f7784; font-size: .7rem; }
       .state-more { position: relative; margin-left: auto; }
       .state-menu, .item-menu { padding: 0 .3rem; background: none; color: #aaa; }
-      .board-items { position: relative; display: flex; flex-direction: column; gap: .4rem;
+      .board-cards { position: relative; display: flex; flex-direction: column; gap: .4rem;
         min-height: 1.5rem; }
-      .board-item { position: relative; display: flex; flex-direction: column; gap: .2rem;
+      .thread-card { position: relative; display: flex; flex-direction: column; gap: .2rem;
         padding: .5rem .6rem; background: var(--page); border: 1px solid var(--edge);
         border-radius: 6px; --surface: var(--page); }
       /* Where a dragged root would land (use-root-drag.ts): a line in the gap
          above the card it goes before, or below a column's last card. The
          closed state keeps no order of its own, so it is outlined whole. The
          card dragged stays, dimmed, in its place until it is dropped. */
-      .board-item[data-root-drop]::before, .board-column[data-root-drop] > .board-items::after {
+      .thread-card[data-root-drop]::before, .board-column[data-root-drop] > .board-cards::after {
         content: ""; position: absolute; left: -1px; right: -1px; height: 3px;
         border-radius: 2px; background: #8ab4f8; pointer-events: none; }
-      .board-item[data-root-drop]::before { top: calc(-.2rem - 2.5px); }
-      .board-column[data-root-drop] > .board-items::after { bottom: calc(-.2rem - 1.5px); }
-      .board-column[data-root-drop] > .board-items:empty::after { top: calc(50% - 1.5px); bottom: auto; }
+      .thread-card[data-root-drop]::before { top: calc(-.2rem - 2.5px); }
+      .board-column[data-root-drop] > .board-cards::after { bottom: calc(-.2rem - 1.5px); }
+      .board-column[data-root-drop] > .board-cards:empty::after { top: calc(50% - 1.5px); bottom: auto; }
       .board-closed[data-root-drop] { outline: 2px solid #8ab4f8; outline-offset: .3rem;
         border-radius: 4px; }
-      .board-item[data-root-dragging] { opacity: .4; border-style: dashed; }
+      .thread-card[data-root-dragging] { opacity: .4; border-style: dashed; }
       .board-open { display: flex; gap: .35rem; align-items: center; padding: 0; background: none;
         color: #e6e6e6; text-align: left; line-height: 1.25; }
       .board-label { flex: 1; min-width: 0; }
@@ -910,7 +936,7 @@
       .board-writers { color: #8b949e; font-size: .72rem; }
       .readers { display: inline-flex; gap: .1rem; margin-left: auto; }
       .item-more { position: absolute; top: .3rem; right: .3rem; visibility: hidden; }
-      .board-item:hover .item-more, .board-item:focus-within .item-more, .item-more.open { visibility: visible; }
+      .thread-card:hover .item-more, .thread-card:focus-within .item-more, .item-more.open { visibility: visible; }
       .board-add-state { flex: 0 0 auto; }
       .add-state { padding: .3rem .6rem; background: none; color: #aab4c3; border: 1px dashed #3a3f48; }
       .closed-search { padding: .3rem .5rem; background: var(--page); color: #ddd;
@@ -1036,7 +1062,7 @@
       .profile-page .profile-email { margin: 1.25rem 0 0; padding-top: .75rem;
         border-top: 1px solid #2a2e36; color: #aab4c3; font-size: .85rem; }
 
-      /* Your list folded (ADR-0088), after the rules these refine: your pip
+      /* The sidebar folded (ADR-0088), after the rules these refine: your pip
          on an icon's corner, and the footer's corner holding only your
          avatar, which carries the inbox's badge (ADR-0098). */
       .open-icon .card-pip { position: absolute; bottom: -2px; right: -2px; }

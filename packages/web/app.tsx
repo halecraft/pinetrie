@@ -1,12 +1,12 @@
 // web/app — the page: `App`, which `main.tsx` mounts.
 //
-// The screen is your list down the left, the root you are on beside it, a
+// The screen is the sidebar down the left, the root you are on beside it, a
 // rail beside a strip of columns, and the footer along the bottom: you, the
 // board's strip, what needs you and publish (docs/06-interface.md,
 // ADR-0112). The rail draws the root's tree; each column is one path, read on
 // its own scroll; the board opens over them. What is drawn is a read of the
-// document, through `@pinetrie/reads` and `projection.ts`. Your list is your
-// own document, on every device (`openList`). Which root you are on, each
+// document, through `@pinetrie/reads` and `projection.ts`. The sidebar is your
+// own document, on every device (`openThreads`). Which root you are on, each
 // root's columns and whether the board is open are this window's own view
 // state: a reducer (`layout.ts`), kept in this browser tab's storage and
 // never in the document (ADR-0027).
@@ -67,7 +67,6 @@ import {
   NO_TEXT,
   nameEffects,
   offeredByRoot,
-  openListView,
   ownCards,
   pageTitle,
   perform,
@@ -90,6 +89,7 @@ import {
   type Spot,
   screenMemory,
   shownWidth,
+  sidebarView,
   spotFor,
   spotStore,
   summariesOf,
@@ -131,7 +131,6 @@ import { Column } from "./column.tsx"
 import { Footer } from "./footer.tsx"
 import { threadRow } from "./inbox-menu.tsx"
 import { InventoryPanel } from "./inventory-panel.tsx"
-import { OpenList } from "./open-list.tsx"
 import { Page } from "./page.tsx"
 import { TrackSeed } from "./palette-context.ts"
 import { Pictures } from "./pictures-context.ts"
@@ -143,6 +142,7 @@ import {
   type ReviewPrefs,
   ReviewPrefsContext,
 } from "./review-prefs.ts"
+import { Sidebar } from "./sidebar.tsx"
 import type { DeviceState, TabState } from "./tab-state.ts"
 import { useAttention } from "./use-attention.ts"
 import { useColumnDrag } from "./use-column-drag.ts"
@@ -165,11 +165,11 @@ export interface AppStores {
   readonly dock: DeviceState<Dock>
   /** How you read a review, on this device (ADR-0087). */
   readonly review: DeviceState<ReviewPrefs>
-  /** Your list full or folded to icons, chosen in this tab (ADR-0088). */
+  /** The sidebar full or folded to icons, chosen in this tab (ADR-0088). */
   readonly list: TabState<ListWidth>
 }
 
-/** How long a card's drag held over a root in your list opens it. */
+/** How long a card's drag held over a root in the sidebar opens it. */
 const ITEM_HOVER_MS = 600
 
 const cardOrNull = (id: string | undefined): CardId | null =>
@@ -294,7 +294,7 @@ export function App({
   const status = useDocStatus(doc)
   // The page over the workspace, from the URL's hash (ADR-0098).
   const page = usePage()
-  // The roots this tab holds (ADR-0063): the roots of your list and the one
+  // The roots this tab holds (ADR-0063): the roots of the sidebar and the one
   // you are on, set by the effect below. Every read of the tree reads them
   // as one.
   const roots = useSyncExternalStore(
@@ -309,7 +309,7 @@ export function App({
     }),
     [session, roots],
   )
-  // The directory of every root (ADR-0063): what your list, the board and
+  // The directory of every root (ADR-0063): what the sidebar, the board and
   // the inbox read of a root without holding it.
   const directory = useSelector(doc, readRoots)
   // Every read is `useSelector` over a named read, never an inline
@@ -356,7 +356,7 @@ export function App({
   const pictures = useSelector(doc, readParticipantPictures)
 
   // Each root, for the board and its label: its title, else its first line
-  // (ADR-0045). Which roots are in your list is yours (`openList`, ADR-0112).
+  // (ADR-0045). Which roots are in the sidebar is yours (`openThreads`, ADR-0112).
   const summaries = useMemo(() => summariesOf(directory), [directory])
   const lines = useMemo(() => firstLinesOf(directory), [directory])
   const labels = useMemo(
@@ -396,11 +396,11 @@ export function App({
     () => new Set(archivedEntries.keys()),
     [archivedEntries],
   )
-  // Your list (ADR-0112): your own document, by root entry; a root the
+  // The sidebar (ADR-0112): your own document, by root entry; a root the
   // directory does not name yet is left out until it does.
   const listIds = useSyncExternalStore(
-    session.openList.roots.subscribe,
-    session.openList.roots.current,
+    session.openThreads.roots.subscribe,
+    session.openThreads.roots.current,
   )
   const list = useMemo(
     () =>
@@ -428,7 +428,7 @@ export function App({
     () => laneRootsOf(workFacts.lanes, rootEntries),
     [workFacts.lanes, rootEntries],
   )
-  // The agent's work in every root, held or not: one map for your list,
+  // The agent's work in every root, held or not: one map for the sidebar,
   // the board and each root's ring (ADR-0091).
   const work = useMemo(
     () => workAnywhere({ held: rootWork(index, lanes), running, rootEntries }),
@@ -464,7 +464,7 @@ export function App({
   // settled, and the tab to show is chosen then: before, missing means not
   // yet arrived. `"populated"` comes with the first data, so it cannot tell
   // (S29).
-  // The roots your list and the stored root you were on name are held, and
+  // The roots the sidebar and the stored root you were on name are held, and
   // settled, first: their anchors are in no index before (ADR-0063).
   const [settled, setSettled] = useState(false)
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, with the stored layout of that render
@@ -476,7 +476,7 @@ export function App({
         planHeldRoots({
           layout: {
             active: stored.active,
-            open: session.openList.roots
+            open: session.openThreads.roots
               .current()
               .flatMap(id => known.get(id) ?? []),
           },
@@ -492,7 +492,7 @@ export function App({
       alive = false
     }
   }, [doc, session])
-  // What this tab holds follows your list, once the stored roots are settled.
+  // What this tab holds follows the sidebar, once the stored roots are settled.
   useEffect(() => {
     if (settled) session.holdRoots(planHeldRoots({ layout, directory }))
   }, [settled, session, layout, directory])
@@ -544,10 +544,10 @@ export function App({
     [index, columns],
   )
   const rail = useMemo(() => hereRail(index, active), [index, active])
-  // The root you are on, which your list's repair keeps while it is archived.
+  // The root you are on, which the sidebar's repair keeps while it is archived.
   const hereId =
     active?.kind === "root" ? (rootIds.get(active.root) ?? null) : null
-  useEffect(() => session.openList.here(hereId), [session, hereId])
+  useEffect(() => session.openThreads.here(hereId), [session, hereId])
   // The root whose colours the workspace draws in (ADR-0089): the root you
   // are on, or the root a new tab will start, whose id it minted as it opened.
   const seedRoot =
@@ -716,7 +716,7 @@ export function App({
   const listView =
     active === null
       ? null
-      : openListView({
+      : sidebarView({
           layout,
           active,
           labels,
@@ -858,7 +858,7 @@ export function App({
   openNow.current = inventoryOpen
   const [dock, setDock] = useState<Dock>(() => stores.dock.load() ?? "centre")
   useEffect(() => stores.dock.subscribe(d => setDock(d ?? "centre")), [stores])
-  // Your list's width: your choice in this tab, else by the window's size.
+  // The sidebar's width: your choice in this tab, else by the window's size.
   const [chosenWidth, setChosenWidth] = useState(() => stores.list.load())
   const listWidth = shownWidth(chosenWidth, useSmallWindow())
   useEffect(() => {
@@ -939,6 +939,7 @@ export function App({
             lanes,
             laneRecords: workFacts.lanes,
             me: session.writer,
+            filled,
             slots,
             selected,
             composers: composers.current(),
@@ -995,7 +996,7 @@ export function App({
   }, [])
   // A card's drag (HTML drag and drop: it crosses elements and roots). A
   // drop lands only where put can (`targetOfElement`); held over a root in
-  // your list, the drag opens it. A root's drag is not a card's: it is
+  // the sidebar, the drag opens it. A root's drag is not a card's: it is
   // `ROOT_MIME`, and lands by `useRootDrag`.
   useEffect(() => {
     let hover: {
@@ -1017,7 +1018,7 @@ export function App({
         e.target instanceof Element
           ? e.target.closest<HTMLElement>(".open-root[data-root]")?.dataset.root
           : undefined
-      // The item's root, as your list holds it.
+      // The item's root, as the sidebar holds it.
       const root = layout.open.find(r => r === item)
       if (root !== hover?.root) {
         if (hover !== null) clearTimeout(hover.timer)
@@ -1069,9 +1070,9 @@ export function App({
       document.removeEventListener("drop", onDrop)
     }
   }, [onIntent, layout.open])
-  // A root's drag, from the board or your list (ADR-0112).
+  // A root's drag, from the board or the sidebar (ADR-0112).
   useRootDrag(onIntent, workflow?.closed.id ?? null)
-  /** A root's drag from your list: its id and state, or null with no id yet. */
+  /** A root's drag from the sidebar: its id and state, or null with no id yet. */
   const dragOf = (root: string): RootDrag | null => {
     const entry = root as EntryId
     const id: RootId | undefined = rootIds.get(entry)
@@ -1148,7 +1149,7 @@ export function App({
     <Pictures value={pictures}>
       <CardHistories value={historyFacts}>
         {listView !== null && workspace.kind !== "connecting" ? (
-          <OpenList
+          <Sidebar
             colorOf={colorOf}
             dragOf={dragOf}
             index={index}
@@ -1160,7 +1161,7 @@ export function App({
             width={listWidth}
           />
         ) : (
-          <nav aria-label="your threads" id="open-list" />
+          <nav aria-label="your threads" id="sidebar" />
         )}
         {inventoryOpen && (
           <InventoryPanel

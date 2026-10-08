@@ -1,7 +1,7 @@
 // interface/held-roots — which roots this tab asks its session to hold
 // (ADR-0063). Pure.
 //
-// A tab loads only what it shows: the roots of your list and the one you are
+// A tab loads only what it shows: the roots of the sidebar and the one you are
 // on, archived or not. Every other root is read from the directory alone,
 // the board's included. What holding them opens and lets go is
 // `planHold` (`root-hold.ts`).

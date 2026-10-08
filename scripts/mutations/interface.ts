@@ -355,7 +355,7 @@ export const mutations: readonly Mutation[] = [
     from: '    ...(active?.kind === "root" ? [active.root] : []),',
     to: "    ...[],",
     command: unit,
-    expect: "your list's roots and the one you are on, and no other",
+    expect: "the sidebar's roots and the one you are on, and no other",
   },
   {
     name: "a tab holds only the root it is on",
@@ -363,7 +363,7 @@ export const mutations: readonly Mutation[] = [
     from: "    ...input.layout.open,\n",
     to: "",
     command: unit,
-    expect: "your list's roots and the one you are on, and no other",
+    expect: "the sidebar's roots and the one you are on, and no other",
   },
   {
     name: "conflicts in your files offer no agent",
@@ -523,7 +523,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "Move to Done names no offer it withdraws",
-    file: "packages/interface/open-list-view.ts",
+    file: "packages/interface/sidebar-view.ts",
     from: "        drops: closes ? (input.offered.get(root) ?? []) : [],",
     to: "        drops: [],",
     command: unit,
@@ -659,7 +659,7 @@ export const mutations: readonly Mutation[] = [
     from: "  const kept = list.filter(r => !archived.has(r) || r === here)",
     to: "  const kept = list",
     command: unit,
-    expect: "archived roots leave your list as drawn",
+    expect: "archived roots leave the sidebar as drawn",
   },
   {
     name: "a branch's prefill is not stored",
@@ -856,12 +856,12 @@ export const mutations: readonly Mutation[] = [
     expect: "stretchFill: the agent alone, people alone, or both",
   },
   {
-    name: "a root leaving your list forgets its columns",
+    name: "a root leaving the sidebar forgets its columns",
     file: "packages/interface/layout.ts",
     from: "      return { ...state, active: afterClosing(state, here) }",
     to: "      return { ...state, active: afterClosing(state, here), roots: withRoot(state.roots, action.root, []) }",
     command: unit,
-    expect: "a root that leaves your list keeps its columns",
+    expect: "a root that leaves the sidebar keeps its columns",
   },
   {
     name: "prune falls back to an archived root",
@@ -880,12 +880,12 @@ export const mutations: readonly Mutation[] = [
     expect: "closing the root you are on shows its neighbour below",
   },
   {
-    name: "every root anyone starts is in your list",
+    name: "every root anyone starts is in the sidebar",
     file: "packages/interface/layout.ts",
     from: "  const open = drawnList(facts.list, facts.archived, synced.active)",
     to: "  const open = drawnList([...new Set([...facts.list, ...facts.index.roots])], facts.archived, synced.active)",
     command: unit,
-    expect: "a root someone else starts is not in your list",
+    expect: "a root someone else starts is not in the sidebar",
   },
   {
     name: "a v4 layout is decoded",
@@ -1572,38 +1572,6 @@ export const mutations: readonly Mutation[] = [
     expect: "a card found attaches; a card gone detaches",
   },
   {
-    name: "editorState: a blank box takes the card it finds",
-    file: "packages/interface/card-state.ts",
-    from: '      return state.kind === "local"\n        ? step({ kind: "bound", card: event.card }, ["attach"])',
-    to: '      return free(state)\n        ? step({ kind: "bound", card: event.card }, ["attach"])',
-    command: unit,
-    expect: "a blank box takes no card it finds",
-  },
-  {
-    name: "editorState: typing in a blank box creates nothing",
-    file: "packages/interface/card-state.ts",
-    from: "      return free(state) && needsCard(event.text, prefill)",
-    to: '      return state.kind === "local" && needsCard(event.text, prefill)',
-    command: unit,
-    expect: "typing in a blank box creates a new card",
-  },
-  {
-    name: "editorState: + card keeps the box bound",
-    file: "packages/interface/card-state.ts",
-    from: '      return state.kind === "bound" ? step(BLANK, ["detach"]) : stay(state)',
-    to: "      return stay(state)",
-    command: unit,
-    expect: "new empties the box and lets go of its card",
-  },
-  {
-    name: "shownBelow: a blank composer hides your newest card",
-    file: "packages/interface/card-state.ts",
-    from: '  composer === undefined || composer.kind === "local"',
-    to: '  composer === undefined || composer.kind !== "bound"',
-    command: unit,
-    expect: "a blank box shows nothing",
-  },
-  {
     name: "newPinAt: + pin stays in the header once a card is pinned",
     file: "packages/interface/column-view.ts",
     from: '  !f.canPin || f.pinning ? null : f.pinned === 0 ? "header" : "strip"',
@@ -1673,7 +1641,7 @@ export const mutations: readonly Mutation[] = [
     from: "  [...roots].filter(r => !layout.open.includes(r) && !archived.has(r))",
     to: "  [...roots].filter(r => !archived.has(r))",
     command: unit,
-    expect: "a drafting card marks its root and its thread's end",
+    expect: "your message marks its root and its thread's end",
   },
   {
     name: "railKeep drops your cards' ends",
@@ -1726,7 +1694,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the latest thread's sprite",
-    file: "packages/interface/open-list-view.ts",
+    file: "packages/interface/sidebar-view.ts",
     from: "    a.name < b.name ? -1 : a.name > b.name ? 1 : 0,",
     to: "    a.name < b.name ? 1 : a.name > b.name ? -1 : 0,",
     command: unit,
@@ -1734,7 +1702,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a new tab borrows a root's colour",
-    file: "packages/interface/open-list-view.ts",
+    file: "packages/interface/sidebar-view.ts",
     from: '        icon: { kind: "fresh" },',
     to: '        icon: { kind: "initials", letters: "", slot: "pending" },',
     command: unit,
@@ -1754,7 +1722,7 @@ export const mutations: readonly Mutation[] = [
     from: '  if (chord && key === "l") return { kind: "foldList" }',
     to: "",
     command: unit,
-    expect: "Ctrl+Shift+L folds or unfolds your list",
+    expect: "Ctrl+Shift+L folds or unfolds the sidebar",
   },
   {
     name: "folding saves the width it shows",
@@ -1762,7 +1730,7 @@ export const mutations: readonly Mutation[] = [
     from: '      return [{ kind: "listWidth", width: otherWidth(state.listWidth) }]',
     to: '      return [{ kind: "listWidth", width: state.listWidth }]',
     command: unit,
-    expect: "foldList asks for the width your list does not show",
+    expect: "foldList asks for the width the sidebar does not show",
   },
   {
     name: "an archived root lights the Archive tab",
@@ -1787,7 +1755,7 @@ export const mutations: readonly Mutation[] = [
     to: '          return [{ kind: "request", intent: { kind: "name", name: "x" } }, ...closeRoot(intent.here.root, state)]',
     command: unit,
     expect:
-      "× on a root closes it for you: it leaves your list, and nothing shared is written",
+      "× on a root closes it for you: it leaves the sidebar, and nothing shared is written",
   },
   {
     name: "a first message's new tab starts empty",
@@ -1906,7 +1874,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "＋'s default starts a conversation",
-    file: "packages/interface/open-list-view.ts",
+    file: "packages/interface/sidebar-view.ts",
     from: '      agent: { kind: "newTab", asksAgent: true },',
     to: '      agent: { kind: "newTab", asksAgent: false },',
     command: unit,
@@ -1914,7 +1882,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a root's ⋯ shows only on the root you are on",
-    file: "packages/interface/open-list-view.ts",
+    file: "packages/interface/sidebar-view.ts",
     from: "        menu: archived ? [] : menuOf(root, status, input),",
     to: "        menu: archived || !common.selected ? [] : menuOf(root, status, input),",
     command: unit,
@@ -1922,7 +1890,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the window's title names no root",
-    file: "packages/interface/open-list-view.ts",
+    file: "packages/interface/sidebar-view.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "  const place = shown === null ? PRODUCT_NAME : `${shown} · ${PRODUCT_NAME}`",
     to: "  const place = PRODUCT_NAME",
@@ -1931,7 +1899,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the window's title counts nothing needing you",
-    file: "packages/interface/open-list-view.ts",
+    file: "packages/interface/sidebar-view.ts",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
     from: "  return count === 0 ? place : `(${count}) ${place}`",
     // biome-ignore lint/suspicious/noTemplateCurlyInString: the anchor is source text
@@ -1940,8 +1908,8 @@ export const mutations: readonly Mutation[] = [
     expect: "0 needing you, on nothing",
   },
   {
-    name: "your list draws no mark",
-    file: "packages/interface/open-list-view.ts",
+    name: "the sidebar draws no mark",
+    file: "packages/interface/sidebar-view.ts",
     from: "        pip: input.unsent.roots.has(root),",
     to: "        pip: false,",
     command: unit,
@@ -2160,7 +2128,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an unqueue removes its card",
     file: "packages/interface/intent.ts",
-    from: "      const move = moveOf(now, draftingOf(now.place))",
+    from: "      const move = moveOf(now, noteOf(now.place))",
     to: "      const move = moveOf(now, null)",
     command: unit,
     expect: "an unqueue puts the card back where it was queued",
@@ -2200,11 +2168,28 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a card that could not be sent says nothing",
-    file: "packages/interface/card-words.ts",
-    from: '  status !== "" || unsent === null ? status : unsentWords(unsent)',
-    to: "  status",
+    file: "packages/interface/card-frame.ts",
+    from: '    : { kind: "unsent", reason: card.unsent }',
+    to: '    : { kind: "none" }',
     command: unit,
-    expect: "cardStatus: the send's own status first",
+    expect:
+      "a note: yours names nobody, another's its owner and who else wrote; not sent says why",
+  },
+  {
+    name: "a drop on the composer leaves the message there",
+    file: "packages/interface/card-intents.ts",
+    from: '  return [{ kind: "keep", moves: [into, back], actedAt, close: [] }]',
+    to: '  return [{ kind: "keep", moves: [into], actedAt, close: [] }]',
+    command: unit,
+    expect: "a message with text takes the note's place",
+  },
+  {
+    name: "a queued card cannot be pinned from its ⋯",
+    file: "packages/interface/card-frame.ts",
+    from: '        pin,\n        take,\n      ]\n    case "pinned":',
+    to: '        take,\n      ]\n    case "pinned":',
+    command: unit,
+    expect: "Move to ▸ queued: the notes, pinned, your inventory",
   },
   {
     name: "every move flies",
@@ -2296,7 +2281,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a client view mints an entry id",
-    file: "packages/interface/open-list-view.ts",
+    file: "packages/interface/sidebar-view.ts",
     from: 'import { blobUrl, PRODUCT_NAME, rootOf } from "@pinetrie/core"',
     to: 'import { blobUrl, entryId, PRODUCT_NAME, rootOf } from "@pinetrie/core"',
     command: [
@@ -2304,7 +2289,7 @@ export const mutations: readonly Mutation[] = [
       "exec",
       "biome",
       "lint",
-      "packages/interface/open-list-view.ts",
+      "packages/interface/sidebar-view.ts",
     ],
     expect: "Mint an id only where it enters",
   },
@@ -2381,7 +2366,7 @@ export const mutations: readonly Mutation[] = [
     from: '  if (target.kind === "inventory") return { kind: "inventory", holder: me }',
     to: '  if (target.kind === "inventory") return null',
     command: unit,
-    expect: "a column lands as its composer place; a slot as your inventory",
+    expect: "a column lands as a note at its end, its composer as your message",
   },
   {
     name: "a slot is marked under another name",
@@ -2398,7 +2383,7 @@ export const mutations: readonly Mutation[] = [
     to: "  if (false) {\n",
     command: unit,
     expect:
-      "composerPlace: drafting at the end with the lane, in its root; fresh by key, in its root",
+      "composerPlace: your message at the end with the lane, in its root; fresh by key, in its root",
   },
   {
     name: "the undo keys reach into a text box",
@@ -2480,7 +2465,7 @@ export const mutations: readonly Mutation[] = [
     from: "          input.rootEntries.get(card.place.root) ??\n",
     to: "",
     command: unit,
-    expect: "a drafting card in a root this tab does not hold marks that root",
+    expect: "your message in a root this tab does not hold marks that root",
   },
   {
     name: "a new tab is stored without its root",
@@ -2506,7 +2491,7 @@ export const mutations: readonly Mutation[] = [
     to: "    const its = root\n",
     command: unit,
     expect:
-      "composerPlace: drafting at the end with the lane, in its root; fresh by key, in its root",
+      "composerPlace: your message at the end with the lane, in its root; fresh by key, in its root",
   },
   {
     name: "an undo in a root names no root",
@@ -2572,7 +2557,7 @@ export const mutations: readonly Mutation[] = [
     from: "  const to = now === undefined ? null : pinnedOf(now.place)",
     to: "  const to = null",
     command: unit,
-    expect: "pin: a drafting card to the top of the same thread's column",
+    expect: "pin: your message to the top of the same thread's column",
   },
   {
     name: "an unpin is ignored",
@@ -2580,13 +2565,13 @@ export const mutations: readonly Mutation[] = [
     from: '  return now?.place.kind === "pinned"\n',
     to: "  return false\n",
     command: unit,
-    expect: "unpin: below the line where it was pinned",
+    expect: "unpin: a note where it was pinned",
   },
   {
     name: "a drop on the strip lands below the line",
     file: "packages/interface/put-target.ts",
-    from: '  return target.kind === "pinned" ? pinnedOf(place) : keyOf(place)',
-    to: "  return keyOf(place)",
+    from: '  if (target.kind === "pinned") return pinnedOf(place)\n',
+    to: "",
     command: unit,
     expect: "a column's pinned strip lands pinned",
   },
@@ -2607,10 +2592,10 @@ export const mutations: readonly Mutation[] = [
     expect: "pinnedStatus: read, changed or unread",
   },
   {
-    name: "a pinned card marks as a drafting one",
+    name: "a pinned card marks as a note",
     file: "packages/interface/card-marks.ts",
-    from: '    switch (card.place.kind) {\n      case "drafting": {',
-    to: '    switch (card.place.kind === "pinned" ? "drafting" : card.place.kind) {\n      case "drafting": {',
+    from: '    switch (card.place.kind) {\n      case "composing":',
+    to: '    switch (card.place.kind === "pinned" ? "note" : card.place.kind) {\n      case "composing":',
     command: unit,
     expect: "a pinned card marks nothing",
   },
@@ -2697,7 +2682,7 @@ export const mutations: readonly Mutation[] = [
     expect: "an item's ⇡ names its threads with work ready",
   },
   {
-    name: "a board item never carries ⇡",
+    name: "a thread card never carries ⇡",
     file: "packages/interface/board-view.ts",
     from: "      ready: input.ready.get(entry) ?? [],",
     to: "      ready: [],",
@@ -2706,7 +2691,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a thread the host has not named has no ready mark",
-    file: "packages/interface/open-list-view.ts",
+    file: "packages/interface/sidebar-view.ts",
     from: "  for (const { lane, root } of offers)\n",
     to: "  for (const { lane, root } of offers)\n    if (names.has(lane))\n",
     command: unit,
@@ -2730,7 +2715,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a root's ⋯ leaves out Auto-update title",
-    file: "packages/interface/open-list-view.ts",
+    file: "packages/interface/sidebar-view.ts",
     from: '    { kind: "retitle", intent: { kind: "retitle", root } },\n',
     to: "",
     command: unit,
@@ -2745,7 +2730,7 @@ export const mutations: readonly Mutation[] = [
     expect: "rename and retitle are one write each",
   },
   {
-    name: "moving the root you are on to Done leaves it in your list",
+    name: "moving the root you are on to Done leaves it in the sidebar",
     file: "packages/interface/intent.ts",
     from: "              : closeRoot(entry, state),",
     to: "              : [],",
@@ -2861,7 +2846,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "a root's ⋯ offers no not needed",
-    file: "packages/interface/open-list-view.ts",
+    file: "packages/interface/sidebar-view.ts",
     from: '    ...(status === null || status.kind === "working"',
     to: "    ...(true",
     command: unit,
@@ -2950,7 +2935,7 @@ export const mutations: readonly Mutation[] = [
     expect: "unqueue all only when offered",
   },
   {
-    name: "the root you are on is lost when your list lacks it",
+    name: "the root you are on is lost when the sidebar lacks it",
     file: "packages/interface/layout.ts",
     from: "  return here === null || kept.includes(here) ? kept : [...kept, here]",
     to: "  return kept",
@@ -3083,7 +3068,7 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the window's title names the root under the page",
-    file: "packages/interface/open-list-view.ts",
+    file: "packages/interface/sidebar-view.ts",
     from: "    page !== null ? pageWords(page).title : here === null ? null : here.label",
     to: "    here === null ? null : here.label",
     command: unit,

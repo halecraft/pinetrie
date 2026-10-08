@@ -57,6 +57,7 @@ import type { Scenario } from "../scenario.ts"
 import {
   boardSel,
   chooseFromMenu,
+  chooseOnCard,
   componentRenders,
   connected,
   itemSel,
@@ -260,8 +261,8 @@ async function run(check: Checks["check"]): Promise<void> {
         () => readParticipantNames(host.session).get(ME) === "Ada",
         15_000,
       )
-      await page.waitForSelector("#open-list .add-agent", { timeout: 15_000 })
-      await page.click("#open-list .add-agent")
+      await page.waitForSelector("#sidebar .add-agent", { timeout: 15_000 })
+      await page.click("#sidebar .add-agent")
       await page.waitForSelector(`${col(0)} .composer`, { timeout: 15_000 })
       check(
         "＋ agent's new tab is ready to type in: its box has focus",
@@ -279,14 +280,14 @@ async function run(check: Checks["check"]): Promise<void> {
                 }
           }
           return {
-            item: look("#open-list .open-item[data-selected]"),
+            item: look("#sidebar .sidebar-item[data-selected]"),
             page: look("#workspace"),
-            list: look("#open-list"),
+            list: look("#sidebar"),
           }
         })
         const { item, page: paper, list } = surface
         check(
-          "the root you are on is the page's colour, your list is not, and it meets the page",
+          "the root you are on is the page's colour, the sidebar is not, and it meets the page",
           item !== null &&
             paper !== null &&
             list !== null &&
@@ -846,7 +847,7 @@ async function run(check: Checks["check"]): Promise<void> {
         {
           id: again,
           place: {
-            kind: "drafting",
+            kind: "composing",
             root: rootAt(other, beaEnd),
             at: beaEnd,
             lane: beaLane ?? null,
@@ -977,7 +978,7 @@ async function run(check: Checks["check"]): Promise<void> {
           [again, yours?.id].every(
             id =>
               readPlaces(host.places).find(c => c.id === id)?.place.kind ===
-              "drafting",
+              "note",
           ),
         15_000,
       )
@@ -1083,14 +1084,14 @@ async function run(check: Checks["check"]): Promise<void> {
           () => false,
         )
       const tabWorking = await page
-        .waitForSelector("#open-list .root-status.working", { timeout: 15_000 })
+        .waitForSelector("#sidebar .root-status.working", { timeout: 15_000 })
         .then(
           () => true,
           () => false,
         )
       const animated = await page
         .$$eval(
-          "#bottom .strip-state, #bottom .strip-state *, #open-list .root-status",
+          "#bottom .strip-state, #bottom .strip-state *, #sidebar .root-status",
           ns =>
             ns.flatMap(n => {
               const name = getComputedStyle(n).animationName
@@ -1218,7 +1219,7 @@ async function run(check: Checks["check"]): Promise<void> {
       const firstRoot = treeOf(host).roots[0] ?? ""
       // A new tab holds one column, so the thread's columns count from 0.
       const before = 0
-      await page.click("#open-list .add-agent")
+      await page.click("#sidebar .add-agent")
       const agentCol = col(before)
       await page.waitForSelector(`${agentCol} .composer`, { timeout: 15_000 })
       await send(before, "say exactly: DOWN-ONE")
@@ -1370,12 +1371,12 @@ async function run(check: Checks["check"]): Promise<void> {
         undefined,
         { timeout: 15_000 },
       )
-      // Your list is your own document (ADR-0112): another device of yours,
+      // The sidebar is your own document (ADR-0112): another device of yours,
       // a browser context of its own, has it, in your order. A reload reads
       // it the same way.
       {
         const listOf = (p: Page) =>
-          p.$$eval("#open-list .open-root", ts =>
+          p.$$eval("#sidebar .open-root", ts =>
             ts.map(t => t.getAttribute("data-root") ?? ""),
           )
         const mine = await listOf(page)
@@ -1388,7 +1389,7 @@ async function run(check: Checks["check"]): Promise<void> {
           await device
             .waitForFunction(
               order =>
-                [...document.querySelectorAll("#open-list .open-root")]
+                [...document.querySelectorAll("#sidebar .open-root")]
                   .map(n => n.getAttribute("data-root"))
                   .join() === order,
               mine.join(),
@@ -1400,7 +1401,7 @@ async function run(check: Checks["check"]): Promise<void> {
           await device.close().catch(() => {})
         }
         check(
-          "your list is your own: another device of yours has it, in your order",
+          "the sidebar is your own: another device of yours has it, in your order",
           mine.length >= 2 && theirs.join() === mine.join(),
           `${theirs.length} of ${mine.length}`,
         )
@@ -1410,23 +1411,23 @@ async function run(check: Checks["check"]): Promise<void> {
       const first = `${agentCol} ${msg("say exactly: DOWN-ONE")}`
       await page.hover(first)
       await page.click(`${first} > .tools > .edit-new-tab`)
-      await page.waitForSelector('#open-list .open-new[aria-current="true"]', {
+      await page.waitForSelector('#sidebar .open-new[aria-current="true"]', {
         timeout: 15_000,
       })
       await page.click(`${col(0)} .close`)
       const agentRoot = treeOf(host).roots.at(-1) ?? ""
-      await page.click(`#open-list .open-root[data-root="${agentRoot}"]`)
+      await page.click(`#sidebar .open-root[data-root="${agentRoot}"]`)
       await page.waitForFunction(
         () => document.querySelectorAll(".column").length === 2,
         undefined,
         { timeout: 15_000 },
       )
 
-      // ── your list, the board and the inbox (ADR-0030, ADR-0112) ───────────
+      // ── the sidebar, the board and the inbox (ADR-0030, ADR-0112) ───────────
       const downRoot = treeOf(host).roots.at(-1) ?? ""
       const selectedRoot = (p: Page) =>
         p
-          .$eval('#open-list [aria-current="true"]', n =>
+          .$eval('#sidebar [aria-current="true"]', n =>
             n.getAttribute("data-root"),
           )
           .catch(() => null)
@@ -1444,14 +1445,14 @@ async function run(check: Checks["check"]): Promise<void> {
         )
         .catch(() => null)
 
-      // 2. A root someone else starts is not added to your list (ADR-0030).
+      // 2. A root someone else starts is not added to the sidebar (ADR-0030).
       const api = await join(host, "tabs", "browser")
       await api.request({ kind: "name", name: "Bea" })
       const third = await api.chat("a third thread", ROOT, { mode: "branch" })
       const thirdRoot = third.kind === "appended" ? third.id : entryId("")
       await countIsHosts(page)
       check(
-        "a root another writer starts is not added to your list, and the page stays where it is",
+        "a root another writer starts is not added to the sidebar, and the page stays where it is",
         thirdRoot !== "" &&
           (await page.locator(itemSel(thirdRoot)).count()) === 0 &&
           (await selectedRoot(page)) === firstRoot,
@@ -1465,7 +1466,7 @@ async function run(check: Checks["check"]): Promise<void> {
       const shownOnHover = await otherMenu.isVisible()
       await page.mouse.move(0, 0)
       check(
-        "another root in your list shows its ⋯ on hover, and not at rest",
+        "another root in the sidebar shows its ⋯ on hover, and not at rest",
         hiddenAtRest && shownOnHover,
         `${hiddenAtRest}, ${shownOnHover}`,
       )
@@ -1489,7 +1490,7 @@ async function run(check: Checks["check"]): Promise<void> {
       const rendersOf = (name: string) => typed.filter(r => r.name === name)
       const outside = [
         "Footer",
-        "OpenList",
+        "Sidebar",
         "Column",
         "MessageListView",
         "MessageView",
@@ -1518,7 +1519,7 @@ async function run(check: Checks["check"]): Promise<void> {
         )
       const readRenders = await componentRenders(page)
       const readColumns = readRenders.filter(r =>
-        ["Column", "Footer", "OpenList"].includes(r.name),
+        ["Column", "Footer", "Sidebar"].includes(r.name),
       )
       check(
         "another person following this thread shows in its header and redraws no column",
@@ -1530,7 +1531,7 @@ async function run(check: Checks["check"]): Promise<void> {
         .waitForSelector(beaHere, { state: "detached", timeout: 15_000 })
         .catch(() => null)
       // A message in a thread this tab does not show redraws none of its
-      // messages. It is in a root of your list, which this tab holds, so the
+      // messages. It is in a root of the sidebar, which this tab holds, so the
       // tree changes and every column's list draws again: only the messages'
       // own memo keeps them (S59).
       await componentRenders(page)
@@ -1565,9 +1566,8 @@ async function run(check: Checks["check"]): Promise<void> {
       await page
         .waitForFunction(
           r =>
-            document.querySelector(
-              `#open-list .open-root[data-root="${r}"]`,
-            ) === null,
+            document.querySelector(`#sidebar .open-root[data-root="${r}"]`) ===
+            null,
           downRoot,
           { timeout: 15_000 },
         )
@@ -1615,7 +1615,7 @@ async function run(check: Checks["check"]): Promise<void> {
             () => false,
           )
         check(
-          "another window shows on its root's board item, and you never do",
+          "another window shows on its root's thread card, and you never do",
           avatar &&
             (await page
               .locator(
@@ -1633,7 +1633,7 @@ async function run(check: Checks["check"]): Promise<void> {
             () => false,
           )
         check(
-          "choosing a reader's thread on a board item opens it in your list",
+          "choosing a reader's thread on a thread card opens it in the sidebar",
           toThem && followed && (await shows("a third thread")),
         )
         const onThird = await page
@@ -1696,10 +1696,10 @@ async function run(check: Checks["check"]): Promise<void> {
           .waitForFunction(
             ([from, to]) =>
               document.querySelector(
-                `#open-list .open-root[data-root="${from}"] .avatar`,
+                `#sidebar .open-root[data-root="${from}"] .avatar`,
               ) === null &&
               document.querySelector(
-                `#open-list .open-root[data-root="${to}"] .avatar`,
+                `#sidebar .open-root[data-root="${to}"] .avatar`,
               ) !== null,
             [thirdRoot, firstRoot] as const,
             { timeout: 15_000 },
@@ -1709,7 +1709,7 @@ async function run(check: Checks["check"]): Promise<void> {
             () => false,
           )
         check(
-          "another window shows on the root it is on in your list, and leaves it when it switches",
+          "another window shows on the root it is on in the sidebar, and leaves it when it switches",
           onThird && moved,
         )
 
@@ -1810,7 +1810,7 @@ async function run(check: Checks["check"]): Promise<void> {
             r => r.entry === firstRoot,
           )?.root
           check(
-            "dragging a board item to another state moves it for the other window",
+            "dragging a thread card to another state moves it for the other window",
             theirs &&
               id !== undefined &&
               readBoardPlaces(host.session).get(id)?.state === doing,
@@ -1822,7 +1822,7 @@ async function run(check: Checks["check"]): Promise<void> {
 
         // 5. ＋'s menu, by keyboard; an unsent new tab closes without a trace.
 
-        await page.focus("#open-list .add-menu")
+        await page.focus("#sidebar .add-menu")
         await page.keyboard.press("ArrowDown")
         const focused = await page
           .waitForFunction(
@@ -1843,16 +1843,16 @@ async function run(check: Checks["check"]): Promise<void> {
           focused &&
             convo === TO_NOBODY &&
             (await page.textContent(
-              '#open-list .open-new[aria-current="true"]',
+              '#sidebar .open-new[aria-current="true"]',
             )) === "new conversation",
           `"${convo}"`,
         )
         await page.fill(`${col(0)} .composer .input`, "never sent")
-        await page.hover("#open-list .open-new")
-        await page.click("#open-list .open-new ~ .open-close")
+        await page.hover("#sidebar .open-new")
+        await page.click("#sidebar .open-new ~ .open-close")
         await page
           .waitForFunction(
-            () => document.querySelector("#open-list .open-new") === null,
+            () => document.querySelector("#sidebar .open-new") === null,
           )
           .catch(() => null)
 
@@ -1898,7 +1898,7 @@ async function run(check: Checks["check"]): Promise<void> {
           width: 860,
           height: viewport?.height ?? 720,
         })
-        if (await folded()) await page.click("#open-list .list-fold")
+        if (await folded()) await page.click("#sidebar .list-fold")
         const corner = await page
           .evaluate(() => {
             const badge = document.querySelector(
@@ -1931,7 +1931,7 @@ async function run(check: Checks["check"]): Promise<void> {
           .catch(() => null)
         if (viewport !== null) await page.setViewportSize(viewport)
         if (wasFolded !== (await folded()))
-          await page.click("#open-list .list-fold")
+          await page.click("#sidebar .list-fold")
         check(
           "the corner holds you, your inbox and your inventory side by side at 11.5rem with a two-digit badge",
           corner?.inside === true && corner.apart && corner.width < 200,
@@ -2107,7 +2107,7 @@ async function run(check: Checks["check"]): Promise<void> {
         const menuSeen =
           (await seeInMenu(page, OWN_MENU, ".move-to.closes")) !== null
         await page.keyboard.press("Escape")
-        check("a root's ⋯ in your list opens a menu drawn in full", menuSeen)
+        check("a root's ⋯ in the sidebar opens a menu drawn in full", menuSeen)
         await chooseFromMenu(tb, OWN_MENU, ".move-to.closes")
         await page
           .waitForSelector(`${col(0)} .read-only`, { timeout: 15_000 })
@@ -2135,7 +2135,7 @@ async function run(check: Checks["check"]): Promise<void> {
           .waitForFunction(
             r =>
               document.querySelector(
-                `#open-list .open-root[data-root="${r}"]`,
+                `#sidebar .open-root[data-root="${r}"]`,
               ) === null,
             thirdRoot,
             { timeout: 15_000 },
@@ -2165,14 +2165,14 @@ async function run(check: Checks["check"]): Promise<void> {
             (await tb.locator(itemSel(thirdRoot)).count()) === 0,
         )
 
-        // Moved to Done again, here, it leaves your list; the board brings it back.
+        // Moved to Done again, here, it leaves the sidebar; the board brings it back.
         await page.fill(input, "")
         await chooseFromMenu(page, OWN_MENU, ".move-to.closes")
         await page
           .waitForFunction(
             r =>
               document.querySelector(
-                `#open-list .open-root[data-root="${r}"]`,
+                `#sidebar .open-root[data-root="${r}"]`,
               ) === null,
             thirdRoot,
             { timeout: 15_000 },
@@ -2215,14 +2215,14 @@ async function run(check: Checks["check"]): Promise<void> {
           )
         await waitFor(() => false, 1_000)
         check(
-          "Restore on an archived root you opened keeps it in your list, and not in the other window's",
+          "Restore on an archived root you opened keeps it in the sidebar, and not in the other window's",
           restored &&
             (await page.locator(itemSel(thirdRoot)).count()) === 1 &&
             (await tb.locator(itemSel(thirdRoot)).count()) === 0,
         )
         // The other window, on nothing, reports no thread: it leaves nothing
         // behind, once its deletions have reached this page.
-        await tb.$$eval("#open-list .open-close", bs => {
+        await tb.$$eval("#sidebar .open-close", bs => {
           for (const b of bs) (b as HTMLButtonElement).click()
         })
         await page
@@ -2655,7 +2655,7 @@ async function run(check: Checks["check"]): Promise<void> {
             )
           }
           // On nothing, Lee reports no thread, and leaves no presence behind.
-          await lp.$$eval("#open-list .open-close", bs => {
+          await lp.$$eval("#sidebar .open-close", bs => {
             for (const b of bs) (b as HTMLButtonElement).click()
           })
           await page
@@ -2792,7 +2792,7 @@ async function run(check: Checks["check"]): Promise<void> {
         // cards below look for the column's last message in A's window.
         await countIsHosts(page)
         const shownRoot = await page
-          .$eval('#open-list [aria-current="true"]', n =>
+          .$eval('#sidebar [aria-current="true"]', n =>
             n.getAttribute("data-root"),
           )
           .catch(() => null)
@@ -2803,8 +2803,9 @@ async function run(check: Checks["check"]): Promise<void> {
           .waitForSelector(`.msg[data-entry="${newest}"]`, { timeout: 15_000 })
           .catch(() => null)
 
-        // Cards (ADR-0048): what you type is a card on its thread, shown to
-        // everyone at that end, and kept across tab switches.
+        // Cards (ADR-0048, ADR-0113): what you type is your message on its
+        // thread, which only you see, kept across tab switches; a note is
+        // shown to everyone at that end.
         const box = `${col(0)} .composer .input`
         const boxValue = (p: typeof page, sel: string) =>
           p.$eval(sel, el => (el as HTMLTextAreaElement).value).catch(() => "")
@@ -2825,32 +2826,60 @@ async function run(check: Checks["check"]): Promise<void> {
         // Typed with no pause: the first keystroke creates the card, and the rest
         // must land in it.
         await page.keyboard.type("Together:")
+        await page.waitForFunction(
+          s => document.querySelector(s)?.getAttribute("data-card") != null,
+          box,
+          { timeout: 10_000 },
+        )
+        const together = (await page.getAttribute(box, "data-card")) ?? ""
         const cardEnd = await page
           .locator(`${col(0)} .msg[data-entry]`)
           .last()
           .getAttribute("data-entry")
         await second.click(`.rail-dot[data-entry="${cardEnd}"]`)
-        const theirs = `.cards .card-editor.others .input`
+        const theirs = `.cards textarea[data-card="${together}"]`
+        const messageHidden = await second
+          .waitForSelector(theirs, { timeout: 2_000 })
+          .then(
+            () => false,
+            () => true,
+          )
+        await chooseOnCard(
+          page,
+          `${col(0)} .composer`,
+          '.move-to[data-to="note"]',
+        )
         const shownThere = await hasValue(second, theirs, "Together:")
         check(
-          "a card typed in one window shows in the other's column, above its composer",
-          shownThere,
+          "your message shows only in your window; moved to the notes, it shows in the other's column, above its composer",
+          messageHidden && shownThere,
+          `hidden ${messageHidden}, a note there ${shownThere}`,
         )
         await second.focus(theirs)
         await second.keyboard.press("End")
         await second.keyboard.type(" from B")
-        const mergedHere = await hasValue(page, box, "Together: from B")
+        const ours = `${col(0)} .cards textarea[data-card="${together}"]`
+        const mergedHere = await hasValue(page, ours, "Together: from B")
         const heading = await second
-          .textContent(".cards .card-heading")
+          .textContent(
+            `.cards .card-frame:has(textarea[data-card="${together}"]) .card-by`,
+          )
           .catch(() => "")
         check(
-          "the other window's edit reaches the card's owner, and the card names who wrote in it",
-          mergedHere && /'s draft · with /.test(heading ?? ""),
+          "the other window's edit reaches the note's owner, and the note names who wrote in it",
+          mergedHere && /'s note · with /.test(heading ?? ""),
           `${heading}`,
         )
+        // The note discarded, and a message again, for what follows.
+        await page.click(
+          `${col(0)} .cards .card-frame:has(textarea[data-card="${together}"]) .discard-card`,
+        )
+        await page.click(box)
+        await page.keyboard.type("Together: from B")
+        await hasValue(page, box, "Together: from B")
         const here =
           (await page.getAttribute(
-            '#open-list [aria-current="true"]',
+            '#sidebar [aria-current="true"]',
             "data-root",
           )) ?? ""
         await page.click(itemSel(downRoot))
@@ -3044,7 +3073,7 @@ async function run(check: Checks["check"]): Promise<void> {
         const railDot = `.rail-dot[data-entry="${markedEnd}"]`
         const railMarked = await pipIn(page, railDot)
         check(
-          "a card of yours with text marks its root's item in your list and its thread's end on the rail",
+          "a card of yours with text marks its root's item in the sidebar and its thread's end on the rail",
           tabMarked && otherBare && railMarked,
           `tab ${tabMarked}, other tab bare ${otherBare}, rail ${railMarked}`,
         )
@@ -3062,7 +3091,7 @@ async function run(check: Checks["check"]): Promise<void> {
           unmarked && readPlaces(host.places).length === records,
           `${unmarked}; ${readPlaces(host.places).length} records, ${records} before`,
         )
-        // A root you closed is marked on ▦ and on its board item (ADR-0112).
+        // A root you closed is marked on ▦ and on its thread card (ADR-0112).
         await page.keyboard.type("back tomorrow")
         await pipIn(page, itemSel(here))
         const columnsHere = await page.locator(".column").count()
@@ -3083,7 +3112,7 @@ async function run(check: Checks["check"]): Promise<void> {
             () => false,
           )
         check(
-          "a closed root holding your card marks ▦ and its board item, and comes back as it was",
+          "a closed root holding your card marks ▦ and its thread card, and comes back as it was",
           archiveMarked && rowMarked && columnsBack,
           `▦ ${archiveMarked}, item ${rowMarked}, columns ${columnsBack}`,
         )
@@ -3092,9 +3121,8 @@ async function run(check: Checks["check"]): Promise<void> {
         await chooseFromMenu(page, OWN_MENU, ".move-to.closes")
         await page.waitForFunction(
           r =>
-            document.querySelector(
-              `#open-list .open-root[data-root="${r}"]`,
-            ) === null,
+            document.querySelector(`#sidebar .open-root[data-root="${r}"]`) ===
+            null,
           here,
           { timeout: 15_000 },
         )
@@ -3112,7 +3140,7 @@ async function run(check: Checks["check"]): Promise<void> {
           timeout: 15_000,
         })
         check(
-          "an archived root holding your card marks its board item, not ▦",
+          "an archived root holding your card marks its thread card, not ▦",
           archiveBare && archivedRow,
           `▦ bare ${archiveBare}, item ${archivedRow}`,
         )
@@ -3218,12 +3246,13 @@ async function run(check: Checks["check"]): Promise<void> {
       await page.click(downBox)
       await page.click(slotOf(parked))
       await page.keyboard.press("Control+Shift+O")
-      const putBack = await valueIs(downBox, "for later: a plan")
-      await waitFor(() => placeOf(parked)?.kind === "drafting", 5_000)
+      const putNote = `${col(1)} .cards textarea[data-card="${parked}"]`
+      const putBack = await valueIs(putNote, "for later: a plan")
+      await waitFor(() => placeOf(parked)?.kind === "note", 5_000)
       check(
-        "Ctrl+Shift+O puts the selected card below the line in the column you were in, and its composer holds it again",
-        putBack && placeOf(parked)?.kind === "drafting",
-        `${await boxText(downBox)}; ${placeOf(parked)?.kind}`,
+        "Ctrl+Shift+O puts the selected card in the column you were in, as a note there",
+        putBack && placeOf(parked)?.kind === "note",
+        `${await boxText(putNote)}; ${placeOf(parked)?.kind}`,
       )
       // Undo, outside a box: the put is undone, and the card is back in its
       // slot. The host records a move as it applies it (ADR-0066), so the key
@@ -3245,10 +3274,10 @@ async function run(check: Checks["check"]): Promise<void> {
       const agentBox = `${col(0)} textarea[data-card="${parked}"]`
       await page.dragAndDrop(slotOf(parked), `${col(0)} .composer`)
       const droppedThere = await valueIs(agentBox, "for later: a plan")
-      await waitFor(() => placeOf(parked)?.kind === "drafting", 5_000)
+      await waitFor(() => placeOf(parked)?.kind === "composing", 5_000)
       check(
         "dragging a slot onto another column's foot puts its card there",
-        droppedThere && placeOf(parked)?.kind === "drafting",
+        droppedThere && placeOf(parked)?.kind === "composing",
         `${await boxText(agentBox)}; ${placeOf(parked)?.kind}`,
       )
       // Undone, and removed: what follows starts from no card of this one.
@@ -3332,7 +3361,11 @@ async function run(check: Checks["check"]): Promise<void> {
       )
       const pinnedCard =
         (await page.getAttribute(composerBox, "data-card")) ?? ""
-      await page.click(`${col(0)} .composer .pin`)
+      await chooseOnCard(
+        page,
+        `${col(0)} .composer`,
+        '.move-to[data-to="pinned"]',
+      )
       const inStrip = await appears(
         `${col(0)} .pinned-strip textarea[data-card="${pinnedCard}"]`,
       )
@@ -3385,8 +3418,11 @@ async function run(check: Checks["check"]): Promise<void> {
         readMarked,
       )
 
-      // "+ card" (ADR-0048): the composer empties and keeps focus, the card
-      // you were writing is drawn above it, and typing makes another.
+      // Notes (ADR-0113): your message's ⋯ moves it to the notes above the
+      // composer, which empties; the note's ⋯ moves it back into the box.
+      // The inventory, left open in the middle of the screen, would cover it.
+      if ((await page.locator(".inventory").count()) > 0)
+        await page.click("#bottom .inventory-toggle")
       await page.click(composerBox)
       await page.keyboard.type("one thought")
       await page.waitForFunction(
@@ -3394,25 +3430,21 @@ async function run(check: Checks["check"]): Promise<void> {
         composerBox,
         { timeout: 10_000 },
       )
-      const setAside = (await page.getAttribute(composerBox, "data-card")) ?? ""
-      await page.click(`${col(0)} .composer .new-card`)
-      const blanked = await valueIs(composerBox, "")
-      const blankFocused = await page
-        .$eval(composerBox, el => el === document.activeElement)
-        .catch(() => false)
-      const drawnAbove = await appears(
-        `${col(0)} .cards textarea[data-card="${setAside}"]`,
+      const noted = (await page.getAttribute(composerBox, "data-card")) ?? ""
+      await chooseOnCard(
+        page,
+        `${col(0)} .composer`,
+        '.move-to[data-to="note"]',
       )
-      await page.keyboard.type("another thought")
-      const another = await page
+      const emptied = await valueIs(composerBox, "")
+      const noteFrame = `${col(0)} .cards .card-frame:has(textarea[data-card="${noted}"])`
+      const drawnAsNote = await appears(noteFrame)
+      await chooseOnCard(page, noteFrame, '.move-to[data-to="message"]')
+      const back = await page
         .waitForFunction(
-          ([s, old]) => {
-            const id = document
-              .querySelector(s ?? "")
-              ?.getAttribute("data-card")
-            return id != null && id !== old
-          },
-          [composerBox, setAside],
+          ([s, id]) =>
+            document.querySelector(s ?? "")?.getAttribute("data-card") === id,
+          [composerBox, noted],
           { timeout: 10_000 },
         )
         .then(
@@ -3420,9 +3452,9 @@ async function run(check: Checks["check"]): Promise<void> {
           () => false,
         )
       check(
-        '"+ card" empties the focused composer, draws your card above it, and typing makes another',
-        blanked && blankFocused && drawnAbove && another,
-        `emptied ${blanked}, focused ${blankFocused}, above ${drawnAbove}, another ${another}`,
+        "Move to notes takes your message above the composer, and the note's Move to your message brings it back into the box",
+        emptied && drawnAsNote && back,
+        `emptied ${emptied}, a note ${drawnAsNote}, back ${back}`,
       )
 
       // "+ pin" (ADR-0048), in the conversation below, which has no pinned
@@ -3480,7 +3512,13 @@ async function run(check: Checks["check"]): Promise<void> {
       const traced = cardId(
         (await page.getAttribute(traceBox, "data-card")) ?? "",
       )
-      await waitFor(() => placeOf(traced)?.kind === "drafting", 5_000)
+      // A note: your message is yours alone, and nobody else moves it.
+      await chooseOnCard(
+        page,
+        `${col(1)} .composer`,
+        '.move-to[data-to="note"]',
+      )
+      await waitFor(() => placeOf(traced)?.kind === "note", 5_000)
       const tracedFrom = placeOf(traced)
       await stepAway(page)
       await waitFor(
@@ -3504,15 +3542,12 @@ async function run(check: Checks["check"]): Promise<void> {
       // The inventory, left open in the middle of the screen, would cover it.
       if ((await page.locator(".inventory").count()) > 0)
         await page.click("#bottom .inventory-toggle")
-      const clickError = await page
-        .click(
-          `${col(1)} .pinned-strip .card-editor:has(textarea[data-card="${traced}"]) .card-history-trigger`,
-          { timeout: 5_000 },
-        )
-        .then(
-          () => "",
-          (e: unknown) => String(e).split("\n").slice(-4).join(" | "),
-        )
+      const tracedFrame = `${col(1)} .pinned-strip .card-editor:has(textarea[data-card="${traced}"])`
+      const historyOpened = await chooseOnCard(
+        page,
+        tracedFrame,
+        ".card-history-item",
+      )
       // Who pinned it, as the trace names them.
       const pinner = traceText.replace(" pinned this", "")
       const historyNames = await page
@@ -3535,7 +3570,7 @@ async function run(check: Checks["check"]): Promise<void> {
           traceText.includes("pinned this") &&
           leads &&
           historyNames,
-        `trace ${drawnTrace} (${traceText}), leads ${leads}, history ${historyNames}${clickError === "" ? "" : `: ${clickError}`}`,
+        `trace ${drawnTrace} (${traceText}), leads ${leads}, history ${historyNames}${historyOpened ? "" : ": not opened"}`,
       )
 
       // What a new tab of this device opens is the layout last saved (ADR-0027).
@@ -3633,7 +3668,7 @@ async function run(check: Checks["check"]): Promise<void> {
       }
 
       // Archived by someone else before a reload, the root you were on gives
-      // way to the last of your list.
+      // way to the last of the sidebar.
       check(
         "a reload keeps the root you were on",
         (await selectedRoot(page)) === downRoot,
@@ -3644,7 +3679,7 @@ async function run(check: Checks["check"]): Promise<void> {
         .waitForFunction(
           r => {
             const on = document
-              .querySelector('#open-list [aria-current="true"]')
+              .querySelector('#sidebar [aria-current="true"]')
               ?.getAttribute("data-root")
             return on != null && on !== r
           },

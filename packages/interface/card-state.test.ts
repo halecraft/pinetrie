@@ -5,7 +5,6 @@ import {
   type EditorState,
   editorState,
   needsCard,
-  shownBelow,
   startText,
 } from "./card-state.ts"
 import { sendable } from "./send.ts"
@@ -14,7 +13,6 @@ const AGENT = { text: "@agent ", blank: true }
 const C1: CardId = cardId("c-1")
 const local: EditorState = { kind: "local" }
 const bound: EditorState = { kind: "bound", card: C1 }
-const blank: EditorState = { kind: "blank" }
 const step = (s: EditorState, e: EditorEvent) => editorState(s, e, AGENT)
 
 test("needsCard: only what could be sent, and it agrees with sendable", () => {
@@ -104,60 +102,6 @@ describe("editorState", () => {
     expect(
       step(sending.state, { kind: "settled", spent: false }).state,
     ).toEqual(local)
-  })
-})
-
-describe('"+ card": a blank box (PLAN-2026-10-04-cards-per-place)', () => {
-  test("new empties the box and lets go of its card", () => {
-    expect(step(bound, { kind: "new" })).toEqual({
-      state: blank,
-      acts: ["detach"],
-    })
-    // A send in flight finishes first.
-    const sending: EditorState = { kind: "sending", card: C1 }
-    expect(step(sending, { kind: "new" }).state).toBe(sending)
-  })
-
-  test("a blank box takes no card it finds, so the one set aside stays above", () => {
-    expect(step(blank, { kind: "found", card: C1 })).toEqual({
-      state: blank,
-      acts: [],
-    })
-    expect(step(blank, { kind: "gone" }).state).toBe(blank)
-  })
-
-  test("typing in a blank box creates a new card, at the first input worth keeping", () => {
-    expect(step(blank, { kind: "input", text: "@agent ", card: C1 })).toEqual({
-      state: blank,
-      acts: [],
-    })
-    expect(step(blank, { kind: "input", text: "next", card: C1 })).toEqual({
-      state: bound,
-      acts: ["create", "attach"],
-    })
-  })
-
-  test("after a send from a blank box settles, the box is local again and takes your newest card", () => {
-    const sending = step(blank, { kind: "send" }).state
-    expect(sending).toEqual({ kind: "sending", card: null })
-    expect(step(sending, { kind: "settled", spent: true }).state).toEqual(local)
-    expect(step(local, { kind: "found", card: C1 }).state).toEqual(bound)
-  })
-})
-
-describe("shownBelow", () => {
-  const C2 = cardId("c-2")
-  test("before the composer says, and while local, it shows your newest", () => {
-    expect(shownBelow(undefined, C1)).toBe(C1)
-    expect(shownBelow(local, C1)).toBe(C1)
-    expect(shownBelow(local, undefined)).toBe(null)
-  })
-  test("bound or sending, the card it holds", () => {
-    expect(shownBelow({ kind: "bound", card: C2 }, C1)).toBe(C2)
-    expect(shownBelow({ kind: "sending", card: C2 }, C1)).toBe(C2)
-  })
-  test('a blank box shows nothing, so the card "+ card" set aside is drawn above', () => {
-    expect(shownBelow(blank, C1)).toBe(null)
   })
 })
 

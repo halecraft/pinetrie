@@ -21,12 +21,12 @@ import { subscribe } from "@kyneta/schema"
 import {
   type CardId,
   type CardRecord,
-  draftingOf,
   type EntryId,
   errorText,
   type LaneName,
   type LaneView,
   moveOf,
+  noteOf,
   type Position,
   queueRoot,
   type RootId,
@@ -465,7 +465,7 @@ export function unqueueCard(
   const card = drawnCard(client, id)
   if (card.place.kind !== "queued") throw new Error(`${id} is not queued`)
   return client.moveCard(
-    moveOf(card, draftingOf(card.place)),
+    moveOf(card, noteOf(card.place)),
     undefined,
     card.place.by,
   )

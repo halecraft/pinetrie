@@ -88,7 +88,7 @@ async function run(
       await asPerson(ap, "asa@browser.test", "Asa")
       try {
         await ap.goto(askHost.httpUrl, { waitUntil: "domcontentloaded" })
-        await ap.click("#open-list .add-agent")
+        await ap.click("#sidebar .add-agent")
         const say = async (text: string) => {
           await ap.fill(`${col(0)} .composer .input`, text)
           await ap.click(`${col(0)} .composer .send`)
@@ -396,7 +396,7 @@ async function run(
       await asPerson(tp, "tools@browser.test", "Tess")
       try {
         await tp.goto(toolHost.httpUrl, { waitUntil: "domcontentloaded" })
-        await tp.click("#open-list .add-agent")
+        await tp.click("#sidebar .add-agent")
         const say = async (text: string) => {
           await tp.fill(`${col(0)} .composer .input`, text)
           await tp.click(`${col(0)} .composer .send`)
@@ -741,7 +741,7 @@ async function run(
           )
           const root =
             (await tp.getAttribute(
-              '#open-list .open-root[aria-current="true"]',
+              '#sidebar .open-root[aria-current="true"]',
               "data-root",
             )) ?? ""
           /** Away to a new tab and back, recording every bash row's state as it mounts and changes. */
@@ -1714,7 +1714,7 @@ async function run(
         // hold it, choosing the item opens it, and that root cannot be
         // archived until the agent is done.
         await tp
-          .$eval('#open-list [aria-current="true"]', n =>
+          .$eval('#sidebar [aria-current="true"]', n =>
             n.getAttribute("data-root"),
           )
           .catch(() => null)
@@ -1731,7 +1731,7 @@ async function run(
           await appears(ringed)
           await tp.click(ringed)
           await appears(
-            `#open-list .open-root[data-root="${newRoot}"][aria-current="true"]`,
+            `#sidebar .open-root[data-root="${newRoot}"][aria-current="true"]`,
           )
           await seeInMenu(tp, OWN_MENU, ".move-to.closes")
 
@@ -1742,7 +1742,7 @@ async function run(
 
         // ── the rail draws a long loop as one capsule (ADR-0031) ─────────────
         await tp.keyboard.press("Escape")
-        await tp.click("#open-list .add-agent")
+        await tp.click("#sidebar .add-agent")
         script.use([
           ...Array.from({ length: 30 }, () => ({
             tool: "read" as const,
@@ -1826,7 +1826,7 @@ async function run(
           const aside = trunk === null ? null : await chain(trunk, "Aside", 1)
           const railRoot =
             start.kind === "appended" ? start.id : entryId("none")
-          // Another writer's root is not in your list (ADR-0030): open it from the board.
+          // Another writer's root is not in the sidebar (ADR-0030): open it from the board.
           await openFromBoard(tp, railRoot)
           await tp.waitForSelector(
             `${col(0)} .msg[data-entry="${aside ?? "none"}"]`,

@@ -111,18 +111,18 @@ test("planHoldSweep: a hold whose lane no root holds, or whose root is archived,
 
 describe("planQueueCard (ADR-0113)", () => {
   const at = atEntry(entryId("e1"))
-  const drafting = { kind: "drafting", root: ROOT_A, at, lane: L } as const
+  const atEnd = { kind: "composing", root: ROOT_A, at, lane: L } as const
   const card: CardRecord = {
     id: cardId("c-1"),
     owner: ADA,
     placer: ADA,
-    place: drafting,
+    place: atEnd,
     carries: PLAIN,
     unsent: null,
   }
   const move = {
     card: card.id,
-    from: drafting,
+    from: atEnd,
     to: { kind: "queued", root: ROOT_A, at, lane: L, seen: "" },
   } as const
   const plan = (

@@ -77,21 +77,25 @@ async function run(check: Checks["check"]): Promise<void> {
     const onHost = (id: CardId) => readPlaces(ch.places).find(c => c.id === id)
     const drafting = (end: string | null) =>
       ({
-        kind: "drafting",
+        kind: "composing",
         root: rootAt(ch, at(end)),
         at: at(end),
         lane: null,
       }) as const
+    /** A note at `end` (ADR-0113): shared, as your message is not. */
+    const noteAt = (end: string | null) =>
+      ({ ...drafting(end), kind: "note" }) as const
     const newCard = (
       who: SessionClient,
       end: string | null,
       text: string,
+      place: "composing" | "note" = "composing",
     ): CardId => {
       const id = cardId(crypto.randomUUID())
       who.createCard(
         {
           id,
-          place: drafting(end),
+          place: place === "note" ? noteAt(end) : drafting(end),
           carries: { kind: "message", command: null },
           unsent: null,
         },
@@ -222,7 +226,7 @@ async function run(check: Checks["check"]): Promise<void> {
     void unqueueCard(ada, c5)
     await waitFor(
       () =>
-        onHost(c5)?.place.kind === "drafting" &&
+        onHost(c5)?.place.kind === "note" &&
         ch.cardText(c3) === "@Ada the plan is ready",
       5_000,
     )
@@ -250,8 +254,8 @@ async function run(check: Checks["check"]): Promise<void> {
     check(
       "an unqueued card is not sent, and is below the line again for everyone",
       neverSent &&
-        onHost(c5)?.place.kind === "drafting" &&
-        bea.cards.current().find(c => c.id === c5)?.place.kind === "drafting",
+        onHost(c5)?.place.kind === "note" &&
+        bea.cards.current().find(c => c.id === c5)?.place.kind === "note",
       `${neverSent}; ${onHost(c5)?.place.kind}`,
     )
 
@@ -442,8 +446,8 @@ async function run(check: Checks["check"]): Promise<void> {
         at: at(end),
         lane: null,
       }) as const
-    const away = newCard(ada, traceEnd, "pinned while Ada was away")
-    const watched = newCard(ada, traceEnd, "pinned while Ada read")
+    const away = newCard(ada, traceEnd, "pinned while Ada was away", "note")
+    const watched = newCard(ada, traceEnd, "pinned while Ada read", "note")
     await waitFor(
       () => onHost(away) !== undefined && onHost(watched) !== undefined,
       5_000,
@@ -453,7 +457,7 @@ async function run(check: Checks["check"]): Promise<void> {
       slot: null,
     } as const
     await bea.moveCard(
-      { card: away, from: drafting(traceEnd), to: pinnedAt(traceEnd) },
+      { card: away, from: noteAt(traceEnd), to: pinnedAt(traceEnd) },
       byBea,
     )
     ada.setReading("k-ada", traceEnd ?? "", rootAt(ch, at(traceEnd)))
@@ -465,7 +469,7 @@ async function run(check: Checks["check"]): Promise<void> {
       5_000,
     )
     await bea.moveCard(
-      { card: watched, from: drafting(traceEnd), to: pinnedAt(traceEnd) },
+      { card: watched, from: noteAt(traceEnd), to: pinnedAt(traceEnd) },
       byBea,
     )
     const tracesOf = (card: CardId) =>
@@ -600,7 +604,7 @@ async function run(check: Checks["check"]): Promise<void> {
     await takeIntoInventory(a1, tipOf(), 4)
     await takeIntoInventory(b1, otherEnd, 5)
     const undoneHere = await ada2.undoMoves(here, "undo")
-    const a1Back = onHost(a1)?.place.kind === "drafting"
+    const a1Back = onHost(a1)?.place.kind === "composing"
     const b1Stays = onHost(b1)?.place.kind === "inventory"
     const parked = {
       kind: "fresh",
@@ -630,7 +634,7 @@ async function run(check: Checks["check"]): Promise<void> {
         refused.kind === "unmoved" &&
         refused.by === bea.writer &&
         onHost(a1)?.placer === bea.writer &&
-        onHost(a1)?.place.kind === "drafting",
+        onHost(a1)?.place.kind === "composing",
       `${undoneHere.kind}, ${a1Back}, ${b1Stays}; ${JSON.stringify(refused)}`,
     )
     const keeping = {
@@ -800,7 +804,7 @@ async function run(check: Checks["check"]): Promise<void> {
     check(
       "after the host restarts, Ada's undo in a root still undoes her last move there",
       afterRestart.kind === "undone" &&
-        onHost(lastMove)?.place.kind === "drafting",
+        onHost(lastMove)?.place.kind === "composing",
       `${JSON.stringify(afterRestart)}; ${onHost(lastMove)?.place.kind}`,
     )
     await adaAgain.close()

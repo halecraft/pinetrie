@@ -56,7 +56,7 @@ const stores: AppStores = {
     events: window,
   }),
   /**
-   * Your list full or folded to icons (ADR-0088): this browser tab's choice,
+   * The sidebar full or folded to icons (ADR-0088): this browser tab's choice,
    * or on a new one the device's latest.
    */
   list: tabState({

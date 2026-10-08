@@ -1,12 +1,12 @@
 // interface/inventory-keys — the keys that take into the inventory, put, undo
 // and redo moves, move through the inventory's grid (ADR-0048 step 4), and
-// fold your list (ADR-0088).
+// fold the sidebar (ADR-0088).
 // Pure: one table, from a key and where focus is to an intent or nothing.
 // The key-system redesign replaces this file.
 //
 // Take into the inventory is Ctrl+Shift+I and put Ctrl+Shift+O, with Ctrl on a Mac too, where
 // it is not Cmd and clashes with nothing. Elsewhere a browser may keep them
-// for itself; the panel's buttons and drag still work. Folding your list is
+// for itself; the panel's buttons and drag still work. Folding the sidebar is
 // Ctrl+Shift+L, the same way, beside the control at its foot. Undo and redo of a
 // move are Cmd or Ctrl with Z (Shift+Z, or Ctrl+Y, to redo), only outside a
 // text box, where they are the box's own text undo (ADR-0052).
@@ -59,7 +59,7 @@ export function keyAct(event: KeyLike, focus: KeyFocus): Intent | null {
   const key = event.key.toLowerCase()
   const chord =
     event.ctrlKey && event.shiftKey && !event.metaKey && !event.altKey
-  // Your list's width (ADR-0088), from anywhere, as the chords below.
+  // The sidebar's width (ADR-0088), from anywhere, as the chords below.
   if (chord && key === "l") return { kind: "foldList" }
   if (focus.page) return null
   if (chord && key === "i")

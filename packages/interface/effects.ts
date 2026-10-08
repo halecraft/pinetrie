@@ -6,6 +6,7 @@
 
 import type {
   AskIndex,
+  CardId,
   CardRecord,
   EntryId,
   LaneName,
@@ -42,7 +43,7 @@ import type { ComposerPlaces } from "./put-target.ts"
 
 export type Effect =
   | { readonly kind: "layout"; readonly action: LayoutAction }
-  /** Show your list at `width`, and keep that choice for this tab. */
+  /** Show the sidebar at `width`, and keep that choice for this tab. */
   | { readonly kind: "listWidth"; readonly width: ListWidth }
   /** Show a page over the workspace, or, with null, the workspace (ADR-0098). */
   | { readonly kind: "page"; readonly to: PageName | null }
@@ -54,7 +55,7 @@ export type Effect =
     }
   /** Ask the host for something that moves no card (`HostRequest`). */
   | { readonly kind: "request"; readonly intent: HostRequest }
-  /** Change your list, in your own document (`openList`, ADR-0112). */
+  /** Change the sidebar, in your own document (`openThreads`, ADR-0112). */
   | { readonly kind: "list"; readonly act: ListAct }
   /**
    * Move a root on the board; `afterRootMove` decides from its answer
@@ -103,8 +104,9 @@ export type Effect =
   /** Swap two slots of your inventory, as one step of this tab's swaps. */
   | { readonly kind: "swapSlots"; readonly a: number; readonly b: number }
   /**
-   * Moves into your inventory, sent as one move the host accepts or refuses
-   * whole (ADR-0066); `afterKeep` decides from its answer whether `close`
+   * Moves sent as one, which the host accepts or refuses whole (ADR-0066):
+   * a keep into your inventory, or a card put in your composer and the
+   * message it displaces. `afterKeep` decides from its answer whether `close`
    * runs.
    */
   | {
@@ -146,9 +148,9 @@ export type Effect =
   | { readonly kind: "forgetIdentity" }
   | { readonly kind: "reload" }
 
-/** A change to your list, by root id: your document's key (ADR-0112). */
+/** A change to the sidebar, by root id: your document's key (ADR-0112). */
 export type ListAct =
-  /** At its end, unless it is in your list already. */
+  /** At its end, unless it is in the sidebar already. */
   | { readonly kind: "ensure"; readonly root: RootId }
   | {
       readonly kind: "place"
@@ -168,9 +170,9 @@ export interface IntentState {
    * undo names its tab's root, and a fresh column reopens in its root's tab.
    */
   readonly rootEntries: ReadonlyMap<RootId, EntryId>
-  /** Each root's id, by its root entry: your list's key. */
+  /** Each root's id, by its root entry: the sidebar's key. */
   readonly rootIds: ReadonlyMap<EntryId, RootId>
-  /** What your list shows now (`shownWidth`). */
+  /** What the sidebar shows now (`shownWidth`). */
   readonly listWidth: ListWidth
   /** The page over the workspace, if any (ADR-0098). */
   readonly page: PageName | null
@@ -184,22 +186,24 @@ export interface CardFacts {
   /** Every lane's record: a queue takes its lane's root (`queueRoot`). */
   readonly laneRecords: ReadonlyMap<LaneName, LaneRecord>
   readonly me: WriterId
+  /** Your cards that hold text (`holdsText`): an empty message gives way to a put. */
+  readonly filled: ReadonlySet<CardId>
   /** Your inventory's slots as drawn (`settleSlots`). */
   readonly slots: Slots
   /** The selected slot. */
   readonly selected: number
-  /** Each column's composer place, by key. */
+  /** Each column's composer, by key. */
   readonly composers: ComposerPlaces
 }
 
-/** An effect on the layout, and one on your list: the constructors the planners share. */
+/** An effect on the layout, and one on the sidebar: the constructors the planners share. */
 export const layout = (action: LayoutAction): Effect => ({
   kind: "layout",
   action,
 })
 export const list = (act: ListAct): Effect => ({ kind: "list", act })
 
-/** Show `here`; a root shown is opened in your list, at its end if it was not there. */
+/** Show `here`; a root shown is opened in the sidebar, at its end if it was not there. */
 export function show(
   here: Here,
   state: Pick<IntentState, "rootIds">,

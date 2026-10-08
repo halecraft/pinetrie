@@ -22,7 +22,7 @@ const held = (input: Parameters<typeof planHeldRoots>[0]) =>
   [...planHeldRoots(input)].sort()
 
 describe("planHeldRoots", () => {
-  test("your list's roots and the one you are on, and no other", () => {
+  test("the sidebar's roots and the one you are on, and no other", () => {
     expect(
       held({
         layout: {

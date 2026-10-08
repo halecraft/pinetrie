@@ -72,7 +72,7 @@ export function queueCommand(
     {
       id,
       place: {
-        kind: "drafting",
+        kind: "composing",
         root: rootAt(session, where),
         at: where,
         lane,

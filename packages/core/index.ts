@@ -658,7 +658,7 @@ export interface ArchivedRoot {
 // --- the directory of roots (ADR-0063) --------------------------------------
 
 /**
- * A root as your list, the board and your inbox see it,
+ * A root as the sidebar, the board and your inbox see it,
  * without its document: a host-written `pinetrie.root` value in the session,
  * keyed by the root's id, refreshed whenever the root's document changes.
  */
@@ -1390,12 +1390,14 @@ export const commandOf = (card: {
   card.carries.kind === "message" ? card.carries.command : null
 
 /**
- * Where a card is. Drafting: below the line at a thread's end, kept as a send
- * carries it (where it started, and its column's lane) and resolved through
- * `threadOf` whenever it is needed, so it follows its thread as the thread
- * grows. Pinned: at the top of a thread's column, kept and resolved as a
- * drafting card is; the agent reads it on every run. Queued: above the line, waiting for its thread's lane, until the
- * host pops it or someone unqueues it. Fresh: an unsent branch or new tab,
+ * Where a card is (ADR-0113). Composing: your message, in your composer at a
+ * thread's end, which only you see; kept as a send carries it (where it
+ * started, and its column's lane) and resolved through `threadOf` whenever
+ * it is needed, so it follows its thread as the thread grows. Note: below
+ * the line at a thread's end, shared, kept and resolved as a composing card
+ * is. Pinned: at the top of a thread's column, kept and resolved the same
+ * way; the agent reads it on every run. Queued: above the line, waiting for
+ * its thread's lane, until the host pops it or someone unqueues it. Fresh: an unsent branch or new tab,
  * by its column's key, in the root it will start or branch in. Inventory: in its holder's inventory; which slot holds
  * it is the holder's own document (`InventoryDoc`), not the host's (ADR-0059).
  * Gone: discarded, drawn nowhere, kept so the undo key can bring it back
@@ -1403,7 +1405,14 @@ export const commandOf = (card: {
  */
 export type CardPlace =
   | {
-      readonly kind: "drafting"
+      readonly kind: "composing"
+      /** The root its thread is in (ADR-0063), with `at` a `Spot`. */
+      readonly root: RootId
+      readonly at: Position
+      readonly lane: LaneName | null
+    }
+  | {
+      readonly kind: "note"
       /** The root its thread is in (ADR-0063), with `at` a `Spot`. */
       readonly root: RootId
       readonly at: Position
@@ -1491,7 +1500,8 @@ export type PlaceKey = OmitEach<CardPlace, "order" | "by">
 
 export function keyOf(place: CardPlace): PlaceKey {
   switch (place.kind) {
-    case "drafting":
+    case "composing":
+    case "note":
       return place
     case "pinned":
       return {
@@ -1522,10 +1532,9 @@ export function keyOf(place: CardPlace): PlaceKey {
  */
 export function sameKey(a: PlaceKey, b: PlaceKey): boolean {
   switch (a.kind) {
-    case "drafting":
-      return (
-        b.kind === "drafting" && samePosition(a.at, b.at) && a.lane === b.lane
-      )
+    case "composing":
+    case "note":
+      return b.kind === a.kind && samePosition(a.at, b.at) && a.lane === b.lane
     case "pinned":
       return (
         b.kind === "pinned" && samePosition(a.at, b.at) && a.lane === b.lane
@@ -1595,13 +1604,13 @@ export const moveOf = (card: CardRecord, to: PlaceKey): Move => ({
 })
 
 /**
- * Where an unqueue or an unpin puts a card: drafting where it was queued or
- * pinned.
+ * Where an unqueue or an unpin puts a card, and where your message goes to
+ * the notes: a note at the same thread end (ADR-0113).
  */
-export const draftingOf = (
-  place: Extract<CardPlace, { kind: "queued" | "pinned" }>,
+export const noteOf = (
+  place: Extract<CardPlace, { kind: "queued" | "pinned" | "composing" }>,
 ): PlaceKey => ({
-  kind: "drafting",
+  kind: "note",
   root: place.root,
   at: place.at,
   lane: place.lane,
@@ -1621,18 +1630,19 @@ export const discardedOf = (
 })
 
 /**
- * Where a pin puts a card below the line: pinned at the same thread end.
- * Null for any other place: a fresh column has no thread to pin it to yet.
+ * Where a pin puts your message, a note or a queued card: pinned at the
+ * same thread end. Null for any other place: a fresh column has no thread to
+ * pin it to yet.
  */
 export const pinnedOf = (place: CardPlace | PlaceKey): PlaceKey | null =>
-  place.kind === "drafting"
+  place.kind === "composing" || place.kind === "note" || place.kind === "queued"
     ? { kind: "pinned", root: place.root, at: place.at, lane: place.lane }
     : null
 
 /**
  * The root a card queued on `lane` belongs to: its lane's, since the host
  * pops it into a chat there (ADR-0063); else, for a lane with no record yet, the
- * root the card drafts or queues in. Undefined for a card at no thread.
+ * root its thread is in. Undefined for a card at no thread.
  */
 export function queueRoot(
   lane: LaneName,
@@ -1640,7 +1650,10 @@ export function queueRoot(
   lanes: ReadonlyMap<LaneName, LaneRecord>,
 ): RootId | undefined {
   const own =
-    card.place.kind === "drafting" || card.place.kind === "queued"
+    card.place.kind === "composing" ||
+    card.place.kind === "note" ||
+    card.place.kind === "queued" ||
+    card.place.kind === "pinned"
       ? card.place.root
       : undefined
   return lanes.get(lane)?.root ?? own
@@ -1673,7 +1686,7 @@ export type MoveRefusal =
  */
 export interface PlaceFields {
   readonly kind: string
-  /** A drafting, pinned, queued or fresh card's root (ADR-0063); "" for an inventory's. */
+  /** A card's root at a thread or in a fresh column (ADR-0063); "" for an inventory's. */
   readonly root: string
   readonly at: string
   readonly lane: string
@@ -1689,9 +1702,12 @@ const entryOrEmpty = (at: Position): string => (at.kind === "root" ? "" : at.id)
 /** A place (or a key, whose `order` and `by` are "") as flat strings. */
 export function placeFields(place: CardPlace | PlaceKey): PlaceFields {
   switch (place.kind) {
-    case "drafting":
+    // Your message keeps the stored kind it had as a drafting card, so no
+    // stored row changed with the split (ADR-0113).
+    case "composing":
+    case "note":
       return {
-        kind: "drafting",
+        kind: place.kind === "composing" ? "drafting" : "note",
         root: place.root,
         at: entryOrEmpty(place.at),
         lane: place.lane ?? "",
@@ -1766,13 +1782,14 @@ export function placeFields(place: CardPlace | PlaceKey): PlaceFields {
 }
 
 /**
- * Flat strings -> a place; undefined for one that is malformed. A drafting
- * or queued card's `at` is an entry, never the root; a fresh card's `at` is
- * either. Every card in a root needs its `RootId`. A fresh card's column is
- * never "", nor an inventory card's holder. A drafting card whose lane is
+ * Flat strings -> a place; undefined for one that is malformed. A card at a
+ * thread's end or queued has an entry for its `at`, never the root; a fresh
+ * card's `at` is either. Every card in a root needs its `RootId`. A fresh
+ * card's column is never "", nor an inventory card's holder. Stored kind
+ * `drafting` is your message (`composing`). A message or note whose lane is
  * not a thread's keeps its place with no lane: dropped, its text would be
  * swept at the next start, and the lane only says which thread it follows.
- * A pinned card is read as a drafting one, and needs its order. A queued
+ * A pinned card is read as a note is, and needs its order. A queued
  * card needs its lane, its order and who queued it.
  */
 export function placeOfFields(f: PlaceFields): CardPlace | undefined {
@@ -1800,10 +1817,14 @@ export function placeOfFields(f: PlaceFields): CardPlace | undefined {
             why: { kind: "discarded" },
           }
     case "drafting":
+    case "note":
       return f.at === "" || !isRootId(f.root)
         ? undefined
         : {
-            kind: "drafting",
+            kind:
+              f.kind === "drafting"
+                ? ("composing" as const)
+                : ("note" as const),
             root: f.root,
             at: atEntry(entryId(f.at)),
             lane: isLaneName(f.lane) ? f.lane : null,

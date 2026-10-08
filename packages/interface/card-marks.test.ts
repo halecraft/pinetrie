@@ -28,12 +28,12 @@ const said = (id: string, parentId: string | null): EntryLike =>
 /** Two roots: e1 -> e2, and g1. */
 const tree = (...more: EntryLike[]): TreeIndex =>
   indexOf([said("e1", null), said("e2", "e1"), said("g1", null), ...more])
-const drafting = (id: string, at: string, owner = ADA): CardRecord => ({
+const atEnd = (id: string, at: string, owner = ADA): CardRecord => ({
   id: cardId(id),
   owner,
   placer: owner,
   place: {
-    kind: "drafting",
+    kind: "composing",
     root: TEST_ROOT,
     at: atEntry(entryId(at)),
     lane: null,
@@ -114,8 +114,26 @@ test("hereOfColumn: a new tab's column, a root's open or closed, or none", () =>
 })
 
 describe("cardMarks", () => {
-  test("a drafting card marks its root and its thread's end", () => {
-    expect(sets(marks([drafting("c", "e2")]))).toEqual({
+  test("your message marks its root and its thread's end", () => {
+    expect(sets(marks([atEnd("c", "e2")]))).toEqual({
+      roots: ["e1"],
+      newTabs: [],
+      ends: ["e2"],
+      elsewhere: false,
+    })
+  })
+
+  test("a note you own marks its root and its thread's end too (ADR-0113)", () => {
+    const note: CardRecord = {
+      ...atEnd("c", "e2"),
+      place: {
+        kind: "note",
+        root: TEST_ROOT,
+        at: atEntry(entryId("e2")),
+        lane: null,
+      },
+    }
+    expect(sets(marks([note]))).toEqual({
       roots: ["e1"],
       newTabs: [],
       ends: ["e2"],
@@ -125,8 +143,8 @@ describe("cardMarks", () => {
 
   test("a pinned card marks nothing: it is a thread's direction, not unsent work", () => {
     const pinned: CardRecord = {
-      ...drafting("p", "e2"),
-      // In a root this tab does not hold, which a drafting card would mark.
+      ...atEnd("p", "e2"),
+      // In a root this tab does not hold, which your message would mark.
       place: {
         kind: "pinned",
         root: FAR_ROOT,
@@ -143,8 +161,8 @@ describe("cardMarks", () => {
     })
   })
 
-  test("a drafting card in a root this tab does not hold marks that root, from the directory (ADR-0063)", () => {
-    const far = drafting("c", "f2")
+  test("your message in a root this tab does not hold marks that root, from the directory (ADR-0063)", () => {
+    const far = atEnd("c", "f2")
     const card = { ...far, place: { ...far.place, root: FAR_ROOT } }
     const m = marks([card])
     expect([...m.roots]).toEqual(["f1"])
@@ -154,7 +172,7 @@ describe("cardMarks", () => {
   test("it follows its thread as the thread grows", () => {
     const grown = tree(said("e3", "e2"))
     expect([
-      ...marks([drafting("c", "e2")], ["c"], { index: grown }).ends,
+      ...marks([atEnd("c", "e2")], ["c"], { index: grown }).ends,
     ]).toEqual(["e3"])
   })
 
@@ -173,22 +191,22 @@ describe("cardMarks", () => {
 
   test("only your cards, only with text, only where their place still is", () => {
     const none = { roots: [], newTabs: [], ends: [], elsewhere: false }
-    expect(sets(marks([drafting("c", "e2", BEA)]))).toEqual(none)
-    expect(sets(marks([drafting("c", "e2")], []))).toEqual(none)
-    expect(sets(marks([drafting("c", "gone")]))).toEqual(none)
+    expect(sets(marks([atEnd("c", "e2", BEA)]))).toEqual(none)
+    expect(sets(marks([atEnd("c", "e2")], []))).toEqual(none)
+    expect(sets(marks([atEnd("c", "gone")]))).toEqual(none)
   })
 
   test("elsewhere: a marked root whose tab you closed", () => {
-    expect(marks([drafting("c", "g1")]).elsewhere).toBe(true)
+    expect(marks([atEnd("c", "g1")]).elsewhere).toBe(true)
     expect(marks([fresh("c", "first-g1")]).elsewhere).toBe(true)
     const closed = { ...layout, open: [] }
-    expect(
-      marks([drafting("c", "e2")], ["c"], { layout: closed }).elsewhere,
-    ).toBe(true)
+    expect(marks([atEnd("c", "e2")], ["c"], { layout: closed }).elsewhere).toBe(
+      true,
+    )
   })
 
   test("an archived root marks its row, never the Archive tab", () => {
-    const m = marks([drafting("c", "g1")], ["c"], {
+    const m = marks([atEnd("c", "g1")], ["c"], {
       archived: new Set([entryId("g1")]),
     })
     expect([...m.roots]).toEqual(["g1"])

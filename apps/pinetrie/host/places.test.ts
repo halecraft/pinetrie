@@ -19,7 +19,7 @@ const record = (id: string) =>
     owner: ada,
     placer: ada,
     place: {
-      kind: "drafting",
+      kind: "composing",
       root: TEST_ROOT,
       at: atEntry(entryId("e-1")),
       lane: null,

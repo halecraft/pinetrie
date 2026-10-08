@@ -4,7 +4,7 @@
 // (`account-menu.tsx`).
 //
 // A rename is sent on Enter or save, never on blur: a click on "← back" or
-// your list would blur the field and send a name you were still typing.
+// the sidebar would blur the field and send a name you were still typing.
 
 import type { Sha256, WriterId } from "@pinetrie/core"
 import { planRename, profileWords, renameProblem } from "@pinetrie/interface"

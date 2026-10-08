@@ -376,7 +376,7 @@ rejects `shutdown()`.
   nothing. The dispatcher's `chat` case spends the card when the answer
   takes its text (`spendsCard`: `appended` or `started`): the record goes,
   then the text, and the reply carries the places' `rev`. Sent from a fresh
-  column, the spend first moves the column's other cards to drafting at the
+  column, the spend first makes the column's other cards notes at the
   message it wrote (`planFreshFollow`, found by the send's id), in the same
   step, so no move gets between. The drain destroys
   a popped card's text itself, since the pop removed the record. The command's
@@ -511,7 +511,7 @@ rejects `shutdown()`.
   `sendPoppedQueuedCard` in mode `queue`, as its queuer (`by`), with the card's other
   writers as contributors. A card with no text starts no run.
 - **A card the host could not send goes back below the line, whole**
-  (`planUnsent`): drafting where it was queued, saying why, and never queued
+  (`planUnsent`): a note where it was queued, saying why, and never queued
   again, or the next drain would fail the same way (S69, answer 5). Its text
   is kept. After a clean update its command is cleared: it was carried out.
   An update or a send that throws writes the card back the same way, saying

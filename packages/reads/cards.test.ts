@@ -18,7 +18,7 @@ const card = (id: string, owner = "p-ada"): CardRecord => ({
   owner: writerId(owner),
   placer: writerId(owner),
   place: {
-    kind: "drafting",
+    kind: "composing",
     root: TEST_ROOT,
     at: atEntry(entryId("e1")),
     lane: null,

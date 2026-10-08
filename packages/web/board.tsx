@@ -9,14 +9,13 @@
 // within one, or use its ⋯'s Move to ▸, to move it for everyone. To the
 // closed state it is archived (ADR-0029). An item with a thread whose work
 // is ready to accept carries ⇡, for everyone. Selecting an item opens it in your
-// list; dragged onto your list, it opens there. A state's name is edited in
+// list; dragged onto the sidebar, it opens there. A state's name is edited in
 // place, its ⋯ moves or removes it, and ＋ state adds one. The closed state
 // is a count, a search over labels and its most recent roots. What it shows
 // is `boardView`'s.
 
 import type { EntryId, WriterId } from "@pinetrie/core"
 import {
-  type BoardItem,
   type BoardSide,
   type BoardView,
   clickClosesBoard,
@@ -33,11 +32,11 @@ import {
   rootGroupProps,
   type StripState,
   stripWords,
+  type ThreadCard,
 } from "@pinetrie/interface"
 import { ROOT_BUSY_REASON } from "@pinetrie/rules"
 import { useEffect, useRef, useState } from "react"
 import { Menu, type MenuItem } from "./menu.tsx"
-import { AddButton } from "./open-list.tsx"
 import {
   ReaderMenus,
   Readers,
@@ -45,11 +44,12 @@ import {
   RootStatus,
   StatusMark,
 } from "./root-signals.tsx"
+import { AddButton } from "./sidebar.tsx"
 import { startRootDrag } from "./use-root-drag.ts"
 
-/** ▦'s mark's title: what the roots not in your list raise. */
+/** ▦'s mark's title: what the roots not in the sidebar raise. */
 const elsewhereWords = (level: Level): string =>
-  `a thread not in your list: ${LEVEL_WORDS[level]}`
+  `a thread not in the sidebar: ${LEVEL_WORDS[level]}`
 
 /**
  * The strip: ▦, then each state's name, count, readers and mark, and its
@@ -69,9 +69,9 @@ export function BoardStrip({
   onIntent: (intent: Intent) => void
   /** The session's message count: ▦'s title and `data-messages`. */
   count: MessageCount
-  /** The highest a root not in your list raises (`markOf`). */
+  /** The highest a root not in the sidebar raises (`markOf`). */
   elsewhere: Level | null
-  /** A root not in your list holds an unsent card of yours. */
+  /** A root not in the sidebar holds an unsent card of yours. */
   pip: React.ReactNode | null
   readers: ReadersProps
 }) {
@@ -217,7 +217,7 @@ export function Board({
   const [adding, setAdding] = useState(false)
   // An open column's item is a place to drop before; a closed row is not,
   // since the closed state shows its roots by activity, not by place.
-  const item = (t: BoardItem, place: boolean) => (
+  const item = (t: ThreadCard, place: boolean) => (
     <ItemCard
       drop={
         place
@@ -294,7 +294,7 @@ export function Board({
               triggerClassName="state-menu"
             />
           </div>
-          <div className="board-items">
+          <div className="board-cards">
             {column.items.map(t => item(t, true))}
           </div>
           <AddButton add={column.add} onIntent={onIntent} />
@@ -355,7 +355,7 @@ export function Board({
           />{" "}
           mine
         </label>
-        <div className="board-items">
+        <div className="board-cards">
           {view.closed.rows.map(t => item(t, false))}
         </div>
       </div>
@@ -384,7 +384,7 @@ function ItemCard({
   thread,
   pip,
 }: {
-  item: BoardItem
+  item: ThreadCard
   /** Its drop zone's attributes (`rootDropProps`), or none. */
   drop: Readonly<Record<string, string>>
   onIntent: (intent: Intent) => void
@@ -394,7 +394,7 @@ function ItemCard({
 }) {
   return (
     <div
-      className="board-item"
+      className="thread-card"
       data-entry={item.entry}
       data-root={item.root}
       {...drop}

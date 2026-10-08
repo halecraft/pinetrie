@@ -45,7 +45,7 @@ export const messageCountTitle = ({ held, total }: MessageCount): string =>
   `${held} in the threads this tab has loaded, of ${total} in the session`
 
 /**
- * Every root with a message, ascending by its root entry, as your list and
+ * Every root with a message, ascending by its root entry, as the sidebar and
  * the board read it: from the directory (ADR-0063), not the tree, so a
  * root this tab does not hold is there too.
  */
@@ -80,7 +80,7 @@ export const CHAT_LABEL = "Chat"
 /**
  * Every root's label, by its root entry: its title; else, for a root no lane
  * works in (only people have written there), `CHAT_LABEL`; else its first
- * line. `App` builds it once per change, and your list, the board and your
+ * line. `App` builds it once per change, and the sidebar, the board and your
  * inbox look labels up in it.
  */
 export function labelsOf(

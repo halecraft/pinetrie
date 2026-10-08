@@ -38,7 +38,7 @@ const END = entryId("e-end")
 const C1 = cardId("c-1")
 const at = atEntry(entryId("e-1"))
 
-const DRAFTING: CardPlace = { kind: "drafting", root: ROOT, at, lane: LANE }
+const DRAFTING: CardPlace = { kind: "note", root: ROOT, at, lane: LANE }
 const QUEUED: CardPlace = {
   kind: "queued",
   root: ROOT,
@@ -59,7 +59,7 @@ const FRESH: CardPlace = { kind: "fresh", column: "k", root: ROOT, at }
 const BEAS: CardPlace = { kind: "inventory", holder: BEA }
 const ADAS: CardPlace = { kind: "inventory", holder: ADA }
 const ELSEWHERE: CardPlace = {
-  kind: "drafting",
+  kind: "note",
   root: ROOT,
   at: atEntry(entryId("e-2")),
   lane: null,
@@ -216,7 +216,7 @@ describe("planProvenance: traces", () => {
         for: ADA,
         card: C1,
         by: BEA,
-        from: { kind: "drafting", root: ROOT, at, lane: LANE },
+        from: { kind: "note", root: ROOT, at, lane: LANE },
         to: { kind: "queued", root: ROOT, at, lane: LANE, seen: "" },
         message: null,
         at: 7,
@@ -283,7 +283,7 @@ describe("planProvenance: traces", () => {
       for: ADA,
       card: C1,
       by: BEA,
-      from: { kind: "drafting", root: ROOT, at, lane: LANE },
+      from: { kind: "note", root: ROOT, at, lane: LANE },
       to: { kind: "queued", root: ROOT, at, lane: LANE, seen: "" },
       message: null,
       at: 1,
@@ -330,7 +330,7 @@ describe("movedBackBy", () => {
         kind: "moved",
         by,
         from: { kind: "queued", root: ROOT, at, lane: LANE, seen: "" },
-        to: { kind: "drafting", root: ROOT, at, lane: LANE },
+        to: { kind: "note", root: ROOT, at, lane: LANE },
         at: 1,
       },
     ],
@@ -352,7 +352,7 @@ test("planTraceSweep: traces too old, and histories whose card is gone", () => {
     for: ADA,
     card: C1,
     by: BEA,
-    from: { kind: "drafting", root: ROOT, at, lane: LANE },
+    from: { kind: "note", root: ROOT, at, lane: LANE },
     to: null,
     message: null,
     at: when,

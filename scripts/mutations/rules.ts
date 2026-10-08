@@ -1046,7 +1046,7 @@ export const mutations: readonly Mutation[] = [
     from: "        c.place.kind === kind &&\n",
     to: "        c.place.kind === kind && c.owner === cards[0]?.owner &&\n",
     command: unit,
-    expect: "cardsAt drafting: everyone's cards at one end",
+    expect: "cardsAt note: everyone's notes at one end",
   },
   {
     name: "planCardSweep keeps empty cards",
@@ -1110,7 +1110,7 @@ export const mutations: readonly Mutation[] = [
     from: "      root: card.place.root,\n      at: card.place.at,\n      lane: card.place.lane,\n    },\n    unsent: reason,",
     to: "      root: card.place.root,\n      at: card.place.at,\n      lane: card.place.lane,\n    } && card.place,\n    unsent: reason,",
     command: unit,
-    expect: "planUnsent: the whole record, drafting where it was queued",
+    expect: "planUnsent: the whole record, a note where it was queued",
   },
   {
     name: "an unqueue clears why a card was not sent",
@@ -1177,12 +1177,12 @@ export const mutations: readonly Mutation[] = [
     expect: "a message",
   },
   {
-    name: "a queued card is drafting too",
+    name: "a queued card is your message too",
     file: "packages/rules/card.ts",
-    from: '  card.place.kind === "drafting"\n    ? placeEnd(card.place, card.owner, lanes, index)',
+    from: '  card.place.kind === "composing"\n    ? placeEnd(card.place, card.owner, lanes, index)',
     to: '  card.place.kind !== "fresh"\n    ? placeEnd(card.place, card.owner, lanes, index)',
     command: unit,
-    expect: "cardEnd and drafting cardsAt see drafting cards only",
+    expect: "cardEnd and cardsAt note see their own kind",
   },
   {
     name: "the resolution leaves out what the person asked",
@@ -1375,7 +1375,8 @@ export const mutations: readonly Mutation[] = [
     from: "        c.place.column === place.column,",
     to: "        true,",
     command: unit,
-    expect: "planFreshFollow: the sent card's column's other cards go drafting",
+    expect:
+      "planFreshFollow: the sent card's column's other cards become notes",
   },
   {
     name: "anyone takes into anyone's inventory",
@@ -1489,7 +1490,7 @@ export const mutations: readonly Mutation[] = [
     to: '  if (place?.kind !== "fresh") return []',
     command: unit,
     expect:
-      "planFreshFollow: the sent card's column's other cards go drafting at the new entry, placer kept; nothing else moves",
+      "planFreshFollow: the sent card's column's other cards become notes at the new entry, placer kept; nothing else moves",
   },
   {
     name: "a move's history is the root it leaves",
@@ -1585,11 +1586,11 @@ export const mutations: readonly Mutation[] = [
   {
     name: "cardEnd resolves a pinned card too",
     file: "packages/rules/card.ts",
-    from: '  card.place.kind === "drafting"\n    ? placeEnd(card.place, card.owner, lanes, index)',
-    to: '  card.place.kind === "drafting" || card.place.kind === "pinned"\n    ? placeEnd(card.place, card.owner, lanes, index)',
+    from: '  card.place.kind === "composing"\n    ? placeEnd(card.place, card.owner, lanes, index)',
+    to: '  card.place.kind === "composing" || card.place.kind === "pinned"\n    ? placeEnd(card.place, card.owner, lanes, index)',
     command: unit,
     expect:
-      "drafting cardsAt and yourCard never return a pinned card at the same end as your drafting card",
+      "cardsAt note and yourCard never return a pinned card at the same end",
   },
   {
     name: "a pin is ordered among nothing",
@@ -2178,10 +2179,18 @@ export const mutations: readonly Mutation[] = [
     expect: "a hold is written where there is none",
   },
   {
+    name: "the startup repair keeps every message",
+    file: "packages/rules/card.ts",
+    from: "    if (!kept.has(key)) {\n",
+    to: "    if (true) {\n",
+    command: unit,
+    expect: "of two of your messages at one end",
+  },
+  {
     name: "unqueue all moves a fact",
     file: "packages/rules/card.ts",
-    from: '    .filter(c => c.carries.kind === "message")\n    .map(c => moveOf(c, draftingOf(c.place)))',
-    to: "    .map(c => moveOf(c, draftingOf(c.place)))",
+    from: '    .filter(c => c.carries.kind === "message")\n    .map(c => moveOf(c, noteOf(c.place)))',
+    to: "    .map(c => moveOf(c, noteOf(c.place)))",
     command: unit,
     expect: "planUnqueueAll",
   },

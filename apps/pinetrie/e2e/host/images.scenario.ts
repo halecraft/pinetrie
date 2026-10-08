@@ -115,7 +115,7 @@ async function run(check: Checks["check"]): Promise<void> {
       {
         id: queued,
         place: {
-          kind: "drafting",
+          kind: "composing",
           root: rootAt(iu, at(replyId)),
           at: at(replyId),
           lane: lane ?? null,
@@ -153,7 +153,7 @@ async function run(check: Checks["check"]): Promise<void> {
       {
         id: drafted,
         place: {
-          kind: "drafting",
+          kind: "composing",
           root: rootAt(iu, at(idOfIn(ih, "a green one"))),
           at: at(idOfIn(ih, "a green one")),
           lane: null,

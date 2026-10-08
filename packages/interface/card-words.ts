@@ -19,7 +19,7 @@ import {
 } from "@pinetrie/rules"
 import type { CardNotice } from "@pinetrie/session"
 import type { PinnedMarker } from "./column-view.ts"
-import { lineWords, type Reader } from "./send.ts"
+import type { Reader } from "./send.ts"
 import type { TraceGroup } from "./traces.ts"
 
 /** What a thread catches up with, for a command's words. */
@@ -74,18 +74,11 @@ export const commandNote = (command: CardCommand, at: CatchUps): string =>
       ? "↓ continues from accepted work first, then sends what you write"
       : `↓ catches up with ${fromName(commandFrom(command, at))} first, then sends what you write`
 
-/** A queued card's button that takes it back below the line. */
-export const UNQUEUE = "unqueue"
-
 /** The × beside a command: what pressing it does. */
 export const CLEAR_COMMAND = "send it as a plain message"
 
 const who = (by: WriterId, reader: Reader): string =>
   by === reader.me ? "you" : displayName(by, reader.nameOf.get(by))
-
-/** A queued card's heading: who queued it, and its place in line, from 0. */
-export const queuedWords = (by: WriterId, n: number, reader: Reader): string =>
-  `queued by ${who(by, reader)} · ${lineWords(n)}`
 
 /** A control's words: its label, its title and its class. */
 export interface ControlWords {
@@ -128,6 +121,8 @@ export const DISCARDED_NOTICE =
  */
 export function noticeWords(notice: CardNotice, reader: Reader): string {
   if (notice.code === "discarded") return DISCARDED_NOTICE
+  if (notice.code === "message-holds-text")
+    return "not moved: your message here holds text"
   if (notice.code === "slots-changed")
     return "not undone: those slots have changed since"
   const { by } = notice
@@ -157,23 +152,10 @@ export function noticeWords(notice: CardNotice, reader: Reader): string {
   }
 }
 
-/**
- * What an editor's status line says: what its last send said, else why the
- * host could not send its card, until it is queued again.
- */
-export const cardStatus = (status: string, unsent: string | null): string =>
-  status !== "" || unsent === null ? status : unsentWords(unsent)
-
 /** The inventory panel's name, and its button in the footer. */
 export const INVENTORY = "inventory"
-/** A card's button that takes it into your inventory; its drag handle too. */
-export const TAKE_INTO_INVENTORY = "take"
-export const TAKE_INTO_INVENTORY_TITLE =
-  "take into your inventory (Ctrl+Shift+I) · drag to move"
-/** The composer's button that empties it for another card here. */
-export const NEW_CARD = "+ card"
-export const NEW_CARD_TITLE =
-  "start another card here: this one stays, above the box"
+/** A message's button that takes a copy of it into your inventory. */
+export const TAKE_COPY = "take"
 /** A message's button that takes a copy of it, or of your selection in it. */
 export const TAKE_COPY_INTO_INVENTORY = "take a copy into your inventory"
 /** The panel's button that puts the selected card in the column last focused. */
@@ -199,10 +181,6 @@ export const noticeKey = (notice: CardNotice): string =>
 
 // ── pinned cards (ADR-0048 step 5) ────────────────────────────────────────
 
-/** A drafting card's button that pins it to the top of its column. */
-export const PIN = "pin"
-export const PIN_TITLE =
-  "pin to the top of the column: the agent reads it on every run"
 /** A column's button that opens a box for a new pinned card. */
 export const NEW_PIN = "+ pin"
 export const NEW_PIN_TITLE =
@@ -210,14 +188,10 @@ export const NEW_PIN_TITLE =
 /** That box, empty. */
 export const NEW_PIN_PLACEHOLDER =
   "what the agent should keep in mind on every run"
-/** A pinned card's button that puts it back below the line. */
-export const UNPIN = "unpin"
+/** A thread's notes with none: where a drop makes one (ADR-0113). */
+export const NOTES_EMPTY = "drop a card here to make it a note"
 /** The pinned strip with no cards: where a drop pins one. */
 export const PINNED_EMPTY = "drop a card here to pin it for the agent"
-
-/** A pinned card's heading: who pinned it. */
-export const pinnedWords = (by: WriterId, reader: Reader): string =>
-  `pinned by ${who(by, reader)}`
 
 /** How a pinned card stands against what the agent last read of it. */
 export const pinnedStatusWords = (status: PinnedStatus): string => {
@@ -247,8 +221,9 @@ export const retiredWords = (line: string): string =>
 
 // ── history and traces (ADR-0048 step 6) ──────────────────────────────────
 
-/** A card's button that shows where it has been. */
-export const HISTORY = "history"
+/** A card's ⋯ item that shows where it has been, or hides it again. */
+export const historyItemWords = (open: boolean): string =>
+  open ? "Hide history" : "History"
 export const HISTORY_TITLE = "where this card has been, and who moved it"
 
 /** A verb as it reads after "by": "queued by Bea", "taken by Carl". */

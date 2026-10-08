@@ -5,20 +5,21 @@
 // Every input makes the same moves: a key, a button and a drop each become
 // one of these intents. A take into the inventory lands in the selected
 // slot when it is empty, else the first empty one (`firstEmpty`); a put
-// lands where the target's composer would create a card (`placeOfTarget`). Each move says where it was
-// made, so a refusal is said there. Which history a move enters is the
+// lands at the place its target names (`placeOfTarget`): a note at a
+// column's end, or your message in its composer. Each move says where it
+// was made, so a refusal is said there. Which history a move enters is the
 // host's to decide (`historyOf`); an undo names only the root you are on.
 
 import {
   type CardId,
   type CardRecord,
   discardedOf,
-  draftingOf,
   keyOf,
   type LaneName,
   type Move,
   type MoveDirection,
   moveOf,
+  noteOf,
   type PlaceKey,
   type Position,
   pinnedOf,
@@ -46,7 +47,7 @@ import {
   type IntentState,
   planOpenAt,
 } from "./effects.ts"
-import { type PutTarget, placeOfTarget } from "./put-target.ts"
+import { intoMessage, type PutTarget, placeOfTarget } from "./put-target.ts"
 import { revealOf } from "./reveal.ts"
 
 /** A move to send; `fly`: whether its card animates to where it lands. */
@@ -191,10 +192,10 @@ export function planTakeCopyIntoInventory(
 }
 
 /**
- * Put `card` at `target`. A column: where its composer would create a card,
- * below the line. A slot: a card already in your inventory swaps with what
- * is there; any other card is taken into the inventory, into that slot if
- * it is empty.
+ * Put `card` at `target`. A column: a note at its end. A composer, or a
+ * fresh column: your message there (`putInMessage`). A slot: a card already
+ * in your inventory swaps with what is there; any other card is taken into
+ * the inventory, into that slot if it is empty.
  */
 export function planPut(
   card: CardId,
@@ -204,6 +205,8 @@ export function planPut(
   const facts = state.cards
   const now = cardOf(facts, card)
   if (now === undefined) return []
+  if (target.kind !== "inventory" && intoMessage(target, facts.composers))
+    return putInMessage(now, target.key, state)
   if (target.kind === "inventory") {
     const from = slotOf(facts.slots, card)
     if (from === null || now.place.kind !== "inventory")
@@ -219,7 +222,69 @@ export function planPut(
 }
 
 /**
- * Pin `card`, below the line at a thread's end, at the top of the same
+ * `now` as your message in column `key`'s composer (ADR-0113). A message
+ * there with text takes `now`'s place, a slot of your inventory included,
+ * in one move the host accepts or refuses whole, so one undo; an empty one
+ * is discarded. In a fresh column a message with text gives way only to a
+ * card from your inventory: anywhere else, it would land in another
+ * thread, so the put is refused.
+ */
+function putInMessage(
+  now: CardRecord,
+  key: string,
+  state: IntentState,
+): readonly Effect[] {
+  const facts = state.cards
+  const spot = facts.composers.get(key)
+  if (spot === undefined || spot.message === now.id) return []
+  const to = keyOf(spot.place)
+  const from = keyOf(now.place)
+  if (sameKey(from, to)) return []
+  const actedAt = atColumn(key)
+  const into = { move: moveOf(now, to), slot: null }
+  const message =
+    spot.message === null ? undefined : cardOf(facts, spot.message)
+  if (message === undefined)
+    return [moveCard(into.move, { actedAt, slot: null }, true)]
+  if (!facts.filled.has(message.id)) {
+    const away = moveOf(message, discardedOf(message.place, rootOfTab(state)))
+    return [
+      {
+        kind: "keep",
+        moves: [into, { move: away, slot: null }],
+        actedAt,
+        close: [],
+      },
+    ]
+  }
+  if (spot.place.kind === "fresh" && now.place.kind !== "inventory")
+    return [
+      {
+        kind: "refuse",
+        refusal: { card: now.id, actedAt, code: "message-holds-text" },
+      },
+    ]
+  const back = {
+    move: moveOf(message, from),
+    slot: now.place.kind === "inventory" ? slotOf(facts.slots, now.id) : null,
+  }
+  return [{ kind: "keep", moves: [into, back], actedAt, close: [] }]
+}
+
+/** Your message `card` to the notes at its thread's end (ADR-0113). */
+export function planToNote(
+  card: CardId,
+  key: string,
+  state: IntentState,
+): readonly Effect[] {
+  const now = cardOf(state.cards, card)
+  return now?.place.kind === "composing"
+    ? [moveCard(moveOf(now, noteOf(now.place)), IN_COLUMN(key), true)]
+    : []
+}
+
+/**
+ * Pin `card`, your message, a note or a queued card, at the top of its
  * thread's column. A move like any other: the host records it, and an undo
  * of moves reverses it (ADR-0066).
  */
@@ -243,7 +308,7 @@ export function planUnpin(
 ): readonly Effect[] {
   const now = cardOf(state.cards, card)
   return now?.place.kind === "pinned"
-    ? [moveCard(moveOf(now, draftingOf(now.place)), IN_COLUMN(key), true)]
+    ? [moveCard(moveOf(now, noteOf(now.place)), IN_COLUMN(key), true)]
     : []
 }
 

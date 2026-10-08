@@ -67,7 +67,8 @@ export interface ProvenanceDeps {
 }
 
 /**
- * Each drafting, queued or pinned card's thread end, from its loaded root;
+ * Each card's thread end, from its loaded root, for a card at one: your
+ * message, a note, a queued or a pinned card;
  * a card in a root not loaded is left out, and counts as unwatched.
  */
 export function endsOf(
@@ -79,7 +80,12 @@ export function endsOf(
   const ends = new Map<CardId, EntryId | null>()
   for (const c of cards) {
     const p = c.place
-    if (p.kind !== "drafting" && p.kind !== "queued" && p.kind !== "pinned")
+    if (
+      p.kind !== "composing" &&
+      p.kind !== "note" &&
+      p.kind !== "queued" &&
+      p.kind !== "pinned"
+    )
       continue
     const root = view(p.root)
     if (root !== null)

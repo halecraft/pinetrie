@@ -2,7 +2,7 @@
 
 The browser page (ADR-0093): React components, hooks and what touches the
 DOM, drawing what `@pinetrie/interface` decides
-(`packages/interface/TECHNICAL.md`): your list of roots down the left, the
+(`packages/interface/TECHNICAL.md`): the sidebar of roots down the left, the
 root you are on as a rail beside a strip of columns, and the board in the
 footer (`docs/06-interface.md`, ADR-0112). Its connection to the host is
 `@pinetrie/session` (`packages/session/TECHNICAL.md`), which declares no
@@ -125,7 +125,7 @@ about 55 ms (S59).
 (`sessionStorage`), read first, which survives a reload; and the device's
 (`localStorage`), which a new tab starts from. It knows nothing of pine·trie; a
 value's stored form is its codec's. It keeps the layout, under the key
-`pinetrie-columns:<session>`, which predates root tabs, and your list's width
+`pinetrie-columns:<session>`, which predates root tabs, and the sidebar's width
 (`pinetrie-list`, `list-width.ts`, ADR-0088). The width is saved only when you
 fold or unfold, so until then the default follows the window (`shownWidth`).
 
@@ -153,8 +153,8 @@ error.
   shape: a TypeBox schema, then a build step field by field. A layout decodes
   whole or not at all, and `v` rejects an older one: a `v: 2` layout (before
   your tabs were yours, ADR-0030) is dropped once and overwritten by the first
-  save; so is a `v: 4` one (before your list was your own document,
-  ADR-0112), and the page opens on your list's last root, else the board. A lane that is not a lane name
+  save; so is a `v: 4` one (before the sidebar was your own document,
+  ADR-0112), and the page opens on the sidebar's last root, else the board. A lane that is not a lane name
   is left off; `sync` binds the column again.
 - **`reserved` is stored** (ADR-0057), and decoded only in the shape the host
   accepts (`parseNewLane`), so a reload keeps the thread's name. The device
@@ -163,7 +163,7 @@ error.
 - **`fresh.pending` is never stored**, by either side: restoring it would send
   its message again. A "branch here" column comes back empty. `fresh.prefill`
   is stored, blank or content: only `pending` is sent on opening. What was
-  typed over it is a card, kept by the column's key (Drafting cards, below).
+  typed over it is a card, kept by the column's key (Your message and notes, below).
 - **Restored anchors the document lacks are pruned once, after
   `whenSettled`.** Until then, missing means not yet arrived: `connectSession`
   returns before the document does (S29: 0 of 50 had it). Neither
@@ -208,14 +208,14 @@ that scrolls and for one that opens a column.
 ## The page's colours (`index.html`, ADR-0081)
 
 `:root` names them: `--page` (the paper the columns and the root you are on
-are drawn on), `--chrome` (your list and the footer), `--edge` (their lines
+are drawn on), `--chrome` (the sidebar and the footer), `--edge` (their lines
 and the selected item's sides), `--on` (the selected item's left edge) and
-`--side` (your list's width, which the footer's own cell shares: 15rem,
+`--side` (the sidebar's width, which the footer's own cell shares: 15rem,
 11.5rem under 56rem, 3rem under `:root[data-list="icons"]`, ADR-0088). No
 page-colour literal is left in the stylesheet. `--surface` is the colour
 behind a thing, set by context: `--page` by default, `--chrome` in
-`#open-list` and `#bottom`, the hover fill on a hovered item, `--page` on
-the selected one and on a board item. A ring that must read as a gap around
+`#sidebar` and `#bottom`, the hover fill on a hovered item, `--page` on
+the selected one and on a thread card. A ring that must read as a gap around
 a dot (`.root-status.needs-you`, `.card-pip`) is drawn in `--surface`, so
 it matches whatever the dot sits on.
 
@@ -606,7 +606,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   newer than the offer's record.
 - **Open offers in your repo** ("work ready to accept") are your inbox's
   rows for the threads you follow, each leading with the thread's name and
-  opening it, and a board item's ⇡ for everyone (ADR-0091). Move to Done
+  opening it, and a thread card's ⇡ for everyone (ADR-0091). Move to Done
   in an item's `⋯` names the threads whose offers it withdraws (`offeredByRoot`,
   `dropsWords`). All read `openOffers`, which keeps only `offerStatus`'s
   `open` (ADR-0067): one accepted work already holds (`held`) has nothing to
@@ -697,7 +697,7 @@ offer's review, an ask's, a table from a message, or a stored image.
 - **The pane's width is the strip's** (ADR-0087, S109). `#strip` is an
   inline-size container, and `.pane` is
   `clamp(40rem, 100cqw - 28rem - 1px, 64rem)`: what the strip has beside the
-  thread and `.column`'s right border. Your list and the rail are outside
+  thread and `.column`'s right border. The sidebar and the rail are outside
   the container, whatever their width. A container applies no layout
   containment, so the fixed menus inside columns still place against the
   window (S109). `pane.test.ts` reads `index.html` to hold the numbers to
@@ -707,9 +707,9 @@ offer's review, an ask's, a table from a message, or a stored image.
   `.column`'s child after `.column-thread`. Where the strip is narrower than
   the thread and 40rem, it is `dialog.pane`, modal, portalled to `body`:
   the top layer covers every stacking context and makes the page inert.
-  `App` measures `#strip` with a `ResizeObserver`, so folding your list
+  `App` measures `#strip` with a `ResizeObserver`, so folding the sidebar
   crosses accepted work as a window resize does; crossing it remounts the pane.
-  A media query could not: it reads the window, and your list's width
+  A media query could not: it reads the window, and the sidebar's width
   varies. The strip comes and goes with what the workspace shows, so the
   hook checks on each render whether it still observes the element there.
 - **Focus goes back to what had it.** The wide frame reads
@@ -779,7 +779,7 @@ The page's one connection to a host is `SessionClient`, from
 `packages/session/TECHNICAL.md`. `main.tsx` connects and hands its
 `exchange` to `ExchangeProvider`, so React renders from the same connection.
 
-## Drafting cards (ADR-0048)
+## Your message and notes (ADR-0048, ADR-0113)
 
 What you type is a card: a record in the places document, which only the
 host writes (ADR-0059), and a `TextDoc` of its own (`session.cardText`),
@@ -789,7 +789,7 @@ the session sends moves and draws them until its copy holds them
 `packages/session/TECHNICAL.md`.
 
 - **A move is planned once.** `planIntent` builds each `Move` with core's
-  `moveOf` (an unqueue's target is `draftingOf`, a queue's root
+  `moveOf` (an unqueue's target is `noteOf`, a queue's root
   `queueRoot`), from the cards as drawn, and the session sends it.
 - **Refusals are worded here** (`refusalWords`), from the session's
   `CardRefusal`: an unqueue the pop beat says "already sent", a move
@@ -797,26 +797,35 @@ the session sends moves and draws them until its copy holds them
   inventory's.
 
 - **Where the column's cards are.** `Column` resolves its thread's end with
-  `threadOf`, as a reply would go, and finds your card there with `yourCard`
-  and everyone else's with `cardsAt("drafting", …)`. A fresh column's cards are found by
-  its key (`CardPlace` `fresh`). So a tab switch, a reload or another device
-  finds the same card: it belongs to the thread, not to the mounted column.
-  Every card there but the one the composer shows is drawn above it: the
-  composer reports its `EditorState` (`onShows`), and `shownBelow` decides
-  which card that leaves out. So a card put where you already had one is
-  drawn too, and once a send frees the box it takes your newest card there.
-- **"+ card" empties the box for another card** (`blank`). It shows while the
-  box is bound to a card with text, detaches and focuses the box, and moves
-  no card, so it adds no history step. A blank box takes no card it finds:
-  `card` is still your newest, so the editor reads only the card its state
-  holds (`shownBy`), and `shownBelow` leaves nothing out, so the card set
-  aside is drawn above. Typing creates a new card at the first input
-  `needsCard` accepts, as from `local`; a send's settling returns the box to
-  `local`, which takes your newest card here.
-- **One editor for every card: `card-editor.tsx`.** Your composer is one, and
-  everyone else's cards above it are others, with a heading (`cardHeading`)
-  and no where-menu. `Composer` is the column's foot: typing presence and your
-  card's editor, in the `form.composer` the suites select by.
+  `threadOf`, as a reply would go, and finds your message there with
+  `yourCard` (`composing` only) and the notes with `cardsAt("note", …)`. A
+  fresh column's cards are found by its key (`CardPlace` `fresh`), and
+  every one there but your message is drawn as a note. So a tab switch, a
+  reload or another device finds the same card: it belongs to the thread,
+  not to the mounted column. Nobody else's message is drawn.
+- **A column publishes its composer** (`ComposerSpot`: its place and your
+  message there) for `planPut`: a put on the column makes a note, a drop on
+  the composer (`data-put-composer`) your message, swapping out one with
+  text (`App`'s `filled` says which hold text).
+- **The notes are drawn above the composer** (`NoteCardEditor`), and with
+  none, a drop zone shown only while a card is dragged, as the empty pinned
+  strip is (`.cards[data-empty]`).
+- **One editor for every card: `card-editor.tsx`, in one frame:
+  `card-frame.tsx`** (ADR-0111). `CardEditor` is your composer's and the
+  "+ pin" box's; every other card is a `BoundCardEditor`, a note named in
+  its header with who else wrote in it. The frame's header is the card's drag handle (`draggable`,
+  `data-card`, so Ctrl+Shift+I finds the card from it and `NOT_A_HANDLE`
+  keeps a column's drag off it); a press on its ⋯ or × starts no drag. Its
+  ⋯ is a `Menu` of the card's Move to ▸ items, then History. Its × discards.
+  Its footer holds ↑ and ↓ and the editor's own primary button. What it
+  shows is `cardFrame` (`packages/interface/TECHNICAL.md`, *Card frames*).
+- **The frame's wrappers are the same with a card and without one.** The
+  composer's box must stay one element (below): only what is inside the
+  header changes when the card is created, and the room for ⋯ and × is kept
+  (`.card-head-acts`), so the header does not shift.
+- **`Composer` is the column's foot**: who else is writing at the end
+  ("Bea is writing…", from presence) and your message's editor, in the
+  `form.composer` the suites select by.
 - **One uncontrolled textarea for the editor's whole life.** While there is no
   card, it holds what is typed and nothing else does. The `input` that makes
   `needsCard` true (anything `sendable` would send) creates the card from
@@ -876,12 +885,13 @@ stays in view; the strip scrolls past 30vh.
   column, or one with no thread end, has no strip: a card is pinned at a
   thread's end, and a fresh column has none until its first send.
 - **Each is a `PinnedCardEditor`** (`card-editor.tsx`), a `BoundCardEditor`
-  with its size (`tokensOf`, four characters a token, as pi estimates),
-  its status, **unpin** and **take** (into your inventory). It has no send: Enter is a new line.
-  A drafting card's editor gains **pin**. Pin and unpin are moves
+  with its size (`tokensOf`, four characters a token, as pi estimates) and
+  its status in its header. It has no send: Enter is a new line. Its ⋯
+  moves it to the notes, to the queue or into your inventory; your
+  message's, a note's and a queued card's ⋯ pin it. Pin and unpin are moves
   (`planPin`, `planUnpin`, `card-intents.ts`), so the host records them and
   the undo key outside a box reverses them; `revealOf` shows a pinned place
-  as a drafting one, at its thread's end.
+  as a note, at its thread's end.
 - **A card's status is `pinnedStatus`** (`column-view.ts`): the card's
   entry in `pinnedDiff(pinnedInView(index, end), …)`, the walk and the
   comparison the host plans a run's entry from, so the strip and the run
@@ -917,18 +927,19 @@ stays in view; the strip scrolls past 30vh.
   `.release-queue` and `.unqueue-all`; a queued or pinned card's
   `.reorder-up` and `.reorder-down`.
 - **Selectors for the browser suite:** `.pinned-strip`, its
-  `textarea[data-card]`, a drafting card's `.pin`, a pinned card's `.unpin`,
-  `.pinned-status[data-status]`, and `details.pinned-read` just before its
-  prompt's `.msg`.
+  `textarea[data-card]`, and `details.pinned-read` just before its
+  prompt's `.msg`. A card's frame is `.card-frame` (with `data-tone`), its
+  header `.card-head` (`.card-state[data-state]`, `.card-by`), its ⋯
+  `.card-menu-trigger` and its items `.move-to[data-to]` and
+  `.card-history-item`; its × `.discard-card`.
 
 ## History and traces (ADR-0048 step 6)
 
-- **Each card's editor has a history button** (`card-history.tsx`): the
-  composer's, others' cards', and every `BoundCardEditor`'s (queued, pinned,
-  the inventory's selected card). Its popover lists `historyWords` for each
-  event, oldest first, then `writtenWords`, the card's writers, read only
-  while it is open. A card someone other than its owner unqueued or
-  unpinned says so beside its heading (`MovedBack`, `movedBackBy`).
+- **Each card's ⋯ has History** (`card-history.tsx`), which opens the
+  card's history in its body: `historyWords` for each event, oldest first,
+  then `writtenWords`, the card's writers, read only while it is open. A
+  card someone other than its owner unqueued or unpinned says so in its
+  header (`MovedBack`, `movedBackBy`).
 - **They read by context, not props** (`CardHistories`): `App` reads the
   histories with the session's facts and provides them, the seats, the
   session and the reader, in one object kept while those are the same, as
@@ -948,8 +959,8 @@ stays in view; the strip scrolls past 30vh.
   be seen (the read marks' condition, ADR-0077). The host deletes them; the
   column keeps drawing what it drew until it unmounts (`keptTraces`).
 - **Selectors for the browser suite:** `.trace` (with `data-trace`, its ids)
-  inside `.traces`; `.card-history-trigger`, `.card-history-box` and its
-  `li[data-event]`; `.moved-back`.
+  inside `.traces`; `.card-history-box` and its `li[data-event]`;
+  `.moved-back`.
 
 ## Selectors in the browser suite
 
@@ -1009,7 +1020,7 @@ the email is the only thing pine·trie chooses.
   portrait.
 - **Your profile is a page** (`profile-page.tsx`, Pages, below). Its submit
   is `planRename` (pure): refuse, unchanged, or send. A rename is sent on
-  Enter or save, never on blur: a click on ← back or your list blurs the
+  Enter or save, never on blur: a click on ← back or the sidebar blurs the
   field first. The draft starts from your name when the page mounts, so
   another device's rename does not overwrite what you type.
 - **One name field** (`name-input.tsx`) serves the identification screen and
@@ -1060,6 +1071,15 @@ leaving treats the history, are `page.ts`'s (`@pinetrie/interface`).
 
 ## Gotchas
 
+- **Kyneta's detach puts back the `readOnly` a box had when it was bound**
+  (`attach`, `@kyneta/react`). React sets `readOnly` only when its prop
+  changes, so a composer bound while its column was read-only stayed so
+  once its card left (moved to the notes). `CardEditor`'s `unbind` sets it
+  again from its state.
+- **A menu closes when an element holding it scrolls** (`popover.tsx`): a
+  column that follows its end as its notes change can close a card's ⋯
+  just opened. The browser suite opens it again until its item is chosen
+  (`chooseOnCard`, `apps/pinetrie/e2e/browser/page.ts`).
 - **`.column-floor` is not `.spacer`.** The spacer, inside `.column-content`,
   lines a column up on opening; the floor, after it, holds a following
   column's height (`useFollow`). The floor's rule measures `.column-content`,
@@ -1091,9 +1111,9 @@ leaving treats the history, are `page.ts`'s (`@pinetrie/interface`).
   `open`). The menu is its child, so hiding the `⋯` would hide an open menu
   too. Both are absolutely placed over the label's end, so they take no
   width from the label. A browser check hovers first (`seeInMenu` does for
-  every menu in your list or on the board): Playwright waits on a hidden
+  every menu in the sidebar or on the board): Playwright waits on a hidden
   target until it times out.
-- **Your list's right edge is an inset shadow on `#open-list`**, which the
+- **The sidebar's right edge is an inset shadow on `#sidebar`**, which the
   selected item's fill covers: a descendant's background paints over an
   ancestor's inset shadow. The item reaches the list's right edge (the list
   has no right padding), so it meets the rail.
@@ -1101,7 +1121,7 @@ leaving treats the history, are `page.ts`'s (`@pinetrie/interface`).
   hidden on a root's only column (`columnsOf` would give it back).
 - **A popover opens above its trigger in the window's lower half, and from
   its left edge in the left half.** A composer's `▾`, and the footer, are at
-  the window's foot, so a list below would be out of sight; your list's `⋯`
+  the window's foot, so a list below would be out of sight; the sidebar's `⋯`
   and your avatar are at its left, so a box anchored by its right edge
   would open past it. Since `.popover` sets a `top` and a `right` in the
   stylesheet, an upward box sets `top: auto`, and a leftward one `right:
@@ -1121,8 +1141,8 @@ leaving treats the history, are `page.ts`'s (`@pinetrie/interface`).
   disabled item: it returns false, so the check expecting the item fails and
   the suite goes on.
 
-- **Selectors for your list and the board:** a root in your list is
-  `#open-list .open-root[data-root="…"]`, the one you are on has
+- **Selectors for the sidebar and the board:** a root in the sidebar is
+  `#sidebar .open-root[data-root="…"]`, the one you are on has
   `aria-current="true"` and its wrap `data-selected`, its × is the
   `.open-close` after it, its `⋯` (`.open-menu`) holds `.rename-root`,
   `.retitle-root` and `.move-to` (`.closes` for
@@ -1134,7 +1154,7 @@ leaving treats the history, are `page.ts`'s (`@pinetrie/interface`).
   rename field sits in `.open-rename`; the fold control is `.list-fold`, and
   the inventory's toggle is the account menu's `.account-inventory`. The board is `#board`: a `.board-column[data-state]`
   per open state and `.board-closed` for the closed one, each item a
-  `.board-item[data-root][data-entry]` with `.board-open`, `.board-label`,
+  `.thread-card[data-root][data-entry]` with `.board-open`, `.board-label`,
   `.reader-trigger` per reader (its menu `.reader`, `.open` while open),
   `.root-ready` when a thread has work ready, and `.item-menu`; `.closed-search`,
   `.add-state`, `.state-name`. The footer is `#bottom`: ▦ is
@@ -1142,7 +1162,7 @@ leaving treats the history, are `page.ts`'s (`@pinetrie/interface`).
   (the browser suite's `countIsHosts` waits on it), each state
   `.strip-state[data-state]`, with `.strip-working` and `.strip-ready`
   when nonzero; `connected` (`page.ts`) waits for
-  `#open-list .add-agent` with no `.sync-note`. The corner is
+  `#sidebar .add-agent` with no `.sync-note`. The corner is
   `.footer-you`: its icons are in `.footer-tools`. Your inbox is `.inbox`,
   its trigger `.inbox-trigger` and badge `.inbox-badge[data-needs-you]`
   (folded, the same badge is on `.me-trigger`); your inventory's toggle is
@@ -1160,9 +1180,9 @@ leaving treats the history, are `page.ts`'s (`@pinetrie/interface`).
   `.profile-save`, `.profile-saved` and `.profile-email`. A person's
   picture is `.initial img`. The
   identification screen's email problem is `.identity-problem`.
-- **A page with nothing in your list opens on the board**, so a browser check
+- **A page with nothing in the sidebar opens on the board**, so a browser check
   that opens a second page opens its thread from there (`openFromBoard`), or
-  from a reader on a board item. To step away from a root so its columns
+  from a reader on a thread card. To step away from a root so its columns
   unmount, a check opens a new tab and closes it again (`stepAway`,
   `stepBack`).
 - **`.column` must stay `#strip`'s direct child**: `use-column-drag.ts`

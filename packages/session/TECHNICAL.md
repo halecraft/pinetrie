@@ -52,7 +52,7 @@ it.
 | one `snapshotStore<LocalState>` | the host's records, this tab's moves, the cards drawn | `localStep` (`card-moves.ts`) |
 | `inventorySlots` (`inventory-slots.ts`) | your inventory's slots, the repair's alarm | `repairStep`, `takeIntoInventoryWrites`, `swapWrites` (`inventory.ts`) |
 | `attentionStore` (`attention-doc.ts`) | what you have dealt with, the read marks' alarm | `readStep` (`read-marks.ts`) |
-| `openList` (`open-list.ts`) | your list: the roots you have open, in your order (ADR-0112) | `placeInList`, `planOpenRepair` (`open-repair.ts`) |
+| `openThreads` (`open-threads.ts`) | the sidebar: the roots you have open, in your order (ADR-0112) | `placeInList`, `planOpenRepair` (`open-repair.ts`) |
 | `presenceSeat` (`presence-seat.ts`) | this seat's reading and typing | none |
 | `hostLine` (`host-line.ts`) | the requests waiting for their replies | `encodeIntent`, `decodeReply` |
 | one `snapshotStore<ActingState>` | your offer and setup and publish commands out | `nextActing` (`acting.ts`) |
@@ -140,7 +140,7 @@ session or someone else's inventory throws before it is made.
   host's records array itself.
 - **A send is a move of its card**: out of the composer until the copy holds
   what the host did with it, spent or queued. Without it, the composer's
-  `yourCard` finds the card still drafting at the thread's end between the
+  `yourCard` finds the card still your message at the thread's end between the
   reply and the change, and takes it back.
 - **A reorder is tracked as a move is** (`reorderCard`, ADR-0048 step 7):
   a pending `reorder` is drawn by running core's rules' `planReorder` over
@@ -214,7 +214,7 @@ session or someone else's inventory throws before it is made.
 
 ## A person's documents (`person-doc.ts`, ADR-0059, ADR-0077, ADR-0112)
 
-Your inventory, your attention and your list are each a document of yours
+Your inventory, your attention and the sidebar are each a document of yours
 (`personDocId`), written only by your tabs and relayed by the host to you
 alone. `personDoc` is the one shell over either: the document read as a
 `Readable`, `onChange` for its changes and its sync with the host, and
@@ -239,9 +239,9 @@ the two merge (S101), so a writer asks `ready()` first.
   `ready()`, losing nothing reported meanwhile. Each write stays in the
   document's history, about 10 bytes (S101).
 
-## Your list (`open-list.ts`, `open-repair.ts`, ADR-0112)
+## The sidebar (`open-threads.ts`, `open-repair.ts`, ADR-0112)
 
-- **Your list is `OpenList`**: your `OpenDoc` read in order (`roots`, the
+- **The sidebar is `OpenThreads`**: your `OpenDoc` read in order (`roots`, the
   same array until the document changes, since the page reads it in
   render), `open` (before a root, or at the end; one in it moves),
   `ensure` (at the end, unless it is there), `close`, and `here`, the root
@@ -250,7 +250,7 @@ the two merge (S101), so a writer asks `ready()` first.
   (`planOpenRepair`), on every change to your document, to the session's
   records, and to `here`: a restore then brings a root back only for whoever
   restores it (ADR-0030). It writes nothing when nothing differs.
-- **A root you start is in your list**: `chat` ensures it once its answer
+- **A root you start is in the sidebar**: `chat` ensures it once its answer
   says the send at the root was written (`startsRoot`: `appended` or
   `started`). A refused or failed send writes nothing.
 - **`placeInList` renumbers** when `orderBetween` finds no room between a

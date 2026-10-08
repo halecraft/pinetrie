@@ -273,7 +273,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       move: {
         card: cardId("c-7"),
         from: {
-          kind: "drafting",
+          kind: "composing",
           root: TEST_ROOT,
           at: atEntry(entryId("e-5")),
           lane: laneNameForThread("abc"),
@@ -294,7 +294,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
         {
           card: cardId("c-7"),
           from: {
-            kind: "drafting",
+            kind: "composing",
             root: TEST_ROOT,
             at: atEntry(entryId("e-5")),
             lane: null,
@@ -621,7 +621,7 @@ test("decode: a malformed reorder or queue hold is refused (ADR-0048 step 7)", (
   )
   assert.equal(
     reorder("c-1", {
-      at: { kind: "drafting", root: TEST_ROOT, at: "e-1", lane: "" },
+      at: { kind: "composing", root: TEST_ROOT, at: "e-1", lane: "" },
       after: "c-2",
     }),
     "refused",

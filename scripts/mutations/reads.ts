@@ -79,7 +79,7 @@ export const mutations: readonly Mutation[] = [
     expect: "readLanes: a lane's queued cards are what waits",
   },
   {
-    name: "a lane's drafting cards count as waiting",
+    name: "a lane's notes count as waiting",
     file: "packages/reads/index.ts",
     from: "    const queue = queuedOn(cards, name)",
     to: '    const queue = cards.filter(c => c.place.kind !== "fresh") as ReturnType<typeof queuedOn>',

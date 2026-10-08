@@ -103,12 +103,12 @@ test("readLanes: a lane's queued cards are what waits; askedBy is who queued the
     carries: { kind: "message", command: null },
     unsent: null,
   })
-  const drafting: CardRecord = {
+  const atEnd: CardRecord = {
     id: cardId("c-0"),
     owner: writerId("cy@x.io"),
     placer: writerId("cy@x.io"),
     place: {
-      kind: "drafting",
+      kind: "composing",
       root: TEST_ROOT,
       at: atEntry(entryId("e1")),
       lane,
@@ -119,7 +119,7 @@ test("readLanes: a lane's queued cards are what waits; askedBy is who queued the
   const cards = [
     queued("c-2", "b", "bea@x.io"),
     queued("c-1", "a", "ada@x.io"),
-    drafting,
+    atEnd,
   ]
   const found = readLanes(view, readTreeIndex(doc), cards, new Map()).find(
     l => l.name === lane,

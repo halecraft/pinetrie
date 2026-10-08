@@ -28,7 +28,7 @@ export interface AppPorts {
     | "swapSlots"
     | "undoSwap"
     | "refuse"
-    | "openList"
+    | "openThreads"
   >
   /** Your attention document: what "not needed" marks (ADR-0077). */
   readonly attention: Pick<AttentionStore, "dismiss" | "dismissOffer">
@@ -54,7 +54,7 @@ export interface AppPorts {
     readonly clear: () => void
   }
   readonly reload: () => void
-  /** Show your list at a width, and keep the choice for this tab (ADR-0088). */
+  /** Show the sidebar at a width, and keep the choice for this tab (ADR-0088). */
   readonly listWidth: (width: ListWidth) => void
   /** Show a page over the workspace, or, with null, the workspace (ADR-0098). */
   readonly page: (to: PageName | null) => void
@@ -82,11 +82,11 @@ function performOne(effect: Effect, ports: AppPorts): void {
       void ports.session.offer(effect.lane, effect.action, effect.to)
       return
     case "list": {
-      const { openList } = ports.session
+      const { openThreads } = ports.session
       const { act } = effect
-      if (act.kind === "ensure") openList.ensure(act.root)
-      else if (act.kind === "place") openList.open(act.root, act.before)
-      else openList.close(act.root)
+      if (act.kind === "ensure") openThreads.ensure(act.root)
+      else if (act.kind === "place") openThreads.open(act.root, act.before)
+      else openThreads.close(act.root)
       return
     }
     case "moveRoot":

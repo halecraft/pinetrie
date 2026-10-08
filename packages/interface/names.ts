@@ -31,20 +31,3 @@ export const namesOf = (
   nameOf: ReadonlyMap<WriterId, string>,
   writers: readonly WriterId[],
 ): string => writers.map(w => displayName(w, nameOf.get(w))).join(", ")
-
-/**
- * Whose drafting card this is, and who else wrote in it (ADR-0048): "Ada's
- * draft · with Bea". `writers` are everyone who wrote in it (`writersOfClients`),
- * the owner among them or not.
- */
-export function cardHeading(
-  nameOf: ReadonlyMap<WriterId, string>,
-  owner: WriterId,
-  writers: readonly WriterId[],
-): string {
-  const others = writers.filter(w => w !== owner)
-  const whose = `${displayName(owner, nameOf.get(owner))}'s draft`
-  return others.length === 0
-    ? whose
-    : `${whose} · with ${namesOf(nameOf, others)}`
-}

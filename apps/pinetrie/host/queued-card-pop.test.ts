@@ -147,7 +147,7 @@ describe("popNextQueuedCard", () => {
     const cards = newPlacesDoc()
     queue(cards, "c-1", "a")
     const row = cards.cards()["c-1"]
-    if (row !== undefined) cards.cards.set("c-1", { ...row, kind: "drafting" })
+    if (row !== undefined) cards.cards.set("c-1", { ...row, kind: "note" })
     expect(
       popNextQueuedCard(
         cards,
@@ -389,7 +389,7 @@ describe("drain", () => {
       expect.objectContaining({
         id: "c-1",
         place: {
-          kind: "drafting",
+          kind: "note",
           root: TEST_ROOT,
           at: atEntry(E1),
           lane: LANE,
@@ -423,7 +423,7 @@ describe("drain", () => {
       expect.objectContaining({
         id: "c-1",
         place: {
-          kind: "drafting",
+          kind: "note",
           root: TEST_ROOT,
           at: atEntry(E1),
           lane: LANE,
@@ -513,7 +513,7 @@ describe("drain: bring up to date (ADR-0108)", () => {
         carries: { kind: "message", command: CMD },
         unsent: "the lane has no copy of its own",
         place: {
-          kind: "drafting",
+          kind: "note",
           root: TEST_ROOT,
           at: atEntry(E1),
           lane: LANE,

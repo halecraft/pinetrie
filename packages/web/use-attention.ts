@@ -43,7 +43,7 @@ export interface AttentionView {
   /** Everything raised for you (`attentionOf`). */
   readonly items: readonly Item[]
   readonly status: ReadonlyMap<EntryId, Status>
-  /** ▦'s: the highest status of roots not in your list (`markOf`). */
+  /** ▦'s: the highest status of roots not in the sidebar (`markOf`). */
   readonly elsewhere: Level | null
   readonly arrivals: Moments
 }

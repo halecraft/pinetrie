@@ -19,7 +19,6 @@ import {
   type CardRecord,
   type CatchUpCommand,
   cardId,
-  draftingOf,
   type EntryId,
   INVENTORY_SLOTS,
   keyOf,
@@ -29,6 +28,7 @@ import {
   type MoveRefusal,
   moveOf,
   movesOfDocId,
+  noteOf,
   type OfferFact,
   PLAIN,
   type PlaceKey,
@@ -170,27 +170,27 @@ export function placeEnd(
 }
 
 /**
- * A drafting card's thread end now; null for any other card, or a place
- * gone. A pinned card's end is `cardsAt`'s alone: resolved here, it would be
- * drawn among the drafting cards and could take your composer (`yourCard`).
+ * Your message's thread end now (ADR-0113); null for any other card, or a
+ * place gone. A note's or a pinned card's end is `cardsAt`'s alone: resolved
+ * here, it could take your composer (`yourCard`).
  */
 export const cardEnd = (
   card: CardRecord,
   lanes: readonly LaneView[],
   index: TreeIndex,
 ): EntryId | null =>
-  card.place.kind === "drafting"
+  card.place.kind === "composing"
     ? placeEnd(card.place, card.owner, lanes, index)
     : null
 
-/** The kinds of place at a thread's end, resolved through `threadOf`. */
-type EndKind = "drafting" | "pinned"
+/** The shared kinds of place at a thread's end, resolved through `threadOf`. */
+type EndKind = "note" | "pinned"
 
 /**
  * Everyone's cards of `kind` whose thread ends at `end`: by `order` when they
- * have one, then by id, so oldest first. The one way a pinned card's end is
- * resolved: `cardEnd` stays a drafting card's alone, so a pinned card is
- * never drawn among the drafting cards or bound to a composer (`yourCard`).
+ * have one, then by id, so oldest first. The one way a note's or a pinned
+ * card's end is resolved: `cardEnd` stays your message's alone, so neither
+ * is ever bound to a composer (`yourCard`).
  */
 export function cardsAt(
   kind: EndKind,
@@ -225,10 +225,9 @@ type CardWhere =
   | { readonly kind: "fresh"; readonly column: string }
 
 /**
- * Your own card where a column's composer is; never another writer's. Of
- * several at one end, the newest (ids are uuidv7): a card of yours that
- * someone unqueued comes back below the line, and must not take the
- * composer from the one you are typing in.
+ * Your message where a column's composer is (ADR-0113); never another
+ * writer's, and never a note. Of several at one end, the newest (ids are
+ * uuidv7); a starting host leaves one (`planStoredCardRepair`).
  */
 export function yourCard(
   me: WriterId,
@@ -312,7 +311,8 @@ export function planNextQueuedCardPop(
 
 /**
  * Unqueue all (ADR-0048 step 7): every message card queued on the lane
- * back below the line where it was queued, in queue order. A fact stays:
+ * back below the line where it was queued, a note (ADR-0113), in queue
+ * order. A fact stays:
  * nobody moves it. Planned by the host from the queue as it is, so a card
  * popped since the click is not in it. Pure.
  */
@@ -322,10 +322,10 @@ export const planUnqueueAll = (
 ): readonly Move[] =>
   queuedOn(cards, lane)
     .filter(c => c.carries.kind === "message")
-    .map(c => moveOf(c, draftingOf(c.place)))
+    .map(c => moveOf(c, noteOf(c.place)))
 
 /**
- * A popped card the host could not send, written back: drafting where it
+ * A popped card the host could not send, written back: a note where it
  * was queued, saying why, its command and placer kept, since the host's own
  * write is nobody's move. Never queued again, or the next drain would pop
  * it and fail the same way (S69, answer 5).
@@ -335,7 +335,7 @@ export const planUnsent = (card: QueuedCard, reason: string): PlaceStep => ({
   record: {
     ...card,
     place: {
-      kind: "drafting",
+      kind: "note",
       root: card.place.root,
       at: card.place.at,
       lane: card.place.lane,
@@ -642,7 +642,7 @@ export function planReorder(
 
 /**
  * What a fresh column's first send does to the column's other cards: each
- * goes to drafting at `at`, the message the send wrote, on `lane`. The column
+ * becomes a note at `at` (ADR-0113), the message the send wrote, on `lane`. The column
  * has become that thread's, and a card left fresh under its key would be
  * drawn nowhere. The host's write, not a person's move, so each card keeps its
  * placer, as `planUnsent` does. Nothing when the sent card was not fresh,
@@ -668,9 +668,47 @@ export function planFreshFollow(
       kind: "write",
       record: {
         ...c,
-        place: { kind: "drafting", root, at: atEntry(at), lane },
+        place: { kind: "note", root, at: atEntry(at), lane },
       },
     }))
+}
+
+/**
+ * Stored cards made right for this build, by a starting host outside every
+ * gesture (ADR-0113): before notes, everyone's drafting cards at a thread's
+ * end were one kind, so one person may hold several there. Of each owner's
+ * messages at one thread end (`ends`, resolved through `placeEnd`; by their
+ * stored place for a root not loaded), the one `yourCard` would choose stays
+ * their message, and every other becomes a note, so the host and the page
+ * agree on which is. Pure.
+ */
+export function planStoredCardRepair(
+  cards: readonly CardRecord[],
+  ends: ReadonlyMap<CardId, EntryId | null>,
+): readonly PlaceStep[] {
+  const kept = new Set<string>()
+  const steps: PlaceStep[] = []
+  // Newest first: `yourCard` takes the newest at an end (ids are uuidv7).
+  const newest = [...cards].sort((a, b) =>
+    a.id < b.id ? 1 : a.id > b.id ? -1 : 0,
+  )
+  for (const c of newest) {
+    const { place } = c
+    if (place.kind !== "composing") continue
+    const end =
+      ends.get(c.id) ??
+      `${place.root} ${place.at.kind === "entry" ? place.at.id : ""} ${place.lane ?? ""}`
+    const key = `${c.owner} ${end}`
+    if (!kept.has(key)) {
+      kept.add(key)
+      continue
+    }
+    steps.push({
+      kind: "write",
+      record: { ...c, place: { ...place, kind: "note" } },
+    })
+  }
+  return steps
 }
 
 /** What the host makes of several moves: every step, or the first refusal. */

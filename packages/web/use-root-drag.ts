@@ -1,4 +1,4 @@
-// web/use-root-drag — a root's drag, from the board or your list
+// web/use-root-drag — a root's drag, from the board or the sidebar
 // (ADR-0112).
 //
 // The shell of `root-target.ts`: a drop lands only where a key could move it
@@ -26,11 +26,11 @@ import {
 } from "@pinetrie/interface"
 import { type DragEvent as ReactDragEvent, useEffect } from "react"
 
-/** An item a root is dragged from: a board card or a row of your list. */
-const ROOT_ITEM = ".board-item, .open-item"
+/** An item a root is dragged from: a board card or a row of the sidebar. */
+const ROOT_ITEM = ".thread-card, .sidebar-item"
 
 /**
- * A root's drag start, from the board or your list: it carries `drag` (none
+ * A root's drag start, from the board or the sidebar: it carries `drag` (none
  * while the root has no id), and its image is the whole item, held where the
  * pointer took it.
  */

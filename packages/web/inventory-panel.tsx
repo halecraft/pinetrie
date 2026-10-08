@@ -7,6 +7,7 @@
 import { subscribe } from "@kyneta/schema"
 import type { CardId, CardRecord, WriterId } from "@pinetrie/core"
 import {
+  cardFrame,
   type Dock,
   dropProps,
   INVENTORY,
@@ -26,8 +27,9 @@ import type {
   SessionClient,
   Slots,
 } from "@pinetrie/session"
-import { useEffect, useRef, useState } from "react"
-import { BoundCardEditor, dragCard } from "./card-editor.tsx"
+import { type CSSProperties, useEffect, useRef, useState } from "react"
+import { BoundCardEditor } from "./card-editor.tsx"
+import { dragCard } from "./card-frame.tsx"
 
 /**
  * The text of each card in `ids`, read from its document and kept current.
@@ -98,7 +100,13 @@ export function InventoryPanel(p: {
       className="inventory"
       data-dock={p.dock}
       ref={frame}
-      style={shift === null ? undefined : { translate: `${shift}px 0` }}
+      // Your colour: a card in your inventory is drawn in it (`--you`, ADR-0111).
+      style={
+        {
+          "--you": p.colorOf(p.reader.me),
+          ...(shift === null ? {} : { translate: `${shift}px 0` }),
+        } as CSSProperties
+      }
     >
       <div
         className="inventory-frame"
@@ -175,40 +183,41 @@ export function InventoryPanel(p: {
             </p>
           ) : (
             <BoundCardEditor
+              among={null}
               card={selected}
-              className="card-editor held"
-              heading={displayName(
-                selected.owner,
-                p.reader.nameOf.get(selected.owner),
-              )}
+              catchUps={null}
+              foot={
+                <button
+                  className="put primary"
+                  disabled={p.column === null}
+                  onClick={() => {
+                    if (p.column !== null)
+                      p.onIntent({
+                        kind: "put",
+                        card: selected.id,
+                        target: { kind: "column", key: p.column },
+                      })
+                  }}
+                  title={PUT_TITLE}
+                  type="button"
+                >
+                  {PUT}
+                </button>
+              }
               key={selected.id}
-              onTyping={() => {}}
-              queued={null}
-              readOnly={false}
               onDiscard={() =>
                 p.onIntent({ kind: "discard", card: selected.id })
               }
-              reorder={null}
+              onTyping={() => {}}
+              readOnly={false}
+              reader={p.reader}
               rows={4}
               session={p.session}
-            >
-              <button
-                className="put"
-                disabled={p.column === null}
-                onClick={() => {
-                  if (p.column !== null)
-                    p.onIntent({
-                      kind: "put",
-                      card: selected.id,
-                      target: { kind: "column", key: p.column },
-                    })
-                }}
-                title={PUT_TITLE}
-                type="button"
-              >
-                {PUT}
-              </button>
-            </BoundCardEditor>
+              view={cardFrame(selected, "inventory", {
+                me: p.reader.me,
+                readOnly: false,
+              })}
+            />
           )}
           {p.notices.map(r => (
             <div className="refused-move" key={noticeKey(r)}>

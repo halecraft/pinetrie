@@ -43,6 +43,7 @@ import {
   planNextQueuedCardPop,
   planReorder,
   planSetCommand,
+  planStoredCardRepair,
   planUnqueueAll,
   planUnsent,
   type QueuedCard,
@@ -80,11 +81,17 @@ const card = (over: Partial<CardRecord> = {}): CardRecord => ({
   id: cardId("c-1"),
   owner: ADA,
   placer: ADA,
-  place: { kind: "drafting", root: TEST_ROOT, at: atEntry(E2), lane: null },
+  place: { kind: "composing", root: TEST_ROOT, at: atEntry(E2), lane: null },
   carries: { kind: "message", command: null },
   unsent: null,
   ...over,
 })
+/** A note at e2, as `card` is your message there. */
+const note = (over: Partial<CardRecord> = {}): CardRecord =>
+  card({
+    place: { kind: "note", root: TEST_ROOT, at: atEntry(E2), lane: null },
+    ...over,
+  })
 const LANE = laneNameForThread("x")
 const queuedPlace = {
   kind: "queued",
@@ -259,7 +266,7 @@ describe("where a card sits", () => {
   test("cardEnd: a lane card follows its lane after a conversation forks at the lane's old tip", () => {
     const lane = laneNameForThread("x")
     const onLane = card({
-      place: { kind: "drafting", root: TEST_ROOT, at: atEntry(E2), lane },
+      place: { kind: "composing", root: TEST_ROOT, at: atEntry(E2), lane },
     })
     const forked = tree(entry("e3", "e2"), entry("g1", "e2"))
     expect(cardEnd(onLane, laneAt("e3"), forked)).toBe("e3")
@@ -271,7 +278,7 @@ describe("where a card sits", () => {
       cardEnd(
         card({
           place: {
-            kind: "drafting",
+            kind: "composing",
             root: TEST_ROOT,
             at: atEntry(entryId("x")),
             lane: null,
@@ -283,15 +290,26 @@ describe("where a card sits", () => {
     ).toBeNull()
   })
 
-  test("cardsAt drafting: everyone's cards at one end, oldest first, and not a sibling thread's", () => {
-    const beas = card({ id: cardId("c-2"), owner: BEA })
+  test("cardsAt note: everyone's notes at one end, oldest first, and not a sibling thread's", () => {
+    const mine = note()
+    const beas = note({ id: cardId("c-2"), owner: BEA })
     const sibling = card({
       id: cardId("c-3"),
-      place: { kind: "drafting", root: TEST_ROOT, at: atEntry(F1), lane: null },
+      place: { kind: "note", root: TEST_ROOT, at: atEntry(F1), lane: null },
     })
     expect(
-      cardsAt("drafting", entryId("e2"), [card(), beas, sibling], [], tree()),
-    ).toEqual([card(), beas])
+      cardsAt("note", entryId("e2"), [mine, beas, sibling], [], tree()),
+    ).toEqual([mine, beas])
+  })
+
+  test("yourCard: your message only, never a note of yours at the same end (ADR-0113)", () => {
+    const yours = note({ id: cardId("c-9") })
+    expect(
+      yourCard(ADA, { kind: "end", end: E2 }, [card(), yours], [], tree())?.id,
+    ).toBe("c-1")
+    expect(
+      yourCard(ADA, { kind: "end", end: E2 }, [yours], [], tree()),
+    ).toBeUndefined()
   })
 
   test("yourCard: by thread end or fresh column, never another writer's", () => {
@@ -333,18 +351,60 @@ describe("where a card sits", () => {
     ).toBe("c-9")
   })
 
-  test("cardEnd and drafting cardsAt see drafting cards only: a queued card is above the line", () => {
+  test("cardEnd and cardsAt note see their own kind: a queued card is above the line, your message no note", () => {
     const q = queued("c-2", "a")
-    // Its lane ends at e2, where it was queued: it is still not drafting there.
+    // Its lane ends at e2, where it was queued: it is still not a note there.
     expect(cardEnd(q, laneAt("e2"), tree())).toBeNull()
     expect(
-      cardsAt("drafting", entryId("e2"), [card(), q], laneAt("e2"), tree()),
-    ).toEqual([card()])
+      cardsAt("note", entryId("e2"), [card(), note(), q], laneAt("e2"), tree()),
+    ).toEqual([note()])
+  })
+})
+
+describe("planStoredCardRepair (ADR-0113)", () => {
+  test("of two of your messages at one end, the one yourCard skips becomes a note; another person's is untouched", () => {
+    const older = card({ id: cardId("c-1") })
+    const newer = card({ id: cardId("c-9") })
+    const beas = card({ id: cardId("c-5"), owner: BEA })
+    const ends = new Map([
+      [older.id, E2],
+      [newer.id, E2],
+      [beas.id, E2],
+    ])
+    expect(planStoredCardRepair([older, newer, beas], ends)).toEqual([
+      {
+        kind: "write",
+        record: { ...older, place: { ...older.place, kind: "note" } },
+      },
+    ])
+  })
+
+  test("messages at two ends, or in a root not loaded at different places, stay", () => {
+    const here = card({ id: cardId("c-1") })
+    const there = card({
+      id: cardId("c-2"),
+      place: {
+        kind: "composing",
+        root: TEST_ROOT,
+        at: atEntry(F1),
+        lane: null,
+      },
+    })
+    expect(planStoredCardRepair([here, there], new Map())).toEqual([])
+    expect(
+      planStoredCardRepair(
+        [here, there],
+        new Map([
+          [here.id, E2],
+          [there.id, F1],
+        ]),
+      ),
+    ).toEqual([])
   })
 })
 
 describe("pinned cards", () => {
-  test("cardsAt pinned: a thread's pinned cards by order, then id; not a sibling thread's, nor drafting ones", () => {
+  test("cardsAt pinned: a thread's pinned cards by order, then id; not a sibling thread's, nor notes", () => {
     const cards = [
       pinned("p-3", "b"),
       pinned("p-1", "c"),
@@ -368,11 +428,11 @@ describe("pinned cards", () => {
     ).toEqual(["p-1"])
   })
 
-  test("drafting cardsAt and yourCard never return a pinned card at the same end as your drafting card", () => {
+  test("cardsAt note and yourCard never return a pinned card at the same end", () => {
     const mine = pinned("p-9", "a")
     expect(cardEnd(mine, [], tree())).toBeNull()
     expect(
-      cardsAt("drafting", E2, [card(), mine], [], tree()).map(c => c.id),
+      cardsAt("note", E2, [note(), mine], [], tree()).map(c => c.id),
     ).toEqual(["c-1"])
     expect(
       yourCard(ADA, { kind: "end", end: E2 }, [card(), mine], [], tree())?.id,
@@ -384,7 +444,7 @@ describe("pinned cards", () => {
 })
 
 describe("the queue", () => {
-  test("queuedOn: a lane's queued cards by order key, then id; not another lane's, nor drafting ones", () => {
+  test("queuedOn: a lane's queued cards by order key, then id; not another lane's, nor notes", () => {
     const other = laneNameForThread("y")
     const cards = [
       queued("c-3", "b"),
@@ -479,12 +539,12 @@ describe("the queue", () => {
           lane: LANE,
           seen: "",
         },
-        to: { kind: "drafting", root: TEST_ROOT, at: atEntry(E2), lane: LANE },
+        to: { kind: "note", root: TEST_ROOT, at: atEntry(E2), lane: LANE },
       })),
     )
   })
 
-  test("planUnsent: the whole record, drafting where it was queued, saying why, its command and placer kept", () => {
+  test("planUnsent: the whole record, a note where it was queued, saying why, its command and placer kept", () => {
     const q: QueuedCard = {
       ...queued("c-1", "a"),
       placer: BEA,
@@ -495,7 +555,7 @@ describe("the queue", () => {
       record: {
         ...q,
         place: {
-          kind: "drafting",
+          kind: "note",
           root: TEST_ROOT,
           at: atEntry(E2),
           lane: LANE,
@@ -508,8 +568,8 @@ describe("the queue", () => {
 
 describe("handoffs (ADR-0059)", () => {
   const C1 = cardId("c-1")
-  const drafting = {
-    kind: "drafting",
+  const atEnd = {
+    kind: "composing",
     root: TEST_ROOT,
     at: atEntry(E2),
     lane: LANE,
@@ -523,43 +583,43 @@ describe("handoffs (ADR-0059)", () => {
   } as const
 
   test("a creation: the sender owns and placed it, with no command; refused when the id is in use", () => {
-    expect(planMove([], { card: C1, from: null, to: drafting }, BEA)).toEqual({
+    expect(planMove([], { card: C1, from: null, to: atEnd }, BEA)).toEqual({
       kind: "write",
       record: {
         id: C1,
         owner: BEA,
         placer: BEA,
-        place: drafting,
+        place: atEnd,
         carries: PLAIN,
         unsent: null,
       },
     })
     const taken = card()
-    expect(
-      planMove([taken], { card: C1, from: null, to: drafting }, BEA),
-    ).toEqual({ kind: "refused", code: "exists", now: taken })
+    expect(planMove([taken], { card: C1, from: null, to: atEnd }, BEA)).toEqual(
+      { kind: "refused", code: "exists", now: taken },
+    )
   })
 
   test("the compare: gone when there is no record, moved when it is not where the sender saw it", () => {
-    expect(
-      planMove([], { card: C1, from: drafting, to: queuedKey }, BEA),
-    ).toEqual({ kind: "refused", code: "gone", now: null })
+    expect(planMove([], { card: C1, from: atEnd, to: queuedKey }, BEA)).toEqual(
+      { kind: "refused", code: "gone", now: null },
+    )
     const elsewhere = card({ place: freshPlace("k") })
     expect(
-      planMove([elsewhere], { card: C1, from: drafting, to: queuedKey }, BEA),
+      planMove([elsewhere], { card: C1, from: atEnd, to: queuedKey }, BEA),
     ).toEqual({ kind: "refused", code: "moved", now: elsewhere })
   })
 
   test("queueing: after the lane's last card, queued and placed by the sender, why it was not sent cleared", () => {
     const before = queued("c-0", orderAfter([]))
     const c = card({
-      place: drafting,
+      place: atEnd,
       unsent: "refused",
       carries: { kind: "message", command: "bring-up-to-date" },
     })
     const step = planMove(
       [before, c],
-      { card: C1, from: drafting, to: queuedKey },
+      { card: C1, from: atEnd, to: queuedKey },
       BEA,
     )
     expect(step).toEqual({
@@ -575,10 +635,10 @@ describe("handoffs (ADR-0059)", () => {
 
   test("a reorder does not make another person's unqueue fail: the key leaves out the order", () => {
     const q = { ...queued("c-1", "zz"), placer: ADA }
-    const step = planMove([q], { card: C1, from: queuedKey, to: drafting }, BEA)
+    const step = planMove([q], { card: C1, from: queuedKey, to: atEnd }, BEA)
     expect(step).toEqual({
       kind: "write",
-      record: { ...q, place: drafting, placer: BEA },
+      record: { ...q, place: atEnd, placer: BEA },
     })
   })
 
@@ -595,7 +655,7 @@ describe("handoffs (ADR-0059)", () => {
       carries: { kind: "message", command: "bring-up-to-date" },
       unsent: "x",
     } as const
-    const step = planMove([q], { card: C1, from: queuedKey, to: drafting }, ADA)
+    const step = planMove([q], { card: C1, from: queuedKey, to: atEnd }, ADA)
     expect(step.kind === "write" && step.record).toMatchObject({
       carries: { kind: "message", command: "bring-up-to-date" },
       unsent: "x",
@@ -610,13 +670,9 @@ describe("handoffs (ADR-0059)", () => {
       lane: LANE,
     } as const
     const elsewhere = pinned("p-1", orderAfter([]), F1)
-    const c = card({ place: drafting })
+    const c = card({ place: atEnd })
     expect(
-      planMove(
-        [elsewhere, c],
-        { card: C1, from: drafting, to: pinnedKey },
-        BEA,
-      ),
+      planMove([elsewhere, c], { card: C1, from: atEnd, to: pinnedKey }, BEA),
     ).toEqual({
       kind: "write",
       record: {
@@ -643,16 +699,47 @@ describe("handoffs (ADR-0059)", () => {
       at: atEntry(E2),
       lane: LANE,
     } as const
-    expect(planMove([p], { card: C1, from, to: drafting }, BEA)).toEqual({
+    expect(planMove([p], { card: C1, from, to: atEnd }, BEA)).toEqual({
       kind: "write",
-      record: { ...p, place: drafting, placer: BEA },
+      record: { ...p, place: atEnd, placer: BEA },
+    })
+  })
+
+  test.each([
+    {
+      name: "queued to pinned",
+      place: queuedPlace,
+      to: { kind: "pinned", root: TEST_ROOT, at: atEntry(E2), lane: LANE },
+      lands: { order: orderAfter([]) },
+    },
+    {
+      name: "pinned to the queue",
+      place: {
+        kind: "pinned",
+        root: TEST_ROOT,
+        at: atEntry(E2),
+        lane: LANE,
+        order: "a",
+      },
+      to: queuedKey,
+      lands: { order: orderAfter([]), by: BEA },
+    },
+  ] as const)("a card moves straight from $name (Move to ▸, ADR-0111)", ({
+    place,
+    to,
+    lands,
+  }) => {
+    const c = card({ place })
+    expect(planMove([c], { card: C1, from: keyOf(place), to }, BEA)).toEqual({
+      kind: "write",
+      record: { ...c, place: { ...to, ...lands }, placer: BEA },
     })
   })
 
   describe("a discard (ADR-0111)", () => {
     const gone = (place: CardRecord["place"]) => discardedOf(place, OTHER)
     test.each([
-      ["a drafting card", drafting],
+      ["your message", atEnd],
       ["a fresh column's card", freshPlace("k")],
       [
         "a pinned card",
@@ -707,12 +794,12 @@ describe("handoffs (ADR-0059)", () => {
       expect(
         planMove(
           [discarded],
-          { card: C1, from: keyOf(discarded.place), to: drafting },
+          { card: C1, from: keyOf(discarded.place), to: atEnd },
           ADA,
         ),
       ).toEqual({ kind: "refused", code: "gone", now: null })
       expect(
-        planMove([], { card: C1, from: drafting, to: gone(card().place) }, ADA),
+        planMove([], { card: C1, from: atEnd, to: gone(card().place) }, ADA),
       ).toEqual({ kind: "refused", code: "gone", now: null })
     })
   })
@@ -731,26 +818,26 @@ describe("handoffs (ADR-0059)", () => {
     test("a take into your own inventory keeps the card's owner, command and why it was not sent", () => {
       const c = card({
         owner: BEA,
-        place: drafting,
+        place: atEnd,
         carries: { kind: "message", command: "bring-up-to-date" },
         unsent: "x",
       })
-      expect(
-        planMove([c], { card: C1, from: drafting, to: mine }, ADA),
-      ).toEqual({
+      expect(planMove([c], { card: C1, from: atEnd, to: mine }, ADA)).toEqual({
         kind: "write",
         record: { ...c, place: mine, placer: ADA },
       })
     })
 
     test("into or out of someone else's inventory is refused not-yours", () => {
-      const c = card({ place: drafting })
-      expect(
-        planMove([c], { card: C1, from: drafting, to: beas }, ADA),
-      ).toEqual({ kind: "refused", code: "not-yours", now: c })
+      const c = card({ place: atEnd })
+      expect(planMove([c], { card: C1, from: atEnd, to: beas }, ADA)).toEqual({
+        kind: "refused",
+        code: "not-yours",
+        now: c,
+      })
       const held = card({ place: beas })
       expect(
-        planMove([held], { card: C1, from: beas, to: drafting }, ADA),
+        planMove([held], { card: C1, from: beas, to: atEnd }, ADA),
       ).toEqual({ kind: "refused", code: "not-yours", now: held })
       expect(planMove([], { card: C1, from: null, to: beas }, ADA)).toEqual({
         kind: "refused",
@@ -760,19 +847,15 @@ describe("handoffs (ADR-0059)", () => {
     })
 
     test("the nineteenth card is refused full, a creation too; another person's full inventory is not yours", () => {
-      const c = card({ place: drafting })
+      const c = card({ place: atEnd })
       expect(
-        planMove(
-          [...full(ADA), c],
-          { card: C1, from: drafting, to: mine },
-          ADA,
-        ),
+        planMove([...full(ADA), c], { card: C1, from: atEnd, to: mine }, ADA),
       ).toEqual({ kind: "refused", code: "full", now: c })
       expect(
         planMove(full(ADA), { card: C1, from: null, to: mine }, ADA),
       ).toEqual({ kind: "refused", code: "full", now: null })
       expect(
-        planMove([...full(BEA), c], { card: C1, from: drafting, to: mine }, ADA)
+        planMove([...full(BEA), c], { card: C1, from: atEnd, to: mine }, ADA)
           .kind,
       ).toBe("write")
       expect(
@@ -797,20 +880,20 @@ describe("handoffs (ADR-0059)", () => {
     test("a key names its holder: Bea's inventory is not Ada's", () => {
       const held = card({ place: beas })
       expect(
-        planMove([held], { card: C1, from: mine, to: drafting }, ADA),
+        planMove([held], { card: C1, from: mine, to: atEnd }, ADA),
       ).toEqual({ kind: "refused", code: "moved", now: held })
     })
 
     test("ownsPlace: false only for someone else's inventory", () => {
       expect(ownsPlace(mine, ADA)).toBe(true)
       expect(ownsPlace(beas, ADA)).toBe(false)
-      expect(ownsPlace(drafting, ADA)).toBe(true)
+      expect(ownsPlace(atEnd, ADA)).toBe(true)
       expect(ownsPlace(queuedKey, ADA)).toBe(true)
       expect(ownsPlace(freshPlace("k"), ADA)).toBe(true)
     })
   })
 
-  test("planFreshFollow: the sent card's column's other cards go drafting at the new entry, placer kept; nothing else moves", () => {
+  test("planFreshFollow: the sent card's column's other cards become notes at the new entry, placer kept; nothing else moves", () => {
     const fresh = freshPlace("k")
     const sent = card({ place: fresh })
     const other = card({
@@ -831,7 +914,7 @@ describe("handoffs (ADR-0059)", () => {
         record: {
           ...other,
           place: {
-            kind: "drafting",
+            kind: "note",
             root: TEST_ROOT,
             at: atEntry(E2),
             lane: LANE,
@@ -839,7 +922,7 @@ describe("handoffs (ADR-0059)", () => {
         },
       },
     ])
-    const draft = card({ place: drafting })
+    const draft = card({ place: atEnd })
     expect(
       planFreshFollow([draft, other], draft.id, TEST_ROOT, E2, LANE),
     ).toEqual([])
@@ -851,12 +934,12 @@ describe("handoffs (ADR-0059)", () => {
   })
 
   test("planMoveCommand: the lanes to drain where a card ends queued on a lane not running", () => {
-    const c = card({ place: drafting })
-    const move = { card: C1, from: drafting, to: queuedKey } as const
+    const c = card({ place: atEnd })
+    const move = { card: C1, from: atEnd, to: queuedKey } as const
     expect(planMoveCommand([c], [move], ADA, () => false).drain).toEqual([LANE])
     expect(planMoveCommand([c], [move], ADA, () => true).drain).toEqual([])
     expect(
-      planMoveCommand([c], [{ ...move, to: drafting }], ADA, () => false).drain,
+      planMoveCommand([c], [{ ...move, to: atEnd }], ADA, () => false).drain,
     ).toEqual([])
     expect(planMoveCommand([], [move], ADA, () => false).drain).toEqual([])
   })
@@ -869,7 +952,7 @@ describe("handoffs (ADR-0059)", () => {
     const inFresh = (id: CardId) => card({ id, place: fresh })
 
     test("two moves, the second refused: nothing written, the refusal naming its card", () => {
-      const moved = card({ id: C2, place: drafting })
+      const moved = card({ id: C2, place: atEnd })
       expect(
         planMoves(
           [inFresh(C1), moved],
@@ -1032,7 +1115,12 @@ describe("planReorder (ADR-0048 step 7)", () => {
     ).toMatchObject({ kind: "refused", code: "fact" })
     const drafted = card({
       id: c.id,
-      place: { kind: "drafting", root: TEST_ROOT, at: atEntry(E2), lane: LANE },
+      place: {
+        kind: "composing",
+        root: TEST_ROOT,
+        at: atEntry(E2),
+        lane: LANE,
+      },
     })
     expect(
       planReorder([a, drafted], { card: c.id, at, after: null, before: a.id }),
@@ -1141,7 +1229,7 @@ describe("storage", () => {
     for (const c of [
       card(),
       card({
-        place: { kind: "drafting", root: TEST_ROOT, at: atEntry(E2), lane },
+        place: { kind: "composing", root: TEST_ROOT, at: atEntry(E2), lane },
       }),
       card({ place: freshPlace("k-1") }),
       card({ place: { kind: "inventory", holder: BEA } }),
@@ -1213,7 +1301,7 @@ describe("storage", () => {
   test("a card whose lane is not a thread's keeps its text, and loses the lane", () => {
     const stored = { ...encodeCard(card()), at: "e2", lane: "main" }
     expect(decodeCard("c", stored)?.place).toEqual({
-      kind: "drafting",
+      kind: "composing",
       root: TEST_ROOT,
       at: atEntry(E2),
       lane: null,
@@ -1225,7 +1313,7 @@ describe("historyOf: the root a move enters the sender's history in (ADR-0066)",
   const C1 = cardId("c-1")
   const inv = { kind: "inventory", holder: ADA } as const
   const draftingIn = (root: RootId) =>
-    ({ kind: "drafting", root, at: atEntry(E2), lane: null }) as const
+    ({ kind: "composing", root, at: atEntry(E2), lane: null }) as const
   const queuedIn = {
     kind: "queued",
     root: TEST_ROOT,

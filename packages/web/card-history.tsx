@@ -1,9 +1,10 @@
 // web/card-history — a card's history, and who moved it back below the
-// line (ADR-0048 step 6). Every card's editor draws them: the composer,
-// others' cards, queued and pinned cards, and the inventory's selected
-// card. What they read comes by context from `App`, which reads it once
-// (`readCardHistories`), as a message's pane facts do (`pane-context.ts`):
-// a prop through every editor would be one more for each to pass on.
+// line (ADR-0048 step 6). Every card's frame draws them (`card-frame.tsx`):
+// the history in its body while its ⋯'s History is open, who moved it back
+// in its header. What they read comes by context from `App`, which reads it
+// once (`readCardHistories`), as a message's pane facts do
+// (`pane-context.ts`): a prop through every editor would be one more for
+// each to pass on.
 
 import type {
   CardHistoryRecord,
@@ -12,7 +13,6 @@ import type {
   WriterId,
 } from "@pinetrie/core"
 import {
-  HISTORY,
   HISTORY_TITLE,
   historyWords,
   movedBackWords,
@@ -23,7 +23,6 @@ import { movedBackBy, writersOfClients } from "@pinetrie/rules"
 import { textClients } from "@pinetrie/schema"
 import type { SessionClient } from "@pinetrie/session"
 import { createContext, useContext } from "react"
-import { Popover } from "./popover.tsx"
 
 export interface CardHistoryFacts {
   readonly histories: ReadonlyMap<CardId, CardHistoryRecord>
@@ -39,48 +38,31 @@ export const CardHistories = createContext<CardHistoryFacts | null>(null)
 const time = (at: number): string =>
   new Date(at).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
 
-/** A card's history button, opening its events, oldest first, and its writers. */
+/** A card's history: its events, oldest first, and who has text in it. */
 export function CardHistory({ card }: { card: CardId }) {
   const facts = useContext(CardHistories)
   if (facts === null) return null
   const events = facts.histories.get(card)?.events ?? []
+  // The text's writers walk its operations: read only while it is drawn.
+  const written = writtenWords(
+    writersOfClients(textClients(facts.session.cardText(card)), facts.seats),
+    facts.reader,
+  )
   return (
-    <Popover
-      boxClassName="popover card-history-box"
-      className="card-history"
-      heading={HISTORY_TITLE}
-      label={HISTORY}
-      onOpen={() => {}}
-      role="dialog"
-      title={HISTORY_TITLE}
-      trigger={HISTORY}
-      triggerClassName="card-history-trigger"
-    >
-      {() => {
-        // Read only while open: the text's writers walk its operations.
-        const written = writtenWords(
-          writersOfClients(
-            textClients(facts.session.cardText(card)),
-            facts.seats,
-          ),
-          facts.reader,
-        )
-        return (
-          <ol className="card-history-events">
-            {events.map((e, i) => (
-              // biome-ignore lint/suspicious/noArrayIndexKey: a history only grows at its end; two events can share a time
-              <li data-event={e.kind} key={i}>
-                {historyWords(e, facts.reader)}{" "}
-                <span className="card-history-at">{time(e.at)}</span>
-              </li>
-            ))}
-            {written !== null && (
-              <li className="card-history-writers">{written}</li>
-            )}
-          </ol>
-        )
-      }}
-    </Popover>
+    <section aria-label={HISTORY_TITLE} className="card-history-box">
+      <ol className="card-history-events">
+        {events.map((e, i) => (
+          // biome-ignore lint/suspicious/noArrayIndexKey: a history only grows at its end; two events can share a time
+          <li data-event={e.kind} key={i}>
+            {historyWords(e, facts.reader)}{" "}
+            <span className="card-history-at">{time(e.at)}</span>
+          </li>
+        ))}
+        {written !== null && (
+          <li className="card-history-writers">{written}</li>
+        )}
+      </ol>
+    </section>
   )
 }
 

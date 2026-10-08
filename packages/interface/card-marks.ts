@@ -1,12 +1,13 @@
 // interface/card-marks — where your unsent cards are, as marks (ADR-0048, step
-// 2): on your list's roots and new tabs, on the rail at a thread's end, on
-// the board's items, and on ▦ for a root not in your list (ADR-0112). An
+// 2): on the sidebar's roots and new tabs, on the rail at a thread's end, on
+// the board's items, and on ▦ for a root not in the sidebar (ADR-0112). An
 // archived root's work is done, so it lights only its own item on the board,
 // never ▦. They answer "where was I?",
 // so they count only the cards you own (contributors wait for Kyneta,
 // ADR-0048's *Who contributed*). A card counts while it holds text, not while its record exists:
-// a record outlives its text. Only drafting and fresh cards count: a queued
-// card is on its way to being sent, not left somewhere. A trace marks
+// a record outlives its text. Only your messages, your notes and fresh cards
+// count (ADR-0113): a queued card is on its way to being sent, not left
+// somewhere. A trace marks
 // nothing yet: raising it is for `attentionOf` (ADR-0077), beside verdicts
 // and offers. Pure.
 
@@ -20,7 +21,7 @@ import {
   type TreeIndex,
   type WriterId,
 } from "@pinetrie/core"
-import { cardEnd } from "@pinetrie/rules"
+import { placeEnd } from "@pinetrie/rules"
 import { needsCard } from "./card-state.ts"
 import { hereOfColumn, type Layout, unlisted } from "./layout.ts"
 import { AGENT_PREFILL } from "./message-tools.ts"
@@ -60,14 +61,14 @@ export function withFilled(
 
 /** Where your unsent cards are: the marks that answer "where was I?". */
 export interface CardMarks {
-  /** Roots holding a card of yours: their items in your list and on the board. */
+  /** Roots holding a card of yours: their items in the sidebar and on the board. */
   readonly roots: ReadonlySet<EntryId>
   /** New tabs, by key, whose column holds a card of yours. */
   readonly newTabs: ReadonlySet<string>
-  /** Thread ends holding a drafting card of yours: dots on the rail. */
+  /** Thread ends holding your message or a note of yours: dots on the rail. */
   readonly ends: ReadonlySet<EntryId>
   /**
-   * A root in `roots` is not in your list and not archived: ▦ is marked
+   * A root in `roots` is not in the sidebar and not archived: ▦ is marked
    * (ADR-0112).
    */
   readonly elsewhere: boolean
@@ -84,8 +85,8 @@ export function cardMarks(input: {
   readonly lanes: readonly LaneView[]
   readonly index: TreeIndex
   /**
-   * Each root's root entry, by its id, from the directory: a drafting card
-   * in a root this tab does not hold is marked by its place's root (ADR-0063).
+   * Each root's root entry, by its id, from the directory: a message or a
+   * note in a root this tab does not hold is marked by its place's root (ADR-0063).
    */
   readonly rootEntries: ReadonlyMap<RootId, EntryId>
 }): CardMarks {
@@ -95,8 +96,9 @@ export function cardMarks(input: {
   for (const card of input.mine) {
     if (!input.filled.has(card.id)) continue
     switch (card.place.kind) {
-      case "drafting": {
-        const end = cardEnd(card, input.lanes, input.index)
+      case "composing":
+      case "note": {
+        const end = placeEnd(card.place, card.owner, input.lanes, input.index)
         const root =
           (end === null ? null : rootOf(input.index, end)) ??
           input.rootEntries.get(card.place.root) ??
@@ -114,11 +116,12 @@ export function cardMarks(input: {
         if (tab?.kind === "root") roots.add(tab.root)
         break
       }
-      // Only drafting and fresh cards are marked (ADR-0048): the inventory
-      // is no tab, and a pinned card is a thread's direction, not unsent work.
+      // The inventory is no tab, and a pinned card is a thread's direction,
+      // not unsent work (ADR-0048).
       case "queued":
       case "pinned":
       case "inventory":
+      case "gone":
         break
     }
   }

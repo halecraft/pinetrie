@@ -1,8 +1,8 @@
-// web/open-list — your list, down the left edge: the roots you have open,
+// web/sidebar — the sidebar, down the left edge: the roots you have open,
 // in your order, then new tabs, then ＋ (ADR-0030, ADR-0112); full, or folded
 // to an icon per item (ADR-0088, `FoldedItem`).
 //
-// Your list is yours, on every device: × closes a root for you and writes
+// The sidebar is yours, on every device: × closes a root for you and writes
 // nothing shared. Drag an item to reorder; a root dragged here from the
 // board opens there. In its ⋯, Rename titles a root for everyone (ADR-0045),
 // and Move to ▸ moves it on the board for everyone: to the closed state, it
@@ -19,13 +19,13 @@ import {
   type ListWidth,
   listFoldWords,
   listKey,
-  type OpenListView,
   planTitle,
   type RootDrag,
   renameIntent,
   renameKey,
   rootDropProps,
   rootGroupProps,
+  type SidebarView,
 } from "@pinetrie/interface"
 import { ROOT_BUSY_REASON } from "@pinetrie/rules"
 import type { SessionClient } from "@pinetrie/session"
@@ -58,7 +58,7 @@ function moveFocus(e: KeyboardEvent<HTMLElement>) {
   next?.focus()
 }
 
-export function OpenList({
+export function Sidebar({
   view,
   width,
   onIntent,
@@ -69,8 +69,8 @@ export function OpenList({
   colorOf,
   dragOf,
 }: {
-  /** What the list shows and offers (`openListView`). */
-  view: OpenListView
+  /** What the list shows and offers (`sidebarView`). */
+  view: SidebarView
   /** Full, or folded to icons (ADR-0088). */
   width: ListWidth
   onIntent: (intent: Intent) => void
@@ -104,14 +104,14 @@ export function OpenList({
   useEffect(() => {
     if (here === null) return
     nav.current
-      ?.querySelector(".open-item[data-selected]")
+      ?.querySelector(".sidebar-item[data-selected]")
       ?.scrollIntoView({ block: "nearest" })
   }, [here])
   const readers = { session, index, order, nameOf, colorOf }
   return (
-    <nav aria-label="your threads" id="open-list" ref={nav}>
+    <nav aria-label="your threads" id="sidebar" ref={nav}>
       {/* biome-ignore lint/a11y/noStaticElementInteractions: Up and Down move focus between the buttons inside */}
-      <div className="open-items" onKeyDown={moveFocus} {...rootGroupProps}>
+      <div className="sidebar-items" onKeyDown={moveFocus} {...rootGroupProps}>
         {view.items.map(item => {
           const key = listKey(item)
           if (width === "icons")
@@ -146,7 +146,7 @@ export function OpenList({
           if (item.kind === "new")
             return (
               <span
-                className="open-item"
+                className="sidebar-item"
                 data-selected={item.selected || undefined}
                 key={key}
               >
@@ -174,7 +174,7 @@ export function OpenList({
           if (renaming === root)
             return (
               <span
-                className="open-item"
+                className="sidebar-item"
                 data-selected={item.selected || undefined}
                 key={key}
               >
@@ -191,7 +191,7 @@ export function OpenList({
             )
           return (
             <span
-              className="open-item"
+              className="sidebar-item"
               data-selected={item.selected || undefined}
               key={key}
               {...rootDropProps({ kind: "list", before: root })}
@@ -319,7 +319,7 @@ function FoldedItem({
   readers,
   nameOf,
 }: {
-  item: OpenListView["items"][number]
+  item: SidebarView["items"][number]
   onIntent: (intent: Intent) => void
   onRename: (root: string) => void
   /** While this root is renamed, what its field does; else null. */
@@ -367,7 +367,7 @@ function FoldedItem({
   const root = item.kind === "root" ? item.root : undefined
   return (
     <span
-      className="open-item"
+      className="sidebar-item"
       data-selected={item.selected || undefined}
       ref={wrap}
       {...(root === undefined
@@ -571,7 +571,7 @@ export function AddButton({
   folded = false,
   onIntent,
 }: {
-  add: OpenListView["add"]
+  add: SidebarView["add"]
   /** In a folded list (ADR-0088): ＋ alone, its ▾ under it. */
   folded?: boolean
   onIntent: (intent: Intent) => void

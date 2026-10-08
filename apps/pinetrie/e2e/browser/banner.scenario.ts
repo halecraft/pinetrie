@@ -42,7 +42,7 @@ async function run(check: Checks["check"]): Promise<void> {
       try {
         await bp.goto(bannerHost.httpUrl, { waitUntil: "domcontentloaded" })
         // Drawn before the first message is typed (ADR-0057).
-        await bp.click("#open-list .add-agent")
+        await bp.click("#sidebar .add-agent")
         const drawn = await bp
           .waitForSelector(`${col(0)} .column-head .banner[data-loaded]`, {
             timeout: 30_000,
@@ -112,11 +112,11 @@ async function run(check: Checks["check"]): Promise<void> {
         // a scripted model draws one image for every name.
         await bp.fill(`${col(0)} .composer .input`, "plan the parser")
         await bp.click(`${col(0)} .composer .send`)
-        await bp.waitForSelector("#open-list .open-root", { timeout: 15_000 })
+        await bp.waitForSelector("#sidebar .open-root", { timeout: 15_000 })
 
         // Back to its root, the column mounts again with its banner already there.
         const root =
-          (await bp.getAttribute("#open-list .open-root", "data-root")) ?? ""
+          (await bp.getAttribute("#sidebar .open-root", "data-root")) ?? ""
         await stepAway(bp)
         await stepBack(bp, root)
         const again = await bp

@@ -1,10 +1,10 @@
 // interface/root-target — where a root moves to, by drag or by key (ADR-0112).
 // Pure.
 //
-// A root is dragged from the board or from your list. A drop names a target
+// A root is dragged from the board or from the sidebar. A drop names a target
 // by the attributes the drop code marks it with (`rootDropProps`), and
 // `planRootDrop` turns it into an intent: on the board, the one a board
-// item's Move to ▸, Move up or Move down (`stepsIn`) sends; on your list, a
+// item's Move to ▸, Move up or Move down (`stepsIn`) sends; on the sidebar, a
 // `moveInList`. Where in a group of places (`rootGroupProps`) the pointer
 // lands is `landingIn`'s.
 
@@ -36,7 +36,7 @@ export type RootTarget =
       readonly state: WorkflowStateId
       readonly before: RootId | null
     }
-  /** Your list: before `before`, or at its end. */
+  /** The sidebar: before `before`, or at its end. */
   | { readonly kind: "list"; readonly before: EntryId | null }
 
 const ROOT_STATE = "data-root-state"
@@ -62,7 +62,7 @@ export function rootDropProps(
     : { [LIST_BEFORE]: target.before ?? END }
 }
 
-/** What a group of places matches: a board column, the closed state, your list. */
+/** What a group of places matches: a board column, the closed state, the sidebar. */
 export const ROOT_GROUP_ZONE = `[${ROOT_GROUP}]`
 
 /** The attribute that marks an element as a group of places. */
@@ -169,7 +169,7 @@ export function parseRootDrag(text: string): RootDrag | null {
 
 /**
  * What a drop of `drag` on `target` asks: a move on the board, for a state
- * other than its own or a place in it; a place in your list. Null when it
+ * other than its own or a place in it; a place in the sidebar. Null when it
  * would do nothing: a root dropped before itself, or on `home`, the place
  * just after it where it was dragged from (null when not known).
  */

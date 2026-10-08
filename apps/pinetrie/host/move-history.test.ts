@@ -20,8 +20,13 @@ const ADA = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
 const R1 = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const R2 = rootIdFor("01a0ffd2-0000-7000-8000-00000000000b")
-const drafting = (root: RootId) =>
-  ({ kind: "drafting", root, at: atEntry(entryId("e-1")), lane: null }) as const
+const atEnd = (root: RootId) =>
+  ({
+    kind: "note",
+    root,
+    at: atEntry(entryId("e-1")),
+    lane: null,
+  }) as const
 const inventory = { kind: "inventory", holder: ADA } as const
 
 async function setUp() {
@@ -34,7 +39,7 @@ async function setUp() {
     id: cardId(id),
     owner: ADA,
     placer: ADA,
-    place: drafting(root),
+    place: atEnd(root),
     carries: { kind: "message", command: null },
     unsent: null,
   })
@@ -67,7 +72,7 @@ test("a move is one step of its writer's history in its root, and undoes whole a
   expect(placeOf("a")).toBe("inventory")
   const undone = await histories.step(ADA, R1, "undo")
   expect(undone.kind).toBe("undone")
-  expect(placeOf("a")).toBe("drafting")
+  expect(placeOf("a")).toBe("note")
   expect((await histories.step(ADA, R1, "redo")).kind).toBe("undone")
   expect(placeOf("a")).toBe("inventory")
   histories.dispose()
@@ -82,7 +87,7 @@ test("another root's history, and another writer's, are untouched by an undo", a
   await move(BEA, R1, c, inventory)
   expect((await histories.step(ADA, R1, "undo")).kind).toBe("undone")
   expect([placeOf("a"), placeOf("b"), placeOf("c")]).toEqual([
-    "drafting",
+    "note",
     "inventory",
     "inventory",
   ])
@@ -95,11 +100,11 @@ test("an undo is refused, and nothing reverted, after someone else moved the car
   const a = card("a", R1)
   seed(a)
   await move(ADA, R1, a, inventory)
-  await move(BEA, R1, a, drafting(R2))
+  await move(BEA, R1, a, atEnd(R2))
   const refused = await histories.step(ADA, R1, "undo")
   expect(refused.kind).toBe("refused")
   // Where Bea put it.
-  expect(recordOf("a")).toMatchObject({ place: drafting(R2), placer: BEA })
+  expect(recordOf("a")).toMatchObject({ place: atEnd(R2), placer: BEA })
   histories.dispose()
 })
 

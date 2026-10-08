@@ -1,4 +1,4 @@
-// roots — the directory of roots (ADR-0063): what your list, the board and
+// roots — the directory of roots (ADR-0063): what the sidebar, the board and
 // your inbox read of a root without opening its document.
 //
 // The record is a host-written `pinetrie.root` value in the session, keyed by

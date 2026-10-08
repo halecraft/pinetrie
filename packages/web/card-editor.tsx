@@ -1,7 +1,9 @@
-// web/card-editor — one card's editor (ADR-0048): your composer's box,
-// every other drafting card at a thread's end, the box "+ pin" opens, and
-// each queued card above the line (`QueuedCardEditor`), each pinned card and
-// the card selected in your inventory, all a `BoundCardEditor`.
+// web/card-editor — one card's editor (ADR-0048), in its frame
+// (`card-frame.tsx`, ADR-0111): your message in the composer and the box
+// "+ pin" opens, each a `CardEditor`; each note at a thread's end
+// (`NoteCardEditor`), each queued card above the line (`QueuedCardEditor`),
+// each pinned card and the card selected in your inventory, all a
+// `BoundCardEditor`.
 //
 // One uncontrolled textarea for the editor's whole life. Until there is
 // something worth keeping it is local; the input that makes it worth keeping
@@ -30,18 +32,14 @@ import type {
 import { commandOf } from "@pinetrie/core"
 import {
   baseChoices,
-  CARD_MIME,
+  type CardFrameFacts,
+  type CardFrameView,
   type CatchUps,
-  CLEAR_COMMAND,
   type ColumnAct,
   type ColumnHow,
   type ComposerMode,
-  cardHeading,
+  cardFrame,
   cardKeyAct,
-  cardStatus,
-  commandNote,
-  DISCARD_CARD,
-  DISCARD_CARD_TITLE,
   type EditorEvent,
   type EditorState,
   type EditorStep,
@@ -52,26 +50,16 @@ import {
   imageMarkdown,
   insertAt,
   matchCommands,
-  NEW_CARD,
-  NEW_CARD_TITLE,
   NEW_PIN_PLACEHOLDER,
-  needsCard,
   type Pending,
-  PIN,
-  PIN_TITLE,
   type Prefill,
   pastedFiles,
   pinnedStatus,
-  pinnedStatusWords,
-  pinnedWords,
   placeholderWords,
   planSend,
-  queuedWords,
   queueWords,
   type Reader,
   type ReadOnly,
-  reorderOf,
-  reorderWords,
   type Selection,
   sendable,
   sendButton,
@@ -80,11 +68,7 @@ import {
   sizeWords,
   spent,
   startText,
-  TAKE_INTO_INVENTORY,
-  TAKE_INTO_INVENTORY_TITLE,
   tokensOf,
-  UNPIN,
-  UNQUEUE,
   uploadImage,
   whereChoices,
   whereWords,
@@ -99,7 +83,7 @@ import {
   useRef,
   useState,
 } from "react"
-import { CardHistory, MovedBack } from "./card-history.tsx"
+import { CardFrame } from "./card-frame.tsx"
 import { Menu } from "./menu.tsx"
 import { useStable } from "./use-stable.ts"
 
@@ -159,15 +143,9 @@ export interface Where {
  */
 export function CardEditor(p: {
   session: SessionClient
-  /**
-   * The card this edits: your newest here once it exists, or someone
-   * else's. After "+ card" the box shows none, though this is still yours.
-   */
+  /** The card this edits: your message here (`yourCard`), once it exists. */
   card: CardRecord | undefined
-  /**
-   * Where a card made from this box goes: yours, at this column. Undefined
-   * for someone else's card, which always exists.
-   */
+  /** Where a card made from this box goes; undefined where none may be made. */
   place: CardPlace | undefined
   /** Where the message attaches: the column's end, or its branch point. */
   at: Position
@@ -186,13 +164,11 @@ export function CardEditor(p: {
   participants: readonly string[]
   /** Who is sending, and everyone's names. */
   reader: Reader
-  /** Every seat the host has seen: who wrote in the card (`writersOfClients`). */
-  seats: readonly SeatRecord[]
   /** What the box starts with, unsent: a fresh column's (`Prefill`). */
   prefill: Prefill | undefined
   /** A first message to send at once: this column was opened to send it. */
   pending: Pending | undefined
-  /** Where a lane the send creates works; absent for someone else's card. */
+  /** Where a lane the send creates works; absent for the "+ pin" box. */
   where: Where | undefined
   readOnly: ReadOnly | null
   /** A fresh column's send id, recorded before its message is sent. */
@@ -207,9 +183,8 @@ export function CardEditor(p: {
   /** Told whether the next send would create a lane, each time that changes. */
   onCreatesLane: ((createsLane: boolean) => void) | undefined
   /**
-   * Told the box's state each time it changes: the column draws every card
-   * at its end but the one the box shows above it (`shownBelow`), a card put
-   * there among them.
+   * Told the box's state each time it changes: the "+ pin" box's, so the
+   * strip leaves out the card it shows.
    */
   onShows: ((state: EditorState) => void) | undefined
   /** Where a read-only action goes (`ReadOnly.action.intent`). */
@@ -231,8 +206,7 @@ export function CardEditor(p: {
       ? { kind: "local" }
       : { kind: "bound", card: p.card.id },
   )
-  // The card the box shows: `p.card` once the state holds it. Not after
-  // "+ card", when `p.card` is still the one you were writing.
+  // The card the box shows: `p.card` once the state holds it.
   const card = p.card?.id === shownBy(state) ? p.card : undefined
   // The state as the handlers last left it, read synchronously between renders.
   const current = useRef(state)
@@ -288,11 +262,20 @@ export function CardEditor(p: {
     detach.current = bindText(session, id, el, setText)
     el.setSelectionRange(selectionStart, selectionEnd)
   }
-  /** Unbind the box, and empty it. */
+  /**
+   * Unbind the box, and empty it. Kyneta's detach puts back the `readOnly`
+   * the box had when it was bound, which React then no longer knows of: a
+   * box bound while its column was read-only would stay so. So it is set
+   * again from what the box is now.
+   */
   const unbind = () => {
     detach.current?.()
     detach.current = null
-    if (box.current !== null) box.current.value = ""
+    const el = box.current
+    if (el !== null) {
+      el.value = ""
+      el.readOnly = p.readOnly !== null || current.current.kind === "sending"
+    }
     setText("")
   }
   /**
@@ -338,8 +321,7 @@ export function CardEditor(p: {
   // The card as the column finds it: found, or gone. Gone only once it was
   // seen: a card just created is not in the records until they redraw. A box
   // left empty by a send finds the card the column gives it then: one put
-  // here while this one was being written, or the one "+ card" set aside.
-  // A blank box takes none (`editorState`).
+  // here while this one was being written.
   const seen = useRef<CardId | null>(null)
   // biome-ignore lint/correctness/useExhaustiveDependencies: on the card's coming and going, and the box coming free
   useEffect(() => {
@@ -349,6 +331,12 @@ export function CardEditor(p: {
       if (now.kind === "bound" && now.card === card.id) {
         seen.current = card.id
         if (detach.current === null) bind(card.id)
+      } else if (now.kind === "bound") {
+        // Another card took its place: a card dropped here, whose swap
+        // took the one it showed away (`planPut`).
+        step({ kind: "gone" })
+        seen.current = card.id
+        step({ kind: "found", card: card.id })
       } else if (now.kind === "local") {
         seen.current = card.id
         step({ kind: "found", card: card.id })
@@ -414,14 +402,6 @@ export function CardEditor(p: {
     setConflict(settled.conflict)
     setStatus(settled.status)
   }
-  /** "+ card": empty the box for another; the one it showed goes above. */
-  const another = () => {
-    step({ kind: "new" })
-    setConflict(null)
-    setStatus("")
-    box.current?.focus()
-  }
-
   // Sent once, however often React runs effects (StrictMode runs them twice).
   const sentPending = useRef(false)
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, on opening
@@ -491,32 +471,90 @@ export function CardEditor(p: {
     write(start, end, after.slice(start, after.length - (before.length - end)))
   }
 
-  const writers =
-    card === undefined
-      ? []
-      : writersOfClients(textClients(session.cardText(card.id)), p.seats)
-  const others = card !== undefined && card.owner !== session.writer
   const { readOnly } = p
+  const frame = cardFrame(card ?? null, pins ? "pinned" : "composing", {
+    me: session.writer,
+    queueOn:
+      p.lane.kind === "lane" && p.at.kind === "entry"
+        ? { lane: p.lane.name, at: p.at }
+        : null,
+    readOnly: readOnly !== null,
+  })
 
   return (
-    <div
-      className={
-        pins
-          ? "card-editor pinned pinning"
-          : others
-            ? "card-editor others"
-            : "card-editor"
+    <CardFrame
+      card={card ?? null}
+      catchUps={p.catchUps}
+      pinning={pins}
+      foot={
+        frame.primary !== "send" ? null : (
+          <>
+            {readOnly !== null ? (
+              <div className="read-only">
+                <span className="read-only-label">{readOnly.label}</span>
+                {readOnly.action !== null && (
+                  <button
+                    className="read-only-action"
+                    onClick={() => {
+                      if (readOnly.action !== null)
+                        p.onIntent(readOnly.action.intent)
+                    }}
+                    type="button"
+                  >
+                    {readOnly.action.title}
+                  </button>
+                )}
+              </div>
+            ) : (
+              <div className="compose-row">
+                {plan.createsLane &&
+                  work !== null &&
+                  p.where !== undefined &&
+                  p.where.project !== null && (
+                    <div className="where-line">
+                      <WhereMenu
+                        project={p.where.project}
+                        usedDirs={p.where.usedDirs}
+                        work={work}
+                        choose={setChoice}
+                        accepted={p.where.accepted}
+                        base={base}
+                        chooseBase={setBase}
+                      />
+                      {work.kind === "own" && p.where.forkConflicts > 0 && (
+                        <span className="where-fork-conflict">
+                          {forkWords(p.where.forkConflicts)}
+                        </span>
+                      )}
+                    </div>
+                  )}
+                <button
+                  className="send primary"
+                  disabled={button.disabled}
+                  onClick={() => void submit()}
+                  title={button.title ?? undefined}
+                  type="button"
+                >
+                  {button.label}
+                </button>
+              </div>
+            )}
+            <span className="status">{status}</span>
+          </>
+        )
       }
+      onAct={p.onAct}
+      onClearCommand={
+        card === undefined || readOnly !== null
+          ? null
+          : () => p.onAct({ kind: "setCommand", card: card.id, command: null })
+      }
+      onDiscard={() => {
+        if (card !== undefined) p.onAct({ kind: "discard", card: card.id })
+      }}
+      reader={p.reader}
+      view={frame}
     >
-      {others && card !== undefined && (
-        <div className="card-heading">
-          {cardHeading(p.reader.nameOf, card.owner, writers)}{" "}
-          <MovedBack card={card.id} owner={card.owner} />
-        </div>
-      )}
-      {!others && card !== undefined && (
-        <MovedBack card={card.id} owner={card.owner} />
-      )}
       {conflict !== null && (
         <div className="conflict">
           <span className="conflict-text">{conflict.line}</span>{" "}
@@ -543,22 +581,6 @@ export function CardEditor(p: {
             type="button"
           >
             branch here
-          </button>
-        </div>
-      )}
-      {card !== undefined && command !== null && p.readOnly === null && (
-        <div className="card-command">
-          {commandNote(command, p.catchUps)}{" "}
-          <button
-            aria-label={CLEAR_COMMAND}
-            className="card-command-clear"
-            onClick={() =>
-              p.onAct({ kind: "setCommand", card: card.id, command: null })
-            }
-            title={CLEAR_COMMAND}
-            type="button"
-          >
-            ×
           </button>
         </div>
       )}
@@ -670,163 +692,43 @@ export function CardEditor(p: {
         ref={box}
         rows={Math.min(8, Math.max(2, text.split("\n").length))}
       />
-      {pins ? null : readOnly !== null ? (
-        <div className="read-only">
-          <span className="read-only-label">{readOnly.label}</span>
-          {readOnly.action !== null && (
-            <button
-              className="read-only-action"
-              onClick={() => {
-                if (readOnly.action !== null) p.onIntent(readOnly.action.intent)
-              }}
-              type="button"
-            >
-              {readOnly.action.title}
-            </button>
-          )}
-        </div>
-      ) : (
-        <div className="compose-row">
-          {plan.createsLane &&
-            work !== null &&
-            p.where !== undefined &&
-            p.where.project !== null && (
-              <div className="where-line">
-                <WhereMenu
-                  project={p.where.project}
-                  usedDirs={p.where.usedDirs}
-                  work={work}
-                  choose={setChoice}
-                  accepted={p.where.accepted}
-                  base={base}
-                  chooseBase={setBase}
-                />
-                {work.kind === "own" && p.where.forkConflicts > 0 && (
-                  <span className="where-fork-conflict">
-                    {forkWords(p.where.forkConflicts)}
-                  </span>
-                )}
-              </div>
-            )}
-          {state.kind === "bound" &&
-            p.place !== undefined &&
-            needsCard(text, prefill) && (
-              <button
-                className="new-card"
-                onClick={another}
-                title={NEW_CARD_TITLE}
-                type="button"
-              >
-                {NEW_CARD}
-              </button>
-            )}
-          {card?.place.kind === "drafting" && (
-            <button
-              className="pin"
-              onClick={() => p.onAct({ kind: "pin", card: card.id })}
-              title={PIN_TITLE}
-              type="button"
-            >
-              {PIN}
-            </button>
-          )}
-          {card !== undefined && <CardHistory card={card.id} />}
-          {card !== undefined && (
-            <DiscardButton
-              onDiscard={() => p.onAct({ kind: "discard", card: card.id })}
-            />
-          )}
-          {card !== undefined && (
-            <TakeIntoInventoryButton
-              card={card.id}
-              onTakeIntoInventory={id =>
-                p.onAct({ kind: "takeIntoInventory", card: id })
-              }
-            />
-          )}
-          <button
-            className="send"
-            disabled={button.disabled}
-            onClick={() => void submit()}
-            title={button.title ?? undefined}
-            type="button"
-          >
-            {button.label}
-          </button>
-        </div>
-      )}
-      <span className="status">{cardStatus(status, card?.unsent ?? null)}</span>
-    </div>
-  )
-}
-
-/** Start a card's drag: its id, under pinetrie's own type (`put-target.ts`). */
-export const dragCard = (
-  e: { readonly dataTransfer: DataTransfer | null },
-  card: CardId,
-) => {
-  e.dataTransfer?.setData(CARD_MIME, card)
-  if (e.dataTransfer !== null) e.dataTransfer.effectAllowed = "move"
-}
-
-/**
- * A card's "take" button: a press takes it into your inventory, and a drag
- * moves it wherever it is dropped (ADR-0048).
- */
-export function TakeIntoInventoryButton(p: {
-  card: CardId
-  onTakeIntoInventory: (card: CardId) => void
-}) {
-  return (
-    <button
-      className="take-into-inventory"
-      data-card={p.card}
-      draggable
-      onClick={() => p.onTakeIntoInventory(p.card)}
-      onDragStart={e => dragCard(e, p.card)}
-      title={TAKE_INTO_INVENTORY_TITLE}
-      type="button"
-    >
-      {TAKE_INTO_INVENTORY}
-    </button>
+    </CardFrame>
   )
 }
 
 /**
- * A card that exists, bound whole: a heading, its text, and its buttons. A
- * queued card is one, and so is your inventory's selected card.
+ * A card that exists, bound whole, in its frame: a queued or pinned card,
+ * and your inventory's selected card.
  */
 export function BoundCardEditor(p: {
   session: SessionClient
   card: CardRecord
-  className: string
-  heading: ReactNode
+  view: CardFrameView
+  reader: Reader
+  /** What a command catches up with at its thread; null in your inventory. */
+  catchUps: CatchUps | null
   readOnly: boolean
   /** The box's least height, in lines. */
   rows: number
   /** Called on each keystroke in its box, with its card. */
   onTyping: (card: CardId) => void
-  /** Its buttons. */
-  children: ReactNode
-  /** `data-queued`: a queued card's, which the browser suite reads. */
-  queued: CardId | null
+  /** Its footer, after ↑ and ↓. */
+  foot: ReactNode
   /** Told the card's text each time it changes. */
   onText?: (text: string) => void
   /**
-   * A queued or pinned card's list as drawn, which its ↑, ↓ and Alt+↑/↓
-   * move it in (ADR-0048 step 7); null for a card with no place in line.
+   * A queued or pinned card's list as drawn, which Alt+↑/↓ in its box move
+   * it in (ADR-0048 step 7); null for a card with no place in line.
    */
-  reorder: {
-    readonly among: readonly CardRecord[]
-    readonly onAct: (act: ColumnAct) => void
-  } | null
-  /** Discards the card (ADR-0111): its × and Ctrl+Shift+Backspace; null for none. */
-  onDiscard: (() => void) | null
+  among: readonly CardRecord[] | null
+  /** A move from its ⋯, a ↑ or ↓, or a key in its box; absent where it has none. */
+  onAct?: (act: ColumnAct) => void
+  /** Discards the card (ADR-0111): its × and Ctrl+Shift+Backspace. */
+  onDiscard: () => void
+  /** Every seat the host has seen, to name who wrote in a note; empty for none. */
+  seats?: readonly SeatRecord[]
 }) {
-  const { session, card } = p
-  // A read-only box moves nothing.
-  const reorder = p.readOnly ? null : p.reorder
-  const discard = p.readOnly ? null : p.onDiscard
+  const { session, card, view } = p
   const box = useRef<HTMLTextAreaElement>(null)
   const [text, setText] = useState("")
   // Of fixed identity, so a new `onText` each render never binds the box again.
@@ -838,12 +740,25 @@ export function BoundCardEditor(p: {
     const el = box.current
     return el === null ? undefined : bindText(session, card.id, el, told)
   }, [session, card.id, told])
+  // A read-only box moves nothing (`cardFrame`).
+  const among = view.tools.length === 0 ? null : p.among
+  const onAct = p.onAct ?? (() => {})
   return (
-    <div className={p.className} data-queued={p.queued ?? undefined}>
-      <div className="card-heading">
-        {p.heading} <MovedBack card={card.id} owner={card.owner} />
-        {discard !== null && <DiscardButton onDiscard={discard} />}
-      </div>
+    <CardFrame
+      card={card}
+      catchUps={p.catchUps}
+      foot={p.foot}
+      onAct={onAct}
+      onClearCommand={null}
+      onDiscard={p.onDiscard}
+      reader={p.reader}
+      view={view}
+      writers={
+        p.seats === undefined
+          ? []
+          : writersOfClients(textClients(session.cardText(card.id)), p.seats)
+      }
+    >
       <textarea
         autoComplete="off"
         className="input"
@@ -853,35 +768,20 @@ export function BoundCardEditor(p: {
           const act = cardKeyAct(
             keyOfBox(e),
             card.id,
-            reorder === null ? null : reorder.among.map(c => c.id),
+            among === null ? null : among.map(c => c.id),
           )
           if (act === null) return
-          if (act.kind === "discard") {
-            if (discard === null) return
-            e.preventDefault()
-            discard()
-            return
-          }
-          if (reorder === null) return
+          if (act.kind === "discard" && !view.discards) return
+          if (act.kind === "reorder" && among === null) return
           e.preventDefault()
-          reorder.onAct(act)
+          if (act.kind === "discard") p.onDiscard()
+          else onAct(act)
         }}
         readOnly={p.readOnly}
         ref={box}
         rows={Math.min(8, Math.max(p.rows, text.split("\n").length))}
       />
-      <div className="compose-row">
-        {reorder !== null && (
-          <ReorderButtons
-            among={reorder.among}
-            card={card}
-            onAct={reorder.onAct}
-          />
-        )}
-        {p.children}
-        <CardHistory card={card.id} />
-      </div>
-    </div>
+    </CardFrame>
   )
 }
 
@@ -895,65 +795,60 @@ const keyOfBox = (e: KeyboardEvent<HTMLTextAreaElement>) => ({
   isComposing: e.nativeEvent.isComposing,
 })
 
-/** A card's ×: discards it, and the undo key outside a box brings it back (ADR-0111). */
-export function DiscardButton(p: { onDiscard: () => void }) {
-  return (
-    <button
-      aria-label={DISCARD_CARD_TITLE}
-      className="discard-card"
-      onClick={p.onDiscard}
-      title={DISCARD_CARD_TITLE}
-      type="button"
-    >
-      {DISCARD_CARD}
-    </button>
-  )
-}
-
 /**
- * A queued or pinned card's ↑ and ↓ (ADR-0048 step 7): the same reorder as
- * Alt+↑ and Alt+↓ in its box, each off where `reorderOf` finds none.
+ * A note at a thread's end (ADR-0113): its text, which anyone here may
+ * edit, and whose it is. It has no send: Enter is a new line, and its ⋯
+ * moves it into your message, the queue, the pinned cards or your
+ * inventory.
  */
-function ReorderButtons(p: {
+export function NoteCardEditor(p: {
+  session: SessionClient
   card: CardRecord
-  among: readonly CardRecord[]
+  /** Where a queue from its column puts it; null where nothing can be queued. */
+  queueOn: CardFrameFacts["queueOn"]
+  reader: Reader
+  readOnly: ReadOnly | null
+  catchUps: CatchUps
+  seats: readonly SeatRecord[]
   onAct: (act: ColumnAct) => void
+  onTyping: (card: CardId) => void
 }) {
-  const among = p.among.map(c => c.id)
+  const { card } = p
+  const view = cardFrame(card, "note", {
+    me: p.session.writer,
+    queueOn: p.queueOn,
+    readOnly: p.readOnly !== null,
+  })
   return (
-    <>
-      {([-1, 1] as const).map(step => {
-        const words = reorderWords(step)
-        return (
-          <button
-            className={words.className}
-            disabled={reorderOf(p.card, p.among, step) === null}
-            key={step}
-            onClick={() =>
-              p.onAct({ kind: "reorder", card: p.card.id, among, step })
-            }
-            title={words.title}
-            type="button"
-          >
-            {words.label}
-          </button>
-        )
-      })}
-    </>
+    <BoundCardEditor
+      among={null}
+      card={card}
+      catchUps={p.catchUps}
+      foot={null}
+      onAct={p.onAct}
+      onDiscard={() => p.onAct({ kind: "discard", card: card.id })}
+      onTyping={p.onTyping}
+      readOnly={p.readOnly !== null}
+      reader={p.reader}
+      rows={1}
+      seats={p.seats}
+      session={p.session}
+      view={view}
+    />
   )
 }
 
 /**
  * A queued card above the line (ADR-0048): its text, which anyone here may
  * edit until the host pops it, who queued it and its place in line, its
- * command, ↑ and ↓ that move it in line (as Alt+↑/↓ in its box do), a
- * button that unqueues it, and one that takes it into your inventory.
+ * command, and ↑ and ↓ that move it in line (as Alt+↑/↓ in its box do). Its
+ * other moves are its ⋯'s; the queue's controls send it.
  */
 export function QueuedCardEditor(p: {
   session: SessionClient
   card: QueuedCard
-  /** Its place in its lane's queue, from 0. */
-  n: number
+  /** Its queue is held. */
+  held: boolean
   reader: Reader
   readOnly: ReadOnly | null
   /** What its command catches up with: the thread's base, or the thread it branched from. */
@@ -964,63 +859,38 @@ export function QueuedCardEditor(p: {
   onTyping: (card: CardId) => void
 }) {
   const { card } = p
-  const command = commandOf(card)
+  const view = cardFrame(card, "queued", {
+    me: p.session.writer,
+    queueOn: null,
+    among: p.among,
+    held: p.held,
+    pinned: null,
+    readOnly: p.readOnly !== null,
+  })
   return (
     <BoundCardEditor
+      among={p.among}
       card={card}
-      className="card-editor queued"
-      heading={
-        <>
-          {queuedWords(card.place.by, p.n, p.reader)}
-          {command !== null && (
-            <div className="card-command">
-              {commandNote(command, p.catchUps)}
-            </div>
-          )}
-        </>
-      }
+      catchUps={p.catchUps}
+      foot={null}
+      onAct={p.onAct}
       onDiscard={() => p.onAct({ kind: "discard", card: card.id })}
       onTyping={p.onTyping}
-      queued={card.id}
       readOnly={p.readOnly !== null}
-      reorder={{ among: p.among, onAct: p.onAct }}
+      reader={p.reader}
       rows={1}
       session={p.session}
-    >
-      {p.readOnly === null && (
-        <>
-          <button
-            className="unqueue"
-            onClick={() =>
-              p.onAct({
-                kind: "unqueue",
-                card: card.id,
-                lane: card.place.lane,
-                by: card.place.by,
-              })
-            }
-            type="button"
-          >
-            {UNQUEUE}
-          </button>
-          <TakeIntoInventoryButton
-            card={card.id}
-            onTakeIntoInventory={id =>
-              p.onAct({ kind: "takeIntoInventory", card: id })
-            }
-          />
-        </>
-      )}
-    </BoundCardEditor>
+      view={view}
+    />
   )
 }
 
 /**
  * A pinned card at the top of its column (ADR-0048): its text, which anyone
  * here may edit, who pinned it, its size, how it stands against what the
- * agent last read (`inView`), ↑ and ↓ that move it among the thread's
- * pinned cards (as Alt+↑/↓ in its box do), a button that unpins it, and one
- * that takes it into your inventory. It has no send: Enter is a new line.
+ * agent last read (`inView`), and ↑ and ↓ that move it among the thread's
+ * pinned cards (as Alt+↑/↓ in its box do). It has no send: Enter is a new
+ * line. Its other moves are its ⋯'s.
  */
 export function PinnedCardEditor(p: {
   session: SessionClient
@@ -1029,52 +899,40 @@ export function PinnedCardEditor(p: {
   inView: PinnedView | null
   /** The thread's pinned cards as drawn: what a reorder moves it among. */
   among: readonly CardRecord[]
+  /** Where a queue from its column puts it; null where nothing can be queued. */
+  queueOn: CardFrameFacts["queueOn"]
   reader: Reader
   readOnly: ReadOnly | null
+  catchUps: CatchUps
   onAct: (act: ColumnAct) => void
   onTyping: (card: CardId) => void
 }) {
   const { card } = p
   const [text, setText] = useState("")
-  const status = pinnedStatus(card, text, p.inView)
+  const view = cardFrame(card, "pinned", {
+    me: p.session.writer,
+    queueOn: p.queueOn,
+    among: p.among,
+    held: false,
+    pinned: pinnedStatus(card, text, p.inView),
+    readOnly: p.readOnly !== null,
+  })
   return (
     <BoundCardEditor
+      among={p.among}
       card={card}
-      className="card-editor pinned"
-      heading={pinnedWords(card.placer, p.reader)}
+      catchUps={p.catchUps}
+      foot={<span className="pinned-size">{sizeWords(tokensOf(text))}</span>}
+      onAct={p.onAct}
       onDiscard={() => p.onAct({ kind: "discard", card: card.id })}
       onText={setText}
       onTyping={p.onTyping}
-      queued={null}
       readOnly={p.readOnly !== null}
-      reorder={{ among: p.among, onAct: p.onAct }}
+      reader={p.reader}
       rows={1}
       session={p.session}
-    >
-      <span className="pinned-size">{sizeWords(tokensOf(text))}</span>
-      {status !== null && (
-        <span className="pinned-status" data-status={status}>
-          {pinnedStatusWords(status)}
-        </span>
-      )}
-      {p.readOnly === null && (
-        <>
-          <button
-            className="unpin"
-            onClick={() => p.onAct({ kind: "unpin", card: card.id })}
-            type="button"
-          >
-            {UNPIN}
-          </button>
-          <TakeIntoInventoryButton
-            card={card.id}
-            onTakeIntoInventory={id =>
-              p.onAct({ kind: "takeIntoInventory", card: id })
-            }
-          />
-        </>
-      )}
-    </BoundCardEditor>
+      view={view}
+    />
   )
 }
 

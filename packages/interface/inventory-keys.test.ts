@@ -30,7 +30,7 @@ const focus = (over: Partial<KeyFocus> = {}): KeyFocus => ({
 const chord = { ctrlKey: true, shiftKey: true }
 
 describe("keyAct", () => {
-  test("Ctrl+Shift+L folds or unfolds your list, in a text box too, and not with Meta or Alt", () => {
+  test("Ctrl+Shift+L folds or unfolds the sidebar, in a text box too, and not with Meta or Alt", () => {
     const fold = { kind: "foldList" }
     expect(keyAct(key("L", chord), focus())).toEqual(fold)
     expect(keyAct(key("L", chord), focus({ inText: true }))).toEqual(fold)

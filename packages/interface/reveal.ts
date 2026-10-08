@@ -63,7 +63,8 @@ export function revealOf(
     // Discarded: drawn nowhere, so nothing comes into view.
     case "gone":
       return { effects: [], actedAt: AT_INVENTORY }
-    case "drafting":
+    case "composing":
+    case "note":
     case "pinned":
     case "queued": {
       const end =

@@ -63,7 +63,7 @@ page's (`storage-keys.ts`, `tab-state.ts`, `same-props.ts`, `colors.ts`).
 ## The roots a tab holds (ADR-0063)
 
 - **A tab holds the roots it shows** (`planHeldRoots`, `held-roots.ts`): the
-  roots of your list, and the one you are on, archived or not. `SessionClient.holdRoots` opens what is new and `destroy`s what
+  roots of the sidebar, and the one you are on, archived or not. `SessionClient.holdRoots` opens what is new and `destroy`s what
   is not, which leaves the host's copy (S86). A root this client starts is
   held from its first send until the page asks for it, and after that only
   while the page does. What opens and goes, and why every other root is
@@ -128,7 +128,7 @@ function is proven by a unit test in a second.
 - **A component draws a view.** It branches only on a view's `kind` or its
   flags, and draws the view's strings. It compares no document fact, builds
   no label, and chooses nothing that is offered. The views are `appView`
-  (`app-view.ts`), `openListView`, `boardView`, `columnView`, `messageTools`, `railItems`,
+  (`app-view.ts`), `sidebarView`, `boardView`, `columnView`, `messageTools`, `railItems`,
   `rowSummary`, `toolBody` and `callStatus`, `editorState` and `startText`. What stays in
   components and `use-*.ts` is what needs a browser: measuring, focus and
   the caret, scrolling, observers, subscriptions.
@@ -146,7 +146,7 @@ function is proven by a unit test in a second.
   name step (`reconcileName`).
 - **`perform` carries the effects out** (`perform.ts`), one port call each,
   through `AppPorts`: the reducer's `dispatch`, the session's writes,
-  `reveal`, your list (`openList`), focus, the identity store and
+  `reveal`, the sidebar (`openThreads`), focus, the identity store and
   `reload`. A request the session does not track is one `request` effect
   carrying the `HostRequest` itself, so a new kind of request adds no effect
   and no case. What the session tracks keeps a method of its own: a chat
@@ -171,86 +171,86 @@ function is proven by a unit test in a second.
   are, connects, and mounts `App({ session, stores })`. `app.tsx` touches no
   browser global as it loads.
 
-## Your list and the layout (`layout.ts`, ADR-0029, ADR-0030, ADR-0112)
+## The sidebar and the layout (`layout.ts`, ADR-0029, ADR-0030, ADR-0112)
 
 The stored layout is `{ active, roots, newTabs, board }`, and
 `layoutReducer` is pure. `active` is a `Here`: a root (by its root entry: a
 thread started at the root is rooted at its first message, S30), a new tab,
-or nothing. Your list is not the layout's: it is your own document
-(`openList`, `@pinetrie/session`), keyed by `RootId`, which `App` maps to root
+or nothing. The sidebar is not the layout's: it is your own document
+(`openThreads`, `@pinetrie/session`), keyed by `RootId`, which `App` maps to root
 entries through the directory and passes in as `LayoutFacts.list`.
 `summarizeRoots` and `rootWork` (`packages/core/roots.ts`) give the roots
 and each item's signals.
 
-- **`Layout.open` is drawn, never stored** (`drawnList`): your list, less
+- **`Layout.open` is drawn, never stored** (`drawnList`): the sidebar, less
   the archived roots but the one you are on, and the root you are on
   wherever the list lacks it. Another device's repair may have taken it
   out of your document; the screen you are on does not lose it.
-- **Who writes your list.** `show` of a root ensures it in your document
+- **Who writes the sidebar.** `show` of a root ensures it in your document
   (`intent.ts`'s `show`, a `list` effect), so every way of opening goes
   through it: the board, your inbox, `openAt`. A root you
   start joins it in the session, as its send is answered (`startsRoot`). ×
   is a `list` close and a `closeRoot`, which moves you on only if you were
-  on it: `afterClosing`'s choice, your list's next item below, else above,
+  on it: `afterClosing`'s choice, the sidebar's next item below, else above,
   else nothing. `moveInList` places a root before another, or at the end.
   The session's repair deletes archived roots but the one the page reports
-  it is on (`openList.here`), so a restore brings a root back only for
+  it is on (`openThreads.here`), so a restore brings a root back only for
   whoever restores it.
 - **A root's label is `labelsOf`'s** (`root-label.ts`, ADR-0045, ADR-0074):
   its title; else `CHAT_LABEL` for a root no lane works in, read from the
   session's lane records, so a root only people wrote in needs no field of
   its own; else its first line (`firstLinesOf`), from its directory record
   (ADR-0063). `App` builds both maps once per directory change, and every
-  place that names a root looks one up: your list, the board, the activity
+  place that names a root looks one up: the sidebar, the board, the activity
   menu, the inbox. The first lines are also the rename field's placeholder:
   what clearing a title brings back.
-- **Renaming is `OpenList`'s state, never the layout's.** `planTitle` is the
+- **Renaming is `Sidebar`'s state, never the layout's.** `planTitle` is the
   field's submit, over `parseTitle`, the rule the codec decides by too, and
   `renameKey` what Enter and Escape do.
-- **What your list shows and offers is `openListView`'s**
-  (`open-list-view.ts`), over `listOf`'s order: each item's label, pip,
+- **What the sidebar shows and offers is `sidebarView`'s**
+  (`sidebar-view.ts`), over `listOf`'s order: each item's label, pip,
   `⋯` items (Not needed, Rename, Auto-update title, Move to ▸ each other
-  state) and the intents they send. `OpenList`
-  (`open-list.tsx`) draws it; each item's `Readers` read presence
+  state) and the intents they send. `Sidebar`
+  (`sidebar.tsx`) draws it; each item's `Readers` read presence
   themselves (S59, `root-signals.tsx`). `selected` is the item you are on,
   decided there once: `App` titles the window from it (`pageTitle`) and
-  `OpenList` scrolls it into view, keyed by `listKey`.
-- **The chrome is your list, then the footer** (ADR-0112): the body is a
+  `Sidebar` scrolls it into view, keyed by `listKey`.
+- **The chrome is the sidebar, then the footer** (ADR-0112): the body is a
   grid, `--side` wide on the left, the workspace beside it, and `#bottom`
-  under both. `#open-list` holds `.open-item` wraps, each around its
+  under both. `#sidebar` holds `.sidebar-item` wraps, each around its
   `.open-root` (or `.open-new`) button, ⋯ and ×; the selected wrap carries
   `data-selected`, set from `ItemView.selected`, and is filled with
   `--page`, the list `--chrome`. The footer (`footer.tsx`) holds
   `.footer-you` (your avatar and name, then your inbox and inventory as
   icons; folded, your avatar alone, ADR-0098), the board's strip
   (`BoardStrip`), then `.footer-right` (sync note, publish).
-- **Your list folds to icons** (ADR-0088). The width is a value
+- **The sidebar folds to icons** (ADR-0088). The width is a value
   (`ListWidth`, `list-width.ts`): your choice in this tab, else icons on a
   small window (`shownWidth`, `useSmallWindow`). Folding is an intent,
   `foldList`, from the control at the list's foot or Ctrl+Shift+L
   (`keyAct`); `planIntent` asks for the width not shown, and `perform`'s
   `listWidth` port sets it and saves it. `App` writes it as `data-list` on
   the root element, and the CSS sets `--side` from that, so the body's
-  grid, the footer's corner and the board follow. Folded, `OpenList` draws
-  each item as `FoldedItem`: `openListView` decides its `ItemIcon` (a
+  grid, the footer's corner and the board follow. Folded, `Sidebar` draws
+  each item as `FoldedItem`: `sidebarView` decides its `ItemIcon` (a
   sprite from `rootSprites`, else `initialsOf` its label on its root's slot
-  (`rootSlot`), which `OpenList` draws in `slotColor`,
+  (`rootSlot`), which `Sidebar` draws in `slotColor`,
   else a new tab's hollow tile). The icon is the trigger of a `Menu` opened
   by `contextmenu` (`Popover`'s `opensOn`), whose click shows the root;
   the tooltip and the rename field are fixed to the window beside it, since
   the list clips. The footer's corner then draws only `AccountMenu`, whose
   menu holds the inbox and the inventory (`accountView`, ADR-0098).
-- **`resolveLayout` keeps an archived root you are on** in your list as
+- **`resolveLayout` keeps an archived root you are on** in the sidebar as
   drawn, read-only, until you leave it. `prune`, once after `whenSettled`,
   drops columns of roots the document lacks, and replaces a gone or
-  archived root you were on with your list's last, else nothing; with
+  archived root you were on with the sidebar's last, else nothing; with
   nothing, the board opens: nothing opens a root by itself. No action sets
   `active` back to null.
 - **Choosing a root or a new tab closes the board** (`show`, `newTab`): it
   lay over what you chose.
 - **A click outside the board closes it** only when it was pressed outside
   too (`clickClosesBoard`): a selection dragged out of the board keeps it,
-  and a drag from your list fires no click, so it can still drop there. The
+  and a drag from the sidebar fires no click, so it can still drop there. The
   strip counts as the board's own, so its buttons act alone: ▦ toggles, and
   a state's button keeps the board open rather than closing and reopening it.
 - **Moving a root on the board** is a `moveRoot` effect: the host's
@@ -258,7 +258,7 @@ and each item's signals.
   (`moved`), which `afterRootMove` runs only once the host answers
   `moved-root`, as `afterKeep` does for a keep.
 - **`hereOfColumn` is the one lookup from a column's key to where it is**: a
-  new tab's, or a root's whether or not that root is in your list. The card
+  new tab's, or a root's whether or not that root is in the sidebar. The card
   marks place a fresh card with it.
 - **`columnsOf` is the one place a root gets its first column**
   (`first-<root>`, anchored at the root). `columnsReducer` may leave a root
@@ -282,7 +282,7 @@ and each item's signals.
 - **`sync` runs on every root's columns**, not only the active one's: an anchor
   left behind can later follow a newer branch below it (ADR-0027).
 - **The layout drawn is `resolveLayout(stored, facts)`, computed in render**
-  (ADR-0044): `sync`, then your list drawn. An effect stores it with
+  (ADR-0044): `sync`, then the sidebar drawn. An effect stores it with
   `resolve`, the same function, so an action reduces from it: React runs
   pending effects before it handles the next event. `App` draws `layout`,
   never `stored`.
@@ -317,13 +317,13 @@ and each item's signals.
   `CLOSED_RECENT` newest.
 - **One landing rule for a root's drag** (`root-target.ts`), as
   `put-target.ts` is for a card's: `rootDropProps` marks a column, an item
-  or your list (`data-root-state`, `data-root-before`, `data-list-before`),
+  or the sidebar (`data-root-state`, `data-root-before`, `data-list-before`),
   `rootTargetOfElement` reads it, and `planRootDrop` gives the same intent
   the keyboard's moves send. A root's drag carries `ROOT_MIME`, never a
   card's; `App`'s card handlers ignore it, and `useRootDrag`'s ignore
   `CARD_MIME`.
 - **A drag shows where it lands** (`use-root-drag.ts`). A board column,
-  the closed state and your list are each a group of places
+  the closed state and the sidebar are each a group of places
   (`rootGroupProps`), and anywhere in a group lands by the pointer's height
   alone (`landingIn`): before the first item whose centre is below it, or
   at the group's end. Landing by the element under the pointer instead
@@ -336,15 +336,15 @@ and each item's signals.
   item itself no line is drawn. The closed state is one target: its rows are a search, newest
   activity first, so no row is a place to drop before, and the panel is
   outlined instead. One drag start, `startRootDrag`, serves the board and
-  your list; its image is the whole item, held where the pointer took it
+  the sidebar; its image is the whole item, held where the pointer took it
   (`setDragImage`). All of it is DOM attributes, never React state, as a
   column's drag is.
 - **`markOf` is the one rule for a mark over several roots** (`attention.ts`):
-  a board column's, a strip state's and ▦'s (the roots not in your list,
+  a board column's, a strip state's and ▦'s (the roots not in the sidebar,
   `unlisted`).
 - **Readers' avatars read presence themselves** (`root-signals.tsx`):
-  `Readers` for your list's items and the strip's states, `ReaderMenus` (a
-  menu of each reader's threads there, `peopleIn`) for a board item, so a
+  `Readers` for the sidebar's items and the strip's states, `ReaderMenus` (a
+  menu of each reader's threads there, `peopleIn`) for a thread card, so a
   presence write redraws them and not `App` (S59).
 - **The board is `#board`, absolutely placed in `#workspace`** from its
   foot: it covers the columns and moves none of them.
@@ -434,9 +434,9 @@ pending.
   repeated here. There is no group of people of its own (ADR-0112): a board
   item's readers are those people in its root (`peopleIn`), each avatar
   (`Avatar`) a `Menu` of the threads that person reads there
-  (`ReaderMenus`); your list's items and the strip's states show avatars
+  (`ReaderMenus`); the sidebar's items and the strip's states show avatars
   only (`Readers`).
-- **You** are first in the footer, under your list (ADR-0098): your
+- **You** are first in the footer, under the sidebar (ADR-0098): your
   avatar and name, opening the account menu (`account-menu.tsx`), then
   your inbox and your inventory as icons. `accountView` (pure) decides the
   menu's items and the badge on your avatar: folded, the corner holds your
@@ -459,7 +459,7 @@ pending.
 - **Where the agent works, and what is ready, is the board's** (ADR-0091):
   `workAnywhere` (`app-view.ts`) is the agent's work in every root: the held
   lanes' (`rootWork`) and every lane running in the session (`running`, by
-  its root entry). `App` builds it once, and your list, the board and
+  its root entry). `App` builds it once, and the sidebar, the board and
   `rootStatus` all read it, so a root rung on the board also refuses Move to
   Done there. `rootStatus` rings a root while the agent works there or its
   verdict is pending; `boardView` folds each column's items into `working` and `ready`
@@ -515,15 +515,15 @@ pending.
   and a menu's list does.
 - **A trigger from live data is `gone`, not unmounted.** Unmounting a
   `Popover` takes its open box with it, so a change in the session would
-  close a menu you opened. A board item keeps a person who leaves while
+  close a menu you opened. A thread card keeps a person who leaves while
   their menu is open (`withOpenMenus`, told by `onToggle`), `gone`, until
   you close it; the menu's heading says so (`readerHeading`). Escape closes
   that menu first: the board leaves Escape alone while a menu in it is open
   (`.open`), since both listen on the document and the board's listener,
   added first, hears it first.
 - **`Menu`** (`menu.tsx`) is a `Popover` whose box is a `role="menu"` list,
-  in sections (`MenuSection`): a board item's readers, your inbox, the
-  account menu, publish's setup, your list's items' `⋯`, ＋'s menu and the
+  in sections (`MenuSection`): a thread card's readers, your inbox, the
+  account menu, publish's setup, the sidebar's items' `⋯`, ＋'s menu and the
   composer's where line. A `lead` is drawn above the list, outside it (the
   account menu's who you are), and a change of `focusKey` while open gives
   the first item focus, as opening does (the account menu's swap to the
@@ -543,7 +543,7 @@ pending.
   (`.more`) are `.initial` and never `.avatar`.
   The circle's shape is `.initial`'s rule; `.avatar` has none. A person's
   picture (ADR-0098) is an `img` inside the same circle, so both rules hold
-  with a picture or without. Your list's
+  with a picture or without. The sidebar's
   items and the board's hold readers' avatars too, so `.avatar` anywhere matches them,
   who never include you either.
 
@@ -573,7 +573,7 @@ pending.
   typed, which the browser suite's render check caught.
 - **One count** (`inboxCount`: the items that need you plus unseen mentions),
   computed once in `App`, is the inbox's badge and the window title's.
-  `pageTitle` (`open-list-view.ts`) puts it before the selected root's label.
+  `pageTitle` (`sidebar-view.ts`) puts it before the selected root's label.
 - **Words:** `attentionWords` words each item's reason, `LEVEL_WORDS` and
   `LEVEL_CLASS` a level's name and class. Selectors: `.root-status`
   (`.working`, `.needs-you`, `.worth-a-read`, `.done`, `data-arrived`),
@@ -973,6 +973,37 @@ change of wording then touches the words function, its one test, and
   ("the button says what the send does, and to whom"), and this file names the
   function.
 
+## Card frames (`card-frame.ts`, ADR-0111)
+
+Every text card is drawn in one frame, decided as a value: `cardFrame(card,
+tone, facts)` gives its tone (its place's colour), its state, who put it
+there, its command, its primary action, its tools and its Move to ▸, and
+`cardFrameWords` words them. `CardFrame` (`packages/web/card-frame.tsx`)
+draws it.
+
+- **The tone is the caller's.** Each editor knows what it draws: the
+  composer is `composing`, notes `note`, the "+ pin" box and pinned
+  cards `pinned`, queued cards `queued`, the inventory's selected card
+  `inventory`. With no card yet (the composer before its first keystroke,
+  the "+ pin" box) the frame has its tone and place alone: no state, no
+  moves, no ×.
+- **Move to ▸ is the moves a drag makes from where the card is**, each an
+  existing `ColumnAct`: a queue is `queue` with `hold: "keep"`
+  (`queue-card`), a pin `pin` (from a draft or a queued card: `pinnedOf`),
+  back below the line `unqueue` or `unpin`, a take `takeIntoInventory`. A
+  queue needs the column's lane and an entry to queue at (`queueOn`); a
+  fresh column's card goes only to your inventory, and an inventory card
+  has none (put, ×, a drag). A fact or a read-only column moves nothing.
+- **The primary** is put in the inventory and send on a draft, the editor's
+  own button (`sendButton`); a queued card has none, since the queue's
+  controls send it (ADR-0113), and a pinned card none.
+- **The state** is a queued card's place in line (`lineWords`, "next" on
+  top, "held · …" while its queue is held), a pinned card's `pinnedStatus`,
+  or why the host could not send it (`unsentWords`).
+- **A command is a chip** (`commandWords`, `commandNote` its title). In
+  your inventory `catchUps` is null, since a command there has no thread
+  to name, and no chip is drawn.
+
 ## Threads, lanes and the composer (ADR-0020)
 
 - **The agent can reply in several threads at once**: `readAgentActivity`
@@ -1023,10 +1054,10 @@ change of wording then touches the words function, its one test, and
 - **Queued cards** (ADR-0048) are drawn after the thread's last message and
   its working line, above the line, in the order the host pops them
   (`queuedOn`), each a `QueuedCardEditor`: always bound, editable by anyone
-  here, with `queuedWords`, its command's `commandNote` and **unqueue**. They
-  are not in the tree yet. Below the line, the column shows every drafting
-  card at its end but the composer's (`others` filters on id, not owner), so
-  a card of yours someone unqueued while you typed another shows there.
+  here, in its frame (*Card frames*, below). They are not in the tree yet.
+  Below the line, the column shows the notes at its end (`cardsAt("note",
+  …)`), and the composer your message alone (`yourCard`, ADR-0113): an
+  unqueued card is a note, so it never takes your composer.
 - **A queue sends the text's version too** (`seen`, `textVersion`), in the
   queued key, and so does a chat sent from a card (`SentCard`), which the
   host queues when the lane is busy: the host pops the card only once it
@@ -1068,7 +1099,7 @@ change of wording then touches the words function, its one test, and
   which gives nothing at an edge or past a fact, and the session tracks the
   reorder as a move (`reorderCard`). Only those two editors take Alt+↑/↓:
   on a Mac it is Option+↑/↓, a textarea's move to its paragraph's start or
-  end, which the composer and drafting cards keep. A queued card's editor
+  end, which the composer and notes keep. A queued card's editor
   is keyed by its card, so a reorder moves the element, and its box keeps
   focus and caret. There is no drop target for a reorder: put could not
   reach it (`put-target.test.ts`).
@@ -1137,7 +1168,7 @@ change of wording then touches the words function, its one test, and
   `visibilitychange` listener refreshes on return). Switching roots therefore
   clears the last root's keys, through that same deletion. On nothing, a
   page reports nothing. Typing is written at most once a second (`typingDue`).
-- **A root's avatars in your list** are `readersByRoot(peopleHere(…))` (`here.ts`): the
+- **A root's avatars in the sidebar** are `readersByRoot(peopleHere(…))` (`here.ts`): the
   header's people turned around, each tab's `Readers` taking its root's.
 - **`core/presence.ts` decides everything shown**, from one field's read
   (`readReading` and `readTyping` in `@pinetrie/reads`) and the
@@ -1163,13 +1194,13 @@ change of wording then touches the words function, its one test, and
 
 A pip in your colour (`CardPip`, `.card-pip`, the one selector the suites
 use) marks where an unsent card of yours holds text: its root's item in your
-list or its new tab, the rail dot at a drafting card's thread end, and the
+list or its new tab, the rail dot at its thread end, and the
 root's item on the board. ▦ itself is marked only for a root not in your
 list: an archived root's work is done, so it never lights ▦ (`elsewhere`).
 
 - **`cardMarks` (`card-marks.ts`) decides, purely,** from your cards, the
-  ones holding text, the layout, the lanes and the index. A drafting card is
-  placed by `cardEnd` and `rootOf`; a fresh card by `tabOfColumn`, so one
+  ones holding text, the layout, the lanes and the index. Your message and
+  a note you own are placed by `placeEnd` and `rootOf` (ADR-0113); a fresh card by `tabOfColumn`, so one
   typed in another browser tab or device, whose layout this one lacks, marks
   nothing. A card in your inventory marks nothing: the inventory is no tab.
   Nor does a pinned card: it is a thread's direction, not unsent work.
@@ -1252,7 +1283,7 @@ state, never stored.
   refusals, and closes the column once accepted (`afterKeep`).
 - **Drag** is HTML drag and drop, not the column drag's pointer events: it
   crosses elements and roots. A card's drag carries its id under
-  `CARD_MIME`; its handle is its take button (`TakeIntoInventoryButton`), or a slot. `App` listens on
+  `CARD_MIME`; its handle is its frame's header (`CardFrame`), or a slot. `App` listens on
   the document for `dragover` and `drop`; a drag held over a root in your
   list for `ITEM_HOVER_MS` opens it. A root's drag is not a card's
   (`ROOT_MIME`, The board, above). `NOT_A_HANDLE` includes `[draggable='true']`, so
@@ -1264,7 +1295,7 @@ state, never stored.
   focus; Cmd or Ctrl with Z, Shift+Z, or Ctrl+Y undo and redo a move, only
   outside a text box, where the box's own text undo has them; arrows and
   `hjkl` move through the grid while the panel has focus. Ctrl+Shift+L
-  folds or unfolds your list (ADR-0088), from anywhere, as I and O.
+  folds or unfolds the sidebar (ADR-0088), from anywhere, as I and O.
 - **A move flies** (`use-flight.ts`): `perform` measures the card's element
   before the move (`ports.fly`), and once it is drawn elsewhere that
   element animates from the old box. A take into the inventory while the
@@ -1272,7 +1303,7 @@ state, never stored.
 - **Selectors for the browser suite:** `.inventory` (the panel),
   `.inventory .slot[data-slot][data-card]` and `.slot-line`, `.inventory
   .put`, `.inventory .discard-card`, `#bottom .inventory-toggle`
-  (`.account-inventory` in the account menu while your list is folded), a card's
+  (`.account-inventory` in the account menu while the sidebar is folded), a card's
   `.take-into-inventory`, a message's `.take-copy-into-inventory`, and a
   fresh column's `.close-keep`,
   `.close-discard` and `.close-cancel`.

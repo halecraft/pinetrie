@@ -11,6 +11,7 @@ import { composerPlace } from "./column-view.ts"
 import {
   composerPlacesStore,
   dropProps,
+  intoMessage,
   type PutTarget,
   placeOfTarget,
   targetOfElement,
@@ -31,11 +32,15 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
   const store = composerPlacesStore()
   const thread = composerPlace({ key: "k-thread", lane: LANE }, E1, TEST_ROOT)
   const fresh = composerPlace({ key: "k-fresh", fresh: {} }, E1, TEST_ROOT)
-  store.set("k-thread", thread)
-  store.set("k-fresh", fresh)
+  store.set(
+    "k-thread",
+    thread === null ? null : { place: thread, message: null },
+  )
+  store.set("k-fresh", fresh === null ? null : { place: fresh, message: null })
   const targets: PutTarget[] = [
     { kind: "column", key: "k-thread" },
     { kind: "column", key: "k-fresh" },
+    { kind: "composer", key: "k-thread" },
     { kind: "inventory", slot: 0 },
     { kind: "inventory", slot: 17 },
     { kind: "column", key: "k-closed" },
@@ -51,36 +56,39 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
     ).toEqual(placeOfTarget(target, store.current(), ME))
   })
 
-  test("a column lands as its composer place; a slot as your inventory; a column no store holds as nothing", () => {
+  test("a column lands as a note at its end, its composer as your message; a fresh column as its message; a slot as your inventory; a column no store holds as nothing", () => {
     const at = (t: PutTarget) => placeOfTarget(t, store.current(), ME)
-    expect(at(targets[0] as PutTarget)).toEqual({
-      kind: "drafting",
-      root: TEST_ROOT,
-      at: E1,
-      lane: LANE,
-    })
+    const end = { root: TEST_ROOT, at: E1, lane: LANE }
+    expect(at(targets[0] as PutTarget)).toEqual({ kind: "note", ...end })
     expect(at(targets[1] as PutTarget)).toEqual({
       kind: "fresh",
       column: "k-fresh",
       root: TEST_ROOT,
       at: E1,
     })
-    expect(at(targets[2] as PutTarget)).toEqual({
+    expect(at(targets[2] as PutTarget)).toEqual({ kind: "composing", ...end })
+    expect(at(targets[3] as PutTarget)).toEqual({
       kind: "inventory",
       holder: ME,
     })
-    expect(at(targets[4] as PutTarget)).toBeNull()
+    expect(at(targets[5] as PutTarget)).toBeNull()
   })
 
   test("a column's pinned strip lands pinned at its composer's thread end; a fresh column has none", () => {
     const at = (t: PutTarget) => placeOfTarget(t, store.current(), ME)
-    expect(at(targets[5] as PutTarget)).toEqual({
+    expect(at(targets[6] as PutTarget)).toEqual({
       kind: "pinned",
       root: TEST_ROOT,
       at: E1,
       lane: LANE,
     })
-    expect(at(targets[6] as PutTarget)).toBeNull()
+    expect(at(targets[7] as PutTarget)).toBeNull()
+  })
+
+  test("a composer, or a fresh column, takes a put as your message", () => {
+    expect(intoMessage(targets[2] as PutTarget, store.current())).toBe(true)
+    expect(intoMessage(targets[1] as PutTarget, store.current())).toBe(true)
+    expect(intoMessage(targets[0] as PutTarget, store.current())).toBe(false)
   })
 
   test("an element with no mark, or a slot that is no number, is no target", () => {
@@ -89,15 +97,15 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
   })
 })
 
-test("composerPlace: drafting at the end with the lane, in its root; fresh by key, in its root; none at the root, nor in no root", () => {
+test("composerPlace: your message at the end with the lane, in its root; fresh by key, in its root; none at the root, nor in no root", () => {
   expect(composerPlace({ key: "k", lane: LANE }, E1, TEST_ROOT)).toEqual({
-    kind: "drafting",
+    kind: "composing",
     root: TEST_ROOT,
     at: E1,
     lane: LANE,
   })
   expect(composerPlace({ key: "k" }, E1, TEST_ROOT)).toEqual({
-    kind: "drafting",
+    kind: "composing",
     root: TEST_ROOT,
     at: E1,
     lane: null,

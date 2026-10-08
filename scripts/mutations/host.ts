@@ -879,8 +879,7 @@ export const mutations: readonly Mutation[] = [
     from: "      const followed = await followers(cards, card, sent)\n",
     to: "      const followed: PlaceStep[] = []\n",
     command: unit,
-    expect:
-      "spend: a fresh column's first send leaves its other cards drafting",
+    expect: "spend: a fresh column's first send leaves its other cards notes",
   },
   {
     name: "the policy shares every person's document with everyone",

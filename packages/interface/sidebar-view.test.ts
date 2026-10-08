@@ -25,23 +25,23 @@ import {
   layoutReducer,
   resolveLayout,
 } from "./layout.ts"
+import { rootSlot } from "./palette.ts"
 import {
   dropsWords,
   listKey,
-  type OpenListViewInput,
   offeredByRoot,
-  openListView,
   pageTitle,
   rootSprites,
-} from "./open-list-view.ts"
-import { rootSlot } from "./palette.ts"
+  type SidebarViewInput,
+  sidebarView,
+} from "./sidebar-view.ts"
 
 const R1: Here = { kind: "root", root: entryId("r1") }
 const R2: Here = { kind: "root", root: entryId("r2") }
 const R3: Here = { kind: "root", root: entryId("r3") }
 const reduce = (l: Layout, ...actions: Parameters<typeof layoutReducer>[1][]) =>
   actions.reduce(layoutReducer, l)
-// Your list: r1, r2, r3, then a new agent tab "t"; you are on r1.
+// The sidebar: r1, r2, r3, then a new agent tab "t"; you are on r1.
 const layout = resolveLayout(
   reduce(
     initialLayout(),
@@ -80,7 +80,7 @@ const WORKFLOW: Workflow = {
   closed: { id: DONE, name: "Done" },
 }
 const ID = (n: number) => rootIdFor(`01a0ffd2-0000-7000-8000-00000000000${n}`)
-const input = (over: Partial<OpenListViewInput> = {}): OpenListViewInput => ({
+const input = (over: Partial<SidebarViewInput> = {}): SidebarViewInput => ({
   layout,
   active: R1,
   labels: new Map([
@@ -112,15 +112,15 @@ const input = (over: Partial<OpenListViewInput> = {}): OpenListViewInput => ({
   sprites: new Map(),
   ...over,
 })
-const items = (over: Partial<OpenListViewInput> = {}) =>
-  openListView(input(over)).items
+const items = (over: Partial<SidebarViewInput> = {}) =>
+  sidebarView(input(over)).items
 const kinds = (
   r:
     | (typeof items extends (...a: never) => infer T ? T : never)[number]
     | undefined,
 ) => (r?.kind === "root" ? r.menu.map(i => i.kind) : null)
 
-describe("openListView", () => {
+describe("sidebarView", () => {
   test("your roots, then new tabs, in listOf's order", () => {
     expect(items().map(t => t.kind)).toEqual(["root", "root", "root", "new"])
     expect(items().map(t => t.selected)).toEqual([true, false, false, false])
@@ -290,14 +290,14 @@ describe("openListView", () => {
 })
 
 test("＋'s main action starts agent work; its menu, a conversation", () => {
-  expect(openListView(input()).add).toEqual({
+  expect(sidebarView(input()).add).toEqual({
     agent: { kind: "newTab", asksAgent: true },
     conversation: { kind: "newTab", asksAgent: false },
   })
 })
 
 test("selected is the item you are on, and each item has its own key", () => {
-  const view = openListView(input({ active: R2 }))
+  const view = sidebarView(input({ active: R2 }))
   expect(view.selected).toMatchObject({ kind: "root", root: entryId("r2") })
   expect(view.items.map(listKey)).toEqual([
     "root:r1",
@@ -305,7 +305,7 @@ test("selected is the item you are on, and each item has its own key", () => {
     "root:r3",
     "new:t",
   ])
-  expect(openListView(input({ active: R3 })).selected).toMatchObject({
+  expect(sidebarView(input({ active: R3 })).selected).toMatchObject({
     root: "r3",
   })
 })

@@ -25,10 +25,29 @@ words they were written with.
 | **catch up** | Bring your files, or a thread's copy, up to date with what it is based on. Its commit is titled `catch up: accepted work`, `catch up: <thread>`, or `copy of <wip>`. | `catchUp`, `CatchUpFrom`, `catchUpName` | update, follow, bring up to date |
 | **lane** | A thread's own copy of your repo, in a container of its own (ADR-0034). | `lane`, `LaneName` | |
 
+## Cards and where they are
+
+| word | what it is | in code | retired |
+|---|---|---|---|
+| **card** | Something you pick up and put down: a text card or a thread card (ADR-0111). | | |
+| **text card** | Unsent text, with a place, drawn in one frame coloured by that place. | `CardRecord`, `CardPlace`, `CardFrame`, `cardFrame` | |
+| **thread card** | A root, as the board and the sidebar draw it. | `ThreadCard` | board item |
+| **your message** | The text card in your composer at a thread's end, which only you see. | `composing` (stored as `drafting`), `yourCard` | the composer's card, drafting card (yours) |
+| **note** | A text card below the line, which everyone at the thread sees and the agent does not (ADR-0113). | `note`, `noteOf`, `NoteCardEditor` | drafting card, draft |
+| **queued card** | A text card above the line, which the agent reads once, when the host pops it. | `queued`, `queuedOn`, `QueuedCardEditor` | |
+| **pinned card** | A text card the agent reads on every run, at the top of its thread's column. | `pinned`, `pinnedOf`, `PinnedCardEditor` | |
+| **inventory** | Your own grid of text cards, on every root and device. | `inventory`, `InventoryPanel` | |
+| **the line** | What divides a thread's queued cards, which the agent reads, from its notes and your message, which it does not. | | |
+| **notes board** | A thread's notes laid out in a grid, in its column's pane (ADR-0113). | | |
+| **the dock** | A column's foot: the queue, the line and your message (ADR-0113). | | |
+| **the sidebar** | The column down the left of the page, of your open threads. | `Sidebar`, `sidebarView` | your list |
+| **your open threads** | The roots in the sidebar, yours on every device. | `open:<you>` (stored) | your list |
+
 ## Words that look alike and are not these
 
 - **line**: a line of text (`firstLine`, a column's one-line fact), the
-  cards' line in a column (above it queued, below it drafting, ADR-0048),
+  cards' line in a column (above it queued, below it notes and your
+  message, ADR-0048, ADR-0113),
   and Kyneta's command **Line** (`host/control.ts`), one per seat. None of
   them is accepted work.
 - **take**: take a card into your inventory (ADR-0083). Nothing is done to

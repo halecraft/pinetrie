@@ -1,9 +1,9 @@
-// interface/card-state — the drafting card's editor, decided (ADR-0048).
+// interface/card-state — your message's editor, decided (ADR-0048,
+// ADR-0113).
 //
-// One textarea edits your card at a column's end. Until there is something
-// worth keeping it is local, and takes your card here when it finds one;
-// "+ card" empties it to ask for another (`blank`), and it then takes none.
-// The input that makes it worth keeping creates the card and binds the same
+// One textarea edits your message at a column's end. Until there is
+// something worth keeping it is local, and takes your message here when it
+// finds one. The input that makes it worth keeping creates the card and binds the same
 // element to it; a send holds it until the host answers. Undo and redo in the
 // box reach only its card (ADR-0052).
 // `editorState` decides each step and names what the component must do;
@@ -29,11 +29,6 @@ export type EditorState =
    * takes your card here when one is found.
    */
   | { readonly kind: "local" }
-  /**
-   * No card, after "+ card": as `local`, but a card found is not taken. The
-   * one you were writing is drawn above with the column's other cards.
-   */
-  | { readonly kind: "blank" }
   /** The element is bound to this card's text. */
   | { readonly kind: "bound"; readonly card: CardId }
   /** A send is in flight, from this card or, with null, from the box alone. */
@@ -49,8 +44,6 @@ export type EditorEvent =
    * past its creation only empties it (ADR-0059), so it is not gone.
    */
   | { readonly kind: "gone" }
-  /** "+ card", shown only while bound: empty the box for another card. */
-  | { readonly kind: "new" }
   | { readonly kind: "send" }
   /** The host answered the send; `spent` is whether it took the card's text. */
   | { readonly kind: "settled"; readonly spent: boolean }
@@ -74,29 +67,13 @@ export interface EditorStep {
 }
 
 const LOCAL: EditorState = { kind: "local" }
-const BLANK: EditorState = { kind: "blank" }
 
 /** Whether the box holds no card, so an input worth keeping makes one. */
-export const free = (state: EditorState): boolean =>
-  state.kind === "local" || state.kind === "blank"
+export const free = (state: EditorState): boolean => state.kind === "local"
 
 /** The card the box shows, if any. */
 export const shownBy = (state: EditorState): CardId | null =>
   state.kind === "bound" || state.kind === "sending" ? state.card : null
-
-/**
- * The card a column leaves out of the cards it draws above its composer,
- * because the composer shows it. Before the composer says, and while it is
- * `local`, that is your newest card here (`yourCard`), which it takes at
- * once; after "+ card", none.
- */
-export const shownBelow = (
-  composer: EditorState | undefined,
-  mine: CardId | undefined,
-): CardId | null =>
-  composer === undefined || composer.kind === "local"
-    ? (mine ?? null)
-    : shownBy(composer)
 
 const step = (
   state: EditorState,
@@ -122,8 +99,6 @@ export function editorState(
       // While sending, the host spends the card as part of this send: the
       // reply says how it went.
       return state.kind === "bound" ? step(LOCAL, ["detach"]) : stay(state)
-    case "new":
-      return state.kind === "bound" ? step(BLANK, ["detach"]) : stay(state)
     case "send":
       return state.kind === "sending"
         ? stay(state)

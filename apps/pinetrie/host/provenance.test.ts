@@ -36,13 +36,13 @@ test("before: a shared card's thread end in a loaded root; none for a root not l
   const elsewhere = rootIdFor("01a0ffd2-0000-7000-8000-0000000000bb")
   applyPlaceSteps(b.places, [
     card("here", {
-      kind: "drafting",
+      kind: "note",
       root: ROOT_ID,
       at: atEntry(E1),
       lane: LANE,
     }),
     card("away", {
-      kind: "drafting",
+      kind: "note",
       root: elsewhere,
       at: atEntry(E1),
       lane: LANE,

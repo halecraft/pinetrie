@@ -285,7 +285,7 @@ async function run(check: Checks["check"]): Promise<void> {
         {
           id: held,
           place: {
-            kind: "drafting",
+            kind: "composing",
             root: rootAt(u, where),
             at: where,
             lane: l6.name,

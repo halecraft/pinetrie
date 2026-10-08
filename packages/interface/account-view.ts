@@ -1,5 +1,5 @@
 // interface/account-view — the footer's corner and the menu your avatar opens
-// (ADR-0098). With your list full, the corner is you, your inbox and your
+// (ADR-0098). With the sidebar full, the corner is you, your inbox and your
 // inventory, and the menu is your profile and signing out. Folded, the corner
 // is your avatar alone, carrying the inbox's badge, and the menu holds the
 // inbox and the inventory too. Decided as a value (`accountView`) and worded

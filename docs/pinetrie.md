@@ -256,7 +256,7 @@ Hook names, verified against source: **`useTracked(thunk)`** for a derived
 read — *not* `useValue`, which takes a `CallableRef`; `useDocStatus` returns the
 string union `"pending" | "empty" | "populated"`, not an object.
 
-**The interface is your list of roots down the left, and the root you are
+**The interface is the sidebar of roots down the left, and the root you are
 on, a rail beside columns** (`docs/06-interface.md`,
 `packages/interface/TECHNICAL.md`, ADR-0029, ADR-0112), over a footer showing
 who is here, what needs you and the board, which slides up over the columns
@@ -267,13 +267,14 @@ stretch drawn as one capsule (ADR-0031), a long ask's work a capsule of its
 own (ADR-0056).
 Views are pure functions over one `indexTree` (`packages/core/tree.ts`,
 `roots.ts`); which root you are on and each root's columns are a reducer in
-`packages/interface/layout.ts`, your list is your `open:` document
-(`packages/session/open-list.ts`), and the inbox is
+`packages/interface/layout.ts`, the sidebar is your `open:` document
+(`packages/session/open-threads.ts`), and the inbox is
 `packages/interface/inbox.ts`.
 
-The composer is your drafting card (ADR-0048), the text people edit
-together: one uncontrolled textarea, bound with Kyneta's `attach` to the
-card's text from the keystroke that creates it (`packages/web/card-editor.tsx`).
+The composer is your message (ADR-0048, ADR-0113), which only you see;
+what people edit together before it is sent is a note. The composer is one
+uncontrolled textarea, bound with Kyneta's `attach` to the card's text
+from the keystroke that creates it (`packages/web/card-editor.tsx`).
 
 **An image pasted into a composer reaches the agent** (ADR-0042): uploaded
 to `POST /blob`, kept by SHA-256 in `pinetrie_blobs` beside the session in

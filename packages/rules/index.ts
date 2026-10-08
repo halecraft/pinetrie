@@ -115,6 +115,7 @@ export {
   planNextQueuedCardPop,
   planReorder,
   planSetCommand,
+  planStoredCardRepair,
   planUnqueueAll,
   planUnsent,
   type QueuedCard,

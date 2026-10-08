@@ -108,7 +108,7 @@ import { type ChatHow, planChatRequest, startsRoot } from "./chat.ts"
 import { hostLine } from "./host-line.ts"
 import { heldBy, type Slots, swapWrites } from "./inventory.ts"
 import { inventorySlots } from "./inventory-slots.ts"
-import { type OpenList, openList } from "./open-list.ts"
+import { type OpenThreads, openThreads } from "./open-threads.ts"
 import { presenceSeat } from "./presence-seat.ts"
 import { NO_ROOT, rootDocs } from "./root-docs.ts"
 import { type Readable, readable, select, snapshotStore } from "./store.ts"
@@ -299,11 +299,11 @@ export interface SessionClient {
    */
   readonly attention: AttentionStore
   /**
-   * Your list: the roots you have open, in your order, on every device of
+   * The sidebar: the roots you have open, in your order, on every device of
    * yours (ADR-0112). A root moved to the closed state leaves it, but the one
    * the page reports it shows (`here`).
    */
-  readonly openList: OpenList
+  readonly openThreads: OpenThreads
   /**
    * Title the entry `entry`, or clear its title with null (ADR-0045), in
    * the held root that has it.
@@ -430,7 +430,7 @@ export async function connectSession(
       ? startOf(readRoots(session).values())
       : null,
   )
-  const open = openList(exchange, me, host.peerId, () => {
+  const open = openThreads(exchange, me, host.peerId, () => {
     const archived = readArchived(session)
     return new Set(archived.keys())
   })
@@ -570,7 +570,7 @@ export async function connectSession(
     moves,
     slots: inventory.slots,
     attention,
-    openList: open,
+    openThreads: open,
     cardText: texts.text,
     undoFor(id) {
       const docs = [cardDocId(id)]
@@ -604,7 +604,7 @@ export async function connectSession(
           ? line.request(plan.intent, plan.id)
           : tracked(plan.intent, [plan.pending], null)
       return sent.then(({ outcome }) => {
-        // A root you start is in your list (ADR-0112).
+        // A root you start is in the sidebar (ADR-0112).
         if (startsRoot(at, outcome)) open.ensure(root)
         return outcome
       })

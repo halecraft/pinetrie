@@ -1,5 +1,5 @@
-// interface/inbox-view — your inbox, under your list beside your avatar
-// (ADR-0091), or in the menu your avatar opens while your list is folded
+// interface/inbox-view — your inbox, under the sidebar beside your avatar
+// (ADR-0091), or in the menu your avatar opens while the sidebar is folded
 // (ADR-0098): how the threads you follow ended, their work ready to accept,
 // what is worth a read, and mentions of you. It lists exactly what it
 // counts: the badge is what needs you (`inboxCount`), the one count the

@@ -1,5 +1,5 @@
-// session/open-repair — what your list's document should say (ADR-0112).
-// Pure: `open-list.ts` writes what these decide.
+// session/open-repair — what the sidebar's document should say (ADR-0112).
+// Pure: `open-threads.ts` writes what these decide.
 
 import type { RootId } from "@pinetrie/core"
 import { keyAfter, orderBetween, orderKeys } from "@pinetrie/rules"
@@ -23,7 +23,7 @@ export const orderOpen = (
     .map(([root]) => root)
 
 /**
- * `root` put before `before` in your list, or at its end for null or a root
+ * `root` put before `before` in the sidebar, or at its end for null or a root
  * not in it; a root already in it moves. Renumbers every root when there is
  * no room between its neighbours.
  */
@@ -59,7 +59,7 @@ export function placeInList(
 }
 
 /**
- * The repair: archived roots leave your list, but the one you are on, which
+ * The repair: archived roots leave the sidebar, but the one you are on, which
  * leaves once you switch away. A restore then brings a root back only for
  * whoever restores it (ADR-0030). Nothing when nothing differs.
  */

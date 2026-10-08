@@ -9,7 +9,6 @@ import {
   type CardRecord,
   cardId,
   discardedOf,
-  draftingOf,
   emailLocalPart,
   entryId,
   findSeqKeys,
@@ -25,9 +24,11 @@ import {
   NOBODY,
   normalizeEmail,
   normalizeName,
+  noteOf,
   parseMentions,
   parseNewLane,
   parseTitle,
+  pinnedOf,
   placeFields,
   placeOfFields,
   projectTranscript,
@@ -313,7 +314,7 @@ describe("a card's place as flat fields (ADR-0059)", () => {
   const ADA = writerId("ada@example.com")
   const places: CardPlace[] = [
     {
-      kind: "drafting",
+      kind: "note",
       root: TEST_ROOT,
       at: atEntry(entryId("e-1")),
       lane: null,
@@ -363,12 +364,11 @@ describe("a card's place as flat fields (ADR-0059)", () => {
     })
   })
 
-  test("sameKey leaves out the pinned cards' order, and tells pinned from drafting", () => {
+  test("sameKey leaves out the pinned cards' order, and tells pinned from a note", () => {
     const pinned = keyOf(places[2] as CardPlace)
     expect(sameKey(pinned, keyOf({ ...(places[2] as CardPlace) }))).toBe(true)
     expect(
-      pinned.kind === "pinned" &&
-        sameKey(pinned, { ...pinned, kind: "drafting" }),
+      pinned.kind === "pinned" && sameKey(pinned, { ...pinned, kind: "note" }),
     ).toBe(false)
   })
 
@@ -432,17 +432,17 @@ describe("moves, built once (ADR-0059)", () => {
     carries: { kind: "message", command: null },
     unsent: null,
   })
-  const drafting = card({ kind: "drafting", root: TEST_ROOT, at, lane: LANE })
+  const atEnd = card({ kind: "note", root: TEST_ROOT, at, lane: LANE })
   const lanes = (
     root: typeof TEST_ROOT,
   ): ReadonlyMap<typeof LANE, LaneRecord> =>
     new Map([[LANE, { lane: LANE, root, work: null, by: ADA, createdAt: 0 }]])
 
   test("a move goes from where the card is; a discard is gone in its root, or the one you are on", () => {
-    const gone = discardedOf(drafting.place, OTHER)
-    expect(moveOf(drafting, gone)).toEqual({
+    const gone = discardedOf(atEnd.place, OTHER)
+    expect(moveOf(atEnd, gone)).toEqual({
       card: cardId("c-1"),
-      from: { kind: "drafting", root: TEST_ROOT, at, lane: LANE },
+      from: { kind: "note", root: TEST_ROOT, at, lane: LANE },
       to: { kind: "gone", root: TEST_ROOT, why: { kind: "discarded" } },
     })
     expect(discardedOf({ kind: "inventory", holder: ADA }, OTHER)).toEqual({
@@ -475,7 +475,7 @@ describe("moves, built once (ADR-0059)", () => {
 
   test("an unqueue puts a card back where it was queued, in its root", () => {
     expect(
-      draftingOf({
+      noteOf({
         kind: "queued",
         root: OTHER,
         at,
@@ -484,12 +484,39 @@ describe("moves, built once (ADR-0059)", () => {
         by: ADA,
         seen: "v",
       }),
-    ).toEqual({ kind: "drafting", root: OTHER, at, lane: LANE })
+    ).toEqual({ kind: "note", root: OTHER, at, lane: LANE })
+  })
+
+  test("a pin pins a card below the line or queued, at the same thread end", () => {
+    const pinned = { kind: "pinned", root: OTHER, at, lane: LANE }
+    expect(pinnedOf({ kind: "note", root: OTHER, at, lane: LANE })).toEqual(
+      pinned,
+    )
+    expect(
+      pinnedOf({
+        kind: "queued",
+        root: OTHER,
+        at,
+        lane: LANE,
+        order: "a",
+        by: ADA,
+        seen: "v",
+      }),
+    ).toEqual(pinned)
+    expect(pinnedOf({ kind: "inventory", holder: ADA })).toBeNull()
   })
 
   test("a queued card's root is its lane's, else its own; a card at no thread has none", () => {
-    expect(queueRoot(LANE, drafting, lanes(OTHER))).toBe(OTHER)
-    expect(queueRoot(LANE, drafting, new Map())).toBe(TEST_ROOT)
+    expect(queueRoot(LANE, atEnd, lanes(OTHER))).toBe(OTHER)
+    expect(queueRoot(LANE, atEnd, new Map())).toBe(TEST_ROOT)
+    const pinned = card({
+      kind: "pinned",
+      root: OTHER,
+      at,
+      lane: LANE,
+      order: "a",
+    })
+    expect(queueRoot(LANE, pinned, new Map())).toBe(OTHER)
     expect(
       queueRoot(LANE, card({ kind: "inventory", holder: ADA }), new Map()),
     ).toBeUndefined()

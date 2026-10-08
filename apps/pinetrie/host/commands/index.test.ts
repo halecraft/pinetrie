@@ -234,7 +234,7 @@ test("a chat command spends its card once written, record then text, answering w
           owner: ALICE,
           placer: ALICE,
           place: {
-            kind: "drafting",
+            kind: "composing",
             root: ROOT_ID,
             at: atEntry(ROOT_ENTRY),
             lane: null,

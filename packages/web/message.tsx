@@ -26,8 +26,8 @@ import {
   type ScreenMemory,
   showsText,
   speakerLabel,
+  TAKE_COPY,
   TAKE_COPY_INTO_INVENTORY,
-  TAKE_INTO_INVENTORY,
   toolBody,
   withContributors,
 } from "@pinetrie/interface"
@@ -206,7 +206,7 @@ function Tools({
           title={TAKE_COPY_INTO_INVENTORY}
           type="button"
         >
-          {TAKE_INTO_INVENTORY}
+          {TAKE_COPY}
         </button>
       )}
       {edit?.kind === "branch" && (

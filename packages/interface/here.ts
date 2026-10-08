@@ -1,10 +1,10 @@
-// interface/here — who else is in the session, for the board and your list
+// interface/here — who else is in the session, for the board and the sidebar
 // (ADR-0030, ADR-0112). Pure.
 //
 // Presence is thread-level (ADR-0024): each column of the root a person is on
 // reports the end of its thread. `peopleHere` groups those by person, where
 // `readingAt` groups them by thread end; "never you" is `readingAt`'s. A
-// board item's readers are those people in its root (`peopleIn`); your
+// thread card's readers are those people in its root (`peopleIn`); your
 // list's avatars are the same people turned around, by root.
 
 import {
@@ -74,7 +74,7 @@ export function peopleIn(
   })
 }
 
-/** Each root's readers, for your list's avatars: `people` turned around. */
+/** Each root's readers, for the sidebar's avatars: `people` turned around. */
 export function readersByRoot(
   people: readonly PersonHere[],
 ): ReadonlyMap<string, readonly WriterId[]> {

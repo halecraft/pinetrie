@@ -1,12 +1,12 @@
-// interface/layout — which root you are on, your list, and each root's columns
+// interface/layout — which root you are on, the sidebar, and each root's columns
 // (ADR-0029, ADR-0030, ADR-0112).
 //
-// The root you are on shows one root: its rail and its columns. Your list is
+// The root you are on shows one root: its rail and its columns. The sidebar is
 // the roots you have open, in your order: it is your own document, the same
-// on every device (`openList`, `@pinetrie/session`), and comes in here as a
+// on every device (`openThreads`, `@pinetrie/session`), and comes in here as a
 // fact, so the layout draws it but never stores it. The layout keeps a
 // column list per root you have opened, and new tabs: each one fresh column
-// at the root that becomes a root of your list once its first message is
+// at the root that becomes a root of the sidebar once its first message is
 // written. Which root you are on, the columns, the new tabs and whether the
 // board is open are this browser tab's view state, never written to the
 // document; they are stored per browser tab (ADR-0027) in the form at the end
@@ -39,7 +39,7 @@ import {
   type ReaderAction,
 } from "./columns.ts"
 
-/** What the workspace shows: a root of your list, a new tab, or nothing. */
+/** What the workspace shows: a root of the sidebar, a new tab, or nothing. */
 export type Here =
   | { readonly kind: "nothing" }
   | { readonly kind: "root"; readonly root: EntryId }
@@ -54,13 +54,13 @@ export interface Layout {
    */
   readonly active: Here | null
   /**
-   * Your list as drawn: your open roots in your order (`LayoutFacts.list`),
+   * The sidebar as drawn: your open roots in your order (`LayoutFacts.list`),
    * less the archived ones but the root you are on, and the root you are on
    * wherever the list lacks it. Derived by `resolveLayout`, never stored.
    */
   readonly open: readonly EntryId[]
   /**
-   * Each opened root's columns, in order, kept when it leaves your list so
+   * Each opened root's columns, in order, kept when it leaves the sidebar so
    * opening it again brings them back. A root with none is absent.
    */
   readonly roots: ReadonlyMap<EntryId, readonly Column[]>
@@ -86,7 +86,7 @@ export type LayoutAction =
   /** Close an unsent new tab; nothing was written. */
   | { readonly kind: "closeNewTab"; readonly key: string }
   /**
-   * A root leaves your list (its document is written apart): if you are on
+   * A root leaves the sidebar (its document is written apart): if you are on
    * it, show its neighbour. Its columns are kept.
    */
   | { readonly kind: "closeRoot"; readonly root: EntryId }
@@ -124,7 +124,7 @@ export interface LayoutFacts {
   readonly lanes: readonly LaneView[]
   /** The roots in the closed workflow state, by root entry (ADR-0112). */
   readonly archived: ReadonlySet<EntryId>
-  /** Your list (`openList`), by root entry: a root the directory lacks is left out. */
+  /** The sidebar (`openThreads`), by root entry: a root the directory lacks is left out. */
   readonly list: readonly EntryId[]
 }
 
@@ -146,7 +146,7 @@ export function columnsOf(layout: Layout, root: EntryId): readonly Column[] {
 
 /**
  * Where a column is, by its key: a new tab's, or a root's, whether or not
- * that root is in your list. Undefined for a key this layout does not hold.
+ * that root is in the sidebar. Undefined for a key this layout does not hold.
  */
 export function hereOfColumn(layout: Layout, key: string): Here | undefined {
   if (layout.newTabs.some(c => c.key === key)) return { kind: "new", key }
@@ -174,7 +174,7 @@ const withRoot = (
 }
 
 /**
- * Your list as drawn: the archived roots leave it, but the root you are on,
+ * The sidebar as drawn: the archived roots leave it, but the root you are on,
  * which stays where it is, or comes at the end where the list lacks it:
  * another device's repair may have taken it out (`planOpenRepair`).
  */
@@ -192,7 +192,7 @@ const sameList = (a: readonly EntryId[], b: readonly EntryId[]): boolean =>
   a.length === b.length && a.every((r, i) => b[i] === r)
 
 /**
- * What to show once `closed` is closed: its neighbour below in your list,
+ * What to show once `closed` is closed: its neighbour below in the sidebar,
  * else above, else nothing. `layout` is before the close. Pure.
  */
 export function afterClosing(layout: Layout, closed: Here): Here {
@@ -293,7 +293,7 @@ export function layoutReducer(state: Layout, action: LayoutAction): Layout {
 /**
  * The layout to draw: `stored` brought up to `facts`. `App` draws this in the
  * render that reads the facts, and stores it after, so no render pairs new
- * entries with an old anchor (S35). Your list is the facts' (`drawnList`).
+ * entries with an old anchor (S35). The sidebar is the facts' (`drawnList`).
  * Returns `stored` itself when nothing changes.
  */
 export function resolveLayout(stored: Layout, facts: LayoutFacts): Layout {
@@ -306,7 +306,7 @@ export function resolveLayout(stored: Layout, facts: LayoutFacts): Layout {
  * Every root's columns follow the tree, not only the active root's: a stored
  * anchor left behind can later follow a newer branch below it (ADR-0027). A
  * new tab whose first message is written becomes its root's columns, and the
- * root you are on; the session puts that root in your list as its send is
+ * root you are on; the session puts that root in the sidebar as its send is
  * answered.
  */
 function syncLayout(
@@ -352,7 +352,7 @@ function syncLayout(
  * anchors a held root lacks go, and what to show is chosen. A root's columns
  * are pruned only where this tab holds it: another's anchors are in no index.
  * A root you were on that is gone or archived gives way to the last root of
- * your list, else nothing, and with nothing the board opens: nothing opens a
+ * the sidebar, else nothing, and with nothing the board opens: nothing opens a
  * root by itself (ADR-0030).
  */
 function pruneLayout(
@@ -395,7 +395,7 @@ function pruneLayout(
 }
 
 /**
- * Your list as drawn, then new tabs: what the sidebar shows. An archived
+ * The sidebar as drawn, then new tabs: what the sidebar shows. An archived
  * root you are on is still in `open` (`resolveLayout` keeps it), so it keeps
  * its place.
  */
@@ -407,7 +407,7 @@ export function listOf(layout: Layout): readonly Here[] {
 }
 
 /**
- * The roots among `roots` not in your list and not archived: what ▦ marks
+ * The roots among `roots` not in the sidebar and not archived: what ▦ marks
  * for them (ADR-0077, ADR-0112). An archived root's work is done, so it marks
  * only its own row on the board.
  */
@@ -532,7 +532,7 @@ const StoredHere = Type.Union([
 
 /**
  * `v` changes when the shape does; an older layout is dropped, not migrated.
- * `v: 5` (ADR-0112): your list left for your own document, and the board's
+ * `v: 5` (ADR-0112): the sidebar left for your own document, and the board's
  * state came in.
  */
 const StoredLayout = Type.Object({

@@ -17,7 +17,7 @@ const BEA = writerId("bea@x.io")
 const CAL = writerId("cal@x.io")
 const HERE = entryId("e-here")
 const at = (id: string): PlaceKey => ({
-  kind: "drafting",
+  kind: "note",
   root: ROOT,
   at: atEntry(entryId(id)),
   lane: null,
@@ -43,7 +43,7 @@ const trace = (over: Partial<TraceRecord>): TraceRecord => ({
 
 test("tracesAt: yours, whose place resolves to this end, oldest first", () => {
   const endOf = (from: PlaceKey) =>
-    from.kind === "drafting" && from.at.kind === "entry" ? from.at.id : null
+    from.kind === "note" && from.at.kind === "entry" ? from.at.id : null
   const traces = [
     trace({ id: "late", at: 3 }),
     trace({ id: "early", at: 1 }),

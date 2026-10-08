@@ -20,6 +20,7 @@ import {
   layoutReducer,
   resolveLayout,
 } from "./layout.ts"
+import type { ComposerSpot } from "./put-target.ts"
 
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
@@ -30,12 +31,13 @@ const index = tree({ "1-r1": null, "2-a": "1-r1" })
 const R1 = entryId("1-r1")
 const A = entryId("2-a")
 const inventory = { kind: "inventory", holder: ADA } as const
-const drafting = {
-  kind: "drafting",
+const atEnd = {
+  kind: "composing",
   root: TEST_ROOT,
   at: atEntry(A),
   lane: null,
 } as const
+const note = { ...atEnd, kind: "note" } as const
 const pinnedKey = {
   kind: "pinned",
   root: TEST_ROOT,
@@ -76,11 +78,12 @@ const facts = (over: Partial<CardFacts> = {}): CardFacts => ({
   lanes: [],
   laneRecords: new Map(),
   me: ADA,
+  filled: new Set(),
   slots: {},
   selected: 0,
-  composers: new Map<string, CardPlace>([
-    [threadKey, drafting],
-    ["f-1", freshF1],
+  composers: new Map<string, ComposerSpot>([
+    [threadKey, { place: atEnd, message: null }],
+    ["f-1", { place: freshF1, message: null }],
   ]),
   ...over,
 })
@@ -106,8 +109,8 @@ const inColumn = (
 
 describe("take into the inventory (ADR-0048 step 4)", () => {
   test("into the selected slot when it is empty, else the first empty", () => {
-    const s = state({ cards: [card(C1, drafting)], selected: 4 })
-    const move = { card: C1, from: drafting, to: inventory }
+    const s = state({ cards: [card(C1, atEnd)], selected: 4 })
+    const move = { card: C1, from: atEnd, to: inventory }
     expect(plan({ kind: "takeIntoInventory", card: C1 }, s)).toEqual([
       { kind: "showInventory", brief: true },
       {
@@ -120,7 +123,7 @@ describe("take into the inventory (ADR-0048 step 4)", () => {
     ])
     const intoInventory = plan(
       { kind: "takeIntoInventory", card: C1 },
-      state({ cards: [card(C1, drafting)], selected: 4, slots: { "4": C2 } }),
+      state({ cards: [card(C1, atEnd)], selected: 4, slots: { "4": C2 } }),
     )
     expect(intoInventory[1]).toMatchObject({ how: { slot: 0 } })
   })
@@ -132,7 +135,7 @@ describe("take into the inventory (ADR-0048 step 4)", () => {
     expect(
       plan(
         { kind: "takeIntoInventory", card: C1 },
-        state({ cards: [card(C1, drafting)], slots }),
+        state({ cards: [card(C1, atEnd)], slots }),
       )[1],
     ).toEqual({
       kind: "refuse",
@@ -169,9 +172,9 @@ describe("take into the inventory (ADR-0048 step 4)", () => {
 })
 
 describe("put", () => {
-  test("to a column: below the line where its composer creates cards, said there", () => {
+  test("to a column: a note at its end, said there (ADR-0113)", () => {
     const s = state({ cards: [card(C1, inventory)], slots: { "3": C1 } })
-    const move = { card: C1, from: inventory, to: drafting }
+    const move = { card: C1, from: inventory, to: note }
     expect(
       plan(
         { kind: "put", card: C1, target: { kind: "column", key: threadKey } },
@@ -190,7 +193,7 @@ describe("put", () => {
 
   test("to a slot: a swap within your inventory, or a take into the inventory there", () => {
     const s = state({
-      cards: [card(C1, inventory), card(C2, drafting)],
+      cards: [card(C1, inventory), card(C2, atEnd)],
       slots: { "3": C1 },
     })
     expect(
@@ -208,7 +211,7 @@ describe("put", () => {
   })
 
   test("a column no composer publishes, or where the card already is: nothing", () => {
-    const s = state({ cards: [card(C1, drafting)] })
+    const s = state({ cards: [card(C1, note)] })
     expect(
       plan(
         { kind: "put", card: C1, target: { kind: "column", key: "gone" } },
@@ -224,13 +227,34 @@ describe("put", () => {
   })
 })
 
-describe("pin and unpin (ADR-0048 step 5)", () => {
-  test("pin: a drafting card to the top of the same thread's column, a move said in the column", () => {
-    const s = state({ cards: [card(C1, drafting)] })
-    expect(plan(inColumn({ kind: "pin", card: C1 }, threadKey), s)).toEqual([
+describe("your message (ADR-0113)", () => {
+  const MSG = cardId("c-9")
+  const withMessage = (
+    filled: boolean,
+    cards: readonly CardRecord[],
+    key = threadKey,
+    place: CardPlace = atEnd,
+  ) =>
+    state({
+      cards: [...cards, card(MSG, place)],
+      filled: new Set(filled ? [MSG] : []),
+      slots: { "3": C1 },
+      composers: new Map<string, ComposerSpot>([
+        [key, { place, message: MSG }],
+      ]),
+    })
+  const toComposer = (key = threadKey): Intent => ({
+    kind: "put",
+    card: C1,
+    target: { kind: "composer", key },
+  })
+
+  test("a drop on the composer with no message there makes the card your message", () => {
+    const s = state({ cards: [card(C1, note)] })
+    expect(plan(toComposer(), s)).toEqual([
       {
         kind: "moveCard",
-        move: { card: C1, from: drafting, to: pinnedKey },
+        move: { card: C1, from: note, to: atEnd },
         how: { actedAt: { kind: "column", key: threadKey }, slot: null },
         queuedBy: null,
         fly: true,
@@ -238,18 +262,105 @@ describe("pin and unpin (ADR-0048 step 5)", () => {
     ])
   })
 
-  test("unpin: below the line where it was pinned", () => {
+  test("a message with text takes the note's place, in one move of the two: one undo", () => {
+    expect(plan(toComposer(), withMessage(true, [card(C1, note)]))).toEqual([
+      {
+        kind: "keep",
+        moves: [
+          { move: { card: C1, from: note, to: atEnd }, slot: null },
+          { move: { card: MSG, from: atEnd, to: note }, slot: null },
+        ],
+        actedAt: { kind: "column", key: threadKey },
+        close: [],
+      },
+    ])
+  })
+
+  test("a message with text goes to the slot a card from your inventory leaves", () => {
+    const [keep] = plan(toComposer(), withMessage(true, [card(C1, inventory)]))
+    expect(keep).toMatchObject({
+      kind: "keep",
+      moves: [
+        { move: { card: C1, to: atEnd }, slot: null },
+        { move: { card: MSG, to: inventory }, slot: 3 },
+      ],
+    })
+  })
+
+  test("an empty message is discarded as the card takes its place", () => {
+    const [keep] = plan(toComposer(), withMessage(false, [card(C1, note)]))
+    expect(keep).toMatchObject({
+      kind: "keep",
+      moves: [
+        { move: { card: C1, to: atEnd } },
+        { move: { card: MSG, to: { kind: "gone" } } },
+      ],
+    })
+  })
+
+  test("in a fresh column, a message with text refuses a card from anywhere but your inventory", () => {
+    const s = withMessage(true, [card(C1, note)], "f-1", freshF1)
+    expect(plan(toComposer("f-1"), s)).toEqual([
+      {
+        kind: "refuse",
+        refusal: {
+          card: C1,
+          actedAt: { kind: "column", key: "f-1" },
+          code: "message-holds-text",
+        },
+      },
+    ])
+    const fromInventory = withMessage(
+      true,
+      [card(C1, inventory)],
+      "f-1",
+      freshF1,
+    )
+    expect(plan(toComposer("f-1"), fromInventory)[0]).toMatchObject({
+      kind: "keep",
+    })
+  })
+
+  test("Move to ▸ notes: your message becomes a note at its end", () => {
+    const s = state({ cards: [card(C1, atEnd)] })
+    expect(plan(inColumn({ kind: "toNote", card: C1 }, threadKey), s)).toEqual([
+      {
+        kind: "moveCard",
+        move: { card: C1, from: atEnd, to: note },
+        how: { actedAt: { kind: "column", key: threadKey }, slot: null },
+        queuedBy: null,
+        fly: true,
+      },
+    ])
+  })
+})
+
+describe("pin and unpin (ADR-0048 step 5)", () => {
+  test("pin: your message to the top of the same thread's column, a move said in the column", () => {
+    const s = state({ cards: [card(C1, atEnd)] })
+    expect(plan(inColumn({ kind: "pin", card: C1 }, threadKey), s)).toEqual([
+      {
+        kind: "moveCard",
+        move: { card: C1, from: atEnd, to: pinnedKey },
+        how: { actedAt: { kind: "column", key: threadKey }, slot: null },
+        queuedBy: null,
+        fly: true,
+      },
+    ])
+  })
+
+  test("unpin: a note where it was pinned", () => {
     const s = state({ cards: [card(C1, pinnedAtA)] })
     expect(
       plan(inColumn({ kind: "unpin", card: C1 }, threadKey), s)[0],
     ).toMatchObject({
       kind: "moveCard",
-      move: { card: C1, from: pinnedKey, to: drafting },
+      move: { card: C1, from: pinnedKey, to: note },
     })
   })
 
   test("a fresh card has no thread to pin to; an unpin of a card not pinned is nothing", () => {
-    const s = state({ cards: [card(C1, freshF1), card(C2, drafting)] })
+    const s = state({ cards: [card(C1, freshF1), card(C2, atEnd)] })
     expect(plan(inColumn({ kind: "pin", card: C1 }), s)).toEqual([])
     expect(plan(inColumn({ kind: "unpin", card: C2 }, threadKey), s)).toEqual(
       [],
@@ -355,11 +466,11 @@ describe("afterUndo: what an undo's answer brings into view (ADR-0052)", () => {
 
   test("a card back at a thread's end: shown as openAt shows it", () => {
     expect(
-      answered({ kind: "undone", cards: [{ card: C1, place: drafting }] }),
+      answered({ kind: "undone", cards: [{ card: C1, place: atEnd }] }),
     ).toContainEqual({ kind: "reveal", entry: A })
   })
 
-  test("an undone pin: shown at its thread's end, as a drafting card is", () => {
+  test("an undone pin: shown at its thread's end, as a note is", () => {
     expect(
       answered({ kind: "undone", cards: [{ card: C1, place: pinnedKey }] }),
     ).toContainEqual({ kind: "reveal", entry: A })
@@ -447,7 +558,7 @@ describe("openTrace: where a trace leads (ADR-0048, Other people)", () => {
       for: ADA,
       card: C1,
       by: BEA,
-      from: drafting,
+      from: atEnd,
       to: null,
       message,
       at: 1,

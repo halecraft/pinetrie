@@ -1,4 +1,4 @@
-// interface/list-width — your list full or folded to icons (ADR-0088). The
+// interface/list-width — the sidebar full or folded to icons (ADR-0088). The
 // choice is kept by each client: the page's is this browser tab's, a new tab
 // starting from the device's latest (`tabState`). Until you choose, a small
 // window shows icons. Pure.
@@ -34,7 +34,7 @@ export function listFoldWords(shown: ListWidth): {
   readonly title: string
 } {
   const label =
-    shown === "full" ? "fold your list to icons" : "show your list's titles"
+    shown === "full" ? "fold the sidebar to icons" : "show the sidebar's titles"
   return {
     glyph: shown === "full" ? "«" : "»",
     label,

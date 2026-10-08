@@ -30,7 +30,7 @@ const BEA = writerId("bea@x.io")
 const LANE = laneNameForThread("x")
 const C1 = cardId("c-1")
 const at = atEntry(entryId("e-1"))
-const drafting = { kind: "drafting", root: TEST_ROOT, at, lane: LANE } as const
+const atEnd = { kind: "composing", root: TEST_ROOT, at, lane: LANE } as const
 const queuedKey = {
   kind: "queued",
   root: TEST_ROOT,
@@ -43,7 +43,7 @@ const card = (over: Partial<CardRecord> = {}): CardRecord => ({
   id: C1,
   owner: ME,
   placer: ME,
-  place: drafting,
+  place: atEnd,
   carries: { kind: "message", command: null },
   unsent: null,
   ...over,
@@ -64,7 +64,7 @@ const queueIt: Pending = {
   ...sentAs,
   id: "m-1",
   kind: "move",
-  move: { card: C1, from: drafting, to: queuedKey },
+  move: { card: C1, from: atEnd, to: queuedKey },
 }
 const sent = (...p: Pending[]): MovesEvent => ({ kind: "sent", pending: p })
 const accepted = (id: string, rev: number): MovesEvent => ({
@@ -87,7 +87,7 @@ describe("the tab's moves (ADR-0059)", () => {
     const drawn = withPending(host, s, ME)
     expect(drawn.map(c => [c.id, c.place.kind])).toEqual([
       ["c-1", "queued"],
-      ["c-2", "drafting"],
+      ["c-2", "composing"],
     ])
     const out = run([sent({ ...sentAs, id: "m-1", kind: "send", card: C1 })])
     expect(withPending(host, out, ME)).toEqual([])
@@ -111,7 +111,7 @@ describe("the tab's moves (ADR-0059)", () => {
 
   test("overtaken: accepted, then the queued card's pop removes it before the copy catches up; nothing stays drawn", () => {
     const s = run([sent(queueIt), accepted("m-1", 4)])
-    // The copy goes from drafting straight to gone, at rev 5.
+    // The copy goes from atEnd straight to gone, at rev 5.
     const after = movesStep(s, changed(5))
     expect(after.pending).toEqual([])
     expect(withPending([], after, ME)).toEqual([])
@@ -143,7 +143,7 @@ describe("the tab's moves (ADR-0059)", () => {
       ...sentAs,
       id: "d-1",
       kind: "move",
-      move: { card: C1, from: drafting, to: gone },
+      move: { card: C1, from: atEnd, to: gone },
     } as const
     const s = run([sent(discard), accepted("d-1", 4)])
     expect(s.notices).toEqual([
@@ -255,7 +255,7 @@ describe("answerOf", () => {
   test("a move someone made first: moved, naming its placer", () => {
     expect(
       answerOf(
-        { kind: "unmoved", code: "moved", place: drafting, by: BEA },
+        { kind: "unmoved", code: "moved", place: atEnd, by: BEA },
         3,
         context,
       ),
@@ -279,7 +279,7 @@ describe("a command of several moves: a keep (ADR-0066)", () => {
     ...sentAs,
     id: "k-1",
     kind: "move",
-    move: { card, from: drafting, to: inventory },
+    move: { card, from: atEnd, to: inventory },
     slot,
   })
   const both = [keeping(C1, 3), keeping(C2, 4)]
@@ -341,7 +341,7 @@ describe("intentsOf", () => {
       ...sentAs,
       id: "m-1",
       kind: "move",
-      move: { card: C1, from: drafting, to: { kind: "inventory", holder: ME } },
+      move: { card: C1, from: atEnd, to: { kind: "inventory", holder: ME } },
       slot: 3,
     }
     const create: Pending = {
@@ -372,7 +372,7 @@ describe("a move's decisions, before and after it is sent", () => {
   const inventory = { kind: "inventory", holder: ME } as const
   const intoInventory = pendingOf(
     "m-1",
-    { card: C1, from: drafting, to: inventory },
+    { card: C1, from: atEnd, to: inventory },
     { actedAt: { kind: "inventory" }, slot: 4 },
     null,
   )
@@ -388,9 +388,9 @@ describe("a move's decisions, before and after it is sent", () => {
   })
 
   test("a queue carries the text's version as sent; any other move is left alone", () => {
-    const move = { card: C1, from: drafting, to: queuedKey }
+    const move = { card: C1, from: atEnd, to: queuedKey }
     expect(stampSeen(move, "v9").to).toEqual({ ...queuedKey, seen: "v9" })
-    const out = { card: C1, from: drafting, to: drafting }
+    const out = { card: C1, from: atEnd, to: atEnd }
     expect(stampSeen(out, "v9")).toBe(out)
   })
 })

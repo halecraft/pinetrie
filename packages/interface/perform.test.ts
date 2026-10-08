@@ -34,7 +34,7 @@ const ports = () => {
       swapSlots: vi.fn(),
       undoSwap: vi.fn(async () => {}),
       refuse: vi.fn(),
-      openList: {
+      openThreads: {
         roots: { current: () => [], subscribe: () => () => {} },
         open: vi.fn(),
         ensure: vi.fn(),
@@ -75,7 +75,7 @@ const card: CardRecord = {
   id: cardId("c"),
   owner: ada,
   placer: ada,
-  place: { kind: "drafting", root: TEST_ROOT, at, lane },
+  place: { kind: "composing", root: TEST_ROOT, at, lane },
   carries: { kind: "message", command: "bring-up-to-date" },
   unsent: null,
 }
@@ -129,7 +129,7 @@ test.each<Row>([
   },
   {
     effect: { kind: "list", act: { kind: "ensure", root: TEST_ROOT } },
-    port: p => p.session.openList.ensure,
+    port: p => p.session.openThreads.ensure,
     args: [TEST_ROOT],
   },
   {
@@ -137,12 +137,12 @@ test.each<Row>([
       kind: "list",
       act: { kind: "place", root: TEST_ROOT, before: null },
     },
-    port: p => p.session.openList.open,
+    port: p => p.session.openThreads.open,
     args: [TEST_ROOT, null],
   },
   {
     effect: { kind: "list", act: { kind: "close", root: TEST_ROOT } },
-    port: p => p.session.openList.close,
+    port: p => p.session.openThreads.close,
     args: [TEST_ROOT],
   },
   { effect: { kind: "armFocus", key: "k" }, port: p => p.arm, args: ["k"] },

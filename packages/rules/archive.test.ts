@@ -302,7 +302,7 @@ describe("writesIn: the root a command writes in (ADR-0063)", () => {
             card: cardId("c"),
             from: null,
             to: {
-              kind: "drafting",
+              kind: "composing",
               root: TEST_ROOT,
               at: atEntry(entryId("b")),
               lane: null,
@@ -320,7 +320,7 @@ describe("writesIn: the root a command writes in (ADR-0063)", () => {
           {
             card: cardId("c"),
             from: {
-              kind: "drafting",
+              kind: "composing",
               root: TEST_ROOT,
               at: atEntry(entryId("b")),
               lane: null,
@@ -344,7 +344,7 @@ describe("writesIn: the root a command writes in (ADR-0063)", () => {
           {
             card: cardId("c"),
             from: {
-              kind: "drafting",
+              kind: "composing",
               root: TEST_ROOT,
               at: atEntry(entryId("b")),
               lane: null,

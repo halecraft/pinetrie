@@ -6,7 +6,7 @@
 //
 // Only queued and pinned boxes take Alt+↑/↓. On a Mac, Option+↑/↓ moves a
 // textarea's caret to its paragraph's start or end; those boxes lose that,
-// and the composer and drafting cards keep it. Ctrl, not Cmd, as take
+// and the composer and notes keep it. Ctrl, not Cmd, as take
 // (Ctrl+Shift+I) and put (Ctrl+Shift+O) are: Cmd+Backspace deletes the line.
 
 import type { CardId } from "@pinetrie/core"

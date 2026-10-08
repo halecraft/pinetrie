@@ -257,7 +257,7 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a later person's colour comes from their id",
   },
-  // ── your list folded to icons (ADR-0088) ──
+  // ── the sidebar folded to icons (ADR-0088) ──
   {
     name: "a stored wrap is dropped",
     file: "packages/web/review-prefs.ts",
@@ -286,5 +286,5 @@ export const mutations: readonly Mutation[] = [
   // ── attention (ADR-0077) ──
   // ── the publish button (ADR-0076, ADR-0090) ──
   // ── queue control (ADR-0048 step 7) ──
-  // ── your list and the board (ADR-0112) ──
+  // ── the sidebar and the board (ADR-0112) ──
 ]

@@ -66,7 +66,10 @@ const deps = (over: Partial<StartupDeps> = {}): StartupDeps => ({
     stored: async () => [],
     destroyDocs: async () => {},
   }).port,
-  provenance: { sweep: async () => {} },
+  provenance: {
+    before: () => ({ cards: [], ends: new Map() }),
+    sweep: async () => {},
+  },
   ...over,
 })
 
@@ -231,7 +234,7 @@ test("recover sweeps empty cards, texts no record names, and seats no text names
       owner: writerId("ada@x.io"),
       placer: writerId("ada@x.io"),
       place: {
-        kind: "drafting",
+        kind: "composing",
         root: TEST_ROOT,
         at: atEntry(entryId("e-1")),
         lane: null,

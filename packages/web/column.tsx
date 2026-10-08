@@ -65,6 +65,7 @@ import {
   leftLine,
   NEW_PIN,
   NEW_PIN_TITLE,
+  NOTES_EMPTY,
   newPinAt,
   noticeKey,
   noticeWords,
@@ -82,7 +83,6 @@ import {
   type SpotStore,
   START_WORDS,
   seenBatches,
-  shownBelow,
   shownBy,
   spotOf,
   startedWords,
@@ -121,7 +121,7 @@ import {
   useState,
   useSyncExternalStore,
 } from "react"
-import { CardEditor, QueuedCardEditor } from "./card-editor.tsx"
+import { CardEditor, NoteCardEditor, QueuedCardEditor } from "./card-editor.tsx"
 import { Composer } from "./composer.tsx"
 import { COPIED, useCopy } from "./copy.ts"
 import { Menu } from "./menu.tsx"
@@ -226,7 +226,7 @@ export interface ColumnProps {
    * thread's end.
    */
   traces: ReadonlyMap<string, TraceRecord>
-  /** Each column's composer place, which a put lands in (`put-target.ts`). */
+  /** Each column's composer, which a put on the column reads (`put-target.ts`). */
   composers: ComposerPlacesStore
 }
 
@@ -595,7 +595,7 @@ export function Column(p: ColumnProps) {
       create: {
         id: newCardId(),
         owner: p.session.writer,
-        place: { kind: "drafting", root, at, lane: lane.name },
+        place: { kind: "note", root, at, lane: lane.name },
         placer: p.session.writer,
         carries: { kind: "message", command: null },
         unsent: null,
@@ -614,33 +614,37 @@ export function Column(p: ColumnProps) {
   const forkConflicts =
     above.commit === null ? [] : conflictsAt(p.work.revisions, above.commit)
 
-  // Every card here but the one the composer shows (`shownBelow`):
-  // everyone else's, and any other of yours, such as one someone unqueued
-  // while you typed this one, one put here while you had one, or the one
-  // "+ card" set aside. A fresh column's are those under its key.
-  const [composer, setComposer] = useState<EditorState | undefined>(undefined)
-  const shown = shownBelow(composer, mine?.id)
-  const others = (
-    fresh
-      ? p.cards.filter(
-          c => c.place.kind === "fresh" && c.place.column === p.column.key,
-        )
-      : threadEnd === null
-        ? []
-        : cardsAt("drafting", threadEnd, p.cards, p.lanes, index)
-  ).filter(c => c.id !== shown)
+  // The notes at this end (ADR-0113): everyone's, drawn above the composer.
+  // A fresh column has none; any card under its key but your message is
+  // drawn there too.
+  const notes = fresh
+    ? p.cards.filter(
+        c =>
+          c.place.kind === "fresh" &&
+          c.place.column === p.column.key &&
+          c.id !== mine?.id,
+      )
+    : threadEnd === null
+      ? []
+      : cardsAt("note", threadEnd, p.cards, p.lanes, index)
   const place =
     composerPlace(
       p.column,
       at,
       at.kind === "entry" ? p.session.rootOf(at.id) : undefined,
     ) ?? undefined
-  // A put lands where this composer would create a card. A column that can
-  // be written publishes it; one leaving takes it back.
+  // Where this composer creates your message, and the message there: what
+  // a put here reads (`ComposerSpot`). A column that can be written
+  // publishes them; one leaving takes them back.
   const { composers } = p
   const key = p.column.key
   useEffect(() => {
-    composers.set(key, writable ? (place ?? null) : null)
+    composers.set(
+      key,
+      writable && place !== undefined
+        ? { place, message: mine?.id ?? null }
+        : null,
+    )
   })
   useEffect(() => () => composers.set(key, null), [composers, key])
   // A send from any card here: a fresh column's first one names the message
@@ -652,6 +656,9 @@ export function Column(p: ColumnProps) {
     act({ kind: "sent", key: p.column.key, sendId })
     return sendId
   }
+  // Where a queue from a card's ⋯ puts it: on this thread's lane, at its end.
+  const queueOn =
+    lane.kind === "lane" && at.kind === "entry" ? { lane: lane.name, at } : null
   // Where a drop lands: exactly where a put can.
   const putColumn = writable && place !== undefined ? key : null
   const pinKey = writable && place !== undefined ? pinnedOf(place) : null
@@ -685,7 +692,7 @@ export function Column(p: ColumnProps) {
           p.session.writer,
           threadEnd,
           (from, placer) =>
-            from.kind === "drafting" ||
+            from.kind === "note" ||
             from.kind === "queued" ||
             from.kind === "pinned"
               ? placeEnd(from, placer, p.lanes, index)
@@ -713,7 +720,7 @@ export function Column(p: ColumnProps) {
   const [askClose, setAskClose] = useState<readonly CardId[] | null>(null)
   const close = () => {
     const typed = fresh
-      ? [...(mine === undefined ? [] : [mine]), ...others]
+      ? [...(mine === undefined ? [] : [mine]), ...notes]
           .filter(c => p.session.cardText(c.id).text().trim() !== "")
           .map(c => c.id)
       : []
@@ -896,7 +903,6 @@ export function Column(p: ColumnProps) {
                     prefill={undefined}
                     readOnly={p.readOnly}
                     reader={reader}
-                    seats={p.seats}
                     session={p.session}
                     takeFocus={() => true}
                     where={undefined}
@@ -904,11 +910,13 @@ export function Column(p: ColumnProps) {
                 ) : null
               }
               cards={pinned.filter(c => c.id !== pinShown)}
+              catchUps={catchUps}
               inView={inView}
               onNewPin={newPin === "strip" ? openPin : null}
               onAct={act}
               onTyping={p.onTyping}
               putKey={putPinned}
+              queueOn={queueOn}
               readOnly={p.readOnly}
               reader={reader}
               session={p.session}
@@ -984,7 +992,7 @@ export function Column(p: ColumnProps) {
               {running && <div aria-hidden className="working-line" />}
               {/* Cards queued for this thread's lane, in the order the host pops
             them: not in the tree yet, and editable by anyone until popped. */}
-              {queued.map((c, n) =>
+              {queued.map(c =>
                 c.carries.kind === "fact" ? (
                   // The host's fact, waiting for the run's end: nobody edits
                   // or moves it (ADR-0080).
@@ -995,8 +1003,8 @@ export function Column(p: ColumnProps) {
                   <QueuedCardEditor
                     among={queued}
                     card={c}
+                    held={(shows.queue?.heldBy ?? null) !== null}
                     key={c.id}
-                    n={n}
                     onAct={act}
                     onTyping={p.onTyping}
                     readOnly={p.readOnly}
@@ -1051,43 +1059,32 @@ export function Column(p: ColumnProps) {
               })}
             </div>
           )}
-          {/* Everyone else's cards at this end (ADR-0048): shown in full, each
-          editable and sendable by anyone here. */}
-          {others.length > 0 && (
+          {/* The notes at this end (ADR-0113): shown in full, each editable
+          by anyone here. With none, a drop zone shown only while a card is
+          dragged, as the empty pinned strip is. */}
+          {(notes.length > 0 || (putColumn !== null && !fresh)) && (
             <div
               className="cards"
+              data-empty={notes.length === 0 || undefined}
               {...(putColumn === null
                 ? {}
                 : dropProps({ kind: "column", key: putColumn }))}
             >
-              {others.map(c => (
-                <CardEditor
-                  at={at}
+              {notes.length === 0 && (
+                <span className="notes-empty">{NOTES_EMPTY}</span>
+              )}
+              {notes.map(c => (
+                <NoteCardEditor
                   card={c}
-                  commands={p.work.commands}
-                  fresh={fresh}
-                  how={how}
+                  catchUps={catchUps}
                   key={c.id}
-                  lane={lane}
                   onAct={act}
-                  onBranchInstead={branchInstead}
-                  onCreatesLane={undefined}
-                  onShows={undefined}
-                  onIntent={p.onIntent}
-                  onSend={onSend}
                   onTyping={p.onTyping}
-                  participants={p.participants}
-                  pending={undefined}
-                  place={undefined}
-                  prefill={undefined}
+                  queueOn={queueOn}
                   readOnly={p.readOnly}
                   reader={reader}
                   seats={p.seats}
                   session={p.session}
-                  takeFocus={undefined}
-                  onLeave={undefined}
-                  catchUps={catchUps}
-                  where={undefined}
                 />
               ))}
             </div>
@@ -1118,7 +1115,6 @@ export function Column(p: ColumnProps) {
           <Composer
             card={mine}
             place={place}
-            seats={p.seats}
             where={{
               defaultWork,
               project: p.work.project,
@@ -1143,7 +1139,6 @@ export function Column(p: ColumnProps) {
             onSend={onSend}
             onAct={act}
             onCreatesLane={setCreatesLane}
-            onShows={setComposer}
             onIntent={p.onIntent}
             onTyping={p.onTyping}
             takeFocus={() => p.takeFocus(p.column.key)}

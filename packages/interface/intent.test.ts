@@ -31,7 +31,7 @@ import {
 } from "./layout.ts"
 
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
-/** Each root's id, by its root entry: your list's key. */
+/** Each root's id, by its root entry: the sidebar's key. */
 const R1_ID = rootIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
 const R2_ID = rootIdFor("01a0ffd2-0000-7000-8000-0000000000a2")
 const R9_ID = rootIdFor("01a0ffd2-0000-7000-8000-0000000000a9")
@@ -79,7 +79,7 @@ const at = (
   listWidth: "full",
   page: null,
 })
-/** A root shown: the root you are on, and in your list, at its end if it was not. */
+/** A root shown: the root you are on, and in the sidebar, at its end if it was not. */
 const shown = (root: string, id: RootId): Effect[] => [
   {
     kind: "layout",
@@ -95,6 +95,7 @@ const NO_CARDS: CardFacts = {
   me: ME,
   slots: {},
   selected: 0,
+  filled: new Set(),
   composers: new Map(),
 }
 const R1 = at(onRoot("1-r1"))
@@ -106,7 +107,7 @@ const column = (
 ): Intent => ({ kind: "column", position, key: "col-k", act })
 
 describe("planIntent", () => {
-  test("× on a root closes it for you: it leaves your list, and nothing shared is written", () => {
+  test("× on a root closes it for you: it leaves the sidebar, and nothing shared is written", () => {
     expect(
       plan({ kind: "close", here: { kind: "root", root: entryId("1-r1") } }),
     ).toEqual([
@@ -122,7 +123,7 @@ describe("planIntent", () => {
     expect(plan({ kind: "close", here: { kind: "nothing" } })).toEqual([])
   })
 
-  test("showing a root opens it in your list; reordering your list places it by id (ADR-0112)", () => {
+  test("showing a root opens it in the sidebar; reordering the sidebar places it by id (ADR-0112)", () => {
     expect(
       plan({ kind: "show", here: { kind: "root", root: entryId("5-r2") } }),
     ).toEqual(shown("5-r2", R2_ID))
@@ -458,7 +459,7 @@ describe("planIntent", () => {
       id: cardId("c-new"),
       owner: ada,
       placer: ada,
-      place: { kind: "drafting", root: TEST_ROOT, at: where, lane },
+      place: { kind: "composing", root: TEST_ROOT, at: where, lane },
       carries: { kind: "message", command: null },
       unsent: null,
     }
@@ -468,8 +469,8 @@ describe("planIntent", () => {
     const laneRecords = new Map([
       [lane, { lane, root: OTHER_ROOT, work: null, by: ada, createdAt: 0 }],
     ])
-    const drafting = {
-      kind: "drafting",
+    const atEnd = {
+      kind: "composing",
       root: TEST_ROOT,
       at: where,
       lane,
@@ -498,10 +499,10 @@ describe("planIntent", () => {
         hold: "release",
       })
       for (const layout of [onRoot("1-r1"), onNewTab]) {
-        const state = at(layout, undefined, withCard(drafting))
+        const state = at(layout, undefined, withCard(atEnd))
         const move = {
           card: c,
-          from: drafting,
+          from: atEnd,
           to: { kind: "queued", root: OTHER_ROOT, at: where, lane, seen: "" },
         }
         expect(plan(queue, state)).toEqual([
@@ -521,7 +522,7 @@ describe("planIntent", () => {
       const move = {
         card: c,
         from: { kind: "queued", root: TEST_ROOT, at: where, lane, seen: "v" },
-        to: drafting,
+        to: { ...atEnd, kind: "note" },
       }
       expect(plan(unqueue, state)).toEqual([
         {
@@ -533,7 +534,7 @@ describe("planIntent", () => {
         },
       ])
       expect(
-        plan(unqueue, at(onRoot("1-r1"), undefined, withCard(drafting))),
+        plan(unqueue, at(onRoot("1-r1"), undefined, withCard(atEnd))),
       ).toEqual([])
     })
     test("a reorder moves the card one place among the list as drawn, said in the column; at an edge, or past a fact, nothing (ADR-0048 step 7)", () => {
@@ -697,7 +698,7 @@ test("the column you opened takes focus once; no other column does", () => {
   expect(claimFocus(null, "k")).toEqual({ focus: false, armed: null })
 })
 
-test("foldList asks for the width your list does not show", () => {
+test("foldList asks for the width the sidebar does not show", () => {
   expect(plan({ kind: "foldList" }, { ...R1, listWidth: "full" })).toEqual([
     { kind: "listWidth", width: "icons" },
   ])

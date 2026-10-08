@@ -10,11 +10,11 @@ import {
   type CardCommand,
   type CardId,
   type CardRecord,
-  draftingOf,
   type EntryId,
   type LaneName,
   type MoveDirection,
   moveOf,
+  noteOf,
   type OfferAction,
   type Position,
   type QueueHoldChange,
@@ -39,6 +39,7 @@ import {
   planPut,
   planTakeCopyIntoInventory,
   planTakeIntoInventory,
+  planToNote,
   planUndoMove,
   planUnpin,
   queueMove,
@@ -104,8 +105,12 @@ export type ColumnAct =
     }
   /** Pin a card below the line at the top of its thread's column (ADR-0048). */
   | { readonly kind: "pin"; readonly card: CardId }
-  /** Unpin a card: below the line at the thread's end again. */
+  /** Unpin a card: a note at the thread's end. */
   | { readonly kind: "unpin"; readonly card: CardId }
+  /** Your message to the notes at its thread's end (ADR-0113). */
+  | { readonly kind: "toNote"; readonly card: CardId }
+  /** A card into this column's composer, as your message (`planPut`). */
+  | { readonly kind: "toMessage"; readonly card: CardId }
   /** Take a queued card back below the line; `by` queued it. */
   | {
       readonly kind: "unqueue"
@@ -167,7 +172,7 @@ export type Intent =
       readonly key: string
       readonly act: ColumnAct
     }
-  /** Show a root, opening it in your list, or a new tab, or nothing. */
+  /** Show a root, opening it in the sidebar, or a new tab, or nothing. */
   | { readonly kind: "show"; readonly here: Here }
   | {
       readonly kind: "newTab"
@@ -176,9 +181,9 @@ export type Intent =
       /** The workflow state its root lands in: the board column it came from (ADR-0112). */
       readonly state?: WorkflowStateId
     }
-  /** Close a root of your list, or a new tab, for you: nothing shared is written. */
+  /** Close a root of the sidebar, or a new tab, for you: nothing shared is written. */
   | { readonly kind: "close"; readonly here: Here }
-  /** Move a root of your list before `before`, or to its end (ADR-0112). */
+  /** Move a root of the sidebar before `before`, or to its end (ADR-0112). */
   | {
       readonly kind: "moveInList"
       readonly root: EntryId
@@ -201,7 +206,7 @@ export type Intent =
   | { readonly kind: "editWorkflow"; readonly edit: WorkflowEdit }
   /** Open or close the board. */
   | { readonly kind: "board"; readonly open: boolean }
-  /** Fold your list to icons, or unfold it (ADR-0088). */
+  /** Fold the sidebar to icons, or unfold it (ADR-0088). */
   | { readonly kind: "foldList" }
   /** Show a page over the workspace, or, with null, the workspace (ADR-0098). */
   | { readonly kind: "page"; readonly to: PageName | null }
@@ -334,7 +339,7 @@ function planOf(
       return [list({ kind: "place", root, before })]
     }
     case "moveRoot": {
-      // Into the closed state: it leaves your list once the host accepts.
+      // Into the closed state: it leaves the sidebar once the host accepts.
       const entry = state.rootEntries.get(intent.root)
       return [
         {
@@ -512,7 +517,7 @@ function planColumn(
       // If the host popped the card first, the refusal says it was sent.
       const now = cardOf(state.cards, act.card)
       if (now?.place.kind !== "queued") return []
-      const move = moveOf(now, draftingOf(now.place))
+      const move = moveOf(now, noteOf(now.place))
       return [moveCard(move, IN_COLUMN(key), false, act.by)]
     }
     case "reorder": {
@@ -541,6 +546,10 @@ function planColumn(
       return planPin(act.card, key, state)
     case "unpin":
       return planUnpin(act.card, key, state)
+    case "toNote":
+      return planToNote(act.card, key, state)
+    case "toMessage":
+      return planPut(act.card, { kind: "composer", key }, state)
     case "setCommand":
       return [
         {
@@ -599,7 +608,7 @@ function planOpenIn(
 const opened = (key: string, effects: readonly Effect[]): readonly Effect[] =>
   effects.length === 0 ? [] : [{ kind: "armFocus", key }, ...effects]
 
-/** `root` leaves your list, and if you are on it, its neighbour is shown. */
+/** `root` leaves the sidebar, and if you are on it, its neighbour is shown. */
 function closeRoot(
   root: EntryId,
   state: Pick<IntentState, "rootIds">,
@@ -613,7 +622,7 @@ function closeRoot(
 
 /**
  * After a move on the board is answered (ADR-0112): `moved` runs only once
- * the host accepts. A root you move into the closed state leaves your list,
+ * the host accepts. A root you move into the closed state leaves the sidebar,
  * the one you are on too; only a root someone else archives stays while you
  * are on it (`resolveLayout`). A refusal changes nothing.
  */

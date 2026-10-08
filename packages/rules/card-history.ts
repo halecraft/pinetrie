@@ -157,25 +157,25 @@ export type Verb =
   | "discarded"
   | "moved"
 
-/** Whether a place is one everyone at a thread sees, and anyone may move. */
+/**
+ * Whether a place is one everyone at a thread sees, and anyone may move:
+ * not your message, which only you see (ADR-0113).
+ */
 const isShared = (p: PlaceKey | CardPlace): boolean =>
-  p.kind === "drafting" || p.kind === "queued" || p.kind === "pinned"
+  p.kind === "note" || p.kind === "queued" || p.kind === "pinned"
 
 /**
- * Back below the line where it was queued or pinned: an unqueue or an
- * unpin. The card stays in its column, so it leaves no trace.
+ * Back below the line where it was queued or pinned, a note: an unqueue or
+ * an unpin. The card stays in its column, so it leaves no trace.
  */
 function movedBack(
   from: PlaceKey,
   to: PlaceKey,
 ): "unqueued" | "unpinned" | null {
-  if (
-    to.kind !== "drafting" ||
-    (from.kind !== "queued" && from.kind !== "pinned")
-  )
+  if (to.kind !== "note" || (from.kind !== "queued" && from.kind !== "pinned"))
     return null
   const below: PlaceKey = {
-    kind: "drafting",
+    kind: "note",
     root: from.root,
     at: from.at,
     lane: from.lane,
@@ -251,7 +251,7 @@ function eventKind(
   if (cause.kind === "undo") return "undone"
   if (cause.kind === "redo") return "redone"
   if (cause.kind !== "host") return "moved"
-  if (before.place.kind === "fresh" && after.place.kind === "drafting")
+  if (before.place.kind === "fresh" && after.place.kind === "note")
     return "followed"
   if (after.unsent !== null && before.place.kind === "queued") return "unsent"
   return "moved"

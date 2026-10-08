@@ -27,7 +27,7 @@ import { NO_TEXT } from "./root-label.ts"
 import { stepsIn } from "./root-target.ts"
 
 /** A root on the board. */
-export interface BoardItem {
+export interface ThreadCard {
   readonly root: RootId
   readonly entry: EntryId
   readonly label: string
@@ -62,7 +62,7 @@ export interface BoardMove {
 /** An open state's column. */
 export interface BoardColumnView {
   readonly state: WorkflowState
-  readonly items: readonly BoardItem[]
+  readonly items: readonly ThreadCard[]
   /** Its highest mark (`markOf`). */
   readonly mark: Level | null
   /** Its items whose agent works (`Status` working, a pending verdict among them). */
@@ -83,7 +83,7 @@ export interface ClosedView {
   readonly state: WorkflowState
   readonly count: number
   /** The roots `query` and `mine` keep, newest first; the most recent few with no query. */
-  readonly rows: readonly BoardItem[]
+  readonly rows: readonly ThreadCard[]
 }
 
 /** One state as the strip says it. */
@@ -154,7 +154,7 @@ export function boardView(input: BoardViewInput): BoardView {
     root: RootId,
     state: WorkflowStateId,
     column: readonly RootId[],
-  ): BoardItem | null => {
+  ): ThreadCard | null => {
     const entry = input.rootEntries.get(root)
     if (entry === undefined) return null
     const steps = stepsIn(column, root)
@@ -280,14 +280,14 @@ export function boardView(input: BoardViewInput): BoardView {
  * wrote a chat in. With no query, only the most recent few.
  */
 export function closedRows(input: {
-  readonly items: readonly BoardItem[]
+  readonly items: readonly ThreadCard[]
   readonly summaries: ReadonlyMap<EntryId, RootSummary>
   readonly query: string
   readonly mine: boolean
   readonly me: WriterId
-}): readonly BoardItem[] {
+}): readonly ThreadCard[] {
   const needle = input.query.trim().toLowerCase()
-  const newest = (t: BoardItem) => input.summaries.get(t.entry)?.newest ?? ""
+  const newest = (t: ThreadCard) => input.summaries.get(t.entry)?.newest ?? ""
   const kept = input.items
     .filter(t => !input.mine || t.writers.includes(input.me))
     .filter(t => needle === "" || t.label.toLowerCase().includes(needle))
@@ -311,7 +311,7 @@ export type BoardSide = "board" | "strip" | "elsewhere"
 /**
  * Whether a click closes the open board: one pressed and released outside
  * it and its strip, whose buttons act for themselves. A press in the board let go
- * outside (a selection dragged out) keeps it open, and a drag from your list
+ * outside (a selection dragged out) keeps it open, and a drag from the sidebar
  * ends in no click, so it can drop on the board.
  */
 export const clickClosesBoard = (
@@ -341,7 +341,7 @@ export const stripWords = (
   ready: `${count(state.ready, "root", "roots")} with work ready to accept`,
 })
 
-/** A board item's ⇡: the threads it names. */
+/** A thread card's ⇡: the threads it names. */
 export const readyWords = (threads: readonly string[]): string =>
   `ready to accept: ${threads.join(", ")}`
 

@@ -274,7 +274,8 @@ which are swept.
 - **The stored record is flat strings**, "" for none (`encodeCard`,
   `decodeCard`, total). Where a card is goes through core's `placeFields`
   and `placeOfFields`, which the wire's key codec uses too, so the two
-  cannot drift. A drafting or queued card's `at` is never the root; a fresh
+  cannot drift. A card's place at a thread's end, or queued, has an `at`
+  that is never the root; a fresh
   card's `column` is never "", and it carries its root and its branch
   point (a `Spot`, ADR-0066), the root for a new tab; a queued card has its `lane`, `order` and
   `by`, and `seen`, its text's version as its queuer had it (S96), which
@@ -285,8 +286,10 @@ which are swept.
   (`CardCarries`, ADR-0080): stored as `command` and `fact`, one of them
   "". A record with both does not decode; one stored before facts has no
   `fact`, and is a message. Every move of a fact's card is refused
-  `fact`: it is the host's. A drafting
-  card whose lane fails `isLaneName` keeps its place with no lane: dropped,
+  `fact`: it is the host's. Your message (`composing`, ADR-0113) is stored
+  under the kind `drafting` it had before notes, so no row changed with
+  the split; a note is stored as `note`. A message or note whose lane fails
+  `isLaneName` keeps its place with no lane: dropped,
   it would be swept with its text at the next start (`planCardSweep`), and
   the lane only says which thread it follows. A queued card with such a
   lane does not decode: its lane is where it runs.
@@ -297,7 +300,7 @@ which are swept.
   someone else's unqueue fail. It leaves out a queue's `seen` and `root`
   too. Every move, on
   the host and on a client, is built by core's `moveOf` (from where the
-  card is); an unqueue's target is `draftingOf`, and a queue's root
+  card is); an unqueue's or an unpin's target is `noteOf`, and a queue's root
   `queueRoot`, its lane's. No `from` creates the card, its sender its
   owner. Nobody removes a card: `Move.to` is never null. A discard is a move
   to `gone` (`discardedOf`, ADR-0111), from any place the sender may move
@@ -332,7 +335,7 @@ which are swept.
   of those few changed since. The session draws a pending reorder by running
   `planReorder` over what it draws.
 - **`planUnqueueAll`**: every message card queued on a lane, back to
-  `draftingOf` its place, in queue order; a fact stays. The host plans it
+  `noteOf` its place, in queue order; a fact stays. The host plans it
   from the queue as it is when the command arrives, and carries it out as
   one move, so one undo queues them again.
 - **An inventory is its holder's alone** (`ownsPlace`): a move into or out
@@ -341,8 +344,8 @@ which are swept.
   itself not counted. A creation obeys both. A card taken into the
   inventory keeps its owner: the take moves its place, not who wrote it.
 - **A fresh column's first send carries its other cards**
-  (`planFreshFollow`): each card fresh in the sent card's column goes to
-  drafting at the message the send wrote, when that message is in the
+  (`planFreshFollow`): each card fresh in the sent card's column becomes a
+  note at the message the send wrote, when that message is in the
   column's root. The host's write, so it keeps each card's placer, as
   `planUnsent` does.
 - **The placer is who put the card where it is**: the sender of every
@@ -367,20 +370,24 @@ which are swept.
   `ARCHIVED_HISTORY_MS` (7 days) after it was archived, and, at startup
   only, those of a root the directory does not name. After a run's end that
   second rule would retire a new tab's history while it is open.
-- **A drafting or pinned card is resolved, never stored as an end.**
-  `placeEnd` runs `threadOf` from where it started and its column's lane, as
-  a reply from there would go, so the card follows its thread as the thread
-  grows. `cardsAt(kind, end, …)` is everyone's cards of that kind (`drafting`
-  or `pinned`) whose end is `end`, by `order` when they have one, then by
-  id. `cardEnd` is a drafting card's end only, and `yourCard` finds your own
-  through it, at an end or a fresh column, never another writer's, and the
-  newest of yours there (ids are uuidv7), so a card someone unqueued does not
-  take your composer. Were `cardEnd` to resolve pinned cards too, a column
-  would draw them again among its drafting cards, and your composer could
-  bind to a pinned card of yours.
-- **A pinned card** (ADR-0048 step 5) is a drafting card's place with an
-  `order`. Pinning moves it from drafting to pinned at the same `at` and
-  lane (`pinnedOf`); unpinning back (`draftingOf`). Anyone may do either in
+- **A card at a thread's end is resolved, never stored as an end**: your
+  message, a note, a pinned card. `placeEnd` runs `threadOf` from where it
+  started and its column's lane, as a reply from there would go, so the
+  card follows its thread as the thread grows. `cardsAt(kind, end, …)` is
+  everyone's cards of a shared kind (`note` or `pinned`) whose end is
+  `end`, by `order` when they have one, then by id. `cardEnd` is your
+  message's end only (`composing`), and `yourCard` finds yours through it,
+  at an end or a fresh column, never another writer's and never a note,
+  the newest of yours there (ids are uuidv7). Were `cardEnd` to resolve
+  notes or pinned cards too, your composer could bind to one of yours.
+- **One message per person at a thread end** (`planStoredCardRepair`,
+  ADR-0113): before notes, everyone's cards there were one kind, so a
+  starting host makes every one of a person's messages at one end but the
+  one `yourCard` would choose a note, outside every gesture. Remove it once
+  every store has started with notes.
+- **A pinned card** (ADR-0048 step 5) is a note's place with an `order`.
+  Pinning moves your message, a note or a queued card to pinned at the
+  same `at` and lane (`pinnedOf`); unpinning makes it a note (`noteOf`). Anyone may do either in
   a shared place. The host
   orders it after every pinned card in the session (`placeAt`), not only its
   thread's: a thread is found through the tree, which a handoff does not
@@ -396,7 +403,7 @@ which are swept.
   message; `typing` when someone types in its top card (presence
   `typingIn`); else `pop`. A fact on top is popped whatever the hold or the
   typing: it is nobody's instruction, and starts no run. `planUnsent` is the
-  step a refused pop writes back: drafting where it was queued, saying why,
+  step a refused pop writes back: a note where it was queued, saying why,
   never queued.
 - **`planCardSweep`**: records whose text is empty and that carry no
   command, and stored `card:` documents with no record, a spent or empty
@@ -447,12 +454,12 @@ read is dropped, not its history.
   whose revert Kyneta writes, is read like any other write.
   - A card that appeared is `created`; one whose key changed gets `moved`,
     `undone`, `redone`, `unsent` (the host wrote a queued card back below
-    the line with `unsent`) or `followed` (a fresh card to drafting); one
+    the line with `unsent`) or `followed` (a fresh card to a note); one
     that went has its history deleted. A reorder changes no key, and adds
     nothing.
   - **A trace** is left for the card's placer when a person (not the host)
-    other than the placer moved it out of a shared place (drafting, queued,
-    pinned), it was not an unqueue or an unpin, and no presence pair has the
+    other than the placer moved it out of a shared place (a note, queued,
+    pinned; your message is yours alone), it was not an unqueue or an unpin, and no presence pair has the
     placer at the card's end. A card whose end is unknown (its root not
     loaded) counts as not watched. A spend's trace carries the message.
   - **A trace whose card is back at its `from`** is deleted.
