@@ -64,6 +64,7 @@ code uses them yet; each becomes current as its part is built.
 | **fold** (a column) | Hide a column for yourself; it keeps its place as a narrow strip with its title. | ADR-0116 | close (a column) |
 | **thread** | A line of conversation, from where it forks to its end, with an id of its own. Its context is its path to its root. | ADR-0117 | a thread known by its lane, or by its end |
 | **thread card** | A thread, held by a task or by someone's inventory. | ADR-0117 | a root, as the board and the sidebar draw it |
+| **root** | A code word, not the interface's: the first message a thread's path leads back to, and the document of every thread that branched from it (`RootId`, `root:<RootId>`), which is also one pi session. Nothing a person reads says "root" (or "tree"): ＋ starts a thread. | ADR-0116 | the root as the board's item, and "root" on screen |
 | **copy** (a thread) | A new thread branched at a thread's end, put as its own card; its fork row leads back to the original. | ADR-0117 | |
 | **note column** | A card holding notes in one order, a task's or an inventory's. | ADR-0116 | notes board |
 | **note** | A text card in a note column, which everyone in the task sees and no agent reads. | ADR-0116 | a note below the line on its thread's notes board |
