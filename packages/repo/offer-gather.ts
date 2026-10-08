@@ -36,11 +36,11 @@ import {
   titlesOf,
 } from "@pinetrie/lanes"
 import { readWipState } from "./accepted.ts"
+import { type CatchUpTarget, readCatchUp } from "./catch-up.ts"
 import { gatherLane } from "./lane-read.ts"
 import {
   laneTipIn,
   query,
-  readCatchUp,
   readOffer,
   startOfOffer,
   workChanges,
@@ -134,6 +134,12 @@ const placeFrom = (input: {
 const commitOf = async (jj: Runner, bookmark: string) =>
   (await commitsOf(jj, `present(${revsetName(bookmark)})`))[0] ?? null
 
+/** A target of `kind` at `commit`; null when the bookmark names none. */
+const targetOf = (
+  kind: CatchUpTarget["kind"],
+  commit: CommitId | null,
+): CatchUpTarget | null => (commit === null ? null : { kind, commit })
+
 /**
  * Where a lane's offer sits and starts, and its base record, by the separate
  * reads: its base from the lane's newest `Pinetrie-Base`, its target accepted work's
@@ -156,30 +162,27 @@ async function placeOf(
   const state = await readWipState(jj, repoConfig, base)
   // A WIP still above accepted work is the target, and its update a copy of
   // it; a landed WIP's update merges accepted work (`planUpdateFrom`).
-  const copied = base.base.kind === "wip" && state === "ok" ? base.base : null
-  const copiesWip = copied !== null
   const target =
-    copied !== null
-      ? await commitOf(jj, copied.bookmark)
+    base.base.kind === "wip" && state === "ok"
+      ? targetOf("wip", await commitOf(jj, base.base.bookmark))
       : state === "gone"
         ? null
-        : await commitOf(jj, repoConfig.acceptedBookmark)
+        : targetOf("accepted", await commitOf(jj, repoConfig.acceptedBookmark))
   const start = await startOfOffer(jj, { tip, base, repoConfig, lane })
   const catchUp =
     target === null
       ? null
-      : await readCatchUp(jj, {
-          base,
-          start,
-          copiesWip,
-          to: target,
-          tip,
-          known: input.known,
-        })
+      : await readCatchUp(jj, { base, start, target, tip, known: input.known })
   // An untraced start reads nothing: its work is unknown (ADR-0067).
   const work = await workChanges(jj, { start, tip })
   return {
-    place: placeFrom({ tip, base, state, target, start }),
+    place: placeFrom({
+      tip,
+      base,
+      state,
+      target: target?.commit ?? null,
+      start,
+    }),
     base: baseRecord(lane, { base, state, start, catchUp, work }),
     work,
   }

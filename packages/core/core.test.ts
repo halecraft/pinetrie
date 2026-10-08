@@ -22,6 +22,7 @@ import {
   messageText,
   moveOf,
   NOBODY,
+  nonEmpty,
   normalizeEmail,
   normalizeName,
   noteOf,
@@ -523,4 +524,9 @@ describe("moves, built once (ADR-0059)", () => {
       queueRoot(LANE, card({ kind: "inventory", holder: ADA }), new Map()),
     ).toBeUndefined()
   })
+})
+
+test("nonEmpty: a list with one element or more, or null", () => {
+  expect(nonEmpty([])).toBeNull()
+  expect(nonEmpty(["a", "b"])).toEqual(["a", "b"])
 })

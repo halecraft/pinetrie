@@ -95,6 +95,20 @@ export type OfferInRepo =
  */
 export type WorkChanges = "none" | "some" | "unknown"
 
+/** A list with at least one element. */
+export type NonEmpty<T> = readonly [T, ...T[]]
+
+/**
+ * `xs` as `NonEmpty`, or null when it is empty. Its elements are never
+ * `undefined`, which marks the empty list.
+ */
+export const nonEmpty = <T extends NonNullable<unknown>>(
+  xs: readonly T[],
+): NonEmpty<T> | null => {
+  const [first, ...rest] = xs
+  return first === undefined ? null : [first, ...rest]
+}
+
 /**
  * Where a lane's offer starts (ADR-0104), or `untraced`: an accepted-offer
  * commit of this lane above its base names no source (`untracedLanes`), so
@@ -102,7 +116,7 @@ export type WorkChanges = "none" | "some" | "unknown"
  * lane catches up past it (ADR-0067).
  */
 export type StartRead =
-  | { readonly kind: "known"; readonly start: readonly CommitId[] }
+  | { readonly kind: "known"; readonly start: NonEmpty<CommitId> }
   | {
       readonly kind: "untraced"
       readonly acceptedOfferCommits: readonly CommitId[]

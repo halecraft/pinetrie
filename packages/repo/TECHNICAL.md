@@ -62,6 +62,8 @@ translates to.
   (`wipState`, `readWipState`).
 - `shared.ts`: the facts every lane and accepted work share, per operation.
 - `lane-read.ts`: one lane's refresh facts in one `jj log` (`gatherLane`).
+- `catch-up.ts`: what catching up would change in a lane, its rules and
+  its read (`readCatchUp`).
 
 ## The owner (`owner.ts`, ADR-0065)
 
@@ -142,7 +144,7 @@ operation is read once and kept until the head moves.**
   `acceptedOfferCommitsRevset`'s `~ ::present(<base source>)`: the base commit merged that
   source, and an accepted-offer commit is a accepted commit.
 - **What the rows cannot say is read only when needed:** the start, when a
-  accepted source above the base names more (`offerStart`); a stack's files,
+  accepted source above the base names more (`readStart`); a stack's files,
   and the top's conflicted files when it conflicts, with the files
   conflicted where its ledger says it starts (`startConflictsOf`,
   ADR-0072): `conflictCause` reads both. An unconflicted offer pays
@@ -153,12 +155,6 @@ operation is read once and kept until the head moves.**
   against the target, empty once accepted work holds the lane's work, which
   still changes files. Read from them, such an offer was withdrawn and built
   again on every observation, without end (S89).
-- **What catching up would change** (`readCatchUp`) is read only once the
-  base has moved from the lane's base start, and kept (`known`: the page's
-  `pinetrie.base`, as a memo) while the lane's tip and the base's commit
-  stay: `planCatchUpRead` decides, and `readCatchUp` carries it out. The
-  commits it diffs from are decided from the tip and the base, so the memo
-  needs no other key.
 - **The budget:** an unchanged offer's refresh runs at most 3 jj processes
   (`repo.test.ts` counts 3: the read, the evolog, and `workChanges`); S89
   measured 18 before. A lane whose base moved runs two more, once per move,
@@ -170,6 +166,51 @@ operation is read once and kept until the head moves.**
   way (`wipFacts`): its target and state need more of your repo. Which way
   a lane is read is `gatherRefresh`'s choice; the host never makes it.
   Whether one read could serve every lane is S100.
+
+## What catching up would change (`catch-up.ts`, S97, S102)
+
+**The page's ↓, a base's news and `catch_up`'s refusals read one forecast,
+made in your repo before any update runs, and it must name the files the
+update's merge will change.**
+
+- **One module, rules beside the read** (as `planLaneRead` beside
+  `gatherLane`): `planCatchUpRead`, `catchUpHolds` and `catchUpFilesOf`
+  are pure; `catchUpFiles` reads the diffs and `readCatchUp` runs the rest.
+  Both gathers call `readCatchUp`: `gatherLane`, and `placeOf` for every
+  other gather.
+- **The target is one value** (`CatchUpTarget`): accepted work's commit,
+  merged, or a WIP's commit, copied. `placeOf` builds it from the WIP's
+  state, a landed WIP's update merging accepted work; `gatherLane` reads
+  lanes on accepted work only. The stored `CatchUpRead.to` is its commit.
+- **Read once per move.** It is read only once the base has moved from the
+  lane's base start, and kept (`known`: the page's `pinetrie.base`, as a
+  memo) while the lane's tip and the target's commit stay: `planCatchUpRead`
+  decides. The commits it diffs from are decided from the tip and the base,
+  so the memo needs no other key.
+- **The forecast diffs from where the next offer would start**
+  (`catchUpHolds`, S102 item 11). It names the files
+  catching up would change in a lane: those the base's commit `to` has
+  differently from each commit the lane holds of its history
+  (`jj diff --from <held> --to <to>`), and from the lane's tip
+  (`jj diff --from <tip> --to <to>`), decided by `catchUpFilesOf`. On
+  accepted work the held commits are the offer's start, which holds every
+  accepted source the lane has: the sources `mergeBase` joins before it
+  merges, so an acceptance of the lane's own work counts for nothing even
+  after the lane edited it again. Diffed from the base's start instead, it
+  counted every file the lane touched since. The start has two heads when
+  the lane caught up between its offer and the acceptance (the base's
+  commit and the source). A file then counts only when `to` differs from
+  both. A union would count every file of the acceptance again, and the
+  intersection misses a file only when accepted work puts it back to the
+  base's exactly. A WIP's copy, and an untraced start, diff from the base's
+  start: for a WIP the target is the WIP's commit, and the copy has its
+  files.
+  `repo.test.ts` holds it against `mergeUpdate`'s files on accepted work
+  and on a WIP, your own acceptance, the lane editing it again, and the
+  start with two heads.
+- **Read as the merge reads its files** (`changedPaths`, `@pinetrie/lanes`),
+  from the repo's root, so the forecast and `mergeUpdate`'s `files`
+  compare; a jj failure is null, which the page reads as `unknown`.
 
 ## Steps and runners (`step.ts`, `run.ts`)
 
@@ -306,8 +347,10 @@ operation is read once and kept until the head moves.**
   agree. From several, `jj diff -r '(<start>)..<tip>'`, which diffs a range
   from its roots' parents, merged, to its tip. jj refuses a range with gaps,
   as after a catch-up merged an accepted-offer commit (S97): the merge is in the range and
-  one of its parents is not. A refusal, or no start, is `unknown`, which
-  never builds an offer.
+  one of its parents is not. A refusal, or an untraced start, is
+  `unknown`, which never builds an offer. A known start is never empty
+  (`NonEmpty`, core): `readStart` reads `offerStart`'s heads, which hold
+  the base's start, since `laneBase` reads it from the tip's own history.
 - **An untraced accepted-offer commit** is one whose paragraph names a
   thread and a lane but no source (`untracedLanes`, core): an offer
   accepted before offers carried their ledger. Above a lane's base, it makes the lane's start `untraced`
@@ -322,29 +365,9 @@ operation is read once and kept until the head moves.**
   it was, until the lane catches up past the accepted-offer commit. Only an offer the host
   made is withdrawn there. `RefreshDecision` names it, so nothing reaches
   it by accident.
-- **The forecast diffs from where the next offer would start**
-  (`catchUpFiles`, `catchUpHolds`, S102 item 11). It names the files
-  catching up would change in a lane: those the base's commit `to` has
-  differently from each commit the lane holds of its history
-  (`jj diff --from <held> --to <to>`), and from the lane's tip
-  (`jj diff --from <tip> --to <to>`), decided by `catchUpFilesOf`. On
-  accepted work the held commits are the offer's start, which holds every
-  accepted source the lane has: the sources `mergeBase` joins before it
-  merges, so an acceptance of the lane's own work counts for nothing even
-  after the lane edited it again. Diffed from the base's start instead, it
-  counted every file the lane touched since. The start has two heads when
-  the lane caught up between its offer and the acceptance (the base's
-  commit and the source). A file then counts only when `to` differs from
-  both. A union would count every file of the acceptance again, and the
-  intersection misses a file only when accepted work puts it back to the
-  base's exactly. A WIP's copy, and an untraced start, diff from the base's
-  start: for a WIP `to` is the WIP's commit, and the copy has its files.
-  `repo.test.ts` holds it against `mergeUpdate`'s files on accepted work
-  and on a WIP, your own acceptance, the lane editing it again, and the
-  start with two heads.
 - **`startOfOffer` is the one path to a start**, or to `untraced`. Every
-  gather reaches it, the one read included (`gatherLane`'s `offerStart`
-  read): the host's refresh, its `squash` and `refresh` actions and
+  gather reaches it, the one read included (`gatherLane`'s `readStart`,
+  which `startOfOffer` reads its start with too): the host's refresh, its `squash` and `refresh` actions and
   `stackSpan` all plan from it: a start from
   another rule would read as a moved start to `planRefresh`, and a split
   would build on it. The exclusion above is inside it: sources read any

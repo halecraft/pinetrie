@@ -2,7 +2,7 @@
 //
 // Reads only, each a query over jj on your repo (a step's, or a pinned read's)
 // returning values: the facts an offer step plans from (`readOffer`,
-// `startOfOffer`, `laneTipIn`, `workChanges`, `readCatchUp`), what a review
+// `startOfOffer` and `readStart`, `laneTipIn`, `workChanges`), what a review
 // shows of a commit (`revisionRead`, `fileDiff`), and which of a divergent
 // revision's commits the host made (`hostCommitIn`, from `evologOf`). The
 // gathers in `offer-gather.ts` call them, or read a lane on accepted work in one
@@ -12,12 +12,13 @@
 // since a lane reads it too.
 
 import {
-  type CatchUpRead,
   type CommitId,
   commitId,
   type DiffSpan,
   type LaneBase,
   type LaneName,
+  type NonEmpty,
+  nonEmpty,
   type OfferInRepo,
   type OfferLedger,
   type OfferRevision,
@@ -33,7 +34,6 @@ import {
 import {
   ACCEPTED_OFFER_COMMIT_ROW,
   bookmarkRevset,
-  changedPaths,
   commitsOf,
   conflictedFilesAt,
   describeFailure,
@@ -47,13 +47,10 @@ import {
 } from "@pinetrie/lanes"
 import {
   acceptedOfferCommitsRevset,
-  catchUpFilesOf,
-  catchUpHolds,
   EVOLOG_ENTRY,
   type EvologEntry,
   offerStart,
   parseEvolog,
-  planCatchUpRead,
   walkToHost,
 } from "./plan.ts"
 
@@ -149,11 +146,24 @@ export async function startOfOffer(
     return { kind: "untraced", acceptedOfferCommits: untraced }
   return {
     kind: "known",
-    start: await commitsOf(
-      jj,
-      offerStart({ tip: input.tip, start: input.base.start, sources }),
-    ),
+    start: await readStart(jj, {
+      tip: input.tip,
+      start: input.base.start,
+      sources,
+    }),
   }
+}
+
+/**
+ * `offerStart`'s heads, read. Never empty in practice: `start`, the base's
+ * start, is in `::tip`, since `laneBase` reads it from the tip's own
+ * history; an empty read falls back to it.
+ */
+export async function readStart(
+  jj: Runner,
+  input: Parameters<typeof offerStart>[0],
+): Promise<NonEmpty<CommitId>> {
+  return nonEmpty(await commitsOf(jj, offerStart(input))) ?? [input.start]
 }
 
 /**
@@ -161,8 +171,7 @@ export async function startOfOffer(
  * diff from it to the tip: what a build restores, so the two agree. From
  * several, one diff over `start..tip`, from its roots' parents, merged, to
  * the tip. jj refuses a range with gaps, as after a catch-up merged an
- * accepted-offer commit (S97): that, no start, or an untraced one is
- * `unknown`.
+ * accepted-offer commit (S97): that, or an untraced start, is `unknown`.
  */
 export async function workChanges(
   jj: Runner,
@@ -171,7 +180,6 @@ export async function workChanges(
   if (input.start.kind === "untraced") return "unknown"
   const { start } = input.start
   const [only, ...more] = start
-  if (only === undefined) return "unknown"
   const ran = await jj(
     more.length === 0
       ? ["diff", "--from", only, "--to", input.tip, "--name-only"]
@@ -179,65 +187,6 @@ export async function workChanges(
   )
   if (!ran.ok) return "unknown"
   return lines(ran.stdout).length === 0 ? "none" : "some"
-}
-
-/**
- * The files catching up with a base would change in the lane, or null when
- * jj cannot say: one diff from each commit the lane holds of the base's
- * history (`holds`, from `catchUpHolds`) to the base's commit `to`, and one
- * from the lane's `tip`, decided by `catchUpFilesOf`. Two diffs for one held
- * commit. Read as `mergeUpdate` reads the files a merge changed
- * (`changedPaths`), so the two compare.
- */
-export async function catchUpFiles(
-  jj: Runner,
-  input: {
-    readonly holds: readonly CommitId[]
-    readonly to: CommitId
-    readonly tip: CommitId
-  },
-): Promise<string[] | null> {
-  try {
-    const moved: (readonly string[])[] = []
-    for (const held of input.holds)
-      moved.push(await changedPaths(jj, held, input.to))
-    const lacking = await changedPaths(jj, input.tip, input.to)
-    return catchUpFilesOf({ moved, lacking })
-  } catch {
-    return null
-  }
-}
-
-/**
- * What catching up would change, read at `tip` and the base's commit `to`
- * as `planCatchUpRead` decides: null when the base has not moved from the
- * lane's base start, or jj cannot say; `known` when it was read at the same
- * tip and commit; else `catchUpFiles` from the commits `catchUpHolds` names.
- */
-export async function readCatchUp(
-  jj: Runner,
-  input: {
-    readonly base: LaneBase
-    readonly start: StartRead
-    /** The update copies the WIP rather than merging accepted work. */
-    readonly copiesWip: boolean
-    readonly to: CommitId
-    readonly tip: CommitId
-    readonly known: CatchUpRead | null
-  },
-): Promise<CatchUpRead | null> {
-  const { base, to, tip, known } = input
-  switch (planCatchUpRead({ start: base.start, to, tip, known })) {
-    case "none":
-      return null
-    case "keep":
-      return known
-    case "read": {
-      const holds = catchUpHolds(input)
-      const files = await catchUpFiles(jj, { holds, to, tip })
-      return files === null ? null : { tip, to, files }
-    }
-  }
 }
 
 /** Whether `to` has `from`'s description, and `jj interdiff` between them is empty. */

@@ -74,15 +74,14 @@ import {
 } from "@pinetrie/lanes"
 import { afterAll, beforeAll, describe, expect, test } from "vitest"
 import { acceptedFacts } from "./accepted.ts"
+import { catchUpFiles, readCatchUp } from "./catch-up.ts"
 import { gatherLane } from "./lane-read.ts"
 import {
-  catchUpFiles,
   changeOf,
   fileDiff,
   hostCommitIn,
   laneTipIn,
   offerRevisions,
-  readCatchUp,
   readOffer,
   revisionRead,
   startOfOffer,
@@ -1126,8 +1125,7 @@ describe("a lane's repo, with jj", () => {
         catchUp: await readCatchUp(ops, {
           base,
           start,
-          copiesWip: false,
-          to: target,
+          target: { kind: "accepted", commit: target },
           tip,
           known: null,
         }),
@@ -2502,10 +2500,11 @@ describe("a lane's repo, with jj", () => {
     const { laneDir, ops, turn, fetch, base } = await turnRig("undone")
     await fetch(base)
     const first = await laneTipIn(ops, LANE)
-    if (first === null) throw new Error("no tip")
+    const [start] = base
+    if (first === null || start === undefined) throw new Error("no tip")
     expect(
       await workChanges(ops, {
-        start: { kind: "known", start: base },
+        start: { kind: "known", start: [start] },
         tip: first,
       }),
     ).toBe("some")
@@ -2516,7 +2515,7 @@ describe("a lane's repo, with jj", () => {
     if (undone === null) throw new Error("no tip")
     expect(
       await workChanges(ops, {
-        start: { kind: "known", start: base },
+        start: { kind: "known", start: [start] },
         tip: undone,
       }),
     ).toBe("none")
@@ -2526,12 +2525,6 @@ describe("a lane's repo, with jj", () => {
         tip: undone,
       }),
     ).toBe("some")
-    expect(
-      await workChanges(ops, {
-        start: { kind: "known", start: [] },
-        tip: undone,
-      }),
-    ).toBe("unknown")
     // A range jj refuses, here for a commit it does not have, is not a change.
     expect(
       await workChanges(ops, {

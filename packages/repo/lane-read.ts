@@ -25,7 +25,6 @@ import {
 } from "@pinetrie/core"
 import {
   bookmarkRevset,
-  commitsOf,
   conflictedFilesAt,
   describeFailure,
   laneTipName,
@@ -35,14 +34,14 @@ import {
   type Runner,
   revsetName,
 } from "@pinetrie/lanes"
+import { readCatchUp } from "./catch-up.ts"
 import {
   offerFiles,
-  readCatchUp,
+  readStart,
   sinceHost,
   startConflictsOf,
   workChanges,
 } from "./offer.ts"
-import { offerStart } from "./plan.ts"
 import type { SharedFacts } from "./shared.ts"
 
 /** One commit of the read, with what the read's revsets say of it. */
@@ -247,7 +246,7 @@ export function planLaneRead(
           acceptedOfferCommits: untraced.map(r => r.commit),
         }
       : sources.length === 0
-        ? { kind: "known" as const, start: [base.start] }
+        ? { kind: "known" as const, start: [base.start] as const }
         : { kind: "read" as const, sources }
   return {
     kind: "accepted",
@@ -358,7 +357,11 @@ export async function gatherLane(
     planned.start.kind === "read"
       ? {
           kind: "known",
-          start: await startFrom(jj, tip, base.start, planned.start.sources),
+          start: await readStart(jj, {
+            tip,
+            start: base.start,
+            sources: planned.start.sources,
+          }),
         }
       : planned.start
   const offer = await offerFrom(jj, planned.offer, acceptedBookmark)
@@ -370,21 +373,12 @@ export async function gatherLane(
   const catchUp = await readCatchUp(jj, {
     base,
     start,
-    // A lane on accepted work merges it.
-    copiesWip: false,
-    to: acceptedBookmark,
+    target: { kind: "accepted", commit: acceptedBookmark },
     tip,
     known: input.known,
   })
   return { tip, base, target: acceptedBookmark, start, offer, work, catchUp }
 }
-
-const startFrom = (
-  jj: Runner,
-  tip: CommitId,
-  start: CommitId,
-  sources: readonly CommitId[],
-) => commitsOf(jj, offerStart({ tip, start, sources }))
 
 async function offerFrom(
   jj: Runner,
