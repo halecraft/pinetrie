@@ -51,7 +51,7 @@ export interface LaneDeps {
   readonly basics: Basics
   readonly agent: Pick<Agent, "lane">
   readonly records: Pick<Records, "writeValues">
-  readonly work: Pick<LaneWork, "offers" | "accepted">
+  readonly work: Pick<LaneWork, "repo">
   readonly start: Runs["start"]
   /** Stop a chat's run that has not reached pi yet (`Runs.cancel`). */
   readonly cancel: Runs["cancel"]
@@ -201,6 +201,13 @@ export async function handleCarryOn(
   }
 }
 
+/** An offer or accepted work's action on a host without tools: no repo to act on. */
+const NO_REPO: Outcome = {
+  kind: "refused",
+  code: ERR.NOT_OWN_COPY,
+  message: "this host has no lanes of their own",
+}
+
 /**
  * An offer action (ADR-0105), the offer shell's, on your repo. A split is a
  * card's command, not an action (ADR-0080).
@@ -212,14 +219,8 @@ export async function actOnOffer(
 ): Promise<Outcome> {
   const { lane, action, to, seen } = intent
   const { work } = deps
-  const offers = work.offers
-  if (offers === null)
-    return {
-      kind: "refused",
-      code: ERR.NOT_OWN_COPY,
-      message: "this host has no lanes of their own",
-    }
-  const done = await offers.act(lane, action, by, to, seen)
+  if (work.repo === null) return NO_REPO
+  const done = await work.repo.offers.act(lane, action, by, to, seen)
   if (done.kind === "refused")
     return {
       kind: "refused",
@@ -282,14 +283,9 @@ export async function actOnAccepted(
   deps: Pick<LaneDeps, "work">,
   action: AcceptedAction,
 ): Promise<Outcome> {
-  const { accepted } = deps.work
-  if (accepted === null)
-    return {
-      kind: "refused",
-      code: ERR.NOT_OWN_COPY,
-      message: "this host has no lanes of their own",
-    }
-  const refused = await accepted.act(action)
+  const { repo } = deps.work
+  if (repo === null) return NO_REPO
+  const refused = await repo.accepted.act(action)
   return refused === null
     ? { kind: "accepted-moved" }
     : { kind: "refused", ...refused }

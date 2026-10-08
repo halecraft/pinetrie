@@ -50,7 +50,7 @@ function setUp() {
   )
   const records = record<BoardDeps["records"]>({ writeValues: async () => {} })
   const work = record<BoardDeps["work"]>({
-    offers: null,
+    repo: null,
     teardown: async () => {},
   })
   const deps: BoardDeps = {

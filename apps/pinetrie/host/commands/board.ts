@@ -54,7 +54,7 @@ export interface BoardDeps {
     "session" | "docs" | "live" | "places" | "now" | "newId"
   >
   readonly records: Pick<Records, "writeValues">
-  readonly work: Pick<LaneWork, "teardown" | "offers">
+  readonly work: Pick<LaneWork, "teardown" | "repo">
   readonly keeper: Pick<HostKeeper, "run" | "track">
 }
 
@@ -154,7 +154,7 @@ async function planCrossing(
   const doc = await docs.root(root)
   const index = readTreeIndex(doc)
   const own =
-    deps.work.offers === null
+    deps.work.repo === null
       ? []
       : lanesIn(session, root).map(lane => ({
           lane,

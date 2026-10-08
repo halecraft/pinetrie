@@ -264,7 +264,8 @@ any refresh they queued.
   lane work starts only with tools on. `startSetup` returns a whole `Setup`
   (project, runtime, your repo's owner, the lanes' configs, `ready`) or,
   without tools, null, and lane work is then `NO_LANES`: it records each
-  lane and its name, and has no offers, accepted work or owner. Nothing
+  lane and its name, and its `repo` (`YourRepo`: the owner, accepted work
+  and the offers, all or none) is null. Nothing
   asks a lane's access then.
 - **Commands are taken only after `recover`.** `Control.listen` is made
   earlier, and `startControl` registers `onReceive` after `recover`. Earlier,
@@ -887,7 +888,7 @@ request is out, for the caller's plan to read (`bannerDue`, `digestDue`).
   accepting publish and a move made in jj outside pine·trie all reach it
   by one path. An acceptance into a WIP does not, since the snapshot is
   accepted work's.
-- **Shutdown closes the owner** (`LaneWork.owner`, the `close` step): it
+- **Shutdown closes the owner** (`LaneWork.repo.owner`, the `close` step): it
   refuses every step from then on and stops its watch; `quiet` waits for
   what it holds (`LaneWork.quiet`).
 

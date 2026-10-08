@@ -632,7 +632,7 @@ export async function startHost({
     tools: toolsIn !== null,
     serverTransport,
     blobs,
-    offers: work.offers,
+    repo: work.repo,
     log,
   })
 
@@ -645,7 +645,7 @@ export async function startHost({
           return
         case "close":
           keeper.close()
-          work.owner?.close()
+          work.repo?.owner.close()
           return
         case "quiet":
           // Queued steps, a compaction among them, finish their writes.

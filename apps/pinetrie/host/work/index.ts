@@ -32,6 +32,17 @@ import { createTurns } from "./turns.ts"
 import { createUpdates, type Updates } from "./update.ts"
 
 /**
+ * Your repo as lane work keeps it, all of it or none: its one writer
+ * (ADR-0065), which shutdown closes, accepted work in it (ADR-0104), and each
+ * lane's offer there (ADR-0105).
+ */
+export interface YourRepo {
+  readonly owner: RepoOwner
+  readonly accepted: AcceptedWork
+  readonly offers: Offers
+}
+
+/**
  * What the host needs of lane work. Each member is declared, with its doc,
  * in the module that implements it.
  */
@@ -47,12 +58,8 @@ export type LaneWork = Pick<
     readonly project: ProjectRecord | null
     /** pi's hooks lane work answers; `askSplit` is the documents' (`host/split-call.ts`). */
     readonly hooks: Omit<LaneHooks, "askSplit">
-    /** Each lane's offer in your repo; null with no lanes of their own. */
-    readonly offers: Offers | null
-    /** Accepted work in your repo (ADR-0104); null with no lanes of their own. */
-    readonly accepted: AcceptedWork | null
-    /** The one writer of your repo (ADR-0065); null with no lanes of their own. Shutdown closes it. */
-    readonly owner: RepoOwner | null
+    /** Your repo, as lane work keeps it; null for a host without tools. */
+    readonly repo: YourRepo | null
     /**
      * Settles when every lane's queued steps, fetches and the base snapshot's
      * refresh have, and the owner of your repo has nothing queued, including
@@ -207,9 +214,7 @@ export async function startLaneWork(input: {
     prepareUpdate: updates.prepareUpdate,
     prepareSplit: splits.prepareSplit,
     splitEnded: splits.splitEnded,
-    offers,
-    accepted: accepted,
-    owner,
+    repo: { offers, accepted, owner },
     teardown: archive.teardown,
     async quiet() {
       await keeper.idle()
@@ -247,9 +252,7 @@ const NO_LANES: LaneWork = {
   }),
   prepareSplit: async () => ({ refused: "the lane has no copy of its own" }),
   splitEnded: async () => null,
-  offers: null,
-  accepted: null,
-  owner: null,
+  repo: null,
   teardown: async () => {},
   quiet: async () => {},
   close: async () => {},

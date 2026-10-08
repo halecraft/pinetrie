@@ -29,6 +29,7 @@ import {
 import type { Offers } from "../offers/index.ts"
 import { applyPlaceSteps } from "../places.ts"
 import { createProvenance } from "../provenance.ts"
+import type { YourRepo } from "../work/index.ts"
 import { type CommandDeps, createCommands, placeOfCommand } from "./index.ts"
 
 const ALICE = writerId("alice@example.com")
@@ -151,10 +152,13 @@ test.each([
 })
 
 test("a chat completes while an acceptance is held open on your repo's owner", async () => {
-  const held =
-    Promise.withResolvers<Awaited<ReturnType<NonNullable<Offers>["act"]>>>()
+  const held = Promise.withResolvers<Awaited<ReturnType<Offers["act"]>>>()
   const { commands, replies, sender, chat } = setUp({
-    offers: record<NonNullable<Offers>>({ act: () => held.promise }).port,
+    repo: {
+      owner: record<YourRepo["owner"]>().port,
+      accepted: record<YourRepo["accepted"]>().port,
+      offers: record<Offers>({ act: () => held.promise }).port,
+    },
   })
   const acceptance = commands.handle(sender, ALICE, {
     id: "t-1",
@@ -179,7 +183,7 @@ test("a chat completes while an acceptance is held open on your repo's owner", a
 test("a move into Done holds the keeper only for its place and its unload: a command waits on neither its teardown, and one into the root is refused meanwhile; its reply comes after it all", async () => {
   const teardown = Promise.withResolvers<void>()
   const { b, commands, replies, sender, chat } = setUp({
-    offers: null,
+    repo: null,
     teardown: () => teardown.promise,
   })
   const archive = commands.handle(sender, ALICE, {
