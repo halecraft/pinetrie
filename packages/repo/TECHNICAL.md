@@ -155,10 +155,14 @@ operation is read once and kept until the head moves.**
   again on every observation, without end (S89).
 - **What catching up would change** (`readCatchUp`) is read only once the
   base has moved from the lane's base start, and kept (`known`: the page's
-  `pinetrie.base`, as a memo) while the lane's tip and the base's commit stay.
+  `pinetrie.base`, as a memo) while the lane's tip and the base's commit
+  stay: `planCatchUpRead` decides, and `readCatchUp` carries it out. The
+  commits it diffs from are decided from the tip and the base, so the memo
+  needs no other key.
 - **The budget:** an unchanged offer's refresh runs at most 3 jj processes
   (`repo.test.ts` counts 3: the read, the evolog, and `workChanges`); S89
-  measured 18 before. A lane whose base moved runs two more, once per move.
+  measured 18 before. A lane whose base moved runs two more, once per move,
+  and one more for each further head of its offer's start.
 - **One rule decides both.** `repo.test.ts` holds `gatherLane` beside the
   separate reads (`laneTipIn`, `laneBase`, `startOfOffer`, `readOffer`,
   `workChanges`, `readCatchUp`) at every offer it builds, accepts, follows, repairs and
@@ -318,14 +322,26 @@ operation is read once and kept until the head moves.**
   it was, until the lane catches up past the accepted-offer commit. Only an offer the host
   made is withdrawn there. `RefreshDecision` names it, so nothing reaches
   it by accident.
-- **`catchUpFiles`** says which files catching up would change in a lane:
-  those the base changed between the lane's base start and its commit now
-  (`jj diff --from <start> --to <to>`) that the lane's tip does not hold as
-  the base does (`jj diff --from <tip> --to <to>`). A three-way merge from
-  the start changes no other file. For a WIP, `to` is the WIP's commit: the
-  copy the update makes has its files. `repo.test.ts` holds it against
-  `mergeUpdate`'s files on accepted work and on a WIP, and against your own
-  acceptance (none).
+- **The forecast diffs from where the next offer would start**
+  (`catchUpFiles`, `catchUpHolds`, S102 item 11). It names the files
+  catching up would change in a lane: those the base's commit `to` has
+  differently from each commit the lane holds of its history
+  (`jj diff --from <held> --to <to>`), and from the lane's tip
+  (`jj diff --from <tip> --to <to>`), decided by `catchUpFilesOf`. On
+  accepted work the held commits are the offer's start, which holds every
+  accepted source the lane has: the sources `mergeBase` joins before it
+  merges, so an acceptance of the lane's own work counts for nothing even
+  after the lane edited it again. Diffed from the base's start instead, it
+  counted every file the lane touched since. The start has two heads when
+  the lane caught up between its offer and the acceptance (the base's
+  commit and the source). A file then counts only when `to` differs from
+  both. A union would count every file of the acceptance again, and the
+  intersection misses a file only when accepted work puts it back to the
+  base's exactly. A WIP's copy, and an untraced start, diff from the base's
+  start: for a WIP `to` is the WIP's commit, and the copy has its files.
+  `repo.test.ts` holds it against `mergeUpdate`'s files on accepted work
+  and on a WIP, your own acceptance, the lane editing it again, and the
+  start with two heads.
 - **`startOfOffer` is the one path to a start**, or to `untraced`. Every
   gather reaches it, the one read included (`gatherLane`'s `offerStart`
   read): the host's refresh, its `squash` and `refresh` actions and
@@ -425,7 +441,9 @@ operation is read once and kept until the head moves.**
   tip, from a branch whose parent was accepted after the fork (S72), and
   from a lane after a branch of it was accepted before its update (S51,
   S72); an untraced accepted-offer commit, read either way until the lane catches up past it, and what catching
-  up changes against what the merge changed (S97); and a review of an
+  up changes against what the merge changed (S97), and after the lane
+  edited its accepted work again, with one start and two (S102 item 11);
+  and a review of an
   offer's commit (its description, a rename, names with a space and a
   quote, and one file's diff, never a directory's). The gathers are held to
   it as well: each place kind (placed, untraced, a WIP gone), what an

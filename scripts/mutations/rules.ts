@@ -6,6 +6,15 @@ const archive = "packages/rules/archive.ts"
 
 export const mutations: readonly Mutation[] = [
   {
+    name: "an update that changed no file says files changed",
+    file: "packages/rules/update.ts",
+    from: '      files === ""\n',
+    to: "      false\n",
+    command: unit,
+    expect:
+      "an update that changed no file says so, and one with no commits says why",
+  },
+  {
     name: "a send to a held queue leaves it held",
     file: "packages/rules/queue-hold.ts",
     from: '  const held = hold === "hold-if-idle"\n',

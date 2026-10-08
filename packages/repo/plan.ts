@@ -7,6 +7,7 @@
 
 import {
   type AcceptedFacts,
+  type CatchUpRead,
   type CommitId,
   commitId,
   HOST_OPERATOR,
@@ -14,6 +15,7 @@ import {
   type LaneName,
   type OfferSource,
   type PublishMove,
+  type StartRead,
   type ThreadName,
   trailerRevset,
 } from "@pinetrie/core"
@@ -244,6 +246,68 @@ export function acceptedOfferCommitsRevset(input: {
     ...(base.kind === "wip" ? [`present(${revsetName(base.bookmark)})`] : []),
   ].join(" | ")
   return `(::(${heads}) ~ ::present(${input.base.source})) & ${ACCEPTED_OFFER_COMMITS}`
+}
+
+/**
+ * Whether a lane's catch-up forecast is read: `none` while the base is at
+ * the lane's base start, `keep` when `known` was read at this tip and base
+ * commit, else `read`: each lane reads it once per move of its tip or of
+ * the base.
+ */
+export function planCatchUpRead(input: {
+  readonly start: CommitId
+  readonly to: CommitId
+  readonly tip: CommitId
+  readonly known: CatchUpRead | null
+}): "none" | "keep" | "read" {
+  const { start, to, tip, known } = input
+  if (start === to) return "none"
+  return known !== null && known.tip === tip && known.to === to
+    ? "keep"
+    : "read"
+}
+
+/**
+ * The commits a catch-up's forecast diffs from: where the lane's next offer
+ * would start. When the update merges accepted work, that is the offer's
+ * start, which holds every accepted source the lane has: the sources
+ * `mergeBase` joins to their accepted-offer commits before it merges
+ * (S102), so the lane's own accepted work does not count as coming in. A
+ * WIP's copy is no merge, and an untraced start names no source: both diff
+ * from the base's start.
+ */
+export function catchUpHolds(input: {
+  readonly base: LaneBase
+  readonly start: StartRead
+  /** The update copies the WIP rather than merging accepted work. */
+  readonly copiesWip: boolean
+}): readonly CommitId[] {
+  const { base, start } = input
+  return input.copiesWip ||
+    start.kind === "untraced" ||
+    start.start.length === 0
+    ? [base.start]
+    : start.start
+}
+
+/**
+ * The files a catch-up would change, from one diff to the base's commit per
+ * commit the lane holds (`moved`) and the diff from the lane's tip to it
+ * (`lacking`): those every held commit has differently from the base, and
+ * the tip too. A file the base has as any held commit has it keeps that
+ * commit's value as the merge's base, so the merge leaves it alone. A union
+ * would count every file of an offer accepted after the lane caught up
+ * between offering it and its acceptance, whose start has two heads. In
+ * the first diff's order.
+ */
+export function catchUpFilesOf(input: {
+  readonly moved: readonly (readonly string[])[]
+  readonly lacking: readonly string[]
+}): string[] {
+  const [first = [], ...rest] = input.moved
+  const others = rest.map(files => new Set(files))
+  const lacking = new Set(input.lacking)
+  return first.filter(f => lacking.has(f) && others.every(o => o.has(f)))
 }
 
 /** One version of a commit in `jj evolog`: who made it, and from what. */

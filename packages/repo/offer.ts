@@ -33,6 +33,7 @@ import {
 import {
   ACCEPTED_OFFER_COMMIT_ROW,
   bookmarkRevset,
+  changedPaths,
   commitsOf,
   conflictedFilesAt,
   describeFailure,
@@ -46,10 +47,13 @@ import {
 } from "@pinetrie/lanes"
 import {
   acceptedOfferCommitsRevset,
+  catchUpFilesOf,
+  catchUpHolds,
   EVOLOG_ENTRY,
   type EvologEntry,
   offerStart,
   parseEvolog,
+  planCatchUpRead,
   walkToHost,
 } from "./plan.ts"
 
@@ -179,61 +183,61 @@ export async function workChanges(
 
 /**
  * The files catching up with a base would change in the lane, or null when
- * jj cannot say: those the base changed between `start` (where the lane last
- * caught up with it) and `to` (where it is now) that the lane's `tip` does
- * not already hold as `to` does. A three-way merge from `start` changes no
- * other file, so none at all when the base's new work is the lane's own,
- * accepted.
+ * jj cannot say: one diff from each commit the lane holds of the base's
+ * history (`holds`, from `catchUpHolds`) to the base's commit `to`, and one
+ * from the lane's `tip`, decided by `catchUpFilesOf`. Two diffs for one held
+ * commit. Read as `mergeUpdate` reads the files a merge changed
+ * (`changedPaths`), so the two compare.
  */
 export async function catchUpFiles(
   jj: Runner,
   input: {
-    readonly start: CommitId
+    readonly holds: readonly CommitId[]
     readonly to: CommitId
     readonly tip: CommitId
   },
 ): Promise<string[] | null> {
-  const moved = await jj([
-    "diff",
-    "--from",
-    input.start,
-    "--to",
-    input.to,
-    "--name-only",
-  ])
-  const differ = await jj([
-    "diff",
-    "--from",
-    input.tip,
-    "--to",
-    input.to,
-    "--name-only",
-  ])
-  if (!moved.ok || !differ.ok) return null
-  const lacking = new Set(lines(differ.stdout))
-  return lines(moved.stdout).filter(f => lacking.has(f))
+  try {
+    const moved: (readonly string[])[] = []
+    for (const held of input.holds)
+      moved.push(await changedPaths(jj, held, input.to))
+    const lacking = await changedPaths(jj, input.tip, input.to)
+    return catchUpFilesOf({ moved, lacking })
+  } catch {
+    return null
+  }
 }
 
 /**
- * What catching up would change (`catchUpFiles`), read at `tip` and the
- * base's commit `to`: null when the base has not moved from `start`, or jj
- * cannot say. `known`, read before at the same tip and commit, is kept, so
- * each lane reads it once per move of either.
+ * What catching up would change, read at `tip` and the base's commit `to`
+ * as `planCatchUpRead` decides: null when the base has not moved from the
+ * lane's base start, or jj cannot say; `known` when it was read at the same
+ * tip and commit; else `catchUpFiles` from the commits `catchUpHolds` names.
  */
 export async function readCatchUp(
   jj: Runner,
   input: {
-    readonly start: CommitId
+    readonly base: LaneBase
+    readonly start: StartRead
+    /** The update copies the WIP rather than merging accepted work. */
+    readonly copiesWip: boolean
     readonly to: CommitId
     readonly tip: CommitId
     readonly known: CatchUpRead | null
   },
 ): Promise<CatchUpRead | null> {
-  const { start, to, tip, known } = input
-  if (start === to) return null
-  if (known !== null && known.tip === tip && known.to === to) return known
-  const files = await catchUpFiles(jj, { start, to, tip })
-  return files === null ? null : { tip, to, files }
+  const { base, to, tip, known } = input
+  switch (planCatchUpRead({ start: base.start, to, tip, known })) {
+    case "none":
+      return null
+    case "keep":
+      return known
+    case "read": {
+      const holds = catchUpHolds(input)
+      const files = await catchUpFiles(jj, { holds, to, tip })
+      return files === null ? null : { tip, to, files }
+    }
+  }
 }
 
 /** Whether `to` has `from`'s description, and `jj interdiff` between them is empty. */

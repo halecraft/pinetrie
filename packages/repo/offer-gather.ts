@@ -154,9 +154,13 @@ async function placeOf(
   const base = await laneBase(jj, tip, repoConfig)
   if (base === null) return null
   const state = await readWipState(jj, repoConfig, base)
+  // A WIP still above accepted work is the target, and its update a copy of
+  // it; a landed WIP's update merges accepted work (`planUpdateFrom`).
+  const copied = base.base.kind === "wip" && state === "ok" ? base.base : null
+  const copiesWip = copied !== null
   const target =
-    base.base.kind === "wip" && state === "ok"
-      ? await commitOf(jj, base.base.bookmark)
+    copied !== null
+      ? await commitOf(jj, copied.bookmark)
       : state === "gone"
         ? null
         : await commitOf(jj, repoConfig.acceptedBookmark)
@@ -165,7 +169,9 @@ async function placeOf(
     target === null
       ? null
       : await readCatchUp(jj, {
-          start: base.start,
+          base,
+          start,
+          copiesWip,
           to: target,
           tip,
           known: input.known,

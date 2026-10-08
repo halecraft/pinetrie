@@ -57,6 +57,7 @@ import {
   catchUpRefusal,
   encodeUpdate,
   type Floor,
+  incomingWords,
   type LandMessage,
   type LandSkill,
   mergedFrom,
@@ -105,16 +106,6 @@ export function unfittableWords(tokens: number, budget: number): string {
   return `a resolution's prompt would need ${tokens} tokens, over the ${budget} a run keeps: shorten the card's text or the resolve-conflicts skill`
 }
 
-/** Whose work a catch-up brings in, as a resolution's prompt says it to the model. */
-export function incomingOf(from: BaseMerge): string {
-  const caughtUp = mergedFrom(from)
-  return caughtUp.kind === "parent"
-    ? `The work of the thread this one branched from (${caughtUp.name})`
-    : caughtUp.kind === "accepted"
-      ? "Accepted work"
-      : `The work on ${caughtUp.bookmark}`
-}
-
 /**
  * What a catch-up may do once its base is known (ADR-0084): merge, with the
  * floor its resolution's prompt will fit, or refuse with the lane untouched,
@@ -136,7 +127,10 @@ export function planCatchUp(
       readonly plan: MergePlan
       readonly floor: Floor
     } {
-  const found = resolutionFloor({ ...resolution, incoming: incomingOf(from) })
+  const found = resolutionFloor({
+    ...resolution,
+    incoming: incomingWords(mergedFrom(from)),
+  })
   if (found.kind === "too-large")
     return {
       kind: "refused",

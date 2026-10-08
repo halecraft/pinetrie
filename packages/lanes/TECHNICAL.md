@@ -436,6 +436,9 @@ containers, disks and the helper, S122 to S131 for Docker and the lane VM.
     (`withoutAcceptedOfferCommits`), and keep accepted work's commits under them.
   - **A WIP's copy has no accepted-offer commit in its history,** so a WIP thread joins
     nothing.
+  - **The host's forecast starts from the same sources** (`catchUpFiles`,
+    `@pinetrie/repo`): it diffs from the offer's start, which holds them,
+    not from the base's start (S102 item 11).
 - **`mergeUpdate` is an update's whole run in a lane** after its edits,
   on the lane's queue: `planMerge`'s steps (a fetch of accepted work's commit,
   or of the WIP's commit and its copy), the merge, a mark naming accepted work

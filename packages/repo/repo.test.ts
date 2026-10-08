@@ -682,7 +682,7 @@ describe("a lane's repo, with jj", () => {
     // What `catchUpFiles` said catching up would change, it changed (S97).
     expect(
       (
-        await catchUpFiles(laneRoot, { start: base, to: line1, tip: before })
+        await catchUpFiles(laneRoot, { holds: [base], to: line1, tip: before })
       )?.sort(),
     ).toEqual(["a.txt", "c.txt"])
     expect(await baseOfLane()).toEqual({
@@ -765,7 +765,11 @@ describe("a lane's repo, with jj", () => {
     })
     if (first.kind !== "clean") throw new Error("not clean")
     expect(
-      await catchUpFiles(laneRoot, { start: line2, to: w1, tip: beforeFirst }),
+      await catchUpFiles(laneRoot, {
+        holds: [line2],
+        to: w1,
+        tip: beforeFirst,
+      }),
     ).toEqual(["w.txt"])
     await yours("w.txt", "w2\n", "wip two")
     await yoursJj(["bookmark", "move", "wip/x", "--to", "@-"])
@@ -789,7 +793,7 @@ describe("a lane's repo, with jj", () => {
     // From the lane's copy, the WIP's base start, to the WIP's commit.
     expect(
       await catchUpFiles(laneRoot, {
-        start: first.from,
+        holds: [first.from],
         to: w2,
         tip: beforeNext,
       }),
@@ -1081,8 +1085,8 @@ describe("a lane's repo, with jj", () => {
     }
     /**
      * The one batched read (`gatherLane`) says what the separate reads say:
-     * the lane's tip, base and start, the offer, and whether its work
-     * changes any file.
+     * the lane's tip, base and start, the offer, whether its work changes
+     * any file, and what catching up would change. Returns that read.
      */
     const agrees = async () => {
       const op = (await ops(["op", "log", "--no-graph", "-n", "1", "-T", "id"]))
@@ -1099,11 +1103,11 @@ describe("a lane's repo, with jj", () => {
       const base = tip === null ? null : await laneBase(ops, tip, line)
       if (tip === null || base === null) {
         expect(gathered).toBe("none")
-        return
+        return gathered
       }
       if (base.base.kind === "wip") {
         expect(gathered).toBe("wip")
-        return
+        return gathered
       }
       const target = await acceptedNow()
       const start = await startOfOffer(ops, {
@@ -1120,12 +1124,15 @@ describe("a lane's repo, with jj", () => {
         offer: await readOffer(ops, { name: NAME, target }),
         work: await workChanges(ops, { start, tip }),
         catchUp: await readCatchUp(ops, {
-          start: base.start,
+          base,
+          start,
+          copiesWip: false,
           to: target,
           tip,
           known: null,
         }),
       })
+      return gathered
     }
     /** An offer of the lane's tip, fetched from `from`, its ledger naming the tip. */
     const offer = async (from: readonly CommitId[]) => {
@@ -2255,7 +2262,7 @@ describe("a lane's repo, with jj", () => {
     if (tip === null || start === undefined) throw new Error("no tip")
     const to = await acceptedNow()
     expect(to).not.toBe(start)
-    expect(await catchUpFiles(ops, { start, to, tip })).toEqual([])
+    expect(await catchUpFiles(ops, { holds: [start], to, tip })).toEqual([])
     await inLane([fetchById([to])])
     const { ours, merge } = await mergeBase(laneJj, LANE, to, "update")
     if (merge === null) throw new Error("nothing merged")
@@ -2298,6 +2305,18 @@ describe("a lane's repo, with jj", () => {
     }
     const read = (dir: string, file: string) =>
       readFile(path.join(dir, file), "utf8")
+    /**
+     * The lane's tip fetched into your repo, then what the one read says
+     * catching up would change, and where the offer starts; the separate
+     * reads say the same (`agrees`).
+     */
+    const forecast = async (rig: Awaited<ReturnType<typeof turnRig>>) => {
+      await rig.fetch(rig.base)
+      const gathered = await rig.agrees()
+      if (gathered === "none" || gathered === "wip")
+        throw new Error("not on accepted work")
+      return { files: gathered.catchUp?.files, start: gathered.start }
+    }
 
     test("your own acceptance, then your edit to it on accepted work: clean, and the accepted-offer commit is not listed as come in", async () => {
       const rig = await acceptedOfferRig("past-own")
@@ -2315,15 +2334,67 @@ describe("a lane's repo, with jj", () => {
       expect([next.conflicted, next.files]).toEqual([false, ["c.txt"]])
     }, 60_000)
 
-    test("the lane re-edits its own accepted lines: clean, with both edits", async () => {
+    test("the lane re-edits its own accepted lines: clean, with both edits, and the forecast names the file", async () => {
       const rig = await acceptedOfferRig("past-reedit")
       await yoursOnAccepted(rig, doc({ 1: "yours" }), "yours: doc line 1")
       await rig.edit(rig.laneDir, "doc.txt", doc({ 5: "lane again" }))
       await rig.turn()
-      expect((await rig.catchUp()).kind).toBe("clean")
+      expect((await forecast(rig)).files).toEqual(["doc.txt"])
+      const merged = await rig.catchUp()
+      if (merged.kind !== "clean") throw new Error(`not clean: ${merged.kind}`)
+      expect(merged.files).toEqual(["doc.txt"])
       expect(await read(rig.laneDir, "doc.txt")).toBe(
         doc({ 1: "yours", 5: "lane again" }),
       )
+    }, 60_000)
+
+    test("the lane re-edits a file of its own accepted offer, accepted work unchanged since: the forecast is none, and so is the merge", async () => {
+      const rig = await acceptedOfferRig("past-own-reedit")
+      await rig.edit(rig.laneDir, "doc.txt", doc({ 5: "lane again" }))
+      await rig.turn()
+      const { files, start } = await forecast(rig)
+      expect(start).toEqual({ kind: "known", start: [rig.t1] })
+      expect(files).toEqual([])
+      const merged = await rig.catchUp()
+      if (merged.kind !== "clean") throw new Error(`not clean: ${merged.kind}`)
+      expect(merged.files).toEqual([])
+    }, 60_000)
+
+    test("offered, caught up, then accepted, and re-edited: the offer starts at two commits, and the forecast is none, as the merge", async () => {
+      const rig = await turnRig("past-two-starts")
+      await rig.edit(rig.laneDir, "doc.txt", doc())
+      await rig.turn()
+      const offered = await rig.offer(rig.base)
+      // Accepted work moves by a file of yours, and the lane catches up.
+      await rig.yoursJj(["new", rig.line.acceptedBookmark])
+      await rig.edit(rig.yoursDir, "other.txt", "other\n")
+      await rig.yoursJj(["commit", "-m", "yours: other.txt"])
+      await rig.yoursJj([
+        "bookmark",
+        "move",
+        rig.line.acceptedBookmark,
+        "--to",
+        "@-",
+      ])
+      const caughtUp = await rig.catchUp()
+      expect(caughtUp.kind).toBe("clean")
+      // The offer, made before, follows accepted work and is accepted.
+      const [bottom] = offered.built.changes
+      if (bottom === undefined) throw new Error("no offer")
+      await executeRepo(
+        rig.yoursDir,
+        planRefreshOffer(bottom, await rig.acceptedNow()),
+      )
+      await rig.accept(offered)
+      // The lane re-edits what was accepted.
+      await rig.edit(rig.laneDir, "doc.txt", doc({ 5: "lane again" }))
+      await rig.turn()
+      const { files, start } = await forecast(rig)
+      expect(start.kind === "known" && start.start.length).toBe(2)
+      expect(files).toEqual([])
+      const merged = await rig.catchUp()
+      if (merged.kind !== "clean") throw new Error(`not clean: ${merged.kind}`)
+      expect(merged.files).toEqual([])
     }, 60_000)
 
     test("two acceptances, your edit to the first between them: clean (S102 item 7)", async () => {

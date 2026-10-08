@@ -323,6 +323,7 @@ export {
 export {
   decodeStack,
   encodeUpdate,
+  incomingWords,
   planStack,
   type StackMessage,
   type UpdateMessage,

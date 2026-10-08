@@ -99,12 +99,29 @@ is no bug to fix.
     It is abandoned, and the take is merged as before the joins. The update
     conflicts, as it did, and no join is left in the lane's history.
 
+11. **The forecast of what catching up changes must start where the next
+    offer starts.** Found on 2026-10-08, after this spike's "not probed"
+    list said `catchUpFiles` should be unchanged. It diffed accepted work
+    from the lane's base start, which counts the take's files as coming in.
+    Once the lane edited one of them again, its tip differed from the take
+    there, and the forecast named it, while the join merge changed nothing.
+    In pine·trie's own repo: sturdy-nutmeg, based at `c60be882`, had its
+    offer accepted as `16066861` (`Pinetrie-Source: 68326ec0`), then edited
+    `packages/core/index.ts` again. The forecast said 1 file. The agent
+    caught up, and the merge (`65ef9500`) had its parent `c986c472`'s tree.
+    Diffing from the offer's start (`offerStart`), which holds every source
+    the joins use, the forecast is empty, as the merge is. When the lane
+    caught up between its offer and the take, the start has two heads (the
+    base's commit and the source). A file then comes in only when accepted
+    work differs from both: from the base's commit alone, every file of the
+    take still counts. The tests "the lane re-edits a file of its own
+    accepted offer…" and "offered, caught up, then accepted, and
+    re-edited…" in `packages/repo/repo.test.ts` hold both.
+
 **Not probed.**
 
 - A take to a WIP, which a WIP thread's update copies (`planWipCopy`)
-  rather than merges.
-- `catchUpFiles`' preview, which compares trees and not history. It should
-  be unchanged, but it was not run.
+  rather than merges. Its forecast still diffs from the base's start.
 - The offer that `offerStart` and `takenRevset` (S81) build on a history
   holding join commits was not probed. The implementation's test builds it:
   it holds the lane's own work alone, and the batched and separate reads

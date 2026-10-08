@@ -6,6 +6,7 @@
 import type { Mutation } from "../mutate.ts"
 
 const unit = ["pnpm", "exec", "vitest", "run", "packages/repo"]
+const planTest = ["pnpm", "exec", "vitest", "run", "packages/repo/plan.test.ts"]
 const repoTest = ["pnpm", "exec", "vitest", "run", "packages/repo/repo.test.ts"]
 const offersRefresh = [
   "pnpm",
@@ -686,30 +687,53 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "catching up counts every file the base changed",
-    file: "packages/repo/offer.ts",
-    from: "  return lines(moved.stdout).filter(f => lacking.has(f))\n",
-    to: "  return lines(moved.stdout)\n",
+    file: "packages/repo/plan.ts",
+    from: "  return first.filter(f => lacking.has(f) && others.every(o => o.has(f)))\n",
+    to: "  return first.filter(f => others.every(o => o.has(f)))\n",
+    command: planTest,
+    expect: "catchUpFilesOf: one held commit: the files the tip lacks too",
+  },
+  {
+    name: "catching up counts a file any held commit has differently",
+    file: "packages/repo/plan.ts",
+    from: "  return first.filter(f => lacking.has(f) && others.every(o => o.has(f)))\n",
+    to: "  return [...new Set([first, ...rest].flat())].filter(f => lacking.has(f))\n",
     command: repoTest,
     expect:
-      "catching up with your own acceptance of the lane's work changes no file, as catchUpFiles says (S97)",
+      "offered, caught up, then accepted, and re-edited: the offer starts at two commits, and the forecast is none, as the merge",
+  },
+  {
+    name: "catching up is forecast from the base's start",
+    file: "packages/repo/plan.ts",
+    from: "    : start.start\n",
+    to: "    : [base.start]\n",
+    command: planTest,
+    expect: "catchUpHolds: a known start: where the next offer starts",
+  },
+  {
+    name: "the one read forecasts a lane on accepted work as a WIP's copy",
+    file: "packages/repo/lane-read.ts",
+    from: "    copiesWip: false,\n",
+    to: "    copiesWip: true,\n",
+    command: repoTest,
+    expect:
+      "the lane re-edits a file of its own accepted offer, accepted work unchanged since: the forecast is none, and so is the merge",
   },
   {
     name: "what catching up changes is read on every refresh",
-    file: "packages/repo/offer.ts",
-    from: "  if (known !== null && known.tip === tip && known.to === to) return known\n",
-    to: "",
-    command: repoTest,
-    expect:
-      "an unchanged offer's refresh reads at most 3 jj processes (ADR-0065), and what catching up changes is read once per move (S97)",
+    file: "packages/repo/plan.ts",
+    from: "  return known !== null && known.tip === tip && known.to === to\n",
+    to: "  return false\n",
+    command: planTest,
+    expect: "planCatchUpRead: read at this tip and commit",
   },
   {
     name: "what catching up changes is kept past a move",
-    file: "packages/repo/offer.ts",
-    from: "  if (known !== null && known.tip === tip && known.to === to) return known\n",
-    to: "  if (known !== null) return known\n",
-    command: repoTest,
-    expect:
-      "an unchanged offer's refresh reads at most 3 jj processes (ADR-0065), and what catching up changes is read once per move (S97)",
+    file: "packages/repo/plan.ts",
+    from: "  return known !== null && known.tip === tip && known.to === to\n",
+    to: "  return known !== null\n",
+    command: planTest,
+    expect: "planCatchUpRead: read at another tip",
   },
   {
     name: "the shared facts are read for every step",

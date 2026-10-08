@@ -906,7 +906,8 @@ commit-message request `request.ts` (`describeRequest`).
   host's `catchUp` was not read at the commit it is at now; or there is no
   `pinetrie.base` at all: the host has never read the lane, as for a lane
   whose turns never committed, so never reached your repo), `nothing-new`
-  (it moved by work the lane holds, as after you accepted its own offer)
+  (it moved by work the lane holds, as after you accepted its own offer,
+  even once the lane edited that work again: S102 item 11)
   or `brings`, with the file count and the move, the one kind that carries
   it. `catchUpOf` owns those checks; the commit comparison under them
   (`baseMoved`) is private to it.
@@ -1090,7 +1091,11 @@ and the total `decodePinned` are the only code that builds or reads it, and
 Two pi `CustomMessage`s in `land.ts`'s pattern, as is the carry-on message
 (`stop.ts`, above). An update (`pinetrie.update`,
 role `update`) is a fact in the thread, never a prompt: which of your commits
-came in and which files changed, so the agent's next run reads them again.
+came in and which files changed, so the agent's next run reads them again,
+or that none did. A merge that changed no file is still an update: the
+`merged` commit it carries is how `parentNow` knows what the lane caught up
+with, and its revision is where a branch below it starts. `incomingWords`
+words whose work came in, for the update and for a resolution's prompt.
 The card that brought the thread up to date carries what the person wants
 done with it (ADR-0108); its text is sent after the update. A stack message (`pinetrie.stack`, role `stack`) is the prompt of the run that
 splits an offer: the `offer-stack` skill, the commit the stack starts from,

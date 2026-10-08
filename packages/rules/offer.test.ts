@@ -39,7 +39,7 @@ import {
   setRecord,
 } from "./index.ts"
 import { offerAcceptanceDestinations, offerMoved } from "./offer.ts"
-import { decodeUpdate } from "./update.ts"
+import { decodeUpdate, incomingWords } from "./update.ts"
 
 const LANE = laneNameForThread("1")
 const ADA = writerId("ada@x.io")
@@ -373,6 +373,9 @@ describe("the update and stack messages", () => {
     expect(renderableMessage(encodeUpdate(wip, 5))).toMatchObject({
       content: "↓ caught up with wip/a: 2 files changed",
     })
+    expect(encodeUpdate(wip, 5).content).toContain(
+      "The work on wip/a was merged",
+    )
   })
   test("an update from the thread it branched from names it, for the column and the model (ADR-0072)", () => {
     const fromParent = {
@@ -393,6 +396,35 @@ describe("the update and stack messages", () => {
     expect(m.content).toContain(
       "The work of the thread this one branched from (amber-fox) was merged",
     )
+  })
+  test("an update that changed no file says so, and one with no commits says why", () => {
+    const m = encodeUpdate({ ...details, commits: [], files: [] }, 5)
+    expect(m.content).toContain(
+      "Accepted work was merged into this thread's own copy. It changed none of your files, so what you read before still holds.",
+    )
+    expect(m.content).not.toContain("Files that changed")
+    expect(m.content).not.toContain("changed under you")
+    expect(m.content).toContain(
+      "- only work this copy already holds, as accepted offers",
+    )
+    expect(renderableMessage(m)).toMatchObject({
+      content: "↓ caught up with accepted work: no file changed",
+    })
+  })
+  test.each([
+    [null, "The person's work"],
+    [{ kind: "accepted" }, "Accepted work"],
+    [{ kind: "wip", bookmark: "wip/a" }, "The work on wip/a"],
+    [
+      {
+        kind: "parent",
+        lane: laneNameForThread("p"),
+        name: "amber-fox" as ThreadName,
+      },
+      "The work of the thread this one branched from (amber-fox)",
+    ],
+  ] as const)("incomingWords: %o", (from, words) => {
+    expect(incomingWords(from)).toBe(words)
   })
   test("a stack message names where it starts and ends, and the bookmark to set", () => {
     const m = planStack({

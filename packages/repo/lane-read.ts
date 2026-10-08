@@ -368,7 +368,10 @@ export async function gatherLane(
   // empty one was withdrawn and then built again, without end (S89).
   const work = await workChanges(jj, { start, tip })
   const catchUp = await readCatchUp(jj, {
-    start: base.start,
+    base,
+    start,
+    // A lane on accepted work merges it.
+    copiesWip: false,
     to: acceptedBookmark,
     tip,
     known: input.known,
