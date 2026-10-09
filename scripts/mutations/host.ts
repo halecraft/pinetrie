@@ -1881,13 +1881,4 @@ export const mutations: readonly Mutation[] = [
     expect:
       "an undo that puts a running thread back in an inventory stops it too: the stop follows the places change, whatever wrote it",
   },
-  {
-    name: "0007 gives no record its origin",
-    file: "apps/pinetrie/host/migrations/0007-thread-origin.ts",
-    from: '      ? [{ kind: "set", key, value: { ...rest, origin: { kind: "started" } } }]',
-    to: "      ? []",
-    command: unit,
-    expect:
-      "planThreadOrigin gives a record with no fork its origin, leaves one with a fork, and finds nothing to do after",
-  },
 ]

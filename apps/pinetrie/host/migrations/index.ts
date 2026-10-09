@@ -11,7 +11,6 @@
 import type { Exchange, Store } from "@kyneta/exchange"
 import { PRODUCT_NAME } from "@pinetrie/core"
 import { SCHEMA_OF, type StoredKind, storedKind } from "../policy.ts"
-import { threadOrigin } from "./0007-thread-origin.ts"
 
 /** What a migration reads with, and writes with once every read loaded. */
 export interface MigrationRun {
@@ -65,11 +64,12 @@ export interface RecordMigration {
 }
 
 /**
- * Every one-time record migration this build carries, oldest first.
- * 0003-workflow-archive, 0004-threads (ADR-0117), 0005-tasks' records and
- * 0006-note-columns (ADR-0116) ran on Duane's store and were deleted.
+ * Every one-time record migration this build carries, oldest first. Empty:
+ * 0003-workflow-archive, 0004-threads (ADR-0117), 0005-tasks' records,
+ * 0006-note-columns (ADR-0116) and 0007-thread-origin (ADR-0117) ran on
+ * Duane's store and were deleted.
  */
-export const RECORD_MIGRATIONS: readonly RecordMigration[] = [threadOrigin]
+export const RECORD_MIGRATIONS: readonly RecordMigration[] = []
 
 /** Each stored document's id and the hash of the schema it was written under. */
 export async function readStored(
