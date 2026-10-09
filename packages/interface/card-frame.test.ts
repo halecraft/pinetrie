@@ -6,10 +6,10 @@ import {
   type TextCard,
   type TextPlace,
   taskIdFor,
-  textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   type CardFrameFacts,
@@ -30,7 +30,7 @@ const READER = { me: ME, nameOf: new Map([[BEA, "Bea"]]) }
 const CATCH_UPS = { base: { kind: "accepted" }, parent: null } as const
 const LANE = threadIdFor("x")
 const at = atEntry(entryId("e-1"))
-const C1 = textCardId("c0000000-0000-7000-8000-000000000001")
+const C1 = cardIdFor("c1")
 
 const card = (place: TextPlace, over: Partial<TextCard> = {}): TextCard => ({
   kind: "text",
@@ -209,7 +209,7 @@ describe("cardFrame (ADR-0111)", () => {
   test("↑ and ↓ in a list, each off at its edge", () => {
     const other = {
       ...card(queued),
-      id: textCardId("c0000000-0000-7000-8000-000000000002"),
+      id: cardIdFor("c2"),
     }
     const view = cardFrame(card(queued), "queued", {
       ...FACTS,
@@ -239,7 +239,7 @@ describe("cardFrameWords", () => {
     )
   const second = {
     ...card(queued),
-    id: textCardId("c0000000-0000-7000-8000-000000000000"),
+    id: cardIdFor("c0"),
   }
 
   test.each([

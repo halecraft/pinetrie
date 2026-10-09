@@ -8,6 +8,7 @@ import {
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import { createKeeper } from "@pinetrie/keeper"
 import type { WireCommand } from "@pinetrie/protocol/codec"
 import type { Reply } from "@pinetrie/protocol/messages"
@@ -178,21 +179,15 @@ test("a chat completes while an acceptance is held open on your repo's owner", a
     mode: "accept",
     seen: JSON.stringify({ ledger: null, conflicted: false }),
   })
-  await commands.handle(
-    sender,
-    ALICE,
-    chat("c0000000-0000-7000-8000-000000000001"),
-  )
-  expect(replies.map(r => r.id)).toEqual([
-    "c0000000-0000-7000-8000-000000000001",
-  ])
+  await commands.handle(sender, ALICE, chat(cardIdFor("c1")))
+  expect(replies.map(r => r.id)).toEqual([cardIdFor("c1")])
   held.resolve({
     kind: "done",
     fact: { kind: "squashed", lane: HELD, by: ALICE },
   })
   await acceptance
   expect(replies.map(r => [r.id, r.outcome])).toEqual([
-    ["c0000000-0000-7000-8000-000000000001", "appended"],
+    [cardIdFor("c1"), "appended"],
     ["t-1", "accepted"],
   ])
 })
@@ -215,14 +210,10 @@ test("a move into Done holds the keeper only for its place and its unload: a com
     kind: "name",
     text: "Alice",
   })
-  await commands.handle(
-    sender,
-    ALICE,
-    chat("c0000000-0000-7000-8000-000000000001"),
-  )
+  await commands.handle(sender, ALICE, chat(cardIdFor("c1")))
   expect(replies.map(r => [r.id, r.outcome])).toEqual([
     ["n-1", "named"],
-    ["c0000000-0000-7000-8000-000000000001", "refused"],
+    [cardIdFor("c1"), "refused"],
   ])
   teardown.resolve()
   await archive
@@ -233,13 +224,9 @@ test("a move into Done holds the keeper only for its place and its unload: a com
 test("a chat in an archived root is refused, and the agent is never called", async () => {
   const { b, pi, commands, replies, sender, chat } = setUp()
   placeRoot(b, DONE)
-  await commands.handle(
-    sender,
-    ALICE,
-    chat("c0000000-0000-7000-8000-000000000001"),
-  )
+  await commands.handle(sender, ALICE, chat(cardIdFor("c1")))
   expect(replies[0]).toMatchObject({
-    id: "c0000000-0000-7000-8000-000000000001",
+    id: cardIdFor("c1"),
     outcome: "refused",
   })
   expect(replies[0]?.errorMessage).toMatch(/^archived by /)
@@ -248,26 +235,19 @@ test("a chat in an archived root is refused, and the agent is never called", asy
 
 test("the command's id is the send's id", async () => {
   const { pi, commands, replies, sender, chat } = setUp()
-  await commands.handle(
-    sender,
-    ALICE,
-    chat("c0000000-0000-7000-8000-000000000002"),
-  )
+  await commands.handle(sender, ALICE, chat(cardIdFor("c2")))
   expect(replies[0]).toMatchObject({
-    id: "c0000000-0000-7000-8000-000000000002",
+    id: cardIdFor("c2"),
     outcome: "appended",
   })
   expect(pi.calls[0]?.args[0]).toMatchObject({
-    details: { sendId: "c0000000-0000-7000-8000-000000000002" },
+    details: { sendId: cardIdFor("c2") },
   })
 })
 
 test("a chat command spends its card once written, record then text, answering with its rev; a refused one leaves it", async () => {
   const { b, cards, commands, replies, sender, chat } = setUp()
-  for (const id of [
-    "c0000000-0000-7000-8000-0000000000c1",
-    "c0000000-0000-7000-8000-0000000000c2",
-  ])
+  for (const id of [cardIdFor("cc1"), cardIdFor("cc2")])
     applyPlaceSteps(b.places, [
       {
         kind: "write",
@@ -287,26 +267,26 @@ test("a chat command spends its card once written, record then text, answering w
       },
     ])
   await commands.handle(sender, ALICE, {
-    ...chat("c0000000-0000-7000-8000-000000000004"),
-    cardId: "c0000000-0000-7000-8000-0000000000c1",
+    ...chat(cardIdFor("c4")),
+    cardId: cardIdFor("cc1"),
   })
   // Refused by `sendChat` itself: an image the host does not store.
   await commands.handle(sender, ALICE, {
-    ...chat("c0000000-0000-7000-8000-000000000005"),
+    ...chat(cardIdFor("c5")),
     text: `look ![a](/blob/${"b".repeat(64)})`,
-    cardId: "c0000000-0000-7000-8000-0000000000c2",
+    cardId: cardIdFor("cc2"),
   })
   expect(replies.map(r => [r.outcome, r.rev])).toEqual([
     ["appended", 4],
     ["refused", 0],
   ])
   expect(readPlaces(b.places).map(c => c.id)).toEqual([
-    "c0000000-0000-7000-8000-0000000000c2",
+    cardIdFor("cc2"),
     THREAD,
   ])
   expect(
     cards.calls.filter(c => c.method === "destroy").map(c => c.args[0]),
-  ).toEqual(["c0000000-0000-7000-8000-0000000000c1"])
+  ).toEqual([cardIdFor("cc1")])
 })
 
 test("a popped queued card in an archived root is refused, and the agent is never called", async () => {
@@ -329,11 +309,7 @@ test("a popped queued card in an archived root is refused, and the agent is neve
 
 test("a seat whose principal names nobody is refused whatever it sends", async () => {
   const { pi, commands, replies, sender, chat } = setUp()
-  await commands.handle(
-    sender,
-    undefined,
-    chat("c0000000-0000-7000-8000-000000000003"),
-  )
+  await commands.handle(sender, undefined, chat(cardIdFor("c3")))
   expect(replies[0]).toMatchObject({ outcome: "refused" })
   expect(pi.calls).toEqual([])
 })
@@ -342,13 +318,13 @@ test("a command that throws is answered failed, and logged", async () => {
   const { b, commands, replies, sender } = setUp({}, { writes: false })
   // The agent port has no `writeValues`, so `record` throws.
   await commands.handle(sender, ALICE, {
-    id: "c0000000-0000-7000-8000-000000000004",
+    id: cardIdFor("c4"),
     kind: "name",
     text: "Alice",
   } as never)
   expect(replies).toEqual([
     expect.objectContaining({
-      id: "c0000000-0000-7000-8000-000000000004",
+      id: cardIdFor("c4"),
       outcome: "failed",
       errorMessage: "writeValues is not in this port",
     }),
@@ -362,18 +338,18 @@ test("a reservation is answered reserved, and refused for a lane pi holds (ADR-0
   const { commands, replies, sender } = setUp()
   const reserve = (id: string, lane: string) =>
     commands.handle(sender, ALICE, { id, kind: "reserve", lane } as never)
-  await reserve("c0000000-0000-7000-8000-000000000004", NEW)
-  await reserve("c0000000-0000-7000-8000-000000000005", HELD)
+  await reserve(cardIdFor("c4"), NEW)
+  await reserve(cardIdFor("c5"), HELD)
   expect(replies.map(r => [r.id, r.outcome, r.errorCode])).toEqual([
-    ["c0000000-0000-7000-8000-000000000004", "reserved", ""],
-    ["c0000000-0000-7000-8000-000000000005", "refused", "thread_taken"],
+    [cardIdFor("c4"), "reserved", ""],
+    [cardIdFor("c5"), "refused", "thread_taken"],
   ])
 })
 
 test("a retitle asks for its task's title as its sender, and answers retitling", async () => {
   const { commands, replies, sender, titles } = setUp()
   await commands.handle(sender, ALICE, {
-    id: "c0000000-0000-7000-8000-000000000006",
+    id: cardIdFor("c6"),
     kind: "retitle",
     task: TASK_ID,
   } as never)
@@ -381,6 +357,6 @@ test("a retitle asks for its task's title as its sender, and answers retitling",
     ["asked", TASK_ID, ALICE],
   ])
   expect(replies.map(r => [r.id, r.outcome])).toEqual([
-    ["c0000000-0000-7000-8000-000000000006", "retitling"],
+    [cardIdFor("c6"), "retitling"],
   ])
 })

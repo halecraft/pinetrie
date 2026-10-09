@@ -5,10 +5,10 @@ import {
   PLAIN,
   rootIdFor,
   taskIdFor,
-  textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import type { QueuedCard } from "./card.ts"
 import {
@@ -57,7 +57,7 @@ describe("planQueueHold", () => {
 describe("holdOnStop", () => {
   const card = (kind: "message" | "fact"): QueuedCard =>
     ({
-      id: "c0000000-0000-7000-8000-000000000001",
+      id: cardIdFor("c1"),
       owner: ADA,
       placer: ADA,
       place: {
@@ -125,7 +125,7 @@ describe("planQueueCard (ADR-0113)", () => {
   const atEnd = { kind: "composing", at, thread: L } as const
   const card: CardRecord = {
     kind: "text",
-    id: textCardId("c0000000-0000-7000-8000-000000000001"),
+    id: cardIdFor("c1"),
     owner: ADA,
     placer: ADA,
     place: atEnd,

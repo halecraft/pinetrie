@@ -13,6 +13,7 @@ import {
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import type { Item, Status } from "./attention.ts"
 import type { CardMarks } from "./card-marks.ts"
@@ -268,7 +269,7 @@ describe("sidebarView", () => {
       lane: threadIdFor("a"),
       end: entryId("e"),
       level: "needsYou",
-      raised: { kind: "offer", source: "c0000000-0000-7000-8000-000000000001" },
+      raised: { kind: "offer", source: cardIdFor("c1") },
     }
     const status = new Map<TaskId, Status>([
       [K("r1"), { kind: "working" }],
@@ -287,7 +288,7 @@ describe("sidebarView", () => {
       lane: threadIdFor("a"),
       end: entryId("e"),
       level: "worthARead",
-      raised: { kind: "offer", source: "c0000000-0000-7000-8000-000000000001" },
+      raised: { kind: "offer", source: cardIdFor("c1") },
     }
     const [raised] = items({
       status: new Map([[K("r1"), { kind: "worthARead", item }]]),

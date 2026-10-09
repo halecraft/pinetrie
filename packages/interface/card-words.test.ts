@@ -10,6 +10,7 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import type { CardNotice } from "@pinetrie/session"
 import { describe, expect, test } from "vitest"
 import {
@@ -33,7 +34,7 @@ const BEA = writerId("bea@x.test")
 const READER = { me: ME, nameOf: new Map([[BEA, "Bea"]]) }
 type MoveRefused = Extract<CardNotice, { fromQueue: boolean }>
 const refusal = (over: Partial<MoveRefused>): CardNotice => ({
-  card: textCardId("c0000000-0000-7000-8000-000000000001"),
+  card: cardIdFor("c1"),
   actedAt: { kind: "inventory" },
   code: "gone",
   by: null,
@@ -217,7 +218,7 @@ describe("history and traces (ADR-0048 step 6)", () => {
   const trace = (to: PlaceKey | null) => ({
     id: "t",
     for: ME,
-    card: textCardId("c0000000-0000-7000-8000-000000000001"),
+    card: cardIdFor("c1"),
     by: BEA,
     from: atEnd,
     to,

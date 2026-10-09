@@ -15,6 +15,7 @@ import {
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import { BOARD_SEARCH } from "./board-view.ts"
 import type { CardFacts, Effect, IntentState } from "./effects.ts"
@@ -531,10 +532,10 @@ describe("planIntent", () => {
     const lane = threadIdFor("x")
     const where = atEntry(entryId("3-b"))
     const ada = writerId("ada@x.test")
-    const c = textCardId("c0000000-0000-7000-8000-000000000001")
+    const c = cardIdFor("c1")
     const fresh: TextCard = {
       kind: "text",
-      id: textCardId("c0000000-0000-7000-8000-000000000105"),
+      id: cardIdFor("c105"),
       owner: ada,
       placer: ada,
       place: { kind: "composing", at: where, thread: lane },
@@ -622,12 +623,9 @@ describe("planIntent", () => {
           id: textCardId(id),
           place: { ...queuedPlace, order },
         }) satisfies CardRecord
-      const [a, b] = [
-        q("c0000000-0000-7000-8000-00000000000a", "a"),
-        q("c0000000-0000-7000-8000-00000000000b", "b"),
-      ]
+      const [a, b] = [q(cardIdFor("ca"), "a"), q(cardIdFor("cb"), "b")]
       const fact = {
-        ...q("c0000000-0000-7000-8000-00000000000f", "c"),
+        ...q(cardIdFor("cf"), "c"),
         carries: {
           kind: "fact",
           fact: { kind: "described", lane, by: ada },

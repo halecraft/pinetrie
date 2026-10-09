@@ -10,6 +10,7 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import { expect, test } from "vitest"
 import { IN_COLUMN, sendPendingOf } from "./card-moves.ts"
 import { chatAtOf, planChatRequest, startsRoot } from "./chat.ts"
@@ -27,7 +28,7 @@ const END: ChatAt = {
 const ADA = writerId("ada@x.io")
 const card: CardRecord = {
   kind: "text" as const,
-  id: textCardId("c0000000-0000-7000-8000-000000000001"),
+  id: cardIdFor("c1"),
   owner: ADA,
   placer: ADA,
   place: { kind: "composing", at, thread: TEST_THREAD },
@@ -84,7 +85,7 @@ test("a chat fills in what its column left out, and carries each card's version 
   ).toMatchObject({
     at: branch,
     asksAgent: true,
-    card: { id: "c0000000-0000-7000-8000-000000000001", seen: "v-c-1" },
+    card: { id: cardIdFor("c1"), seen: "v-c-1" },
     pinned,
     base: "wip",
   })

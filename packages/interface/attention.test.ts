@@ -9,6 +9,7 @@ import {
   type VerdictRecord,
   writerId,
 } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import type { Attention } from "@pinetrie/schema"
 import { describe, expect, test } from "vitest"
 import type { OpenOffer } from "./app-view.ts"
@@ -120,7 +121,7 @@ describe("attentionOf", () => {
       attentionOf(
         input({
           verdicts: new Map([[B, verdict(B, said("needsYou"))]]),
-          offers: [offer(B, "c0000000-0000-7000-8000-000000000001")],
+          offers: [offer(B, cardIdFor("c1"))],
         }),
       ),
     ).toEqual([])
@@ -167,7 +168,7 @@ describe("attentionOf", () => {
     const items = attentionOf(
       input({
         verdicts: new Map(),
-        offers: [offer(A, "c0000000-0000-7000-8000-000000000001")],
+        offers: [offer(A, cardIdFor("c1"))],
         person: read,
       }),
     )
@@ -175,13 +176,13 @@ describe("attentionOf", () => {
       ["needsYou", "offer"],
     ])
     const dismissed = person({
-      dismissedOffers: new Map([[A, "c0000000-0000-7000-8000-000000000001"]]),
+      dismissedOffers: new Map([[A, cardIdFor("c1")]]),
     })
     expect(
       attentionOf(
         input({
           verdicts: new Map(),
-          offers: [offer(A, "c0000000-0000-7000-8000-000000000001")],
+          offers: [offer(A, cardIdFor("c1"))],
           person: dismissed,
         }),
       ),
@@ -190,7 +191,7 @@ describe("attentionOf", () => {
       attentionOf(
         input({
           verdicts: new Map(),
-          offers: [offer(A, "c0000000-0000-7000-8000-000000000002")],
+          offers: [offer(A, cardIdFor("c2"))],
           person: dismissed,
         }),
       ),
@@ -201,9 +202,7 @@ describe("attentionOf", () => {
 describe("threadStatus and taskStatus (ADR-0116)", () => {
   const facts = { work: new Map(), verdicts: new Map() }
   test("working wins, and a pending verdict is working; else the highest item", () => {
-    const items = attentionOf(
-      input({ offers: [offer(A, "c0000000-0000-7000-8000-000000000001")] }),
-    )
+    const items = attentionOf(input({ offers: [offer(A, cardIdFor("c1"))] }))
     const status = threadStatus({
       ...facts,
       items,
@@ -221,9 +220,7 @@ describe("threadStatus and taskStatus (ADR-0116)", () => {
   })
 
   test("cards behind a held queue are not working: the thread shows what was raised there, or nothing", () => {
-    const items = attentionOf(
-      input({ offers: [offer(A, "c0000000-0000-7000-8000-000000000001")] }),
-    )
+    const items = attentionOf(input({ offers: [offer(A, cardIdFor("c1"))] }))
     const work = new Map([
       [A, "held"],
       [B, "held"],

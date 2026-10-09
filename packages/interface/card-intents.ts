@@ -15,6 +15,7 @@ import {
   type CardRecord,
   DISCARDED,
   isFact,
+  isReorderAt,
   keyOf,
   type Move,
   type MoveDirection,
@@ -24,6 +25,7 @@ import {
   type PlaceKey,
   type Position,
   pinnedOf,
+  type QueueMove,
   type Reorder,
   sameKey,
   type TaskId,
@@ -74,7 +76,7 @@ export const moveCard = (
 export const queueMove = (
   card: CardRecord,
   to: { readonly lane: ThreadId; readonly at: Position },
-): Move =>
+): QueueMove =>
   moveOf(card, { kind: "queued", at: to.at, thread: to.lane, seen: "" })
 
 /**
@@ -84,7 +86,7 @@ export const queueMove = (
 export const queueNew = (
   card: CardId,
   to: { readonly lane: ThreadId; readonly at: Position },
-): Move => ({
+): QueueMove => ({
   card,
   from: null,
   to: { kind: "queued", at: to.at, thread: to.lane, seen: "" },
@@ -102,8 +104,7 @@ export function reorderOf(
   step: -1 | 1,
 ): Reorder | null {
   const at = keyOf(card.place)
-  if (at.kind !== "queued" && at.kind !== "pinned" && at.kind !== "note")
-    return null
+  if (!isReorderAt(at)) return null
   const from = among.findIndex(c => c.id === card.id)
   const to = from + step
   const passed = among[to]
@@ -241,7 +242,8 @@ export function planPut(
   }
   const to = placeOfTarget(target, facts.composers, facts.me)
   // A note put on its own column stays where it is: a reorder moves it there.
-  if (to === null || sameKey(keyOf(now.place), to)) return []
+  if (to === null || (to.kind !== "notes" && sameKey(keyOf(now.place), to)))
+    return []
   const key = target.kind === "notes" ? target.column : target.key
   const move = moveOf(now, to)
   return [moveCard(move, { actedAt: atColumn(key), slot: null }, true)]

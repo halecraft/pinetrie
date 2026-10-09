@@ -1198,8 +1198,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a move is recorded in no history",
     file: "apps/pinetrie/host/commands/cards.ts",
-    from: '      drain,\n      { kind: "move", by: writer },\n      gesture,\n    )',
-    to: '      drain,\n      { kind: "move", by: writer },\n    )',
+    from: '    return carry(step, drain, { kind: "move", by: writer }, gesture)\n  }\n\n  /**\n   * A card queued',
+    to: '    return carry(step, drain, { kind: "move", by: writer })\n  }\n\n  /**\n   * A card queued',
     command: unit,
     expect:
       "a take into the inventory is one step of the taker's history in the root it left; a creation is in none",
@@ -1777,21 +1777,5 @@ export const mutations: readonly Mutation[] = [
     to: "    const discards = { tasks, here: null }\n",
     command: unit,
     expect: "the host names a discard's history",
-  },
-  {
-    name: "0006 makes the note column at the canvas's end",
-    file: "apps/pinetrie/host/migrations/0006-note-columns.ts",
-    from: "    const between = orderBetween(orders[at - 1] ?? null, orders[at] ?? null)",
-    to: "    const between = orderBetween(orders.at(-1) ?? null, null)",
-    command: unit,
-    expect: "each thread's notes go to a note column made just after its card",
-  },
-  {
-    name: "0006 orders notes by id, not by cell",
-    file: "apps/pinetrie/host/migrations/0006-note-columns.ts",
-    from: "      .sort(([a, x], [b, y]) => cellOf(x) - cellOf(y) || (a < b ? -1 : 1))",
-    to: "      .sort(([a], [b]) => (a < b ? -1 : 1))",
-    command: unit,
-    expect: "in the board's reading order, gaps dropped",
   },
 ]

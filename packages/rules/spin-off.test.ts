@@ -6,10 +6,10 @@ import {
   rootIdFor,
   type TextCard,
   taskIdFor,
-  textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import { planRootDelete } from "./root.ts"
 import { planLiftRoot, planSpinOff, type SpunThread } from "./spin-off.ts"
@@ -28,7 +28,7 @@ const THREAD = rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff")
 const STARTS = threadIdFor("spun")
 const ADA = writerId("p-ada")
 const BEA = writerId("p-bea")
-const C1 = textCardId("c0000000-0000-7000-8000-000000000001")
+const C1 = cardIdFor("c1")
 /** Your message at the thread: a card at a thread, in its task. */
 const note = {
   kind: "composing",
@@ -177,7 +177,7 @@ describe("planLiftRoot (S139)", () => {
         cards: [
           gone,
           card({
-            id: textCardId("c0000000-0000-7000-8000-000000000002"),
+            id: cardIdFor("c2"),
             place: { ...note, thread: STARTS },
           }),
         ],
@@ -225,7 +225,7 @@ describe("planLiftRoot (S139)", () => {
 
 test("planRootDelete: its directory record, its thread's, its task's record, board place and title, the cards in it and on its task's canvas, its document and the task's stacks", () => {
   const inThread = card({
-    id: textCardId("c0000000-0000-7000-8000-000000000002"),
+    id: cardIdFor("c2"),
     place: { ...note, thread: STARTS },
   })
   const onCanvas = threadCardOf({
@@ -249,7 +249,7 @@ test("planRootDelete: its directory record, its thread's, its task's record, boa
     "pinetrie.mark",
   ])
   expect(plan.cards).toEqual([
-    { kind: "remove", id: textCardId("c0000000-0000-7000-8000-000000000002") },
+    { kind: "remove", id: cardIdFor("c2") },
     { kind: "remove", id: STARTS },
   ])
   expect(plan.doc).toBe(`root:${THREAD}`)

@@ -25,6 +25,7 @@ import {
   entryId,
   type Intent,
   isNoteColumnId,
+  isReorderAt,
   isRootId,
   isSha256,
   isTaskId,
@@ -39,6 +40,7 @@ import {
   type Move,
   type MoveDirection,
   type MoveRefusal,
+  type MoveTarget,
   modeOf,
   normalizeName,
   OFFER_ACTIONS,
@@ -65,6 +67,7 @@ import {
   type SentCard,
   type TaskId,
   type ThreadId,
+  targetOfFields,
   WORKFLOW_ACTIONS,
   type WorkflowAction,
   type WorkflowStateId,
@@ -288,12 +291,14 @@ export function decodeCommand(
   if (kind === "queue-card") {
     const moves = decodeMoves(text(wire?.moves))
     if (typeof moves === "string") return refused(ERR.UNKNOWN_TARGET, moves)
-    const [move, ...more] = moves
-    if (move === undefined || more.length > 0 || move.to.kind !== "queued")
+    const [first, ...more] = moves
+    const to = first?.to
+    if (first === undefined || more.length > 0 || to?.kind !== "queued")
       return refused(
         ERR.UNKNOWN_TARGET,
         "a queue-card names one move into a queue",
       )
+    const move = { ...first, to }
     const hold = text(wire?.mode)
     if (!isQueueHoldChange(hold))
       return refused(ERR.UNKNOWN_KIND, `unknown queue hold change: ${hold}`)
@@ -309,17 +314,19 @@ export function decodeCommand(
   if (kind === "spin-off") {
     const moves = decodeMoves(text(wire?.moves))
     if (typeof moves === "string") return refused(ERR.UNKNOWN_TARGET, moves)
-    const [move, ...more] = moves
+    const [first, ...more] = moves
+    const to = first?.to
     if (
-      move === undefined ||
+      first === undefined ||
       more.length > 0 ||
-      move.to.kind !== "gone" ||
-      move.to.why.kind !== "spun"
+      to?.kind !== "gone" ||
+      to.why.kind !== "spun"
     )
       return refused(
         ERR.UNKNOWN_TARGET,
         "a spin-off names one move, into a new thread",
       )
+    const move = { ...first, to }
     const state = text(wire?.state)
     if (state !== "" && !isWorkflowStateId(state))
       return refused(ERR.UNKNOWN_TARGET, `not a workflow state: ${state}`)
@@ -564,11 +571,8 @@ function pinnedFromWire(s: string): readonly SentCard[] | undefined {
 const isCardCommand = (c: string): c is CardCommand =>
   (CARD_COMMANDS as readonly string[]).includes(c)
 
-/**
- * A place's key as a JSON value: its flat fields, null for none. A key has
- * no order but a note's, which is its cell (ADR-0113).
- */
-const keyToJson = (key: PlaceKey | null) =>
+/** A place's key, or a move's target, as a JSON value: its flat fields, null for none. */
+const keyToJson = (key: MoveTarget | null) =>
   key === null ? null : keyFieldsOf(placeFields(key))
 
 /** A place's key -> the wire: its flat fields as JSON, `""` for none. */
@@ -602,6 +606,16 @@ function keyFromJson(value: unknown): PlaceKey | null | undefined {
   )
 }
 
+/** A JSON value -> a move's target: a key, or a thread's nearest notes. */
+function targetFromJson(value: unknown): MoveTarget | null | undefined {
+  if (value === null) return null
+  if (typeof value !== "object" || Array.isArray(value)) return undefined
+  const v = value as Record<string, unknown>
+  return targetOfFields(
+    keyFieldsFrom(k => (typeof v[k] === "string" ? (v[k] as string) : "")),
+  )
+}
+
 /** Moves -> the wire: a JSON list of `{ card, from, to }`. */
 export const encodeMoves = (moves: readonly Move[]): string =>
   JSON.stringify(
@@ -628,7 +642,7 @@ export function decodeMoves(s: string): readonly Move[] | string {
     const card = parseCardId(typeof m.card === "string" ? m.card.trim() : "")
     if (card === undefined) return "a move must name its card"
     const from = keyFromJson(m.from ?? null)
-    const to = keyFromJson(m.to ?? null)
+    const to = targetFromJson(m.to ?? null)
     if (from === undefined || to === undefined)
       return "a move names a malformed place"
     if (to === null) return "a move must name where the card goes"
@@ -658,11 +672,7 @@ export function decodeReorder(text: string, s: string): Reorder | string {
     return "a reorder must name its place"
   const v = value as Record<string, unknown>
   const at = keyFromJson(v.at ?? null)
-  if (
-    at === null ||
-    at === undefined ||
-    (at.kind !== "queued" && at.kind !== "pinned" && at.kind !== "note")
-  )
+  if (at === null || at === undefined || !isReorderAt(at))
     return "a reorder stays in a queue, among the pinned cards or in a note column"
   const neighbour = (k: unknown): string =>
     typeof k === "string" ? k.trim() : ""

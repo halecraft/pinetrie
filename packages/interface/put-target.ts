@@ -14,9 +14,9 @@ import {
   isTaskId,
   isWorkflowStateId,
   keyOf,
+  type MoveTarget,
   type NoteColumnId,
   noteOf,
-  type PlaceKey,
   pinnedOf,
   sameKey,
   type TaskId,
@@ -144,7 +144,7 @@ export function placeOfTarget(
   target: PutTarget,
   places: ComposerPlaces,
   me: WriterId,
-): PlaceKey | null {
+): MoveTarget | null {
   if (target.kind === "inventory") return { kind: "inventory", holder: me }
   if (target.kind === "notes") return { kind: "note", column: target.column }
   if (target.kind === "state" || target.kind === "sidebar") return null

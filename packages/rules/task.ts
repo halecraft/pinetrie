@@ -11,6 +11,7 @@ import {
   type CardPlace,
   type CardRecord,
   isThreadId,
+  type MoveTarget,
   type PlaceKey,
   type RootId,
   type TaskId,
@@ -183,10 +184,18 @@ export function taskOfPlace(
     case "queued":
     case "composing":
     case "pinned":
-    case "notes":
       return tasks.taskOfThread.get(place.thread) ?? null
   }
 }
+
+/** The task a move sends a card to: its place's (`taskOfPlace`), or a thread's nearest notes', its thread's. Pure. */
+export const taskOfTarget = (
+  tasks: TaskIndex,
+  to: MoveTarget,
+): TaskId | null =>
+  to.kind === "notes"
+    ? (tasks.taskOfThread.get(to.thread) ?? null)
+    : taskOfPlace(tasks, to)
 
 /** The task a card is in now: its place's (`taskOfPlace`); null for none. */
 export const taskOfCard = (

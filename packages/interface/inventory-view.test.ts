@@ -1,11 +1,12 @@
 import { type TextCard, textCardId, writerId } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import { NO_INTENTS, type Slots, settleSlots } from "@pinetrie/session"
 import { describe, expect, test } from "vitest"
 import { inventoryView, slotKey } from "./inventory-view.ts"
 
 const ADA = writerId("ada@x.io")
-const A = textCardId("c0000000-0000-7000-8000-00000000000a")
-const B = textCardId("c0000000-0000-7000-8000-00000000000b")
+const A = cardIdFor("ca")
+const B = cardIdFor("cb")
 const slotsOf = (o: Record<string, string>): Slots =>
   Object.fromEntries(Object.entries(o).map(([s, c]) => [s, textCardId(c)]))
 
@@ -22,7 +23,7 @@ describe("inventoryView", () => {
 
   test("draws exactly settleSlots, the selection, and first lines", () => {
     const held = [record(A), record(B)]
-    const slots = slotsOf({ "10": "c0000000-0000-7000-8000-00000000000b" })
+    const slots = slotsOf({ "10": cardIdFor("cb") })
     const view = inventoryView({
       held,
       slots,
@@ -57,7 +58,7 @@ describe("inventoryView", () => {
   test("labels the first nine slots 1–9 on their faces", () => {
     const view = inventoryView({
       held: [record(A)],
-      slots: slotsOf({ "0": "c0000000-0000-7000-8000-00000000000a" }),
+      slots: slotsOf({ "0": cardIdFor("ca") }),
       intents: NO_INTENTS,
       selected: 0,
       texts: new Map(),

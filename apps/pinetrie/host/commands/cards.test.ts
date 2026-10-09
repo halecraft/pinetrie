@@ -4,10 +4,10 @@ import {
   type CardId,
   entryId,
   isTextCard,
-  type Move,
   type MoveDirection,
   noteColumnIdFor,
   type QueueHoldChange,
+  type QueueMove,
   type Reorder,
   ROOT,
   rootIdFor,
@@ -16,11 +16,11 @@ import {
   type TextCard,
   type ThreadId,
   taskIdFor,
-  textCardId,
   threadIdFor,
   type WriterId,
   writerId,
 } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import { PLACES_DOC_ID } from "@pinetrie/protocol/messages"
 import {
   readBoardPlaces,
@@ -65,7 +65,7 @@ const ADA = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
 const LANE = threadIdFor("0123456789abcdef")
 const E1 = entryId("e-1")
-const C1 = textCardId("c0000000-0000-7000-8000-000000000001")
+const C1 = cardIdFor("c1")
 /** A note column on the lane's task's canvas (`putNoteColumn`, ADR-0116). */
 const NOTES = noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
 /** A note in it: a shared place, in the lane's task. */
@@ -143,7 +143,7 @@ function setUp() {
       raw.move(w, m, h, tasksNow(b)),
     queueCard: (
       w: WriterId,
-      m: Move,
+      m: QueueMove,
       h: QueueHoldChange,
       c: CardCommand | null,
     ) => raw.queueCard(w, m, h, c, tasksNow(b)),
@@ -387,7 +387,7 @@ describe("moves' history (ADR-0066)", () => {
       ADA,
       [
         {
-          card: textCardId("c0000000-0000-7000-8000-000000000002"),
+          card: cardIdFor("c2"),
           from: null,
           to: inventory,
         },
@@ -413,7 +413,7 @@ describe("moves' history (ADR-0066)", () => {
       [
         { card: C1, from: fresh, to: inventory },
         {
-          card: textCardId("c0000000-0000-7000-8000-000000000009"),
+          card: cardIdFor("c9"),
           from: fresh,
           to: inventory,
         },
@@ -470,7 +470,7 @@ describe("reorders and unqueue all (ADR-0048 step 7)", () => {
         kind: "write",
         record: {
           kind: "text" as const,
-          id: textCardId("c0000000-0000-7000-8000-000000000002"),
+          id: cardIdFor("c2"),
           owner: ADA,
           placer: ADA,
           place: queuedAt("0000000300"),
@@ -480,7 +480,7 @@ describe("reorders and unqueue all (ADR-0048 step 7)", () => {
       },
     ])
     const done = await commands.reorder(ADA, {
-      card: textCardId("c0000000-0000-7000-8000-000000000002"),
+      card: cardIdFor("c2"),
       at: queuedKey,
       after: null,
       before: C1,
@@ -502,7 +502,7 @@ describe("reorders and unqueue all (ADR-0048 step 7)", () => {
       )
       .map(c => c.id)
     expect(order).toHaveLength(2)
-    expect(queue).toEqual(["c0000000-0000-7000-8000-000000000002", C1])
+    expect(queue).toEqual([cardIdFor("c2"), C1])
   })
 
   test("unqueue all: every queued card below the line in one step of the sender's history; with none queued, nothing", async () => {
@@ -517,7 +517,7 @@ describe("reorders and unqueue all (ADR-0048 step 7)", () => {
         kind: "write",
         record: {
           kind: "text" as const,
-          id: textCardId("c0000000-0000-7000-8000-000000000002"),
+          id: cardIdFor("c2"),
           owner: BEA,
           placer: BEA,
           place: queuedAt("b"),
@@ -612,8 +612,8 @@ test("spend: a fresh column's first send leaves its other cards notes at the new
     at: ROOT,
   } as const
   put({ place: fresh })
-  const C2 = textCardId("c0000000-0000-7000-8000-000000000002")
-  const C3 = textCardId("c0000000-0000-7000-8000-000000000003")
+  const C2 = cardIdFor("c2")
+  const C3 = cardIdFor("c3")
   put({ id: C2, owner: BEA, placer: BEA, place: fresh })
   put({
     id: C3,

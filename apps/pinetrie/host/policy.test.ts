@@ -3,9 +3,9 @@ import {
   rootDocId,
   rootIdFor,
   taskIdFor,
-  textCardId,
   writerId,
 } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import {
   LIVE_DOC_ID,
   PLACES_DOC_ID,
@@ -33,7 +33,7 @@ import {
   storedKind,
 } from "./policy.ts"
 
-const CARD = cardDocId(textCardId("c0000000-0000-7000-8000-000000000001"))
+const CARD = cardDocId(cardIdFor("c1"))
 const UNDO = "undo:seat-a"
 const INVENTORY = personDocId("inventory", writerId("ada@x.io"))
 const ATTENTION = personDocId("attention", writerId("ada@x.io"))

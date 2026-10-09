@@ -385,7 +385,7 @@ async function unsent(
     cards: readPlaces(places),
     card,
     reason,
-    column: noteColumnIdFor(newId()),
+    newColumn: () => noteColumnIdFor(newId()),
   })
   // The hold first, so the drain this card ends finds the queue held.
   if (plan.hold)

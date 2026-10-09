@@ -278,8 +278,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a queue is sent without its text's version",
     file: "packages/session/card-moves.ts",
-    from: '  move.to.kind === "queued" ? { ...move, to: { ...move.to, seen } } : move',
-    to: "  move",
+    from: "  to: { ...move.to, seen },\n})",
+    to: "  to: move.to,\n})",
     command: unit,
     expect: "a queue carries the text's version as sent",
   },

@@ -10,6 +10,7 @@ import {
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   type AppViewInput,
@@ -122,10 +123,7 @@ test("the header's offers are the open ones, never one accepted work already hol
       acceptedAs,
       files,
       edited: false,
-      ledger:
-        lane === A
-          ? { source: "c0000000-0000-7000-8000-00000000000a", start: [] }
-          : null,
+      ledger: lane === A ? { source: cardIdFor("ca"), start: [] } : null,
     }) as unknown as OfferRecord
   const lane = (name: ThreadId, tip: string | null) =>
     ({ name, tip }) as unknown as LaneView
@@ -153,7 +151,7 @@ test("the header's offers are the open ones, never one accepted work already hol
       lane: A,
       root: "r1",
       end: "t1",
-      source: "c0000000-0000-7000-8000-00000000000a",
+      source: cardIdFor("ca"),
     },
     { lane: D, root: "r2", end: "r2", source: null },
   ])

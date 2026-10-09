@@ -14,6 +14,7 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import { entry, indexOf } from "./fixtures.ts"
 import {
@@ -69,12 +70,9 @@ const queued = (id: string, order: string): TextCard => ({
   carries: PLAIN,
   unsent: null,
 })
-const C1 = textCardId("c0000000-0000-7000-8000-000000000001")
-const C2 = textCardId("c0000000-0000-7000-8000-000000000002")
-const two = [
-  queued("c0000000-0000-7000-8000-000000000001", "a"),
-  queued("c0000000-0000-7000-8000-000000000002", "b"),
-]
+const C1 = cardIdFor("c1")
+const C2 = cardIdFor("c2")
+const two = [queued(cardIdFor("c1"), "a"), queued(cardIdFor("c2"), "b")]
 
 const facts = (
   over: {
@@ -120,8 +118,8 @@ describe("nextOf: what the thread does next, as the host decides it (ADR-0113)",
       "held with only a blank card: nothing to send",
       { waiting: 1, heldBy: BEA },
       {
-        cards: [queued("c0000000-0000-7000-8000-000000000001", "a")],
-        blank: ["c0000000-0000-7000-8000-000000000001"],
+        cards: [queued(cardIdFor("c1"), "a")],
+        blank: [cardIdFor("c1")],
       },
       { kind: "held", by: BEA, top: null, count: 0, resumable: false },
     ],
@@ -152,7 +150,7 @@ describe("nextOf: what the thread does next, as the host decides it (ADR-0113)",
     [
       "a blank top card is passed over, as the drain passes it",
       { waiting: 2 },
-      { cards: two, blank: ["c0000000-0000-7000-8000-000000000001"] },
+      { cards: two, blank: [cardIdFor("c1")] },
       { kind: "sending", top: C2, typing: false },
     ],
   ])("%s", (_, over, f, next) => {

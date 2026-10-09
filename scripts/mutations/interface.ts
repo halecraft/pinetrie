@@ -2443,7 +2443,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a put where the card already is moves it",
     file: "packages/interface/card-intents.ts",
-    from: "  if (to === null || sameKey(keyOf(now.place), to)) return []",
+    from: '  if (to === null || (to.kind !== "notes" && sameKey(keyOf(now.place), to)))\n    return []',
     to: "  if (to === null) return []",
     command: unit,
     expect:
@@ -3297,10 +3297,10 @@ export const mutations: readonly Mutation[] = [
       "each note column just after the last open column whose thread comes before it",
   },
   {
-    name: "a note to a column not made yet is drawn nowhere",
+    name: "a note to a column not made yet is drawn in a column",
     file: "packages/session/card-moves.ts",
-    from: "      return notes === null || notes.made.length > 0 ? undefined : notes.place",
-    to: "      return notes === null ? undefined : notes.place",
+    from: '        case "inventory":\n          return { kind: "inventory", holder: near.holder }\n        // A column the host would make is not drawn until it is.\n        default:\n          return undefined',
+    to: '        case "inventory":\n          return { kind: "inventory", holder: near.holder }\n        case "make":\n          return { kind: "note", column: "n-unmade" as never, order: LAST_ORDER }\n        default:\n          return undefined',
     command: ["pnpm", "exec", "vitest", "run", "packages/session"],
     expect:
       "a thread's nearest notes are drawn in the column the host would choose",

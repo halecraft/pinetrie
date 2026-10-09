@@ -11,11 +11,11 @@ import {
   type SentCard,
   type Sha256,
   taskIdFor,
-  textCardId,
   threadIdFor,
   type ValueWrite,
   writerId,
 } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import type { ThreadLaneHandle } from "@pinetrie/pi"
 import { readPlaces } from "@pinetrie/reads"
 import {
@@ -141,9 +141,7 @@ describe("executeChat", () => {
 
   test("a run carries the sender's pinned versions, for it to wait for", async () => {
     const { seen, deps, context } = setUp()
-    const pinned = [
-      { id: textCardId("c0000000-0000-7000-8000-000000000001"), seen: "v-1" },
-    ]
+    const pinned = [{ id: cardIdFor("c1"), seen: "v-1" }]
     await executeChat(
       deps,
       { kind: "run", lane: LANE, details },
@@ -274,9 +272,7 @@ describe("sendChat", () => {
 
   test("the chat command's pinned versions reach its run", async () => {
     const { seen, deps } = setUp()
-    const pinned = [
-      { id: textCardId("c0000000-0000-7000-8000-000000000001"), seen: "v-1" },
-    ]
+    const pinned = [{ id: cardIdFor("c1"), seen: "v-1" }]
     await sendChat(deps, ALICE, "s-1", { ...chat("do it", true), pinned })
     expect(seen).toEqual([pinned])
   })
@@ -496,7 +492,7 @@ describe("sendChat", () => {
     const out = await sendChat(deps, ALICE, "s-1", {
       ...chat("from the card"),
       card: {
-        id: textCardId("c0000000-0000-7000-8000-000000000001"),
+        id: cardIdFor("c1"),
         seen: "",
       },
     })
@@ -509,7 +505,7 @@ describe("sendChat", () => {
       cards.calls
         .filter(c => c.method === "writers")
         .map(c => [c.method, ...c.args]),
-    ).toEqual([["writers", "c0000000-0000-7000-8000-000000000001"]])
+    ).toEqual([["writers", cardIdFor("c1")]])
   })
 
   test("spendsCard: written or running takes the card; busy, a conflict, a refusal or a failure leaves it", () => {
@@ -532,7 +528,7 @@ describe("sendChat", () => {
     const early = await sendChat(deps, ALICE, "s-1", {
       ...chat(`look ![a](/blob/${missing})`),
       card: {
-        id: textCardId("c0000000-0000-7000-8000-000000000001"),
+        id: cardIdFor("c1"),
         seen: "",
       },
     })
@@ -549,7 +545,7 @@ describe("sendChat", () => {
       {
         ...chat("from the card"),
         card: {
-          id: textCardId("c0000000-0000-7000-8000-000000000001"),
+          id: cardIdFor("c1"),
           seen: "",
         },
       },
@@ -565,7 +561,7 @@ describe("sendChat", () => {
     const out = await sendChat(deps, ALICE, "s-1", {
       ...chat("@bea when it is done"),
       card: {
-        id: textCardId("c0000000-0000-7000-8000-000000000001"),
+        id: cardIdFor("c1"),
         seen: "",
       },
     })

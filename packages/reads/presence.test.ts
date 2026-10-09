@@ -1,4 +1,5 @@
 import { taskIdFor, writerId } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import { newPresenceDoc, readingKey, seatKey } from "@pinetrie/schema"
 import { expect, test } from "vitest"
 import {
@@ -68,11 +69,11 @@ test("each followed end's task, as its column reported it; one that is no task's
 test("the cards someone is typing in, from any seat, without decayed ones; the same set while unchanged (ADR-0048 step 7)", () => {
   const ada = writerId("ada@x.io")
   const doc = newPresenceDoc()
-  doc.typingIn.set(seatKey(ada, "s1"), "c0000000-0000-7000-8000-000000000001")
+  doc.typingIn.set(seatKey(ada, "s1"), cardIdFor("c1"))
   doc.typingIn.set(seatKey(ada, "s2"), null)
   const first = readTypingIn(doc)
-  expect([...first]).toEqual(["c0000000-0000-7000-8000-000000000001"])
-  doc.typingIn.set(seatKey(ada, "s1"), "c0000000-0000-7000-8000-000000000001")
+  expect([...first]).toEqual([cardIdFor("c1")])
+  doc.typingIn.set(seatKey(ada, "s1"), cardIdFor("c1"))
   expect(readTypingIn(doc)).toBe(first)
   doc.typingIn.set(seatKey(ada, "s1"), null)
   expect([...readTypingIn(doc)]).toEqual([])

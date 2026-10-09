@@ -9,10 +9,10 @@ import {
   indexTree,
   type LaneView,
   type StopRecord,
-  textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import type { QueuedCard } from "./card.ts"
 import { renderableMessage } from "./chat.ts"
@@ -64,7 +64,7 @@ describe("planStop", () => {
     const name = threadIdFor("s")
     const queued: QueuedCard = {
       kind: "text",
-      id: textCardId("c0000000-0000-7000-8000-000000000001"),
+      id: cardIdFor("c1"),
       owner: ada,
       placer: ada,
       place: {

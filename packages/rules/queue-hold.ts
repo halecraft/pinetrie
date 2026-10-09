@@ -12,9 +12,9 @@
 import type {
   CardCommand,
   CardRecord,
-  Move,
   QueueHold,
   QueueHoldChange,
+  QueueMove,
   TaskId,
   ThreadId,
   ValueWrite,
@@ -82,7 +82,7 @@ export function planQueueHold(input: {
 export function planQueueCard(input: {
   readonly cards: readonly CardRecord[]
   readonly holds: ReadonlyMap<ThreadId, QueueHold>
-  readonly move: Move
+  readonly move: QueueMove
   readonly hold: QueueHoldChange
   /** The created card's command; ignored for a card that exists. */
   readonly command: CardCommand | null

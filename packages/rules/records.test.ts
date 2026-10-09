@@ -1,3 +1,4 @@
+import { cardIdFor } from "@pinetrie/core/fixtures"
 // Every host record's spec: its key is stored once, as its address, and a
 // record reads back whole from what is stored.
 
@@ -13,7 +14,6 @@ import {
   snapshotId,
   type ThreadName,
   taskIdFor,
-  textCardId,
   threadIdFor,
   workflowStateIdFor,
   writerId,
@@ -243,7 +243,7 @@ const SAMPLES: readonly Sample[] = [
     "card history",
     CARD_HISTORY,
     {
-      card: textCardId("c0000000-0000-7000-8000-000000000001"),
+      card: cardIdFor("c1"),
       events: [
         {
           kind: "created",
@@ -273,7 +273,7 @@ const SAMPLES: readonly Sample[] = [
     {
       id: "t-1",
       for: ADA,
-      card: textCardId("c0000000-0000-7000-8000-000000000001"),
+      card: cardIdFor("c1"),
       by: writerId("bea@x.io"),
       from: {
         kind: "pinned",

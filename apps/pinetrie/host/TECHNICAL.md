@@ -238,14 +238,12 @@ until the next compaction (S120), and the host compacts at startup. So
   second start finds nothing to do. It writes under the document's current
   schema, so its hash stays. The backup is taken after the reads, before
   the first write. Each is deleted, with its mutations, once Duane's store
-  has run it. `0006-note-columns` is registered (ADR-0116): each thread's
-  notes, stored in the cells of its notes board, moved into a note column
-  made just after the thread's card, in reading order (`planNoteColumns`);
-  a note whose thread is on no canvas is logged and left. It logs what it
-  made through `MigrationRun.log`. `0003-workflow-archive` (the workflow's
-  `closed` state renamed `archive`), `0004-threads` (each thread named in
-  its first message, ADR-0117) and `0005-tasks`' records (a task per root,
-  ADR-0116) ran, and were deleted.
+  has run it. None is registered now: `0003-workflow-archive` (the
+  workflow's `closed` state renamed `archive`), `0004-threads` (each thread
+  named in its first message, ADR-0117), `0005-tasks`' records (a task per
+  root, ADR-0116) and `0006-note-columns` (each thread's notes moved from
+  its notes board's cells into a note column beside it, ADR-0116) ran, and
+  were deleted.
 
 ## Startup
 

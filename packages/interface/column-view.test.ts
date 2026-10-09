@@ -23,6 +23,7 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import {
   type CatchUpNow,
   offerStatus,
@@ -1063,13 +1064,11 @@ describe("where the agent read pinned cards (ADR-0048)", () => {
   ): PinnedView => ({ lane, cards, retired })
 
   test("pinnedMarker: the cards read, and what no longer applies only after this lane's own read", () => {
-    const before = read(A, [
-      card("c0000000-0000-7000-8000-000000000001", "old"),
-    ])
+    const before = read(A, [card(cardIdFor("c1"), "old")])
     const entry = read(
       A,
-      [card("c0000000-0000-7000-8000-000000000002", "new")],
-      [{ id: textCardId("c0000000-0000-7000-8000-000000000001"), line: "old" }],
+      [card(cardIdFor("c2"), "new")],
+      [{ id: cardIdFor("c1"), line: "old" }],
     )
     expect(pinnedMarker(entry, before)).toEqual({
       cards: entry.cards,
@@ -1083,7 +1082,7 @@ describe("where the agent read pinned cards (ADR-0048)", () => {
           [],
           [
             {
-              id: textCardId("c0000000-0000-7000-8000-000000000001"),
+              id: cardIdFor("c1"),
               line: "old",
             },
           ],
@@ -1095,10 +1094,10 @@ describe("where the agent read pinned cards (ADR-0048)", () => {
       pinnedMarker(
         read(
           B,
-          [card("c0000000-0000-7000-8000-000000000003", "x")],
+          [card(cardIdFor("c3"), "x")],
           [
             {
-              id: textCardId("c0000000-0000-7000-8000-000000000001"),
+              id: cardIdFor("c1"),
               line: "old",
             },
           ],
@@ -1106,7 +1105,7 @@ describe("where the agent read pinned cards (ADR-0048)", () => {
         before,
       ),
     ).toEqual({
-      cards: [card("c0000000-0000-7000-8000-000000000003", "x")],
+      cards: [card(cardIdFor("c3"), "x")],
       retired: [],
     })
   })
@@ -1119,11 +1118,7 @@ describe("where the agent read pinned cards (ADR-0048)", () => {
     })
     const index = indexOf([
       entry("1-q", null, chat("q")),
-      entry(
-        "2-k",
-        "1-q",
-        pinned(read(A, [card("c0000000-0000-7000-8000-000000000001", "a")])),
-      ),
+      entry("2-k", "1-q", pinned(read(A, [card(cardIdFor("c1"), "a")]))),
       entry("3-p", "2-k", chat("p", true)),
       entry("4-r", "3-p", { role: "assistant", content: "r" }),
       entry("5-p", "4-r", chat("again", true)),
@@ -1133,7 +1128,7 @@ describe("where the agent read pinned cards (ADR-0048)", () => {
       [
         entryId("3-p"),
         {
-          cards: [card("c0000000-0000-7000-8000-000000000001", "a")],
+          cards: [card(cardIdFor("c1"), "a")],
           retired: [],
         },
       ],
@@ -1144,7 +1139,7 @@ describe("where the agent read pinned cards (ADR-0048)", () => {
 test("pinnedStatus: read, changed or unread against what the agent reads, by the host's comparison; none for a card with no text", () => {
   const card = {
     kind: "text" as const,
-    id: textCardId("c0000000-0000-7000-8000-000000000001"),
+    id: cardIdFor("c1"),
     owner: ADA,
     placer: ADA,
     place: { kind: "inventory", holder: ADA } as const,
@@ -1155,7 +1150,7 @@ test("pinnedStatus: read, changed or unread against what the agent reads, by the
     lane: A,
     cards: [
       {
-        id: textCardId("c0000000-0000-7000-8000-000000000001"),
+        id: cardIdFor("c1"),
         text: "ship it",
         by: ADA,
       },

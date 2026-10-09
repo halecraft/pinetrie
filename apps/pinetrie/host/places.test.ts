@@ -7,6 +7,7 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import { readPlaces, readPlacesRev } from "@pinetrie/reads"
 import { newPlacesDoc } from "@pinetrie/schema"
 import { expect, test } from "vitest"
@@ -33,10 +34,7 @@ const record = (id: string) =>
 
 test("applyPlaceSteps: one rev per batch of writes and removals (ADR-0059)", () => {
   const places = newPlacesDoc()
-  const [a, b] = [
-    record("c0000000-0000-7000-8000-000000000001"),
-    record("c0000000-0000-7000-8000-000000000002"),
-  ]
+  const [a, b] = [record(cardIdFor("c1")), record(cardIdFor("c2"))]
   expect(
     applyPlaceSteps(places, [
       { kind: "write", record: a },
@@ -64,7 +62,7 @@ test("applyPlaceSteps: inside a gesture, rev is raised outside it (S82)", () => 
       [
         {
           kind: "write",
-          record: record("c0000000-0000-7000-8000-000000000001"),
+          record: record(cardIdFor("c1")),
         },
       ],
       gesture,

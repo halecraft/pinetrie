@@ -3,10 +3,10 @@ import {
   ERR,
   entryId,
   NOBODY,
-  textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import type { Agent } from "@pinetrie/pi"
 import {
   encodeBehind,
@@ -193,7 +193,7 @@ describe("a run's pinned cards (ADR-0048)", () => {
       lane: LANE,
       cards: [
         {
-          id: textCardId("c0000000-0000-7000-8000-000000000001"),
+          id: cardIdFor("c1"),
           text: "ship it",
           by: writerId("a@x.io"),
         },
@@ -214,9 +214,7 @@ describe("a run's pinned cards (ADR-0048)", () => {
         return pinned
       },
     )
-    const seen = [
-      { id: textCardId("c0000000-0000-7000-8000-000000000001"), seen: "v-1" },
-    ]
+    const seen = [{ id: cardIdFor("c1"), seen: "v-1" }]
     runs.start(LANE, { kind: "prompt", message: chat, pinnedSeen: seen })
     lane.finish({ kind: "ok" })
     await ended

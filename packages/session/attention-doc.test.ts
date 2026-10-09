@@ -1,5 +1,6 @@
 import { Exchange } from "@kyneta/exchange"
 import { entryId, type RootRecord, threadIdFor, writerId } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import { expect, test } from "vitest"
 import { attentionStore, EARLIEST, startOf } from "./attention-doc.ts"
 
@@ -12,7 +13,7 @@ test("before the host's copy arrives, your attention document is not written: an
   store.read(LANE, entryId("e-1"))
   store.leave()
   store.dismiss(LANE, entryId("p-1"))
-  store.dismissOffer(LANE, "c0000000-0000-7000-8000-000000000001")
+  store.dismissOffer(LANE, cardIdFor("c1"))
   store.setInbox({ since: "e-9", seen: ["e-10"] })
   expect(store.attention.current()).toEqual({
     since: "",

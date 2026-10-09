@@ -632,8 +632,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "an unqueue goes to another thread's notes",
     file: core,
-    from: '): PlaceKey => ({ kind: "notes", thread: place.thread })',
-    to: '): PlaceKey => ({ kind: "notes", thread: threadIdFor("elsewhere") })',
+    from: '): NotesTarget => ({ kind: "notes", thread: place.thread })',
+    to: '): NotesTarget => ({ kind: "notes", thread: threadIdFor("elsewhere") })',
     command: unit,
     expect: "an unqueue sends a card to the note column nearest its thread",
   },
@@ -857,19 +857,19 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a note column fits an inventory",
     file: "packages/core/index.ts",
-    from: '    case "note-column":\n      return place === "canvas"',
-    to: '    case "note-column":\n      return place === "canvas" || place === "inventory"',
+    from: '  "note-column": ["canvas"],',
+    to: '  "note-column": ["canvas", "inventory"],',
     command: unit,
     expect:
       "fitsPlace: a text card anywhere but a canvas, a thread's card on a canvas or in an inventory, a note column on a canvas alone",
   },
   {
-    name: "a card on its way to the notes is seen anywhere",
+    name: "a note column is placed anywhere",
     file: "packages/core/index.ts",
-    from: '  from.kind === "notes" ? now.kind === "note" : sameKey(now, from)',
-    to: '  from.kind === "notes" ? true : sameKey(now, from)',
-    command: ["pnpm", "exec", "vitest", "run", "packages/core"],
-    expect: "seenAt: a card seen on its way to a thread's nearest notes",
+    from: '      return fits("note-column", place) ? { ...card, place } : undefined',
+    to: "      return { ...card, place } as CardRecord",
+    command: unit,
+    expect: "placed: a card at a place its kind is ever in",
   },
   {
     name: "a mark may name a task and a note column",
@@ -879,5 +879,13 @@ export const mutations: readonly Mutation[] = [
     command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
     expect:
       "decode: a mark names a task or a note column, never both or neither",
+  },
+  {
+    name: "a reorder is anywhere a card is",
+    file: core,
+    from: "  return kinds.includes(key.kind)",
+    to: "  return kinds.length > 0",
+    command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
+    expect: "decode: a malformed reorder or queue hold is refused",
   },
 ]

@@ -26,6 +26,7 @@ import {
   type NoteColumnId,
   noteColumnIdFor,
   type QueueHoldChange,
+  type QueueMove,
   type Reorder,
   type RootId,
   type SentCard,
@@ -48,7 +49,6 @@ import {
   readTreeIndex,
 } from "@pinetrie/reads"
 import {
-  afterSteps,
   type Cause,
   cardsOfParts,
   historyOf,
@@ -60,7 +60,7 @@ import {
   planFreshFollow,
   planLiftRoot,
   planMoveCommand,
-  planNotesTargets,
+  planMoveRequest,
   planQueueCard,
   planReorder,
   planRootDelete,
@@ -260,7 +260,7 @@ export function createCardCommands(deps: CardCommandDeps) {
         sent: card,
         root,
         thread: sent.chat.at.thread,
-        column: newColumn(),
+        newColumn,
         by: writer,
       }),
     }
@@ -285,30 +285,16 @@ export function createCardCommands(deps: CardCommandDeps) {
       task === null ? undefined : await deps.histories.gestureOf(writer, task)
     // plan: each move to a thread's notes to its nearest note column, made
     // first where its task has none, then the moves
-    const cards = readPlaces(places)
-    const notes = planNotesTargets({
-      cards,
+    const { step, drain } = planMoveRequest(
+      readPlaces(places),
       moves,
-      sender: writer,
-      newColumn,
-    })
-    const made = notes.made.map(record => ({ kind: "write", record }) as const)
-    const { step, drain } = planMoveCommand(
-      afterSteps(cards, made),
-      notes.moves,
       writer,
       running,
       discards,
+      newColumn,
     )
     // execute
-    return carry(
-      step.kind === "steps"
-        ? { kind: "steps", steps: [...made, ...step.steps] }
-        : step,
-      drain,
-      { kind: "move", by: writer },
-      gesture,
-    )
+    return carry(step, drain, { kind: "move", by: writer }, gesture)
   }
 
   /**
@@ -320,7 +306,7 @@ export function createCardCommands(deps: CardCommandDeps) {
    */
   async function queueCard(
     writer: WriterId,
-    queued: Move,
+    queued: QueueMove,
     hold: QueueHoldChange,
     command: CardCommand | null,
     tasks: TaskIndex,

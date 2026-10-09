@@ -1,5 +1,5 @@
 import { describe, expect, test } from "vitest"
-import { entriesOf, entry, fromParents } from "./fixtures.ts"
+import { cardIdFor, entriesOf, entry, fromParents } from "./fixtures.ts"
 import {
   agentActivity,
   ancestry,
@@ -621,15 +621,13 @@ describe("pinned cards in the tree (ADR-0048)", () => {
     entry(id, parent, { role: "pinned", content: "", pinned: view })
   const first: PinnedView = {
     lane: OTHER,
-    cards: [card("c0000000-0000-7000-8000-000000000001", "a")],
+    cards: [card(cardIdFor("c1"), "a")],
     retired: [],
   }
   const second: PinnedView = {
     lane: LANE,
-    cards: [card("c0000000-0000-7000-8000-000000000002", "b")],
-    retired: [
-      { id: textCardId("c0000000-0000-7000-8000-000000000001"), line: "a" },
-    ],
+    cards: [card(cardIdFor("c2"), "b")],
+    retired: [{ id: cardIdFor("c1"), line: "a" }],
   }
   // 1-q -> 2-cards(first) -> 3-p1 -> 4-r1 -> 5-cards(second) -> 6-p2 -> 7-r2
   const list = [

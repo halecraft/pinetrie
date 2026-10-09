@@ -3,10 +3,10 @@ import {
   entryId,
   runId,
   type ThreadId,
-  textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import type { Agent } from "@pinetrie/pi"
 import { readCardHistories, readPlaces } from "@pinetrie/reads"
 import {
@@ -144,10 +144,10 @@ test("a stop while a chat's run waits for its pinned cards cancels it there, and
 test("a stop with a message card queued holds the queue in the same write as its stop record, before the abort (ADR-0048 step 7)", async () => {
   const { b, lane, handle, pi } = running()
   b.places.cards.set(
-    "c0000000-0000-7000-8000-000000000001",
+    cardIdFor("c1"),
     encodeCard({
       kind: "text" as const,
-      id: textCardId("c0000000-0000-7000-8000-000000000001"),
+      id: cardIdFor("c1"),
       owner: bea,
       placer: bea,
       place: {

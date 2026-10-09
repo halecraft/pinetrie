@@ -7,6 +7,7 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import { encodeCard } from "@pinetrie/rules"
 import { newPlacesDoc } from "@pinetrie/schema"
 import { expect, test } from "vitest"
@@ -31,38 +32,26 @@ const card = (id: string, owner = "p-ada"): TextCard => ({
 
 test("readPlaces: oldest first, malformed ones left out, an unchanged card the same object", () => {
   const doc = newPlacesDoc()
-  doc.cards.set(
-    "c0000000-0000-7000-8000-000000000002",
-    encodeCard(card("c0000000-0000-7000-8000-000000000002")),
-  )
-  doc.cards.set(
-    "c0000000-0000-7000-8000-000000000001",
-    encodeCard(card("c0000000-0000-7000-8000-000000000001")),
-  )
-  doc.cards.set("c0000000-0000-7000-8000-000000000003", {
-    ...encodeCard(card("c0000000-0000-7000-8000-000000000003")),
+  doc.cards.set(cardIdFor("c2"), encodeCard(card(cardIdFor("c2"))))
+  doc.cards.set(cardIdFor("c1"), encodeCard(card(cardIdFor("c1"))))
+  doc.cards.set(cardIdFor("c3"), {
+    ...encodeCard(card(cardIdFor("c3"))),
     kind: "pinned",
   })
   const first = readPlaces(doc)
-  expect(first.map(c => c.id)).toEqual([
-    "c0000000-0000-7000-8000-000000000001",
-    "c0000000-0000-7000-8000-000000000002",
-  ])
+  expect(first.map(c => c.id)).toEqual([cardIdFor("c1"), cardIdFor("c2")])
   // A write to one card keeps every other card's object.
-  doc.cards.set(
-    "c0000000-0000-7000-8000-000000000004",
-    encodeCard(card("c0000000-0000-7000-8000-000000000004")),
-  )
+  doc.cards.set(cardIdFor("c4"), encodeCard(card(cardIdFor("c4"))))
   const second = readPlaces(doc)
   expect(second.map(c => c.id)).toEqual([
-    "c0000000-0000-7000-8000-000000000001",
-    "c0000000-0000-7000-8000-000000000002",
-    "c0000000-0000-7000-8000-000000000004",
+    cardIdFor("c1"),
+    cardIdFor("c2"),
+    cardIdFor("c4"),
   ])
   expect(second[0]).toBe(first[0])
   expect(second[1]).toBe(first[1])
-  doc.cards.set("c0000000-0000-7000-8000-000000000001", {
-    ...encodeCard(card("c0000000-0000-7000-8000-000000000001")),
+  doc.cards.set(cardIdFor("c1"), {
+    ...encodeCard(card(cardIdFor("c1"))),
     lane: threadIdFor("elsewhere"),
   })
   const third = readPlaces(doc)

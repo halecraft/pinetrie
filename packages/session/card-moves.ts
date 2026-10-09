@@ -24,14 +24,14 @@ import {
   isTextCardId,
   type Move,
   type MoveRefusal,
-  noteColumnIdFor,
-  type PlaceKey,
+  type MoveTarget,
   placed,
+  type QueueMove,
   type Reorder,
   type WriterId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
-import { notesOf, planReorder } from "@pinetrie/rules"
+import { notesNear, planReorder } from "@pinetrie/rules"
 import type { Intents } from "./inventory.ts"
 
 /**
@@ -311,8 +311,10 @@ export function slotOnAccept(
  * a queued card only once it holds that much (S96). Any other move is
  * returned as it is.
  */
-export const stampSeen = (move: Move, seen: string): Move =>
-  move.to.kind === "queued" ? { ...move, to: { ...move.to, seen } } : move
+export const stampSeen = (move: QueueMove, seen: string): QueueMove => ({
+  ...move,
+  to: { ...move.to, seen },
+})
 
 /** The slot each take into the inventory this tab has in flight chose, by card. */
 export function intentsOf(state: MovesState): Intents {
@@ -337,7 +339,7 @@ export const LAST_ORDER = "\uffff"
  * when the host would make one, or the thread has no card.
  */
 export function drawnPlace(
-  key: PlaceKey,
+  key: MoveTarget,
   me: WriterId,
   cards: readonly CardRecord[],
 ): CardPlace | undefined {
@@ -352,21 +354,21 @@ export function drawnPlace(
     case "gone":
       return { ...key, task: null, by: me }
     case "notes": {
-      const notes = notesOf({
-        cards,
-        thread: key.thread,
-        column: UNMADE,
-        by: me,
-      })
-      return notes === null || notes.made.length > 0 ? undefined : notes.place
+      const near = notesNear(cards, key.thread)
+      switch (near?.kind) {
+        case "column":
+          return { kind: "note", column: near.column, order: LAST_ORDER }
+        case "inventory":
+          return { kind: "inventory", holder: near.holder }
+        // A column the host would make is not drawn until it is.
+        default:
+          return undefined
+      }
     }
     default:
       return key
   }
 }
-
-/** The id a note column the host would make is drawn with: never drawn, since it is not made yet. */
-const UNMADE = noteColumnIdFor("unmade")
 
 /**
  * The record a `queue-card` with no `from` is drawn as until the host

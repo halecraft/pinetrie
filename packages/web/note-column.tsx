@@ -21,7 +21,7 @@ import {
 import { newCardId, type SessionClient } from "@pinetrie/session"
 import { useEffect, useRef, useState } from "react"
 import { NoteCardEditor } from "./card-editor.tsx"
-import { TitleField } from "./sidebar.tsx"
+import { TitleField } from "./title-field.tsx"
 
 export function NoteColumn(p: {
   session: SessionClient

@@ -1,4 +1,5 @@
 import { writerId } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import { createKeeper } from "@pinetrie/keeper"
 import type { WireCommand } from "@pinetrie/protocol/codec"
 import { expect, test } from "vitest"
@@ -55,7 +56,7 @@ test("a command's writer is the principal its seat connected as, never the seat"
     async (_sender, writer) => {
       seen.push(writer)
     },
-    ["c0000000-0000-7000-8000-000000000001"],
+    [cardIdFor("c1")],
   )
   expect(seen).toEqual([writerId("ada@example.com")])
 })
@@ -68,21 +69,14 @@ test("a seat's second command is queued only after its first replied, so a drain
     (_sender, _writer, wire) =>
       keeper.run(async () => {
         order.push(wire.id as string)
-        if (wire.id !== "c0000000-0000-7000-8000-000000000001") return
+        if (wire.id !== cardIdFor("c1")) return
         // Some gathering first, so the seat's next command has long arrived.
         await new Promise(r => setTimeout(r, 2))
         void keeper.run(async () => void order.push("drain"))
       }),
-    [
-      "c0000000-0000-7000-8000-000000000001",
-      "c0000000-0000-7000-8000-000000000002",
-    ],
+    [cardIdFor("c1"), cardIdFor("c2")],
   )
-  expect(order).toEqual([
-    "c0000000-0000-7000-8000-000000000001",
-    "drain",
-    "c0000000-0000-7000-8000-000000000002",
-  ])
+  expect(order).toEqual([cardIdFor("c1"), "drain", cardIdFor("c2")])
 })
 
 test("one seat's command held open holds no other seat's", async () => {
@@ -110,16 +104,10 @@ test("a failed command does not end its seat's commands", async () => {
   await seatSends(
     async (_sender, _writer, wire) => {
       seen.push(wire.id)
-      if (wire.id === "c0000000-0000-7000-8000-000000000001")
+      if (wire.id === cardIdFor("c1"))
         throw new Error("the Line went with its seat")
     },
-    [
-      "c0000000-0000-7000-8000-000000000001",
-      "c0000000-0000-7000-8000-000000000002",
-    ],
+    [cardIdFor("c1"), cardIdFor("c2")],
   )
-  expect(seen).toEqual([
-    "c0000000-0000-7000-8000-000000000001",
-    "c0000000-0000-7000-8000-000000000002",
-  ])
+  expect(seen).toEqual([cardIdFor("c1"), cardIdFor("c2")])
 })

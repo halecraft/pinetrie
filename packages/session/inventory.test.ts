@@ -1,4 +1,5 @@
 import { textCardId, writerId } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   firstEmpty,
@@ -14,9 +15,9 @@ import {
 } from "./inventory.ts"
 
 const _ADA = writerId("ada@x.io")
-const A = textCardId("c0000000-0000-7000-8000-00000000000a")
-const B = textCardId("c0000000-0000-7000-8000-00000000000b")
-const C = textCardId("c0000000-0000-7000-8000-00000000000c")
+const A = cardIdFor("ca")
+const B = cardIdFor("cb")
+const C = cardIdFor("cc")
 /** Every card steady: the repair acts at once. */
 const STEADY = () => true
 const slotsOf = (o: Record<string, string>): Slots =>
@@ -25,8 +26,8 @@ const slotsOf = (o: Record<string, string>): Slots =>
 describe("firstEmpty", () => {
   test("the start when it is empty, else the first empty in reading order, else null", () => {
     const some = slotsOf({
-      "0": "c0000000-0000-7000-8000-00000000000a",
-      "2": "c0000000-0000-7000-8000-00000000000b",
+      "0": cardIdFor("ca"),
+      "2": cardIdFor("cb"),
     })
     expect(firstEmpty(some, 5)).toBe(5)
     expect(firstEmpty(some, 2)).toBe(1)
@@ -40,7 +41,7 @@ describe("firstEmpty", () => {
 
 describe("settleSlots and planSlots: the repair (ADR-0059, S76)", () => {
   test("an unslotted held card goes in the first empty slot, in id order", () => {
-    const slots = slotsOf({ "0": "c0000000-0000-7000-8000-00000000000b" })
+    const slots = slotsOf({ "0": cardIdFor("cb") })
     expect(settleSlots([C, A, B], slots, NO_INTENTS)).toEqual({
       "0": B,
       "1": A,
@@ -54,9 +55,9 @@ describe("settleSlots and planSlots: the repair (ADR-0059, S76)", () => {
 
   test("a slot naming a card not held is cleared, and a slot that is no slot", () => {
     const slots = slotsOf({
-      "3": "c0000000-0000-7000-8000-00000000000a",
-      "4": "c0000000-0000-7000-8000-000000000103",
-      "99": "c0000000-0000-7000-8000-00000000000b",
+      "3": cardIdFor("ca"),
+      "4": cardIdFor("c103"),
+      "99": cardIdFor("cb"),
     })
     expect(planSlots([A], slots, NO_INTENTS, STEADY)).toEqual({
       set: {},
@@ -66,8 +67,8 @@ describe("settleSlots and planSlots: the repair (ADR-0059, S76)", () => {
 
   test("a card in two slots keeps the lower", () => {
     const slots = slotsOf({
-      "7": "c0000000-0000-7000-8000-00000000000a",
-      "2": "c0000000-0000-7000-8000-00000000000a",
+      "7": cardIdFor("ca"),
+      "2": cardIdFor("ca"),
     })
     expect(settleSlots([A], slots, NO_INTENTS)).toEqual({ "2": A })
     expect(planSlots([A], slots, NO_INTENTS, STEADY)).toEqual({
@@ -78,8 +79,8 @@ describe("settleSlots and planSlots: the repair (ADR-0059, S76)", () => {
 
   test("a card keeps its slot, gaps included; nothing to do gives no writes", () => {
     const slots = slotsOf({
-      "5": "c0000000-0000-7000-8000-00000000000a",
-      "11": "c0000000-0000-7000-8000-00000000000b",
+      "5": cardIdFor("ca"),
+      "11": cardIdFor("cb"),
     })
     expect(settleSlots([A, B], slots, NO_INTENTS)).toEqual(slots)
     expect(planSlots([A, B], slots, NO_INTENTS, STEADY)).toEqual({
@@ -90,8 +91,8 @@ describe("settleSlots and planSlots: the repair (ADR-0059, S76)", () => {
 
   test("an intent's card is drawn in its chosen slot, and the repair writes nothing for it", () => {
     const slots = slotsOf({
-      "0": "c0000000-0000-7000-8000-00000000000b",
-      "4": "c0000000-0000-7000-8000-00000000000c",
+      "0": cardIdFor("cb"),
+      "4": cardIdFor("cc"),
     })
     const intents = new Map([
       [A, 4],
@@ -112,15 +113,14 @@ describe("settleSlots and planSlots: the repair (ADR-0059, S76)", () => {
 
   test("a card not yet steady is neither placed nor has its slot cleared; a duplicate, or a slot that is no slot, is settled at once", () => {
     const unsteady = (card: string) =>
-      card !== "c0000000-0000-7000-8000-00000000000b" &&
-      card !== "c0000000-0000-7000-8000-000000000103"
+      card !== cardIdFor("cb") && card !== cardIdFor("c103")
     // B newly held and unslotted: not placed yet. A gone card's slot: kept.
     expect(
       planSlots(
         [A, B],
         slotsOf({
-          "0": "c0000000-0000-7000-8000-00000000000a",
-          "3": "c0000000-0000-7000-8000-000000000103",
+          "0": cardIdFor("ca"),
+          "3": cardIdFor("c103"),
         }),
         NO_INTENTS,
         unsteady,
@@ -131,9 +131,9 @@ describe("settleSlots and planSlots: the repair (ADR-0059, S76)", () => {
       planSlots(
         [A],
         slotsOf({
-          "0": "c0000000-0000-7000-8000-00000000000a",
-          "4": "c0000000-0000-7000-8000-00000000000a",
-          x: "c0000000-0000-7000-8000-00000000000a",
+          "0": cardIdFor("ca"),
+          "4": cardIdFor("ca"),
+          x: cardIdFor("ca"),
         }),
         NO_INTENTS,
         () => false,
@@ -145,7 +145,7 @@ describe("settleSlots and planSlots: the repair (ADR-0059, S76)", () => {
     const first = steadiness(
       new Map(),
       [A],
-      slotsOf({ "2": "c0000000-0000-7000-8000-00000000000b" }),
+      slotsOf({ "2": cardIdFor("cb") }),
       1_000,
     )
     expect(first.steady(A)).toBe(false)
@@ -153,7 +153,7 @@ describe("settleSlots and planSlots: the repair (ADR-0059, S76)", () => {
     const later = steadiness(
       first.memory,
       [A],
-      slotsOf({ "2": "c0000000-0000-7000-8000-00000000000b" }),
+      slotsOf({ "2": cardIdFor("cb") }),
       1_000 + STEADY_MS,
     )
     expect([later.steady(A), later.steady(B), later.wake]).toEqual([
@@ -165,7 +165,7 @@ describe("settleSlots and planSlots: the repair (ADR-0059, S76)", () => {
     const changed = steadiness(
       later.memory,
       [A, B],
-      slotsOf({ "2": "c0000000-0000-7000-8000-00000000000b" }),
+      slotsOf({ "2": cardIdFor("cb") }),
       5_000,
     )
     expect([changed.steady(A), changed.steady(B), changed.wake]).toEqual([
@@ -179,8 +179,8 @@ describe("settleSlots and planSlots: the repair (ADR-0059, S76)", () => {
     expect(
       takeIntoInventoryWrites(
         slotsOf({
-          "2": "c0000000-0000-7000-8000-00000000000a",
-          "3": "c0000000-0000-7000-8000-00000000000b",
+          "2": cardIdFor("ca"),
+          "3": cardIdFor("cb"),
         }),
         A,
         6,

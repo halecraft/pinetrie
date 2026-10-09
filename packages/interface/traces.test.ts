@@ -4,10 +4,10 @@ import {
   type PlaceKey,
   rootIdFor,
   type TraceRecord,
-  textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import { expect, test } from "vitest"
 import { keptTraces, seenBatches, traceGroups, tracesAt } from "./traces.ts"
 
@@ -32,7 +32,7 @@ const queued: PlaceKey = {
 const trace = (over: Partial<TraceRecord>): TraceRecord => ({
   id: "t",
   for: ADA,
-  card: textCardId("c0000000-0000-7000-8000-000000000001"),
+  card: cardIdFor("c1"),
   by: BEA,
   from: at("e-here"),
   to: queued,

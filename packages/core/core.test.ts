@@ -35,6 +35,7 @@ import {
   parseTextCardId,
   parseTitle,
   pinnedOf,
+  placed,
   placeFields,
   placeOfFields,
   projectTranscript,
@@ -46,13 +47,14 @@ import {
   type TextPlace,
   THE_AGENT,
   type ThreadId,
+  targetOfFields,
   taskIdFor,
-  textCardId,
   threadIdFor,
   writerId,
   writerOfPrincipal,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
+import { cardIdFor } from "./fixtures.ts"
 
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 const TEST_THREAD = threadIdFor("e")
@@ -439,6 +441,36 @@ describe("a card's place as flat fields (ADR-0059)", () => {
     expect(fits("media")).toEqual([])
   })
 
+  test("placed: a card at a place its kind is ever in, and no record where it is never", () => {
+    const by = writerId("ada@example.com")
+    const canvas = {
+      kind: "canvas",
+      task: TEST_TASK,
+      order: "m",
+      width: 1,
+    } as const
+    const held = { kind: "inventory", holder: by } as const
+    const column: CardRecord = {
+      kind: "note-column",
+      id: NOTES,
+      owner: by,
+      place: canvas,
+      placer: by,
+    }
+    const thread: CardRecord = {
+      kind: "thread",
+      id: TEST_THREAD,
+      owner: by,
+      place: canvas,
+      placer: by,
+    }
+    expect(placed(thread, held)?.place).toEqual(held)
+    expect(placed(column, held)).toBeUndefined()
+    expect(placed(column, { ...canvas, order: "n" })?.place).toMatchObject({
+      order: "n",
+    })
+  })
+
   test("text that is no card's id parses as none", () => {
     for (const id of [
       "",
@@ -477,7 +509,7 @@ describe("a card's place as flat fields (ADR-0059)", () => {
     expect(placeOfFields({ ...f, column: "t-x" })).toBeUndefined()
     const notes = placeFields({ kind: "notes", thread: TEST_THREAD })
     expect(placeOfFields(notes)).toBeUndefined()
-    expect(keyOfFields(keyFieldsFrom(k => notes[k]))).toEqual({
+    expect(targetOfFields(keyFieldsFrom(k => notes[k]))).toEqual({
       kind: "notes",
       thread: TEST_THREAD,
     })
@@ -547,7 +579,7 @@ describe("moves, built once (ADR-0059)", () => {
   const at = atEntry(entryId("e-1"))
   const card = (place: TextPlace): CardRecord => ({
     kind: "text",
-    id: textCardId("c0000000-0000-7000-8000-000000000001"),
+    id: cardIdFor("c1"),
     owner: ADA,
     place,
     placer: ADA,
@@ -557,7 +589,7 @@ describe("moves, built once (ADR-0059)", () => {
   const atEnd = card({ kind: "note", column: NOTES, order: "a" })
   test("a move goes from where the card is; a discard names no history: the host's to name", () => {
     expect(moveOf(atEnd, DISCARDED)).toEqual({
-      card: textCardId("c0000000-0000-7000-8000-000000000001"),
+      card: cardIdFor("c1"),
       from: { kind: "note", column: NOTES },
       to: { kind: "gone", why: { kind: "discarded" } },
     })
@@ -579,19 +611,27 @@ describe("moves, built once (ADR-0059)", () => {
     expect(keyOfFields(fields)).toEqual({ kind: "gone", why: place.why })
   })
 
-  test("seenAt: a card seen on its way to a thread's nearest notes is in whichever note column the host chose; else where it is", () => {
+  test("seenAt: a note is where its sender saw it in its column, whatever its rank", () => {
     const now = { kind: "note", column: NOTES } as const
-    expect(seenAt(now, { kind: "notes", thread: TEST_THREAD })).toBe(true)
     expect(seenAt(now, now)).toBe(true)
     expect(seenAt(now, { kind: "note", column: noteColumnIdFor("x") })).toBe(
       false,
     )
+  })
+
+  test("a thread's nearest notes are a move's target alone: read as a target, never as a key", () => {
+    const notes = placeFields({ kind: "notes", thread: TEST_THREAD })
+    expect(targetOfFields(notes)).toEqual({
+      kind: "notes",
+      thread: TEST_THREAD,
+    })
+    expect(keyOfFields(notes)).toBeUndefined()
     expect(
-      seenAt(
-        { kind: "inventory", holder: ADA },
-        { kind: "notes", thread: TEST_THREAD },
-      ),
-    ).toBe(false)
+      targetOfFields(placeFields({ kind: "note", column: NOTES })),
+    ).toEqual({
+      kind: "note",
+      column: NOTES,
+    })
   })
 
   test("a spun card is stored as spun, its root in its column and its thread in its lane; a spun place with neither is malformed", () => {

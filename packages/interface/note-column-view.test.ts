@@ -6,6 +6,7 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import { type CanvasCard, canvasOf, NEW_NOTES_TITLE } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import { noteColumnsOf, stripItems } from "./note-column-view.ts"
@@ -79,8 +80,8 @@ test("noteColumnsOf: each note column in the canvas's order, its title or Notes,
     carries: { kind: "message", command: null },
     unsent: null,
   })
-  const n1 = note("c0000000-0000-7000-8000-000000000001", N1, "b")
-  const n2 = note("c0000000-0000-7000-8000-000000000002", N1, "a")
+  const n1 = note(cardIdFor("c1"), N1, "b")
+  const n2 = note(cardIdFor("c2"), N1, "a")
   const views = noteColumnsOf({
     canvas: canvas(A, N2, N1),
     cards: [n1, n2],

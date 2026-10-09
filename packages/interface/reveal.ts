@@ -84,9 +84,6 @@ export function revealOf(
         actedAt: at(place.column),
       }
     }
-    // A target alone: no card is ever there.
-    case "notes":
-      return { effects: [], actedAt: AT_INVENTORY }
     // Discarded: drawn nowhere, so nothing comes into view.
     case "gone":
       return { effects: [], actedAt: AT_INVENTORY }

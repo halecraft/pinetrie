@@ -41,6 +41,7 @@ import {
   type OfferAction,
   PLAIN,
   type QueueHoldChange,
+  type QueueMove,
   type Reorder,
   type RootId,
   type TaskId,
@@ -265,7 +266,7 @@ export interface SessionClient {
    * resolves with the host's answer.
    */
   queueCard(
-    move: Move,
+    move: QueueMove,
     hold: QueueHoldChange,
     how?: MoveHow,
     command?: CardCommand | null,

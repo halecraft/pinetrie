@@ -16,11 +16,11 @@ import {
   type TextPlace,
   type TraceRecord,
   taskIdFor,
-  textCardId,
   threadIdFor,
   type WriterId,
   writerId,
 } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   type Cause,
@@ -41,7 +41,7 @@ const LANE = threadIdFor("x")
 const ADA = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
 const END = entryId("e-end")
-const C1 = textCardId("c0000000-0000-7000-8000-000000000001")
+const C1 = cardIdFor("c1")
 const at = atEntry(entryId("e-1"))
 
 const NOTES = noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
@@ -369,7 +369,7 @@ test("planTraceSweep: traces too old, and histories whose card is gone", () => {
     at: when,
   })
   const now = TRACE_MAX_AGE_MS + 10
-  const gone = textCardId("c0000000-0000-7000-8000-000000000103")
+  const gone = cardIdFor("c103")
   expect(
     planTraceSweep({
       traces: [trace("old", 1), trace("new", now)],
@@ -401,9 +401,9 @@ test("planGoneSweep: a card discarded a week ago or more, or with no history to 
     at: when,
   })
   const now = GONE_KEEP_MS + 100
-  const old = textCardId("c0000000-0000-7000-8000-000000000107")
-  const fresh = textCardId("c0000000-0000-7000-8000-000000000108")
-  const silent = textCardId("c0000000-0000-7000-8000-000000000109")
+  const old = cardIdFor("c107")
+  const fresh = cardIdFor("c108")
+  const silent = cardIdFor("c109")
   expect(
     planGoneSweep({
       cards: [

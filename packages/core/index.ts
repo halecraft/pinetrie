@@ -668,7 +668,7 @@ export type Intent =
    */
   | {
       readonly kind: "queue-card"
-      readonly move: Move
+      readonly move: QueueMove
       readonly hold: QueueHoldChange
       /** The created card's command; null for a move of a card that exists. */
       readonly command: CardCommand | null
@@ -683,7 +683,7 @@ export type Intent =
    */
   | {
       readonly kind: "spin-off"
-      readonly move: Move
+      readonly move: Move<Extract<PlaceKey, { readonly kind: "gone" }>>
       readonly task: TaskId
       readonly state: WorkflowStateId | null
       /**
@@ -1734,12 +1734,20 @@ export type PlaceKey =
     >
   /** A discard names no history: the host's to decide (`historyOf`, ADR-0066). */
   | { readonly kind: "gone"; readonly why: GoneWhy }
-  /**
-   * A move's target, never where a card is: the note column nearest
-   * `thread`'s card in its task (`nearestNoteColumn`), which the host
-   * resolves, making one when the task has none (ADR-0116).
-   */
-  | { readonly kind: "notes"; readonly thread: ThreadId }
+
+/**
+ * A move's target alone, never where a card is: the note column nearest
+ * `thread`'s card in its task (`nearestNoteColumn`), which the host
+ * resolves before it plans the move, making one when the task has none
+ * (ADR-0116).
+ */
+export interface NotesTarget {
+  readonly kind: "notes"
+  readonly thread: ThreadId
+}
+
+/** Where a move sends a card: a place's key, or a thread's nearest notes. */
+export type MoveTarget = PlaceKey | NotesTarget
 
 export function keyOf(place: CardPlace): PlaceKey {
   switch (place.kind) {
@@ -1782,8 +1790,6 @@ export function sameKey(a: PlaceKey, b: PlaceKey): boolean {
     // A note's rank is not part of where it is, as a queued card's is not.
     case "note":
       return b.kind === "note" && a.column === b.column
-    case "notes":
-      return b.kind === "notes" && a.thread === b.thread
     case "pinned":
       return (
         b.kind === "pinned" && samePosition(a.at, b.at) && a.thread === b.thread
@@ -1812,14 +1818,13 @@ export function sameKey(a: PlaceKey, b: PlaceKey): boolean {
 }
 
 /**
- * Whether a card at `now` is where a move's sender saw it, `from`: the
- * same place (`sameKey`), where a card seen on its way to a thread's
- * nearest notes (`notes`) is in whichever note column the host chose: a
- * card the sender has just unqueued or unpinned is drawn so until the
- * host's write reaches them.
+ * Whether a card at `now` is where a move's sender saw it, `from`. A card
+ * on its way to a thread's nearest notes is drawn where the host would put
+ * it, or where it was (`drawnPlace`), so its sender never sees it at a
+ * target.
  */
 export const seenAt = (now: PlaceKey, from: PlaceKey): boolean =>
-  from.kind === "notes" ? now.kind === "note" : sameKey(now, from)
+  sameKey(now, from)
 
 /**
  * What queueing a card does to its queue's hold (ADR-0113): nothing; hold an
@@ -1843,11 +1848,45 @@ export const MOVE_DIRECTIONS: readonly MoveDirection[] = ["undo", "redo"]
  * move to gone (ADR-0111), and only the host deletes a record, for a card it
  * sends or sweeps.
  */
-export interface Move {
+export interface Move<To extends MoveTarget = MoveTarget> {
   readonly card: CardId
   readonly from: PlaceKey | null
-  readonly to: PlaceKey
+  readonly to: To
 }
+
+/**
+ * A move to a place: every move the host plans, once a thread's nearest
+ * notes are resolved (`planNotesTargets`), so `planMove` cannot be given an
+ * unresolved one.
+ */
+export type ResolvedMove = Move<PlaceKey>
+
+/** A queue's key: where a card is queued, its text's version as its queuer had it. */
+export type QueuedKey = Extract<PlaceKey, { readonly kind: "queued" }>
+
+/** A move into a queue: a `queue-card`'s, which changes the queue's hold with it. */
+export type QueueMove = Move<QueuedKey>
+
+/**
+ * The places a reorder moves a card among (ADR-0048 step 7, ADR-0116): a
+ * queue, a thread's pinned cards, or a note column.
+ */
+export const REORDER_PLACES = ["queued", "pinned", "note"] as const
+
+/** Where a reorder is: a key of a place in `REORDER_PLACES`. */
+export type ReorderAt = Extract<
+  PlaceKey,
+  { readonly kind: (typeof REORDER_PLACES)[number] }
+>
+
+/** Whether a card at `key` is reordered among its neighbours there. */
+export const isReorderAt = (key: PlaceKey): key is ReorderAt => {
+  const kinds: readonly PlaceKey["kind"][] = REORDER_PLACES
+  return kinds.includes(key.kind)
+}
+
+/** A place with a rank among its neighbours: every one with an `order`. */
+export type OrderedPlace = Extract<CardPlace, { readonly order: string }>
 
 /**
  * A card's new place among its neighbours, as its sender saw them (ADR-0048
@@ -1857,11 +1896,7 @@ export interface Move {
  */
 export interface Reorder {
   readonly card: CardId
-  /** Where the card is: a queue, a thread's pinned cards, or a note column. */
-  readonly at: Extract<
-    PlaceKey,
-    { readonly kind: "queued" | "pinned" | "note" }
-  >
+  readonly at: ReorderAt
   /** The card it goes after, null for the first. */
   readonly after: CardId | null
   /** The card it goes before, null for the last. */
@@ -1869,7 +1904,10 @@ export interface Reorder {
 }
 
 /** `card`'s move from where it is now to `to`. */
-export const moveOf = (card: CardRecord, to: PlaceKey): Move => ({
+export const moveOf = <To extends MoveTarget>(
+  card: CardRecord,
+  to: To,
+): Move<To> => ({
   card: card.id,
   from: keyOf(card.place),
   to,
@@ -1882,17 +1920,13 @@ export const moveOf = (card: CardRecord, to: PlaceKey): Move => ({
  */
 export const noteOf = (
   place: Extract<CardPlace, { kind: "queued" | "pinned" | "composing" }>,
-): PlaceKey => ({ kind: "notes", thread: place.thread })
+): NotesTarget => ({ kind: "notes", thread: place.thread })
 
-/**
- * The thread a place is at: your message's, a pinned or queued card's, or
- * a move's target nearest a thread's notes; null for any other.
- */
+/** The thread a place is at: your message's, a pinned or queued card's; null for any other. */
 export const threadOfPlace = (place: CardPlace | PlaceKey): ThreadId | null =>
   place.kind === "composing" ||
   place.kind === "pinned" ||
-  place.kind === "queued" ||
-  place.kind === "notes"
+  place.kind === "queued"
     ? place.thread
     : null
 
@@ -2031,8 +2065,11 @@ export const keyFieldsFrom = (
 
 const entryOrEmpty = (at: Position): string => (at.kind === "root" ? "" : at.id)
 
-/** A place (or a key, whose `order`, `by` and `width` are "") as flat strings. */
-export function placeFields(place: CardPlace | PlaceKey): PlaceFields {
+/**
+ * A place (or a key, whose `order`, `by` and `width` are "", or a move's
+ * target) as flat strings.
+ */
+export function placeFields(place: CardPlace | MoveTarget): PlaceFields {
   switch (place.kind) {
     // Your message keeps the stored kind it had as a drafting card, so no
     // stored row changed with the split (ADR-0113).
@@ -2207,7 +2244,7 @@ const atThread = (
  * malformed. A queued key has no order and no queuer, and keeps its text's
  * version; a pinned key has no order, nor a canvas key its order and width,
  * nor a note's key its order; a gone key names no task, which is the host's
- * to give. `notes` is a target alone: no place is stored so.
+ * to give. A move's target may be a thread's nearest notes (`targetOfFields`).
  */
 export function keyOfFields(f: PlaceFields): PlaceKey | undefined {
   switch (f.kind) {
@@ -2221,8 +2258,6 @@ export function keyOfFields(f: PlaceFields): PlaceKey | undefined {
       return isNoteColumnId(f.column)
         ? { kind: "note", column: f.column }
         : undefined
-    case "notes":
-      return isThreadId(f.lane) ? { kind: "notes", thread: f.lane } : undefined
     case "discarded":
     case "spun": {
       const why = goneWhyOf(f)
@@ -2239,14 +2274,40 @@ export function keyOfFields(f: PlaceFields): PlaceKey | undefined {
   }
 }
 
-/** The places a text card is ever in: every place but a canvas (ADR-0116). */
-export type TextPlace = Exclude<CardPlace, { readonly kind: "canvas" }>
+/**
+ * Flat strings -> a move's target: a thread's nearest notes, else a key
+ * (`keyOfFields`); undefined for one that is malformed.
+ */
+export function targetOfFields(f: PlaceFields): MoveTarget | undefined {
+  if (f.kind !== "notes") return keyOfFields(f)
+  return isThreadId(f.lane) ? { kind: "notes", thread: f.lane } : undefined
+}
 
-/** The places a thread card is ever in: a task's canvas, or an inventory (ADR-0117). */
-export type HeldPlace = Extract<
+/**
+ * The places each kind of card is ever in (ADR-0116, ADR-0117): a text
+ * card anywhere but a canvas, a thread's card on a canvas or in an
+ * inventory, a note column on a canvas, and no other kind yet. `fitsPlace`,
+ * `placed` and each record's place type read it.
+ */
+export const PLACES_OF = {
+  text: ["composing", "note", "pinned", "queued", "fresh", "gone", "inventory"],
+  thread: ["canvas", "inventory"],
+  "note-column": ["canvas"],
+  media: [],
+  file: [],
+} as const satisfies Record<CardKind, readonly CardPlace["kind"][]>
+
+/** The places a card of `K` is ever in (`PLACES_OF`). */
+export type PlaceOf<K extends CardKind> = Extract<
   CardPlace,
-  { readonly kind: "canvas" | "inventory" }
+  { readonly kind: (typeof PLACES_OF)[K][number] }
 >
+
+/** The places a text card is ever in. */
+export type TextPlace = PlaceOf<"text">
+
+/** The places a thread card is ever in. */
+export type HeldPlace = PlaceOf<"thread">
 
 /**
  * A text card's record, in the places document, which only the host writes
@@ -2287,7 +2348,7 @@ export interface NoteColumnCard {
   readonly id: NoteColumnId
   /** Who made it: a person's move, or, for a note with nowhere else to go, the mover. */
   readonly owner: WriterId
-  readonly place: CanvasPlace
+  readonly place: PlaceOf<"note-column">
   /** Who put it where it is. */
   readonly placer: WriterId
 }
@@ -2318,24 +2379,17 @@ export const isTextCard = (card: CardRecord): card is TextCard =>
 export const isFact = (card: CardRecord): boolean =>
   card.kind === "text" && card.carries.kind === "fact"
 
-/**
- * Whether a card of `kind` is ever at a place of `place` (ADR-0116): a text
- * card anywhere but a canvas, a thread's card on a canvas or in an
- * inventory, a note column on a canvas, and no other kind yet.
- */
+/** Whether a card of `kind` is ever at a place of `place` (`PLACES_OF`). */
 export const fitsPlace = (kind: CardKind, place: PlaceKey["kind"]): boolean => {
-  switch (kind) {
-    case "text":
-      return place !== "canvas"
-    case "thread":
-      return place === "canvas" || place === "inventory"
-    case "note-column":
-      return place === "canvas"
-    case "media":
-    case "file":
-      return false
-  }
+  const places: readonly PlaceKey["kind"][] = PLACES_OF[kind]
+  return places.includes(place)
 }
+
+/** Whether `place` is one a card of `kind` is ever in (`PLACES_OF`). */
+const fits = <K extends CardKind>(
+  kind: K,
+  place: CardPlace,
+): place is PlaceOf<K> => fitsPlace(kind, place.kind)
 
 /**
  * `card` at `place`; undefined for a place its kind is never in, so no
@@ -2347,13 +2401,11 @@ export function placed(
 ): CardRecord | undefined {
   switch (card.kind) {
     case "text":
-      return place.kind === "canvas" ? undefined : { ...card, place }
+      return fits("text", place) ? { ...card, place } : undefined
     case "thread":
-      return place.kind === "canvas" || place.kind === "inventory"
-        ? { ...card, place }
-        : undefined
+      return fits("thread", place) ? { ...card, place } : undefined
     case "note-column":
-      return place.kind === "canvas" ? { ...card, place } : undefined
+      return fits("note-column", place) ? { ...card, place } : undefined
   }
 }
 

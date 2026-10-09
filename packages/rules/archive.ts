@@ -16,8 +16,8 @@ import {
   ERR,
   type Intent,
   type LaneView,
+  type MoveTarget,
   nearestRevision,
-  type PlaceKey,
   type Refusal,
   type RevisionRecord,
   type RootId,
@@ -29,7 +29,7 @@ import {
   type TreeIndex,
   threadsWork,
 } from "@pinetrie/core"
-import { type TaskIndex, taskOfCard, taskOfPlace } from "./task.ts"
+import { type TaskIndex, taskOfCard, taskOfTarget } from "./task.ts"
 import { planRetention } from "./work.ts"
 
 /** Into the archive, or out of it: `transitionOf`'s crossings. */
@@ -163,7 +163,7 @@ export function writesIn(
 ): readonly TaskId[] {
   const tasksOf = {
     thread: (t: ThreadId) => tasks.taskOfThread.get(t) ?? null,
-    place: (key: PlaceKey) => taskOfPlace(tasks, key),
+    place: (to: MoveTarget) => taskOfTarget(tasks, to),
     card: (id: CardId) => taskOfCard(tasks, cards, id),
   }
   const only = (...tasks: readonly (TaskId | null)[]): readonly TaskId[] =>

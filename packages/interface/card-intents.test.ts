@@ -12,6 +12,7 @@ import {
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import { LAST_ORDER } from "@pinetrie/session"
 import { describe, expect, test } from "vitest"
@@ -40,8 +41,8 @@ const TEST_THREAD = threadIdFor("e")
 const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 
 const ADA = writerId("ada@x.io")
-const C1 = textCardId("c0000000-0000-7000-8000-000000000001")
-const C2 = textCardId("c0000000-0000-7000-8000-000000000002")
+const C1 = cardIdFor("c1")
+const C2 = cardIdFor("c2")
 const index = tree({ "1-r1": null, "2-a": "1-r1" })
 const R1 = entryId("1-r1")
 const A = entryId("2-a")
@@ -269,7 +270,7 @@ describe("put", () => {
 })
 
 describe("your message (ADR-0113)", () => {
-  const MSG = textCardId("c0000000-0000-7000-8000-000000000009")
+  const MSG = cardIdFor("c9")
   const withMessage = (
     filled: boolean,
     cards: readonly CardRecord[],
@@ -380,7 +381,7 @@ describe("your message (ADR-0113)", () => {
 })
 
 describe("a note column (ADR-0116)", () => {
-  const C3 = textCardId("c0000000-0000-7000-8000-000000000003")
+  const C3 = cardIdFor("c3")
   const OTHER = noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a2")
   const into = (card: typeof C1, column = OTHER): Intent => ({
     kind: "put",

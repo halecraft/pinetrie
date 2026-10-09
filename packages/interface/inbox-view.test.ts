@@ -1,4 +1,5 @@
 import { entryId, threadIdFor } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import type { Item, Level } from "./attention.ts"
 import {
@@ -22,7 +23,7 @@ const offer = (lane: string): Item => ({
   lane: threadIdFor(lane),
   end: entryId(`e-${lane}`),
   level: "needsYou",
-  raised: { kind: "offer", source: "c0000000-0000-7000-8000-000000000001" },
+  raised: { kind: "offer", source: cardIdFor("c1") },
 })
 
 const view = (

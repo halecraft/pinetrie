@@ -9,6 +9,7 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import { encodePinned } from "@pinetrie/rules"
 import { newLiveDoc, type StoredEntryRow } from "@pinetrie/schema"
 import {
@@ -56,7 +57,7 @@ test("a compaction carries the newest cards entry of its retained tail; one with
     lane,
     cards: [
       {
-        id: textCardId("c0000000-0000-7000-8000-000000000001"),
+        id: cardIdFor("c1"),
         text,
         by: writerId("ada@x.io"),
       },
@@ -112,7 +113,7 @@ test("readLanes: a lane's queued cards are what waits; askedBy is who queued the
   })
   const atEnd: CardRecord = {
     kind: "text" as const,
-    id: textCardId("c0000000-0000-7000-8000-000000000000"),
+    id: cardIdFor("c0"),
     owner: writerId("cy@x.io"),
     placer: writerId("cy@x.io"),
     place: {
@@ -124,8 +125,8 @@ test("readLanes: a lane's queued cards are what waits; askedBy is who queued the
     unsent: null,
   }
   const cards = [
-    queued("c0000000-0000-7000-8000-000000000002", "b", "bea@x.io"),
-    queued("c0000000-0000-7000-8000-000000000001", "a", "ada@x.io"),
+    queued(cardIdFor("c2"), "b", "bea@x.io"),
+    queued(cardIdFor("c1"), "a", "ada@x.io"),
     atEnd,
   ]
   const found = readLanes(
@@ -158,7 +159,7 @@ test("readLanes: a lane's queued cards are what waits; askedBy is who queued the
       readTreeIndex(doc),
       cards,
       new Map(),
-      new Set([textCardId("c0000000-0000-7000-8000-000000000002")]),
+      new Set([cardIdFor("c2")]),
     ).find(l => l.name === lane),
   ).toMatchObject({ waiting: 1, lastWaiting: writerId("ada@x.io") })
   expect(
@@ -167,10 +168,7 @@ test("readLanes: a lane's queued cards are what waits; askedBy is who queued the
       readTreeIndex(doc),
       cards,
       new Map(),
-      new Set([
-        textCardId("c0000000-0000-7000-8000-000000000001"),
-        textCardId("c0000000-0000-7000-8000-000000000002"),
-      ]),
+      new Set([cardIdFor("c1"), cardIdFor("c2")]),
     ).find(l => l.name === lane),
   ).toMatchObject({ waiting: 0, askedBy: null, lastWaiting: null })
   // A held queue names who holds it (ADR-0048 step 7).

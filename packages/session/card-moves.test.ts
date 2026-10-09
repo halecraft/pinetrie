@@ -9,6 +9,7 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   type ActedAt,
@@ -34,7 +35,7 @@ const _TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 const ME = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
 const LANE = threadIdFor("x")
-const C1 = textCardId("c0000000-0000-7000-8000-000000000001")
+const C1 = cardIdFor("c1")
 const at = atEntry(entryId("e-1"))
 const atEnd = { kind: "composing", at, thread: LANE } as const
 const queuedKey = {
@@ -86,7 +87,7 @@ describe("the tab's moves (ADR-0059)", () => {
 
   test("sent: a creation, a move and a move out are drawn at once", () => {
     const draft = card({
-      id: textCardId("c0000000-0000-7000-8000-000000000002"),
+      id: cardIdFor("c2"),
     })
     const s = run([
       sent({ ...sentAs, id: "m-0", kind: "create", draft }),
@@ -94,8 +95,8 @@ describe("the tab's moves (ADR-0059)", () => {
     ])
     const drawn = withPending(host, s, ME)
     expect(drawn.map(c => [c.id, c.place.kind])).toEqual([
-      ["c0000000-0000-7000-8000-000000000001", "queued"],
-      ["c0000000-0000-7000-8000-000000000002", "composing"],
+      [cardIdFor("c1"), "queued"],
+      [cardIdFor("c2"), "composing"],
     ])
     const out = run([sent({ ...sentAs, id: "m-1", kind: "send", card: C1 })])
     expect(withPending(host, out, ME)).toEqual([])
@@ -216,22 +217,22 @@ describe("the tab's moves (ADR-0059)", () => {
         placer: BEA,
       })
     const records = [
-      q("c0000000-0000-7000-8000-00000000000a", 100),
-      q("c0000000-0000-7000-8000-00000000000b", 200),
-      q("c0000000-0000-7000-8000-00000000000c", 300),
+      q(cardIdFor("ca"), 100),
+      q(cardIdFor("cb"), 200),
+      q(cardIdFor("cc"), 300),
     ]
     const reorder = {
-      card: textCardId("c0000000-0000-7000-8000-00000000000c"),
+      card: cardIdFor("cc"),
       at: queuedKey,
-      after: textCardId("c0000000-0000-7000-8000-00000000000a"),
-      before: textCardId("c0000000-0000-7000-8000-00000000000b"),
+      after: cardIdFor("ca"),
+      before: cardIdFor("cb"),
     }
     const s = run([
       sent({ ...sentAs, id: "r-1", kind: "reorder", reorder }),
       accepted("r-1", 4),
     ])
     const drawn = withPending(records, s, ME).find(
-      c => c.id === "c0000000-0000-7000-8000-00000000000c",
+      c => c.id === cardIdFor("cc"),
     )
     expect(drawn?.place).toEqual({ ...queuedKey, order: key(150), by: BEA })
     expect(drawn?.placer).toBe(BEA)
@@ -307,7 +308,7 @@ describe("answerOf", () => {
 })
 
 describe("a command of several moves: a keep (ADR-0066)", () => {
-  const C2 = textCardId("c0000000-0000-7000-8000-000000000002")
+  const C2 = cardIdFor("c2")
   const inventory = { kind: "inventory", holder: ME } as const
   const keeping = (card: typeof C1, slot: number): Pending => ({
     ...sentAs,
@@ -382,7 +383,7 @@ describe("intentsOf", () => {
       ...sentAs,
       id: "m-2",
       kind: "create",
-      draft: card({ id: textCardId("c0000000-0000-7000-8000-000000000002") }),
+      draft: card({ id: cardIdFor("c2") }),
       slot: 7,
     }
     const s = run([
@@ -393,11 +394,11 @@ describe("intentsOf", () => {
     expect(intentsOf(s)).toEqual(
       new Map([
         [C1, 3],
-        [textCardId("c0000000-0000-7000-8000-000000000002"), 7],
+        [cardIdFor("c2"), 7],
       ]),
     )
     expect(intentsOf(run([accepted("m-1", 5), changed(5)], s))).toEqual(
-      new Map([[textCardId("c0000000-0000-7000-8000-000000000002"), 7]]),
+      new Map([[cardIdFor("c2"), 7]]),
     )
   })
 })
@@ -421,11 +422,9 @@ describe("a move's decisions, before and after it is sent", () => {
     expect(slotOnAccept(queueIt, yes)).toBeNull()
   })
 
-  test("a queue carries the text's version as sent; any other move is left alone", () => {
+  test("a queue carries the text's version as sent", () => {
     const move = { card: C1, from: atEnd, to: queuedKey }
     expect(stampSeen(move, "v9").to).toEqual({ ...queuedKey, seen: "v9" })
-    const out = { card: C1, from: atEnd, to: atEnd }
-    expect(stampSeen(out, "v9")).toBe(out)
   })
 })
 

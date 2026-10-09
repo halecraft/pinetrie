@@ -1,8 +1,9 @@
-import { type CardId, textCardId } from "@pinetrie/core"
+import type { CardId } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import { hostLetGo, spentCards } from "./card-copies.ts"
 
-const C1: CardId = textCardId("c0000000-0000-7000-8000-000000000001")
+const C1: CardId = cardIdFor("c1")
 
 describe("hostLetGo", () => {
   const letGo = { hadHost: true, hasHost: false, hostConnected: true }
@@ -21,7 +22,7 @@ describe("hostLetGo", () => {
 })
 
 test("spentCards: only the cards let go of whose records are gone", () => {
-  const C2: CardId = textCardId("c0000000-0000-7000-8000-000000000002")
+  const C2: CardId = cardIdFor("c2")
   expect(spentCards([C1, C2], id => id === C1)).toEqual([C2])
   expect(spentCards([C1], () => true)).toEqual([])
 })

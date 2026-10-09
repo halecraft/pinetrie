@@ -30,11 +30,13 @@ import {
   kindOfCard,
   type Move,
   type MoveRefusal,
+  type MoveTarget,
   moveOf,
   movesOfDocId,
   type NoteColumnId,
   noteOf,
   type OfferFact,
+  type OrderedPlace,
   PLAIN,
   type PlaceKey,
   type Position,
@@ -43,6 +45,7 @@ import {
   placeFields,
   placeOfFields,
   type Reorder,
+  type ResolvedMove,
   type RootId,
   sameKey,
   seenAt,
@@ -66,6 +69,7 @@ import {
   NO_TASK_INDEX,
   type TaskIndex,
   taskOfPlace,
+  taskOfTarget,
 } from "./task.ts"
 
 /**
@@ -229,13 +233,12 @@ export function pinnedAt(
     .sort(byOrder)
 }
 
+/** Whether `place` has a rank among its neighbours. */
+const isOrdered = (place: CardPlace): place is OrderedPlace => "order" in place
+
 /** The order of a place that has one, else "". */
 const orderOf = (c: CardRecord): string =>
-  c.place.kind === "queued" ||
-  c.place.kind === "pinned" ||
-  c.place.kind === "note"
-    ? c.place.order
-    : ""
+  isOrdered(c.place) ? c.place.order : ""
 
 /** By `order`, then by id (S69). */
 const byOrder = (a: CardRecord, b: CardRecord): number => {
@@ -305,68 +308,99 @@ export function nearestNoteColumn(
 }
 
 /**
- * The note column nearest `thread` (`nearestNoteColumn`) as a place, and
- * the column made for it when its task has none: `column` is the id the
- * caller mints for one. A thread whose card is in an inventory sends its
- * cards to that inventory (ADR-0117). Null for a thread with no card.
- * Pure.
+ * Where a thread's nearest notes are (ADR-0116), decided and not yet
+ * written: a note column of its task; one to make there, at `order`, the
+ * canvas cards `renumbered` to fit it; or, for a thread whose card is in an
+ * inventory, that inventory (ADR-0117).
  */
-export function notesOf(input: {
-  readonly cards: readonly CardRecord[]
-  readonly thread: ThreadId
-  /** The id a column made here takes. */
-  readonly column: NoteColumnId
-  /** Who makes it: its owner and placer. */
-  readonly by: WriterId
-}): {
-  readonly place: TextPlace
-  /** The column made for it, with the canvas cards renumbered to fit it. */
-  readonly made: readonly CardRecord[]
-} | null {
-  const { cards, thread } = input
+export type NotesNear =
+  | { readonly kind: "column"; readonly column: NoteColumnId }
+  | {
+      readonly kind: "make"
+      readonly task: TaskId
+      readonly order: string
+      readonly renumbered: readonly CardRecord[]
+    }
+  | { readonly kind: "inventory"; readonly holder: WriterId }
+
+/**
+ * Where `thread`'s nearest notes are (`nearestNoteColumn` over its task's
+ * canvas); null for a thread with no card. Decides, mints nothing. Pure.
+ */
+export function notesNear(
+  cards: readonly CardRecord[],
+  thread: ThreadId,
+): NotesNear | null {
   const card = cards.find(c => c.id === thread)
   if (card === undefined) return null
-  if (card.place.kind === "inventory") return { place: card.place, made: [] }
+  if (card.place.kind === "inventory")
+    return { kind: "inventory", holder: card.place.holder }
   if (card.place.kind !== "canvas") return null
-  const canvas = canvasOf(cards, card.place.task)
+  const { task } = card.place
+  const canvas = canvasOf(cards, task)
   const near = nearestNoteColumn(canvas, thread)
   switch (near.kind) {
     case "none":
       return null
     case "column":
-      return {
-        place: noteAt(cards, near.column),
-        made: [],
-      }
+      return { kind: "column", column: near.column }
     case "make": {
-      const task = card.place.task
-      const made: CardRecord[] = []
-      let order = near.order
-      if (order === null) {
-        // No room just after the thread's card: renumber the crowded cards.
-        const at = canvas.findIndex(c => c.id === thread) + 1
-        const spaced = respace(
-          canvas.map(c => c.place.order),
-          at,
-        )
-        order = spaced.inserted
-        for (const [i, key] of spaced.changed) {
-          const c = canvas[i]
-          const moved =
-            c === undefined ? undefined : placed(c, { ...c.place, order: key })
-          if (moved !== undefined) made.push(moved)
-        }
-      }
-      made.push({
+      if (near.order !== null)
+        return { kind: "make", task, order: near.order, renumbered: [] }
+      // No room just after the thread's card: renumber the crowded cards.
+      const spaced = respace(
+        canvas.map(c => c.place.order),
+        canvas.findIndex(c => c.id === thread) + 1,
+      )
+      const renumbered = [...spaced.changed].flatMap(([i, order]) => {
+        const c = canvas[i]
+        const moved =
+          c === undefined ? undefined : placed(c, { ...c.place, order })
+        return moved === undefined ? [] : [moved]
+      })
+      return { kind: "make", task, order: spaced.inserted, renumbered }
+    }
+  }
+}
+
+/**
+ * A card sent to `thread`'s nearest notes, as a place, and the writes that
+ * go first: a note column made for it (its id `newColumn`'s, owned and
+ * placed by `by`), and the canvas cards renumbered to fit it. The one step
+ * every write to a thread's notes takes: a move's, an unsent card's, a
+ * fresh column's followers'. Null for a thread with no card. Pure.
+ */
+export function toNotes(input: {
+  readonly cards: readonly CardRecord[]
+  readonly thread: ThreadId
+  readonly newColumn: () => NoteColumnId
+  readonly by: WriterId
+}): {
+  readonly place: TextPlace
+  readonly first: readonly PlaceStep[]
+} | null {
+  const near = notesNear(input.cards, input.thread)
+  if (near === null) return null
+  switch (near.kind) {
+    case "inventory":
+      return { place: { kind: "inventory", holder: near.holder }, first: [] }
+    case "column":
+      return { place: noteAt(input.cards, near.column), first: [] }
+    case "make": {
+      const column = input.newColumn()
+      const made: CardRecord = {
         kind: "note-column",
-        id: input.column,
+        id: column,
         owner: input.by,
         placer: input.by,
-        place: { kind: "canvas", task, order, width: 1 },
-      })
+        place: { kind: "canvas", task: near.task, order: near.order, width: 1 },
+      }
       return {
-        place: { kind: "note", column: input.column, order: orderAfter([]) },
-        made,
+        place: { kind: "note", column, order: orderAfter([]) },
+        first: [...near.renumbered, made].map(record => ({
+          kind: "write",
+          record,
+        })),
       }
     }
   }
@@ -560,33 +594,28 @@ export function planUnsent(input: {
   readonly cards: readonly CardRecord[]
   readonly card: QueuedCard
   readonly reason: string
-  /** The id a note column made for it takes. */
-  readonly column: NoteColumnId
+  /** Mints the id of a note column made for it. */
+  readonly newColumn: () => NoteColumnId
 }): { readonly steps: readonly PlaceStep[]; readonly hold: boolean } {
   const { cards, card, reason } = input
-  const notes = notesOf({
+  const notes = toNotes({
     cards,
     thread: card.place.thread,
-    column: input.column,
+    newColumn: input.newColumn,
     by: card.placer,
   })
-  const full =
-    notes?.place.kind === "inventory" &&
-    cards.filter(
-      c =>
-        c.id !== card.id &&
-        c.place.kind === "inventory" &&
-        notes.place.kind === "inventory" &&
-        c.place.holder === notes.place.holder,
-    ).length >= INVENTORY_SLOTS
-  if (notes === null || full)
+  if (
+    notes === null ||
+    (notes.place.kind === "inventory" &&
+      inventoryFull(cards, notes.place.holder, card.id))
+  )
     return {
       steps: [{ kind: "write", record: { ...card, unsent: reason } }],
       hold: true,
     }
   return {
     steps: [
-      ...notes.made.map(record => ({ kind: "write", record }) as const),
+      ...notes.first,
       {
         kind: "write",
         record: { ...card, place: notes.place, unsent: reason },
@@ -595,6 +624,19 @@ export function planUnsent(input: {
     hold: false,
   }
 }
+
+/** Whether `holder`'s inventory holds `INVENTORY_SLOTS` cards, `card` not counted. */
+const inventoryFull = (
+  cards: readonly CardRecord[],
+  holder: WriterId,
+  card: CardId,
+): boolean =>
+  cards.filter(
+    c =>
+      c.id !== card &&
+      c.place.kind === "inventory" &&
+      c.place.holder === holder,
+  ).length >= INVENTORY_SLOTS
 
 /**
  * The card a fact rides in (ADR-0080): queued on its lane after every card
@@ -750,9 +792,6 @@ function placeAt(
             : discardHistory(now.place, discards),
         by: sender,
       }
-    // Resolved before any move is planned (`planNotesTargets`).
-    case "notes":
-      return undefined
     default:
       return key
   }
@@ -774,14 +813,9 @@ function refuseInto(
 ): MoveRefusal | null {
   if (!fitsPlace(kindOfCard(card), to.kind)) return "no-place"
   if (!ownsPlace(to, sender)) return "not-yours"
-  if (to.kind !== "inventory") return null
-  const held = cards.filter(
-    c =>
-      c.id !== card &&
-      c.place.kind === "inventory" &&
-      c.place.holder === sender,
-  ).length
-  return held >= INVENTORY_SLOTS ? "full" : null
+  return to.kind === "inventory" && inventoryFull(cards, sender, card)
+    ? "full"
+    : null
 }
 
 /**
@@ -806,7 +840,7 @@ function refuseInto(
  */
 export function planMove(
   cards: readonly CardRecord[],
-  move: Move,
+  move: ResolvedMove,
   sender: WriterId,
   discards: Discards,
 ): MoveStep {
@@ -898,9 +932,7 @@ const siblingsOf = (
 
 /** `card` with order `order`, everything else as it is. */
 const withOrder = (card: CardRecord, order: string): CardRecord =>
-  card.place.kind === "queued" ||
-  card.place.kind === "pinned" ||
-  card.place.kind === "note"
+  isOrdered(card.place)
     ? (placed(card, { ...card.place, order }) ?? card)
     : card
 
@@ -993,8 +1025,8 @@ export function planFreshFollow(input: {
   readonly sent: CardId
   readonly root: RootId
   readonly thread: ThreadId
-  /** The id a note column made for them takes. */
-  readonly column: NoteColumnId
+  /** Mints the id of a note column made for them. */
+  readonly newColumn: () => NoteColumnId
   /** Who sent it: a note column made here is theirs. */
   readonly by: WriterId
 }): readonly PlaceStep[] {
@@ -1010,15 +1042,15 @@ export function planFreshFollow(input: {
       c.place.column !== place.column
     )
       continue
-    const notes = notesOf({
+    const notes = toNotes({
       cards: now,
       thread,
-      column: input.column,
+      newColumn: input.newColumn,
       by: input.by,
     })
     if (notes === null) return steps
     for (const step of [
-      ...notes.made.map(record => ({ kind: "write", record }) as const),
+      ...notes.first,
       { kind: "write", record: { ...c, place: notes.place } } as const,
     ]) {
       steps.push(step)
@@ -1030,12 +1062,10 @@ export function planFreshFollow(input: {
 
 /**
  * Moves whose target is a thread's nearest notes (`notes`, `noteOf`),
- * resolved to a place before any is planned (ADR-0116): each to the note
- * column nearest its thread (`notesOf`), or, when its task has none, to one
- * made for it, written first; a thread in an inventory, to that inventory.
- * Each is resolved against the cards as the ones before it left them, so a
- * column made for the first takes the rest. One whose thread has no card is
- * left as it is, and `planMove` refuses it (`no-place`). Pure.
+ * resolved to places before any is planned (ADR-0116, `toNotes`): each
+ * against the cards as the ones before it left them, so a column made for
+ * the first takes the rest. Refused `no-place`, naming the card, for a
+ * thread with no card. Pure.
  */
 export function planNotesTargets(input: {
   readonly cards: readonly CardRecord[]
@@ -1043,29 +1073,71 @@ export function planNotesTargets(input: {
   readonly sender: WriterId
   /** Mints the id of a note column made for them. */
   readonly newColumn: () => NoteColumnId
-}): {
-  readonly moves: readonly Move[]
-  /** The cards to write first: a note column made, and any canvas card renumbered for it. */
-  readonly made: readonly CardRecord[]
-} {
-  const made: CardRecord[] = []
+}):
+  | {
+      readonly kind: "resolved"
+      readonly moves: readonly ResolvedMove[]
+      /** What is written before the moves: each column made, and the canvas renumbered for it. */
+      readonly first: readonly PlaceStep[]
+    }
+  | Extract<MoveStep, { kind: "refused" }> {
+  const first: PlaceStep[] = []
+  const moves: ResolvedMove[] = []
   let now = input.cards
-  const moves = input.moves.map(move => {
-    if (move.to.kind !== "notes") return move
-    const notes = notesOf({
+  for (const move of input.moves) {
+    const { to } = move
+    if (to.kind !== "notes") {
+      moves.push({ ...move, to })
+      continue
+    }
+    const notes = toNotes({
       cards: now,
-      thread: move.to.thread,
-      column: input.newColumn(),
+      thread: to.thread,
+      newColumn: input.newColumn,
       by: input.sender,
     })
-    if (notes === null) return move
-    for (const record of notes.made) {
-      made.push(record)
-      now = afterStep(now, { kind: "write", record })
-    }
-    return { ...move, to: keyOf(notes.place) }
-  })
-  return { moves, made }
+    if (notes === null)
+      return {
+        kind: "refused",
+        code: "no-place",
+        now: now.find(c => c.id === move.card) ?? null,
+      }
+    first.push(...notes.first)
+    now = afterSteps(now, notes.first)
+    moves.push({ ...move, to: keyOf(notes.place) })
+  }
+  return { kind: "resolved", moves, first }
+}
+
+/**
+ * Moves as a person sends them: each to a thread's nearest notes resolved
+ * first (`planNotesTargets`), its column written before the moves, then
+ * planned whole (`planMoveCommand`). Pure.
+ */
+export function planMoveRequest(
+  cards: readonly CardRecord[],
+  moves: readonly Move[],
+  sender: WriterId,
+  running: (lane: ThreadId) => boolean,
+  discards: Discards,
+  newColumn: () => NoteColumnId,
+): { readonly step: MovesStep; readonly drain: readonly ThreadId[] } {
+  const resolved = planNotesTargets({ cards, moves, sender, newColumn })
+  if (resolved.kind === "refused") return { step: resolved, drain: [] }
+  const { step, drain } = planMoveCommand(
+    afterSteps(cards, resolved.first),
+    resolved.moves,
+    sender,
+    running,
+    discards,
+  )
+  return {
+    step:
+      step.kind === "steps"
+        ? { kind: "steps", steps: [...resolved.first, ...step.steps] }
+        : step,
+    drain,
+  }
 }
 
 /** What the host makes of several moves: every step, or the first refusal. */
@@ -1095,7 +1167,7 @@ const afterStep = (
  */
 export function planMoves(
   cards: readonly CardRecord[],
-  moves: readonly Move[],
+  moves: readonly ResolvedMove[],
   sender: WriterId,
   discards: Discards,
 ): MovesStep {
@@ -1116,7 +1188,7 @@ export function planMoves(
  */
 export function planMoveCommand(
   cards: readonly CardRecord[],
-  moves: readonly Move[],
+  moves: readonly ResolvedMove[],
   sender: WriterId,
   running: (lane: ThreadId) => boolean,
   discards: Discards,
@@ -1142,15 +1214,18 @@ export function planMoveCommand(
  * left, a put where it went, a drag across tasks where it went, and a
  * discard where its gone place goes (`discardHistory`), which the page does not
  * name (ADR-0066). Of several, the first that names a task names the
- * step's. A place at a thread is in its thread's task (`taskOfPlace`). Pure.
+ * step's. A place at a thread, or a thread's nearest notes, is in its
+ * thread's task (`taskOfPlace`, `taskOfTarget`). Pure.
  */
 export function historyOf(
   moves: readonly Move[],
   cards: readonly CardRecord[],
   discards: Discards,
 ): TaskId | null {
-  const taskOf = (place: CardPlace | PlaceKey) =>
-    taskOfPlace(discards.tasks, place)
+  const taskOf = (to: CardPlace | MoveTarget) =>
+    to.kind === "notes"
+      ? taskOfTarget(discards.tasks, to)
+      : taskOfPlace(discards.tasks, to)
   for (const move of moves) {
     // A note column made is in its task's history, so the undo key takes
     // it back; a card made in a composer or a queue is in none.

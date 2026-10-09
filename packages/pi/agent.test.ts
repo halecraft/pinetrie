@@ -14,10 +14,10 @@ import {
   rootIdFor,
   THE_AGENT,
   type ThreadId,
-  textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import {
   BEHIND_TYPE,
   encodeBehind,
@@ -235,7 +235,7 @@ describe("pinned cards: what the model reads (ADR-0048, S92)", () => {
         lane,
         cards: [
           {
-            id: textCardId("c0000000-0000-7000-8000-000000000001"),
+            id: cardIdFor("c1"),
             text,
             by: ADA,
           },

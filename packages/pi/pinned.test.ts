@@ -1,5 +1,6 @@
 import type { AgentMessage, CompactResult } from "@earendil-works/pi-agent-core"
-import { textCardId, threadIdFor, writerId } from "@pinetrie/core"
+import { threadIdFor, writerId } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import { encodePinned } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
 import { carryPinned, withCarried } from "./pinned.ts"
@@ -10,7 +11,7 @@ const cards = (text: string) =>
       lane: threadIdFor("x"),
       cards: [
         {
-          id: textCardId("c0000000-0000-7000-8000-000000000001"),
+          id: cardIdFor("c1"),
           text,
           by: writerId("ada@x.io"),
         },

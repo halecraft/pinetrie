@@ -9,6 +9,7 @@ import {
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import type { MoveAnswer, MoveHow } from "@pinetrie/session"
 import { expect, test, vi } from "vitest"
@@ -355,7 +356,7 @@ test("not needed marks a verdict by its ask, an offer by its source, and an offe
         lane,
         raised: {
           kind: "offer",
-          source: "c0000000-0000-7000-8000-000000000001",
+          source: cardIdFor("c1"),
         },
       },
       { kind: "notNeeded", lane, raised: { kind: "offer", source: null } },
@@ -363,7 +364,5 @@ test("not needed marks a verdict by its ask, an offer by its source, and an offe
     p,
   )
   expect(p.attention.dismiss.mock.calls).toEqual([[lane, "p-1"]])
-  expect(p.attention.dismissOffer.mock.calls).toEqual([
-    [lane, "c0000000-0000-7000-8000-000000000001"],
-  ])
+  expect(p.attention.dismissOffer.mock.calls).toEqual([[lane, cardIdFor("c1")]])
 })

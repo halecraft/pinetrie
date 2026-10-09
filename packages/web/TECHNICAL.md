@@ -840,8 +840,8 @@ the session sends moves and draws them until its copy holds them
 - **The notes are in note columns** (`note-column.tsx`, `NoteColumn`,
   ADR-0116), drawn in `#strip` among the thread columns where `stripItems`
   puts them, a `.note-column` with its id as `data-column`: its title
-  (`.note-column-title`, a button that opens `TitleField`, the sidebar's
-  rename field, and sends `rename` with a `MarkTarget`), its notes one under
+  (`.note-column-title`, a button that opens `TitleField`
+  (`title-field.tsx`), the sidebar's rename field, and sends `rename` with a `MarkTarget`), its notes one under
   another, each a `NoteCardEditor` (`among` its column's notes, so ↑ and ↓
   and Alt+↑/↓ reorder it), folded to one line until it holds the focus, as
   a queued card in the dock is, and "+ add a note" (`.add-note`), which

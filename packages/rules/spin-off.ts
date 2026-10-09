@@ -11,6 +11,7 @@ import {
   type Mention,
   type Move,
   type MoveRefusal,
+  type PlaceKey,
   parseMentions,
   type RootId,
   type TaskId,
@@ -27,7 +28,7 @@ import { rootOfPlace, type TaskIndex } from "./task.ts"
  * the first open one).
  */
 export interface SpinOff {
-  readonly move: Move
+  readonly move: Move<Extract<PlaceKey, { readonly kind: "gone" }>>
   /** The new task the thread is put in (ADR-0116). */
   readonly task: TaskId
   readonly state: WorkflowStateId | null

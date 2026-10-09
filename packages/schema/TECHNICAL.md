@@ -267,8 +267,9 @@ would refuse each whole undo of a move (S82).
   the split.
 - **A note is stored as `note`, its note column in `column` and its rank in
   `order`** (ADR-0116), no `at` and no `lane`: the fields a row had, so the
-  schema's hash held, and record migration `0006-note-columns` moved each
-  thread's notes from their cells into a note column beside it. A note
+  schema's hash held, and record migration `0006-note-columns` (run, then
+  deleted) moved each thread's notes from their cells into a note column
+  beside it. A note
   column is a `canvas` row whose id starts `n-`.
 - **A client cannot write it.** Every peer registers `writersPolicy`
   (`@pinetrie/protocol/writers`), Kyneta's `canWrite`, so a client's write

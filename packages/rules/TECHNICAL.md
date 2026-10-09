@@ -322,10 +322,15 @@ which are swept.
   someone else's unqueue fail. It leaves out a queue's `seen` too. Every
   move, on the host and on a client, is built by core's `moveOf` (from
   where the card is); an unqueue's or an unpin's target is `noteOf`, the
-  thread's nearest notes (`notes`), which the host resolves to a place
-  before planning (`planNotesTargets`, below). No `from` creates the card,
-  its sender its owner: a text card anywhere but a canvas, or a note column
-  on a canvas (`n-` id), which is then in its task's history. Nobody removes a card:
+  thread's nearest notes (`notes`). That is a `MoveTarget` alone, on
+  `Move.to`, never a `PlaceKey`, so no stored place or `from` is one; the
+  host resolves it to a place before planning (`planMoveRequest`, below),
+  and `planMove` takes a `ResolvedMove`, so an unresolved one does not
+  compile. No `from` creates the card, its sender its owner: a text card,
+  or a note column on a canvas (`n-` id), which is then in its task's
+  history. Where each kind of card may be is one table, core's
+  `PLACES_OF`, which `fitsPlace`, `placed` and each record's place type
+  (`PlaceOf`) read. Nobody removes a card:
   `Move.to` is never null. A discard is a move to `gone` (`DISCARDED`,
   ADR-0111), from any place the sender may move out of. Its key names no
   task: the host names its history (`placeAt`, `historyOf`, over
@@ -349,7 +354,9 @@ which are swept.
   ADR-0048 step 7). It names the card, its place's key, and the two cards
   it goes between as its sender saw them; the host checks them against the
   places alone, since a thread's pinned cards are found through the tree,
-  which a handoff does not read. Its siblings are the lane's queue, its
+  which a handoff does not read. Where a reorder may be is core's
+  `REORDER_PLACES` (`ReorderAt`, `isReorderAt`, which the codec and
+  `reorderOf` read too). Its siblings are the lane's queue, its
   note column's notes, or every pinned card in the session (pinned keys are
   the session's). Only `order`
   changes: `placer`, `by`, `seen` and `unsent` stay, so it changes nobody's
@@ -423,14 +430,19 @@ which are swept.
   the thread's task, the note column fewest places from the thread's card,
   the one after it on a tie; with none, one made just after the thread's
   card (`orderBetween`, or `respace` with no room), untitled, read as
-  `NEW_NOTES_TITLE`. `notesOf` is that as a place, with the column to write
-  first; a thread whose card is in an inventory sends its cards to that
-  inventory (ADR-0117). The page names the target `notes` (`noteOf`), and
-  the host resolves it before planning the moves (`planNotesTargets`), each
-  against the cards the ones before it left, so a column made for the first
-  takes the rest; it mints a column's id (`n-` and a uuidv7). The page draws
-  a pending one in the column the host would choose (`drawnPlace`), and,
-  while the host would make one, where it was.
+  `NEW_NOTES_TITLE`. `notesNear` decides which, minting nothing: a
+  column, one to make (its task, rank and the canvas cards renumbered
+  around it), or, for a thread whose card is in an inventory, that
+  inventory (ADR-0117). `toNotes` turns that into a place and the steps to
+  write first, minting a column's id (`newColumn`, `n-` and a uuidv7 on
+  the host) only when one is made; moves, unsent cards and a fresh
+  column's followers all go through it. The page names the target `notes`
+  (`noteOf`), and the host resolves it (`planNotesTargets`, inside
+  `planMoveRequest`), each move against the cards the ones before it
+  left, so a column made for the first takes the rest, and writes the
+  column in the same step as the moves. The page draws a pending one in
+  the column the host would choose (`drawnPlace`), or where it was while
+  the host would make one.
 - **A card the host could not send** (`planUnsent`) goes to the note column
   nearest its thread the same way, saying why. Where it has nowhere to go
   (its thread's holder's inventory full, or a thread with no card) it stays

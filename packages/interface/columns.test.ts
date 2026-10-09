@@ -1,4 +1,5 @@
-import { entryId, type LaneView, textCardId, threadIdFor } from "@pinetrie/core"
+import { entryId, type LaneView, threadIdFor } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import { type Column, columnsReducer } from "./columns.ts"
 import { threadOfEntry, tree } from "./fixtures.ts"
@@ -117,13 +118,13 @@ describe("columnsReducer", () => {
       after: 0,
       pending: {
         text: "@agent separately?",
-        card: textCardId("c0000000-0000-7000-8000-000000000001"),
+        card: cardIdFor("c1"),
       },
     })
     expect(opened[1]?.fresh).toEqual({
       pending: {
         text: "@agent separately?",
-        card: "c0000000-0000-7000-8000-000000000001",
+        card: cardIdFor("c1"),
       },
     })
     const sent = columnsReducer(opened, { kind: "sent", key: "b", sendId: "s" })

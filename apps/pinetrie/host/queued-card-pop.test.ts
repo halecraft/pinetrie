@@ -12,6 +12,7 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import type { ThreadLaneHandle } from "@pinetrie/pi"
 import type { Outcome } from "@pinetrie/protocol/codec"
 import { readCardHistories, readPlaces, readPlacesRev } from "@pinetrie/reads"
@@ -98,8 +99,8 @@ const poppedOf = (top: NextQueuedCardPop): PoppedQueuedCard | null =>
 describe("popNextQueuedCard", () => {
   test("reads the top queued card and deletes its record before it returns", () => {
     const cards = newPlacesDoc()
-    queue(cards, "c0000000-0000-7000-8000-000000000002", "b")
-    queue(cards, "c0000000-0000-7000-8000-000000000001", "a")
+    queue(cards, cardIdFor("c2"), "b")
+    queue(cards, cardIdFor("c1"), "a")
     const popped = poppedOf(
       popNextQueuedCard(
         cards,
@@ -108,16 +109,14 @@ describe("popNextQueuedCard", () => {
         held(id => `text of ${id}`),
       ),
     )
-    expect(popped?.card.id).toBe("c0000000-0000-7000-8000-000000000001")
-    expect(popped?.text).toBe("text of c0000000-0000-7000-8000-000000000001")
-    expect(readPlaces(cards).map(c => c.id)).toEqual([
-      "c0000000-0000-7000-8000-000000000002",
-    ])
+    expect(popped?.card.id).toBe(cardIdFor("c1"))
+    expect(popped?.text).toBe(`text of ${cardIdFor("c1")}`)
+    expect(readPlaces(cards).map(c => c.id)).toEqual([cardIdFor("c2")])
   })
 
   test("its removal raises the places document's rev, so a client whose unqueue it beat settles (ADR-0059)", () => {
     const cards = newPlacesDoc()
-    queue(cards, "c0000000-0000-7000-8000-000000000001", "a")
+    queue(cards, cardIdFor("c1"), "a")
     popNextQueuedCard(
       cards,
       LANE,
@@ -129,7 +128,7 @@ describe("popNextQueuedCard", () => {
 
   test("pops nothing while the lane runs, or when nothing is queued", () => {
     const cards = newPlacesDoc()
-    queue(cards, "c0000000-0000-7000-8000-000000000001", "a")
+    queue(cards, cardIdFor("c1"), "a")
     expect(
       popNextQueuedCard(
         cards,
@@ -155,10 +154,10 @@ describe("popNextQueuedCard", () => {
 
   test("an unqueued card is not popped", () => {
     const cards = newPlacesDoc()
-    queue(cards, "c0000000-0000-7000-8000-000000000001", "a")
-    const row = cards.cards()["c0000000-0000-7000-8000-000000000001"]
+    queue(cards, cardIdFor("c1"), "a")
+    const row = cards.cards()[cardIdFor("c1")]
     if (row !== undefined)
-      cards.cards.set("c0000000-0000-7000-8000-000000000001", {
+      cards.cards.set(cardIdFor("c1"), {
         ...row,
         kind: "note",
         order: "",
@@ -175,27 +174,25 @@ describe("popNextQueuedCard", () => {
 
   test("a top card whose text the host does not yet hold is behind, and stays: the next waits behind it (S96)", () => {
     const cards = newPlacesDoc()
-    queue(cards, "c0000000-0000-7000-8000-000000000001", "a")
-    queue(cards, "c0000000-0000-7000-8000-000000000002", "b")
+    queue(cards, cardIdFor("c1"), "a")
+    queue(cards, cardIdFor("c2"), "b")
     const top = popNextQueuedCard(
       cards,
       LANE,
       IDLE,
-      held(() => "x", ["c0000000-0000-7000-8000-000000000001"]),
+      held(() => "x", [cardIdFor("c1")]),
     )
-    expect(top.kind === "behind" ? top.card.id : top.kind).toBe(
-      "c0000000-0000-7000-8000-000000000001",
-    )
+    expect(top.kind === "behind" ? top.card.id : top.kind).toBe(cardIdFor("c1"))
     expect(readPlaces(cards).map(c => c.id)).toEqual([
-      "c0000000-0000-7000-8000-000000000001",
-      "c0000000-0000-7000-8000-000000000002",
+      cardIdFor("c1"),
+      cardIdFor("c2"),
     ])
   })
 })
 
 test("chatOfPoppedQueuedCard: the queuer's message, in the queue's mode, from the card", () => {
   const cards = newPlacesDoc()
-  queue(cards, "c0000000-0000-7000-8000-000000000001", "a")
+  queue(cards, cardIdFor("c1"), "a")
   const popped = poppedOf(
     popNextQueuedCard(
       cards,
@@ -210,7 +207,7 @@ test("chatOfPoppedQueuedCard: the queuer's message, in the queue's mode, from th
     root: ROOT_ID,
     text: "@agent go",
     at: { kind: "queue", thread: LANE },
-    card: { id: "c0000000-0000-7000-8000-000000000001", seen: "" },
+    card: { id: cardIdFor("c1"), seen: "" },
     mentions: [{ kind: "agent" }],
   })
 })
@@ -306,29 +303,24 @@ describe("drain", () => {
   test("a held queue pops no message; a card someone types in on top waits for them, and the cards behind it wait too (ADR-0048 step 7)", async () => {
     const { b, events, deps, presence } = setUp(
       {
-        "c0000000-0000-7000-8000-000000000001": "a",
-        "c0000000-0000-7000-8000-000000000002": "b",
+        [cardIdFor("c1")]: "a",
+        [cardIdFor("c2")]: "b",
       },
       [],
     )
-    queue(b.places, "c0000000-0000-7000-8000-000000000001", "a")
-    queue(b.places, "c0000000-0000-7000-8000-000000000002", "b")
+    queue(b.places, cardIdFor("c1"), "a")
+    queue(b.places, cardIdFor("c2"), "b")
     applyWrites(b, [setRecord(QUEUE_HOLD, { lane: LANE, by: ADA, at: 1 })])
     await drain(deps, LANE)
-    expect(events).toEqual([
-      "hydrate c0000000-0000-7000-8000-000000000001,c0000000-0000-7000-8000-000000000002",
-    ])
+    expect(events).toEqual([`hydrate ${cardIdFor("c1")},${cardIdFor("c2")}`])
     expect(textsIn(b.places)).toHaveLength(2)
     applyWrites(b, [deleteRecord(QUEUE_HOLD, LANE)])
-    presence.typingIn.set(
-      seatKey(BEA, "s1"),
-      "c0000000-0000-7000-8000-000000000001",
-    )
+    presence.typingIn.set(seatKey(BEA, "s1"), cardIdFor("c1"))
     events.length = 0
     await drain(deps, LANE)
     expect(events).toEqual([
-      "hydrate c0000000-0000-7000-8000-000000000001,c0000000-0000-7000-8000-000000000002",
-      "typing c0000000-0000-7000-8000-000000000001",
+      `hydrate ${cardIdFor("c1")},${cardIdFor("c2")}`,
+      `typing ${cardIdFor("c1")}`,
     ])
     expect(textsIn(b.places)).toHaveLength(2)
   })
@@ -336,57 +328,55 @@ describe("drain", () => {
   test("a blank message is passed over and stays queued; with only blank cards left, the drain waits for one to be written in (ADR-0113)", async () => {
     const { b, events, deps } = setUp(
       {
-        "c0000000-0000-7000-8000-000000000001": " ",
-        "c0000000-0000-7000-8000-000000000002": "go",
+        [cardIdFor("c1")]: " ",
+        [cardIdFor("c2")]: "go",
       },
       [],
     )
-    queue(b.places, "c0000000-0000-7000-8000-000000000001", "a")
-    queue(b.places, "c0000000-0000-7000-8000-000000000002", "b")
+    queue(b.places, cardIdFor("c1"), "a")
+    queue(b.places, cardIdFor("c2"), "b")
     await drain(deps, LANE)
     expect(events).toEqual([
-      "hydrate c0000000-0000-7000-8000-000000000001,c0000000-0000-7000-8000-000000000002",
-      "send c0000000-0000-7000-8000-000000000002: go",
-      "destroy c0000000-0000-7000-8000-000000000002",
-      "blank c0000000-0000-7000-8000-000000000001",
+      `hydrate ${cardIdFor("c1")},${cardIdFor("c2")}`,
+      `send ${cardIdFor("c2")}: go`,
+      `destroy ${cardIdFor("c2")}`,
+      `blank ${cardIdFor("c1")}`,
     ])
-    expect(textsIn(b.places).map(c => c.id)).toEqual([
-      "c0000000-0000-7000-8000-000000000001",
-    ])
+    expect(textsIn(b.places).map(c => c.id)).toEqual([cardIdFor("c1")])
   })
 
   test("a card whose text is behind is not blank: the cards behind it wait for it", async () => {
     const { b, events, deps } = setUp(
-      { "c0000000-0000-7000-8000-000000000002": "go" },
+      { [cardIdFor("c2")]: "go" },
       [],
       undefined,
-      ["c0000000-0000-7000-8000-000000000001"],
+      [cardIdFor("c1")],
     )
-    queue(b.places, "c0000000-0000-7000-8000-000000000001", "a")
-    queue(b.places, "c0000000-0000-7000-8000-000000000002", "b")
+    queue(b.places, cardIdFor("c1"), "a")
+    queue(b.places, cardIdFor("c2"), "b")
     await drain(deps, LANE)
     expect(events).toEqual([
-      "hydrate c0000000-0000-7000-8000-000000000001,c0000000-0000-7000-8000-000000000002",
-      "behind c0000000-0000-7000-8000-000000000001",
+      `hydrate ${cardIdFor("c1")},${cardIdFor("c2")}`,
+      `behind ${cardIdFor("c1")}`,
     ])
   })
 
   test("a top card whose text is behind stops the drain and asks to be drained again; the cards behind it wait", async () => {
     const { b, events, deps } = setUp(
       {
-        "c0000000-0000-7000-8000-000000000001": "first",
-        "c0000000-0000-7000-8000-000000000002": "second",
+        [cardIdFor("c1")]: "first",
+        [cardIdFor("c2")]: "second",
       },
       [],
       undefined,
-      ["c0000000-0000-7000-8000-000000000001"],
+      [cardIdFor("c1")],
     )
-    queue(b.places, "c0000000-0000-7000-8000-000000000001", "a")
-    queue(b.places, "c0000000-0000-7000-8000-000000000002", "b")
+    queue(b.places, cardIdFor("c1"), "a")
+    queue(b.places, cardIdFor("c2"), "b")
     await drain(deps, LANE)
     expect(events).toEqual([
-      "hydrate c0000000-0000-7000-8000-000000000001,c0000000-0000-7000-8000-000000000002",
-      "behind c0000000-0000-7000-8000-000000000001",
+      `hydrate ${cardIdFor("c1")},${cardIdFor("c2")}`,
+      `behind ${cardIdFor("c1")}`,
     ])
     expect(textsIn(b.places)).toHaveLength(2)
   })
@@ -394,41 +384,36 @@ describe("drain", () => {
   test("loads every queued text first, then sends in order until one starts a run", async () => {
     const { b, events, deps } = setUp(
       {
-        "c0000000-0000-7000-8000-000000000001": "first",
-        "c0000000-0000-7000-8000-000000000002": "@agent second",
-        "c0000000-0000-7000-8000-000000000003": "third",
+        [cardIdFor("c1")]: "first",
+        [cardIdFor("c2")]: "@agent second",
+        [cardIdFor("c3")]: "third",
       },
       [
         { kind: "appended", id: entryId("e-2") },
         { kind: "started", runId: runId("r-1") },
       ],
     )
-    queue(b.places, "c0000000-0000-7000-8000-000000000001", "a")
-    queue(b.places, "c0000000-0000-7000-8000-000000000002", "b")
-    queue(b.places, "c0000000-0000-7000-8000-000000000003", "c")
+    queue(b.places, cardIdFor("c1"), "a")
+    queue(b.places, cardIdFor("c2"), "b")
+    queue(b.places, cardIdFor("c3"), "c")
     await drain(deps, LANE)
     expect(events).toEqual([
-      "hydrate c0000000-0000-7000-8000-000000000001,c0000000-0000-7000-8000-000000000002,c0000000-0000-7000-8000-000000000003",
-      "send c0000000-0000-7000-8000-000000000001: first",
-      "destroy c0000000-0000-7000-8000-000000000001",
-      "send c0000000-0000-7000-8000-000000000002: @agent second",
-      "destroy c0000000-0000-7000-8000-000000000002",
+      `hydrate ${cardIdFor("c1")},${cardIdFor("c2")},${cardIdFor("c3")}`,
+      `send ${cardIdFor("c1")}: first`,
+      `destroy ${cardIdFor("c1")}`,
+      `send ${cardIdFor("c2")}: @agent second`,
+      `destroy ${cardIdFor("c2")}`,
     ])
-    expect(textsIn(b.places).map(c => c.id)).toEqual([
-      "c0000000-0000-7000-8000-000000000003",
-    ])
+    expect(textsIn(b.places).map(c => c.id)).toEqual([cardIdFor("c3")])
   })
 
   test("a card popped and sent leaves no history (ADR-0048 step 6)", async () => {
-    const { b, deps } = setUp(
-      { "c0000000-0000-7000-8000-000000000001": "first" },
-      [],
-    )
-    queue(b.places, "c0000000-0000-7000-8000-000000000001", "a")
+    const { b, deps } = setUp({ [cardIdFor("c1")]: "first" }, [])
+    queue(b.places, cardIdFor("c1"), "a")
     putValue(
       b,
       setRecord(CARD_HISTORY, {
-        card: textCardId("c0000000-0000-7000-8000-000000000001"),
+        card: cardIdFor("c1"),
         events: [],
       }),
     )
@@ -437,26 +422,23 @@ describe("drain", () => {
   })
 
   test("pops nothing while the lane runs", async () => {
-    const { b, events, deps } = setUp(
-      { "c0000000-0000-7000-8000-000000000001": "first" },
-      [],
-    )
-    queue(b.places, "c0000000-0000-7000-8000-000000000001", "a")
+    const { b, events, deps } = setUp({ [cardIdFor("c1")]: "first" }, [])
+    queue(b.places, cardIdFor("c1"), "a")
     beginRun(b.live, LANE, runId("r-0"))
     await drain(deps, LANE)
-    expect(events).toEqual(["hydrate c0000000-0000-7000-8000-000000000001"])
+    expect(events).toEqual([`hydrate ${cardIdFor("c1")}`])
     expect(textsIn(b.places)).toHaveLength(1)
   })
 
   test("a card queued while texts load is loaded before it is popped", async () => {
     const { b, events, deps } = setUp(
       {
-        "c0000000-0000-7000-8000-000000000001": "first",
-        "c0000000-0000-7000-8000-000000000002": "second",
+        [cardIdFor("c1")]: "first",
+        [cardIdFor("c2")]: "second",
       },
       [],
     )
-    queue(b.places, "c0000000-0000-7000-8000-000000000001", "a")
+    queue(b.places, cardIdFor("c1"), "a")
     const hydrate = deps.texts.hydrate
     let once = false
     const late: QueuedCardPopDeps = {
@@ -464,8 +446,7 @@ describe("drain", () => {
       texts: {
         hydrate: async ids => {
           await hydrate(ids)
-          if (!once)
-            queue(b.places, "c0000000-0000-7000-8000-000000000002", "b")
+          if (!once) queue(b.places, cardIdFor("c2"), "b")
           once = true
         },
         textNow: id => deps.texts.textNow(id),
@@ -475,35 +456,35 @@ describe("drain", () => {
     }
     await drain(late, LANE)
     expect(events).toEqual([
-      "hydrate c0000000-0000-7000-8000-000000000001",
-      "hydrate c0000000-0000-7000-8000-000000000002",
-      "send c0000000-0000-7000-8000-000000000001: first",
-      "destroy c0000000-0000-7000-8000-000000000001",
-      "send c0000000-0000-7000-8000-000000000002: second",
-      "destroy c0000000-0000-7000-8000-000000000002",
+      `hydrate ${cardIdFor("c1")}`,
+      `hydrate ${cardIdFor("c2")}`,
+      `send ${cardIdFor("c1")}: first`,
+      `destroy ${cardIdFor("c1")}`,
+      `send ${cardIdFor("c2")}: second`,
+      `destroy ${cardIdFor("c2")}`,
     ])
   })
 
   test("a refused send goes back below the line, whole, saying why; its text is kept", async () => {
     const { b, events, deps } = setUp(
       {
-        "c0000000-0000-7000-8000-000000000001": "look",
-        "c0000000-0000-7000-8000-000000000002": "next",
+        [cardIdFor("c1")]: "look",
+        [cardIdFor("c2")]: "next",
       },
       [{ kind: "refused", code: ERR.IMAGE_MISSING, message: "no such image" }],
     )
-    queue(b.places, "c0000000-0000-7000-8000-000000000001", "a")
-    queue(b.places, "c0000000-0000-7000-8000-000000000002", "b")
+    queue(b.places, cardIdFor("c1"), "a")
+    queue(b.places, cardIdFor("c2"), "b")
     await drain(deps, LANE)
     expect(events).toEqual([
-      "hydrate c0000000-0000-7000-8000-000000000001,c0000000-0000-7000-8000-000000000002",
-      "send c0000000-0000-7000-8000-000000000001: look",
-      "send c0000000-0000-7000-8000-000000000002: next",
-      "destroy c0000000-0000-7000-8000-000000000002",
+      `hydrate ${cardIdFor("c1")},${cardIdFor("c2")}`,
+      `send ${cardIdFor("c1")}: look`,
+      `send ${cardIdFor("c2")}: next`,
+      `destroy ${cardIdFor("c2")}`,
     ])
     expect(textsIn(b.places)).toEqual([
       expect.objectContaining({
-        id: "c0000000-0000-7000-8000-000000000001",
+        id: cardIdFor("c1"),
         place: expect.objectContaining({ kind: "note" }),
         unsent: "no such image",
       }),
@@ -512,10 +493,8 @@ describe("drain", () => {
   })
 
   test("busy under the pop: the card goes back on top as it was, and the drain stops", async () => {
-    const { b, deps } = setUp({ "c0000000-0000-7000-8000-000000000001": "x" }, [
-      { kind: "busy" },
-    ])
-    queue(b.places, "c0000000-0000-7000-8000-000000000001", "a")
+    const { b, deps } = setUp({ [cardIdFor("c1")]: "x" }, [{ kind: "busy" }])
+    queue(b.places, cardIdFor("c1"), "a")
     await drain(deps, LANE)
     expect(textsIn(b.places)[0]?.place.kind).toBe("queued")
   })
@@ -523,33 +502,32 @@ describe("drain", () => {
   test("a send that throws writes the card back below the line, saying the host failed, and the next is popped", async () => {
     const { b, events, deps } = setUp(
       {
-        "c0000000-0000-7000-8000-000000000001": "first",
-        "c0000000-0000-7000-8000-000000000002": "second",
+        [cardIdFor("c1")]: "first",
+        [cardIdFor("c2")]: "second",
       },
       [],
     )
     const throwing: QueuedCardPopDeps = {
       ...deps,
       send: async popped => {
-        if (popped.card.id === "c0000000-0000-7000-8000-000000000001")
-          throw new Error("store closed")
+        if (popped.card.id === cardIdFor("c1")) throw new Error("store closed")
         return deps.send(popped)
       },
     }
-    queue(b.places, "c0000000-0000-7000-8000-000000000001", "a")
-    queue(b.places, "c0000000-0000-7000-8000-000000000002", "b")
+    queue(b.places, cardIdFor("c1"), "a")
+    queue(b.places, cardIdFor("c2"), "b")
     await drain(throwing, LANE)
     expect(textsIn(b.places)).toEqual([
       expect.objectContaining({
-        id: "c0000000-0000-7000-8000-000000000001",
+        id: cardIdFor("c1"),
         place: expect.objectContaining({ kind: "note" }),
         unsent: "the host failed: store closed",
       }),
     ])
     expect(events).toEqual([
-      "hydrate c0000000-0000-7000-8000-000000000001,c0000000-0000-7000-8000-000000000002",
-      "send c0000000-0000-7000-8000-000000000002: second",
-      "destroy c0000000-0000-7000-8000-000000000002",
+      `hydrate ${cardIdFor("c1")},${cardIdFor("c2")}`,
+      `send ${cardIdFor("c2")}: second`,
+      `destroy ${cardIdFor("c2")}`,
     ])
   })
 })
@@ -559,47 +537,42 @@ describe("drain: bring up to date (ADR-0108)", () => {
 
   test("clean: the update, then the card's text as a message", async () => {
     const { b, events, deps } = setUp(
-      { "c0000000-0000-7000-8000-000000000001": "check yours" },
+      { [cardIdFor("c1")]: "check yours" },
       [],
       {
         kind: "clean",
       },
     )
-    queue(b.places, "c0000000-0000-7000-8000-000000000001", "a", CMD)
+    queue(b.places, cardIdFor("c1"), "a", CMD)
     await drain(deps, LANE)
     expect(events).toEqual([
-      "hydrate c0000000-0000-7000-8000-000000000001",
+      `hydrate ${cardIdFor("c1")}`,
       `update by ${BEA}: check yours`,
-      "send c0000000-0000-7000-8000-000000000001: check yours",
-      "destroy c0000000-0000-7000-8000-000000000001",
+      `send ${cardIdFor("c1")}: check yours`,
+      `destroy ${cardIdFor("c1")}`,
     ])
   })
 
   test("clean with no text: the update alone, and no run", async () => {
-    const { b, events, deps } = setUp(
-      { "c0000000-0000-7000-8000-000000000001": "" },
-      [],
-      { kind: "clean" },
-    )
-    queue(b.places, "c0000000-0000-7000-8000-000000000001", "a", CMD)
+    const { b, events, deps } = setUp({ [cardIdFor("c1")]: "" }, [], {
+      kind: "clean",
+    })
+    queue(b.places, cardIdFor("c1"), "a", CMD)
     await drain(deps, LANE)
     expect(events).toEqual([
-      "hydrate c0000000-0000-7000-8000-000000000001",
+      `hydrate ${cardIdFor("c1")}`,
       `update by ${BEA}: `,
-      "destroy c0000000-0000-7000-8000-000000000001",
+      `destroy ${cardIdFor("c1")}`,
     ])
   })
 
   test("nothing new: the text alone", async () => {
-    const { b, events, deps } = setUp(
-      { "c0000000-0000-7000-8000-000000000001": "go on" },
-      [],
-    )
-    queue(b.places, "c0000000-0000-7000-8000-000000000001", "a", CMD)
+    const { b, events, deps } = setUp({ [cardIdFor("c1")]: "go on" }, [])
+    queue(b.places, cardIdFor("c1"), "a", CMD)
     await drain(deps, LANE)
     expect(events.slice(2)).toEqual([
-      "send c0000000-0000-7000-8000-000000000001: go on",
-      "destroy c0000000-0000-7000-8000-000000000001",
+      `send ${cardIdFor("c1")}: go on`,
+      `destroy ${cardIdFor("c1")}`,
     ])
   })
 
@@ -607,8 +580,8 @@ describe("drain: bring up to date (ADR-0108)", () => {
     const message = { customType: "pinetrie.land" } as never
     const { b, events, deps } = setUp(
       {
-        "c0000000-0000-7000-8000-000000000001": "keep both",
-        "c0000000-0000-7000-8000-000000000002": "later",
+        [cardIdFor("c1")]: "keep both",
+        [cardIdFor("c2")]: "later",
       },
       [],
       {
@@ -616,25 +589,23 @@ describe("drain: bring up to date (ADR-0108)", () => {
         message,
       },
     )
-    queue(b.places, "c0000000-0000-7000-8000-000000000001", "a", CMD)
-    queue(b.places, "c0000000-0000-7000-8000-000000000002", "b")
+    queue(b.places, cardIdFor("c1"), "a", CMD)
+    queue(b.places, cardIdFor("c2"), "b")
     await drain(deps, LANE)
     expect(events).toEqual([
-      "hydrate c0000000-0000-7000-8000-000000000001,c0000000-0000-7000-8000-000000000002",
+      `hydrate ${cardIdFor("c1")},${cardIdFor("c2")}`,
       `update by ${BEA}: keep both`,
-      "destroy c0000000-0000-7000-8000-000000000001",
+      `destroy ${cardIdFor("c1")}`,
       "start pinetrie.land",
     ])
-    expect(textsIn(b.places).map(c => c.id)).toEqual([
-      "c0000000-0000-7000-8000-000000000002",
-    ])
+    expect(textsIn(b.places).map(c => c.id)).toEqual([cardIdFor("c2")])
   })
 
   test("refused: back below the line with its command, saying why, and the next card is popped", async () => {
     const { b, events, deps } = setUp(
       {
-        "c0000000-0000-7000-8000-000000000001": "x",
-        "c0000000-0000-7000-8000-000000000002": "next",
+        [cardIdFor("c1")]: "x",
+        [cardIdFor("c2")]: "next",
       },
       [],
       {
@@ -642,26 +613,23 @@ describe("drain: bring up to date (ADR-0108)", () => {
         reason: "the lane has no copy of its own",
       },
     )
-    queue(b.places, "c0000000-0000-7000-8000-000000000001", "a", CMD)
-    queue(b.places, "c0000000-0000-7000-8000-000000000002", "b")
+    queue(b.places, cardIdFor("c1"), "a", CMD)
+    queue(b.places, cardIdFor("c2"), "b")
     await drain(deps, LANE)
     expect(textsIn(b.places)).toEqual([
       expect.objectContaining({
         kind: "text" as const,
-        id: "c0000000-0000-7000-8000-000000000001",
+        id: cardIdFor("c1"),
         carries: { kind: "message", command: CMD },
         unsent: "the lane has no copy of its own",
         place: expect.objectContaining({ kind: "note" }),
       }),
     ])
-    expect(events).toContain("send c0000000-0000-7000-8000-000000000002: next")
+    expect(events).toContain(`send ${cardIdFor("c2")}: next`)
   })
 
   test("an update that throws writes the card back with its command, saying the host failed", async () => {
-    const { b, deps } = setUp(
-      { "c0000000-0000-7000-8000-000000000001": "x" },
-      [],
-    )
+    const { b, deps } = setUp({ [cardIdFor("c1")]: "x" }, [])
     const throwing: QueuedCardPopDeps = {
       ...deps,
       work: record<QueuedCardPopDeps["work"]>({
@@ -670,7 +638,7 @@ describe("drain: bring up to date (ADR-0108)", () => {
         },
       }).port,
     }
-    queue(b.places, "c0000000-0000-7000-8000-000000000001", "a", CMD)
+    queue(b.places, cardIdFor("c1"), "a", CMD)
     await drain(throwing, LANE)
     expect(textsIn(b.places)[0]).toMatchObject({
       carries: { kind: "message", command: CMD },
@@ -680,11 +648,11 @@ describe("drain: bring up to date (ADR-0108)", () => {
 
   test("its text refused after a clean update: back below the line without the command, which was carried out", async () => {
     const { b, deps } = setUp(
-      { "c0000000-0000-7000-8000-000000000001": "x" },
+      { [cardIdFor("c1")]: "x" },
       [{ kind: "refused", code: ERR.REFUSED, message: "pi refused" }],
       { kind: "clean" },
     )
-    queue(b.places, "c0000000-0000-7000-8000-000000000001", "a", CMD)
+    queue(b.places, cardIdFor("c1"), "a", CMD)
     await drain(deps, LANE)
     expect(textsIn(b.places)[0]).toMatchObject({
       carries: { kind: "message", command: null },
@@ -703,22 +671,16 @@ describe("the drain's waits for its top card", () => {
 
   test("givenUp: the awaited cards no longer queued, and no other", () => {
     const places = newPlacesDoc()
-    queue(places, "c0000000-0000-7000-8000-000000000001", "a")
+    queue(places, cardIdFor("c1"), "a")
     expect(
-      givenUp(
-        [
-          textCardId("c0000000-0000-7000-8000-000000000001"),
-          textCardId("c0000000-0000-7000-8000-000000000002"),
-        ],
-        readPlaces(places),
-      ),
-    ).toEqual(["c0000000-0000-7000-8000-000000000002"])
+      givenUp([cardIdFor("c1"), cardIdFor("c2")], readPlaces(places)),
+    ).toEqual([cardIdFor("c2")])
   })
 
   test("a card that leaves the queue gives its wait up, and drains nothing; one whose wait ends drains its lane", async () => {
     const places = newPlacesDoc()
-    queue(places, "c0000000-0000-7000-8000-000000000001", "a")
-    queue(places, "c0000000-0000-7000-8000-000000000002", "b")
+    queue(places, cardIdFor("c1"), "a")
+    queue(places, cardIdFor("c2"), "b")
     const waits = new Map<
       string,
       { arrive: () => void; signal?: AbortSignal }
@@ -730,31 +692,17 @@ describe("the drain's waits for its top card", () => {
       })
     const drained: string[] = []
     const wait = createWaits({ places, drain: l => drained.push(l) })
-    wait(
-      queuedCard(places, "c0000000-0000-7000-8000-000000000001"),
-      until("c0000000-0000-7000-8000-000000000001"),
-    )
-    wait(
-      queuedCard(places, "c0000000-0000-7000-8000-000000000002"),
-      until("c0000000-0000-7000-8000-000000000002"),
-    )
+    wait(queuedCard(places, cardIdFor("c1")), until(cardIdFor("c1")))
+    wait(queuedCard(places, cardIdFor("c2")), until(cardIdFor("c2")))
     // Asked twice, a card is waited for once.
-    wait(
-      queuedCard(places, "c0000000-0000-7000-8000-000000000001"),
-      until("c0000000-0000-7000-8000-000000000102"),
-    )
-    expect([...waits.keys()]).toEqual([
-      "c0000000-0000-7000-8000-000000000001",
-      "c0000000-0000-7000-8000-000000000002",
-    ])
+    wait(queuedCard(places, cardIdFor("c1")), until(cardIdFor("c102")))
+    expect([...waits.keys()]).toEqual([cardIdFor("c1"), cardIdFor("c2")])
     // c-1 leaves the queue: its wait is given up.
-    places.cards.delete("c0000000-0000-7000-8000-000000000001")
+    places.cards.delete(cardIdFor("c1"))
     await Promise.resolve()
-    expect(
-      waits.get("c0000000-0000-7000-8000-000000000001")?.signal?.aborted,
-    ).toBe(true)
+    expect(waits.get(cardIdFor("c1"))?.signal?.aborted).toBe(true)
     expect(drained).toEqual([])
-    waits.get("c0000000-0000-7000-8000-000000000002")?.arrive()
+    waits.get(cardIdFor("c2"))?.arrive()
     await Promise.resolve()
     await Promise.resolve()
     expect(drained).toEqual([LANE])
@@ -763,30 +711,26 @@ describe("the drain's waits for its top card", () => {
   test("untilNotTyped: resolves once the typing in the card is gone, or at once when there is none", async () => {
     const presence = newPresenceDoc()
     const seat = seatKey(BEA, "s1")
-    presence.typingIn.set(seat, "c0000000-0000-7000-8000-000000000001")
+    presence.typingIn.set(seat, cardIdFor("c1"))
     let done = false
     void untilNotTyped(
       presence,
-      textCardId("c0000000-0000-7000-8000-000000000001"),
+      cardIdFor("c1"),
       new AbortController().signal,
     ).then(() => {
       done = true
     })
-    presence.typingIn.set(seat, "c0000000-0000-7000-8000-000000000002")
+    presence.typingIn.set(seat, cardIdFor("c2"))
     await Promise.resolve()
     expect(done).toBe(true)
-    await untilNotTyped(
-      presence,
-      textCardId("c0000000-0000-7000-8000-000000000009"),
-      new AbortController().signal,
-    )
+    await untilNotTyped(presence, cardIdFor("c9"), new AbortController().signal)
   })
 })
 
 describe("drain: a fact (ADR-0080)", () => {
   test("a queued fact is appended as the fact, its card gone, and the drain goes on", async () => {
     const { b, events, deps, appended } = setUp(
-      { "c0000000-0000-7000-8000-000000000002": "next" },
+      { [cardIdFor("c2")]: "next" },
       [],
     )
     const fact = {
@@ -798,10 +742,10 @@ describe("drain: a fact (ADR-0080)", () => {
       to: { kind: "accepted" },
     } as const
     b.places.cards.set(
-      "c0000000-0000-7000-8000-000000000001",
+      cardIdFor("c1"),
       encodeCard({
         kind: "text" as const,
-        id: textCardId("c0000000-0000-7000-8000-000000000001"),
+        id: cardIdFor("c1"),
         owner: ADA,
         placer: ADA,
         place: {
@@ -816,14 +760,14 @@ describe("drain: a fact (ADR-0080)", () => {
         unsent: null,
       }),
     )
-    queue(b.places, "c0000000-0000-7000-8000-000000000002", "b")
+    queue(b.places, cardIdFor("c2"), "b")
     await drain(deps, LANE)
     expect(events).toEqual([
-      "hydrate c0000000-0000-7000-8000-000000000001,c0000000-0000-7000-8000-000000000002",
-      "destroy c0000000-0000-7000-8000-000000000001",
+      `hydrate ${cardIdFor("c1")},${cardIdFor("c2")}`,
+      `destroy ${cardIdFor("c1")}`,
       "append pinetrie.fact",
-      "send c0000000-0000-7000-8000-000000000002: next",
-      "destroy c0000000-0000-7000-8000-000000000002",
+      `send ${cardIdFor("c2")}: next`,
+      `destroy ${cardIdFor("c2")}`,
     ])
     expect(appended.map(decodeFact)).toEqual([fact])
     expect(textsIn(b.places)).toEqual([])
@@ -834,41 +778,39 @@ describe("drain: a split (ADR-0080)", () => {
   test("a split card starts the split's own run, its text the brief, and ends the drain", async () => {
     const { b, events, deps } = setUp(
       {
-        "c0000000-0000-7000-8000-000000000001": "tests apart",
-        "c0000000-0000-7000-8000-000000000002": "next",
+        [cardIdFor("c1")]: "tests apart",
+        [cardIdFor("c2")]: "next",
       },
       [],
     )
-    queue(b.places, "c0000000-0000-7000-8000-000000000001", "a", "split")
-    queue(b.places, "c0000000-0000-7000-8000-000000000002", "b")
+    queue(b.places, cardIdFor("c1"), "a", "split")
+    queue(b.places, cardIdFor("c2"), "b")
     await drain(deps, LANE)
     expect(events).toEqual([
-      "hydrate c0000000-0000-7000-8000-000000000001,c0000000-0000-7000-8000-000000000002",
+      `hydrate ${cardIdFor("c1")},${cardIdFor("c2")}`,
       `split by ${BEA}: tests apart`,
-      "destroy c0000000-0000-7000-8000-000000000001",
+      `destroy ${cardIdFor("c1")}`,
       "start pinetrie.stack",
     ])
-    expect(textsIn(b.places).map(c => c.id)).toEqual([
-      "c0000000-0000-7000-8000-000000000002",
-    ])
+    expect(textsIn(b.places).map(c => c.id)).toEqual([cardIdFor("c2")])
   })
 
   test("refused: back below the line with its command, saying why, and the next card is popped", async () => {
     const { b, events, deps } = setUp(
       {
-        "c0000000-0000-7000-8000-000000000001": "refuse",
-        "c0000000-0000-7000-8000-000000000002": "next",
+        [cardIdFor("c1")]: "refuse",
+        [cardIdFor("c2")]: "next",
       },
       [],
     )
-    queue(b.places, "c0000000-0000-7000-8000-000000000001", "a", "split")
-    queue(b.places, "c0000000-0000-7000-8000-000000000002", "b")
+    queue(b.places, cardIdFor("c1"), "a", "split")
+    queue(b.places, cardIdFor("c2"), "b")
     await drain(deps, LANE)
-    expect(events).toContain("send c0000000-0000-7000-8000-000000000002: next")
+    expect(events).toContain(`send ${cardIdFor("c2")}: next`)
     expect(textsIn(b.places)).toEqual([
       expect.objectContaining({
         kind: "text" as const,
-        id: "c0000000-0000-7000-8000-000000000001",
+        id: cardIdFor("c1"),
         carries: { kind: "message", command: "split" },
         unsent: "nothing to split",
       }),

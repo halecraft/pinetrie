@@ -21,6 +21,7 @@ import {
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import { archivedIn, planArchive, writesIn } from "./archive.ts"
 import { indexTasks, threadCardOf } from "./task.ts"
@@ -177,7 +178,7 @@ describe("writesIn: the tasks a command writes in (ADR-0063, ADR-0116)", () => {
     threadCardOf({ thread: T_B, task: TASK, by: BEA, cards: [] }),
     {
       kind: "text",
-      id: textCardId("c0000000-0000-7000-8000-000000000106"),
+      id: cardIdFor("c106"),
       owner: BEA,
       placer: BEA,
       place: {
@@ -264,7 +265,7 @@ describe("writesIn: the tasks a command writes in (ADR-0063, ADR-0116)", () => {
       {
         kind: "reorder",
         reorder: {
-          card: textCardId("c0000000-0000-7000-8000-000000000001"),
+          card: cardIdFor("c1"),
           at: {
             kind: "queued",
             at: atEntry(entryId("a")),
@@ -272,7 +273,7 @@ describe("writesIn: the tasks a command writes in (ADR-0063, ADR-0116)", () => {
             seen: "",
           },
           after: null,
-          before: textCardId("c0000000-0000-7000-8000-000000000002"),
+          before: cardIdFor("c2"),
         },
       },
       [OTHER_TASK],
@@ -332,7 +333,7 @@ describe("writesIn: the tasks a command writes in (ADR-0063, ADR-0116)", () => {
         kind: "move",
         moves: [
           {
-            card: textCardId("c0000000-0000-7000-8000-000000000106"),
+            card: cardIdFor("c106"),
             from: atB,
             to: { kind: "inventory", holder: writerId("ada@x.io") },
           },

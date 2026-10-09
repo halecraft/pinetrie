@@ -16,6 +16,7 @@ import type {
   MoveDirection,
   OfferAction,
   QueueHoldChange,
+  QueueMove,
   Reorder,
   TaskId,
   TextCard,
@@ -102,7 +103,7 @@ export type Effect =
    */
   | {
       readonly kind: "queueCard"
-      readonly move: Move
+      readonly move: QueueMove
       readonly hold: QueueHoldChange
       readonly command: CardCommand | null
       readonly how: MoveHow

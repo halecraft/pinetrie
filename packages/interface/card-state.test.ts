@@ -1,4 +1,5 @@
-import { type CardId, textCardId } from "@pinetrie/core"
+import type { CardId } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   type EditorEvent,
@@ -10,7 +11,7 @@ import {
 import { sendable } from "./send.ts"
 
 const AGENT = { text: "@agent ", blank: true }
-const C1: CardId = textCardId("c0000000-0000-7000-8000-000000000001")
+const C1: CardId = cardIdFor("c1")
 const local: EditorState = { kind: "local" }
 const bound: EditorState = { kind: "bound", card: C1 }
 const step = (s: EditorState, e: EditorEvent) => editorState(s, e, AGENT)
@@ -54,7 +55,7 @@ describe("editorState", () => {
       step(bound, {
         kind: "input",
         text: "",
-        card: textCardId("c0000000-0000-7000-8000-000000000002"),
+        card: cardIdFor("c2"),
       }),
     ).toEqual({ state: bound, acts: [] })
   })
@@ -67,7 +68,7 @@ describe("editorState", () => {
     expect(
       step(bound, {
         kind: "found",
-        card: textCardId("c0000000-0000-7000-8000-000000000002"),
+        card: cardIdFor("c2"),
       }).state,
     ).toBe(bound)
     expect(step(bound, { kind: "gone" })).toEqual({
@@ -84,7 +85,7 @@ describe("editorState", () => {
       step(bound, {
         kind: "input",
         text: "",
-        card: textCardId("c0000000-0000-7000-8000-000000000002"),
+        card: cardIdFor("c2"),
       }),
     ).toEqual({ state: bound, acts: [] })
   })

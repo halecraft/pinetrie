@@ -10,13 +10,7 @@
 // starts is not added here. An item holding an unsent card of yours carries a
 // pip (ADR-0048, `cardMarks`), and before its label, its status (ADR-0077).
 
-import {
-  MAX_TITLE,
-  type TaskId,
-  type ThreadId,
-  type TreeIndex,
-  type WriterId,
-} from "@pinetrie/core"
+import type { TaskId, ThreadId, TreeIndex, WriterId } from "@pinetrie/core"
 import {
   dropProps,
   dropsWords,
@@ -26,10 +20,8 @@ import {
   type ListWidth,
   listFoldWords,
   listKey,
-  planTitle,
   type RootDrag,
   renameIntent,
-  renameKey,
   rootDropProps,
   rootGroupProps,
   type SidebarView,
@@ -50,6 +42,7 @@ import { slotColor } from "./colors.ts"
 import { Menu, type MenuItem } from "./menu.tsx"
 import { Readers, type ReadersProps, RootStatus } from "./root-signals.tsx"
 import { ThreadHead } from "./thread-card.tsx"
+import { TitleField } from "./title-field.tsx"
 import { startRootDrag } from "./use-root-drag.ts"
 
 /** Up and Down move focus between items. */
@@ -514,72 +507,6 @@ function menuItem(
       }
     }
   }
-}
-
-/**
- * A root's item while it is renamed: a field holding its title. Enter and
- * leaving the field save, and Escape cancels.
- */
-export function TitleField({
-  stored,
-  placeholder,
-  onSend,
-  onEnd,
-  label = "title for this thread",
-}: {
-  stored: string | null
-  placeholder: string
-  /** The field's accessible name. */
-  label?: string
-  onSend: (title: string | null) => void
-  /** The field is done; `focusItem` when the keyboard ended it. */
-  onEnd: (focusItem: boolean) => void
-}) {
-  const [text, setText] = useState(stored ?? "")
-  const [invalid, setInvalid] = useState(false)
-  const input = useRef<HTMLInputElement>(null)
-  // Every way out comes here once. Removing a focused field can fire a blur
-  // after Enter or Escape, which must not save again, or save a cancel.
-  const done = useRef(false)
-  useLayoutEffect(() => {
-    input.current?.focus()
-    input.current?.select()
-  }, [])
-  const finish = (save: boolean, focusItem: boolean) => {
-    if (done.current) return
-    if (save) {
-      const plan = planTitle(text, stored)
-      if (plan.kind === "refuse") {
-        setInvalid(true)
-        return
-      }
-      if (plan.kind === "send") onSend(plan.title)
-    }
-    done.current = true
-    onEnd(focusItem)
-  }
-  return (
-    <input
-      aria-invalid={invalid}
-      aria-label={label}
-      className="open-title-input"
-      maxLength={MAX_TITLE}
-      onBlur={() => finish(true, false)}
-      onChange={e => {
-        setText(e.target.value)
-        setInvalid(false)
-      }}
-      onKeyDown={e => {
-        const step = renameKey(e.key)
-        if (step === null) return
-        e.preventDefault()
-        finish(step.save, step.refocus)
-      }}
-      placeholder={placeholder}
-      ref={input}
-      value={text}
-    />
-  )
 }
 
 /**

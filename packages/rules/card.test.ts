@@ -27,7 +27,7 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { entriesOf, withThreads } from "@pinetrie/core/fixtures"
+import { cardIdFor, entriesOf, withThreads } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   blankQueued,
@@ -39,7 +39,7 @@ import {
   isBlankMessage,
   NO_DISCARDS,
   nearestNoteColumn,
-  notesOf,
+  notesNear,
   ownsPlace,
   pinnedAt,
   placeEnd,
@@ -50,6 +50,7 @@ import {
   planHistorySweep,
   planMove,
   planMoveCommand,
+  planMoveRequest,
   planMoves,
   planNextQueuedCardPop,
   planNotesTargets,
@@ -59,6 +60,7 @@ import {
   planUnsent,
   type QueuedCard,
   queuedOn,
+  toNotes,
   undoAnswer,
   yourCard,
 } from "./card.ts"
@@ -101,7 +103,7 @@ const T_E = threadIdFor("e1")
 const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 const card = (over: Partial<TextCard> = {}): TextCard => ({
   kind: "text",
-  id: textCardId("c0000000-0000-7000-8000-000000000001"),
+  id: cardIdFor("c1"),
   owner: ADA,
   placer: ADA,
   place: { kind: "composing", at: atEntry(E2), thread: T_E },
@@ -305,11 +307,11 @@ describe("where a card sits", () => {
 
   test("yourCard: your message only, never a note of yours at the same end (ADR-0113)", () => {
     const yours = note({
-      id: textCardId("c0000000-0000-7000-8000-000000000009"),
+      id: cardIdFor("c9"),
     })
     expect(
       yourCard(ADA, { kind: "end", end: E2 }, [card(), yours], tree())?.id,
-    ).toBe("c0000000-0000-7000-8000-000000000001")
+    ).toBe(cardIdFor("c1"))
     expect(
       yourCard(ADA, { kind: "end", end: E2 }, [yours], tree()),
     ).toBeUndefined()
@@ -317,48 +319,42 @@ describe("where a card sits", () => {
 
   test("yourCard: by thread end or fresh column, never another writer's", () => {
     const beas = card({
-      id: textCardId("c0000000-0000-7000-8000-000000000002"),
+      id: cardIdFor("c2"),
       owner: BEA,
     })
     const fresh = card({
-      id: textCardId("c0000000-0000-7000-8000-000000000003"),
+      id: cardIdFor("c3"),
       place: freshPlace("k-1"),
     })
     const cards = [beas, card(), fresh]
     const at = (where: Parameters<typeof yourCard>[1], me = ADA) =>
       yourCard(me, where, cards, tree())?.id
-    expect(at({ kind: "end", end: entryId("e2") })).toBe(
-      "c0000000-0000-7000-8000-000000000001",
-    )
-    expect(at({ kind: "end", end: entryId("e2") }, BEA)).toBe(
-      "c0000000-0000-7000-8000-000000000002",
-    )
-    expect(at({ kind: "fresh", column: "k-1" })).toBe(
-      "c0000000-0000-7000-8000-000000000003",
-    )
+    expect(at({ kind: "end", end: entryId("e2") })).toBe(cardIdFor("c1"))
+    expect(at({ kind: "end", end: entryId("e2") }, BEA)).toBe(cardIdFor("c2"))
+    expect(at({ kind: "fresh", column: "k-1" })).toBe(cardIdFor("c3"))
     expect(at({ kind: "fresh", column: "k-1" }, BEA)).toBeUndefined()
     expect(at({ kind: "end", end: entryId("f1") })).toBeUndefined()
   })
 
   test("yourCard: of two of yours at one end, the newest, so an unqueued one does not take the composer", () => {
     const older = card({
-      id: textCardId("c0000000-0000-7000-8000-000000000001"),
+      id: cardIdFor("c1"),
     })
     const newer = card({
-      id: textCardId("c0000000-0000-7000-8000-000000000009"),
+      id: cardIdFor("c9"),
     })
     expect(
       yourCard(ADA, { kind: "end", end: entryId("e2") }, [newer, older], tree())
         ?.id,
-    ).toBe("c0000000-0000-7000-8000-000000000009")
+    ).toBe(cardIdFor("c9"))
     expect(
       yourCard(ADA, { kind: "end", end: entryId("e2") }, [older, newer], tree())
         ?.id,
-    ).toBe("c0000000-0000-7000-8000-000000000009")
+    ).toBe(cardIdFor("c9"))
   })
 
   test("cardEnd sees your message alone: a queued card is above the line", () => {
-    const q = queued("c0000000-0000-7000-8000-000000000002", "a")
+    const q = queued(cardIdFor("c2"), "a")
     // Its lane ends at e2, where it was queued: it is still no message there.
     expect(cardEnd(q, tree())).toBeNull()
     expect(cardEnd(note(), tree())).toBeNull()
@@ -383,7 +379,7 @@ describe("note columns (ADR-0116)", () => {
   const nearest = (cards: readonly CardRecord[], t = LANE) =>
     nearestNoteColumn(canvasOf(cards, TEST_TASK), t)
   const MADE = noteColumnIdFor("made")
-  const C1 = textCardId("c0000000-0000-7000-8000-000000000001")
+  const C1 = cardIdFor("c1")
 
   test("nearestNoteColumn: the closest in the canvas's order, left or right; on a tie, the one after", () => {
     const left = column("l", K(1))
@@ -408,53 +404,84 @@ describe("note columns (ADR-0116)", () => {
     expect(nearest([thread(T2, K(2))])).toEqual({ kind: "none" })
   })
 
-  test("notesOf: a note at the nearest column's end; the column made first where the task has none; a thread in an inventory, its inventory; a thread with no card, null", () => {
-    const n1 = card({
-      id: textCardId("c0000000-0000-7000-8000-000000000005"),
-      place: { kind: "note", column: noteColumnIdFor("l"), order: K(5) },
-    })
-    const cards = [thread(LANE, K(2)), column("l", K(3)), n1]
-    const there = notesOf({ cards, thread: LANE, column: MADE, by: BEA })
-    expect(there?.made).toEqual([])
-    expect(there?.place).toMatchObject({
-      kind: "note",
+  test("notesNear decides, minting nothing: a column, one to make there, or the holder's inventory; null for a thread with no card", () => {
+    const cards = [thread(LANE, K(2)), column("l", K(3))]
+    expect(notesNear(cards, LANE)).toEqual({
+      kind: "column",
       column: noteColumnIdFor("l"),
     })
-    const order = there?.place.kind === "note" ? there.place.order : ""
-    expect(order > K(5)).toBe(true)
-    const made = notesOf({
-      cards: [thread(LANE, K(2))],
-      thread: LANE,
-      column: MADE,
-      by: BEA,
+    expect(notesNear([thread(LANE, K(2))], LANE)).toMatchObject({
+      kind: "make",
+      task: TEST_TASK,
+      renumbered: [],
     })
-    expect(made?.made).toEqual([
-      {
-        kind: "note-column",
-        id: MADE,
-        owner: BEA,
-        placer: BEA,
-        place: expect.objectContaining({ kind: "canvas", task: TEST_TASK }),
-      },
-    ])
-    expect(made?.place).toMatchObject({ kind: "note", column: MADE })
     const held = {
       ...thread(LANE, K(2)),
       place: { kind: "inventory", holder: BEA } as const,
     }
-    expect(
-      notesOf({ cards: [held], thread: LANE, column: MADE, by: ADA })?.place,
-    ).toEqual({ kind: "inventory", holder: BEA })
-    expect(
-      notesOf({ cards: [], thread: LANE, column: MADE, by: ADA }),
-    ).toBeNull()
+    expect(notesNear([held], LANE)).toEqual({ kind: "inventory", holder: BEA })
+    expect(notesNear([], LANE)).toBeNull()
   })
 
-  test("planNotesTargets: each move to a thread's notes to a column; one made for the first takes the rest", () => {
+  test("notesNear: with no room after the thread's card, the crowded canvas cards are renumbered around the new column's rank", () => {
+    const tight = (Number.parseInt(K(2), 36) + 1).toString(36).padStart(10, "0")
+    const near = notesNear([thread(LANE, K(2)), thread(T2, tight)], LANE)
+    if (near?.kind !== "make") throw new Error(`not made: ${near?.kind}`)
+    const order = (id: string) => {
+      const moved = near.renumbered.find(c => c.id === id)?.place
+      return moved?.kind === "canvas" ? moved.order : id === LANE ? K(2) : tight
+    }
+    expect(near.renumbered.length).toBeGreaterThan(0)
+    expect(order(LANE) < near.order && near.order < order(T2)).toBe(true)
+  })
+
+  test("toNotes: a note at the nearest column's end; a column made, written first, where the task has none, its id minted then alone", () => {
+    const n1 = card({
+      id: cardIdFor("c5"),
+      place: { kind: "note", column: noteColumnIdFor("l"), order: K(5) },
+    })
+    let minted = 0
+    const newColumn = () => {
+      minted++
+      return MADE
+    }
+    const there = toNotes({
+      cards: [thread(LANE, K(2)), column("l", K(3)), n1],
+      thread: LANE,
+      newColumn,
+      by: BEA,
+    })
+    expect(there?.first).toEqual([])
+    const order = there?.place.kind === "note" ? there.place.order : ""
+    expect(order > K(5)).toBe(true)
+    expect(minted).toBe(0)
+    const made = toNotes({
+      cards: [thread(LANE, K(2))],
+      thread: LANE,
+      newColumn,
+      by: BEA,
+    })
+    expect(made?.first).toEqual([
+      {
+        kind: "write",
+        record: {
+          kind: "note-column",
+          id: MADE,
+          owner: BEA,
+          placer: BEA,
+          place: expect.objectContaining({ kind: "canvas", task: TEST_TASK }),
+        },
+      },
+    ])
+    expect(made?.place).toMatchObject({ kind: "note", column: MADE })
+    expect(minted).toBe(1)
+  })
+
+  test("planNotesTargets: each move to a thread's notes to a column; one made for the first takes the rest; a thread with no card, refused", () => {
     const cards = [
       thread(LANE, K(2)),
-      queued("c0000000-0000-7000-8000-000000000001", "a"),
-      queued("c0000000-0000-7000-8000-000000000002", "b"),
+      queued(cardIdFor("c1"), "a"),
+      queued(cardIdFor("c2"), "b"),
     ]
     let n = 0
     const resolved = planNotesTargets({
@@ -463,32 +490,59 @@ describe("note columns (ADR-0116)", () => {
       sender: ADA,
       newColumn: () => noteColumnIdFor(`made-${++n}`),
     })
-    expect(resolved.made.map(c => c.id)).toEqual([noteColumnIdFor("made-1")])
+    if (resolved.kind !== "resolved") throw new Error(resolved.code)
+    expect(
+      resolved.first.map(s => (s.kind === "write" ? s.record.id : s.id)),
+    ).toEqual([noteColumnIdFor("made-1")])
     expect(resolved.moves.map(m => m.to)).toEqual([
       { kind: "note", column: noteColumnIdFor("made-1") },
       { kind: "note", column: noteColumnIdFor("made-1") },
     ])
+    const lost = queued(cardIdFor("c3"), "c")
+    expect(
+      planNotesTargets({
+        cards: [lost],
+        moves: planUnqueueAll([lost], LANE),
+        sender: ADA,
+        newColumn: () => MADE,
+      }),
+    ).toEqual({ kind: "refused", code: "no-place", now: lost })
   })
 
-  test("a move to a thread's notes no one resolved is refused: no place", () => {
+  test("planMoveRequest: a column made for a move is written before the move, in one step", () => {
+    const q = queued(cardIdFor("c1"), "a")
+    const { step } = planMoveRequest(
+      [thread(LANE, K(2)), q],
+      planUnqueueAll([q], LANE),
+      ADA,
+      () => false,
+      NO_DISCARDS,
+      () => MADE,
+    )
     expect(
-      planMove(
-        [note()],
-        {
-          card: C1,
-          from: keyOf(note().place),
-          to: { kind: "notes", thread: LANE },
-        },
-        ADA,
-        NO_DISCARDS,
-      ),
-    ).toEqual({ kind: "refused", code: "no-place", now: note() })
+      step.kind === "steps"
+        ? step.steps.map(s => (s.kind === "write" ? s.record.place : null))
+        : step,
+    ).toEqual([
+      expect.objectContaining({ kind: "canvas", task: TEST_TASK }),
+      expect.objectContaining({ kind: "note", column: MADE }),
+    ])
+  })
+
+  test("planMove takes no move to a thread's nearest notes: one is resolved first", () => {
+    const unresolved = {
+      card: C1,
+      from: keyOf(note().place),
+      to: { kind: "notes", thread: LANE },
+    } as const
+    // @ts-expect-error a thread's nearest notes are resolved before planning
+    planMove([note()], unresolved, ADA, NO_DISCARDS)
   })
 
   test("a move into a note column lands at its end; a reorder moves a note among its column's own", () => {
     const n = (id: string, order: string, col = NOTES) =>
       card({
-        id: textCardId(`c0000000-0000-7000-8000-00000000000${id}`),
+        id: cardIdFor(`c${id}`),
         place: { kind: "note", column: col, order },
       })
     const step = planMove(
@@ -505,10 +559,10 @@ describe("note columns (ADR-0116)", () => {
     expect(placed?.kind === "note" && placed.order > K(1)).toBe(true)
     const notes = [n("1", K(0)), n("2", K(1)), n("3", K(2))]
     const moved = planReorder(notes, {
-      card: textCardId("c0000000-0000-7000-8000-000000000003"),
+      card: cardIdFor("c3"),
       at: { kind: "note", column: NOTES },
       after: null,
-      before: textCardId("c0000000-0000-7000-8000-000000000001"),
+      before: cardIdFor("c1"),
     })
     const order =
       moved.kind === "write" && moved.record.place.kind === "note"
@@ -518,10 +572,10 @@ describe("note columns (ADR-0116)", () => {
     // Not next to each other as its sender saw them: refused.
     expect(
       planReorder(notes, {
-        card: textCardId("c0000000-0000-7000-8000-000000000003"),
+        card: cardIdFor("c3"),
         at: { kind: "note", column: NOTES },
         after: null,
-        before: textCardId("c0000000-0000-7000-8000-000000000002"),
+        before: cardIdFor("c2"),
       }).kind,
     ).toBe("refused")
   })
@@ -598,7 +652,7 @@ describe("pinned cards", () => {
     expect(cardEnd(mine, tree())).toBeNull()
     expect(
       yourCard(ADA, { kind: "end", end: E2 }, [card(), mine], tree())?.id,
-    ).toBe("c0000000-0000-7000-8000-000000000001")
+    ).toBe(cardIdFor("c1"))
     expect(
       yourCard(ADA, { kind: "end", end: E2 }, [mine], tree()),
     ).toBeUndefined()
@@ -609,27 +663,25 @@ describe("the queue", () => {
   test("queuedOn: a lane's queued cards by order key, then id; not another lane's, nor notes", () => {
     const other = threadIdFor("y")
     const cards = [
-      queued("c0000000-0000-7000-8000-000000000003", "b"),
-      queued("c0000000-0000-7000-8000-000000000001", "c"),
-      queued("c0000000-0000-7000-8000-000000000002", "b"),
-      queued("c0000000-0000-7000-8000-000000000004", "a", other),
-      card({ id: textCardId("c0000000-0000-7000-8000-000000000005") }),
+      queued(cardIdFor("c3"), "b"),
+      queued(cardIdFor("c1"), "c"),
+      queued(cardIdFor("c2"), "b"),
+      queued(cardIdFor("c4"), "a", other),
+      card({ id: cardIdFor("c5") }),
     ]
     expect(queuedOn(cards, LANE).map(c => c.id)).toEqual([
-      "c0000000-0000-7000-8000-000000000002",
-      "c0000000-0000-7000-8000-000000000003",
-      "c0000000-0000-7000-8000-000000000001",
+      cardIdFor("c2"),
+      cardIdFor("c3"),
+      cardIdFor("c1"),
     ])
   })
 
   test("orderAfter: fixed-width keys, each after every key in the queue", () => {
     const first = orderAfter([])
-    const second = orderAfter([
-      queued("c0000000-0000-7000-8000-000000000001", first),
-    ])
+    const second = orderAfter([queued(cardIdFor("c1"), first)])
     const third = orderAfter([
-      queued("c0000000-0000-7000-8000-000000000002", second),
-      queued("c0000000-0000-7000-8000-000000000001", first),
+      queued(cardIdFor("c2"), second),
+      queued(cardIdFor("c1"), first),
     ])
     expect(first.length).toBe(second.length)
     expect(first < second && second < third).toBe(true)
@@ -643,10 +695,7 @@ describe("the queue", () => {
   }
 
   test("planNextQueuedCardPop: nothing while the lane runs; else its top queued card", () => {
-    const cards = [
-      queued("c0000000-0000-7000-8000-000000000002", "b"),
-      queued("c0000000-0000-7000-8000-000000000001", "a"),
-    ]
+    const cards = [queued(cardIdFor("c2"), "b"), queued(cardIdFor("c1"), "a")]
     expect(
       planNextQueuedCardPop(cards, LANE, { ...idle, running: true }),
     ).toEqual({ kind: "idle" })
@@ -660,8 +709,8 @@ describe("the queue", () => {
   })
 
   test("planNextQueuedCardPop: a held queue pops no message, nor a card someone types in; a fact on top goes whatever (ADR-0048 step 7)", () => {
-    const top = queued("c0000000-0000-7000-8000-000000000001", "a")
-    const cards = [top, queued("c0000000-0000-7000-8000-000000000002", "b")]
+    const top = queued(cardIdFor("c1"), "a")
+    const cards = [top, queued(cardIdFor("c2"), "b")]
     expect(planNextQueuedCardPop(cards, LANE, { ...idle, held: true })).toEqual(
       { kind: "held" },
     )
@@ -675,11 +724,11 @@ describe("the queue", () => {
     expect(
       planNextQueuedCardPop(cards, LANE, {
         ...idle,
-        typing: new Set([textCardId("c0000000-0000-7000-8000-000000000002")]),
+        typing: new Set([cardIdFor("c2")]),
       }),
     ).toEqual({ kind: "pop", card: top })
     const fact: QueuedCard = {
-      ...queued("c0000000-0000-7000-8000-000000000000", "0"),
+      ...queued(cardIdFor("c0"), "0"),
       carries: { kind: "fact", fact: ACCEPTED },
     }
     expect(
@@ -698,10 +747,10 @@ describe("the queue", () => {
   })
 
   describe("planNextQueuedCardPop passes over a blank message, which stays where it is (ADR-0113)", () => {
-    const empty = queued("c0000000-0000-7000-8000-000000000001", "a")
-    const next = queued("c0000000-0000-7000-8000-000000000002", "b")
+    const empty = queued(cardIdFor("c1"), "a")
+    const next = queued(cardIdFor("c2"), "b")
     const fact: QueuedCard = {
-      ...queued("c0000000-0000-7000-8000-000000000003", "c"),
+      ...queued(cardIdFor("c3"), "c"),
       carries: { kind: "fact", fact: ACCEPTED },
     }
     test.each([
@@ -759,16 +808,16 @@ describe("the queue", () => {
   })
 
   test("blankQueued: a queued message with no command and no text, whose text is held as its queuer had it; not one whose text has not arrived", () => {
-    const empty = queued("c0000000-0000-7000-8000-000000000001", "a")
+    const empty = queued(cardIdFor("c1"), "a")
     const behind = {
-      ...queued("c0000000-0000-7000-8000-000000000002", "b"),
+      ...queued(cardIdFor("c2"), "b"),
       place: {
-        ...queued("c0000000-0000-7000-8000-000000000002", "b").place,
+        ...queued(cardIdFor("c2"), "b").place,
         seen: "v-1",
       },
     }
     const command: QueuedCard = {
-      ...queued("c0000000-0000-7000-8000-000000000003", "c"),
+      ...queued(cardIdFor("c3"), "c"),
       carries: { kind: "message", command: "split" },
     }
     const blank = blankQueued([empty, behind, command, card()], {
@@ -780,20 +829,17 @@ describe("the queue", () => {
 
   test("planUnqueueAll: every message card queued on the lane, to the note column nearest its thread, in order; a fact and another lane's stay", () => {
     const fact: QueuedCard = {
-      ...queued("c0000000-0000-7000-8000-000000000000", "0"),
+      ...queued(cardIdFor("c0"), "0"),
       carries: { kind: "fact", fact: ACCEPTED },
     }
     const cards = [
-      queued("c0000000-0000-7000-8000-000000000002", "b"),
+      queued(cardIdFor("c2"), "b"),
       fact,
-      queued("c0000000-0000-7000-8000-000000000001", "a"),
-      queued("c0000000-0000-7000-8000-000000000003", "c", threadIdFor("y")),
+      queued(cardIdFor("c1"), "a"),
+      queued(cardIdFor("c3"), "c", threadIdFor("y")),
     ]
     expect(planUnqueueAll(cards, LANE)).toEqual(
-      [
-        "c0000000-0000-7000-8000-000000000001",
-        "c0000000-0000-7000-8000-000000000002",
-      ].map(id => ({
+      [cardIdFor("c1"), cardIdFor("c2")].map(id => ({
         card: textCardId(id),
         from: {
           kind: "queued",
@@ -808,7 +854,7 @@ describe("the queue", () => {
 
   test("planUnsent: the whole record, a note in the column nearest its thread, saying why, its command and placer kept", () => {
     const q: QueuedCard = {
-      ...queued("c0000000-0000-7000-8000-000000000001", "a"),
+      ...queued(cardIdFor("c1"), "a"),
       placer: BEA,
       carries: { kind: "message", command: "bring-up-to-date" },
     }
@@ -823,7 +869,7 @@ describe("the queue", () => {
       cards: [onCanvas, q],
       card: q,
       reason: "no such image",
-      column: MADE,
+      newColumn: () => MADE,
     })
     expect(plan.hold).toBe(false)
     expect(plan.steps).toEqual([
@@ -843,22 +889,25 @@ describe("the queue", () => {
   })
 
   test("planUnsent: a thread in a full inventory keeps its card queued, saying why, and holds its queue (ADR-0117)", () => {
-    const q = queued("c0000000-0000-7000-8000-000000000001", "a")
+    const q = queued(cardIdFor("c1"), "a")
     const held = {
       ...threadCardOf({ thread: LANE, task: TEST_TASK, by: BEA, cards: [] }),
       place: { kind: "inventory", holder: BEA } as const,
     }
     const full = Array.from({ length: INVENTORY_SLOTS - 1 }, (_, n) =>
       card({
-        id: textCardId(
-          `c0000000-0000-7000-8000-0000000001${String(n).padStart(2, "0")}`,
-        ),
+        id: cardIdFor(`c1${String(n).padStart(2, "0")}`),
         place: { kind: "inventory", holder: BEA },
       }),
     )
-    const column = noteColumnIdFor("made")
+    const newColumn = () => noteColumnIdFor("made")
     expect(
-      planUnsent({ cards: [held, q, ...full], card: q, reason: "r", column }),
+      planUnsent({
+        cards: [held, q, ...full],
+        card: q,
+        reason: "r",
+        newColumn,
+      }),
     ).toEqual({
       steps: [{ kind: "write", record: { ...q, unsent: "r" } }],
       hold: true,
@@ -868,7 +917,7 @@ describe("the queue", () => {
         cards: [held, q, ...full.slice(1)],
         card: q,
         reason: "r",
-        column,
+        newColumn,
       }).steps,
     ).toEqual([
       {
@@ -884,7 +933,7 @@ describe("the queue", () => {
 })
 
 describe("handoffs (ADR-0059)", () => {
-  const C1 = textCardId("c0000000-0000-7000-8000-000000000001")
+  const C1 = cardIdFor("c1")
   const atEnd = {
     kind: "composing",
     at: atEntry(E2),
@@ -934,10 +983,7 @@ describe("handoffs (ADR-0059)", () => {
   })
 
   test("queueing: after the lane's last card, queued and placed by the sender, why it was not sent cleared", () => {
-    const before = queued(
-      "c0000000-0000-7000-8000-000000000000",
-      orderAfter([]),
-    )
+    const before = queued(cardIdFor("c0"), orderAfter([]))
     const c = card({
       place: atEnd,
       unsent: "refused",
@@ -962,7 +1008,7 @@ describe("handoffs (ADR-0059)", () => {
 
   test("a reorder does not make another person's unqueue fail: the key leaves out the order", () => {
     const q = {
-      ...queued("c0000000-0000-7000-8000-000000000001", "zz"),
+      ...queued(cardIdFor("c1"), "zz"),
       placer: ADA,
     }
     const step = planMove(
@@ -979,7 +1025,7 @@ describe("handoffs (ADR-0059)", () => {
 
   test("a move to where the card is is refused: a card changes its place in line by a reorder", () => {
     const q = {
-      ...queued("c0000000-0000-7000-8000-000000000001", "a"),
+      ...queued(cardIdFor("c1"), "a"),
       placer: ADA,
     }
     expect(
@@ -994,7 +1040,7 @@ describe("handoffs (ADR-0059)", () => {
 
   test("an unqueue keeps the command and why it was not sent", () => {
     const q = {
-      ...queued("c0000000-0000-7000-8000-000000000001", "a"),
+      ...queued(cardIdFor("c1"), "a"),
       carries: { kind: "message", command: "bring-up-to-date" },
       unsent: "x",
     } as const
@@ -1303,13 +1349,13 @@ describe("handoffs (ADR-0059)", () => {
     const fresh = freshPlace("k")
     const sent = card({ place: fresh })
     const other = card({
-      id: textCardId("c0000000-0000-7000-8000-000000000002"),
+      id: cardIdFor("c2"),
       owner: BEA,
       placer: BEA,
       place: fresh,
     })
     const elsewhere = card({
-      id: textCardId("c0000000-0000-7000-8000-000000000003"),
+      id: cardIdFor("c3"),
       place: freshPlace("j"),
     })
     const onCanvas = threadCardOf({
@@ -1329,7 +1375,7 @@ describe("handoffs (ADR-0059)", () => {
         sent: c.id,
         root,
         thread: LANE,
-        column,
+        newColumn: () => column,
         by: ADA,
       })
     expect(follow([onCanvas, sent, other, elsewhere], sent)).toEqual([
@@ -1378,8 +1424,8 @@ describe("handoffs (ADR-0059)", () => {
   })
 
   describe("planMoves: several moves, accepted whole or refused (ADR-0066)", () => {
-    const C2 = textCardId("c0000000-0000-7000-8000-000000000002")
-    const C3 = textCardId("c0000000-0000-7000-8000-000000000003")
+    const C2 = cardIdFor("c2")
+    const C3 = cardIdFor("c3")
     const inv = { kind: "inventory", holder: ADA } as const
     const fresh = freshPlace("k")
     const inFresh = (id: TextCardId) => card({ id, place: fresh })
@@ -1457,27 +1503,27 @@ describe("handoffs (ADR-0059)", () => {
 })
 
 test("planCardSweep: empty cards and documents with no record go; a card with text stays", () => {
-  const empty = card({ id: textCardId("c0000000-0000-7000-8000-000000000002") })
+  const empty = card({ id: cardIdFor("c2") })
   const ofDoc = (docId: string) =>
     docId.startsWith("card:") ? textCardId(docId.slice(5)) : undefined
   expect(
     planCardSweep({
       cards: [card(), empty],
       texts: new Map([
-        [textCardId("c0000000-0000-7000-8000-000000000001"), "keep me"],
-        [textCardId("c0000000-0000-7000-8000-000000000002"), ""],
+        [cardIdFor("c1"), "keep me"],
+        [cardIdFor("c2"), ""],
       ]),
       stored: [
-        "card:c0000000-0000-7000-8000-000000000001",
-        "card:c0000000-0000-7000-8000-000000000002",
+        `card:${cardIdFor("c1")}`,
+        `card:${cardIdFor("c2")}`,
         "card:gone",
         "note:n-1",
       ],
       cardOfDoc: ofDoc,
     }),
   ).toEqual({
-    records: ["c0000000-0000-7000-8000-000000000002"],
-    docs: ["card:c0000000-0000-7000-8000-000000000002", "card:gone"],
+    records: [cardIdFor("c2")],
+    docs: [`card:${cardIdFor("c2")}`, "card:gone"],
   })
 })
 
@@ -1488,10 +1534,8 @@ test("planCardSweep: a card with a command stays, whatever its text", () => {
   expect(
     planCardSweep({
       cards: [command],
-      texts: new Map([
-        [textCardId("c0000000-0000-7000-8000-000000000001"), ""],
-      ]),
-      stored: ["card:c0000000-0000-7000-8000-000000000001"],
+      texts: new Map([[cardIdFor("c1"), ""]]),
+      stored: [`card:${cardIdFor("c1")}`],
       cardOfDoc: d => textCardId(d.slice(5)),
     }),
   ).toEqual({ records: [], docs: [] })
@@ -1517,9 +1561,9 @@ describe("planReorder (ADR-0048 step 7)", () => {
 
   test("up and down: only the order changes, between the neighbours its sender saw; placer, queuer, version and why kept", () => {
     const [a, b, c] = [
-      q("c0000000-0000-7000-8000-00000000000a", 100),
-      q("c0000000-0000-7000-8000-00000000000b", 200),
-      q("c0000000-0000-7000-8000-00000000000c", 300),
+      q(cardIdFor("ca"), 100),
+      q(cardIdFor("cb"), 200),
+      q(cardIdFor("cc"), 300),
     ]
     const up = planReorder([a, b, c], {
       card: c.id,
@@ -1537,7 +1581,7 @@ describe("planReorder (ADR-0048 step 7)", () => {
       after: c.id,
       before: null,
     })
-    const order = orderIn(down, "c0000000-0000-7000-8000-00000000000a")
+    const order = orderIn(down, cardIdFor("ca"))
     expect(order !== null && order > key(300)).toBe(true)
     const first = planReorder([a, b, c], {
       card: b.id,
@@ -1545,22 +1589,22 @@ describe("planReorder (ADR-0048 step 7)", () => {
       after: null,
       before: a.id,
     })
-    const top = orderIn(first, "c0000000-0000-7000-8000-00000000000b")
+    const top = orderIn(first, cardIdFor("cb"))
     expect(top !== null && top < key(100)).toBe(true)
   })
 
   test("refused: gone, a fact, moved, and neighbours no longer next to each other or out of order", () => {
     const [a, b, c] = [
-      q("c0000000-0000-7000-8000-00000000000a", 100),
-      q("c0000000-0000-7000-8000-00000000000b", 200),
-      q("c0000000-0000-7000-8000-00000000000c", 300),
+      q(cardIdFor("ca"), 100),
+      q(cardIdFor("cb"), 200),
+      q(cardIdFor("cc"), 300),
     ]
     const at = queuedAt
     expect(
       planReorder([a, b], { card: c.id, at, after: null, before: a.id }),
     ).toEqual({ kind: "refused", code: "gone", now: null })
     const fact: QueuedCard = {
-      ...q("c0000000-0000-7000-8000-00000000000f", 150),
+      ...q(cardIdFor("cf"), 150),
       carries: { kind: "fact", fact: ACCEPTED },
     }
     expect(
@@ -1579,8 +1623,8 @@ describe("planReorder (ADR-0048 step 7)", () => {
     ).toEqual({ kind: "refused", code: "moved", now: drafted })
     // b sits between a and c now: the sender saw them next to each other.
     expect(
-      planReorder([a, b, c, q("c0000000-0000-7000-8000-00000000000d", 400)], {
-        card: "c0000000-0000-7000-8000-00000000000d" as CardId,
+      planReorder([a, b, c, q(cardIdFor("cd"), 400)], {
+        card: cardIdFor("cd") as CardId,
         at,
         after: a.id,
         before: c.id,
@@ -1598,12 +1642,9 @@ describe("planReorder (ADR-0048 step 7)", () => {
   })
 
   test("a queued card never passes a fact, up or down", () => {
-    const [a, c] = [
-      q("c0000000-0000-7000-8000-00000000000a", 100),
-      q("c0000000-0000-7000-8000-00000000000c", 300),
-    ]
+    const [a, c] = [q(cardIdFor("ca"), 100), q(cardIdFor("cc"), 300)]
     const fact: QueuedCard = {
-      ...q("c0000000-0000-7000-8000-00000000000f", 200),
+      ...q(cardIdFor("cf"), 200),
       carries: { kind: "fact", fact: ACCEPTED },
     }
     expect(
@@ -1626,16 +1667,16 @@ describe("planReorder (ADR-0048 step 7)", () => {
 
   test("with no room, only the crowded siblings are written, and every card keeps its order", () => {
     const cards = [
-      q("c0000000-0000-7000-8000-00000000000a", 1000),
-      q("c0000000-0000-7000-8000-00000000000b", 1001),
-      q("c0000000-0000-7000-8000-00000000000c", 1002),
-      q("c0000000-0000-7000-8000-00000000000d", 9000),
+      q(cardIdFor("ca"), 1000),
+      q(cardIdFor("cb"), 1001),
+      q(cardIdFor("cc"), 1002),
+      q(cardIdFor("cd"), 9000),
     ]
     const step = planReorder(cards, {
-      card: textCardId("c0000000-0000-7000-8000-00000000000d"),
+      card: cardIdFor("cd"),
       at: queuedAt,
-      after: textCardId("c0000000-0000-7000-8000-00000000000a"),
-      before: textCardId("c0000000-0000-7000-8000-00000000000b"),
+      after: cardIdFor("ca"),
+      before: cardIdFor("cb"),
     })
     expect(step.kind).toBe("steps")
     const written = step.kind === "steps" ? step.steps : []
@@ -1647,10 +1688,10 @@ describe("planReorder (ADR-0048 step 7)", () => {
         now.set(w.record.id, (w.record.place as { order: string }).order)
     const ids = [...now].sort((x, y) => (x[1] < y[1] ? -1 : 1)).map(e => e[0])
     expect(ids).toEqual([
-      "c0000000-0000-7000-8000-00000000000a",
-      "c0000000-0000-7000-8000-00000000000d",
-      "c0000000-0000-7000-8000-00000000000b",
-      "c0000000-0000-7000-8000-00000000000c",
+      cardIdFor("ca"),
+      cardIdFor("cd"),
+      cardIdFor("cb"),
+      cardIdFor("cc"),
     ])
     expect(
       written.every(w => w.kind === "write" && w.record.placer === ADA),
@@ -1696,8 +1737,8 @@ describe("storage", () => {
       }),
       card({ place: freshPlace("k-1") }),
       card({ place: { kind: "inventory", holder: BEA } }),
-      queued("c0000000-0000-7000-8000-000000000002", "k"),
-      pinned("c0000000-0000-7000-8000-000000000003", "k"),
+      queued(cardIdFor("c2"), "k"),
+      pinned(cardIdFor("c3"), "k"),
       card({
         place: {
           kind: "pinned",
@@ -1763,9 +1804,7 @@ describe("storage", () => {
 
   test("a card stored before facts is a message (ADR-0080)", () => {
     const { fact: _, ...before } = encodeCard(card())
-    expect(decodeCard("c0000000-0000-7000-8000-000000000001", before)).toEqual(
-      card(),
-    )
+    expect(decodeCard(cardIdFor("c1"), before)).toEqual(card())
   })
 
   test("a card at a thread's end must name its thread: one stored with no thread's id does not decode", () => {
@@ -1782,15 +1821,13 @@ describe("storage", () => {
     })
     const stored = encodeCard(onCanvas)
     expect(decodeCard(T_E, stored)).toEqual(onCanvas)
-    expect(
-      decodeCard("c0000000-0000-7000-8000-000000000001", stored),
-    ).toBeUndefined()
+    expect(decodeCard(cardIdFor("c1"), stored)).toBeUndefined()
     expect(decodeCard(T_E, encodeCard(card()))).toBeUndefined()
   })
 })
 
 describe("historyOf: the task a move enters the sender's history in (ADR-0066, ADR-0116)", () => {
-  const C1 = textCardId("c0000000-0000-7000-8000-000000000001")
+  const C1 = cardIdFor("c1")
   const T_OTHER = threadIdFor("other")
   const OTHER_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000d")
   const inv = { kind: "inventory", holder: ADA } as const
@@ -1908,10 +1945,7 @@ describe("undoAnswer (ADR-0066)", () => {
           kind: "undone",
           step: {
             parts: [
-              part(
-                "c0000000-0000-7000-8000-000000000001",
-                "c0000000-0000-7000-8000-000000000009",
-              ),
+              part(cardIdFor("c1"), cardIdFor("c9")),
               { docId: "other", footprint: [["cards", "x"]] },
             ],
           },
@@ -1924,7 +1958,7 @@ describe("undoAnswer (ADR-0066)", () => {
       cards: [
         { card: c1.id, place: c1.place },
         {
-          card: textCardId("c0000000-0000-7000-8000-000000000009"),
+          card: cardIdFor("c9"),
           place: null,
         },
       ],
@@ -1936,18 +1970,18 @@ describe("undoAnswer (ADR-0066)", () => {
       undoAnswer(
         {
           kind: "refused",
-          step: { parts: [part("c0000000-0000-7000-8000-000000000001")] },
+          step: { parts: [part(cardIdFor("c1"))] },
           stale: [part(stale)],
         },
         [moved],
         PLACES,
       )
-    expect(refused("c0000000-0000-7000-8000-000000000001")).toEqual({
+    expect(refused(cardIdFor("c1"))).toEqual({
       kind: "refused",
       code: "moved",
       now: moved,
     })
-    expect(refused("c0000000-0000-7000-8000-000000000009")).toEqual({
+    expect(refused(cardIdFor("c9"))).toEqual({
       kind: "refused",
       code: "gone",
       now: null,

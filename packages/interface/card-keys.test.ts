@@ -1,4 +1,4 @@
-import { textCardId } from "@pinetrie/core"
+import { cardIdFor } from "@pinetrie/core/fixtures"
 import { expect, test } from "vitest"
 import { cardKeyAct } from "./card-keys.ts"
 
@@ -14,8 +14,8 @@ const key = (
   isComposing: false,
   ...over,
 })
-const C = textCardId("c0000000-0000-7000-8000-000000000001")
-const among = [textCardId("c0000000-0000-7000-8000-000000000000"), C]
+const C = cardIdFor("c1")
+const among = [cardIdFor("c0"), C]
 
 test("Alt+↑ and Alt+↓ move the card one place; anything else is the box's own", () => {
   expect(cardKeyAct(key("ArrowUp"), C, among)).toEqual({
