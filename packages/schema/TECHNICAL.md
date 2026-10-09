@@ -346,8 +346,7 @@ ADR-0116): `{ tasks }`, each task's `TaskId` to an order key, read by
 `readOpenKeys` (a key that is no task is left out) and ordered by
 `orderOpen` (by key, then id, in `packages/session/open-repair.ts`). A
 record, not a list: two devices reordering at once merge per task, and a
-list could hold a task twice. `OpenDocBeforeTasks` is the schema before,
-keyed by root, frozen for migration `0005-tasks` and deleted with it.
+list could hold a task twice.
 
 ## A document per root (ADR-0063)
 

@@ -224,23 +224,9 @@ until the next compaction (S120), and the host compacts at startup. So
   planned the same way next time.
 - **One file per migration**, deleted once Duane's store has passed it; a
   store still on its hash is then refused. A change that moves no data is a
-  migration with no `run`: registering it is the acknowledgement.
-  `0005-tasks` (ADR-0116) is registered: a `places` migration, an `open`
-  one and a record migration, which agree without reading each other's
-  writes because each root's task is `k-` and the root's own uuidv7
-  (`taskOfRoot`). The places: each thread with a record gets its card on
-  its root's task's canvas, in rail order; every card at a thread names
-  its thread (from the tree, `threadAt`, where its stored lane is no
-  thread's) and no root; a fresh or gone card names its task. The
-  sidebars: each `open:` document destroyed and made again under
-  `{ tasks }` (S120), read through a frozen `OpenDocBeforeTasks`. The
-  records: a `TASK` per root with a thread, its `BOARD` place re-keyed,
-  its root entry's mark the task's session `MARK`; and the histories of
-  moves kept by root destroyed (`historiesByRoot`), dropped rather than
-  migrated. A card at a thread whose thread the tree cannot name is
-  logged and left; it then does not decode. `MigrationRun` carries
-  `storedIds`, every stored document, and `log`. `0001-live-row` and
-  `0002-records` (ADR-0095) ran, and were deleted.
+  migration with no `run`: registering it is the acknowledgement. None is
+  registered now: `0001-live-row`, `0002-records` (ADR-0095) and
+  `0005-tasks`' places and sidebars (ADR-0116) ran, and were deleted.
 - **A change to a record's contents moves no hash**: records are JSON in a
   document's `records`. A `RecordMigration` (`RECORD_MIGRATIONS`) is
   one-time: `migrate` runs each one's reads with the hash migrations', and
@@ -248,10 +234,10 @@ until the next compaction (S120), and the host compacts at startup. So
   second start finds nothing to do. It writes under the document's current
   schema, so its hash stays. The backup is taken after the reads, before
   the first write. Each is deleted, with its mutations, once Duane's store
-  has run it. `0005-tasks`' records are registered (above), and skip
-  once any task is recorded. `0003-workflow-archive` (the workflow's
-  `closed` state renamed `archive`) and `0004-threads` (each thread named
-  in its first message, ADR-0117) ran, and were deleted.
+  has run it. None is registered now: `0003-workflow-archive` (the
+  workflow's `closed` state renamed `archive`), `0004-threads` (each thread
+  named in its first message, ADR-0117) and `0005-tasks`' records (a task
+  per root, ADR-0116) ran, and were deleted.
 
 ## Startup
 

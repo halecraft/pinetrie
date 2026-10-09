@@ -307,8 +307,8 @@ which are swept.
   `fact`: it is the host's. Your message (`composing`, ADR-0113) is stored
   under the kind `drafting` it had before notes, so no row changed with
   the split; a note is stored as `note`. A card at a thread whose stored
-  `lane` is no thread's id does not decode: migration `0005-tasks` gave
-  every such row its thread.
+  `lane` is no thread's id does not decode: migration `0005-tasks`
+  (deleted once run) gave every such row its thread.
 - **A handoff is a compare-and-set on where a card is** (`planMove`, pure):
   accepted only if the card is still where its sender saw it, its `PlaceKey`
   (`sameKey`, over its kind, `at` and thread, or an inventory's holder). A
@@ -390,7 +390,7 @@ which are swept.
   only, those of a task the session does not hold. After a run's end that
   second rule would retire a new tab's history while it is open. An id
   that names no task is left: the histories once kept by root were
-  retired by migration `0005-tasks`.
+  retired by migration `0005-tasks`, since deleted.
 - **A card at a thread's end is resolved, never stored as an end**: your
   message, a note, a pinned card. `placeEnd` takes the thread its place's
   entry is in (`threadAt`) and that thread's end (`threadEnd`), so the card

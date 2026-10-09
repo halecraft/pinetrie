@@ -36,11 +36,3 @@ export const readOpenKeys = (doc: OpenDocHandle): ReadonlyMap<TaskId, string> =>
       isTaskId(task) ? [[task, key] as const] : [],
     ),
   )
-
-/**
- * The sidebar's document as it was before tasks, keyed by root: frozen for
- * migration 0005-tasks, which reads it once. Delete it with that migration.
- */
-export const OpenDocBeforeTasks = yjs.bind(
-  Schema.struct({ roots: Schema.record(Schema.string()) }),
-)

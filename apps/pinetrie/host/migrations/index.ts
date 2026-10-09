@@ -11,17 +11,11 @@
 import type { Exchange, Store } from "@kyneta/exchange"
 import { PRODUCT_NAME } from "@pinetrie/core"
 import { SCHEMA_OF, type StoredKind, storedKind } from "../policy.ts"
-import { tasksInOpen, tasksInPlaces, tasksInRecords } from "./0005-tasks.ts"
 
 /** What a migration reads with, and writes with once every read loaded. */
 export interface MigrationRun {
   readonly exchange: Exchange
-  /** The documents it migrates: of its kind for a schema's, every one for a record migration. */
   readonly docIds: readonly string[]
-  /** Every stored document's id: what a migration may also read. */
-  readonly storedIds: readonly string[]
-  /** The host's log, for what a migration leaves as it was. */
-  readonly log: (line: string) => void
   /**
    * Wait for a document the migration has got (`exchange.get`) to load. A
    * read-only open leaves its stored schema hash as it was (S120); a record
@@ -45,12 +39,12 @@ export interface Migration {
 }
 
 /**
- * Every migration this build carries, oldest first: 0005-tasks' places and
- * sidebars (ADR-0116). 0001-live-row and 0002-records (ADR-0095) ran on
- * Duane's store and were deleted; restore one from the revision that
- * deleted it for a store still on its hash.
+ * Every migration this build carries, oldest first. Empty: 0001-live-row,
+ * 0002-records (ADR-0095) and 0005-tasks' places and sidebars (ADR-0116)
+ * ran on Duane's store and were deleted; restore one from the revision
+ * that deleted it for a store still on its hash.
  */
-export const MIGRATIONS: readonly Migration[] = [tasksInPlaces, tasksInOpen]
+export const MIGRATIONS: readonly Migration[] = []
 
 /**
  * A one-time change to stored records' contents. A record's contents are
@@ -70,11 +64,11 @@ export interface RecordMigration {
 }
 
 /**
- * Every one-time record migration this build carries, oldest first:
- * 0005-tasks' records (ADR-0116). 0003-workflow-archive and 0004-threads
- * (ADR-0117) ran on Duane's store and were deleted.
+ * Every one-time record migration this build carries, oldest first. Empty:
+ * 0003-workflow-archive, 0004-threads (ADR-0117) and 0005-tasks' records
+ * (ADR-0116) ran on Duane's store and were deleted.
  */
-export const RECORD_MIGRATIONS: readonly RecordMigration[] = [tasksInRecords]
+export const RECORD_MIGRATIONS: readonly RecordMigration[] = []
 
 /** Each stored document's id and the hash of the schema it was written under. */
 export async function readStored(
@@ -221,21 +215,13 @@ export async function migrate(input: {
         writes.push({
           name: migration.name,
           docs: docIds.length,
-          write: await migration.run({
-            exchange,
-            docIds,
-            storedIds: input.storedIds,
-            hydrated,
-            log,
-          }),
+          write: await migration.run({ exchange, docIds, hydrated }),
         })
     for (const migration of input.records) {
       const write = await migration.run({
         exchange,
         docIds: input.storedIds,
-        storedIds: input.storedIds,
         hydrated,
-        log,
       })
       if (write !== null)
         writes.push({ name: migration.name, docs: null, write })
