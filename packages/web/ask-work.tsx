@@ -1,7 +1,7 @@
 // web/ask-work — one ask's work in a column, folded or open (ADR-0106), laid
 // out from `planAskWork`, which decides every row and word. It reads the
 // reader's choice for its own ask (`FoldMemory`), so opening or closing one
-// redraws it alone, as a tool row does (ADR-0049).
+// redraws it alone, as a tool row does (ADR-0123).
 
 import type { EntryId } from "@pinetrie/core"
 import {
@@ -68,7 +68,8 @@ export function AskWork({
   const title = open ? "fold this ask's work" : "show this ask's work"
   // One flat list of children in `draw`'s order, each message keyed by its
   // entry: a message that moves into a fold as its run goes on keeps its
-  // element, and a tool row its output's scroll (ADR-0044).
+  // element, and a running tool row the element its result replaces its
+  // live output in (ADR-0044).
   const drawn: ReactNode[] = []
   if (draw.line !== null)
     drawn.push(

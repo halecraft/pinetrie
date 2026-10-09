@@ -226,8 +226,8 @@ runtime keeps them). A suite's own helpers are beside its scenarios:
   that tab's entries decay, her avatar's menu offers its thread too, so the
   scenario waits for one seat of hers before it goes on.
 - **`waitForSelector` waits for a visible element by default**, and so does
-  the browser suite's `appears`. An element CSS hides, such as a closed tool
-  row's `.tool-label-whole`, never resolves it. Wait for something visible,
+  the browser suite's `appears`. An element CSS hides, or one with no
+  height, such as `.working-line`, never resolves it. Wait for something visible,
   or pass `state: "attached"` when being in the page is what counts.
 - **The browser suite swallows timeouts**, through its `appears` helpers
   and `.catch(() => null)`: a mutant must fail at its check, and `judge`

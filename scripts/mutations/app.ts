@@ -385,44 +385,34 @@ export const mutations: readonly Mutation[] = [
     expect: "with the key, Vite's HMR socket opens on the host's port",
   },
   {
-    name: "an opened tool row shows its cut label and the whole one",
+    name: "a command's lines run together",
     file: "packages/web/index.html",
-    from: "      .tool[open] > summary:has(.tool-label-whole) .tool-label { display: none; }",
-    to: "      .tool[open] > summary:has(.tool-label-whole) .tool-label { }",
+    from: "        white-space: pre-wrap; overflow-wrap: anywhere; }\n      /* A command's runs by role",
+    to: "        overflow-wrap: anywhere; }\n      /* A command's runs by role",
     suite: "browser",
     scenario: "tools",
     expect:
-      "an opened row shows the whole command in its label's place, once, and a short one's has nothing to swap",
+      "a row shows its command's first five lines and its output's last five, its toggle saying what they leave out, and the toggle shows both whole, then folds them; a short one has no toggle",
   },
   {
     name: "a tool's tag sits beside its command, not at the row's right",
     file: "packages/web/index.html",
-    from: "      .tool-tag { float: right; margin-left: .6rem;",
-    to: "      .tool-tag { margin-left: .6rem;",
+    from: "      .tool-head { float: right;",
+    to: "      .tool-head {",
     suite: "browser",
     scenario: "tools",
     expect:
-      "a shell row's tag sits at its top right, and its opened command is laid out a step a line, its command names marked",
+      "a shell row's tag and status sit at its top right, and its command, opened, is laid out a step a line, its command names marked",
   },
   {
-    name: "an opened command is its preview again, not laid out",
+    name: "the toggle opens nothing",
     file: "packages/web/message.tsx",
-    from: "            <Runs runs={summary.whole} />",
-    to: "            <Runs runs={summary.preview} />",
+    from: "          onClick={() => setMemory(m => ({ ...m, open: !m.open }))}",
+    to: "          onClick={() => {}}",
     suite: "browser",
     scenario: "tools",
     expect:
-      "a shell row's tag sits at its top right, and its opened command is laid out a step a line, its command names marked",
-  },
-  {
-    name: "a tool row never shows its whole label",
-    file: "packages/web/message.tsx",
-    from: "        {summary.whole !== undefined && (",
-    to: "        {summary.whole === null && (",
-    suite: "browser",
-    scenario: "tools",
-    expect:
-      "an opened row shows the whole command in its label's place, once, and a short one's has nothing to swap",
+      "a row shows its command's first five lines and its output's last five, its toggle saying what they leave out, and the toggle shows both whole, then folds them; a short one has no toggle",
   },
   {
     name: "a run's end does not compact",
@@ -521,8 +511,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a long tool label runs out of its column",
     file: "packages/web/index.html",
-    from: "      .tool-label { font-family: ui-monospace, monospace; overflow-wrap: anywhere; }",
-    to: "      .tool-label { font-family: ui-monospace, monospace; }",
+    from: "        white-space: pre-wrap; overflow-wrap: anywhere; }\n      /* A command's runs by role",
+    to: "        white-space: pre; }\n      /* A command's runs by role",
     suite: "browser",
     scenario: "tools",
     expect:
@@ -1097,7 +1087,7 @@ export const mutations: readonly Mutation[] = [
     name: "a following column has no floor",
     file: "packages/web/column.tsx",
     from: "    { floor, holding: streamingLanes.length > 0 },",
-    to: "    undefined,",
+    to: "    { floor, holding: false },",
     suite: "browser",
     scenario: "tools",
     expect:
@@ -1111,7 +1101,7 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "tools",
     expect:
-      "a command still running after half a second opens its row, and it stays open when it ends, where its reader scrolled it",
+      "a tab shown again draws each tool row as it was left: a running one ringed from its first frame, the line hidden, and its reader's choice of detail or summary kept",
   },
   {
     name: "a row mounted again forgets how it was left",
@@ -1121,7 +1111,7 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "tools",
     expect:
-      "a tab shown again draws each tool row as it was left: a running one open from its first frame, the line hidden, and a finished one's size or its reader's choice kept",
+      "a tab shown again draws each tool row as it was left: a running one ringed from its first frame, the line hidden, and its reader's choice of detail or summary kept",
   },
   {
     name: "a column's mark never pulses",
@@ -1234,34 +1224,14 @@ export const mutations: readonly Mutation[] = [
       "a running command the work opened is outlined, the row and its ring centred in its column, and hides the line; a fast one does neither",
   },
   {
-    name: "the result is a new element",
+    name: "a result's text is never drawn",
     file: "packages/web/message.tsx",
-    from: "        <ToolOutput doc={doc} result={call.result?.text} stream={live} />",
-    to: '        <ToolOutput doc={doc} key={call.result === undefined ? "live" : "result"} result={call.result?.text} stream={live} />',
+    from: "    call.result?.text ?? streamed,",
+    to: "    streamed,",
     suite: "browser",
     scenario: "tools",
     expect:
-      "a command still running after half a second opens its row, and it stays open when it ends, where its reader scrolled it",
-  },
-  {
-    name: "a capped row is uncapped",
-    file: "packages/web/index.html",
-    from: '      .tool[data-size="capped"] .tool-output { max-height: 10rem; }',
-    to: '      .tool[data-size="capped"] .tool-output { }',
-    suite: "browser",
-    scenario: "tools",
-    expect:
-      "a row the work opens is capped, at its end, and the toggle shows it whole, then folds it",
-  },
-  {
-    name: "the summary toggles natively",
-    file: "packages/web/message.tsx",
-    from: "          e.preventDefault()\n",
-    to: "",
-    suite: "browser",
-    scenario: "tools",
-    expect:
-      "a row the work opens is capped, at its end, and the toggle shows it whole, then folds it",
+      "a running command shows its output's last five lines live, and its result takes their place, the row no shorter",
   },
   {
     name: "a column forgets its end on unmount",
@@ -1421,11 +1391,12 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a tool row draws its caption, not its image",
     file: "packages/web/message.tsx",
-    from: '      {size === "closed" ? null : body.kind === "images" ? (',
-    to: '      {size === "closed" ? null : body.kind === "never" ? (',
+    from: '      {body.kind === "images" ? (',
+    to: '      {body.kind === "never" ? (',
     suite: "browser",
     scenario: "images",
-    expect: "a read image opens its row capped, drawn in place of its caption",
+    expect:
+      "a read image is drawn in its row's summary, 10rem tall at most, in place of its caption",
   },
   {
     name: "the host resolves no card a client creates",

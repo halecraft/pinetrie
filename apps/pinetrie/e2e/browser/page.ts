@@ -177,7 +177,7 @@ interface ColumnFrame {
   readonly steps: number
   /** Its thread's lane is running: its composer offers Stop. */
   readonly running: boolean
-  /** Each tool row's preview drawn (`.tool-label`), as text: no tag. */
+  /** Each tool row's command drawn (`.tool-command`), as text: no tag. */
   readonly labels: readonly string[]
 }
 
@@ -212,7 +212,7 @@ export async function recordFrames(
         chips: column?.querySelectorAll(".open-branch").length ?? 0,
         steps: column?.querySelectorAll(".msg.assistant").length ?? 0,
         running: column?.querySelector(".stop") != null,
-        labels: [...(column?.querySelectorAll(".tool-label") ?? [])].map(
+        labels: [...(column?.querySelectorAll(".tool-command") ?? [])].map(
           l => l.textContent ?? "",
         ),
       })

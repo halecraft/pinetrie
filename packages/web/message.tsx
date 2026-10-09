@@ -5,10 +5,9 @@
 import { useSelector } from "@kyneta/react"
 import type { StreamId, ToolCall, TranscriptMessage } from "@pinetrie/core"
 import {
-  CALL_MARK,
   callLabel,
+  callMark,
   callStatus,
-  click,
   copyIntoInventoryText,
   copyText,
   joinWords,
@@ -21,8 +20,8 @@ import {
   type RowMemory,
   type Run,
   retiredWords,
-  rowSize,
   rowSummary,
+  rowView,
   type ScreenMemory,
   showsText,
   speakerLabel,
@@ -41,7 +40,6 @@ import { MessageText } from "./message-text.tsx"
 import { useTrackColors } from "./palette-context.ts"
 import { MessageSource } from "./pane-context.ts"
 import { nameFor } from "./presence.tsx"
-import { useFollow } from "./use-follow.ts"
 
 /** What a message's role is called above it, where it is not its own name. */
 const ROLE_LABEL: Readonly<Record<string, string>> = {
@@ -288,20 +286,17 @@ function CopyIcon() {
   )
 }
 
-/** The most of a result a row shows; the whole of it is in the tree. */
-const SHOWN = 20_000
-
 /**
- * One tool call: its tool's word as a tag, what it touched, whether it
- * worked, and what it returned (`rowSummary`, ADR-0114). What it touched is
- * previewed closed and shown whole open (a command laid out a step a line):
- * CSS on `[open]` swaps the two, so it is never shown twice. The result is its own entry in the tree, paired here by
- * `projectSpine`; with none yet, the call is still running or was cut off.
- * How much is shown is `rowSize`'s: a call whose output streams for
- * `REVEAL_MS`, or whose result has an image, opens its row, capped, and only
- * the reader closes it. A result's images are drawn in place of its text
- * (`toolBody`), which keeps to their `title`. What it decided is kept in
- * `rows` by the call's id, so a row mounted again starts where it was left.
+ * One tool call: its tool's word as a tag and its status at its top right,
+ * what it touched, what it returned, and a toggle (ADR-0114, ADR-0123).
+ * `rowView` decides how much it draws: the summary shows the command's first lines and
+ * the output's last, and the reader's toggle shows both whole. The result is
+ * its own entry in the tree, paired here by `projectSpine`; with none yet, the
+ * call is still running or was cut off, and its live output is drawn in the
+ * same element the result replaces it in. A result's images are drawn in
+ * place of its text (`toolBody`), which keeps to their `title`. What it
+ * decided is kept in `rows` by the call's id, so a row mounted again starts
+ * where it was left.
  */
 function ToolRow({
   call,
@@ -315,16 +310,27 @@ function ToolRow({
   rows: ScreenMemory<RowMemory>
 }) {
   const status = callStatus(call.result)
-  const mark = CALL_MARK[status]
+  const mark = callMark(status)
   // A result replaces the stream, whether or not the stream has gone yet.
   const live = call.result === undefined ? stream : undefined
   const [memory, setMemory] = useRemembered(rows, call.id)
-  const { revealed } = memory
-  const body = toolBody(call.result)
+  const { revealed, open } = memory
+  const streamed = useSelector(
+    doc,
+    useCallback(
+      (d: LiveDocHandle) => (live === undefined ? "" : readStreamText(d, live)),
+      [live],
+    ),
+  )
   const summary = useMemo(() => rowSummary(call), [call])
-  const size = rowSize({ ...memory, shows: body.kind === "images" })
-  // Set once and never unset, so the row stays open when the result arrives.
-  // A result within REVEAL_MS clears the timer: the row never opened.
+  const view = rowView(
+    summary,
+    call.result?.text ?? streamed,
+    toolBody(call.result),
+    open,
+  )
+  // Set once and never unset: it rings a call that lasts (ADR-0054). A
+  // result within REVEAL_MS clears the timer: the row was never ringed.
   useEffect(() => {
     if (live === undefined || revealed) return
     const t = setTimeout(
@@ -333,40 +339,26 @@ function ToolRow({
     )
     return () => clearTimeout(t)
   }, [live, revealed, setMemory])
+  const { body } = view
   return (
-    <details
+    <div
       className={live === undefined ? "tool" : "tool live"}
+      data-open={open || undefined}
       data-revealed={revealed || undefined}
-      data-size={size}
       data-status={status}
       data-tool={call.name}
-      open={size !== "closed"}
     >
-      {/* The row's size is state, not the element's: a native toggle would
-        close a capped row, where a click shows it whole. Enter and Space on a
-        summary are clicks too. */}
-      {/* biome-ignore lint/a11y/noStaticElementInteractions: a summary is its details' own toggle, focusable and keyboard-operable */}
-      <summary
-        onClick={e => {
-          e.preventDefault()
-          setMemory(m => ({ ...m, reader: click(size) }))
-        }}
-      >
+      <span className="tool-head">
         {summary.tag !== undefined && (
           <span className="tool-tag">{summary.tag}</span>
         )}
-        <span className="tool-label">
-          <Runs runs={summary.preview} />
-        </span>
-        {summary.whole !== undefined && (
-          <span className="tool-label-whole">
-            <Runs runs={summary.whole} />
-          </span>
-        )}{" "}
-        <span className="tool-status">{mark}</span>
-      </summary>
-      {size === "closed" ? null : body.kind === "images" ? (
-        <div className="tool-images">
+        {mark !== undefined && <span className="tool-status">{mark}</span>}
+      </span>
+      <div className="tool-command">
+        <Runs runs={view.command} />
+      </div>
+      {body.kind === "images" ? (
+        <div className="tool-images" data-thumb={body.thumb || undefined}>
           {body.images.map(image => (
             <StoredImage
               alt={call.subject ?? callLabel(call, "cut")}
@@ -377,19 +369,29 @@ function ToolRow({
           ))}
         </div>
       ) : (
-        <ToolOutput doc={doc} result={call.result?.text} stream={live} />
+        body.text !== "" && <pre className="tool-output">{body.text}</pre>
       )}
-    </details>
+      {view.more !== undefined && (
+        <button
+          aria-expanded={open}
+          className="tool-more"
+          onClick={() => setMemory(m => ({ ...m, open: !m.open }))}
+          type="button"
+        >
+          {view.more}
+        </button>
+      )}
+    </div>
   )
 }
 
-/** A summary's runs, each in a span its role colours (`.sh-*`); plain text bare. */
+/** A command's runs, each in a span its role colours (`.sh-*`); plain text bare. */
 function Runs({ runs }: { runs: readonly Run[] }) {
   return runs.map((run, i) =>
     run.role === "plain" ? (
       run.text
     ) : (
-      // biome-ignore lint/suspicious/noArrayIndexKey: runs are fixed for a call, and never reordered
+      // biome-ignore lint/suspicious/noArrayIndexKey: runs are fixed for a call's view, and never reordered
       <span className={`sh-${run.role}`} key={i}>
         {run.text}
       </span>
@@ -420,44 +422,4 @@ function useRemembered(
     [rows, id],
   )
   return [memory, set]
-}
-
-/**
- * A call's output: its result, or while it has none, its stream. One element
- * for both, so the handover keeps its scroll and its follow: a capped row
- * shows the result's end, where the live output was.
- */
-function ToolOutput({
-  doc,
-  stream,
-  result,
-}: {
-  doc: LiveDocHandle
-  stream: StreamId | undefined
-  result: string | undefined
-}) {
-  const streamed = useSelector(
-    doc,
-    useCallback(
-      (d: LiveDocHandle) =>
-        stream === undefined ? "" : readStreamText(d, stream),
-      [stream],
-    ),
-  )
-  const text =
-    result === undefined
-      ? streamed
-      : result.length > SHOWN
-        ? `${result.slice(0, SHOWN)}\n… ${result.length - SHOWN} more characters`
-        : result
-  const pre = useRef<HTMLPreElement>(null)
-  const inner = useRef<HTMLElement>(null)
-  useFollow(pre, inner)
-  return (
-    <pre className="tool-output" ref={pre}>
-      <code className="tool-output-text" ref={inner}>
-        {text}
-      </code>
-    </pre>
-  )
 }

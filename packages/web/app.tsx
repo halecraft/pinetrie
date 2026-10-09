@@ -868,7 +868,7 @@ export function App({
   // column, placed at its end, and that clears ↓ new below.
   const [seenEnds] = useState(() => screenMemory<SeenEnd>())
   // What each tool row decided, by its call's id, so a tab shown again draws
-  // its rows as they were left (ADR-0049). Never pruned: a call id is not
+  // its rows as they were left (ADR-0123). Never pruned: a call id is not
   // reused.
   const [rows] = useState(() => screenMemory<RowMemory>())
   // Each ask's fold as its reader chose it (ADR-0106), kept as rows are.

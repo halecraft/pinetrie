@@ -129,7 +129,7 @@ function is proven by a unit test in a second.
   flags, and draws the view's strings. It compares no document fact, builds
   no label, and chooses nothing that is offered. The views are `appView`
   (`app-view.ts`), `sidebarView`, `boardView`, `columnView`, `messageTools`, `railItems`,
-  `rowSummary`, `toolBody` and `callStatus`, `editorState` and `startText`. What stays in
+  `rowSummary` and `rowView`, `callStatus`, `editorState` and `startText`. What stays in
   components and `use-*.ts` is what needs a browser: measuring, focus and
   the caret, scrolling, observers, subscriptions.
 - **A click is an `Intent`** (`intent.ts`). A column's acts are nested
@@ -690,8 +690,8 @@ the columns read one. `segmentPath` (`ask-segments.ts`) decides what a column fo
 (`ask-work.tsx`) lays that out.
 
 - **`AskWork` is `ToolRow`'s twin.** `foldOpen` (`ask-fold.ts`, called in
-  `planAskWork`) is the rule, as `rowSize` is; the reader's choice is kept in a `FoldMemory` by
-  the ask's prompt, made once in `App`, as tool rows' are. Each `AskWork`
+  `planAskWork`) is the rule, as `rowView` is; the reader's choice is kept in a `FoldMemory` by
+  the ask's prompt, made once in `App`, as tool rows' `RowMemory.open` is. Each `AskWork`
   reads its own key with `useSyncExternalStore`, so opening one redraws it
   alone and `MessageList` gets no new prop. Its messages are drawn only
   while open: a closed fold creates none of their elements (S59).

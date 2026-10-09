@@ -366,7 +366,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
 
 - **It follows height, not data.** A ResizeObserver watches the column's
   viewport and `.column-content`, and scrolls to the end in the frame the
-  layout changed. A streaming reply, markdown reflowing, a tool row opening,
+  layout changed. A streaming reply, markdown reflowing, a tool row's detail,
   an image, the composer growing: each is a change of size.
   Following new messages alone missed a reply being written (S32: 900 px
   behind by its end).
@@ -389,7 +389,7 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   aligned short of its end would jump there on its first ResizeObserver
   callback. `useReveal` dispatches it too (below). A placement at the end
   clears ↓ new below; one short of it keeps it.
-- **↓ new below survives an unmount** (ADR-0049). A column of a root tab you
+- **↓ new below survives an unmount** (ADR-0123). A column of a root tab you
   leave is unmounted, and `useFollow` tells it (`seen.leave`) whether ↓ new
   below showed; the column saves that with its tip (`SeenEnd`) in `App`.
   Mounted again, it starts with ↓ new below when `behind` says it moved on
@@ -420,76 +420,78 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   cleared by following again. `SeenEnd.released` carries it across an
   unmount; `seen.leave` also runs when the page is hidden. An ask whose
   run ended after it stays open (`foldOpen`).
-- **The floor is at most a third of the view** (`FLOOR_MAX`, ADR-0049).
+- **The floor is at most a third of the view** (`FLOOR_MAX`, ADR-0123).
   `capFloor` applies wherever the floor is set, so a view that gets shorter
   cuts a standing floor too. `held` counts the capped floor, so what the cap
-  gave up is not claimed again. Since tool rows stay open, what the floor
-  still takes up is a row the reader folds mid-run, and columns opened to the
-  left.
+  gave up is not claimed again. Since tool rows never fold on their own,
+  what the floor still takes up is a row's detail the reader folds mid-run,
+  and columns opened to the left.
 
 ## Tools and live work (ADR-0107)
 
 - **A tool call is a row under the agent's message** (`ToolRow` in
-  `message.tsx`), its result folded in a `<details>`, cut at 20,000
-  characters for display. Its summary is `rowSummary`'s (`@pinetrie/interface`,
-  ADR-0114), in this order:
-  - `.tool-tag`, the tool's word ("shell", "read", "search"), absent for a
-    call that touched nothing it names, whose word is then its preview;
-  - `.tool-label`, the preview: what the call touched (`subjectOf`, core),
-    to its first line or 120 characters, with "…" when cut. A `grep` or
-    `find` shows its pattern and the path it searches;
-  - `.tool-label-whole`, all of it, when that reads otherwise: a long or
-    multi-line command whole, a long one-line chain laid out a step a line
-    (`@pinetrie/shell`). CSS on `[open]` swaps it for the preview, so the
-    command is never drawn twice and no state is kept;
-  - `.tool-status`: ✓, ✗ or ….
+  `message.tsx`, a `div.tool`), and `rowView` (`@pinetrie/interface`,
+  `tool-row.ts`, ADR-0123) decides all it draws but its head, in this
+  order:
+  - `.tool-head`: `.tool-tag`, the tool's word ("shell", "read", "search",
+    ADR-0114), absent for a call that touched nothing it names, whose word
+    is then its command; then `.tool-status`, ✓ or ✗ (`callMark`). A
+    running call has no mark: its ring and its live lines say it runs.
+  - `.tool-command`, what the call touched (`subjectOf`, core), as
+    `rowSummary` reads it: a shell command highlighted, and a long one-line
+    chain laid out a step a line (`@pinetrie/shell`). A `grep` or `find`
+    shows its pattern and the path it searches.
+  - `.tool-output`, the live output's text or the result's, or
+    `.tool-images`, a result's images in its text's place.
+  - `.tool-more`, the toggle, a `<button>` with `aria-expanded`.
 
-  Each is drawn in runs (`Runs`), a `<span class="sh-<role>">` each, and a
-  plain run as bare text: a command's names, options, strings, variables,
-  redirects, keywords and operators are coloured apart. The live row is the
-  committed row, so a running command, once its row opens, shows it whole.
-- **The tag floats right, first in the summary**, so it takes the row's top
-  right and the label wraps around it. The summary stays a list item: a
-  flex summary loses its ▶. An open command is one inline block beside the
-  tag, so every line of it has the room the tag leaves: `LAYOUT_WIDTH`
-  (`tool-row.ts`) is 46 characters, the Mac's SF Mono at .8rem (0.6em a
-  character) in a 28rem column's 26.5rem row, less the ▶ and the tag. A wider
-  open command drops below the tag. Measured in headless Chromium, whose
-  fallback monospace is 0.5em wide, so it is the Mac's font that sets the
-  width.
-- **How much of a row shows is `rowSize`'s** (`tool-row.ts`, ADR-0049):
-  `closed`, `capped` or `full`, from two facts the row holds.
-  `revealed` is set by a timer once the call's output has streamed for
-  `REVEAL_MS` (500ms) while the row is drawn, and never unset; the reader's
-  last choice wins over it. So a fast command never opens, a slow one opens
-  `capped` (command at most 5rem, output at most 10rem, each scrolling) and
-  stays open when its result arrives, and only the reader closes it. A click
-  makes a closed or capped row `full`, uncapped, and a full one closed.
-  `data-size` names the size; a closed row draws no output, so a check reads
-  `.tool-output` only after opening its row.
-- **A row keeps what it decided across an unmount** (ADR-0049, amended by
-  ADR-0054). `revealed` and the reader's choice are one `RowMemory`, which
-  `App` keeps by call id in a `screenMemory`, passed down to `ToolRow` as
-  `rows` (an identity prop in both props tables, made once). `useRemembered`
-  (`message.tsx`) starts from it and writes it in the same call that sets
-  the state, so a row unmounted at any moment has left its latest state. A
-  remembered `revealed` starts no timer: a running command's row on a tab
-  shown again is open from its first frame. A reload remembers nothing.
-- **A result with an image opens its row too** (ADR-0051): `rowSize`'s third
-  fact, `shows`, is read from the result, so the row opens `capped` when the
-  result arrives and on every mount after, and the reader's choice still
-  wins. `toolBody` (`tool-row.ts`) draws the images (`.tool-images`,
-  `StoredImage` in `blob-image.tsx`) in place of the text, whose caption and
-  resize note become each image's `title`; the call's path (`subject`) is its
-  `alt`. A capped row caps an image at 10rem tall through its width,
-  `min(100%, 10rem × --ratio)`, which `StoredImage` sets: overriding `width`
-  would drop the box the `width` and `height` attributes give before the
-  image loads.
-- **One `ToolOutput` draws the live output and the result**, and follows its
-  end (`useFollow`). The result keeps the live output's element and scroll:
-  at its end, or where the reader left it. A result is its own entry in the tree;
-  `projectSpine` pairs it with its call on the same path, so it adds no column
-  row and no rail row. A message that only called tools shows only its rows.
+  The command is drawn in runs (`Runs`), a `<span class="sh-<role>">` each,
+  and a plain run as bare text: a command's names, options, strings,
+  variables, redirects, keywords and operators are coloured apart.
+- **A row is its summary or its detail** (`RowMemory.open`, `data-open`).
+  The summary shows the command's first 5 lines and the output's last 5
+  (`headLines`, `tailLines`), as written: the command is cut after its
+  layout, so it keeps it. A line over `LINE_LENGTH` (160) characters ends
+  in "…". The detail shows both whole; an output over `SHOWN` (20,000)
+  characters keeps its end (`wholeOutput`). Neither scrolls inside the row.
+  The toggle names what the summary hides (`moreWords`: "+3 lines · +335
+  lines of output", "whole lines", "full size"), or says "less"; a row
+  that hides nothing has none. Only the toggle toggles, so the command
+  and output can be selected.
+- **A row's height holds when its result arrives.** Its output is the
+  live stream's text until the result's replaces it, in the same
+  `.tool-output`, and both show their last 5 lines: pi's result is the
+  stream's text with at most a status line after a blank one (S142). Nothing
+  opens or folds on its own, so a fast command and a slow one draw the same
+  row.
+- **The head floats right, first in the row**, so the command's first line
+  runs beside it and the rest have the row's width. `LAYOUT_WIDTH`
+  (`tool-row.ts`) is 55 characters: the Mac's SF Mono at .8rem (0.6em a
+  character) in a 28rem column's 26.5rem row. Headless Chromium's fallback
+  monospace is 0.5em wide, so the width is worked out for the Mac's font,
+  not measured (S142).
+- **A row keeps what it decided across an unmount** (ADR-0123, ADR-0054).
+  `revealed` and `open` are one `RowMemory`, which `App` keeps by call id
+  in a `screenMemory`, passed down to `ToolRow` as `rows` (an identity prop
+  in both props tables, made once). `revealed` is set by a timer once the
+  call's output has streamed for `REVEAL_MS` (500ms) while the row is
+  drawn, and never unset; it only rings the row. `useRemembered`
+  (`message.tsx`) starts from the memory and writes it in the same call
+  that sets the state, so a row unmounted at any moment has left its latest
+  state. A remembered `revealed` starts no timer: a running command's row
+  on a tab shown again is ringed from its first frame. A reload remembers
+  nothing.
+- **A result's images are drawn in its text's place** (ADR-0051, ADR-0123).
+  `toolBody` reads them from the result; `StoredImage` (`blob-image.tsx`)
+  draws each in `.tool-images`, its caption and resize note its `title`,
+  the call's path (`subject`) its `alt`. In the summary, an image taller
+  than `THUMB_HEIGHT` (160px, 10rem) is a thumbnail (`data-thumb`), capped
+  through its width, `min(100%, 10rem × --ratio)`, which `StoredImage`
+  sets: overriding `width` would drop the box the `width` and `height`
+  attributes give before the image loads. Its toggle says "full size".
+- **A result is its own entry in the tree**; `projectSpine` pairs it with
+  its call on the same path, so it adds no column row and no rail row. A
+  message that only called tools shows only its rows.
 - **Live work hands over to its entry in one render** (ADR-0044). `App`
   reads the stream records with the index (`readSessionFacts`), and
   `liveWork` (`live.ts`, pure) decides what is drawn. Each reads its own text
@@ -498,9 +500,9 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
     is its lane's current reply (`isCurrentReply`, the host's own rule). Its
     entry moves the lane's tip, so the entry and the stream's end are one
     change.
-  - A tool's output is drawn in its own row (`ToolRow`) while the call has a
-    stream and no result, once the row is open. The result replaces it in the
-    same element (`ToolOutput`).
+  - A tool's output is drawn in its own row (`ToolRow`, which reads its
+    stream) while the call has a stream and no result. The result replaces
+    it in the same `.tool-output`.
 - **A stream goes when its entry arrives,** which a fast model can do between
   two renders, so a check that must see one uses a slow scripted model. A
   check that must see a run in progress, not its reply, pauses the reply
@@ -1260,12 +1262,13 @@ leaving treats the history, are `page.ts`'s (`@pinetrie/interface`).
 - **`.column-content` must stay unpositioned.** A positioned wrapper becomes
   the messages' offsetParent, and `alignOnOpen` measures `offsetTop` against
   the body's.
-- **A ResizeObserver sees an inline element as 0 × 0.** `ToolOutput`'s
-  `<code>` is `display: block` for it.
-- **A tool row's summary click is its own** (`preventDefault`), and the
-  state alone sets `open`. A native toggle would take a capped row to
-  closed, and `toggle` fires for React's own `open` too, so it cannot tell
-  who opened the row. Enter and Space on a summary are clicks.
+- **The copy fallback selects what a row draws**: a row in its summary
+  gives its summary's lines, not the whole command and output, which only
+  the copied text (`copyText`) holds. `.tool-more` is `user-select: none`,
+  so the toggle's words are never in it.
+- **A tool row is not a `<details>`**: its summary must show the command
+  and output, and a `<summary>` would make them one click target, which
+  cannot be selected, and its `toggle` fires for React's own `open` too.
 
 - **Every scroll `useFollow` makes is instant.** A smooth one passes through
   positions short of the end, and the rule reads each as the reader leaving.

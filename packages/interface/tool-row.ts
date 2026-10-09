@@ -1,12 +1,11 @@
-// interface/tool-row — how much of a tool call's row is shown, and what it
-// shows, as pure rules: its summary from what the call touched
-// (`rowSummary`, ADR-0114), its body from what it returned (`toolBody`).
+// interface/tool-row — what a tool call's row shows, as pure rules: what the
+// call touched (`rowSummary`, ADR-0114), and how much of it and of what it
+// returned the row draws (`rowView`, ADR-0123).
 //
-// A row opens on its own, capped, for a call whose output streams for
-// REVEAL_MS, so a fast command never flashes open, and for a result with an
-// image (ADR-0051). Nothing but the reader closes it or shows it whole: a
-// following column that grew for a row does not shrink when the call ends
-// (S35).
+// A row is its summary or its detail. The summary shows the command's first
+// SUMMARY_LINES lines and the output's last, so the live output and the
+// result that replaces it draw the same height (S142); only the reader opens
+// the detail, which shows both whole.
 
 import {
   BASH_TOOL,
@@ -17,49 +16,30 @@ import {
   toolIdOf,
 } from "@pinetrie/core"
 import { readShell, type ShellRole } from "@pinetrie/shell"
-import { previewEnd, toolWord } from "./tool-words.ts"
+import { plural } from "./counts.ts"
+import { toolWord } from "./tool-words.ts"
 
-/** How long a call's output streams before its row opens. */
+/** How long a call's output streams before its row is ringed (ADR-0054). */
 export const REVEAL_MS = 500
 
 /**
- * `closed`: the summary line. `capped`: opened by the work, its command and
- * output each scrolling in a capped box. `full`: opened by the reader, uncapped.
- */
-export type RowSize = "closed" | "capped" | "full"
-
-/** The reader's last choice, or null before they made one. */
-export type ReaderChoice = "full" | "closed" | null
-
-/**
  * What a row decides for itself. It outlives the row, kept by its call's id,
- * since a tab shown again mounts its columns anew (ADR-0049).
+ * since a tab shown again mounts its columns anew (ADR-0123).
  */
 export interface RowMemory {
-  /** The call's output streamed for REVEAL_MS while this row was drawn. */
+  /** The call's output streamed for REVEAL_MS while this row was drawn: its ring shows. */
   readonly revealed: boolean
-  readonly reader: ReaderChoice
+  /** The reader opened its detail. */
+  readonly open: boolean
 }
 
 /** A row never drawn before. */
-export const NO_MEMORY: RowMemory = { revealed: false, reader: null }
-
-export interface RowFacts extends RowMemory {
-  /** Its result has an image. */
-  readonly shows: boolean
-}
-
-export const rowSize = (f: RowFacts): RowSize =>
-  f.reader ?? (f.revealed || f.shows ? "capped" : "closed")
-
-/** A capped row is partly open already: a click shows the rest. */
-export const click = (size: RowSize): "full" | "closed" =>
-  size === "full" ? "closed" : "full"
+export const NO_MEMORY: RowMemory = { revealed: false, open: false }
 
 /**
- * What an open row draws: a result's images in place of its text, whose
- * caption only says an image was read, or else its text or live output.
- * `note` is that text: the caption, and pi's note of a resize.
+ * Whether a result has images, drawn in place of its text, whose caption
+ * only says an image was read. `note` is that text: the caption, and pi's
+ * note of a resize.
  */
 export type ToolBody =
   | {
@@ -80,99 +60,235 @@ export type CallStatus = "pending" | "error" | "ok"
 export const callStatus = (result: ToolResult | undefined): CallStatus =>
   result === undefined ? "pending" : result.isError ? "error" : "ok"
 
-/** A status as its row's mark. */
-export const CALL_MARK: Readonly<Record<CallStatus, string>> = {
-  pending: "…",
-  error: "✗",
-  ok: "✓",
-}
+/** A status as its row's mark. A running call has none: its ring and live lines say it. */
+export const callMark = (status: CallStatus): string | undefined =>
+  status === "error" ? "✗" : status === "ok" ? "✓" : undefined
 
-/** What a run of a summary is, for the page to colour. Only a shell command has runs other than plain. */
+/** What a run of a command is, for the page to colour. Only a shell command has runs other than plain. */
 export type RunRole = ShellRole
 
-/** Some of a summary's text, and what it is. */
+/** Some of a command's text, and what it is. */
 export interface Run {
   readonly text: string
   readonly role: RunRole
 }
 
-/** What a row's summary shows. */
+/** What a call touched, as a row shows it. */
 export interface RowSummary {
-  /** The tool's word (`toolWord`). Absent when the call has no subject: its word is then its preview. */
+  /** The tool's word (`toolWord`). Absent when the call has no subject: its word is then its command. */
   readonly tag: string | undefined
-  /** The closed row: what the call touched, to its first line or `PREVIEW_LENGTH`. */
-  readonly preview: readonly Run[]
-  /** The open row, in the preview's place; undefined when it reads the same. */
-  readonly whole: readonly Run[] | undefined
-}
-
-/**
- * How many columns a shell command is laid out to. An open command is one
- * box beside the tag, so every line has the room the tag leaves: a 28rem
- * column's row is 26.5rem, which less the ▶ and the tag is about 365px, or
- * 47 characters of the Mac's SF Mono at a row's .8rem (0.6em each).
- */
-export const LAYOUT_WIDTH = 46
-
-/** A subject's preview, and all of it. */
-type View = (subject: string) => {
-  readonly preview: readonly Run[]
+  /** All of what the call touched: a shell command highlighted, and laid out when it is one long line. */
   readonly whole: readonly Run[]
 }
 
-/** The runs to `at`, and "…" when the text goes on past it. */
-function cutRuns(runs: readonly Run[], at: number, cut: boolean): Run[] {
-  const out: Run[] = []
-  let left = at
+/**
+ * How many columns a shell command is laid out to. A command has its row's
+ * whole width: a 28rem column's row is 26.5rem, 424px, which is 55
+ * characters of the Mac's SF Mono at a row's .8rem (0.6em each, S142). Only
+ * its first line runs beside the tag and status, and wraps once when long.
+ */
+export const LAYOUT_WIDTH = 55
+
+/** The tools whose subject reads other than as plain text, by id; any other reads plain. */
+const VIEWS: Readonly<Partial<Record<ToolId, (subject: string) => Run[]>>> = {
+  [BASH_TOOL]: subject => {
+    const { spans, laidOut } = readShell(subject, LAYOUT_WIDTH)
+    return [...(laidOut ?? spans)]
+  },
+}
+
+/** What a call's row shows of what it touched. Pure; a row keeps it for its call. */
+export function rowSummary(call: ToolCall): RowSummary {
+  const word = toolWord(call.name)
+  if (call.subject === undefined)
+    return { tag: undefined, whole: [{ text: word, role: "plain" }] }
+  const id = toolIdOf(call.name)
+  const view = id === undefined ? undefined : VIEWS[id]
+  return {
+    tag: word,
+    whole: view?.(call.subject) ?? [{ text: call.subject, role: "plain" }],
+  }
+}
+
+/** Lines a summary shows of a command, and of its output. */
+export const SUMMARY_LINES = 5
+/** The most of one line a summary shows. */
+export const LINE_LENGTH = 160
+/** The most of a result the detail draws: its end. */
+export const SHOWN = 20_000
+/** The tallest image a summary draws at its own size, in CSS px: 10rem, as `.tool-images[data-thumb]` caps it. */
+export const THUMB_HEIGHT = 160
+
+type Line = readonly Run[]
+
+/** Runs as lines as written; a run across a break is split, each part keeping its role. A final break ends a line, and starts none. */
+function linesOf(runs: readonly Run[]): Line[] {
+  const lines: Run[][] = [[]]
   for (const run of runs) {
+    const parts = run.text.split("\n")
+    parts.forEach((text, i) => {
+      if (i > 0) lines.push([])
+      if (text !== "") lines.at(-1)?.push({ text, role: run.role })
+    })
+  }
+  if (lines.length > 1 && lines.at(-1)?.length === 0) lines.pop()
+  return lines.length === 1 && lines[0]?.length === 0 ? [] : lines
+}
+
+/** One line, cut at LINE_LENGTH with "…". */
+function cutLine(line: Line): Line {
+  if (lengthOf(line) <= LINE_LENGTH) return line
+  const out: Run[] = []
+  let left = LINE_LENGTH
+  for (const run of line) {
     if (left <= 0) break
     out.push(
       run.text.length <= left ? run : { ...run, text: run.text.slice(0, left) },
     )
     left -= run.text.length
   }
-  return cut ? [...out, { text: "…", role: "plain" }] : out
+  return [...out, { text: "…", role: "plain" }]
 }
 
-const plainView: View = subject => {
-  const { at, cut } = previewEnd(subject)
-  const runs: Run[] = [{ text: subject, role: "plain" }]
-  return { preview: cutRuns(runs, at, cut), whole: runs }
+const lengthOf = (line: Line) => line.reduce((n, r) => n + r.text.length, 0)
+
+/** Lines joined back into runs, a plain break between each, and a run following one of its role merged into it. */
+function joinLines(lines: readonly Line[]): Run[] {
+  const out: Run[] = []
+  const add = (run: Run) => {
+    const last = out.at(-1)
+    if (last?.role === run.role)
+      out[out.length - 1] = { ...last, text: last.text + run.text }
+    else out.push(run)
+  }
+  lines.forEach((line, i) => {
+    if (i > 0) add({ text: "\n", role: "plain" })
+    for (const run of line) add(run)
+  })
+  return out
 }
 
-/** A command, highlighted, and opened laid out when it is one long line. */
-const shellView: View = subject => {
-  const { spans, laidOut } = readShell(subject, LAYOUT_WIDTH)
-  const { at, cut } = previewEnd(subject)
-  return { preview: cutRuns(spans, at, cut), whole: laidOut ?? spans }
+/** Some of a text's lines, and what the cut hides. */
+export interface Cut {
+  readonly runs: readonly Run[]
+  /** Lines left out. */
+  readonly hidden: number
+  /** A line shown was cut at LINE_LENGTH. */
+  readonly cut: boolean
 }
 
-/**
- * The tools whose subject reads other than as plain text, by id; any other
- * reads plain. A later tool's own view (a read's range, an edit's diff)
- * joins here.
- */
-const VIEWS: Readonly<Partial<Record<ToolId, View>>> = {
-  [BASH_TOOL]: shellView,
+/** Some of `all`'s lines, each cut at LINE_LENGTH, and what the cut leaves out. */
+function cutOf(all: readonly Line[], lines: readonly Line[]): Cut {
+  return {
+    runs: joinLines(lines.map(cutLine)),
+    hidden: all.length - lines.length,
+    cut: lines.some(l => lengthOf(l) > LINE_LENGTH),
+  }
+}
+
+/** The first SUMMARY_LINES lines of runs as written, each cut at LINE_LENGTH. */
+export function headLines(runs: readonly Run[]): Cut {
+  const lines = linesOf(runs)
+  return cutOf(lines, lines.slice(0, SUMMARY_LINES))
+}
+
+/** The last SUMMARY_LINES lines of runs as written, each cut at LINE_LENGTH. */
+export function tailLines(runs: readonly Run[]): Cut {
+  const lines = linesOf(runs)
+  return cutOf(lines, lines.slice(-SUMMARY_LINES))
+}
+
+/** The detail's output: whole, or its last SHOWN characters after a line counting the rest. */
+export function wholeOutput(text: string): string {
+  if (text.length <= SHOWN) return text
+  const left = text.length - SHOWN
+  return `… ${plural(left, "earlier character")}\n${text.slice(left)}`
+}
+
+/** What a row's body draws: its output's text, or its images. */
+export type RowBody =
+  | { readonly kind: "text"; readonly text: string }
+  | {
+      readonly kind: "images"
+      readonly images: readonly ImageRef[]
+      readonly note: string
+      /** Drawn THUMB_HEIGHT tall at most, not at its own size. */
+      readonly thumb: boolean
+    }
+
+/** Everything a row draws but its tag and status. */
+export interface RowView {
+  /** What the call touched, its head or whole. */
+  readonly command: readonly Run[]
+  readonly body: RowBody
+  /** The toggle's words; undefined when the summary hides nothing. */
+  readonly more: string | undefined
+}
+
+/** What a summary hides, which its toggle names. */
+export interface Hidden {
+  /** The command's lines left out. */
+  readonly command: number
+  /** The output's lines left out. */
+  readonly output: number
+  /** A line shown, of either, was cut at LINE_LENGTH. */
+  readonly cut: boolean
+  /** An image is drawn as a thumbnail. */
+  readonly image: boolean
+}
+
+/** The toggle's words: what the summary hides, or "less" in the detail; undefined when it hides nothing. */
+export function moreWords(hidden: Hidden, open: boolean): string | undefined {
+  const lines = [
+    ...(hidden.command > 0 ? [`+${plural(hidden.command, "line")}`] : []),
+    ...(hidden.output > 0
+      ? [`+${plural(hidden.output, "line")} of output`]
+      : []),
+  ]
+  const parts = [
+    ...lines,
+    ...(hidden.cut && lines.length === 0 ? ["whole lines"] : []),
+    ...(hidden.image ? ["full size"] : []),
+  ]
+  if (parts.length === 0) return undefined
+  return open ? "less" : parts.join(" · ")
 }
 
 const textOf = (runs: readonly Run[]) => runs.map(r => r.text).join("")
 
-/** What a call's row shows in its summary, closed and open. Pure. */
-export function rowSummary(call: ToolCall): RowSummary {
-  const word = toolWord(call.name)
-  if (call.subject === undefined)
-    return {
-      tag: undefined,
-      preview: [{ text: word, role: "plain" }],
-      whole: undefined,
-    }
-  const id = toolIdOf(call.name)
-  const view = (id === undefined ? undefined : VIEWS[id]) ?? plainView
-  const { preview, whole } = view(call.subject)
+/**
+ * What a row draws, from what its call touched (`rowSummary`), its output's
+ * text (the live stream's, or the result's), its body, and whether the
+ * reader opened its detail. Pure.
+ */
+export function rowView(
+  summary: RowSummary,
+  output: string,
+  body: ToolBody,
+  open: boolean,
+): RowView {
+  const head = headLines(summary.whole)
+  const tail =
+    body.kind === "text"
+      ? tailLines([{ text: output, role: "plain" }])
+      : { runs: [], hidden: 0, cut: false }
+  const tall =
+    body.kind === "images" && body.images.some(i => i.height > THUMB_HEIGHT)
+  const hidden: Hidden = {
+    command: head.hidden,
+    output: tail.hidden,
+    cut: head.cut || tail.cut,
+    image: tall,
+  }
   return {
-    tag: word,
-    preview,
-    whole: textOf(whole) === textOf(preview) ? undefined : whole,
+    command: open ? summary.whole : head.runs,
+    body:
+      body.kind === "images"
+        ? { ...body, thumb: !open && tall }
+        : {
+            kind: "text",
+            text: open ? wholeOutput(output) : textOf(tail.runs),
+          },
+    more: moreWords(hidden, open),
   }
 }

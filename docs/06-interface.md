@@ -693,24 +693,28 @@ The rail is E; the column is T. Seeing both at once is the product.
 - The speaker's name heads each human message; the agent's messages are marked
   as the agent's.
 - **Tool calls are rows under the agent's message** (ADR-0107): what the call
-  touched (`packages/core/tree.ts`, `pnpm test`), then ✓, ✗, or … while it
-  has no result, with the result folded away. The tool's word is a tag at
-  the row's top right, apart from what it touched: "shell", "read",
-  "search", "ask" (ADR-0114). The model still calls its tools by their ids
-  (`bash`, `grep`). A shell command is highlighted, its commands, options,
-  strings and variables told apart. A long or multi-line one is cut at its
-  first line, and the opened row shows it whole in its place, a long
-  one-line chain laid out a step a line. A result is its own
-  entry in the tree, but it belongs to its call, so it adds no message and no
-  row on the rail.
-- **An image a tool read is drawn in its row** (ADR-0051), which opens on
-  its own, capped at 10rem tall. The image takes the place of the caption
-  ("Read image file [image/png]"), which is its tooltip; a click on the
-  summary shows it whole, and a click on the image opens it in the pane
-  (ADR-0078), Cmd- or Ctrl-click in a new tab.
+  touched (`packages/core/tree.ts`, `pnpm test`), and what it returned. The
+  tool's word is a tag at the row's top right, apart from what it touched:
+  "shell", "read", "search", "ask" (ADR-0114), with ✓ or ✗ beside it once
+  the call ends. The model still calls its tools by their ids (`bash`,
+  `grep`). A shell command is highlighted, its commands, options, strings
+  and variables told apart, and a long one-line chain is laid out a step a
+  line. A result is its own entry in the tree, but it belongs to its call,
+  so it adds no message and no row on the rail.
+- **A row shows its summary until you ask for its detail** (ADR-0123): the
+  command's first five lines and the output's last five, a very long line
+  cut short. Below them, a button says what they leave out, "+3 lines ·
+  +335 lines of output", and shows it all; in the detail it says "less". A
+  row that leaves nothing out has no button. The row spans the column, as
+  far from its right edge as from its left.
+- **An image a tool read is drawn in its row** (ADR-0051), in place of the
+  caption ("Read image file [image/png]"), which is its tooltip. A tall
+  one shows 10rem tall, and its row's button, "full size", shows it whole;
+  a click on the image opens it in the pane (ADR-0078), Cmd- or Ctrl-click
+  in a new tab.
 - **While the agent works, its column shows it live**: the reply as it is
-  written, and each running command's output in its own row, open, following
-  its end as a column does. Each becomes the committed message or result in
+  written, and each running command's last five lines of output in its own
+  row. Each becomes the committed message or result in
   place, and a column at its end does not get shorter while the agent works
   (ADR-0044).
   **stop**, the queue header's button, ends the turn, and records who
@@ -730,8 +734,9 @@ The rail is E; the column is T. Seeing both at once is the product.
   command that has run for half a second is still running, its row is
   outlined instead, and accepted work hides: the wait is the machine's, not the
   model's. A quicker command changes neither.
-- **A root shown again draws its tool rows as they were left** (ADR-0049):
-  a running command's row open, a row you opened or closed the same way.
+- **A root shown again draws its tool rows as they were left** (ADR-0123):
+  a running command's row outlined, a row whose detail you opened or folded
+  the same way.
 - **Pasting an image into a composer puts it in the message** (ADR-0042).
   It is uploaded as it is pasted, and its markdown, `![name](/blob/…)`, goes
   in where the cursor was; the send button reads "uploading image…" until

@@ -1,10 +1,13 @@
 # ADR-0049 — A tool row opens, capped, only for work that lasts, and only the reader closes it or shows it whole; the floor is capped
 
-- **Status:** Accepted
+- **Status:** Superseded
 - **Area:** `packages/web/TECHNICAL.md`, `docs/06-interface.md`
 - **Evidence:** S35, S67
 - **Amends:**
   - ADR-0044: when a tool's row opens and closes, and the floor's height.
+- **Superseded by:**
+  - ADR-0123: restated, with a row's three sizes replaced by its summary and
+    its detail.
 - **Amended by:**
   - ADR-0051: a row whose result has an image opens capped too, and draws the
     image in place of its text.

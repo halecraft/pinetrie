@@ -10,6 +10,8 @@
   - ADR-0056: the mark's title names the ask the agent is working on, and in
     outline density the running ask's own line pulses where the working line
     would be.
+  - ADR-0123: `revealed` only marks a running row for its ring; it opens
+    nothing.
 
 **Context.** Inside a column, the only sign that its agent was working was the
 **Stop** button above the composer. Nothing said whether the agent was

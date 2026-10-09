@@ -153,7 +153,7 @@ export const toggled = (open: boolean): FoldChoice => (open ? "closed" : "open")
 
 /**
  * Each ask's choice, by its prompt, kept while the page lives, as tool rows'
- * are (ADR-0049). A fold reads its own key, so a choice redraws only the ask
+ * are (ADR-0123). A fold reads its own key, so a choice redraws only the ask
  * it is for. A reload remembers nothing.
  */
 export interface FoldMemory {

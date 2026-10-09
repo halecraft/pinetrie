@@ -13,8 +13,8 @@ export const UNPROVEN: Readonly<Record<string, readonly string[]>> = {
   ],
   "browser/images": [
     "the sent message draws the image, at its stored width",
-    "a click on its summary shows the image whole",
-    "folded, it stays folded when another message arrives",
+    "its toggle shows the image whole",
+    "folded, it stays in its summary when another message arrives",
   ],
   "browser/page": [
     "a first visit asks for your email and name, and refuses what is not an email",
@@ -70,7 +70,6 @@ export const UNPROVEN: Readonly<Record<string, readonly string[]>> = {
     "a fold's toggle redraws no list",
     "a column's density is kept across a reload, and outline draws each ask as a line",
     "the agent's reply shows in its column while it is written",
-    "a command that ends within half a second never opens its row",
     "a running command's output shows live in its column",
     "the column was sampled through the run, taller than its view",
     "a column following its end never gets shorter while its agent works",

@@ -15,7 +15,12 @@ import {
   ROOT,
   type ThreadName,
 } from "@pinetrie/core"
-import { rowSummary, toolWord, workingWords } from "@pinetrie/interface"
+import {
+  rowSummary,
+  rowView,
+  toolWord,
+  workingWords,
+} from "@pinetrie/interface"
 import { scriptedModel } from "@pinetrie/pi"
 import {
   readLaneRecords,
@@ -400,15 +405,6 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             () => true,
             () => false,
           )
-        /**
-         * Open a closed tool row, as a reader does, so its output is drawn. A
-         * row the work opened is left as it is: a click would show it whole.
-         */
-        const openRow = async (sel: string) => {
-          if ((await tp.getAttribute(sel, "open").catch(() => "")) === null)
-            await tp.click(`${sel} summary`)
-        }
-
         // ── what a new thread starts from, said before sending (ADR-0104) ───
         // With no WIP there is nothing to choose, and no line. A WIP above
         // accepted work offers one; it goes again before the thread starts.
@@ -498,62 +494,17 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           "the agent's reply shows in its column while it is written",
           streamed,
         )
-        const row = `${col(0)} .tool[data-tool="read"][data-status="ok"]`
-        const shown = await appears(row)
+        await appears(`${col(0)} .tool[data-tool="read"][data-status="ok"]`)
         await toolIdle()
-        await tp.textContent(`${row} .tool-label`).catch(() => "")
-        if (shown) await openRow(row)
-        await tp.textContent(`${row} .tool-output`).catch(() => "")
 
-        // A command that ends within REVEAL_MS never opens its row: a
-        // MutationObserver records any bash row that is ever open.
-        await tp.evaluate(c => {
-          const w = window as unknown as {
-            __opened: string[]
-            __openedWatch: MutationObserver
-          }
-          w.__opened = []
-          const look = (el: Element) => {
-            for (const row of [el, ...el.querySelectorAll(".tool")])
-              if (row.matches('.tool[data-tool="bash"][open]'))
-                w.__opened.push(row.textContent ?? "")
-          }
-          w.__openedWatch = new MutationObserver(records => {
-            for (const r of records) {
-              if (r.target instanceof Element) look(r.target)
-              for (const n of r.addedNodes) if (n instanceof Element) look(n)
-            }
-          })
-          const column = document.querySelector(c)
-          if (column !== null)
-            w.__openedWatch.observe(column, {
-              subtree: true,
-              childList: true,
-              attributes: true,
-              attributeFilter: ["open"],
-            })
-        }, col(0))
+        // A command short enough to hide nothing: the summary/detail check
+        // below finds it has no toggle.
         script.use([
           { tool: "bash", args: { command: "echo quick" } },
           { text: "quick" },
         ])
         await say("quick")
         await toolIdle()
-        const quick = `${col(0)} .tool[data-tool="bash"][data-status="ok"]`
-        const quickShown = await appears(quick, 10_000)
-        const everOpened = await tp.evaluate(() => {
-          const w = window as unknown as {
-            __opened: string[]
-            __openedWatch: MutationObserver
-          }
-          w.__openedWatch.disconnect()
-          return w.__opened
-        })
-        check(
-          "a command that ends within half a second never opens its row",
-          quickShown && everOpened.length === 0,
-          `${everOpened.length} opened`,
-        )
 
         script.use([
           {
@@ -580,8 +531,8 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             () => false,
           )
         check("a running command's output shows live in its column", live)
-        // The reader scrolls the live output up: the result, drawn in the same
-        // element, keeps that place.
+        // The live output's last five lines, then the result's in their place:
+        // pi's result is the live text, so the row keeps its height (S142).
         await tp
           .waitForFunction(
             c =>
@@ -592,11 +543,9 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             { timeout: 20_000 },
           )
           .catch(() => null)
-        await tp
-          .$eval(`${col(0)} .tool.live .tool-output`, o => {
-            o.scrollTop = 0
-          })
-          .catch(() => null)
+        const liveHeight = await tp
+          .$eval(`${col(0)} .tool.live`, r => r.getBoundingClientRect().height)
+          .catch(() => 0)
         await toolIdle()
         const ticked = tp.locator(`${col(0)} .tool[data-tool="bash"]`).last()
         await ticked
@@ -607,30 +556,35 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           const out = d.querySelector(".tool-output")
           return {
             live: d.classList.contains("live"),
-            open: d.hasAttribute("open"),
-            size: d.getAttribute("data-size"),
+            open: d.hasAttribute("data-open"),
             status: d.getAttribute("data-status"),
-            top: out?.scrollTop ?? -1,
-            scrolls: out === null ? false : out.scrollHeight > out.clientHeight,
+            lines: ((out as HTMLElement | null)?.innerText ?? "").split("\n")
+              .length,
             result: out?.textContent?.includes("tick 8") === true,
+            height: d.getBoundingClientRect().height,
           }
         })
         check(
-          "a command still running after half a second opens its row, and it stays open when it ends, where its reader scrolled it",
-          !kept.live &&
-            kept.open &&
-            kept.size === "capped" &&
+          "a running command shows its output's last five lines live, and its result takes their place, the row no shorter",
+          liveHeight > 0 &&
+            !kept.live &&
+            !kept.open &&
             kept.status === "ok" &&
             kept.result &&
-            kept.scrolls &&
-            kept.top <= 2,
-          `${JSON.stringify(kept)}`,
+            kept.lines === 5 &&
+            kept.height >= liveHeight - 0.5,
+          `${JSON.stringify({ liveHeight, kept })}`,
         )
 
-        // A row the work opened is capped; the reader's click shows it whole,
-        // and a second folds it.
+        // A row's summary is its command's first five lines and its output's
+        // last five, its toggle saying what they leave out; the toggle shows
+        // both whole, then folds them. A short command hides nothing, and has
+        // no toggle (ADR-0123).
         {
-          const LONG = "seq 1 300 | sed 's/^/line /'\nsleep 0.6"
+          const LONG = [
+            "seq 1 300 | sed 's/^/line /'",
+            ...Array.from({ length: 8 }, (_, i) => `echo ${i} >/dev/null`),
+          ].join("\n")
           script.use([
             { tool: "bash", args: { command: LONG } },
             { text: "listed" },
@@ -639,6 +593,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           await toolIdle()
           const row = tp
             .locator(`${col(0)} .tool[data-tool="bash"][data-status="ok"]`)
+            .filter({ hasText: "seq 1 300" })
             .last()
           await row
             .locator(".tool-output")
@@ -646,57 +601,76 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             .catch(() => null)
           const measure = () =>
             row.evaluate(d => {
-              const rem = Number.parseFloat(
-                getComputedStyle(document.documentElement).fontSize,
-              )
-              const out = d.querySelector(".tool-output")
+              const lines = (sel: string) => {
+                const el = d.querySelector(sel)
+                // A final line break ends a line and starts none.
+                return el instanceof HTMLElement
+                  ? el.innerText.replace(/\n$/, "").split("\n")
+                  : []
+              }
+              const more = d.querySelector(".tool-more")
               return {
-                size: d.getAttribute("data-size"),
-                rems: d.getBoundingClientRect().height / rem,
-                inner:
-                  out === null ? null : out.scrollHeight - out.clientHeight,
-                gap:
-                  out === null
-                    ? null
-                    : out.scrollHeight - out.scrollTop - out.clientHeight,
+                open: d.hasAttribute("data-open"),
+                command: lines(".tool-command").length,
+                output: lines(".tool-output"),
+                more: more?.textContent ?? null,
+                expanded: more?.getAttribute("aria-expanded") ?? null,
               }
             })
-          const capped = await measure()
-          await row.locator("summary").click()
-          const full = await measure()
-          await row.locator("summary").click()
+          const toggle = () =>
+            row
+              .locator(".tool-more")
+              .click({ timeout: 5_000 })
+              .catch(() => {})
+          const summary = await measure()
+          await toggle()
+          const detail = await measure()
+          await toggle()
           const folded = await measure()
+          const quick = tp
+            .locator(`${col(0)} .tool[data-tool="bash"]`)
+            .filter({ hasText: "echo quick" })
+          const quicks = await quick.count()
+          const quickToggles = await quick.locator(".tool-more").count()
+          const shown = (m: typeof summary) =>
+            m.open === false &&
+            m.command === 5 &&
+            m.output.join() ===
+              "line 296,line 297,line 298,line 299,line 300" &&
+            m.more === "+4 lines · +295 lines of output" &&
+            m.expanded === "false"
           check(
-            "a row the work opens is capped, at its end, and the toggle shows it whole, then folds it",
-            capped.size === "capped" &&
-              capped.rems <= 17 &&
-              capped.gap !== null &&
-              capped.gap <= 2 &&
-              full.size === "full" &&
-              full.rems > 17 &&
-              full.inner !== null &&
-              full.inner <= 1 &&
-              folded.size === "closed" &&
-              folded.inner === null,
-            `${JSON.stringify({ capped, full, folded })}`,
+            "a row shows its command's first five lines and its output's last five, its toggle saying what they leave out, and the toggle shows both whole, then folds them; a short one has no toggle",
+            shown(summary) &&
+              detail.open &&
+              detail.command === 9 &&
+              detail.output.length === 300 &&
+              detail.more === "less" &&
+              detail.expanded === "true" &&
+              shown(folded) &&
+              quicks > 0 &&
+              quickToggles === 0,
+            `${JSON.stringify({ summary: { ...summary, output: summary.output.length }, detail: { ...detail, output: detail.output.length }, folded: folded.more, quicks, quickToggles })}`,
           )
         }
 
         // A row its reader folds while the agent works: the floor takes up
         // what it gave back, so a column at its end keeps its height. Its
-        // output is short, so the floor needs less than its cap (FLOOR_MAX).
+        // output is two lines past its summary's, so the floor needs less
+        // than its cap (FLOOR_MAX).
         {
           script.use([
             {
               tool: "bash",
-              args: { command: "printf 'step %s\\n' a b c; sleep 3" },
+              args: {
+                command: "printf 'step %s\\n' a b c d e f g; sleep 3",
+              },
             },
             { text: "stepped" },
           ])
           await say("step through")
-          const running = `${col(0)} .tool.live[data-size="capped"]`
-          const opened = await appears(running, 10_000)
-          const summary = `${col(0)} .tool.live summary`
+          const toggle = `${col(0)} .tool.live .tool-more`
+          const opened = await appears(toggle, 10_000)
           const column = () =>
             tp.$eval(`${col(0)} .column-body`, b => ({
               height: b.scrollHeight,
@@ -705,32 +679,30 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
                 b.querySelector(".column-floor")?.getBoundingClientRect()
                   .height ?? 0,
             }))
-          if (opened) await tp.click(summary)
+          if (opened) await tp.click(toggle)
           await twoFrames(tp)
           const full = await column()
-          if (opened) await tp.click(summary)
+          if (opened) await tp.click(toggle)
           await twoFrames(tp)
           const folded = await column()
-          const size = await tp
-            .getAttribute(`${col(0)} .tool.live`, "data-size", {
-              timeout: 1_000,
-            })
+          const detail = await tp
+            .$eval(`${col(0)} .tool.live`, r => r.hasAttribute("data-open"))
             .catch(() => null)
           await toolIdle()
           check(
             "a row its reader folds while its agent works leaves the column at its end, no shorter",
             opened &&
-              size === "closed" &&
+              detail === false &&
               folded.floor > 0 &&
               folded.height >= full.height &&
               folded.gap <= 2,
-            `${JSON.stringify({ size, full, folded })}`,
+            `${JSON.stringify({ detail, full, folded })}`,
           )
         }
 
         // A tab shown again mounts its columns anew: each row starts as it was
-        // left (ADR-0049), so a running one is open from its first frame and a
-        // finished one keeps its size, or its reader's choice.
+        // left (ADR-0123), so a running one is ringed from its first frame and
+        // a finished one keeps its reader's choice.
         {
           script.use([
             {
@@ -748,12 +720,12 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           const stepped = tp
             .locator(`${col(0)} .tool[data-tool="bash"]`)
             .filter({ hasText: "step %s" })
-          // The reader shows the tick command's row whole. The floor check
+          // The reader opens the tick command's detail. The floor check
           // above folded the step command's.
-          await ticked.locator("summary").click()
+          await ticked.locator(".tool-more").click()
           await say("again")
           const opened = await appears(
-            `${col(0)} .tool.live[data-size="capped"]`,
+            `${col(0)} .tool.live[data-revealed]`,
             10_000,
           )
           const root =
@@ -771,7 +743,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
               }
               w.__rows = []
               const state = (row: Element, how: string) =>
-                `${how}:${row.textContent?.includes("echo again") ? "again" : "other"}:${row.classList.contains("live") ? "live" : "done"}:${row.getAttribute("data-size")}:${row.hasAttribute("data-revealed") ? "revealed" : "-"}`
+                `${how}:${row.textContent?.includes("echo again") ? "again" : "other"}:${row.classList.contains("live") ? "live" : "done"}:${row.hasAttribute("data-open") ? "detail" : "summary"}:${row.hasAttribute("data-revealed") ? "revealed" : "-"}`
               w.__rowsWatch = new MutationObserver(records => {
                 for (const r of records) {
                   if (
@@ -792,7 +764,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
                 subtree: true,
                 childList: true,
                 attributes: true,
-                attributeFilter: ["open", "data-size", "data-revealed"],
+                attributeFilter: ["data-open", "data-revealed"],
               })
             })
             await stepBack(tp, root)
@@ -820,7 +792,9 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           const running = await recorded()
           const sizeOf = async (row: typeof ticked) =>
             (await row.count()) === 1
-              ? await row.getAttribute("data-size")
+              ? (await row.getAttribute("data-open")) === null
+                ? "summary"
+                : "detail"
               : "missing"
           await toolIdle()
           await away()
@@ -834,18 +808,19 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             ticked: await sizeOf(ticked),
             stepped: await sizeOf(stepped),
           }
-          // Fold the whole one again, so the checks below see the column they expect.
-          if (after.ticked === "full") await ticked.locator("summary").click()
+          // Fold the opened one again, so the checks below see the column they expect.
+          if (after.ticked === "detail")
+            await ticked.locator(".tool-more").click()
           check(
-            "a tab shown again draws each tool row as it was left: a running one open from its first frame, the line hidden, and a finished one's size or its reader's choice kept",
+            "a tab shown again draws each tool row as it was left: a running one ringed from its first frame, the line hidden, and its reader's choice of detail or summary kept",
             opened &&
               running.filter(r => r.includes(":again:")).join() ===
-                "added:again:live:capped:revealed" &&
+                "added:again:live:summary:revealed" &&
               line === "hidden" &&
               done.every(r => r.startsWith("added:")) &&
-              after.again === "capped" &&
-              after.ticked === "full" &&
-              after.stepped === "closed",
+              after.again === "summary" &&
+              after.ticked === "detail" &&
+              after.stepped === "summary",
             `${JSON.stringify({ running, line, done, after })}`,
           )
         }
@@ -1078,47 +1053,10 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           )
         }
 
-        // A row previews a command's first line, and at most 120 characters;
-        // the row, opened, shows all of it in the preview's place, once. A
-        // command its preview shows whole has nothing to swap.
-        {
-          const WHOLE = `echo ${"long ".repeat(30)}\necho second line`
-          script.use([
-            { tool: "bash", args: { command: WHOLE } },
-            { text: "echoed" },
-          ])
-          await say("echo a long one")
-          await toolIdle()
-          const cut = `${col(0)} .tool[data-tool="bash"][data-status="ok"]`
-          await appears(`${cut}:has-text("echo long")`, 10_000)
-          const row = tp.locator(cut).last()
-          /** The summary's text as shown: only what is displayed counts. */
-          const summaryShows = () =>
-            row.locator("summary").evaluate(s => (s as HTMLElement).innerText)
-          const closed = await summaryShows()
-          await row.locator("summary").click()
-          const opened = await summaryShows()
-          const whole = WHOLE
-          // A command short enough to need no layout, run earlier.
-          const short = tp.locator(cut).filter({ hasText: "echo quick" })
-          const shorts = await short.count()
-          const swaps = await short.locator(".tool-label-whole").count()
-          check(
-            "an opened row shows the whole command in its label's place, once, and a short one's has nothing to swap",
-            closed.includes("…") &&
-              !closed.includes("second line") &&
-              opened.includes(whole) &&
-              !opened.includes("…") &&
-              opened.split("echo long").length === 2 &&
-              shorts > 0 &&
-              swaps === 0,
-            `${JSON.stringify(closed.slice(-12))}, ${opened.split("echo long").length - 1} times, ${swaps} of ${shorts}`,
-          )
-        }
-
-        // A shell row's tag is its tool's word, at its top right (ADR-0114),
-        // and a long one-line chain opens laid out, a step a line, each
-        // step's command marked.
+        // A shell row's tag is its tool's word, with its status at its top
+        // right (ADR-0114), and a long one-line chain is laid out, a step a
+        // line, each step's command marked. Seven steps are more than a
+        // summary shows: its detail shows them all.
         {
           const STEPS = [
             "mkdir -p /tmp/chain",
@@ -1138,29 +1076,44 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           const chained = `${col(0)} .tool[data-tool="bash"][data-status="ok"]:has-text("mkdir -p /tmp/chain")`
           await appears(chained, 10_000)
           const row = tp.locator(chained).last()
-          await row.locator("summary").click()
+          await row
+            .locator(".tool-more")
+            .click({ timeout: 5_000 })
+            .catch(() => {})
           const seen = await row.evaluate(r => {
-            const summary = r.querySelector("summary")?.getBoundingClientRect()
-            const tag = r.querySelector(".tool-tag")
-            const box = tag?.getBoundingClientRect()
-            const whole = r.querySelector(
-              ".tool-label-whole",
-            ) as HTMLElement | null
+            const box = r.getBoundingClientRect()
+            const tag = r.querySelector(".tool-head .tool-tag")
+            const status = r.querySelector(".tool-head .tool-status")
+            const command = r.querySelector(".tool-command")
             return {
               tag: tag?.textContent ?? "",
-              right: (summary?.right ?? 0) - (box?.right ?? 0),
-              top: (box?.top ?? 0) - (summary?.top ?? 0),
-              lines: (whole?.innerText ?? "").split("\n").length,
+              status: status?.textContent ?? "",
+              // The status ends the row's top line, and the command's first
+              // line runs beside the head, not below it.
+              right: box.right - (status?.getBoundingClientRect().right ?? 0),
+              top: (tag?.getBoundingClientRect().top ?? 0) - box.top,
+              beside:
+                (command?.getBoundingClientRect().top ?? box.bottom) - box.top,
+              lines:
+                command instanceof HTMLElement
+                  ? command.innerText.split("\n").length
+                  : 0,
               commands: [
-                ...r.querySelectorAll(".tool-label-whole .sh-command"),
+                ...r.querySelectorAll(".tool-command .sh-command"),
               ].map(c => c.textContent ?? ""),
             }
           })
+          await row
+            .locator(".tool-more")
+            .click({ timeout: 5_000 })
+            .catch(() => {})
           check(
-            "a shell row's tag sits at its top right, and its opened command is laid out a step a line, its command names marked",
+            "a shell row's tag and status sit at its top right, and its command, opened, is laid out a step a line, its command names marked",
             seen.tag === toolWord("bash") &&
+              seen.status === "✓" &&
               Math.abs(seen.right) <= 2 &&
               Math.abs(seen.top) <= 2 &&
+              Math.abs(seen.beside) <= 2 &&
               seen.lines === STEPS.length &&
               STEPS.every(step =>
                 seen.commands.includes(step.split(" ")[0] ?? ""),
@@ -1214,8 +1167,13 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
               ? [`${before.steps}→${f.steps}`]
               : []
           })
-          const label = rowSummary({ id: "", name: "bash", subject: COMMAND })
-            .preview.map(r => r.text)
+          const label = rowView(
+            rowSummary({ id: "", name: "bash", subject: COMMAND }),
+            "",
+            { kind: "text" },
+            false,
+          )
+            .command.map(r => r.text)
             .join("")
           const twice = during.filter(
             f => f.labels.filter(l => l === label).length > 1,
@@ -1262,7 +1220,6 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         if (stopShown) await tp.click(`${col(0)} .stop`)
         const failed = `${col(0)} .tool[data-tool="bash"][data-status="error"]`
         const ended = await appears(failed, 10_000)
-        if (ended) await openRow(failed)
         const why = await tp
           .textContent(`${failed} .tool-output`)
           .catch(() => "")
@@ -1307,7 +1264,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         ])
         await say("something wide")
         await appears(
-          `${col(0)} .tool[data-tool="read"] .tool-label:has-text("yyy")`,
+          `${col(0)} .tool[data-tool="read"] .tool-command:has-text("yyy")`,
         )
         await toolIdle()
         const widths = await tp.$eval(`${col(0)} .column-thread`, c => {

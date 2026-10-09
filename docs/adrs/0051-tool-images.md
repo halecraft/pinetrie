@@ -9,6 +9,9 @@
   - ADR-0042: a tool's images are blobs too.
   - ADR-0049: a row whose result has an image opens capped too, and draws the
     image in place of its text.
+- **Amended by:**
+  - ADR-0123: an image a tool read is drawn in its row's summary, as a
+    thumbnail when it is tall; no row opens for it.
 
 **Context.** A `read` of an image showed only its caption, "Read image file
 [image/png]". pi's `read` returns the image as a base64 part, and

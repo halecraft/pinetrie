@@ -1,7 +1,7 @@
 # S35 — why an agent's column jumps while it works
 
 - **Status:** Answered
-- **Led to:** ADR-0044, ADR-0049
+- **Led to:** ADR-0044, ADR-0049, ADR-0123
 
 **Answers.**
 1. **Each tool call changes the column's height five or six times, and each

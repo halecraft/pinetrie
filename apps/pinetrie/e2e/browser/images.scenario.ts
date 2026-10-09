@@ -404,7 +404,11 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
                   return null
                 const box = image.getBoundingClientRect()
                 return {
-                  size: details?.getAttribute("data-size"),
+                  thumb:
+                    details
+                      ?.querySelector(".tool-images")
+                      ?.hasAttribute("data-thumb") === true,
+                  more: details?.querySelector(".tool-more")?.textContent,
                   height: Math.round(box.height),
                   alt: image.alt,
                   title: image.title,
@@ -425,8 +429,9 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           ),
         )
         check(
-          "a read image opens its row capped, drawn in place of its caption",
-          capped?.size === "capped" &&
+          "a read image is drawn in its row's summary, 10rem tall at most, in place of its caption",
+          capped?.thumb === true &&
+            capped.more === "full size" &&
             capped.height <= 10 * rem + 1 &&
             capped.alt === "tall.png" &&
             capped.title.startsWith("Read image file [image/png]") &&
@@ -454,25 +459,27 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           ),
           `${JSON.stringify(copied)}`,
         )
-        await ip.click(`${row} summary`)
+        await ip.click(`${row} .tool-more`).catch(() => {})
         const full = await drawn()
         check(
-          "a click on its summary shows the image whole",
-          full?.size === "full" &&
+          "its toggle shows the image whole",
+          full?.thumb === false &&
+            full.more === "less" &&
             capped !== null &&
             full.height > capped.height,
           `${JSON.stringify(full)}`,
         )
-        await ip.click(`${row} summary`)
+        await ip.click(`${row} .tool-more`).catch(() => {})
         script.use([{ text: "Still grey." }])
         await say("@agent and now?")
         await idle()
         await ip.waitForTimeout(300)
-        const after = await ip.getAttribute(row, "data-size")
+        const after = await drawn()
+        const open = await ip.getAttribute(row, "data-open")
         check(
-          "folded, it stays folded when another message arrives",
-          after === "closed" && (await ip.$(img)) === null,
-          `${after}`,
+          "folded, it stays in its summary when another message arrives",
+          open === null && after?.thumb === true,
+          `${JSON.stringify({ open, after })}`,
         )
       } finally {
         await ip.context().close()

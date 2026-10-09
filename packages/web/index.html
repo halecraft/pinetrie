@@ -523,20 +523,24 @@
         border-image: linear-gradient(transparent 4px, #9ecbff 4px, #9ecbff calc(100% - 4px),
           transparent 0) 0 0 0 1 / 0 0 0 2px / 0 0 0 6px; }
       .msg.streaming { opacity: .75; }
-      /* A tool call: what it touched, its status, and its result folded away
-         (`rowSize`, tool-row.ts). Its right margin takes the rem .column-body's
-         right gutter has over its left padding, so a row sits as far from the
-         column's right edge as from its left. */
+      /* A tool call: its head, what it touched, what it returned, and its
+         toggle, each as much as `rowView` (tool-row.ts, ADR-0123) says. Its
+         right margin takes the rem .column-body's right gutter has over its
+         left padding, so a row sits as far from the column's right edge as
+         from its left. */
       .tool { margin: .3rem -1rem .3rem 0; font-size: .8rem; }
-      .tool summary { cursor: pointer; color: #aab4c3; }
-      /* Not a scroll container: a long path wraps, or it runs out of the column. */
-      .tool-label { font-family: ui-monospace, monospace; overflow-wrap: anywhere; }
-      /* The tool's word, at the row's top right, where a code block's language
-         sits, so it never reads as part of the command (ADR-0114). A float, first
-         in the summary, so the label wraps around it; the summary stays a list
-         item, since a flex summary loses its ▶. */
-      .tool-tag { float: right; margin-left: .6rem; font-size: 11px; line-height: 1.6;
-        text-transform: uppercase; letter-spacing: .1em; color: #6f7784; }
+      /* The tool's word and the call's status, at the row's top right, where a
+         code block's language sits, so neither reads as part of the command
+         (ADR-0114). A float, first in the row, so the command's first line
+         runs beside it and the rest have the row's width. */
+      .tool-head { float: right; display: flex; gap: .4rem; align-items: baseline;
+        margin-left: .6rem; }
+      .tool-tag { font-size: 11px; line-height: 1.6; text-transform: uppercase;
+        letter-spacing: .1em; color: #6f7784; }
+      /* Not a scroll container: a long line wraps, or it runs out of the column.
+         Its lines are as `rowView` cut them, so pre-wrap keeps them. */
+      .tool-command { font-family: ui-monospace, monospace; color: #aab4c3;
+        white-space: pre-wrap; overflow-wrap: anywhere; }
       /* A command's runs by role (`rowSummary`, @pinetrie/shell). */
       .sh-command { color: #9ecbff; }
       .sh-option, .sh-redirect { color: #8a93a2; }
@@ -546,28 +550,21 @@
       .sh-comment { color: #6f7784; font-style: italic; }
       .tool[data-status="ok"] .tool-status { color: #7bd88f; }
       .tool[data-status="error"] .tool-status { color: #f28b82; }
-      .tool-output { overflow: auto; margin: .3rem 0 0; padding: .4rem;
-        background: #11141a; border: 1px solid #23272e; white-space: pre-wrap; font-size: .75rem; }
-      /* Block: a ResizeObserver sees an inline element as 0 × 0. */
-      .tool-output-text { display: block; }
-      /* A result's images, in place of its text (`toolBody`). A capped row
-         caps an image at 10rem tall, as it caps output, through its width. */
-      .tool-images { margin: .3rem 0 0; }
+      /* Its last lines, or all of them: never a scroll of its own. */
+      .tool-output { clear: both; margin: .3rem 0 0; padding: .4rem;
+        background: #11141a; border: 1px solid #23272e; white-space: pre-wrap;
+        overflow-wrap: anywhere; font-size: .75rem; }
+      /* A result's images, in place of its text (`toolBody`). A tall one is a
+         thumbnail in the summary, 10rem tall (THUMB_HEIGHT) through its width. */
+      .tool-images { clear: both; margin: .3rem 0 0; }
       .tool-images img { display: block; max-width: 100%; height: auto; margin-bottom: .3rem; }
-      .tool[data-size="capped"] .tool-images img { max-width: min(100%, calc(10rem * var(--ratio))); }
-      /* What the call touched, whole (a command laid out), in the preview's place
-         while the row is open. */
-      .tool-label-whole { display: none; font-family: ui-monospace, monospace;
-        white-space: pre-wrap; overflow-wrap: anywhere; max-width: 100%;
-        overflow: auto; vertical-align: top; }
-      /* A row the work opened: about 15rem at most, command and output
-         together, so it fits in a column with text left above it. A heredoc
-         or a build log can run to hundreds of lines; the reader's click
-         shows them whole (data-size="full"). */
-      .tool[data-size="capped"] .tool-label-whole { max-height: 5rem; }
-      .tool[data-size="capped"] .tool-output { max-height: 10rem; }
-      .tool[open] > summary:has(.tool-label-whole) .tool-label { display: none; }
-      .tool[open] > summary .tool-label-whole { display: inline-block; }
+      .tool-images[data-thumb] img { max-width: min(100%, calc(10rem * var(--ratio))); }
+      /* What the summary hides, in words, or "less". Never selected with the
+         row: the copy fallback selects `.tool` (`useCopy`). */
+      .tool-more { display: block; clear: both; margin-top: .2rem; padding: 0;
+        background: none; border: none; color: #6f7784; font-size: .72rem;
+        cursor: pointer; user-select: none; }
+      .tool-more:hover { color: #aab4c3; }
       .tool.live { opacity: .85; }
       /* A command the work opened, still running: a ring, absolutely placed, so
          it takes no layout and the column does not move when it comes or goes.

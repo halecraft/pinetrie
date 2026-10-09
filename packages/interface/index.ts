@@ -471,15 +471,17 @@ export {
   threadCardHeads,
 } from "./thread-card.ts"
 export {
-  CALL_MARK,
+  callMark,
   callStatus,
-  click,
   NO_MEMORY,
   REVEAL_MS,
+  type RowBody,
   type RowMemory,
+  type RowSummary,
+  type RowView,
   type Run,
-  rowSize,
   rowSummary,
+  rowView,
   toolBody,
 } from "./tool-row.ts"
 export { callLabel, toolWord } from "./tool-words.ts"
