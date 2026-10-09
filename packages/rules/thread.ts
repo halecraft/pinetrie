@@ -1,10 +1,13 @@
 // thread — a thread's record (ADR-0117): its root, who started it and when,
-// and a copy's fork until it writes. Where a thread starts and ends is the
+// and how it began: started by its first message, or a copy, with its
+// source and fork. Where a thread starts and ends is the
 // tree's (`starts`, `threadEnd` in @pinetrie/core), never a record's.
 
 import {
   entryId,
   isRootId,
+  isThreadId,
+  STARTED,
   type ThreadId,
   type ThreadRecord,
   type WriterId,
@@ -17,7 +20,14 @@ const ThreadRecordSchema = Type.Object({
   root: Type.String({ minLength: 1 }),
   by: Type.String({ minLength: 1 }),
   createdAt: Type.Number(),
-  fork: Type.Union([Type.String({ minLength: 1 }), Type.Null()]),
+  origin: Type.Union([
+    Type.Object({ kind: Type.Literal("started") }),
+    Type.Object({
+      kind: Type.Literal("copy"),
+      source: Type.String({ minLength: 1 }),
+      fork: Type.String({ minLength: 1 }),
+    }),
+  ]),
 })
 
 /** Each thread, at its id, in the session: written with its first message. */
@@ -27,15 +37,23 @@ export const THREAD: RecordSpec<ThreadRecord, ThreadId, "session"> = {
   keyOf: r => r.thread,
   encode: ({ thread, ...contents }) => contents,
   decode: (contents, key) =>
-    decodeAt(ThreadRecordSchema, contents, threadKey(key), (r, thread) =>
-      isRootId(r.root)
-        ? {
-            thread,
-            root: r.root,
-            by: r.by as WriterId,
-            createdAt: r.createdAt,
-            fork: r.fork === null ? null : entryId(r.fork),
-          }
-        : undefined,
-    ),
+    decodeAt(ThreadRecordSchema, contents, threadKey(key), (r, thread) => {
+      if (!isRootId(r.root)) return undefined
+      const { origin } = r
+      if (origin.kind === "copy" && !isThreadId(origin.source)) return undefined
+      return {
+        thread,
+        root: r.root,
+        by: r.by as WriterId,
+        createdAt: r.createdAt,
+        origin:
+          origin.kind === "copy" && isThreadId(origin.source)
+            ? {
+                kind: "copy",
+                source: origin.source,
+                fork: entryId(origin.fork),
+              }
+            : STARTED,
+      }
+    }),
 }

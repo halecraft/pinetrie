@@ -14,12 +14,15 @@ import type {
   TextCard,
   ThreadId,
   ThreadName,
+  WriterId,
 } from "@pinetrie/core"
 import {
   type CardColumn,
   type Column as ColumnSpec,
   type ColumnView,
   foldedView,
+  freshTaskOf,
+  heldWords,
   type Intent,
   type NoteColumnView,
   type Reader,
@@ -66,6 +69,8 @@ interface Projected {
   readonly path: ReadonlySet<EntryId>
   readonly closable: boolean
   readonly track: number
+  /** Who holds the thread a branch not yet sent forks in, when someone else does (ADR-0124). */
+  readonly heldBy: WriterId | null
 }
 
 export function Strip(p: {
@@ -90,7 +95,7 @@ export function Strip(p: {
   shared: SharedColumnProps
   reader: Reader
   readers: ReadersProps
-  thread: (end: EntryId, task: TaskId) => MenuItem
+  thread: (end: EntryId, task: TaskId) => MenuItem | null
   onIntent: (intent: Intent) => void
   /** This window is typing at `end` (null for none), in `card`. */
   typing: (end: EntryId | null, card: CardId | null) => void
@@ -110,7 +115,7 @@ export function Strip(p: {
     const projected = p.projected.get(column.key)
     if (projected === undefined) return null
     const task =
-      workspace.kind === "task" ? workspace.task : (column.fresh?.task ?? null)
+      workspace.kind === "task" ? workspace.task : (freshTaskOf(column) ?? null)
     return (
       <Column
         {...p.shared}
@@ -133,7 +138,11 @@ export function Strip(p: {
             ? -1
             : (positions.get(item.card) ?? -1)
         }
-        readOnly={readOnly}
+        readOnly={
+          projected.heldBy === null
+            ? readOnly
+            : { label: heldWords(projected.heldBy, p.reader), action: null }
+        }
         task={task}
         track={projected.track}
         view={projected.view}
@@ -149,22 +158,31 @@ export function Strip(p: {
       return (
         <FoldedColumn key={folded.card} onIntent={p.onIntent} view={folded} />
       )
-    if (item.kind === "thread") return threadColumn(item, item.column)
-    const notes = p.noteViews.get(item.card)
-    return notes === undefined ? null : (
-      <NoteColumn
-        colorOf={p.shared.colorOf}
-        key={item.card}
-        onIntent={p.onIntent}
-        onTyping={card => p.typing(null, card)}
-        readOnly={readOnly}
-        reader={p.reader}
-        seats={p.shared.seats}
-        session={p.shared.session}
-        view={notes}
-        width={item.width}
-      />
-    )
+    // Each kind of column in one component; a new kind does not compile
+    // until it is drawn.
+    switch (item.kind) {
+      case "thread":
+        return threadColumn(item, item.column)
+      case "notes": {
+        const notes = p.noteViews.get(item.card)
+        return notes === undefined ? null : (
+          <NoteColumn
+            colorOf={p.shared.colorOf}
+            key={item.card}
+            onIntent={p.onIntent}
+            onTyping={card => p.typing(null, card)}
+            readOnly={readOnly}
+            reader={p.reader}
+            seats={p.shared.seats}
+            session={p.shared.session}
+            view={notes}
+            width={item.width}
+          />
+        )
+      }
+      default:
+        return item satisfies never
+    }
   }
   return (
     <div id="strip" onPointerDown={p.onPointerDown} ref={p.stripRef}>

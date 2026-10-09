@@ -1,12 +1,14 @@
 import {
   type CardRecord,
   type CardWidth,
+  type EntryId,
   entryId,
   type NoteColumnId,
   noteColumnIdFor,
   type ThreadId,
   taskIdFor,
   threadIdFor,
+  type WriterId,
   writerId,
 } from "@pinetrie/core"
 import { type CanvasCard, canvasOf } from "@pinetrie/rules"
@@ -16,9 +18,11 @@ import {
   type CardView,
   canvasColumns,
   defaultView,
+  heldByOthers,
   openColumns,
   type TaskView,
 } from "./canvas-columns.ts"
+import { BOUND } from "./columns.ts"
 import { threadOfEntry, tree } from "./fixtures.ts"
 
 const ADA = writerId("ada@x.io")
@@ -71,8 +75,12 @@ const TRUNK = threadOfEntry("1-r")
 const C = threadOfEntry("4-c")
 const E = threadOfEntry("6-e")
 
-const draw = (canvas: readonly CanvasCard[], view: TaskView) =>
-  canvasColumns({ canvas, view, index, lanes: [] })
+const draw = (
+  canvas: readonly CanvasCard[],
+  view: TaskView,
+  forks: ReadonlyMap<ThreadId, EntryId> = new Map(),
+  holders: ReadonlyMap<ThreadId, WriterId> = new Map(),
+) => canvasColumns({ canvas, view, index, lanes: [], forks, holders })
 
 const shape = (columns: readonly CardColumn[]) =>
   columns.map(c =>
@@ -120,6 +128,80 @@ describe("canvasColumns (ADR-0116)", () => {
     ).toEqual([["thread", TRUNK, true]])
   })
 
+  test("a thread whose parent thread is on no column of the canvas folds its path above its first entry; one whose parent is here does not (ADR-0117)", () => {
+    const view: TaskView = {
+      ...defaultView(C),
+      cards: new Map([
+        [C, { unfolded: true }],
+        [TRUNK, { unfolded: true }],
+      ]),
+    }
+    const alone = draw(canvasFor([C]), view)[0]
+    expect(alone?.kind === "thread" && alone.column.foldAbove).toBe(
+      entryId("4-c"),
+    )
+    const both = draw(canvasFor([TRUNK, C]), view)
+    expect(
+      both.map(c => (c.kind === "thread" ? c.column.foldAbove : null)),
+    ).toEqual([undefined, undefined])
+  })
+
+  test("a branch not yet sent in a thread someone else holds says who, and is drawn without that thread's entries; one you hold is drawn whole (ADR-0124)", () => {
+    const F = threadIdFor("01a0ffd2-0000-7000-8000-0000000000f1")
+    const BEA = writerId("bea@x.io")
+    const view: TaskView = {
+      ...defaultView(TRUNK),
+      fresh: new Map([[F, { at: entryId("3-b") }]]),
+    }
+    const held = draw(
+      canvasFor([TRUNK]),
+      view,
+      new Map(),
+      new Map([[TRUNK, BEA]]),
+    ).find(c => c.kind === "thread" && c.card === null)
+    expect(held?.kind === "thread" && held.column.mode).toEqual({
+      kind: "fresh",
+      held: { thread: TRUNK, by: BEA },
+    })
+    // Who holds which, as the page reads it: your own held threads are none.
+    const card = (holder: typeof BEA): CardRecord => ({
+      kind: "thread",
+      id: TRUNK,
+      owner: ADA,
+      placer: ADA,
+      place: { kind: "inventory", holder },
+    })
+    expect(heldByOthers([card(BEA)], ADA)).toEqual(new Map([[TRUNK, BEA]]))
+    expect(heldByOthers([card(ADA)], ADA)).toEqual(new Map())
+    const free = draw(canvasFor([TRUNK]), view).find(
+      c => c.kind === "thread" && c.card === null,
+    )
+    expect(free?.kind === "thread" && free.column.mode).toEqual({
+      kind: "fresh",
+    })
+  })
+
+  test("a copy before its first send ends at its fork, and sends as a branch there (ADR-0117)", () => {
+    const copy = threadIdFor("copy")
+    const [drawn] = draw(
+      canvasFor([copy]),
+      defaultView(copy),
+      new Map([[copy, entryId("3-b")]]),
+    )
+    expect(drawn).toMatchObject({
+      kind: "thread",
+      card: copy,
+      column: {
+        key: copy,
+        anchor: entryId("3-b"),
+        thread: copy,
+        mode: { kind: "copy", fork: entryId("3-b") },
+      },
+    })
+    // Without its record's fork, it is left out as a thread not held is.
+    expect(draw(canvasFor([copy]), defaultView(copy))).toEqual([])
+  })
+
   test("a branch not yet sent is drawn just after the thread it forks from, two there in the order they were opened", () => {
     const [F1, F2] = [
       threadIdFor("01a0ffd2-0000-7000-8000-0000000000f1"),
@@ -147,7 +229,7 @@ describe("canvasColumns (ADR-0116)", () => {
         key: F1,
         anchor: entryId("2-a"),
         thread: F1,
-        fresh: { prefill: { text: "hi", blank: false } },
+        mode: { kind: "fresh", prefill: { text: "hi", blank: false } },
       },
     })
     // At a fork in a thread on no canvas here: at the end.
@@ -169,11 +251,9 @@ describe("canvasColumns (ADR-0116)", () => {
     const before = draw(canvasFor([TRUNK]), sent)
     expect(before[1]).toMatchObject({
       card: null,
-      column: { key: E, anchor: entryId("6-e"), thread: E },
+      column: { key: E, anchor: entryId("6-e"), thread: E, mode: BOUND },
     })
-    expect(before[1]?.kind === "thread" && before[1].column.fresh).toBe(
-      undefined,
-    )
+    expect(before[1]?.kind === "thread" && before[1].column.mode).toEqual(BOUND)
     expect(shape(draw(canvasFor([TRUNK, E]), sent))).toEqual([
       ["thread", TRUNK, false],
       ["thread", E, true],

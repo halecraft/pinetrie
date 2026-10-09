@@ -2,9 +2,15 @@
 // ADR-0059): `settleSlots`, the one slot rule the repair writes too, as a
 // card grid (`gridView`), each of the first nine slots labelled 1–9. Pure.
 
-import { type CardId, type CardRecord, INVENTORY_GRID } from "@pinetrie/core"
+import {
+  type CardId,
+  type CardRecord,
+  INVENTORY_GRID,
+  type ThreadId,
+} from "@pinetrie/core"
 import { type Intents, type Slots, settleSlots } from "@pinetrie/session"
 import { type GridView, gridView } from "./grid-view.ts"
+import type { ThreadFace } from "./thread-face.ts"
 
 export interface InventoryView {
   readonly grid: GridView
@@ -24,6 +30,8 @@ export function inventoryView(input: {
   readonly selected: number
   /** Each card's text, by id; one not yet read is "". */
   readonly texts: ReadonlyMap<CardId, string>
+  /** Each thread's face, for a thread's card (ADR-0124). */
+  readonly threads: ReadonlyMap<ThreadId, ThreadFace>
 }): InventoryView {
   const byId = new Map<CardId, CardRecord>(
     input.held.map(c => [c.id, c] as const),
@@ -44,6 +52,7 @@ export function inventoryView(input: {
     placed,
     selected: input.selected,
     texts: input.texts,
+    threads: input.threads,
     keyOf: slotKey,
   })
   return { grid, free: grid.cells.length - placed.size }

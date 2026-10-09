@@ -1,8 +1,11 @@
 import {
   atEntry,
+  type CardHistoryRecord,
+  type CardId,
   type CardRecord,
   entryId,
   type LaneRecord,
+  noteColumnIdFor,
   rootIdFor,
   type TextCard,
   taskIdFor,
@@ -29,6 +32,7 @@ const STARTS = threadIdFor("spun")
 const ADA = writerId("p-ada")
 const BEA = writerId("p-bea")
 const C1 = cardIdFor("c1")
+const canvasKey = { kind: "canvas", task: NEW_TASK } as const
 /** Your message at the thread: a card at a thread, in its task. */
 const note = {
   kind: "composing",
@@ -130,16 +134,28 @@ describe("planLiftRoot (S139)", () => {
     known,
     writers,
   })
+  /** The spun thread's card, alone on the task the spin-off made. */
+  const spunCard = threadCardOf({
+    thread: STARTS,
+    task: NEW_TASK,
+    by: ADA,
+    cards: [],
+  })
   const lift = (
     t: SpunThread,
-    over: { cards?: CardRecord[]; lanes?: LaneRecord[] } = {},
+    over: {
+      cards?: CardRecord[]
+      lanes?: LaneRecord[]
+      histories?: ReadonlyMap<CardId, CardHistoryRecord>
+    } = {},
   ) =>
     planLiftRoot({
       lifting: [C1],
-      cards: over.cards ?? [gone],
+      cards: over.cards ?? [gone, spunCard],
       threads: new Map([[THREAD, t]]),
       lanes: over.lanes ?? [],
       rootOfThread: new Map([[STARTS, THREAD]]),
+      histories: over.histories ?? new Map(),
     })
 
   test.each([
@@ -176,9 +192,79 @@ describe("planLiftRoot (S139)", () => {
       {
         cards: [
           gone,
+          spunCard,
           card({
             id: cardIdFor("c2"),
             place: { ...note, thread: STARTS },
+          }),
+        ],
+      },
+      { kind: "replied", by: null },
+    ],
+    [
+      "its thread's card taken into an inventory: refused (ADR-0124)",
+      thread([ADA]),
+      {
+        cards: [
+          gone,
+          { ...spunCard, place: { kind: "inventory", holder: BEA } },
+        ],
+      },
+      { kind: "replied", by: null },
+    ],
+    [
+      "its thread's card moved since it was made: refused (ADR-0124)",
+      thread([ADA]),
+      {
+        histories: new Map([
+          [
+            STARTS,
+            {
+              card: STARTS,
+              events: [
+                { kind: "created", by: ADA, from: null, to: canvasKey, at: 1 },
+                {
+                  kind: "moved",
+                  by: BEA,
+                  from: { kind: "canvas", task: TEST_TASK },
+                  to: canvasKey,
+                  at: 2,
+                },
+              ],
+            },
+          ],
+        ]),
+      },
+      { kind: "replied", by: null },
+    ],
+    [
+      "another card on its task's canvas: refused (ADR-0124)",
+      thread([ADA]),
+      {
+        cards: [
+          gone,
+          spunCard,
+          {
+            kind: "note-column",
+            id: noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a9"),
+            owner: BEA,
+            placer: BEA,
+            place: { kind: "canvas", task: NEW_TASK, order: "9", width: 1 },
+          },
+        ],
+      },
+      { kind: "replied", by: null },
+    ],
+    [
+      "a card pinned to its task: refused (ADR-0124)",
+      thread([ADA]),
+      {
+        cards: [
+          gone,
+          spunCard,
+          card({
+            id: cardIdFor("c3"),
+            place: { kind: "task-pinned", task: NEW_TASK, order: "a" },
           }),
         ],
       },
@@ -218,6 +304,7 @@ describe("planLiftRoot (S139)", () => {
         threads: new Map(),
         lanes: [],
         rootOfThread: new Map(),
+        histories: new Map(),
       }),
     ).toEqual({ kind: "lift", delete: [] })
   })

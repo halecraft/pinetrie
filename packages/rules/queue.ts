@@ -132,7 +132,8 @@ export function blankQueued(
 export const NONE_BLANK: ReadonlySet<CardId> = new Set()
 
 /**
- * The next queued card to pop for a lane: none while it runs; else its top
+ * The next queued card to pop for a lane: none while it runs or its thread
+ * is in an inventory; else its top
  * card that is not blank (`blank`, each `isBlankMessage`), unless the queue
  * is held or someone is typing in that card. A blank card is passed over
  * and stays where it is, so the cards behind it are not stuck behind
@@ -144,6 +145,8 @@ export function planNextQueuedCardPop(
   lane: ThreadId,
   facts: {
     readonly running: boolean
+    /** Its thread is in someone's inventory (`heldIn`, ADR-0124): nothing runs there. */
+    readonly away: boolean
     readonly held: boolean
     /** The cards someone is typing in now (`typingIn`). */
     readonly typing: ReadonlySet<CardId>
@@ -151,7 +154,8 @@ export function planNextQueuedCardPop(
     readonly blank: ReadonlySet<CardId>
   },
 ): NextQueuedCardPopStep {
-  if (facts.running) return { kind: "idle" }
+  // A thread in an inventory has no runner (ADR-0124): its queue waits.
+  if (facts.running || facts.away) return { kind: "idle" }
   const queue = queuedOn(cards, lane)
   const top = queue.find(c => !facts.blank.has(c.id))
   if (top === undefined) {

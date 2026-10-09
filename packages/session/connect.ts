@@ -36,7 +36,6 @@ import {
   isTextCard,
   isTextCardId,
   keyOf,
-  type Move,
   type MoveDirection,
   type OfferAction,
   PLAIN,
@@ -48,6 +47,7 @@ import {
   type TextCard,
   type TextCardId,
   type ThreadId,
+  type TypedMove,
   type WriterId,
   writerOfPrincipal,
 } from "@pinetrie/core"
@@ -252,7 +252,7 @@ export interface SessionClient {
    * discard from your inventory (ADR-0116). Resolves with the host's answer.
    */
   moveCard(
-    move: Move,
+    move: TypedMove,
     how?: MoveHow,
     queuedBy?: WriterId | null,
     here?: TaskId | null,
@@ -538,7 +538,7 @@ export async function connectSession(
    * into a queue: that is `queueCard`'s, with its text's version.
    */
   function sendMove(
-    move: Move,
+    move: TypedMove,
     how: MoveHow,
     queuedBy: WriterId | null,
     draft: CardRecord | null,

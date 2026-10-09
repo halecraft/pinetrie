@@ -79,7 +79,16 @@ const resolve = (
   lanes: readonly LaneView[] = [],
   list: readonly TaskId[] = [],
   canvases = tasksIn(i).canvases,
-) => resolveLayout(l, { index: i, lanes, archived, list, canvases })
+) =>
+  resolveLayout(l, {
+    index: i,
+    lanes,
+    archived,
+    list,
+    canvases,
+    forks: new Map(),
+    holders: new Map(),
+  })
 const sync = (l: Layout, i = index) => resolve(l, i)
 /** `l` drawn with `list` as the sidebar. */
 const drawn = (l: Layout, list: readonly TaskId[]) =>
@@ -98,6 +107,8 @@ const prune = (
     archived,
     list,
     canvases,
+    forks: new Map(),
+    holders: new Map(),
     known: new Set(i.roots.map(r => TK(r))),
   })
 /** A change to your view of `root`'s task, its first card the canvas's. */
@@ -113,6 +124,8 @@ const unfold = (card: CardId, root = "1-r1") =>
 const columnsOf = (l: Layout, root = "1-r1", i = index) =>
   taskColumns(l, TK(root), {
     canvases: tasksIn(i).canvases,
+    forks: new Map(),
+    holders: new Map(),
     index: i,
     lanes: [],
   }).map(c => [c.kind === "notes" ? c.card : c.column.key, c.folded])
@@ -287,7 +300,7 @@ describe("layoutReducer", () => {
         key: NEW_THREAD,
         anchor: null,
         thread: NEW_THREAD,
-        fresh: { root: NEW_ROOT, task: NEW_TASK },
+        mode: { kind: "fresh", root: NEW_ROOT, task: NEW_TASK },
         asksAgent: true,
       },
     ])
@@ -306,7 +319,8 @@ describe("layoutReducer", () => {
       asksAgent: true,
       prefill,
     })
-    expect(opened.newTabs[0]?.fresh).toEqual({
+    expect(opened.newTabs[0]?.mode).toEqual({
+      kind: "fresh",
       root: NEW_ROOT,
       task: NEW_TASK,
       prefill,
@@ -451,6 +465,8 @@ describe("layoutReducer", () => {
       archived,
       list,
       canvases: w.canvases,
+      forks: new Map(),
+      holders: new Map(),
     })
     expect(stored).toEqual(shown)
   })
@@ -459,6 +475,8 @@ describe("layoutReducer", () => {
     expect(
       taskColumns(initialLayout(), TK("1-r1"), {
         canvases: TASKS.canvases,
+        forks: new Map(),
+        holders: new Map(),
         index,
         lanes: [],
       })[0],
@@ -467,6 +485,8 @@ describe("layoutReducer", () => {
     expect(
       taskColumns(initialLayout(), TK("1-r1"), {
         canvases: tasksIn(replied).canvases,
+        forks: new Map(),
+        holders: new Map(),
         index: replied,
         lanes: [],
       })[0],
@@ -562,12 +582,12 @@ describe("planOpen", () => {
   const l = at(initialLayout())
   test("scrolls to a message an unfolded column already shows", () => {
     // The task's first column follows its thread, through 2-a to 3-b.
-    expect(planOpen(l, index, entryId("2-a"), TASKS, [])).toEqual({
+    expect(planOpen(l, index, entryId("2-a"), TASKS, [], new Map())).toEqual({
       kind: "scroll",
       task: TK("1-r1"),
       key: TRUNK,
     })
-    expect(planOpen(l, index, entryId("6-d"), TASKS, [])).toEqual({
+    expect(planOpen(l, index, entryId("6-d"), TASKS, [], new Map())).toEqual({
       kind: "scroll",
       task: TK("5-r2"),
       key: threadOfEntry("5-r2"),
@@ -575,7 +595,7 @@ describe("planOpen", () => {
   })
   test("unfolds the column of a message's thread when no unfolded column shows it", () => {
     // 4-c is a branch at 2-a: another thread, its column folded.
-    expect(planOpen(l, index, entryId("4-c"), TASKS, [])).toEqual({
+    expect(planOpen(l, index, entryId("4-c"), TASKS, [], new Map())).toEqual({
       kind: "unfold",
       task: TK("1-r1"),
       card: C,
@@ -585,26 +605,31 @@ describe("planOpen", () => {
       layoutReducer(l, unfold(C)),
       view("1-r1", { kind: "fold", card: TRUNK, unfolded: false }),
     )
-    expect(planOpen(folded, index, entryId("2-a"), TASKS, [])).toEqual({
+    expect(
+      planOpen(folded, index, entryId("2-a"), TASKS, [], new Map()),
+    ).toEqual({
       kind: "scroll",
       task: TK("1-r1"),
       key: C,
     })
-    expect(planOpen(folded, index, entryId("3-b"), TASKS, [])).toEqual({
+    expect(
+      planOpen(folded, index, entryId("3-b"), TASKS, [], new Map()),
+    ).toEqual({
       kind: "unfold",
       task: TK("1-r1"),
       card: TRUNK,
     })
   })
   test("an entry the index lacks, or one whose thread is in no task, has no plan", () => {
-    expect(planOpen(l, index, entryId("nope"), TASKS, [])).toBeNull()
+    expect(planOpen(l, index, entryId("nope"), TASKS, [], new Map())).toBeNull()
     expect(
       planOpen(
         l,
         index,
         entryId("4-c"),
-        { taskOfThread: new Map(), canvases: new Map() },
+        { taskOfThread: new Map(), canvases: new Map(), forkOf: new Map() },
         [],
+        new Map(),
       ),
     ).toBeNull()
   })
@@ -645,7 +670,8 @@ describe("encodeLayout / decodeLayout", () => {
           thread: NEW_THREAD,
           asksAgent: true,
           density: "raw",
-          fresh: {
+          mode: {
+            kind: "fresh",
             root: NEW_ROOT,
             task: NEW_TASK,
             state: workflowStateIdFor("d"),
@@ -675,6 +701,24 @@ describe("encodeLayout / decodeLayout", () => {
       ]),
     })
     expect(JSON.stringify(stored)).not.toContain("hello")
+    // A new tab's column, likewise.
+    const tab = encodeLayout({
+      ...initialLayout(),
+      newTabs: [
+        {
+          key: NEW_THREAD,
+          anchor: null,
+          thread: NEW_THREAD,
+          mode: {
+            kind: "fresh",
+            root: NEW_ROOT,
+            task: NEW_TASK,
+            pending: { text: "hello" },
+          },
+        },
+      ],
+    })
+    expect(JSON.stringify(tab)).not.toContain("hello")
     const raw = {
       ...stored,
       tasks: {
@@ -720,7 +764,10 @@ describe("encodeLayout / decodeLayout", () => {
       {
         ...good,
         tasks: {
-          [TK("1-r1")]: { ...goodView, fresh: { "w-x": { at: "2-a" } } },
+          [TK("1-r1")]: {
+            ...goodView,
+            fresh: { "w-x": { at: "2-a" } },
+          },
         },
       },
       // A view as a list: an order of this tab's.
@@ -747,8 +794,8 @@ describe("encodeLayout / decodeLayout", () => {
           thread: NEW_THREAD,
           fresh: { root: NEW_ROOT, task: NEW_TASK },
         }),
-      )?.newTabs[0]?.fresh,
-    ).toEqual({ root: NEW_ROOT, task: NEW_TASK })
+      )?.newTabs[0]?.mode,
+    ).toEqual({ kind: "fresh", root: NEW_ROOT, task: NEW_TASK })
     for (const column of [
       { key: "n", anchor: null, fresh: { root: NEW_ROOT, task: NEW_TASK } },
       { key: "n", anchor: null, thread: NEW_THREAD, fresh: {} },

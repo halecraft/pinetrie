@@ -11,7 +11,6 @@ import {
   type ThreadId,
   type ThreadName,
   type TreeIndex,
-  type WriterId,
 } from "@pinetrie/core"
 import {
   attentionWords,
@@ -24,6 +23,10 @@ import {
   inboxView,
   inboxWords,
   LEVEL_CLASS,
+  linkWords,
+  opens,
+  type Reader,
+  type ThreadLink,
 } from "@pinetrie/interface"
 import { threadNameOf } from "@pinetrie/rules"
 import { useState } from "react"
@@ -33,33 +36,38 @@ import { nameFor } from "./presence.tsx"
 import type { InboxSeen } from "./use-inbox.ts"
 
 /**
- * A thread as a menu row: its lane's name when it has one, its task's label,
- * and the start of the message at `end`; choosing it opens it in its task
- * (`onOpen`).
+ * A thread as a menu row: its lane's name when it has one, where its link
+ * leads (its task's label, or who has it), and the start of the message at
+ * `end`; choosing it follows the link (`onOpen`), which a thread someone
+ * else holds does not let it (ADR-0124).
  */
 export function threadRow(input: {
   readonly index: TreeIndex
   readonly labelOf: (task: TaskId | null) => string
-  readonly onOpen: (id: EntryId, task: TaskId | null) => void
+  readonly reader: Reader
+  readonly onOpen: (id: EntryId, link: ThreadLink) => void
 }) {
   return (
     key: string,
     end: EntryId,
-    task: TaskId | null,
+    link: ThreadLink,
     name?: string,
     at: string = firstLine(messageText(input.index.entries[end]?.message), 48),
   ): MenuItem => ({
     key,
     className: "here-thread",
     data: { entry: end },
+    disabled: !opens(link),
     label: (
       <>
         {name !== undefined && <span className="here-name">{name}</span>}
-        <span className="here-root">{input.labelOf(task)}</span>
+        <span className="here-root">
+          {linkWords(link, input.reader, input.labelOf)}
+        </span>
         <span className="here-at">{at}</span>
       </>
     ),
-    onChoose: () => input.onOpen(end, task),
+    onChoose: () => input.onOpen(end, link),
   })
 }
 
@@ -74,11 +82,11 @@ export interface InboxMenuProps {
   readonly inbox: InboxSeen
   readonly thread: ThreadRow
   readonly names: ReadonlyMap<ThreadId, ThreadName>
-  /** Each thread's task: a raised item opens there. */
-  readonly taskOfThread: ReadonlyMap<ThreadId, TaskId>
+  /** Where each thread's link leads (`linkTo`): a raised item or a mention opens there. */
+  readonly linkOf: (thread: ThreadId) => ThreadLink
   readonly labelOf: (task: TaskId | null) => string
-  readonly nameOf: ReadonlyMap<WriterId, string>
-  readonly onOpen: (id: EntryId, task: TaskId | null) => void
+  readonly reader: Reader
+  readonly onOpen: (id: EntryId, link: ThreadLink) => void
   readonly onIntent: (intent: Intent) => void
 }
 
@@ -96,9 +104,9 @@ export function useInboxMenu({
   inbox,
   thread,
   names,
-  taskOfThread,
+  linkOf,
   labelOf,
-  nameOf,
+  reader,
   onIntent,
   onOpen,
 }: InboxMenuProps): {
@@ -111,6 +119,7 @@ export function useInboxMenu({
 } {
   const [onlyUnseen, setOnlyUnseen] = useState(false)
   const [kept, setKept] = useState<readonly InboxSection[]>([])
+  const { nameOf } = reader
   const view = inboxView({
     items: attention,
     badge: count,
@@ -125,7 +134,7 @@ export function useInboxMenu({
       ...thread(
         `${item.lane}:${item.raised.kind}`,
         item.end,
-        taskOfThread.get(item.lane) ?? null,
+        linkOf(item.lane),
         threadNameOf(names, item.lane),
         attentionWords(item.raised, w => nameFor(nameOf, w)),
       ),
@@ -169,25 +178,28 @@ export function useInboxMenu({
       onChoose: inbox.markAllSeen,
     },
   ]
-  const rows: MenuItem[] = listed.map(m => ({
-    key: m.id,
-    className: inbox.isUnseen(m.id) ? "inbox-row unseen" : "inbox-row",
-    data: { entry: m.id },
-    label: (
-      <>
-        <span className="inbox-who">
-          {nameFor(nameOf, m.by)} ·{" "}
-          {labelOf(taskOfThread.get(m.thread) ?? null)}
-        </span>
-        <span className="inbox-text">{firstLine(m.text, 48)}</span>
-      </>
-    ),
-    onChoose: () => {
-      inbox.markSeen(m.id)
-      // A mention opens in the task its thread is in (ADR-0116).
-      onOpen(m.id, taskOfThread.get(m.thread) ?? null)
-    },
-  }))
+  const rows: MenuItem[] = listed.map(m => {
+    const link = linkOf(m.thread)
+    return {
+      key: m.id,
+      className: inbox.isUnseen(m.id) ? "inbox-row unseen" : "inbox-row",
+      data: { entry: m.id },
+      label: (
+        <>
+          <span className="inbox-who">
+            {nameFor(nameOf, m.by)} · {linkWords(link, reader, labelOf)}
+          </span>
+          <span className="inbox-text">{firstLine(m.text, 48)}</span>
+        </>
+      ),
+      onChoose: () => {
+        inbox.markSeen(m.id)
+        // A mention opens in the task its thread is in (ADR-0116), or not
+        // at all where someone else holds it (ADR-0124).
+        onOpen(m.id, link)
+      },
+    }
+  })
   const items = (s: InboxSection): readonly MenuItem[] =>
     s === "mentions"
       ? mentions.length === 0

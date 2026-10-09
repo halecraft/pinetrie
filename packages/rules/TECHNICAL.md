@@ -57,6 +57,8 @@ follow this list. A name only this package uses is imported from its module.
   carries; handoffs and their targets; reorders, a card's width and its
   command; each sender's history of moves and its undo.
 - `rank.ts`: a rank on a canvas, a drop's, and where a branch lands.
+- `held.ts`, `copy.ts`: a thread in an inventory (the gate, who holds it,
+  what a change takes) and a thread copied (ADR-0117, ADR-0124).
 - `queue-hold.ts`, `seat.ts`, `startup.ts`: a held queue, who wrote in a
   text, what a starting host resumes.
 - `board.ts`, `archive.ts`, `order.ts`: the board's workflow states and
@@ -543,7 +545,11 @@ not `pinetrie:live`, so it lasts until a release, across a restart.
   thread the directory still names must hold its first message alone (its
   tree's writers, oldest first), with no lane and no card in it but those
   the undo moves; otherwise `replied`, naming who wrote second (null for
-  the agent, a lane or a card). A card is in the root by `rootOfPlace`. A
+  the agent, a lane or a card). A card is in the root by `rootOfPlace`.
+  Its thread's card must also be where the spin-off put it (ADR-0124): on
+  a canvas, never moved since (its card history holds its making alone),
+  with no other card on that canvas and none pinned to the task, so an
+  undo restores exactly what was there or does nothing. A
   thread already gone lifts nothing; `delete` names each root and its
   thread, read before the undo reverts the card.
 - **`planRootDelete`** (`root.ts`) is what deleting a lifted thread
@@ -643,8 +649,45 @@ by construction.
 - **`rootsHeld`**: the roots with a thread on the canvas of a task outside
   the archive, or in an inventory: what a starting host loads, and what
   archiving keeps.
+- **`forkOf`**: each copy's fork, from its record's `origin`: where its
+  column ends before its first send.
 
-# The board (`board.ts`, ADR-0122)
+# Threads as cards (`held.ts`, `copy.ts`, ADR-0117, ADR-0124)
+
+A thread's card is a canvas's or an inventory's (`PLACES_OF.thread`), and
+moves between them as any card does (`planMove`, typed at the codec by
+`typedMove`). An inventory has no agent and no runner.
+
+- **One gate, per command kind** (`runsIn`, beside `writesIn`): what each
+  `Intent`, or a queue's pop, runs or writes a message in: a send at a
+  thread's end, a carry-on, an offer action that may ask the agent (all but
+  an acceptance) and a pop run in their thread; a branch in the thread its
+  fork is in, read from its root's tree; a new root in none. Exhaustive, so
+  a new kind of command does not compile until it says. `heldIn` finds
+  the first of those someone holds (`holderOf`); a copy's first send, at
+  its own record's fork, runs in the copy. The host refuses before every
+  command and popped card (`refuseHeld`), and the drain asks before it
+  pops (`planNextQueuedCardPop`'s `away`), so the queue waits, held.
+  Refused with `HELD_WORDS`, "put it on a canvas first".
+- **A take stops the run** (`takenIn(before, after)`): every thread card
+  in an inventory after a change that was not before. The host's
+  provenance step reads it from every person's change to the places (a
+  move, an undo or a redo, a copy), so no path that writes places can
+  take a running thread and leave it running. The stop is the taker's own.
+- **A moved thread is told** (`canvas.ts`, `planCanvasFacts`): a running
+  thread whose card moved from one task's canvas to another's is steered
+  "Bea moved this thread to the task …"; the tasks' other running threads
+  are told it was taken and added.
+- **`planCopy`**: a copy of `source` at `end`, refused unless `end` is in
+  the source (`threadAt`), the copy's id is new, and nobody else holds the
+  source. Its record's `origin` is `{ kind: "copy", source, fork: end }`,
+  kept after its first send, so its fork row can say "copied from". Its
+  card is made by **`planMake`** (`moves.ts`), the one way a person's
+  command makes a card: `exists`, then `refuseInto`'s refusals (a place its
+  kind is never in, another's inventory, a full one). It lands on a canvas
+  by **`rankOnCanvas`**, as a move's drop does. No entry is written: its
+  first send is a branch at its fork, which `sendChat` lets through for the
+  thread whose record names that fork, and writes no second record or card. (`board.ts`, ADR-0122)
 
 Every task is in one workflow state. The workflow is a host-written
 singleton (`WORKFLOW`): the open states in board order, then the closed
@@ -912,11 +955,18 @@ Host-written records, each a `RecordSpec` (above) with a total decoder:
   above it, else the base snapshot; and the nearest commit, else the
   thread's base (`planBegin`): accepted work's commit, or a WIP's copy on accepted work
   commit under it. The start is always named: a cloned disk carries its
-  parent's working-copy change, and the fork must leave it.
+  parent's working-copy change, and the fork must leave it. A snapshot
+  that is gone (`kept` false, which the host asks the runtime) is read as
+  missing: the fork starts from its base, and names the snapshot `lost`;
+  the host records it (`FILES_LOST`, `pinetrie.files-lost`, keyed by lane),
+  which a copy's fork row reads (ADR-0124).
 - **A project record of kind `workspaces` no longer decodes**; the host
   rewrites it at start.
 - **`planRetention`** keeps every snapshot of an open root, and each lane's
-  newest when the root is archived; the base snapshot is never deleted.
+  newest when the root is archived, and the one nearest each thread's end
+  in its roots (`keep`, from `planArchive`'s `trees`), whatever task the
+  thread is in, which a copy from the archive clones (ADR-0124); the base
+  snapshot is never deleted.
 - **`showHostWorkingCopy`** shows a path under your working copy's root as the same
   path under `/mnt/host-working-copy`, whole path prefixes only. `planChat` applies it to a
   message's text when its thread works, or will work, in its own copy, so

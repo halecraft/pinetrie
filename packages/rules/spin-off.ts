@@ -5,6 +5,7 @@
 // card while the root holds that first message alone (S139). Pure.
 
 import {
+  type CardHistoryRecord,
   type CardId,
   type CardRecord,
   type LaneRecord,
@@ -126,9 +127,12 @@ export type LiftPlan =
 /**
  * Whether an undo that moves `lifting` (the cards the step names, S139) may
  * lift back the threads those spun off: each must hold its first message
- * alone, with no lane and no card in it but those the undo moves. A thread
- * the directory no longer names has nothing to lift. Refused `replied`,
- * naming who wrote second, when any holds more. Pure.
+ * alone, with no lane and no card in it but those the undo moves, and its
+ * card must still be where the spin-off put it, alone on its task's canvas
+ * with nothing pinned to the task (ADR-0124): an undo restores exactly what
+ * was there, or does nothing. A thread the directory no longer names has
+ * nothing to lift. Refused `replied`, naming who wrote second, when any
+ * holds more. Pure.
  */
 export function planLiftRoot(input: {
   readonly lifting: readonly CardId[]
@@ -137,6 +141,8 @@ export function planLiftRoot(input: {
   readonly lanes: readonly LaneRecord[]
   /** Each recorded thread's root (`TaskIndex`): a card at a thread names no root. */
   readonly rootOfThread: ReadonlyMap<ThreadId, RootId>
+  /** Each card's history: a thread's card that moved since it was made has more than one event. */
+  readonly histories: ReadonlyMap<CardId, CardHistoryRecord>
 }): LiftPlan {
   const spun = input.cards.filter(
     c =>
@@ -157,8 +163,30 @@ export function planLiftRoot(input: {
         rootOfPlace(c.place, input.rootOfThread) === thread.thread,
     )
     const lane = input.lanes.some(l => l.root === thread.thread)
-    if (others || lane) return { kind: "replied", by: null }
+    if (others || lane || !aloneInItsTask(input, card.place.why.thread))
+      return { kind: "replied", by: null }
     deleting.push({ root: thread.thread, thread: card.place.why.thread })
   }
   return { kind: "lift", delete: deleting }
+}
+
+/**
+ * Whether a spun thread's card is where the spin-off put it: on a task's
+ * canvas, never moved since (its history holds its making alone), with no
+ * other card on that canvas and none pinned to the task.
+ */
+function aloneInItsTask(
+  input: Pick<Parameters<typeof planLiftRoot>[0], "cards" | "histories">,
+  thread: ThreadId,
+): boolean {
+  const card = input.cards.find(c => c.id === thread)
+  if (card?.place.kind !== "canvas") return false
+  if ((input.histories.get(thread)?.events.length ?? 0) > 1) return false
+  const { task } = card.place
+  return !input.cards.some(
+    c =>
+      c.id !== thread &&
+      (c.place.kind === "canvas" || c.place.kind === "task-pinned") &&
+      c.place.task === task,
+  )
 }

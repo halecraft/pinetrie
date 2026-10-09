@@ -17,21 +17,25 @@ import {
   isFact,
   isReorderAt,
   keyOf,
-  type Move,
   type MoveDirection,
   moveOf,
+  type NoteColumnCard,
   type NoteColumnId,
   noteOf,
   type PlaceKey,
   type Position,
+  parseCardId,
   pinnedOf,
   type QueueMove,
   type Reorder,
   sameKey,
   type TaskId,
+  type TextCard,
   type TextCardId,
+  type ThreadCard,
   type ThreadId,
   type TraceRecord,
+  type TypedMove,
   type WriterId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
@@ -47,9 +51,10 @@ import {
   type MoveHow,
   type Slots,
 } from "@pinetrie/session"
-import type { Minted } from "./columns.ts"
+import { freshTaskOf, type Minted } from "./columns.ts"
 import {
   type CardFacts,
+  changeViewOf,
   type Effect,
   type IntentState,
   planOpenAt,
@@ -63,7 +68,7 @@ import { planSpinOff } from "./spin-off.ts"
  * `here`, for a discard, the task you are on.
  */
 export const moveCard = (
-  move: Move,
+  move: TypedMove,
   how: MoveHow,
   fly: boolean,
   queuedBy: WriterId | null = null,
@@ -75,7 +80,7 @@ export const moveCard = (
  * empty: the session reads it as it sends (S96).
  */
 export const queueMove = (
-  card: CardRecord,
+  card: TextCard,
   to: { readonly lane: ThreadId; readonly at: Position },
 ): QueueMove =>
   moveOf(card, { kind: "queued", at: to.at, thread: to.lane, seen: "" })
@@ -119,7 +124,7 @@ export function reorderOf(
   }
 }
 
-const slotOf = (slots: Slots, card: CardId): number | null => {
+export const slotOf = (slots: Slots, card: CardId): number | null => {
   const found = Object.entries(slots).find(([, c]) => c === card)
   return found === undefined ? null : Number(found[0])
 }
@@ -129,8 +134,18 @@ export const cardOf = (
   card: CardId,
 ): CardRecord | undefined => facts.cards.find(c => c.id === card)
 
+/** `card`'s record when it is a text card's: what moves between a thread's places. */
+export const textCardOf = (
+  facts: Pick<CardFacts, "cards">,
+  card: CardId,
+): TextCard | undefined => {
+  const now = cardOf(facts, card)
+  return now?.kind === "text" ? now : undefined
+}
+
 /** A take into the inventory refused before it is sent: it is full, as the host would say. */
-const full = (card: CardId): CardNotice => ({
+/** Your inventory is full: said where a take into it was made. */
+export const full = (card: CardId): CardNotice => ({
   card,
   actedAt: AT_INVENTORY,
   code: "full",
@@ -140,7 +155,7 @@ const full = (card: CardId): CardNotice => ({
 
 /** A handoff into your inventory, at `slot`. */
 const moveIntoInventorySlot = (
-  card: CardRecord,
+  card: TextCard | ThreadCard,
   slot: number,
   me: CardFacts["me"],
 ) =>
@@ -163,12 +178,18 @@ export function planTakeIntoInventory(
 ): readonly Effect[] {
   const facts = state.cards
   const now = cardOf(facts, card)
-  if (now === undefined || now.place.kind === "inventory") return []
+  // A note column is never in an inventory (`PLACES_OF`).
+  if (
+    now === undefined ||
+    now.kind === "note-column" ||
+    now.place.kind === "inventory"
+  )
+    return []
   return takeIntoInventoryAt(now, facts.selected, state)
 }
 
 function takeIntoInventoryAt(
-  now: CardRecord,
+  now: TextCard | ThreadCard,
   start: number,
   state: IntentState,
 ): readonly Effect[] {
@@ -229,26 +250,25 @@ export function planPut(
   if (now === undefined) return []
   if (target.kind === "state" || target.kind === "sidebar")
     return planSpinOff(card, target, minted, state)
-  if (
-    (target.kind === "column" || target.kind === "composer") &&
-    intoMessage(target, facts.composers)
-  )
-    return putInMessage(now, target.key, state)
   if (target.kind === "inventory") {
+    // A note column is never in an inventory (`PLACES_OF`).
+    if (now.kind === "note-column") return []
     const from = slotOf(facts.slots, card)
     if (from === null || now.place.kind !== "inventory")
       return takeIntoInventoryAt(now, target.slot, state)
     if (from === target.slot) return []
     return [{ kind: "swapSlots", a: from, b: target.slot }]
   }
+  // A thread's card or a note column goes on a canvas (ADR-0117).
+  if (now.kind !== "text") return putOnCanvas(now, target, state)
+  if (
+    (target.kind === "column" || target.kind === "composer") &&
+    intoMessage(target, facts.composers)
+  )
+    return putInMessage(now, target.key, state)
   const to = placeOfTarget(target, facts.composers, facts.me)
   // A note put on its own column stays where it is: a reorder moves it there.
-  if (
-    to === null ||
-    (to.kind !== "notes" &&
-      to.kind !== "canvas-at" &&
-      sameKey(keyOf(now.place), to))
-  )
+  if (to === null || (to.kind !== "notes" && sameKey(keyOf(now.place), to)))
     return []
   // Where a refusal is said: the column the card was put on; a task's pins,
   // its task column's.
@@ -263,6 +283,49 @@ export function planPut(
 }
 
 /**
+ * A card that lives on a canvas, put from your inventory (ADR-0117): on the
+ * canvas of the task you are on, just after the column it was put on, or
+ * first on a task's pinned cards' column; unfolded, so you see it land.
+ * Nothing on the canvas it is on already, where a reorder moves it, nor on
+ * a state or the sidebar, which make a thread from a text card alone.
+ */
+function putOnCanvas(
+  now: ThreadCard | NoteColumnCard,
+  target: PutTarget,
+  state: IntentState,
+): readonly Effect[] {
+  const here = taskOfTab(state)
+  const spot: { task: TaskId; after: CardId | null } | null =
+    target.kind === "taskPinned"
+      ? { task: target.task, after: null }
+      : target.kind === "notes"
+        ? here === null
+          ? null
+          : { task: here, after: target.column }
+        : target.kind === "column" ||
+            target.kind === "composer" ||
+            target.kind === "pinned"
+          ? here === null
+            ? null
+            : { task: here, after: parseCardId(target.key) ?? null }
+          : null
+  if (spot === null) return []
+  if (now.place.kind === "canvas" && now.place.task === spot.task) return []
+  return [
+    moveCard(
+      moveOf(now, { kind: "canvas-at", ...spot }),
+      { actedAt: AT_INVENTORY, slot: null },
+      false,
+    ),
+    changeViewOf(state, spot.task, {
+      kind: "fold",
+      card: now.id,
+      unfolded: true,
+    }),
+  ]
+}
+
+/**
  * `now` as your message in column `key`'s composer (ADR-0113). A message
  * there with text takes `now`'s place, a slot of your inventory included,
  * in one move the host accepts or refuses whole, so one undo; an empty one
@@ -271,7 +334,7 @@ export function planPut(
  * thread, so the put is refused.
  */
 function putInMessage(
-  now: CardRecord,
+  now: TextCard,
   key: string,
   state: IntentState,
 ): readonly Effect[] {
@@ -284,7 +347,7 @@ function putInMessage(
   const actedAt = atColumn(key)
   const into = { move: moveOf(now, to), slot: null }
   const message =
-    spot.message === null ? undefined : cardOf(facts, spot.message)
+    spot.message === null ? undefined : textCardOf(facts, spot.message)
   if (message === undefined)
     return [moveCard(into.move, { actedAt, slot: null }, true)]
   if (!facts.filled.has(message.id)) {
@@ -319,7 +382,7 @@ export function planToNote(
   key: string,
   state: IntentState,
 ): readonly Effect[] {
-  const now = cardOf(state.cards, card)
+  const now = textCardOf(state.cards, card)
   return now?.place.kind === "composing"
     ? [moveCard(moveOf(now, noteOf(now.place)), IN_COLUMN(key), true)]
     : []
@@ -362,7 +425,7 @@ export function planPin(
   key: string,
   state: IntentState,
 ): readonly Effect[] {
-  const now = cardOf(state.cards, card)
+  const now = textCardOf(state.cards, card)
   const to = now === undefined ? null : pinnedOf(now.place)
   return now === undefined || to === null
     ? []
@@ -378,7 +441,7 @@ export function planUnpin(
   key: string,
   state: IntentState,
 ): readonly Effect[] {
-  const now = cardOf(state.cards, card)
+  const now = textCardOf(state.cards, card)
   if (now?.place.kind === "pinned")
     return [moveCard(moveOf(now, noteOf(now.place)), IN_COLUMN(key), true)]
   if (now?.place.kind === "task-pinned")
@@ -402,7 +465,7 @@ export function planPinToTask(
   key: string,
   state: IntentState,
 ): readonly Effect[] {
-  const now = cardOf(state.cards, card)
+  const now = textCardOf(state.cards, card)
   if (now === undefined || now.place.kind === "task-pinned") return []
   const active = state.layout.active
   const task =
@@ -429,7 +492,7 @@ export function planDiscard(
   how: MoveHow,
   state: IntentState,
 ): readonly Effect[] {
-  const now = cardOf(state.cards, card)
+  const now = textCardOf(state.cards, card)
   if (now === undefined || isFact(now)) return []
   // Someone else's inventory is theirs to empty (ADR-0059).
   if (now.place.kind === "inventory" && state.cards.me !== now.place.holder)
@@ -452,7 +515,7 @@ export function planKeep(
   const facts = state.cards
   const slots: Record<string, CardId> = { ...facts.slots }
   const moves = cards.flatMap(id => {
-    const now = cardOf(facts, id)
+    const now = textCardOf(facts, id)
     if (now === undefined) return []
     const slot = firstEmpty(slots, facts.selected)
     if (slot !== null) slots[String(slot)] = now.id
@@ -489,7 +552,7 @@ export function taskOfTab(state: IntentState): TaskId | null {
   if (active === null || active.kind === "nothing") return null
   if (active.kind === "new")
     return (
-      state.layout.newTabs.find(c => c.key === active.key)?.fresh?.task ?? null
+      freshTaskOf(state.layout.newTabs.find(c => c.key === active.key)) ?? null
     )
   return active.task
 }

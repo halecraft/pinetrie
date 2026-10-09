@@ -63,7 +63,9 @@ page's (`storage-keys.ts`, `tab-state.ts`, `same-props.ts`, `colors.ts`).
 ## The roots a tab holds (ADR-0063)
 
 - **A tab holds the roots it shows** (`planHeldRoots`, `held-roots.ts`): the
-  roots of the sidebar, and the one you are on, archived or not. `SessionClient.holdRoots` opens what is new and `destroy`s what
+  roots of the sidebar, and the one you are on, archived or not, and of each
+  thread in your inventory (`inventoryThreads`), whose slot and preview read
+  it (ADR-0124). `SessionClient.holdRoots` opens what is new and `destroy`s what
   is not, which leaves the host's copy (S86). A root this client starts is
   held from its first send until the page asks for it, and after that only
   while the page does. What opens and goes, and why every other root is
@@ -88,9 +90,18 @@ page's (`storage-keys.ts`, `tab-state.ts`, `same-props.ts`, `colors.ts`).
   columns sync only while it is held; `prune` waits for the stored tabs'
   roots to settle, and drops only what the directory lacks.
 - **What the footer and the board open may be in a root not held**
-  (`openIn`): one held opens as `openAt`; any other root is shown, archived
+  (`openLink`): one held opens as `openAt`; any other root is shown, archived
   or not, which holds it, and `openWhenHeld` shows the entry once the index
   has it.
+- **A link to a thread is a `ThreadLink`** (`thread-link.ts`, ADR-0117,
+  ADR-0124), which only `linkTo(thread, cards, me)` makes (a brand): `open`
+  in a task, `mine` in your inventory (its preview opens: `openSelected`),
+  `held` in someone else's, `gone` with no card. The inbox's rows, a
+  mention, a reader's thread, a copy's or a parent elsewhere's fork row and
+  a rail stub all follow one through the `openLink` intent
+  (`planOpenLink`); `linkWords` words it, "Bea has it" (`heldWords`).
+  `openAt` serves only what is drawn: an entry whose thread is in no task
+  gets no plan from `planOpen`.
 - **A write names its root**: `chat` and `mark` find it from the held
   document with the entry (`rootOf`), and a send at the root mints one
   (`newRootId`) and its task (`newTaskId`). A card's place at a thread
@@ -434,11 +445,30 @@ task's threads (`hereRail`). A task's signals are its threads', whatever roots t
 - **A column moves for everyone**: `moveColumn` is a reorder of its card
   on the canvas (`planColumnMove`), host-ordered and undone by the undo
   key; its width is the card's too (`cardWidth`, `columnMenu`).
+- **A thread column's ⋯ moves and copies it** (`columnMenu`'s `move` and
+  `copy` sections, ADR-0117): `moveThread` to another task's canvas end,
+  `takeIntoInventory`, and `copyThread` (a `copy-thread` request at the
+  source's end, `threadAnchor`, its id `Minted.thread`). A thread's card put
+  from your inventory lands on the canvas you are on after the column it
+  was put on (`putOnCanvas`).
+- **A copy before its first send** is a column of mode `copy`, ending at its
+  record's fork (`TaskIndex.forkOf`), its next send a branch there
+  (`branchesAt`); shared as any card, so never closable (`isClosable`
+  takes fresh columns alone).
+- **A thread whose parent thread is on no column of the canvas** carries
+  `foldAbove`, its first entry: `projectColumns` folds the path above it
+  into `ColumnView.above` when no column to its left shares any of it, and
+  the column draws "↑ N earlier messages" (`earlierWords`).
+- **A branch not yet sent in a thread someone else holds** is decided by
+  `canvasColumns` from `holders` (`heldByOthers`): its `FreshMode.held`
+  names that thread and who; `projectColumns` leaves the thread's entries
+  out (`hide`), and the strip draws the column read only, "Bea has it".
 
 ## The column model (`columns.ts`)
 
-A thread column is `{ key, anchor, thread, asksAgent?, fresh?, density?,
-details? }`. A task's come from its canvas (`canvasColumns`); a new tab's
+A thread column is `{ key, anchor, thread, asksAgent?, foldAbove?,
+density?, details?, mode }`, `mode` one of `bound`, `fresh` (`FreshMode`)
+or `copy`. A task's come from its canvas (`canvasColumns`); a new tab's
 one column is the layout's, changed by `newTabReducer`, which is pure: ids
 come from the shell in the action (`Minted`), so it has no hidden counter.
 
@@ -665,6 +695,16 @@ pending.
   `LEVEL_CLASS` a level's name and class. Selectors: `.root-status`
   (`.working`, `.needs-you`, `.worth-a-read`, `.done`, `data-arrived`),
   `.here-thread.raised`, `.not-needed`.
+
+## The rail of a task (`taskRail`, `app-view.ts`, ADR-0116, ADR-0117)
+
+A forest: one tree for each root a thread of the task is in, in canvas
+order, each cut to the rows on a path to a task thread's end (`ends`: its
+`threadAnchor`, a copy's fork). A child of a kept row that starts a thread
+not kept is a `RailStub` with its `ThreadLink` (`railStubWords`). Each
+tree's tracks are shifted (`shiftOf`) so the page's seed draws each in its
+own root's palette (`trackSlot`; 7 is its own inverse in 12 slots): a
+column takes its rows' track, so its colour agrees with no change of its own.
 
 ## Rail stretches (ADR-0031, ADR-0106)
 
@@ -1262,6 +1302,10 @@ docked left, centre or right by this device's choice (`inventory-dock.ts`,
 *Card grids* below), the selected card opening whole in place. Open or
 closed is `App`'s state, never stored.
 
+- **A thread's card is drawn by its face** (`thread-face.ts`, ADR-0124):
+  `threadFace` (name, banner, first line, the first line of where it ended,
+  stopped, cards queued), `GridCell.thread`; opened, `threadPreview`, its
+  path read only, a `ThreadPreview` that no composer, dock or queue takes.
 - **Two layers**: the host's records say which cards are in your
   inventory, and your inventory document which slot holds each. The session
   keeps the slots and repairs them (`packages/session/TECHNICAL.md`, "Your

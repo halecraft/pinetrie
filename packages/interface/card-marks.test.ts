@@ -120,7 +120,9 @@ const layout: Layout = {
       },
     ],
   ]),
-  newTabs: [{ key: NEW_TAB, anchor: null, thread: NEW_TAB, fresh: {} }],
+  newTabs: [
+    { key: NEW_TAB, anchor: null, thread: NEW_TAB, mode: { kind: "fresh" } },
+  ],
 }
 const marks = (
   cards: readonly CardRecord[],

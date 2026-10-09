@@ -485,7 +485,7 @@ export function queueCard(
   lane: ThreadId,
 ): ReturnType<SessionClient["queueCard"]> {
   const card = drawnCard(client, id)
-  if (!("at" in card.place))
+  if (card.kind !== "text" || !("at" in card.place))
     throw new Error(`${id} has no position to queue from`)
   const { at } = card.place
   return client.queueCard(
@@ -500,7 +500,8 @@ export function unqueueCard(
   id: CardId,
 ): ReturnType<SessionClient["moveCard"]> {
   const card = drawnCard(client, id)
-  if (card.place.kind !== "queued") throw new Error(`${id} is not queued`)
+  if (card.kind !== "text" || card.place.kind !== "queued")
+    throw new Error(`${id} is not queued`)
   return client.moveCard(
     moveOf(card, noteOf(card.place)),
     undefined,

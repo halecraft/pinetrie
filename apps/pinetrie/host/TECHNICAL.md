@@ -243,7 +243,9 @@ until the next compaction (S120), and the host compacts at startup. So
   second start finds nothing to do. It writes under the document's current
   schema, so its hash stays. The backup is taken after the reads, before
   the first write. Each is deleted, with its mutations, once Duane's store
-  has run it. None is registered now: `0003-workflow-archive` (the
+  has run it. Registered now: `0007-thread-origin` (each thread record's
+  `fork` replaced by its `origin`, `started` for every stored one, since no
+  copy was made before it, ADR-0117). Ran and deleted: `0003-workflow-archive` (the
   workflow's `closed` state renamed `archive`), `0004-threads` (each thread
   named in its first message, ADR-0117), `0005-tasks`' records (a task per
   root, ADR-0116) and `0006-note-columns` (each thread's notes moved from
@@ -393,6 +395,21 @@ rejects `shutdown()`.
   `readArchived` and `writesIn`: a task in the archive. Only the `chat`
   command and `sendPoppedQueuedCard` call `sendChat`, both behind the
   gate, so `sendChat` has no gate of its own.
+- **So is the held gate** (`refuseHeld`, ADR-0124): `runsIn` says where
+  each command, or a popped card, runs or writes a message; a branch's fork
+  is read from its root's tree; `heldIn` finds one in someone's inventory,
+  and the command is refused "put it on a canvas first". The drain asks the
+  same before it pops (`away`), so a held thread's queue waits.
+- **A take stops the run in the step that made it**: `provenance.after`,
+  which every person's change to the places goes through, finds the threads
+  it took into an inventory (`takenIn`) and calls the dispatcher's
+  `onTaken`, which stops each running one with `handleStop`, as the taker.
+  A move, an undo or a redo take alike.
+- **A copy** (`copyThread`, `commands/cards.ts`): `planCopy` over the
+  source's record and tree; the copy's `THREAD` record first, then its card,
+  then its name (`names.ensure`). Its first send is a branch at its fork:
+  `sendChat` refuses a branch naming a recorded thread anywhere else, and
+  writes no record or card for it.
 - **A thread's start is planned with its send** (ADR-0116, ADR-0117):
   `planChat`'s decision names the thread a branch starts (`starts`), and
   `sendChat`, after its last await, plans what it writes

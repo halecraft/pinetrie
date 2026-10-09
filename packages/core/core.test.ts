@@ -47,6 +47,7 @@ import {
   sameKey,
   seenAt,
   shellWord,
+  type TextCard,
   type TextPlace,
   THE_AGENT,
   type ThreadId,
@@ -585,7 +586,7 @@ describe("moves, built once (ADR-0059)", () => {
   const LANE = threadIdFor("x")
   const OTHER = rootIdFor("01a0ffd2-0000-7000-8000-0000000000ff")
   const at = atEntry(entryId("e-1"))
-  const card = (place: TextPlace): CardRecord => ({
+  const card = (place: TextPlace): TextCard => ({
     kind: "text",
     id: cardIdFor("c1"),
     owner: ADA,

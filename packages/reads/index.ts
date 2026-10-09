@@ -88,6 +88,8 @@ import {
   DIGEST,
   decodeCard,
   decodeChat,
+  FILES_LOST,
+  type FilesLostRecord,
   type Home,
   LANE,
   MARK,
@@ -569,6 +571,11 @@ const sameHolds = (
 export const readThreads = (
   doc: SessionDocHandle,
 ): ReadonlyMap<ThreadId, ThreadRecord> => readRecords(doc, THREAD)
+
+/** Each lane whose fork's files were not kept (`pinetrie.files-lost`, ADR-0124). */
+export const readFilesLost = (
+  doc: SessionDocHandle,
+): ReadonlyMap<ThreadId, FilesLostRecord> => readRecords(doc, FILES_LOST)
 
 export const readQueueHolds = keptWhileSame(
   (doc: SessionDocHandle): ReadonlyMap<ThreadId, QueueHold> =>

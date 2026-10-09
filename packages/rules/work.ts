@@ -205,33 +205,76 @@ export function planTurnRecord(input: {
  * carries its parent's working-copy change, which the fork must leave (S42
  * item 2).
  */
-export const forkPoint = (input: {
+export function forkPoint(input: {
   readonly above: Above
   readonly begin: ForkBegin
+  /**
+   * Whether the snapshot above is still there. Archiving deletes snapshots
+   * its revision records still name (`planRetention`), so one that is gone
+   * is read as missing: the fork starts from its base (ADR-0124).
+   */
+  readonly kept: boolean
 }): {
   readonly snapshot: SnapshotId
   readonly start: ForkStart
-} =>
-  input.above.commit === null
+  /** The snapshot it should have cloned and could not: gone. Null when its files were kept. */
+  readonly lost: SnapshotId | null
+} {
+  const { above } = input
+  if (above.snapshot !== null && !input.kept)
+    return { snapshot: BASE_SNAPSHOT, start: input.begin, lost: above.snapshot }
+  return above.commit === null
     ? {
-        snapshot: input.above.snapshot ?? BASE_SNAPSHOT,
+        snapshot: above.snapshot ?? BASE_SNAPSHOT,
         start: input.begin,
+        lost: null,
       }
     : {
-        snapshot: input.above.snapshot ?? BASE_SNAPSHOT,
-        start: { kind: "commits", commits: [input.above.commit] },
+        snapshot: above.snapshot ?? BASE_SNAPSHOT,
+        start: { kind: "commits", commits: [above.commit] },
+        lost: null,
       }
+}
+
+/**
+ * A lane that began from its base because the files it was forked from
+ * were not kept (ADR-0124): a copy from the archive whose snapshot was
+ * deleted. Its fork row says so.
+ */
+export interface FilesLostRecord {
+  readonly lane: ThreadId
+  /** The snapshot it would have cloned. */
+  readonly snapshot: SnapshotId
+}
+
+const FilesLostSchema = Type.Object({ snapshot: Type.String({ minLength: 1 }) })
+
+/** Each lane whose fork's files were not kept, at the lane. */
+export const FILES_LOST: RecordSpec<FilesLostRecord, ThreadId, "session"> = {
+  namespace: "pinetrie.files-lost",
+  home: "session",
+  keyOf: r => r.lane,
+  encode: ({ lane, ...contents }) => contents,
+  decode: (contents, key) =>
+    decodeAt(FilesLostSchema, contents, threadKey(key), (r, lane) => ({
+      lane,
+      snapshot: snapshotId(r.snapshot),
+    })),
+}
 
 /**
  * The snapshots to delete. An open root keeps every one: any visible turn can
  * be branched from. An archived root keeps each lane's newest, which
- * restoring it clones. Entry ids are uuidv7, so the greatest is the newest.
- * The base snapshot is never deleted.
+ * restoring it clones, and `keep`: the one nearest each thread's end, which
+ * a copy of it clones (ADR-0124). Entry ids are uuidv7, so the greatest is
+ * the newest. The base snapshot is never deleted.
  */
 export function planRetention(input: {
   /** The revision records of the root's lanes. */
   readonly records: Iterable<RevisionRecord>
   readonly archived: boolean
+  /** The snapshots nearest each thread's end (`nearestRevision`). */
+  readonly keep: ReadonlySet<SnapshotId>
 }): readonly SnapshotId[] {
   if (!input.archived) return []
   const newest = new Map<ThreadId, SnapshotId>()
@@ -242,7 +285,7 @@ export function planRetention(input: {
     const kept = newest.get(r.lane)
     if (kept === undefined || r.snapshot > kept) newest.set(r.lane, r.snapshot)
   }
-  const keep = new Set(newest.values())
+  const keep = new Set([...newest.values(), ...input.keep])
   return all.filter(s => !keep.has(s))
 }
 

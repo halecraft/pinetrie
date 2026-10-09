@@ -186,6 +186,7 @@ export {
   contextKindOf,
   contextOf,
 } from "./context.ts"
+export { type CopyPlan, type CopyThread, planCopy } from "./copy.ts"
 export {
   type Answer,
   type AskLines,
@@ -214,6 +215,15 @@ export {
   factContent,
   factLine,
 } from "./fact.ts"
+export {
+  HELD_WORDS,
+  heldIn,
+  holderOf,
+  type QueuePop,
+  type RunAt,
+  runsIn,
+  takenIn,
+} from "./held.ts"
 export { pastedImages, planImages } from "./images.ts"
 export { planReorder, planSetCommand, planWidth } from "./in-place.ts"
 export {
@@ -246,14 +256,17 @@ export {
 export {
   afterSteps,
   type Discards,
+  type MoveCommand,
   type MoveStep,
   type MovesStep,
   NO_DISCARDS,
   type PlaceStep,
   planFreshFollow,
+  planMake,
   planMoveCommand,
   planMoveRequest,
   planMoveTargets,
+  rankOnCanvas,
 } from "./moves.ts"
 export {
   NAME,
@@ -394,8 +407,10 @@ export {
 } from "./stop.ts"
 export {
   type CanvasCard,
+  type CanvasKind,
   canvasOf,
   indexTasks,
+  isCanvasCard,
   NO_TASK_INDEX,
   planThreadCard,
   planThreadStart,
@@ -438,6 +453,8 @@ export {
   verdictOf,
 } from "./verdict.ts"
 export {
+  FILES_LOST,
+  type FilesLostRecord,
   forkPoint,
   LANE,
   PROJECT,

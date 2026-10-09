@@ -36,6 +36,7 @@ import {
   type ThreadLane,
   type ThreadName,
   type TreeIndex,
+  threadAt,
   type WriterId,
 } from "@pinetrie/core"
 import {
@@ -44,6 +45,7 @@ import {
   catchUpName,
   catchUpOf,
   displayName,
+  type FilesLostRecord,
   type OfferActivity,
   type OfferButton,
   type OfferView,
@@ -59,10 +61,12 @@ import {
 import type { OfferActing } from "@pinetrie/session"
 import { commandWords } from "./card-words.ts"
 import type { ColumnView } from "./column-paths.ts"
-import type { Column } from "./columns.ts"
+import { type Column, freshOf } from "./columns.ts"
 import { ago, count } from "./counts.ts"
 import { speakerLabel } from "./names.ts"
 import { outcomeWords } from "./outcome-words.ts"
+import type { Reader } from "./send.ts"
+import { linkWords, type ThreadLink } from "./thread-link.ts"
 
 /** The agent's mark, wherever the agent or a lane of it is named. */
 export const AGENT_MARK = "✦"
@@ -98,6 +102,10 @@ export interface WorkFacts {
   readonly accepted: AcceptedRecord | null
   /** Each lane's base, as its history says it (ADR-0104). */
   readonly bases: ReadonlyMap<ThreadId, BaseRecord>
+  /** Each copy's fork, from its record (ADR-0117). */
+  readonly forks: ReadonlyMap<ThreadId, EntryId>
+  /** The lanes that began from their base, their fork's files not kept (ADR-0124). */
+  readonly filesLost: ReadonlyMap<ThreadId, FilesLostRecord>
 }
 
 /**
@@ -207,7 +215,29 @@ export type HeadOrigin =
       readonly speaker: string
       readonly text: string
     }
+  /**
+   * A copy, or a branch whose parent thread is in another task or an
+   * inventory (ADR-0117): it names its source and where that is, and opens
+   * it there by its link, at the fork.
+   */
+  | {
+      readonly kind: "source"
+      readonly copied: boolean
+      readonly at: EntryId
+      readonly link: ThreadLink
+      /** "↰ copied from amber-fox · Fix the sync bug", or "· Bea has it". */
+      readonly words: string
+    }
   | { readonly kind: "none" }
+
+/** What a fork row needs to name a source in another task (ADR-0117). */
+export interface OriginFacts {
+  /** The task the column is on; null for a new tab. */
+  readonly task: TaskId | null
+  readonly linkOf: (thread: ThreadId) => ThreadLink
+  readonly labelOf: (task: TaskId) => string
+  readonly reader: Reader
+}
 
 /** A divider where a lane starts on a column's displayed path. */
 export interface LaneJoin {
@@ -288,6 +318,7 @@ export interface ColumnFacts {
   readonly queued: readonly QueuedCard[]
   /** Your last offer command on the column's lane (`acting.ts`); null for none. */
   readonly acting: OfferActing | null
+  readonly origins: OriginFacts
 }
 
 export interface ColumnShows {
@@ -499,10 +530,17 @@ const isFirst = (index: TreeIndex, id: EntryId): boolean => {
   return parent === null || index.entries[parent] === undefined
 }
 
+/**
+ * A column's fork row: a copy names its source, wherever it is; a thread
+ * whose parent thread is in another task or an inventory names that
+ * (ADR-0117); else the message it forks from on the path to its left.
+ */
 function originOf(
   f: ColumnFacts,
   stretches: readonly LaneStretch[],
 ): HeadOrigin {
+  const source = sourceOf(f)
+  if (source !== null) return source
   const at = f.view.forkFrom
   const message = at === null ? undefined : f.index.entries[at]?.message
   if (at === null || message === undefined) return { kind: "none" }
@@ -518,6 +556,40 @@ function originOf(
     at,
     speaker,
     text: firstLine(messageText(message), 48),
+  }
+}
+
+/** A copy's source, or a parent thread elsewhere, as its fork row names it; null for neither. */
+function sourceOf(f: ColumnFacts): HeadOrigin | null {
+  const { thread, index, origins } = f
+  if (thread === null) return null
+  const fork = f.work.forks.get(thread)
+  const first = index.firstOf.get(thread)
+  const parentAt = fork ?? (first === undefined ? null : index.parentOf(first))
+  if (parentAt === null || index.entries[parentAt] === undefined) return null
+  const parent = threadAt(index, parentAt)
+  if (parent === null) return null
+  const link = origins.linkOf(parent)
+  const copied = fork !== undefined
+  // A branch whose parent is on this canvas keeps today's row.
+  if (!copied && link.kind === "open" && link.task === origins.task) return null
+  const name = f.work.names.get(parent) ?? "a thread"
+  const where =
+    link.kind === "open" && link.task === origins.task
+      ? []
+      : [linkWords(link, origins.reader, origins.labelOf)]
+  const lost =
+    copied && f.work.filesLost.has(thread) ? ["its files were not kept"] : []
+  return {
+    kind: "source",
+    copied,
+    at: parentAt,
+    link,
+    words: [
+      `${copied ? "copied from" : "from"} ${name}`,
+      ...where,
+      ...lost,
+    ].join(" · "),
   }
 }
 
@@ -841,14 +913,17 @@ export function joinWords(join: LaneJoin): string {
  * there has no end yet.
  */
 export function composerPlace(
-  column: Pick<Column, "key" | "fresh" | "thread">,
+  column: Pick<Column, "key" | "mode" | "thread">,
   at: Position,
   root: RootId | undefined,
   task: TaskId | null,
 ): TextPlace | null {
-  if (column.fresh !== undefined) {
-    const its = column.fresh.root ?? root
-    const in_ = column.fresh.task ?? task
+  // A copy before its first send writes nothing of its own yet either: its
+  // composer's card waits under its key, as a fresh column's does.
+  if (column.mode.kind !== "bound") {
+    const fresh = freshOf(column)
+    const its = fresh?.root ?? root
+    const in_ = fresh?.task ?? task
     return its === undefined || in_ === null
       ? null
       : { kind: "fresh", column: column.key, root: its, task: in_, at }

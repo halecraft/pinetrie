@@ -24,7 +24,7 @@ import { STOP } from "./stop.ts"
 import { TASK } from "./task.ts"
 import { THREAD } from "./thread.ts"
 import { VERDICT } from "./verdict.ts"
-import { LANE, PROJECT, REVISION } from "./work.ts"
+import { FILES_LOST, LANE, PROJECT, REVISION } from "./work.ts"
 
 /** What a check over every record reads of a spec: its address and its decoder. */
 export type AnyRecordSpec = Pick<
@@ -40,6 +40,7 @@ export const RECORD_SPECS: readonly AnyRecordSpec[] = [
   CARD_HISTORY,
   COMMANDS,
   DIGEST,
+  FILES_LOST,
   LANE,
   ACCEPTED,
   MARK,

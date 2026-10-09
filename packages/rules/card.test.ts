@@ -804,6 +804,7 @@ describe("the queue", () => {
 
   const idle = {
     running: false,
+    away: false,
     held: false,
     typing: new Set<CardId>(),
     blank: new Set<CardId>(),
@@ -821,6 +822,17 @@ describe("the queue", () => {
     expect(planNextQueuedCardPop(cards, threadIdFor("y"), idle)).toEqual({
       kind: "idle",
     })
+  })
+
+  test("planNextQueuedCardPop: a thread in an inventory pops nothing, a fact neither (ADR-0124)", () => {
+    const top = queued(cardIdFor("c1"), "a")
+    const away = { ...idle, away: true }
+    expect(planNextQueuedCardPop([top], LANE, away)).toEqual({ kind: "idle" })
+    const fact: QueuedCard = {
+      ...queued(cardIdFor("c0"), "0"),
+      carries: { kind: "fact", fact: ACCEPTED },
+    }
+    expect(planNextQueuedCardPop([fact], LANE, away)).toEqual({ kind: "idle" })
   })
 
   test("planNextQueuedCardPop: a held queue pops no message, nor a card someone types in; a fact on top goes whatever (ADR-0048 step 7)", () => {

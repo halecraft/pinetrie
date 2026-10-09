@@ -22,9 +22,11 @@ import {
 import {
   askWords,
   compactRail,
+  opens,
   pickAt,
   type RailItem,
   type RailStretch,
+  type RailStub,
   railItems,
   railKeep,
   railScroll,
@@ -32,6 +34,7 @@ import {
   type StretchFill,
   stretchFill,
   stretchWords,
+  type ThreadLink,
   type Tick,
   type ViewportStore,
   workWords,
@@ -60,9 +63,18 @@ const PANEL = "#14161a"
 const x = (across: number) => PAD + across * GAP
 const y = (slot: number) => PAD + slot * ROW
 
+/** A rail stub as drawn: where it forks, where it leads, and its words. */
+export interface DrawnStub {
+  readonly stub: RailStub
+  readonly label: string
+  readonly title: string
+}
+
 export function Rail({
   index,
   items,
+  stubs = [],
+  onLink,
   open,
   activity,
   onPick,
@@ -93,6 +105,12 @@ export function Rail({
   nameOf: (writer: WriterId) => string
   /** Each mounted column's view, outlined (ADR-0058); none, no outlines. */
   viewports?: ViewportStore
+  /**
+   * Each fork to a thread on no column of this canvas (ADR-0117), worded:
+   * a press follows its link, which a thread someone else holds does not.
+   */
+  stubs?: readonly DrawnStub[]
+  onLink?: (link: ThreadLink, at: EntryId) => void
 }) {
   const colors = useTrackColors()
   // Every message, a stretch's included, to the item that draws it.
@@ -165,6 +183,28 @@ export function Rail({
         {viewports !== undefined && (
           <RailViewport itemOf={itemOf} store={viewports} />
         )}
+        {/* Each fork to a thread elsewhere: a stub beside the row it leaves. */}
+        {stubs.map(({ stub, label, title }) => {
+          const from = itemOf.get(stub.from)
+          if (from === undefined) return null
+          return (
+            <button
+              className="rail-stub"
+              data-thread={stub.thread}
+              disabled={onLink === undefined || !opens(stub.link)}
+              key={stub.at}
+              onClick={() => onLink?.(stub.link, stub.at)}
+              style={{
+                left: x(from.across) + GAP,
+                top: y(from.slot) + ROW / 2,
+              }}
+              title={title}
+              type="button"
+            >
+              {label}
+            </button>
+          )
+        })}
       </div>
     </nav>
   )

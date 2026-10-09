@@ -2,6 +2,7 @@ import {
   atEntry,
   type CardCommand,
   type CardId,
+  ERR,
   entryId,
   isTextCard,
   type MoveDirection,
@@ -29,10 +30,13 @@ import {
   readPlacesRev,
   readQueueHolds,
   readRoots,
+  readRunning,
+  readThreads,
   readTraces,
 } from "@pinetrie/reads"
 import {
   BOARD,
+  type CopyThread,
   QUEUE_HOLD,
   ROOT as ROOT_RECORD,
   setRecord,
@@ -82,7 +86,12 @@ const pinnedKey = { kind: "pinned", at: atEntry(E1), thread: LANE } as const
 /** Texts the host holds whole. */
 const held = { textNow: () => "x", holds: () => true }
 /** An idle lane, its queue not held, nobody typing. */
-const idle = { running: false, held: false, typing: new Set<CardId>() }
+const idle = {
+  running: false,
+  away: false,
+  held: false,
+  typing: new Set<CardId>(),
+}
 const queuedKey = {
   kind: "queued",
   at: atEntry(E1),
@@ -110,6 +119,8 @@ function setUp() {
     textNow: id => texts.get(id) ?? "",
   })
   const drains: string[] = []
+  // Each run a take stopped, and who stopped it.
+  const stops: [ThreadId, WriterId][] = []
   // Which history each move was recorded in; an undo answers `undoing`.
   let undoing: UndoResult = { kind: "none" }
   // What an undo writes before it answers, as Kyneta writes its revert.
@@ -135,6 +146,11 @@ function setUp() {
     presence,
     records: { writeValues: async writes => applyWrites(b, writes) },
   })
+  // Each run a take stopped, as the dispatcher stops it (`onTaken`).
+  provenance.onTaken(async (threads, by) => {
+    for (const lane of threads)
+      if (readRunning(b.live, lane)) stops.push([lane, by])
+  })
   const raw = createCardCommands({
     basics: b,
     cards: cards.port,
@@ -142,6 +158,7 @@ function setUp() {
     histories: histories.port,
     provenance,
     records: { writeValues: async writes => applyWrites(b, writes) },
+    ensureNames: async () => {},
   })
   // Each command gathers the task index once, as the dispatcher does.
   type Raw = typeof raw
@@ -190,6 +207,7 @@ function setUp() {
     cards,
     texts,
     drains,
+    stops,
     commands,
     put,
     histories,
@@ -322,6 +340,139 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
     expect([...readTraces(b.session).values()]).toMatchObject([
       { for: BEA, by: ADA, from: pinnedKey },
     ])
+  })
+})
+
+describe("a thread's card taken, put and moved (ADR-0117, ADR-0124)", () => {
+  const OTHER_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000d")
+  const canvas = { kind: "canvas", task: TEST_TASK } as const
+  const bea = { kind: "inventory", holder: BEA } as const
+
+  test("taken into an inventory, its run stops with the move, the taker's own stop", async () => {
+    const { b, stops, commands } = setUp()
+    beginRun(b.live, LANE, runId("r-1"))
+    const done = await commands.move(
+      BEA,
+      [{ card: LANE, from: canvas, to: bea }],
+      null,
+    )
+    expect(done.outcome).toEqual({ kind: "moved" })
+    expect(readPlaces(b.places).find(c => c.id === LANE)?.place).toEqual(bea)
+    expect(stops).toEqual([[LANE, BEA]])
+  })
+
+  test("taken while idle, nothing is stopped; put on a canvas, its queue is drained", async () => {
+    const { stops, drains, commands } = setUp()
+    await commands.move(BEA, [{ card: LANE, from: canvas, to: bea }], null)
+    expect(stops).toEqual([])
+    expect(drains).toEqual([])
+    await commands.move(
+      BEA,
+      [
+        {
+          card: LANE,
+          from: bea,
+          to: { kind: "canvas-at", task: TEST_TASK, after: null },
+        },
+      ],
+      null,
+    )
+    expect(drains).toEqual([LANE])
+  })
+
+  test("an undo that puts a running thread back in an inventory stops it too: the stop follows the places change, whatever wrote it", async () => {
+    const { b, stops, commands, undoes } = setUp()
+    beginRun(b.live, LANE, runId("r-1"))
+    const card = readPlaces(b.places).find(c => c.id === LANE)
+    if (card?.kind !== "thread") throw new Error("no thread card")
+    undoes(
+      {
+        kind: "undone",
+        step: {
+          parts: [{ docId: PLACES_DOC_ID, footprint: [["cards", LANE]] }],
+        },
+      },
+      () =>
+        applyPlaceSteps(b.places, [
+          { kind: "write", record: { ...card, place: bea } },
+        ]),
+    )
+    await commands.undoMove(BEA, TEST_TASK, "undo")
+    expect(stops).toEqual([[LANE, BEA]])
+  })
+
+  test("moved to another task while it runs, it keeps running", async () => {
+    const { b, stops, commands } = setUp()
+    putTask(b, threadIdFor("other"), OTHER_TASK)
+    beginRun(b.live, LANE, runId("r-1"))
+    const done = await commands.move(
+      ADA,
+      [
+        {
+          card: LANE,
+          from: canvas,
+          to: { kind: "canvas-at", task: OTHER_TASK, after: null },
+        },
+      ],
+      null,
+    )
+    expect(done.outcome).toEqual({ kind: "moved" })
+    expect(stops).toEqual([])
+  })
+})
+
+describe("a thread copied (ADR-0117, ADR-0124)", () => {
+  const COPY = threadIdFor("copy")
+  const copy = (to: CopyThread["move"]["to"]): CopyThread => ({
+    source: LANE,
+    end: E1,
+    move: { card: COPY, from: null, to },
+  })
+
+  test("its record names its fork, its card lands where it was dropped, and no entry is written", async () => {
+    const { b, commands } = setUp()
+    const done = await commands.copyThread(
+      BEA,
+      copy({ kind: "canvas-at", task: TEST_TASK, after: LANE }),
+    )
+    expect(done.outcome).toEqual({ kind: "moved" })
+    expect(readThreads(b.session).get(COPY)).toMatchObject({
+      root: TEST_ROOT,
+      by: BEA,
+      origin: { kind: "copy", source: LANE, fork: E1 },
+    })
+    const canvas = readPlaces(b.places).filter(
+      c => c.place.kind === "canvas" && c.place.task === TEST_TASK,
+    )
+    expect(canvas.map(c => c.id)).toEqual(expect.arrayContaining([LANE, COPY]))
+  })
+
+  test("refused: an end not in its source; a thread someone else holds", async () => {
+    const { b, commands } = setUp()
+    expect(
+      (
+        await commands.copyThread(BEA, {
+          ...copy({ kind: "inventory", holder: BEA }),
+          end: entryId("e-none"),
+        })
+      ).outcome,
+    ).toMatchObject({ kind: "refused", code: ERR.UNKNOWN_TARGET })
+    await commands.move(
+      ADA,
+      [
+        {
+          card: LANE,
+          from: { kind: "canvas", task: TEST_TASK },
+          to: { kind: "inventory", holder: ADA },
+        },
+      ],
+      null,
+    )
+    expect(
+      (await commands.copyThread(BEA, copy({ kind: "inventory", holder: BEA })))
+        .outcome,
+    ).toMatchObject({ kind: "refused", code: ERR.REFUSED })
+    expect(readThreads(b.session).has(COPY)).toBe(false)
   })
 })
 

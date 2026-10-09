@@ -33,6 +33,7 @@ import {
   planTraceSweep,
   setRecord,
   TRACE,
+  takenIn,
 } from "@pinetrie/rules"
 import type { PresenceDocHandle } from "@pinetrie/schema"
 import type { Basics } from "./basics.ts"
@@ -60,6 +61,15 @@ export interface Provenance {
    * task's canvas changed (`canvas-news.ts`, ADR-0116). Never awaited.
    */
   onChanged(listener: (change: PlacesChange) => void): void
+  /**
+   * Call `stop` after each change a person made that takes threads into an
+   * inventory (`takenIn`), with those threads and who made it: their runs
+   * stop with it, whatever wrote it (ADR-0124). Awaited in `after`, in the
+   * step that made the change.
+   */
+  onTaken(
+    stop: (threads: readonly ThreadId[], by: WriterId) => Promise<void>,
+  ): void
 }
 
 /** One change to the places, as `after` read it. */
@@ -116,6 +126,10 @@ export function createProvenance(deps: ProvenanceDeps): Provenance {
   }
 
   const listeners: ((change: PlacesChange) => void)[] = []
+  const stoppers: ((
+    threads: readonly ThreadId[],
+    by: WriterId,
+  ) => Promise<void>)[] = []
 
   return {
     before() {
@@ -135,7 +149,7 @@ export function createProvenance(deps: ProvenanceDeps): Provenance {
       return { cards, ends: endsOf(cards, view) }
     },
 
-    after(cause, before) {
+    async after(cause, before) {
       // gather
       const facts = {
         before: before.cards,
@@ -150,12 +164,21 @@ export function createProvenance(deps: ProvenanceDeps): Provenance {
       }
       for (const listener of listeners)
         listener({ before: facts.before, after: facts.after, cause })
-      // plan, then execute
-      return write(planProvenance(facts))
+      // plan, then execute: the records, then the runs of the threads the
+      // change took stopped (the host's own writes take none)
+      const taken =
+        cause.kind === "host" ? [] : takenIn(facts.before, facts.after)
+      await write(planProvenance(facts))
+      if (cause.kind !== "host" && taken.length > 0)
+        for (const stop of stoppers) await stop(taken, cause.by)
     },
 
     onChanged(listener) {
       listeners.push(listener)
+    },
+
+    onTaken(stop) {
+      stoppers.push(stop)
     },
 
     seen(writer, ids) {

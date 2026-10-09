@@ -7,7 +7,9 @@ import {
   projectSpine,
   type RailRow,
   type SpineNode,
+  type ThreadId,
   type TreeIndex,
+  threadAt,
 } from "@pinetrie/core"
 
 export interface ColumnSpec {
@@ -16,6 +18,17 @@ export interface ColumnSpec {
    * null only for a fresh column at the root.
    */
   readonly anchor: EntryId | null
+  /**
+   * Its thread's first entry, when its parent thread is on no column of the
+   * canvas (ADR-0117): its path above it folds, behind its fork row, unless
+   * a column to its left shows some of it.
+   */
+  readonly foldAbove?: EntryId
+  /**
+   * A thread someone else holds, whose entries a branch not yet sent from it
+   * leaves out, its column saying who has it in their place (ADR-0124).
+   */
+  readonly hide?: ThreadId
 }
 
 export interface ColumnView {
@@ -29,8 +42,10 @@ export interface ColumnView {
    * its neighbour but T2 with the trunk, and must start after T2.
    */
   readonly forkFrom: EntryId | null
-  /** The path after `forkFrom` (all of it when `forkFrom` is null). */
+  /** The path after `forkFrom` (all of it when `forkFrom` is null), less what `above` folds. */
   readonly nodes: readonly SpineNode[]
+  /** The path above its thread's first entry, folded (`ColumnSpec.foldAbove`); empty for none. */
+  readonly above: readonly SpineNode[]
 }
 
 /**
@@ -49,10 +64,21 @@ export function projectColumns(
     let cut = -1
     for (const [i, node] of spine.entries()) if (shown.has(node.id)) cut = i
     for (const node of spine) shown.add(node.id)
+    const { hide, foldAbove } = column
+    const own = spine
+      .slice(cut + 1)
+      .filter(n => hide === undefined || threadAt(index, n.id) !== hide)
+    // Shown from its root, with no column to its left sharing any of it:
+    // the path above its own thread folds.
+    const first =
+      cut < 0 && foldAbove !== undefined
+        ? own.findIndex(n => n.id === foldAbove)
+        : -1
     return {
       tipId,
       forkFrom: cut < 0 ? null : (spine[cut]?.id ?? null),
-      nodes: spine.slice(cut + 1),
+      nodes: first > 0 ? own.slice(first) : own,
+      above: first > 0 ? own.slice(0, first) : [],
     }
   })
 }
@@ -95,3 +121,7 @@ export function branchColors(
   }
   return { track, forks }
 }
+
+/** The toggle that unfolds a column's path above its own thread (`ColumnView.above`). */
+export const earlierWords = (count: number): string =>
+  `↑ ${count} earlier message${count === 1 ? "" : "s"}`

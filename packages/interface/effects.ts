@@ -12,7 +12,6 @@ import type {
   EntryId,
   LaneRecord,
   LaneView,
-  Move,
   MoveDirection,
   OfferAction,
   QueueHoldChange,
@@ -22,6 +21,7 @@ import type {
   TextCard,
   ThreadId,
   TreeIndex,
+  TypedMove,
   WriterId,
 } from "@pinetrie/core"
 import type {
@@ -33,6 +33,7 @@ import type {
   Slots,
 } from "@pinetrie/session"
 import type { Raised } from "./attention.ts"
+import { heldByOthers } from "./canvas-columns.ts"
 import type { Identity } from "./identity.ts"
 import {
   type Here,
@@ -89,7 +90,7 @@ export type Effect =
   /** A move (ADR-0059): a take into the inventory, a put, an unqueue, a discard. */
   | {
       readonly kind: "moveCard"
-      readonly move: Move
+      readonly move: TypedMove
       readonly how: MoveHow
       /** Who queued the card, for an unqueue: a refusal names them. */
       readonly queuedBy: WriterId | null
@@ -145,6 +146,8 @@ export type Effect =
   /** Open the inventory; `brief`: only for the flight of a take into it, if it was closed. */
   | { readonly kind: "showInventory"; readonly brief: boolean }
   | { readonly kind: "select"; readonly slot: number }
+  /** Open the selected slot's card in your inventory: a thread's read-only preview (ADR-0124). */
+  | { readonly kind: "openSelected" }
   /** An offer action, which the session tracks (`acting`). */
   | {
       readonly kind: "offer"
@@ -258,6 +261,7 @@ export function planOpenAt(id: EntryId, state: IntentState): readonly Effect[] {
     id,
     state.tasks.index,
     state.cards.lanes,
+    heldByOthers(state.cards.cards, state.cards.me),
   )
   if (plan === null) return []
   const ask = state.asks.askOf.get(id)

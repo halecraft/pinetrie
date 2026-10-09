@@ -11,10 +11,14 @@ export {
 export { placement } from "./align.ts"
 export {
   appView,
-  hereRail,
   laneRootsOf,
+  NO_RAIL,
   type OpenOffer,
+  type RailStub,
   type ReadOnly,
+  railStubWords,
+  type TaskRail,
+  taskRail,
   taskWork,
   threadWork,
   type Workspace,
@@ -102,6 +106,7 @@ export {
   type CardColumn,
   type CardView,
   defaultView,
+  heldByOthers,
   keyOfColumn,
   openColumns,
   type Strip,
@@ -173,10 +178,12 @@ export {
   type ColumnMenuItem,
   columnMenu,
   FIRST_NOTE_COLUMN,
+  type TaskChoice,
 } from "./column-menu.ts"
 export {
   branchColors,
   type ColumnView,
+  earlierWords,
   projectColumns,
 } from "./column-paths.ts"
 export {
@@ -208,13 +215,21 @@ export {
   workingWords,
 } from "./column-view.ts"
 export {
+  BOUND,
+  branchesAt,
   type CardKey,
   type Column,
   type ColumnKey,
+  type ColumnMode,
   type FreshKey,
+  type FreshMode,
+  freshOf,
+  freshRootOf,
+  freshTaskOf,
   keyText,
   type Pending,
   type Prefill,
+  threadAnchor,
 } from "./columns.ts"
 export { matchCommands } from "./commands.ts"
 export { copyIntoInventoryText } from "./copy-into-inventory-text.ts"
@@ -239,6 +254,7 @@ export {
 export { gridKeyAct } from "./grid-keys.ts"
 export type { GridView } from "./grid-view.ts"
 export {
+  inventoryThreads,
   planHeldRoots,
   rootEntriesOf,
 } from "./held-roots.ts"
@@ -525,6 +541,23 @@ export {
   type ThreadMove,
   threadCardHeads,
 } from "./thread-card.ts"
+export {
+  faceStatus,
+  type PreviewRow,
+  type ThreadFace,
+  type ThreadPreview,
+  threadFace,
+  threadPreview,
+} from "./thread-face.ts"
+export {
+  heldWords,
+  type LinkOpen,
+  linkTo,
+  linkWords,
+  openOf,
+  opens,
+  type ThreadLink,
+} from "./thread-link.ts"
 export {
   callMark,
   callStatus,

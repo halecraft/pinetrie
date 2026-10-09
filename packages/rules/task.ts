@@ -7,11 +7,14 @@
 
 import {
   type BoardPlace,
+  type CanvasPlace,
   type CardId,
   type CardPlace,
   type CardRecord,
+  type EntryId,
   isThreadId,
   type MoveTarget,
+  type NoteColumnCard,
   type PlaceKey,
   type RootId,
   type TaskId,
@@ -52,11 +55,18 @@ export const TASK: RecordSpec<TaskRecord, TaskId, "session"> = {
 }
 
 /** A card on a canvas, in its task's order. */
-export type CanvasCard = CardRecord & {
-  readonly place: Extract<CardPlace, { readonly kind: "canvas" }>
-}
+export type CanvasCard =
+  | (ThreadCard & { readonly place: CanvasPlace })
+  | (NoteColumnCard & { readonly place: CanvasPlace })
 
-const onCanvas = (c: CardRecord): c is CanvasCard => c.place.kind === "canvas"
+/** A canvas card's kinds: what every consumer of a canvas switches over. */
+export type CanvasKind = CanvasCard["kind"]
+
+/** Whether `c` is on a canvas. */
+export const isCanvasCard = (c: CardRecord): c is CanvasCard =>
+  c.kind !== "text" && c.place.kind === "canvas"
+
+const onCanvas = isCanvasCard
 
 const byRank = (a: CanvasCard, b: CanvasCard): number =>
   a.place.order < b.place.order
@@ -95,6 +105,11 @@ export interface TaskIndex {
    * place's root is its thread's (`THREAD`).
    */
   readonly rootOfThread: ReadonlyMap<ThreadId, RootId>
+  /**
+   * Each copy's fork (ADR-0117): where its column ends before its first
+   * send, and what its fork row names after it.
+   */
+  readonly forkOf: ReadonlyMap<ThreadId, EntryId>
 }
 
 /** Every card's task, as the places and the threads' records say. Pure. */
@@ -132,6 +147,11 @@ export function indexTasks(
   const rootOfThread = new Map(
     [...threads].map(([thread, r]) => [thread, r.root] as const),
   )
+  const forkOf = new Map(
+    [...threads].flatMap(([thread, r]) =>
+      r.origin.kind === "copy" ? [[thread, r.origin.fork] as const] : [],
+    ),
+  )
   return {
     canvases,
     taskOfCard,
@@ -140,6 +160,7 @@ export function indexTasks(
     rootsOf,
     tasksOfRoot,
     rootOfThread,
+    forkOf,
   }
 }
 
@@ -310,7 +331,7 @@ export function planThreadStart(input: {
       root: input.root,
       by,
       createdAt: now,
-      fork: null,
+      origin: { kind: "started" },
     }),
   ]
   if (opens) {

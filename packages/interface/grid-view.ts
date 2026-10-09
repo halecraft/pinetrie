@@ -3,14 +3,17 @@
 // (core's `grid.ts`). Pure: `inventoryView` builds one,
 // and `CardGrid` (`packages/web/card-grid.tsx`) draws it.
 
-import type { CardId, CardRecord, Grid } from "@pinetrie/core"
+import type { CardId, CardRecord, Grid, ThreadId } from "@pinetrie/core"
 import { type CardFaceView, type CardTone, cardFace } from "./card-frame.ts"
+import type { ThreadFace } from "./thread-face.ts"
 
 export interface GridCell {
   readonly index: number
   /** Its card, and the card folded; null for an empty cell. */
   readonly card: CardRecord | null
   readonly face: CardFaceView | null
+  /** A thread's card: its face (ADR-0124); null for any other. */
+  readonly thread: ThreadFace | null
   readonly selected: boolean
 }
 
@@ -34,6 +37,8 @@ export function gridView(input: {
   readonly selected: number
   /** Each card's text, by id; one not yet read is "". */
   readonly texts: ReadonlyMap<CardId, string>
+  /** Each thread's face, by its id; one without is drawn by its card's face. */
+  readonly threads?: ReadonlyMap<ThreadId, ThreadFace>
   readonly keyOf?: (cell: number) => string | null
 }): GridView {
   const { rows } = input.grid
@@ -49,6 +54,8 @@ export function gridView(input: {
               tone: input.tone,
               key: input.keyOf?.(index) ?? null,
             }),
+      thread:
+        card?.kind === "thread" ? (input.threads?.get(card.id) ?? null) : null,
       selected: index === input.selected,
     }
   })

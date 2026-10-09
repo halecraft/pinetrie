@@ -3812,7 +3812,7 @@ async function run(check: Checks["check"]): Promise<void> {
               at: atEntry(entryId(aboveEnd)),
               thread: threadHolding(host, entryId(aboveEnd)),
             } as const)
-      if (tracedFrom !== undefined && pinTo !== null)
+      if (tracedFrom?.kind === "pinned" && pinTo !== null)
         await api.moveCard(
           { card: traced, from: keyOf(tracedFrom), to: pinTo },
           { actedAt: { kind: "column", key: "k-api" }, slot: null },
@@ -3952,6 +3952,96 @@ async function run(check: Checks["check"]): Promise<void> {
       } finally {
         await newTab.close().catch(() => {})
       }
+
+      // ── threads as cards (ADR-0117, ADR-0124) ───────────────────────────────
+      // A thread of another root, moved onto the canvas you are on: the
+      // canvas holds two roots, and the rail draws each one's tree.
+      const here = taskHolding(host, entryId(downRoot))
+      const far = await api.chat("a root of another task", ROOT, {
+        mode: "branch",
+      })
+      const farEntry = far.kind === "appended" ? far.id : entryId("none")
+      await waitFor(() => {
+        try {
+          return taskHolding(host, farEntry) !== undefined
+        } catch {
+          return false
+        }
+      }, 10_000)
+      const farThread = threadHolding(host, farEntry)
+      await api.moveCard(
+        {
+          card: farThread,
+          from: { kind: "canvas", task: taskHolding(host, farEntry) },
+          to: { kind: "canvas-at", task: here, after: null },
+        },
+        { actedAt: { kind: "column", key: "k-api" }, slot: null },
+      )
+      const twoRoots = await page
+        .waitForFunction(
+          ([thread, entry, own]) =>
+            document.querySelector(`#strip [data-card="${thread}"]`) !== null &&
+            document.querySelector(`.rail [data-entry="${entry}"]`) !== null &&
+            document.querySelector(`.rail [data-entry="${own}"]`) !== null,
+          [farThread, farEntry, downRoot],
+          { timeout: 20_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        )
+      check(
+        "a thread moved onto the canvas from another task's makes a canvas of two roots: its column, and its root's tree on the rail",
+        twoRoots,
+      )
+      // Copy to ▸ this task: a new thread forked at its source's end, its
+      // card beside its source, its fork row naming where it came from.
+      const copiesBefore = new Set(
+        [...readThreads(host.session)].flatMap(([t, r]) =>
+          r.origin.kind === "copy" ? [t] : [],
+        ),
+      )
+      const chose = await chooseFromMenu(
+        page,
+        `${col(0)} .column-menu`,
+        ".column-copy",
+      )
+      if (chose)
+        await waitFor(
+          () =>
+            [...readThreads(host.session)].some(
+              ([t, r]) => r.origin.kind === "copy" && !copiesBefore.has(t),
+            ),
+          10_000,
+        )
+      const copy =
+        [...readThreads(host.session)].find(
+          ([t, r]) => r.origin.kind === "copy" && !copiesBefore.has(t),
+        )?.[0] ?? ""
+      if (copy !== "")
+        await page
+          .click(`.folded-column[data-card="${copy}"] .folded-title`, {
+            timeout: 15_000,
+          })
+          .catch(() => {})
+      const copiedRow = await page
+        .waitForFunction(
+          c =>
+            document
+              .querySelector(`.column[data-card="${c}"] .origin`)
+              ?.textContent?.includes("copied from") === true,
+          copy,
+          { timeout: 15_000 },
+        )
+        .then(
+          () => true,
+          () => false,
+        )
+      check(
+        "Copy to ▸ this task makes a copy beside its source, its fork row naming what it was copied from",
+        copy !== "" && copiedRow,
+        copy,
+      )
 
       // Archived by someone else before a reload, the root you were on gives
       // way to the last of the sidebar.

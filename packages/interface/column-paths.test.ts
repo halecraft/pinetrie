@@ -1,4 +1,4 @@
-import { entryId, indexTree, projectRail } from "@pinetrie/core"
+import { entryId, indexTree, projectRail, threadAt } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { branchColors, PENDING_TRACK, projectColumns } from "./column-paths.ts"
 import { fromParents } from "./fixtures.ts"
@@ -25,6 +25,55 @@ const ids = (nodes: readonly { id: string }[]) => nodes.map(n => n.id)
 
 describe("projectColumns", () => {
   const i = indexTree(forks)
+  test("over two roots: each tree's shared part shown once, the trees apart (ADR-0117)", () => {
+    const two = indexTree(
+      tree({
+        "1-t1": null,
+        "2-t2": "1-t1",
+        "3-t3": "2-t2",
+        "6-b1": "2-t2",
+        "7-b2": "6-b1",
+        "8-r2": null,
+        "9-c1": "8-r2",
+      }),
+    )
+    const [t, other, b] = projectColumns(two, [
+      { anchor: entryId("3-t3") },
+      { anchor: entryId("9-c1") },
+      { anchor: entryId("7-b2") },
+    ])
+    expect(ids(t?.nodes ?? [])).toEqual(["1-t1", "2-t2", "3-t3"])
+    expect([other?.forkFrom, ids(other?.nodes ?? [])]).toEqual([
+      null,
+      ["8-r2", "9-c1"],
+    ])
+    expect([b?.forkFrom, ids(b?.nodes ?? [])]).toEqual([
+      "2-t2",
+      ["6-b1", "7-b2"],
+    ])
+  })
+  test("a column whose parent thread is on no column folds its path above its own first entry; one a column to its left shares does not (ADR-0117)", () => {
+    const [b] = projectColumns(i, [
+      { anchor: entryId("7-b2"), foldAbove: entryId("6-b1") },
+    ])
+    expect([ids(b?.above ?? []), ids(b?.nodes ?? [])]).toEqual([
+      ["1-t1", "2-t2"],
+      ["6-b1", "7-b2"],
+    ])
+    const [, shared] = projectColumns(i, [
+      { anchor: entryId("5-a2") },
+      { anchor: entryId("7-b2"), foldAbove: entryId("6-b1") },
+    ])
+    expect([shared?.forkFrom, ids(shared?.above ?? [])]).toEqual(["1-t1", []])
+  })
+  test("a branch not yet sent from a held thread leaves that thread's entries out (ADR-0124)", () => {
+    const held = threadAt(i, entryId("6-b1"))
+    expect(held).not.toBeNull()
+    const [c] = projectColumns(i, [
+      { anchor: entryId("7-b2"), ...(held === null ? {} : { hide: held }) },
+    ])
+    expect(ids(c?.nodes ?? [])).toEqual(["1-t1", "2-t2"])
+  })
   test("a first column is its whole path", () => {
     const [c] = projectColumns(i, [{ anchor: entryId("3-t3") }])
     expect([c?.forkFrom, ids(c?.nodes ?? [])]).toEqual([

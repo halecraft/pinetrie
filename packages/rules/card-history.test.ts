@@ -168,6 +168,41 @@ describe("planProvenance: each card's history", () => {
     expect(events[0]?.by).toBe(cause.kind === "host" ? null : cause.by)
   })
 
+  test("a thread's card: each move between tasks and into an inventory is in its history, naming its task, and leaves no trace (ADR-0124)", () => {
+    const OTHER = taskIdFor("01a0ffd2-0000-7000-8000-00000000000d")
+    const thread = (
+      place: CardPlace & { kind: "canvas" | "inventory" },
+      placer: WriterId,
+    ) => ({ kind: "thread", id: LANE, owner: ADA, placer, place }) as const
+    const on = (task: typeof TEST_TASK) =>
+      ({ kind: "canvas", task, order: "1", width: 1 }) as const
+    const moved = plan({
+      before: [thread(on(TEST_TASK), ADA)],
+      after: [thread(on(OTHER), BEA)],
+      cause: BY_BEA,
+      ends: new Map(),
+    })
+    expect(eventsOf(moved)).toEqual([
+      {
+        kind: "moved",
+        by: BEA,
+        from: { kind: "canvas", task: TEST_TASK },
+        to: { kind: "canvas", task: OTHER },
+        at: 7,
+      },
+    ])
+    const taken = plan({
+      before: [thread(on(OTHER), ADA)],
+      after: [thread(BEAS as CardPlace & { kind: "inventory" }, BEA)],
+      cause: BY_BEA,
+      ends: new Map(),
+    })
+    expect(eventsOf(taken).map(e => [e.from, e.to])).toEqual([
+      [{ kind: "canvas", task: OTHER }, BEAS],
+    ])
+    expect([newTraces(moved), newTraces(taken)]).toEqual([[], []])
+  })
+
   test("a reorder, or a write that moves nothing, adds no event", () => {
     const reordered = card({ ...QUEUED, order: "2" })
     expect(

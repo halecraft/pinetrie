@@ -617,8 +617,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a move goes from nowhere",
     file: places,
-    from: "  from: keyOf(card.place),",
-    to: "  from: null,",
+    from: "  return { card: card.id, from: keyOf(card.place), to }",
+    to: "  return { card: card.id, from: null, to }",
     command: unit,
     expect: "a move goes from where the card is",
   },
@@ -919,5 +919,35 @@ export const mutations: readonly Mutation[] = [
     from: '  discarded: ["task", "holder"],',
     to: '  discarded: ["holder"],',
     command: ["pnpm", "exec", "tsc", "--noEmit"],
+  },
+  {
+    name: "a move is typed whatever place it is from",
+    file: places,
+    from: "  if (move.from !== null && !fitsPlace(kind, move.from.kind)) return undefined\n",
+    to: "",
+    command: [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "packages/protocol/codec.test.ts",
+    ],
+    expect:
+      "decode: a move is typed by its card's kind, refused to or from a place that kind is never in (ADR-0117)",
+  },
+  {
+    name: "a target that is no place is typed as any place",
+    file: places,
+    from: "      ? TARGET_PLACES[to.kind]\n",
+    to: '      ? "canvas"\n',
+    command: [
+      "pnpm",
+      "exec",
+      "vitest",
+      "run",
+      "packages/protocol/codec.test.ts",
+    ],
+    expect:
+      "decode: a move is typed by its card's kind, refused to or from a place that kind is never in (ADR-0117)",
   },
 ]

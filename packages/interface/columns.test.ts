@@ -1,6 +1,13 @@
-import { entryId, type LaneView, threadIdFor } from "@pinetrie/core"
+import { entryId, indexTree, type LaneView, threadIdFor } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
-import { type Column, keyText, newTabReducer } from "./columns.ts"
+import {
+  BOUND,
+  type ClosableColumn,
+  type Column,
+  isClosable,
+  keyText,
+  newTabReducer,
+} from "./columns.ts"
 import { TEST_TASK, threadOfEntry, tree } from "./fixtures.ts"
 
 const anchors = (s: readonly Column[]) => s.map(c => c.anchor)
@@ -30,11 +37,13 @@ describe("newTabReducer", () => {
   const A = threadOfEntry("1-a")
   test("sync follows its thread to its end, never into a newer branch", () => {
     const col: readonly Column[] = [
-      { key: "k", anchor: entryId("2-b"), thread: A },
+      { key: "k", anchor: entryId("2-b"), thread: A, mode: BOUND },
     ]
     // A reply below the end moves the column on.
     const replied = sync(col, tree({ "1-a": null, "2-b": "1-a", "3-c": "2-b" }))
-    expect(replied).toEqual([{ key: "k", anchor: "3-c", thread: A }])
+    expect(replied).toEqual([
+      { key: "k", anchor: "3-c", thread: A, mode: BOUND },
+    ])
     // A newer branch off an earlier message does not.
     const branched = sync(
       replied,
@@ -62,7 +71,7 @@ describe("newTabReducer", () => {
         key: "k",
         anchor: entryId("2-t"),
         thread: T,
-        fresh: { sendId: "s-1" },
+        mode: { kind: "fresh", sendId: "s-1" },
       },
     ]
     const i = tree({ "1-a": null, "2-t": "1-a" })
@@ -75,17 +84,17 @@ describe("newTabReducer", () => {
     const t4 = threadOfEntry("4-ours")
     expect(
       sync([{ ...fresh[0], thread: t4 } as Column], ours, [lane("4-ours", t4)]),
-    ).toEqual([{ key: "k", anchor: "4-ours", thread: t4 }])
+    ).toEqual([{ key: "k", anchor: "4-ours", thread: t4, mode: BOUND }])
   })
 
   test("a thread with no entry yet follows its lane's tip", () => {
     const T = threadIdFor("new")
     const col: readonly Column[] = [
-      { key: "k", anchor: entryId("1-a"), thread: T },
+      { key: "k", anchor: entryId("1-a"), thread: T, mode: BOUND },
     ]
     const i = tree({ "1-a": null, "2-t": "1-a" })
     expect(sync(col, i, [lane("2-t", T)])).toEqual([
-      { key: "k", anchor: "2-t", thread: T },
+      { key: "k", anchor: "2-t", thread: T, mode: BOUND },
     ])
     expect(sync(col, i)).toBe(col)
   })
@@ -97,7 +106,8 @@ describe("newTabReducer", () => {
         key: "b",
         anchor: null,
         thread: T,
-        fresh: {
+        mode: {
+          kind: "fresh",
           prefill: { text: "@agent ", blank: true },
           task: TEST_TASK,
         },
@@ -111,12 +121,17 @@ describe("newTabReducer", () => {
       key: "b",
       anchor: null,
       thread: T,
-      fresh: { sendId: "s", task: TEST_TASK },
+      mode: { kind: "fresh", sendId: "s", task: TEST_TASK },
     })
   })
 
   describe("a reader's settings (ADR-0106, ADR-0073)", () => {
-    const a: Column = { key: "a", anchor: entryId("1-a"), thread: A }
+    const a: Column = {
+      key: "a",
+      anchor: entryId("1-a"),
+      thread: A,
+      mode: BOUND,
+    }
     test("details and density change the column; a setting already so, the same column", () => {
       const open = newTabReducer(a, { kind: "details", open: true })
       expect(open.details).toBe(true)
@@ -130,18 +145,32 @@ describe("newTabReducer", () => {
     })
     test("open details survive the column settling on its thread", () => {
       const settled = sync(
-        [{ key: "k", anchor: entryId("1-a"), thread: A, details: true }],
+        [
+          {
+            key: "k",
+            anchor: entryId("1-a"),
+            thread: A,
+            mode: BOUND,
+            details: true,
+          },
+        ],
         tree({ "1-a": null, "2-t": "1-a" }),
       )
       expect(settled).toEqual([
-        { key: "k", anchor: entryId("2-t"), thread: A, details: true },
+        {
+          key: "k",
+          anchor: entryId("2-t"),
+          thread: A,
+          mode: BOUND,
+          details: true,
+        },
       ])
     })
   })
 
   test("sync leaves a column whose thread has not arrived, and settles it once it has", () => {
     const waiting: readonly Column[] = [
-      { key: "k", anchor: entryId("2-b"), thread: A },
+      { key: "k", anchor: entryId("2-b"), thread: A, mode: BOUND },
     ]
     expect(sync(waiting, tree({ "5-z": null }))).toBe(waiting)
     const arrived = tree({ "1-a": null, "2-b": "1-a", "3-c": "2-b" })
@@ -155,4 +184,44 @@ test("keyText: a column's key as the page draws it, whatever its kind (ADR-0116)
   expect(keyText({ kind: "fresh", thread: T })).toBe(T)
   expect(keyText({ kind: "newTab", thread: T })).toBe(T)
   expect(keyText({ kind: "task", task: TEST_TASK })).toBe(TEST_TASK)
+})
+
+test("a copy's column is a card's: shared, never closable as a fresh one is (ADR-0117)", () => {
+  const copy: Column = {
+    key: "c",
+    anchor: entryId("1-a"),
+    thread: threadIdFor("copy"),
+    mode: { kind: "copy", fork: entryId("1-a") },
+  }
+  expect(isClosable(copy)).toBe(false)
+  expect(isClosable({ ...copy, mode: { kind: "fresh" } })).toBe(true)
+  // @ts-expect-error: a copy's column closes as no fresh one does
+  const closable: ClosableColumn = copy
+  expect(closable.key).toBe("c")
+})
+
+test("a copy's column waits at its fork, then follows its thread once its first entry is written by anyone (ADR-0117)", () => {
+  const copy = threadIdFor("copy")
+  const col: Column = {
+    key: copy,
+    anchor: entryId("1-a"),
+    thread: copy,
+    mode: { kind: "copy", fork: entryId("1-a") },
+  }
+  const waiting = tree({ "1-a": null })
+  expect(newTabReducer(col, { kind: "sync", index: waiting, lanes: [] })).toBe(
+    col,
+  )
+  const written = indexTree({
+    ...tree({ "1-a": null }).entries,
+    [entryId("2-c")]: {
+      id: entryId("2-c"),
+      parentId: entryId("1-a"),
+      type: "message",
+      message: { role: "user", content: "go", starts: copy },
+    },
+  })
+  expect(
+    newTabReducer(col, { kind: "sync", index: written, lanes: [] }),
+  ).toEqual({ ...col, mode: BOUND, anchor: "2-c" })
 })

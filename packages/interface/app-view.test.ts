@@ -3,6 +3,7 @@ import {
   entryId,
   type LaneView,
   type OfferRecord,
+  rootIdFor,
   type ThreadId,
   taskIdFor,
   threadIdFor,
@@ -15,14 +16,17 @@ import { describe, expect, test } from "vitest"
 import {
   type AppViewInput,
   appView,
-  hereRail,
+  NO_RAIL,
   readOnlyWords,
+  taskRail,
   taskWork,
   threadWork,
 } from "./app-view.ts"
 import { PENDING_TRACK } from "./column-paths.ts"
-import type { Column } from "./columns.ts"
-import { tree } from "./fixtures.ts"
+import { BOUND, type Column } from "./columns.ts"
+import { threadOfEntry, tree } from "./fixtures.ts"
+import { rootSeed, trackSlot } from "./palette.ts"
+import { linkTo } from "./thread-link.ts"
 
 const ADA = writerId("ada@x.test")
 const nameOf = new Map([[ADA, "Ada"]])
@@ -36,7 +40,12 @@ const WORKFLOW: Workflow = {
   archive: { id: workflowStateIdFor("x"), name: "Done" },
 }
 const columns = (...keys: string[]): Column[] =>
-  keys.map(key => ({ key, anchor: entryId("r"), thread: threadIdFor(key) }))
+  keys.map(key => ({
+    key,
+    anchor: entryId("r"),
+    thread: threadIdFor(key),
+    mode: BOUND,
+  }))
 const input = (over: Partial<AppViewInput>): AppViewInput => ({
   active: { kind: "task", task: K },
   columns: columns("a"),
@@ -68,7 +77,7 @@ describe("appView's workspace", () => {
 
   test("in a task, only a branch not yet sent closes: a card's column folds (ADR-0116)", () => {
     const [a, b] = columns("a", "b")
-    const fresh = { ...(b as Column), fresh: {} }
+    const fresh: Column = { ...(b as Column), mode: { kind: "fresh" } }
     const two = workspace({ columns: [a as Column, fresh], tracks: [3] })
     expect(two.kind === "task" && two.slots).toEqual([
       { key: "a", closable: false, track: 3 },
@@ -155,22 +164,81 @@ test("the header's offers are the open ones, never one accepted work already hol
   ])
 })
 
-test("a task's rail draws one tree for each root of its threads, in order, and nothing off a task (ADR-0116)", () => {
-  const index = tree({ r1: null, a: "r1", r2: null, b: "r2", r3: null })
+test("a task's rail is a forest: a tree for each root of its threads, in order, each cut to the paths to its threads, a fork elsewhere a stub; nothing off a task (ADR-0116, ADR-0117)", () => {
+  // 1-r1 -> 2-a -> 3-b; 4-c, a branch at 2-a, is another thread; 5-r2 -> 6-d.
+  const index = tree({
+    "1-r1": null,
+    "2-a": "1-r1",
+    "3-b": "2-a",
+    "4-c": "2-a",
+    "5-r2": null,
+    "6-d": "5-r2",
+  })
   const ids = (rows: readonly { readonly id: string }[]) => rows.map(r => r.id)
   const task = { kind: "task", task: K } as const
-  expect(ids(hereRail(index, task, [entryId("r1")]))).toEqual(["r1", "a"])
-  expect(ids(hereRail(index, task, [entryId("r2"), entryId("r1")]))).toEqual([
-    "r2",
-    "b",
-    "r1",
-    "a",
+  const [R1, R2] = [
+    rootIdFor("01a0ffd2-0000-7000-8000-0000000000a1"),
+    rootIdFor("01a0ffd2-0000-7000-8000-0000000000a2"),
+  ]
+  const roots = [
+    { root: R1, entry: entryId("1-r1") },
+    { root: R2, entry: entryId("5-r2") },
+  ]
+  const C = threadOfEntry("4-c")
+  const elsewhere = taskIdFor("01a0ffd2-0000-7000-8000-0000000000ee")
+  const linkOf = (thread: ThreadId) =>
+    linkTo(
+      thread,
+      [
+        {
+          kind: "thread",
+          id: C,
+          owner: ADA,
+          placer: ADA,
+          place: { kind: "canvas", task: elsewhere, order: "1", width: 1 },
+        },
+      ],
+      ADA,
+    )
+  const rail = taskRail({
+    index,
+    active: task,
+    roots,
+    ends: new Map([
+      [threadOfEntry("1-r1"), entryId("3-b")],
+      [threadOfEntry("5-r2"), entryId("6-d")],
+    ]),
+    linkOf,
+    seed: rootSeed(R1),
+  })
+  expect(ids(rail.rows)).toEqual(["1-r1", "2-a", "3-b", "5-r2", "6-d"])
+  expect(rail.stubs).toMatchObject([
+    {
+      from: "2-a",
+      at: "4-c",
+      thread: C,
+      link: { kind: "open", task: elsewhere },
+    },
   ])
-  expect(hereRail(index, task, [])).toEqual([])
-  expect(hereRail(index, { kind: "new", key: "t" }, [entryId("r1")])).toEqual(
-    [],
-  )
-  expect(hereRail(index, null, [entryId("r1")])).toEqual([])
+  // Each tree in its root's palette under the page's seed.
+  const slotOf = (id: string) => {
+    const row = rail.rows.find(r => r.id === id)
+    return row === undefined ? null : trackSlot(rootSeed(R1), row.track)
+  }
+  expect([slotOf("1-r1"), slotOf("5-r2")]).toEqual([
+    trackSlot(rootSeed(R1), 0),
+    trackSlot(rootSeed(R2), 0),
+  ])
+  expect(
+    taskRail({
+      index,
+      active: { kind: "new", key: "t" },
+      roots,
+      ends: new Map(),
+      linkOf,
+      seed: 0,
+    }),
+  ).toEqual(NO_RAIL)
 })
 
 test("threadWork and taskWork: each busy held lane's work, and each lane running anywhere, by thread; a task's is the most of its threads' (ADR-0091, ADR-0116)", () => {

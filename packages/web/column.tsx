@@ -12,6 +12,7 @@ import {
   conflictsAt,
   type DigestRecord,
   type EntryId,
+  isThreadId,
   type LaneView,
   laneOf,
   messageAt,
@@ -26,6 +27,7 @@ import {
   type StreamRecord,
   type TaskId,
   type TextPlace,
+  type ThreadId,
   type ThreadLane,
   type TraceRecord,
   type TreeIndex,
@@ -36,6 +38,7 @@ import {
   askWords,
   bannerUrl,
   behind,
+  branchesAt,
   type CatchUps,
   type ColumnAct,
   type ColumnHow,
@@ -53,8 +56,10 @@ import {
   densityWords,
   detailsTitle,
   type EditorState,
+  earlierWords,
   FOLD,
   type FoldMemory,
+  freshOf,
   type HeadBanner,
   type HeadIdentity,
   type HeadOrigin,
@@ -67,11 +72,13 @@ import {
   keyMove,
   type LiveWork,
   leftLine,
+  linkTo,
   NEW_PIN,
   NEW_PIN_TITLE,
   newPinAt,
   noticeKey,
   noticeWords,
+  opens,
   type Pending,
   type ReadOnly,
   type ReserveStep,
@@ -84,7 +91,9 @@ import {
   shownBy,
   spotOf,
   startedWords,
+  type TaskChoice,
   type ThreadDetails,
+  type ThreadLink,
   traceGroups,
   tracesAt,
   traceWords,
@@ -114,6 +123,7 @@ import {
   useSyncExternalStore,
 } from "react"
 import { CardEditor } from "./card-editor.tsx"
+import { dragCard } from "./card-frame.tsx"
 import { ColumnMenu } from "./column-menu.tsx"
 import { Composer } from "./composer.tsx"
 import { COPIED, useCopy } from "./copy.ts"
@@ -157,6 +167,10 @@ export interface ColumnProps {
   drawnAt: number
   /** How many columns wide its card is drawn (ADR-0116); 1 with no card. */
   width: CardWidth
+  /** The tasks its ⋯ moves or copies its thread to (ADR-0117). */
+  menuTasks: readonly TaskChoice[]
+  /** A task's label: what a fork row names a source's task by (ADR-0117). */
+  labelOf: (task: TaskId) => string
   /** How many cards the canvas holds: with two or more, a card's column can move. */
   count: number
   view: ColumnView
@@ -239,12 +253,27 @@ export interface ColumnProps {
   composers: ComposerPlacesStore
 }
 
+/** The take handle's words: what dropping it on a slot does. */
+const TAKE_DRAG =
+  "drag onto a slot of your inventory to put this thread away: its run stops"
+
 /** A place a text card may be in; undefined for a canvas. */
 const textPlaceOf = (place: CardPlace | undefined): TextPlace | undefined =>
   place === undefined || place.kind === "canvas" ? undefined : place
 
 export function Column(p: ColumnProps) {
-  const { view, index } = p
+  const { index } = p
+  // The path above the column's own thread, folded when the thread it forks
+  // from is on no column of this canvas (ADR-0117): unfolded, it is drawn
+  // as the rest of the path is.
+  const [aboveOpen, setAboveOpen] = useState(false)
+  const view = useMemo(
+    () =>
+      aboveOpen && p.view.above.length > 0
+        ? { ...p.view, nodes: [...p.view.above, ...p.view.nodes], above: [] }
+        : p.view,
+    [aboveOpen, p.view],
+  )
   const colors = useTrackColors()
   const body = useRef<HTMLDivElement>(null)
   const content = useRef<HTMLDivElement>(null)
@@ -272,7 +301,10 @@ export function Column(p: ColumnProps) {
       spacer.current.style.height = "0px"
   }, [view.forkFrom])
 
-  const fresh = p.column.fresh !== undefined
+  // A fresh column, or a copy before its first send: its next send is a
+  // branch at its anchor, its thread's first message (ADR-0117).
+  const fresh = branchesAt(p.column)
+  const freshMode = freshOf(p.column)
   // A card's column folds and moves; a fresh one closes and sends first.
   const { columnKey } = p
   const card = columnKey.kind === "card" ? columnKey.card : null
@@ -461,6 +493,15 @@ export function Column(p: ColumnProps) {
     p.session.acting.subscribe,
     p.session.acting.current,
   )
+  const origins = useMemo(
+    () => ({
+      task: p.task,
+      linkOf: (t: ThreadId) => linkTo(t, p.cards, p.session.writer),
+      labelOf: p.labelOf,
+      reader: { me: p.session.writer, nameOf: p.nameOf },
+    }),
+    [p.task, p.cards, p.session.writer, p.labelOf, p.nameOf],
+  )
   const shows = columnView({
     acting:
       lane.kind === "lane" ? (acting.offers.get(lane.name) ?? null) : null,
@@ -477,6 +518,7 @@ export function Column(p: ColumnProps) {
     nameOf: p.nameOf,
     lanes: p.lanes,
     work: p.work,
+    origins,
   })
   // What a card's command catches up with: the thread's base (ADR-0104),
   // or the thread it branched from (ADR-0072). One object while what it
@@ -512,9 +554,7 @@ export function Column(p: ColumnProps) {
     asksAgent: p.column.asksAgent === true,
     thread,
     task: p.task,
-    ...(p.column.fresh?.root === undefined
-      ? {}
-      : { root: p.column.fresh.root }),
+    ...(freshMode?.root === undefined ? {} : { root: freshMode.root }),
     ...(pinned.length === 0 ? {} : { pinned: pinned.map(c => c.id) }),
   }
   // The column's pane (ADR-0078): what you opened beside the thread, kept
@@ -790,9 +830,30 @@ export function Column(p: ColumnProps) {
                   session={p.session}
                 />
               )}
+              {card !== null && isThreadId(card) && (
+                // A thread's card dragged onto a slot of your inventory is
+                // taken there (ADR-0117, ADR-0124); the header itself drags
+                // the column along the canvas.
+                <button
+                  aria-label={TAKE_DRAG}
+                  className="take-drag"
+                  draggable
+                  onDragStart={e => dragCard(e, card)}
+                  title={TAKE_DRAG}
+                  type="button"
+                >
+                  ⇲
+                </button>
+              )}
               {card !== null && (
                 <ColumnMenu
-                  items={columnMenu({ card: card, width: p.width })}
+                  items={columnMenu({
+                    card,
+                    width: p.width,
+                    ...(p.task === null
+                      ? {}
+                      : { thread: { here: p.task, tasks: p.menuTasks } }),
+                  })}
                   onIntent={p.onIntent}
                 />
               )}
@@ -822,7 +883,23 @@ export function Column(p: ColumnProps) {
                 </button>
               )}
             </div>
-            <Origin onOpen={openAt} origin={shows.origin} />
+            <Origin
+              onLink={(link, at) =>
+                p.onIntent({ kind: "openLink", link, entry: at })
+              }
+              onOpen={openAt}
+              origin={shows.origin}
+            />
+            {view.above.length > 0 && (
+              <button
+                className="earlier"
+                onClick={() => setAboveOpen(true)}
+                title="show the path above this thread"
+                type="button"
+              >
+                {earlierWords(view.above.length)}
+              </button>
+            )}
             {/* The work strip, a row of the header (ADR-0113). */}
             <WorkStripView
               act={actOnOffer}
@@ -1078,7 +1155,7 @@ export function Column(p: ColumnProps) {
               how={how}
               fresh={fresh}
               reader={{ me: p.session.writer, nameOf: p.nameOf }}
-              prefill={p.column.fresh?.prefill}
+              prefill={freshMode?.prefill}
               lane={lane}
               onBranchInstead={branchInstead}
               onSend={onSend}
@@ -1090,7 +1167,7 @@ export function Column(p: ColumnProps) {
               catchUps={catchUps}
               putColumn={putColumn}
               participants={p.participants}
-              pending={p.column.fresh?.pending}
+              pending={freshMode?.pending}
               readOnly={p.readOnly}
               typingAt={view.tipId}
               session={p.session}
@@ -1328,15 +1405,38 @@ function ThreadDetailsPanel({
   )
 }
 
-/** Where the column forks, leading back to it. */
+/**
+ * Where the column forks, leading back to it: the message it forks from;
+ * or a copy's source, or a parent thread in another task, by its link,
+ * which opens nothing where someone else holds it (ADR-0117, ADR-0124).
+ */
 function Origin({
   origin,
   onOpen,
+  onLink,
 }: {
   origin: HeadOrigin
   onOpen: (id: EntryId) => void
+  onLink: (link: ThreadLink, at: EntryId) => void
 }) {
   if (origin.kind === "none") return null
+  if (origin.kind === "source")
+    return (
+      <button
+        className="origin"
+        data-copied={origin.copied || undefined}
+        disabled={!opens(origin.link)}
+        onClick={() => onLink(origin.link, origin.at)}
+        title={
+          origin.copied
+            ? "show the thread it was copied from"
+            : "show where it branched"
+        }
+        type="button"
+      >
+        <span className="origin-dot" />↰ {origin.words}
+      </button>
+    )
   return (
     <button
       className="origin"

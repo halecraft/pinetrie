@@ -8,6 +8,7 @@ import {
   type ForkStart,
   nearestRevision,
   type Position,
+  type SnapshotId,
   type ThreadId,
   type WriterId,
 } from "@pinetrie/core"
@@ -21,6 +22,7 @@ import {
 import { type RootView, readRevisions, readTreeIndex } from "@pinetrie/reads"
 import { beginFacts, type RepoOwner } from "@pinetrie/repo"
 import {
+  FILES_LOST,
   type ForkBegin,
   forkPoint,
   LANE,
@@ -44,11 +46,18 @@ export async function forkFacts(ports: {
   readonly pendingRecords: Turns["pendingRecords"]
   readonly nearest: () => ReturnType<typeof nearestRevision>
   readonly begin: () => Promise<ForkBegin | ErrCode>
+  /** Whether a snapshot is still there: archiving deletes some (ADR-0124). */
+  readonly exists: (snapshot: SnapshotId) => Promise<boolean>
 }): Promise<Parameters<typeof forkPoint>[0] | ErrCode> {
   await ports.pendingRecords()
   const above = ports.nearest()
   const begin = await ports.begin()
-  return typeof begin === "string" ? begin : { above, begin }
+  if (typeof begin === "string") return begin
+  const kept =
+    above.snapshot === null ||
+    above.snapshot === BASE_SNAPSHOT ||
+    (await ports.exists(above.snapshot))
+  return { above, begin, kept }
 }
 
 export interface NewLanes {
@@ -170,10 +179,16 @@ export function createNewLanes(deps: {
                 nearest: () =>
                   nearestRevision(readTreeIndex(doc), readRevisions(doc), at),
                 begin: () => beginAt(owner, base),
+                exists: id => runtime.snapshotExists(id),
               })
               if (typeof facts === "string")
                 throw new Error(`the lane cannot begin: ${facts}`)
               const point = forkPoint(facts)
+              // Its fork row says it began from its base (ADR-0124).
+              if (point.lost !== null)
+                await deps.records.writeValues([
+                  setRecord(FILES_LOST, { lane, snapshot: point.lost }),
+                ])
               if (point.snapshot === BASE_SNAPSHOT) await setup.baseAtAccepted()
               await removeLane(runtime, lane)
               await executeOrThrow(

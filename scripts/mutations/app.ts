@@ -619,8 +619,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a new root takes the page to it",
     file: "packages/web/app.tsx",
-    from: "  }, [layout, stored, index, lanes, archivedTasks, list, canvases])\n",
-    to: '  }, [layout, stored, index, lanes, archivedTasks, list, canvases])\n  const othersTasks = tasks.byId.size\n  useEffect(() => {\n    const newest = [...tasks.byId.keys()].at(-1)\n    if (newest !== undefined) dispatch({ kind: "show", here: { kind: "task", task: newest } })\n  }, [othersTasks])\n',
+    from: "    forkOf,\n    holders,\n  ])\n  // Every change is saved",
+    to: '    forkOf,\n    holders,\n  ])\n  const othersTasks = tasks.byId.size\n  useEffect(() => {\n    const newest = [...tasks.byId.keys()].at(-1)\n    if (newest !== undefined) dispatch({ kind: "show", here: { kind: "task", task: newest } })\n  }, [othersTasks])\n  // Every change is saved',
     suite: "browser",
     scenario: "page",
     expect:
@@ -1055,8 +1055,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the column does not know who you are",
     file: "packages/web/column.tsx",
-    from: "              reader={{ me: p.session.writer, nameOf: p.nameOf }}\n              prefill={p.column.fresh?.prefill}",
-    to: '              reader={{ me: "w-nobody" as WriterId, nameOf: p.nameOf }}\n              prefill={p.column.fresh?.prefill}',
+    from: "              reader={{ me: p.session.writer, nameOf: p.nameOf }}\n              prefill={freshMode?.prefill}",
+    to: '              reader={{ me: "w-nobody" as WriterId, nameOf: p.nameOf }}\n              prefill={freshMode?.prefill}',
     suite: "browser",
     scenario: "page",
     expect:
@@ -1068,8 +1068,8 @@ export const mutations: readonly Mutation[] = [
     // the strip reading the tree a frame late is what brings it back.
     name: "the strip reads the tree a frame behind the document",
     file: "packages/web/app.tsx",
-    from: '  const strip: StripView | null = useMemo(\n    () =>\n      active?.kind === "task"\n        ? taskStrip(layout, active.task, { canvases, index, lanes })\n        : null,\n    [layout, active, canvases, index, lanes],\n  )\n',
-    to: '  const [behind, setBehind] = useState(index)\n  useEffect(() => {\n    const f = requestAnimationFrame(() => setBehind(index))\n    return () => cancelAnimationFrame(f)\n  }, [index])\n  const strip: StripView | null = useMemo(\n    () =>\n      active?.kind === "task"\n        ? taskStrip(layout, active.task, { canvases, index: behind, lanes })\n        : null,\n    [layout, active, canvases, behind, lanes],\n  )\n',
+    from: '  const strip: StripView | null = useMemo(\n    () =>\n      active?.kind === "task"\n        ? taskStrip(layout, active.task, {\n            canvases,\n            forks: forkOf,\n            holders,\n            index,\n            lanes,\n          })\n        : null,\n    [layout, active, canvases, forkOf, index, lanes, holders],\n  )\n',
+    to: '  const [behind, setBehind] = useState(index)\n  useEffect(() => {\n    const f = requestAnimationFrame(() => setBehind(index))\n    return () => cancelAnimationFrame(f)\n  }, [index])\n  const strip: StripView | null = useMemo(\n    () =>\n      active?.kind === "task"\n        ? taskStrip(layout, active.task, {\n            canvases,\n            forks: forkOf,\n            holders,\n            index: behind,\n            lanes,\n          })\n        : null,\n    [layout, active, canvases, forkOf, behind, lanes, holders],\n  )\n',
     suite: "browser",
     scenario: "tools",
     expect: "no branch chip is painted in the agent's column while it works",
@@ -1077,10 +1077,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "live work is drawn a render behind the document",
     file: "packages/web/app.tsx",
-    from: "  const shared = {\n    activity,\n    asks,\n    folds,\n    stops,\n    live,\n",
+    from: "  const shared = {\n    menuTasks,\n    labelOf,\n    activity,\n    asks,\n    folds,\n    stops,\n    live,\n",
     // A frame behind, not a render: a render's passive effect can be
     // flushed before paint by a later update in the same frame.
-    to: "  const [lagged, setLagged] = useState(live)\n  useEffect(() => {\n    const f = requestAnimationFrame(() => setLagged(live))\n    return () => cancelAnimationFrame(f)\n  }, [live])\n  const shared = {\n    activity,\n    asks,\n    folds,\n    stops,\n    live: lagged,\n",
+    to: "  const [lagged, setLagged] = useState(live)\n  useEffect(() => {\n    const f = requestAnimationFrame(() => setLagged(live))\n    return () => cancelAnimationFrame(f)\n  }, [live])\n  const shared = {\n    menuTasks,\n    labelOf,\n    activity,\n    asks,\n    folds,\n    stops,\n    live: lagged,\n",
     suite: "browser",
     scenario: "tools",
     expect:
@@ -2213,5 +2213,45 @@ export const mutations: readonly Mutation[] = [
     suite: "browser",
     scenario: "page",
     expect: "a note column is renamed from its header, for everyone",
+  },
+  {
+    name: "the host takes no copy",
+    file: "packages/protocol/codec.ts",
+    from: '  if (kind === "copy-thread") {\n',
+    to: '  if (kind === "copy-thread-never") {\n',
+    suite: "host",
+    scenario: "cards",
+    expect:
+      "a copy forks at its source's end, its card where it was dropped, and its first send branches there, its record naming its source",
+  },
+  {
+    name: "a send runs in a thread in an inventory",
+    file: "apps/pinetrie/host/commands/index.ts",
+    from: "    const held = await refuseHeld(deps.basics, intent)\n    if (held !== null) return settled(held)\n",
+    to: "",
+    suite: "host",
+    scenario: "cards",
+    expect:
+      "a thread's card taken into an inventory runs nothing there, put it on a canvas first; put back, it takes a send",
+  },
+  {
+    name: "the rail draws the first root's tree alone",
+    file: "packages/web/app.tsx",
+    from: "        return entry === undefined ? [] : [{ root, entry }]\n",
+    to: '        return entry === undefined || root !== tasks.byId.get(hereTask ?? ("" as never))?.roots[0] ? [] : [{ root, entry }]\n',
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "a thread moved onto the canvas from another task's makes a canvas of two roots: its column, and its root's tree on the rail",
+  },
+  {
+    name: "a thread's column offers no copy",
+    file: "packages/web/column.tsx",
+    from: "                      : { thread: { here: p.task, tasks: p.menuTasks } }),",
+    to: "                      : {}),",
+    suite: "browser",
+    scenario: "page",
+    expect:
+      "Copy to \u25b8 this task makes a copy beside its source, its fork row naming what it was copied from",
   },
 ]

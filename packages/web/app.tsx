@@ -29,7 +29,9 @@ import {
   pathIds,
   type TaskId,
   type TextCard,
+  type ThreadId,
   taskPinnedInView,
+  threadAt,
   type WorkflowState,
   type WorkflowStateId,
 } from "@pinetrie/core"
@@ -49,18 +51,22 @@ import {
   DROP_ZONE,
   type Effect,
   foldMemory,
+  freshOf,
+  freshRootOf,
   type HeldView,
-  hereRail,
+  heldByOthers,
   type Identity,
   type Intent,
   inboxCount,
   initialLayout,
+  inventoryThreads,
   keyAct,
   type Layout,
   type ListWidth,
   labelsOf,
   laneRootsOf,
   layoutReducer,
+  linkTo,
   mentionsOf,
   messageCount,
   NO_TEXT,
@@ -80,6 +86,7 @@ import {
   projectColumns,
   type RootDrag,
   type RowMemory,
+  railStubWords,
   readHeldLanes,
   readSessionFacts,
   reconcileName,
@@ -97,14 +104,19 @@ import {
   storedLayout,
   stripCards,
   summariesOf,
+  type ThreadLink,
   type TypedLast,
   targetOfElement,
   taskColumnView,
+  taskRail,
   taskSprites,
   taskStrip,
   tasksOf,
   taskWork,
+  threadAnchor,
   threadCardHeads,
+  threadFace,
+  threadPreview,
   threadWork,
   typingDue,
   viewportStore,
@@ -398,7 +410,7 @@ export function App({
     () => tasksOf({ known: taskRecords.keys(), cards, threads }),
     [taskRecords, cards, threads],
   )
-  const { taskOfThread, canvases } = tasks.index
+  const { taskOfThread, canvases, forkOf } = tasks.index
   // Each task with a message, for the board, and each task's label: its
   // title, else its first card's (ADR-0045). Which tasks are in the sidebar
   // is yours (`openThreads`, ADR-0122).
@@ -471,6 +483,12 @@ export function App({
   // a column opened at a lane's tip is bound at once. The effect below stores
   // it, so an action reduces from it: React runs pending effects before it
   // handles the next event.
+  // Each thread someone else holds (ADR-0124): a branch not yet sent from
+  // one is drawn without its entries.
+  const holders = useMemo(
+    () => heldByOthers(cards, session.writer),
+    [cards, session.writer],
+  )
   const layout = useMemo(
     () =>
       resolveLayout(stored, {
@@ -479,8 +497,10 @@ export function App({
         archived: archivedTasks,
         list,
         canvases,
+        forks: forkOf,
+        holders,
       }),
-    [stored, index, lanes, archivedTasks, list, canvases],
+    [stored, index, lanes, archivedTasks, list, canvases, forkOf, holders],
   )
   useEffect(() => {
     if (layout !== stored)
@@ -491,8 +511,20 @@ export function App({
         archived: archivedTasks,
         list,
         canvases,
+        forks: forkOf,
+        holders,
       })
-  }, [layout, stored, index, lanes, archivedTasks, list, canvases])
+  }, [
+    layout,
+    stored,
+    index,
+    lanes,
+    archivedTasks,
+    list,
+    canvases,
+    forkOf,
+    holders,
+  ])
   // Every change is saved, the document's too, so a restored column's anchor
   // is never older than the tree it was drawn from.
   useEffect(
@@ -524,6 +556,7 @@ export function App({
             cards: session.cards.current(),
             threads: facts.threads,
           }),
+          inventory: inventoryThreads(session.cards.current(), session.writer),
         }),
       )
       await Promise.all(
@@ -535,10 +568,19 @@ export function App({
       alive = false
     }
   }, [doc, session])
+  // The threads in your inventory, one list while they are the same.
+  const heldKey = inventoryThreads(cards, session.writer).join(" ")
+  const heldThreads = useMemo(
+    () => (heldKey === "" ? [] : (heldKey.split(" ") as ThreadId[])),
+    [heldKey],
+  )
   // What this tab holds follows the sidebar, once the stored roots are settled.
   useEffect(() => {
-    if (settled) session.holdRoots(planHeldRoots({ layout, tasks }))
-  }, [settled, session, layout, tasks])
+    if (settled)
+      session.holdRoots(
+        planHeldRoots({ layout, tasks, inventory: heldThreads }),
+      )
+  }, [settled, session, layout, tasks, heldThreads])
   // biome-ignore lint/correctness/useExhaustiveDependencies: once, at settle, with the index of that render
   useEffect(() => {
     if (settled)
@@ -549,6 +591,8 @@ export function App({
         archived: archivedTasks,
         list,
         canvases,
+        forks: forkOf,
+        holders,
         known: new Set(tasks.byId.keys()),
       })
   }, [settled])
@@ -570,6 +614,8 @@ export function App({
         archived: archivedTasks,
         list,
         canvases,
+        forks: forkOf,
+        holders,
         known: now,
       })
   }, [settled, tasks])
@@ -580,9 +626,15 @@ export function App({
   const strip: StripView | null = useMemo(
     () =>
       active?.kind === "task"
-        ? taskStrip(layout, active.task, { canvases, index, lanes })
+        ? taskStrip(layout, active.task, {
+            canvases,
+            forks: forkOf,
+            holders,
+            index,
+            lanes,
+          })
         : null,
-    [layout, active, canvases, index, lanes],
+    [layout, active, canvases, forkOf, index, lanes, holders],
   )
   // The tab's thread columns drawn whole: the task's, or a new tab's one
   // fresh column. Every projection below is keyed on this one.
@@ -609,7 +661,14 @@ export function App({
     () =>
       projectColumns(
         index,
-        columns.map(c => ({ anchor: c.anchor })),
+        columns.map(c => {
+          const held = freshOf(c)?.held
+          return {
+            anchor: c.anchor,
+            ...(c.foldAbove === undefined ? {} : { foldAbove: c.foldAbove }),
+            ...(held === undefined ? {} : { hide: held.thread }),
+          }
+        }),
       ),
     [index, columns],
   )
@@ -635,20 +694,19 @@ export function App({
     [canvas, cards, noteTitles],
   )
   // The task you are on, which the sidebar's repair keeps while it is
-  // archived, and the root entries of its threads' roots, whose trees the
-  // rail draws.
+  // archived, and its threads' roots with their root entries, whose trees
+  // the rail draws.
   const hereTask = active?.kind === "task" ? active.task : null
   const hereRoots = useMemo(
     () =>
       (hereTask === null
         ? []
         : (tasks.byId.get(hereTask)?.roots ?? [])
-      ).flatMap(root => rootEntries.get(root) ?? []),
+      ).flatMap(root => {
+        const entry = rootEntries.get(root)
+        return entry === undefined ? [] : [{ root, entry }]
+      }),
     [hereTask, tasks, rootEntries],
-  )
-  const rail = useMemo(
-    () => hereRail(index, active, hereRoots),
-    [index, active, hereRoots],
   )
   useEffect(() => session.openThreads.here(hereTask), [session, hereTask])
   // The root whose colours the workspace draws in (ADR-0089): the task
@@ -657,9 +715,52 @@ export function App({
   const seedRoot =
     (hereTask === null ? undefined : tasks.byId.get(hereTask)?.roots[0]) ??
     (active?.kind === "new"
-      ? (layout.newTabs.find(c => c.key === active.key)?.fresh?.root ?? null)
+      ? (freshRootOf(layout.newTabs.find(c => c.key === active.key)) ?? null)
       : null)
   const seed = seedRoot === null ? 0 : rootSeed(seedRoot)
+  // Where each thread on the canvas ends, which the rail cuts its trees to
+  // (ADR-0117): its end, its lane's tip before its first entry, a copy's fork.
+  const threadEnds = useMemo(
+    () =>
+      new Map(
+        (hereTask === null
+          ? []
+          : (tasks.byId.get(hereTask)?.threads ?? [])
+        ).flatMap(thread => {
+          const end = threadAnchor(index, lanes, thread) ?? forkOf.get(thread)
+          return end === undefined || end === null
+            ? []
+            : [[thread, end] as const]
+        }),
+      ),
+    [hereTask, tasks, index, lanes, forkOf],
+  )
+  const taskRailView = useMemo(
+    () =>
+      taskRail({
+        index,
+        active,
+        roots: hereRoots,
+        ends: threadEnds,
+        linkOf: thread => linkTo(thread, cards, session.writer),
+        seed,
+      }),
+    [index, active, hereRoots, threadEnds, cards, session.writer, seed],
+  )
+  const rail = taskRailView.rows
+  const drawnStubs = useMemo(
+    () =>
+      taskRailView.stubs.map(stub => ({
+        stub,
+        ...railStubWords(
+          stub,
+          workFacts.names,
+          { me: session.writer, nameOf },
+          task => labels.get(task) ?? NO_TEXT,
+        ),
+      })),
+    [taskRailView, workFacts.names, session.writer, nameOf, labels],
+  )
   const order = useMemo(
     () => writerOrder(index, nameOf.keys()),
     [index, nameOf],
@@ -794,6 +895,7 @@ export function App({
                   path: paths[i] ?? new Set<EntryId>(),
                   closable: slot.closable,
                   track: slot.track,
+                  heldBy: freshOf(column)?.held?.by ?? null,
                 },
               ] as const,
             ]
@@ -1029,6 +1131,30 @@ export function App({
     [cards, session.writer],
   )
   const intents = useMemo(() => intentsOf(moves), [moves])
+  // Each thread you hold, as its slot draws it (ADR-0124).
+  const threadFaces = useMemo(
+    () =>
+      new Map(
+        held.flatMap(c =>
+          c.kind === "thread"
+            ? [
+                [
+                  c.id,
+                  threadFace({
+                    thread: c.id,
+                    index,
+                    lanes,
+                    names: workFacts.names,
+                    banners: workFacts.banners,
+                    stops,
+                  }),
+                ] as const,
+              ]
+            : [],
+        ),
+      ),
+    [held, index, lanes, workFacts.names, workFacts.banners, stops],
+  )
   const slots = useMemo(
     () =>
       settleSlots(
@@ -1039,6 +1165,8 @@ export function App({
     [held, storedSlots, intents],
   )
   const [selected, setSelected] = useState(0)
+  // Each request to open the selected slot's card: a thread's preview (ADR-0124).
+  const [openSlot, setOpenSlot] = useState(0)
   const [inventoryOpen, setInventoryOpen] = useState(false)
   const openNow = useRef(false)
   openNow.current = inventoryOpen
@@ -1106,6 +1234,7 @@ export function App({
         if (brief) setTimeout(() => setInventoryOpen(false), FLIGHT_MS * 2)
       },
       select: setSelected,
+      openSelected: () => setOpenSlot(n => n + 1),
     },
     fly,
     intent: intent => onIntent(intent),
@@ -1271,10 +1400,9 @@ export function App({
     state: stateOf.get(task) ?? null,
   })
   const openAt = (entry: EntryId) => onIntent({ kind: "openAt", entry })
-  /** Show `entry`, in `task`; nothing for none. */
-  const openIn = (entry: EntryId, task: TaskId | null) => {
-    if (task !== null) onIntent({ kind: "openIn", entry, task })
-  }
+  /** Follow `link` to `entry` (ADR-0124): a held thread's opens nothing. */
+  const openLink = (entry: EntryId, link: ThreadLink) =>
+    onIntent({ kind: "openLink", link, entry })
   // The card's id is the DOM's (`data-card`): read at the edge.
   const dragColumn = useColumnDrag(stripEl, (id, to) => {
     const card = parseCardId(id)
@@ -1294,8 +1422,19 @@ export function App({
     )
   }, [settled, myName, session, stores, run])
 
+  // The tasks a thread's ⋯ moves or copies it to: the sidebar's, by label
+  // (ADR-0117). Archived ones take no card.
+  const menuTasks = useMemo(
+    () =>
+      layout.open
+        .filter(t => !archivedTasks.has(t))
+        .map(task => ({ task, label: labels.get(task) ?? NO_TEXT })),
+    [layout.open, archivedTasks, labels],
+  )
   /** The props every column shares, whichever tab draws it. */
   const shared = {
+    menuTasks,
+    labelOf,
     activity,
     asks,
     folds,
@@ -1335,7 +1474,22 @@ export function App({
   const { workspace } = view
   const readers = { session, index, taskOfThread, order, nameOf, colorOf }
   const pip = <CardPip color={colorOf(session.writer)} />
-  const thread = threadRow({ index, labelOf, onOpen: openIn })
+  const reader = { me: session.writer, nameOf }
+  /** Where a link to `thread` leads, as you follow it (ADR-0124). */
+  const linkOf = (thread: ThreadId) => linkTo(thread, cards, session.writer)
+  const thread = threadRow({ index, labelOf, reader, onOpen: openLink })
+  /**
+   * A reader's thread, by the end they read at: a link to its thread, or,
+   * where this tab holds no tree with that end, to the task's first thread,
+   * which shows the task and the entry once it arrives; null for a task
+   * with no thread on its canvas.
+   */
+  const readerRow = (end: EntryId, task: TaskId) => {
+    const first = canvases.get(task)?.find(c => c.kind === "thread")
+    const at =
+      threadAt(index, end) ?? (first?.kind === "thread" ? first.id : null)
+    return at === null ? null : thread(end, end, linkOf(at))
+  }
   return (
     <Pictures value={pictures}>
       <CardHistories value={historyFacts}>
@@ -1364,6 +1518,11 @@ export function App({
             intents={intents}
             onDock={d => setDock(stores.dock.save(d))}
             onIntent={onIntent}
+            openRequest={openSlot}
+            previewOf={thread =>
+              threadPreview(thread, index, forkOf.get(thread) ?? null)
+            }
+            threads={threadFaces}
             reader={{ me: session.writer, nameOf }}
             notices={moves.notices.filter(r => r.actedAt.kind === "inventory")}
             selected={selected}
@@ -1409,6 +1568,10 @@ export function App({
                           open={shown}
                           rows={rail}
                           session={session}
+                          stubs={drawnStubs}
+                          onLink={(link, at) =>
+                            onIntent({ kind: "openLink", link, entry: at })
+                          }
                           viewports={viewports}
                           yours={yours}
                         />
@@ -1438,7 +1601,7 @@ export function App({
                         taskPins={taskPins}
                         taskPinsInView={taskPinsInView}
                         told={told}
-                        thread={(end, task) => thread(end, end, task)}
+                        thread={readerRow}
                         typing={typing}
                         workspace={workspace}
                       />
@@ -1451,7 +1614,7 @@ export function App({
                       pip={pip}
                       readers={readers}
                       searchRef={boardSearchField}
-                      thread={(end, task) => thread(end, end, task)}
+                      thread={readerRow}
                       view={boardShown}
                     />
                   )}
@@ -1504,10 +1667,10 @@ export function App({
             inbox,
             thread,
             names: workFacts.names,
-            taskOfThread,
+            linkOf,
             labelOf,
-            nameOf,
-            onOpen: openIn,
+            reader,
+            onOpen: openLink,
             onIntent,
           }}
           accepted={workFacts.accepted}

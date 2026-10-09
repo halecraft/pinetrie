@@ -7,7 +7,10 @@ import {
   ERR,
   errorText,
   type Intent,
+  type RootId,
   type TaskId,
+  type TreeIndex,
+  threadAt,
   type WriterId,
 } from "@pinetrie/core"
 import {
@@ -16,17 +19,28 @@ import {
   type Outcome,
   type WireCommand,
 } from "@pinetrie/protocol/codec"
-import { readArchived, readParticipantNames, readPlaces } from "@pinetrie/reads"
+import {
+  readArchived,
+  readParticipantNames,
+  readPlaces,
+  readRunning,
+  readTreeIndex,
+} from "@pinetrie/reads"
 import {
   archivedIn,
   displayName,
+  HELD_WORDS,
+  heldIn,
   PARTICIPANT,
+  type QueuePop,
+  runsIn,
   setRecord,
   writesIn,
 } from "@pinetrie/rules"
 import { type Basics, failed, type HostKeeper } from "../basics.ts"
 import type { ControlSender } from "../control.ts"
 import type { Names } from "../names.ts"
+import type { Provenance } from "../provenance.ts"
 import type { Records } from "../records.ts"
 import { tasksNow } from "../tasks.ts"
 import type { Titles } from "../titles.ts"
@@ -71,7 +85,8 @@ export interface CommandDeps {
   readonly titles: ChatDeps["titles"] & Pick<Titles, "asked">
   readonly drain: CardCommandDeps["drain"]
   readonly histories: CardCommandDeps["histories"]
-  readonly provenance: CardCommandDeps["provenance"]
+  readonly provenance: CardCommandDeps["provenance"] &
+    Pick<Provenance, "onTaken">
   /** The documents' keeper: a `documents` command is one step on it. */
   readonly keeper: Pick<HostKeeper, "run" | "track">
 }
@@ -122,7 +137,16 @@ export interface Commands {
 export function createCommands(deps: CommandDeps): Commands {
   const { records } = deps
   const { newId } = deps.basics
-  const cardCommands = createCardCommands(deps)
+  const cardCommands = createCardCommands({
+    ...deps,
+    ensureNames: () => deps.names.ensure(),
+  })
+  // A change that takes a thread into an inventory stops its run, as the
+  // taker's own stop, whatever wrote it (ADR-0124).
+  deps.provenance.onTaken(async (threads, by) => {
+    for (const lane of threads)
+      if (readRunning(deps.basics.live, lane)) await handleStop(deps, lane, by)
+  })
 
   async function handle(
     sender: Pick<ControlSender, "send">,
@@ -179,6 +203,8 @@ export function createCommands(deps: CommandDeps): Commands {
       writesIn(intent, tasks, readPlaces(deps.basics.places)),
     )
     if (archived !== null) return settled(archived)
+    const held = await refuseHeld(deps.basics, intent)
+    if (held !== null) return settled(held)
     switch (intent.kind) {
       case "chat": {
         // The command's id is the send's id: its column finds its message by it.
@@ -200,6 +226,8 @@ export function createCommands(deps: CommandDeps): Commands {
       }
       case "move":
         return cardCommands.move(writer, intent.moves, intent.here, tasks)
+      case "copy-thread":
+        return cardCommands.copyThread(writer, intent)
       case "spin-off":
         return cardCommands.spinOff(
           writer,
@@ -284,7 +312,14 @@ export function createCommands(deps: CommandDeps): Commands {
                 (t): t is TaskId => t !== undefined,
               )
             : [],
-        ) ?? (await sendChat(deps, writer, sendId, chat))
+        ) ??
+        (chat.at.kind === "queue"
+          ? await refuseHeld(deps.basics, {
+              kind: "pop",
+              thread: chat.at.thread,
+            })
+          : null) ??
+        (await sendChat(deps, writer, sendId, chat))
       )
     },
   }
@@ -298,6 +333,37 @@ export function createCommands(deps: CommandDeps): Commands {
  * command writes in (`writesIn`), so no root's document is opened to check.
  * Null when the command may go on.
  */
+/**
+ * A command that would run, or write a message, in a thread someone holds
+ * in their inventory is refused (ADR-0124): `runsIn` says where each kind
+ * of command runs, and a branch's fork is read from its root's tree. Null
+ * when the command may go on.
+ */
+async function refuseHeld(
+  basics: Pick<Basics, "places" | "docs" | "session">,
+  command: Intent | QueuePop,
+): Promise<Outcome | null> {
+  const at = runsIn(command)
+  if (at.length === 0) return null
+  // gather: the trees of the roots a branch forks in
+  const trees = new Map<RootId, TreeIndex>()
+  for (const a of at)
+    if (a.kind === "entry" && !trees.has(a.root))
+      trees.set(a.root, readTreeIndex(await basics.docs.root(a.root)))
+  const held = heldIn(
+    at,
+    readPlaces(basics.places),
+    (root, entry) => {
+      const index = trees.get(root)
+      return index === undefined ? null : threadAt(index, entry)
+    },
+    tasksNow(basics).forkOf,
+  )
+  return held === null
+    ? null
+    : { kind: "refused", code: ERR.REFUSED, message: HELD_WORDS }
+}
+
 function refuseInArchive(
   basics: Pick<Basics, "session">,
   tasks: readonly TaskId[],

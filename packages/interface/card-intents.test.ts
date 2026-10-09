@@ -86,6 +86,8 @@ const onR1: Layout = resolveLayout(
     archived: new Set(),
     list: [TEST_TASK],
     canvases: tasksFor(index, [TEST_TASK, R1]).index.canvases,
+    forks: new Map(),
+    holders: new Map(),
   },
 )
 const withFresh: Layout = layoutReducer(onR1, {

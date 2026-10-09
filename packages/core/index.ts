@@ -26,11 +26,13 @@ import type {
   CardWidth,
   Move,
   MoveDirection,
+  MoveOf,
   PlaceKey,
   QueueHoldChange,
   QueueMove,
   Reorder,
   SentCard,
+  TypedMove,
 } from "./places.ts"
 
 // --- branded identifiers ----------------------------------------------------
@@ -161,9 +163,24 @@ export interface ThreadRecord {
   readonly by: WriterId
   /** When, in ms since the epoch. */
   readonly createdAt: number
-  /** A copy's fork entry, before its first message is written; else null. */
-  readonly fork: EntryId | null
+  readonly origin: ThreadOrigin
 }
+
+/**
+ * How a thread began (ADR-0117): started by its first message, a branch's
+ * or a new root's; or a copy of `source` at `fork`, its source's end as its
+ * copier saw it, which its first send branches at and its fork row names.
+ */
+export type ThreadOrigin =
+  | { readonly kind: "started" }
+  | {
+      readonly kind: "copy"
+      readonly source: ThreadId
+      readonly fork: EntryId
+    }
+
+/** A thread started by its first message. */
+export const STARTED: ThreadOrigin = { kind: "started" }
 
 declare const taskIdBrand: unique symbol
 /**
@@ -755,8 +772,20 @@ export type Intent =
    */
   | {
       readonly kind: "move"
-      readonly moves: readonly Move[]
+      readonly moves: readonly TypedMove[]
       readonly here: TaskId | null
+    }
+  /**
+   * Copy the thread `source` (ADR-0117, ADR-0124): a new thread, its id the
+   * move's card, forked at `end`, the source's end as its copier saw it,
+   * its card made where the move puts it: a spot on a canvas or the
+   * copier's inventory.
+   */
+  | {
+      readonly kind: "copy-thread"
+      readonly source: ThreadId
+      readonly end: EntryId
+      readonly move: MoveOf<"thread"> & { readonly from: null }
     }
   /**
    * Move a queued or pinned card among its neighbours (ADR-0048 step 7),

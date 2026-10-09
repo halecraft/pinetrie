@@ -34,6 +34,7 @@ import {
   keyFieldsFrom,
   keyFieldsOf,
   keyOfFields,
+  kindOfCard,
   MAX_TITLE,
   type MarkTarget,
   MOVE_DIRECTIONS,
@@ -67,7 +68,9 @@ import {
   type SentCard,
   type TaskId,
   type ThreadId,
+  type TypedMove,
   targetOfFields,
+  typedMove,
   WORKFLOW_ACTIONS,
   type WorkflowAction,
   type WorkflowStateId,
@@ -337,6 +340,33 @@ export function decodeCommand(
     if (here === undefined)
       return refused(ERR.UNKNOWN_TARGET, "its sender's task is not a task")
     return { kind, move, task, state: state === "" ? null : state, here }
+  }
+  if (kind === "copy-thread") {
+    const source = text(wire?.lane)
+    if (!isThreadId(source))
+      return refused(ERR.UNKNOWN_TARGET, `not a thread: ${source}`)
+    if (at.kind !== "entry")
+      return refused(ERR.UNKNOWN_TARGET, "a copy names the end it forks at")
+    const moves = decodeMoves(text(wire?.moves))
+    if (typeof moves === "string") return refused(ERR.UNKNOWN_TARGET, moves)
+    const [first, ...more] = moves
+    if (
+      first === undefined ||
+      more.length > 0 ||
+      first.from !== null ||
+      !isThreadId(first.card) ||
+      (first.to.kind !== "canvas-at" && first.to.kind !== "inventory")
+    )
+      return refused(
+        ERR.UNKNOWN_TARGET,
+        "a copy names one new thread's card, onto a canvas or into an inventory",
+      )
+    return {
+      kind,
+      source,
+      end: at.id,
+      move: { card: first.card, from: null, to: first.to },
+    }
   }
   if (kind === "undo-move") {
     const task = text(wire?.task)
@@ -644,14 +674,16 @@ export const encodeMoves = (moves: readonly Move[]): string =>
   )
 
 /**
- * The wire -> moves, or why they are malformed: an empty list, a move with
- * no card, a malformed place, or a move from nowhere to nowhere.
+ * The wire -> moves, typed by each card's kind (`typedMove`), or why they
+ * are malformed: an empty list, a move with no card, a malformed place, a
+ * move from nowhere to nowhere, or one from or to a place its card's kind
+ * is never in.
  */
-export function decodeMoves(s: string): readonly Move[] | string {
+export function decodeMoves(s: string): readonly TypedMove[] | string {
   const value = parsed(s)
   if (!Array.isArray(value) || value.length === 0)
     return "a move must name its cards"
-  const moves: Move[] = []
+  const moves: TypedMove[] = []
   for (const item of value as unknown[]) {
     if (typeof item !== "object" || item === null)
       return "a move must name its card"
@@ -663,7 +695,10 @@ export function decodeMoves(s: string): readonly Move[] | string {
     if (from === undefined || to === undefined)
       return "a move names a malformed place"
     if (to === null) return "a move must name where the card goes"
-    moves.push({ card, from, to })
+    const move = typedMove({ card, from, to })
+    if (move === undefined)
+      return `a ${kindOfCard(card)} card is never moved from ${from?.kind ?? "nowhere"} to ${to.kind}`
+    moves.push(move)
   }
   return moves
 }
@@ -878,6 +913,14 @@ export function encodeIntent(id: string, intent: Intent): Command {
         task: intent.task,
         state: intent.state ?? "",
         here: intent.here ?? "",
+      })
+    case "copy-thread":
+      return command({
+        id,
+        kind: "copy-thread",
+        lane: intent.source,
+        parentId: intent.end,
+        moves: encodeMoves([intent.move]),
       })
     case "undo-move":
       return command({

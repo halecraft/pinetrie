@@ -88,6 +88,7 @@ export function nextOf(lane: LaneView, facts: NextFacts): Next {
   if (lane.heldBy !== null) {
     const released = planNextQueuedCardPop(facts.cards, lane.name, {
       running: false,
+      away: false,
       held: false,
       typing: new Set(),
       blank,
@@ -103,6 +104,7 @@ export function nextOf(lane: LaneView, facts: NextFacts): Next {
   }
   const step = planNextQueuedCardPop(facts.cards, lane.name, {
     running: false,
+    away: false,
     held: false,
     typing: facts.typing,
     blank,

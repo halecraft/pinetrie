@@ -291,7 +291,20 @@ type (`Strip = [TaskColumn, ...CardColumn[]]`), so no strip lacks one.
   on the canvas, is the grip's.
 - **A column's ⋯** (`column-menu.tsx`, `columnMenu`) is its card's, for
   everyone: its width, one column or two (`cardWidth`), and a note column
-  after it. The task column's **+ note column** puts one first.
+  after it; a thread's adds **Move to ▸** and **Copy to ▸** sections
+  (ADR-0117), over the sidebar's tasks (`menuTasks`). The task column's
+  **+ note column** puts one first.
+- **⇲ in a thread column's header** is a card drag (`dragCard`), which a
+  slot of your inventory takes; the header's own drag reorders.
+- **A copy's fork row and a parent elsewhere's** (`Origin`, kind `source`)
+  follow a `ThreadLink`; one held by someone else is disabled. A column
+  whose path above its thread is folded (`ColumnView.above`) draws
+  "↑ N earlier messages" under it, which unfolds it for the column's life.
+- **The rail draws a task's forest** (`taskRail`), with each stub a button
+  at its fork's row (`.rail-stub`).
+- **A thread in your inventory** is a `ThreadFaceView` in its slot and a
+  `ThreadPreviewView` opened (`thread-preview.tsx`), whose **put** puts it
+  on the canvas you are on.
 - **Only a fresh column has ×** (`closable` in `ColumnSlot`); a card's
   folds (⇤, `.fold`).
 

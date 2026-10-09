@@ -10,10 +10,13 @@ import {
   type CatchUpFrom,
   type EntryId,
   entryId,
+  type FileCardId,
   isNoteColumnId,
   isRootId,
   isTaskId,
   isThreadId,
+  kindOfCard,
+  type MediaId,
   type NoteColumnId,
   type Position,
   parseCardId,
@@ -283,6 +286,10 @@ export interface RankedCanvas {
   readonly order: string
 }
 
+/** A place's key: the same kind of place, with what the host assigns left out. */
+export function keyOf<P extends CardPlace>(
+  place: P,
+): Extract<PlaceKey, { readonly kind: P["kind"] }>
 export function keyOf(place: CardPlace): PlaceKey {
   switch (place.kind) {
     case "composing":
@@ -460,15 +467,35 @@ export interface Reorder {
   readonly before: CardId | null
 }
 
-/** `card`'s move from where it is now to `to`. */
-export const moveOf = <To extends MoveTarget>(
-  card: CardRecord,
+/**
+ * `card`'s move from where it is now to `to`, typed by its kind
+ * (`MoveOf`): `to` must be a target its kind is ever sent to, so a thread's
+ * card is never moved into a queue, nor a text card onto a canvas. A card
+ * whose kind is not known goes only where every kind may: an inventory.
+ */
+export function moveOf<To extends TargetOf<"text">>(
+  card: TextCard,
   to: To,
-): Move<To> => ({
-  card: card.id,
-  from: keyOf(card.place),
-  to,
-})
+): MoveOf<"text"> & { readonly to: To }
+export function moveOf<To extends TargetOf<"thread">>(
+  card: ThreadCard,
+  to: To,
+): MoveOf<"thread"> & { readonly to: To }
+export function moveOf<To extends TargetOf<"note-column">>(
+  card: NoteColumnCard,
+  to: To,
+): MoveOf<"note-column"> & { readonly to: To }
+export function moveOf(
+  card: TextCard | ThreadCard,
+  to: Extract<PlaceKey, { readonly kind: "inventory" }>,
+): TypedMove
+export function moveOf(
+  card: ThreadCard | NoteColumnCard,
+  to: CanvasTarget,
+): TypedMove
+export function moveOf(card: CardRecord, to: MoveTarget): Move {
+  return { card: card.id, from: keyOf(card.place), to }
+}
 
 /**
  * Where an unqueue or an unpin puts a card, and where your message goes to
@@ -501,7 +528,9 @@ export const DISCARDED: Extract<PlaceKey, { readonly kind: "gone" }> = {
  * end. Null for any other place: a note and a fresh column have no thread
  * to pin it to.
  */
-export const pinnedOf = (place: CardPlace | PlaceKey): PlaceKey | null =>
+export const pinnedOf = (
+  place: CardPlace | PlaceKey,
+): Extract<PlaceKey, { readonly kind: "pinned" }> | null =>
   place.kind === "composing" || place.kind === "queued"
     ? { kind: "pinned", at: place.at, thread: place.thread }
     : null
@@ -1040,6 +1069,82 @@ const fits = <K extends CardKind>(
   kind: K,
   place: CardPlace,
 ): place is PlaceOf<K> => fitsPlace(kind, place.kind)
+
+/** The id of a card of `K`. */
+export type IdOf<K extends CardKind> = {
+  readonly text: TextCardId
+  readonly thread: ThreadId
+  readonly "note-column": NoteColumnId
+  readonly media: MediaId
+  readonly file: FileCardId
+}[K]
+
+/** The keys of the places a card of `K` is ever in. */
+export type KeyOf<K extends CardKind> = Extract<
+  PlaceKey,
+  { readonly kind: (typeof PLACES_OF)[K][number] }
+>
+
+/**
+ * The place each target that is no place resolves to: a thread's nearest
+ * notes to a note, a spot on a canvas to the canvas.
+ */
+const TARGET_PLACES = {
+  notes: "note",
+  "canvas-at": "canvas",
+} as const satisfies Record<
+  (NotesTarget | CanvasTarget)["kind"],
+  CardPlace["kind"]
+>
+
+type TargetKind = keyof typeof TARGET_PLACES
+
+/** The targets that resolve to a place a card of `K` is ever in. */
+type TargetKindOf<K extends CardKind> = {
+  [T in TargetKind]: (typeof TARGET_PLACES)[T] extends (typeof PLACES_OF)[K][number]
+    ? T
+    : never
+}[TargetKind]
+
+/** Where a move may send a card of `K`: a key or a target of a place it is ever in. */
+export type TargetOf<K extends CardKind> =
+  | KeyOf<K>
+  | Extract<NotesTarget | CanvasTarget, { readonly kind: TargetKindOf<K> }>
+
+/** A move of a card of `K`, from and to places that kind is ever in. */
+export interface MoveOf<K extends CardKind> extends Move<TargetOf<K>> {
+  readonly card: IdOf<K>
+  readonly from: KeyOf<K> | null
+}
+
+/**
+ * A move as the wire decodes it (`typedMove`): by its card's kind, so a
+ * thread's card can only be moved between canvases and inventories, and a
+ * text card never onto a canvas.
+ */
+export type TypedMove = MovesOf<CardKind>
+
+/** The moves of a card of each kind in `K`, one `MoveOf` per kind. */
+export type MovesOf<K extends CardKind> = K extends CardKind ? MoveOf<K> : never
+
+/** Whether a target is one a card of `kind` may be sent to (`TargetOf`). */
+const fitsTarget = (kind: CardKind, to: MoveTarget): boolean =>
+  fitsPlace(
+    kind,
+    to.kind === "notes" || to.kind === "canvas-at"
+      ? TARGET_PLACES[to.kind]
+      : to.kind,
+  )
+
+/**
+ * `move` typed by its card's kind; undefined when its `from` or `to` is a
+ * place that kind is never in.
+ */
+export function typedMove(move: Move): TypedMove | undefined {
+  const kind = kindOfCard(move.card)
+  if (move.from !== null && !fitsPlace(kind, move.from.kind)) return undefined
+  return fitsTarget(kind, move.to) ? (move as TypedMove) : undefined
+}
 
 /**
  * `card` at `place`; undefined for a place its kind is never in, so no

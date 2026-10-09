@@ -1,8 +1,17 @@
-import { type TextCard, textCardId, writerId } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
+import {
+  entryId,
+  indexTree,
+  type TextCard,
+  type ThreadName,
+  textCardId,
+  threadIdFor,
+  writerId,
+} from "@pinetrie/core"
+import { cardIdFor, fromParents, threadOfEntry } from "@pinetrie/core/fixtures"
 import { NO_INTENTS, type Slots, settleSlots } from "@pinetrie/session"
 import { describe, expect, test } from "vitest"
 import { inventoryView, slotKey } from "./inventory-view.ts"
+import { faceStatus, threadFace, threadPreview } from "./thread-face.ts"
 
 const ADA = writerId("ada@x.io")
 const A = cardIdFor("ca")
@@ -30,6 +39,7 @@ describe("inventoryView", () => {
       intents: NO_INTENTS,
       selected: 10,
       texts: new Map([[B, "\n  plan: ship it\nsecond line"]]),
+      threads: new Map(),
     })
     const drawn = Object.fromEntries(
       view.grid.cells.flatMap(s =>
@@ -62,6 +72,7 @@ describe("inventoryView", () => {
       intents: NO_INTENTS,
       selected: 0,
       texts: new Map(),
+      threads: new Map(),
     })
     expect(view.grid.cells[0]?.face?.key).toBe("1")
     expect(Array.from({ length: 18 }, (_, n) => slotKey(n))).toEqual([
@@ -69,4 +80,67 @@ describe("inventoryView", () => {
       ...Array(9).fill(null),
     ])
   })
+})
+
+test("a thread's card is drawn by its face: its name, its first line, where it ended, and its status (ADR-0124)", () => {
+  const T = threadIdFor("t")
+  const index = indexTree(
+    fromParents({ "1-r": null, "2-a": "1-r" }, id => ({
+      role: "chat",
+      content: "",
+      details: { author: ADA, authorName: "Ada", text: `said ${id}` },
+    })),
+  )
+  const thread = threadOfEntry("1-r")
+  const face = threadFace({
+    thread,
+    index,
+    lanes: [
+      {
+        name: thread,
+        tip: entryId("2-a"),
+        running: false,
+        waiting: 2,
+        askedBy: null,
+        lastWaiting: null,
+        heldBy: null,
+      },
+    ],
+    names: new Map([[thread, "amber-fox" as ThreadName]]),
+    banners: new Map(),
+    stops: new Map(),
+  })
+  expect(face).toMatchObject({ name: "amber-fox", queued: 2, stopped: false })
+  expect(faceStatus(face)).toBe("2 cards queued")
+  expect(faceStatus({ ...face, stopped: true, queued: 0 })).toBe("stopped")
+  const view = inventoryView({
+    held: [
+      {
+        kind: "thread",
+        id: T,
+        owner: ADA,
+        placer: ADA,
+        place: { kind: "inventory", holder: ADA },
+      },
+    ],
+    slots: {},
+    intents: NO_INTENTS,
+    selected: 0,
+    texts: new Map(),
+    threads: new Map([[T, { ...face, thread: T }]]),
+  })
+  expect(view.grid.cells[0]?.thread?.name).toBe("amber-fox")
+})
+
+test("a thread's preview is its path from its root, read only (ADR-0124)", () => {
+  const index = indexTree(
+    fromParents({ "1-r": null, "2-a": "1-r", "3-b": "1-r" }, id => ({
+      role: "chat",
+      content: id,
+      details: { author: ADA, authorName: "Ada", text: id },
+    })),
+  )
+  const preview = threadPreview(threadOfEntry("3-b"), index, null)
+  expect(preview.kind).toBe("preview")
+  expect(preview.rows.map(r => r.id)).toEqual(["1-r", "3-b"])
 })

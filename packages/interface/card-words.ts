@@ -150,7 +150,7 @@ export function noticeWords(notice: CardNotice, reader: Reader): string {
       return "not moved: the cards around it changed first"
     case "replied":
       return by === null
-        ? "not lifted back: its thread has more in it"
+        ? "not lifted back: its thread or its task has more in it"
         : `not lifted back: ${who(by, reader)} replied`
     case "exists":
     case "no-place":

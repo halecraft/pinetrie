@@ -5,14 +5,17 @@ import {
   type CardRecord,
   type EntryId,
   entryId,
+  INVENTORY_SLOTS,
   indexAsks,
   rootIdFor,
   type TaskId,
   type TextCard,
   type TextPlace,
+  type ThreadCard,
   taskIdFor,
   textCardId,
   threadIdFor,
+  type WriterId,
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -43,6 +46,7 @@ import {
   layoutReducer,
   resolveLayout,
 } from "./layout.ts"
+import { linkTo } from "./thread-link.ts"
 
 const TEST_TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
 
@@ -86,6 +90,8 @@ const onRoot = (root: string): Layout =>
       archived: new Set(),
       list: [TASK_OF(root)],
       canvases: TASKS.index.canvases,
+      forks: new Map(),
+      holders: new Map(),
     },
   )
 /** A new tab, keyed by the thread it minted. */
@@ -119,6 +125,27 @@ const shown = (root: string, id: TaskId): Effect[] => [
   { kind: "list", act: { kind: "ensure", task: id } },
 ]
 const ME = writerId("ada@x.io")
+/** A thread whose card a link finds (ADR-0117). */
+const LINKED = threadIdFor("linked")
+const inventoryOf = (holder: WriterId): ThreadCard => ({
+  kind: "thread",
+  id: LINKED,
+  owner: ME,
+  placer: holder,
+  place: { kind: "inventory", holder },
+})
+/** A link to a thread on `task`'s canvas. */
+const linkOn = (task: TaskId) =>
+  linkTo(
+    LINKED,
+    [
+      {
+        ...inventoryOf(ME),
+        place: { kind: "canvas", task, order: "1", width: 1 },
+      },
+    ],
+    ME,
+  )
 const NO_CARDS: CardFacts = {
   cards: [],
   lanes: [],
@@ -550,20 +577,139 @@ describe("planIntent", () => {
       ).toBe(false)
     })
 
-    test("openIn: an entry this tab holds opens as openAt does; another root is shown, archived or not, and the entry once it arrives (ADR-0063)", () => {
+    test("moveThread: the card to the end of another task's canvas; nothing onto its own (ADR-0117)", () => {
+      const trunk = TASKS.index.canvases
+        .get(R1_ID)
+        ?.find(c => c.id === TRUNK) as CardRecord
+      const facts = { ...NO_CARDS, cards: [trunk] }
+      const state = at(onRoot("1-r1"), indexAsks(index), facts)
+      const last = TASKS.index.canvases.get(R2_ID)?.at(-1)?.id ?? null
       expect(
-        plan({ kind: "openIn", entry: entryId("3-b"), task: TASK_OF("1-r1") }),
+        plan({ kind: "moveThread", thread: TRUNK, task: R2_ID }, state),
+      ).toMatchObject([
+        {
+          kind: "moveCard",
+          move: {
+            card: TRUNK,
+            from: { kind: "canvas", task: R1_ID },
+            to: { kind: "canvas-at", task: R2_ID, after: last },
+          },
+        },
+      ])
+      expect(
+        plan({ kind: "moveThread", thread: TRUNK, task: R1_ID }, state),
+      ).toEqual([])
+    })
+
+    test("copyThread: a copy at the source's end, just after it, or into your inventory; refused here into a full one (ADR-0117)", () => {
+      expect(plan({ kind: "copyThread", source: TRUNK, task: R1_ID })).toEqual([
+        {
+          kind: "request",
+          intent: {
+            kind: "copy-thread",
+            source: TRUNK,
+            end: entryId("3-b"),
+            move: {
+              card: NEW_THREAD,
+              from: null,
+              to: { kind: "canvas-at", task: R1_ID, after: TRUNK },
+            },
+          },
+        },
+      ])
+      expect(
+        plan({ kind: "copyThread", source: TRUNK, task: null }),
+      ).toMatchObject([
+        {
+          kind: "request",
+          intent: { move: { to: { kind: "inventory", holder: ME } } },
+        },
+      ])
+      const slots = Object.fromEntries(
+        Array.from({ length: INVENTORY_SLOTS }, (_, n) => [
+          String(n),
+          cardIdFor(`s${n}`),
+        ]),
+      )
+      expect(
+        plan(
+          { kind: "copyThread", source: TRUNK, task: null },
+          at(onRoot("1-r1"), indexAsks(index), { ...NO_CARDS, slots }),
+        ).map(e => e.kind),
+      ).toEqual(["showInventory", "refuse"])
+    })
+
+    test("put: a thread's card from your inventory lands on the canvas you are on, just after the column it was put on, unfolded (ADR-0117)", () => {
+      const held: CardRecord = {
+        kind: "thread",
+        id: LINKED,
+        owner: ME,
+        placer: ME,
+        place: { kind: "inventory", holder: ME },
+      }
+      const state = at(onRoot("1-r1"), indexAsks(index), {
+        ...NO_CARDS,
+        cards: [held],
+      })
+      const effects = plan(
+        { kind: "put", card: LINKED, target: { kind: "column", key: TRUNK } },
+        state,
+      )
+      expect(effects[0]).toMatchObject({
+        kind: "moveCard",
+        move: {
+          card: LINKED,
+          from: { kind: "inventory", holder: ME },
+          to: { kind: "canvas-at", task: R1_ID, after: TRUNK },
+        },
+      })
+      expect(effects[1]).toMatchObject({ kind: "layout" })
+    })
+
+    test("openLink: an entry this tab holds opens as openAt does; another root is shown, archived or not, and the entry once it arrives (ADR-0063)", () => {
+      expect(
+        plan({
+          kind: "openLink",
+          link: linkOn(TASK_OF("1-r1")),
+          entry: entryId("3-b"),
+        }),
       ).toEqual(plan({ kind: "openAt", entry: entryId("3-b") }))
       expect(
         plan({
-          kind: "openIn",
+          kind: "openLink",
+          link: linkOn(TASK_OF("8-r9")),
           entry: entryId("9-far"),
-          task: TASK_OF("8-r9"),
         }),
       ).toEqual([
         ...shown("8-r9", R9_ID),
         { kind: "openWhenHeld", entry: "9-far" },
       ])
+    })
+
+    test("openLink: a thread in your inventory opens its preview there; one someone else holds, or with no card, nothing (ADR-0124)", () => {
+      const mine = linkTo(LINKED, [inventoryOf(ME)], ME)
+      const slots = { "4": LINKED }
+      expect(
+        plan(
+          { kind: "openLink", link: mine, entry: entryId("3-b") },
+          at(onRoot("1-r1"), indexAsks(index), { ...NO_CARDS, slots }),
+        ),
+      ).toEqual([
+        { kind: "showInventory", brief: false },
+        { kind: "select", slot: 4 },
+        { kind: "openSelected" },
+      ])
+      const held = linkTo(LINKED, [inventoryOf(writerId("bea@x.io"))], ME)
+      expect(
+        plan({ kind: "openLink", link: held, entry: entryId("3-b") }),
+      ).toEqual([])
+      expect(
+        plan({
+          kind: "openLink",
+          link: linkTo(LINKED, [], ME),
+          entry: entryId("3-b"),
+        }),
+      ).toEqual([])
     })
 
     test("a message's closed branch opens as openAt does; an unknown entry, nothing", () => {
@@ -857,9 +1003,9 @@ describe("a page over the workspace (ADR-0098)", () => {
     const board: Intent = { kind: "board", open: true, focus: true }
     expect(plan(board, onPage)).toEqual([leave, ...plan(board)])
     const inbox: Intent = {
-      kind: "openIn",
+      kind: "openLink",
+      link: linkOn(TASK_OF("5-r2")),
       entry: entryId("9-unheld"),
-      task: TASK_OF("5-r2"),
     }
     expect(plan(inbox, onPage)[0]).toEqual(leave)
   })

@@ -56,7 +56,7 @@ export function TaskColumn(p: {
   onTyping: (card: CardId) => void
   readers: ReadersProps
   /** A reader's menu row: one of their threads, which opens it. */
-  thread: (end: EntryId, task: TaskId) => MenuItem
+  thread: (end: EntryId, task: TaskId) => MenuItem | null
   onIntent: (intent: Intent) => void
 }) {
   const { view } = p

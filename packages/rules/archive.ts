@@ -9,6 +9,7 @@
 
 import {
   type ArchivedTask,
+  atEntry,
   type CardId,
   type CardRecord,
   type CommitId,
@@ -27,6 +28,7 @@ import {
   type TaskId,
   type ThreadId,
   type TreeIndex,
+  threadEnd,
   threadsWork,
 } from "@pinetrie/core"
 import { type TaskIndex, taskOfCard, taskOfTarget } from "./task.ts"
@@ -91,6 +93,8 @@ export function planArchive(input: {
   }[]
   /** Its roots' revision records: what its lanes' turns recorded. */
   readonly revisions: ReadonlyMap<EntryId, RevisionRecord>
+  /** Its roots' trees, whose every thread's end keeps its snapshot. */
+  readonly trees: readonly TreeIndex[]
   /** The roots of the task's threads. */
   readonly roots: readonly RootId[]
   /** The roots a thread outside this task, in no archived task, is in. */
@@ -112,13 +116,15 @@ export function planArchive(input: {
 
 /**
  * Archive: every own lane forgotten, its ref deleted, and every snapshot but
- * each lane's newest (`planRetention`). Restore: each lane's ref back at its
+ * each lane's newest and the one nearest each thread's end in its roots,
+ * whatever task the thread is in (`planRetention`), so a copy from the
+ * archive finds its files (ADR-0124). Restore: each lane's ref back at its
  * tip's nearest revision (`nearestRevision`), none for a lane with no tip or
  * no revision yet.
  */
 function planTeardown(
   crossing: Crossing,
-  input: Pick<Parameters<typeof planArchive>[0], "own" | "revisions">,
+  input: Pick<Parameters<typeof planArchive>[0], "own" | "revisions" | "trees">,
 ): ArchiveTeardown {
   const lanes = input.own.map(o => o.lane)
   if (crossing === "archive") {
@@ -129,6 +135,7 @@ function planTeardown(
       snapshots: planRetention({
         records: [...input.revisions.values()].filter(r => inRoot.has(r.lane)),
         archived: true,
+        keep: endSnapshots(input.trees, input.revisions),
       }),
     }
   }
@@ -190,6 +197,10 @@ export function writesIn(
     // own for the history its gone place names.
     case "spin-off":
       return only(tasksOf.card(intent.move.card), tasksOf.place(intent.move.to))
+    // A copy writes in the task its card lands in alone: an archived
+    // thread is copied, since archiving freezes its end, not its history.
+    case "copy-thread":
+      return only(tasksOf.place(intent.move.to))
     // A reorder stays in the place it names.
     case "reorder":
       return only(tasksOf.place(intent.reorder.at))
@@ -240,4 +251,20 @@ export function archivedIn(
     if (found !== undefined) return found
   }
   return null
+}
+
+/** The snapshot nearest each thread's end in `trees` (`nearestRevision`). */
+function endSnapshots(
+  trees: readonly TreeIndex[],
+  revisions: ReadonlyMap<EntryId, RevisionRecord>,
+): ReadonlySet<SnapshotId> {
+  const keep = new Set<SnapshotId>()
+  for (const index of trees)
+    for (const thread of index.firstOf.keys()) {
+      const end = threadEnd(index, thread)
+      if (end === null) continue
+      const { snapshot } = nearestRevision(index, revisions, atEntry(end))
+      if (snapshot !== null) keep.add(snapshot)
+    }
+  return keep
 }

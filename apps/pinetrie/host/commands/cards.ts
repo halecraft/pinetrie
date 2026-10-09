@@ -41,16 +41,20 @@ import {
 import type { Outcome } from "@pinetrie/protocol/codec"
 import { PLACES_DOC_ID } from "@pinetrie/protocol/messages"
 import {
+  readCardHistories,
   readLaneRecords,
   readLanes,
   readPlaces,
   readQueueHolds,
   readRoots,
   readRunning,
+  readThreads,
   readTreeIndex,
 } from "@pinetrie/reads"
 import {
   type Cause,
+  type CopyPlan,
+  type CopyThread,
   cardsOfParts,
   historyOf,
   type LiftPlan,
@@ -58,6 +62,7 @@ import {
   type MovesStep,
   NO_DISCARDS,
   type PlaceStep,
+  planCopy,
   planFreshFollow,
   planLiftRoot,
   planMoveCommand,
@@ -71,7 +76,9 @@ import {
   planWidth,
   type SpinOff,
   type SpunThread,
+  setRecord,
   type TaskIndex,
+  THREAD,
   taskOfPlace,
   undoAnswer,
 } from "@pinetrie/rules"
@@ -117,6 +124,8 @@ export interface CardCommandDeps {
   readonly provenance: Pick<Provenance, "before" | "after" | "seen">
   /** A queue's hold, written with a card queued (ADR-0113). */
   readonly records: Pick<Records, "writeValues">
+  /** Name every recorded thread that has none: a copy is named as it is made (ADR-0117). */
+  readonly ensureNames: () => Promise<void>
 }
 
 /** A lift that deletes no thread: a redo, or an undo of no spin-off. */
@@ -204,6 +213,7 @@ export function createCardCommands(deps: CardCommandDeps) {
       threads,
       lanes: [...readLaneRecords(session).values()],
       rootOfThread: tasks.rootOfThread,
+      histories: readCardHistories(session),
     })
   }
 
@@ -510,6 +520,43 @@ export function createCardCommands(deps: CardCommandDeps) {
       return settled(sent, moved.rev)
     },
 
+    /**
+     * A thread copied (ADR-0117, ADR-0124), in one step of the keeper:
+     * planned (`planCopy`) from the source's record and tree, then the
+     * copy's record, its card and the canvas re-ranked for it, then its
+     * name. No entry is written: its first send branches at its fork.
+     */
+    async copyThread(writer: WriterId, copy: CopyThread): Promise<Settled> {
+      // gather
+      const threads = readThreads(session)
+      const root = threads.get(copy.source)?.root
+      const index =
+        root === undefined ? null : readTreeIndex(await docs.root(root))
+      const cards = readPlaces(places)
+      // plan
+      const plan =
+        index === null
+          ? ({ kind: "refused", why: "unknown" } as const)
+          : planCopy({
+              copy,
+              sender: writer,
+              cards,
+              threads,
+              index,
+              now: deps.basics.now(),
+            })
+      if (plan.kind === "refused") return settled(copyRefusal(plan.why))
+      // execute: the record first, so a reader that finds the card finds
+      // its thread's root
+      await deps.records.writeValues([setRecord(THREAD, plan.record)])
+      const done = await carry({ kind: "steps", steps: plan.steps }, [], {
+        kind: "move",
+        by: writer,
+      })
+      await deps.ensureNames()
+      return done
+    },
+
     /** Set a card's command, or clear it (ADR-0108). */
     setCommand(card: CardId, command: CardCommand | null): Promise<Settled> {
       return carry(planSetCommand(readPlaces(places), card, command), [], null)
@@ -566,7 +613,7 @@ export function createCardCommands(deps: CardCommandDeps) {
       if (
         thread.kind !== "thread" ||
         thread.lane.kind !== "lane" ||
-        now === undefined
+        now?.kind !== "text"
       )
         return null
       const { step, drain } = planMoveCommand(
@@ -599,5 +646,33 @@ export function createCardCommands(deps: CardCommandDeps) {
       await deps.provenance.seen(writer, ids)
       return settled({ kind: "seen" })
     },
+  }
+}
+
+/** Why a copy was refused, as its sender is answered. */
+function copyRefusal(
+  why: Extract<CopyPlan, { kind: "refused" }>["why"],
+): Outcome {
+  switch (why) {
+    case "unknown":
+      return {
+        kind: "refused",
+        code: ERR.UNKNOWN_TARGET,
+        message: "no such thread, or no such end of it, to copy",
+      }
+    case "taken":
+      return {
+        kind: "refused",
+        code: ERR.THREAD_TAKEN,
+        message: "that copy's thread has started already",
+      }
+    case "held":
+      return {
+        kind: "refused",
+        code: ERR.REFUSED,
+        message: "someone else holds that thread",
+      }
+    default:
+      return { kind: "unmoved", code: why, place: null, by: null }
   }
 }

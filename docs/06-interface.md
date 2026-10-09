@@ -355,7 +355,11 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   agent to come is named already (ADR-0057), with `✦ new agent` only until its name arrives. A conversation
   shows nothing there, since a message goes to people. Its second row, for a column
   that forks, names the fork, `↰ Ada: “Say exactly…”`, and clicking it brings
-  the fork point into view. A thread that started from a WIP says so, "on
+  the fork point into view. A copy names its source instead, "↰ copied from
+  amber-fox · Fix the sync bug", and a thread whose parent thread is in
+  another task names that, "↰ from amber-fox · Fix the sync bug": clicking
+  either opens that task at the fork. Where someone holds the source in
+  their inventory, the row says "Bea has it" and opens nothing. A thread that started from a WIP says so, "on
   wip/search", or "wip/search is gone" once it is (ADR-0104); one on the
   line says nothing.
 - **A thread's name opens its details** (ADR-0073), under the header, and a
@@ -392,8 +396,31 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   to do the same: ←/→ move a column one place, and Home/End move it to
   either end. A column's ⋯ sets its width, one or two columns wide, for
   everyone.
+- **A thread is a card** (ADR-0117, ADR-0124): one place, on a task's canvas
+  or in someone's inventory. A thread column's ⋯ has **Move to ▸** each
+  other task in your sidebar, or your inventory, and **Copy to ▸** this
+  task, another, or your inventory; ⇲ in its header, dragged onto a slot,
+  takes it too. Moved between tasks, a running thread keeps running, and
+  its agent is told it moved. Taken into an inventory, its run stops at
+  once, the taker's own stop ("Bea stopped it"); nothing is sent in it
+  there, nor branched from its entries ("put it on a canvas first"), and
+  its queue waits, held. Put on a canvas again, from its slot or by a drop
+  on a column, it lands after that column and takes sends again.
+- **A copy is a branch at its source's end** as you saw it, its card where
+  you put it: a new thread, with a new name, and no message yet. Its first
+  send writes its first message there, and its lane is made when it first
+  asks the agent, from the files of that end's turn (ADR-0021); if those
+  were not kept, it starts from its base, and its fork row says so. An
+  archived thread copies.
+- **A thread from another root shows its path from that root**, the part
+  above its own first message folded behind "↑ N earlier messages" when
+  the thread it forks from is on no column of the canvas. A canvas with
+  threads of several roots draws each root's tree on the rail.
 - **Only a branch you have not sent closes** (×); asked first when it holds
-  text, which you keep in your inventory or discard. A card's column folds
+  text, which you keep in your inventory or discard. A branch not yet sent
+  from a thread someone else has since taken keeps its text, but its
+  column says "Bea has it" in place of that thread's messages and sends
+  nothing until the thread is on a canvas again. A card's column folds
   instead. A new tab's × closes the new tab. The cards at a thread's end
   stay with the thread.
 - **Each column's foot is its dock** (ADR-0113), pinned there while the
@@ -581,6 +608,12 @@ the tree.
 
 ### The rail: a root's tree, compactly
 
+- **A forest on a canvas of several roots** (ADR-0116, ADR-0117): one tree
+  for each root a thread of the task is in, each cut to the paths leading
+  to the task's threads, in its root's own colours. A fork from those paths
+  to a thread elsewhere is a stub, `↳ amber-fox`, titled where it is: a
+  click opens that task, or your inventory's preview; one someone else
+  holds says "Bea has it" and opens nothing.
 - A strip beside the sidebar draws every branch in the root you are on as a line,
   and every message as a dot, except for uneventful stretches (below). A row
   is a depth, not a turn in one order: a branch starts on the row under its
@@ -968,7 +1001,13 @@ The rail is E; the column is T. Seeing both at once is the product.
   every root and device; nobody else can move a card into or out of it.
 - **A fixed 3 × 6 grid of cards**: each slot shows
   its card folded, its first three lines under its author's circle; the
-  first nine are numbered 1–9. Click a slot, or move with the arrow keys or
+  first nine are numbered 1–9. A thread's card takes one slot, drawn so it
+  is known at a glance (ADR-0124): its banner and name, its first line,
+  the first line of where it ended, and whether it stopped or has cards
+  queued. Opened, it shows the thread's path read only, with no composer,
+  queue or run, and **put** puts it on the canvas you are on, after the
+  column you were last in. Only its holder opens it: a link to it anywhere
+  else says "Bea has it". Click a slot, or move with the arrow keys or
   `hjkl` while the panel has focus, to select it; a click or Enter opens
   the card whole in place, over its neighbours, and editable, and Escape
   folds it. Cards keep their slots, gaps included, on every device.
@@ -1059,15 +1098,9 @@ board's records (ADR-0122); a card's text is its own document (ADR-0048).
 
 ## Deferred, but designed for
 
-- **What else a canvas holds** (ADR-0116): threads from any root under a
-  rail that draws a forest, file cards showing a source's file, and media.
-  Threads and note columns are built (above).
-- **Threads as cards** (ADR-0117), accepted, not yet built: a thread would have an id and
-  one place, in a task or an inventory; copying it would branch at its
-  end, and a copy's fork row would lead back to its source, or say who has
-  it. Taking a running thread would stop it, its holder would see it in
-  their inventory read only, and a send there would be refused; a thread
-  moved between tasks would keep running (ADR-0124).
+- **What else a canvas holds** (ADR-0116): file cards showing a source's
+  file, and media. Threads from any root and note columns are built
+  (above).
 - **What is left of cards and the dock** (ADR-0111, ADR-0113): a thread
   card's body on the board drawn from its pinned cards' first lines (today
   its first line, under a title); and who is in a note column now, which

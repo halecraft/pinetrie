@@ -326,7 +326,7 @@ export function Board({
   searchRef: RefObject<HTMLInputElement | null>
   readers: ReadersProps
   /** A thread as a row of a reader's menu, which opens it. */
-  thread: (end: EntryId, task: TaskId) => MenuItem
+  thread: (end: EntryId, task: TaskId) => MenuItem | null
   pip: React.ReactNode
 }) {
   // The board's keys are `boardKeyAct`'s: Escape closes the board, as ▦
@@ -583,7 +583,7 @@ function ItemCard({
   drop: Readonly<Record<string, string>>
   onIntent: (intent: Intent) => void
   readers: ReadersProps
-  thread: (end: EntryId, task: TaskId) => MenuItem
+  thread: (end: EntryId, task: TaskId) => MenuItem | null
   pip: React.ReactNode
 }) {
   return (

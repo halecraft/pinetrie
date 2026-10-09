@@ -35,6 +35,8 @@ export interface AppPorts {
   readonly inventory: {
     readonly show: (brief: boolean) => void
     readonly select: (slot: number) => void
+    /** Open the selected slot's card. */
+    readonly openSelected: () => void
   }
   /** Measure a card's box before it moves, so it flies to where it lands. */
   readonly fly: (card: CardId) => void
@@ -161,6 +163,9 @@ function performOne(effect: Effect, ports: AppPorts): void {
       return
     case "select":
       ports.inventory.select(effect.slot)
+      return
+    case "openSelected":
+      ports.inventory.openSelected()
       return
     case "openFold":
       ports.openFold(effect.ask)

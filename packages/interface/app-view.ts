@@ -7,6 +7,7 @@
 
 import {
   type ArchivedTask,
+  ancestry,
   type EntryId,
   isBusy,
   type LaneRecord,
@@ -19,15 +20,19 @@ import {
   type RootWork,
   type TaskId,
   type ThreadId,
+  type ThreadName,
   type TreeIndex,
   type Workflow,
   type WriterId,
 } from "@pinetrie/core"
 import { displayName, offerStatus } from "@pinetrie/rules"
 import { PENDING_TRACK } from "./column-paths.ts"
-import type { Column } from "./columns.ts"
+import { type Column, isClosable } from "./columns.ts"
 import type { Intent } from "./intent.ts"
 import type { Here } from "./layout.ts"
+import { rootSeed, SLOTS, STRIDE } from "./palette.ts"
+import type { Reader } from "./send.ts"
+import { linkWords, type ThreadLink } from "./thread-link.ts"
 
 /**
  * A column nothing may be written in (ADR-0029): its composer stays mounted,
@@ -188,7 +193,7 @@ function workspaceOf(input: AppViewInput): Workspace {
           archived === undefined
             ? null
             : readOnlyWords(archived, input.workflow, input.nameOf),
-        slots: slots(c => c.fresh !== undefined),
+        slots: slots(isClosable),
       }
     }
   }
@@ -212,17 +217,90 @@ const openOffers = (input: AppViewInput): readonly OpenOffer[] =>
       : [{ lane: o.lane, root, end: held.tip, source }]
   })
 
+/** A fork on the rail to a thread on no column of this canvas (ADR-0117). */
+export interface RailStub {
+  /** The row it forks from. */
+  readonly from: EntryId
+  /** The thread's first entry. */
+  readonly at: EntryId
+  readonly thread: ThreadId
+  /** Where it is: another task's canvas, your inventory, someone else's. */
+  readonly link: ThreadLink
+}
+
+/** What the rail draws for the task you are on. */
+export interface TaskRail {
+  readonly rows: readonly RailRow[]
+  readonly stubs: readonly RailStub[]
+}
+
+/** No rail: off a task. */
+export const NO_RAIL: TaskRail = { rows: [], stubs: [] }
+
 /**
- * The rows the rail draws: one tree for each root a thread of the task you
- * are on is in (`roots`, their root entries, in canvas order), and none off
- * a task (ADR-0116).
+ * The rail of the task you are on, a forest (ADR-0116, ADR-0117): one tree
+ * for each root a thread of the task is in, in canvas order, each cut to
+ * the paths that lead to its threads' ends (`ends`); each fork from those
+ * paths to a thread elsewhere a stub naming where it is (`linkOf`). Each
+ * tree is drawn in its root's palette: its tracks are shifted so the
+ * page's seed (`seed`) gives each one the slot its root's seed would
+ * (`trackSlot`), so its columns and fork dots, which take their rows'
+ * tracks, agree. None off a task. Pure.
  */
-export const hereRail = (
-  index: TreeIndex,
-  active: Here | null,
-  roots: readonly EntryId[],
-): readonly RailRow[] =>
-  active?.kind === "task" ? roots.flatMap(r => projectRail(index, r)) : []
+export function taskRail(input: {
+  readonly index: TreeIndex
+  readonly active: Here | null
+  /** The task's roots and their root entries, in canvas order. */
+  readonly roots: readonly { readonly root: RootId; readonly entry: EntryId }[]
+  /** Where each thread on the canvas ends (`threadAnchor`, a copy's fork). */
+  readonly ends: ReadonlyMap<ThreadId, EntryId>
+  readonly linkOf: (thread: ThreadId) => ThreadLink
+  /** The page's seed (`rootSeed` of its first root). */
+  readonly seed: number
+}): TaskRail {
+  const { index, active } = input
+  if (active?.kind !== "task") return NO_RAIL
+  // Every entry on a path to a thread's end, the ends' own included.
+  const keep = new Set<EntryId>()
+  for (const end of input.ends.values())
+    for (const id of ancestry(index, end).path) keep.add(id)
+  const rows: RailRow[] = []
+  const stubs: RailStub[] = []
+  for (const { root, entry } of input.roots) {
+    const shift = shiftOf(input.seed, rootSeed(root))
+    for (const row of projectRail(index, entry)) {
+      if (!keep.has(row.id)) continue
+      rows.push({ ...row, track: row.track + shift })
+      for (const child of index.childrenOf.get(row.id) ?? []) {
+        if (keep.has(child)) continue
+        const thread = index.entries[child]?.message?.starts
+        if (thread === undefined) continue
+        const link = input.linkOf(thread)
+        if (link.kind !== "gone")
+          stubs.push({ from: row.id, at: child, thread, link })
+      }
+    }
+  }
+  return { rows, stubs }
+}
+
+/** A stub's words: the thread's name, and where it is ("Bea has it"). */
+export const railStubWords = (
+  stub: RailStub,
+  names: ReadonlyMap<ThreadId, ThreadName>,
+  reader: Reader,
+  labelOf: (task: TaskId) => string,
+): { readonly label: string; readonly title: string } => ({
+  label: `↳ ${names.get(stub.thread) ?? "a thread"}`,
+  title: linkWords(stub.link, reader, labelOf),
+})
+
+/**
+ * How far a tree's tracks move so that `seed`, the page's, draws them as
+ * `own`, its root's, would: `STRIDE` is 7, its own inverse in the 12 slots.
+ */
+const shiftOf = (seed: number, own: number): number =>
+  (((STRIDE * (own - seed)) % SLOTS) + SLOTS) % SLOTS
 
 /**
  * What an archived task's column says and offers (ADR-0122): who moved it to

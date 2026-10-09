@@ -27,13 +27,14 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
-import { AT_INVENTORY, IN_COLUMN } from "@pinetrie/session"
+import { AT_INVENTORY, firstEmpty, IN_COLUMN } from "@pinetrie/session"
 import type { Density } from "./ask-words.ts"
 import type { Raised } from "./attention.ts"
 import { BOARD_SEARCH } from "./board-view.ts"
 import {
   afterUndo,
   cardOf,
+  full,
   moveCard,
   planDiscard,
   planKeep,
@@ -50,6 +51,8 @@ import {
   queueMove,
   queueNew,
   reorderOf,
+  slotOf,
+  textCardOf,
 } from "./card-intents.ts"
 import {
   type CardKey,
@@ -60,6 +63,7 @@ import {
   type NewTabAction,
   type Pending,
   type Prefill,
+  threadAnchor,
 } from "./columns.ts"
 import {
   changeViewOf,
@@ -78,6 +82,7 @@ import type { MessageAct } from "./message-tools.ts"
 import type { PageName } from "./page.ts"
 import type { PutTarget } from "./put-target.ts"
 import { planSpinOff } from "./spin-off.ts"
+import { openOf, type ThreadLink } from "./thread-link.ts"
 
 /**
  * What a reader asks of one column, whatever its kind. A message's acts are
@@ -240,6 +245,25 @@ export type Intent =
    * card `after`, or first with null (ADR-0116).
    */
   | { readonly kind: "addNoteColumn"; readonly after: CardId | null }
+  /**
+   * Move the thread `thread`'s card to the end of `task`'s canvas, for
+   * everyone (ADR-0117); a running thread keeps running.
+   */
+  | {
+      readonly kind: "moveThread"
+      readonly thread: ThreadId
+      readonly task: TaskId
+    }
+  /**
+   * Copy the thread `source` at its end as you see it (ADR-0117): its new
+   * card just after the source on `task`'s canvas, at that canvas's end
+   * when the source is not on it, or into your inventory with null.
+   */
+  | {
+      readonly kind: "copyThread"
+      readonly source: ThreadId
+      readonly task: TaskId | null
+    }
   /** Draw a card's column one column wide or two, for everyone (ADR-0116). */
   | {
       readonly kind: "cardWidth"
@@ -307,10 +331,16 @@ export type Intent =
   /** Show entry `entry`, wherever it is (`planOpen`). */
   | { readonly kind: "openAt"; readonly entry: EntryId }
   /**
-   * Show entry `entry` of task `task`, whose root this tab may not hold
-   * (ADR-0063): what the header and the inbox open.
+   * Follow a link to entry `entry` of its thread (ADR-0117, ADR-0124): in
+   * its task, whose root this tab may not hold (ADR-0063); in your
+   * inventory, its preview; held by someone else, nothing. What the inbox,
+   * a mention, a fork row and a rail's stub open.
    */
-  | { readonly kind: "openIn"; readonly entry: EntryId; readonly task: TaskId }
+  | {
+      readonly kind: "openLink"
+      readonly link: ThreadLink
+      readonly entry: EntryId
+    }
   | { readonly kind: "signOut" }
   /** Take `card` into your inventory: by key, wherever it is. */
   | { readonly kind: "takeIntoInventory"; readonly card: CardId }
@@ -428,6 +458,10 @@ function planOf(
         ? planAddNoteColumn(active.task, intent.after, minted.noteColumn, state)
         : []
     }
+    case "moveThread":
+      return planMoveThread(intent.thread, intent.task, state)
+    case "copyThread":
+      return planCopyThread(intent.source, intent.task, minted.thread, state)
     // From the canvas its sender sees it on: the host refuses it moved since.
     case "cardWidth": {
       const task = state.tasks.index.taskOfCard.get(intent.card)
@@ -518,8 +552,8 @@ function planOf(
       return [{ kind: "notNeeded", lane: intent.lane, raised: intent.raised }]
     case "openAt":
       return planOpenAt(intent.entry, state)
-    case "openIn":
-      return planOpenIn(intent.entry, intent.task, state)
+    case "openLink":
+      return planOpenLink(intent.link, intent.entry, state)
     case "signOut":
       return [{ kind: "forgetIdentity" }, { kind: "reload" }]
     case "takeIntoInventory":
@@ -636,7 +670,7 @@ function planColumn(
     case "details":
       return reading({ kind: "details", open: act.open })
     case "queue": {
-      const now = cardOf(state.cards, act.card)
+      const now = textCardOf(state.cards, act.card)
       return now === undefined
         ? []
         : [
@@ -651,7 +685,7 @@ function planColumn(
     }
     case "unqueue": {
       // If the host popped the card first, the refusal says it was sent.
-      const now = cardOf(state.cards, act.card)
+      const now = textCardOf(state.cards, act.card)
       if (now?.place.kind !== "queued") return []
       const move = moveOf(now, noteOf(now.place))
       return [moveCard(move, IN_COLUMN(key), false, act.by)]
@@ -720,6 +754,35 @@ function planColumn(
 }
 
 /**
+ * Follow `link` to `entry` (`openOf`): in its task (`planOpenIn`); a thread
+ * in your inventory, its preview there, read only; one someone else holds,
+ * or with no card, nothing.
+ */
+export function planOpenLink(
+  link: ThreadLink,
+  entry: EntryId,
+  state: IntentState,
+): readonly Effect[] {
+  const open = openOf(link, entry)
+  switch (open.kind) {
+    case "task":
+      return planOpenIn(open.entry, open.task, state)
+    case "preview": {
+      const slot = slotOf(state.cards.slots, open.thread)
+      return slot === null
+        ? []
+        : [
+            { kind: "showInventory", brief: false },
+            { kind: "select", slot },
+            { kind: "openSelected" },
+          ]
+    }
+    case "nothing":
+      return []
+  }
+}
+
+/**
  * Show `entry`, in task `task` (ADR-0063). One this tab holds opens as
  * `planOpenAt`. Else the task is shown, which holds its roots, archived or
  * not, and the entry is shown once it has arrived.
@@ -781,6 +844,77 @@ function planAddNoteColumn(
       false,
     ),
     changeViewOf(state, task, { kind: "fold", card: column, unfolded: true }),
+  ]
+}
+
+/**
+ * `thread`'s card from where you see it to the end of `task`'s canvas
+ * (ADR-0117): nothing where it is on that canvas already, or has no card.
+ */
+function planMoveThread(
+  thread: ThreadId,
+  task: TaskId,
+  state: IntentState,
+): readonly Effect[] {
+  const now = cardOf(state.cards, thread)
+  if (now?.kind !== "thread") return []
+  if (now.place.kind === "canvas" && now.place.task === task) return []
+  const canvas = state.tasks.index.canvases.get(task) ?? []
+  return [
+    moveCard(
+      moveOf(now, {
+        kind: "canvas-at",
+        task,
+        after: canvas.at(-1)?.id ?? null,
+      }),
+      IN_COLUMN(thread),
+      false,
+    ),
+  ]
+}
+
+/**
+ * A copy of `source` at its end as this tab holds it (ADR-0117), its id
+ * `thread`: just after the source on `task`'s canvas, or at that canvas's
+ * end, or into your inventory's first empty slot for null. Nothing for a
+ * thread with no end here; refused here, as the host would, into a full
+ * inventory.
+ */
+function planCopyThread(
+  source: ThreadId,
+  task: TaskId | null,
+  thread: ThreadId,
+  state: IntentState,
+): readonly Effect[] {
+  const end = threadAnchor(state.index, state.cards.lanes, source)
+  if (end === null) return []
+  if (task === null && firstEmpty(state.cards.slots, 0) === null)
+    return [
+      { kind: "showInventory", brief: true },
+      { kind: "refuse", refusal: full(thread) },
+    ]
+  const canvas =
+    task === null ? [] : (state.tasks.index.canvases.get(task) ?? [])
+  const after = canvas.some(c => c.id === source)
+    ? source
+    : (canvas.at(-1)?.id ?? null)
+  return [
+    {
+      kind: "request",
+      intent: {
+        kind: "copy-thread",
+        source,
+        end,
+        move: {
+          card: thread,
+          from: null,
+          to:
+            task === null
+              ? { kind: "inventory", holder: state.cards.me }
+              : { kind: "canvas-at", task, after },
+        },
+      },
+    },
   ]
 }
 

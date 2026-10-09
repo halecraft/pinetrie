@@ -384,7 +384,13 @@ export function putTask(
   putValue(b, setRecord(TASK, { task, by: STARTER, createdAt: 0 }))
   putValue(
     b,
-    setRecord(THREAD, { thread, root, by: STARTER, createdAt: 0, fork: null }),
+    setRecord(THREAD, {
+      thread,
+      root,
+      by: STARTER,
+      createdAt: 0,
+      origin: { kind: "started" },
+    }),
   )
   applyPlaceSteps(b.places, [
     {

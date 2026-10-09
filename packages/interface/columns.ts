@@ -18,6 +18,7 @@ import {
   type TreeIndex,
   threadEnd,
   type WorkflowStateId,
+  type WriterId,
 } from "@pinetrie/core"
 import type { Density } from "./ask-words.ts"
 
@@ -70,6 +71,11 @@ export interface Column {
   /** A Start Agent column: a message with no mention asks the agent. */
   readonly asksAgent?: true
   /**
+   * Its thread's first entry, when the thread it forks from is on no column
+   * of its canvas (ADR-0117): the path above it folds behind its fork row.
+   */
+  readonly foldAbove?: EntryId
+  /**
    * How much of each ask is drawn (ADR-0106); absent is story. The reader's
    * choice, never the document's.
    */
@@ -80,27 +86,85 @@ export interface Column {
    */
   readonly details?: true
   /**
-   * A fresh column: nothing of its own yet. Once its first message is sent,
-   * `sendId` is that send's id, and `sync` anchors the column at the entry it
-   * wrote (`TreeIndex.bySend`): exactly, whatever else appeared meanwhile.
-   * `pending` is a first message to send on opening ("branch here" after a
-   * conflict), sent by the column's own composer so its outcome shows there.
-   * `prefill` is what its composer starts with. `root` is a new tab's
-   * root, minted as it opens (ADR-0066): its cards and its first send name
-   * it. A branch's root is its tab's. `task` is a new tab's task, minted
-   * with its root (ADR-0116): its first send starts it, and its cards'
-   * places and their moves' history name it. `state` is the workflow state
-   * a new tab opened from a board column lands its task in (ADR-0122).
+   * How its next send writes (ADR-0117): at its thread's end; or, fresh or
+   * a copy, as a branch at its anchor, its thread's first message.
    */
-  readonly fresh?: {
-    readonly sendId?: string
-    readonly pending?: Pending
-    readonly prefill?: Prefill
-    readonly root?: RootId
-    readonly task?: TaskId
-    readonly state?: WorkflowStateId
-  }
+  readonly mode: ColumnMode
 }
+
+/**
+ * A fresh column: nothing of its own yet, and yours alone until its first
+ * send, which closes with × and whose other cards follow that send
+ * (`planFreshFollow`). Once its first message is sent, `sendId` is that
+ * send's id, and `sync` anchors the column at the entry it wrote
+ * (`TreeIndex.bySend`): exactly, whatever else appeared meanwhile.
+ * `pending` is a first message to send on opening ("branch here" after a
+ * conflict), sent by the column's own composer so its outcome shows there.
+ * `prefill` is what its composer starts with. `root` is a new tab's root,
+ * minted as it opens (ADR-0066): its cards and its first send name it. A
+ * branch's root is its tab's. `task` is a new tab's task, minted with its
+ * root (ADR-0116): its first send starts it, and its cards' places and
+ * their moves' history name it. `state` is the workflow state a new tab
+ * opened from a board column lands its task in (ADR-0122).
+ */
+export interface FreshMode {
+  readonly kind: "fresh"
+  readonly sendId?: string
+  readonly pending?: Pending
+  readonly prefill?: Prefill
+  readonly root?: RootId
+  readonly task?: TaskId
+  readonly state?: WorkflowStateId
+  /**
+   * The thread it forks in, when someone else holds it (ADR-0124): its
+   * entries are left out, the column says who has it, and a send there is
+   * refused until it is on a canvas again.
+   */
+  readonly held?: { readonly thread: ThreadId; readonly by: WriterId }
+}
+
+/**
+ * How a column's next send writes: `bound` at its thread's end; `fresh`
+ * (`FreshMode`); `copy`, a copy's card before its first send (ADR-0117),
+ * shared as any card is, its first send a branch at its record's fork.
+ */
+export type ColumnMode =
+  | { readonly kind: "bound" }
+  | FreshMode
+  | { readonly kind: "copy"; readonly fork: EntryId }
+
+/**
+ * A column yours alone until its first send, which × closes: a fresh one.
+ * A copy's column is a card's, shared, and folds as any card's does.
+ */
+export type ClosableColumn = Column & { readonly mode: FreshMode }
+
+/** Whether `column` closes with ×: a fresh one (`ClosableColumn`). */
+export const isClosable = (column: Column): column is ClosableColumn =>
+  column.mode.kind === "fresh"
+
+/** A bound column's mode. */
+export const BOUND: ColumnMode = { kind: "bound" }
+
+/** A column's fresh mode, or undefined for any other. */
+export const freshOf = (column: Pick<Column, "mode">): FreshMode | undefined =>
+  column.mode.kind === "fresh" ? column.mode : undefined
+
+/** A new tab's task, which it minted as it opened; undefined for any other column. */
+export const freshTaskOf = (
+  column: Pick<Column, "mode"> | undefined,
+): TaskId | undefined =>
+  column === undefined ? undefined : freshOf(column)?.task
+
+/** A new tab's root, which it minted as it opened; undefined for any other column. */
+export const freshRootOf = (
+  column: Pick<Column, "mode"> | undefined,
+): RootId | undefined =>
+  column === undefined ? undefined : freshOf(column)?.root
+
+/** Whether a column's next send is a branch at its anchor: fresh, or a copy. */
+export const branchesAt = (column: Pick<Column, "mode">): boolean =>
+  column.mode.kind !== "bound"
 
 /**
  * Which column something is said or done in, by kind (ADR-0116), carried
@@ -159,19 +223,20 @@ export type ReaderAction =
 /** A new tab's column, changed by `action`; the same column when nothing changes. */
 export function newTabReducer(column: Column, action: NewTabAction): Column {
   switch (action.kind) {
-    case "sent":
-      return column.fresh === undefined
+    case "sent": {
+      const fresh = freshOf(column)
+      return fresh === undefined
         ? column
         : {
             ...column,
             // A new tab keeps its task: once written, it is that task's.
-            fresh: {
+            mode: {
+              kind: "fresh",
               sendId: action.sendId,
-              ...(column.fresh.task === undefined
-                ? {}
-                : { task: column.fresh.task }),
+              ...(fresh.task === undefined ? {} : { task: fresh.task }),
             },
           }
+    }
     case "density":
       return column.density === action.density
         ? column
@@ -203,17 +268,24 @@ export function settle(
   index: TreeIndex,
   lanes: readonly LaneView[],
 ): Column {
-  const { fresh, ...rest } = column
+  const fresh = freshOf(column)
+  // Its thread started from another browser tab holding the same column,
+  // or a copy's first send written by anyone.
+  const started = index.firstOf.has(column.thread)
   if (fresh !== undefined) {
     const own =
       fresh.sendId === undefined ? undefined : index.bySend.get(fresh.sendId)
-    // Its thread started from another browser tab holding the same column.
-    const started = index.firstOf.has(column.thread)
     // Anchored at its own message, it follows its thread from here.
     return own === undefined && !started
       ? column
-      : settle({ ...rest, anchor: own ?? column.anchor }, index, lanes)
+      : settle(
+          { ...column, mode: BOUND, anchor: own ?? column.anchor },
+          index,
+          lanes,
+        )
   }
+  if (column.mode.kind === "copy")
+    return started ? settle({ ...column, mode: BOUND }, index, lanes) : column
   const end = threadAnchor(index, lanes, column.thread) ?? column.anchor
   return end === column.anchor ? column : { ...column, anchor: end }
 }

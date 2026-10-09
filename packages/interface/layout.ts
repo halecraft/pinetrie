@@ -33,6 +33,7 @@ import {
   type TreeIndex,
   threadAt,
   type WorkflowStateId,
+  type WriterId,
 } from "@pinetrie/core"
 import type { CanvasCard, TaskIndex } from "@pinetrie/rules"
 import { type Static, Type } from "typebox"
@@ -51,7 +52,9 @@ import {
 } from "./canvas-columns.ts"
 import { projectColumns } from "./column-paths.ts"
 import {
+  BOUND,
   type Column,
+  freshOf,
   type NewTabAction,
   newTabReducer,
   type Pending,
@@ -185,6 +188,10 @@ export type LayoutAction =
 export interface CanvasFacts {
   /** Each task's canvas, in order (`TaskIndex.canvases`). */
   readonly canvases: ReadonlyMap<TaskId, readonly CanvasCard[]>
+  /** Each copy's fork (`TaskIndex.forkOf`, ADR-0117). */
+  readonly forks: ReadonlyMap<ThreadId, EntryId>
+  /** Each thread someone else holds, by its holder (`heldByOthers`, ADR-0124). */
+  readonly holders: ReadonlyMap<ThreadId, WriterId>
   readonly index: TreeIndex
   readonly lanes: readonly LaneView[]
 }
@@ -373,7 +380,8 @@ export function layoutReducer(state: Layout, action: LayoutAction): Layout {
             key: action.key,
             anchor: null,
             thread: action.key,
-            fresh: {
+            mode: {
+              kind: "fresh",
               root: action.root,
               task: action.task,
               ...(action.prefill === undefined
@@ -630,6 +638,8 @@ export const taskColumns = (
     view: viewOf(layout.tasks, task, canvas),
     index: facts.index,
     lanes: facts.lanes,
+    forks: facts.forks,
+    holders: facts.holders,
   })
 }
 
@@ -668,15 +678,22 @@ export function planOpen(
   layout: Layout,
   index: TreeIndex,
   id: EntryId,
-  tasks: Pick<TaskIndex, "taskOfThread" | "canvases">,
+  tasks: Pick<TaskIndex, "taskOfThread" | "canvases" | "forkOf">,
   lanes: readonly LaneView[],
+  holders: ReadonlyMap<ThreadId, WriterId>,
 ): OpenPlan | null {
   const thread = threadAt(index, id)
   if (thread === null || index.entries[id] === undefined) return null
   const task = tasks.taskOfThread.get(thread)
   if (task === undefined) return null
   const columns = openColumns(
-    taskColumns(layout, task, { canvases: tasks.canvases, index, lanes }),
+    taskColumns(layout, task, {
+      canvases: tasks.canvases,
+      forks: tasks.forkOf,
+      holders,
+      index,
+      lanes,
+    }),
   )
   const views = projectColumns(
     index,
@@ -776,27 +793,30 @@ type Stored = Static<typeof StoredColumn>
 
 const storedPrefill = (p: Prefill) => ({ text: p.text, blank: p.blank })
 
-const toStored = (c: Column): Stored => ({
-  key: c.key,
-  anchor: c.anchor,
-  thread: c.thread,
-  ...(c.asksAgent ? { asksAgent: true } : {}),
-  ...(c.density === undefined ? {} : { density: c.density }),
-  ...(c.details ? { details: true } : {}),
-  ...(c.fresh === undefined
-    ? {}
-    : {
-        fresh: {
-          ...(c.fresh.sendId === undefined ? {} : { sendId: c.fresh.sendId }),
-          ...(c.fresh.root === undefined ? {} : { root: c.fresh.root }),
-          ...(c.fresh.task === undefined ? {} : { task: c.fresh.task }),
-          ...(c.fresh.state === undefined ? {} : { state: c.fresh.state }),
-          ...(c.fresh.prefill === undefined
-            ? {}
-            : { prefill: storedPrefill(c.fresh.prefill) }),
-        },
-      }),
-})
+const toStored = (c: Column): Stored => {
+  const fresh = freshOf(c)
+  return {
+    key: c.key,
+    anchor: c.anchor,
+    thread: c.thread,
+    ...(c.asksAgent ? { asksAgent: true } : {}),
+    ...(c.density === undefined ? {} : { density: c.density }),
+    ...(c.details ? { details: true } : {}),
+    ...(fresh === undefined
+      ? {}
+      : {
+          fresh: {
+            ...(fresh.sendId === undefined ? {} : { sendId: fresh.sendId }),
+            ...(fresh.root === undefined ? {} : { root: fresh.root }),
+            ...(fresh.task === undefined ? {} : { task: fresh.task }),
+            ...(fresh.state === undefined ? {} : { state: fresh.state }),
+            ...(fresh.prefill === undefined
+              ? {}
+              : { prefill: storedPrefill(fresh.prefill) }),
+          },
+        }),
+  }
+}
 
 /**
  * A stored new tab's column, or undefined for one that cannot be restored:
@@ -817,9 +837,10 @@ const fromStored = (s: Stored): Column | undefined => {
     ...(s.density === undefined ? {} : { density: s.density }),
     ...(s.details ? { details: true } : {}),
     ...(s.fresh === undefined
-      ? {}
+      ? { mode: BOUND }
       : {
-          fresh: {
+          mode: {
+            kind: "fresh" as const,
             ...(s.fresh.sendId === undefined ? {} : { sendId: s.fresh.sendId }),
             ...(root === undefined ? {} : { root }),
             ...(task === undefined ? {} : { task }),

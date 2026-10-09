@@ -63,6 +63,8 @@ const layout = resolveLayout(
     archived: new Set(),
     list: [K("r1"), K("r2"), K("r3")],
     canvases: new Map(),
+    forks: new Map(),
+    holders: new Map(),
   },
 )
 const none: CardMarks = {

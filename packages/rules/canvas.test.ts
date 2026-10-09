@@ -212,6 +212,7 @@ describe("a canvas change during a run (ADR-0116)", () => {
       threadsOf: new Map([[K, [A, B]]]),
       running: new Set([A]),
       titleOf: c => (c.id === N ? 'note column "Decisions"' : c.id),
+      taskTitleOf: t => (t === K ? "Here" : "Elsewhere"),
       ...over,
     })
 
@@ -252,6 +253,51 @@ describe("a canvas change during a run (ADR-0116)", () => {
     ).toEqual([])
   })
 
+  test("a running thread moved to another task is told it moved; the tasks' threads are told it was taken and added (ADR-0124)", () => {
+    const L = taskIdFor("01a0ffd2-0000-7000-8000-0000000000f2")
+    const moved = [
+      ...canvas([B]),
+      ...canvas([A]).flatMap(c =>
+        c.kind === "thread" ? [{ ...c, place: { ...c.place, task: L } }] : [],
+      ),
+    ]
+    const steers = facts({
+      before: canvas([A, B]),
+      after: moved,
+      threadsOf: new Map([
+        [K, [B]],
+        [L, [A]],
+      ]),
+      running: new Set([A, B]),
+    })
+    expect(steers).toContainEqual({
+      kind: "steer",
+      lane: A,
+      fact: { task: L, by: BEA, title: "Elsewhere", change: "moved" },
+    })
+    expect(steers).toContainEqual({
+      kind: "steer",
+      lane: B,
+      fact: { task: K, by: BEA, title: A, change: "taken" },
+    })
+    expect(
+      canvasFactLine({
+        task: L,
+        by: BEA,
+        byName: "Bea",
+        title: "Elsewhere",
+        change: "moved",
+      }),
+    ).toBe('Bea moved this thread to the task "Elsewhere"')
+    // Into an inventory it is taken, and told nothing: its run stops.
+    const taken = facts({
+      before: canvas([A, B]),
+      after: canvas([B]),
+      running: new Set([A]),
+    })
+    expect(taken).toEqual([])
+  })
+
   test("a steer is never a queued fact card", () => {
     const [steer] = facts()
     planFactCard({
@@ -262,4 +308,17 @@ describe("a canvas change during a run (ADR-0116)", () => {
       at: { kind: "root" },
     })
   })
+})
+
+test("a switch over a canvas card's kind that leaves one out does not compile (ADR-0116)", () => {
+  const kindOf = (c: CanvasCard): string => {
+    switch (c.kind) {
+      case "thread":
+        return "thread"
+      default:
+        // @ts-expect-error: a note column is left out, so `c` is no `never`
+        return c satisfies never
+    }
+  }
+  expect(kindOf(canvas([A])[0] as CanvasCard)).toBe("thread")
 })

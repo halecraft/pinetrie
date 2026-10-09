@@ -86,7 +86,7 @@ test("a conversation thread is named as a lane is, and draws no banner: every th
       root: ROOT_ID,
       by: writerId("ada@x.io"),
       createdAt: 1,
-      fork: null,
+      origin: { kind: "started" },
     }),
   ])
   const scribe = record<Pick<Records, "writeValues">>({

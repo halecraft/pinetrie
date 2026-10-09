@@ -54,6 +54,7 @@ import {
   workingWords,
 } from "./column-view.ts"
 import { entry, indexOf, TEST_ROOT } from "./fixtures.ts"
+import { linkTo } from "./thread-link.ts"
 
 const A = threadIdFor("a")
 const B = threadIdFor("b")
@@ -180,6 +181,8 @@ const work = (over: Partial<WorkFacts> = {}): WorkFacts => ({
   banners: new Map(),
   accepted: null,
   bases: new Map(),
+  forks: new Map(),
+  filesLost: new Map(),
   ...over,
 })
 /** Accepted work, one commit past the lane's base: `base` read what catching up brings. */
@@ -261,6 +264,12 @@ const facts = (
     acting: null,
     lanes: [],
     work: work(),
+    origins: {
+      task: null,
+      linkOf: thread => linkTo(thread, [], ADA),
+      labelOf: () => "",
+      reader: { me: ADA, nameOf: new Map() },
+    },
     ...over,
   }
 }

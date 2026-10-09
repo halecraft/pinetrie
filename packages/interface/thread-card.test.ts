@@ -89,6 +89,8 @@ describe("threadCardHead (ADR-0111, ADR-0116)", () => {
         archived: new Set(),
         list: [K1],
         canvases: new Map(),
+        forks: new Map(),
+        holders: new Map(),
       },
     )
     const sidebar = sidebarView({

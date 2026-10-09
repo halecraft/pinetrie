@@ -2,6 +2,7 @@ import {
   entryId,
   type RootRecord,
   rootIdFor,
+  type ThreadId,
   taskIdFor,
   threadIdFor,
   writerId,
@@ -46,15 +47,28 @@ const tasks = tasksOf({
         root: rootIdFor(`r${n}`),
         by: writerId("a"),
         createdAt: 0,
-        fork: null,
+        origin: { kind: "started" },
       },
     ]),
   ),
 })
-const held = (input: Parameters<typeof planHeldRoots>[0]) =>
-  [...planHeldRoots(input)].sort()
+const held = (
+  input: Omit<Parameters<typeof planHeldRoots>[0], "inventory"> & {
+    inventory?: readonly ThreadId[]
+  },
+) => [...planHeldRoots({ inventory: [], ...input })].sort()
 
 describe("planHeldRoots (ADR-0116)", () => {
+  test("the roots of the threads in your inventory too, which their slots and previews read (ADR-0124)", () => {
+    expect(
+      held({
+        layout: { open: [], active: null },
+        tasks,
+        inventory: [threadIdFor("3")],
+      }),
+    ).toEqual([rootIdFor("r3")])
+  })
+
   test("the roots of the sidebar's tasks and the one you are on, and no other", () => {
     expect(
       held({

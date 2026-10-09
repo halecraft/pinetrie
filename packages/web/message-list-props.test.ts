@@ -13,7 +13,12 @@ import {
   sameMessageListProps,
 } from "./message-list-props.ts"
 
-const view: ColumnView = { tipId: entryId("e2"), forkFrom: null, nodes: [] }
+const view: ColumnView = {
+  tipId: entryId("e2"),
+  forkFrom: null,
+  nodes: [],
+  above: [],
+}
 const lane = (running = false): MessageListProps["lane"] => ({
   kind: "lane",
   name: "lane-1" as ThreadId,

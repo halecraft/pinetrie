@@ -47,7 +47,7 @@ const ports = () => {
         dispose: vi.fn(),
       },
     },
-    inventory: { show: vi.fn(), select: vi.fn() },
+    inventory: { show: vi.fn(), select: vi.fn(), openSelected: vi.fn() },
     attention: { dismiss: vi.fn(), dismissOffer: vi.fn() },
     fly: vi.fn(),
     intent: vi.fn(),

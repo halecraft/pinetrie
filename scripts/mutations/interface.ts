@@ -606,16 +606,16 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a column keeps its pending message after sending it",
     file: "packages/interface/columns.ts",
-    from: "            fresh: {\n              sendId: action.sendId,",
-    to: "            fresh: {\n              ...column.fresh,\n              sendId: action.sendId,",
+    from: '            mode: {\n              kind: "fresh",\n              sendId: action.sendId,',
+    to: '            mode: {\n              ...fresh,\n              kind: "fresh",\n              sendId: action.sendId,',
     command: unit,
     expect: "a fresh column's first send spends its prefill and keeps its task",
   },
   {
     name: "a pending message is stored",
     file: "packages/interface/layout.ts",
-    from: "          ...(c.fresh.sendId === undefined ? {} : { sendId: c.fresh.sendId }),",
-    to: "          ...c.fresh,",
+    from: "            ...(fresh.sendId === undefined ? {} : { sendId: fresh.sendId }),",
+    to: "            ...fresh,",
     command: unit,
     expect: "never stored, nor restored",
   },
@@ -2257,7 +2257,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a put where the card already is moves it",
     file: "packages/interface/card-intents.ts",
-    from: '  if (\n    to === null ||\n    (to.kind !== "notes" &&\n      to.kind !== "canvas-at" &&\n      sameKey(keyOf(now.place), to))\n  )\n    return []',
+    from: '  if (to === null || (to.kind !== "notes" && sameKey(keyOf(now.place), to)))\n    return []',
     to: "  if (to === null) return []",
     command: unit,
     expect:
@@ -2299,7 +2299,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a fresh column takes cards at its end",
     file: "packages/interface/column-view.ts",
-    from: "  if (column.fresh !== undefined) {\n",
+    from: '  if (column.mode.kind !== "bound") {\n',
     to: "  if (false) {\n",
     command: unit,
     expect:
@@ -2390,7 +2390,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a new tab is stored without its root",
     file: "packages/interface/layout.ts",
-    from: "          ...(c.fresh.root === undefined ? {} : { root: c.fresh.root }),\n",
+    from: "            ...(fresh.root === undefined ? {} : { root: fresh.root }),\n",
     to: "",
     command: unit,
     expect: "a round trip keeps what you are on, each root's columns, new tabs",
@@ -2399,7 +2399,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a new tab's fresh place takes no root of its own",
     file: "packages/interface/column-view.ts",
-    from: "    const its = column.fresh.root ?? root\n",
+    from: "    const its = fresh?.root ?? root\n",
     to: "    const its = root\n",
     command: unit,
     expect:
@@ -3293,7 +3293,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a card's column offers close",
     file: "packages/interface/app-view.ts",
-    from: "        slots: slots(c => c.fresh !== undefined),",
+    from: "        slots: slots(isClosable),",
     to: "        slots: slots(() => true),",
     command: unit,
     expect: "only a branch not yet sent closes",
@@ -3301,10 +3301,10 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the tab's rail draws every tree",
     file: "packages/interface/app-view.ts",
-    from: '  active?.kind === "task" ? roots.flatMap(r => projectRail(index, r)) : []',
-    to: '  active?.kind === "task" ? index.roots.flatMap(r => projectRail(index, r)) : []',
+    from: "  for (const { root, entry } of input.roots) {\n",
+    to: "  for (const { root, entry } of index.roots.map(entry => ({ root: entry as never, entry }))) {\n",
     command: unit,
-    expect: "a task's rail draws one tree for each root of its threads",
+    expect: "a task's rail is a forest: a tree for each root of its threads",
   },
   {
     name: "a new tab's reader settings go to a task, and are dropped",
@@ -3396,5 +3396,158 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "pinnedMarkers: a run's task pins and canvas list, written above its prompt with its cards entry, mark it too (ADR-0116)",
+  },
+  {
+    name: "a link to someone else's held thread opens it",
+    file: "packages/interface/thread-link.ts",
+    from: "        ? place.holder === me\n",
+    to: "        ? place.holder !== null\n",
+    command: unit,
+    expect:
+      "a link opens a thread's task, your own held thread's preview, and nothing for someone else's (ADR-0117, ADR-0124)",
+  },
+  {
+    name: "a link to your own held thread opens nothing",
+    file: "packages/interface/intent.ts",
+    from: '      return slot === null\n        ? []\n        : [\n            { kind: "showInventory", brief: false },',
+    to: '      return slot === slot\n        ? []\n        : [\n            { kind: "showInventory", brief: false },',
+    command: unit,
+    expect:
+      "openLink: a thread in your inventory opens its preview there; one someone else holds, or with no card, nothing (ADR-0124)",
+  },
+  {
+    name: "a thread moved onto its own canvas moves",
+    file: "packages/interface/intent.ts",
+    from: '  if (now.place.kind === "canvas" && now.place.task === task) return []\n  const canvas = state.tasks.index.canvases.get(task) ?? []',
+    to: "  const canvas = state.tasks.index.canvases.get(task) ?? []",
+    command: unit,
+    expect:
+      "moveThread: the card to the end of another task's canvas; nothing onto its own (ADR-0117)",
+  },
+  {
+    name: "a copy lands at the canvas's end, not after its source",
+    file: "packages/interface/intent.ts",
+    from: "  const after = canvas.some(c => c.id === source)\n",
+    to: "  const after = canvas.some(c => c.id === thread)\n",
+    command: unit,
+    expect:
+      "copyThread: a copy at the source's end, just after it, or into your inventory; refused here into a full one (ADR-0117)",
+  },
+  {
+    name: "a thread put from the inventory goes in a note column",
+    file: "packages/interface/card-intents.ts",
+    from: '  if (now.kind !== "text") return putOnCanvas(now, target, state)\n',
+    to: "",
+    command: unit,
+    expect:
+      "put: a thread's card from your inventory lands on the canvas you are on, just after the column it was put on, unfolded (ADR-0117)",
+  },
+  {
+    name: "a tab holds no root of a thread in your inventory",
+    file: "packages/interface/held-roots.ts",
+    from: "    ...input.inventory.flatMap(\n",
+    to: "    ...[].flatMap(\n",
+    command: unit,
+    expect:
+      "the roots of the threads in your inventory too, which their slots and previews read (ADR-0124)",
+  },
+  {
+    name: "a copy's column is left out before its first send",
+    file: "packages/interface/canvas-columns.ts",
+    from: "      const fork = forks.get(c.id)\n",
+    to: "      const fork = forks.get(c.id) && undefined\n",
+    command: unit,
+    expect:
+      "a copy before its first send ends at its fork, and sends as a branch there (ADR-0117)",
+  },
+  {
+    name: "a column from elsewhere folds nothing above",
+    file: "packages/interface/column-paths.ts",
+    from: "      cut < 0 && foldAbove !== undefined\n",
+    to: "      cut < 0 && foldAbove === undefined\n",
+    command: unit,
+    expect:
+      "a column whose parent thread is on no column folds its path above its own first entry; one a column to its left shares does not (ADR-0117)",
+  },
+  {
+    name: "a thread with its parent elsewhere is drawn whole",
+    file: "packages/interface/canvas-columns.ts",
+    from: "  return from === null || onCanvas.has(from) ? null : (first ?? null)\n",
+    to: "  return null\n",
+    command: unit,
+    expect:
+      "a thread whose parent thread is on no column of the canvas folds its path above its first entry; one whose parent is here does not (ADR-0117)",
+  },
+  {
+    name: "a branch from a held thread shows its entries",
+    file: "packages/interface/column-paths.ts",
+    from: "      .filter(n => hide === undefined || threadAt(index, n.id) !== hide)\n",
+    to: "",
+    command: unit,
+    expect:
+      "a branch not yet sent from a held thread leaves that thread's entries out (ADR-0124)",
+  },
+  {
+    name: "a copy's column closes",
+    file: "packages/interface/columns.ts",
+    from: 'export const isClosable = (column: Column): column is ClosableColumn =>\n  column.mode.kind === "fresh"',
+    to: 'export const isClosable = (column: Column): column is ClosableColumn =>\n  column.mode.kind !== "bound"',
+    command: unit,
+    expect:
+      "a copy's column is a card's: shared, never closable as a fresh one is (ADR-0117)",
+  },
+  {
+    name: "a copy's column never follows its thread",
+    file: "packages/interface/columns.ts",
+    from: "    return started ? settle({ ...column, mode: BOUND }, index, lanes) : column",
+    to: "    return column",
+    command: unit,
+    expect:
+      "a copy's column waits at its fork, then follows its thread once its first entry is written by anyone (ADR-0117)",
+  },
+  {
+    name: "a branch in a held thread is drawn as any other",
+    file: "packages/interface/canvas-columns.ts",
+    from: "      ...heldAt(index, fresh.at, holders),\n",
+    to: "",
+    command: unit,
+    expect:
+      "a branch not yet sent in a thread someone else holds says who, and is drawn without that thread's entries; one you hold is drawn whole (ADR-0124)",
+  },
+  {
+    name: "your own held threads are others'",
+    file: "packages/interface/canvas-columns.ts",
+    from: "      c.place.holder !== me\n",
+    to: "      c.place.holder !== null\n",
+    command: unit,
+    expect:
+      "a branch not yet sent in a thread someone else holds says who, and is drawn without that thread's entries; one you hold is drawn whole (ADR-0124)",
+  },
+  {
+    name: "the rail draws every row of a task's roots",
+    file: "packages/interface/app-view.ts",
+    from: "      if (!keep.has(row.id)) continue\n",
+    to: "",
+    command: unit,
+    expect:
+      "a task's rail is a forest: a tree for each root of its threads, in order, each cut to the paths to its threads, a fork elsewhere a stub; nothing off a task (ADR-0116, ADR-0117)",
+  },
+  {
+    name: "the rail draws no stub",
+    file: "packages/interface/app-view.ts",
+    from: '        if (link.kind !== "gone")\n          stubs.push({ from: row.id, at: child, thread, link })',
+    to: "        void link",
+    command: unit,
+    expect:
+      "a task's rail is a forest: a tree for each root of its threads, in order, each cut to the paths to its threads, a fork elsewhere a stub; nothing off a task (ADR-0116, ADR-0117)",
+  },
+  {
+    name: "every root's tree is in the page's palette",
+    file: "packages/interface/app-view.ts",
+    from: "    const shift = shiftOf(input.seed, rootSeed(root))\n",
+    to: "    const shift = 0 * shiftOf(input.seed, rootSeed(root))\n",
+    command: unit,
+    expect:
+      "a task's rail is a forest: a tree for each root of its threads, in order, each cut to the paths to its threads, a fork elsewhere a stub; nothing off a task (ADR-0116, ADR-0117)",
   },
 ]

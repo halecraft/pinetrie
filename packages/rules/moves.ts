@@ -3,6 +3,8 @@
 // moves make.
 
 import {
+  type CanvasKey,
+  type CanvasTarget,
   type CardId,
   type CardPlace,
   type CardRecord,
@@ -19,6 +21,7 @@ import {
   PLAIN,
   type PlaceKey,
   placed,
+  type RankedCanvas,
   type ResolvedMove,
   type ResolvedTarget,
   type RootId,
@@ -150,6 +153,30 @@ function refuseInto(
 }
 
 /**
+ * A card made by `sender` at `to`, the one way every card is made by a
+ * person's command (ADR-0059): refused `exists` for an id in use, else as
+ * any move into `to` is (`refuseInto`: a place its kind is never in,
+ * someone else's inventory, a full one), else `no-place` where no record
+ * could be made there (`made` null). `planMove`'s creations and a copy's
+ * card (`planCopy`) go through it, so their refusals cannot drift. Pure.
+ */
+export function planMake(
+  cards: readonly CardRecord[],
+  card: CardId,
+  to: PlaceKey | ResolvedTarget,
+  sender: WriterId,
+  made: CardRecord | null,
+): MoveStep {
+  const now = cards.find(c => c.id === card)
+  if (now !== undefined) return { kind: "refused", code: "exists", now }
+  const refusal = refuseInto(to, cards, card, sender)
+  if (refusal !== null) return { kind: "refused", code: refusal, now: null }
+  return made === null
+    ? { kind: "refused", code: "no-place", now: null }
+    : { kind: "write", record: made }
+}
+
+/**
  * A handoff: a compare-and-set on where the card is. The host accepts a move
  * only if the card is still where its sender saw it; someone else's reorder
  * since does not count as moving it (`sameKey`). A move to where the card is
@@ -177,41 +204,37 @@ export function planMove(
 ): MoveStep {
   const now = cards.find(c => c.id === move.card)
   if (move.from === null) {
-    if (now !== undefined) return { kind: "refused", code: "exists", now }
-    const refusal = refuseInto(move.to, cards, move.card, sender)
-    if (refusal !== null) return { kind: "refused", code: refusal, now: null }
-    const place = placeAt(move.to, cards, sender, undefined, discards)
     // A move makes a text card, or a note column on a canvas: a thread's
-    // card is the host's to make, with its thread's first message.
-    if (place === undefined)
-      return { kind: "refused", code: "no-place", now: null }
-    if (isNoteColumnId(move.card))
-      return place.kind === "canvas"
-        ? {
-            kind: "write",
-            record: {
-              kind: "note-column",
-              id: move.card,
-              owner: sender,
-              place,
-              placer: sender,
-            },
-          }
-        : { kind: "refused", code: "no-place", now: null }
-    if (!isTextCardId(move.card) || place.kind === "canvas")
-      return { kind: "refused", code: "no-place", now: null }
-    return {
-      kind: "write",
-      record: {
-        kind: "text",
-        id: move.card,
-        owner: sender,
-        place,
-        placer: sender,
-        carries: PLAIN,
-        unsent: null,
-      },
-    }
+    // card is the host's to make, with its thread's first message or a
+    // copy (`planCopy`).
+    const place = placeAt(move.to, cards, sender, undefined, discards)
+    const made =
+      place === undefined
+        ? undefined
+        : isNoteColumnId(move.card)
+          ? place.kind === "canvas"
+            ? ({
+                kind: "note-column",
+                id: move.card,
+                owner: sender,
+                place,
+                placer: sender,
+              } as const)
+            : undefined
+          : isTextCardId(move.card) && place.kind !== "canvas"
+            ? ({
+                kind: "text",
+                id: move.card,
+                owner: sender,
+                place,
+                placer: sender,
+                carries: PLAIN,
+                unsent: null,
+              } as const)
+            : undefined
+    return made === undefined
+      ? planMake(cards, move.card, move.to, sender, null)
+      : planMake(cards, move.card, move.to, sender, made)
   }
   if (now === undefined || now.place.kind === "gone")
     return { kind: "refused", code: "gone", now: null }
@@ -356,20 +379,10 @@ export function planMoveTargets(input: {
       // its end.
       case "canvas":
       case "canvas-at": {
-        const canvas = canvasOf(now, to.task).filter(c => c.id !== move.card)
-        const ranked =
-          to.kind === "canvas-at"
-            ? rankOfDrop(canvas, to.after)
-            : rankAfter(canvas, canvas.length - 1)
-        const steps = ranked.respaced.map(
-          (record): PlaceStep => ({ kind: "write", record }),
-        )
-        first.push(...steps)
-        now = afterSteps(now, steps)
-        moves.push({
-          ...move,
-          to: { kind: "canvas", task: to.task, order: ranked.order },
-        })
+        const ranked = rankOnCanvas(now, move.card, to)
+        first.push(...ranked.first)
+        now = afterSteps(now, ranked.first)
+        moves.push({ ...move, to: ranked.to })
         break
       }
       default:
@@ -377,6 +390,29 @@ export function planMoveTargets(input: {
     }
   }
   return { kind: "resolved", moves, first }
+}
+
+/**
+ * Where `card` lands on a canvas (ADR-0116): just after a drop's `after`,
+ * at the end when that card is no longer there or for a canvas's key alone,
+ * with the cards given new ranks to make room, written first. Pure.
+ */
+export function rankOnCanvas(
+  cards: readonly CardRecord[],
+  card: CardId,
+  to: CanvasKey | CanvasTarget,
+): { readonly to: RankedCanvas; readonly first: readonly PlaceStep[] } {
+  const canvas = canvasOf(cards, to.task).filter(c => c.id !== card)
+  const ranked =
+    to.kind === "canvas-at"
+      ? rankOfDrop(canvas, to.after)
+      : rankAfter(canvas, canvas.length - 1)
+  return {
+    to: { kind: "canvas", task: to.task, order: ranked.order },
+    first: ranked.respaced.map(
+      (record): PlaceStep => ({ kind: "write", record }),
+    ),
+  }
 }
 
 /**
@@ -391,22 +427,23 @@ export function planMoveRequest(
   running: (lane: ThreadId) => boolean,
   discards: Discards,
   newColumn: () => NoteColumnId,
-): { readonly step: MovesStep; readonly drain: readonly ThreadId[] } {
+): MoveCommand {
   const resolved = planMoveTargets({ cards, moves, sender, newColumn })
-  if (resolved.kind === "refused") return { step: resolved, drain: [] }
-  const { step, drain } = planMoveCommand(
+  if (resolved.kind === "refused") return REFUSED(resolved)
+  const command = planMoveCommand(
     afterSteps(cards, resolved.first),
     resolved.moves,
     sender,
     running,
     discards,
   )
+  const { step } = command
   return {
+    ...command,
     step:
       step.kind === "steps"
         ? { kind: "steps", steps: [...resolved.first, ...step.steps] }
         : step,
-    drain,
   }
 }
 
@@ -452,23 +489,44 @@ export function planMoves(
   return { kind: "steps", steps }
 }
 
-/**
- * Moves and what follows them: the lanes to drain, where a move leaves its
- * card queued on a lane that is not running. Pure.
- */
+/** What a command's moves do: its steps, and the lanes they leave to drain. */
+export interface MoveCommand {
+  readonly step: MovesStep
+  /**
+   * The lanes to drain, those not running: each a move leaves a card queued
+   * on, and each thread put from an inventory onto a canvas.
+   */
+  readonly drain: readonly ThreadId[]
+}
+
+/** A command that moves nothing. */
+const REFUSED = (step: MovesStep): MoveCommand => ({ step, drain: [] })
+
+/** Moves and what follows them (`MoveCommand`). Pure. */
 export function planMoveCommand(
   cards: readonly CardRecord[],
   moves: readonly ResolvedMove[],
   sender: WriterId,
   running: (lane: ThreadId) => boolean,
   discards: Discards,
-): { readonly step: MovesStep; readonly drain: readonly ThreadId[] } {
+): MoveCommand {
   const step = planMoves(cards, moves, sender, discards)
-  if (step.kind === "refused") return { step, drain: [] }
-  const lanes = step.steps.flatMap(s =>
-    s.kind === "write" && s.record.place.kind === "queued"
-      ? [s.record.place.thread]
-      : [],
-  )
-  return { step, drain: [...new Set(lanes)].filter(l => !running(l)) }
+  if (step.kind === "refused") return REFUSED(step)
+  const was = new Map(cards.map(c => [c.id, c.place.kind] as const))
+  // A card queued, or a thread put out of an inventory, whose queue waited
+  // there (ADR-0124).
+  const lanes = step.steps.flatMap(s => {
+    if (s.kind !== "write") return []
+    const { record } = s
+    if (record.place.kind === "queued") return [record.place.thread]
+    return record.kind === "thread" &&
+      record.place.kind !== "inventory" &&
+      was.get(record.id) === "inventory"
+      ? [record.id]
+      : []
+  })
+  return {
+    step,
+    drain: [...new Set(lanes)].filter(l => !running(l)),
+  }
 }

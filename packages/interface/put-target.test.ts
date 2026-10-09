@@ -11,6 +11,7 @@ import {
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { composerPlace } from "./column-view.ts"
+import { BOUND } from "./columns.ts"
 import { NEW_TASK } from "./fixtures.ts"
 import {
   composerPlacesStore,
@@ -37,13 +38,13 @@ const E1 = atEntry(entryId("e-1"))
 describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
   const store = composerPlacesStore()
   const thread = composerPlace(
-    { key: "k-thread", thread: LANE },
+    { key: "k-thread", thread: LANE, mode: BOUND },
     E1,
     TEST_ROOT,
     TEST_TASK,
   )
   const fresh = composerPlace(
-    { key: "k-fresh", thread: LANE, fresh: {} },
+    { key: "k-fresh", thread: LANE, mode: { kind: "fresh" } },
     E1,
     TEST_ROOT,
     TEST_TASK,
@@ -137,7 +138,12 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
 
 test("composerPlace: your message at the end of its thread; fresh by key, in its root and the task it is on; none at the root, nor a fresh one in no root", () => {
   expect(
-    composerPlace({ key: "k", thread: LANE }, E1, TEST_ROOT, TEST_TASK),
+    composerPlace(
+      { key: "k", thread: LANE, mode: BOUND },
+      E1,
+      TEST_ROOT,
+      TEST_TASK,
+    ),
   ).toEqual({
     kind: "composing",
     at: E1,
@@ -146,7 +152,7 @@ test("composerPlace: your message at the end of its thread; fresh by key, in its
   // A branch: its tab's root, at its branch point, on the task you are on.
   expect(
     composerPlace(
-      { key: "k", thread: LANE, fresh: {} },
+      { key: "k", thread: LANE, mode: { kind: "fresh" } },
       E1,
       TEST_ROOT,
       TEST_TASK,
@@ -161,7 +167,11 @@ test("composerPlace: your message at the end of its thread; fresh by key, in its
   // A new tab: the root and the task it minted as it opened (ADR-0066).
   expect(
     composerPlace(
-      { key: "k", thread: LANE, fresh: { root: NEW_ROOT, task: NEW_TASK } },
+      {
+        key: "k",
+        thread: LANE,
+        mode: { kind: "fresh", root: NEW_ROOT, task: NEW_TASK },
+      },
       { kind: "root" },
       undefined,
       null,
@@ -175,7 +185,7 @@ test("composerPlace: your message at the end of its thread; fresh by key, in its
   })
   expect(
     composerPlace(
-      { key: "k", thread: LANE, fresh: {} },
+      { key: "k", thread: LANE, mode: { kind: "fresh" } },
       { kind: "root" },
       undefined,
       TEST_TASK,
@@ -183,7 +193,7 @@ test("composerPlace: your message at the end of its thread; fresh by key, in its
   ).toBeNull()
   expect(
     composerPlace(
-      { key: "k", thread: LANE, fresh: { root: NEW_ROOT } },
+      { key: "k", thread: LANE, mode: { kind: "fresh", root: NEW_ROOT } },
       { kind: "root" },
       undefined,
       null,
@@ -191,7 +201,7 @@ test("composerPlace: your message at the end of its thread; fresh by key, in its
   ).toBeNull()
   expect(
     composerPlace(
-      { key: "k", thread: LANE },
+      { key: "k", thread: LANE, mode: BOUND },
       { kind: "root" },
       undefined,
       TEST_TASK,
@@ -199,6 +209,11 @@ test("composerPlace: your message at the end of its thread; fresh by key, in its
   ).toBeNull()
   // A thread's place needs no root: the thread's record names it.
   expect(
-    composerPlace({ key: "k", thread: LANE }, E1, undefined, TEST_TASK),
+    composerPlace(
+      { key: "k", thread: LANE, mode: BOUND },
+      E1,
+      undefined,
+      TEST_TASK,
+    ),
   ).toEqual({ kind: "composing", at: E1, thread: LANE })
 })

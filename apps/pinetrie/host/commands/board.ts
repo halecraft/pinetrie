@@ -167,9 +167,11 @@ async function planCrossing(
   const lanes = []
   const own = []
   const revisions = new Map<EntryId, RevisionRecord>()
+  const trees = []
   for (const root of roots) {
     const doc = await docs.root(root)
     const index = readTreeIndex(doc)
+    trees.push(index)
     lanes.push(...readLanes({ doc, live }, index, cards, holds, blank))
     for (const [entry, r] of readRevisions(doc)) revisions.set(entry, r)
     if (deps.work.repo !== null)
@@ -188,6 +190,7 @@ async function planCrossing(
     lanes,
     own,
     revisions,
+    trees,
     roots,
     stillHeld: rootsHeld(cards, readThreads(session), archived),
   })

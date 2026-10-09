@@ -19,12 +19,18 @@ import {
   readQueueHolds,
   readReading,
   readSeats,
+  readThreads,
   readTraces,
   readTypingIn,
 } from "@pinetrie/reads"
-import { yourCard } from "@pinetrie/rules"
+import { HELD_WORDS, yourCard } from "@pinetrie/rules"
 import { cardDocId, InventoryDoc, PlacesDoc } from "@pinetrie/schema"
-import { LAST_ORDER, newCardId, type SessionClient } from "@pinetrie/session"
+import {
+  LAST_ORDER,
+  newCardId,
+  newThreadId,
+  type SessionClient,
+} from "@pinetrie/session"
 import { openStore } from "../../host/store.ts"
 import type { Checks } from "../checks.ts"
 import {
@@ -600,7 +606,7 @@ async function run(check: Checks["check"]): Promise<void> {
     const other = await ada.chat("a root of its own", ROOT, { mode: "branch" })
     const otherEnd = other.kind === "appended" ? other.id : null
     const takeIntoInventory = (
-      card: CardId,
+      card: TextCardId,
       end: EntryId | null,
       slot: number,
     ) => ada.moveCard({ card, from: drafting(end), to: mine }, into(slot))
@@ -668,8 +674,8 @@ async function run(check: Checks["check"]): Promise<void> {
       return id
     })
     await waitFor(() => three.every(id => onHost(id) !== undefined), 5_000)
-    const [k1, k2, k3] = three as [CardId, CardId, CardId]
-    const keepAt = (card: CardId, slot: number) => ({
+    const [k1, k2, k3] = three as [TextCardId, TextCardId, TextCardId]
+    const keepAt = (card: TextCardId, slot: number) => ({
       move: { card, from: keeping, to: mine },
       slot,
     })
@@ -839,6 +845,75 @@ async function run(check: Checks["check"]): Promise<void> {
       "a held queue keeps a card sent to its idle thread queued across a restart, and a release pops it",
       heldSend.kind === "queued" && heldAcross && released >= 0,
       `${heldSend.kind}; held ${heldAcross}; popped after ${released} ms`,
+    )
+    // 7. A thread's card taken into an inventory (ADR-0117, ADR-0124):
+    // nothing is sent in it there; a copy of it forks at its end, where it
+    // was dropped; put back on a canvas, it takes a send again.
+    const tipNow = tipIn(ch, lane)
+    const took = await eve.moveCard(
+      {
+        card: lane,
+        from: { kind: "canvas", task: here },
+        to: { kind: "inventory", holder: eve.writer },
+      },
+      { actedAt: { kind: "column", key: "k-take" }, slot: 0 },
+    )
+    await waitFor(() => onHost(lane)?.place.kind === "inventory", 5_000)
+    const heldSend2 = await eve.chat("@Ada while it is away", at(tipNow), {
+      mode: "reply",
+      thread: lane,
+    })
+    const COPY = newThreadId()
+    const copied = await eve.request({
+      kind: "copy-thread",
+      source: lane,
+      end: tipNow ?? entryId(""),
+      move: {
+        card: COPY,
+        from: null,
+        to: { kind: "canvas-at", task: here, after: null },
+      },
+    })
+    await waitFor(() => onHost(COPY) !== undefined, 5_000)
+    const firstOfCopy = await eve.chat("the copy's first", at(tipNow), {
+      mode: "branch",
+      thread: COPY,
+      task: here,
+    })
+    const copyRecord = readThreads(ch.session).get(COPY)
+    const copyFirst = treeOf(ch).firstOf.get(COPY)
+    check(
+      "a copy forks at its source's end, its card where it was dropped, and its first send branches there, its record naming its source",
+      copied.kind === "moved" &&
+        onHost(COPY)?.place.kind === "canvas" &&
+        firstOfCopy.kind === "appended" &&
+        copyFirst !== undefined &&
+        treeOf(ch).parentOf(copyFirst) === tipNow &&
+        copyRecord?.origin.kind === "copy" &&
+        copyRecord.origin.source === lane,
+      `${copied.kind}; ${firstOfCopy.kind}; ${JSON.stringify(copyRecord?.origin)}`,
+    )
+    const put = await eve.moveCard(
+      {
+        card: lane,
+        from: { kind: "inventory", holder: eve.writer },
+        to: { kind: "canvas-at", task: here, after: null },
+      },
+      { actedAt: { kind: "inventory" }, slot: null },
+    )
+    await waitFor(() => onHost(lane)?.place.kind === "canvas", 5_000)
+    const sentBack = await eve.chat("@Ada back on the canvas", at(tipNow), {
+      mode: "reply",
+      thread: lane,
+    })
+    check(
+      "a thread's card taken into an inventory runs nothing there, put it on a canvas first; put back, it takes a send",
+      took.kind === "accepted" &&
+        heldSend2.kind === "refused" &&
+        heldSend2.message === HELD_WORDS &&
+        put.kind === "accepted" &&
+        sentBack.kind === "appended",
+      `${took.kind}; ${heldSend2.kind}; ${put.kind}; ${sentBack.kind}`,
     )
     await waitFor(
       () => eve.cardText(keep).text() === "kept across a restart",

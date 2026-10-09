@@ -10,6 +10,7 @@
 import { type CardId, isThreadId, type PlaceKey } from "@pinetrie/core"
 import { placeEnd } from "@pinetrie/rules"
 import { type ActedAt, AT_INVENTORY } from "@pinetrie/session"
+import { heldByOthers } from "./canvas-columns.ts"
 import {
   changeViewOf,
   type Effect,
@@ -120,6 +121,7 @@ export function revealOf(
         end,
         state.tasks.index,
         state.cards.lanes,
+        heldByOthers(state.cards.cards, state.cards.me),
       )
       return {
         effects: [

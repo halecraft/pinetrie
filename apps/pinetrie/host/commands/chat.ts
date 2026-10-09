@@ -33,6 +33,7 @@ import {
   readRoots,
   readTasks,
   readThreadName,
+  readThreads,
   readTreeIndex,
   readWorkflow,
   worksOwn,
@@ -193,6 +194,19 @@ export async function sendChat(
       code: ERR.THREAD_TAKEN,
       message: "that thread has started already",
     }
+  // A copy's first send is a branch at its fork, which its record names
+  // (ADR-0117): any other branch naming a recorded thread is another's.
+  const copied = readThreads(session).get(chat.at.thread)
+  if (
+    chat.at.kind === "branch" &&
+    copied !== undefined &&
+    (copied.origin.kind !== "copy" || copied.origin.fork !== chat.at.at)
+  )
+    return {
+      kind: "refused",
+      code: ERR.THREAD_TAKEN,
+      message: "that thread has started already",
+    }
   // A thread that works, or will work, in its own copy is sent paths as
   // its lane sees them: your working copy's (ADR-0034), and a command's
   // files (ADR-0036).
@@ -267,8 +281,9 @@ export async function sendChat(
     planned.kind === "appendToTree" || planned.kind === "createAndRun"
       ? planned.starts
       : null
+  // A copy's record and card were written as it was made.
   const start =
-    starts === null
+    starts === null || copied !== undefined
       ? null
       : planThreadStart({
           ...starts,

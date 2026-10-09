@@ -28,6 +28,7 @@ import {
   placed,
   type QueueMove,
   type Reorder,
+  type TypedMove,
   type WriterId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
@@ -61,7 +62,7 @@ export interface MoveHow {
 
 /** One card of several moved as one (a keep), with the slot it takes in your inventory. */
 export interface SlotMove {
-  readonly move: Move
+  readonly move: TypedMove
   readonly slot: number | null
 }
 

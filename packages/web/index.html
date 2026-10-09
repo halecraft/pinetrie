@@ -190,6 +190,11 @@
         border: 1.5px solid; border-radius: 7px; pointer-events: none; }
       .rail-tick { position: absolute; z-index: 1; border-radius: 1px; pointer-events: none; }
       .rail-anchor { position: absolute; }
+      /* A fork to a thread on another canvas or in an inventory (ADR-0117). */
+      .rail-stub { position: absolute; transform: translateY(-50%); padding: 0 .2rem;
+        font-size: .65rem; white-space: nowrap; color: #8b93a1; background: var(--page);
+        border: 1px dashed #3a3f48; border-radius: 3px; cursor: pointer; }
+      .rail-stub:disabled { cursor: default; opacity: .7; }
       /* Others here (ADR-0024): the ring is inline style; several share a count. */
       .here-count { position: absolute; top: -9px; left: 7px; font-size: 9px; line-height: 1;
         color: #ddd; pointer-events: none; }
@@ -291,6 +296,12 @@
       .column-head .origin { display: block; min-width: 0; overflow: hidden; text-overflow: ellipsis;
         white-space: nowrap; text-align: left; font-size: .75rem; color: #7f8896; }
       .column-head .origin:hover, .column-head .origin:focus-visible { color: #d0d4da; }
+      /* A column's path above its own thread, folded (ADR-0117). */
+      .column-head .take-drag { padding: 0 .2rem; color: #8b93a1; cursor: grab; }
+      .column-head .take-drag:hover { color: #d0d4da; }
+      .column-head .earlier { display: block; padding: .1rem 0; font-size: .75rem; color: #8b93a1;
+        background: none; border: 0; cursor: pointer; }
+      .column-head .earlier:hover, .column-head .earlier:focus-visible { color: #d0d4da; }
       .column-head .origin-dot { display: inline-block; width: 8px; height: 8px; margin-right: .35rem;
         border-radius: 50%; vertical-align: middle; background: var(--track, #777); }
       .column-head .close { padding: 0 .2rem; font-size: 1rem; line-height: 1; color: #8b93a1; }
@@ -884,6 +895,25 @@
       .card-grid-open[data-side="left"] { left: 0; }
       .card-grid-open[data-side="right"] { right: 0; }
       .card-grid-open .card-frame { margin: 0; }
+      /* A thread's card in a slot (ADR-0124): its banner and name, its first
+         line, where it ended, its status; opened, its path read only. */
+      .thread-face { display: flex; flex-direction: column; gap: .1rem; height: 100%;
+        border-top: 3px solid #a371f7; padding: .2rem .35rem; font-size: .72rem;
+        overflow: hidden; }
+      .thread-face-head { display: flex; align-items: center; gap: .3rem; }
+      .thread-face-sprite { width: 1.1rem; height: 1.1rem; image-rendering: pixelated; }
+      .thread-face-name { font-weight: 600; color: #d2a8ff; }
+      .thread-face-first, .thread-face-last { color: #c9d1d9; white-space: nowrap;
+        overflow: hidden; text-overflow: ellipsis; }
+      .thread-face-last { color: #8b93a1; }
+      .thread-face-status { margin-top: auto; color: #e3b341; }
+      .thread-preview { flex: 1; display: flex; flex-direction: column; max-height: 24rem;
+        background: #1b1e24; border-radius: 6px; font-size: .8rem; }
+      .thread-preview-path { margin: 0; padding: .5rem .75rem; overflow-y: auto; list-style: none; }
+      .thread-preview-path > li { margin-bottom: .5rem; }
+      .thread-preview-who { font-size: .7rem; color: #8b93a1; }
+      .thread-preview-foot { padding: .4rem .75rem; border-top: 1px solid #23272e;
+        display: flex; justify-content: flex-end; }
       /* A card folded: its place's colour as a strip, its owner, its lines. */
       .card-face { --tone: #6f7784; display: flex; flex-direction: column; height: 100%;
         border-top: 3px solid var(--tone); padding: .2rem .35rem; font-size: .72rem; }

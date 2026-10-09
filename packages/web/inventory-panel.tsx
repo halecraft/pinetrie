@@ -5,7 +5,12 @@
 // `inventoryView`; every click and drop here is an intent, planned like any
 // other.
 
-import { type CardRecord, isTextCard, type WriterId } from "@pinetrie/core"
+import {
+  type CardRecord,
+  isTextCard,
+  type ThreadId,
+  type WriterId,
+} from "@pinetrie/core"
 import {
   cardFrame,
   type Dock,
@@ -18,6 +23,8 @@ import {
   PUT_TITLE,
   type Reader,
   snapTo,
+  type ThreadFace,
+  type ThreadPreview,
 } from "@pinetrie/interface"
 import type {
   CardNotice,
@@ -28,6 +35,12 @@ import type {
 import { type CSSProperties, useRef, useState } from "react"
 import { BoundCardEditor } from "./card-editor.tsx"
 import { CardGrid } from "./card-grid.tsx"
+import { ThreadPreviewView } from "./thread-preview.tsx"
+
+/** A thread's put: onto the canvas you are on, after the column you were in. */
+const PUT_THREAD_TITLE =
+  "put this thread on the canvas you are on, after the column you were in"
+
 import { useCardTexts } from "./use-card-texts.ts"
 
 export function InventoryPanel(p: {
@@ -45,6 +58,11 @@ export function InventoryPanel(p: {
   /** The column a put lands in: the one last focused, if any. */
   column: string | null
   onIntent: (intent: Intent) => void
+  /** Each change opens the selected slot's card (`openSelected`). */
+  openRequest: number
+  /** Each held thread's face, and its preview when opened (ADR-0124). */
+  threads: ReadonlyMap<ThreadId, ThreadFace>
+  previewOf: (thread: ThreadId) => ThreadPreview
 }) {
   const texts = useCardTexts(
     p.session,
@@ -56,6 +74,7 @@ export function InventoryPanel(p: {
     intents: p.intents,
     selected: p.selected,
     texts,
+    threads: p.threads,
   })
   const frame = useRef<HTMLElement>(null)
   // Dragged by its frame, it follows the pointer, then settles at the
@@ -111,9 +130,32 @@ export function InventoryPanel(p: {
             })
           }
           onSelect={slot => p.onIntent({ kind: "selectSlot", slot })}
+          openRequest={p.openRequest}
           reader={p.reader}
           renderOpen={card =>
-            !isTextCard(card) ? null : (
+            card.kind === "thread" ? (
+              <ThreadPreviewView
+                foot={
+                  <button
+                    className="put primary"
+                    disabled={p.column === null}
+                    onClick={() => {
+                      if (p.column !== null)
+                        p.onIntent({
+                          kind: "put",
+                          card: card.id,
+                          target: { kind: "column", key: p.column },
+                        })
+                    }}
+                    title={PUT_THREAD_TITLE}
+                    type="button"
+                  >
+                    {PUT}
+                  </button>
+                }
+                preview={p.previewOf(card.id)}
+              />
+            ) : !isTextCard(card) ? null : (
               <BoundCardEditor
                 among={null}
                 card={card}

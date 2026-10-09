@@ -9,17 +9,17 @@
 
 import {
   type CardId,
-  type CardPlace,
   isNoteColumnId,
   isTaskId,
   isWorkflowStateId,
   keyOf,
-  type MoveTarget,
   type NoteColumnId,
   noteOf,
   pinnedOf,
   sameKey,
+  type TargetOf,
   type TaskId,
+  type TextPlace,
   type WorkflowStateId,
   type WriterId,
 } from "@pinetrie/core"
@@ -121,7 +121,7 @@ export function targetOfElement(el: {
 /** What a column publishes of its composer: where it makes your message, and the message there. */
 export interface ComposerSpot {
   /** Where it creates your message (`composerPlace`). */
-  readonly place: CardPlace
+  readonly place: TextPlace
   /** Your message there, if you have one (`yourCard`). */
   readonly message: CardId | null
 }
@@ -153,7 +153,7 @@ export function placeOfTarget(
   target: PutTarget,
   places: ComposerPlaces,
   me: WriterId,
-): MoveTarget | null {
+): TargetOf<"text"> | null {
   if (target.kind === "inventory") return { kind: "inventory", holder: me }
   if (target.kind === "notes") return { kind: "note", column: target.column }
   if (target.kind === "taskPinned")

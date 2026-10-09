@@ -13,7 +13,7 @@ import { createKeeper } from "@pinetrie/keeper"
 import type { WireCommand } from "@pinetrie/protocol/codec"
 import type { Reply } from "@pinetrie/protocol/messages"
 import { readPlaces } from "@pinetrie/reads"
-import { BOARD, setRecord, WORKFLOW } from "@pinetrie/rules"
+import { BOARD, HELD_WORDS, setRecord, WORKFLOW } from "@pinetrie/rules"
 import { newPresenceDoc } from "@pinetrie/schema"
 import { writeEntry } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
@@ -304,6 +304,56 @@ test("a popped queued card in an archived root is refused, and the agent is neve
     state: null,
   })
   expect(out).toMatchObject({ kind: "refused", code: ERR.TASK_ARCHIVED })
+  expect(pi.calls).toEqual([])
+})
+
+test("nothing runs in a thread in an inventory: a send, a branch at its entries, a carry-on, an offer's description, a popped card (ADR-0124)", async () => {
+  const { b, pi, commands, replies, sender, chat } = setUp()
+  const taken = readPlaces(b.places).find(c => c.id === THREAD)
+  if (taken?.kind !== "thread") throw new Error("no thread card")
+  applyPlaceSteps(b.places, [
+    {
+      kind: "write",
+      record: { ...taken, place: { kind: "inventory", holder: ALICE } },
+    },
+  ])
+  await commands.handle(sender, ALICE, chat(cardIdFor("c1")))
+  await commands.handle(sender, ALICE, {
+    ...chat(cardIdFor("c2")),
+    mode: "branch",
+    lane: NEW,
+    task: TASK_ID,
+  })
+  await commands.handle(sender, ALICE, {
+    id: "co-1",
+    kind: "carry-on",
+    lane: THREAD,
+  })
+  await commands.handle(sender, ALICE, {
+    id: "d-1",
+    kind: "offer",
+    lane: THREAD,
+    mode: "describe",
+  })
+  expect(replies.map(r => [r.outcome, r.errorMessage])).toEqual(
+    Array(4).fill(["refused", HELD_WORDS]),
+  )
+  const popped = await commands.sendPoppedQueuedCard(ALICE, "s-1", {
+    text: "from the queue",
+    root: ROOT_ID,
+    at: { kind: "queue", thread: THREAD },
+    asksAgent: false,
+    mentions: [],
+    card: null,
+    pinned: [],
+    base: null,
+    state: null,
+  })
+  expect(popped).toEqual({
+    kind: "refused",
+    code: ERR.REFUSED,
+    message: HELD_WORDS,
+  })
   expect(pi.calls).toEqual([])
 })
 

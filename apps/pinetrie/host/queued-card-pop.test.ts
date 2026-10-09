@@ -37,6 +37,7 @@ import {
   ROOT_ID,
   record,
 } from "./fakes.ts"
+import { applyPlaceSteps } from "./places.ts"
 import { createProvenance } from "./provenance.ts"
 import {
   chatOfPoppedQueuedCard,
@@ -92,7 +93,12 @@ const held = (
   holds: id => !behind.includes(id),
 })
 /** An idle lane, its queue not held, nobody typing. */
-const IDLE = { running: false, held: false, typing: new Set<CardId>() }
+const IDLE = {
+  running: false,
+  away: false,
+  held: false,
+  typing: new Set<CardId>(),
+}
 const poppedOf = (top: NextQueuedCardPop): PoppedQueuedCard | null =>
   top.kind === "popped" ? top.popped : null
 
@@ -428,6 +434,22 @@ describe("drain", () => {
     await drain(deps, LANE)
     expect(events).toEqual([`hydrate ${cardIdFor("c1")}`])
     expect(textsIn(b.places)).toHaveLength(1)
+  })
+
+  test("pops nothing while its thread is in an inventory: its cards stay queued (ADR-0124)", async () => {
+    const { b, events, deps } = setUp({ [cardIdFor("c1")]: "first" }, [])
+    queue(b.places, cardIdFor("c1"), "a")
+    const card = readPlaces(b.places).find(c => c.id === LANE)
+    if (card?.kind !== "thread") throw new Error("no thread card")
+    applyPlaceSteps(b.places, [
+      {
+        kind: "write",
+        record: { ...card, place: { kind: "inventory", holder: card.owner } },
+      },
+    ])
+    await drain(deps, LANE)
+    expect(events).toEqual([`hydrate ${cardIdFor("c1")}`])
+    expect(textsIn(b.places).map(c => c.place.kind)).toEqual(["queued"])
   })
 
   test("a card queued while texts load is loaded before it is popped", async () => {

@@ -18,6 +18,7 @@ import {
 import { type ReactNode, useEffect, useRef, useState } from "react"
 import { CardFace, dragCard } from "./card-frame.tsx"
 import { isTextBox } from "./text-box.ts"
+import { ThreadFaceView } from "./thread-preview.tsx"
 
 /** The grid's own names: its class, and its cells' class and attribute. */
 const names = { grid: "inventory-grid", cell: "slot", attr: "data-slot" }
@@ -33,6 +34,8 @@ export function CardGrid(p: {
   onMove: (card: CardRecord, to: number) => void
   /** The open card, whole: a `CardFrame` around its box. */
   renderOpen: (card: CardRecord) => ReactNode
+  /** Each change asks to open the selected card: a link to a thread you hold (ADR-0124). */
+  openRequest: number
 }) {
   const { view } = p
   const [open, setOpen] = useState(false)
@@ -44,6 +47,9 @@ export function CardGrid(p: {
   useEffect(() => {
     if (selectedCard === null) setOpen(false)
   }, [selectedCard])
+  useEffect(() => {
+    if (p.openRequest > 0) setOpen(true)
+  }, [p.openRequest])
   /** Select cell `n`, folded, and give it focus. */
   const select = (n: number) => {
     setOpen(false)
@@ -106,12 +112,16 @@ export function CardGrid(p: {
             }}
             type="button"
           >
-            {cell.face !== null && (
-              <CardFace
-                colorOf={p.colorOf}
-                face={cell.face}
-                reader={p.reader}
-              />
+            {cell.thread !== null ? (
+              <ThreadFaceView face={cell.thread} />
+            ) : (
+              cell.face !== null && (
+                <CardFace
+                  colorOf={p.colorOf}
+                  face={cell.face}
+                  reader={p.reader}
+                />
+              )
             )}
           </button>
           {shownOpen && cell.selected && cell.card !== null && (

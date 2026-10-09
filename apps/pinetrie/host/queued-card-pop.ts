@@ -38,12 +38,14 @@ import {
   type CarryPlan,
   displayName,
   encodeFact,
+  heldIn,
   planCarry,
   planNextQueuedCardPop,
   planQueueHold,
   planUnsent,
   type QueuedCard,
   queuedOn,
+  runsIn,
 } from "@pinetrie/rules"
 import type { PlacesDocHandle, PresenceDocHandle } from "@pinetrie/schema"
 import type { Basics } from "./basics.ts"
@@ -189,6 +191,13 @@ export async function drain(
       lane,
       {
         running: readRunning(deps.basics.live, lane),
+        away:
+          heldIn(
+            runsIn({ kind: "pop", thread: lane }),
+            readPlaces(places),
+            () => null,
+            new Map(),
+          ) !== null,
         held: readQueueHolds(deps.basics.session).has(lane),
         typing: readTypingIn(deps.presence),
       },

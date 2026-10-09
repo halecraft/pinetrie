@@ -1827,4 +1827,67 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "planRebuild: a root a thread names",
   },
+  {
+    name: "a copy's first send writes a second card",
+    file: "apps/pinetrie/host/commands/chat.ts",
+    from: "    starts === null || copied !== undefined\n",
+    to: "    starts === null\n",
+    command: unit,
+    expect:
+      "a copy's first send is a branch at its fork: its message names it, and its record and card stay as made (ADR-0117)",
+  },
+  {
+    name: "a branch names a copy anywhere",
+    file: "apps/pinetrie/host/commands/chat.ts",
+    from: '    (copied.origin.kind !== "copy" || copied.origin.fork !== chat.at.at)\n',
+    to: '    copied.origin.kind !== "copy"\n',
+    command: unit,
+    expect:
+      "a copy's first send is a branch at its fork: its message names it, and its record and card stay as made (ADR-0117)",
+  },
+  {
+    name: "the dispatcher lets a command run in a held thread",
+    file: "apps/pinetrie/host/commands/index.ts",
+    from: "    const held = await refuseHeld(deps.basics, intent)\n    if (held !== null) return settled(held)\n",
+    to: "",
+    command: unit,
+    expect:
+      "nothing runs in a thread in an inventory: a send, a branch at its entries, a carry-on, an offer's description, a popped card (ADR-0124)",
+  },
+  {
+    name: "the drain pops a held thread's card",
+    file: "apps/pinetrie/host/queued-card-pop.ts",
+    from: "        away:\n          heldIn(",
+    to: "        away:\n          false &&\n          heldIn(",
+    command: unit,
+    expect:
+      "pops nothing while its thread is in an inventory: its cards stay queued (ADR-0124)",
+  },
+  {
+    name: "a take stops no run",
+    file: "apps/pinetrie/host/provenance.ts",
+    from: "        for (const stop of stoppers) await stop(taken, cause.by)\n",
+    to: "        for (const stop of stoppers) void stop\n",
+    command: unit,
+    expect:
+      "taken into an inventory, its run stops with the move, the taker's own stop",
+  },
+  {
+    name: "an undo's take stops no run",
+    file: "apps/pinetrie/host/provenance.ts",
+    from: '        cause.kind === "host" ? [] : takenIn(facts.before, facts.after)',
+    to: '        cause.kind !== "move" ? [] : takenIn(facts.before, facts.after)',
+    command: unit,
+    expect:
+      "an undo that puts a running thread back in an inventory stops it too: the stop follows the places change, whatever wrote it",
+  },
+  {
+    name: "0007 gives no record its origin",
+    file: "apps/pinetrie/host/migrations/0007-thread-origin.ts",
+    from: '      ? [{ kind: "set", key, value: { ...rest, origin: { kind: "started" } } }]',
+    to: "      ? []",
+    command: unit,
+    expect:
+      "planThreadOrigin gives a record with no fork its origin, leaves one with a fork, and finds nothing to do after",
+  },
 ]

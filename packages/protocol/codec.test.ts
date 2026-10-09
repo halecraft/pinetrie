@@ -7,12 +7,15 @@
 import assert from "node:assert/strict"
 import {
   atEntry,
+  type CardId,
   commitId,
   ERR,
   entryId,
   type Intent,
-  type Move,
+  type MoveOf,
+  type MoveTarget,
   noteColumnIdFor,
+  type PlaceKey,
   ROOT,
   rootIdFor,
   runId,
@@ -25,7 +28,7 @@ import {
   writerId,
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
-import { test } from "vitest"
+import { expect, test } from "vitest"
 import {
   decodeCommand,
   decodeKey,
@@ -416,7 +419,7 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
     {
       kind: "move",
       moves: [cardIdFor("c7"), cardIdFor("c8")].map(
-        (id): Move => ({
+        (id): MoveOf<"text"> => ({
           card: textCardId(id),
           from: {
             kind: "fresh",
@@ -429,6 +432,16 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
         }),
       ),
       here: null,
+    },
+    {
+      kind: "copy-thread",
+      source: TEST_THREAD,
+      end: entryId("e-9"),
+      move: {
+        card: threadIdFor("copy"),
+        from: null,
+        to: { kind: "canvas-at", task: TEST_TASK, after: TEST_THREAD },
+      },
     },
     { kind: "undo-move", task: TEST_TASK, direction: "undo" },
     { kind: "undo-move", task: TEST_TASK, direction: "redo" },
@@ -686,6 +699,105 @@ test("a move's target may be a spot on a canvas, after a card or first, and no p
     ),
     "string",
   )
+})
+
+test("decode: a move is typed by its card's kind, refused to or from a place that kind is never in (ADR-0117)", () => {
+  const canvas = { kind: "canvas", task: TEST_TASK } as const
+  const inventory = {
+    kind: "inventory",
+    holder: writerId("w-ada@x.io"),
+  } as const
+  const queued = {
+    kind: "queued",
+    at: atEntry(entryId("e1")),
+    thread: TEST_THREAD,
+    seen: "",
+  } as const
+  const decoded = (card: CardId, from: PlaceKey | null, to: MoveTarget) =>
+    typeof decodeMoves(encodeMoves([{ card, from, to }]))
+  // A thread's card: between a canvas and an inventory, and nowhere else.
+  assert.equal(decoded(TEST_THREAD, canvas, inventory), "object")
+  assert.equal(
+    decoded(TEST_THREAD, inventory, {
+      ...canvas,
+      kind: "canvas-at",
+      after: null,
+    }),
+    "object",
+  )
+  assert.equal(decoded(TEST_THREAD, canvas, queued), "string")
+  assert.equal(decoded(TEST_THREAD, queued, inventory), "string")
+  assert.equal(
+    decoded(TEST_THREAD, canvas, {
+      kind: "notes",
+      near: "thread",
+      thread: TEST_THREAD,
+    }),
+    "string",
+  )
+  // A text card never onto a canvas, by a key or a spot.
+  assert.equal(decoded(cardIdFor("c1"), inventory, queued), "object")
+  assert.equal(decoded(cardIdFor("c1"), inventory, canvas), "string")
+  assert.equal(
+    decoded(cardIdFor("c1"), inventory, {
+      ...canvas,
+      kind: "canvas-at",
+      after: null,
+    }),
+    "string",
+  )
+  const thread: MoveOf<"thread"> = {
+    card: TEST_THREAD,
+    from: canvas,
+    to: inventory,
+  }
+  assert.ok(thread)
+  const never: MoveOf<"thread"> = {
+    card: TEST_THREAD,
+    from: canvas,
+    // @ts-expect-error: a thread's card is never queued
+    to: queued,
+  }
+  assert.ok(never)
+  // @ts-expect-error: a text card is never on a canvas
+  const nor: MoveOf<"text"> = { card: cardIdFor("c1"), from: null, to: canvas }
+  assert.ok(nor)
+})
+
+test("decode: a copy names its source, the end it forks at, and one new thread's card onto a canvas or into an inventory (ADR-0117)", () => {
+  const wire = (over: Record<string, string>) =>
+    decodeCommand({
+      kind: "copy-thread",
+      lane: TEST_THREAD,
+      parentId: "e-9",
+      moves: encodeMoves([
+        {
+          card: threadIdFor("copy"),
+          from: null,
+          to: { kind: "inventory", holder: writerId("w-ada@x.io") },
+        },
+      ]),
+      ...over,
+    })
+  expect(wire({})).toMatchObject({ kind: "copy-thread", end: "e-9" })
+  expect(refusalCode(wire({ parentId: "" }))).toBe(ERR.UNKNOWN_TARGET)
+  expect(refusalCode(wire({ lane: "nope" }))).toBe(ERR.UNKNOWN_TARGET)
+  const text = encodeMoves([
+    {
+      card: cardIdFor("c1"),
+      from: null,
+      to: { kind: "inventory", holder: writerId("w-ada@x.io") },
+    },
+  ])
+  expect(refusalCode(wire({ moves: text }))).toBe(ERR.UNKNOWN_TARGET)
+  const moved = encodeMoves([
+    {
+      card: threadIdFor("copy"),
+      from: { kind: "canvas", task: TEST_TASK },
+      to: { kind: "inventory", holder: writerId("w-ada@x.io") },
+    },
+  ])
+  expect(refusalCode(wire({ moves: moved }))).toBe(ERR.UNKNOWN_TARGET)
 })
 
 test("decode: a mark names a task or a note column, never both or neither (ADR-0116)", () => {

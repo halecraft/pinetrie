@@ -227,18 +227,34 @@ describe("forkPoint: a snapshot to clone, and what to start on", () => {
       forkPoint({
         above: { lane: LANE, commit: C2, commitLane: LANE, snapshot: S },
         begin,
+        kept: true,
       }),
-    ).toEqual({ snapshot: S, start: { kind: "commits", commits: [C2] } })
+    ).toEqual({
+      snapshot: S,
+      start: { kind: "commits", commits: [C2] },
+      lost: null,
+    })
+  })
+  test("from a turn whose snapshot is gone: the base snapshot and where agent work begins, its snapshot named lost (ADR-0124)", () => {
+    expect(
+      forkPoint({
+        above: { lane: LANE, commit: C2, commitLane: LANE, snapshot: S },
+        begin,
+        kept: false,
+      }),
+    ).toEqual({ snapshot: BASE_SNAPSHOT, start: begin, lost: S })
   })
   test("from a lane before lane containers: the base snapshot at its commit", () => {
     expect(
       forkPoint({
         above: { lane: LANE, commit: C2, commitLane: LANE, snapshot: null },
         begin,
+        kept: true,
       }),
     ).toEqual({
       snapshot: BASE_SNAPSHOT,
       start: { kind: "commits", commits: [C2] },
+      lost: null,
     })
   })
   test("from nothing: the base snapshot, and where agent work begins (ADR-0104)", () => {
@@ -246,8 +262,9 @@ describe("forkPoint: a snapshot to clone, and what to start on", () => {
       forkPoint({
         above: { lane: null, commit: null, commitLane: null, snapshot: null },
         begin,
+        kept: true,
       }),
-    ).toEqual({ snapshot: BASE_SNAPSHOT, start: begin })
+    ).toEqual({ snapshot: BASE_SNAPSHOT, start: begin, lost: null })
   })
 })
 
@@ -270,20 +287,30 @@ describe("planRetention: which snapshots go", () => {
     { ...rec("06-d"), snapshot: null },
   ]
   test("an open root keeps every snapshot", () => {
-    expect(planRetention({ records, archived: false })).toEqual([])
+    expect(
+      planRetention({ records, archived: false, keep: new Set() }),
+    ).toEqual([])
   })
   test("an archived root keeps each lane's newest", () => {
-    expect(planRetention({ records, archived: true })).toEqual([
-      "01-a",
-      "02-a",
-      "04-b",
-    ])
+    expect(planRetention({ records, archived: true, keep: new Set() })).toEqual(
+      ["01-a", "02-a", "04-b"],
+    )
+  })
+  test("an archived root keeps the snapshots it is asked to keep (ADR-0124)", () => {
+    expect(
+      planRetention({
+        records,
+        archived: true,
+        keep: new Set([snapshotId("02-a")]),
+      }),
+    ).toEqual(["01-a", "04-b"])
   })
   test("the base snapshot is never deleted", () => {
     expect(
       planRetention({
         records: [{ ...rec("00-a"), snapshot: BASE_SNAPSHOT }, rec("01-a")],
         archived: true,
+        keep: new Set(),
       }),
     ).toEqual([])
   })

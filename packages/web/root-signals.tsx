@@ -149,7 +149,7 @@ export function Readers(p: ReadersProps & { tasks: readonly TaskId[] }) {
 export function ReaderMenus(
   p: ReadersProps & {
     task: TaskId
-    thread: (end: EntryId, task: TaskId) => MenuItem
+    thread: (end: EntryId, task: TaskId) => MenuItem | null
   },
 ) {
   const [openMenus, setOpenMenus] = useState<OpenMenus>(new Map())
@@ -173,7 +173,7 @@ export function ReaderMenus(
             {
               key: "threads",
               heading: readerHeading(nameFor(p.nameOf, person.writer), gone),
-              items: person.threads.map(t => p.thread(t.end, t.task)),
+              items: person.threads.flatMap(t => p.thread(t.end, t.task) ?? []),
             },
           ]}
           title={nameFor(p.nameOf, person.writer)}

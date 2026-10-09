@@ -177,7 +177,7 @@ test("a starting directory rebuilds a stale record of a root no one holds, openi
       root: archived,
       by: writerId("ada@x.io"),
       createdAt: 0,
-      fork: null,
+      origin: { kind: "started" },
     }),
   )
   const keeper = createKeeper<HostKey>()

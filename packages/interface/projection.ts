@@ -49,6 +49,7 @@ import {
   readCardHistories,
   readCommands,
   readDigests,
+  readFilesLost,
   readHeld,
   readHeldIndex,
   readLaneRecords,
@@ -209,6 +210,8 @@ function readFacts(view: HeldView): SessionFacts {
       banners: readBanners(doc),
       accepted: readAccepted(doc),
       bases: readBases(doc),
+      forks: forksOf(readThreads(doc)),
+      filesLost: readFilesLost(doc),
     },
   }
 }
@@ -229,3 +232,13 @@ export const readHeldLanes = (
     readLanes({ doc: root, live: view.live }, index, cards, holds, blank),
   )
 }
+
+/** Each copy's fork, from the threads' records (ADR-0117). */
+const forksOf = (
+  threads: ReadonlyMap<ThreadId, ThreadRecord>,
+): ReadonlyMap<ThreadId, EntryId> =>
+  new Map(
+    [...threads].flatMap(([thread, r]) =>
+      r.origin.kind === "copy" ? [[thread, r.origin.fork] as const] : [],
+    ),
+  )

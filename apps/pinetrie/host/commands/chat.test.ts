@@ -307,7 +307,7 @@ describe("sendChat", () => {
           root: ROOT_ID,
           by: ALICE,
           createdAt: 1000,
-          fork: null,
+          origin: { kind: "started" },
         }),
       ],
     ])
@@ -340,6 +340,43 @@ describe("sendChat", () => {
     })
     expect(out).toMatchObject({ kind: "refused", code: ERR.THREAD_TAKEN })
     expect(pi.calls.filter(c => c.method === "appendToTree")).toEqual([])
+  })
+
+  test("a copy's first send is a branch at its fork: its message names it, and its record and card stay as made (ADR-0117)", async () => {
+    const { b, pi, records, deps } = setUp()
+    const COPY = threadIdFor("copy")
+    putValue(
+      b,
+      setRecord(THREAD, {
+        thread: COPY,
+        root: ROOT_ID,
+        by: BEA,
+        createdAt: 5,
+        origin: { kind: "copy", source: LANE, fork: E1 },
+      }),
+    )
+    const before = readPlaces(b.places)
+    const sent = await sendChat(deps, ALICE, "s-1", {
+      ...chat("go on"),
+      at: { kind: "branch", thread: COPY, at: E1, task: TASK_ID },
+    })
+    expect(sent.kind).toBe("appended")
+    const appended = pi.calls
+      .filter(c => c.method === "appendToTree")
+      .map(c => (c.args[0] as { details: ChatDetails }).details.starts)
+    expect(appended).toEqual([COPY])
+    expect(records.calls).toEqual([])
+    expect(readPlaces(b.places)).toEqual(before)
+    // Anywhere but its fork, its id is another's.
+    writeEntry(b.root, threadRow(entryId("e-0"), E1, LANE))
+    const elsewhere = await sendChat(deps, ALICE, "s-2", {
+      ...chat("again"),
+      at: { kind: "branch", thread: COPY, at: entryId("e-0"), task: TASK_ID },
+    })
+    expect(elsewhere).toMatchObject({
+      kind: "refused",
+      code: ERR.THREAD_TAKEN,
+    })
   })
 
   test("a sent message keeps the images its text shows, as references", async () => {

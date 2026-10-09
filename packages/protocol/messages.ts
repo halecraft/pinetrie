@@ -86,6 +86,10 @@ export const HOST_PRINCIPAL = "pinetrie-host"
  *   - `card-width` draws the card `cardId` on the canvas of the task
  *     `task`, where its sender saw it, one column wide (`mode` `1`) or two
  *     (`2`), ADR-0116.
+ *   - `copy-thread` copies the thread `lane` at its end `parentId` as its
+ *     sender saw it (ADR-0117): `moves` is the copy's one move, its new
+ *     thread's card from nowhere onto a canvas spot or into the sender's
+ *     inventory.
  *   - `undo-move` undoes (`mode` `undo`) or redoes (`redo`) the sender's
  *     newest move in the root `root` (ADR-0066).
  *   - `set-command` sets the card `cardId`'s command to `mode`, or
@@ -112,6 +116,7 @@ export const COMMAND_KINDS = [
   "queue-hold",
   "unqueue-all",
   "spin-off",
+  "copy-thread",
   "set-command",
   "setup",
   "publish",

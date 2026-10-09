@@ -71,6 +71,7 @@ const plan = (
     lanes: [],
     own: [],
     revisions: new Map(),
+    trees: [],
     roots: [TEST_ROOT, OTHER_ROOT],
     stillHeld: new Set([OTHER_ROOT]),
     ...over,
@@ -152,6 +153,26 @@ describe("planArchive (ADR-0116)", () => {
           snapshots: ["s-a1"],
         },
         unload: [TEST_ROOT],
+      })
+    })
+    test("archive keeps the snapshot nearest each thread's end, a copy's files (ADR-0124)", () => {
+      // A conversation thread from `a`, which A's turn there recorded.
+      const T = threadIdFor("talk")
+      const forked = indexTree(
+        Object.fromEntries(
+          [
+            entry("r1", null),
+            entry("a", "r1"),
+            entry("b", "a"),
+            {
+              ...entry("c", "a"),
+              message: { role: "user", content: "c", starts: T },
+            },
+          ].map(e => [e.id, e]),
+        ),
+      )
+      expect(plan({ own, revisions, trees: [forked] })).toMatchObject({
+        teardown: { snapshots: [] },
       })
     })
     test("restore: each lane's ref back at its tip's nearest revision; none without a tip; nothing forgotten or deleted, nor unloaded", () => {
@@ -279,6 +300,20 @@ describe("writesIn: the tasks a command writes in (ADR-0063, ADR-0116)", () => {
       [OTHER_TASK],
     ],
     ["a reservation", { kind: "reserve", lane: threadIdFor("x") }, []],
+    [
+      "a copy: the task its card lands in, never its source's, which may be archived (ADR-0117)",
+      {
+        kind: "copy-thread",
+        source: LANE_X,
+        end: entryId("b"),
+        move: {
+          card: threadIdFor("copy"),
+          from: null,
+          to: { kind: "canvas-at", task: TASK, after: null },
+        },
+      },
+      [TASK],
+    ],
     [
       "a move on the board: none, so an archived task can be restored",
       {

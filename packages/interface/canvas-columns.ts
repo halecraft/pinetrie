@@ -9,6 +9,7 @@
 
 import {
   type CardId,
+  type CardRecord,
   type CardWidth,
   type EntryId,
   type LaneView,
@@ -17,11 +18,14 @@ import {
   type ThreadId,
   type TreeIndex,
   threadAt,
+  type WriterId,
 } from "@pinetrie/core"
 import { branchAfter, type CanvasCard } from "@pinetrie/rules"
 import type { Density } from "./ask-words.ts"
 import {
+  BOUND,
   type Column,
+  type FreshMode,
   type Pending,
   type Prefill,
   threadAnchor,
@@ -147,6 +151,10 @@ export function canvasColumns(input: {
   readonly view: TaskView
   readonly index: TreeIndex
   readonly lanes: readonly LaneView[]
+  /** Each copy's fork (`TaskIndex.forkOf`): its column's end before its first send. */
+  readonly forks: ReadonlyMap<ThreadId, EntryId>
+  /** Each thread someone else holds in their inventory, by its holder (`heldByOthers`). */
+  readonly holders: ReadonlyMap<ThreadId, WriterId>
 }): readonly CardColumn[] {
   const { canvas, view, index, lanes } = input
   const onCanvas = new Set<string>(canvas.map(c => c.id))
@@ -162,7 +170,13 @@ export function canvasColumns(input: {
       {
         kind: "thread",
         card: null,
-        column: freshColumn(thread, fresh, view.cards.get(thread), index),
+        column: freshColumn(
+          thread,
+          fresh,
+          view.cards.get(thread),
+          index,
+          input.holders,
+        ),
         folded: false,
         width: 1,
       },
@@ -170,35 +184,93 @@ export function canvasColumns(input: {
   }
   const out: CardColumn[] = [...(after.get(-1) ?? [])]
   for (const [i, c] of canvas.entries()) {
-    const drawn = cardColumn(c, view.cards.get(c.id), index, lanes)
+    const drawn = cardColumn(
+      c,
+      view.cards.get(c.id),
+      index,
+      lanes,
+      input.forks,
+      onCanvas,
+    )
     if (drawn !== null) out.push(drawn)
     out.push(...(after.get(i) ?? []))
   }
   return out
 }
 
-/** A card's column; null for a thread whose root this tab does not hold. */
+/**
+ * A card's column; null for a thread whose root this tab does not hold. A
+ * copy before its first send ends at its fork, and its first send is a
+ * branch there, as a fresh column's is (ADR-0117).
+ */
 function cardColumn(
   c: CanvasCard,
   seen: CardView | undefined,
   index: TreeIndex,
   lanes: readonly LaneView[],
+  forks: ReadonlyMap<ThreadId, EntryId>,
+  onCanvas: ReadonlySet<string>,
 ): CardColumn | null {
   const folded = seen?.unfolded !== true
   const width = c.place.width
   switch (c.kind) {
     case "thread": {
       const anchor = threadAnchor(index, lanes, c.id)
+      const fork = forks.get(c.id)
+      if (
+        anchor === null &&
+        fork !== undefined &&
+        index.entries[fork] !== undefined
+      )
+        return {
+          kind: "thread",
+          card: c.id,
+          column: {
+            key: c.id,
+            anchor: fork,
+            thread: c.id,
+            ...readerOf(seen),
+            mode: { kind: "copy", fork },
+          },
+          folded,
+          width,
+        }
       if (anchor === null) return null
-      const column = { key: c.id, anchor, thread: c.id, ...readerOf(seen) }
+      const above = foldAboveOf(index, c.id, onCanvas)
+      const column = {
+        key: c.id,
+        anchor,
+        thread: c.id,
+        ...readerOf(seen),
+        ...(above === null ? {} : { foldAbove: above }),
+        mode: BOUND,
+      }
       return { kind: "thread", card: c.id, column, folded, width }
     }
     case "note-column":
       return { kind: "notes", card: c.id, folded, width }
-    // A text card is never on a canvas (`PLACES_OF`).
-    case "text":
-      return null
+    // A new kind of canvas card does not compile until it has its column.
+    default:
+      return c satisfies never
   }
+}
+
+/**
+ * `thread`'s first entry, when the thread it forks from is on no column of
+ * this canvas (`onCanvas`), so its path above folds (ADR-0117); null for a
+ * thread at its root, or whose parent is here.
+ */
+function foldAboveOf(
+  index: TreeIndex,
+  thread: ThreadId,
+  onCanvas: ReadonlySet<string>,
+): EntryId | null {
+  const first = index.firstOf.get(thread)
+  const parent =
+    first === undefined ? undefined : index.entries[first]?.parentId
+  if (parent === undefined || parent === null) return null
+  const from = threadAt(index, parent)
+  return from === null || onCanvas.has(from) ? null : (first ?? null)
 }
 
 /**
@@ -210,6 +282,7 @@ function freshColumn(
   fresh: FreshColumn,
   seen: CardView | undefined,
   index: TreeIndex,
+  holders: ReadonlyMap<ThreadId, WriterId>,
 ): Column {
   const own =
     fresh.sendId === undefined ? undefined : index.bySend.get(fresh.sendId)
@@ -221,19 +294,51 @@ function freshColumn(
       anchor: threadAnchor(index, [], thread) ?? own ?? fresh.at,
       thread,
       ...reader,
+      mode: BOUND,
     }
   return {
     key: thread,
     anchor: fresh.at,
     thread,
     ...reader,
-    fresh: {
+    mode: {
+      kind: "fresh",
+      ...heldAt(index, fresh.at, holders),
       ...(fresh.sendId === undefined ? {} : { sendId: fresh.sendId }),
       ...(fresh.pending === undefined ? {} : { pending: fresh.pending }),
       ...(fresh.prefill === undefined ? {} : { prefill: fresh.prefill }),
     },
   }
 }
+
+/** The thread `at` is in, and who holds it, when someone else does (ADR-0124). */
+const heldAt = (
+  index: TreeIndex,
+  at: EntryId,
+  holders: ReadonlyMap<ThreadId, WriterId>,
+): Pick<FreshMode, "held"> => {
+  const thread = threadAt(index, at)
+  const by = thread === null ? undefined : holders.get(thread)
+  return thread === null || by === undefined ? {} : { held: { thread, by } }
+}
+
+/**
+ * Each thread someone other than `me` holds in their inventory, by its
+ * holder: what `canvasColumns` decides a branch not yet sent from it by.
+ */
+export const heldByOthers = (
+  cards: readonly CardRecord[],
+  me: WriterId,
+): ReadonlyMap<ThreadId, WriterId> =>
+  new Map(
+    cards.flatMap(c =>
+      c.kind === "thread" &&
+      c.place.kind === "inventory" &&
+      c.place.holder !== me
+        ? [[c.id, c.place.holder] as const]
+        : [],
+    ),
+  )
 
 /** The thread columns drawn whole, in order: the paths laid out side by side (`projectColumns`). */
 export const openColumns = (
