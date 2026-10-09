@@ -10,16 +10,18 @@
 import {
   BASH_TOOL,
   type ImageRef,
+  type StreamId,
+  streamStart,
   type ToolCall,
   type ToolId,
   type ToolResult,
   toolIdOf,
 } from "@pinetrie/core"
 import { readShell, type ShellRole } from "@pinetrie/shell"
-import { plural } from "./counts.ts"
+import { elapsed, plural } from "./counts.ts"
 import { toolWord } from "./tool-words.ts"
 
-/** How long a call's output streams before its row is ringed (ADR-0054). */
+/** How long a call's output streams before its row is ringed and timed (ADR-0054). */
 export const REVEAL_MS = 500
 
 /**
@@ -27,7 +29,7 @@ export const REVEAL_MS = 500
  * since a tab shown again mounts its columns anew (ADR-0123).
  */
 export interface RowMemory {
-  /** The call's output streamed for REVEAL_MS while this row was drawn: its ring shows. */
+  /** The call's output streamed for REVEAL_MS while this row was drawn: its ring and time show. */
   readonly revealed: boolean
   /** The reader opened its detail. */
   readonly open: boolean
@@ -63,6 +65,21 @@ export const callStatus = (result: ToolResult | undefined): CallStatus =>
 /** A status as its row's mark. A running call has none: its ring and live lines say it. */
 export const callMark = (status: CallStatus): string | undefined =>
   status === "error" ? "✗" : status === "ok" ? "✓" : undefined
+
+/**
+ * How long a running call has run, by its stream's start on the host's clock,
+ * and when that next changes: the ms from `now` to the next whole second it
+ * has run. Undefined for a stream whose id holds no start.
+ */
+export function runningFor(
+  stream: StreamId,
+  now: number,
+): { readonly words: string; readonly next: number } | undefined {
+  const start = streamStart(stream)
+  if (start === undefined) return undefined
+  const ran = Math.max(0, now - start)
+  return { words: elapsed(ran), next: 1000 - (ran % 1000) }
+}
 
 /** What a run of a command is, for the page to colour. Only a shell command has runs other than plain. */
 export type RunRole = ShellRole

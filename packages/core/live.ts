@@ -31,6 +31,16 @@ declare const streamIdBrand: unique symbol
 export type StreamId = string & { readonly [streamIdBrand]: true }
 export const streamId = (id: string): StreamId => id as StreamId
 
+/**
+ * When a stream opened, in ms since the epoch on the host's clock: a
+ * uuidv7's first 48 bits. Undefined for an id that is no uuidv7, as a test's
+ * fake ids are.
+ */
+export function streamStart(id: StreamId): number | undefined {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-7/i.test(id)) return undefined
+  return Number.parseInt(id.slice(0, 8) + id.slice(9, 13), 16)
+}
+
 /** A stream as stored, without its text. */
 export type StreamRecord =
   | {

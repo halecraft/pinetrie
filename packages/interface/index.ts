@@ -482,6 +482,7 @@ export {
   type Run,
   rowSummary,
   rowView,
+  runningFor,
   toolBody,
 } from "./tool-row.ts"
 export { callLabel, toolWord } from "./tool-words.ts"

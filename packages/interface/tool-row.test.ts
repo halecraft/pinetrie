@@ -1,6 +1,7 @@
 import {
   type ImageRef,
   isSha256,
+  streamId,
   type ToolCall,
   type ToolResult,
 } from "@pinetrie/core"
@@ -15,6 +16,7 @@ import {
   type Run,
   rowSummary,
   rowView,
+  runningFor,
   SHOWN,
   tailLines,
   toolBody,
@@ -249,4 +251,19 @@ describe("rowSummary (ADR-0114)", () => {
     })
     expect(rowSummary(call("mystery", "x")).tag).toBe("mystery")
   })
+})
+
+test("a running call's time counts from its stream's start, and next changes at its next whole second", () => {
+  const start = Date.UTC(2026, 9, 9, 12, 0, 0, 0)
+  const hex = start.toString(16).padStart(12, "0")
+  const stream = streamId(
+    `${hex.slice(0, 8)}-${hex.slice(8)}-7abc-8def-0123456789ab`,
+  )
+  expect(runningFor(stream, start + 65_250)).toEqual({
+    words: "1m 05s",
+    next: 750,
+  })
+  // A browser whose clock is behind the host's: no time before the start.
+  expect(runningFor(stream, start - 2_500)).toEqual({ words: "0s", next: 1000 })
+  expect(runningFor(streamId("id-0001"), start)).toBeUndefined()
 })

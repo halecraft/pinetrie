@@ -21,3 +21,12 @@ export function ago(ms: number, now: number): string {
   if (s < 86_400) return `${Math.round(s / 3600)} h ago`
   return `${Math.round(s / 86_400)} d ago`
 }
+
+/** How long something has run, to the second: "0s", "59s", "1m 05s", "1h 02m". */
+export function elapsed(ms: number): string {
+  const s = Math.max(0, Math.floor(ms / 1000))
+  const two = (n: number) => String(n).padStart(2, "0")
+  if (s < 60) return `${s}s`
+  if (s < 3600) return `${Math.floor(s / 60)}m ${two(s % 60)}s`
+  return `${Math.floor(s / 3600)}h ${two(Math.floor(s / 60) % 60)}m`
+}

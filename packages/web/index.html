@@ -548,6 +548,10 @@
       .sh-variable { color: #e8c07a; }
       .sh-keyword, .sh-operator { color: #c8d0dc; }
       .sh-comment { color: #6f7784; font-style: italic; }
+      /* How long a running call has run, in the ring's colour. Tabular figures,
+         so a tick that keeps its count of digits keeps its width. */
+      .tool-elapsed { font-size: 11px; line-height: 1.6; color: #e8c07a;
+        font-variant-numeric: tabular-nums; }
       .tool[data-status="ok"] .tool-status { color: #7bd88f; }
       .tool[data-status="error"] .tool-status { color: #f28b82; }
       /* Its last lines, or all of them: never a scroll of its own. */

@@ -436,7 +436,8 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
   - `.tool-head`: `.tool-tag`, the tool's word ("shell", "read", "search",
     ADR-0114), absent for a call that touched nothing it names, whose word
     is then its command; then `.tool-status`, ✓ or ✗ (`callMark`). A
-    running call has no mark: its ring and its live lines say it runs.
+    running call has no mark: once ringed, it has `.tool-elapsed`, how long
+    it has run (below).
   - `.tool-command`, what the call touched (`subjectOf`, core), as
     `rowSummary` reads it: a shell command highlighted, and a long one-line
     chain laid out a step a line (`@pinetrie/shell`). A `grep` or `find`
@@ -559,6 +560,16 @@ the scroller, calls it, and scrolls. A running tool's output uses the same hook.
     against .75rem on the left: `.tool`'s negative right margin), so the
     row, its contents and its ring sit centred in the column. The browser
     suite measures the row's box and the pseudo-element's resolved insets.
+  - The same row shows how long it has run in its head (`Elapsed` in
+    `message.tsx`, `.tool-elapsed`): `runningFor` (`tool-row.ts`) counts
+    from its stream's start, the time in the stream id's uuidv7, minted on
+    the host's clock (`streamStart`, core), so a reload or a tab shown
+    again counts from the same start. A browser whose clock is behind the
+    host's shows 0s until it catches up. `Elapsed` redraws itself, not its
+    row, at each whole second the call has run, by a timeout to the next
+    one (`runningFor`'s `next`). Unlike the ring it takes room, in the
+    floated head, so it can wrap the command's first line; its figures are
+    tabular, so a tick keeps its width until it gains a digit.
   - `.working-line` is drawn at the content's end for the whole run, before
     the queued cards; in outline the running ask's own line pulses, and
     `.column[data-density="outline"]` hides it. `.column-content:has(.tool.live[data-revealed])`

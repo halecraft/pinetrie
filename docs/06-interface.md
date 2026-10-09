@@ -732,7 +732,8 @@ The rail is E; the column is T. Seeing both at once is the product.
   short line pulses at the
   end of the column, centred, where its next text will appear. While a
   command that has run for half a second is still running, its row is
-  outlined instead, and accepted work hides: the wait is the machine's, not the
+  outlined instead, with how long it has run beside its tag ("12s",
+  "1m 05s"), and accepted work hides: the wait is the machine's, not the
   model's. A quicker command changes neither.
 - **A root shown again draws its tool rows as they were left** (ADR-0123):
   a running command's row outlined, a row whose detail you opened or folded

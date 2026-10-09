@@ -3236,4 +3236,28 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "the reserve step: a lane already",
   },
+  {
+    name: "an elapsed minute's seconds are not padded",
+    file: "packages/interface/counts.ts",
+    from: '  const two = (n: number) => String(n).padStart(2, "0")',
+    to: "  const two = (n: number) => String(n)",
+    command: unit,
+    expect: "elapsed(65000) is 1m 05s",
+  },
+  {
+    name: "a running call's time runs before its start",
+    file: "packages/interface/tool-row.ts",
+    from: "  const ran = Math.max(0, now - start)",
+    to: "  const ran = now - start",
+    command: unit,
+    expect: "a running call's time counts from its stream's start",
+  },
+  {
+    name: "a running call's time changes every second from now",
+    file: "packages/interface/tool-row.ts",
+    from: "  return { words: elapsed(ran), next: 1000 - (ran % 1000) }",
+    to: "  return { words: elapsed(ran), next: 1000 }",
+    command: unit,
+    expect: "a running call's time counts from its stream's start",
+  },
 ]

@@ -788,4 +788,20 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "an id two entries claim keeps the older",
   },
+  {
+    name: "a stream starts at its id's first 32 bits",
+    file: "packages/core/live.ts",
+    from: "  return Number.parseInt(id.slice(0, 8) + id.slice(9, 13), 16)",
+    to: "  return Number.parseInt(id.slice(0, 8), 16)",
+    command: unit,
+    expect: "a stream's start is its uuidv7's milliseconds",
+  },
+  {
+    name: "any id holds a stream's start",
+    file: "packages/core/live.ts",
+    from: "  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-7/i.test(id)) return undefined",
+    to: '  if (id === "") return undefined',
+    command: unit,
+    expect: "an id that is no uuidv7 has none",
+  },
 ]

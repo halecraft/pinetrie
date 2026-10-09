@@ -920,13 +920,13 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           )
         }
 
-        // A command the work opened is outlined while it runs, and the line
-        // hides; one that ends within half a second does neither. The fast one
-        // sleeps, so it is live for frames the sampler sees: an `echo` alone
-        // gets its result between two.
+        // A command the work opened is outlined while it runs, shows how long
+        // it has run, and the line hides; one that ends within half a second
+        // does none of it. The fast one sleeps, so it is live for frames the
+        // sampler sees: an `echo` alone gets its result between two.
         {
           script.use([
-            { tool: "bash", args: { command: "sleep 2" } },
+            { tool: "bash", args: { command: "sleep 3" } },
             { text: "slept" },
           ])
           await say("sleep on it")
@@ -984,6 +984,14 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
               col(0),
             )
             .catch(() => null)
+          // How long it has run, read twice a little over a second apart.
+          const elapsedNow = () =>
+            tp
+              .$eval(`${revealed} .tool-head .tool-elapsed`, e => e.textContent)
+              .catch(() => null)
+          const firstTime = await elapsedNow()
+          await tp.waitForTimeout(1_100)
+          const laterTime = await elapsedNow()
           await toolIdle()
           await tp.evaluate(c => {
             const w = window as unknown as {
@@ -992,10 +1000,11 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
                 hidden: number
                 live: number
                 outlined: number
+                timed: number
               }
               __sampling: boolean
             }
-            w.__frames = { line: 0, hidden: 0, live: 0, outlined: 0 }
+            w.__frames = { line: 0, hidden: 0, live: 0, outlined: 0, timed: 0 }
             w.__sampling = true
             const sample = () => {
               if (!w.__sampling) return
@@ -1009,6 +1018,8 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
                 w.__frames.live++
                 if (getComputedStyle(row, "::after").content !== "none")
                   w.__frames.outlined++
+                if (row.querySelector(".tool-elapsed") !== null)
+                  w.__frames.timed++
               }
               requestAnimationFrame(sample)
             }
@@ -1028,6 +1039,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
                 hidden: number
                 live: number
                 outlined: number
+                timed: number
               }
               __sampling: boolean
             }
@@ -1050,6 +1062,17 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
               fast.hidden === 0 &&
               fast.outlined === 0,
             `${JSON.stringify({ slow, fast })}`,
+          )
+          const seconds = (t: string | null) =>
+            t === null ? Number.NaN : Number.parseInt(t, 10)
+          check(
+            "a running command the work opened shows how long it has run, counting up; a fast one never shows it",
+            /^\d+s$/.test(firstTime ?? "") &&
+              /^\d+s$/.test(laterTime ?? "") &&
+              seconds(laterTime) > seconds(firstTime) &&
+              fast.live > 0 &&
+              fast.timed === 0,
+            `${JSON.stringify({ firstTime, laterTime, timed: fast.timed })}`,
           )
         }
 

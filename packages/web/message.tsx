@@ -22,6 +22,7 @@ import {
   retiredWords,
   rowSummary,
   rowView,
+  runningFor,
   type ScreenMemory,
   showsText,
   speakerLabel,
@@ -353,6 +354,7 @@ function ToolRow({
           <span className="tool-tag">{summary.tag}</span>
         )}
         {mark !== undefined && <span className="tool-status">{mark}</span>}
+        {live !== undefined && revealed && <Elapsed stream={live} />}
       </span>
       <div className="tool-command">
         <Runs runs={view.command} />
@@ -382,6 +384,25 @@ function ToolRow({
         </button>
       )}
     </div>
+  )
+}
+
+/**
+ * How long a running call has run (`runningFor`), drawn once its row is
+ * ringed, so a fast call never shows one. It redraws itself, not its row,
+ * at each whole second the call has run.
+ */
+function Elapsed({ stream }: { stream: StreamId }) {
+  const [now, setNow] = useState(Date.now)
+  const ran = runningFor(stream, now)
+  useEffect(() => {
+    const next = runningFor(stream, now)?.next
+    if (next === undefined) return
+    const t = setTimeout(() => setNow(Date.now()), next)
+    return () => clearTimeout(t)
+  }, [stream, now])
+  return ran === undefined ? null : (
+    <span className="tool-elapsed">{ran.words}</span>
   )
 }
 

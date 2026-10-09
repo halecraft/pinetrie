@@ -1214,6 +1214,26 @@ export const mutations: readonly Mutation[] = [
       "a running command the work opened is outlined, the row and its ring centred in its column, and hides the line; a fast one does neither",
   },
   {
+    name: "a running command's time never moves",
+    file: "packages/web/message.tsx",
+    from: "    const t = setTimeout(() => setNow(Date.now()), next)",
+    to: "    const t = setTimeout(() => {}, next)",
+    suite: "browser",
+    scenario: "tools",
+    expect:
+      "a running command the work opened shows how long it has run, counting up; a fast one never shows it",
+  },
+  {
+    name: "a fast command shows its time",
+    file: "packages/web/message.tsx",
+    from: "        {live !== undefined && revealed && <Elapsed stream={live} />}",
+    to: "        {live !== undefined && <Elapsed stream={live} />}",
+    suite: "browser",
+    scenario: "tools",
+    expect:
+      "a running command the work opened shows how long it has run, counting up; a fast one never shows it",
+  },
+  {
     name: "a tool row stops short of the right gutter",
     file: "packages/web/index.html",
     from: "      .tool { margin: .3rem -1rem .3rem 0;",
