@@ -56,6 +56,9 @@
   - 2026-10-05 (with Duane): step 7, in *The column, read as time*, *Physics*
     and *Input*: a held queue, Stop holding it, unqueue all, reordering queued
     and pinned cards, and the wait while someone types in the next card.
+  - 2026-10-09 (with Duane, ADR-0116): a note moved by someone else leaves no
+    trace. A note column is everyone's scratch, so traces are left only at
+    queued and pinned places (*Only shared places leave traces*).
 - **Amended by:**
   - ADR-0052: Cmd+Z in a card undoes only that card's steps, never the tab's
     last step wherever it is, and undoing a move first shows where it acts.
@@ -333,7 +336,9 @@ centred by default, and open while you work in them, since nothing pauses.
   Traces at one spot collapse into one ("3 cards moved by Bea").
 
   *Amended in place (step 6):*
-  - **Only shared places leave traces**: drafting, queued and pinned. Nobody
+  - **Only shared places leave traces**: drafting, queued and pinned; since
+    ADR-0116, queued and pinned only, a note column being everyone's
+    scratch. Nobody
     else moves a fresh column's card, which only its owner's column draws,
     or a card in someone's inventory.
   - **An unpin is treated as an unqueue.** The card goes back below the

@@ -3,38 +3,37 @@
 //
 // The host answers an undo with each card it moved and where it is now, so
 // the place is shown as the undo acts. A fresh column the layout no longer
-// holds is opened again from its place alone, in its task: its key, its
-// task and its branch point are in the place (`openFresh`).
+// holds is opened again from its place alone, in its task: its key (the
+// thread it minted), its task and its branch point are in the place
+// (`openFresh`).
 
-import type { CardId, PlaceKey } from "@pinetrie/core"
+import { type CardId, isThreadId, type PlaceKey } from "@pinetrie/core"
 import { placeEnd } from "@pinetrie/rules"
 import { type ActedAt, AT_INVENTORY } from "@pinetrie/session"
-import type { Minted } from "./columns.ts"
 import {
+  changeViewOf,
   type Effect,
-  entryOfTask,
   type IntentState,
   planOpenAt,
   show,
   showTask,
 } from "./effects.ts"
-import { columnsOf, hereOfColumn, planOpen } from "./layout.ts"
+import { hereOfColumn, planOpen } from "./layout.ts"
 
 const at = (key: string): ActedAt => ({ kind: "column", key })
 
 /**
  * The effects that show `place`, and where a refusal there is said: your
- * inventory's panel; a thread's end, as `openAt` shows an entry; or a fresh
- * column, shown where it is, or opened again at the end of its task's
- * columns. A fresh column whose task has no message yet belongs to a new
- * tab, whose history only that tab reaches while it is open, so the layout
- * holds it. A queued `card` is scrolled to in its column's dock,
- * which scrolls apart from the thread (ADR-0113).
+ * inventory's panel; a thread's end, as `openAt` shows an entry; a note
+ * column, unfolded; or a fresh column, shown where it is, or opened again
+ * after the thread it forks from. A fresh column whose task has no message
+ * yet belongs to a new tab, whose history only that tab reaches while it is
+ * open, so the layout holds it. A queued `card` is scrolled to in its
+ * column's dock, which scrolls apart from the thread (ADR-0113).
  */
 export function revealOf(
   place: PlaceKey,
   state: IntentState,
-  minted: Minted,
   card: CardId | null = null,
 ): { readonly effects: readonly Effect[]; readonly actedAt: ActedAt } {
   switch (place.kind) {
@@ -47,43 +46,64 @@ export function revealOf(
       const here = hereOfColumn(state.layout, place.column)
       if (here !== undefined)
         return { effects: show(here), actedAt: at(place.column) }
-      const { task } = place
-      const entry = entryOfTask(state, task)
-      if (entry === null || place.at.kind !== "entry")
-        return { effects: [], actedAt: at(place.column) }
+      const { task, column } = place
+      if (place.at.kind !== "entry" || !isThreadId(column))
+        return { effects: [], actedAt: at(column) }
       return {
         effects: [
           ...showTask(task),
-          {
-            kind: "layout",
-            action: {
-              kind: "columns",
-              task,
-              entry,
-              action: {
-                kind: "openFresh",
-                key: place.column,
-                thread: minted.thread,
-                at: place.at.id,
-                after: columnsOf(state.layout, task, entry).length - 1,
-              },
-            },
-          },
+          changeViewOf(state, task, {
+            kind: "openFresh",
+            thread: column,
+            at: place.at.id,
+          }),
         ],
-        actedAt: at(place.column),
+        actedAt: at(column),
       }
     }
-    // A card on a canvas: its task comes into view.
+    // A card on a canvas: its column, unfolded in its task (ADR-0116).
     case "canvas":
-      return { effects: showTask(place.task), actedAt: AT_INVENTORY }
-    // A note: its note column's task, where the column is drawn (ADR-0116).
+      return {
+        effects:
+          card === null
+            ? showTask(place.task)
+            : [
+                ...showTask(place.task),
+                changeViewOf(state, place.task, {
+                  kind: "fold",
+                  card,
+                  unfolded: true,
+                }),
+              ],
+        actedAt: AT_INVENTORY,
+      }
+    // A note: its note column, unfolded in its task (ADR-0116).
     case "note": {
       const task = state.tasks.index.taskOfCard.get(place.column)
       return {
-        effects: task === undefined ? [] : showTask(task),
+        effects:
+          task === undefined
+            ? []
+            : [
+                ...showTask(task),
+                changeViewOf(state, task, {
+                  kind: "fold",
+                  card: place.column,
+                  unfolded: true,
+                }),
+              ],
         actedAt: at(place.column),
       }
     }
+    // Pinned to a task: its task column, unfolded (ADR-0116).
+    case "task-pinned":
+      return {
+        effects: [
+          ...showTask(place.task),
+          changeViewOf(state, place.task, { kind: "foldTask", unfolded: true }),
+        ],
+        actedAt: at(place.task),
+      }
     // Discarded: drawn nowhere, so nothing comes into view.
     case "gone":
       return { effects: [], actedAt: AT_INVENTORY }
@@ -98,12 +118,12 @@ export function revealOf(
         state.layout,
         state.index,
         end,
-        state.tasks.index.taskOfThread,
-        state.entries,
+        state.tasks.index,
+        state.cards.lanes,
       )
       return {
         effects: [
-          ...planOpenAt(end, state, minted.key),
+          ...planOpenAt(end, state),
           ...(place.kind === "queued" && card !== null
             ? [{ kind: "revealCard", card } as const]
             : []),
@@ -111,8 +131,8 @@ export function revealOf(
         actedAt:
           plan?.kind === "scroll"
             ? at(plan.key)
-            : plan?.kind === "open"
-              ? at(minted.key)
+            : plan?.kind === "unfold"
+              ? at(plan.card)
               : AT_INVENTORY,
       }
     }

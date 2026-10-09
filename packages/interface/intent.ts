@@ -3,12 +3,12 @@
 //
 // A click reaches `App` as an `Intent`. `planIntent` turns it into `Effect`s
 // and `perform` (`perform.ts`) carries them out. A column's acts are nested
-// under its position, as `LayoutAction` nests `ColumnAction` under a root, and
-// a message's acts (`MessageAct`) are among them.
+// under its key, and a message's acts (`MessageAct`) are among them.
 
 import {
   type CardCommand,
   type CardId,
+  type CardWidth,
   type EntryId,
   type MarkTarget,
   type MoveDirection,
@@ -40,6 +40,7 @@ import {
   planNewNote,
   planOpenTrace,
   planPin,
+  planPinToTask,
   planPut,
   planTakeCopyIntoInventory,
   planTakeIntoInventory,
@@ -50,10 +51,19 @@ import {
   queueNew,
   reorderOf,
 } from "./card-intents.ts"
-import type { Minted, Pending, Prefill, ReaderAction } from "./columns.ts"
 import {
+  type CardKey,
+  type ColumnKey,
+  type FreshKey,
+  keyText,
+  type Minted,
+  type NewTabAction,
+  type Pending,
+  type Prefill,
+} from "./columns.ts"
+import {
+  changeViewOf,
   type Effect,
-  entryOfTask,
   type IntentState,
   layout,
   list,
@@ -62,35 +72,29 @@ import {
   showTask,
 } from "./effects.ts"
 import type { NameStep } from "./identity.ts"
-import { type Here, type LayoutAction, showsWorkspace } from "./layout.ts"
+import { type Here, showsWorkspace, type ViewChange } from "./layout.ts"
 import { otherWidth } from "./list-width.ts"
 import type { MessageAct } from "./message-tools.ts"
 import type { PageName } from "./page.ts"
 import type { PutTarget } from "./put-target.ts"
 import { planSpinOff } from "./spin-off.ts"
 
-/** What a reader asks of one column. A message's acts are among them. */
+/**
+ * What a reader asks of one column, whatever its kind. A message's acts are
+ * among them. What only one kind of column does (a card's moves, a fresh
+ * column's close and first send) is an intent of its own that names a key of
+ * that kind (`ColumnKey`), so it cannot be asked of another.
+ */
 export type ColumnAct =
   | MessageAct
-  /** Close the column, discarding `discard` first: a fresh column's cards. */
-  | { readonly kind: "close"; readonly discard: readonly CardId[] }
   /** Discard a card here; the undo key brings it back (ADR-0111). */
   | { readonly kind: "discard"; readonly card: CardId }
-  /**
-   * Close a fresh column, keeping `cards` (its cards with text) in your
-   * inventory first; it closes once every one is accepted.
-   */
-  | { readonly kind: "keep"; readonly cards: readonly CardId[] }
   /** Take a card in this column into your inventory (ADR-0048). */
   | { readonly kind: "takeIntoInventory"; readonly card: CardId }
-  /** Move the column to index `to`. */
-  | { readonly kind: "move"; readonly to: number }
   /** Read the column at `density` (ADR-0106). */
   | { readonly kind: "density"; readonly density: Density }
   /** Open or close the thread's details under the header (ADR-0073). */
   | { readonly kind: "details"; readonly open: boolean }
-  /** A fresh column's first send, as send `sendId`. */
-  | { readonly kind: "sent"; readonly key: string; readonly sendId: string }
   /** After a conflict: a fresh column at `at`, which sends `pending` there. */
   | {
       readonly kind: "branchInstead"
@@ -110,8 +114,13 @@ export type ColumnAct =
     }
   /** Pin a card below the line at the top of its thread's column (ADR-0048). */
   | { readonly kind: "pin"; readonly card: CardId }
-  /** Unpin a card: a note at the thread's end. */
+  /**
+   * Unpin a card: a note in the note column nearest its thread, or, pinned
+   * to the task, nearest the task column (ADR-0116).
+   */
   | { readonly kind: "unpin"; readonly card: CardId }
+  /** Pin a card to the task its column is in: every thread reads it (ADR-0116). */
+  | { readonly kind: "pinToTask"; readonly card: CardId }
   /** Your message to the note column nearest its thread (ADR-0116). */
   | { readonly kind: "toNote"; readonly card: CardId }
   /** A new, empty note at the end of note column `column` (ADR-0116). */
@@ -187,10 +196,55 @@ export type ColumnAct =
 export type Intent =
   | {
       readonly kind: "column"
-      readonly position: number
-      /** The column's key: where a refusal of what it does is said. */
-      readonly key: string
+      /** The column: where a refusal of what it does is said. */
+      readonly column: ColumnKey
       readonly act: ColumnAct
+    }
+  /** Move a card's column to index `to` on its canvas, for everyone (ADR-0116). */
+  | {
+      readonly kind: "moveColumn"
+      readonly column: CardKey
+      readonly to: number
+    }
+  /** Close a fresh column, discarding `discard` first: its cards. */
+  | {
+      readonly kind: "closeFresh"
+      readonly column: FreshKey
+      readonly discard: readonly CardId[]
+    }
+  /**
+   * Close a fresh column, keeping `cards` (its cards with text) in your
+   * inventory first; it closes once every one is accepted.
+   */
+  | {
+      readonly kind: "keepFresh"
+      readonly column: FreshKey
+      readonly cards: readonly CardId[]
+    }
+  /** A fresh column's first send, as send `sendId`. */
+  | {
+      readonly kind: "sentFresh"
+      readonly column: FreshKey
+      readonly sendId: string
+    }
+  /** Unfold a column of the task you are on, or fold it (ADR-0116). */
+  | {
+      readonly kind: "fold"
+      readonly card: CardId
+      readonly unfolded: boolean
+    }
+  /** Unfold the task column of the task you are on, or fold it. */
+  | { readonly kind: "foldTask"; readonly unfolded: boolean }
+  /**
+   * Make a note column on the canvas of the task you are on, just after the
+   * card `after`, or first with null (ADR-0116).
+   */
+  | { readonly kind: "addNoteColumn"; readonly after: CardId | null }
+  /** Draw a card's column one column wide or two, for everyone (ADR-0116). */
+  | {
+      readonly kind: "cardWidth"
+      readonly card: CardId
+      readonly width: CardWidth
     }
   /** Show a task, opening it in the sidebar, or a new tab, or nothing. */
   | { readonly kind: "show"; readonly here: Here }
@@ -280,9 +334,6 @@ export type Intent =
   /** Follow a trace to where its card is now, or the message it became. */
   | { readonly kind: "openTrace"; readonly trace: TraceRecord }
 
-/** A column action on one task's columns, as `LayoutAction` carries it. */
-type TaskColumnAction = Extract<LayoutAction, { kind: "columns" }>["action"]
-
 /**
  * The effects of `intent`. `minted` holds the ids the shell made for it
  * (`Minted`): a column opened with its key takes focus, except one `openAt`
@@ -319,21 +370,92 @@ function planOf(
   state: IntentState,
   minted: Minted,
 ): readonly Effect[] {
-  const fresh = minted.key
   switch (intent.kind) {
     case "column":
-      return planColumn(intent.position, intent.key, intent.act, state, minted)
+      return planColumn(intent.column, intent.act, state, minted)
+    case "moveColumn": {
+      const active = state.layout.active
+      return active?.kind === "task"
+        ? planColumnMove(intent.column.card, intent.to, active.task, state)
+        : []
+    }
+    case "closeFresh": {
+      const at = IN_COLUMN(keyText(intent.column))
+      return [
+        ...intent.discard.flatMap(id => planDiscard(id, at, state)),
+        ...closeFresh(intent.column, state),
+      ]
+    }
+    case "keepFresh":
+      return planKeep(
+        intent.cards,
+        keyText(intent.column),
+        closeFresh(intent.column, state),
+        state,
+      )
+    case "sentFresh":
+      return intent.column.kind === "newTab"
+        ? [
+            layout({
+              kind: "newTabColumn",
+              key: intent.column.thread,
+              action: { kind: "sent", sendId: intent.sendId },
+            }),
+          ]
+        : onTaskYouAreOn(state, {
+            kind: "sent",
+            thread: intent.column.thread,
+            sendId: intent.sendId,
+          })
+    case "fold":
+    case "foldTask": {
+      const active = state.layout.active
+      return active?.kind === "task"
+        ? [
+            changeViewOf(
+              state,
+              active.task,
+              intent.kind === "fold"
+                ? { kind: "fold", card: intent.card, unfolded: intent.unfolded }
+                : { kind: "foldTask", unfolded: intent.unfolded },
+            ),
+          ]
+        : []
+    }
+    case "addNoteColumn": {
+      const active = state.layout.active
+      return active?.kind === "task"
+        ? planAddNoteColumn(active.task, intent.after, minted.noteColumn, state)
+        : []
+    }
+    // From the canvas its sender sees it on: the host refuses it moved since.
+    case "cardWidth": {
+      const task = state.tasks.index.taskOfCard.get(intent.card)
+      return task === undefined
+        ? []
+        : [
+            {
+              kind: "request",
+              intent: {
+                kind: "card-width",
+                card: intent.card,
+                at: { kind: "canvas", task },
+                width: intent.width,
+              },
+            },
+          ]
+    }
     case "show":
       return show(intent.here)
     case "newTab":
+      // Keyed by the thread it minted, as its card will be.
       return [
-        { kind: "armFocus", key: fresh },
+        { kind: "armFocus", key: minted.thread },
         layout({
           kind: "newTab",
-          key: fresh,
+          key: minted.thread,
           root: minted.root,
           task: minted.task,
-          thread: minted.thread,
           asksAgent: intent.asksAgent,
           ...(intent.prefill === undefined ? {} : { prefill: intent.prefill }),
           ...(intent.state === undefined ? {} : { state: intent.state }),
@@ -395,9 +517,9 @@ function planOf(
     case "notNeeded":
       return [{ kind: "notNeeded", lane: intent.lane, raised: intent.raised }]
     case "openAt":
-      return planOpenAt(intent.entry, state, fresh)
+      return planOpenAt(intent.entry, state)
     case "openIn":
-      return planOpenIn(intent.entry, intent.task, state, fresh)
+      return planOpenIn(intent.entry, intent.task, state)
     case "signOut":
       return [{ kind: "forgetIdentity" }, { kind: "reload" }]
     case "takeIntoInventory":
@@ -415,82 +537,79 @@ function planOf(
     case "undoMove":
       return planUndoMove(intent.direction, intent.inPanel, state)
     case "undoAnswered":
-      return afterUndo(intent.outcome, state, minted)
+      return afterUndo(intent.outcome, state)
     case "openTrace":
-      return planOpenTrace(intent.trace, state, minted)
+      return planOpenTrace(intent.trace, state)
   }
 }
 
-/**
- * The column action a reader's setting is, for column `key`; null for any
- * other act. `planColumn` applies it.
- */
-export function readerAction(act: ColumnAct, key: string): ReaderAction | null {
-  switch (act.kind) {
-    case "density":
-      return { kind: "density", key, density: act.density }
-    case "details":
-      return { kind: "details", key, open: act.open }
-    default:
-      return null
-  }
+/** A change to your view of the task you are on; off a task, nothing. */
+const onTaskYouAreOn = (
+  state: IntentState,
+  change: ViewChange,
+): readonly Effect[] => {
+  const active = state.layout.active
+  return active?.kind === "task"
+    ? [changeViewOf(state, active.task, change)]
+    : []
 }
 
+/** Closing a fresh column: a new tab's closes the tab, a branch's leaves your view. */
+const closeFresh = (column: FreshKey, state: IntentState): readonly Effect[] =>
+  column.kind === "newTab"
+    ? [layout({ kind: "closeNewTab", key: column.thread })]
+    : onTaskYouAreOn(state, { kind: "closeFresh", thread: column.thread })
+
 /**
- * A column's act. One that changes the columns is the column action of the
- * task you are on; a new tab's one column can only send, take a reader's
- * setting, and close, which closes the tab.
+ * A column's act, said in `column`. A reader's setting is your view of its
+ * card, of the branch, or of a new tab's one column; the task column has
+ * none.
  */
 function planColumn(
-  position: number,
-  key: string,
+  column: ColumnKey,
   act: ColumnAct,
   state: IntentState,
   minted: Minted,
 ): readonly Effect[] {
-  const fresh = minted.key
-  const active = state.layout.active
-  const onRoot = (action: TaskColumnAction): readonly Effect[] =>
-    active?.kind === "task"
-      ? [
-          layout({
-            kind: "columns",
-            task: active.task,
-            entry: entryOfTask(state, active.task),
-            action,
-          }),
-        ]
-      : []
-  /** An action on the column itself, which may be a new tab's one column. */
-  const onColumn = (
-    action: Extract<LayoutAction, { kind: "newTabColumn" }>["action"],
-  ): readonly Effect[] =>
-    active?.kind === "new"
-      ? [layout({ kind: "newTabColumn", key: active.key, action })]
-      : onRoot(action)
-  /** Closing this column: a new tab's closes the tab. */
-  const closing = (): readonly Effect[] =>
-    active?.kind === "new"
-      ? [layout({ kind: "closeNewTab", key: active.key })]
-      : onRoot({ kind: "close", index: position })
+  const key = keyText(column)
+  const onTask = (change: ViewChange) => onTaskYouAreOn(state, change)
+  /** A reader's setting: of a card, a branch, or a new tab's column. */
+  const reading = (
+    action: Extract<NewTabAction, { kind: "density" | "details" }>,
+  ): readonly Effect[] => {
+    switch (column.kind) {
+      case "newTab":
+        return [layout({ kind: "newTabColumn", key: column.thread, action })]
+      case "task":
+        return []
+      case "card":
+      case "fresh": {
+        const card = column.kind === "card" ? column.card : column.thread
+        return onTask(
+          action.kind === "density"
+            ? { kind: "density", card, density: action.density }
+            : { kind: "details", card, open: action.open },
+        )
+      }
+    }
+  }
   switch (act.kind) {
     case "openAt":
-      return planOpenAt(act.entry, state, fresh)
+      return planOpenAt(act.entry, state)
     case "newTab":
       return planOf(
         { kind: "newTab", asksAgent: act.asksAgent, prefill: act.prefill },
         state,
         minted,
       )
+    // A branch is keyed by the thread it minted, as its card will be.
     case "branch":
       return opened(
-        fresh,
-        onRoot({
+        minted.thread,
+        onTask({
           kind: "openFresh",
-          key: fresh,
           thread: minted.thread,
           at: act.branch.at,
-          after: position,
           ...(act.branch.prefill === undefined
             ? {}
             : { prefill: act.branch.prefill }),
@@ -498,39 +617,24 @@ function planColumn(
       )
     case "branchInstead":
       return opened(
-        fresh,
-        onRoot({
+        minted.thread,
+        onTask({
           kind: "openFresh",
-          key: fresh,
           thread: minted.thread,
           at: act.at,
-          after: position,
           pending: act.pending,
         }),
       )
-    case "close": {
-      const discard = act.discard.flatMap(id =>
-        planDiscard(id, IN_COLUMN(key), state),
-      )
-      return [...discard, ...closing()]
-    }
     case "discard":
       return planDiscard(act.card, IN_COLUMN(key), state)
-    case "keep":
-      return planKeep(act.cards, key, closing(), state)
     case "takeIntoInventory":
       return planTakeIntoInventory(act.card, state)
     case "takeCopyIntoInventory":
       return planTakeCopyIntoInventory(act.card, act.text, state)
-    case "move":
-      return onRoot({ kind: "move", from: position, to: act.to })
     case "density":
-    case "details": {
-      const action = readerAction(act, key)
-      return action === null ? [] : onColumn(action)
-    }
-    case "sent":
-      return onColumn({ kind: "sent", key: act.key, sendId: act.sendId })
+      return reading({ kind: "density", density: act.density })
+    case "details":
+      return reading({ kind: "details", open: act.open })
     case "queue": {
       const now = cardOf(state.cards, act.card)
       return now === undefined
@@ -578,6 +682,8 @@ function planColumn(
       return planPin(act.card, key, state)
     case "unpin":
       return planUnpin(act.card, key, state)
+    case "pinToTask":
+      return planPinToTask(act.card, key, state)
     case "toNote":
       return planToNote(act.card, key, state)
     case "newNote":
@@ -622,11 +728,60 @@ function planOpenIn(
   entry: EntryId,
   task: TaskId,
   state: IntentState,
-  fresh: string,
 ): readonly Effect[] {
-  if (state.index.entries[entry] !== undefined)
-    return planOpenAt(entry, state, fresh)
+  if (state.index.entries[entry] !== undefined) return planOpenAt(entry, state)
   return [...showTask(task), { kind: "openWhenHeld", entry }]
+}
+
+/**
+ * A column moved to index `to` of its task's canvas, for everyone: a reorder
+ * of its card among the canvas's cards as drawn (ADR-0116), which the host
+ * orders and the undo key takes back (ADR-0066). Nothing for a card on no
+ * canvas of `task`, or one already at `to`.
+ */
+export function planColumnMove(
+  card: CardId,
+  to: number,
+  task: TaskId,
+  state: Pick<IntentState, "tasks">,
+): readonly Effect[] {
+  const canvas = state.tasks.index.canvases.get(task) ?? []
+  const from = canvas.findIndex(c => c.id === card)
+  if (from < 0 || from === to || to < 0 || to >= canvas.length) return []
+  const rest = canvas.filter(c => c.id !== card)
+  return [
+    {
+      kind: "reorderCard",
+      reorder: {
+        card,
+        at: { kind: "canvas", task },
+        after: rest[to - 1]?.id ?? null,
+        before: rest[to]?.id ?? null,
+      },
+      how: IN_COLUMN(card),
+    },
+  ]
+}
+
+/**
+ * A note column made on `task`'s canvas just after `after` (ADR-0116): a
+ * move with no `from` to that spot, so the host ranks it there and the undo
+ * key takes it back; unfolded, so you see what you made.
+ */
+function planAddNoteColumn(
+  task: TaskId,
+  after: CardId | null,
+  column: NoteColumnId,
+  state: IntentState,
+): readonly Effect[] {
+  return [
+    moveCard(
+      { card: column, from: null, to: { kind: "canvas-at", task, after } },
+      IN_COLUMN(column),
+      false,
+    ),
+    changeViewOf(state, task, { kind: "fold", card: column, unfolded: true }),
+  ]
 }
 
 /** A column opened with `key` takes focus; nothing opened, nothing armed. */

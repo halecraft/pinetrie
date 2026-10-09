@@ -46,12 +46,14 @@ import {
 } from "@pinetrie/core"
 import { type Static, Type } from "typebox"
 import { type BaseNews, behindLine, decodeBehind } from "./behind.ts"
+import { canvasFactLine, decodeCanvas, decodeCanvasFact } from "./canvas.ts"
 import { decodeWith, ThreadIdSchema } from "./decode.ts"
 import { decodeFact, factLine } from "./fact.ts"
 import { decodeLand, type LandMessage, landLine } from "./land.ts"
 import { decodePinned } from "./pinned.ts"
 import { decodeStack, type StackMessage, stackLine } from "./stack.ts"
 import { type CarryOnMessage, carryOnLine, decodeCarryOn } from "./stop.ts"
+import { decodeTaskPinned } from "./task-pinned.ts"
 import { decodeUpdate, updateLine } from "./update.ts"
 import { showHostWorkingCopy } from "./work.ts"
 
@@ -295,7 +297,8 @@ function toolResultFacts(
  * `land`, `update`, `stack` or `carry-on` with its one line (ADR-0033,
  * ADR-0105, ADR-0082), as a fact becomes role `fact` and a base's news role
  * `behind` (ADR-0080); a cards entry becomes role `pinned` with the cards it
- * read (ADR-0048); a host tool's result keeps its role and gains what it
+ * read (ADR-0048), a task's cards entry role `task-pinned`, and a canvas
+ * entry role `canvas` with the list it told (ADR-0116); a host tool's result keeps its role and gains what it
  * says as a fact (`asked`, `merged`, ADR-0080); anything else passes
  * through unchanged for `core` to judge.
  */
@@ -323,6 +326,14 @@ export function renderableMessage(message: unknown): AgentMessageLike {
   // Not a message: the column draws a marker above the prompt it came with.
   const pinned = decodePinned(message)
   if (pinned !== undefined) return { role: "pinned", content: "", pinned }
+  const taskPinned = decodeTaskPinned(message)
+  if (taskPinned !== undefined)
+    return { role: "task-pinned", content: "", taskPinned }
+  const canvas = decodeCanvas(message)
+  if (canvas !== undefined) return { role: "canvas", content: "", canvas }
+  const canvasFact = decodeCanvasFact(message)
+  if (canvasFact !== undefined)
+    return { role: "fact", content: canvasFactLine(canvasFact) }
   const result = toolResultFacts(message)
   if (result !== undefined)
     return { ...(message as AgentMessageLike), ...result }

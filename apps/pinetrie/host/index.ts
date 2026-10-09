@@ -85,6 +85,8 @@ import {
   slow,
 } from "./basics.ts"
 import { memoryBlobs } from "./blobs.ts"
+import { createTaskContext } from "./canvas.ts"
+import { createCanvasNews } from "./canvas-news.ts"
 import { startCards } from "./cards.ts"
 import { createCommands } from "./commands/index.ts"
 import { startControl } from "./control.ts"
@@ -398,21 +400,19 @@ export async function startHost({
     onError: failed(basics, "step"),
     onSlow: slow(basics),
   })
-  const directoryNow = readRoots(session)
   // The roots that are not archived, opened before anything reads one: every
   // lane that could be running is in one of them (`planLoads`).
+  const threadsNow = readThreads(session)
   const roots = planLoads(
-    directoryNow,
     rootsHeld(
       readPlaces(places),
-      readThreads(session),
+      threadsNow,
       new Set(readArchived(session).keys()),
     ),
   )
   for (const root of roots) await docs.root(root)
-  log(
-    `[host] ${rootsOpenedWords({ opened: roots.length, total: directoryNow.size })}`,
-  )
+  const total = new Set([...threadsNow.values()].map(t => t.root)).size
+  log(`[host] ${rootsOpenedWords({ opened: roots.length, total })}`)
   // The directory follows the roots opened above as well as those opened
   // later (`onOpened`).
   startDirectory({ basics, keeper, records })
@@ -510,15 +510,21 @@ export async function startHost({
   // refreshes announce a changed base, and a running lane is steered.
   const baseNews = createBaseNews({ basics, agent, keeper })
   work.onBaseChanged(lane => baseNews.baseChanged(lane))
+  // A card added to or taken from a task, told to its running threads
+  // (ADR-0116).
+  const canvasNews = createCanvasNews({ basics, agent, keeper })
+  provenance.onChanged(change => canvasNews.changed(change))
   // Commands are received only from `startControl`, after `recover`.
   const listener = Control.listen(exchange)
   const cardPort = startCards({ exchange, store, session })
   const { readPinned } = createPinned({ basics, cards: cardPort })
+  const { readTaskContext } = createTaskContext({ basics, cards: cardPort })
   const runs = createRuns({
     basics,
     agent,
     work,
     readPinned,
+    readTaskContext,
     baseNews,
     pending: digests.pending,
   })

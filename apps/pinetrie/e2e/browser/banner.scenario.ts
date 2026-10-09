@@ -114,9 +114,9 @@ async function run(check: Checks["check"]): Promise<void> {
         await bp.click(`${col(0)} .composer .send`)
         await bp.waitForSelector("#sidebar .open-root", { timeout: 15_000 })
 
-        // Back to its root, the column mounts again with its banner already there.
+        // Back to its task, the column mounts again with its banner already there.
         const root =
-          (await bp.getAttribute("#sidebar .open-root", "data-root")) ?? ""
+          (await bp.getAttribute("#sidebar .open-root", "data-task")) ?? ""
         await stepAway(bp)
         await stepBack(bp, root)
         const again = await bp

@@ -1,14 +1,18 @@
 import {
-  type EntryId,
+  type CardId,
   entryId,
   indexTree,
   type LaneView,
   type TaskId,
+  type TreeIndex,
   taskIdFor,
   threadIdFor,
   workflowStateIdFor,
+  writerId,
 } from "@pinetrie/core"
+import { type CanvasCard, canvasOf } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
+import { defaultView, type TaskView } from "./canvas-columns.ts"
 import {
   entriesOf,
   entry,
@@ -21,18 +25,21 @@ import {
   withThreads,
 } from "./fixtures.ts"
 import {
-  columnsOf,
   decodeLayout,
   encodeLayout,
   type Here,
   initialLayout,
   type Layout,
+  type LayoutAction,
   layoutReducer,
   listOf,
   NOTHING,
   planOpen,
   resolveLayout,
+  storedLayout,
+  taskColumns,
   unlisted,
+  type ViewChange,
 } from "./layout.ts"
 
 // Two roots: r1 -> a -> b, with a branch a -> c; and r2 -> d.
@@ -52,16 +59,15 @@ const index = tree(parents)
 const TK = (root: string): TaskId =>
   root === "7-r3" ? NEW_TASK : taskIdFor(root)
 const ROOTS = ["1-r1", "5-r2", "7-r3", "9-r", "9-x"]
-/** Each task's first root's root entry: where its first column is. */
-const ENTRIES: ReadonlyMap<TaskId, EntryId> = new Map(
-  ROOTS.map(r => [TK(r), entryId(r)] as const),
-)
-/** Each thread's task: every thread of a root is in its root's task. */
-const OF_THREAD = tasksFor(
-  index,
-  ...ROOTS.map(r => [TK(r), entryId(r)] as const),
-).index.taskOfThread
+/** Each task's threads on its canvas, in thread order (`tasksFor`). */
+const tasksIn = (i: TreeIndex) =>
+  tasksFor(i, ...ROOTS.map(r => [TK(r), entryId(r)] as const)).index
+const TASKS = tasksIn(index)
+const ADA = writerId("ada@x.io")
 const R1: Here = { kind: "task", task: TK("1-r1") }
+const R2: Here = { kind: "task", task: TK("5-r2") }
+const TRUNK = threadOfEntry("1-r1")
+const C = threadOfEntry("4-c")
 const at = (l: Layout, here: Here = R1): Layout =>
   layoutReducer(l, { kind: "show", here })
 /** The sidebar, as the session's document holds it, by root entry. */
@@ -72,7 +78,8 @@ const resolve = (
   archived: ReadonlySet<TaskId> = new Set(),
   lanes: readonly LaneView[] = [],
   list: readonly TaskId[] = [],
-) => resolveLayout(l, { index: i, lanes, archived, list, entries: ENTRIES })
+  canvases = tasksIn(i).canvases,
+) => resolveLayout(l, { index: i, lanes, archived, list, canvases })
 const sync = (l: Layout, i = index) => resolve(l, i)
 /** `l` drawn with `list` as the sidebar. */
 const drawn = (l: Layout, list: readonly TaskId[]) =>
@@ -82,6 +89,7 @@ const prune = (
   list: readonly TaskId[] = [],
   archived: ReadonlySet<TaskId> = new Set(),
   i = index,
+  canvases = tasksIn(i).canvases,
 ) =>
   layoutReducer(l, {
     kind: "prune",
@@ -89,242 +97,272 @@ const prune = (
     lanes: [],
     archived,
     list,
-    entries: ENTRIES,
+    canvases,
     known: new Set(i.roots.map(r => TK(r))),
   })
-const R2: Here = { kind: "task", task: TK("5-r2") }
+/** A change to your view of `root`'s task, its first card the canvas's. */
+const view = (root: string, change: ViewChange): LayoutAction => ({
+  kind: "view",
+  task: TK(root),
+  first: TASKS.canvases.get(TK(root))?.[0]?.id ?? null,
+  change,
+})
+const unfold = (card: CardId, root = "1-r1") =>
+  view(root, { kind: "fold", card, unfolded: true })
+/** The keys of `root`'s task's columns as drawn, each folded or not. */
+const columnsOf = (l: Layout, root = "1-r1", i = index) =>
+  taskColumns(l, TK(root), {
+    canvases: tasksIn(i).canvases,
+    index: i,
+    lanes: [],
+  }).map(c => [c.kind === "notes" ? c.card : c.column.key, c.folded])
+const newTab = (l: Layout, asksAgent = false): Layout =>
+  layoutReducer(l, {
+    kind: "newTab",
+    key: NEW_THREAD,
+    task: NEW_TASK,
+    root: NEW_ROOT,
+    asksAgent,
+  })
+const NEW: Here = { kind: "new", key: NEW_THREAD }
+/** `7-r3`, the first message of a new tab's thread, written; and its task's card. */
+const written = (sends: Record<string, string> = { "7-r3": "s" }) => {
+  const i = indexTree({
+    ...indexTree(
+      withThreads(
+        entriesOf(
+          Object.entries(parents).map(([id, parent]) =>
+            entry(id, parent, { role: "chat", content: id }),
+          ),
+        ),
+      ),
+    ).entries,
+    ...entriesOf([
+      entry("7-r3", null, {
+        role: "chat",
+        content: "7-r3",
+        starts: NEW_THREAD,
+        ...(sends["7-r3"] === undefined ? {} : { sendId: sends["7-r3"] }),
+      }),
+    ]),
+  })
+  return { index: i, canvases: tasksIn(i).canvases }
+}
 
 describe("layoutReducer", () => {
-  test("a column action changes only its root's columns", () => {
-    const r2 = layoutReducer(at(initialLayout()), {
-      kind: "columns",
-      task: TK("5-r2"),
-      entry: entryId("5-r2"),
-      action: { kind: "open", key: "j", after: 0, anchor: entryId("6-d") },
-    })
-    const l = layoutReducer(r2, {
-      kind: "columns",
-      task: TK("1-r1"),
-      entry: entryId("1-r1"),
-      action: { kind: "open", key: "k", after: 0, anchor: entryId("4-c") },
-    })
-    expect(
-      columnsOf(l, TK("1-r1"), entryId("1-r1")).map(c => c.anchor),
-    ).toEqual(["1-r1", "4-c"])
-    expect(columnsOf(l, TK("5-r2"), entryId("5-r2"))).toBe(
-      columnsOf(r2, TK("5-r2"), entryId("5-r2")),
+  test("a view change changes only its task's view, which starts from the default", () => {
+    const l = layoutReducer(at(initialLayout()), unfold(C))
+    expect(columnsOf(l)).toEqual([
+      [TRUNK, false],
+      [C, false],
+    ])
+    expect(l.tasks.has(TK("5-r2"))).toBe(false)
+    expect(columnsOf(l, "5-r2")).toEqual([[threadOfEntry("5-r2"), false]])
+    const folded = layoutReducer(
+      l,
+      view("1-r1", { kind: "fold", card: TRUNK, unfolded: false }),
     )
-    expect(columnsOf(l, TK("7-r3"), entryId("7-r3"))).toEqual([
-      { key: `first-${TK("7-r3")}`, anchor: entryId("7-r3") },
+    expect(columnsOf(folded)).toEqual([
+      [TRUNK, true],
+      [C, false],
     ])
+    // Unfolding what is unfolded changes nothing.
+    expect(layoutReducer(folded, unfold(C))).toBe(folded)
   })
 
-  test("a root's first column has a key with no colon, as a presence key needs", () => {
-    expect(
-      columnsOf(initialLayout(), TK("1-r1"), entryId("1-r1"))[0]?.key,
-    ).not.toContain(":")
+  test("the task column starts folded, and folds apart from the cards", () => {
+    const l = layoutReducer(
+      initialLayout(),
+      view("1-r1", { kind: "foldTask", unfolded: true }),
+    )
+    expect(l.tasks.get(TK("1-r1"))?.task).toEqual({ unfolded: true })
+    expect(defaultView(null).task).toEqual({ unfolded: false })
   })
 
-  test("closing a root's last column gives it its first column again", () => {
-    const l = layoutReducer(initialLayout(), {
-      kind: "columns",
-      task: TK("1-r1"),
-      entry: entryId("1-r1"),
-      action: { kind: "close", index: 0 },
+  test("a reader's settings are kept by card, folded or not (ADR-0106, ADR-0073)", () => {
+    const l = layoutReducer(
+      layoutReducer(
+        initialLayout(),
+        view("1-r1", { kind: "density", card: C, density: "outline" }),
+      ),
+      view("1-r1", { kind: "details", card: C, open: true }),
+    )
+    expect(l.tasks.get(TK("1-r1"))?.cards.get(C)).toEqual({
+      density: "outline",
+      details: true,
     })
-    expect(l.tasks.has(TK("1-r1"))).toBe(false)
-    expect(columnsOf(l, TK("1-r1"), entryId("1-r1"))).toEqual([
-      { key: `first-${TK("1-r1")}`, anchor: entryId("1-r1") },
+    const closed = layoutReducer(
+      l,
+      view("1-r1", { kind: "details", card: C, open: false }),
+    )
+    expect(closed.tasks.get(TK("1-r1"))?.cards.get(C)).toEqual({
+      density: "outline",
+    })
+  })
+
+  test("a branch is yours until its card is on the canvas, then that card's column, unfolded", () => {
+    const T = threadIdFor("01a0ffd2-0000-7000-8000-0000000000f1")
+    const opened = layoutReducer(
+      at(initialLayout()),
+      view("1-r1", { kind: "openFresh", thread: T, at: entryId("3-b") }),
+    )
+    expect(columnsOf(opened)).toEqual([
+      [TRUNK, false],
+      [T, false],
+      [C, true],
     ])
+    const sent = layoutReducer(
+      opened,
+      view("1-r1", { kind: "sent", thread: T, sendId: "s" }),
+    )
+    expect(sent.tasks.get(TK("1-r1"))?.fresh.get(T)).toEqual({
+      at: entryId("3-b"),
+      sendId: "s",
+    })
+    // Its message is written, its card not yet: still drawn where it was.
+    const grown = tree({ ...parents, "8-e": "3-b" }, { "8-e": "s" })
+    expect(sync(sent, grown).tasks).toBe(sent.tasks)
+    // Its card lands: the branch is that card's column.
+    const card: CanvasCard = canvasOf(
+      [
+        {
+          kind: "thread",
+          id: T,
+          owner: ADA,
+          placer: ADA,
+          place: { kind: "canvas", task: TK("1-r1"), order: "a0z", width: 1 },
+        },
+      ],
+      TK("1-r1"),
+    )[0] as CanvasCard
+    const canvases = new Map(tasksIn(grown).canvases)
+    canvases.set(TK("1-r1"), [...(canvases.get(TK("1-r1")) ?? []), card])
+    const landed = resolve(sent, grown, new Set(), [], [], canvases)
+    expect(landed.tasks.get(TK("1-r1"))?.fresh.size).toBe(0)
+    expect(landed.tasks.get(TK("1-r1"))?.cards.get(T)).toEqual({
+      unfolded: true,
+    })
+    const closed = layoutReducer(
+      opened,
+      view("1-r1", { kind: "closeFresh", thread: T }),
+    )
+    expect(columnsOf(closed)).toEqual(columnsOf(at(initialLayout())))
+  })
+
+  test("a branch holds its first message and its prefill until its first send, which spends both", () => {
+    const T = threadIdFor("01a0ffd2-0000-7000-8000-0000000000f1")
+    const pending = { text: "@agent separately?" }
+    const prefill = { text: "@agent ", blank: true }
+    const opened = layoutReducer(
+      initialLayout(),
+      view("1-r1", {
+        kind: "openFresh",
+        thread: T,
+        at: entryId("3-b"),
+        pending,
+        prefill,
+      }),
+    )
+    expect(opened.tasks.get(TK("1-r1"))?.fresh.get(T)).toEqual({
+      at: entryId("3-b"),
+      pending,
+      prefill,
+    })
+    const sent = layoutReducer(
+      opened,
+      view("1-r1", { kind: "sent", thread: T, sendId: "s" }),
+    )
+    expect(sent.tasks.get(TK("1-r1"))?.fresh.get(T)).toEqual({
+      at: entryId("3-b"),
+      sendId: "s",
+    })
   })
 
   test("a new tab, closed before it sends, leaves the layout as it was", () => {
     const before = drawn(at(initialLayout()), listed("1-r1"))
-    const opened = layoutReducer(before, {
-      kind: "newTab",
-      key: "n",
-      task: NEW_TASK,
-      root: NEW_ROOT,
-      thread: NEW_THREAD,
-      asksAgent: true,
-    })
-    expect(opened.active).toEqual({ kind: "new", key: "n" })
+    const opened = newTab(before, true)
+    expect(opened.active).toEqual(NEW)
     expect(opened.newTabs).toEqual([
       {
-        key: "n",
+        key: NEW_THREAD,
         anchor: null,
         thread: NEW_THREAD,
         fresh: { root: NEW_ROOT, task: NEW_TASK },
         asksAgent: true,
       },
     ])
-    expect(layoutReducer(opened, { kind: "closeNewTab", key: "n" })).toEqual(
-      before,
-    )
+    expect(
+      layoutReducer(opened, { kind: "closeNewTab", key: NEW_THREAD }),
+    ).toEqual(before)
   })
 
   test("a new tab can start with a prefill: a message's text, to send again", () => {
     const prefill = { text: "the first question", blank: false }
     const opened = layoutReducer(at(initialLayout()), {
       kind: "newTab",
-      key: "n",
+      key: NEW_THREAD,
       task: NEW_TASK,
       root: NEW_ROOT,
-      thread: NEW_THREAD,
       asksAgent: true,
       prefill,
     })
-    expect(opened.newTabs).toEqual([
-      {
-        key: "n",
-        anchor: null,
-        thread: NEW_THREAD,
-        fresh: { root: NEW_ROOT, task: NEW_TASK, prefill },
-        asksAgent: true,
-      },
-    ])
+    expect(opened.newTabs[0]?.fresh).toEqual({
+      root: NEW_ROOT,
+      task: NEW_TASK,
+      prefill,
+    })
   })
 
-  test("a sent new tab becomes its root's columns, and stays the one you are on, in the sidebar", () => {
-    const opened = layoutReducer(at(initialLayout()), {
-      kind: "newTab",
-      key: "n",
-      task: NEW_TASK,
-      root: NEW_ROOT,
-      thread: NEW_THREAD,
-      asksAgent: false,
-    })
-    const sent = layoutReducer(opened, {
+  test("a sent new tab becomes its task once its card is on the canvas, and stays the one you are on, in the sidebar", () => {
+    const sent = layoutReducer(newTab(at(initialLayout())), {
       kind: "newTabColumn",
-      key: "n",
-      action: { kind: "sent", key: "n", sendId: "s" },
+      key: NEW_THREAD,
+      action: { kind: "sent", sendId: "s" },
     })
     expect(sync(sent)).toBe(sent)
-    const written = tree({ ...parents, "7-r3": null }, { "7-r3": "s" })
-    const synced = sync(sent, written)
+    const w = written()
+    // Its message is written, its card not yet: it stays a new tab.
+    const early = resolve(sent, w.index, new Set(), [], [], new Map())
+    expect(early.active).toEqual(NEW)
+    expect(early.newTabs[0]?.anchor).toBe("7-r3")
+    const synced = resolve(sent, w.index, new Set(), [], [], w.canvases)
     expect(synced.newTabs).toEqual([])
-    expect(synced.active).toEqual({ kind: "task", task: TK("7-r3") })
+    expect(synced.active).toEqual({ kind: "task", task: NEW_TASK })
     // The session puts it in the sidebar as its send is answered; until then
-    // it is drawn as the root you are on.
-    expect(synced.open).toEqual([TK("7-r3")])
-    expect(columnsOf(synced, TK("7-r3"), entryId("7-r3"))).toEqual([
-      { key: "n", anchor: entryId("7-r3"), thread: NEW_THREAD },
-    ])
+    // it is drawn as the task you are on.
+    expect(synced.open).toEqual([NEW_TASK])
+    expect(synced.tasks.get(NEW_TASK)?.cards.get(NEW_THREAD)).toEqual({
+      unfolded: true,
+    })
   })
 
-  test("a sent new tab you have left becomes its task's columns, and you stay where you went", () => {
-    const opened = layoutReducer(at(initialLayout()), {
-      kind: "newTab",
-      key: "n",
-      task: NEW_TASK,
-      root: NEW_ROOT,
-      thread: NEW_THREAD,
-      asksAgent: false,
-    })
-    const sent = layoutReducer(opened, {
-      kind: "newTabColumn",
-      key: "n",
-      action: { kind: "sent", key: "n", sendId: "s" },
-    })
-    const left = at(sent, R1)
-    const written = tree({ ...parents, "7-r3": null }, { "7-r3": "s" })
-    const synced = sync(left, written)
+  test("a sent new tab you have left becomes its task, and you stay where you went", () => {
+    const w = written()
+    const left = at(newTab(at(initialLayout())), R1)
+    const synced = resolve(left, w.index, new Set(), [], [], w.canvases)
     expect(synced.newTabs).toEqual([])
     expect(synced.active).toEqual(R1)
   })
 
-  test("a new tab's column takes the reader's settings, and keeps them as it becomes its root's (ADR-0073)", () => {
-    const opened = layoutReducer(at(initialLayout()), {
-      kind: "newTab",
-      key: "n",
-      task: NEW_TASK,
-      root: NEW_ROOT,
-      thread: NEW_THREAD,
-      asksAgent: true,
-    })
-    const shown = layoutReducer(opened, {
+  test("a new tab's column takes the reader's settings, and keeps them as it becomes its task's (ADR-0073)", () => {
+    const shown = layoutReducer(newTab(at(initialLayout()), true), {
       kind: "newTabColumn",
-      key: "n",
-      action: { kind: "details", key: "n", open: true },
+      key: NEW_THREAD,
+      action: { kind: "details", open: true },
     })
     expect(shown.newTabs[0]?.details).toBe(true)
-    const sent = layoutReducer(shown, {
-      kind: "newTabColumn",
-      key: "n",
-      action: { kind: "sent", key: "n", sendId: "s" },
-    })
-    const written = tree({ ...parents, "7-r3": null }, { "7-r3": "s" })
-    expect(
-      columnsOf(sync(sent, written), TK("7-r3"), entryId("7-r3"))[0]?.details,
-    ).toBe(true)
-  })
-
-  test("a new tab whose thread starts becomes that root's tab, in every browser tab holding it (ADR-0117)", () => {
-    const opened = layoutReducer(at(initialLayout()), {
-      kind: "newTab",
-      key: "n",
-      task: NEW_TASK,
-      root: NEW_ROOT,
-      thread: NEW_THREAD,
-      asksAgent: true,
-    })
-    // Sent from another browser tab: no send id here, only its thread's
+    const w = written({})
+    // Started from another browser tab: no send id here, only its thread's
     // first message.
-    const written = indexTree(
-      withThreads(
-        entriesOf([
-          ...Object.entries(parents).map(([id, parent]) =>
-            entry(id, parent, { role: "chat", content: id }),
-          ),
-        ]),
-      ),
-    )
-    const started = indexTree({
-      ...written.entries,
-      ...entriesOf([
-        entry("7-r3", null, {
-          role: "chat",
-          content: "7-r3",
-          starts: NEW_THREAD,
-        }),
-      ]),
-    })
-    const synced = resolve(opened, started)
+    const synced = resolve(shown, w.index, new Set(), [], [], w.canvases)
     expect(synced.newTabs).toEqual([])
-    expect(columnsOf(synced, TK("7-r3"), entryId("7-r3"))).toEqual([
-      {
-        key: "n",
-        anchor: entryId("7-r3"),
-        thread: NEW_THREAD,
-        asksAgent: true,
-      },
-    ])
-  })
-
-  // A stored column that the grown tree moves on, so `sync` returns a new
-  // layout rather than the same one.
-  const withColumn = (l: Layout) =>
-    layoutReducer(l, {
-      kind: "columns",
-      task: TK("1-r1"),
-      entry: entryId("1-r1"),
-      action: { kind: "open", key: "k", after: 0, anchor: entryId("4-c") },
+    expect(synced.tasks.get(NEW_TASK)?.cards.get(NEW_THREAD)).toEqual({
+      unfolded: true,
+      details: true,
     })
-
-  test("a root someone else starts is not in the sidebar", () => {
-    const l = withColumn(drawn(at(initialLayout()), listed("1-r1")))
-    const grown = resolve(
-      l,
-      tree({ ...parents, "8-e": "4-c", "9-r3": null }),
-      new Set(),
-      [],
-      listed("1-r1"),
-    )
-    expect(grown).not.toBe(l)
-    expect(grown.open).toEqual([TK("1-r1")])
   })
 
-  test("the sidebar is the facts', in its order, and the root you are on wherever it lacks it", () => {
+  test("the sidebar is the facts', in its order, and the task you are on wherever it lacks it", () => {
     const l = at(initialLayout(), R2)
     expect(drawn(l, listed("1-r1", "5-r2")).open).toEqual([
       TK("1-r1"),
@@ -339,28 +377,16 @@ describe("layoutReducer", () => {
     expect(drawn(at(l, NOTHING), listed("1-r1")).open).toEqual([TK("1-r1")])
   })
 
-  test("a root that leaves the sidebar keeps its columns, and opening it again brings them back", () => {
-    const withColumn = layoutReducer(at(initialLayout()), {
-      kind: "columns",
-      task: TK("1-r1"),
-      entry: entryId("1-r1"),
-      action: { kind: "open", key: "k", after: 0, anchor: entryId("3-b") },
-    })
+  test("a task that leaves the sidebar keeps your view of it, and opening it again brings it back", () => {
+    const viewed = layoutReducer(at(initialLayout()), unfold(C))
     const closed = drawn(
-      layoutReducer(withColumn, { kind: "closeTask", task: TK("1-r1") }),
+      layoutReducer(viewed, { kind: "closeTask", task: TK("1-r1") }),
       [],
     )
-    expect(closed.tasks.get(TK("1-r1"))?.map(c => c.key)).toEqual(
-      withColumn.tasks.get(TK("1-r1"))?.map(c => c.key),
-    )
-    expect(
-      columnsOf(at(closed), TK("1-r1"), entryId("1-r1")).map(c => c.key),
-    ).toEqual(
-      columnsOf(withColumn, TK("1-r1"), entryId("1-r1")).map(c => c.key),
-    )
+    expect(columnsOf(at(closed))).toEqual(columnsOf(viewed))
   })
 
-  test("closing the root you are on shows its neighbour below, else above, else nothing", () => {
+  test("closing the task you are on shows its neighbour below, else above, else nothing", () => {
     const list = listed("1-r1", "5-r2", "9-r")
     const middle = drawn(at(initialLayout(), R2), list)
     expect(
@@ -382,20 +408,13 @@ describe("layoutReducer", () => {
       layoutReducer(middle, { kind: "closeTask", task: TK("1-r1") }).active,
     ).toEqual(R2)
     // An unsent new tab, likewise: its neighbour.
-    const withNew = layoutReducer(drawn(at(initialLayout()), listed("1-r1")), {
-      kind: "newTab",
-      key: "n",
-      task: NEW_TASK,
-      root: NEW_ROOT,
-      thread: NEW_THREAD,
-      asksAgent: false,
-    })
+    const withNew = newTab(drawn(at(initialLayout()), listed("1-r1")))
     expect(
-      layoutReducer(withNew, { kind: "closeNewTab", key: "n" }).active,
+      layoutReducer(withNew, { kind: "closeNewTab", key: NEW_THREAD }).active,
     ).toEqual(R1)
   })
 
-  test("archived roots leave the sidebar as drawn, except the one you are on until you leave it", () => {
+  test("archived tasks leave the sidebar as drawn, except the one you are on until you leave it", () => {
     const list = listed("1-r1", "5-r2")
     const archived = new Set(list)
     const l = at(initialLayout(), R2)
@@ -407,7 +426,7 @@ describe("layoutReducer", () => {
     ).toEqual([])
   })
 
-  test("showing a root or a new tab closes the board; showing nothing keeps it", () => {
+  test("showing a task or a new tab closes the board; showing nothing keeps it", () => {
     const open = layoutReducer(at(initialLayout()), {
       kind: "board",
       open: true,
@@ -415,68 +434,52 @@ describe("layoutReducer", () => {
     expect(open.board).toBe(true)
     expect(at(open, R2).board).toBe(false)
     expect(at(open, NOTHING).board).toBe(true)
-    expect(
-      layoutReducer(open, {
-        kind: "newTab",
-        key: "n",
-        task: NEW_TASK,
-        root: NEW_ROOT,
-        thread: NEW_THREAD,
-        asksAgent: true,
-      }).board,
-    ).toBe(false)
-  })
-
-  test("sync moves every stored root's columns on, not only the active one's", () => {
-    const l = layoutReducer(at(initialLayout(), NOTHING), {
-      kind: "columns",
-      task: TK("5-r2"),
-      entry: entryId("5-r2"),
-      action: { kind: "open", key: "k", after: 0, anchor: entryId("5-r2") },
-    })
-    // Both columns of r2 end at its newest leaf, which a reply then moves on.
-    const grown = sync(l, tree({ ...parents, "8-e": "6-d" }))
-    expect(
-      columnsOf(grown, TK("5-r2"), entryId("5-r2")).map(c => c.anchor),
-    ).toEqual(["8-e", "8-e"])
+    expect(newTab(open).board).toBe(false)
   })
 
   test("resolve is idempotent, and the stored state catches up to what it drew", () => {
-    const l = withColumn(at(initialLayout()))
-    const grown = tree({ ...parents, "8-e": "4-c" })
+    const l = newTab(at(initialLayout()))
+    const w = written()
     const archived = new Set([TK("5-r2")])
     const list = listed("1-r1", "5-r2")
-    const shown = resolve(at(l, R2), grown, archived, [], list)
-    expect(resolve(shown, grown, archived, [], list)).toBe(shown)
-    const stored = layoutReducer(at(l, R2), {
+    const shown = resolve(l, w.index, archived, [], list, w.canvases)
+    expect(resolve(shown, w.index, archived, [], list, w.canvases)).toBe(shown)
+    const stored = layoutReducer(l, {
       kind: "resolve",
-      index: grown,
+      index: w.index,
       lanes: [],
       archived,
       list,
-      entries: ENTRIES,
+      canvases: w.canvases,
     })
     expect(stored).toEqual(shown)
   })
 
-  test("a column's anchor moves with its thread's end in the layout drawn", () => {
-    const drawn = resolve(withColumn(at(initialLayout())), index)
-    expect(columnsOf(drawn, TK("1-r1"), entryId("1-r1"))[1]).toMatchObject({
-      anchor: entryId("4-c"),
-      thread: threadOfEntry("4-c"),
-    })
-    const replied = tree({ ...parents, "8-e": "4-c" })
-    const next = resolve(drawn, replied)
-    expect(columnsOf(next, TK("1-r1"), entryId("1-r1"))[1]?.anchor).toBe("8-e")
+  test("a column's anchor moves with its thread's end", () => {
+    expect(
+      taskColumns(initialLayout(), TK("1-r1"), {
+        canvases: TASKS.canvases,
+        index,
+        lanes: [],
+      })[0],
+    ).toMatchObject({ column: { anchor: entryId("3-b") } })
+    const replied = tree({ ...parents, "8-e": "3-b" })
+    expect(
+      taskColumns(initialLayout(), TK("1-r1"), {
+        canvases: tasksIn(replied).canvases,
+        index: replied,
+        lanes: [],
+      })[0],
+    ).toMatchObject({ column: { anchor: entryId("8-e") } })
   })
 
-  test("prune with nothing stored lands on nothing, with the board open: nothing opens a root by itself", () => {
+  test("prune with nothing stored lands on nothing, with the board open: nothing opens a task by itself", () => {
     const pruned = prune(initialLayout())
     expect(pruned.active).toEqual(NOTHING)
     expect(pruned.board).toBe(true)
   })
 
-  test("prune replaces a root you were on that is archived or gone with the last of the sidebar, and drops a gone root's columns", () => {
+  test("prune replaces a task you were on that is archived or gone with the last of the sidebar, and drops a gone task's view", () => {
     const onR1 = at(initialLayout())
     const archivedR1 = prune(
       onR1,
@@ -487,12 +490,7 @@ describe("layoutReducer", () => {
     expect(archivedR1.board).toBe(false)
     const gone = layoutReducer(
       at(initialLayout(), { kind: "task", task: TK("9-x") }),
-      {
-        kind: "columns",
-        task: TK("9-x"),
-        entry: entryId("9-x"),
-        action: { kind: "open", key: "k", after: 0, anchor: entryId("9-y") },
-      },
+      view("9-x", { kind: "fold", card: C, unfolded: true }),
     )
     const pruned = prune(gone, listed("1-r1"))
     expect(pruned.tasks.has(TK("9-x"))).toBe(false)
@@ -500,18 +498,40 @@ describe("layoutReducer", () => {
     expect(prune(gone).active).toEqual(NOTHING)
   })
 
-  test("once chosen, what you are on stays when a root appears", () => {
+  test("prune drops a branch whose fork is gone, where the task's roots are held; storing drops the view of a card no longer on the canvas", () => {
+    const T = threadIdFor("01a0ffd2-0000-7000-8000-0000000000f1")
+    const gone = threadIdFor("01a0ffd2-0000-7000-8000-0000000000f2")
+    let l = at(initialLayout())
+    for (const change of [
+      { kind: "openFresh", thread: T, at: entryId("3-b") },
+      { kind: "openFresh", thread: gone, at: entryId("9-gone") },
+      { kind: "fold", card: threadIdFor("taken"), unfolded: true },
+      { kind: "density", card: T, density: "raw" },
+    ] as const)
+      l = layoutReducer(l, view("1-r1", change))
+    const pruned = prune(l, listed("1-r1"))
+    const kept = pruned.tasks.get(TK("1-r1"))
+    expect([...(kept?.fresh.keys() ?? [])]).toEqual([T])
+    const stored = storedLayout(pruned, TASKS.canvases).tasks.get(TK("1-r1"))
+    expect([...(stored?.cards.keys() ?? [])]).toEqual([TRUNK, T])
+    // A canvas not arrived yet keeps every view.
+    expect(storedLayout(pruned, new Map())).toBe(pruned)
+    // A task whose roots this tab does not hold keeps its view as it is.
+    const elsewhere = prune(
+      l,
+      listed("1-r1"),
+      new Set(),
+      index,
+      new Map(),
+    ).tasks.get(TK("1-r1"))
+    expect(elsewhere).toBe(l.tasks.get(TK("1-r1")))
+  })
+
+  test("once chosen, what you are on stays when a task appears", () => {
     const grown = tree({ ...parents, "9-r3": null })
-    const moved = tree({ ...parents, "8-e": "4-c", "9-r3": null })
     for (const here of [R1, NOTHING]) {
-      const settled = prune(
-        withColumn(at(initialLayout(), here)),
-        listed("1-r1"),
-      )
+      const settled = prune(at(initialLayout(), here), listed("1-r1"))
       expect(settled.active).toEqual(here)
-      const synced = sync(settled, moved)
-      expect(synced).not.toBe(settled)
-      expect(synced.active).toEqual(here)
       const later = prune(
         sync(settled, grown),
         listed("1-r1"),
@@ -525,18 +545,8 @@ describe("layoutReducer", () => {
 
 describe("listOf", () => {
   test("the sidebar as drawn, then new tabs", () => {
-    const l = layoutReducer(
-      drawn(at(initialLayout()), listed("5-r2", "1-r1")),
-      {
-        kind: "newTab",
-        key: "n",
-        task: NEW_TASK,
-        root: NEW_ROOT,
-        thread: NEW_THREAD,
-        asksAgent: false,
-      },
-    )
-    expect(listOf(l)).toEqual([R2, R1, { kind: "new", key: "n" }])
+    const l = newTab(drawn(at(initialLayout()), listed("5-r2", "1-r1")))
+    expect(listOf(l)).toEqual([R2, R1, NEW])
     expect(listOf(initialLayout())).toEqual([])
   })
 })
@@ -550,69 +560,96 @@ test("unlisted: the tasks not in the sidebar, and not archived (ADR-0077, ADR-01
 
 describe("planOpen", () => {
   const l = at(initialLayout())
-  test("scrolls to a message a column of its root already shows", () => {
-    // The root's first column follows its thread, through 2-a to 3-b.
-    expect(planOpen(l, index, entryId("2-a"), OF_THREAD, ENTRIES)).toEqual({
+  test("scrolls to a message an unfolded column already shows", () => {
+    // The task's first column follows its thread, through 2-a to 3-b.
+    expect(planOpen(l, index, entryId("2-a"), TASKS, [])).toEqual({
       kind: "scroll",
       task: TK("1-r1"),
-      key: expect.any(String),
+      key: TRUNK,
     })
-  })
-  test("opens beside the column sharing most of its path, in its own root", () => {
-    // 4-c is a branch at 2-a: another thread, which no column shows.
-    expect(planOpen(l, index, entryId("4-c"), OF_THREAD, ENTRIES)).toEqual({
-      kind: "open",
-      task: TK("1-r1"),
-      entry: "1-r1",
-      after: 0,
-    })
-    expect(planOpen(l, index, entryId("6-d"), OF_THREAD, ENTRIES)).toEqual({
+    expect(planOpen(l, index, entryId("6-d"), TASKS, [])).toEqual({
       kind: "scroll",
       task: TK("5-r2"),
-      key: expect.any(String),
+      key: threadOfEntry("5-r2"),
+    })
+  })
+  test("unfolds the column of a message's thread when no unfolded column shows it", () => {
+    // 4-c is a branch at 2-a: another thread, its column folded.
+    expect(planOpen(l, index, entryId("4-c"), TASKS, [])).toEqual({
+      kind: "unfold",
+      task: TK("1-r1"),
+      card: C,
+    })
+    // The trunk folded, the branch's column shows the shared 2-a.
+    const folded = layoutReducer(
+      layoutReducer(l, unfold(C)),
+      view("1-r1", { kind: "fold", card: TRUNK, unfolded: false }),
+    )
+    expect(planOpen(folded, index, entryId("2-a"), TASKS, [])).toEqual({
+      kind: "scroll",
+      task: TK("1-r1"),
+      key: C,
+    })
+    expect(planOpen(folded, index, entryId("3-b"), TASKS, [])).toEqual({
+      kind: "unfold",
+      task: TK("1-r1"),
+      card: TRUNK,
     })
   })
   test("an entry the index lacks, or one whose thread is in no task, has no plan", () => {
-    expect(planOpen(l, index, entryId("nope"), OF_THREAD, ENTRIES)).toBeNull()
-    expect(planOpen(l, index, entryId("4-c"), new Map(), ENTRIES)).toBeNull()
+    expect(planOpen(l, index, entryId("nope"), TASKS, [])).toBeNull()
+    expect(
+      planOpen(
+        l,
+        index,
+        entryId("4-c"),
+        { taskOfThread: new Map(), canvases: new Map() },
+        [],
+      ),
+    ).toBeNull()
   })
 })
 
 describe("encodeLayout / decodeLayout", () => {
-  const T = threadIdFor("01a0ffd2-0000-7000-8000-0000000000bb")
   const trip = (l: Layout) =>
     decodeLayout(JSON.parse(JSON.stringify(encodeLayout(l))))
+  const F = threadIdFor("01a0ffd2-0000-7000-8000-0000000000f1")
+  const VIEW: TaskView = {
+    cards: new Map([
+      [TRUNK, { unfolded: true, density: "outline" }],
+      [C, { details: true }],
+    ]),
+    task: { unfolded: true },
+    fresh: new Map([
+      [
+        F,
+        {
+          at: entryId("2-a"),
+          sendId: "s-1",
+          prefill: { text: "@agent ", blank: true },
+        },
+      ],
+    ]),
+  }
 
-  test("a round trip keeps what you are on, each root's columns and threads, new tabs and the board; never the sidebar, which is your document's", () => {
+  test("a round trip keeps what you are on, each task's view, new tabs and the board; never the sidebar, which is your document's", () => {
     const l: Layout = {
-      active: { kind: "new", key: "n" },
+      active: NEW,
       open: [],
       board: true,
-      tasks: new Map([
-        [
-          TK("1-r1"),
-          [
-            { key: "a", anchor: entryId("1-r1") },
-            { key: "b", anchor: entryId("2-a"), thread: T },
-            {
-              key: "d",
-              anchor: entryId("2-a"),
-              thread: NEW_THREAD,
-              fresh: { sendId: "s-1" },
-            },
-          ],
-        ],
-      ]),
+      tasks: new Map([[TK("1-r1"), VIEW]]),
       newTabs: [
         {
-          key: "n",
+          key: NEW_THREAD,
           anchor: null,
           thread: NEW_THREAD,
           asksAgent: true,
+          density: "raw",
           fresh: {
             root: NEW_ROOT,
             task: NEW_TASK,
             state: workflowStateIdFor("d"),
+            prefill: { text: "say it again", blank: false },
           },
         },
       ],
@@ -622,155 +659,82 @@ describe("encodeLayout / decodeLayout", () => {
     expect(trip(initialLayout())).toEqual(initialLayout())
   })
 
-  test("a column's density and open details are kept (ADR-0106, ADR-0073)", () => {
-    const l: Layout = {
-      active: { kind: "task", task: TK("1-r1") },
-      open: [],
-      board: false,
-      tasks: new Map([
-        [
-          TK("1-r1"),
-          [
-            { key: "a", anchor: entryId("1-r1"), density: "outline" },
-            { key: "b", anchor: entryId("2-a"), details: true },
-          ],
-        ],
-      ]),
-      newTabs: [],
-    }
-    expect(trip(l)).toEqual(l)
-  })
-
   test("a message waiting to be sent is never stored, nor restored: it would be sent again", () => {
     const stored = encodeLayout({
       ...initialLayout(),
       tasks: new Map([
         [
           TK("1-r1"),
-          [
-            {
-              key: "a",
-              anchor: entryId("1-r1"),
-              thread: NEW_THREAD,
-              fresh: { pending: { text: "hello" } },
-            },
-          ],
+          {
+            ...defaultView(null),
+            fresh: new Map([
+              [F, { at: entryId("2-a"), pending: { text: "hello" } }],
+            ]),
+          },
         ],
       ]),
     })
     expect(JSON.stringify(stored)).not.toContain("hello")
     const raw = {
-      v: 7,
-      active: null,
+      ...stored,
       tasks: {
-        [TK("1-r1")]: [
-          {
-            key: "a",
-            anchor: entryId("1-r1"),
-            thread: NEW_THREAD,
-            fresh: { pending: "hello" },
-          },
-        ],
+        [TK("1-r1")]: {
+          cards: {},
+          task: { unfolded: false },
+          fresh: { [F]: { at: "2-a", pending: "hello" } },
+        },
       },
-      newTabs: [],
-      board: false,
     }
-    expect(decodeLayout(raw)?.tasks.get(TK("1-r1"))).toEqual([
-      { key: "a", anchor: entryId("1-r1"), thread: NEW_THREAD, fresh: {} },
-    ])
-  })
-
-  test("a prefill, blank or content, is stored and restored: only pending sends on opening", () => {
-    const l = {
-      ...initialLayout(),
-      tasks: new Map([
-        [
-          TK("1-r1"),
-          [
-            { key: "a", anchor: entryId("1-r1") },
-            {
-              key: "b",
-              anchor: entryId("1-r1"),
-              thread: NEW_THREAD,
-              fresh: { prefill: { text: "@agent ", blank: true } },
-            },
-            {
-              key: "c",
-              anchor: entryId("1-r1"),
-              thread: T,
-              fresh: { prefill: { text: "say it again", blank: false } },
-            },
-          ],
-        ],
-      ]),
-    }
-    expect(decodeLayout(encodeLayout(l))).toEqual(l)
+    expect(decodeLayout(raw)?.tasks.get(TK("1-r1"))?.fresh.get(F)).toEqual({
+      at: entryId("2-a"),
+    })
   })
 
   test("a layout that is another version, or partly malformed, restores nothing", () => {
-    const good = { key: "a", anchor: entryId("1-r1") }
+    const good = encodeLayout({
+      ...initialLayout(),
+      tasks: new Map([[TK("1-r1"), VIEW]]),
+    })
+    const goodView = good.tasks[TK("1-r1")]
+    expect(decodeLayout(good)).toBeDefined()
     for (const raw of [
-      { v: 1, columns: [good] },
-      { v: 2, active: null, roots: {}, newTabs: [] },
-      { v: 3, active: null, open: [], roots: {}, newTabs: [] },
-      { v: 4, active: null, roots: {}, newTabs: [], board: false },
-      // v5 named a column's lane and reserved id (ADR-0117); one in v6's
-      // shape under v5 is dropped too.
-      { v: 5, active: null, roots: { r: [good] }, newTabs: [], board: false },
-      // v6 kept columns per root (ADR-0116): a good v6 layout is dropped.
-      { v: 6, active: null, roots: { r: [good] }, newTabs: [], board: false },
-      // One in v7's shape under v6 is dropped too.
-      {
-        v: 6,
-        active: null,
-        tasks: { [TK("1-r1")]: [good] },
-        newTabs: [],
-        board: false,
-      },
+      { v: 1, columns: [] },
+      { v: 6, active: null, roots: {}, newTabs: [], board: false },
+      // v7 kept a task's columns, in an order of this tab's (ADR-0116).
       {
         v: 7,
         active: null,
-        tasks: { [TK("1-r1")]: [] },
+        tasks: { [TK("1-r1")]: [{ key: "a", anchor: "1-r1" }] },
         newTabs: [],
         board: false,
       },
+      { ...good, v: 7 },
+      // A view keyed by something that is no task.
+      { ...good, tasks: { "1-r1": goodView } },
+      // A card's view keyed by something that is no card.
       {
-        v: 7,
-        active: { kind: "root", root: "1-r1" },
-        tasks: {},
-        newTabs: [],
-        board: false,
+        ...good,
+        tasks: { [TK("1-r1")]: { ...goodView, cards: { "not a card": {} } } },
       },
+      // A branch keyed by something that is no thread.
       {
-        v: 7,
-        active: null,
-        tasks: { [TK("1-r1")]: [good, { key: 3 }] },
-        newTabs: [],
-        board: false,
+        ...good,
+        tasks: {
+          [TK("1-r1")]: { ...goodView, fresh: { "w-x": { at: "2-a" } } },
+        },
       },
-      {
-        v: 7,
-        active: null,
-        tasks: { [TK("1-r1")]: [{ ...good, thread: "w-someone" }] },
-        newTabs: [],
-        board: false,
-      },
-      // A task's columns keyed by something that is no task.
-      {
-        v: 7,
-        active: null,
-        tasks: { "1-r1": [good] },
-        newTabs: [],
-        board: false,
-      },
-      { v: 7, active: null, tasks: {}, newTabs: [] },
+      // A view as a list: an order of this tab's.
+      { ...good, tasks: { [TK("1-r1")]: [TRUNK, C] } },
+      { ...good, active: { kind: "root", root: "1-r1" } },
+      { ...good, newTabs: [{ key: "n", anchor: null }] },
+      { v: 8, active: null, tasks: {}, newTabs: [] },
       "layout",
       null,
     ])
       expect(decodeLayout(raw)).toBeUndefined()
   })
 
-  test("a fresh column with no thread, or a new tab with no root or task of its own, restores nothing (ADR-0066, ADR-0117, ADR-0116)", () => {
+  test("a new tab with no root or task of its own restores nothing (ADR-0066, ADR-0117, ADR-0116)", () => {
     const stored = (column: object) => ({
       ...encodeLayout(initialLayout()),
       newTabs: [column],
@@ -778,7 +742,7 @@ describe("encodeLayout / decodeLayout", () => {
     expect(
       decodeLayout(
         stored({
-          key: "n",
+          key: NEW_THREAD,
           anchor: null,
           thread: NEW_THREAD,
           fresh: { root: NEW_ROOT, task: NEW_TASK },
@@ -789,7 +753,6 @@ describe("encodeLayout / decodeLayout", () => {
       { key: "n", anchor: null, fresh: { root: NEW_ROOT, task: NEW_TASK } },
       { key: "n", anchor: null, thread: NEW_THREAD, fresh: {} },
       { key: "n", anchor: null, thread: NEW_THREAD, fresh: { root: "r-x" } },
-      // A new tab with no task of its own (ADR-0116).
       { key: "n", anchor: null, thread: NEW_THREAD, fresh: { root: NEW_ROOT } },
       {
         key: "n",

@@ -109,7 +109,7 @@ const rootRecord: RootRecord = {
   newest: E,
   writers: [ADA],
   threads: { [L]: [ADA] },
-  mentions: [{ id: E, by: ADA, text: "@bea look" }],
+  mentions: [{ id: E, by: ADA, text: "@bea look", thread: L }],
   images: [],
 }
 
@@ -346,12 +346,16 @@ test("an offer record written before ADR-0100 reads its `integratedAs` as `accep
   expect("integratedAs" in stored).toBe(false)
 })
 
-test("a root record written before its threads reads with none, so a starting host still opens it (ADR-0077)", () => {
-  const { threads: _, ...before } = ROOT.encode(rootRecord) as Record<
-    string,
-    unknown
-  >
-  expect(ROOT.decode(before, TEST_ROOT)).toEqual({ ...rootRecord, threads: {} })
+test("a root record in an older shape does not decode: it is derived, and the directory rebuilds it (ADR-0063, ADR-0116)", () => {
+  const stored = ROOT.encode(rootRecord) as Record<string, unknown>
+  const { threads: _, ...noThreads } = stored
+  expect(ROOT.decode(noThreads, TEST_ROOT)).toBeUndefined()
+  const mentionNoThread = {
+    ...stored,
+    mentions: [{ id: E, by: ADA, text: "@bea look" }],
+  }
+  expect(ROOT.decode(mentionNoThread, TEST_ROOT)).toBeUndefined()
+  expect(ROOT.derived).toBe(true)
 })
 
 test("a root record's thread that is no lane is dropped, and the record kept", () => {

@@ -40,7 +40,7 @@ import {
   toolContextOf,
 } from "./lanes.ts"
 import { type PiSetup, setupInside } from "./pi-setup.ts"
-import { carryPinned, withCarried } from "./pinned.ts"
+import { carryContext, withCarried } from "./pinned.ts"
 import { prefixChange, prefixOf } from "./prefix.ts"
 import { type Scribe, scribeInside } from "./scribe.ts"
 import { STREAM_SOURCES, streamEventOf } from "./stream.ts"
@@ -246,13 +246,13 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
         return undefined
       })
     }
-    // A compaction keeps the cards the model last read in view (S92): the
-    // newest cards entry summarised is carried into pi's retained tail.
-    // Nothing is thrown: if `compact` fails, pi compacts on its own, and
-    // only the cards are lost, until the next run restates them.
+    // A compaction keeps the context the model last read in view (S92):
+    // the newest entry of each kind summarised is carried into pi's
+    // retained tail. Nothing is thrown: if `compact` fails, pi compacts on
+    // its own, and only the context is lost, until the next run restates it.
     harness.hooks.on("before_compaction", async event => {
-      const cards = carryPinned(event.preparation)
-      if (cards === null) return undefined
+      const cards = carryContext(event.preparation)
+      if (cards.length === 0) return undefined
       const done = await compact(
         event.preparation,
         setup.models,

@@ -17,7 +17,7 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
-import { decodeAt, rootKey } from "./decode.ts"
+import { decodeAt, rootKey, ThreadIdSchema } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
 const Id = Type.String({ minLength: 1 })
@@ -28,11 +28,14 @@ const RootRecordSchema = Type.Object({
   messages: Type.Number(),
   newest: Type.Union([Id, Type.Null()]),
   writers: Type.Array(Type.String()),
-  // Optional: a starting host chooses the roots it opens from these records
-  // (`planLoads`), and a record written before the field must still decode.
-  threads: Type.Optional(Type.Record(Type.String(), Type.Array(Type.String()))),
+  threads: Type.Record(Type.String(), Type.Array(Type.String())),
   mentions: Type.Array(
-    Type.Object({ id: Id, by: Type.String(), text: Type.String() }),
+    Type.Object({
+      id: Id,
+      by: Type.String(),
+      text: Type.String(),
+      thread: ThreadIdSchema,
+    }),
   ),
   images: Type.Array(Type.String()),
 })
@@ -42,18 +45,23 @@ const idOrNull = (id: string | null): EntryId | null =>
 
 /** Each thread's writers, a key that is no lane name dropped. */
 const threadsOf = (
-  threads: Readonly<Record<string, readonly string[]>> | undefined,
+  threads: Readonly<Record<string, readonly string[]>>,
 ): Readonly<Record<ThreadId, readonly WriterId[]>> =>
   Object.fromEntries(
-    Object.entries(threads ?? {}).flatMap(([lane, writers]) =>
+    Object.entries(threads).flatMap(([lane, writers]) =>
       isThreadId(lane) ? [[lane, writers as WriterId[]]] : [],
     ),
   )
 
-/** Each root's directory record, at its id. */
+/**
+ * Each root's directory record, at its id. Derived from the root's document
+ * alone, so a record that does not decode in this build's shape is rebuilt
+ * at a host's start (`host/directory.ts`), never migrated.
+ */
 export const ROOT: RecordSpec<RootRecord, RootId, "session"> = {
   namespace: "pinetrie.root",
   home: "session",
+  derived: true,
   keyOf: r => r.root,
   encode: ({ root, ...contents }) => contents,
   decode: (contents, key) =>
@@ -70,6 +78,7 @@ export const ROOT: RecordSpec<RootRecord, RootId, "session"> = {
         id: entryId(m.id),
         by: m.by as WriterId,
         text: m.text,
+        thread: m.thread,
       })),
       images: r.images as Sha256[],
     })),

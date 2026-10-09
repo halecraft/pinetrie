@@ -14,6 +14,7 @@ import {
   noteColumnIdFor,
   type OfferFact,
   PLAIN,
+  REORDER_PLACES,
   ROOT,
   rootIdFor,
   type TaskId,
@@ -52,14 +53,17 @@ import {
   planMoveCommand,
   planMoveRequest,
   planMoves,
+  planMoveTargets,
   planNextQueuedCardPop,
-  planNotesTargets,
   planReorder,
   planSetCommand,
   planUnqueueAll,
   planUnsent,
+  planWidth,
   type QueuedCard,
   queuedOn,
+  REORDERS,
+  taskPinnedOf,
   toNotes,
   undoAnswer,
   yourCard,
@@ -397,20 +401,26 @@ describe("note columns (ADR-0116)", () => {
   })
 
   test("nearestNoteColumn: with none, one is made just after the thread; a thread not on the canvas has none", () => {
-    const made = nearest([thread(LANE, K(2)), thread(T2, K(4))])
-    expect(made.kind).toBe("make")
-    const order = made.kind === "make" ? made.order : null
-    expect(order !== null && order > K(2) && order < K(4)).toBe(true)
+    expect(nearest([thread(LANE, K(2)), thread(T2, K(4))])).toEqual({
+      kind: "make",
+      after: 0,
+    })
+    expect(nearest([thread(T2, K(2)), thread(LANE, K(4))])).toEqual({
+      kind: "make",
+      after: 1,
+    })
     expect(nearest([thread(T2, K(2))])).toEqual({ kind: "none" })
   })
 
   test("notesNear decides, minting nothing: a column, one to make there, or the holder's inventory; null for a thread with no card", () => {
     const cards = [thread(LANE, K(2)), column("l", K(3))]
-    expect(notesNear(cards, LANE)).toEqual({
+    expect(notesNear(cards, { kind: "notes", thread: LANE })).toEqual({
       kind: "column",
       column: noteColumnIdFor("l"),
     })
-    expect(notesNear([thread(LANE, K(2))], LANE)).toMatchObject({
+    expect(
+      notesNear([thread(LANE, K(2))], { kind: "notes", thread: LANE }),
+    ).toMatchObject({
       kind: "make",
       task: TEST_TASK,
       renumbered: [],
@@ -419,13 +429,35 @@ describe("note columns (ADR-0116)", () => {
       ...thread(LANE, K(2)),
       place: { kind: "inventory", holder: BEA } as const,
     }
-    expect(notesNear([held], LANE)).toEqual({ kind: "inventory", holder: BEA })
-    expect(notesNear([], LANE)).toBeNull()
+    expect(notesNear([held], { kind: "notes", thread: LANE })).toEqual({
+      kind: "inventory",
+      holder: BEA,
+    })
+    expect(notesNear([], { kind: "notes", thread: LANE })).toBeNull()
+  })
+
+  test("a task's own nearest notes: its first note column, or one made before every card (ADR-0116)", () => {
+    const toTask = { kind: "notes", task: TEST_TASK } as const
+    expect(
+      notesNear(
+        [thread(LANE, K(2)), column("l", K(3)), column("r", K(5))],
+        toTask,
+      ),
+    ).toEqual({ kind: "column", column: noteColumnIdFor("l") })
+    const made = notesNear([thread(LANE, K(2)), thread(T2, K(4))], toTask)
+    expect(made?.kind === "make" && made.order < K(2)).toBe(true)
+    expect(nearestNoteColumn(canvasOf([], TEST_TASK), null)).toEqual({
+      kind: "make",
+      after: -1,
+    })
   })
 
   test("notesNear: with no room after the thread's card, the crowded canvas cards are renumbered around the new column's rank", () => {
     const tight = (Number.parseInt(K(2), 36) + 1).toString(36).padStart(10, "0")
-    const near = notesNear([thread(LANE, K(2)), thread(T2, tight)], LANE)
+    const near = notesNear([thread(LANE, K(2)), thread(T2, tight)], {
+      kind: "notes",
+      thread: LANE,
+    })
     if (near?.kind !== "make") throw new Error(`not made: ${near?.kind}`)
     const order = (id: string) => {
       const moved = near.renumbered.find(c => c.id === id)?.place
@@ -447,7 +479,7 @@ describe("note columns (ADR-0116)", () => {
     }
     const there = toNotes({
       cards: [thread(LANE, K(2)), column("l", K(3)), n1],
-      thread: LANE,
+      to: { kind: "notes", thread: LANE },
       newColumn,
       by: BEA,
     })
@@ -457,7 +489,7 @@ describe("note columns (ADR-0116)", () => {
     expect(minted).toBe(0)
     const made = toNotes({
       cards: [thread(LANE, K(2))],
-      thread: LANE,
+      to: { kind: "notes", thread: LANE },
       newColumn,
       by: BEA,
     })
@@ -477,14 +509,14 @@ describe("note columns (ADR-0116)", () => {
     expect(minted).toBe(1)
   })
 
-  test("planNotesTargets: each move to a thread's notes to a column; one made for the first takes the rest; a thread with no card, refused", () => {
+  test("planMoveTargets, notes: each move to a thread's notes to a column; one made for the first takes the rest; a thread with no card, refused", () => {
     const cards = [
       thread(LANE, K(2)),
       queued(cardIdFor("c1"), "a"),
       queued(cardIdFor("c2"), "b"),
     ]
     let n = 0
-    const resolved = planNotesTargets({
+    const resolved = planMoveTargets({
       cards,
       moves: planUnqueueAll(cards, LANE),
       sender: ADA,
@@ -500,13 +532,88 @@ describe("note columns (ADR-0116)", () => {
     ])
     const lost = queued(cardIdFor("c3"), "c")
     expect(
-      planNotesTargets({
+      planMoveTargets({
         cards: [lost],
         moves: planUnqueueAll([lost], LANE),
         sender: ADA,
         newColumn: () => MADE,
       }),
     ).toEqual({ kind: "refused", code: "no-place", now: lost })
+  })
+
+  test("planMoveTargets, a drop on a canvas: ranked just after the card it names, first with none, at the end when that card is gone; a column made there is in its task's history (ADR-0116)", () => {
+    const [x, y] = [thread(LANE, K(2)), thread(threadIdFor("y"), K(4))]
+    const made = noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000c1")
+    const drop = (after: CardId | null) => {
+      const resolved = planMoveTargets({
+        cards: [x, y],
+        moves: [
+          {
+            card: made,
+            from: null,
+            to: { kind: "canvas-at", task: TEST_TASK, after },
+          },
+        ],
+        sender: ADA,
+        newColumn: () => MADE,
+      })
+      if (resolved.kind !== "resolved") throw new Error(resolved.code)
+      return resolved.moves[0]?.to
+    }
+    const order = (to: ReturnType<typeof drop>) =>
+      to?.kind === "canvas" ? to.order : ""
+    const between = order(drop(LANE))
+    expect(between > K(2) && between < K(4)).toBe(true)
+    expect(order(drop(null)) < K(2)).toBe(true)
+    expect(order(drop(threadIdFor("gone"))) > K(4)).toBe(true)
+    // A canvas's key alone is ranked at its end: no card lands unranked.
+    const plain = planMoveTargets({
+      cards: [x, y],
+      moves: [
+        { card: made, from: null, to: { kind: "canvas", task: TEST_TASK } },
+      ],
+      sender: ADA,
+      newColumn: () => MADE,
+    })
+    const atEnd =
+      plain.kind === "resolved" && plain.moves[0]?.to.kind === "canvas"
+        ? plain.moves[0].to.order
+        : ""
+    expect(atEnd > K(4)).toBe(true)
+    planMove(
+      [x],
+      // @ts-expect-error: planMove takes a canvas only with its rank
+      { card: made, from: null, to: { kind: "canvas", task: TEST_TASK } },
+      ADA,
+      NO_DISCARDS,
+    )
+    const { step } = planMoveRequest(
+      [x, y],
+      [
+        {
+          card: made,
+          from: null,
+          to: { kind: "canvas-at", task: TEST_TASK, after: LANE },
+        },
+      ],
+      ADA,
+      () => false,
+      { tasks: indexTasks([x, y], new Map()), here: null },
+      () => MADE,
+    )
+    expect(step).toMatchObject({
+      kind: "steps",
+      steps: [
+        {
+          kind: "write",
+          record: {
+            kind: "note-column",
+            id: made,
+            place: { kind: "canvas", task: TEST_TASK, order: between },
+          },
+        },
+      ],
+    })
   })
 
   test("planMoveRequest: a column made for a move is written before the move, in one step", () => {
@@ -582,7 +689,7 @@ describe("note columns (ADR-0116)", () => {
 
   test("a note column is made by a move onto a canvas, in its task's history; never into an inventory", () => {
     const id = noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000c1")
-    const to = { kind: "canvas", task: TEST_TASK } as const
+    const to = { kind: "canvas", task: TEST_TASK, order: "m" } as const
     expect(
       planMove([], { card: id, from: null, to }, ADA, NO_DISCARDS),
     ).toMatchObject({
@@ -1723,6 +1830,207 @@ describe("planReorder (ADR-0048 step 7)", () => {
   })
 })
 
+describe("a reorder on a canvas (ADR-0116)", () => {
+  const key = (n: number) => n.toString(36).padStart(10, "0")
+  const at = { kind: "canvas", task: TEST_TASK } as const
+  const onCanvas = (
+    id: string,
+    n: number,
+    width: 1 | 2 = 1,
+    task = TEST_TASK,
+  ): CardRecord => ({
+    kind: "thread",
+    id: threadIdFor(id),
+    owner: ADA,
+    placer: BEA,
+    place: { kind: "canvas", task, order: key(n), width },
+  })
+  const [a, b, c] = [
+    onCanvas("a", 100),
+    onCanvas("b", 200, 2),
+    onCanvas("c", 300),
+  ]
+
+  test("a column's card moves among its task's cards: only its rank changes, its width and placer kept", () => {
+    const moved = planReorder(
+      [a, b, c, onCanvas("z", 150, 1, taskIdFor("k-other"))],
+      {
+        card: b.id,
+        at,
+        after: c.id,
+        before: null,
+      },
+    )
+    expect(moved).toEqual({
+      kind: "write",
+      record: { ...b, place: { ...b.place, order: expect.any(String) } },
+    })
+    const order =
+      moved.kind === "write" && "order" in moved.record.place
+        ? moved.record.place.order
+        : ""
+    expect(order > key(300)).toBe(true)
+    expect(moved.kind === "write" && moved.record.place).toMatchObject({
+      width: 2,
+    })
+  })
+
+  test("its neighbours must still be next to each other, as its sender saw them", () => {
+    expect(
+      planReorder([a, b, c], { card: c.id, at, after: null, before: b.id }),
+    ).toMatchObject({ kind: "refused", code: "order-changed" })
+    // Another task's card is no neighbour here.
+    expect(
+      planReorder([a, b, c, onCanvas("z", 50, 1, taskIdFor("k-other"))], {
+        card: c.id,
+        at,
+        after: threadIdFor("z"),
+        before: a.id,
+      }),
+    ).toMatchObject({ kind: "refused", code: "order-changed" })
+  })
+
+  test("planWidth: a card's width on its canvas, from where its sender saw it; its rank and placer kept", () => {
+    expect(planWidth([a, b], { card: a.id, at, width: 2 })).toEqual({
+      kind: "write",
+      record: { ...a, place: { ...a.place, width: 2 } },
+    })
+    // The width it has: nothing to write.
+    expect(planWidth([a, b], { card: b.id, at, width: 2 })).toBeNull()
+    expect(planWidth([b], { card: a.id, at, width: 2 })).toEqual({
+      kind: "refused",
+      code: "gone",
+      now: null,
+    })
+    // On another canvas than its sender saw, or on none.
+    const elsewhere = onCanvas("a", 100, 1, taskIdFor("k-other"))
+    expect(planWidth([elsewhere], { card: a.id, at, width: 2 })).toMatchObject({
+      kind: "refused",
+      code: "moved",
+    })
+    const held: CardRecord = {
+      ...a,
+      kind: "thread",
+      id: threadIdFor("a"),
+      place: { kind: "inventory", holder: ADA },
+    } as CardRecord
+    expect(planWidth([held], { card: a.id, at, width: 2 })).toMatchObject({
+      kind: "refused",
+      code: "moved",
+    })
+  })
+
+  test("every place a reorder moves among has its rule", () => {
+    // @ts-expect-error: a place with no row does not compile
+    const missing: typeof REORDERS = {
+      queued: REORDERS.queued,
+      pinned: REORDERS.pinned,
+      note: REORDERS.note,
+    }
+    expect(Object.keys(REORDERS).sort()).toEqual([...REORDER_PLACES].sort())
+    expect(missing).toBeDefined()
+  })
+})
+
+describe("cards pinned to a task (ADR-0116)", () => {
+  const key = (n: number) => n.toString(36).padStart(10, "0")
+  const pinnedTo = (id: string, n: number, task = TEST_TASK): CardRecord =>
+    card({
+      id: cardIdFor(id),
+      place: { kind: "task-pinned", task, order: key(n) },
+    })
+  const at = { kind: "task-pinned", task: TEST_TASK } as const
+
+  test("a pin to the task goes after its other pins, and only its own", () => {
+    const step = planMove(
+      [
+        card(),
+        pinnedTo("c2", 100),
+        pinnedTo("c3", 2 ** 30, taskIdFor("k-other")),
+      ],
+      { card: cardIdFor("c1"), from: keyOf(card().place), to: at },
+      BEA,
+      NO_DISCARDS,
+    )
+    expect(step).toMatchObject({
+      kind: "write",
+      record: { placer: BEA, place: { kind: "task-pinned", task: TEST_TASK } },
+    })
+    const order =
+      step.kind === "write" && step.record.place.kind === "task-pinned"
+        ? step.record.place.order
+        : ""
+    expect(order > key(100) && order < key(2 ** 30)).toBe(true)
+    expect(
+      taskPinnedOf(
+        [pinnedTo("c3", 300), pinnedTo("c2", 100), card()],
+        TEST_TASK,
+      ).map(c => c.id),
+    ).toEqual([cardIdFor("c2"), cardIdFor("c3")])
+  })
+
+  test("a reorder among the task's pins, the neighbours next to each other", () => {
+    const [a, b, c] = [
+      pinnedTo("ca", 100),
+      pinnedTo("cb", 200),
+      pinnedTo("cc", 300),
+    ]
+    const up = planReorder([a, b, c], {
+      card: c.id,
+      at,
+      after: null,
+      before: a.id,
+    })
+    expect(up.kind === "write" && up.record.place).toMatchObject({
+      kind: "task-pinned",
+    })
+    expect(
+      planReorder([a, b, c], { card: c.id, at, after: null, before: b.id }),
+    ).toMatchObject({ kind: "refused", code: "order-changed" })
+  })
+
+  test("unpinned from the task, a card goes to its first note column, made first on the canvas when it has none", () => {
+    const pin = pinnedTo("c1", 100)
+    const onCanvas = threadCardOf({
+      thread: LANE,
+      task: TEST_TASK,
+      by: ADA,
+      cards: [],
+    })
+    const made = noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000c9")
+    const { step } = planMoveRequest(
+      [pin, onCanvas],
+      [
+        {
+          card: pin.id,
+          from: at,
+          to: { kind: "notes", task: TEST_TASK },
+        },
+      ],
+      ADA,
+      () => false,
+      { tasks: indexTasks([pin, onCanvas], new Map()), here: null },
+      () => made,
+    )
+    expect(step).toMatchObject({
+      kind: "steps",
+      steps: [
+        { kind: "write", record: { kind: "note-column", id: made } },
+        {
+          kind: "write",
+          record: { id: pin.id, place: { kind: "note", column: made } },
+        },
+      ],
+    })
+    const column =
+      step.kind === "steps" && step.steps[0]?.kind === "write"
+        ? step.steps[0].record.place
+        : null
+    const first = onCanvas.place.kind === "canvas" ? onCanvas.place.order : ""
+    expect(column?.kind === "canvas" && column.order < first).toBe(true)
+  })
+})
+
 describe("storage", () => {
   test("a record round-trips through its flat stored form", () => {
     const lane = threadIdFor("x")
@@ -1747,6 +2055,7 @@ describe("storage", () => {
           order: "m",
         },
       }),
+      card({ place: { kind: "task-pinned", task: TEST_TASK, order: "m" } }),
       card({
         carries: { kind: "message", command: "bring-up-to-date" },
         unsent: "refused",

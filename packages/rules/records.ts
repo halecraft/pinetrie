@@ -27,6 +27,12 @@ export type Home = "session" | "root"
 export interface RecordSpec<R, K extends string, H extends Home = Home> {
   readonly namespace: HostNamespace
   readonly home: H
+  /**
+   * Derived from a document the host holds (the directory's `ROOT`): a
+   * record that does not decode is written again from its document, so its
+   * shape changes with no migration.
+   */
+  readonly derived?: true
   /** The address a write goes to. */
   readonly keyOf: (record: R) => K
   /** The plain JSON contents stored, without the key. */

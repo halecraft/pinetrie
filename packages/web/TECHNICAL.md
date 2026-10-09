@@ -274,6 +274,27 @@ and dropped: forks far apart could not be seen together
   spacer taller than the view. A fork point above the view is still met, by
   scrolling alone. So a spacer is never taller than the view it lines up with.
 
+## The strip (`strip.tsx`, ADR-0116)
+
+`Strip` draws a task's strip (`taskStrip`, `StripView`): the task column
+(`task-column.tsx`), then each card on the canvas in its order, then, among
+them, your branches not yet sent. Its first column is a `TaskColumn` by its
+type (`Strip = [TaskColumn, ...CardColumn[]]`), so no strip lacks one.
+
+- **A folded column is a `.folded-column`** (`folded-column.tsx`), never a
+  `.column`: a narrow strip with its title, `data-card`, and `data-kind`
+  (`thread` or `notes`), which a click unfolds. So `.column` counts whole
+  thread columns, and the browser suite counts with it. The folded task
+  column is a `.task-column.folded-column`.
+- **`data-position` is a column's index among whole thread columns**
+  (`drawnAt`), which the suite's `col(n)` selects by; `position`, its index
+  on the canvas, is the grip's.
+- **A column's ⋯** (`column-menu.tsx`, `columnMenu`) is its card's, for
+  everyone: its width, one column or two (`cardWidth`), and a note column
+  after it. The task column's **+ note column** puts one first.
+- **Only a fresh column has ×** (`closable` in `ColumnSlot`); a card's
+  folds (⇤, `.fold`).
+
 ## A column's view (`viewport.ts`, `use-viewport.ts`, ADR-0058)
 
 Each column measures which of its messages are in view, and the same span
@@ -326,9 +347,13 @@ serves the rail's outline and the column's spot.
 
 ## Moving columns (`reorder.ts`, `use-column-drag.ts`)
 
-A column's header is its drag handle, once the tab has two columns. Its grip
-(`.grip`) moves it from the keyboard. `move` in `columnsReducer` is the one
-action; `reorder.ts` decides, purely, which gap a pointer is in (`gapAt`),
+A card's column moves for everyone (ADR-0116): its header
+(`[data-column-head]`, a folded strip's and a note column's too) is its drag
+handle, once the canvas has two cards, and its grip (`.grip`) moves it from
+the keyboard. A branch not yet sent and the task column do not move: only
+`#strip > [data-card]` is dragged among. The drop is one `moveColumn`
+intent, a reorder of the card on the canvas (`planColumnMove`), which the
+host orders and the undo key takes back; `reorder.ts` decides, purely, which gap a pointer is in (`gapAt`),
 where a drop there lands (`landing`), what a key does (`keyMove`), and how
 fast the strip scrolls near an edge (`edgeScroll`).
 
@@ -838,8 +863,9 @@ the session sends moves and draws them until its copy holds them
   the composer (`data-put-composer`) your message, swapping out one with
   text (`App`'s `filled` says which hold text).
 - **The notes are in note columns** (`note-column.tsx`, `NoteColumn`,
-  ADR-0116), drawn in `#strip` among the thread columns where `stripItems`
-  puts them, a `.note-column` with its id as `data-column`: its title
+  ADR-0116), drawn in `#strip` at their card's rank on the canvas
+  (`strip.tsx`), a `.note-column` with its id as `data-column` and
+  `data-card`: its title
   (`.note-column-title`, a button that opens `TitleField`
   (`title-field.tsx`), the sidebar's rename field, and sends `rename` with a `MarkTarget`), its notes one under
   another, each a `NoteCardEditor` (`among` its column's notes, so ↑ and ↓
@@ -847,7 +873,7 @@ the session sends moves and draws them until its copy holds them
   a queued card in the dock is, and "+ add a note" (`.add-note`), which
   focuses its card's box once drawn. The whole column is a drop target
   (`data-put-notes`). A note's acts are sent as a `column` intent keyed by
-  the note column's id, so its refusals are said there.
+  the note column's card, so its refusals are said there.
 - **`CardGrid`** (`card-grid.tsx`) draws your inventory's `GridView` as
   index cards, each cell a button (the drop target, `dropProps`, and the
   card's drag) holding its `CardFace`. Its keys are `gridKeyAct`'s, on the
@@ -1165,7 +1191,7 @@ leaving treats the history, are `page.ts`'s (`@pinetrie/interface`).
   against another column (alignment does) must place that column first.
 - **A renamed root's item is an `<input class="open-title-input">`, not a
   `.open-root`**: an input inside a button is invalid HTML, so while the
-  field is open, `.open-root[data-root]` is gone. Enter, Escape and blur all
+  field is open, `.open-root[data-task]` is gone. Enter, Escape and blur all
   go through one `finish` that acts once: removing a focused field can fire
   a blur after Enter or Escape, which would save again, or save a cancel.
   Only Enter and Escape give the item focus back; a blur leaves focus where
@@ -1186,7 +1212,8 @@ leaving treats the history, are `page.ts`'s (`@pinetrie/interface`).
   ancestor's inset shadow. The item reaches the list's right edge (the list
   has no right padding), so it meets the rail.
 - **A column's × (`.close`) is `closable`** (`ColumnSlot`, `appView`):
-  hidden on a root's only column (`columnsOf` would give it back).
+  only a branch not yet sent and a new tab's column close; a card's column
+  folds (⇤, `.fold`).
 - **A popover opens above its trigger in the window's lower half, and from
   its left edge in the left half.** A composer's `▾`, and the footer, are at
   the window's foot, so a list below would be out of sight; the sidebar's `⋯`
@@ -1210,9 +1237,7 @@ leaving treats the history, are `page.ts`'s (`@pinetrie/interface`).
   the suite goes on.
 
 - **Selectors for the sidebar and the board:** a task in the sidebar is
-  `#sidebar .open-root[data-task="…"]`, which also carries its first
-  root's root entry as `data-root`, which the browser suite reads
-  (ADR-0116); the one you are on has
+  `#sidebar .open-root[data-task="…"]` (ADR-0116); the one you are on has
   `aria-current="true"` and its wrap `data-selected`, its × is the
   `.open-close` after it, its `⋯` (`.open-menu`) holds `.rename-root`,
   `.retitle-root` and `.move-to` (`.closes` for

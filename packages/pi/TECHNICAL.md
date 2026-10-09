@@ -277,23 +277,29 @@ pi's null means either undecodable or impossible to fit. After a resize,
   folds into the system prompt on most Anthropic models), lose the whole
   conversation's cache; cards moved to the end of each request lose it on
   every request (S92).
-- **Every thread's `<rules>` holds `PINNED_RULE`**, first (`systemPromptFor`),
-  for a direct thread too. It is constant, so a lane's prompt stays the same
-  between runs; each lane's prompt changed once when it was added. pi drops
-  a guideline equal to another, so the lane's own lines stay distinct.
-- **pi's compaction carries the cards** (`before_compaction`, `agent.ts`;
-  `pinned.ts`). pi compacts in the middle of a run, and a cards entry
-  summarised away would leave the model without its cards. `carryPinned`
-  decides, pure: the newest cards entry among the summarised messages, when
-  the retained tail has none. The hook then runs pi's own `compact()` and
-  returns `withCarried(result, cards)`, the cards at the head of the
-  retained tail, so the stored compaction entry holds them. pi's
-  preparation is stored before the hook runs, so changing it in place would
-  not stick: the hook returns a result instead.
-- **A failed hook costs only the cards.** It throws nothing on purpose: when
-  `compact()` fails it returns nothing, and pi compacts on its own. The
-  next run's entry restates the cards, since none is in view
-  (`pinnedInView`, `@pinetrie/core`).
+- **Every thread's `<rules>` holds the context rules first**
+  (`CONTEXT_RULES`, `systemPromptFor`), for a direct thread too:
+  `PINNED_RULE` (a thread's and a task's pinned cards) and `CANVAS_RULE`
+  (the canvas list, ADR-0116), from the rules' context table. They are
+  constant, so a lane's prompt stays the same between runs; each lane's
+  prompt changed once when each was added. pi drops a guideline equal to
+  another, so the lane's own lines stay distinct.
+- **pi's compaction carries the context entries** (`before_compaction`,
+  `agent.ts`; `pinned.ts`). pi compacts in the middle of a run, and a
+  context entry summarised away (a thread's cards, a task's cards, the
+  canvas list) would leave the model without it. `carryContext` decides,
+  pure, for every kind in the rules' context table (`CONTEXT_KINDS`): the
+  newest of each kind among the summarised messages, when the retained tail
+  has none of it. The hook then runs pi's own `compact()` and returns
+  `withCarried(result, carried)`, those at the head of the retained tail, so
+  the stored compaction entry holds them (read back as the entry's
+  `carried`, a `ContextInView`). pi's preparation is stored before the hook
+  runs, so changing it in place would not stick: the hook returns a result
+  instead.
+- **A failed hook costs only the context.** It throws nothing on purpose:
+  when `compact()` fails it returns nothing, and pi compacts on its own.
+  The next run's entries restate what is not in view (`pinnedInView`,
+  `taskPinnedInView`, `canvasInView`, `@pinetrie/core`).
 - **The faux provider caches per lane** (`withUsageEstimate`), and pi stores
   each reply's `usage`, so `agent.test.ts` checks that an edited card keeps
   the cache with no model key. Each part is estimated rounding up, so a

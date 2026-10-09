@@ -3,12 +3,14 @@ import path from "node:path"
 import {
   commitId,
   type ThreadName,
+  taskIdFor,
   textCardId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { BEHIND } from "./behind.ts"
+import { CANVAS, CANVAS_FACT } from "./canvas.ts"
 import { renderableMessage } from "./chat.ts"
 import { FACT } from "./fact.ts"
 import type { HistorySpec } from "./history.ts"
@@ -16,6 +18,7 @@ import { LAND } from "./land.ts"
 import { PINNED } from "./pinned.ts"
 import { STACK } from "./stack.ts"
 import { CARRY_ON } from "./stop.ts"
+import { TASK_PINNED } from "./task-pinned.ts"
 import { UPDATE } from "./update.ts"
 
 /** Every kind of history message: a spec left out fails the first test. */
@@ -27,6 +30,9 @@ const MESSAGE_SPECS = [
   BEHIND,
   CARRY_ON,
   PINNED,
+  TASK_PINNED,
+  CANVAS,
+  CANVAS_FACT,
 ] as const
 
 type CustomType = (typeof MESSAGE_SPECS)[number]["customType"]
@@ -84,6 +90,24 @@ const SAMPLES: Record<CustomType, unknown> = {
     cards: [{ id: textCardId("k-1"), text: "do it", by: ADA }],
     retired: [{ id: textCardId("k-0"), line: "old" }],
   },
+  "pinetrie.task-pinned": {
+    task: taskIdFor("t"),
+    cards: [{ id: textCardId("k-1"), text: "do it", by: ADA }],
+    retired: [],
+  },
+  "pinetrie.canvas": {
+    task: taskIdFor("t"),
+    title: "Fix the sync bug",
+    lines: ["thread amber-fox (this thread), put by Ada"],
+    more: 0,
+  },
+  "pinetrie.canvas-fact": {
+    task: taskIdFor("t"),
+    by: ADA,
+    byName: "Ada",
+    title: "Decisions",
+    change: "added",
+  },
 }
 
 /** The role each kind renders as (`renderableMessage`). */
@@ -95,6 +119,9 @@ const ROLES: Record<CustomType, string> = {
   "pinetrie.behind": "behind",
   "pinetrie.carry-on": "carry-on",
   "pinetrie.pinned": "pinned",
+  "pinetrie.task-pinned": "task-pinned",
+  "pinetrie.canvas": "canvas",
+  "pinetrie.canvas-fact": "fact",
 }
 
 const isSpec = (v: unknown): v is HistorySpec<string, unknown> =>

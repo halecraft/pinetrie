@@ -1,24 +1,28 @@
 import type { AgentMessage, CompactResult } from "@earendil-works/pi-agent-core"
-import { threadIdFor, writerId } from "@pinetrie/core"
+import { taskIdFor, threadIdFor, writerId } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
-import { encodePinned } from "@pinetrie/rules"
+import { encodeCanvas, encodePinned, encodeTaskPinned } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
-import { carryPinned, withCarried } from "./pinned.ts"
+import { carryContext, withCarried } from "./pinned.ts"
 
+const read = (text: string) => [
+  { id: cardIdFor("c1"), text, by: writerId("ada@x.io") },
+]
 const cards = (text: string) =>
   encodePinned(
-    {
-      lane: threadIdFor("x"),
-      cards: [
-        {
-          id: cardIdFor("c1"),
-          text,
-          by: writerId("ada@x.io"),
-        },
-      ],
-      retired: [],
-    },
+    { lane: threadIdFor("x"), cards: read(text), retired: [] },
     () => "Ada",
+    1,
+  ) as unknown as AgentMessage
+const taskCards = (text: string) =>
+  encodeTaskPinned(
+    { task: taskIdFor("t"), cards: read(text), retired: [] },
+    () => "Ada",
+    1,
+  ) as unknown as AgentMessage
+const canvas = (line: string) =>
+  encodeCanvas(
+    { task: taskIdFor("t"), title: "T", lines: [line], more: 0 },
     1,
   ) as unknown as AgentMessage
 const user = (text: string) =>
@@ -29,40 +33,52 @@ const prep = (
   retainedTail: AgentMessage[],
 ) => ({ messagesToSummarize, turnPrefixMessages, retainedTail })
 
-describe("carryPinned: what a compaction carries into its retained tail", () => {
-  test("nothing summarised is a cards entry: nothing", () => {
-    expect(carryPinned(prep([user("a")], [user("b")], [user("c")]))).toBeNull()
+describe("carryContext: what a compaction carries into its retained tail", () => {
+  test("nothing summarised is a context entry: nothing", () => {
+    expect(carryContext(prep([user("a")], [user("b")], [user("c")]))).toEqual(
+      [],
+    )
   })
 
   test("the newest cards entry summarised, the turn's prefix after the rest, when the tail has none", () => {
     const old = cards("old")
     const newer = cards("newer")
     const newest = cards("newest")
-    expect(carryPinned(prep([old, user("a"), newer], [], [user("c")]))).toBe(
-      newer,
-    )
     expect(
-      carryPinned(prep([old, user("a")], [newest, user("b")], [user("c")])),
-    ).toBe(newest)
+      carryContext(prep([old, user("a"), newer], [], [user("c")])),
+    ).toEqual([newer])
+    expect(
+      carryContext(prep([old, user("a")], [newest, user("b")], [user("c")])),
+    ).toEqual([newest])
   })
 
   test("the tail holds its own: nothing", () => {
     expect(
-      carryPinned(prep([cards("old")], [], [cards("kept"), user("c")])),
-    ).toBeNull()
+      carryContext(prep([cards("old")], [], [cards("kept"), user("c")])),
+    ).toEqual([])
+  })
+
+  test("every kind is carried, the newest of each, in the context table's order; a kind the tail holds is not (ADR-0116)", () => {
+    const [c, t, p] = [canvas("one"), taskCards("pin"), cards("mine")]
+    expect(
+      carryContext(prep([p, user("a"), t, canvas("old"), c], [], [user("c")])),
+    ).toEqual([c, t, p])
+    expect(
+      carryContext(prep([p, t, c], [], [taskCards("kept"), user("c")])),
+    ).toEqual([c, p])
   })
 })
 
-test("withCarried puts the cards at the head of the tail, and changes nothing else", () => {
+test("withCarried puts the entries at the head of the tail, and changes nothing else", () => {
   const result: CompactResult = {
     summary: "s",
     tokensBefore: 9,
     retainedTail: [user("c")],
     details: { readFiles: [], modifiedFiles: [] },
   }
-  const carried = cards("kept")
+  const carried = [canvas("kept"), cards("kept")]
   expect(withCarried(result, carried)).toEqual({
     ...result,
-    retainedTail: [carried, user("c")],
+    retainedTail: [...carried, user("c")],
   })
 })

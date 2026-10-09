@@ -1,40 +1,16 @@
 import { createInMemoryStore, Exchange } from "@kyneta/exchange"
-import {
-  entryId,
-  type RootId,
-  type RootRecord,
-  rootDocId,
-  rootIdFor,
-} from "@pinetrie/core"
+import { type RootId, rootDocId, rootIdFor } from "@pinetrie/core"
 import { newLiveDoc, newPlacesDoc } from "@pinetrie/schema"
 import { newSessionDoc } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import { hostDocuments, planLoads, rootsOpenedWords } from "./docs.ts"
 
-const record = (n: string, entry: string | null): RootRecord => ({
-  root: rootIdFor(n),
-  entry: entry === null ? null : entryId(entry),
-  first: null,
-  firstLine: "",
-  messages: 0,
-  newest: null,
-  writers: [],
-  threads: {},
-  mentions: [],
-  images: [],
-})
-
-test("planLoads: every root something still holds a thread of, a root with no message among them (ADR-0063, ADR-0116)", () => {
-  const roots = new Map(
-    [record("a", "ea"), record("b", "eb"), record("c", null)].map(
-      r => [r.root, r] as const,
-    ),
-  )
-  expect(planLoads(roots, new Set([rootIdFor("a"), rootIdFor("c")]))).toEqual([
+test("planLoads: every root something still holds a thread of, whatever the directory holds (ADR-0063, ADR-0116)", () => {
+  expect(planLoads(new Set([rootIdFor("c"), rootIdFor("a")]))).toEqual([
     rootIdFor("a"),
     rootIdFor("c"),
   ])
-  expect(planLoads(roots, new Set())).toEqual([])
+  expect(planLoads(new Set())).toEqual([])
 })
 
 test("rootsOpenedWords: how many roots a starting host opened, and how many it left archived", () => {

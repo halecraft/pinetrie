@@ -79,10 +79,13 @@ export const HOST_PRINCIPAL = "pinetrie-host"
  *   - `spin-off` makes a card a thread (ADR-0111): `moves` is its one move,
  *     to gone, spun into the new root it names; `state` is the workflow
  *     state the root lands in, `""` for the first open state.
- *   - `reorder` moves the card `cardId` among its neighbours in its queue
- *     or among the pinned cards: `moves` is `{ at, after, before }`, the
- *     key of where it is and the cards it goes after and before, `""` for
- *     none (ADR-0048 step 7).
+ *   - `reorder` moves the card `cardId` among its neighbours in its queue,
+ *     among the pinned cards, in its note column or on its canvas: `moves`
+ *     is `{ at, after, before }`, the key of where it is and the cards it
+ *     goes after and before, `""` for none (ADR-0048 step 7, ADR-0116).
+ *   - `card-width` draws the card `cardId` on the canvas of the task
+ *     `task`, where its sender saw it, one column wide (`mode` `1`) or two
+ *     (`2`), ADR-0116.
  *   - `undo-move` undoes (`mode` `undo`) or redoes (`redo`) the sender's
  *     newest move in the root `root` (ADR-0066).
  *   - `set-command` sets the card `cardId`'s command to `mode`, or
@@ -105,6 +108,7 @@ export const COMMAND_KINDS = [
   "move",
   "queue-card",
   "reorder",
+  "card-width",
   "queue-hold",
   "unqueue-all",
   "spin-off",
@@ -143,7 +147,8 @@ export interface Command {
   /**
    * `chat` and `spin-off`: the task a thread it starts goes in, for a new
    * root a new task's id the sender's tab minted (ADR-0116); `move-task`,
-   * `mark`, `retitle` and `undo-move`: the task it acts on. `""` otherwise.
+   * `mark`, `retitle` and `undo-move`: the task it acts on; `card-width`:
+   * the task whose canvas its sender saw the card on. `""` otherwise.
    */
   readonly task: string
   /**
@@ -153,8 +158,8 @@ export interface Command {
   readonly here: string
   /**
    * `chat`: `reply` or `branch`; `offer` and `workflow`: the action;
-   * `set-command`: the command; `undo-move`: `undo` or `redo`; `""`
-   * otherwise.
+   * `set-command`: the command; `undo-move`: `undo` or `redo`;
+   * `card-width`: `1` or `2`; `""` otherwise.
    */
   readonly mode: string
   /**
@@ -172,7 +177,10 @@ export interface Command {
    * purpose.
    */
   readonly targetId: string
-  /** `chat`: the card its text was sent from, or `""` (ADR-0048); `set-command`, `reorder`: the card. */
+  /**
+   * `chat`: the card its text was sent from, or `""` (ADR-0048);
+   * `set-command`, `reorder`, `card-width`: the card.
+   */
   readonly cardId: string
   /**
    * `chat`: the card's text version as the sender had it (S96), or `""`.

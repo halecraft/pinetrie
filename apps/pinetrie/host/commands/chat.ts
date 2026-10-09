@@ -13,6 +13,7 @@ import {
   type SendAt,
   type SentCard,
   type ThreadId,
+  threadAt,
   threadOfSend,
   type WriterId,
 } from "@pinetrie/core"
@@ -271,6 +272,11 @@ export async function sendChat(
       ? null
       : planThreadStart({
           ...starts,
+          // A branch's card goes just after the thread it forks from.
+          parent:
+            chat.at.kind === "branch" && chat.at.at !== null
+              ? threadAt(index, chat.at.at)
+              : null,
           root: chat.root,
           by: writer,
           now: deps.basics.now(),
@@ -348,7 +354,10 @@ export async function executeChat(
   const { start } = context
   if (start !== null) {
     await deps.records.writeValues(start.records)
-    applyPlaceSteps(deps.basics.places, [{ kind: "write", record: start.card }])
+    applyPlaceSteps(
+      deps.basics.places,
+      start.cards.map(record => ({ kind: "write", record })),
+    )
     // A conversation's thread is named once its record is (ADR-0117); a new
     // lane's is named as its lane is made, which draws its banner.
     if (planned.kind === "appendToTree") void deps.names.ensure()

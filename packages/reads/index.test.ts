@@ -83,7 +83,7 @@ test("a compaction carries the newest cards entry of its retained tail; one with
   )
   writeEntry(doc, compaction("c2", [{ role: "user", content: "x" }]))
   const index = readTreeIndex(doc)
-  expect(index.entries[entryId("c1")]?.carried).toEqual(view("new"))
+  expect(index.entries[entryId("c1")]?.carried).toEqual({ pinned: view("new") })
   expect(index.entries[entryId("c2")]?.carried).toBeUndefined()
   expect(index.entries[entryId("e1")]?.carried).toBeUndefined()
 })

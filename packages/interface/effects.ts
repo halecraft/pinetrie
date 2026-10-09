@@ -39,6 +39,7 @@ import {
   type Layout,
   type LayoutAction,
   planOpen,
+  type ViewChange,
 } from "./layout.ts"
 import type { ListWidth } from "./list-width.ts"
 import type { PageName } from "./page.ts"
@@ -182,10 +183,11 @@ export interface IntentState {
   /** Every ask (`indexAsks`): a pick into one's work opens its fold. */
   readonly asks: AskIndex
   readonly cards: CardFacts
-  /** Every task (ADR-0116): an entry opens in the task its thread is in. */
+  /**
+   * Every task (ADR-0116): an entry opens in the task its thread is in, and
+   * a task's columns are its canvas's.
+   */
   readonly tasks: Tasks
-  /** Each task's first root's root entry (`entriesOf`): where its first column is. */
-  readonly entries: ReadonlyMap<TaskId, EntryId>
   /** What the sidebar shows now (`shownWidth`). */
   readonly listWidth: ListWidth
   /** The page over the workspace, if any (ADR-0098). */
@@ -227,29 +229,35 @@ export function show(here: Here): readonly Effect[] {
 export const showTask = (task: TaskId): readonly Effect[] =>
   show({ kind: "task", task })
 
-/** A task's first root's root entry, where its first column is; null for none. */
-export const entryOfTask = (
-  state: Pick<IntentState, "entries">,
+/**
+ * A change to your view of `task` (`ViewChange`), as an effect: a view made
+ * by it starts from the task's canvas (`defaultView`).
+ */
+export const changeViewOf = (
+  state: Pick<IntentState, "tasks">,
   task: TaskId,
-): EntryId | null => state.entries.get(task) ?? null
+  change: ViewChange,
+): Effect =>
+  layout({
+    kind: "view",
+    task,
+    first: state.tasks.index.canvases.get(task)?.[0]?.id ?? null,
+    change,
+  })
 
 /**
- * Show entry `id` (`planOpen`): in view in the column that shows it, or in a
- * new column beside the one sharing most of its path. An entry of an ask's work opens the ask's
+ * Show entry `id` (`planOpen`): in view in the column that shows it, or in
+ * its thread's column, unfolded. An entry of an ask's work opens the ask's
  * fold first, whatever the column's density, so it is drawn to be revealed
  * (ADR-0106): forks, branch starts and people's messages are never in one.
  */
-export function planOpenAt(
-  id: EntryId,
-  state: IntentState,
-  fresh: string,
-): readonly Effect[] {
+export function planOpenAt(id: EntryId, state: IntentState): readonly Effect[] {
   const plan = planOpen(
     state.layout,
     state.index,
     id,
-    state.tasks.index.taskOfThread,
-    state.entries,
+    state.tasks.index,
+    state.cards.lanes,
   )
   if (plan === null) return []
   const ask = state.asks.askOf.get(id)
@@ -258,16 +266,15 @@ export function planOpenAt(
   switch (plan.kind) {
     case "scroll":
       return [...fold, { kind: "reveal", entry: id }, ...showTask(plan.task)]
-    case "open":
+    case "unfold":
       return [
         ...fold,
         { kind: "reveal", entry: id },
         ...showTask(plan.task),
-        layout({
-          kind: "columns",
-          task: plan.task,
-          entry: plan.entry,
-          action: { kind: "open", key: fresh, after: plan.after, anchor: id },
+        changeViewOf(state, plan.task, {
+          kind: "fold",
+          card: plan.card,
+          unfolded: true,
         }),
       ]
   }

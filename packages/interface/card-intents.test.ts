@@ -17,18 +17,20 @@ import type { Outcome } from "@pinetrie/protocol/codec"
 import { LAST_ORDER } from "@pinetrie/session"
 import { describe, expect, test } from "vitest"
 import { afterKeep } from "./card-intents.ts"
+import type { ColumnKey } from "./columns.ts"
 import type { CardFacts, IntentState } from "./effects.ts"
 import {
+  NEW_NOTE_COLUMN,
   NEW_ROOT,
   NEW_TASK,
   NEW_THREAD,
   TEST_TASK,
   tasksFor,
+  threadOfEntry,
   tree,
 } from "./fixtures.ts"
 import { type Intent, planIntent } from "./intent.ts"
 import {
-  columnsOf,
   initialLayout,
   type Layout,
   layoutReducer,
@@ -64,9 +66,11 @@ const pinnedKey = {
   thread: TEST_THREAD,
 } as const
 const pinnedAtA = { ...pinnedKey, order: "a" } as const
+/** A branch's thread, and its column's key (ADR-0116). */
+const F1 = threadIdFor("01a0ffd2-0000-7000-8000-0000000000f1")
 const freshF1 = {
   kind: "fresh",
-  column: "f-1",
+  column: F1,
   root: TEST_ROOT,
   task: TEST_TASK,
   at: atEntry(A),
@@ -81,22 +85,17 @@ const onR1: Layout = resolveLayout(
     lanes: [],
     archived: new Set(),
     list: [TEST_TASK],
-    entries: new Map([[TEST_TASK, R1]]),
+    canvases: tasksFor(index, [TEST_TASK, R1]).index.canvases,
   },
 )
 const withFresh: Layout = layoutReducer(onR1, {
-  kind: "columns",
+  kind: "view",
   task: TEST_TASK,
-  entry: R1,
-  action: {
-    kind: "openFresh",
-    key: "f-1",
-    thread: NEW_THREAD,
-    at: A,
-    after: 0,
-  },
+  first: null,
+  change: { kind: "openFresh", thread: F1, at: A },
 })
-const threadKey = columnsOf(onR1, TEST_TASK, R1)[0]?.key ?? ""
+/** The trunk's column: its thread's card's. */
+const threadKey: string = threadOfEntry("1-r1")
 
 const card = (id: typeof C1, place: TextPlace): TextCard => ({
   kind: "text",
@@ -117,7 +116,7 @@ const facts = (over: Partial<CardFacts> = {}): CardFacts => ({
   selected: 0,
   composers: new Map<string, ComposerSpot>([
     [threadKey, { place: atEnd, message: null }],
-    ["f-1", { place: freshF1, message: null }],
+    [F1, { place: freshF1, message: null }],
   ]),
   ...over,
 })
@@ -130,7 +129,6 @@ const state = (
   asks: indexAsks(index),
   cards: facts(cards),
   tasks: tasksFor(index, [TEST_TASK, R1]),
-  entries: new Map([[TEST_TASK, R1]]),
   listWidth: "full",
   page: null,
 })
@@ -140,11 +138,15 @@ const plan = (intent: Intent, s: IntentState) =>
     root: NEW_ROOT,
     task: NEW_TASK,
     thread: NEW_THREAD,
+    noteColumn: NEW_NOTE_COLUMN,
   })
+/** The trunk's column and the note column, as keys an intent names. */
+const TRUNK_COLUMN: ColumnKey = { kind: "card", card: threadOfEntry("1-r1") }
+const NOTES_COLUMN: ColumnKey = { kind: "card", card: NOTES }
 const inColumn = (
   act: Extract<Intent, { kind: "column" }>["act"],
-  key = "f-1",
-): Intent => ({ kind: "column", position: 1, key, act })
+  column: ColumnKey = { kind: "fresh", thread: F1 },
+): Intent => ({ kind: "column", column, act })
 
 describe("take into the inventory (ADR-0048 step 4)", () => {
   test("into the selected slot when it is empty, else the first empty", () => {
@@ -343,31 +345,28 @@ describe("your message (ADR-0113)", () => {
   })
 
   test("in a fresh column, a message with text refuses a card from anywhere but your inventory", () => {
-    const s = withMessage(true, [card(C1, note)], "f-1", freshF1)
-    expect(plan(toComposer("f-1"), s)).toEqual([
+    const s = withMessage(true, [card(C1, note)], F1, freshF1)
+    expect(plan(toComposer(F1), s)).toEqual([
       {
         kind: "refuse",
         refusal: {
           card: C1,
-          actedAt: { kind: "column", key: "f-1" },
+          actedAt: { kind: "column", key: F1 },
           code: "message-holds-text",
         },
       },
     ])
-    const fromInventory = withMessage(
-      true,
-      [card(C1, inventory)],
-      "f-1",
-      freshF1,
-    )
-    expect(plan(toComposer("f-1"), fromInventory)[0]).toMatchObject({
+    const fromInventory = withMessage(true, [card(C1, inventory)], F1, freshF1)
+    expect(plan(toComposer(F1), fromInventory)[0]).toMatchObject({
       kind: "keep",
     })
   })
 
   test("Move to ▸ notes: your message goes to the note column nearest its thread", () => {
     const s = state({ cards: [card(C1, atEnd)] })
-    expect(plan(inColumn({ kind: "toNote", card: C1 }, threadKey), s)).toEqual([
+    expect(
+      plan(inColumn({ kind: "toNote", card: C1 }, TRUNK_COLUMN), s),
+    ).toEqual([
       {
         kind: "moveCard",
         move: { card: C1, from: atEnd, to: toNote },
@@ -412,7 +411,7 @@ describe("a note column (ADR-0116)", () => {
       plan(
         inColumn(
           { kind: "reorder", card: C3, among: [C1, C3], step: -1 },
-          NOTES,
+          NOTES_COLUMN,
         ),
         s,
       ),
@@ -434,7 +433,7 @@ describe("a note column (ADR-0116)", () => {
 describe("pin and unpin (ADR-0048 step 5)", () => {
   test("pin: your message to the top of the same thread's column, a move said in the column", () => {
     const s = state({ cards: [card(C1, atEnd)] })
-    expect(plan(inColumn({ kind: "pin", card: C1 }, threadKey), s)).toEqual([
+    expect(plan(inColumn({ kind: "pin", card: C1 }, TRUNK_COLUMN), s)).toEqual([
       {
         kind: "moveCard",
         move: { card: C1, from: atEnd, to: pinnedKey },
@@ -449,7 +448,7 @@ describe("pin and unpin (ADR-0048 step 5)", () => {
   test("unpin: a note where it was pinned", () => {
     const s = state({ cards: [card(C1, pinnedAtA)] })
     expect(
-      plan(inColumn({ kind: "unpin", card: C1 }, threadKey), s)[0],
+      plan(inColumn({ kind: "unpin", card: C1 }, TRUNK_COLUMN), s)[0],
     ).toMatchObject({
       kind: "moveCard",
       move: { card: C1, from: pinnedKey, to: toNote },
@@ -459,9 +458,57 @@ describe("pin and unpin (ADR-0048 step 5)", () => {
   test("a fresh card has no thread to pin to; an unpin of a card not pinned is nothing", () => {
     const s = state({ cards: [card(C1, freshF1), card(C2, atEnd)] })
     expect(plan(inColumn({ kind: "pin", card: C1 }), s)).toEqual([])
-    expect(plan(inColumn({ kind: "unpin", card: C2 }, threadKey), s)).toEqual(
-      [],
-    )
+    expect(
+      plan(inColumn({ kind: "unpin", card: C2 }, TRUNK_COLUMN), s),
+    ).toEqual([])
+  })
+
+  test("pin to the task: to the pins of the task it is in, else the one you are on; unpinned, to the notes nearest the task column (ADR-0116)", () => {
+    const pinnedToTask = {
+      kind: "task-pinned",
+      task: TEST_TASK,
+      order: "a",
+    } as const
+    const s = state({ cards: [card(C1, atEnd), card(C2, pinnedToTask)] })
+    expect(
+      plan(inColumn({ kind: "pinToTask", card: C1 }, TRUNK_COLUMN), s),
+    ).toEqual([
+      {
+        kind: "moveCard",
+        move: {
+          card: C1,
+          from: atEnd,
+          to: { kind: "task-pinned", task: TEST_TASK },
+        },
+        how: { actedAt: { kind: "column", key: threadKey }, slot: null },
+        queuedBy: null,
+        fly: true,
+        here: null,
+      },
+    ])
+    // Pinned to it already: nothing.
+    expect(plan(inColumn({ kind: "pinToTask", card: C2 }), s)).toEqual([])
+    expect(plan(inColumn({ kind: "unpin", card: C2 }), s)[0]).toMatchObject({
+      move: {
+        card: C2,
+        from: { kind: "task-pinned", task: TEST_TASK },
+        to: { kind: "notes", task: TEST_TASK },
+      },
+    })
+    // A drop on the task column's pins pins there.
+    expect(
+      plan(
+        {
+          kind: "put",
+          card: C1,
+          target: { kind: "taskPinned", task: TEST_TASK },
+        },
+        state({ cards: [card(C1, inventory)], slots: { "3": C1 } }),
+      )[0],
+    ).toMatchObject({
+      move: { card: C1, to: { kind: "task-pinned", task: TEST_TASK } },
+      how: { actedAt: { kind: "column", key: TEST_TASK } },
+    })
   })
 
   test("a drop on a column's pinned strip pins", () => {
@@ -484,18 +531,28 @@ describe("keep on close (ADR-0066)", () => {
       cards: [card(C1, freshF1), card(C2, freshF1)],
       slots: { "0": textCardId("x") },
     })
-    const [keep] = plan(inColumn({ kind: "keep", cards: [C1, C2] }), s)
+    const [keep] = plan(
+      {
+        kind: "keepFresh",
+        column: { kind: "fresh", thread: F1 },
+        cards: [C1, C2],
+      },
+      s,
+    )
     expect(keep).toMatchObject({
       kind: "keep",
       moves: [
         { move: { card: C1, from: freshF1, to: inventory }, slot: 1 },
         { move: { card: C2, from: freshF1, to: inventory }, slot: 2 },
       ],
-      actedAt: { kind: "column", key: "f-1" },
+      actedAt: { kind: "column", key: F1 },
       close: [
         {
           kind: "layout",
-          action: { kind: "columns", action: { kind: "close", index: 1 } },
+          action: {
+            kind: "view",
+            change: { kind: "closeFresh", thread: F1 },
+          },
         },
       ],
       here: null,
@@ -504,12 +561,19 @@ describe("keep on close (ADR-0066)", () => {
 
   test("a keep whose cards have all gone closes its column and sends no move", () => {
     const s = state({ cards: [], slots: {} })
-    const effects = plan(inColumn({ kind: "keep", cards: [C1, C2] }), s)
+    const effects = plan(
+      {
+        kind: "keepFresh",
+        column: { kind: "fresh", thread: F1 },
+        cards: [C1, C2],
+      },
+      s,
+    )
     expect(effects).toHaveLength(1)
     expect(effects).toMatchObject([
       {
         kind: "layout",
-        action: { kind: "columns", action: { kind: "close", index: 1 } },
+        action: { kind: "view", change: { kind: "closeFresh", thread: F1 } },
       },
     ])
   })
@@ -533,10 +597,9 @@ describe("undo and redo of moves (ADR-0066)", () => {
   test("in a new tab: the task it minted as it opened", () => {
     const newTab = layoutReducer(onR1, {
       kind: "newTab",
-      key: "n",
+      key: NEW_THREAD,
       root: NEW_ROOT,
       task: NEW_TASK,
-      thread: NEW_THREAD,
       asksAgent: false,
     })
     expect(
@@ -621,7 +684,7 @@ describe("afterUndo: what an undo's answer brings into view (ADR-0052)", () => {
     ])
   })
 
-  test("back in a fresh column it no longer holds: opened again at the end of its task's columns", () => {
+  test("back in a fresh column it no longer holds: opened again, under the thread it minted, after the thread it forks from", () => {
     expect(
       answered({ kind: "undone", cards: [{ card: C1, place: freshF1 }] }),
     ).toEqual([
@@ -633,16 +696,10 @@ describe("afterUndo: what an undo's answer brings into view (ADR-0052)", () => {
       {
         kind: "layout",
         action: {
-          kind: "columns",
+          kind: "view",
           task: TEST_TASK,
-          entry: R1,
-          action: {
-            kind: "openFresh",
-            key: "f-1",
-            thread: NEW_THREAD,
-            at: A,
-            after: 0,
-          },
+          first: threadOfEntry("1-r1"),
+          change: { kind: "openFresh", thread: F1, at: A },
         },
       },
     ])
@@ -662,7 +719,7 @@ describe("afterUndo: what an undo's answer brings into view (ADR-0052)", () => {
       kind: "refuse",
       refusal: {
         card: null,
-        actedAt: { kind: "column", key: "f-1" },
+        actedAt: { kind: "column", key: F1 },
         code: "moved",
         by: writerId("bea@x.io"),
         fromQueue: false,
@@ -683,7 +740,7 @@ describe("openTrace: where a trace leads (ADR-0048, Other people)", () => {
       for: ADA,
       card: C1,
       by: BEA,
-      from: atEnd,
+      from: pinnedKey,
       to: null,
       message,
       at: 1,
@@ -766,7 +823,7 @@ describe("a card made a thread (ADR-0111)", () => {
   test("a note's ⋯ Move to a new thread in a state is the same as its drop there", () => {
     const s = state({ cards: [card(C1, note)] })
     expect(
-      plan(inColumn({ kind: "spinOff", card: C1, state: S1 }, threadKey), s),
+      plan(inColumn({ kind: "spinOff", card: C1, state: S1 }, TRUNK_COLUMN), s),
     ).toEqual(
       plan({ kind: "put", card: C1, target: { kind: "state", state: S1 } }, s),
     )
@@ -813,7 +870,7 @@ describe("a new note (ADR-0116)", () => {
   test("+ add a note makes an empty note at the end of its note column, said there", () => {
     expect(
       plan(
-        inColumn({ kind: "newNote", card: C1, column: NOTES }, NOTES),
+        inColumn({ kind: "newNote", card: C1, column: NOTES }, NOTES_COLUMN),
         state(),
       ),
     ).toEqual([

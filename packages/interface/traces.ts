@@ -3,7 +3,12 @@
 // else moved it while you were away; the host leaves it (`planProvenance`)
 // and deletes it once you have seen it (`traces-seen`). Pure.
 
-import type { EntryId, PlaceKey, TraceRecord, WriterId } from "@pinetrie/core"
+import type {
+  EntryId,
+  TracedPlace,
+  TraceRecord,
+  WriterId,
+} from "@pinetrie/core"
 import { MAX_TRACES_SEEN } from "@pinetrie/protocol/codec"
 import { type Verb, verbOf } from "@pinetrie/rules"
 
@@ -23,7 +28,7 @@ export function tracesAt(
   traces: Iterable<TraceRecord>,
   me: WriterId,
   end: EntryId,
-  endOf: (from: PlaceKey) => EntryId | null,
+  endOf: (from: TracedPlace) => EntryId | null,
 ): readonly TraceRecord[] {
   return [...traces]
     .filter(t => t.for === me && endOf(t.from) === end)

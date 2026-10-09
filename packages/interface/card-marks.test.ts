@@ -17,6 +17,7 @@ import {
 } from "@pinetrie/core"
 import { threadCardOf } from "@pinetrie/rules"
 import { describe, expect, test } from "vitest"
+import { defaultView } from "./canvas-columns.ts"
 import { cardMarks, holdsText, ownCards, withFilled } from "./card-marks.ts"
 import { entry, indexOf } from "./fixtures.ts"
 import { hereOfColumn, initialLayout, type Layout } from "./layout.ts"
@@ -95,21 +96,31 @@ const tasks = tasksOf({
   ],
   threads: new Map(),
 }).index
-/** e1's task open, holding a branch column; a new tab; g1's task closed. */
+/** A branch's column key in e1's task, and one in g1's: the threads they minted. */
+const BRANCH = threadIdFor("01a0ffd2-0000-7000-8000-0000000000f1")
+const G_BRANCH = threadIdFor("01a0ffd2-0000-7000-8000-0000000000f2")
+const NEW_TAB = threadIdFor("01a0ffd2-0000-7000-8000-0000000000f3")
+/** e1's task open, holding a branch; a new tab; g1's task closed, with a branch. */
 const layout: Layout = {
   ...initialLayout(),
   open: [K("e1")],
   tasks: new Map([
     [
       K("e1"),
-      [
-        { key: "first-e1", anchor: entryId("e1") },
-        { key: "branch", anchor: entryId("e1"), fresh: {} },
-      ],
+      {
+        ...defaultView(null),
+        fresh: new Map([[BRANCH, { at: entryId("e1") }]]),
+      },
     ],
-    [K("g1"), [{ key: "first-g1", anchor: entryId("g1") }]],
+    [
+      K("g1"),
+      {
+        ...defaultView(null),
+        fresh: new Map([[G_BRANCH, { at: entryId("g1") }]]),
+      },
+    ],
   ]),
-  newTabs: [{ key: "new-1", anchor: null, fresh: {} }],
+  newTabs: [{ key: NEW_TAB, anchor: null, thread: NEW_TAB, fresh: {} }],
 }
 const marks = (
   cards: readonly CardRecord[],
@@ -148,13 +159,13 @@ test("withFilled: the same set unless the card flips", () => {
   expect([...withFilled(some, C, false)]).toEqual([])
 })
 
-test("hereOfColumn: a new tab's column, a task's open or closed, or none", () => {
-  expect(hereOfColumn(layout, "new-1")).toEqual({ kind: "new", key: "new-1" })
-  expect(hereOfColumn(layout, "branch")).toEqual({
+test("hereOfColumn: a new tab's column, a branch of a task's open or closed, or none", () => {
+  expect(hereOfColumn(layout, NEW_TAB)).toEqual({ kind: "new", key: NEW_TAB })
+  expect(hereOfColumn(layout, BRANCH)).toEqual({
     kind: "task",
     task: K("e1"),
   })
-  expect(hereOfColumn(layout, "first-g1")).toEqual({
+  expect(hereOfColumn(layout, G_BRANCH)).toEqual({
     kind: "task",
     task: K("g1"),
   })
@@ -219,9 +230,9 @@ describe("cardMarks", () => {
   })
 
   test("a fresh card marks the tab its column is in", () => {
-    expect(sets(marks([fresh("c", "branch"), fresh("d", "new-1")]))).toEqual({
+    expect(sets(marks([fresh("c", BRANCH), fresh("d", NEW_TAB)]))).toEqual({
       tasks: [K("e1")],
-      newTabs: ["new-1"],
+      newTabs: [NEW_TAB],
       ends: [],
       elsewhere: false,
     })
@@ -240,7 +251,7 @@ describe("cardMarks", () => {
 
   test("elsewhere: a marked task you closed", () => {
     expect(marks([atEnd("c", "g1")]).elsewhere).toBe(true)
-    expect(marks([fresh("c", "first-g1")]).elsewhere).toBe(true)
+    expect(marks([fresh("c", G_BRANCH)]).elsewhere).toBe(true)
     const closed = { ...layout, open: [] }
     expect(marks([atEnd("c", "e2")], ["c"], { layout: closed }).elsewhere).toBe(
       true,

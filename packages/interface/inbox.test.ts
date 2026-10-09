@@ -3,6 +3,7 @@ import {
   entryId,
   type RootRecord,
   rootIdFor,
+  threadIdFor,
   type WriterId,
   writerId,
 } from "@pinetrie/core"
@@ -39,6 +40,7 @@ const record = (
     id: entryId(id) as EntryId,
     by,
     text,
+    thread: threadIdFor(id),
   })),
   images: [],
 })

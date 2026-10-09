@@ -9,6 +9,7 @@ import {
   type BannerRecord,
   type BaseRecord,
   blobUrl,
+  type CanvasView,
   type CardRecord,
   type CommandSummary,
   commandOf,
@@ -29,6 +30,7 @@ import {
   type RevisionRecord,
   type RootId,
   type TaskId,
+  type TaskPinnedView,
   type TextPlace,
   type ThreadId,
   type ThreadLane,
@@ -835,8 +837,8 @@ export function joinWords(join: LaneJoin): string {
  * `task` the task the column is on; a new tab's are the ones it minted
  * (`fresh.root`, `fresh.task`). The composer creates its card here, and a
  * drop on it lands here (`placeOfTarget`). None where the root is not known,
- * nor a fresh column's task, nor the thread of a column at an end, nor at
- * the root but in a new tab: a column there has no end yet.
+ * nor a fresh column's task, nor at the root but in a new tab: a column
+ * there has no end yet.
  */
 export function composerPlace(
   column: Pick<Column, "key" | "fresh" | "thread">,
@@ -851,7 +853,7 @@ export function composerPlace(
       ? null
       : { kind: "fresh", column: column.key, root: its, task: in_, at }
   }
-  return at.kind === "entry" && column.thread !== undefined
+  return at.kind === "entry"
     ? { kind: "composing", at, thread: column.thread }
     : null
 }
@@ -869,11 +871,19 @@ export const newPinAt = (f: {
 }): "header" | "strip" | null =>
   !f.canPin || f.pinning ? null : f.pinned === 0 ? "header" : "strip"
 
-/** What a column draws above a run's prompt for the pinned cards the run read. */
+/**
+ * What a column draws above a run's prompt for the context the run read
+ * (ADR-0048, ADR-0116): its thread's pinned cards, the cards pinned to its
+ * task, and the canvas list it was told.
+ */
 export interface PinnedMarker {
   readonly cards: readonly PinnedCardRead[]
   /** Shown only when the cards replaced were read by the entry's own lane. */
   readonly retired: PinnedView["retired"]
+  /** The cards pinned to the task it read, when it read them. */
+  readonly taskPinned?: Pick<TaskPinnedView, "cards" | "retired">
+  /** The canvas list it was told, when it was told one. */
+  readonly canvas?: CanvasView
 }
 
 /**
@@ -892,10 +902,36 @@ export function pinnedMarker(
     : { cards: entry.cards, retired }
 }
 
+/** The roles of the entries a run's prompt is written after, in its commit. */
+const BEFORE_PROMPT: ReadonlySet<string> = new Set([
+  "pinned",
+  "task-pinned",
+  "canvas",
+  "behind",
+])
+
 /**
- * The markers among `nodes`, by the prompt each is drawn above. A cards
- * entry is written in one commit with its run's prompt, so a prompt's parent
- * is the only place one can be.
+ * What a message was sent after, as a person sees it: its parent, past the
+ * context entries its run wrote just above it (a canvas list, pinned cards,
+ * a base's news), which the column draws as markers, not messages. An edit
+ * sends again from there, beside the original, and its own run writes what
+ * context it needs. Null at a root's first message.
+ */
+export function promptParent(index: TreeIndex, id: EntryId): EntryId | null {
+  let at = index.parentOf(id)
+  while (
+    at !== null &&
+    BEFORE_PROMPT.has(index.entries[at]?.message?.role ?? "")
+  )
+    at = index.parentOf(at)
+  return at
+}
+
+/**
+ * The markers among `nodes`, by the prompt each is drawn above. A run's
+ * context entries are written in one commit with its prompt, just above it
+ * (the thread's cards entry its parent), so the walk up from a prompt stops
+ * at the first entry that is none of them.
  */
 export function pinnedMarkers(
   index: TreeIndex,
@@ -903,15 +939,40 @@ export function pinnedMarkers(
 ): ReadonlyMap<EntryId, PinnedMarker> {
   const out = new Map<EntryId, PinnedMarker>()
   for (const node of nodes) {
-    const parent = index.parentOf(node.id)
-    const pinned =
-      parent === null ? undefined : index.entries[parent]?.message?.pinned
-    if (parent === null || pinned === undefined) continue
-    const marker = pinnedMarker(
-      pinned,
-      pinnedInView(index, index.parentOf(parent)),
-    )
-    if (marker !== null) out.set(node.id, marker)
+    let pinned: PinnedMarker | null = null
+    let taskPinned: TaskPinnedView | undefined
+    let canvas: CanvasView | undefined
+    for (
+      let at = index.parentOf(node.id);
+      at !== null && BEFORE_PROMPT.has(index.entries[at]?.message?.role ?? "");
+      at = index.parentOf(at)
+    ) {
+      const message = index.entries[at]?.message
+      if (message?.pinned !== undefined && pinned === null)
+        pinned = pinnedMarker(
+          message.pinned,
+          pinnedInView(index, index.parentOf(at)),
+        )
+      taskPinned ??= message?.taskPinned
+      canvas ??= message?.canvas
+    }
+    const told =
+      taskPinned !== undefined &&
+      (taskPinned.cards.length > 0 || taskPinned.retired.length > 0)
+    if (pinned === null && !told && canvas === undefined) continue
+    out.set(node.id, {
+      cards: pinned?.cards ?? [],
+      retired: pinned?.retired ?? [],
+      ...(told && taskPinned !== undefined
+        ? {
+            taskPinned: {
+              cards: taskPinned.cards,
+              retired: taskPinned.retired,
+            },
+          }
+        : {}),
+      ...(canvas === undefined ? {} : { canvas }),
+    })
   }
   return out
 }
@@ -924,7 +985,7 @@ export function pinnedMarkers(
 export const pinnedStatus = (
   card: CardRecord,
   text: string,
-  inView: PinnedView | null,
+  inView: Pick<PinnedView, "cards"> | null,
 ): PinnedStatus | null => {
   const [read] = pinnedReads([card], () => text)
   return read === undefined

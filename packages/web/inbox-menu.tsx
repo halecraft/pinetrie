@@ -7,7 +7,6 @@ import {
   type EntryId,
   firstLine,
   messageText,
-  type RootId,
   type TaskId,
   type ThreadId,
   type ThreadName,
@@ -77,11 +76,6 @@ export interface InboxMenuProps {
   readonly names: ReadonlyMap<ThreadId, ThreadName>
   /** Each thread's task: a raised item opens there. */
   readonly taskOfThread: ReadonlyMap<ThreadId, TaskId>
-  /**
-   * The task a mention opens in: its directory record names its root and
-   * no thread, so the first task holding a thread of that root.
-   */
-  readonly taskOfRoot: (root: RootId) => TaskId | null
   readonly labelOf: (task: TaskId | null) => string
   readonly nameOf: ReadonlyMap<WriterId, string>
   readonly onOpen: (id: EntryId, task: TaskId | null) => void
@@ -103,7 +97,6 @@ export function useInboxMenu({
   thread,
   names,
   taskOfThread,
-  taskOfRoot,
   labelOf,
   nameOf,
   onIntent,
@@ -183,14 +176,16 @@ export function useInboxMenu({
     label: (
       <>
         <span className="inbox-who">
-          {nameFor(nameOf, m.by)} · {labelOf(taskOfRoot(m.root))}
+          {nameFor(nameOf, m.by)} ·{" "}
+          {labelOf(taskOfThread.get(m.thread) ?? null)}
         </span>
         <span className="inbox-text">{firstLine(m.text, 48)}</span>
       </>
     ),
     onChoose: () => {
       inbox.markSeen(m.id)
-      onOpen(m.id, taskOfRoot(m.root))
+      // A mention opens in the task its thread is in (ADR-0116).
+      onOpen(m.id, taskOfThread.get(m.thread) ?? null)
     },
   }))
   const items = (s: InboxSection): readonly MenuItem[] =>

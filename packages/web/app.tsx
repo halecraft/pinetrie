@@ -27,8 +27,9 @@ import {
   type EntryId,
   parseCardId,
   pathIds,
-  type RootId,
   type TaskId,
+  type TextCard,
+  taskPinnedInView,
   type WorkflowState,
   type WorkflowStateId,
 } from "@pinetrie/core"
@@ -46,9 +47,7 @@ import {
   composerPlacesStore,
   type Dock,
   DROP_ZONE,
-  drawnColumns,
   type Effect,
-  entriesOf,
   foldMemory,
   type HeldView,
   hereRail,
@@ -68,6 +67,7 @@ import {
   nameEffects,
   noteColumnsOf,
   offeredByTask,
+  openColumns,
   ownCards,
   pageTitle,
   parseSearch,
@@ -88,16 +88,20 @@ import {
   rootSeed,
   type SeenEnd,
   type Spot,
+  type Strip as StripView,
   screenMemory,
   shownWidth,
   sidebarView,
   spotFor,
   spotStore,
-  stripItems,
+  storedLayout,
+  stripCards,
   summariesOf,
   type TypedLast,
   targetOfElement,
+  taskColumnView,
   taskSprites,
+  taskStrip,
   tasksOf,
   taskWork,
   threadCardHeads,
@@ -112,10 +116,17 @@ import {
   readParticipantPictures,
   readRoots,
 } from "@pinetrie/reads"
-import { boardOf } from "@pinetrie/rules"
+import {
+  boardOf,
+  type CanvasCard,
+  canvasLines,
+  canvasList,
+  taskPinnedOf,
+} from "@pinetrie/rules"
 import {
   heldBy,
   intentsOf,
+  newNoteColumnId,
   newRootId,
   newTaskId,
   newThreadId,
@@ -135,11 +146,9 @@ import {
 import { Board, BoardStrip } from "./board.tsx"
 import { CardHistories } from "./card-history.tsx"
 import { CardPip } from "./card-pip.tsx"
-import { Column } from "./column.tsx"
 import { Footer } from "./footer.tsx"
 import { threadRow } from "./inbox-menu.tsx"
 import { InventoryPanel } from "./inventory-panel.tsx"
-import { NoteColumn } from "./note-column.tsx"
 import { Page } from "./page.tsx"
 import { TrackSeed } from "./palette-context.ts"
 import { Pictures } from "./pictures-context.ts"
@@ -152,6 +161,7 @@ import {
   ReviewPrefsContext,
 } from "./review-prefs.ts"
 import { Sidebar } from "./sidebar.tsx"
+import { Strip } from "./strip.tsx"
 import type { DeviceState, TabState } from "./tab-state.ts"
 import { isTextBox } from "./text-box.ts"
 import { ThreadStates } from "./thread-states.ts"
@@ -294,6 +304,15 @@ const PRESENCE_REFRESH_MS = 10_000
 /** No open states: the workflow has not arrived. */
 const NO_STATES: readonly WorkflowState[] = []
 
+/** No lines: no task's canvas list. */
+const NO_LINES: readonly string[] = []
+
+/** No cards pinned to a task. */
+const NO_PINS: readonly TextCard[] = []
+
+/** No cards: a task whose canvas has not arrived. */
+const NO_CANVAS: readonly CanvasCard[] = []
+
 /** No task's state: the board has not arrived. */
 const NO_STATE_OF: ReadonlyMap<TaskId, WorkflowStateId> = new Map()
 
@@ -379,10 +398,7 @@ export function App({
     () => tasksOf({ known: taskRecords.keys(), cards, threads }),
     [taskRecords, cards, threads],
   )
-  const { taskOfThread } = tasks.index
-  // Each task's first root's root entry: where its first column is, and
-  // whose rail is drawn.
-  const entries = useMemo(() => entriesOf(tasks, directory), [tasks, directory])
+  const { taskOfThread, canvases } = tasks.index
   // Each task with a message, for the board, and each task's label: its
   // title, else its first card's (ADR-0045). Which tasks are in the sidebar
   // is yours (`openThreads`, ADR-0122).
@@ -443,10 +459,6 @@ export function App({
   // A task with no message has no label in `labels`.
   const labelOf = (task: TaskId | null): string =>
     task === null ? NO_TEXT : (labels.get(task) ?? NO_TEXT)
-  // A mention names its root and no thread: it opens in the first task
-  // holding a thread of that root.
-  const taskOfRoot = (root: RootId): TaskId | null =>
-    tasks.index.tasksOfRoot.get(root)?.[0] ?? null
 
   const [stored, dispatch] = useReducer(
     layoutReducer,
@@ -466,9 +478,9 @@ export function App({
         lanes,
         archived: archivedTasks,
         list,
-        entries,
+        canvases,
       }),
-    [stored, index, lanes, archivedTasks, list, entries],
+    [stored, index, lanes, archivedTasks, list, canvases],
   )
   useEffect(() => {
     if (layout !== stored)
@@ -478,12 +490,15 @@ export function App({
         lanes,
         archived: archivedTasks,
         list,
-        entries,
+        canvases,
       })
-  }, [layout, stored, index, lanes, archivedTasks, list, entries])
+  }, [layout, stored, index, lanes, archivedTasks, list, canvases])
   // Every change is saved, the document's too, so a restored column's anchor
   // is never older than the tree it was drawn from.
-  useEffect(() => stores.layout.save(layout), [stores, layout])
+  useEffect(
+    () => stores.layout.save(storedLayout(layout, canvases)),
+    [stores, layout, canvases],
+  )
   // Restored anchors the document lacks are dropped once, when it has
   // settled, and the tab to show is chosen then: before, missing means not
   // yet arrived. `"populated"` comes with the first data, so it cannot tell
@@ -533,7 +548,7 @@ export function App({
         lanes,
         archived: archivedTasks,
         list,
-        entries,
+        canvases,
         known: new Set(tasks.byId.keys()),
       })
   }, [settled])
@@ -554,33 +569,32 @@ export function App({
         lanes,
         archived: archivedTasks,
         list,
-        entries,
+        canvases,
         known: now,
       })
   }, [settled, tasks])
 
   const active = layout.active
-  // The tab's columns: a root's, or a new tab's one fresh column.
-  // Memoised: `drawnColumns` gives a root with no stored columns a new list
-  // on each call, and every projection below is keyed on this one.
+  // The task's strip (ADR-0116): its task column, then every card on its
+  // canvas, in its order, folded or not, and your branches not yet sent.
+  const strip: StripView | null = useMemo(
+    () =>
+      active?.kind === "task"
+        ? taskStrip(layout, active.task, { canvases, index, lanes })
+        : null,
+    [layout, active, canvases, index, lanes],
+  )
+  // The tab's thread columns drawn whole: the task's, or a new tab's one
+  // fresh column. Every projection below is keyed on this one.
   const columns: readonly ColumnSpec[] = useMemo(
     () =>
-      active === null
-        ? []
-        : active.kind === "task"
-          ? drawnColumns(
-              layout,
-              active.task,
-              entries.get(active.task) ?? null,
-              index,
-              lanes,
-            )
-          : active.kind === "new"
-            ? layout.newTabs.filter(c => c.key === active.key)
-            : [],
-    [layout, active, index, lanes, entries],
+      strip !== null
+        ? openColumns(stripCards(strip))
+        : active?.kind === "new"
+          ? layout.newTabs.filter(c => c.key === active.key)
+          : [],
+    [strip, layout, active],
   )
-
   // The column you just opened, whose composer takes focus once when it
   // mounts (`claimFocus`). Never stored: a column restored, or shown again
   // with its tab, leaves focus where it is.
@@ -599,14 +613,17 @@ export function App({
       ),
     [index, columns],
   )
-  // The task's note columns (ADR-0116), each beside the thread it comes
-  // after on the canvas, among the open thread columns (`stripItems`).
+  // The cards pinned to the task you are on (ADR-0116).
+  const taskPins = useMemo(
+    () =>
+      active?.kind === "task" ? taskPinnedOf(cards, active.task) : NO_PINS,
+    [active, cards],
+  )
+  // The task's canvas, and its note columns (ADR-0116).
   const canvas = useMemo(
     () =>
-      active?.kind === "task"
-        ? (tasks.index.canvases.get(active.task) ?? [])
-        : [],
-    [active, tasks],
+      active?.kind === "task" ? (canvases.get(active.task) ?? NO_CANVAS) : [],
+    [active, canvases],
   )
   const noteViews = useMemo(
     () =>
@@ -617,17 +634,21 @@ export function App({
       ),
     [canvas, cards, noteTitles],
   )
-  const stripOrder = useMemo(
-    () => stripItems(columns, canvas),
-    [columns, canvas],
-  )
   // The task you are on, which the sidebar's repair keeps while it is
-  // archived, and its first root's root entry, whose rail is drawn.
+  // archived, and the root entries of its threads' roots, whose trees the
+  // rail draws.
   const hereTask = active?.kind === "task" ? active.task : null
-  const hereEntry = hereTask === null ? null : (entries.get(hereTask) ?? null)
+  const hereRoots = useMemo(
+    () =>
+      (hereTask === null
+        ? []
+        : (tasks.byId.get(hereTask)?.roots ?? [])
+      ).flatMap(root => rootEntries.get(root) ?? []),
+    [hereTask, tasks, rootEntries],
+  )
   const rail = useMemo(
-    () => hereRail(index, active, hereEntry),
-    [index, active, hereEntry],
+    () => hereRail(index, active, hereRoots),
+    [index, active, hereRoots],
   )
   useEffect(() => session.openThreads.here(hereTask), [session, hereTask])
   // The root whose colours the workspace draws in (ADR-0089): the task
@@ -751,6 +772,34 @@ export function App({
       laneRoots,
     ],
   )
+  // Each thread column drawn whole, by its key: what the strip draws it from.
+  const projected = useMemo(() => {
+    const slots =
+      view.workspace.kind === "task" || view.workspace.kind === "new"
+        ? view.workspace.slots
+        : []
+    return new Map(
+      columns.flatMap((column, i) => {
+        const columnView = views[i]
+        const slot = slots[i]
+        return columnView === undefined || slot === undefined
+          ? []
+          : [
+              [
+                column.key,
+                {
+                  at: i,
+                  column,
+                  view: columnView,
+                  path: paths[i] ?? new Set<EntryId>(),
+                  closable: slot.closable,
+                  track: slot.track,
+                },
+              ] as const,
+            ]
+      }),
+    )
+  }, [view.workspace, columns, views, paths])
   const offered = useMemo(
     () => offeredByTask(view.offers, workFacts.names, taskOfThread),
     [view.offers, workFacts.names, taskOfThread],
@@ -818,6 +867,51 @@ export function App({
       workOfTask,
     ],
   )
+  // The task column (ADR-0116), from what the sidebar and the board read.
+  const taskColumn = useMemo(
+    () =>
+      strip === null
+        ? null
+        : taskColumnView({
+            task: strip[0].task,
+            folded: strip[0].folded,
+            head: heads.get(strip[0].task),
+            mark: marks.get(strip[0].task),
+            summary: summaries.get(strip[0].task),
+            workflow,
+            archived: archivedTasks.has(strip[0].task),
+          }),
+    [strip, heads, marks, summaries, workflow, archivedTasks],
+  )
+  // The canvas list the task's agents are told, read from no thread, and
+  // what the agent of its first column last read of its pins (ADR-0116).
+  const told = useMemo(
+    () =>
+      strip === null
+        ? NO_LINES
+        : canvasLines(
+            canvasList({
+              task: strip[0].task,
+              title: labels.get(strip[0].task) ?? NO_TEXT,
+              canvas,
+              reading: null,
+              names: workFacts.names,
+              work,
+              noteTitles: new Map(
+                [...noteViews].map(([id, v]) => [id, v.title] as const),
+              ),
+              noteCounts: new Map(
+                [...noteViews].map(([id, v]) => [id, v.notes.length] as const),
+              ),
+              nameOf: w => nameFor(nameOf, w),
+            }),
+          ),
+    [strip, labels, canvas, workFacts.names, work, noteViews, nameOf],
+  )
+  const taskPinsInView = useMemo(
+    () => taskPinnedInView(index, views[0]?.tipId ?? null),
+    [index, views],
+  )
   const listView =
     active === null
       ? null
@@ -825,7 +919,6 @@ export function App({
           layout,
           active,
           heads,
-          entries,
           summaries,
           marks,
           archived: archivedTasks,
@@ -856,19 +949,18 @@ export function App({
             workflow,
             places,
             summaries,
-            entries,
             heads,
             search: boardSearch,
             me: session.writer,
           }),
-    [workflow, places, summaries, entries, heads, boardSearch, session.writer],
+    [workflow, places, summaries, heads, boardSearch, session.writer],
   )
   useEffect(() => {
     document.title = title
   }, [title])
 
-  const strip = useRef<HTMLDivElement>(null)
-  const narrow = useStripNarrow(strip)
+  const stripEl = useRef<HTMLDivElement>(null)
+  const narrow = useStripNarrow(stripEl)
 
   // Align each column once, when it appears. A column of another tab is
   // unmounted, so it is aligned again when its tab is shown. Columns are
@@ -883,7 +975,7 @@ export function App({
   const [spots] = useState(() => spotStore())
   const aligned = useRef(new Set<string>())
   useLayoutEffect(() => {
-    const el = strip.current
+    const el = stripEl.current
     const keys = new Set(columns.map(c => c.key))
     for (const key of aligned.current)
       if (!keys.has(key)) aligned.current.delete(key)
@@ -918,8 +1010,8 @@ export function App({
 
   // After the alignment above: a picked message the alignment left out of
   // view is scrolled to.
-  const reveal = useReveal(strip)
-  const revealCard = useRevealCard(strip)
+  const reveal = useReveal(stripEl)
+  const revealCard = useRevealCard(stripEl)
 
   // Your inventory (ADR-0048 step 4): this tab's moves and your slots, the
   // panel's selection, whether it is open (never stored), and its dock
@@ -1040,7 +1132,6 @@ export function App({
             composers: composers.current(),
           },
           tasks,
-          entries,
           listWidth,
           page,
         },
@@ -1049,6 +1140,7 @@ export function App({
           root: newRootId(),
           task: newTaskId(),
           thread: newThreadId(),
+          noteColumn: newNoteColumnId(),
         },
       ),
     ),
@@ -1183,14 +1275,12 @@ export function App({
   const openIn = (entry: EntryId, task: TaskId | null) => {
     if (task !== null) onIntent({ kind: "openIn", entry, task })
   }
-  const dragColumn = useColumnDrag(strip, (from, to) =>
-    onIntent({
-      kind: "column",
-      position: from,
-      key: columns[from]?.key ?? "",
-      act: { kind: "move", to },
-    }),
-  )
+  // The card's id is the DOM's (`data-card`): read at the edge.
+  const dragColumn = useColumnDrag(stripEl, (id, to) => {
+    const card = parseCardId(id)
+    if (card !== undefined)
+      onIntent({ kind: "moveColumn", column: { kind: "card", card }, to })
+  })
 
   // This device's name for you and the session's, made to agree once the
   // document has settled: before, a missing name means not yet arrived.
@@ -1325,70 +1415,33 @@ export function App({
                       ) : (
                         <EmptyRail />
                       )}
-                      {/* A column's header is its drag handle; its grip is the
-                  keyboard's way to move it. */}
-                      <div id="strip" onPointerDown={dragColumn} ref={strip}>
-                        {stripOrder.map(item => {
-                          if (item.kind === "notes") {
-                            const notes = noteViews.get(item.column)
-                            return notes === undefined ? null : (
-                              <NoteColumn
-                                colorOf={colorOf}
-                                key={item.column}
-                                onIntent={onIntent}
-                                onTyping={card => typing(null, card)}
-                                readOnly={
-                                  workspace.kind === "task"
-                                    ? workspace.readOnly
-                                    : null
-                                }
-                                reader={historyFacts.reader}
-                                seats={seats}
-                                session={session}
-                                view={notes}
-                              />
-                            )
-                          }
-                          const slot = workspace.slots[item.position]
-                          const column = columns[item.position]
-                          const columnView = views[item.position]
-                          if (
-                            slot === undefined ||
-                            column === undefined ||
-                            columnView === undefined
-                          )
-                            return null
-                          return (
-                            <Column
-                              {...shared}
-                              closable={slot.closable}
-                              column={column}
-                              task={
-                                workspace.kind === "task"
-                                  ? workspace.task
-                                  : (column.fresh?.task ?? null)
-                              }
-                              count={workspace.slots.length}
-                              landmarks={landmarks}
-                              seenEnd={seenEnds}
-                              forks={colors.forks}
-                              key={slot.key}
-                              onIntent={onIntent}
-                              onTyping={card => typing(columnView.tipId, card)}
-                              path={paths[slot.position] ?? new Set()}
-                              position={slot.position}
-                              readOnly={
-                                workspace.kind === "task"
-                                  ? workspace.readOnly
-                                  : null
-                              }
-                              shown={shown}
-                              track={slot.track}
-                              view={columnView}
-                            />
-                          )
-                        })}
-                      </div>
+                      <Strip
+                        canvas={canvas}
+                        names={workFacts.names}
+                        noteViews={noteViews}
+                        onIntent={onIntent}
+                        onPointerDown={dragColumn}
+                        projected={projected}
+                        reader={historyFacts.reader}
+                        readers={readers}
+                        shared={{
+                          ...shared,
+                          landmarks,
+                          seenEnd: seenEnds,
+                          forks: colors.forks,
+                          onIntent,
+                          shown,
+                        }}
+                        strip={strip}
+                        stripRef={stripEl}
+                        taskColumn={taskColumn}
+                        taskPins={taskPins}
+                        taskPinsInView={taskPinsInView}
+                        told={told}
+                        thread={(end, task) => thread(end, end, task)}
+                        typing={typing}
+                        workspace={workspace}
+                      />
                     </>
                   )}
                   {layout.board && boardShown !== null && (
@@ -1452,7 +1505,6 @@ export function App({
             thread,
             names: workFacts.names,
             taskOfThread,
-            taskOfRoot,
             labelOf,
             nameOf,
             onOpen: openIn,

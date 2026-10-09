@@ -134,15 +134,20 @@ function is proven by a unit test in a second.
   components and `use-*.ts` is what needs a browser: measuring, focus and
   the caret, scrolling, observers, subscriptions.
 - **A click is an `Intent`** (`intent.ts`). A column's acts are nested
-  under its position (`{ kind: "column", position, act }`), as
-  `LayoutAction` nests `ColumnAction` under a root, and a message's
-  `MessageAct`s are among them. `Column` takes one `onIntent`, which `App`
+  under its key (`{ kind: "column", column, act }`), a `ColumnKey` by kind
+  (a card's column, a branch, a new tab's, the task column), and a
+  message's `MessageAct`s are among them. What one kind alone does is an
+  intent of its own naming a key of that kind: `moveColumn` a card's
+  (`CardKey`), `closeFresh`, `keepFresh` and `sentFresh` a branch's or a
+  new tab's (`FreshKey`), so closing a card's column or moving a branch
+  does not compile. `Column` takes one `onIntent`, which `App`
   makes once with `useStable`, so it never redraws a list.
 - **`planIntent` turns an intent into `Effect`s**, from the layout, the
   index and the archive of the render it was made in. It owns what a click
-  does: which root a column act belongs to, that × closes a tab and writes
-  nothing, that a column you open takes focus (`armFocus`). Fresh column
-  keys come from the shell as an argument, as `columnsReducer` takes them.
+  does: which task a column act belongs to, that × closes a tab and writes
+  nothing, that a column you open takes focus (`armFocus`). Ids come from
+  the shell as an argument (`Minted`): a key, a new tab's root and task, a
+  fresh column's thread, a note column's id.
   `afterRootMove` plans a move on the board's answer, and `nameEffects` the settle's
   name step (`reconcileName`).
 - **`perform` carries the effects out** (`perform.ts`), one port call each,
@@ -174,19 +179,20 @@ function is proven by a unit test in a second.
 
 ## The sidebar and the layout (`layout.ts`, ADR-0029, ADR-0030, ADR-0122)
 
-The stored layout is `{ v: 7, active, tasks, newTabs, board }`, and
+The stored layout is `{ v: 8, active, tasks, newTabs, board }`, and
 `layoutReducer` is pure; an older version restores nothing. `active` is a
-`Here`: a task (ADR-0116), a new tab, or nothing. Each task's columns are
-kept by its `TaskId`, its first column at its first root's root entry
-(`columnsOf(layout, task, entry)`, `LayoutFacts.entries`). The sidebar is
+`Here`: a task (ADR-0116), a new tab, or nothing. A task's columns are its
+canvas's, in its order, the same for everyone (*The canvas*, below); the
+layout keeps only your view of each task (`TaskView`), by its `TaskId`.
+The sidebar is
 not the layout's: it is your own document (`openThreads`,
 `@pinetrie/session`), keyed by `TaskId`, which `App` passes in as
 `LayoutFacts.list`. `tasksOf` (`tasks.ts`) is the page's `Tasks`: the
 rules' `TaskIndex`, and each task's threads and roots (`byId`).
-`entriesOf(tasks, directory)` is each task's first root's root entry:
-where its first column opens, whose rail is drawn, and what the sidebar's
-`data-root` and the board's `data-entry` carry, which the browser suite
-selects by. A task's signals are its threads', whatever roots they are in
+`entriesOf(tasks, directory)` is each task's first root's root entry: what
+the sidebar's `data-root` and the board's `data-entry` carry, which the
+browser suite selects by. The rail draws one tree for each root of the
+task's threads (`hereRail`). A task's signals are its threads', whatever roots they are in
 (*Attention*, below).
 
 - **`Layout.open` is drawn, never stored** (`drawnList`): the sidebar, less
@@ -251,12 +257,14 @@ selects by. A task's signals are its threads', whatever roots they are in
   the tooltip and the rename field are fixed to the window beside it, since
   the list clips. The footer's corner then draws only `AccountMenu`, whose
   menu holds the inbox and the inventory (`accountView`, ADR-0098).
-- **`resolveLayout` keeps an archived root you are on** in the sidebar as
+- **`resolveLayout` keeps an archived task you are on** in the sidebar as
   drawn, read-only, until you leave it. `prune`, once after `whenSettled`,
-  drops columns of roots the document lacks, and replaces a gone or
-  archived root you were on with the sidebar's last, else nothing; with
-  nothing, the board opens: nothing opens a root by itself. No action sets
-  `active` back to null.
+  drops the views of tasks the session lacks and branches whose fork the
+  settled index lacks, and replaces a gone or archived task you were on
+  with the sidebar's last, else nothing; with nothing, the board opens:
+  nothing opens a task by itself. No action sets `active` back to null.
+  Storing drops the view of a card no longer on its canvas
+  (`storedLayout`).
 - **Choosing a root or a new tab closes the board** (`show`, `newTab`): it
   lay over what you chose.
 - **A click outside the board closes it** only when it was pressed outside
@@ -269,20 +277,19 @@ selects by. A task's signals are its threads', whatever roots they are in
   `move-root`, and, into the archive, the effects that close it for you
   (`moved`), which `afterRootMove` runs only once the host answers
   `moved-root`, as `afterKeep` does for a keep.
-- **`hereOfColumn` is the one lookup from a column's key to where it is**: a
-  new tab's, or a root's whether or not that root is in the sidebar. The card
-  marks place a fresh card with it.
-- **`columnsOf` is the one place a root gets its first column**
-  (`first-<root>`, anchored at the root). `columnsReducer` may leave a root
-  with none; the layout then deletes the entry.
+- **`hereOfColumn` is the one lookup from a fresh column's key to where it
+  is**: a new tab's, or a branch of a task whether or not that task is in
+  the sidebar. The card marks and the reveal place a fresh card with it.
 - **Column keys hold no `:`.** A presence key is
   `${writer}:${seat}:${columnKey}`, and `readReading` takes the writer from
   before the first colon (ADR-0037). A writer holds none (`normalizeEmail`
   refuses one) and a seat is hex; a colon in a column key would still break
   the rule that a key's parts are its colons.
-- **New tabs** are fresh columns at the root (`anchor: null`), local until
-  their first send. `sync` moves one whose message is written to
-  `roots[rootOf(anchor)]`, keeping its key, and keeps it what you are on. A
+- **New tabs** are fresh columns at the root (`anchor: null`), keyed by the
+  thread they minted, local until their first send (`newTabReducer`). Once
+  its thread's card is on its task's canvas, `sync` makes the tab that
+  task, its card's column unfolded and read as the tab's was, and keeps it
+  what you are on; the key is the card's id, so the column stays mounted. A
   new tab opened from a board column keeps that column's state
   (`fresh.state`), which its first send carries (`ChatHow.state`).
 - **A new tab mints its root's id as it opens** (`fresh.root`, ADR-0066),
@@ -291,8 +298,8 @@ selects by. A task's signals are its threads', whatever roots they are in
   history under it, and its first send starts it (`ChatHow.root`). Stored
   with the layout; a layout with a new tab stored without it restores
   nothing.
-- **`sync` runs on every root's columns**, not only the active one's: an anchor
-  left behind can later follow a newer branch below it (ADR-0027).
+- **`sync` settles every task's branches**, not only the active one's: a
+  branch whose card is on the canvas leaves your view's branches, unfolded.
 - **The layout drawn is `resolveLayout(stored, facts)`, computed in render**
   (ADR-0044): `sync`, then the sidebar drawn. An effect stores it with
   `resolve`, the same function, so an action reduces from it: React runs
@@ -303,13 +310,14 @@ selects by. A task's signals are its threads', whatever roots they are in
   was synced that way, a slow render painted new entries under the old
   anchor: a `⑂ 0 messages` chip and a row stuck at `…` (S35).
 - **`planOpen` is the deduplication `App` used to do**, pure: scroll to an
-  entry a column of its root already shows, or open a column beside the
-  deepest sharer (`openBeside`). An archived root opens as any other; its
-  columns are read-only (`appView`). The rail and fork dots go through it,
-  as an `openAt` intent: `planIntent` turns its plan into effects, and
-  `perform` carries them out.
-- **Columns of other roots are unmounted.** Alignment forgets their keys, so a
-  root shown again places its columns as if opened, left to right: each at
+  entry an unfolded column of its task already shows (the leftmost, as
+  `projectColumns` lays the paths out over the unfolded columns), else
+  unfold its thread's card (`unfold`). An archived task opens as any
+  other; its columns are read-only (`appView`). The rail and fork dots go
+  through it, as an `openAt` intent: `planIntent` turns its plan into
+  effects, and `perform` carries them out.
+- **Columns of other tasks are unmounted.** Alignment forgets their keys, so a
+  task shown again places its columns as if opened, left to right: each at
   the spot it was left (A column's view, `packages/web/TECHNICAL.md`), else aligned, the first at
   its end (Layout: columns scroll independently, `packages/web/TECHNICAL.md`). Each keeps what it
   knew of its end (`SeenEnd`, Following a column's end, `packages/web/TECHNICAL.md`), and each tool row what it decided
@@ -398,31 +406,57 @@ selects by. A task's signals are its threads', whatever roots they are in
   written its first message. A note's and your message's ⋯ offer the same
   per open state (`CardMoveTo`'s `thread`, the `spinOff` act).
 
+## The canvas (`canvas-columns.ts`, ADR-0116)
+
+- **Every card on a task's canvas is a column, in its order**
+  (`canvasColumns`), the same for everyone: a thread's card a thread
+  column, a note column a note column. A thread whose root this tab does
+  not hold yet is left out until it is.
+- **Your view of a task is `TaskView`**: each card's `CardView`
+  (unfolded, density, details), the task column's fold, and your branches
+  not yet sent by the thread each minted. Maps and a flag, so the layout
+  has nowhere to keep an order of its own. A task with no view is drawn
+  with its first card alone unfolded (`defaultView`); a view action
+  carries the canvas's first card to start one (`first`).
+- **The strip is `[TaskColumn, ...CardColumn[]]`** (`stripOf`,
+  `taskStrip`): the task column first by type, with no card's id, so no
+  move, reorder or width can name it.
+- **A branch not yet sent is drawn just after the thread its fork is in**
+  (`branchAfter`, `@pinetrie/rules`), two there in id order: the same rule
+  ranks its card when its first send lands (`planThreadCard`), so the
+  column does not move.
+- **Folded, a column is a strip with its title** (`foldedView`), in its
+  place; `projectColumns` lays the paths out over the unfolded thread
+  columns alone (`openColumns`), so folding the trunk shows it in the next
+  unfolded column. Going to a card unfolds it: `planOpen`'s `unfold`, a
+  reveal of a note or a canvas place (`revealOf`), your new branch, a note
+  column you made.
+- **A column moves for everyone**: `moveColumn` is a reorder of its card
+  on the canvas (`planColumnMove`), host-ordered and undone by the undo
+  key; its width is the card's too (`cardWidth`, `columnMenu`).
+
 ## The column model (`columns.ts`)
 
-A column is `{ key, anchor, thread?, asksAgent?, fresh? }`, and `columnsReducer`
-is pure: keys and thread ids come from the shell in the action (`Minted`),
-so the reducer has no hidden counter.
+A thread column is `{ key, anchor, thread, asksAgent?, fresh?, density?,
+details? }`. A task's come from its canvas (`canvasColumns`); a new tab's
+one column is the layout's, changed by `newTabReducer`, which is pure: ids
+come from the shell in the action (`Minted`), so it has no hidden counter.
 
 - **A column shows a thread** (ADR-0117). `sync` runs on every change and
   sets each anchor to its thread's end (`threadEnd`, core): a reply below
   its last message moves it on, and a branch, which starts another thread
   however new, never does. Its lane is the one named by its thread's id
   (`laneOf`), so there is no binding to do, and no newest leaf to follow.
-- **A column opened at an entry** (`open`: the rail, `openAt`) has no
-  thread until `sync` reads whose that entry is (`threadAt`). Its composer
-  sends nothing meanwhile (`ColumnHow.thread` null), which lasts one render.
 - **A fresh column carries the thread its first send starts**, minted with
-  its key (`newThreadId`, `@pinetrie/session`), in `openFresh` and `newTab`.
+  its key, the key being the thread (`newThreadId`, `@pinetrie/session`), in
+  `openFresh` and `newTab`.
   It waits for the entry its send wrote (`bySend`), or for its thread's first
   entry from another browser tab holding the same column, then follows its
   thread. Before that entry is written, a lane created for the thread holds
   its fork: there the column ends. `thread` is stored, so a reload keeps it
   and its name.
-- **A root's first column is never stored** (`columnsOf`): `drawnColumns`
-  settles it on its thread's end as `sync` does the stored ones, so `App` and
-  `planOpen` draw it as everyone else's. Every column's path ends at its
-  anchor in `projectColumns`.
+- **Every column's path ends at its anchor** in `projectColumns`: a
+  thread's end (`threadAnchor`), or a fresh column's fork.
 - **A null anchor** belongs only to a fresh column at the root: a new tab's.
 - **A fresh column** (`openFresh`: `→`, or "branch here" after a conflict; or
   a new tab) has nothing of its own yet. Its first send mints the
@@ -459,8 +493,7 @@ so the reducer has no hidden counter.
   message with no mention asks the agent, as if `@agent` were written, until
   the thread has a lane of its own. Only the composer reads it; the header
   shows what the composer will do (`onCreatesLane`, below).
-- **Deduplication is `planOpen`'s** (`layout.ts`, above). Two anchors can
-  resolve to one path, which `columnsReducer` cannot see.
+- **Deduplication is `planOpen`'s** (`layout.ts`, above).
 - **Open columns are never written to the document.** Which paths a person
   reads is theirs. The page keeps them in the browser (Kept per tab,
   `packages/web/TECHNICAL.md`).
@@ -1339,14 +1372,13 @@ gone.
 - **`noteColumnsOf`** is the task's note columns in the canvas's order,
   each with its title (its `NOTE_COLUMN` record, else `NEW_NOTES_TITLE`)
   and its notes in order (`notesIn`).
-- **Where one is drawn is `stripItems`'s**, until the canvas lays out the
-  columns: each just after the last open thread column whose thread comes
-  before it on the canvas, else first, so every reader sees it beside the
-  same thread. A fresh column is passed over. A note column is neither
-  closed nor moved from the page yet; a thread column's `data-position`
-  counts thread columns alone.
-- **A note's acts are a column's**, keyed by its note column's id (a
-  `column` intent at position -1), so a refusal is said there: ↑ and ↓
+- **Where one is drawn is its card's rank on the canvas** (`canvasColumns`).
+  "Add a note column here" in a column's `⋯` makes one just after it, and
+  the task column's "+ note column" one first: a move with no `from` to a
+  spot on the canvas (`canvas-at`), which the host ranks; it opens
+  unfolded.
+- **A note's acts are a column's**, keyed by its note column's card (a
+  `column` intent with a `card` key), so a refusal is said there: ↑ and ↓
   reorder it among the column's notes (`reorderOf`, a `note` key), and its
   ⋯ takes it into your inventory or makes it a thread; a drag takes it
   anywhere else. "+ add a note" is `newNote`: an empty note at the

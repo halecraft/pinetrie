@@ -113,10 +113,12 @@ export function cardMarks(input: {
         if (tab?.kind === "task") tasks.add(tab.task)
         break
       }
-      // The inventory is no tab, a pinned card is a thread's direction, not
-      // unsent work (ADR-0048), and a canvas holds no text card.
+      // The inventory is no tab, a pinned card is a thread's or a task's
+      // direction, not unsent work (ADR-0048), and a canvas holds no text
+      // card.
       case "queued":
       case "pinned":
+      case "task-pinned":
       case "inventory":
       case "canvas":
       case "gone":

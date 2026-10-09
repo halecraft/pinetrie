@@ -88,14 +88,13 @@ describe("threadCardHead (ADR-0111, ADR-0116)", () => {
         lanes: [],
         archived: new Set(),
         list: [K1],
-        entries: new Map([[K1, R1]]),
+        canvases: new Map(),
       },
     )
     const sidebar = sidebarView({
       layout,
       active: { kind: "task", task: K1 },
       heads,
-      entries: new Map([[K1, R1]]),
       summaries: new Map(),
       marks: new Map(),
       archived: new Set(),
@@ -112,7 +111,6 @@ describe("threadCardHead (ADR-0111, ADR-0116)", () => {
       workflow: WORKFLOW,
       places: new Map(),
       summaries: new Map([[K1, { line: "", writers: [], newest: R1 }]]),
-      entries: new Map([[K1, R1]]),
       heads,
       search: null,
       me: writerId("a@x.test"),

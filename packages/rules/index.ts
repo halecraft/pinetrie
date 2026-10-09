@@ -95,6 +95,27 @@ export {
   type WorkflowPlan,
 } from "./board.ts"
 export {
+  CANVAS_CAP,
+  CANVAS_FACT_TYPE,
+  CANVAS_RULE,
+  CANVAS_TYPE,
+  type CanvasFact,
+  type CanvasFactMessage,
+  type CanvasFacts,
+  type CanvasMessage,
+  type CanvasSteer,
+  canvasContent,
+  canvasFactLine,
+  canvasLines,
+  canvasList,
+  decodeCanvas,
+  decodeCanvasFact,
+  encodeCanvas,
+  encodeCanvasFact,
+  planCanvasFacts,
+  planCanvasRead,
+} from "./canvas.ts"
+export {
   afterSteps,
   blankQueued,
   type CarryPlan,
@@ -125,14 +146,17 @@ export {
   planHistorySweep,
   planMoveCommand,
   planMoveRequest,
+  planMoveTargets,
   planNextQueuedCardPop,
-  planNotesTargets,
   planReorder,
   planSetCommand,
   planUnqueueAll,
   planUnsent,
+  planWidth,
   type QueuedCard,
   queuedOn,
+  type TaskPinnedCard,
+  taskPinnedOf,
   toNotes,
   type UndoResult,
   undoAnswer,
@@ -150,6 +174,9 @@ export {
   type RecordStep,
   TRACE,
   TRACE_MAX_AGE_MS,
+  TRACED,
+  TRACED_PLACES,
+  traceEnd,
   type Verb,
   verbOf,
 } from "./card-history.ts"
@@ -189,6 +216,14 @@ export {
   resolveCommand,
 } from "./commands.ts"
 export type { ModelRef } from "./config.ts"
+export {
+  CONTEXT,
+  CONTEXT_KINDS,
+  CONTEXT_RULES,
+  type ContextKind,
+  contextKindOf,
+  contextOf,
+} from "./context.ts"
 export {
   type Answer,
   type AskLines,
@@ -351,11 +386,15 @@ export {
   STOP,
 } from "./stop.ts"
 export {
+  branchAfter,
   type CanvasCard,
   canvasOf,
   indexTasks,
   NO_TASK_INDEX,
+  planThreadCard,
   planThreadStart,
+  rankAfter,
+  rankOfDrop,
   rootOfPlace,
   rootsHeld,
   TASK,
@@ -366,6 +405,14 @@ export {
   taskOfTarget,
   threadCardOf,
 } from "./task.ts"
+export {
+  decodeTaskPinned,
+  encodeTaskPinned,
+  planTaskPinnedRead,
+  TASK_PINNED_TYPE,
+  type TaskPinnedMessage,
+  taskPinnedContent,
+} from "./task-pinned.ts"
 export { THREAD } from "./thread.ts"
 export {
   decodeTitleConfig,

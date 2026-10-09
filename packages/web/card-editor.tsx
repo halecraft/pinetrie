@@ -381,9 +381,8 @@ export function CardEditor(p: {
       return
     }
     const { thread, task, ...how } = p.how
-    // A column opened at an entry settles on its thread at once: until then
-    // there is no thread to send in.
-    if (thread === null || task === null) {
+    // A new tab's task is known as it opens; until then nothing is sent.
+    if (task === null) {
       step({ kind: "settled", spent: false })
       return
     }
@@ -889,14 +888,15 @@ export function PinnedCardEditor(p: {
   session: SessionClient
   card: TextCard
   /** What the agent reads of the thread's pinned cards now (`pinnedInView`). */
-  inView: PinnedView | null
+  inView: Pick<PinnedView, "cards"> | null
   /** The thread's pinned cards as drawn: what a reorder moves it among. */
   among: readonly CardRecord[]
   /** Where a queue from its column puts it; null where nothing can be queued. */
   queueOn: CardFrameFacts["queueOn"]
   reader: Reader
   readOnly: ReadOnly | null
-  catchUps: CatchUps
+  /** What a command catches up with; null away from a thread: a task's pin. */
+  catchUps: CatchUps | null
   onAct: (act: ColumnAct) => void
   onTyping: (card: CardId) => void
 }) {

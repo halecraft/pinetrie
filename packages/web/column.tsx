@@ -8,6 +8,7 @@ import {
   type CardId,
   type CardPlace,
   type CardRecord,
+  type CardWidth,
   conflictsAt,
   type DigestRecord,
   type EntryId,
@@ -38,10 +39,12 @@ import {
   type CatchUps,
   type ColumnAct,
   type ColumnHow,
+  type ColumnKey,
   type Column as ColumnSpec,
   type ColumnView,
   type ComposerPlacesStore,
   closeAskWords,
+  columnMenu,
   columnView,
   composerPlace,
   DENSITIES,
@@ -50,6 +53,7 @@ import {
   densityWords,
   detailsTitle,
   type EditorState,
+  FOLD,
   type FoldMemory,
   type HeadBanner,
   type HeadIdentity,
@@ -93,8 +97,8 @@ import {
   effectiveBase,
   type OfferButton,
   pinnedAt,
-  placeEnd,
   queuedOn,
+  traceEnd,
   yourCard,
 } from "@pinetrie/rules"
 import { type LiveDocHandle, readStreamText } from "@pinetrie/schema"
@@ -110,6 +114,7 @@ import {
   useSyncExternalStore,
 } from "react"
 import { CardEditor } from "./card-editor.tsx"
+import { ColumnMenu } from "./column-menu.tsx"
 import { Composer } from "./composer.tsx"
 import { COPIED, useCopy } from "./copy.ts"
 import { Dock } from "./dock.tsx"
@@ -140,8 +145,19 @@ export interface ColumnProps {
   column: ColumnSpec
   /** The task it is on (ADR-0116): a new tab's, minted as it opened; null before it is known. */
   task: TaskId | null
+  /**
+   * Which column it is (ADR-0116): its thread's card on the canvas, which
+   * folds and moves; a branch not yet sent, or a new tab's column, which
+   * close.
+   */
+  columnKey: ColumnKey
+  /** Its card's index on the canvas; -1 with no card. */
   position: number
-  /** How many columns the strip holds: with two or more, a column can move. */
+  /** Its place among the columns drawn whole, as `data-position` says it. */
+  drawnAt: number
+  /** How many columns wide its card is drawn (ADR-0116); 1 with no card. */
+  width: CardWidth
+  /** How many cards the canvas holds: with two or more, a card's column can move. */
   count: number
   view: ColumnView
   index: TreeIndex
@@ -176,7 +192,7 @@ export interface ColumnProps {
   path: ReadonlySet<EntryId>
   /**
    * What a reader asks of the page. The column's own acts go as
-   * `{ kind: "column", position, act }`, a message's among them.
+   * `{ kind: "column", key, act }`, a message's among them.
    */
   onIntent: (intent: Intent) => void
   /** Nothing may be written here (ADR-0029): no composer, no tools that write. */
@@ -257,6 +273,11 @@ export function Column(p: ColumnProps) {
   }, [view.forkFrom])
 
   const fresh = p.column.fresh !== undefined
+  // A card's column folds and moves; a fresh one closes and sends first.
+  const { columnKey } = p
+  const card = columnKey.kind === "card" ? columnKey.card : null
+  const freshKey =
+    columnKey.kind === "fresh" || columnKey.kind === "newTab" ? columnKey : null
   // Where a send attaches: a fresh column's branch point, else the column's end.
   const at: Position = fresh
     ? p.column.anchor === null
@@ -270,12 +291,7 @@ export function Column(p: ColumnProps) {
   // handler every message shares, so none of them redraws when this column
   // does.
   const act = useStable((act: ColumnAct) =>
-    p.onIntent({
-      kind: "column",
-      position: p.position,
-      key: p.column.key,
-      act,
-    }),
+    p.onIntent({ kind: "column", column: p.columnKey, act }),
   )
   const openAt = useStable((entry: EntryId) =>
     p.onIntent({ kind: "openAt", entry }),
@@ -298,11 +314,9 @@ export function Column(p: ColumnProps) {
   // Where you last left the thread, on any device: read as the column
   // mounts and when the page shows again, so the line stays where it was
   // while you read below it (ADR-0106, ADR-0077).
-  const leftLane = p.column.thread ?? null
+  const leftLane = p.column.thread
   const readLeft = useStable(() =>
-    leftLane === null
-      ? undefined
-      : p.attention.attention.current().read.get(leftLane),
+    p.attention.attention.current().read.get(leftLane),
   )
   const [leftAt, setLeftAt] = useState(readLeft)
   const [visible, setVisible] = useState(
@@ -372,10 +386,9 @@ export function Column(p: ColumnProps) {
   // This thread's lane, as the host will find it: busy means a compelled
   // message waits.
   // A fresh column's thread starts with its first send: it has no lane yet.
-  const lane: ThreadLane =
-    fresh || p.column.thread === undefined
-      ? { kind: "none" }
-      : laneOf(p.lanes, p.column.thread)
+  const lane: ThreadLane = fresh
+    ? { kind: "none" }
+    : laneOf(p.lanes, p.column.thread)
   const running = lane.kind === "lane" && lane.running
   // The ask this column's lane is answering (ADR-0106).
   const runningAsk =
@@ -405,7 +418,7 @@ export function Column(p: ColumnProps) {
   // Whether this column's next send would create a lane: the composer's to
   // decide, as it is typed.
   const [createsLane, setCreatesLane] = useState(false)
-  const thread = p.column.thread ?? null
+  const thread = p.column.thread
   // The banner drawn as the column mounts shows at once; one arriving later,
   // a new one, fades in. The composer reports `createsLane` only after the
   // mount, so the banner of the lane its next send creates counts as there
@@ -612,7 +625,8 @@ export function Column(p: ColumnProps) {
     end.follow()
     if (!fresh) return undefined
     const sendId = crypto.randomUUID()
-    act({ kind: "sent", key: p.column.key, sendId })
+    if (freshKey !== null)
+      p.onIntent({ kind: "sentFresh", column: freshKey, sendId })
     return sendId
   }
   // Where a queue from a card's ⋯ puts it: on this thread's lane, at its end.
@@ -647,9 +661,7 @@ export function Column(p: ColumnProps) {
     !watches || threadEnd === null
       ? []
       : tracesAt(p.traces.values(), p.session.writer, threadEnd, from =>
-          from.kind === "queued" || from.kind === "pinned"
-            ? placeEnd(from, index)
-            : null,
+          traceEnd(from, index),
         )
   const [keptHere, setKeptHere] = useState<ReadonlyMap<string, TraceRecord>>(
     () => new Map(),
@@ -678,7 +690,8 @@ export function Column(p: ColumnProps) {
           .map(c => c.id)
       : []
     if (typed.length > 0) setAskClose(typed)
-    else act({ kind: "close", discard: [] })
+    else if (freshKey !== null)
+      p.onIntent({ kind: "closeFresh", column: freshKey, discard: [] })
   }
   const branchInstead = (pending: Pending) => {
     if (at.kind === "entry") act({ kind: "branchInstead", at: at.id, pending })
@@ -687,18 +700,24 @@ export function Column(p: ColumnProps) {
   return (
     <section
       className="column"
+      data-card={card ?? undefined}
       data-density={density}
+      data-width={p.width}
       data-key={p.column.key}
-      data-position={p.position}
+      data-position={p.drawnAt}
       data-pane={pane?.kind}
       data-track={p.track}
       style={colors.style(p.track)}
     >
       <PaneReach value={reach}>
         <div className="column-thread">
-          <header className="column-head" data-color={colors.slot(p.track)}>
+          <header
+            className="column-head"
+            data-color={colors.slot(p.track)}
+            data-column-head={card === null ? undefined : ""}
+          >
             <div className="head-row">
-              {p.count > 1 && (
+              {card !== null && p.count > 1 && (
                 <button
                   aria-keyshortcuts="ArrowLeft ArrowRight Home End"
                   aria-label="move column"
@@ -708,7 +727,8 @@ export function Column(p: ColumnProps) {
                     if (to === null) return
                     e.preventDefault()
                     movedByKey.current = true
-                    act({ kind: "move", to })
+                    if (columnKey.kind === "card")
+                      p.onIntent({ kind: "moveColumn", column: columnKey, to })
                   }}
                   ref={grip}
                   title="drag to move · ← → Home End"
@@ -770,6 +790,26 @@ export function Column(p: ColumnProps) {
                   session={p.session}
                 />
               )}
+              {card !== null && (
+                <ColumnMenu
+                  items={columnMenu({ card: card, width: p.width })}
+                  onIntent={p.onIntent}
+                />
+              )}
+              {card !== null && (
+                <button
+                  aria-label={FOLD.title}
+                  className={FOLD.className}
+                  onClick={() =>
+                    card !== null &&
+                    p.onIntent({ kind: "fold", card: card, unfolded: false })
+                  }
+                  title={FOLD.title}
+                  type="button"
+                >
+                  {FOLD.label}
+                </button>
+              )}
               {p.closable && (
                 <button
                   aria-label="close column"
@@ -802,7 +842,12 @@ export function Column(p: ColumnProps) {
                   className="close-keep"
                   onClick={() => {
                     setAskClose(null)
-                    act({ kind: "keep", cards: askClose })
+                    if (freshKey !== null)
+                      p.onIntent({
+                        kind: "keepFresh",
+                        column: freshKey,
+                        cards: askClose,
+                      })
                   }}
                   type="button"
                 >
@@ -812,7 +857,12 @@ export function Column(p: ColumnProps) {
                   className="close-discard"
                   onClick={() => {
                     setAskClose(null)
-                    act({ kind: "close", discard: askClose })
+                    if (freshKey !== null)
+                      p.onIntent({
+                        kind: "closeFresh",
+                        column: freshKey,
+                        discard: askClose,
+                      })
                   }}
                   type="button"
                 >

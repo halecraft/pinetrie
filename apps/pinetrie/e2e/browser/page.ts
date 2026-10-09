@@ -95,6 +95,21 @@ export async function chooseOnCard(
  * so the note unfolds. The selector of its frame, which may not be there.
  */
 export async function openNote(p: Page, card: string): Promise<string> {
+  // A note column you have not opened is folded (ADR-0116): unfold each.
+  const textarea = `.note-column textarea[data-card="${card}"]`
+  await p
+    .waitForFunction(
+      t =>
+        document.querySelector(t) !== null ||
+        document.querySelector('.folded-column[data-kind="notes"]') !== null,
+      textarea,
+      { timeout: 10_000 },
+    )
+    .catch(() => {})
+  for (const folded of await p
+    .locator('.folded-column[data-kind="notes"] .folded-title')
+    .all())
+    await folded.click().catch(() => {})
   await p
     .locator(`.note-column textarea[data-card="${card}"]`)
     .focus({ timeout: 10_000 })
@@ -313,11 +328,11 @@ export const connected = (p: Page, timeout = 20_000) =>
     undefined,
     { timeout },
   )
-/** A root in the sidebar (ADR-0122). */
-export const itemSel = (root: string) =>
-  `#sidebar .open-root[data-root="${root}"]`
-/** A root on the board, by its root entry: inside `#board`. */
-export const boardSel = (root: string) => `.thread-card[data-entry="${root}"]`
+/** A task in the sidebar (ADR-0122, ADR-0116). */
+export const itemSel = (task: string) =>
+  `#sidebar .open-root[data-task="${task}"]`
+/** A task on the board: inside `#board`. */
+export const boardSel = (task: string) => `.thread-card[data-task="${task}"]`
 /**
  * Step away from the root you are on, so its columns unmount: to a new tab,
  * which is closed again by `stepBack`. The sidebar has nothing else to step to
@@ -329,9 +344,9 @@ export async function stepAway(p: Page): Promise<void> {
     timeout: 15_000,
   })
 }
-/** Back on `root` from `stepAway`, and the new tab closed. */
-export async function stepBack(p: Page, root: string): Promise<void> {
-  await p.click(itemSel(root))
+/** Back on `task` from `stepAway`, and the new tab closed. */
+export async function stepBack(p: Page, task: string): Promise<void> {
+  await p.click(itemSel(task))
   await p.$$eval("#sidebar .open-new ~ .open-close", bs => {
     for (const b of bs) (b as HTMLButtonElement).click()
   })
@@ -348,8 +363,8 @@ export async function openBoard(p: Page): Promise<void> {
 /** The messages the rail on `p` accounts for: dots, and each stretch's count. */
 export const railCount = (p: Page) => p.evaluate(RAIL_MESSAGES)
 /**
- * Open root `r` from the board (ADR-0122): select its item, which shows it
- * and puts it in the sidebar, and wait until you are on it. An archived root
+ * Open task `r` from the board (ADR-0122): select its item, which shows it
+ * and puts it in the sidebar, and wait until you are on it. An archived task
  * is found in the archive's rows, by its label's search.
  */
 export const openFromBoard = async (p: Page, r: string) => {

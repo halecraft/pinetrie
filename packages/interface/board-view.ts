@@ -13,7 +13,6 @@
 
 import type {
   BoardPlace,
-  EntryId,
   TaskId,
   Workflow,
   WorkflowState,
@@ -36,8 +35,6 @@ import type { ThreadCardHead } from "./thread-card.ts"
  */
 export interface ThreadCard extends Omit<ThreadCardHead, "state"> {
   readonly head: ThreadCardHead
-  /** Its first root's root entry (`entriesOf`), written as `data-entry`; null for none. */
-  readonly entry: EntryId | null
   /** The state it is in: what its drag carries. */
   readonly state: WorkflowStateId
   /** Everyone who wrote a chat in it (`TaskSummary.writers`). */
@@ -144,8 +141,6 @@ export interface BoardViewInput {
   readonly places: ReadonlyMap<TaskId, BoardPlace>
   /** Each task with a message (`summariesOf`): its first line is a titled card's body. */
   readonly summaries: ReadonlyMap<TaskId, TaskSummary>
-  /** Each task's first root's root entry (`entriesOf`). */
-  readonly entries: ReadonlyMap<TaskId, EntryId>
   /** Each task's thread card header (`threadCardHeads`), which the sidebar reads too. */
   readonly heads: ReadonlyMap<TaskId, ThreadCardHead>
   /** The board's filter (`parseSearch`), or null for none. */
@@ -208,7 +203,6 @@ export function boardView(input: BoardViewInput): BoardView {
     return {
       ...head,
       head,
-      entry: input.entries.get(task) ?? null,
       state,
       writers: writersOf(task),
       body: bodyOf(head.label, summaries.get(task)?.line),

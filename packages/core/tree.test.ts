@@ -671,7 +671,7 @@ describe("pinned cards in the tree (ADR-0048)", () => {
   test("pinnedInView: a compaction ends the walk; what its retained tail carries is in view, or none", () => {
     const carried: EntryLike = {
       ...entry("8-c", "7-r2", undefined, { type: "compaction" }),
-      carried: first,
+      carried: { pinned: first },
     }
     const after = entry("9-p3", "8-c", {
       role: "chat",

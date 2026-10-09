@@ -54,6 +54,19 @@ export interface Provenance {
   seen(writer: WriterId, ids: readonly string[]): Promise<void>
   /** Old traces, and histories whose card is gone (`planTraceSweep`). */
   sweep(): Promise<void>
+  /**
+   * Call `listener` after each change `after` records, with the places
+   * before and after it and its cause: what tells a running thread its
+   * task's canvas changed (`canvas-news.ts`, ADR-0116). Never awaited.
+   */
+  onChanged(listener: (change: PlacesChange) => void): void
+}
+
+/** One change to the places, as `after` read it. */
+export interface PlacesChange {
+  readonly before: readonly CardRecord[]
+  readonly after: readonly CardRecord[]
+  readonly cause: Cause
 }
 
 export interface ProvenanceDeps {
@@ -102,6 +115,8 @@ export function createProvenance(deps: ProvenanceDeps): Provenance {
     if (writes.length > 0) await deps.records.writeValues(writes)
   }
 
+  const listeners: ((change: PlacesChange) => void)[] = []
+
   return {
     before() {
       const cards = readPlaces(places)
@@ -133,8 +148,14 @@ export function createProvenance(deps: ProvenanceDeps): Provenance {
         now: deps.basics.now(),
         newId: deps.basics.newId,
       }
+      for (const listener of listeners)
+        listener({ before: facts.before, after: facts.after, cause })
       // plan, then execute
       return write(planProvenance(facts))
+    },
+
+    onChanged(listener) {
+      listeners.push(listener)
     },
 
     seen(writer, ids) {

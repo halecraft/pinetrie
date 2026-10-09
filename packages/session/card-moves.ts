@@ -31,7 +31,7 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
-import { notesNear, planReorder } from "@pinetrie/rules"
+import { canvasOf, notesNear, planReorder, rankOfDrop } from "@pinetrie/rules"
 import type { Intents } from "./inventory.ts"
 
 /**
@@ -336,7 +336,8 @@ export const LAST_ORDER = "\uffff"
  * one is gone by you, in no history until the host names it one
  * (`historyOf`). A thread's nearest notes are the note column the host
  * would choose from `cards` (`notesOf`); undefined, drawn where it was,
- * when the host would make one, or the thread has no card.
+ * when the host would make one, or the thread has no card. A spot on a
+ * canvas is drawn at the rank the host would give it (`rankOfDrop`).
  */
 export function drawnPlace(
   key: MoveTarget,
@@ -347,14 +348,23 @@ export function drawnPlace(
     case "queued":
       return { ...key, order: LAST_ORDER, by: me }
     case "pinned":
+    case "task-pinned":
     case "note":
       return { ...key, order: LAST_ORDER }
     case "canvas":
       return { ...key, order: LAST_ORDER, width: 1 }
     case "gone":
       return { ...key, task: null, by: me }
+    // Drawn at the rank the host would give it there.
+    case "canvas-at":
+      return {
+        kind: "canvas",
+        task: key.task,
+        order: rankOfDrop(canvasOf(cards, key.task), key.after).order,
+        width: 1,
+      }
     case "notes": {
-      const near = notesNear(cards, key.thread)
+      const near = notesNear(cards, key)
       switch (near?.kind) {
         case "column":
           return { kind: "note", column: near.column, order: LAST_ORDER }
@@ -432,7 +442,10 @@ export function withPending(
     }
     const now = cards.get(p.move.card)
     if (now === undefined) continue
-    const place = drawnPlace(p.move.to, me, [...cards.values()])
+    // Placed among the others, as the host places it: a spot on a canvas is
+    // ranked without the card that moves there.
+    const others = [...cards.values()].filter(c => c.id !== p.move.card)
+    const place = drawnPlace(p.move.to, me, others)
     cards.set(
       p.move.card,
       (place === undefined ? undefined : placed(now, place)) ?? now,

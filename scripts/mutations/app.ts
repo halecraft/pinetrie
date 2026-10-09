@@ -283,7 +283,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a drop moves nothing",
     file: "packages/web/use-column-drag.ts",
-    from: "      if (to !== null) move(from, to)",
+    from: "      if (to !== null) move(card, to)",
     to: "      void to",
     suite: "browser",
     scenario: "page",
@@ -619,8 +619,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a new root takes the page to it",
     file: "packages/web/app.tsx",
-    from: "  }, [layout, stored, index, lanes, archivedTasks, list, entries])\n",
-    to: '  }, [layout, stored, index, lanes, archivedTasks, list, entries])\n  const othersTasks = tasks.byId.size\n  useEffect(() => {\n    const newest = [...tasks.byId.keys()].at(-1)\n    if (newest !== undefined) dispatch({ kind: "show", here: { kind: "task", task: newest } })\n  }, [othersTasks])\n',
+    from: "  }, [layout, stored, index, lanes, archivedTasks, list, canvases])\n",
+    to: '  }, [layout, stored, index, lanes, archivedTasks, list, canvases])\n  const othersTasks = tasks.byId.size\n  useEffect(() => {\n    const newest = [...tasks.byId.keys()].at(-1)\n    if (newest !== undefined) dispatch({ kind: "show", here: { kind: "task", task: newest } })\n  }, [othersTasks])\n',
     suite: "browser",
     scenario: "page",
     expect:
@@ -1063,10 +1063,13 @@ export const mutations: readonly Mutation[] = [
       "with your own message last in line, it says it will queue after yours",
   },
   {
-    name: "the layout drawn is the stored one, a render behind the document",
+    // S35: a column's anchor a render behind its thread's tip. A card
+    // column's anchor is derived as the strip is drawn (`canvasColumns`), so
+    // the strip reading the tree a frame late is what brings it back.
+    name: "the strip reads the tree a frame behind the document",
     file: "packages/web/app.tsx",
-    from: '  const layout = useMemo(\n    () =>\n      resolveLayout(stored, {\n        index,\n        lanes,\n        archived: archivedTasks,\n        list,\n        entries,\n      }),\n    [stored, index, lanes, archivedTasks, list, entries],\n  )\n  useEffect(() => {\n    if (layout !== stored)\n      dispatch({\n        kind: "resolve",\n        index,\n        lanes,\n        archived: archivedTasks,\n        list,\n        entries,\n      })\n  }, [layout, stored, index, lanes, archivedTasks, list, entries])',
-    to: '  const layout = stored\n  useEffect(\n    () => dispatch({ kind: "resolve", index, lanes, archived: archivedTasks, list, entries }),\n    [index, lanes, archivedTasks, list, entries],\n  )',
+    from: '  const strip: StripView | null = useMemo(\n    () =>\n      active?.kind === "task"\n        ? taskStrip(layout, active.task, { canvases, index, lanes })\n        : null,\n    [layout, active, canvases, index, lanes],\n  )\n',
+    to: '  const [behind, setBehind] = useState(index)\n  useEffect(() => {\n    const f = requestAnimationFrame(() => setBehind(index))\n    return () => cancelAnimationFrame(f)\n  }, [index])\n  const strip: StripView | null = useMemo(\n    () =>\n      active?.kind === "task"\n        ? taskStrip(layout, active.task, { canvases, index: behind, lanes })\n        : null,\n    [layout, active, canvases, behind, lanes],\n  )\n',
     suite: "browser",
     scenario: "tools",
     expect: "no branch chip is painted in the agent's column while it works",
@@ -1934,8 +1937,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "keep in inventory only closes",
     file: "packages/web/column.tsx",
-    from: '                  act({ kind: "keep", cards: askClose })',
-    to: '                  act({ kind: "close", discard: [] })',
+    from: '                        kind: "keepFresh",',
+    to: '                        kind: "closeFresh",\n                        discard: [],',
     suite: "browser",
     scenario: "page",
     expect: "closing a fresh column with text keeps its card in your inventory",
@@ -2048,8 +2051,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "startHost runs read no pinned cards",
     file: "apps/pinetrie/host/index.ts",
-    from: "    readPinned,\n    baseNews,\n",
-    to: "    readPinned: async () => null,\n    baseNews,\n",
+    from: "    readPinned,\n    readTaskContext,\n",
+    to: "    readPinned: async () => null,\n    readTaskContext,\n",
     suite: "host",
     scenario: "cards",
     expect:
@@ -2175,9 +2178,9 @@ export const mutations: readonly Mutation[] = [
   },
   {
     name: "the strip draws no note column",
-    file: "packages/web/app.tsx",
-    from: "    () => stripItems(columns, canvas),",
-    to: "    () => stripItems(columns, []),",
+    file: "packages/web/strip.tsx",
+    from: "    const notes = p.noteViews.get(item.card)",
+    to: "    const notes = undefined",
     suite: "browser",
     scenario: "page",
     expect:

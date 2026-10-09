@@ -8,8 +8,8 @@ import {
 } from "@pinetrie/core"
 import { cardIdFor } from "@pinetrie/core/fixtures"
 import { type CanvasCard, canvasOf, NEW_NOTES_TITLE } from "@pinetrie/rules"
-import { describe, expect, test } from "vitest"
-import { noteColumnsOf, stripItems } from "./note-column-view.ts"
+import { expect, test } from "vitest"
+import { noteColumnsOf } from "./note-column-view.ts"
 
 const ADA = writerId("ada@x.io")
 const TASK = taskIdFor("01a0ffd2-0000-7000-8000-00000000000c")
@@ -45,30 +45,6 @@ const canvas = (...ids: (typeof A | typeof N1)[]): readonly CanvasCard[] =>
     }),
     TASK,
   )
-
-describe("stripItems (ADR-0116)", () => {
-  test("each note column just after the last open column whose thread comes before it on the canvas", () => {
-    expect(
-      stripItems([{ thread: A }, { thread: B }], canvas(A, N1, B, N2)),
-    ).toEqual([
-      { kind: "thread", position: 0 },
-      { kind: "notes", column: N1 },
-      { kind: "thread", position: 1 },
-      { kind: "notes", column: N2 },
-    ])
-  })
-  test("one before every open thread goes first; a fresh column is passed over; the tab's order of thread columns is kept", () => {
-    expect(
-      stripItems([{ thread: B }, {}, { thread: A }], canvas(N1, A, N2, B)),
-    ).toEqual([
-      { kind: "notes", column: N1 },
-      { kind: "thread", position: 0 },
-      { kind: "thread", position: 1 },
-      { kind: "thread", position: 2 },
-      { kind: "notes", column: N2 },
-    ])
-  })
-})
 
 test("noteColumnsOf: each note column in the canvas's order, its title or Notes, its notes in order", () => {
   const note = (id: string, column: typeof N1, order: string): CardRecord => ({

@@ -702,7 +702,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a compaction's carried cards are not in view",
     file: tree,
-    from: "    e => e.carried ?? null,\n",
+    from: "    e => e.carried?.pinned ?? null,\n",
     to: "    () => null,\n",
     command: unit,
     expect: "a compaction ends the walk",
@@ -825,8 +825,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a gone key carries a task on the wire",
     file: "packages/core/index.ts",
-    from: '  task: { key: "for", kinds: ["fresh", "canvas"] },',
-    to: '  task: { key: "always" },',
+    from: '    kinds: ["fresh", "canvas", "canvas-at", "task-pinned", "notes"],',
+    to: '    kinds: ["fresh", "canvas", "canvas-at", "task-pinned", "notes", "discarded"],',
     command: unit,
     expect: "no task but a canvas's and a fresh one's",
   },
@@ -887,5 +887,13 @@ export const mutations: readonly Mutation[] = [
     to: "  return kinds.length > 0",
     command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
     expect: "decode: a malformed reorder or queue hold is refused",
+  },
+  {
+    name: "a spot on a canvas forgets the card it goes after",
+    file: core,
+    from: '        column: place.after ?? "",',
+    to: '        column: "",',
+    command: ["pnpm", "exec", "vitest", "run", "packages/protocol"],
+    expect: "a move's target may be a spot on a canvas",
   },
 ]

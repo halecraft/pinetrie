@@ -43,7 +43,7 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
     TEST_TASK,
   )
   const fresh = composerPlace(
-    { key: "k-fresh", fresh: {} },
+    { key: "k-fresh", thread: LANE, fresh: {} },
     E1,
     TEST_ROOT,
     TEST_TASK,
@@ -69,6 +69,7 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
     { kind: "state", state: workflowStateIdFor("s-1") },
     { kind: "sidebar", before: TEST_TASK },
     { kind: "sidebar", before: null },
+    { kind: "taskPinned", task: TEST_TASK },
   ]
 
   test.each(targets)("a drop on %o lands where a put to it lands", target => {
@@ -112,6 +113,12 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
     expect(at(targets[7] as PutTarget)).toBeNull()
   })
 
+  test("a task column's pins land pinned to the task (ADR-0116)", () => {
+    expect(
+      placeOfTarget(targets[12] as PutTarget, store.current(), ME),
+    ).toEqual({ kind: "task-pinned", task: TEST_TASK })
+  })
+
   test("a composer, or a fresh column, takes a put as your message", () => {
     expect(intoMessage(targets[2] as PutTarget, store.current())).toBe(true)
     expect(intoMessage(targets[1] as PutTarget, store.current())).toBe(true)
@@ -124,7 +131,7 @@ describe("one landing rule (ADR-0048: every input has full fidelity)", () => {
   })
 })
 
-test("composerPlace: your message at the end of its thread; fresh by key, in its root and the task it is on; none at the root, nor a fresh one in no root, nor with no thread yet", () => {
+test("composerPlace: your message at the end of its thread; fresh by key, in its root and the task it is on; none at the root, nor a fresh one in no root", () => {
   expect(
     composerPlace({ key: "k", thread: LANE }, E1, TEST_ROOT, TEST_TASK),
   ).toEqual({
@@ -132,11 +139,14 @@ test("composerPlace: your message at the end of its thread; fresh by key, in its
     at: E1,
     thread: LANE,
   })
-  // A column opened at an entry, before it settles on its thread.
-  expect(composerPlace({ key: "k" }, E1, TEST_ROOT, TEST_TASK)).toBeNull()
   // A branch: its tab's root, at its branch point, on the task you are on.
   expect(
-    composerPlace({ key: "k", fresh: {} }, E1, TEST_ROOT, TEST_TASK),
+    composerPlace(
+      { key: "k", thread: LANE, fresh: {} },
+      E1,
+      TEST_ROOT,
+      TEST_TASK,
+    ),
   ).toEqual({
     kind: "fresh",
     column: "k",
@@ -147,7 +157,7 @@ test("composerPlace: your message at the end of its thread; fresh by key, in its
   // A new tab: the root and the task it minted as it opened (ADR-0066).
   expect(
     composerPlace(
-      { key: "k", fresh: { root: NEW_ROOT, task: NEW_TASK } },
+      { key: "k", thread: LANE, fresh: { root: NEW_ROOT, task: NEW_TASK } },
       { kind: "root" },
       undefined,
       null,
@@ -161,7 +171,7 @@ test("composerPlace: your message at the end of its thread; fresh by key, in its
   })
   expect(
     composerPlace(
-      { key: "k", fresh: {} },
+      { key: "k", thread: LANE, fresh: {} },
       { kind: "root" },
       undefined,
       TEST_TASK,
@@ -169,7 +179,7 @@ test("composerPlace: your message at the end of its thread; fresh by key, in its
   ).toBeNull()
   expect(
     composerPlace(
-      { key: "k", fresh: { root: NEW_ROOT } },
+      { key: "k", thread: LANE, fresh: { root: NEW_ROOT } },
       { kind: "root" },
       undefined,
       null,

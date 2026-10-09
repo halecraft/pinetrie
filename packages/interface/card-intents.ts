@@ -35,6 +35,7 @@ import {
   type WriterId,
 } from "@pinetrie/core"
 import type { Outcome } from "@pinetrie/protocol/codec"
+import { taskOfPlace } from "@pinetrie/rules"
 import {
   AT_INVENTORY,
   atColumn,
@@ -242,9 +243,21 @@ export function planPut(
   }
   const to = placeOfTarget(target, facts.composers, facts.me)
   // A note put on its own column stays where it is: a reorder moves it there.
-  if (to === null || (to.kind !== "notes" && sameKey(keyOf(now.place), to)))
+  if (
+    to === null ||
+    (to.kind !== "notes" &&
+      to.kind !== "canvas-at" &&
+      sameKey(keyOf(now.place), to))
+  )
     return []
-  const key = target.kind === "notes" ? target.column : target.key
+  // Where a refusal is said: the column the card was put on; a task's pins,
+  // its task column's.
+  const key =
+    target.kind === "notes"
+      ? target.column
+      : target.kind === "taskPinned"
+        ? target.task
+        : target.key
   const move = moveOf(now, to)
   return [moveCard(move, { actedAt: atColumn(key), slot: null }, true)]
 }
@@ -356,16 +369,54 @@ export function planPin(
     : [moveCard(moveOf(now, to), IN_COLUMN(key), true)]
 }
 
-/** Unpin `card`: below the line where it was pinned. */
+/**
+ * Unpin `card`: to the note column nearest its thread; pinned to the task,
+ * to the one nearest the task column (ADR-0116).
+ */
 export function planUnpin(
   card: CardId,
   key: string,
   state: IntentState,
 ): readonly Effect[] {
   const now = cardOf(state.cards, card)
-  return now?.place.kind === "pinned"
-    ? [moveCard(moveOf(now, noteOf(now.place)), IN_COLUMN(key), true)]
-    : []
+  if (now?.place.kind === "pinned")
+    return [moveCard(moveOf(now, noteOf(now.place)), IN_COLUMN(key), true)]
+  if (now?.place.kind === "task-pinned")
+    return [
+      moveCard(
+        moveOf(now, { kind: "notes", task: now.place.task }),
+        IN_COLUMN(key),
+        true,
+      ),
+    ]
+  return []
+}
+
+/**
+ * Pin `card` to the task it is in (ADR-0116), else the task you are on:
+ * every thread of it reads the card on every run. A move like any other,
+ * which the undo key takes back.
+ */
+export function planPinToTask(
+  card: CardId,
+  key: string,
+  state: IntentState,
+): readonly Effect[] {
+  const now = cardOf(state.cards, card)
+  if (now === undefined || now.place.kind === "task-pinned") return []
+  const active = state.layout.active
+  const task =
+    taskOfPlace(state.tasks.index, now.place) ??
+    (active?.kind === "task" ? active.task : null)
+  return task === null
+    ? []
+    : [
+        moveCard(
+          moveOf(now, { kind: "task-pinned", task }),
+          IN_COLUMN(key),
+          true,
+        ),
+      ]
 }
 
 /**
@@ -466,7 +517,6 @@ export function planUndoMove(
 export function afterUndo(
   outcome: Outcome,
   state: IntentState,
-  minted: Minted,
 ): readonly Effect[] {
   switch (outcome.kind) {
     case "undone": {
@@ -474,9 +524,7 @@ export function afterUndo(
       for (const { card, place } of outcome.cards)
         if (place !== null && !places.some(p => sameKey(p.place, place)))
           places.push({ place, card })
-      return places.flatMap(
-        p => revealOf(p.place, state, minted, p.card).effects,
-      )
+      return places.flatMap(p => revealOf(p.place, state, p.card).effects)
     }
     case "unmoved": {
       const shown =
@@ -485,7 +533,7 @@ export function afterUndo(
               effects: [{ kind: "showInventory", brief: false }] as const,
               actedAt: AT_INVENTORY,
             }
-          : revealOf(outcome.place, state, minted)
+          : revealOf(outcome.place, state)
       return [
         ...shown.effects,
         {
@@ -513,14 +561,11 @@ export function afterUndo(
 export function planOpenTrace(
   trace: TraceRecord,
   state: IntentState,
-  minted: Minted,
 ): readonly Effect[] {
   const now = state.cards.cards.find(c => c.id === trace.card)
   if (now === undefined)
-    return trace.message === null
-      ? []
-      : planOpenAt(trace.message, state, minted.key)
+    return trace.message === null ? [] : planOpenAt(trace.message, state)
   if (now.place.kind === "inventory" && now.place.holder !== state.cards.me)
     return []
-  return revealOf(keyOf(now.place), state, minted, now.id).effects
+  return revealOf(keyOf(now.place), state, now.id).effects
 }

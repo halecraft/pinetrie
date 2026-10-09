@@ -2,6 +2,7 @@
 // (ADR-0048, ADR-0108), each label in one function. Pure.
 
 import type {
+  CanvasView,
   CardCommand,
   CardEvent,
   CatchUpCommand,
@@ -217,6 +218,20 @@ export const pinnedMarkerWords = (marker: PinnedMarker): string =>
   marker.cards.length === 0
     ? "the agent was told pinned cards no longer apply"
     : `the agent read ${marker.cards.length} pinned ${marker.cards.length === 1 ? "card" : "cards"}`
+
+/** The marker's line for the cards pinned to the task a run read (ADR-0116). */
+export const taskPinnedMarkerWords = (
+  marker: NonNullable<PinnedMarker["taskPinned"]>,
+): string =>
+  marker.cards.length === 0
+    ? "the agent was told the task's pinned cards no longer apply"
+    : `the agent read ${marker.cards.length} ${marker.cards.length === 1 ? "card" : "cards"} pinned to the task`
+
+/** The marker's line for the canvas list a run was told (ADR-0116). */
+export const canvasMarkerWords = (canvas: CanvasView): string => {
+  const n = canvas.lines.length + canvas.more
+  return `the agent was told the task's canvas: ${n} ${n === 1 ? "card" : "cards"}`
+}
 
 /** A card the agent was told no longer applies, by its first line. */
 export const retiredWords = (line: string): string =>

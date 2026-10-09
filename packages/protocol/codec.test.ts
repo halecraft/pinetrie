@@ -443,6 +443,18 @@ test("encodeIntent -> decodeCommand round-trips every intent", () => {
       command: null,
     },
     { kind: "traces-seen", traces: ["t-1", "t-2"] },
+    {
+      kind: "card-width",
+      card: threadIdFor("abc"),
+      at: { kind: "canvas", task: TEST_TASK },
+      width: 2,
+    },
+    {
+      kind: "card-width",
+      card: threadIdFor("abc"),
+      at: { kind: "canvas", task: TEST_TASK },
+      width: 1,
+    },
     { kind: "queue-hold", lane: threadIdFor("abc"), held: true },
     { kind: "queue-hold", lane: threadIdFor("abc"), held: false },
     { kind: "unqueue-all", lane: threadIdFor("abc") },
@@ -646,6 +658,36 @@ test("a note's key carries its column, and a thread's nearest notes its thread (
   assert.equal(decodeKey('{"kind":"notes","lane":"t-x"}'), undefined)
 })
 
+test("a move's target may be a spot on a canvas, after a card or first, and no place (ADR-0116)", () => {
+  const made = noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
+  for (const after of [TEST_THREAD, null]) {
+    const to = { kind: "canvas-at", task: TEST_TASK, after } as const
+    const moves = decodeMoves(encodeMoves([{ card: made, from: null, to }]))
+    assert.deepEqual(typeof moves === "string" ? moves : moves[0]?.to, to)
+  }
+  // A canvas's key is the canvas alone.
+  assert.deepEqual(decodeKey(encodeKey({ kind: "canvas", task: TEST_TASK })), {
+    kind: "canvas",
+    task: TEST_TASK,
+  })
+  assert.equal(
+    decodeKey(`{"kind":"canvas-at","task":"${TEST_TASK}","column":""}`),
+    undefined,
+  )
+  assert.equal(
+    typeof decodeMoves(
+      JSON.stringify([
+        {
+          card: made,
+          from: null,
+          to: { kind: "canvas-at", task: TEST_TASK, column: "not a card" },
+        },
+      ]),
+    ),
+    "string",
+  )
+})
+
 test("decode: a mark names a task or a note column, never both or neither (ADR-0116)", () => {
   const N = noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
   assert.equal(
@@ -738,6 +780,10 @@ test("decode: a move needs its cards, each with a place, and its sender's task a
       mode: "pull",
     },
     { kind: "set-command", cardId: "" },
+    // A width names its card, the task it was seen on, and 1 or 2.
+    { kind: "card-width", cardId: "", task: TEST_TASK, mode: "2" },
+    { kind: "card-width", cardId: cardIdFor("c1"), task: "r-x", mode: "2" },
+    { kind: "card-width", cardId: cardIdFor("c1"), task: TEST_TASK, mode: "3" },
     { kind: "undo-move", root: "", mode: "undo" },
     { kind: "undo-move", root: TEST_ROOT, mode: "sideways" },
     // Accepted work command is gone: setup and publish are commands of their own (ADR-0100).

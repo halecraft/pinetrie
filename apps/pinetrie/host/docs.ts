@@ -6,7 +6,6 @@ import type { Exchange } from "@kyneta/exchange"
 import {
   type EntryId,
   type RootId,
-  type RootRecord,
   rootDocId,
   type ThreadId,
 } from "@pinetrie/core"
@@ -77,17 +76,15 @@ export const rootsOpenedWords = (counts: {
 }
 
 /**
- * The roots a starting host opens (ADR-0116): every root in the directory
- * with a thread in a task outside the archive, or in an inventory
- * (`rootsHeld`). A busy task cannot be archived (`planArchive`), so these
- * hold every lane a crash could have interrupted. Pure.
+ * The roots a starting host opens (ADR-0116): every root with a thread in a
+ * task outside the archive, or in an inventory (`rootsHeld`), from the
+ * threads' records, whatever the directory holds: a root whose directory
+ * record is stale is opened all the same, and the directory rebuilds it. A
+ * busy task cannot be archived (`planArchive`), so these hold every lane a
+ * crash could have interrupted. In order, by id. Pure.
  */
-export function planLoads(
-  roots: ReadonlyMap<RootId, RootRecord>,
-  held: ReadonlySet<RootId>,
-): readonly RootId[] {
-  return [...roots.keys()].filter(r => held.has(r))
-}
+export const planLoads = (held: ReadonlySet<RootId>): readonly RootId[] =>
+  [...held].sort()
 
 export function hostDocuments(input: {
   readonly exchange: Exchange

@@ -36,7 +36,7 @@ const WORKFLOW: Workflow = {
   archive: { id: workflowStateIdFor("x"), name: "Done" },
 }
 const columns = (...keys: string[]): Column[] =>
-  keys.map(key => ({ key, anchor: entryId("r") }))
+  keys.map(key => ({ key, anchor: entryId("r"), thread: threadIdFor(key) }))
 const input = (over: Partial<AppViewInput>): AppViewInput => ({
   active: { kind: "task", task: K },
   columns: columns("a"),
@@ -62,19 +62,17 @@ describe("appView's workspace", () => {
     expect(workspace({ active: { kind: "new", key: "t" } })).toEqual({
       kind: "new",
       key: "t",
-      slots: [{ key: "a", position: 0, closable: true, track: 3 }],
+      slots: [{ key: "a", closable: true, track: 3 }],
     })
   })
 
-  test("a task's only column offers no close; with two, both do", () => {
-    const one = workspace({})
-    const two = workspace({ columns: columns("a", "b"), tracks: [3] })
-    expect(one.kind === "task" && one.slots.map(s => s.closable)).toEqual([
-      false,
-    ])
+  test("in a task, only a branch not yet sent closes: a card's column folds (ADR-0116)", () => {
+    const [a, b] = columns("a", "b")
+    const fresh = { ...(b as Column), fresh: {} }
+    const two = workspace({ columns: [a as Column, fresh], tracks: [3] })
     expect(two.kind === "task" && two.slots).toEqual([
-      { key: "a", position: 0, closable: true, track: 3 },
-      { key: "b", position: 1, closable: true, track: PENDING_TRACK },
+      { key: "a", closable: false, track: 3 },
+      { key: "b", closable: true, track: PENDING_TRACK },
     ])
   })
 
@@ -157,15 +155,22 @@ test("the header's offers are the open ones, never one accepted work already hol
   ])
 })
 
-test("a task's rail draws its first root's tree only", () => {
-  const index = tree({ r1: null, a: "r1", r2: null, b: "r2" })
+test("a task's rail draws one tree for each root of its threads, in order, and nothing off a task (ADR-0116)", () => {
+  const index = tree({ r1: null, a: "r1", r2: null, b: "r2", r3: null })
   const ids = (rows: readonly { readonly id: string }[]) => rows.map(r => r.id)
-  expect(
-    ids(hereRail(index, { kind: "task", task: K }, entryId("r1"))),
-  ).toEqual(["r1", "a"])
-  expect(hereRail(index, { kind: "task", task: K }, null)).toEqual([])
-  expect(hereRail(index, { kind: "new", key: "t" }, entryId("r1"))).toEqual([])
-  expect(hereRail(index, null, null)).toEqual([])
+  const task = { kind: "task", task: K } as const
+  expect(ids(hereRail(index, task, [entryId("r1")]))).toEqual(["r1", "a"])
+  expect(ids(hereRail(index, task, [entryId("r2"), entryId("r1")]))).toEqual([
+    "r2",
+    "b",
+    "r1",
+    "a",
+  ])
+  expect(hereRail(index, task, [])).toEqual([])
+  expect(hereRail(index, { kind: "new", key: "t" }, [entryId("r1")])).toEqual(
+    [],
+  )
+  expect(hereRail(index, null, [entryId("r1")])).toEqual([])
 })
 
 test("threadWork and taskWork: each busy held lane's work, and each lane running anywhere, by thread; a task's is the most of its threads' (ADR-0091, ADR-0116)", () => {

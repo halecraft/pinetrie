@@ -8,6 +8,7 @@ import {
   callLabel,
   callMark,
   callStatus,
+  canvasMarkerWords,
   copyIntoInventoryText,
   copyText,
   joinWords,
@@ -28,9 +29,11 @@ import {
   speakerLabel,
   TAKE_COPY,
   TAKE_COPY_INTO_INVENTORY,
+  taskPinnedMarkerWords,
   toolBody,
   withContributors,
 } from "@pinetrie/interface"
+import { canvasLines } from "@pinetrie/rules"
 import { type LiveDocHandle, readStreamText } from "@pinetrie/schema"
 import { newCardId } from "@pinetrie/session"
 import { memo, useCallback, useEffect, useMemo, useRef, useState } from "react"
@@ -79,22 +82,51 @@ function MessageView(p: MessageProps) {
           {joinWords(p.join)}
         </div>
       )}
-      {p.pinned !== undefined && (
-        <details className="pinned-read">
-          <summary>{pinnedMarkerWords(p.pinned)}</summary>
-          {p.pinned.cards.map(c => (
+      {p.pinned?.canvas !== undefined && (
+        <details className="context-read canvas-read">
+          <summary>{canvasMarkerWords(p.pinned.canvas)}</summary>
+          {canvasLines(p.pinned.canvas).map(line => (
+            <div className="canvas-read-line" key={line}>
+              {line}
+            </div>
+          ))}
+        </details>
+      )}
+      {p.pinned?.taskPinned !== undefined && (
+        <details className="context-read task-pinned-read">
+          <summary>{taskPinnedMarkerWords(p.pinned.taskPinned)}</summary>
+          {p.pinned.taskPinned.cards.map(c => (
             <div className="pinned-read-card" key={c.id}>
               <span className="pinned-read-by">{nameFor(p.nameOf, c.by)}</span>
               <div className="pinned-read-text">{c.text}</div>
             </div>
           ))}
-          {p.pinned.retired.map(r => (
+          {p.pinned.taskPinned.retired.map(r => (
             <div className="pinned-read-retired" key={r.id}>
               {retiredWords(r.line)}
             </div>
           ))}
         </details>
       )}
+      {p.pinned !== undefined &&
+        (p.pinned.cards.length > 0 || p.pinned.retired.length > 0) && (
+          <details className="pinned-read">
+            <summary>{pinnedMarkerWords(p.pinned)}</summary>
+            {p.pinned.cards.map(c => (
+              <div className="pinned-read-card" key={c.id}>
+                <span className="pinned-read-by">
+                  {nameFor(p.nameOf, c.by)}
+                </span>
+                <div className="pinned-read-text">{c.text}</div>
+              </div>
+            ))}
+            {p.pinned.retired.map(r => (
+              <div className="pinned-read-retired" key={r.id}>
+                {retiredWords(r.line)}
+              </div>
+            ))}
+          </details>
+        )}
       <div className={classes.join(" ")} data-entry={node.id}>
         <span className="role">{speaker}</span>
         {node.command !== undefined && (

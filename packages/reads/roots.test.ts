@@ -7,6 +7,7 @@ import {
   rootIdFor,
   SESSION_TARGET,
   type Sha256,
+  type ThreadId,
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
@@ -74,6 +75,20 @@ const agent = (text: string) => ({
   content: [{ type: "text", text }],
 })
 
+/** A chat that starts `thread`: its first message (ADR-0117). */
+const started = (text: string, thread: ThreadId) =>
+  encodeChat(
+    {
+      author: ADA,
+      authorName: "Ada",
+      text,
+      compels: NOBODY,
+      sendId: "s",
+      starts: thread,
+    },
+    1,
+  )
+
 function rootWith(...rows: StoredEntryRow[]): RootDocHandle {
   const doc = newRootDoc()
   for (const r of rows) writeEntry(doc, r)
@@ -83,7 +98,7 @@ function rootWith(...rows: StoredEntryRow[]): RootDocHandle {
 describe("readRootRecord", () => {
   test("its first line, writers, messages and newest, its mentions unresolved, and its images", () => {
     const doc = rootWith(
-      row("e1", null, chat("plan the rail\nwith care")),
+      row("e1", null, started("plan the rail\nwith care", threadIdFor("t"))),
       row("e2", "e1", chat("@bea look")),
       row("e3", "e2", {
         role: "toolResult",
@@ -131,6 +146,19 @@ describe("readRootRecord", () => {
       [b]: [BEA, CY],
       [empty]: [],
     })
+  })
+
+  test("a mention names the thread it is in, which the inbox opens it in (ADR-0116)", () => {
+    const [t, u] = [threadIdFor("t"), threadIdFor("u")]
+    const doc = rootWith(
+      row("e1", null, started("plan", t)),
+      row("e2", "e1", chat("@bea look")),
+      row("e3", "e1", started("@bea elsewhere", u)),
+    )
+    expect(readRootRecord(ROOT, doc).mentions).toEqual([
+      { id: "e2", by: ADA, text: "@bea look", thread: t },
+      { id: "e3", by: ADA, text: "@bea elsewhere", thread: u },
+    ])
   })
 
   test("a root with no message yet has no entry", () => {

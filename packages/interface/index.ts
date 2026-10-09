@@ -17,6 +17,7 @@ export {
   type ReadOnly,
   taskWork,
   threadWork,
+  type Workspace,
 } from "./app-view.ts"
 export {
   type AtTop,
@@ -98,6 +99,17 @@ export {
   tasksWords,
 } from "./board-view.ts"
 export {
+  type CardColumn,
+  type CardView,
+  defaultView,
+  keyOfColumn,
+  openColumns,
+  type Strip,
+  stripCards,
+  type TaskColumn,
+  type TaskView,
+} from "./canvas-columns.ts"
+export {
   type CardFaceView,
   type CardFrameFacts,
   type CardFrameView,
@@ -127,6 +139,7 @@ export {
 export {
   type CatchUps,
   CLEAR_COMMAND,
+  canvasMarkerWords,
   closeAskWords,
   DISCARD,
   DISCARD_CARD,
@@ -150,10 +163,17 @@ export {
   sizeWords,
   TAKE_COPY,
   TAKE_COPY_INTO_INVENTORY,
+  taskPinnedMarkerWords,
   traceWords,
   writtenWords,
 } from "./card-words.ts"
 export type { Codec } from "./codec.ts"
+export {
+  COLUMN_MENU_LABEL,
+  type ColumnMenuItem,
+  columnMenu,
+  FIRST_NOTE_COLUMN,
+} from "./column-menu.ts"
 export {
   branchColors,
   type ColumnView,
@@ -176,6 +196,7 @@ export {
   type PinnedMarker,
   pinnedMarkers,
   pinnedStatus,
+  promptParent,
   type ReserveStep,
   type ReviewTarget,
   START_WORDS,
@@ -186,16 +207,27 @@ export {
   type WorkStrip,
   workingWords,
 } from "./column-view.ts"
-export type {
-  Column,
-  Pending,
-  Prefill,
+export {
+  type CardKey,
+  type Column,
+  type ColumnKey,
+  type FreshKey,
+  keyText,
+  type Pending,
+  type Prefill,
 } from "./columns.ts"
 export { matchCommands } from "./commands.ts"
 export { copyIntoInventoryText } from "./copy-into-inventory-text.ts"
 export { copyText } from "./copy-text.ts"
 export { plural } from "./counts.ts"
 export type { Effect } from "./effects.ts"
+export {
+  FOLD,
+  type FoldedView,
+  foldedView,
+  UNFOLD,
+  UNNAMED_THREAD,
+} from "./folded-column-view.ts"
 export {
   behind,
   type FollowEvent,
@@ -261,14 +293,15 @@ export {
 export { keyAct } from "./inventory-keys.ts"
 export { inventoryView } from "./inventory-view.ts"
 export {
-  columnsOf,
   decodeLayout,
-  drawnColumns,
   encodeLayout,
   initialLayout,
   type Layout,
   layoutReducer,
   resolveLayout,
+  storedLayout,
+  taskColumns,
+  taskStrip,
   unlisted,
 } from "./layout.ts"
 export { leftLine } from "./left.ts"
@@ -309,8 +342,6 @@ export {
   type NoteColumnView,
   noteColumnsOf,
   noteCountWords,
-  type StripItem,
-  stripItems,
 } from "./note-column-view.ts"
 export {
   BACK,
@@ -472,10 +503,21 @@ export {
   taskSprites,
 } from "./sidebar-view.ts"
 export {
-  entriesOf,
+  boardStateWords,
+  FOLD_TASK,
+  pinnedCountWords,
+  RENAME_TASK_TITLE,
+  TASK_LIST_HEADING,
+  TASK_PINS_EMPTY,
+  TASK_PINS_HEADING,
+  type TaskColumnView,
+  taskColumnView,
+  UNFOLD_TASK,
+} from "./task-column-view.ts"
+export {
   NO_TASKS,
   type Tasks,
-  type TaskView,
+  type TaskThreads,
   tasksOf,
 } from "./tasks.ts"
 export {

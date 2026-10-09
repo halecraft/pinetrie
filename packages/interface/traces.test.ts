@@ -1,8 +1,8 @@
 import {
   atEntry,
   entryId,
-  type PlaceKey,
   rootIdFor,
+  type TracedPlace,
   type TraceRecord,
   threadIdFor,
   writerId,
@@ -18,12 +18,12 @@ const ADA = writerId("ada@x.io")
 const BEA = writerId("bea@x.io")
 const CAL = writerId("cal@x.io")
 const HERE = entryId("e-here")
-const at = (id: string): PlaceKey => ({
+const at = (id: string): TracedPlace => ({
   kind: "pinned",
   at: atEntry(entryId(id)),
   thread: TEST_THREAD,
 })
-const queued: PlaceKey = {
+const queued: TracedPlace = {
   kind: "queued",
   at: atEntry(HERE),
   thread: threadIdFor("x"),
@@ -42,7 +42,7 @@ const trace = (over: Partial<TraceRecord>): TraceRecord => ({
 })
 
 test("tracesAt: yours, whose place resolves to this end, oldest first", () => {
-  const endOf = (from: PlaceKey) =>
+  const endOf = (from: TracedPlace) =>
     from.kind === "pinned" && from.at.kind === "entry" ? from.at.id : null
   const traces = [
     trace({ id: "late", at: 3 }),

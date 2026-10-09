@@ -19,6 +19,7 @@ import {
   type ThreadLane,
   type ThreadName,
   type TreeIndex,
+  taskIdFor,
   textCardId,
   threadIdFor,
   writerId,
@@ -32,6 +33,7 @@ import {
 } from "@pinetrie/rules"
 import type { OfferActing } from "@pinetrie/session"
 import { describe, expect, test } from "vitest"
+import { canvasMarkerWords, taskPinnedMarkerWords } from "./card-words.ts"
 import { projectColumns } from "./column-paths.ts"
 import {
   behindMark,
@@ -45,6 +47,7 @@ import {
   pinnedMarker,
   pinnedMarkers,
   pinnedStatus,
+  promptParent,
   startedWords,
   tokensOf,
   type WorkFacts,
@@ -1134,6 +1137,49 @@ describe("where the agent read pinned cards (ADR-0048)", () => {
       ],
     ])
   })
+
+  test("pinnedMarkers: a run's task pins and canvas list, written above its prompt with its cards entry, mark it too (ADR-0116)", () => {
+    const K = taskIdFor("k")
+    const canvas = { task: K, title: "T", lines: ["thread a"], more: 0 }
+    const taskCards = [card(cardIdFor("c2"), "all")]
+    const index = indexOf([
+      entry("1-q", null, chat("q")),
+      entry("2-c", "1-q", { role: "canvas", content: "", canvas }),
+      entry("3-t", "2-c", {
+        role: "task-pinned",
+        content: "",
+        taskPinned: { task: K, cards: taskCards, retired: [] },
+      }),
+      entry("4-p", "3-t", chat("p", true)),
+      entry("5-r", "4-p", { role: "assistant", content: "r" }),
+      // A canvas list alone, then a prompt: marked; the reply is not.
+      entry("6-c", "5-r", { role: "canvas", content: "", canvas }),
+      entry("7-p", "6-c", chat("again", true)),
+    ])
+    const nodes = ["4-p", "5-r", "7-p"].map(id => ({ id: entryId(id) }))
+    expect([...pinnedMarkers(index, nodes)]).toEqual([
+      [
+        entryId("4-p"),
+        {
+          cards: [],
+          retired: [],
+          taskPinned: { cards: taskCards, retired: [] },
+          canvas,
+        },
+      ],
+      [entryId("7-p"), { cards: [], retired: [], canvas }],
+    ])
+    // An edit of 7-p sends again after 5-r, past its run's canvas list.
+    expect(promptParent(index, entryId("7-p"))).toBe("5-r")
+    expect(promptParent(index, entryId("5-r"))).toBe("4-p")
+    expect(promptParent(index, entryId("1-q"))).toBeNull()
+    expect(canvasMarkerWords(canvas)).toBe(
+      "the agent was told the task's canvas: 1 card",
+    )
+    expect(taskPinnedMarkerWords({ cards: taskCards, retired: [] })).toBe(
+      "the agent read 1 card pinned to the task",
+    )
+  })
 })
 
 test("pinnedStatus: read, changed or unread against what the agent reads, by the host's comparison; none for a card with no text", () => {
@@ -1165,12 +1211,54 @@ test("pinnedStatus: read, changed or unread against what the agent reads, by the
 })
 
 test.each([
-  [{ canPin: true, pinning: false, pinned: 0 }, "header"],
-  [{ canPin: true, pinning: false, pinned: 2 }, "strip"],
-  [{ canPin: true, pinning: true, pinned: 0 }, null],
-  [{ canPin: true, pinning: true, pinned: 2 }, null],
-  [{ canPin: false, pinning: false, pinned: 0 }, null],
-  [{ canPin: false, pinning: false, pinned: 2 }, null],
+  [
+    {
+      canPin: true,
+      pinning: false,
+      pinned: 0,
+    },
+    "header",
+  ],
+  [
+    {
+      canPin: true,
+      pinning: false,
+      pinned: 2,
+    },
+    "strip",
+  ],
+  [
+    {
+      canPin: true,
+      pinning: true,
+      pinned: 0,
+    },
+    null,
+  ],
+  [
+    {
+      canPin: true,
+      pinning: true,
+      pinned: 2,
+    },
+    null,
+  ],
+  [
+    {
+      canPin: false,
+      pinning: false,
+      pinned: 0,
+    },
+    null,
+  ],
+  [
+    {
+      canPin: false,
+      pinning: false,
+      pinned: 2,
+    },
+    null,
+  ],
 ] as const)("newPinAt(%o): %s", (facts, want) => {
   expect(newPinAt(facts)).toBe(want)
 })

@@ -50,7 +50,7 @@ function behind(to = "l2") {
   const steered: unknown[] = []
   const handle = record<ThreadLaneHandle>({
     steer: async message => {
-      steered.push(message.details.to)
+      steered.push("to" in message.details ? message.details.to : null)
       return { kind: "ok" }
     },
   }).port

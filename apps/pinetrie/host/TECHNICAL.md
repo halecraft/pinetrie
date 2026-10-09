@@ -20,6 +20,8 @@ wires them.
 | `shutdown.ts` | the order a host stops in (`planShutdown`): the agent, then the scribe, among its steps |
 | `runs.ts` | a run from its start to its end (`createRuns`, `planRunEnd`), a Stop before pi starts (`cancel`), and the agent's `onStream` (`streamInto`); a run asks base news what it is told first, and its lane's stop has base news forget what was steered |
 | `pinned.ts` | what a run reads of its thread's pinned cards (ADR-0048 step 5): `readPinned` gathers, waits a bounded time for the sender's text (`waitFor`), and plans the cards entry |
+| `canvas.ts` | what a run is told of its thread's task (ADR-0116): `readTaskContext`, the canvas list and the cards pinned to the task, each written only when it differs from the newest of its kind on the lane's path; `runs.ts` writes them between base news and the thread's pinned cards |
+| `canvas-news.ts` | a card added to a running thread's canvas or taken from it, steered into its lane as a fact line (`planCanvasFacts`), heard from `Provenance.onChanged`; never a queued fact card, which would wait for the run's end |
 | `base-news.ts` | what a thread is told of its base's new work (ADR-0080): `atStart`, a chat's run's behind entry; `baseChanged`, a steer into a running lane, at most once per base commit (`told`), heard from lane work's `onBaseChanged`; `runEnded` forgets what was steered. Made after the agent, whose lanes it steers |
 | `split-call.ts` | `split_offer` (ADR-0080): a split card queued on the thread, popped when its run ends: pi calls it only during a run, so its step is queued before the run's end queues the drain, which the keeper runs after it |
 | `queued-card-pop.ts` | popping a lane's queued cards to send them (ADR-0048, ADR-0083): `popNextQueuedCard`, and `drain`, which carries each out as `planCarry` decides: a fact appended, a catch-up, a split's run, a message sent (ADR-0108, ADR-0080); and `createWaits`, the drain's waits for its top card's text or for someone's typing in it to stop (ADR-0048 step 7) |
@@ -28,7 +30,7 @@ wires them.
 | `docs.ts` | `HostDocuments`: every document the host holds, a root's opened as it is asked for, `onOpened`, which replays the roots already held to a listener that joins late, and `onReleasing`, whose listeners `unload` awaits, in order, before it lets a root go; `planLoads` |
 | `records.ts` | the host's writes of its records (ADR-0095): `createRecords`, whose `writeValues` writes each document's in one batch; every module that writes a record takes it |
 | `migrations/` | each stored document's schema, checked before anything opens it, and the migrations from a stored hash (§ The stored schemas, ADR-0096) |
-| `directory.ts` | each root's directory record, refreshed as its document changes: `startDirectory`, started with the records |
+| `directory.ts` | each root's directory record, refreshed as its document changes: `startDirectory`, started with the records, and the startup rebuild of records that do not decode (`planRebuild`) |
 | `cards.ts` | the card port (ADR-0048), about texts only: who wrote in a card, destroying one, loading and reading texts for the queue's pops and a run's pinned cards, waiting until a text holds a version (`whenHolds`, which an `AbortSignal` gives up), and the texts of given cards gathered for the sweeps; where the shell opens card documents |
 | `seats.ts` | each connected seat's person, written once as a `pinetrie.seat` record (started after `recover`), and unloading the histories of moves of a person with no seat left |
 | `startup.ts` | `recover`: what a starting host does before it takes a command |
@@ -187,7 +189,10 @@ same for every run (`packages/pi/TECHNICAL.md`, S85).
   exists, since a refresh writes through it, and follows every root through
   `onOpened`: the roots `startHost` opened before it, then each opened
   later. It refreshes each as it starts to follow it, so a record stored
-  before a field was added (ADR-0077) is rewritten at startup. A settle's compaction is `later`, so
+  before a field was added (ADR-0077) is rewritten at startup. `ROOT` is
+  derived, so its shape changes with no migration: a root a thread's record
+  names whose record does not decode, and which is not held, is opened,
+  refreshed and let go at startup (`planRebuild`). A settle's compaction is `later`, so
   it runs after every refresh queued before it starts, and the records it
   compacts are current. A write after a compaction only lands in the next
   one's log.

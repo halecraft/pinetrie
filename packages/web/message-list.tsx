@@ -12,6 +12,7 @@ import {
   lastEndedAsk,
   messageTools,
   pinnedMarkers,
+  promptParent,
   segmentPath,
 } from "@pinetrie/interface"
 import { memo } from "react"
@@ -45,7 +46,7 @@ function MessageListView(p: MessageListProps) {
         node={node}
         onAct={p.onAct}
         tools={messageTools(node, {
-          parentId: index.parentOf(node.id),
+          parentId: promptParent(index, node.id),
           isLast: i === view.nodes.length - 1,
           lane: p.lane,
           writable: p.writable,

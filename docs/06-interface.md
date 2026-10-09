@@ -331,12 +331,24 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
   first message alone; once someone replied, it says "not lifted back: Bea
   replied". A blank card starts nothing.
 
-### Columns: a path each
+### Columns: the task's canvas (ADR-0116)
 
-- **A column is one path through its root's tree**, from the root to a leaf,
+- **A task opens on its canvas**: every card on it, as columns, in an order
+  everyone shares. A thread card's column is its thread's path; a note
+  column's is its notes. Each is **folded** for you until you open it: a
+  narrow strip in its place with its title, which a click unfolds. Folding
+  (⇤ in a column's header) is yours alone, and moves nothing for anyone
+  else.
+- **The task column comes first**, folded the same way: the task's title,
+  which anyone renames there, **Move to ▸** among the board's states, who is
+  reading, the cards pinned to the task, the canvas list its agents are
+  told, and **+ note column**.
+- **A thread's column is one path**, from its root to its thread's end,
   read top to bottom. Its composer sends at its last message.
-- **Opening a branch adds a column to the right**, starting after the fork. An
-  aside of an aside opens a third column.
+- **Opening a branch adds a column after the thread it forks from**, starting
+  after the fork, and yours alone until its first send. Its card then lands
+  on the canvas in that place, for everyone, unfolded for you. An aside of
+  an aside opens a third column.
 - **A column's header says who works in it and where it came from**
   (ADR-0040). Its first row names the agent working there, `✦ amber-fox` in
   the column's colour. While the composer's next send would start one, the
@@ -373,16 +385,17 @@ tab's; with nothing in the sidebar and nothing you are on, it opens by itself.
 - **A column grows as replies arrive.** It shows one thread to its end,
   including the agent's reply (`threadEnd`, ADR-0117). A branch, which
   starts another thread, however new, never pulls it away.
-- **Columns are reordered by dragging their headers.** Whichever column is
-  first shows its whole path, so moving a branch to the far left makes it read
-  as the trunk. Nothing in the document changes: which path reads as the trunk
-  is a view choice, kept client-side, like selection today. A grip (⠿) leads
-  each header, and is the keyboard's way to do the same: ←/→ move a column one
-  place, and Home/End move it to either end.
-- **Closing a column** removes it from the view, never from the document. Its
-  branch is still in the rail. A root's only column has no close, since the
-  root would show that path again; a new tab's closes the new tab. The
-  cards at a thread's end stay with the thread.
+- **Columns are reordered by dragging their headers, for everyone**: the
+  canvas's order is shared, and a drag moves a card on it. Whichever column
+  is first shows its whole path, so moving a branch to the far left makes it
+  read as the trunk. A grip (⠿) leads each header, and is the keyboard's way
+  to do the same: ←/→ move a column one place, and Home/End move it to
+  either end. A column's ⋯ sets its width, one or two columns wide, for
+  everyone.
+- **Only a branch you have not sent closes** (×); asked first when it holds
+  text, which you keep in your inventory or discard. A card's column folds
+  instead. A new tab's × closes the new tab. The cards at a thread's end
+  stay with the thread.
 - **Each column's foot is its dock** (ADR-0113), pinned there while the
   messages scroll above it: the queue's header, which says what happens
   next, the cards queued, **+ add to queue**, the line, and your message.
@@ -616,6 +629,11 @@ The rail is E; the column is T. Seeing both at once is the product.
   marks **where each agent joined**, by name: `✦ amber-fox joined`, or
   `✦ copper-owl, from amber-fox` in a branch of agent work. Everything above
   it is now that agent's context.
+- **What is on the canvas, as the agent was told it**: a run in a task is
+  told the list of the canvas's cards, 50 at most, when it differs from the
+  last the thread was told; "the agent was told the task's canvas: 4 cards"
+  sits above its prompt and opens to the list. A card added or taken while
+  the agent works reaches it as it works, never as a message queued.
 
 ### Who a message is for (ADR-0021)
 
@@ -813,10 +831,10 @@ The rail is E; the column is T. Seeing both at once is the product.
   its first line until you click into it, headed "Ada's note · with Bea".
   ↑ and ↓ on a note, or Alt+↑/↓ in its box, move it in the column, as a
   queued card moves; **+ add a note** makes an empty one at its end, the
-  cursor in it; one left empty is swept when the host next starts. Until
-  the canvas lays out a task's columns, a note column sits just after the
-  thread it follows on the task, among the open threads' columns, and
-  cannot be closed or moved from the page.
+  cursor in it; one left empty is swept when the host next starts. It sits
+  on the canvas in its place, folded until you open it, and moves and
+  folds as a thread's column does. **+ note column** in the task column
+  adds one first on the canvas, and a column's ⋯ adds one after it.
 - **A card leaving a thread's queue or pinned strip goes to the note column
   nearest the thread**, in the task's order, the one after it on a tie;
   with none, a note column titled "Notes" is made just after the thread.
@@ -920,6 +938,10 @@ The rail is E; the column is T. Seeing both at once is the product.
   keep a direction, take a copy of the card into your inventory and pin it
   in the branch.
 - **Pinned cards are not unsent work:** they mark no item in the sidebar and no rail dot.
+- **Pinned to the task**, a card is read by every thread's agent in the
+  task, after the thread's own. **Pin to the task** in a card's ⋯ puts it
+  in the task column; unpinned, it goes to the nearest note column. A run
+  that read them says so above its prompt, as for a thread's.
 
 ### History and traces (ADR-0048 step 6)
 
@@ -934,7 +956,8 @@ The rail is E; the column is T. Seeing both at once is the product.
   Click one to go to the card where it is now, or to the message it became.
   A trace is gone once you have seen it, on every device; the column keeps
   showing it until you leave. An unqueue or an unpin leaves no trace: the
-  card is still in your column, saying who moved it.
+  card is still in your column, saying who moved it. Nor does a note: a
+  note column is everyone's scratch.
 
 ### Your inventory (ADR-0048 step 4)
 
@@ -1027,18 +1050,18 @@ board's records (ADR-0122); a card's text is its own document (ADR-0048).
   root's place (`pinetrie.board`, by its id: its state, its rank there, who
   moved it and when). A root in the archive is archived; the host
   refuses commands that would write in it (ADR-0029).
-- **Which root you are on, each root's columns, new tabs and whether the
-  board is open** are view state, kept in the browser per browser tab, with
+- **Which task you are on, each task's view (which of its columns you
+  unfolded, how each reads, your branches not yet sent), new tabs and
+  whether the board is open** are view state, kept in the browser per
+  browser tab, with
   the device's latest for a new one, and never in the document (ADR-0027,
   amended by ADR-0029, ADR-0030 and ADR-0122).
 
 ## Deferred, but designed for
 
-- **Tasks and the canvas** (ADR-0116), accepted, not yet built: the board would hold
-  tasks, and a task's canvas would lay out what it holds as columns, in an
-  order everyone shares, each folded only for whoever folds it: threads
-  from any root under a rail that draws a forest, note columns (built:
-  above), file cards showing a source's file, and media. Each thread's agent would be told what is on its canvas.
+- **What else a canvas holds** (ADR-0116): threads from any root under a
+  rail that draws a forest, file cards showing a source's file, and media.
+  Threads and note columns are built (above).
 - **Threads as cards** (ADR-0117), accepted, not yet built: a thread would have an id and
   one place, in a task or an inventory; taking it would move its card, not
   its run; copying it would branch at its end, and a copy's fork row would

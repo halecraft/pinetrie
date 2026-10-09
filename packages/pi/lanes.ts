@@ -25,7 +25,7 @@ import {
   type RuntimeProgram,
   type ThreadId,
 } from "@pinetrie/core"
-import { PINNED_RULE, type ToolAnswer } from "@pinetrie/rules"
+import { CONTEXT_RULES, type ToolAnswer } from "@pinetrie/rules"
 import { Type } from "typebox"
 import type { ModelSetup } from "./config.ts"
 import { buildSystemPrompt } from "./deep.ts"
@@ -239,7 +239,8 @@ function skillsInLane<S extends { filePath: string; baseDir: string }>(
  * pi's own prompt, with the repo's context files and the person's skills, so
  * an extension that shapes pi's prompt sections finds them (S23). It names
  * the lane's directory, and does not wait for its setup. Every thread is told
- * what pinned cards are (`PINNED_RULE`); a lane of its own is also told about
+ * what its context entries are (`CONTEXT_RULES`: pinned cards, a task's
+ * pinned cards, the canvas list); a lane of its own is also told about
  * itself (`laneGuidelines`), and sees its skills at the paths it can read
  * them (`skillsInLane`).
  */
@@ -259,8 +260,8 @@ export const systemPromptFor =
           : skillsInLane(setup.skills, toolContext.lane.hostPaths),
       promptGuidelines:
         toolContext.lane === null
-          ? [PINNED_RULE]
-          : [PINNED_RULE, ...laneGuidelines(toolContext.lane.facts)],
+          ? [...CONTEXT_RULES]
+          : [...CONTEXT_RULES, ...laneGuidelines(toolContext.lane.facts)],
     })
 
 /** What `ask_about_conflict` answers with no conflict in the lane's copy. */

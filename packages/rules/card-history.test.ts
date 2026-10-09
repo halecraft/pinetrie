@@ -31,6 +31,8 @@ import {
   planProvenance,
   planTraceSweep,
   TRACE_MAX_AGE_MS,
+  TRACED,
+  TRACED_PLACES,
   verbOf,
 } from "./card-history.ts"
 
@@ -58,6 +60,12 @@ const PINNED: CardPlace = {
   kind: "pinned",
   at,
   thread: LANE,
+  order: "1",
+}
+/** Pinned to the task the fixtures' threads are in (ADR-0116). */
+const TASK_PINNED: CardPlace = {
+  kind: "task-pinned",
+  task: TEST_TASK,
   order: "1",
 }
 const FRESH: CardPlace = {
@@ -216,7 +224,7 @@ describe("planProvenance: traces", () => {
     expect(
       newTraces(
         plan({
-          before: [card(DRAFTING)],
+          before: [card(PINNED)],
           after: [card(QUEUED, BEA)],
           cause: BY_BEA,
         }),
@@ -227,7 +235,7 @@ describe("planProvenance: traces", () => {
         for: ADA,
         card: C1,
         by: BEA,
-        from: { kind: "note", column: NOTES },
+        from: { kind: "pinned", at, thread: LANE },
         to: { kind: "queued", at, thread: LANE, seen: "" },
         message: null,
         at: 7,
@@ -240,7 +248,7 @@ describe("planProvenance: traces", () => {
     expect(
       newTraces(
         plan({
-          before: [card(DRAFTING)],
+          before: [card(PINNED)],
           after: [],
           cause: { kind: "spend", by: BEA, message },
         }),
@@ -252,7 +260,7 @@ describe("planProvenance: traces", () => {
     expect(
       newTraces(
         plan({
-          before: [card(DRAFTING)],
+          before: [card(PINNED)],
           after: [card(QUEUED, BEA)],
           cause: BY_BEA,
           reading: [[ADA, END]],
@@ -262,21 +270,34 @@ describe("planProvenance: traces", () => {
     ).toHaveLength(1)
   })
 
+  test("a note moved by someone else leaves no trace: a note column is everyone's scratch (ADR-0116)", () => {
+    expect(
+      newTraces(
+        plan({
+          before: [card(DRAFTING)],
+          after: [card(QUEUED, BEA)],
+          cause: BY_BEA,
+        }),
+      ),
+    ).toEqual([])
+    // Only a thread's queue and pinned cards are traced, each with its drawer.
+    expect([...TRACED_PLACES].sort()).toEqual(["pinned", "queued"])
+    // @ts-expect-error: a trace is left only where a column draws it
+    const fromNote: TraceRecord["from"] = { kind: "note", column: NOTES }
+    // @ts-expect-error: and a traced place has its drawer
+    const noDrawer: typeof TRACED = { queued: TRACED.queued }
+    expect([fromNote, noDrawer]).toHaveLength(2)
+  })
+
   test.each([
     [
       "you were watching its end",
-      card(DRAFTING),
+      card(PINNED),
       card(QUEUED, BEA),
       BY_BEA,
       [[ADA, END]],
     ],
-    [
-      "you moved it",
-      card(DRAFTING),
-      card(QUEUED),
-      { kind: "move", by: ADA },
-      [],
-    ],
+    ["you moved it", card(PINNED), card(QUEUED), { kind: "move", by: ADA }, []],
     ["it was unqueued", card(QUEUED), card(DRAFTING, BEA), BY_BEA, []],
     ["it was unpinned", card(PINNED), card(DRAFTING, BEA), BY_BEA, []],
     ["the host wrote it", card(QUEUED), card(DRAFTING), { kind: "host" }, []],
@@ -294,15 +315,15 @@ describe("planProvenance: traces", () => {
       for: ADA,
       card: C1,
       by: BEA,
-      from: { kind: "note", column: NOTES },
-      to: { kind: "queued", at, thread: LANE, seen: "" },
+      from: { kind: "queued", at, thread: LANE, seen: "" },
+      to: { kind: "note", column: NOTES },
       message: null,
       at: 1,
     }
     expect(
       plan({
-        before: [card(QUEUED, BEA)],
-        after: [card(DRAFTING)],
+        before: [card(DRAFTING, BEA)],
+        after: [card(QUEUED)],
         cause: { kind: "undo", by: BEA },
         traces: [trace],
       }).traces,
@@ -317,6 +338,8 @@ test.each([
   [QUEUED, DRAFTING, "unqueued"],
   [DRAFTING, PINNED, "pinned"],
   [PINNED, DRAFTING, "unpinned"],
+  [DRAFTING, TASK_PINNED, "pinned"],
+  [TASK_PINNED, DRAFTING, "unpinned"],
   [QUEUED, ADAS, "took-into-inventory"],
   [DRAFTING, BEAS, "took-into-inventory"],
   [BEAS, ELSEWHERE, "put"],
@@ -329,7 +352,9 @@ test.each([
         ? { kind: "queued", at: p.at, thread: p.thread, seen: p.seen }
         : p.kind === "pinned"
           ? { kind: "pinned", at: p.at, thread: p.thread }
-          : p
+          : p.kind === "task-pinned"
+            ? { kind: "task-pinned", task: p.task }
+            : p
   expect(verbOf(key(from), key(to))).toBe(verb)
 })
 
@@ -363,7 +388,7 @@ test("planTraceSweep: traces too old, and histories whose card is gone", () => {
     for: ADA,
     card: C1,
     by: BEA,
-    from: { kind: "note", column: NOTES },
+    from: { kind: "queued", at, thread: LANE, seen: "" },
     to: null,
     message: null,
     at: when,

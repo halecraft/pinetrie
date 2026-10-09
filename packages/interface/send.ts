@@ -30,12 +30,8 @@ import type { Prefill } from "./columns.ts"
 export type ColumnHow = Pick<ChatHow, "base" | "root" | "pinned"> & {
   readonly asksAgent: boolean
   readonly column: string
-  /**
-   * The column's thread (ADR-0117): the one a fresh column's first send
-   * starts. Null for a column opened at an entry, until it settles on the
-   * thread that entry is in: nothing is sent from it meanwhile.
-   */
-  readonly thread: ThreadId | null
+  /** The column's thread (ADR-0117): the one a fresh column's first send starts. */
+  readonly thread: ThreadId
   /**
    * The task the column is on (ADR-0116), where a thread its send starts
    * goes; a new tab's, minted as it opened. Null before it is known:

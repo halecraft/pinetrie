@@ -53,6 +53,7 @@ export type CardMoveTo =
   | "note"
   | "queue"
   | "pinned"
+  | "task"
   | "inventory"
   | { readonly kind: "thread"; readonly state: WorkflowState }
 
@@ -127,6 +128,10 @@ const moveItems = (
           },
         ]
   const pin: CardMoveItem = { to: "pinned", act: { kind: "pin", card: id } }
+  const pinTask: CardMoveItem = {
+    to: "task",
+    act: { kind: "pinToTask", card: id },
+  }
   const take: CardMoveItem = {
     to: "inventory",
     act: { kind: "takeIntoInventory", card: id },
@@ -143,13 +148,14 @@ const moveItems = (
         { to: "note", act: { kind: "toNote", card: id } },
         ...queue,
         pin,
+        pinTask,
         take,
         ...threads,
       ]
     // A note column is no thread's: a note has no message, queue or pinned
     // strip of its own to go to (ADR-0116); a drag takes it there.
     case "note":
-      return [take, ...threads]
+      return [pinTask, take, ...threads]
     case "queued":
       return [
         {
@@ -157,10 +163,19 @@ const moveItems = (
           act: { kind: "unqueue", card: id, lane: place.thread, by: place.by },
         },
         pin,
+        pinTask,
         take,
       ]
     case "pinned":
-      return [{ to: "note", act: { kind: "unpin", card: id } }, ...queue, take]
+      return [
+        { to: "note", act: { kind: "unpin", card: id } },
+        ...queue,
+        pinTask,
+        take,
+      ]
+    // Unpinned from the task, it goes to the task's first note column.
+    case "task-pinned":
+      return [{ to: "note", act: { kind: "unpin", card: id } }, take]
     case "fresh":
       return [take]
     // Put is an inventory card's move, × discards it, and a drag moves it
@@ -195,6 +210,7 @@ const byOf = (card: CardRecord, me: WriterId): WriterId | null => {
     case "queued":
       return card.place.by
     case "pinned":
+    case "task-pinned":
       return card.placer
     default:
       return card.owner === me ? null : card.owner
@@ -301,6 +317,11 @@ const MOVE: Readonly<Record<Exclude<CardMoveTo, object>, MoveWords>> = {
   pinned: {
     label: "Move to pinned",
     title: "pin to the top of the column: the agent reads it on every run",
+  },
+  task: {
+    label: "Pin to the task",
+    title:
+      "pin to the task's column: every thread of the task reads it on every run",
   },
   note: {
     label: "Move to notes",

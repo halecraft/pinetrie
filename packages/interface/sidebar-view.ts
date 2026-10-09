@@ -4,7 +4,6 @@
 
 import type {
   BannerRecord,
-  EntryId,
   MarkRecord,
   Sha256,
   TaskId,
@@ -68,8 +67,6 @@ export type ItemView =
   | (ItemCommon & {
       readonly kind: "task"
       readonly task: TaskId
-      /** Its first root's root entry, written as `data-root`; null before its first message. */
-      readonly entry: EntryId | null
       /** Its thread card's header, the board's too (`threadCardHead`). */
       readonly head: ThreadCardHead
       /** Its first line: the rename field's placeholder. */
@@ -105,8 +102,6 @@ export interface SidebarViewInput {
   readonly active: Here
   /** Each task's thread card header (`threadCardHeads`), which the board reads too. */
   readonly heads: ReadonlyMap<TaskId, ThreadCardHead>
-  /** Each task's first root's root entry (`entriesOf`). */
-  readonly entries: ReadonlyMap<TaskId, EntryId>
   /** Each task's summary (`summariesOf`): the rename field's placeholder. */
   readonly summaries: ReadonlyMap<TaskId, TaskSummary>
   readonly marks: ReadonlyMap<TaskId, MarkRecord>
@@ -163,7 +158,6 @@ function itemView(here: Here, input: SidebarViewInput): ItemView {
         ...common,
         kind: "task",
         task,
-        entry: input.entries.get(task) ?? null,
         head,
         label: head.label,
         icon: iconOf(head, input),

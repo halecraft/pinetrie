@@ -587,12 +587,7 @@ function ItemCard({
   pip: React.ReactNode
 }) {
   return (
-    <div
-      className="thread-card"
-      data-entry={item.entry ?? undefined}
-      data-task={item.task}
-      {...drop}
-    >
+    <div className="thread-card" data-task={item.task} {...drop}>
       <button
         className="board-open"
         draggable

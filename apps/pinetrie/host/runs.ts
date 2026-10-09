@@ -34,6 +34,7 @@ import {
 } from "@pinetrie/schema"
 import type { BaseNews } from "./base-news.ts"
 import { type Basics, failed } from "./basics.ts"
+import type { TaskContext } from "./canvas.ts"
 import type { LaneWork } from "./work/index.ts"
 
 export type RunStart =
@@ -55,6 +56,9 @@ export type ReadPinned = (
   seen: readonly SentCard[],
   signal: AbortSignal,
 ) => Promise<PinnedMessage | null>
+
+/** What a run on `lane` is told of its task first (`canvas.ts`, ADR-0116). */
+export type ReadTaskContext = (lane: ThreadId) => Promise<TaskContext>
 
 export interface Runs {
   /**
@@ -141,12 +145,13 @@ export function createRuns(deps: {
   readonly agent: Pick<Agent, "lane">
   readonly work: Pick<LaneWork, "beforeRun" | "runEnded" | "splitEnded">
   readonly readPinned: ReadPinned
+  readonly readTaskContext: ReadTaskContext
   /** What a chat's run is told first of its base's new work, and forgetting what was steered once the lane stops. */
   readonly baseNews: Pick<BaseNews, "atStart" | "runEnded">
   /** Write `lane`'s run's verdict as pending (`Digests.pending`). */
   readonly pending: (lane: ThreadId, prompt: EntryId) => Promise<void>
 }): Runs {
-  const { basics, agent, work, readPinned, baseNews } = deps
+  const { basics, agent, work, readPinned, readTaskContext, baseNews } = deps
   const { docs, live, log } = basics
   let ended: (lane: ThreadId, prompt: EntryId | null) => void = () => {}
   /**
@@ -234,8 +239,14 @@ export function createRuns(deps: {
                   failed(basics, "the base's news")(error)
                   return null
                 })
+          // What the run is told of its task (ADR-0116), read after the
+          // pinned cards' wait, so it is as late as the run's start.
+          const task = await readTaskContext(lane).catch(error => {
+            failed(basics, "the task's context")(error)
+            return []
+          })
           // The cards entry stays the prompt's parent.
-          const before = [behind, pinned].filter(m => m !== null)
+          const before = [behind, ...task, pinned].filter(m => m !== null)
           const ran = await handle.run(start.message, before)
           if (chat !== null && settleRun(ran) === "keep") {
             // The reply was already `started`, so the author cannot be told;

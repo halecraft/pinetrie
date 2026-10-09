@@ -1,11 +1,14 @@
 // web/use-column-drag — move a column by dragging its header along the strip.
 //
-// The shell of `reorder.ts`. A drag writes to the DOM directly (a transform,
-// `data-dragging`, `data-drop`), never to React state: a render of `App` per
-// pointer move would redraw every column. The order changes once, on drop:
-// moving a column changes what the columns right of it show
-// (`projectColumns`), and columns redrawn under the pointer would be hard to
-// aim between.
+// The shell of `reorder.ts`. Only a card's column moves (`data-card`): a
+// branch not yet sent has no place on the canvas until its first send, and
+// the task column stands before every card. Dropped, the column's card is
+// reordered on the canvas, for everyone (ADR-0116). A drag writes to the DOM
+// directly (a transform, `data-dragging`, `data-drop`), never to React
+// state: a render of `App` per pointer move would redraw every column. The
+// order changes once, on drop: moving a column changes what the columns
+// right of it show (`projectColumns`), and columns redrawn under the pointer
+// would be hard to aim between.
 
 import { edgeScroll, gapAt, landing } from "@pinetrie/interface"
 import {
@@ -22,13 +25,17 @@ const NOT_A_HANDLE =
 /** How far, in px, a press moves before it is a drag rather than a click. */
 export const DRAG_START = 5
 
+/** A column a drag moves: one with a card on the canvas. */
+const CARD_COLUMN = ":scope > [data-card]"
+
 /**
- * The strip's pointerdown handler. `move(from, to)` is called once per drop
- * that moves a column; Escape or a cancelled pointer moves nothing.
+ * The strip's pointerdown handler. `move(card, to)` is called once per drop
+ * that moves a column, `to` its index among the card columns; Escape or a
+ * cancelled pointer moves nothing.
  */
 export function useColumnDrag(
   strip: RefObject<HTMLDivElement | null>,
-  move: (from: number, to: number) => void,
+  move: (card: string, to: number) => void,
 ): (e: ReactPointerEvent<HTMLDivElement>) => void {
   // A drag in flight, stopped if the strip unmounts under it.
   const stop = useRef<(() => void) | null>(null)
@@ -38,12 +45,14 @@ export function useColumnDrag(
     const el = strip.current
     const target = e.target
     if (el === null || e.button !== 0 || !(target instanceof Element)) return
-    const head = target.closest(".column-head")
+    const head = target.closest("[data-column-head]")
     if (head === null || target.closest(NOT_A_HANDLE) !== null) return
-    const columns = [...el.querySelectorAll<HTMLElement>(":scope > .column")]
-    const column = head.closest<HTMLElement>(".column")
+    const columns = [...el.querySelectorAll<HTMLElement>(CARD_COLUMN)]
+    const column = head.closest<HTMLElement>("[data-card]")
     const from = column === null ? -1 : columns.indexOf(column)
-    if (column === null || from < 0 || columns.length < 2) return
+    const card = column?.dataset.card
+    if (column === null || card === undefined || from < 0 || columns.length < 2)
+      return
     stop.current?.()
 
     const pointer = e.pointerId
@@ -138,7 +147,7 @@ export function useColumnDrag(
       if (u.pointerId !== pointer) return
       const to = drag === null ? null : landing(from, gap)
       finish()
-      if (to !== null) move(from, to)
+      if (to !== null) move(card, to)
     }
     const onCancel = (c: PointerEvent) => {
       if (c.pointerId === pointer) finish()

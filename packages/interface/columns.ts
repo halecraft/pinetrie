@@ -1,18 +1,21 @@
-// interface/columns — which paths of one root are open, and in what order.
+// interface/columns — a thread's column as the page draws it, and a new tab's
+// one column, which is the layout's until its first message is written.
 //
-// A view choice, never written to the document: which paths a person reads is
-// theirs. `layout.ts` holds a list of these per root and stores them
-// (ADR-0027, ADR-0029). Pure: a reducer over values, tested without a DOM.
+// Which columns a task shows, and in what order, is its canvas's
+// (`canvas-columns.ts`, ADR-0116); a new tab has no canvas yet, so its
+// column is kept here, in this browser tab's view state (ADR-0027). Pure: a
+// reducer over values, tested without a DOM.
 
 import {
+  type CardId,
   type EntryId,
   type LaneView,
+  type NoteColumnId,
   type RootId,
   type TaskId,
   type TextCardId,
   type ThreadId,
   type TreeIndex,
-  threadAt,
   threadEnd,
   type WorkflowStateId,
 } from "@pinetrie/core"
@@ -38,15 +41,16 @@ export interface Pending {
 }
 
 /**
- * What the shell mints for one intent, as `columnsReducer` takes keys in its
- * actions: a column key, the root and the task a new tab keeps (ADR-0066,
- * ADR-0116), and the thread a fresh column's first send starts (ADR-0117).
+ * What the shell mints for one intent: a key, the root and the task a new
+ * tab keeps (ADR-0066, ADR-0116), the thread a fresh column's first send
+ * starts (ADR-0117), and a note column made on a canvas (ADR-0116).
  */
 export interface Minted {
   readonly key: string
   readonly root: RootId
   readonly task: TaskId
   readonly thread: ThreadId
+  readonly noteColumn: NoteColumnId
 }
 
 export interface Column {
@@ -60,10 +64,9 @@ export interface Column {
   /**
    * The thread it shows (ADR-0117), which names its lane when it has one
    * (`laneOf`). A fresh column's is minted as it opens, for its first send to
-   * start. Absent only for a column opened at an entry, until `sync` reads
-   * whose thread that is (`threadAt`).
+   * start.
    */
-  readonly thread?: ThreadId
+  readonly thread: ThreadId
   /** A Start Agent column: a message with no mention asks the agent. */
   readonly asksAgent?: true
   /**
@@ -99,176 +102,103 @@ export interface Column {
   }
 }
 
-export type ColumnAction =
-  /** Open a path next to the column it forks from. `key` comes from the shell. */
-  | {
-      readonly kind: "open"
-      readonly key: string
-      readonly after: number
-      readonly anchor: EntryId
-    }
-  /** Open a fresh column after column `after`: a branch at `at`. */
-  | {
-      readonly kind: "openFresh"
-      readonly key: string
-      /** The thread its first send starts, minted with its key. */
-      readonly thread: ThreadId
-      readonly at: EntryId
-      readonly after: number
-      /** A first message the column sends as soon as it opens. */
-      readonly pending?: Pending
-      /** What its composer starts with, unsent. */
-      readonly prefill?: Prefill
-    }
-  /** A fresh column sent its first message, as send `sendId`. */
-  | { readonly kind: "sent"; readonly key: string; readonly sendId: string }
-  | { readonly kind: "close"; readonly index: number }
-  /** Move column `from` to index `to` (`reorder.ts`); the rest keep their order. */
-  | { readonly kind: "move"; readonly from: number; readonly to: number }
+/**
+ * Which column something is said or done in, by kind (ADR-0116), carried
+ * in an intent so what each kind allows is the type's: a card's column on
+ * the canvas folds and moves; a branch not yet sent and a new tab's column
+ * close; the task column holds the task's pins. `keyText` is its key as the
+ * page draws it.
+ */
+export type ColumnKey =
+  | { readonly kind: "card"; readonly card: CardId }
+  | { readonly kind: "fresh"; readonly thread: ThreadId }
+  | { readonly kind: "newTab"; readonly thread: ThreadId }
+  | { readonly kind: "task"; readonly task: TaskId }
+
+/** A card's column on the canvas: it folds and moves. */
+export type CardKey = Extract<ColumnKey, { kind: "card" }>
+
+/** A column yours alone until its first send: a branch's, or a new tab's. */
+export type FreshKey = Extract<ColumnKey, { kind: "fresh" | "newTab" }>
+
+/**
+ * A column's key as text: a card's id, the thread a branch or a new tab
+ * minted, a task's id. It holds no `:`, as no key may (`readingKey`).
+ */
+export const keyText = (key: ColumnKey): string => {
+  switch (key.kind) {
+    case "card":
+      return key.card
+    case "fresh":
+    case "newTab":
+      return key.thread
+    case "task":
+      return key.task
+  }
+}
+
+/** What happens to a new tab's one column (`newTabReducer`). */
+export type NewTabAction =
+  /** Its first message was sent, as send `sendId`. */
+  | { readonly kind: "sent"; readonly sendId: string }
   | ReaderAction
   | {
       readonly kind: "sync"
       readonly index: TreeIndex
       readonly lanes: readonly LaneView[]
     }
-  /** Drop restored columns whose anchor the settled document does not have. */
-  | { readonly kind: "prune"; readonly index: TreeIndex }
 
 /**
- * The reader's settings for column `key`: how much of each ask it draws
- * (ADR-0106), and whether its thread's details are open (ADR-0073). By key,
- * so they reach a new tab's one column as they reach a root's.
+ * A reader's setting (ADR-0106, ADR-0073): how much of each ask a column
+ * draws, and whether its thread's details are open.
  */
 export type ReaderAction =
-  | {
-      readonly kind: "density"
-      readonly key: string
-      readonly density: Density
-    }
-  | { readonly kind: "details"; readonly key: string; readonly open: boolean }
+  | { readonly kind: "density"; readonly density: Density }
+  | { readonly kind: "details"; readonly open: boolean }
 
-/** Insert `column` after position `after`, clamped to the list. */
-const placeAfter = (
-  state: readonly Column[],
-  after: number,
-  column: Column,
-): readonly Column[] => {
-  const at = Math.min(Math.max(after + 1, 0), state.length)
-  return [...state.slice(0, at), column, ...state.slice(at)]
-}
-
-/**
- * One root's columns. `close` and `prune` may leave none: the layout then
- * gives the root its first column again (`columnsOf`).
- */
-export function columnsReducer(
-  state: readonly Column[],
-  action: ColumnAction,
-): readonly Column[] {
+/** A new tab's column, changed by `action`; the same column when nothing changes. */
+export function newTabReducer(column: Column, action: NewTabAction): Column {
   switch (action.kind) {
-    case "open":
-      return placeAfter(state, action.after, {
-        key: action.key,
-        anchor: action.anchor,
-      })
-    case "openFresh":
-      return placeAfter(state, action.after, {
-        key: action.key,
-        anchor: action.at,
-        thread: action.thread,
-        fresh: {
-          ...(action.pending === undefined ? {} : { pending: action.pending }),
-          ...(action.prefill === undefined ? {} : { prefill: action.prefill }),
-        },
-      })
     case "sent":
-      return state.map(c =>
-        c.key === action.key && c.fresh !== undefined
-          ? {
-              ...c,
-              // A new tab keeps its task: once written, it is that task's.
-              fresh: {
-                sendId: action.sendId,
-                ...(c.fresh.task === undefined ? {} : { task: c.fresh.task }),
-              },
-            }
-          : c,
-      )
-    case "close":
-      return state.filter((_, i) => i !== action.index)
-    case "move": {
-      const column = state[action.from]
-      const to = Math.min(Math.max(action.to, 0), state.length - 1)
-      if (column === undefined || to === action.from) return state
-      const rest = state.filter((_, i) => i !== action.from)
-      return [...rest.slice(0, to), column, ...rest.slice(to)]
-    }
+      return column.fresh === undefined
+        ? column
+        : {
+            ...column,
+            // A new tab keeps its task: once written, it is that task's.
+            fresh: {
+              sendId: action.sendId,
+              ...(column.fresh.task === undefined
+                ? {}
+                : { task: column.fresh.task }),
+            },
+          }
     case "density":
-      return withColumn(state, action.key, c =>
-        c.density === action.density ? c : { ...c, density: action.density },
-      )
-    case "details":
-      return withColumn(state, action.key, c => {
-        if ((c.details === true) === action.open) return c
-        const { details: _, ...rest } = c
-        return action.open ? { ...rest, details: true } : rest
-      })
-    case "sync":
-      return syncColumns(state, action.index, action.lanes)
-    case "prune": {
-      const known = state.filter(
-        c => c.anchor === null || action.index.entries[c.anchor] !== undefined,
-      )
-      return known.length === state.length ? state : known
+      return column.density === action.density
+        ? column
+        : { ...column, density: action.density }
+    case "details": {
+      if ((column.details === true) === action.open) return column
+      const { details: _, ...rest } = column
+      return action.open ? { ...rest, details: true } : rest
     }
+    case "sync":
+      return settle(column, action.index, action.lanes)
   }
 }
 
 /**
- * Column `key` changed by `change`. The same state when that changes nothing,
- * or no column has the key: a root with no stored columns would otherwise
- * store its first one.
- */
-function withColumn(
-  state: readonly Column[],
-  key: string,
-  change: (column: Column) => Column,
-): readonly Column[] {
-  const at = state.findIndex(c => c.key === key)
-  const column = state[at]
-  if (column === undefined) return state
-  const changed = change(column)
-  return changed === column ? state : state.with(at, changed)
-}
-
-/**
- * Settle columns against the tree, once per change.
+ * A column settled against the tree:
  *
  * - A fresh column waits for the entry its send wrote (`TreeIndex.bySend`),
  *   or for its thread's first entry, sent from another browser tab, then
  *   follows its thread.
- * - A column opened at an entry takes the thread that entry is in.
  * - Every other column's anchor is its thread's end (`threadEnd`, ADR-0117):
  *   a reply moves it on, and a branch, which starts another thread, never
- *   does.
+ *   does. Before its first entry is written, a thread's lane holds its fork.
  *
- * Returns `state` itself when nothing changes, so React skips the render.
+ * The same column when nothing changes.
  */
-function syncColumns(
-  state: readonly Column[],
-  index: TreeIndex,
-  lanes: readonly LaneView[],
-): readonly Column[] {
-  let changed = false
-  const next = state.map(column => {
-    const settled = settle(column, index, lanes)
-    if (settled !== column) changed = true
-    return settled
-  })
-  return changed ? next : state
-}
-
-function settle(
+export function settle(
   column: Column,
   index: TreeIndex,
   lanes: readonly LaneView[],
@@ -278,23 +208,24 @@ function settle(
     const own =
       fresh.sendId === undefined ? undefined : index.bySend.get(fresh.sendId)
     // Its thread started from another browser tab holding the same column.
-    const started =
-      column.thread !== undefined && index.firstOf.has(column.thread)
+    const started = index.firstOf.has(column.thread)
     // Anchored at its own message, it follows its thread from here.
     return own === undefined && !started
       ? column
       : settle({ ...rest, anchor: own ?? column.anchor }, index, lanes)
   }
-  const thread =
-    column.thread ??
-    (column.anchor === null ? null : threadAt(index, column.anchor))
-  if (thread === null) return column
-  // Before its first entry is written, a thread's lane holds its fork.
-  const end =
-    threadEnd(index, thread) ??
-    lanes.find(l => l.name === thread)?.tip ??
-    column.anchor
-  return thread === column.thread && end === column.anchor
-    ? column
-    : { ...column, thread, anchor: end }
+  const end = threadAnchor(index, lanes, column.thread) ?? column.anchor
+  return end === column.anchor ? column : { ...column, anchor: end }
 }
+
+/**
+ * Where a thread's column ends: its thread's end (`threadEnd`), or, before
+ * its first entry is written, its lane's tip, which holds its fork. Null for
+ * a thread neither shows: one whose root this tab does not hold.
+ */
+export const threadAnchor = (
+  index: TreeIndex,
+  lanes: readonly LaneView[],
+  thread: ThreadId,
+): EntryId | null =>
+  threadEnd(index, thread) ?? lanes.find(l => l.name === thread)?.tip ?? null

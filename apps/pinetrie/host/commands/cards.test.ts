@@ -71,6 +71,14 @@ const NOTES = noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
 /** A note in it: a shared place, in the lane's task. */
 const atEnd = { kind: "note", column: NOTES, order: "a" } as const
 const noteKey = { kind: "note", column: NOTES } as const
+/** Pinned at the lane's end: a place a trace is left at (`TRACED`). */
+const pinnedPlace = {
+  kind: "pinned",
+  at: atEntry(E1),
+  thread: LANE,
+  order: "a",
+} as const
+const pinnedKey = { kind: "pinned", at: atEntry(E1), thread: LANE } as const
 /** Texts the host holds whole. */
 const held = { textNow: () => "x", holds: () => true }
 /** An idle lane, its queue not held, nobody typing. */
@@ -295,11 +303,16 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
 
   test("a discard keeps the card, gone, in the discarder's history of its task: no text is destroyed, and its placer gets a trace", async () => {
     const { b, cards, commands, put, recorded } = setUp()
-    put({ placer: BEA })
+    put({ placer: BEA, place: pinnedPlace })
     const gone = { kind: "gone", why: { kind: "discarded" } } as const
     expect(
-      (await commands.move(ADA, [{ card: C1, from: atEnd, to: gone }], null))
-        .outcome,
+      (
+        await commands.move(
+          ADA,
+          [{ card: C1, from: pinnedKey, to: gone }],
+          null,
+        )
+      ).outcome,
     ).toEqual({ kind: "moved" })
     expect(textsIn(b.places).map(c => c.place)).toEqual([
       { ...gone, task: TEST_TASK, by: ADA },
@@ -307,7 +320,7 @@ describe("moves on the documents' keeper: the next queued card's pop and an unqu
     expect(cards.calls).toEqual([])
     expect(recorded).toEqual([[ADA, TEST_TASK]])
     expect([...readTraces(b.session).values()]).toMatchObject([
-      { for: BEA, by: ADA, from: noteKey },
+      { for: BEA, by: ADA, from: pinnedKey },
     ])
   })
 })
@@ -505,6 +518,34 @@ describe("reorders and unqueue all (ADR-0048 step 7)", () => {
     expect(queue).toEqual([cardIdFor("c2"), C1])
   })
 
+  test("a width writes only the card's width, in the sender's history of its task; the width it has, nothing (ADR-0116)", async () => {
+    const { b, commands, recorded, drains } = setUp()
+    const at = { kind: "canvas", task: TEST_TASK } as const
+    const done = await commands.cardWidth(ADA, {
+      kind: "card-width",
+      card: LANE,
+      at,
+      width: 2,
+    })
+    expect(done).toEqual({
+      outcome: { kind: "moved" },
+      rev: readPlacesRev(b.places),
+    })
+    expect(recorded).toEqual([[ADA, TEST_TASK]])
+    expect(drains).toEqual([])
+    const card = readPlaces(b.places).find(c => c.id === LANE)
+    expect(card?.place).toMatchObject({ kind: "canvas", width: 2 })
+    expect(card?.placer).not.toBe(ADA)
+    expect(
+      await commands.cardWidth(ADA, {
+        kind: "card-width",
+        card: LANE,
+        at,
+        width: 2,
+      }),
+    ).toEqual({ outcome: { kind: "nothing" }, rev: null })
+  })
+
   test("unqueue all: every queued card below the line in one step of the sender's history; with none queued, nothing", async () => {
     const { b, commands, put, recorded } = setUp()
     expect(await commands.unqueueAll(ADA, LANE)).toEqual({
@@ -680,8 +721,12 @@ describe("every command that moves a card records it (ADR-0048 step 6)", () => {
 
   test("a move: an event; and a trace for the card's placer, who was not reading its thread", async () => {
     const { b, commands, put } = setUp()
-    put()
-    await commands.move(BEA, [{ card: C1, from: atEnd, to: queuedKey }], null)
+    put({ place: pinnedPlace })
+    await commands.move(
+      BEA,
+      [{ card: C1, from: pinnedKey, to: queuedKey }],
+      null,
+    )
     expect(eventsOf(b)).toEqual([["moved", BEA, "queued"]])
     expect(tracesOf(b)).toMatchObject([{ for: ADA, by: BEA, card: C1 }])
   })
@@ -723,9 +768,17 @@ describe("every command that moves a card records it (ADR-0048 step 6)", () => {
 
   test("a spend: the history goes with the card, and the trace carries the message", async () => {
     const { b, commands, put } = setUp()
-    put()
-    await commands.move(ADA, [{ card: C1, from: atEnd, to: queuedKey }], null)
-    await commands.move(ADA, [{ card: C1, from: queuedKey, to: atEnd }], null)
+    put({ place: pinnedPlace })
+    await commands.move(
+      ADA,
+      [{ card: C1, from: pinnedKey, to: queuedKey }],
+      null,
+    )
+    await commands.move(
+      ADA,
+      [{ card: C1, from: queuedKey, to: pinnedKey }],
+      null,
+    )
     expect(eventsOf(b)).toHaveLength(2)
     const sent = entryId("e-2")
     writeEntry(
@@ -749,8 +802,12 @@ describe("every command that moves a card records it (ADR-0048 step 6)", () => {
 
   test("traces seen: only the sender's go", async () => {
     const { b, commands, put } = setUp()
-    put()
-    await commands.move(BEA, [{ card: C1, from: atEnd, to: queuedKey }], null)
+    put({ place: pinnedPlace })
+    await commands.move(
+      BEA,
+      [{ card: C1, from: pinnedKey, to: queuedKey }],
+      null,
+    )
     const [trace] = tracesOf(b)
     await commands.tracesSeen(BEA, [trace?.id ?? ""])
     expect(tracesOf(b)).toHaveLength(1)

@@ -220,7 +220,7 @@ describe("history and traces (ADR-0048 step 6)", () => {
     for: ME,
     card: cardIdFor("c1"),
     by: BEA,
-    from: atEnd,
+    from: queued,
     to,
     message: null,
     at: 1,

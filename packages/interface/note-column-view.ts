@@ -1,14 +1,9 @@
 // interface/note-column-view — a task's note columns as the page draws them
-// (ADR-0116): each a title and its notes in one order, placed among the
-// task's open thread columns by the canvas's order. Pure: `NoteColumn`
+// (ADR-0116): each a title and its notes in one order, a column of the
+// canvas at its rank there (`canvasColumns`). Pure: `NoteColumn`
 // (`packages/web/note-column.tsx`) draws one.
 
-import type {
-  CardRecord,
-  NoteColumnId,
-  NoteColumnRecord,
-  ThreadId,
-} from "@pinetrie/core"
+import type { CardRecord, NoteColumnId, NoteColumnRecord } from "@pinetrie/core"
 import {
   type CanvasCard,
   NEW_NOTES_TITLE,
@@ -46,46 +41,6 @@ export function noteColumnsOf(input: {
       },
     ]
   })
-}
-
-/** What the strip draws, in order: an open thread column, by position, or a note column. */
-export type StripItem =
-  | { readonly kind: "thread"; readonly position: number }
-  | { readonly kind: "notes"; readonly column: NoteColumnId }
-
-/**
- * The open thread columns, in the tab's order, with each of the task's note
- * columns just after the last open column whose thread comes before it on
- * the canvas, else first. A column with no thread on the canvas (a fresh
- * one) is passed over. Every reader sees a note column beside the same
- * thread. Pure.
- */
-export function stripItems(
-  columns: readonly { readonly thread?: ThreadId }[],
-  canvas: readonly CanvasCard[],
-): readonly StripItem[] {
-  const rank = new Map(canvas.map((c, i) => [c.id as string, i] as const))
-  const before = new Map<number, NoteColumnId[]>()
-  const first: NoteColumnId[] = []
-  canvas.forEach((c, i) => {
-    if (c.kind !== "note-column") return
-    let after = -1
-    columns.forEach((col, position) => {
-      const at = col.thread === undefined ? undefined : rank.get(col.thread)
-      if (at !== undefined && at < i) after = position
-    })
-    if (after < 0) first.push(c.id)
-    else before.set(after, [...(before.get(after) ?? []), c.id])
-  })
-  const notes = (ids: readonly NoteColumnId[]): StripItem[] =>
-    ids.map(column => ({ kind: "notes", column }))
-  return [
-    ...notes(first),
-    ...columns.flatMap((_, position): StripItem[] => [
-      { kind: "thread", position },
-      ...notes(before.get(position) ?? []),
-    ]),
-  ]
 }
 
 /** A note column's "+ add a note". */

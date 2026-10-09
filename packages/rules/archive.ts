@@ -193,6 +193,9 @@ export function writesIn(
     // A reorder stays in the place it names.
     case "reorder":
       return only(tasksOf.place(intent.reorder.at))
+    // A width is drawn on the canvas it names.
+    case "card-width":
+      return only(intent.at.task)
     // A note column's title writes in its column's task.
     case "mark":
       return intent.of.kind === "task"

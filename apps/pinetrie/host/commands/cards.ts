@@ -18,6 +18,7 @@ import {
   type CardRecord,
   type EntryId,
   ERR,
+  type Intent,
   isTextCardId,
   keyOf,
   type Move,
@@ -67,6 +68,7 @@ import {
   planSetCommand,
   planSpinOff,
   planUnqueueAll,
+  planWidth,
   type SpinOff,
   type SpunThread,
   type TaskIndex,
@@ -354,6 +356,25 @@ export function createCardCommands(deps: CardCommandDeps) {
       const step = planReorder(readPlaces(places), reorder)
       // execute
       return carry(step, [], { kind: "move", by: writer }, gesture)
+    },
+
+    /**
+     * A card drawn one column wide or two on its canvas (ADR-0116), as one
+     * step of the sender's history of moves in its task, as a reorder is.
+     * The width it has already writes nothing.
+     */
+    async cardWidth(
+      writer: WriterId,
+      change: Extract<Intent, { kind: "card-width" }>,
+    ): Promise<Settled> {
+      // gather: the history's stack, loaded before the places are read
+      const gesture = await deps.histories.gestureOf(writer, change.at.task)
+      // plan
+      const step = planWidth(readPlaces(places), change)
+      // execute
+      return step === null
+        ? settled({ kind: "nothing" })
+        : carry(step, [], { kind: "move", by: writer }, gesture)
     },
 
     /**

@@ -461,7 +461,7 @@ describe("drawnPlace (ADR-0116)", () => {
     id: LANE,
     owner: ME,
     placer: ME,
-    place: { kind: "canvas", task, order: "0000000001", width: 1 },
+    place: { kind: "canvas", task, order: "0000000100", width: 1 },
   }
   const column = noteColumnIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
   const notes: CardRecord = {
@@ -469,7 +469,7 @@ describe("drawnPlace (ADR-0116)", () => {
     id: column,
     owner: ME,
     placer: ME,
-    place: { kind: "canvas", task, order: "0000000002", width: 1 },
+    place: { kind: "canvas", task, order: "0000000200", width: 1 },
   }
   test("a thread's nearest notes are drawn in the column the host would choose; nowhere while the host would make one", () => {
     const to = { kind: "notes", thread: LANE } as const
@@ -480,5 +480,13 @@ describe("drawnPlace (ADR-0116)", () => {
     })
     expect(drawnPlace(to, ME, [thread])).toBeUndefined()
     expect(drawnPlace(to, ME, [])).toBeUndefined()
+  })
+  test("a spot on a canvas is drawn at the rank the host would give it, between its neighbours", () => {
+    const drawn = drawnPlace({ kind: "canvas-at", task, after: LANE }, ME, [
+      thread,
+      notes,
+    ])
+    const order = drawn?.kind === "canvas" ? drawn.order : ""
+    expect(order > "0000000100" && order < "0000000200").toBe(true)
   })
 })

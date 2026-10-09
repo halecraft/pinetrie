@@ -35,6 +35,7 @@ import {
   join,
   lanesOf,
   setUpAccepted,
+  taskHolding,
   treeOf,
   waitFor,
 } from "../harness.ts"
@@ -731,7 +732,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           const root =
             (await tp.getAttribute(
               '#sidebar .open-root[aria-current="true"]',
-              "data-root",
+              "data-task",
             )) ?? ""
           /** Away to a new tab and back, recording every bash row's state as it mounts and changes. */
           const away = async () => {
@@ -1721,11 +1722,6 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
         // strip counts it, the board rings its root though this tab does not
         // hold it, choosing the item opens it, and that root cannot be
         // archived until the agent is done.
-        await tp
-          .$eval('#sidebar [aria-current="true"]', n =>
-            n.getAttribute("data-root"),
-          )
-          .catch(() => null)
         const starter = await join(toolHost, "starter", "browser")
         try {
           script.use([{ text: LONG }])
@@ -1734,12 +1730,13 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           })
           const newRoot = treeOf(toolHost).roots.at(-1) ?? ""
           await appears("#bottom .state-working")
+          const newTask = taskHolding(toolHost, entryId(newRoot))
           await openBoard(tp)
-          const ringed = `#board ${boardSel(newRoot)}:has(.root-status.working) .board-open`
+          const ringed = `#board ${boardSel(newTask)}:has(.root-status.working) .board-open`
           await appears(ringed)
           await tp.click(ringed)
           await appears(
-            `#sidebar .open-root[data-root="${newRoot}"][aria-current="true"]`,
+            `#sidebar .open-root[data-task="${newTask}"][aria-current="true"]`,
           )
           await seeInMenu(tp, OWN_MENU, ".move-to.closes")
 
@@ -1844,7 +1841,7 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
           const railRoot =
             start.kind === "appended" ? start.id : entryId("none")
           // Another writer's root is not in the sidebar (ADR-0030): open it from the board.
-          await openFromBoard(tp, railRoot)
+          await openFromBoard(tp, taskHolding(toolHost, railRoot))
           await tp.waitForSelector(
             `${col(0)} .msg[data-entry="${aside === null ? "none" : (trunk ?? "none")}"]`,
             { timeout: 15_000 },

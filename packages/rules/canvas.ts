@@ -1,0 +1,288 @@
+// canvas — what a run's agent is told of its task's canvas (ADR-0116).
+//
+// A canvas entry is a history message (`history.ts`): one line per card on
+// the task's canvas, in the order everyone sees them, its kind, its title
+// and who put it there; a thread's name and what its agent is doing, the
+// reading thread marked; a note column's count of notes. Not the cards'
+// contents: only pinned cards' are given (`pinned.ts`, `task-pinned.ts`).
+// The host plans one when a run starts and the list differs from the newest
+// on the thread's path (`canvasInView`), so an unchanged canvas keeps the
+// prompt's cache (S92). The task column shows the same lines.
+
+import type {
+  CanvasView,
+  CardRecord,
+  NoteColumnId,
+  RootWork,
+  TaskId,
+  ThreadId,
+  ThreadName,
+  WriterId,
+} from "@pinetrie/core"
+import { Type } from "typebox"
+import { List, TaskIdSchema, WriterIdSchema } from "./decode.ts"
+import { type HistoryMessage, historyMessage } from "./history.ts"
+import { attribute, neutral } from "./pinned.ts"
+import type { CanvasCard } from "./task.ts"
+
+export const CANVAS_TYPE = "pinetrie.canvas"
+
+/**
+ * The line every agent thread's `<rules>` holds for the canvas list.
+ * Constant, so the system prompt stays the same between runs.
+ */
+export const CANVAS_RULE =
+  "The task's cards are listed in a `<canvas>` block, in the order everyone sees them, and the latest block is what holds. Only pinned cards' contents are given."
+
+/** How many cards the list names; the rest are counted. */
+export const CANVAS_CAP = 50
+
+const CanvasDetailsSchema = Type.Object({
+  task: TaskIdSchema,
+  title: Type.String(),
+  lines: List(Type.String()),
+  more: Type.Number(),
+})
+
+/** The column draws its own marker for a canvas entry, not pi's message. */
+export const CANVAS = historyMessage(CANVAS_TYPE, CanvasDetailsSchema, false)
+
+/** The pi `CustomMessage` a canvas entry is stored as. */
+export type CanvasMessage = HistoryMessage<typeof CANVAS_TYPE, CanvasView>
+
+/** A stored message -> the canvas list it told, or undefined. */
+export const decodeCanvas = (message: unknown): CanvasView | undefined =>
+  CANVAS.decode(message)
+
+/** What one card of a canvas list is drawn from. */
+export interface CanvasFacts {
+  readonly task: TaskId
+  /** The task's title, else its first card's line (`labelsOf`). */
+  readonly title: string
+  /** Its cards, in order. */
+  readonly canvas: readonly CanvasCard[]
+  /** The thread whose run reads the list, marked in it; null for none. */
+  readonly reading: ThreadId | null
+  readonly names: ReadonlyMap<ThreadId, ThreadName>
+  /** What each thread's agent is doing; a thread absent is idle. */
+  readonly work: ReadonlyMap<ThreadId, RootWork>
+  /** Each note column's title, else `NEW_NOTES_TITLE`. */
+  readonly noteTitles: ReadonlyMap<NoteColumnId, string>
+  /** How many notes each note column holds. */
+  readonly noteCounts: ReadonlyMap<NoteColumnId, number>
+  readonly nameOf: (writer: WriterId) => string
+}
+
+const STATE_WORDS: Readonly<Record<RootWork, string>> = {
+  running: "running",
+  waiting: "waiting",
+  held: "held",
+}
+
+const notesWords = (n: number): string => (n === 1 ? "1 note" : `${n} notes`)
+
+/**
+ * One card's line. A thread is named by its two words, else by "a thread";
+ * the reading thread says so, and no state, which is always its own run.
+ */
+function cardLine(c: CanvasCard, f: CanvasFacts): string | null {
+  const by = `put by ${f.nameOf(c.placer)}`
+  switch (c.kind) {
+    case "thread": {
+      const name = f.names.get(c.id) ?? "a thread"
+      if (c.id === f.reading) return `thread ${name} (this thread), ${by}`
+      const work = f.work.get(c.id)
+      return `thread ${name}, ${work === undefined ? "idle" : STATE_WORDS[work]}, ${by}`
+    }
+    case "note-column": {
+      const title = f.noteTitles.get(c.id) ?? ""
+      return `note column "${title}", ${notesWords(f.noteCounts.get(c.id) ?? 0)}, ${by}`
+    }
+    // A text card is never on a canvas (`PLACES_OF`).
+    case "text":
+      return null
+  }
+}
+
+/** The canvas list `facts` make: at most `CANVAS_CAP` lines, the rest counted. Pure. */
+export function canvasList(facts: CanvasFacts): CanvasView {
+  const lines = facts.canvas.flatMap(c => {
+    const line = cardLine(c, facts)
+    return line === null ? [] : [line]
+  })
+  return {
+    task: facts.task,
+    title: facts.title,
+    lines: lines.slice(0, CANVAS_CAP),
+    more: Math.max(0, lines.length - CANVAS_CAP),
+  }
+}
+
+const sameCanvas = (a: CanvasView, b: CanvasView): boolean =>
+  a.task === b.task &&
+  a.title === b.title &&
+  a.more === b.more &&
+  a.lines.length === b.lines.length &&
+  a.lines.every((l, i) => b.lines[i] === l)
+
+/**
+ * The canvas list a run is told, or null when the newest on its path says
+ * the same. Pure.
+ */
+export const planCanvasRead = (input: {
+  readonly inView: CanvasView | null
+  readonly now: CanvasView
+}): CanvasView | null =>
+  input.inView !== null && sameCanvas(input.inView, input.now)
+    ? null
+    : input.now
+
+/** The list's lines as the task column and the model read them, its tail counted. */
+export const canvasLines = (view: CanvasView): readonly string[] =>
+  view.more === 0 ? view.lines : [...view.lines, `and ${view.more} more`]
+
+/** What the model reads of `view`. */
+export const canvasContent = (view: CanvasView): string =>
+  `<canvas task="${attribute(view.title)}">\n${canvasLines(view)
+    .map(neutral)
+    .join("\n")}\n</canvas>`
+
+/** The canvas entry for `view`. */
+export const encodeCanvas = (
+  view: CanvasView,
+  timestamp: number,
+): CanvasMessage =>
+  CANVAS.encode(
+    {
+      task: view.task,
+      title: view.title,
+      lines: [...view.lines],
+      more: view.more,
+    },
+    canvasContent(view),
+    timestamp,
+  )
+
+// ── a change during a run (ADR-0116) ─────────────────────────────────────
+
+/**
+ * A card added to a task's canvas or taken from it, as a running thread of
+ * the task is told: a fact line, steered after the turn in flight as base
+ * news is (ADR-0080, S103). Reorders, widths and titles wait for the next
+ * run's list.
+ */
+export interface CanvasFact {
+  readonly task: TaskId
+  readonly by: WriterId
+  /** The card's title as the list names it: a thread's name, a note column's title. */
+  readonly title: string
+  readonly change: "added" | "taken"
+}
+
+export const CANVAS_FACT_TYPE = "pinetrie.canvas-fact"
+
+const CanvasFactDetailsSchema = Type.Object({
+  task: TaskIdSchema,
+  by: WriterIdSchema,
+  /** Who moved it, by their display name then, as a chat keeps its author's. */
+  byName: Type.String(),
+  title: Type.String(),
+  change: Type.Union([Type.Literal("added"), Type.Literal("taken")]),
+})
+
+/** The column draws a canvas fact as a fact row (`canvasFactLine`). */
+export const CANVAS_FACT = historyMessage(
+  CANVAS_FACT_TYPE,
+  CanvasFactDetailsSchema,
+)
+
+/** A canvas fact as told: with who moved it, by name. */
+export type ToldCanvasFact = CanvasFact & { readonly byName: string }
+
+/** The pi `CustomMessage` a canvas fact is steered as. */
+export type CanvasFactMessage = HistoryMessage<
+  typeof CANVAS_FACT_TYPE,
+  ToldCanvasFact
+>
+
+/** A stored message -> the canvas fact it told, or undefined. */
+export const decodeCanvasFact = (
+  message: unknown,
+): ToldCanvasFact | undefined => CANVAS_FACT.decode(message)
+
+/** A canvas fact in words: "Bea added Decisions to the canvas". The one wording, for the model and the column. */
+export const canvasFactLine = (fact: ToldCanvasFact): string =>
+  fact.change === "added"
+    ? `${fact.byName} added ${fact.title} to the canvas`
+    : `${fact.byName} took ${fact.title} from the canvas`
+
+/** The steer for `fact`, its content the line in `<canvas-change>`. */
+export function encodeCanvasFact(
+  fact: CanvasFact,
+  nameOf: (writer: WriterId) => string,
+  timestamp: number,
+): CanvasFactMessage {
+  const told = { ...fact, byName: nameOf(fact.by) }
+  return CANVAS_FACT.encode(
+    told,
+    `<canvas-change>${neutral(canvasFactLine(told))}</canvas-change>`,
+    timestamp,
+  )
+}
+
+/** A canvas fact steered into one running lane. Never a queued fact card: those wait for the run's end. */
+export interface CanvasSteer {
+  readonly kind: "steer"
+  readonly lane: ThreadId
+  readonly fact: CanvasFact
+}
+
+/**
+ * What a change to the places tells the running threads of each task a card
+ * was added to or taken from (ADR-0116): one steer per card per running
+ * lane of that task, the card's own thread left out. `by` is who moved it;
+ * a change the host made itself tells nothing. Pure.
+ */
+export function planCanvasFacts(input: {
+  readonly before: readonly CardRecord[]
+  readonly after: readonly CardRecord[]
+  readonly by: WriterId | null
+  /** Each task's threads, after the change (`TaskIndex.threadsOf`). */
+  readonly threadsOf: ReadonlyMap<TaskId, readonly ThreadId[]>
+  readonly running: ReadonlySet<ThreadId>
+  /** A card's title as the list names it. */
+  readonly titleOf: (card: CardRecord) => string
+}): readonly CanvasSteer[] {
+  const { by } = input
+  if (by === null) return []
+  const taskOf = (c: CardRecord | undefined): TaskId | null =>
+    c?.place.kind === "canvas" ? c.place.task : null
+  const was = new Map(input.before.map(c => [c.id, c] as const))
+  const is = new Map(input.after.map(c => [c.id, c] as const))
+  const changes: {
+    task: TaskId
+    card: CardRecord
+    change: "added" | "taken"
+  }[] = []
+  for (const id of new Set([...was.keys(), ...is.keys()])) {
+    const before = was.get(id)
+    const after = is.get(id)
+    const [from, to] = [taskOf(before), taskOf(after)]
+    if (from === to) continue
+    if (from !== null && before !== undefined)
+      changes.push({ task: from, card: before, change: "taken" })
+    if (to !== null && after !== undefined)
+      changes.push({ task: to, card: after, change: "added" })
+  }
+  return changes.flatMap(({ task, card, change }) =>
+    (input.threadsOf.get(task) ?? [])
+      .filter(lane => lane !== card.id && input.running.has(lane))
+      .map(
+        (lane): CanvasSteer => ({
+          kind: "steer",
+          lane,
+          fact: { task, by, title: input.titleOf(card), change },
+        }),
+      ),
+  )
+}

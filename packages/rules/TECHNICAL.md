@@ -102,9 +102,10 @@ cannot reach the wrong document and needs no guard at run time.
   its root entry, first line, title, counts, writers, each thread's writers
   on its path (`threads`, its followers, ADR-0077), the chats that name
   someone, and its images. The host writes it from `readRootRecord`.
-  `threads` is optional when read, and a missing one is `{}`: a starting
-  host opens the roots its decoded records name (`planLoads`), so a record
-  from before the field must still decode.
+  Each mention names its thread (`threadAt`), so the inbox reads its task.
+  `ROOT` is `derived`: built from the root's document alone, so a record
+  that does not decode in this build's shape is rebuilt at a host's start
+  (`host/directory.ts`, `planRebuild`), never migrated.
 - **`VERDICT`** (`verdict.ts`, ADR-0077): a thread's last run's verdict,
   keyed by lane, in the session: the run's prompt and last entry, and what
   happened (pending, said, failed, stopped, unclassified), never a level,
@@ -356,9 +357,10 @@ which are swept.
   places alone, since a thread's pinned cards are found through the tree,
   which a handoff does not read. Where a reorder may be is core's
   `REORDER_PLACES` (`ReorderAt`, `isReorderAt`, which the codec and
-  `reorderOf` read too). Its siblings are the lane's queue, its
-  note column's notes, or every pinned card in the session (pinned keys are
-  the session's). Only `order`
+  `reorderOf` read too), and `REORDERS` has a row for each, so a place a
+  reorder may be at cannot lack its siblings: the lane's queue, its note
+  column's notes, its task's pinned cards, its task's canvas, or every
+  pinned card in the session (pinned keys are the session's). Only `order`
   changes: `placer`, `by`, `seen` and `unsent` stay, so it changes nobody's
   trace and adds no history event. Refused `gone`; `fact` for a fact's card,
   or a queued card whose new place passes a fact (a fact says what already
@@ -437,8 +439,8 @@ which are swept.
   write first, minting a column's id (`newColumn`, `n-` and a uuidv7 on
   the host) only when one is made; moves, unsent cards and a fresh
   column's followers all go through it. The page names the target `notes`
-  (`noteOf`), and the host resolves it (`planNotesTargets`, inside
-  `planMoveRequest`), each move against the cards the ones before it
+  (`noteOf`), and the host resolves it (`planMoveTargets`, inside
+  `planMoveRequest`, which ranks a spot on a canvas, `canvas-at`, too), each move against the cards the ones before it
   left, so a column made for the first takes the rest, and writes the
   column in the same step as the moves. The page draws a pending one in
   the column the host would choose (`drawnPlace`), or where it was while
@@ -566,8 +568,10 @@ read is dropped, not its history.
     that went has its history deleted. A reorder changes no key, and adds
     nothing.
   - **A trace** is left for the card's placer when a person (not the host)
-    other than the placer moved it out of a shared place (a note, queued,
-    pinned; your message is yours alone), it was not an unqueue or an unpin, and no presence pair has the
+    other than the placer moved it out of a traced place (queued or
+    pinned: `TRACED`, a row each with where its column draws it, so a place
+    traced with no drawer does not compile; a note column is everyone's
+    scratch, and your message is yours alone), it was not an unqueue or an unpin, and no presence pair has the
     placer at the card's end. A card whose end is unknown (its root not
     loaded) counts as not watched. A spend's trace carries the message.
   - **A trace whose card is back at its `from`** is deleted.
@@ -622,8 +626,9 @@ by construction.
   queued; the thread in the row's `lane`). Its task is its
   thread's (`taskOfPlace`), and its root its thread's record's
   (`rootOfPlace`): one field per fact, so the two cannot disagree.
-- **`planThreadStart`**: a thread's record, its card at the end of its
-  task's canvas, and for a task the session does not hold, the task's
+- **`planThreadStart`**: a thread's record, its card on its task's canvas
+  just after the thread it forks from (`planThreadCard`, `branchAfter`,
+  `rankAfter`), a new root's at the end, and for a task the session does not hold, the task's
   record and its board place (`placeStarted`). `planChat` decides that a
   send starts one (`starts: ThreadStarts`); `sendChat` plans it with the
   send, and `executeChat` writes it before the message.
@@ -1223,6 +1228,27 @@ and the total `decodePinned` are the only code that builds or reads it, and
   it, so they agree on which cards count.
 - **`PINNED_RULE`** is the line every agent thread's `<rules>` holds
   (`packages/pi`).
+
+# What a run is told of its task (`canvas.ts`, `task-pinned.ts`, `context.ts`, ADR-0116)
+
+- **`CONTEXT` is the table of context entries**, one row per kind (the
+  canvas list, the task's pinned cards, the thread's pinned cards) with
+  its decoder, its rule and what `ContextInView` carries of it, in the
+  order a run writes them before its prompt: the thread's pinned cards
+  last, so its entry stays the prompt's parent. `contextOf` reads a
+  compaction's retained tail through it, and `CONTEXT_RULES` are the lines
+  `packages/pi` puts in `<rules>`.
+- **The canvas list** (`canvasList`): a line per card on the canvas, in
+  its order, at most `CANVAS_CAP` (50), the rest counted. `planCanvasRead`
+  writes it only when it differs from the newest on the path
+  (`canvasInView`), so an unchanged canvas keeps the prompt's cache.
+- **A card added or taken while a run goes on** is a fact line steered
+  into the lane (`planCanvasFacts`, `encodeCanvasFact`), never a queued fact
+  card, which the drain would pop only after the run. Reorders and widths
+  wait for the next run's list.
+- **Cards pinned to the task** (`task-pinned` places, `taskPinnedOf`) are
+  an entry of their own (`pinetrie.task-pinned`), compared as a thread's
+  pinned cards are, so a thread's cards entry keeps its shape.
 
 # History messages (`history.ts`)
 

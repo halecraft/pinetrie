@@ -207,4 +207,12 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "a person's picture is kept from the sweep",
   },
+  {
+    name: "a mention names its root's first thread",
+    file: "packages/reads/index.ts",
+    from: "    const thread = threadAt(index, e.id)",
+    to: "    const thread = threadAt(index, index.roots[0] ?? e.id)",
+    command: ["pnpm", "exec", "vitest", "run", "packages/reads"],
+    expect: "a mention names the thread it is in",
+  },
 ]

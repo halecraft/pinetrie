@@ -14,10 +14,13 @@ import {
 } from "@pinetrie/core"
 import type {
   BehindMessage,
+  CanvasFactMessage,
+  CanvasMessage,
   ChatMessage,
   FactMessage,
   PinnedMessage,
   PromptMessage,
+  TaskPinnedMessage,
   UpdateMessage,
 } from "@pinetrie/rules"
 import {
@@ -98,8 +101,15 @@ type PiResult =
   | { readonly ok: true }
   | { readonly ok: false; readonly error: { readonly _tag: string } }
 
-/** What goes into a run's commit before its prompt (`ThreadLaneHandle.run`). */
-export type BeforePrompt = BehindMessage | PinnedMessage
+/**
+ * What goes into a run's commit before its prompt (`ThreadLaneHandle.run`):
+ * a base's news, and the context entries (ADR-0048, ADR-0116).
+ */
+export type BeforePrompt =
+  | BehindMessage
+  | PinnedMessage
+  | TaskPinnedMessage
+  | CanvasMessage
 
 /**
  * A thread's lane (ADR-0120). It is never moved: it advances only by its own
@@ -128,12 +138,14 @@ export interface ThreadLaneHandle {
     before: readonly BeforePrompt[],
   ): Promise<WriteOutcome>
   /**
-   * Tell a running lane its base has new work (ADR-0080, S103 item 4): pi
-   * places the message after the tool results of the turn in flight, at its
-   * next boundary, appended, so the prompt cache holds. A steer that arrives
-   * after the run's last tool call makes one more request.
+   * Tell a running lane something that changed while it runs: its base has
+   * new work (ADR-0080, S103 item 4), or a card was added to or taken from
+   * its task (ADR-0116). pi places the message after the tool results of the
+   * turn in flight, at its next boundary, appended, so the prompt cache
+   * holds. A steer that arrives after the run's last tool call makes one
+   * more request.
    */
-  steer(message: BehindMessage): Promise<WriteOutcome>
+  steer(message: BehindMessage | CanvasFactMessage): Promise<WriteOutcome>
   /** Resume the operation a crash interrupted, in the lane's own directory. */
   resume(): Promise<WriteOutcome>
   /**

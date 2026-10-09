@@ -30,6 +30,7 @@ import {
   type CardId,
   type CardRecord,
   type CommandSummary,
+  type ContextInView,
   type DigestRecord,
   type EntryId,
   type EntryLike,
@@ -45,7 +46,6 @@ import {
   type NoteColumnId,
   type NoteColumnRecord,
   type OfferRecord,
-  type PinnedView,
   type PlanMode,
   type ProjectRecord,
   parseCardId,
@@ -68,6 +68,7 @@ import {
   type ThreadRecord,
   type TraceRecord,
   type TreeIndex,
+  threadAt,
   type VerdictRecord,
   type Workflow,
   type WriterId,
@@ -83,10 +84,10 @@ import {
   CARD_HISTORY,
   COMMANDS,
   COMMANDS_KEY,
+  contextOf,
   DIGEST,
   decodeCard,
   decodeChat,
-  decodePinned,
   type Home,
   LANE,
   MARK,
@@ -149,17 +150,13 @@ const indexOfEntries = new WeakMap<
 >()
 
 /**
- * The pinned cards a compaction's retained tail carries: its newest cards
- * entry, which pi's compaction hook puts there (ADR-0048, S92); absent for
- * none.
+ * The context entries a compaction's retained tail carries: the newest of
+ * each kind, which pi's compaction hook puts there (ADR-0048, ADR-0116,
+ * S92); undefined for none.
  */
-function carriedBy(row: StoredEntryRow): PinnedView | undefined {
-  const tail = rowRetainedTail(row)
-  for (let i = tail.length - 1; i >= 0; i--) {
-    const view = decodePinned(tail[i])
-    if (view !== undefined) return view
-  }
-  return undefined
+function carriedBy(row: StoredEntryRow): ContextInView | undefined {
+  const carried = contextOf(rowRetainedTail(row))
+  return Object.keys(carried).length === 0 ? undefined : carried
 }
 
 function renderableEntry(row: StoredEntryRow): EntryLike {
@@ -828,9 +825,10 @@ export function readRootRecord(root: RootId, doc: RootDocHandle): RootRecord {
     const m = e.message
     if (m?.role !== "chat" || m.writer === undefined) return []
     const text = messageText(m)
-    return parseMentions(text).length === 0
+    const thread = threadAt(index, e.id)
+    return parseMentions(text).length === 0 || thread === null
       ? []
-      : [{ id: e.id, by: m.writer, text }]
+      : [{ id: e.id, by: m.writer, text, thread }]
   })
   return {
     root,

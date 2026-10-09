@@ -24,11 +24,12 @@ import { type HistoryMessage, historyMessage } from "./history.ts"
 export const PINNED_TYPE = "pinetrie.pinned"
 
 /**
- * The line every agent thread's `<rules>` holds. Constant, so the system
- * prompt stays the same between runs and an edited card keeps the cache.
+ * The line every agent thread's `<rules>` holds for pinned cards, a
+ * thread's and a task's (ADR-0116). Constant, so the system prompt stays the
+ * same between runs and an edited card keeps the cache.
  */
 export const PINNED_RULE =
-  "The team pins cards to say what it wants from this thread. They appear in the conversation in `<pinned-cards>` blocks, and the latest block is what holds."
+  "The team pins cards to say what it wants: from this thread in `<pinned-cards>` blocks, from the whole task in `<task-pinned-cards>` blocks. The latest of each is what holds."
 
 const PinnedDetailsSchema = Type.Object({
   lane: ThreadIdSchema,
@@ -61,10 +62,10 @@ export const decodePinned = (message: unknown): PinnedView | undefined =>
  * A card's closing tags, so a card cannot close the block the model is told
  * to trust: `</card>` becomes `<\/card>`, and the block's own the same.
  */
-const neutral = (text: string): string =>
-  text.replace(/<\/(card|pinned-cards)\b/gi, "<\\/$1")
+export const neutral = (text: string): string =>
+  text.replace(/<\/(card|pinned-cards|task-pinned-cards|canvas)\b/gi, "<\\/$1")
 
-const attribute = (name: string): string =>
+export const attribute = (name: string): string =>
   name.replaceAll("&", "&amp;").replaceAll('"', "&quot;")
 
 /** What the model reads of `view`, each card named by its owner's display name. */
@@ -129,7 +130,7 @@ interface PinnedDiff {
 }
 
 /** How long a retired card's line is, as the model reads it. */
-const RETIRED_LINE = 80
+export const RETIRED_LINE = 80
 
 /**
  * The one comparison of the cards pinned now with those the model last read
@@ -138,7 +139,7 @@ const RETIRED_LINE = 80
  * swapped for another with the same text is unread. Pure.
  */
 export function pinnedDiff(
-  inView: PinnedView | null,
+  inView: Pick<PinnedView, "cards"> | null,
   now: readonly PinnedCardRead[],
 ): PinnedDiff {
   const read = new Map((inView?.cards ?? []).map(c => [c.id, c] as const))

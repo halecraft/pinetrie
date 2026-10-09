@@ -174,7 +174,6 @@ export function Sidebar({
               </span>
             )
           const { task } = item
-          const root = item.entry
           if (renaming === task)
             return (
               <span
@@ -206,7 +205,6 @@ export function Sidebar({
                 className={["open-root", item.archived ? "archived" : ""]
                   .filter(c => c !== "")
                   .join(" ")}
-                data-root={root ?? undefined}
                 data-task={task}
                 draggable
                 onDragStart={startRootDrag(dragOf(task))}
@@ -415,7 +413,6 @@ function FoldedItem({
           ...(item.kind === "new"
             ? { "data-new": item.key }
             : {
-                "data-root": item.entry ?? undefined,
                 "data-task": item.task,
                 draggable: true,
                 onDragStart: startDrag,

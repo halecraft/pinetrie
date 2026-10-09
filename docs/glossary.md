@@ -58,6 +58,16 @@ words they were written with.
 | **the archive** | The board's last workflow state, always there, named Done in a new session and renamed as any state is. | `Workflow.archive` | the closed state, the Archive tab |
 | **archived** | In the archive: read-only for everyone, unloaded by the host, its threads' offers withdrawn, until moved out (**restore**). | `archivedOf`, `archivedIn`, `planArchive`, `readArchived` | closed |
 
+## The canvas
+
+| word | what it is | in code | retired |
+|---|---|---|---|
+| **canvas** | Where a task opens: its cards laid out as columns, in an order everyone shares (ADR-0116). | `canvas` (a `CardPlace`), `CanvasCard`, `canvasOf`, `canvasColumns`, `Strip` | |
+| **column** | A card on the canvas, opened: a thread's path or a note column (ADR-0116). | `CardColumn`, `Column`, `ColumnKey` | a column as only a thread's path |
+| **task column** | The strip's first column, outside the canvas's order: the task's title, state, readers, the cards pinned to the task and the canvas list. | `TaskColumn`, `taskColumnView` | |
+| **fold** (a column) | Hide a column for yourself; it keeps its place as a narrow strip with its title. Every column is folded until you open it. | `CardView.unfolded`, `FoldedColumn` | close (a column) |
+| **pinned to the task** | A text card every thread's agent in the task reads on every run, in the task column. | `task-pinned`, `taskPinnedOf` | |
+
 ## Accepted, not yet built: tasks, the canvas and sources
 
 Words of ADR-0116 to ADR-0119, accepted and not yet built. Nothing in the
@@ -65,9 +75,6 @@ code uses them yet; each becomes current as its part is built.
 
 | word | what it is | ADR | replaces |
 |---|---|---|---|
-| **canvas** | Where a task opens: its cards laid out as columns, in an order everyone shares. | ADR-0116 | |
-| **column** | A card opened on the canvas: a thread's path, a note column, a file or a medium. | ADR-0116 | a column as only a thread's path |
-| **fold** (a column) | Hide a column for yourself; it keeps its place as a narrow strip with its title. | ADR-0116 | close (a column) |
 | **thread card** | A thread, held by a task or by someone's inventory. | ADR-0117 | a root, as the board and the sidebar draw it |
 | **root** | A code word, not the interface's: the first message a thread's path leads back to, and the document of every thread that branched from it (`RootId`, `root:<RootId>`), which is also one pi session. Nothing a person reads says "root" (or "tree"): ＋ starts a thread. | ADR-0116 | the root as the board's item, and "root" on screen |
 | **copy** (a thread) | A new thread branched at a thread's end, put as its own card; its fork row leads back to the original. | ADR-0117 | |

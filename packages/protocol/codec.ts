@@ -347,6 +347,23 @@ export function decodeCommand(
       ? { kind, task, direction }
       : refused(ERR.UNKNOWN_KIND, `unknown undo direction: ${direction}`)
   }
+  if (kind === "card-width") {
+    const card = parseCardId(text(wire?.cardId))
+    if (card === undefined)
+      return refused(ERR.UNKNOWN_TARGET, "a width must name its card")
+    const task = text(wire?.task)
+    if (!isTaskId(task))
+      return refused(ERR.UNKNOWN_TARGET, `not a task: ${task}`)
+    const width = text(wire?.mode)
+    return width === "1" || width === "2"
+      ? {
+          kind,
+          card,
+          at: { kind: "canvas", task },
+          width: width === "1" ? 1 : 2,
+        }
+      : refused(ERR.UNKNOWN_KIND, `a card is 1 or 2 columns wide, not ${width}`)
+  }
   if (kind === "set-command") {
     const card = parseCardId(text(wire?.cardId))
     if (card === undefined)
@@ -606,7 +623,7 @@ function keyFromJson(value: unknown): PlaceKey | null | undefined {
   )
 }
 
-/** A JSON value -> a move's target: a key, or a thread's nearest notes. */
+/** A JSON value -> a move's target: a key, a thread's nearest notes, or a spot on a canvas. */
 function targetFromJson(value: unknown): MoveTarget | null | undefined {
   if (value === null) return null
   if (typeof value !== "object" || Array.isArray(value)) return undefined
@@ -660,8 +677,8 @@ export const encodeReorder = (r: Reorder): string =>
   })
 
 /**
- * The wire -> a reorder, or why it is malformed: no card, a place that is
- * not a queue's or the pinned cards', no neighbour, or a neighbour that is
+ * The wire -> a reorder, or why it is malformed: no card, a place no
+ * reorder is in (`REORDER_PLACES`), no neighbour, or a neighbour that is
  * the card itself or both of them.
  */
 export function decodeReorder(text: string, s: string): Reorder | string {
@@ -673,7 +690,7 @@ export function decodeReorder(text: string, s: string): Reorder | string {
   const v = value as Record<string, unknown>
   const at = keyFromJson(v.at ?? null)
   if (at === null || at === undefined || !isReorderAt(at))
-    return "a reorder stays in a queue, among the pinned cards or in a note column"
+    return "a reorder stays in a queue, among the pinned cards, in a note column or on a canvas"
   const neighbour = (k: unknown): string =>
     typeof k === "string" ? k.trim() : ""
   const [after, before] = [neighbour(v.after), neighbour(v.before)]
@@ -868,6 +885,14 @@ export function encodeIntent(id: string, intent: Intent): Command {
         kind: "undo-move",
         task: intent.task,
         mode: intent.direction,
+      })
+    case "card-width":
+      return command({
+        id,
+        kind: "card-width",
+        cardId: intent.card,
+        task: intent.at.task,
+        mode: String(intent.width),
       })
     case "set-command":
       return command({

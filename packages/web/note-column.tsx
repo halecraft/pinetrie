@@ -3,14 +3,17 @@
 // first line and opened while it holds the focus. ↑ and ↓ on a note, or
 // Alt+↑/↓ in its box, move it in the column, as a queued card moves in its
 // queue. A drop anywhere on the column makes the card a note at its end;
-// "+ add a note" makes an empty one there. Drawn among the task's thread
-// columns where `stripItems` places it.
+// "+ add a note" makes an empty one there. A column of its task's canvas, at
+// its rank there (`canvasColumns`); its header is a drag handle, as a thread
+// column's is, and ⇤ folds it.
 
-import type { CardId, SeatRecord, WriterId } from "@pinetrie/core"
+import type { CardId, CardWidth, SeatRecord, WriterId } from "@pinetrie/core"
 import {
   ADD_NOTE,
   type ColumnAct,
+  columnMenu,
   dropProps,
+  FOLD,
   type Intent,
   NOTES_EMPTY,
   type NoteColumnView,
@@ -21,11 +24,14 @@ import {
 import { newCardId, type SessionClient } from "@pinetrie/session"
 import { useEffect, useRef, useState } from "react"
 import { NoteCardEditor } from "./card-editor.tsx"
+import { ColumnMenu } from "./column-menu.tsx"
 import { TitleField } from "./title-field.tsx"
 
 export function NoteColumn(p: {
   session: SessionClient
   view: NoteColumnView
+  /** How many columns wide its card is drawn (ADR-0116). */
+  width: CardWidth
   reader: Reader
   readOnly: ReadOnly | null
   seats: readonly SeatRecord[]
@@ -38,7 +44,11 @@ export function NoteColumn(p: {
   // A note's acts are a column's, by the note column's id: where a refusal
   // is said (`atColumn`).
   const act = (a: ColumnAct) =>
-    p.onIntent({ kind: "column", position: -1, key: column, act: a })
+    p.onIntent({
+      kind: "column",
+      column: { kind: "card", card: column },
+      act: a,
+    })
   const [renaming, setRenaming] = useState(false)
   // "+ add a note" focuses its card's box once the card is drawn.
   const notes = useRef<HTMLDivElement>(null)
@@ -60,10 +70,12 @@ export function NoteColumn(p: {
   return (
     <section
       className="note-column"
+      data-card={column}
       data-column={column}
+      data-width={p.width}
       {...(p.readOnly === null ? dropProps({ kind: "notes", column }) : {})}
     >
-      <header className="note-column-head">
+      <header className="note-column-head" data-column-head="">
         {renaming && p.readOnly === null ? (
           <TitleField
             label="title for this note column"
@@ -90,6 +102,21 @@ export function NoteColumn(p: {
           </button>
         )}
         <span className="note-count">{noteCountWords(view.notes.length)}</span>
+        <ColumnMenu
+          items={columnMenu({ card: column, width: p.width })}
+          onIntent={p.onIntent}
+        />
+        <button
+          aria-label={FOLD.title}
+          className={FOLD.className}
+          onClick={() =>
+            p.onIntent({ kind: "fold", card: column, unfolded: false })
+          }
+          title={FOLD.title}
+          type="button"
+        >
+          {FOLD.label}
+        </button>
       </header>
       <div className="note-column-notes" ref={notes}>
         {view.notes.length === 0 && (

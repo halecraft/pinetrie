@@ -217,6 +217,8 @@ export function createCommands(deps: CommandDeps): Commands {
         )
       case "reorder":
         return cardCommands.reorder(writer, intent.reorder, tasks)
+      case "card-width":
+        return cardCommands.cardWidth(writer, intent)
       case "unqueue-all":
         return cardCommands.unqueueAll(writer, intent.lane, tasks)
       case "queue-hold":

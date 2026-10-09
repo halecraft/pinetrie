@@ -15,6 +15,7 @@ import {
   isThreadId,
   type NoteColumnId,
   type RootId,
+  TASK_PATTERN,
   type TaskId,
   THREAD_PATTERN,
   type ThreadId,
@@ -94,6 +95,11 @@ export const CommitSchema = Type.Unsafe<CommitId>(Type.String({ minLength: 1 }))
 /** A lane's name as stored (`THREAD_PATTERN`). */
 export const ThreadIdSchema = Type.Unsafe<ThreadId>(
   Type.String({ pattern: THREAD_PATTERN }),
+)
+
+/** A task's id as stored (`TASK_PATTERN`). */
+export const TaskIdSchema = Type.Unsafe<TaskId>(
+  Type.String({ pattern: TASK_PATTERN }),
 )
 
 /** Who wrote something, as stored: never empty. */

@@ -36,6 +36,8 @@ export type PutTarget =
   | { readonly kind: "notes"; readonly column: NoteColumnId }
   /** The pinned strip at the top of a thread's column (ADR-0048). */
   | { readonly kind: "pinned"; readonly key: string }
+  /** The cards pinned to a task, in its task column (ADR-0116). */
+  | { readonly kind: "taskPinned"; readonly task: TaskId }
   /** A slot of your inventory. */
   | { readonly kind: "inventory"; readonly slot: number }
   /** A workflow state, on the board or the footer's strip: a new thread there (ADR-0111). */
@@ -52,6 +54,8 @@ const PUT_COLUMN = "data-put-column"
 const PUT_COMPOSER = "data-put-composer"
 /** The attribute a column's pinned strip carries: its column's key. */
 const PUT_PINNED = "data-put-pinned"
+/** The attribute a task column's pinned cards carry: its task. */
+const PUT_TASK_PINNED = "data-put-task-pinned"
 /** The attribute a slot carries: its index. */
 const PUT_SLOT = "data-put-slot"
 /** The attribute a note column carries: its id. */
@@ -63,7 +67,7 @@ const PUT_SIDEBAR = "data-put-sidebar"
 const END = "end"
 
 /** What an element a drop may land on matches: any mark. */
-export const DROP_ZONE = `[${PUT_COLUMN}],[${PUT_COMPOSER}],[${PUT_PINNED}],[${PUT_SLOT}],[${PUT_NOTES}],[${PUT_STATE}],[${PUT_SIDEBAR}]`
+export const DROP_ZONE = `[${PUT_COLUMN}],[${PUT_COMPOSER}],[${PUT_PINNED}],[${PUT_TASK_PINNED}],[${PUT_SLOT}],[${PUT_NOTES}],[${PUT_STATE}],[${PUT_SIDEBAR}]`
 
 /** The attributes that mark an element as `target`, spread onto it by the page. */
 export function dropProps(target: PutTarget): Readonly<Record<string, string>> {
@@ -74,6 +78,8 @@ export function dropProps(target: PutTarget): Readonly<Record<string, string>> {
       return { [PUT_COMPOSER]: target.key }
     case "pinned":
       return { [PUT_PINNED]: target.key }
+    case "taskPinned":
+      return { [PUT_TASK_PINNED]: target.task }
     case "inventory":
       return { [PUT_SLOT]: String(target.slot) }
     case "notes":
@@ -96,6 +102,8 @@ export function targetOfElement(el: {
     return { kind: "composer", key: composer }
   const pinned = el.getAttribute(PUT_PINNED)
   if (pinned !== null && pinned !== "") return { kind: "pinned", key: pinned }
+  const task = el.getAttribute(PUT_TASK_PINNED)
+  if (task !== null && isTaskId(task)) return { kind: "taskPinned", task }
   const state = el.getAttribute(PUT_STATE)
   if (state !== null && isWorkflowStateId(state))
     return { kind: "state", state }
@@ -135,7 +143,8 @@ export const intoMessage = (
 /**
  * The place `target` names: the note column nearest a column's thread
  * (`noteOf`), a note column's end, its composer's place, the same thread
- * end pinned (`pinnedOf`), or your inventory; null for a column no composer
+ * end pinned (`pinnedOf`), a task's pinned cards, or your inventory; null
+ * for a column no composer
  * publishes, and for a fresh column's strip, which it has none of; and for
  * a state or the sidebar, which name a new thread, not a place
  * (`planSpinOff`).
@@ -147,6 +156,8 @@ export function placeOfTarget(
 ): MoveTarget | null {
   if (target.kind === "inventory") return { kind: "inventory", holder: me }
   if (target.kind === "notes") return { kind: "note", column: target.column }
+  if (target.kind === "taskPinned")
+    return { kind: "task-pinned", task: target.task }
   if (target.kind === "state" || target.kind === "sidebar") return null
   const place = places.get(target.key)?.place
   if (place === undefined) return null

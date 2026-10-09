@@ -216,6 +216,8 @@
         border-right: 1px solid #23272e; }
       .column-thread { flex: 0 0 28rem; width: 28rem; min-width: 0; display: flex;
         flex-direction: column; min-height: 0; }
+      /* A card two columns wide (ADR-0116): its width is everyone's. */
+      .column[data-width="2"] .column-thread { flex-basis: 56rem; width: 56rem; }
       /* A column's header (ADR-0040): who works in it, then where it forks. Every
          track colour in a column is `var(--track)`, set inline on `.column`
          (`trackStyle`), and on the narrow pane's dialog, which is outside it. */
@@ -293,20 +295,64 @@
         border-radius: 50%; vertical-align: middle; background: var(--track, #777); }
       .column-head .close { padding: 0 .2rem; font-size: 1rem; line-height: 1; color: #8b93a1; }
       .column-head .close:hover, .column-head .close:focus-visible { color: #e6e6e6; }
-      /* A header is its column's drag handle (use-column-drag.ts), once there are
-         two columns. */
+      /* A card's column's header is its drag handle (use-column-drag.ts), once
+         there are two on the canvas. */
       .column-head { user-select: none; }
-      #strip:has(> .column + .column) .column-head { cursor: grab; }
+      #strip:has(> [data-card] + [data-card]) [data-column-head] { cursor: grab; }
       .column-head .grip { border: none; padding: 0 .1rem; color: #6f7784; cursor: grab;
         font-size: .9rem; line-height: 1; }
       .column-head .grip:hover, .column-head .grip:focus-visible { color: #e6e6e6; }
       /* The header holds the pointer while it drags, so its cursor is the one shown. */
-      #strip[data-reordering] .column[data-dragging] .column-head,
-      #strip[data-reordering] .column[data-dragging] .grip { cursor: grabbing; }
-      .column[data-dragging] { position: relative; z-index: 2; background: var(--page); opacity: .92;
+      #strip[data-reordering] [data-dragging] [data-column-head],
+      #strip[data-reordering] [data-dragging] .grip { cursor: grabbing; }
+      #strip > [data-dragging] { position: relative; z-index: 2; background: var(--page); opacity: .92;
         box-shadow: 0 0 0 1px #3a3f48, 0 8px 24px rgb(0 0 0 / .5); }
-      .column[data-drop="before"] { box-shadow: inset 3px 0 0 #8ab4f8; }
-      .column[data-drop="after"] { box-shadow: inset -3px 0 0 #8ab4f8; }
+      #strip > [data-drop="before"] { box-shadow: inset 3px 0 0 #8ab4f8; }
+      #strip > [data-drop="after"] { box-shadow: inset -3px 0 0 #8ab4f8; }
+      /* A column folded to a strip with its title, in its place on the canvas
+         (ADR-0116): its head a drag handle, the rest a button that unfolds it. */
+      .folded-column { flex: 0 0 2.2rem; width: 2.2rem; min-height: 0; display: flex; flex-direction: column;
+        border-right: 1px solid #23272e; }
+      .folded-column .folded-head { align-items: center; padding: .4rem 0; border-top-color: #6f7784; }
+      .folded-grip { color: #6f7784; font-size: .9rem; line-height: 1; }
+      .folded-title { flex: 1; display: flex; flex-direction: column; align-items: center; gap: .4rem;
+        padding: .5rem 0; background: none; border: 0; color: #aaa; cursor: pointer; }
+      .folded-title:hover, .folded-title:focus-visible { color: #e6e6e6; background: #1b1e23; }
+      .folded-name, .folded-detail { writing-mode: vertical-rl; white-space: nowrap; overflow: hidden;
+        text-overflow: ellipsis; max-height: 60vh; }
+      .folded-name { font-size: .8rem; font-weight: 600; }
+      .folded-detail { font-size: .7rem; color: #8b93a1; }
+      /* The task column (ADR-0116): first on the canvas, outside its order. */
+      .task-column { flex: 0 0 18rem; width: 18rem; min-width: 0; display: flex; flex-direction: column;
+        min-height: 0; border-right: 1px solid #23272e; background: #15171b; }
+      .task-column.folded-column { flex: 0 0 2.2rem; width: 2.2rem; }
+      .task-column-head { display: flex; align-items: center; gap: .5rem; padding: .4rem .75rem;
+        border-top: 4px solid #8ab4f8; font-size: .8rem; color: #aaa; }
+      .task-column-title { flex: 1; text-align: left; background: none; border: 0; padding: 0;
+        color: #e6e6e6; font-weight: 600; font-size: .9rem; cursor: text; }
+      .task-column-title:disabled { cursor: default; }
+      .task-column-head .fold { background: none; border: 0; padding: 0; color: #6f7784;
+        cursor: pointer; font-size: .9rem; line-height: 1; }
+      .task-column-head .fold:hover { color: #e6e6e6; }
+      .task-column-body { flex: 1; overflow-y: auto; padding: .4rem .75rem; display: flex;
+        flex-direction: column; gap: .6rem; font-size: .8rem; color: #aaa; }
+      .task-state { display: flex; align-items: center; gap: .5rem; }
+      .task-state-move { background: none; border: 0; padding: 0; color: #8b93a1; cursor: pointer;
+        font-size: .75rem; }
+      .task-state-move:hover { color: #e6e6e6; }
+      .task-pins { display: flex; flex-direction: column; gap: .3rem; padding: .3rem 0; }
+      .task-pins-heading { font-size: .72rem; color: #b392f0; }
+      body[data-card-drag] .task-pins { outline: 1px dashed #6f7784; outline-offset: 2px; }
+      .task-told summary { font-size: .72rem; color: #8b93a1; cursor: pointer; }
+      .task-told-line, .canvas-read-line { font-size: .72rem; color: #aaa; padding-left: .6rem;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .add-note-column { align-self: flex-start; background: none; border: 0; padding: 0;
+        font-size: .72rem; color: #8b93a1; cursor: pointer; }
+      .add-note-column:hover { color: #ddd; }
+      /* ⇤ in a column's head folds it; only you see your folds. */
+      .column-head .fold, .note-column-head .fold { background: none; border: 0; padding: 0;
+        color: #6f7784; cursor: pointer; font-size: .9rem; line-height: 1; }
+      .column-head .fold:hover, .note-column-head .fold:hover { color: #e6e6e6; }
       .avatars { display: inline-flex; gap: 2px; flex: 0 0 auto; }
       /* The circle. `.avatar` has no rule: it marks a person shown here, which
          the browser suite counts. */
@@ -696,7 +742,8 @@
          makes a note at its end. */
       .note-column { flex: 0 0 20rem; width: 20rem; min-width: 0; display: flex;
         flex-direction: column; min-height: 0; border-right: 1px solid #23272e; }
-      .note-column-head { display: flex; align-items: center; gap: .5rem; padding: .4rem .75rem;
+      .note-column[data-width="2"] { flex-basis: 40rem; width: 40rem; }
+      .note-column-head { user-select: none; display: flex; align-items: center; gap: .5rem; padding: .4rem .75rem;
         border-top: 4px solid #6f7784; font-size: .8rem; color: #aaa; }
       .note-column-title { flex: 1; text-align: left; background: none; border: 0; padding: 0;
         color: #ddd; font-weight: 600; cursor: text; }
@@ -801,8 +848,8 @@
         font-size: .75rem; color: #d0a15f; cursor: pointer; text-align: left; }
       .trace:hover { text-decoration: underline; }
       /* Where a run read pinned cards: a small marker above its prompt. */
-      .pinned-read { font-size: .72rem; color: #8b93a1; margin: 0 0 .4rem; }
-      .pinned-read summary { cursor: pointer; }
+      .pinned-read, .context-read { font-size: .72rem; color: #8b93a1; margin: 0 0 .4rem; }
+      .pinned-read summary, .context-read summary { cursor: pointer; }
       .pinned-read-card { margin: .3rem 0 0 .75rem; }
       .pinned-read-by { color: #6f7784; }
       .pinned-read-text { white-space: pre-wrap; color: #c3c8d0; }

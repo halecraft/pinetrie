@@ -12,11 +12,13 @@ import {
   type ArchivedTask,
   asPlaceFields,
   CARD_COMMANDS,
+  type CanvasKey,
   type CardCarries,
   type CardCommand,
   type CardId,
   type CardPlace,
   type CardRecord,
+  type CardWidth,
   type CatchUpCommand,
   type EntryId,
   fitsPlace,
@@ -34,6 +36,7 @@ import {
   moveOf,
   movesOfDocId,
   type NoteColumnId,
+  type NotesTarget,
   noteOf,
   type OfferFact,
   type OrderedPlace,
@@ -45,7 +48,9 @@ import {
   placeFields,
   placeOfFields,
   type Reorder,
+  type ReorderAt,
   type ResolvedMove,
+  type ResolvedTarget,
   type RootId,
   sameKey,
   seenAt,
@@ -67,6 +72,8 @@ import {
   type CanvasCard,
   canvasOf,
   NO_TASK_INDEX,
+  rankAfter,
+  rankOfDrop,
   type TaskIndex,
   taskOfPlace,
   taskOfTarget,
@@ -271,21 +278,23 @@ export const notesIn = (
 export const NEW_NOTES_TITLE = "Notes"
 
 /**
- * Where a card leaving `thread`'s queue or pinned strip goes (ADR-0116),
- * from `canvas`, the cards of its task in order: the note column nearest
- * the thread's card, the one after it on a tie; with none, a new one ranked
- * just after the thread's card (`make`, at `order`). `none` when the thread
+ * Where a card leaving a queue or pinned cards goes (ADR-0116), from
+ * `canvas`, the cards of its task in order: the note column nearest the
+ * card of `from`, the thread whose they were, or, with null, the task
+ * column, which stands before every card (a card pinned to the task); the
+ * one after on a tie. With none, a new one goes just after that card
+ * (`make`, after canvas index `after`, -1 for first). `none` when the thread
  * is not on `canvas`. Pure.
  */
 export function nearestNoteColumn(
   canvas: readonly CanvasCard[],
-  thread: ThreadId,
+  from: ThreadId | null,
 ):
   | { readonly kind: "column"; readonly column: NoteColumnId }
-  | { readonly kind: "make"; readonly order: string | null }
+  | { readonly kind: "make"; readonly after: number }
   | { readonly kind: "none" } {
-  const at = canvas.findIndex(c => c.id === thread)
-  if (at < 0) return { kind: "none" }
+  const at = from === null ? -1 : canvas.findIndex(c => c.id === from)
+  if (from !== null && at < 0) return { kind: "none" }
   // Scanning left to right, a tie goes to the later: the one after.
   const nearest = canvas.reduce<{
     readonly column: NoteColumnId
@@ -298,19 +307,13 @@ export function nearestNoteColumn(
       : best
   }, null)
   if (nearest !== null) return { kind: "column", column: nearest.column }
-  return {
-    kind: "make",
-    order: orderBetween(
-      canvas[at]?.place.order ?? null,
-      canvas[at + 1]?.place.order ?? null,
-    ),
-  }
+  return { kind: "make", after: at }
 }
 
 /**
- * Where a thread's nearest notes are (ADR-0116), decided and not yet
- * written: a note column of its task; one to make there, at `order`, the
- * canvas cards `renumbered` to fit it; or, for a thread whose card is in an
+ * Where a card's nearest notes are (ADR-0116), decided and not yet written:
+ * a note column of its task; one to make there, at `order`, the canvas
+ * cards `renumbered` to fit it; or, for a thread whose card is in an
  * inventory, that inventory (ADR-0117).
  */
 export type NotesNear =
@@ -324,62 +327,62 @@ export type NotesNear =
   | { readonly kind: "inventory"; readonly holder: WriterId }
 
 /**
- * Where `thread`'s nearest notes are (`nearestNoteColumn` over its task's
- * canvas); null for a thread with no card. Decides, mints nothing. Pure.
+ * Where the notes nearest `to` are (`nearestNoteColumn` over its task's
+ * canvas): a thread's, or a task's own; null for a thread with no card.
+ * Decides, mints nothing. Pure.
  */
 export function notesNear(
   cards: readonly CardRecord[],
-  thread: ThreadId,
+  to: NotesTarget,
 ): NotesNear | null {
-  const card = cards.find(c => c.id === thread)
-  if (card === undefined) return null
-  if (card.place.kind === "inventory")
+  const from = "thread" in to ? to.thread : null
+  const card = from === null ? undefined : cards.find(c => c.id === from)
+  if (card?.place.kind === "inventory")
     return { kind: "inventory", holder: card.place.holder }
-  if (card.place.kind !== "canvas") return null
-  const { task } = card.place
+  const task =
+    "task" in to
+      ? to.task
+      : card?.place.kind === "canvas"
+        ? card.place.task
+        : null
+  if (task === null) return null
   const canvas = canvasOf(cards, task)
-  const near = nearestNoteColumn(canvas, thread)
+  const near = nearestNoteColumn(canvas, from)
   switch (near.kind) {
     case "none":
       return null
     case "column":
       return { kind: "column", column: near.column }
     case "make": {
-      if (near.order !== null)
-        return { kind: "make", task, order: near.order, renumbered: [] }
-      // No room just after the thread's card: renumber the crowded cards.
-      const spaced = respace(
-        canvas.map(c => c.place.order),
-        canvas.findIndex(c => c.id === thread) + 1,
-      )
-      const renumbered = [...spaced.changed].flatMap(([i, order]) => {
-        const c = canvas[i]
-        const moved =
-          c === undefined ? undefined : placed(c, { ...c.place, order })
-        return moved === undefined ? [] : [moved]
-      })
-      return { kind: "make", task, order: spaced.inserted, renumbered }
+      // With no room there, the crowded cards are given new ranks.
+      const ranked = rankAfter(canvas, near.after)
+      return {
+        kind: "make",
+        task,
+        order: ranked.order,
+        renumbered: ranked.respaced,
+      }
     }
   }
 }
 
 /**
- * A card sent to `thread`'s nearest notes, as a place, and the writes that
- * go first: a note column made for it (its id `newColumn`'s, owned and
- * placed by `by`), and the canvas cards renumbered to fit it. The one step
- * every write to a thread's notes takes: a move's, an unsent card's, a
- * fresh column's followers'. Null for a thread with no card. Pure.
+ * A card sent to the notes nearest `to` (a thread's, or a task's own), as a
+ * place, and the writes that go first: a note column made for it (its id
+ * `newColumn`'s, owned and placed by `by`), and the canvas cards renumbered
+ * to fit it. The one step every write to notes takes: a move's, an unsent
+ * card's, a fresh column's followers'. Null for a thread with no card. Pure.
  */
 export function toNotes(input: {
   readonly cards: readonly CardRecord[]
-  readonly thread: ThreadId
+  readonly to: NotesTarget
   readonly newColumn: () => NoteColumnId
   readonly by: WriterId
 }): {
-  readonly place: TextPlace
+  readonly place: Extract<TextPlace, { kind: "note" | "inventory" }>
   readonly first: readonly PlaceStep[]
 } | null {
-  const near = notesNear(input.cards, input.thread)
+  const near = notesNear(input.cards, input.to)
   if (near === null) return null
   switch (near.kind) {
     case "inventory":
@@ -459,6 +462,25 @@ const isPinned = (
 ): c is CardRecord & {
   readonly place: Extract<CardPlace, { kind: "pinned" }>
 } => c.place.kind === "pinned"
+
+/** A card pinned to a task, with its place narrowed. */
+export type TaskPinnedCard = TextCard & {
+  readonly place: Extract<CardPlace, { kind: "task-pinned" }>
+}
+
+/** The cards pinned to `task` (ADR-0116), in the order they were pinned: by `order`, then id. */
+export const taskPinnedOf = (
+  cards: readonly CardRecord[],
+  task: TaskId,
+): readonly TaskPinnedCard[] =>
+  cards
+    .filter(
+      (c): c is TaskPinnedCard =>
+        c.kind === "text" &&
+        c.place.kind === "task-pinned" &&
+        c.place.task === task,
+    )
+    .sort(byOrder)
 
 /** A lane's queued cards, in the order they are popped: by `order`, then id. */
 export function queuedOn(
@@ -600,7 +622,7 @@ export function planUnsent(input: {
   const { cards, card, reason } = input
   const notes = toNotes({
     cards,
-    thread: card.place.thread,
+    to: { kind: "notes", thread: card.place.thread },
     newColumn: input.newColumn,
     by: card.placer,
   })
@@ -747,27 +769,20 @@ export const discardHistory = (
  * does not read, and an order only has to grow within a thread.
  */
 function placeAt(
-  key: PlaceKey,
+  key: ResolvedTarget,
   cards: readonly CardRecord[],
   sender: WriterId,
   now: CardRecord | undefined,
   discards: Discards,
 ): CardPlace | undefined {
   switch (key.kind) {
-    // At the canvas's end, as wide as it was on a canvas, else one column.
+    // At the rank it was given there (`planMoveTargets`), as wide as it was
+    // on a canvas, else one column.
     case "canvas":
       return {
-        ...key,
-        order: orderAfter(
-          cards.filter(
-            (
-              c,
-            ): c is CardRecord & { place: { kind: "canvas"; order: string } } =>
-              c.place.kind === "canvas" &&
-              c.place.task === key.task &&
-              c.id !== now?.id,
-          ),
-        ),
+        kind: "canvas",
+        task: key.task,
+        order: key.order,
         width: now?.place.kind === "canvas" ? now.place.width : 1,
       }
     case "queued":
@@ -778,6 +793,12 @@ function placeAt(
       }
     case "pinned":
       return { ...key, order: orderAfter(cards.filter(isPinned)) }
+    // After the task's other pinned cards.
+    case "task-pinned":
+      return {
+        ...key,
+        order: orderAfter(taskPinnedOf(cards, key.task)),
+      }
     case "note":
       return noteAt(
         cards.filter(c => c.id !== now?.id),
@@ -915,20 +936,83 @@ export function planMove(
 // ── reorders (ADR-0048 step 7) ─────────────────────────────────────────────
 
 /**
- * The cards a reorder of `card` moves among, without it, in order: its
- * lane's queue, its note column's notes, or every pinned card in the
- * session, since pinned keys are the session's (`placeAt`).
+ * How a reorder works in one kind of place (ADR-0048 step 7, ADR-0116).
+ * `siblings` are the cards a card there moves among, in order, itself
+ * included; `adjacent`, whether its two neighbours must still be next to
+ * each other there; `passesFacts`, whether it may pass a fact.
  */
-const siblingsOf = (
-  cards: readonly CardRecord[],
-  card: CardRecord,
-): readonly CardRecord[] =>
-  (card.place.kind === "queued"
-    ? queuedOn(cards, card.place.thread)
-    : card.place.kind === "note"
-      ? notesIn(cards, card.place.column)
-      : cards.filter(isPinned).sort(byOrder)
-  ).filter(c => c.id !== card.id)
+interface ReorderRule<K extends ReorderAt["kind"]> {
+  readonly siblings: (
+    cards: readonly CardRecord[],
+    at: Extract<ReorderAt, { readonly kind: K }>,
+  ) => readonly CardRecord[]
+  readonly adjacent: boolean
+  readonly passesFacts: boolean
+}
+
+/**
+ * Every place a reorder moves a card among (`REORDER_PLACES`), each with
+ * its rule: a row for each, so a place added to that list does not compile
+ * until its rule is written here.
+ *
+ * - A queue: its lane's queued cards, the two neighbours next to each
+ *   other, and no passing a fact, which says what already happened.
+ * - Pinned cards: every pinned card in the session, since pinned keys are
+ *   the session's (`placeAt`). A thread's pinned cards are found through
+ *   the tree, which this does not read, so other threads' may sit between
+ *   two pinned neighbours: they need not be adjacent here.
+ * - A task's pinned cards (ADR-0116): its own, the neighbours next to each
+ *   other.
+ * - A note column: its notes, the neighbours next to each other.
+ * - A canvas: its task's cards (`canvasOf`), the neighbours next to each
+ *   other.
+ */
+export const REORDERS: { readonly [K in ReorderAt["kind"]]: ReorderRule<K> } = {
+  queued: {
+    siblings: (cards, at) => queuedOn(cards, at.thread),
+    adjacent: true,
+    passesFacts: false,
+  },
+  pinned: {
+    siblings: cards => cards.filter(isPinned).sort(byOrder),
+    adjacent: false,
+    passesFacts: true,
+  },
+  "task-pinned": {
+    siblings: (cards, at) => taskPinnedOf(cards, at.task),
+    adjacent: true,
+    passesFacts: true,
+  },
+  note: {
+    siblings: (cards, at) => notesIn(cards, at.column),
+    adjacent: true,
+    passesFacts: true,
+  },
+  canvas: {
+    siblings: (cards, at) => canvasOf(cards, at.task),
+    adjacent: true,
+    passesFacts: true,
+  },
+}
+
+/** The rule for a reorder at `at` (`REORDERS`). */
+const reorderRule = (
+  at: ReorderAt,
+): {
+  readonly siblings: (
+    cards: readonly CardRecord[],
+    at: ReorderAt,
+  ) => readonly CardRecord[]
+  readonly adjacent: boolean
+  readonly passesFacts: boolean
+} =>
+  // Each row takes its own kind of key, and `at` is that kind's.
+  REORDERS[at.kind] as ReorderRule<ReorderAt["kind"]> & {
+    readonly siblings: (
+      cards: readonly CardRecord[],
+      at: ReorderAt,
+    ) => readonly CardRecord[]
+  }
 
 /** `card` with order `order`, everything else as it is. */
 const withOrder = (card: CardRecord, order: string): CardRecord =>
@@ -937,18 +1021,17 @@ const withOrder = (card: CardRecord, order: string): CardRecord =>
     : card
 
 /**
- * A reorder: a queued or pinned card, or a note, moved among its
- * neighbours, as its sender saw them (ADR-0048, *Physics* 5, ADR-0116). Only its order changes: its
- * placer, its queuer, its text's version and why it was not sent stay, so
- * nobody's trace or history changes with it. Refused:
+ * A reorder: a queued or pinned card, a note, or a card on a canvas, moved
+ * among its neighbours, as its sender saw them (ADR-0048, *Physics* 5,
+ * ADR-0116), by its place's rule (`REORDERS`). Only its order changes: its
+ * placer, its queuer, its text's version, why it was not sent and its width
+ * stay, so nobody's trace or history changes with it. Refused:
  * - `gone`: no card;
- * - `fact`: a fact, or a queued card that would pass one, since a fact says
- *   what already happened;
+ * - `fact`: a fact, or a card that would pass one where its rule forbids it;
  * - `moved`: the card is no longer where its sender saw it;
  * - `order-changed`: it names no neighbour, a neighbour is no longer among
- *   its siblings, or, in a queue or a note column, the two are no longer next
- *   to each other. A thread's pinned cards are found through the tree, which
- *   this does not read, so other threads' may sit between two pinned neighbours.
+ *   its siblings, or, where its rule says so, the two are no longer next to
+ *   each other.
  *
  * With no room between the neighbours, the crowded siblings around it are
  * given new keys in the same step (`respace`). Pure.
@@ -963,7 +1046,8 @@ export function planReorder(
   if (!sameKey(keyOf(now.place), reorder.at))
     return { kind: "refused", code: "moved", now }
   const changed: MoveStep = { kind: "refused", code: "order-changed", now }
-  const siblings = siblingsOf(cards, now)
+  const rule = reorderRule(reorder.at)
+  const siblings = rule.siblings(cards, reorder.at).filter(c => c.id !== now.id)
   const find = (id: CardId | null): number | null | undefined => {
     if (id === null) return null
     const i = siblings.findIndex(c => c.id === id)
@@ -977,11 +1061,11 @@ export function planReorder(
   // `after`.
   const index = before ?? (after === null ? 0 : after + 1)
   if (after !== null && before !== null && after >= before) return changed
-  if (now.place.kind === "queued" || now.place.kind === "note") {
+  if (rule.adjacent) {
     if (siblings[index - 1]?.id !== (reorder.after ?? undefined)) return changed
     if (siblings[index]?.id !== (reorder.before ?? undefined)) return changed
   }
-  if (now.place.kind === "queued") {
+  if (!rule.passesFacts) {
     // The cards it passes, from where it was to where it goes.
     const was = siblings.findIndex(c => byOrder(now, c) < 0)
     const from = was < 0 ? siblings.length : was
@@ -1008,6 +1092,33 @@ export function planReorder(
       }),
     ],
   }
+}
+
+/**
+ * A card's width on its canvas (ADR-0116): one column or two, from where its
+ * sender saw it (`at`), a compare-and-set as a reorder is. Only its width
+ * changes: its rank and its placer stay, so nobody's trace or history of
+ * the card changes with it. Refused `gone` with no card, and `moved` once
+ * it is not on the canvas its sender saw. Null when it has that width
+ * already: nothing to write. Pure.
+ */
+export function planWidth(
+  cards: readonly CardRecord[],
+  change: {
+    readonly card: CardId
+    readonly at: CanvasKey
+    readonly width: CardWidth
+  },
+): MoveStep | null {
+  const now = cards.find(c => c.id === change.card)
+  if (now === undefined) return { kind: "refused", code: "gone", now: null }
+  if (now.place.kind !== "canvas" || !sameKey(keyOf(now.place), change.at))
+    return { kind: "refused", code: "moved", now }
+  if (now.place.width === change.width) return null
+  const record = placed(now, { ...now.place, width: change.width })
+  return record === undefined
+    ? { kind: "refused", code: "no-place", now }
+    : { kind: "write", record }
 }
 
 /**
@@ -1044,7 +1155,7 @@ export function planFreshFollow(input: {
       continue
     const notes = toNotes({
       cards: now,
-      thread,
+      to: { kind: "notes", thread },
       newColumn: input.newColumn,
       by: input.by,
     })
@@ -1061,13 +1172,20 @@ export function planFreshFollow(input: {
 }
 
 /**
- * Moves whose target is a thread's nearest notes (`notes`, `noteOf`),
- * resolved to places before any is planned (ADR-0116, `toNotes`): each
- * against the cards as the ones before it left them, so a column made for
- * the first takes the rest. Refused `no-place`, naming the card, for a
- * thread with no card. Pure.
+ * Moves with a target that is no place yet, resolved to places before any is
+ * planned (ADR-0116), each against the cards as the ones before it left
+ * them, so a column made for the first takes the rest:
+ *
+ * - a thread's nearest notes (`notes`, `noteOf`), through `toNotes`, a note
+ *   column made for it written first; refused `no-place`, naming the card,
+ *   for a thread with no card;
+ * - a spot on a canvas (`canvas-at`), ranked just after its `after` there,
+ *   or at the end when that card is no longer on the canvas (`rankAfter`),
+ *   the cards given new ranks to make room written first.
+ *
+ * Pure.
  */
-export function planNotesTargets(input: {
+export function planMoveTargets(input: {
   readonly cards: readonly CardRecord[]
   readonly moves: readonly Move[]
   readonly sender: WriterId
@@ -1077,7 +1195,7 @@ export function planNotesTargets(input: {
   | {
       readonly kind: "resolved"
       readonly moves: readonly ResolvedMove[]
-      /** What is written before the moves: each column made, and the canvas renumbered for it. */
+      /** What is written before the moves: each column made, and the canvas re-ranked for it. */
       readonly first: readonly PlaceStep[]
     }
   | Extract<MoveStep, { kind: "refused" }> {
@@ -1086,32 +1204,62 @@ export function planNotesTargets(input: {
   let now = input.cards
   for (const move of input.moves) {
     const { to } = move
-    if (to.kind !== "notes") {
-      moves.push({ ...move, to })
-      continue
-    }
-    const notes = toNotes({
-      cards: now,
-      thread: to.thread,
-      newColumn: input.newColumn,
-      by: input.sender,
-    })
-    if (notes === null)
-      return {
-        kind: "refused",
-        code: "no-place",
-        now: now.find(c => c.id === move.card) ?? null,
+    switch (to.kind) {
+      case "notes": {
+        const notes = toNotes({
+          cards: now,
+          to,
+          newColumn: input.newColumn,
+          by: input.sender,
+        })
+        if (notes === null)
+          return {
+            kind: "refused",
+            code: "no-place",
+            now: now.find(c => c.id === move.card) ?? null,
+          }
+        first.push(...notes.first)
+        now = afterSteps(now, notes.first)
+        const { place } = notes
+        moves.push({
+          ...move,
+          to:
+            place.kind === "note"
+              ? { kind: "note", column: place.column }
+              : place,
+        })
+        break
       }
-    first.push(...notes.first)
-    now = afterSteps(now, notes.first)
-    moves.push({ ...move, to: keyOf(notes.place) })
+      // Every card onto a canvas is ranked here: a canvas's key alone, at
+      // its end.
+      case "canvas":
+      case "canvas-at": {
+        const canvas = canvasOf(now, to.task).filter(c => c.id !== move.card)
+        const ranked =
+          to.kind === "canvas-at"
+            ? rankOfDrop(canvas, to.after)
+            : rankAfter(canvas, canvas.length - 1)
+        const steps = ranked.respaced.map(
+          (record): PlaceStep => ({ kind: "write", record }),
+        )
+        first.push(...steps)
+        now = afterSteps(now, steps)
+        moves.push({
+          ...move,
+          to: { kind: "canvas", task: to.task, order: ranked.order },
+        })
+        break
+      }
+      default:
+        moves.push({ ...move, to })
+    }
   }
   return { kind: "resolved", moves, first }
 }
 
 /**
- * Moves as a person sends them: each to a thread's nearest notes resolved
- * first (`planNotesTargets`), its column written before the moves, then
+ * Moves as a person sends them: each target that is no place yet resolved
+ * first (`planMoveTargets`), what that writes written before the moves, then
  * planned whole (`planMoveCommand`). Pure.
  */
 export function planMoveRequest(
@@ -1122,7 +1270,7 @@ export function planMoveRequest(
   discards: Discards,
   newColumn: () => NoteColumnId,
 ): { readonly step: MovesStep; readonly drain: readonly ThreadId[] } {
-  const resolved = planNotesTargets({ cards, moves, sender, newColumn })
+  const resolved = planMoveTargets({ cards, moves, sender, newColumn })
   if (resolved.kind === "refused") return { step: resolved, drain: [] }
   const { step, drain } = planMoveCommand(
     afterSteps(cards, resolved.first),
@@ -1215,7 +1363,7 @@ export function planMoveCommand(
  * discard where its gone place goes (`discardHistory`), which the page does not
  * name (ADR-0066). Of several, the first that names a task names the
  * step's. A place at a thread, or a thread's nearest notes, is in its
- * thread's task (`taskOfPlace`, `taskOfTarget`). Pure.
+ * thread's task, a spot on a canvas in its canvas's (`taskOfTarget`). Pure.
  */
 export function historyOf(
   moves: readonly Move[],
@@ -1223,9 +1371,7 @@ export function historyOf(
   discards: Discards,
 ): TaskId | null {
   const taskOf = (to: CardPlace | MoveTarget) =>
-    to.kind === "notes"
-      ? taskOfTarget(discards.tasks, to)
-      : taskOfPlace(discards.tasks, to)
+    taskOfTarget(discards.tasks, to)
   for (const move of moves) {
     // A note column made is in its task's history, so the undo key takes
     // it back; a card made in a composer or a queue is in none.

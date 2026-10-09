@@ -95,7 +95,6 @@ const input = (over: Partial<Facts> = {}): BoardViewInput => {
         place(5, DONE, 1),
       ].map(p => [p.task, p]),
     ),
-    entries: new Map(),
     summaries: new Map([
       summary(1, [ADA], "1"),
       summary(2, [BEA], "2"),
@@ -120,7 +119,6 @@ const input = (over: Partial<Facts> = {}): BoardViewInput => {
     workflow: f.workflow,
     places: f.places,
     summaries: f.summaries,
-    entries: f.entries,
     search: f.search,
     me: f.me,
     heads: threadCardHeads(f.summaries.keys(), {

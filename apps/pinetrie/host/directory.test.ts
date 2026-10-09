@@ -1,15 +1,22 @@
-import { NOBODY, threadIdFor, writerId } from "@pinetrie/core"
+import {
+  NOBODY,
+  type RootId,
+  rootIdFor,
+  threadIdFor,
+  writerId,
+} from "@pinetrie/core"
 import { createKeeper } from "@pinetrie/keeper"
 import { readRoots } from "@pinetrie/reads"
-import { encodeChat } from "@pinetrie/rules"
+import { encodeChat, setRecord, THREAD } from "@pinetrie/rules"
 import { writeEntry } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import type { HostKey } from "./basics.ts"
-import { startDirectory } from "./directory.ts"
+import { planRebuild, startDirectory } from "./directory.ts"
 import {
   applyWrites,
   basics,
   deferred,
+  putValue,
   ROOT_ID,
   record,
   row,
@@ -147,4 +154,39 @@ test("the roots held when the directory starts are refreshed, and an unchanged r
   start()
   await keeper.idle()
   expect(records.calls.length).toBe(written)
+})
+
+test("planRebuild: a root a thread names, with no record that decodes, and held by no document (ADR-0063)", () => {
+  const [a, b, c] = ["a", "b", "c"].map(rootIdFor) as [RootId, RootId, RootId]
+  expect(
+    planRebuild({
+      named: [c, a, b, a],
+      recorded: new Set([b]),
+      loaded: new Set([c]),
+    }),
+  ).toEqual([a])
+})
+
+test("a starting directory rebuilds a stale record of a root no one holds, opening it once and letting it go", async () => {
+  const b = basics()
+  const archived = rootIdFor("01a0ffd2-0000-7000-8000-0000000000dd")
+  putValue(
+    b,
+    setRecord(THREAD, {
+      thread: threadIdFor("x"),
+      root: archived,
+      by: writerId("ada@x.io"),
+      createdAt: 0,
+      fork: null,
+    }),
+  )
+  const keeper = createKeeper<HostKey>()
+  const records = record<Pick<Records, "writeValues">>({
+    writeValues: async writes => applyWrites(b, writes),
+  })
+  startDirectory({ basics: b, keeper, records: records.port })
+  await new Promise(r => setTimeout(r, 0))
+  await keeper.idle()
+  expect(readRoots(b.session).get(archived)).toMatchObject({ messages: 0 })
+  expect(b.docs.loaded()).not.toContain(archived)
 })

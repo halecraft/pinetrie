@@ -21,6 +21,7 @@ import {
   type EntryId,
   type Position,
   type SendAt,
+  type TaskId,
   type ThreadId,
   type WriterId,
 } from "./index.ts"
@@ -83,6 +84,43 @@ export interface PinnedView {
   }[]
 }
 
+/** The cards pinned to a task a run read (ADR-0116): a task's cards entry, decoded. */
+export interface TaskPinnedView {
+  /** The task they are pinned to. */
+  readonly task: TaskId
+  /** Every card pinned to it at the run's start, in order. */
+  readonly cards: readonly PinnedCardRead[]
+  /** Cards the model had read that are no longer pinned, with their first line. */
+  readonly retired: readonly {
+    readonly id: CardId
+    readonly line: string
+  }[]
+}
+
+/**
+ * The task's cards a run was told of (ADR-0116): a canvas entry's details,
+ * decoded. One line per card in the canvas's order, at most a cap of them,
+ * and how many more there are.
+ */
+export interface CanvasView {
+  readonly task: TaskId
+  /** The task's title, as told. */
+  readonly title: string
+  readonly lines: readonly string[]
+  /** How many cards the list left out past its cap. */
+  readonly more: number
+}
+
+/**
+ * What a run's context carries besides the conversation (ADR-0116): the
+ * newest entry of each kind, which a compaction keeps in view.
+ */
+export interface ContextInView {
+  readonly pinned?: PinnedView
+  readonly taskPinned?: TaskPinnedView
+  readonly canvas?: CanvasView
+}
+
 export interface AgentMessageLike {
   readonly role?: string
   readonly content?: string | readonly MessagePart[]
@@ -113,6 +151,10 @@ export interface AgentMessageLike {
   readonly errorMessage?: string
   /** Role `pinned` only: the cards a run read (ADR-0048). */
   readonly pinned?: PinnedView
+  /** Role `task-pinned` only: the cards pinned to the task a run read (ADR-0116). */
+  readonly taskPinned?: TaskPinnedView
+  /** Role `canvas` only: the task's cards a run was told of (ADR-0116). */
+  readonly canvas?: CanvasView
   /**
    * Roles `update` and `land`, and a `catch_up` tool result: the commits
    * merged into the lane (ADR-0072, ADR-0080).
@@ -131,10 +173,11 @@ export interface EntryLike {
   /** Absent on entries that carry no message, e.g. a compaction. */
   readonly message?: AgentMessageLike
   /**
-   * A compaction only: the pinned cards its retained tail carries, which the
-   * model reads after the summary; absent when it carries none.
+   * A compaction only: the context entries its retained tail carries (the
+   * newest of each kind), which the model reads after the summary; absent
+   * when it carries none.
    */
-  readonly carried?: PinnedView
+  readonly carried?: ContextInView
   /** When it was written, in ms since the epoch: the row's column. */
   readonly timestamp?: number
 }
@@ -480,7 +523,31 @@ export const pinnedInView = (
     index,
     tip,
     e => e.message?.pinned,
-    e => e.carried ?? null,
+    e => e.carried?.pinned ?? null,
+  )
+
+/** The cards pinned to the task the model reads on a run from `tip` (ADR-0116), as `pinnedInView` finds a thread's. */
+export const taskPinnedInView = (
+  index: TreeIndex,
+  tip: EntryId | null,
+): TaskPinnedView | null =>
+  newestOnPath(
+    index,
+    tip,
+    e => e.message?.taskPinned,
+    e => e.carried?.taskPinned ?? null,
+  )
+
+/** The task's cards the model was last told of on a run from `tip` (ADR-0116), as `pinnedInView` finds pinned cards. */
+export const canvasInView = (
+  index: TreeIndex,
+  tip: EntryId | null,
+): CanvasView | null =>
+  newestOnPath(
+    index,
+    tip,
+    e => e.message?.canvas,
+    e => e.carried?.canvas ?? null,
   )
 
 /**

@@ -4,9 +4,7 @@
 
 import type {
   CardRecord,
-  EntryId,
   RootId,
-  RootRecord,
   TaskId,
   ThreadId,
   ThreadRecord,
@@ -14,7 +12,7 @@ import type {
 import { indexTasks, NO_TASK_INDEX, type TaskIndex } from "@pinetrie/rules"
 
 /** One task, as the page reads it. */
-export interface TaskView {
+export interface TaskThreads {
   readonly task: TaskId
   /** Its thread cards, in its canvas's order. */
   readonly threads: readonly ThreadId[]
@@ -25,7 +23,7 @@ export interface TaskView {
 /** Every task, and the index the host decides by too. */
 export interface Tasks {
   readonly index: TaskIndex
-  readonly byId: ReadonlyMap<TaskId, TaskView>
+  readonly byId: ReadonlyMap<TaskId, TaskThreads>
 }
 
 export const NO_TASKS: Tasks = { index: NO_TASK_INDEX, byId: new Map() }
@@ -40,7 +38,7 @@ export function tasksOf(input: {
   readonly threads: ReadonlyMap<ThreadId, ThreadRecord>
 }): Tasks {
   const index = indexTasks(input.cards, input.threads)
-  const byId = new Map<TaskId, TaskView>()
+  const byId = new Map<TaskId, TaskThreads>()
   for (const task of [...input.known].sort())
     byId.set(task, {
       task,
@@ -49,20 +47,3 @@ export function tasksOf(input: {
     })
   return { index, byId }
 }
-
-/**
- * Each task's first root's root entry, for those that have one: where the
- * layout opens a task's first column, and whose rail the page draws.
- */
-export const entriesOf = (
-  tasks: Tasks,
-  directory: ReadonlyMap<RootId, RootRecord>,
-): ReadonlyMap<TaskId, EntryId> =>
-  new Map(
-    [...tasks.byId.values()].flatMap(t => {
-      const root = t.roots[0]
-      const entry =
-        root === undefined ? null : (directory.get(root)?.entry ?? null)
-      return entry === null ? [] : [[t.task, entry] as const]
-    }),
-  )

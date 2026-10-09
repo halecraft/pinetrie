@@ -81,28 +81,33 @@ const queue = {
 } as const
 const pin = { kind: "pin", card: C1 } as const
 const take = { kind: "takeIntoInventory", card: C1 } as const
+const pinTask = { kind: "pinToTask", card: C1 } as const
 
 describe("cardFrame (ADR-0111)", () => {
   test.each<[string, TextPlace, CardTone, readonly unknown[]]>([
     [
-      "your message: the notes, the queue, pinned, your inventory",
+      "your message: the notes, the queue, pinned, the task, your inventory",
       composing,
       "composing",
       [
         { to: "note", act: { kind: "toNote", card: C1 } },
         { to: "queue", act: queue },
         { to: "pinned", act: pin },
+        { to: "task", act: pinTask },
         { to: "inventory", act: take },
       ],
     ],
     [
-      "a note: your inventory alone, its note column being no thread's (ADR-0116)",
+      "a note: the task, your inventory, its note column being no thread's (ADR-0116)",
       note,
       "note",
-      [{ to: "inventory", act: take }],
+      [
+        { to: "task", act: pinTask },
+        { to: "inventory", act: take },
+      ],
     ],
     [
-      "queued: the notes, pinned, your inventory",
+      "queued: the notes, pinned, the task, your inventory",
       queued,
       "queued",
       [
@@ -111,16 +116,27 @@ describe("cardFrame (ADR-0111)", () => {
           act: { kind: "unqueue", card: C1, lane: LANE, by: BEA },
         },
         { to: "pinned", act: pin },
+        { to: "task", act: pinTask },
         { to: "inventory", act: take },
       ],
     ],
     [
-      "pinned: the notes, the queue, your inventory",
+      "pinned: the notes, the queue, the task, your inventory",
       pinned,
       "pinned",
       [
         { to: "note", act: { kind: "unpin", card: C1 } },
         { to: "queue", act: queue },
+        { to: "task", act: pinTask },
+        { to: "inventory", act: take },
+      ],
+    ],
+    [
+      "pinned to the task: the notes, your inventory (ADR-0116)",
+      { kind: "task-pinned", task: TEST_TASK, order: "a" },
+      "pinned",
+      [
+        { to: "note", act: { kind: "unpin", card: C1 } },
         { to: "inventory", act: take },
       ],
     ],
@@ -143,11 +159,12 @@ describe("cardFrame (ADR-0111)", () => {
   test("no queue where the column has none to queue on", () => {
     const facts = { ...FACTS, queueOn: null }
     expect(cardFrame(card(note), "note", facts).moves.map(m => m.to)).toEqual([
+      "task",
       "inventory",
     ])
     expect(
       cardFrame(card(pinned), "pinned", facts).moves.map(m => m.to),
-    ).toEqual(["note", "inventory"])
+    ).toEqual(["note", "task", "inventory"])
   })
 
   test.each<[string, CardTone, "put" | "send" | null]>([

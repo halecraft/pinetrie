@@ -10,6 +10,7 @@ import { cardIdFor } from "@pinetrie/core/fixtures"
 import type { Agent } from "@pinetrie/pi"
 import {
   encodeBehind,
+  encodeCanvas,
   encodeChat,
   encodePinned,
   planStack,
@@ -18,8 +19,22 @@ import { readActiveRun, readStreams } from "@pinetrie/schema"
 import { writeEntry, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
 import type { BaseNews } from "./base-news.ts"
-import { basics, deferred, fakeLane, methods, record, row } from "./fakes.ts"
-import { createRuns, planRunEnd, type ReadPinned, streamInto } from "./runs.ts"
+import {
+  basics,
+  deferred,
+  fakeLane,
+  methods,
+  record,
+  row,
+  TASK_ID,
+} from "./fakes.ts"
+import {
+  createRuns,
+  planRunEnd,
+  type ReadPinned,
+  type ReadTaskContext,
+  streamInto,
+} from "./runs.ts"
 import type { LaneWork } from "./work/index.ts"
 
 const LANE = threadIdFor("0123456789abcdef")
@@ -71,6 +86,7 @@ function setUp(
   splitEnded: LaneWork["splitEnded"] = async () => null,
   readPinned: ReadPinned = async () => null,
   atStart: BaseNews["atStart"] = async () => null,
+  readTaskContext: ReadTaskContext = async () => [],
 ) {
   const b = basics()
   const work = record<Pick<LaneWork, "beforeRun" | "runEnded" | "splitEnded">>({
@@ -86,6 +102,7 @@ function setUp(
     agent: agent.port,
     work: work.port,
     readPinned,
+    readTaskContext,
     baseNews: { atStart, runEnded: () => {} },
     pending: async (l, prompt) => {
       pending.push({ prompt, running: readActiveRun(b.live, l) !== undefined })
@@ -224,7 +241,7 @@ describe("a run's pinned cards (ADR-0048)", () => {
     )
   })
 
-  test("a chat's run is told its base's news first, before its cards entry, which stays the prompt's parent (ADR-0080)", async () => {
+  test("a chat's run is told its base's news first, then its task, before its cards entry, which stays the prompt's parent (ADR-0080, ADR-0116)", async () => {
     const behind = encodeBehind(
       {
         from: { kind: "accepted" },
@@ -236,6 +253,10 @@ describe("a run's pinned cards (ADR-0048)", () => {
       1,
     )
     const asked: string[] = []
+    const canvas = encodeCanvas(
+      { task: TASK_ID, title: "T", lines: ["thread a (this thread)"], more: 0 },
+      1,
+    )
     const { lane, runs, ended } = setUp(
       fakeLane(LANE),
       undefined,
@@ -244,13 +265,14 @@ describe("a run's pinned cards (ADR-0048)", () => {
         asked.push(l)
         return behind
       },
+      async () => [canvas],
     )
     runs.start(LANE, { kind: "prompt", message: chat, pinnedSeen: [] })
     lane.finish({ kind: "ok" })
     await ended
     expect(asked).toEqual([LANE])
     expect(lane.calls.filter(c => c.method === "run").map(c => c.args)).toEqual(
-      [[chat, [behind, pinned]]],
+      [[chat, [behind, canvas, pinned]]],
     )
   })
 
@@ -356,6 +378,7 @@ test("a run's end forgets the lane's base news as the lane stops, before ended",
       splitEnded: async () => null,
     },
     readPinned: async () => null,
+    readTaskContext: async () => [],
     baseNews: {
       atStart: async () => null,
       runEnded: l => order.push(`news ${l}`),

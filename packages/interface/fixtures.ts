@@ -7,6 +7,7 @@ import {
   type EntryId,
   type EntryLike,
   indexTree,
+  noteColumnIdFor,
   rootIdFor,
   rootOf,
   type TaskId,
@@ -61,6 +62,11 @@ export const TEST_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000a")
 export const NEW_ROOT = rootIdFor("01a0ffd2-0000-7000-8000-00000000000b")
 /** A thread a fresh column minted as it opened (ADR-0117), in the shape the host accepts. */
 export const NEW_THREAD = threadIdFor("01a0ffd2-0000-7000-8000-0000000000aa")
+
+/** A note column minted for an intent (ADR-0116), in `parseCardId`'s shape. */
+export const NEW_NOTE_COLUMN = noteColumnIdFor(
+  "01a0ffd2-0000-7000-8000-0000000000cc",
+)
 
 /** The task a new tab's first send starts, in `parseNewTask`'s shape (ADR-0116). */
 export const NEW_TASK = taskIdFor("01a0ffd2-0000-7000-8000-0000000000bb")

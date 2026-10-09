@@ -17,6 +17,7 @@ import {
 import {
   type ButtonWords,
   identityCodec,
+  promptParent,
   queueWords,
   readerHeading,
 } from "@pinetrie/interface"
@@ -31,10 +32,11 @@ import {
   readQueueHolds,
   readReading,
   readRoots,
+  readThreads,
   readTyping,
   readWorkflow,
 } from "@pinetrie/reads"
-import { titleOf } from "@pinetrie/rules"
+import { indexTasks, titleOf } from "@pinetrie/rules"
 import { COPIED } from "@pinetrie/web/copy"
 import { IDENTITY_KEY } from "@pinetrie/web/storage-keys"
 import type { Page } from "@playwright/test"
@@ -92,6 +94,21 @@ async function run(check: Checks["check"]): Promise<void> {
       log: (m: string) => console.log("    [host]", m),
     })
     console.log(`  host              : ${host.httpUrl}\n`)
+    /** The task the thread `root` starts is in: what the sidebar and the board name it by (ADR-0116). */
+    // Read while the host holds the root, and kept: an archived task's
+    // root is let go.
+    const tasksOf = new Map<string, string>()
+    const taskOf = (root: string): string => {
+      const known = tasksOf.get(root)
+      if (known !== undefined) return known
+      try {
+        const task = taskHolding(host, entryId(root))
+        tasksOf.set(root, task)
+        return task
+      } catch {
+        return "no-task"
+      }
+    }
     /**
      * The page's message count, on ▦, reaches the host's directory's: it has
      * every root's record, held or not (ADR-0063, ADR-0122).
@@ -1068,8 +1085,8 @@ async function run(check: Checks["check"]): Promise<void> {
       )
 
       // ── the agent in a thread no column shows: the rail pulses ──────────────
-      await page.click(`${col(1)} .close`)
-      await page.click(`${col(1)} .close`)
+      await page.click(`${col(1)} .fold`)
+      await page.click(`${col(1)} .fold`)
       await page.waitForFunction(
         () => document.querySelectorAll(".column").length === 1,
         undefined,
@@ -1372,7 +1389,8 @@ async function run(check: Checks["check"]): Promise<void> {
       const askedId = entryId(
         (await page.getAttribute(person, "data-entry")) ?? "",
       )
-      const parentId = treeOf(host).parentOf(askedId) ?? ""
+      // Past the context its run wrote above it: a canvas list (ADR-0116).
+      const parentId = promptParent(treeOf(host), askedId) ?? ""
       await page.hover(person)
       await page.click(`${person} > .tools > .edit`)
       const editCol = col(before + 1)
@@ -1399,7 +1417,7 @@ async function run(check: Checks["check"]): Promise<void> {
           (await texts(before)).includes("say exactly: DOWN-TWO"),
         `"${editStart}", its fork dot on the parent: ${forkOnParent}`,
       )
-      await page.click(`${editCol} .close`)
+      await page.click(`${editCol} .fold`)
       await page.waitForFunction(
         () => document.querySelectorAll(".column").length === 2,
         undefined,
@@ -1411,7 +1429,7 @@ async function run(check: Checks["check"]): Promise<void> {
       {
         const listOf = (p: Page) =>
           p.$$eval("#sidebar .open-root", ts =>
-            ts.map(t => t.getAttribute("data-root") ?? ""),
+            ts.map(t => t.getAttribute("data-task") ?? ""),
           )
         const mine = await listOf(page)
         const device = await browser.newPage()
@@ -1424,7 +1442,7 @@ async function run(check: Checks["check"]): Promise<void> {
             .waitForFunction(
               order =>
                 [...document.querySelectorAll("#sidebar .open-root")]
-                  .map(n => n.getAttribute("data-root"))
+                  .map(n => n.getAttribute("data-task"))
                   .join() === order,
               mine.join(),
               { timeout: 15_000 },
@@ -1450,7 +1468,7 @@ async function run(check: Checks["check"]): Promise<void> {
       })
       await page.click(`${col(0)} .close`)
       const agentRoot = treeOf(host).roots.at(-1) ?? ""
-      await page.click(`#sidebar .open-root[data-root="${agentRoot}"]`)
+      await page.click(itemSel(taskOf(agentRoot)))
       await page.waitForFunction(
         () => document.querySelectorAll(".column").length === 2,
         undefined,
@@ -1462,13 +1480,13 @@ async function run(check: Checks["check"]): Promise<void> {
       const selectedRoot = (p: Page) =>
         p
           .$eval('#sidebar [aria-current="true"]', n =>
-            n.getAttribute("data-root"),
+            n.getAttribute("data-task"),
           )
           .catch(() => null)
       const messagesIn = (root: string) =>
         projectRail(treeOf(host), entryId(root)).length
       // 1. Which tree a root's rail draws is `hereRail`'s, proven by its unit test.
-      await page.click(itemSel(firstRoot))
+      await page.click(itemSel(taskOf(firstRoot)))
       await page
         .waitForFunction(
           `(${RAIL_MESSAGES})() === ${messagesIn(firstRoot)}`,
@@ -1488,15 +1506,15 @@ async function run(check: Checks["check"]): Promise<void> {
       check(
         "a root another writer starts is not added to the sidebar, and the page stays where it is",
         thirdRoot !== "" &&
-          (await page.locator(itemSel(thirdRoot)).count()) === 0 &&
-          (await selectedRoot(page)) === firstRoot,
+          (await page.locator(itemSel(taskOf(thirdRoot))).count()) === 0 &&
+          (await selectedRoot(page)) === taskOf(firstRoot),
       )
       // Any root can be moved on the board: another item's ⋯ shows while it is hovered.
       const otherMenu = page.locator(
-        `${itemSel(downRoot)} ~ .open-more .open-menu`,
+        `${itemSel(taskOf(downRoot))} ~ .open-more .open-menu`,
       )
       const hiddenAtRest = !(await otherMenu.isVisible())
-      await page.hover(itemSel(downRoot))
+      await page.hover(itemSel(taskOf(downRoot)))
       const shownOnHover = await otherMenu.isVisible()
       await page.mouse.move(0, 0)
       check(
@@ -1584,7 +1602,7 @@ async function run(check: Checks["check"]): Promise<void> {
       )
 
       // 3. Closing a root is yours: × writes nothing shared, and reopening brings its columns back.
-      await page.click(itemSel(downRoot))
+      await page.click(itemSel(taskOf(downRoot)))
       await page.waitForFunction(
         () => document.querySelectorAll(".column").length >= 2,
         undefined,
@@ -1595,18 +1613,18 @@ async function run(check: Checks["check"]): Promise<void> {
       )
       // × closes the root for you and writes nothing shared (`planIntent`'s unit test).
       // × shows while its item is hovered or focused.
-      await page.hover(itemSel(downRoot))
-      await page.click(`${itemSel(downRoot)} ~ .open-close`)
+      await page.hover(itemSel(taskOf(downRoot)))
+      await page.click(`${itemSel(taskOf(downRoot))} ~ .open-close`)
       await page
         .waitForFunction(
           r =>
-            document.querySelector(`#sidebar .open-root[data-root="${r}"]`) ===
+            document.querySelector(`#sidebar .open-root[data-task="${r}"]`) ===
             null,
-          downRoot,
+          taskOf(downRoot),
           { timeout: 15_000 },
         )
         .catch(() => null)
-      await openFromBoard(page, downRoot)
+      await openFromBoard(page, taskOf(downRoot))
       await page
         .waitForFunction(
           n => document.querySelectorAll(".column").length === n,
@@ -1617,7 +1635,7 @@ async function run(check: Checks["check"]): Promise<void> {
       await page.$$eval(".column", cs =>
         cs.map(c => c.getAttribute("data-key") ?? ""),
       )
-      await page.click(itemSel(firstRoot))
+      await page.click(itemSel(taskOf(firstRoot)))
 
       // 4. Another window, another person: the board shows them on the root
       // they read, never yourself, and takes you to them.
@@ -1639,9 +1657,9 @@ async function run(check: Checks["check"]): Promise<void> {
           () => true,
           () => false,
         )
-        await openFromBoard(tb, thirdRoot)
+        await openFromBoard(tb, taskOf(thirdRoot))
         await openBoard(page)
-        const reader = `#board ${boardSel(thirdRoot)} .reader-trigger`
+        const reader = `#board ${boardSel(taskOf(thirdRoot))} .reader-trigger`
         const avatar = await page
           .waitForSelector(reader, { timeout: 15_000 })
           .then(
@@ -1659,9 +1677,12 @@ async function run(check: Checks["check"]): Promise<void> {
         )
         const toThem = await chooseFromMenu(page, reader, ".here-thread")
         const followed = await page
-          .waitForSelector(`${itemSel(thirdRoot)}[aria-current="true"]`, {
-            timeout: 15_000,
-          })
+          .waitForSelector(
+            `${itemSel(taskOf(thirdRoot))}[aria-current="true"]`,
+            {
+              timeout: 15_000,
+            },
+          )
           .then(
             () => true,
             () => false,
@@ -1671,7 +1692,9 @@ async function run(check: Checks["check"]): Promise<void> {
           toThem && followed && (await shows("a third thread")),
         )
         const onThird = await page
-          .waitForSelector(`${itemSel(thirdRoot)} .avatar`, { timeout: 15_000 })
+          .waitForSelector(`${itemSel(taskOf(thirdRoot))} .avatar`, {
+            timeout: 15_000,
+          })
           .then(
             () => true,
             () => false,
@@ -1680,7 +1703,7 @@ async function run(check: Checks["check"]): Promise<void> {
         // only you close it, by Escape though the row that held focus has
         // gone, and then their avatar leaves the item. The board stays.
         await openBoard(page)
-        const tabby = `#board ${boardSel(thirdRoot)} .reader-trigger`
+        const tabby = `#board ${boardSel(taskOf(thirdRoot))} .reader-trigger`
         const heldOpen = await page
           .click(tabby, { timeout: 15_000 })
           .then(() =>
@@ -1692,7 +1715,7 @@ async function run(check: Checks["check"]): Promise<void> {
             () => true,
             () => false,
           )
-        await openFromBoard(tb, firstRoot)
+        await openFromBoard(tb, taskOf(firstRoot))
         const saysLeft = await page
           .waitForFunction(
             text =>
@@ -1730,12 +1753,12 @@ async function run(check: Checks["check"]): Promise<void> {
           .waitForFunction(
             ([from, to]) =>
               document.querySelector(
-                `#sidebar .open-root[data-root="${from}"] .avatar`,
+                `#sidebar .open-root[data-task="${from}"] .avatar`,
               ) === null &&
               document.querySelector(
-                `#sidebar .open-root[data-root="${to}"] .avatar`,
+                `#sidebar .open-root[data-task="${to}"] .avatar`,
               ) !== null,
-            [thirdRoot, firstRoot] as const,
+            [taskOf(thirdRoot), taskOf(firstRoot)] as const,
             { timeout: 15_000 },
           )
           .then(
@@ -1751,13 +1774,13 @@ async function run(check: Checks["check"]): Promise<void> {
         // board shows it, Escape keeps the old one, and clearing it brings
         // back the first line. The page is on the third root.
         const tabLabel = (p: Page, r: string) =>
-          p.textContent(`${itemSel(r)} .open-label`).catch(() => null)
+          p.textContent(`${itemSel(taskOf(r))} .open-label`).catch(() => null)
         const labelIs = (p: Page, r: string, want: string) =>
           p
             .waitForFunction(
               ([sel, text]) =>
                 document.querySelector(sel)?.textContent === text,
-              [`${itemSel(r)} .open-label`, want] as const,
+              [`${itemSel(taskOf(r))} .open-label`, want] as const,
               { timeout: 15_000 },
             )
             .then(
@@ -1777,8 +1800,8 @@ async function run(check: Checks["check"]): Promise<void> {
         const renamed = await rename(TITLE, "Enter")
         const mine = await labelIs(page, thirdRoot, TITLE)
         const refocused = await page.evaluate(
-          r => document.activeElement?.getAttribute("data-root") === r,
-          thirdRoot,
+          r => document.activeElement?.getAttribute("data-task") === r,
+          taskOf(thirdRoot),
         )
         const theirs = await labelIs(tb, thirdRoot, TITLE)
         check(
@@ -1790,11 +1813,14 @@ async function run(check: Checks["check"]): Promise<void> {
         await tb
           .waitForFunction(
             ([sel, text]) => document.querySelector(sel)?.textContent === text,
-            [`#board ${boardSel(thirdRoot)} .board-label`, TITLE] as const,
+            [
+              `#board ${boardSel(taskOf(thirdRoot))} .board-label`,
+              TITLE,
+            ] as const,
             { timeout: 15_000 },
           )
           .catch(() => null)
-        await tb.click(itemSel(firstRoot))
+        await tb.click(itemSel(taskOf(firstRoot)))
         const thirdTask = taskHolding(host, thirdRoot)
         const setAt = readMarks(host.session).get(thirdTask)?.at
         await rename("not this", "Escape")
@@ -1831,10 +1857,13 @@ async function run(check: Checks["check"]): Promise<void> {
           await openBoard(page)
           await openBoard(tb)
           await page
-            .dragAndDrop(`#board ${boardSel(firstRoot)} .board-open`, column)
+            .dragAndDrop(
+              `#board ${boardSel(taskOf(firstRoot))} .board-open`,
+              column,
+            )
             .catch(() => null)
           const theirs = await tb
-            .waitForSelector(`${column} ${boardSel(firstRoot)}`, {
+            .waitForSelector(`${column} ${boardSel(taskOf(firstRoot))}`, {
               timeout: 15_000,
             })
             .then(
@@ -2113,7 +2142,7 @@ async function run(check: Checks["check"]): Promise<void> {
         await page.keyboard.press("Escape")
         // Seen is kept per device: across a reload, and a mention made meanwhile counts.
         // The reload keeps the root you were on and its columns (ADR-0027).
-        await page.click(itemSel(firstRoot))
+        await page.click(itemSel(taskOf(firstRoot)))
         const keysOf = () =>
           page.$$eval(".column", cs => cs.map(c => c.getAttribute("data-key")))
         const columnsBefore = await keysOf()
@@ -2157,7 +2186,7 @@ async function run(check: Checks["check"]): Promise<void> {
           "a reload keeps the root you were on, and its open columns, in order",
           columnsBefore.length >= 1 &&
             columnsBack &&
-            (await selectedRoot(page)) === firstRoot,
+            (await selectedRoot(page)) === taskOf(firstRoot),
           `${(await keysOf()).length} of ${columnsBefore.length}`,
         )
         // Two tabs of one device share it: mark all seen in one clears the other.
@@ -2195,13 +2224,13 @@ async function run(check: Checks["check"]): Promise<void> {
         // 7. Moved to Done, a root is archived and leaves every list: the
         // window that moved it closes it, and the page someone else is on
         // reads it (ADR-0122).
-        await page.click(itemSel(thirdRoot))
+        await page.click(itemSel(taskOf(thirdRoot)))
         await page.waitForSelector(`${col(0)} .composer .send`, {
           timeout: 15_000,
         })
         // tb opens the third root again, so it has an item there to lose, and
         // moves it to Done from there.
-        await openFromBoard(tb, thirdRoot)
+        await openFromBoard(tb, taskOf(thirdRoot))
         await page.fill(`${col(0)} .composer .input`, "typed, not sent")
         const menuSeen =
           (await seeInMenu(page, OWN_MENU, ".move-to.closes")) !== null
@@ -2234,9 +2263,9 @@ async function run(check: Checks["check"]): Promise<void> {
           .waitForFunction(
             r =>
               document.querySelector(
-                `#sidebar .open-root[data-root="${r}"]`,
+                `#sidebar .open-root[data-task="${r}"]`,
               ) === null,
-            thirdRoot,
+            taskOf(thirdRoot),
             { timeout: 15_000 },
           )
           .then(
@@ -2261,7 +2290,7 @@ async function run(check: Checks["check"]): Promise<void> {
         check(
           "restoring it in place brings back the composer with its text, and adds it to no other window's list",
           (await page.inputValue(input)) === "typed, not sent" &&
-            (await tb.locator(itemSel(thirdRoot)).count()) === 0,
+            (await tb.locator(itemSel(taskOf(thirdRoot))).count()) === 0,
         )
 
         // Moved to Done again, here, it leaves the sidebar; the board brings it back.
@@ -2271,9 +2300,9 @@ async function run(check: Checks["check"]): Promise<void> {
           .waitForFunction(
             r =>
               document.querySelector(
-                `#sidebar .open-root[data-root="${r}"]`,
+                `#sidebar .open-root[data-task="${r}"]`,
               ) === null,
-            thirdRoot,
+            taskOf(thirdRoot),
             { timeout: 15_000 },
           )
           .then(
@@ -2282,10 +2311,10 @@ async function run(check: Checks["check"]): Promise<void> {
           )
         await openBoard(page)
         await page.waitForSelector(
-          `#board .board-archive ${boardSel(thirdRoot)}`,
+          `#board .board-archive ${boardSel(taskOf(thirdRoot))}`,
           { timeout: 15_000 },
         )
-        await openFromBoard(page, thirdRoot)
+        await openFromBoard(page, taskOf(thirdRoot))
         await page.waitForSelector(`${col(0)} .msg`, { timeout: 15_000 })
         await page.hover(`${col(0)} .msg`)
         const openedWrites = await page
@@ -2316,8 +2345,8 @@ async function run(check: Checks["check"]): Promise<void> {
         check(
           "Restore on an archived root you opened keeps it in the sidebar, and not in the other window's",
           restored &&
-            (await page.locator(itemSel(thirdRoot)).count()) === 1 &&
-            (await tb.locator(itemSel(thirdRoot)).count()) === 0,
+            (await page.locator(itemSel(taskOf(thirdRoot))).count()) === 1 &&
+            (await tb.locator(itemSel(taskOf(thirdRoot))).count()) === 0,
         )
         // The other window, on nothing, reports no thread: it leaves nothing
         // behind, once its deletions have reached this page.
@@ -2391,7 +2420,7 @@ async function run(check: Checks["check"]): Promise<void> {
           const longRoot = ids[0] ?? ""
           const forkId = ids.at(-2) ?? ""
           await lp.goto(host.httpUrl, { waitUntil: "domcontentloaded" })
-          await openFromBoard(lp, longRoot)
+          await openFromBoard(lp, taskOf(longRoot))
           await lp.waitForSelector(
             `${col(0)} .msg[data-entry="${ids.at(-1)}"]`,
             {
@@ -2409,7 +2438,7 @@ async function run(check: Checks["check"]): Promise<void> {
           await lp.click(`${fork} .open-branch`)
           await lp.waitForSelector(`${col(1)} .msg`, { timeout: 15_000 })
           await stepAway(lp)
-          await stepBack(lp, longRoot)
+          await stepBack(lp, taskOf(longRoot))
           await lp.waitForSelector(`${col(1)} .msg`, { timeout: 15_000 })
           await twoFrames(lp)
           const returned = await lp.evaluate(
@@ -2480,7 +2509,7 @@ async function run(check: Checks["check"]): Promise<void> {
               kinds.push(r.kind)
               if (r.kind === "appended") at = r.id
             }
-            await stepBack(lp, longRoot)
+            await stepBack(lp, taskOf(longRoot))
             const arrived = await lp
               .waitForSelector(`${col(1)} .msg[data-entry="${at}"]`, {
                 timeout: 15_000,
@@ -2727,7 +2756,7 @@ async function run(check: Checks["check"]): Promise<void> {
               )
             const left = await where()
             await stepAway(lp)
-            await stepBack(lp, longRoot)
+            await stepBack(lp, taskOf(longRoot))
             await lp.waitForSelector(`${col(0)} .msg`, { timeout: 15_000 })
             await twoFrames(lp)
             const back =
@@ -2782,7 +2811,7 @@ async function run(check: Checks["check"]): Promise<void> {
       await page.evaluate(() => ({
         avatars: [...document.querySelectorAll(".avatar")].map(
           a =>
-            `${a.closest("[data-root], .column-head")?.className}:${a.getAttribute("data-writer")}`,
+            `${a.closest("[data-task], .column-head")?.className}:${a.getAttribute("data-writer")}`,
         ),
         rings: [...document.querySelectorAll(".rail-dot[data-here]")].map(d =>
           d.getAttribute("title"),
@@ -2890,14 +2919,23 @@ async function run(check: Checks["check"]): Promise<void> {
         // A's replica has everything the host has, and has drawn it, before the
         // cards below look for the column's last message in A's window.
         await countIsHosts(page)
-        const shownRoot = await page
+        const shownTask = await page
           .$eval('#sidebar [aria-current="true"]', n =>
-            n.getAttribute("data-root"),
+            n.getAttribute("data-task"),
           )
           .catch(() => null)
-        const newest = [...readRoots(host.session).values()].find(
-          r => r.entry === shownRoot,
-        )?.newest
+        // Its first root's newest message (ADR-0116).
+        const threads = readThreads(host.session)
+        const shownRoot = [...threads.values()].find(
+          t =>
+            indexTasks(readPlaces(host.places), threads).taskOfThread.get(
+              t.thread,
+            ) === shownTask,
+        )?.root
+        const newest =
+          shownRoot === undefined
+            ? undefined
+            : readRoots(host.session).get(shownRoot)?.newest
         await page
           .waitForSelector(`.msg[data-entry="${newest}"]`, { timeout: 15_000 })
           .catch(() => null)
@@ -2980,9 +3018,9 @@ async function run(check: Checks["check"]): Promise<void> {
         const here =
           (await page.getAttribute(
             '#sidebar [aria-current="true"]',
-            "data-root",
+            "data-task",
           )) ?? ""
-        await page.click(itemSel(downRoot))
+        await page.click(itemSel(taskOf(downRoot)))
         await page.click(itemSel(here))
         check(
           "what you type is still there after switching tabs",
@@ -2990,7 +3028,7 @@ async function run(check: Checks["check"]): Promise<void> {
           `${await boxValue(page, box)}`,
         )
         // A card in another root, typed before this one's last word.
-        await page.click(itemSel(downRoot))
+        await page.click(itemSel(taskOf(downRoot)))
         await page.click(box)
         await page.keyboard.press("End")
         await page.keyboard.type(" elsewhere")
@@ -3013,7 +3051,7 @@ async function run(check: Checks["check"]): Promise<void> {
         )
         // Cmd+Z in the other root's box undoes its card, though this root's
         // typing is newer (ADR-0052).
-        await page.click(itemSel(downRoot))
+        await page.click(itemSel(taskOf(downRoot)))
         await page.focus(box)
         await page.keyboard.press("ControlOrMeta+z")
         const thereUndone = await page
@@ -3051,7 +3089,7 @@ async function run(check: Checks["check"]): Promise<void> {
           .$eval(`${sentCard} .role`, n => n.textContent ?? "")
           .catch(() => "")
         const emptied = await hasValue(page, box, "")
-        await page.click(itemSel(downRoot))
+        await page.click(itemSel(taskOf(downRoot)))
         await page.click(itemSel(here))
         check(
           "a sent card leaves the box empty, and a tab switch does not bring it back",
@@ -3106,7 +3144,7 @@ async function run(check: Checks["check"]): Promise<void> {
         await page.keyboard.press("End")
         await page.keyboard.type("a fresh thought")
         const freshText = await boxValue(page, freshBox)
-        await page.click(itemSel(downRoot))
+        await page.click(itemSel(taskOf(downRoot)))
         await page.click(itemSel(here))
         const freshKept = await hasValue(page, freshBox, freshText)
         check(
@@ -3161,10 +3199,12 @@ async function run(check: Checks["check"]): Promise<void> {
             )
         await page.click(box)
         await page.keyboard.type("where was I")
-        await page.click(itemSel(downRoot))
+        await page.click(itemSel(taskOf(downRoot)))
         const tabMarked = await pipIn(page, itemSel(here))
         const otherBare =
-          (await page.locator(`${itemSel(downRoot)} .card-pip`).count()) === 0
+          (await page
+            .locator(`${itemSel(taskOf(downRoot))} .card-pip`)
+            .count()) === 0
         await page.click(itemSel(here))
         const markedEnd = await page
           .locator(`${col(0)} .msg[data-entry]`)
@@ -3219,7 +3259,7 @@ async function run(check: Checks["check"]): Promise<void> {
         await chooseFromMenu(page, OWN_MENU, ".move-to.closes")
         await page.waitForFunction(
           r =>
-            document.querySelector(`#sidebar .open-root[data-root="${r}"]`) ===
+            document.querySelector(`#sidebar .open-root[data-task="${r}"]`) ===
             null,
           here,
           { timeout: 15_000 },
@@ -3253,7 +3293,7 @@ async function run(check: Checks["check"]): Promise<void> {
 
       // Your inventory (ADR-0048 step 4), in the DOWN thread's tab: its agent
       // thread and the conversation below it.
-      await page.click(itemSel(downRoot))
+      await page.click(itemSel(taskOf(downRoot)))
       await page.waitForFunction(
         () => document.querySelectorAll(".column").length >= 2,
         undefined,
@@ -3777,7 +3817,7 @@ async function run(check: Checks["check"]): Promise<void> {
           { card: traced, from: keyOf(tracedFrom), to: pinTo },
           { actedAt: { kind: "column", key: "k-api" }, slot: null },
         )
-      await stepBack(page, downRoot)
+      await stepBack(page, taskOf(downRoot))
       const traceRow = `${col(1)} .trace`
       const drawnTrace = await appears(traceRow)
       const traceText = (await page.textContent(traceRow).catch(() => "")) ?? ""
@@ -3917,7 +3957,7 @@ async function run(check: Checks["check"]): Promise<void> {
       // way to the last of the sidebar.
       check(
         "a reload keeps the root you were on",
-        (await selectedRoot(page)) === downRoot,
+        (await selectedRoot(page)) === taskOf(downRoot),
       )
       await moveTaskTo(api, entryId(downRoot), "archive")
       await page.reload({ waitUntil: "domcontentloaded" })
@@ -3926,10 +3966,10 @@ async function run(check: Checks["check"]): Promise<void> {
           r => {
             const on = document
               .querySelector('#sidebar [aria-current="true"]')
-              ?.getAttribute("data-root")
+              ?.getAttribute("data-task")
             return on != null && on !== r
           },
-          downRoot,
+          taskOf(downRoot),
           { timeout: 20_000 },
         )
         .then(

@@ -44,16 +44,15 @@ const R2: Here = { kind: "task", task: K("r2") }
 const R3: Here = { kind: "task", task: K("r3") }
 const reduce = (l: Layout, ...actions: Parameters<typeof layoutReducer>[1][]) =>
   actions.reduce(layoutReducer, l)
-// The sidebar: r1, r2, r3, then a new agent tab "t"; you are on r1.
+// The sidebar: r1, r2, r3, then a new agent tab; you are on r1.
 const layout = resolveLayout(
   reduce(
     initialLayout(),
     {
       kind: "newTab",
-      key: "t",
+      key: NEW_THREAD,
       root: NEW_ROOT,
       task: NEW_TASK,
-      thread: NEW_THREAD,
       asksAgent: true,
     },
     { kind: "show", here: R1 },
@@ -63,7 +62,7 @@ const layout = resolveLayout(
     lanes: [],
     archived: new Set(),
     list: [K("r1"), K("r2"), K("r3")],
-    entries: new Map(["r1", "r2", "r3"].map(r => [K(r), entryId(r)] as const)),
+    canvases: new Map(),
   },
 )
 const none: CardMarks = {
@@ -118,7 +117,6 @@ const input = (over: Partial<Facts> = {}): SidebarViewInput => {
       [K("r2"), DOING],
       [K("r3"), BACKLOG],
     ]),
-    entries: new Map(["r1", "r2", "r3"].map(r => [K(r), entryId(r)] as const)),
     sprites: new Map(),
     shown: [K("r1"), K("r2"), K("r3")],
     ...over,
@@ -127,7 +125,6 @@ const input = (over: Partial<Facts> = {}): SidebarViewInput => {
     layout: f.layout,
     active: f.active,
     heads: threadCardHeads(f.shown, { ...f, pips: f.unsent.tasks }),
-    entries: f.entries,
     summaries: f.summaries,
     marks: f.marks,
     archived: f.archived,
@@ -253,7 +250,7 @@ describe("sidebarView", () => {
     const unsent = {
       ...none,
       tasks: new Set([K("r2")]),
-      newTabs: new Set(["t"]),
+      newTabs: new Set([NEW_THREAD]),
     }
     expect(items({ unsent }).map(t => t.pip)).toEqual([
       false,
@@ -311,7 +308,7 @@ describe("sidebarView", () => {
     expect(t).toMatchObject({
       kind: "new",
       label: "new agent",
-      close: { kind: "close", here: { kind: "new", key: "t" } },
+      close: { kind: "close", here: { kind: "new", key: NEW_THREAD } },
     })
   })
 })
@@ -330,7 +327,7 @@ test("selected is the item you are on, and each item has its own key", () => {
     `task:${K("r1")}`,
     `task:${K("r2")}`,
     `task:${K("r3")}`,
-    "new:t",
+    `new:${NEW_THREAD}`,
   ])
   expect(sidebarView(input({ active: R3 })).selected).toMatchObject({
     task: K("r3"),

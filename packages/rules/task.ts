@@ -13,6 +13,7 @@ import {
   isThreadId,
   type MoveTarget,
   type PlaceKey,
+  placed,
   type RootId,
   type TaskId,
   type TaskRecord,
@@ -28,7 +29,7 @@ import {
 import { Type } from "typebox"
 import { BOARD, placeStarted } from "./board.ts"
 import { decodeAt, taskKey } from "./decode.ts"
-import { orderAfter } from "./order.ts"
+import { orderAfter, orderBetween, respace } from "./order.ts"
 import { type RecordSpec, setRecord } from "./records.ts"
 import { THREAD } from "./thread.ts"
 
@@ -161,8 +162,8 @@ export const rootOfPlace = (
 export const NO_TASK_INDEX: TaskIndex = indexTasks([], new Map())
 
 /**
- * The task a place is in (ADR-0116): a canvas card's, a fresh column's or a
- * gone card's own; a note, its note column's; a card at a thread, its
+ * The task a place is in (ADR-0116): a canvas card's, a fresh column's, a
+ * card pinned to a task's or a gone card's own; a note, its note column's; a card at a thread, its
  * thread's task (a queued card's thread is its lane). Null for an
  * inventory, or a thread or a note column in none. Pure.
  */
@@ -173,6 +174,7 @@ export function taskOfPlace(
   switch (place.kind) {
     case "canvas":
     case "fresh":
+    case "task-pinned":
       return place.task
     // A gone key names no history: the host gives it one (`historyOf`).
     case "gone":
@@ -188,14 +190,25 @@ export function taskOfPlace(
   }
 }
 
-/** The task a move sends a card to: its place's (`taskOfPlace`), or a thread's nearest notes', its thread's. Pure. */
-export const taskOfTarget = (
+/**
+ * The task a move sends a card to: its place's (`taskOfPlace`); a thread's
+ * nearest notes, its thread's; a spot on a canvas, its canvas's. Pure.
+ */
+export function taskOfTarget(
   tasks: TaskIndex,
-  to: MoveTarget,
-): TaskId | null =>
-  to.kind === "notes"
-    ? (tasks.taskOfThread.get(to.thread) ?? null)
-    : taskOfPlace(tasks, to)
+  to: CardPlace | MoveTarget,
+): TaskId | null {
+  switch (to.kind) {
+    case "notes":
+      return "thread" in to
+        ? (tasks.taskOfThread.get(to.thread) ?? null)
+        : to.task
+    case "canvas-at":
+      return to.task
+    default:
+      return taskOfPlace(tasks, to)
+  }
+}
 
 /** The task a card is in now: its place's (`taskOfPlace`); null for none. */
 export const taskOfCard = (
@@ -218,45 +231,132 @@ export const canvasOf = (
     .sort(byRank)
 
 /**
- * A thread's card as it first lands on `task`'s canvas: at its end, one
- * column wide, its starter its owner and placer. Pure.
+ * Where a branch of `parent` lands on `canvas` (ADR-0116): the index of the
+ * card it goes just after, its parent thread's; the last card's when the
+ * parent is not on this canvas or there is none (a new root lands at the
+ * end); -1 on an empty canvas. The host ranks a branch's card by it and the
+ * page draws a fresh column there (`canvasColumns`), so the column does not
+ * move as its first send lands. Pure.
  */
-export function threadCardOf(input: {
+export function branchAfter(
+  canvas: readonly CanvasCard[],
+  parent: ThreadId | null,
+): number {
+  const at = parent === null ? -1 : canvas.findIndex(c => c.id === parent)
+  return at < 0 ? canvas.length - 1 : at
+}
+
+/**
+ * A rank for a card going just after index `after` of `canvas` (-1: before
+ * every card), and the cards given new ranks to make room when its
+ * neighbours have none between them (`respace`), each at its new rank.
+ * Pure.
+ */
+export function rankAfter(
+  canvas: readonly CanvasCard[],
+  after: number,
+): { readonly order: string; readonly respaced: readonly CardRecord[] } {
+  const order =
+    after >= canvas.length - 1
+      ? orderAfter(canvas)
+      : orderBetween(
+          canvas[after]?.place.order ?? null,
+          canvas[after + 1]?.place.order ?? null,
+        )
+  if (order !== null) return { order, respaced: [] }
+  const made = respace(
+    canvas.map(c => c.place.order),
+    after + 1,
+  )
+  return {
+    order: made.inserted,
+    respaced: [...made.changed].flatMap(([i, key]) => {
+      const c = canvas[i]
+      const moved =
+        c === undefined ? undefined : placed(c, { ...c.place, order: key })
+      return moved === undefined ? [] : [moved]
+    }),
+  }
+}
+
+/**
+ * The rank of a drop on `canvas` just after the card `after` (null: before
+ * every card), or at the end when that card is not on it (`CanvasTarget`),
+ * with the cards given new ranks to make room (`rankAfter`). Pure.
+ */
+export function rankOfDrop(
+  canvas: readonly CanvasCard[],
+  after: CardId | null,
+): ReturnType<typeof rankAfter> {
+  const at = canvas.findIndex(c => c.id === after)
+  return rankAfter(
+    canvas,
+    after === null ? -1 : at < 0 ? canvas.length - 1 : at,
+  )
+}
+
+/**
+ * A thread's card as it first lands on `task`'s canvas, one column wide,
+ * its starter its owner and placer: a branch just after the thread it forks
+ * from (`parent`, `branchAfter`), anything else at the canvas's end. With
+ * it, the cards given new ranks to make room (`rankAfter`). Pure.
+ */
+export function planThreadCard(input: {
   readonly thread: ThreadId
   readonly task: TaskId
   readonly by: WriterId
   readonly cards: readonly CardRecord[]
-}): ThreadCard {
+  /** The thread a branch forks from; null for a new root. */
+  readonly parent: ThreadId | null
+}): { readonly card: ThreadCard; readonly respaced: readonly CardRecord[] } {
+  const canvas = canvasOf(input.cards, input.task)
+  const { order, respaced } = rankAfter(
+    canvas,
+    branchAfter(canvas, input.parent),
+  )
   return {
-    kind: "thread",
-    id: input.thread,
-    owner: input.by,
-    place: {
-      kind: "canvas",
-      task: input.task,
-      order: orderAfter(canvasOf(input.cards, input.task)),
-      width: 1,
+    card: {
+      kind: "thread",
+      id: input.thread,
+      owner: input.by,
+      place: { kind: "canvas", task: input.task, order, width: 1 },
+      placer: input.by,
     },
-    placer: input.by,
+    respaced,
   }
 }
+
+/** A thread's card as it first lands on `task`'s canvas: at its end (`planThreadCard`). */
+export const threadCardOf = (input: {
+  readonly thread: ThreadId
+  readonly task: TaskId
+  readonly by: WriterId
+  readonly cards: readonly CardRecord[]
+}): ThreadCard => planThreadCard({ ...input, parent: null }).card
 
 /** What a thread's first message writes besides itself (ADR-0116, ADR-0117). */
 export interface ThreadStart {
   /** Its record; and for a new task, the task's record and its board place. */
   readonly records: readonly ValueWrite[]
-  /** Its card, at the end of its task's canvas. */
-  readonly card: ThreadCard
+  /**
+   * Its card, just after the thread it branches from, else at the end of
+   * its task's canvas (`planThreadCard`), then any card given a new rank to
+   * make room.
+   */
+  readonly cards: readonly [ThreadCard, ...CardRecord[]]
 }
 
 /**
- * A thread's start, planned: its record, its card at the end of `task`'s
- * canvas, and, when `task` is new (a new tab's), the task's record and its
- * place at the end of `state` on the board, or of the first open state.
- * With no workflow yet, a new task gets no board place. Pure.
+ * A thread's start, planned: its record, its card on `task`'s canvas just
+ * after the thread it branches from (`parent`), else at its end, and, when
+ * `task` is new (a new tab's), the task's record and its place at the end
+ * of `state` on the board, or of the first open state. With no workflow
+ * yet, a new task gets no board place. Pure.
  */
 export function planThreadStart(input: {
   readonly thread: ThreadId
+  /** The thread a branch forks from; null for a new root. */
+  readonly parent: ThreadId | null
   readonly root: RootId
   readonly task: TaskId
   readonly by: WriterId
@@ -296,10 +396,14 @@ export function planThreadStart(input: {
         ),
       )
   }
-  return {
-    records,
-    card: threadCardOf({ thread, task, by, cards: input.cards }),
-  }
+  const { card, respaced } = planThreadCard({
+    thread,
+    task,
+    by,
+    cards: input.cards,
+    parent: input.parent,
+  })
+  return { records, cards: [card, ...respaced] }
 }
 
 /**

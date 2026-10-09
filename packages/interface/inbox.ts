@@ -14,14 +14,17 @@ import {
   parseMentions,
   type RootId,
   type RootRecord,
+  type ThreadId,
   type WriterId,
 } from "@pinetrie/core"
 
 /** A message that mentions you. */
 export interface InboxItem {
   readonly id: EntryId
-  /** The root it is in: its directory record names no thread. */
+  /** The root it is in. */
   readonly root: RootId
+  /** The thread it is in, whose task it opens in (ADR-0116). */
+  readonly thread: ThreadId
   readonly by: WriterId
   readonly text: string
 }
@@ -42,14 +45,15 @@ export function mentionsOf(input: {
 }): readonly InboxItem[] {
   const out: InboxItem[] = []
   for (const { root, mentions } of input.roots) {
-    for (const { id, by, text } of mentions) {
+    for (const { id, by, text, thread } of mentions) {
       if (by === input.me) continue
       const { people } = address({
         mentions: parseMentions(text),
         participants: input.participants,
         agentByDefault: false,
       })
-      if (people.includes(input.myName)) out.push({ id, root, by, text })
+      if (people.includes(input.myName))
+        out.push({ id, root, thread, by, text })
     }
   }
   return out.sort((a, b) => (a.id < b.id ? 1 : a.id > b.id ? -1 : 0))

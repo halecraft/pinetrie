@@ -25,10 +25,14 @@ import {
   parseCardId,
   placeFields,
   sameKey,
+  type TracedKind,
+  type TracedPlace,
   type TraceRecord,
+  type TreeIndex,
   type WriterId,
 } from "@pinetrie/core"
 import { Type } from "typebox"
+import { placeEnd } from "./card.ts"
 import { decodeAt, textKey } from "./decode.ts"
 import type { RecordSpec } from "./records.ts"
 
@@ -136,10 +140,12 @@ export const TRACE: RecordSpec<TraceRecord, string, "session"> = {
   }),
   decode: (contents, key) =>
     decodeAt(TraceSchema, contents, textKey(key), (r, id) => {
-      const from = keyOfFields(asPlaceFields(r.from))
+      const key = keyOfFields(asPlaceFields(r.from))
+      // A trace is left only at a traced place (`TRACED`).
+      const from = key === undefined ? null : tracedKey(key)
       const to = keyOrNull(r.to)
       const card = parseCardId(r.card)
-      return from === undefined || to === undefined || card === undefined
+      return from === null || to === undefined || card === undefined
         ? undefined
         : {
             id,
@@ -171,23 +177,67 @@ export type Verb =
   | "moved"
 
 /**
- * Whether a place is one everyone at a thread sees, and anyone may move:
- * not your message, which only you see (ADR-0113).
+ * Where a trace left at each traced place (`TracedKind`) is drawn: the
+ * thread end the card was at, which its column draws it at. A row for each,
+ * so a place traced with no drawer does not compile: a trace no column
+ * draws is never written.
  */
-const isShared = (p: PlaceKey | CardPlace): boolean =>
-  p.kind === "note" || p.kind === "queued" || p.kind === "pinned"
+export const TRACED: {
+  readonly [K in TracedKind]: (
+    from: Extract<TracedPlace, { readonly kind: K }>,
+    index: TreeIndex,
+  ) => EntryId | null
+} = {
+  queued: (from, index) => placeEnd(from, index),
+  pinned: (from, index) => placeEnd(from, index),
+}
+
+/** The places a trace is left at (`TRACED`). */
+export const TRACED_PLACES = Object.keys(TRACED) as readonly TracedKind[]
 
 /**
- * Out of a queue or a pinned strip to a note: an unqueue or an unpin, to
- * the note column nearest its thread (ADR-0116), which leaves no trace.
+ * A place a card moved out of leaves a trace at (`TracedKind`), as its key;
+ * null for one it leaves none at.
+ */
+function tracedKey(p: CardPlace | PlaceKey): TracedPlace | null {
+  switch (p.kind) {
+    case "queued":
+      return { kind: "queued", at: p.at, thread: p.thread, seen: p.seen }
+    case "pinned":
+      return { kind: "pinned", at: p.at, thread: p.thread }
+    default:
+      return null
+  }
+}
+
+/** The thread end a trace left at `from` is drawn at (`TRACED`); null for none. */
+export const traceEnd = (
+  from: TracedPlace,
+  index: TreeIndex,
+): EntryId | null =>
+  from.kind === "queued"
+    ? TRACED.queued(from, index)
+    : TRACED.pinned(from, index)
+
+/**
+ * Out of a queue or a thread's or a task's pinned cards to a note: an
+ * unqueue or an unpin, to the nearest note column (ADR-0116), which leaves
+ * no trace.
  */
 function movedBack(
   from: PlaceKey,
   to: PlaceKey,
 ): "unqueued" | "unpinned" | null {
-  if (to.kind !== "note" || (from.kind !== "queued" && from.kind !== "pinned"))
-    return null
-  return from.kind === "queued" ? "unqueued" : "unpinned"
+  if (to.kind !== "note") return null
+  switch (from.kind) {
+    case "queued":
+      return "unqueued"
+    case "pinned":
+    case "task-pinned":
+      return "unpinned"
+    default:
+      return null
+  }
 }
 
 /** The one rule for what a change is called, from its two places. */
@@ -198,7 +248,7 @@ export function verbOf(from: PlaceKey | null, to: PlaceKey | null): Verb {
   if (back !== null) return back
   if (to.kind === "gone") return to.why.kind === "spun" ? "spun" : "discarded"
   if (to.kind === "queued") return "queued"
-  if (to.kind === "pinned") return "pinned"
+  if (to.kind === "pinned" || to.kind === "task-pinned") return "pinned"
   if (to.kind === "inventory") return "took-into-inventory"
   if (from.kind === "inventory") return "put"
   return "moved"
@@ -356,9 +406,9 @@ export function planProvenance(input: {
     const is = after.get(id)
     if (is === undefined && input.histories.has(id))
       histories.push({ kind: "delete", key: id })
-    // A trace: someone else moved it out of a shared place, unseen.
-    if (by === null || by === was.placer || !isShared(was.place)) continue
-    const from = keyOf(was.place)
+    // A trace: someone else moved it out of a traced place, unseen.
+    const from = tracedKey(was.place)
+    if (by === null || by === was.placer || from === null) continue
     const to = is === undefined ? null : keyOf(is.place)
     if (to !== null && (sameKey(from, to) || movedBack(from, to) !== null))
       continue

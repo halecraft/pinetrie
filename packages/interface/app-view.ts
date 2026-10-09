@@ -40,13 +40,12 @@ export interface ReadOnly {
   readonly action: { readonly title: string; readonly intent: Intent } | null
 }
 
-/** One column of the task you are on, or of a new tab, as the strip draws it. */
+/** One thread column drawn whole, of the task you are on or of a new tab. */
 export interface ColumnSlot {
   readonly key: string
-  readonly position: number
   /**
-   * Whether × shows: not on a task's only column, which the task would
-   * give back at once (`columnsOf`). A new tab's one column closes the tab.
+   * Whether × shows: on a branch not yet sent, which is yours alone, and on
+   * a new tab's one column, which closes the tab. A card's column folds.
    */
   readonly closable: boolean
   readonly track: number
@@ -73,7 +72,7 @@ export type Workspace =
 /** Facts `App` already holds; nothing here is projected again. */
 export interface AppViewInput {
   readonly active: Here | null
-  /** The tab's columns: `columnsOf`, or the new tab's one. */
+  /** The tab's thread columns drawn whole (`openColumns`), or the new tab's one. */
   readonly columns: readonly Column[]
   /** `branchColors(rail, views).track`, memoised by `App`. */
   readonly tracks: readonly number[]
@@ -169,18 +168,17 @@ export function appView(input: AppViewInput): {
 function workspaceOf(input: AppViewInput): Workspace {
   const { active, columns, tracks } = input
   if (active === null) return { kind: "connecting" }
-  const slots = (closable: boolean): readonly ColumnSlot[] =>
+  const slots = (closable: (c: Column) => boolean): readonly ColumnSlot[] =>
     columns.map((c, position) => ({
       key: c.key,
-      position,
-      closable,
+      closable: closable(c),
       track: tracks[position] ?? PENDING_TRACK,
     }))
   switch (active.kind) {
     case "nothing":
       return { kind: "nothing" }
     case "new":
-      return { kind: "new", key: active.key, slots: slots(true) }
+      return { kind: "new", key: active.key, slots: slots(() => true) }
     case "task": {
       const archived = input.archived.get(active.task)
       return {
@@ -190,7 +188,7 @@ function workspaceOf(input: AppViewInput): Workspace {
           archived === undefined
             ? null
             : readOnlyWords(archived, input.workflow, input.nameOf),
-        slots: slots(columns.length > 1),
+        slots: slots(c => c.fresh !== undefined),
       }
     }
   }
@@ -215,15 +213,16 @@ const openOffers = (input: AppViewInput): readonly OpenOffer[] =>
   })
 
 /**
- * The rows the rail draws: the task you are on's root's only (`entry`, its
- * first root's root entry), and none off a task.
+ * The rows the rail draws: one tree for each root a thread of the task you
+ * are on is in (`roots`, their root entries, in canvas order), and none off
+ * a task (ADR-0116).
  */
 export const hereRail = (
   index: TreeIndex,
   active: Here | null,
-  entry: EntryId | null,
+  roots: readonly EntryId[],
 ): readonly RailRow[] =>
-  active?.kind === "task" && entry !== null ? projectRail(index, entry) : []
+  active?.kind === "task" ? roots.flatMap(r => projectRail(index, r)) : []
 
 /**
  * What an archived task's column says and offers (ADR-0122): who moved it to
