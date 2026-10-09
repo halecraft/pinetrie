@@ -210,12 +210,6 @@ are the only code that builds or reads the shape.
   the tree with no stored end and no second source. The host writes the
   thread's record (`THREAD`, `thread.ts`: its root, who started it, when,
   and a copy's fork) just before the message, then names it.
-- **`deriveThreads`** (`thread.ts`) guesses the threads of a tree written
-  before `starts`, for the one-time migration that writes it
-  (`apps/pinetrie/host/migrations/0004-threads.ts`): a lane's tip ends its
-  thread; elsewhere the child on the path to the oldest lane's tip
-  continues, else the oldest child; a thread ending at a lane's tip takes
-  its name.
 - **Each chat stores its send's id** (`sendId`, the command's id), so the
   column that sent it finds it exactly (`TreeIndex.bySend`).
   `detailsFromStored` is the one conversion of stored details.

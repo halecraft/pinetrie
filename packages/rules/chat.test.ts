@@ -478,6 +478,14 @@ test("renderableMessage: a chat renders as role chat with its author", () => {
   })
 })
 
+test("renderableMessage: a thread's first message names the thread it starts (ADR-0117)", () => {
+  const starts = threadIdFor("started")
+  assert.equal(
+    renderableMessage(encodeChat({ ...details, starts }, 1)).starts,
+    starts,
+  )
+})
+
 test("participants: named writers and every writer in the tree, the unnamed by their email", () => {
   const names = new Map([[ALICE, "Alice"]])
   const bo = writerId("bo.b@x.io")

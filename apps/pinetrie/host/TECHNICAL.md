@@ -228,10 +228,9 @@ until the next compaction (S120), and the host compacts at startup. So
   second start finds nothing to do. It writes under the document's current
   schema, so its hash stays. The backup is taken after the reads, before
   the first write. Each is deleted, with its mutations, once Duane's store
-  has run it: `0003-workflow-archive` renames the workflow's `closed`
-  state `archive`; `0004-threads` names each thread in its first message
-  (`starts`, guessed by `deriveThreads`) and writes its `THREAD` record, run
-  when the session has none.
+  has run it. None is registered now: `0003-workflow-archive` (the
+  workflow's `closed` state renamed `archive`) and `0004-threads` (each
+  thread named in its first message, ADR-0117) ran, and were deleted.
 
 ## Startup
 

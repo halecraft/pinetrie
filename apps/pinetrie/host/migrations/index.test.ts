@@ -13,6 +13,7 @@ import {
   migrate,
   planOpen,
   planStoredOpen,
+  type RecordMigration,
   readStored,
 } from "./index.ts"
 
@@ -242,5 +243,55 @@ describe("migrate", () => {
     const { wrote, error } = await run(file)
     expect(wrote).toEqual([])
     expect(error).toContain("stopped a migration before it wrote anything")
+  })
+
+  test("a record migration writes only when it finds its old shape, backed up first; one that finds none writes nothing, and is not backed up for", async () => {
+    const file = await stored(false)
+    /** A one-time rename of `k0` to `renamed`, due while `k0` is stored. */
+    const rename: RecordMigration = {
+      name: "test-rename",
+      run: async ({ exchange, docIds, hydrated }) => {
+        if (!docIds.includes("d")) return null
+        const doc = exchange.get("d", Doc)
+        await hydrated("d")
+        if (!("k0" in doc.values())) return null
+        return async () => {
+          batch(doc, d => {
+            d.values.delete("k0")
+            d.values.set("renamed", 0)
+          })
+        }
+      },
+    }
+    const start = async () => {
+      const opened = openStore(file)
+      const ex = new Exchange({
+        principal: "host",
+        type: "service",
+        transports: [],
+        store: opened.store,
+      })
+      const lines: string[] = []
+      await migrate({
+        plan: { kind: "open", run: [], unknown: [] },
+        records: [rename],
+        storedIds: [...(await readStored(opened.store)).keys()],
+        exchange: ex,
+        backup: opened.backup,
+        log: line => lines.push(line),
+      })
+      const doc = ex.get("d", Doc)
+      await ex.whenHydrated("d")
+      const keys = Object.keys(doc.values()).toSorted()
+      await ex.shutdown()
+      return { lines, keys }
+    }
+    const first = await start()
+    expect(first.lines).toEqual([
+      `[host] store copied to ${file}.before-test-rename`,
+      "[host] test-rename: records migrated",
+    ])
+    expect(first.keys).toEqual(["k1", "k2", "k3", "k4", "renamed"])
+    expect((await start()).lines).toEqual([])
   })
 })
