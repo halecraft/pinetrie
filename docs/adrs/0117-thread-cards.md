@@ -13,6 +13,9 @@
     task.
   - ADR-0048: a card in an inventory is its holder's alone, and links to it
     say who has it.
+- **Amended by:**
+  - ADR-0124: taking a running thread stops it, and the inventory previews a
+    thread read only; a thread moved between tasks keeps running.
 
 **Context.**
 

@@ -1063,9 +1063,11 @@ board's records (ADR-0122); a card's text is its own document (ADR-0048).
   rail that draws a forest, file cards showing a source's file, and media.
   Threads and note columns are built (above).
 - **Threads as cards** (ADR-0117), accepted, not yet built: a thread would have an id and
-  one place, in a task or an inventory; taking it would move its card, not
-  its run; copying it would branch at its end, and a copy's fork row would
-  lead back to its source, or say who has it.
+  one place, in a task or an inventory; copying it would branch at its
+  end, and a copy's fork row would lead back to its source, or say who has
+  it. Taking a running thread would stop it, its holder would see it in
+  their inventory read only, and a send there would be refused; a thread
+  moved between tasks would keep running (ADR-0124).
 - **What is left of cards and the dock** (ADR-0111, ADR-0113): a thread
   card's body on the board drawn from its pinned cards' first lines (today
   its first line, under a title); and who is in a note column now, which
