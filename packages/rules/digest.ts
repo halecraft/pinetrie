@@ -56,7 +56,7 @@ export const DIGEST: RecordSpec<DigestRecord, EntryId, "root"> = {
 export const HEADLINE_WORDS = 14
 /** The most points a digest may have. */
 export const MAX_POINTS = 4
-/** The most words one point may have. */
+/** The most words one point may have: the skill asks for thirty. */
 export const POINT_WORDS = 40
 /** The whole reply that says the reader sees everything worth saying already. */
 export const NOTHING_TO_ADD = "nothing to add"

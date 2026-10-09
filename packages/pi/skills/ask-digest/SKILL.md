@@ -14,12 +14,12 @@ Reply in this shape:
 
 ```
 A headline of 12 words or fewer
-- one point
+- one point, 30 words or fewer
 - another point
 ```
 
 - The headline says what came of the work, or what it is doing now if it is unfinished. No "The agent", and no full stop.
-- Then up to four points, each a line starting with `- `: a change, a finding, a decision, a failure or a risk that the last message does not already give. Leave them out when there are none.
+- Then up to four points, each a line starting with `- ` and 30 words or fewer: a change, a finding, a decision, a failure or a risk that the last message does not already give. Leave them out when there are none.
 - Put file names, commands and errors in backticks.
 - Never restate the ask, narrate step by step, count steps, or name how pine·trie works (lanes, sessions, summaries).
 - Never claim what the messages do not show. If the work is unfinished, say what it is doing now, not that it is done.
