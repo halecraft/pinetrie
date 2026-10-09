@@ -29,9 +29,9 @@ words they were written with.
 
 | word | what it is | in code | retired |
 |---|---|---|---|
-| **card** | Something you pick up and put down: a text card or a thread card (ADR-0111). | | |
-| **text card** | Unsent text, with a place, drawn in one frame coloured by that place. | `CardRecord`, `CardPlace`, `CardFrame`, `cardFrame` | |
-| **thread card** | A thread, as a card: on a task's canvas or in someone's inventory, one place either way (ADR-0117, ADR-0124). | `ThreadCard`, `linkTo`, `ThreadLink`, `threadFace` | a root, as the board and the sidebar draw it; board item |
+| **card** | Something with one place, which the host keeps: a text card, a thread card or a note column (ADR-0111, ADR-0116, ADR-0117). | `CardRecord`, `CardId`, `CardKind`, `PLACES_OF` | |
+| **text card** | Unsent text, with a place, drawn in one frame coloured by that place. | `TextCard`, `TextCardId`, `CardPlace`, `CardFrame`, `cardFrame` | |
+| **thread card** | A thread, as a card: on a task's canvas or in someone's inventory, one place either way (ADR-0117, ADR-0124). | `ThreadCard`, `threadFace` | a root, as the board and the sidebar draw it; board item |
 | **your message** | The text card in your composer at a thread's end, which only you see. | `composing` (stored as `drafting`), `yourCard` | the composer's card, drafting card (yours) |
 | **note** | A text card in a note column, which everyone in the task sees and no agent reads (ADR-0116). | `note`, `noteOf`, `notesIn`, `NoteCardEditor` | drafting card, draft; a note below the line on its thread's notes board |
 | **note column** | A card on a task's canvas holding notes in one order, titled or "Notes" (ADR-0116). | `NoteColumnId`, `NoteColumnCard`, `NOTE_COLUMN`, `nearestNoteColumn`, `NoteColumn` | notes board |
@@ -41,7 +41,7 @@ words they were written with.
 | **the line** | What divides a thread's queued cards, which the agent reads, from your message, which it does not. | | |
 | **the dock** | A column's foot: the queue, the line and your message (ADR-0113). | | |
 | **the sidebar** | The column down the left of the page, of your open tasks. | `Sidebar`, `sidebarView`, `OpenThreads` | your list |
-| **your open threads** | The roots in the sidebar, yours on every device. | `open:<you>` (stored) | your list |
+| **your open tasks** | The tasks in the sidebar, yours on every device. | `open:<you>` (stored), `OpenThreads` | your list, your open threads |
 
 ## Threads
 
@@ -49,7 +49,8 @@ words they were written with.
 |---|---|---|---|
 | **thread** | A line of conversation, from where it forks to its end, with an id of its own, which its first message names and its lane is named by (ADR-0117). Its context is its path to its root. | `ThreadId`, `ThreadRecord`, `threadEnd`, `threadAt`, `ChatAt` | a thread known by its lane, or by its end; `LaneName` |
 | **copy** (a thread) | A new thread branched at a thread's end as its copier saw it, put as its own card; its fork row leads back to the original (ADR-0117). | `copy-thread`, `planCopy`, `ThreadOrigin` | |
-| **take** (a thread) | Move a thread's card into your inventory: its run stops, and only you open it until you put it on a canvas (ADR-0124). | `takenIn`, `runsIn`, `heldIn` | |
+| **take** (a thread) | Move a thread's card into your inventory: its run stops, and only you open it until you put it on a canvas (ADR-0124). A link to it anywhere else says who has it. | `takenIn`, `runsIn`, `heldIn`, `linkTo`, `ThreadLink` | |
+| **root** | A code word, not the interface's: the first message a thread's path leads back to, and the document of every thread that branched from it (`root:<RootId>`), which is also one pi session. Nothing a person reads says "root" (or "tree"): ＋ starts a thread (ADR-0116). | `RootId`, `rootSeed`, `RootRecord` | the root as the board's item, and "root" on screen |
 
 ## The board
 
@@ -73,19 +74,20 @@ words they were written with.
 ## Accepted, not yet built: tasks, the canvas and sources
 
 Words of ADR-0116 to ADR-0119, accepted and not yet built. Nothing in the
-code uses them yet; each becomes current as its part is built.
+code uses them yet, beyond a reserved id (`MediaId`, `FileCardId`); each
+becomes current as its part is built.
 
 | word | what it is | ADR | replaces |
 |---|---|---|---|
-| **root** | A code word, not the interface's: the first message a thread's path leads back to, and the document of every thread that branched from it (`RootId`, `root:<RootId>`), which is also one pi session. Nothing a person reads says "root" (or "tree"): ＋ starts a thread. | ADR-0116 | the root as the board's item, and "root" on screen |
 | **file card** | A card showing one file of a source: as it is on disk for a live or read-only source, as accepted work has it for a branched one. | ADR-0116 | |
 | **media card** | A card showing an image, a video or a piece of art, kept as a blob. | ADR-0116 | |
 | **source** | A folder the host's owner registers, which a thread's lane gets in one of three modes. | ADR-0118 | the host's one project |
 | **branched**, **live**, **read-only** | A source's modes: its own copy in the lane, whose work comes back as an offer; a read-write mount, never branched; a read-only mount. | ADR-0118 | |
 | **runner** | Where a lane runs: the host that holds it, that host's machine, and the model of each run. | ADR-0119 | |
 
-(**thread card**, **copy**, **note** and **note column** are built:
-threads are cards, and notes are in note columns.)
+(**thread card**, **copy**, **root**, **note** and **note column** are
+built: threads are cards, notes are in note columns, and "root" is a code
+word alone.)
 
 ## Words that look alike and are not these
 
@@ -94,13 +96,14 @@ threads are cards, and notes are in note columns.)
   ADR-0048, ADR-0113),
   and Kyneta's command **Line** (`host/control.ts`), one per seat. None of
   them is accepted work.
-- **take**: take a card into your inventory (ADR-0083). Nothing is done to
-  an offer by taking it.
+- **take**: take a card into your inventory (ADR-0083); a thread's run
+  stops as it is taken (ADR-0124). Nothing is done to an offer by taking
+  it.
 - **close**: what × does in the sidebar, for you alone, writing nothing
   shared. Nothing archives by closing.
 - **done**: a run's verdict, a ✓ that fades when it ends with nothing to
   do (ADR-0077), and the archive's default name. A thread can be done
-  while its root is in Doing.
+  while its task is in Doing.
 - **task** and **ask**: a task is a card on the board (ADR-0116); an ask is
   a message to the agent and its run (ADR-0106).
 - **column**: a card opened on a task's canvas, and each workflow state's
