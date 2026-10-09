@@ -47,7 +47,7 @@ export const PREVIEW_LENGTH = 120
  * `PREVIEW_LENGTH` characters. `cut` when the subject goes on past it, which
  * a preview shows with "…".
  */
-export function previewEnd(subject: string): {
+function previewEnd(subject: string): {
   readonly at: number
   readonly cut: boolean
 } {

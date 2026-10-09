@@ -32,11 +32,11 @@ export interface Follow {
  * Keep `scroller` at its end while the reader is there (`follow.ts`).
  * `content` is the element whose height grows; a ResizeObserver watches it and
  * the scroller's viewport, and follows in the frame the layout changed.
- * With `hold`, while `holding`, a shrink is taken up by `floor`, an element
+ * While `hold.holding`, a shrink is taken up by `hold.floor`, an element
  * after `content` inside the scroller.
- * With `seen`, it starts with ↓ new below showing when `seen.unseen` (read
- * at mount only), and tells `seen.leave` whether it was showing, and the
- * tip it was released from: on unmount, and when the page is hidden, since
+ * It starts with ↓ new below showing when `seen.unseen` (read at mount
+ * only), and tells `seen.leave` whether it was showing, and the tip it was
+ * released from: on unmount, and when the page is hidden, since
  * most context switches leave the browser, not the tab (ADR-0106).
  * The first placement keeps it only short of the end: nothing clears it
  * before then, since a scroller's first resize comes after `alignOnOpen`.
@@ -45,11 +45,11 @@ export interface Follow {
 export function useFollow(
   scroller: RefObject<HTMLElement | null>,
   content: RefObject<HTMLElement | null>,
-  hold?: {
+  hold: {
     readonly floor: RefObject<HTMLElement | null>
     readonly holding: boolean
   },
-  seen?: {
+  seen: {
     readonly unseen: boolean
     /** The tip it was released from when it was last unmounted. */
     readonly released: EntryId | null
@@ -59,23 +59,23 @@ export function useFollow(
       readonly following: boolean
     }) => void
   },
-  tip: EntryId | null = null,
+  tip: EntryId | null,
 ): Follow {
   // A ref: it changes every frame while a reply streams. Only `unseen` and
   // `releasedTip` are drawn, so only they are React state.
   const state = useRef<FollowState>({
     ...initialFollow,
-    unseen: seen?.unseen ?? false,
-    releasedTip: seen?.released ?? null,
+    unseen: seen.unseen,
+    releasedTip: seen.released,
   })
   const [unseen, setUnseen] = useState(state.current.unseen)
   const [releasedTip, setReleasedTip] = useState(state.current.releasedTip)
   const tipNow = useRef(tip)
   tipNow.current = tip
-  const leave = seen?.leave
+  const { leave } = seen
   useLayoutEffect(() => {
     const left = () =>
-      leave?.({
+      leave({
         unseen: state.current.unseen,
         released: state.current.releasedTip,
         following: state.current.following,
@@ -92,7 +92,7 @@ export function useFollow(
     }
   }, [leave])
 
-  const floorRef = hold?.floor
+  const floorRef = hold.floor
   const step = useCallback(
     (
       event:
@@ -101,7 +101,7 @@ export function useFollow(
     ) => {
       const el = scroller.current
       if (el === null) return
-      const floor = floorRef?.current ?? null
+      const floor = floorRef.current
       const at = {
         scrollTop: el.scrollTop,
         scrollHeight: el.scrollHeight,
@@ -124,7 +124,7 @@ export function useFollow(
     [scroller, content, floorRef],
   )
 
-  const holding = hold?.holding ?? false
+  const { holding } = hold
   useLayoutEffect(() => {
     if (holding !== state.current.holding)
       step({ kind: "holding", value: holding })
