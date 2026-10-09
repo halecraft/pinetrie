@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "@earendil-works/pi-agent-core": "0.87.1",
+    "@pinetrie/core": "workspace:*",
     "@pinetrie/pi": "workspace:*"
   }
 }

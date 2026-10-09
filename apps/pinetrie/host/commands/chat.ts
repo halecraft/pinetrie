@@ -276,17 +276,18 @@ export async function sendChat(
     state: chat.state,
   })
   if (planned.kind === "catch-up-first")
-    return catchUpFirst(deps, writer, sendId, chat, planned.lane)
-  const starts =
+    return catchUpFirst(deps, writer, sendId, chat, planned.thread)
+  const begun =
     planned.kind === "appendToTree" || planned.kind === "createAndRun"
-      ? planned.starts
+      ? planned
       : null
   // A copy's record and card were written as it was made.
   const start =
-    starts === null || copied !== undefined
+    begun === null || begun.starts === null || copied !== undefined
       ? null
       : planThreadStart({
-          ...starts,
+          ...begun.starts,
+          thread: begun.thread,
           // A branch's card goes just after the thread it forks from.
           parent:
             chat.at.kind === "branch" && chat.at.at !== null
@@ -389,11 +390,12 @@ export async function executeChat(
     case "appendToLane": {
       const appended =
         planned.kind === "appendToTree"
-          ? await deps.scribe.appendToTree(message(planned.details), {
-              root,
-              at: planned.parent,
-            })
-          : await agent.lane(planned.lane).append(message(planned.details))
+          ? await deps.scribe.appendToTree(
+              message(planned.details),
+              { root, at: planned.parent },
+              planned.thread,
+            )
+          : await agent.lane(planned.thread).append(message(planned.details))
       if (appended.kind === "refused") {
         return {
           kind: "refused",
@@ -406,7 +408,7 @@ export async function executeChat(
     case "run":
       return {
         kind: "started",
-        runId: deps.start(planned.lane, {
+        runId: deps.start(planned.thread, {
           kind: "prompt",
           message: message(planned.details),
           pinnedSeen: context.pinned,
@@ -425,7 +427,7 @@ export async function executeChat(
         }
       const created = await agent.createThreadLane(
         { root, at: planned.at },
-        planned.lane,
+        planned.thread,
       )
       if (created.kind === "refused") {
         return {

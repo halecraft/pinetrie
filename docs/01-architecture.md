@@ -318,7 +318,8 @@ The shape of a `RootDoc`: pi's storage and the host's `records`. A
   > confirms a same-key concurrent write **silently discards one entry with no
   > error**.
 
-  Fields: `{id, parentId, fromId?, seq?, timestamp, type, …}`
+  Fields: `{id, parentId, fromId?, seq?, timestamp, type, thread, …}`: `thread`
+  is the thread whose commit wrote it (ADR-0125).
 - **values** — LWW map over `(namespace, key)`: pi's own. Carries
   `pi.branch.tip`, `pi.lane.*`, `pi.op.*`.
 - **records** — the host's records (`pinetrie.*`, ADR-0062, ADR-0095: the

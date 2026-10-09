@@ -21,7 +21,7 @@ import {
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
+import { cardIdFor, FIXTURE_THREAD } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import { archivedIn, planArchive, writesIn } from "./archive.ts"
 import { indexTasks, threadCardOf } from "./task.ts"
@@ -36,6 +36,7 @@ const BEA = writerId("p-bea")
 const entry = (id: string, parentId: string | null): EntryLike => ({
   id: entryId(id),
   parentId: parentId === null ? null : entryId(parentId),
+  thread: FIXTURE_THREAD,
   type: "message",
   message: { role: "user", content: id },
 })
@@ -164,10 +165,7 @@ describe("planArchive (ADR-0116)", () => {
             entry("r1", null),
             entry("a", "r1"),
             entry("b", "a"),
-            {
-              ...entry("c", "a"),
-              message: { role: "user", content: "c", starts: T },
-            },
+            { ...entry("c", "a"), thread: T },
           ].map(e => [e.id, e]),
         ),
       )

@@ -1828,8 +1828,8 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             mode: "branch",
           })
           // The trunk is the first thread, which the task's first column
-          // follows; the branches at its end are threads of their own, the
-          // continuation first, so it keeps the trunk's track.
+          // follows; the branches at its end are threads of their own, each
+          // on a track of its own (ADR-0125), the older, Later, first.
           const trunk =
             start.kind === "appended"
               ? await chain(start.id, "Trunk", 20, false)
@@ -1847,9 +1847,10 @@ async function run(check: Checks["check"], lanes: LaneHosts): Promise<void> {
             { timeout: 15_000 },
           )
           const rows = projectRail(treeOf(toolHost), railRoot)
-          const firstLater = rows.find(
-            r => r.parentId === trunk && r.track === 0,
-          )
+          // Later's first message begins its branch, a dot of its own; its
+          // capsule starts at the message after.
+          const laterHead = rows.find(r => r.parentId === trunk && r.head)
+          const firstLater = rows.find(r => r.parentId === laterHead?.id)
           const target = firstLater?.id ?? "none"
           /** Whether `target` is drawn whole inside its column's view, in `scope`. */
           const inView = (scope = "#strip", id = target) =>

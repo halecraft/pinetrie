@@ -1,0 +1,37 @@
+diff --git a/packages/pi/storage.ts b/packages/pi/storage.ts
+index 7b6032507e..fedcd93881 100644
+--- a/packages/pi/storage.ts
++++ b/packages/pi/storage.ts
+@@ -28,6 +28,8 @@
+   ValueList,
+   Write,
+ } from "@earendil-works/pi-agent-core"
++import { appendFileSync } from "node:fs"
++import { laneOf } from "./lanes.ts"
+ import {
+   prepareStorageCommit,
+   resolveListReadOptions,
+@@ -296,6 +298,23 @@
+   // --- commit -------------------------------------------------------------
+   async commit(writes: Write[], _context: Context): Promise<CommitResult> {
+     this.#assertOpen()
++    // PROBE S143
++    if (process.env.PROBE_LOG !== undefined) {
++      const entries = writes.filter(w => w.kind === "entry")
++      if (entries.length > 0) {
++        const tips = writes.flatMap(w =>
++          w.kind === "value" && (w as { namespace?: string }).namespace === "pi.branch.tip"
++            ? [(w as { key: string }).key]
++            : [],
++        )
++        const kinds = entries.map(w => {
++          const e = (w as unknown as { entry: { type: string; message?: { role?: string; customType?: string } } }).entry
++          return e.message?.customType ?? e.message?.role ?? e.type
++        })
++        const stack = (new Error().stack ?? "").split("\n").slice(2, 9).map(l => l.trim()).join(" | ")
++        appendFileSync(process.env.PROBE_LOG, `${JSON.stringify({ tips, ctxLane: laneOf(_context) ?? null, kinds, stack })}\n`)
++      }
++    }
+     const result = this.#commitQueue.then(() => this.#applyCommit(writes))
+     this.#commitQueue = result.then(
+       () => undefined,

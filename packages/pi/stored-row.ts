@@ -2,6 +2,7 @@
 // rejoined (ADR-0015). Pure.
 
 import type { Entry } from "@earendil-works/pi-agent-core"
+import type { ThreadId } from "@pinetrie/core"
 import type { StoredEntryRow } from "@pinetrie/schema"
 import {
   type BlobOf,
@@ -33,14 +34,15 @@ export type EntryWithoutSeq = DistributiveOmit<Entry, "seq">
 const HOISTED = ["id", "parentId", "type", "timestamp", "fromId"] as const
 
 /**
- * Keys `payload` must never carry: the hoisted columns, plus `seq`.
+ * Keys `payload` must never carry: the hoisted columns, `thread`, which is a
+ * column pi's entry does not have, plus `seq`.
  *
  * `seq` needs naming here even though the write path already strips it. The
  * columns are typed, so an undeclared key cannot reach them. `payload` is
  * `Schema.any()`, so a `seq` that got in there would persist and replicate,
  * which ADR-0013 forbids. A test asserts both halves.
  */
-const NEVER_IN_PAYLOAD: readonly string[] = [...HOISTED, "seq"]
+const NEVER_IN_PAYLOAD: readonly string[] = [...HOISTED, "thread", "seq"]
 
 /**
  * Entry -> the row we persist (ADR-0015).
@@ -53,11 +55,13 @@ const NEVER_IN_PAYLOAD: readonly string[] = [...HOISTED, "seq"]
  * `stored-row.test.ts`.
  *
  * A message's image parts whose blob `refOf` finds are stored as references,
- * without their bytes (ADR-0051).
+ * without their bytes (ADR-0051). `thread` is the thread whose commit wrote
+ * it (`commitThread`, ADR-0125): pi's entry has no such field.
  */
 export function toStoredRow(
   entry: EntryWithoutSeq,
   refOf: RefOf,
+  thread: ThreadId,
 ): StoredEntryRow {
   const payload: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(entry)) {
@@ -75,6 +79,7 @@ export function toStoredRow(
     // Absent and null are different facts: the column records null and
     // `fromStoredRow` restores absence.
     fromId: entry.type === "branch_summary" ? entry.fromId : null,
+    thread,
     payload,
   }
 }

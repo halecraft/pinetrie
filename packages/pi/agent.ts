@@ -34,7 +34,6 @@ import { createAgentHarness } from "./deep.ts"
 import {
   type LaneAccess,
   type LaneHooks,
-  laneOf,
   systemPromptFor,
   type ToolContext,
   toolContextOf,
@@ -44,6 +43,7 @@ import { carryContext, withCarried } from "./pinned.ts"
 import { prefixChange, prefixOf } from "./prefix.ts"
 import { type Scribe, scribeInside } from "./scribe.ts"
 import { STREAM_SOURCES, streamEventOf } from "./stream.ts"
+import { threadOfContext } from "./thread-context.ts"
 import {
   type CreateOutcome,
   type LaneRefusal,
@@ -223,7 +223,7 @@ export async function createAgent(options: CreateAgentOptions): Promise<Agent> {
         tools: [...assembled.registered] as never[],
         activeToolNames: activeTools,
         toolContext: (context: typeof CTX): ToolContext =>
-          toolContextOf(accessFor(laneOf(context)), project),
+          toolContextOf(accessFor(threadOfContext(context)), project),
         systemPrompt,
         toProviderMessages: messages =>
           providerMessages(messages, options.blobs ?? NO_BLOBS),

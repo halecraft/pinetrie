@@ -1,7 +1,15 @@
-import { entryId, indexTree, projectRail, threadAt } from "@pinetrie/core"
+import {
+  entryId,
+  indexTree,
+  projectRail,
+  type ThreadId,
+  threadAt,
+  threadEnd,
+  threadIdFor,
+} from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import { branchColors, PENDING_TRACK, projectColumns } from "./column-paths.ts"
-import { fromParents } from "./fixtures.ts"
+import { entriesOf, entry, fromParents, threadOfEntry } from "./fixtures.ts"
 
 /**
  * A tree from `child: parent` pairs. Ids are uuidv7-like: the digit prefix
@@ -52,9 +60,9 @@ describe("projectColumns", () => {
       ["6-b1", "7-b2"],
     ])
   })
-  test("a column whose parent thread is on no column folds its path above its own first entry; one a column to its left shares does not (ADR-0117)", () => {
+  test("a column whose parent thread is on no column folds its path above its own first message; one a column to its left shares does not (ADR-0117)", () => {
     const [b] = projectColumns(i, [
-      { anchor: entryId("7-b2"), foldAbove: entryId("6-b1") },
+      { anchor: entryId("7-b2"), foldAbove: threadOfEntry("6-b1") },
     ])
     expect([ids(b?.above ?? []), ids(b?.nodes ?? [])]).toEqual([
       ["1-t1", "2-t2"],
@@ -62,7 +70,7 @@ describe("projectColumns", () => {
     ])
     const [, shared] = projectColumns(i, [
       { anchor: entryId("5-a2") },
-      { anchor: entryId("7-b2"), foldAbove: entryId("6-b1") },
+      { anchor: entryId("7-b2"), foldAbove: threadOfEntry("6-b1") },
     ])
     expect([shared?.forkFrom, ids(shared?.above ?? [])]).toEqual(["1-t1", []])
   })
@@ -135,6 +143,43 @@ describe("projectColumns", () => {
       { anchor: null },
     ])
     expect([root?.tipId, root?.forkFrom, root?.nodes]).toEqual([null, null, []])
+  })
+})
+
+describe("a branch whose first entry is a context entry no column draws (ADR-0125)", () => {
+  // Under 2-t2, branch B's first run wrote its canvas entry, then its prompt;
+  // then the trunk's next run wrote its own canvas entry, prompt and reply.
+  const T = threadIdFor("t")
+  const B = threadIdFor("b")
+  const canvas = (id: string, parent: string, thread: ThreadId) =>
+    entry(id, parent, { role: "canvas", content: "<canvas>" }, { thread })
+  const chat = (id: string, parent: string | null, thread: ThreadId) =>
+    entry(id, parent, { role: "chat", content: id, author: "A" }, { thread })
+  const i = indexTree(
+    entriesOf([
+      chat("1-t1", null, T),
+      chat("2-t2", "1-t1", T),
+      canvas("3-cb", "2-t2", B),
+      chat("4-b1", "3-cb", B),
+      canvas("5-ct", "2-t2", T),
+      chat("6-t3", "5-ct", T),
+      chat("7-t4", "6-t3", T),
+    ]),
+  )
+  test("the trunk's column runs to its own end, with only the branch as a closed branch", () => {
+    const end = threadEnd(i, T)
+    expect(end).toBe("7-t4")
+    const [trunk] = projectColumns(i, [{ anchor: end }])
+    expect(ids(trunk?.nodes ?? [])).toEqual(["1-t1", "2-t2", "6-t3", "7-t4"])
+    const at = trunk?.nodes.find(n => n.id === "2-t2")
+    expect(at?.branches).toEqual([{ rootId: "3-cb", messageCount: 1 }])
+  })
+  test("its column, its parent on no column, folds the path above its first message", () => {
+    const [b] = projectColumns(i, [{ anchor: threadEnd(i, B), foldAbove: B }])
+    expect([ids(b?.above ?? []), ids(b?.nodes ?? [])]).toEqual([
+      ["1-t1", "2-t2"],
+      ["4-b1"],
+    ])
   })
 })
 

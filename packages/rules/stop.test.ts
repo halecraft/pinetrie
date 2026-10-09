@@ -12,7 +12,7 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
+import { cardIdFor, FIXTURE_THREAD } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import { renderableMessage } from "./chat.ts"
 import type { QueuedCard } from "./queue.ts"
@@ -22,12 +22,14 @@ describe("planStop", () => {
   const prompt: EntryLike = {
     id: entryId("1-p"),
     parentId: null,
+    thread: FIXTURE_THREAD,
     type: "message",
     message: { role: "user", content: "1-p" },
   }
   const work: EntryLike = {
     id: entryId("2-a"),
     parentId: prompt.id,
+    thread: FIXTURE_THREAD,
     type: "message",
     message: { role: "assistant", content: "working" },
   }
@@ -110,7 +112,13 @@ describe("carrying on (ADR-0082)", () => {
     let parent: EntryId | null = null
     for (const [n, message] of messages.entries()) {
       const id = entryId(`${n + 1}-e`)
-      entries[id] = { id, parentId: parent, type: "message", message }
+      entries[id] = {
+        id,
+        parentId: parent,
+        thread: FIXTURE_THREAD,
+        type: "message",
+        message,
+      }
       parent = id
     }
     const index = indexTree(entries)

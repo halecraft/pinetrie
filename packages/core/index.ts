@@ -153,8 +153,8 @@ export const parseNewThread = (s: string): ThreadId | undefined =>
 /**
  * A thread as the host records it, keyed by its id in the session
  * (`pinetrie.thread`, ADR-0117), written with its first message. Its first
- * entry and its end are the tree's: its first message names it
- * (`ChatDetails.starts`).
+ * entry and its end are the tree's: every entry names its thread
+ * (`EntryLike.thread`, ADR-0125).
  */
 export interface ThreadRecord {
   readonly thread: ThreadId

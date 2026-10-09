@@ -6,9 +6,11 @@
 // boundary ADR-0003 holds.
 
 import {
+  atEntry,
   commitId,
   ERR,
   NOBODY,
+  type Position,
   ROOT,
   type RootId,
   rootIdFor,
@@ -33,6 +35,7 @@ import {
   type RootDocHandle,
   readEntries,
   readLaneNames,
+  readLaneTip,
   readNamespace,
   rowMessage,
   rowRetainedTail,
@@ -402,5 +405,51 @@ describe("pinned cards: what the model reads (ADR-0048, S92)", () => {
     const summary = seen.findIndex(t => t.includes("summary"))
     expect(summary).toBeGreaterThanOrEqual(0)
     expect(seen.indexOf(pinned.content)).toBeGreaterThan(summary)
+  })
+
+  test("a branch's run, its context entry first, writes in the branch, and the trunk carrying on from the same fork writes in the trunk (ADR-0125)", async () => {
+    const doc = newRootDoc()
+    const { agent } = await startPi(oneRoot(doc), {
+      model: { kind: "scripted", script: scriptedModel() },
+    })
+    const made = async (at: Position, thread: ThreadId) => {
+      const lane = await agent.createThreadLane({ root: ONE_ROOT, at }, thread)
+      if (lane.kind !== "created") throw new Error("no lane")
+      return lane.lane
+    }
+    const trunk = await made(ROOT, threadIdFor(newId()))
+    await agent.lane(trunk).run(asked("first"), [])
+    const fork = readLaneTip(doc, trunk)
+    if (fork === null) throw new Error("no fork")
+    const branch = await made(atEntry(fork), threadIdFor(newId()))
+    await agent.lane(branch).run(asked("aside"), [cardsOf(branch, "a card")])
+    await agent.lane(trunk).run(asked("carry on"), [cardsOf(trunk, "a card")])
+    await agent.close()
+    const all = readEntries(doc)
+    // Each lane's entries, from its tip up to the fork: its own run's alone.
+    const since = (thread: ThreadId) => {
+      const out: string[] = []
+      for (
+        let id = readLaneTip(doc, thread) as string | null;
+        id !== null && id !== fork;
+        id = all[id]?.parentId ?? null
+      )
+        out.push(id)
+      return out
+    }
+    for (const thread of [branch, trunk]) {
+      const ids = since(thread)
+      // The run's cards entry, its prompt, and the reply at least.
+      expect(ids.length).toBeGreaterThanOrEqual(3)
+      expect(ids.map(id => all[id]?.thread)).toEqual(
+        ids.map(() => (trunk === thread ? trunk : branch)),
+      )
+    }
+    // The cards entry under the fork that is older is the branch's.
+    const underFork = Object.values(all)
+      .filter(r => r.parentId === fork)
+      .sort((a, b) => (a.id < b.id ? -1 : 1))
+    expect(underFork.map(r => r.thread)).toEqual([branch, trunk])
+    expect(all[fork]?.thread).toBe(trunk)
   })
 })

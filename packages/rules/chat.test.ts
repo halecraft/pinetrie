@@ -236,7 +236,7 @@ describe("planChat: plain messages never conflict", () => {
   test("an idle lane: appended through it", () => {
     expect(plan({ mentions: TO_BO, lane: lane() })).toMatchObject({
       kind: "appendToLane",
-      lane: LANE,
+      thread: LANE,
     })
   })
   test("a running lane, or one with cards queued: busy, and nothing is written", () => {
@@ -277,25 +277,28 @@ describe("planChat: a compelled message", () => {
   })
   test("a new lane is named by its thread's id: the thread a send continues, or the one a branch starts (ADR-0117)", () => {
     const laneOf = (d: ReturnType<typeof plan>) =>
-      d.kind === "createAndRun" ? d.lane : d.kind
+      d.kind === "createAndRun" ? d.thread : d.kind
     expect(laneOf(plan({ mentions: ASK }))).toBe(LANE)
     expect(laneOf(plan({ mode: "branch", mentions: ASK }))).toBe(NEW)
   })
-  test("a branch's first message names the thread it starts; no other message does", () => {
-    const starts = (d: ReturnType<typeof plan>) =>
-      "details" in d ? d.details.starts : d.kind
-    expect(starts(plan({ mode: "branch" }))).toBe(NEW)
-    expect(starts(plan({ mode: "branch", mentions: ASK }))).toBe(NEW)
-    expect(starts(plan({}))).toBeUndefined()
-    expect(starts(plan({ mentions: ASK }))).toBeUndefined()
-    expect(starts(plan({ lane: lane() }))).toBeUndefined()
+  test("every decision that writes names its thread once: the one a send continues, or the one a branch starts (ADR-0125)", () => {
+    const threadOf = (d: ReturnType<typeof plan>) =>
+      "thread" in d ? d.thread : d.kind
+    expect(threadOf(plan({ mode: "branch" }))).toBe(NEW)
+    expect(threadOf(plan({ mode: "branch", mentions: ASK }))).toBe(NEW)
+    expect(threadOf(plan({}))).toBe(LANE)
+    expect(threadOf(plan({ mentions: ASK }))).toBe(LANE)
+    expect(threadOf(plan({ lane: lane() }))).toBe(LANE)
+    expect(threadOf(plan({ mentions: ASK, lane: lane() }))).toBe(LANE)
+    expect(
+      "starts" in (plan({ mode: "branch" }) as { details: object }).details,
+    ).toBe(false)
   })
-  test("a branch's decision carries the thread it starts, its task and its board state, in one value; no other does (ADR-0116)", () => {
+  test("a branch's decision carries its card's task and board state, in one value; no other does (ADR-0116)", () => {
     const startsOf = (d: ReturnType<typeof plan>) =>
       d.kind === "appendToTree" || d.kind === "createAndRun" ? d.starts : d.kind
     const state = "s-doing" as WorkflowStateId
     const want = {
-      thread: NEW,
       task: taskIdFor("01a0ffd2-0000-7000-8000-00000000000c"),
       state,
     }
@@ -314,7 +317,7 @@ describe("planChat: a compelled message", () => {
   test("an idle lane: runs on it", () => {
     expect(plan({ mentions: ASK, lane: lane() })).toMatchObject({
       kind: "run",
-      lane: LANE,
+      thread: LANE,
     })
   })
   test("a reply that another writer raced is a conflict, naming them", () => {
@@ -498,14 +501,6 @@ test("renderableMessage: a chat renders as role chat with its author", () => {
   })
 })
 
-test("renderableMessage: a thread's first message names the thread it starts (ADR-0117)", () => {
-  const starts = threadIdFor("started")
-  assert.equal(
-    renderableMessage(encodeChat({ ...details, starts }, 1)).starts,
-    starts,
-  )
-})
-
 test("participants: named writers and every writer in the tree, the unnamed by their email", () => {
   const names = new Map([[ALICE, "Alice"]])
   const bo = writerId("bo.b@x.io")
@@ -669,7 +664,7 @@ describe("planChat: a lane with no work of its own catches up first (ADR-0080)",
   test("a run on a lane whose news is catch-up catches it up first, once per send", () => {
     expect(plan({ ...ask, news: "catch-up" })).toEqual({
       kind: "catch-up-first",
-      lane: LANE,
+      thread: LANE,
     })
     expect(kind(plan({ ...ask, news: "catch-up", caughtUp: true }))).toBe("run")
     expect(kind(plan({ ...ask, news: "tell" }))).toBe("run")

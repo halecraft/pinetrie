@@ -100,7 +100,8 @@ pure modules, each with its own test:
 | `stored-values.ts` | `encodeValue` / `decodeValue` by namespace: checkpoints, pending entries, the rest as they are |
 | `dirty.ts` | `dirtyFrom`, and `Scope`: what a replay leaves to re-index |
 | `arrivals.ts` | `ArrivalLine`, `ArrivalIndex`, `planArrivals`: the local `seq` |
-| `commit.ts` | `planCommit`: a commit's writes as document operations and arrivals |
+| `commit.ts` | `planCommit`: a commit's writes as document operations and arrivals; `commitThread`: the thread its entries are in |
+| `thread-context.ts` | `threadContext`, `threadOfContext`: the thread a pi call is made in, carried in its `Context` |
 | `queries.ts` | pi's read rules over rows: branch walk, stop-at, cursor, key order |
 
 ### The split and the rejoin (ADR-0015)
@@ -109,14 +110,14 @@ pi hands us an `Entry`. The document stores a typed row. Two pure functions in
 `stored-row.ts` do the conversion:
 
 ```
-toStoredRow(entry, refOf)          Entry minus seq  ->  StoredEntryRow
+toStoredRow(entry, refOf, thread)  Entry minus seq  ->  StoredEntryRow
 fromStoredRow(row, seq, blobOf)    StoredEntryRow   ->  Entry
 ```
 
-Four rules hold them together:
+Five rules hold them together:
 
 1. **`payload` carries variant data and only that.** `NEVER_IN_PAYLOAD` lists
-   the hoisted columns plus `seq`. Duplicating a column into `payload` would
+   the hoisted columns, `thread`, plus `seq`. Duplicating a column into `payload` would
    give `parentId` two homes with nothing keeping them equal — `planArrivals`
    orders arrivals from the column while a renderer might read the blob. A
    round-trip test **cannot** see this, because rejoining from either copy
@@ -141,6 +142,23 @@ Four rules hold them together:
    conformance runs. A blob gone from the store rejoins as "[image <sha256>
    is no longer stored]". There is no cache: pi rejoins each entry on a
    branch about twice a model request, at 0.65 ms for a 2 MB image (S93).
+5. **Every entry is in the thread its commit names** (ADR-0125). pi's
+   `Entry` has no thread, so the row's comes from the commit:
+   `commitThread` takes the one its `Context` names (`threadOfContext`).
+   Every call through a lane's handle carries `threadContext(name, …)`,
+   and pi keeps a call's context in every commit of its run (S143); the
+   scribe passes the same for a thread with no lane. A commit that writes
+   entries and names no thread throws, and so does one that names a thread
+   and moves another lane's tip, since a lane is named by its thread.
+   `fromStoredRow` ignores the column.
+
+**Gotcha: pi's conformance suite commits entries in no thread.** Its
+commits carry its own context, and one moves a tip named `main` with an
+entry. So `KynetaStorageOptions.fallbackThread` gives a thread to an entry
+whose commit names none, and only `apps/conformance/run-conformance.ts`
+sets it; a fallback is no claim about lanes, so it is not checked against
+tips. The host's storage, the scribe's, gives none. Tests that commit
+directly pass `threadContext` as their context.
 
 These tests are co-located here on purpose: `toStoredRow` takes pi's
 `Entry`, so a test under `test/` would import a pi type across the boundary
@@ -186,7 +204,8 @@ Four facts from pi's source and the probes shape it:
 
 A thread where the agent has not been asked has no lane. `Scribe.appendToTree` inserts
 its messages with `session.mutate` + `insertEntry`, parented at exactly the
-entry the plan chose; the entry is a full member of the tree (navigable, and a
+entry the plan chose, under `threadContext` of the thread the plan names
+(ADR-0125); the entry is a full member of the tree (navigable, and a
 lane can later be created at it, whose agent reads it). The host's serial
 executor makes the plan's parent still right when it is written. S21 Q2 showed
 the alternative a second host would need: read the thread's end inside
@@ -389,7 +408,7 @@ its result recorded as aborted, and the lane takes its next message (S22).
 One harness serves every lane, but pi resolves the tools' context from the
 run's `Context` alone: `toolContext` is a function of it
 (`harness/runtime/drive/tools.js`). So every call that drives a lane carries
-its name in the `Context` (`laneContext`): `run`, `resume`, `append` and
+its name in the `Context` (`threadContext`): `run`, `resume`, `append` and
 `abort`. Everything else comes from the host's `access(lane)`, one source for
 where a lane works. pi's hooks see the lane's name directly. Measured in S36
 item 18, and in `lanes.test.ts` against the harness.

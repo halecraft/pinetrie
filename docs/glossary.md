@@ -47,7 +47,7 @@ words they were written with.
 
 | word | what it is | in code | retired |
 |---|---|---|---|
-| **thread** | A line of conversation, from where it forks to its end, with an id of its own, which its first message names and its lane is named by (ADR-0117). Its context is its path to its root. | `ThreadId`, `ThreadRecord`, `threadEnd`, `threadAt`, `ChatAt` | a thread known by its lane, or by its end; `LaneName` |
+| **thread** | A line of conversation, from where it forks to its end, with an id of its own, which each of its entries names (ADR-0125) and its lane is named by (ADR-0117). Its context is its path to its root. | `ThreadId`, `ThreadRecord`, `threadEnd`, `threadAt`, `ChatAt` | a thread known by its lane, or by its end; `LaneName` |
 | **copy** (a thread) | A new thread branched at a thread's end as its copier saw it, put as its own card; its fork row leads back to the original (ADR-0117). | `copy-thread`, `planCopy`, `ThreadOrigin` | |
 | **take** (a thread) | Move a thread's card into your inventory: its run stops, and only you open it until you put it on a canvas (ADR-0124). A link to it anywhere else says who has it. | `takenIn`, `runsIn`, `heldIn`, `linkTo`, `ThreadLink` | |
 | **root** | A code word, not the interface's: the first message a thread's path leads back to, and the document of every thread that branched from it (`root:<RootId>`), which is also one pi session. Nothing a person reads says "root" (or "tree"): ＋ starts a thread (ADR-0116). | `RootId`, `rootSeed`, `RootRecord` | the root as the board's item, and "root" on screen |

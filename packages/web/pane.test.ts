@@ -9,6 +9,7 @@ import {
   type SpineNode,
   threadIdFor,
 } from "@pinetrie/core"
+import { FIXTURE_THREAD } from "@pinetrie/core/fixtures"
 import type { ReviewTarget } from "@pinetrie/interface"
 import { entry, indexOf } from "@pinetrie/interface/fixtures"
 import { describe, expect, test } from "vitest"
@@ -41,6 +42,7 @@ const target: ReviewTarget = {
 }
 const node = (id: string, text: string): SpineNode => ({
   id: entryId(id),
+  thread: FIXTURE_THREAD,
   role: "chat",
   text,
   branches: [],

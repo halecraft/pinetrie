@@ -215,4 +215,12 @@ export const mutations: readonly Mutation[] = [
     command: ["pnpm", "exec", "vitest", "run", "packages/reads"],
     expect: "a mention names the thread it is in",
   },
+  {
+    name: "a row whose thread is no thread's id is read into the tree",
+    file: "packages/reads/index.ts",
+    from: "  if (!isThreadId(thread)) return null\n",
+    to: "",
+    command: ["pnpm", "exec", "vitest", "run", "packages/reads"],
+    expect: "a row whose thread is no thread's id is left out",
+  },
 ]

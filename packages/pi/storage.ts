@@ -35,7 +35,12 @@ import {
   value,
 } from "@earendil-works/pi-agent-core"
 import { batch, createDoc, subscribe } from "@kyneta/schema"
-import { type BlobStore, type ImageRef, tailEdit } from "@pinetrie/core"
+import {
+  type BlobStore,
+  type ImageRef,
+  type ThreadId,
+  tailEdit,
+} from "@pinetrie/core"
 import {
   applyTextEdits,
   physicalKey,
@@ -74,6 +79,7 @@ import {
 import type { BlobOf, RefOf } from "./stored-images.ts"
 import { fromStoredRow } from "./stored-row.ts"
 import { decodeValue, type StoredListElement } from "./stored-values.ts"
+import { threadOfContext } from "./thread-context.ts"
 
 let tokenCounter = 0
 const makeToken = (peer: string): string =>
@@ -129,6 +135,12 @@ export interface KynetaStorageOptions {
    * part is stored inline, as pi wrote it.
    */
   readonly blobs?: Pick<BlobStore, "get" | "ref">
+  /**
+   * The thread of an entry whose commit's context names none (ADR-0125).
+   * Only pi's storage conformance suite gives one: its commits are made
+   * outside any thread. Without it, such a commit throws (`commitThread`).
+   */
+  readonly fallbackThread?: ThreadId
 }
 
 /**
@@ -139,6 +151,7 @@ export interface KynetaStorageOptions {
 export class KynetaStorage implements Storage {
   readonly #doc: RootDocHandle
   readonly #blobs: Pick<BlobStore, "get" | "ref"> | undefined
+  readonly #fallbackThread: ThreadId | undefined
   readonly #now: () => number
   readonly #peer: string
   readonly #index = new ArrivalIndex()
@@ -154,6 +167,7 @@ export class KynetaStorage implements Storage {
     this.#peer = options.peerId ?? "p"
     this.#doc = options.doc ?? createDoc(RootDoc)
     this.#blobs = options.blobs
+    this.#fallbackThread = options.fallbackThread
 
     // Only state no writer on this replica made (`replay: true`: a merge, a
     // reset) needs reconciling. Local commits index themselves.
@@ -294,9 +308,12 @@ export class KynetaStorage implements Storage {
   }
 
   // --- commit -------------------------------------------------------------
-  async commit(writes: Write[], _context: Context): Promise<CommitResult> {
+  async commit(writes: Write[], context: Context): Promise<CommitResult> {
     this.#assertOpen()
-    const result = this.#commitQueue.then(() => this.#applyCommit(writes))
+    const named = threadOfContext(context)
+    const result = this.#commitQueue.then(() =>
+      this.#applyCommit(writes, named),
+    )
     this.#commitQueue = result.then(
       () => undefined,
       () => undefined,
@@ -304,7 +321,7 @@ export class KynetaStorage implements Storage {
     return result
   }
 
-  #applyCommit(writes: Write[]): CommitResult {
+  #applyCommit(writes: Write[], named: ThreadId | undefined): CommitResult {
     this.#reconcile() // never allocate a seq below an already-observed one
     const firstSeq = this.#index.lastSeq + 1
     const prepared = prepareStorageCommit(writes, firstSeq, this.#now())
@@ -316,6 +333,8 @@ export class KynetaStorage implements Storage {
     const plan = planCommit(prepared.writes, {
       refOf: this.#refOf(prepared.writes),
       token: () => makeToken(this.#peer),
+      named,
+      fallback: this.#fallbackThread,
     })
     batch(this.#doc, d => {
       for (const op of plan.ops) writeOp(d, op)

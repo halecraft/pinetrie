@@ -29,6 +29,7 @@ const row = (id: string, parentId: string | null): StoredEntryRow => ({
   type: "message",
   timestamp: 0,
   fromId: null,
+  thread: threadIdFor("row"),
   payload: { message: { role: "user", content: id } },
 })
 
@@ -48,6 +49,16 @@ test("readTreeIndex keeps the index, and each unchanged entry, until entries cha
   expect(after.entries[e1]).toBe(before.entries[e1])
   expect(after.entries[e2]).toBe(before.entries[e2])
   expect(after.childrenOf.get(entryId("e2"))).toEqual(["e3"])
+})
+
+test("each entry is in the thread its row names; a row whose thread is no thread's id is left out (ADR-0125)", () => {
+  const doc = newRootDoc()
+  writeEntry(doc, row("e1", null))
+  writeEntry(doc, { ...row("e2", "e1"), thread: "" })
+  const index = readTreeIndex(doc)
+  expect(index.entries[entryId("e1")]?.thread).toBe(threadIdFor("row"))
+  expect(index.entries[entryId("e2")]).toBeUndefined()
+  expect(index.endOf.get(threadIdFor("row"))).toBe("e1")
 })
 
 test("a compaction carries the newest cards entry of its retained tail; one with none carries nothing", () => {
@@ -70,6 +81,7 @@ test("a compaction carries the newest cards entry of its retained tail; one with
     type: "compaction",
     timestamp: 0,
     fromId: null,
+    thread: threadIdFor("row"),
     payload: { summary: "s", tokensBefore: 1, retainedTail, fromHook: true },
   })
   writeEntry(doc, row("e1", null))

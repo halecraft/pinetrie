@@ -8,6 +8,7 @@ import {
   blobUrl,
   type EntryId,
   firstLine,
+  firstMessageOf,
   type LaneView,
   messageText,
   projectSpine,
@@ -49,7 +50,9 @@ export function threadFace(input: {
   readonly stops: ReadonlyMap<EntryId, StopRecord>
 }): ThreadFace {
   const { thread, index } = input
-  const firstId = index.firstOf.get(thread)
+  // Its first message, not its first entry, which is often a context entry
+  // its branch's first run wrote above its prompt (ADR-0125).
+  const firstId = firstMessageOf(index, thread)
   const end = threadEnd(index, thread)
   const lane = input.lanes.find(l => l.name === thread)
   const prompt = end === null ? null : promptOf(index, end)

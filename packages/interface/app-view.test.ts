@@ -1,6 +1,7 @@
 import {
   type ArchivedTask,
   entryId,
+  indexTree,
   type LaneView,
   type OfferRecord,
   rootIdFor,
@@ -11,7 +12,7 @@ import {
   workflowStateIdFor,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor } from "@pinetrie/core/fixtures"
+import { cardIdFor, entriesOf, entry } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   type AppViewInput,
@@ -239,6 +240,47 @@ test("a task's rail is a forest: a tree for each root of its threads, in order, 
       seed: 0,
     }),
   ).toEqual(NO_RAIL)
+})
+
+test("a rail stub for a branch whose first run wrote a context entry above its prompt opens at its first message (ADR-0125)", () => {
+  const T = threadIdFor("t")
+  const B = threadIdFor("b")
+  const index = indexTree(
+    entriesOf([
+      entry("1-r", null, { role: "chat", content: "1-r" }, { thread: T }),
+      entry(
+        "2-cb",
+        "1-r",
+        { role: "canvas", content: "<canvas>" },
+        { thread: B },
+      ),
+      entry("3-b", "2-cb", { role: "chat", content: "3-b" }, { thread: B }),
+    ]),
+  )
+  const R = rootIdFor("01a0ffd2-0000-7000-8000-0000000000a1")
+  const elsewhere = taskIdFor("01a0ffd2-0000-7000-8000-0000000000ee")
+  const rail = taskRail({
+    index,
+    active: { kind: "task", task: K },
+    roots: [{ root: R, entry: entryId("1-r") }],
+    ends: new Map([[T, entryId("1-r")]]),
+    linkOf: thread =>
+      linkTo(
+        thread,
+        [
+          {
+            kind: "thread",
+            id: B,
+            owner: ADA,
+            placer: ADA,
+            place: { kind: "canvas", task: elsewhere, order: "1", width: 1 },
+          },
+        ],
+        ADA,
+      ),
+    seed: rootSeed(R),
+  })
+  expect(rail.stubs).toMatchObject([{ from: "1-r", at: "3-b", thread: B }])
 })
 
 test("threadWork and taskWork: each busy held lane's work, and each lane running anywhere, by thread; a task's is the most of its threads' (ADR-0091, ADR-0116)", () => {

@@ -4,6 +4,7 @@ import {
   indexTree,
   type LaneView,
   type TaskId,
+  type ThreadId,
   type TreeIndex,
   taskIdFor,
   threadIdFor,
@@ -151,12 +152,16 @@ const written = (sends: Record<string, string> = { "7-r3": "s" }) => {
       ),
     ).entries,
     ...entriesOf([
-      entry("7-r3", null, {
-        role: "chat",
-        content: "7-r3",
-        starts: NEW_THREAD,
-        ...(sends["7-r3"] === undefined ? {} : { sendId: sends["7-r3"] }),
-      }),
+      entry(
+        "7-r3",
+        null,
+        {
+          role: "chat",
+          content: "7-r3",
+          ...(sends["7-r3"] === undefined ? {} : { sendId: sends["7-r3"] }),
+        },
+        { thread: NEW_THREAD },
+      ),
     ]),
   })
   return { index: i, canvases: tasksIn(i).canvases }
@@ -580,6 +585,39 @@ test("unlisted: the tasks not in the sidebar, and not archived (ADR-0077, ADR-01
 
 describe("planOpen", () => {
   const l = at(initialLayout())
+  test("a thread that carried on past a branch's older context entry shows its own continuation (ADR-0125)", () => {
+    // Under 3-b, branch X's first run wrote its canvas entry, then its
+    // prompt; then the trunk's next run wrote its own canvas entry and
+    // prompt. Neither canvas entry is a message a column draws.
+    const X = threadIdFor("x")
+    const canvas = (id: string, parent: string, thread: ThreadId) =>
+      entry(id, parent, { role: "canvas", content: "<canvas>" }, { thread })
+    const chat = (id: string, parent: string, thread: ThreadId) =>
+      entry(id, parent, { role: "chat", content: id }, { thread })
+    const grown = indexTree({
+      ...index.entries,
+      ...entriesOf([
+        canvas("7-cx", "3-b", X),
+        chat("8-x", "7-cx", X),
+        canvas("9-cq", "3-b", TRUNK),
+        chat("9-n", "9-cq", TRUNK),
+      ]),
+    })
+    const tasks = tasksIn(grown)
+    expect(planOpen(l, grown, entryId("9-n"), tasks, [], new Map())).toEqual({
+      kind: "scroll",
+      task: TK("1-r1"),
+      key: TRUNK,
+    })
+    const [trunk] = taskColumns(l, TK("1-r1"), {
+      canvases: tasks.canvases,
+      forks: tasks.forkOf,
+      holders: new Map(),
+      index: grown,
+      lanes: [],
+    })
+    expect(trunk?.kind === "thread" && trunk.column.anchor).toBe("9-n")
+  })
   test("scrolls to a message an unfolded column already shows", () => {
     // The task's first column follows its thread, through 2-a to 3-b.
     expect(planOpen(l, index, entryId("2-a"), TASKS, [], new Map())).toEqual({

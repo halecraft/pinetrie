@@ -1,5 +1,6 @@
 import type { ToolCall, TranscriptMessage } from "@pinetrie/core"
 import { entryId } from "@pinetrie/core"
+import { FIXTURE_THREAD } from "@pinetrie/core/fixtures"
 import { expect, test } from "vitest"
 import { copyText } from "./copy-text.ts"
 
@@ -8,6 +9,7 @@ const reply = (
   toolCalls: readonly ToolCall[] = [],
 ): TranscriptMessage => ({
   id: entryId("5-m"),
+  thread: FIXTURE_THREAD,
   role: "assistant",
   text,
   toolCalls,

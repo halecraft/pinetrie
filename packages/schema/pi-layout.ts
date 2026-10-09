@@ -14,12 +14,14 @@ import {
 import type { RootDocHandle } from "./storage.ts"
 
 /**
- * One entry as a root's document holds it (ADR-0015): five typed columns, the
+ * One entry as a root's document holds it (ADR-0015): six typed columns, the
  * fields pine·trie reads, and pi's own fields sealed in `payload`, which never
  * repeats a column (`toStoredRow`, `packages/pi/stored-row.ts`). `type` is any
- * string, so a new pi entry type needs no schema change. `.json()` stores the
- * row as one leaf, since an entry is written once and never edited (ADR-0004,
- * ADR-0009). `TECHNICAL.md`, "The entry row", has the reasons.
+ * string, so a new pi entry type needs no schema change. `thread` is the
+ * thread whose commit wrote the entry (ADR-0125), never empty once written.
+ * `.json()` stores the row as one leaf, since an entry is written once and
+ * never edited (ADR-0004, ADR-0009). `TECHNICAL.md`, "The entry row", has the
+ * reasons.
  */
 export const StoredEntryRowSchema = Schema.struct.json({
   id: Schema.string(),
@@ -27,6 +29,7 @@ export const StoredEntryRowSchema = Schema.struct.json({
   type: Schema.string(),
   timestamp: Schema.number(),
   fromId: Schema.string().nullable(),
+  thread: Schema.string(),
   payload: Schema.any(),
 })
 

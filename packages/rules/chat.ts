@@ -47,7 +47,7 @@ import {
 import { type Static, Type } from "typebox"
 import { type BaseNews, behindLine, decodeBehind } from "./behind.ts"
 import { canvasFactLine, decodeCanvas, decodeCanvasFact } from "./canvas.ts"
-import { decodeWith, ThreadIdSchema } from "./decode.ts"
+import { decodeWith } from "./decode.ts"
 import { decodeFact, factLine } from "./fact.ts"
 import { decodeLand, type LandMessage, landLine } from "./land.ts"
 import { decodePinned } from "./pinned.ts"
@@ -94,8 +94,6 @@ const DetailsSchema = Type.Object({
   ),
   /** The images its text shows, by reference (ADR-0042). */
   images: Type.Optional(Type.Array(ImageRefSchema)),
-  /** The thread it starts, on a thread's first message alone (ADR-0117). */
-  starts: Type.Optional(ThreadIdSchema),
 })
 
 const ChatSchema = Type.Object({
@@ -124,12 +122,6 @@ export interface ChatDetails {
    * their bytes after `content`. Absent when it shows none.
    */
   readonly images?: readonly ImageRef[]
-  /**
-   * The thread whose first message this is (ADR-0117); absent on every other.
-   * Written in the same commit as the entry, so the tree alone says where
-   * each thread starts (`threadEnd`).
-   */
-  readonly starts?: ThreadId
 }
 
 /** The pi `CustomMessage` a chat is stored as. */
@@ -251,7 +243,6 @@ export const detailsFromStored = (
     : {
         images: d.images.map(i => ({ ...i, sha256: i.sha256 as Sha256 })),
       }),
-  ...(d.starts === undefined ? {} : { starts: d.starts }),
 })
 
 /** A stored message -> its chat details, or undefined if it is not a chat. */
@@ -352,7 +343,6 @@ export function renderableMessage(message: unknown): AgentMessageLike {
           : { contributors: chat.contributors }),
         ...(chat.command === undefined ? {} : { command: chat.command.name }),
         ...(chat.images === undefined ? {} : { images: chat.images }),
-        ...(chat.starts === undefined ? {} : { starts: chat.starts }),
       }
 }
 
@@ -377,11 +367,11 @@ export const settleRun = (
 ): "done" | "keep" => (ran.kind === "refused" ? "keep" : "done")
 
 /**
- * A thread a send starts (ADR-0116, ADR-0117): the task its card goes on,
- * and the board state a new task lands in, null for the first open one.
+ * What a send that starts a thread needs for its card (ADR-0116, ADR-0117):
+ * the task its card goes on, and the board state a new task lands in, null
+ * for the first open one. The thread is the decision's own.
  */
 export interface ThreadStarts {
-  readonly thread: ThreadId
   readonly task: TaskId
   readonly state: WorkflowStateId | null
 }
@@ -389,10 +379,11 @@ export interface ThreadStarts {
 export type ChatDecision =
   /**
    * No lane at this thread: append with no lane, parented at exactly
-   * `parent`; first, on a branch, the thread it `starts`.
+   * `parent`, in `thread`; first, on a branch, what its card `starts`.
    */
   | {
       readonly kind: "appendToTree"
+      readonly thread: ThreadId
       readonly parent: Position
       readonly details: ChatDetails
       readonly starts: ThreadStarts | null
@@ -400,37 +391,37 @@ export type ChatDecision =
   /** The thread's lane is idle: append through it. */
   | {
       readonly kind: "appendToLane"
-      readonly lane: ThreadId
+      readonly thread: ThreadId
       readonly details: ChatDetails
     }
   /** The thread's lane is idle and the agent is compelled: run. */
   | {
       readonly kind: "run"
-      readonly lane: ThreadId
+      readonly thread: ThreadId
       readonly details: ChatDetails
     }
   /**
    * The agent is compelled here for the first time: create the thread's lane
-   * at `at`, named by the thread's id, then run; first, on a branch, the
-   * thread it `starts`.
+   * at `at`, named by the thread's id, then run; first, on a branch, what
+   * its card `starts`.
    */
   | {
       readonly kind: "createAndRun"
       readonly at: Position
-      readonly lane: ThreadId
+      readonly thread: ThreadId
       readonly details: ChatDetails
       readonly starts: ThreadStarts | null
     }
-  /**
-   * The lane runs, or has cards queued: nothing is written, and the sender's
-   * client queues its card behind them (ADR-0048).
-   */
   /**
    * The thread's lane is idle and the agent is compelled, but its work
    * changes no file and its base has new work (ADR-0080): catch it up, then
    * plan the chat again.
    */
-  | { readonly kind: "catch-up-first"; readonly lane: ThreadId }
+  | { readonly kind: "catch-up-first"; readonly thread: ThreadId }
+  /**
+   * The lane runs, or has cards queued: nothing is written, and the sender's
+   * client queues its card behind them (ADR-0048).
+   */
   | { readonly kind: "busy" }
   /** Another writer wrote at the slot first. Nothing is written; the sender chooses. */
   | { readonly kind: "conflict"; readonly by: WriterId | null }
@@ -483,7 +474,9 @@ export function addressChat(input: {
  * - Who it is for is `addressChat`, which the composer runs too.
  * - A `branch` starts its thread at its fork and never continues a lane:
  *   plain, it is appended there with no lane; compelled, it creates the
- *   thread's lane there. Its message names the thread it starts (`starts`).
+ *   thread's lane there. What its card needs comes with it (`starts`).
+ * - Every decision that writes names the thread it writes in (`thread`):
+ *   each entry is that thread's (ADR-0125).
  * - A thread lane that is running, or has cards queued, is busy: a message
  *   is not written, and its card is queued behind them, since a lane is never
  *   written while it runs (S21).
@@ -579,26 +572,32 @@ export function planChat(input: {
       : { contributors: input.contributors }),
     ...(command === null ? {} : { command }),
     ...(input.images.length === 0 ? {} : { images: input.images }),
-    ...(branch ? { starts: at.thread } : {}),
   }
   const compelled = compels.kind === "agent"
 
   if (branch) {
-    const starts = { thread: at.thread, task: at.task, state: input.state }
+    const starts = { task: at.task, state: input.state }
+    const thread = at.thread
     return compelled
-      ? { kind: "createAndRun", at: end, lane: at.thread, details, starts }
-      : { kind: "appendToTree", parent: end, details, starts }
+      ? { kind: "createAndRun", at: end, thread, details, starts }
+      : { kind: "appendToTree", thread, parent: end, details, starts }
   }
 
   if (lane.kind === "none") {
     if (!compelled)
-      return { kind: "appendToTree", parent: end, details, starts: null }
+      return {
+        kind: "appendToTree",
+        thread: at.thread,
+        parent: end,
+        details,
+        starts: null,
+      }
     if (mode === "reply" && race !== null)
       return { kind: "conflict", by: race.by }
     return {
       kind: "createAndRun",
       at: end,
-      lane: at.thread,
+      thread: at.thread,
       details,
       starts: null,
     }
@@ -609,13 +608,13 @@ export function planChat(input: {
   if (!compelled) {
     return busy
       ? { kind: "busy" }
-      : { kind: "appendToLane", lane: name, details }
+      : { kind: "appendToLane", thread: name, details }
   }
   if (mode === "reply" && (race !== null || busy)) {
     return { kind: "conflict", by: race?.by ?? lane.askedBy }
   }
   if (busy) return { kind: "busy" }
   return input.news === "catch-up" && !input.caughtUp
-    ? { kind: "catch-up-first", lane: name }
-    : { kind: "run", lane: name, details }
+    ? { kind: "catch-up-first", thread: name }
+    : { kind: "run", thread: name, details }
 }

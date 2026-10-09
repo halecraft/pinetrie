@@ -13,12 +13,19 @@ import {
   StorageBackedSession,
 } from "@earendil-works/pi-agent-core"
 import { insertEntry } from "@earendil-works/pi-agent-core/harness/session"
-import { type BlobStore, entryId, type RootId, type Spot } from "@pinetrie/core"
+import {
+  type BlobStore,
+  entryId,
+  type RootId,
+  type Spot,
+  type ThreadId,
+} from "@pinetrie/core"
 import type { ChatMessage } from "@pinetrie/rules"
 import type { RootDocHandle } from "@pinetrie/schema"
 import type { AgentDocuments, Stack } from "./agent.ts"
 import { sealed } from "./inside.ts"
 import { KynetaStorage } from "./storage.ts"
+import { threadContext } from "./thread-context.ts"
 import { type AppendOutcome, toPi } from "./thread-lanes.ts"
 
 const CTX = BACKGROUND_CONTEXT
@@ -26,11 +33,15 @@ const CTX = BACKGROUND_CONTEXT
 /** Every member is a closure: it may be passed on its own. */
 export interface Scribe {
   /**
-   * Append at exactly `spot`, with no lane: a conversation thread (S21 Q1).
-   * The host's serial executor guarantees nothing was written there since it
-   * planned, so no re-read is needed here.
+   * Append at exactly `spot`, with no lane: a conversation thread (S21 Q1),
+   * the entry in `thread` (ADR-0125). The host's serial executor guarantees
+   * nothing was written there since it planned, so no re-read is needed here.
    */
-  appendToTree(message: ChatMessage, spot: Spot): Promise<AppendOutcome>
+  appendToTree(
+    message: ChatMessage,
+    spot: Spot,
+    thread: ThreadId,
+  ): Promise<AppendOutcome>
   /**
    * Before the host lets `root`'s document go (ADR-0063): what was built over
    * its session closes, then the session. The next call that needs the root
@@ -121,9 +132,10 @@ export function createScribe(options: {
   }
 
   const scribe: Scribe = {
-    async appendToTree(message, spot) {
+    async appendToTree(message, spot, thread) {
       const session = await heldOf(spot.root).session
       const id = session.idGenerator.next()
+      const ctx = threadContext(thread, CTX)
       await session.mutate(
         m =>
           m.commit(
@@ -135,9 +147,9 @@ export function createScribe(options: {
                 message,
               }),
             ],
-            CTX,
+            ctx,
           ),
-        CTX,
+        ctx,
       )
       return { kind: "appended", id: entryId(id) }
     },

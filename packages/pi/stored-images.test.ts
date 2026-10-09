@@ -8,7 +8,13 @@ import {
   pendingEntry,
   setValue,
 } from "@earendil-works/pi-agent-core"
-import type { BlobStore, ImageRef, Sha256, StoredImage } from "@pinetrie/core"
+import {
+  type BlobStore,
+  type ImageRef,
+  type Sha256,
+  type StoredImage,
+  threadIdFor,
+} from "@pinetrie/core"
 import { newRootDoc } from "@pinetrie/schema/fixtures"
 import { describe, expect, test } from "vitest"
 import { sha256Of } from "./images.ts"
@@ -19,6 +25,10 @@ import {
   fromStoredRow,
   toStoredRow,
 } from "./stored-row.ts"
+import { threadContext } from "./thread-context.ts"
+
+// Every commit here writes in one thread, as a lane's or the scribe's does.
+const IN_THREAD = threadContext(threadIdFor("a"), BACKGROUND_CONTEXT)
 
 /** A 40×30 red PNG, 98 bytes. */
 const RED = Buffer.from(
@@ -124,7 +134,7 @@ describe("splitImages / rejoinImages", () => {
 
   test("a row's payload holds the reference; the rejoin restores it", () => {
     const entry = readResult("e1")
-    const row = toStoredRow(entry, refOf)
+    const row = toStoredRow(entry, refOf, threadIdFor("a"))
     expect(JSON.stringify(row)).not.toContain(RED_DATA)
     expect(fromStoredRow(row, 4, blobs.get)).toEqual({ ...entry, seq: 4 })
   })
@@ -150,22 +160,19 @@ describe("KynetaStorage: a tool's image is a reference in the session", () => {
     const blobs = mapBlobs()
     blobs.put(RED_IMAGE)
     const { doc, storage } = setUp(blobs)
-    await storage.commit(
-      [setValue(pending, pendingValue())],
-      BACKGROUND_CONTEXT,
-    )
+    await storage.commit([setValue(pending, pendingValue())], IN_THREAD)
     expect(JSON.stringify(doc.values())).not.toContain(RED_DATA)
-    expect(
-      (await storage.getValue(pending, BACKGROUND_CONTEXT))?.value,
-    ).toEqual(pendingValue())
+    expect((await storage.getValue(pending, IN_THREAD))?.value).toEqual(
+      pendingValue(),
+    )
 
     await storage.commit(
       [insertEntry(readResult("e1")), deleteValue(pending)],
-      BACKGROUND_CONTEXT,
+      IN_THREAD,
     )
     expect(JSON.stringify(doc.entries())).not.toContain(RED_DATA)
     const [back] = await storage
-      .getEntries(["e1"], BACKGROUND_CONTEXT)
+      .getEntries(["e1"], IN_THREAD)
       .then(m => [...m.values()])
     // The entry's timestamp is the commit's; its message is pi's.
     expect(back).toHaveProperty("message", readResult("e1").message)
@@ -174,7 +181,7 @@ describe("KynetaStorage: a tool's image is a reference in the session", () => {
   test("without a store, or for an image it lacks, the bytes stay inline", async () => {
     for (const blobs of [undefined, mapBlobs()]) {
       const { doc, storage } = setUp(blobs)
-      await storage.commit([insertEntry(readResult("e1"))], BACKGROUND_CONTEXT)
+      await storage.commit([insertEntry(readResult("e1"))], IN_THREAD)
       expect(JSON.stringify(doc.entries())).toContain(RED_DATA)
     }
   })
@@ -205,11 +212,11 @@ test("a branch scan rejoins only the entries it returns, and its structure none"
         data: 1,
       }),
     ],
-    BACKGROUND_CONTEXT,
+    IN_THREAD,
   )
-  await storage.scanBranchStructure({ start: "e2" }, BACKGROUND_CONTEXT)
-  await storage.scanBranch({ start: "e2", type: "custom" }, BACKGROUND_CONTEXT)
+  await storage.scanBranchStructure({ start: "e2" }, IN_THREAD)
+  await storage.scanBranch({ start: "e2", type: "custom" }, IN_THREAD)
   expect(reads).toBe(0)
-  await storage.scanBranch({ start: "e2" }, BACKGROUND_CONTEXT)
+  await storage.scanBranch({ start: "e2" }, IN_THREAD)
   expect(reads).toBe(1)
 })

@@ -9,7 +9,6 @@ import {
   type SpineNode,
   type ThreadId,
   type TreeIndex,
-  threadAt,
 } from "@pinetrie/core"
 
 export interface ColumnSpec {
@@ -19,11 +18,11 @@ export interface ColumnSpec {
    */
   readonly anchor: EntryId | null
   /**
-   * Its thread's first entry, when its parent thread is on no column of the
-   * canvas (ADR-0117): its path above it folds, behind its fork row, unless
-   * a column to its left shows some of it.
+   * Its own thread, when its parent thread is on no column of the canvas
+   * (ADR-0117): its path above that thread's first message folds, behind
+   * its fork row, unless a column to its left shows some of it.
    */
-  readonly foldAbove?: EntryId
+  readonly foldAbove?: ThreadId
   /**
    * A thread someone else holds, whose entries a branch not yet sent from it
    * leaves out, its column saying who has it in their place (ADR-0124).
@@ -44,7 +43,7 @@ export interface ColumnView {
   readonly forkFrom: EntryId | null
   /** The path after `forkFrom` (all of it when `forkFrom` is null), less what `above` folds. */
   readonly nodes: readonly SpineNode[]
-  /** The path above its thread's first entry, folded (`ColumnSpec.foldAbove`); empty for none. */
+  /** The path above its thread's first message, folded (`ColumnSpec.foldAbove`); empty for none. */
   readonly above: readonly SpineNode[]
 }
 
@@ -65,14 +64,13 @@ export function projectColumns(
     for (const [i, node] of spine.entries()) if (shown.has(node.id)) cut = i
     for (const node of spine) shown.add(node.id)
     const { hide, foldAbove } = column
-    const own = spine
-      .slice(cut + 1)
-      .filter(n => hide === undefined || threadAt(index, n.id) !== hide)
+    const own = spine.slice(cut + 1).filter(n => n.thread !== hide)
     // Shown from its root, with no column to its left sharing any of it:
-    // the path above its own thread folds.
+    // the path above its own thread folds. By thread, not by its first
+    // entry's id: that is often a context entry, which is no node.
     const first =
       cut < 0 && foldAbove !== undefined
-        ? own.findIndex(n => n.id === foldAbove)
+        ? own.findIndex(n => n.thread === foldAbove)
         : -1
     return {
       tipId,

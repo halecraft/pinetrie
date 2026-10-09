@@ -29,7 +29,7 @@ import {
   readLaneNames,
 } from "@pinetrie/schema"
 import type { createAgentHarness } from "./deep.ts"
-import { laneContext } from "./lanes.ts"
+import { threadContext } from "./thread-context.ts"
 import { toolsChanged } from "./tools.ts"
 
 const CTX = BACKGROUND_CONTEXT
@@ -206,7 +206,7 @@ export function threadLanes(input: {
   }
 
   function handle(name: ThreadId): ThreadLaneHandle {
-    const ctx = laneContext(name, CTX)
+    const ctx = threadContext(name, CTX)
     // A run that pi admitted and that then failed is still "ok" here: it
     // ran. Only an admission refusal is `refused`.
     const turn = (start: (lane: PiLane) => Promise<PiResult>) =>

@@ -128,7 +128,7 @@ describe("canvasColumns (ADR-0116)", () => {
     ).toEqual([["thread", TRUNK, true]])
   })
 
-  test("a thread whose parent thread is on no column of the canvas folds its path above its first entry; one whose parent is here does not (ADR-0117)", () => {
+  test("a thread whose parent thread is on no column of the canvas folds its path above its own thread; one whose parent is here does not (ADR-0117)", () => {
     const view: TaskView = {
       ...defaultView(C),
       cards: new Map([
@@ -137,9 +137,7 @@ describe("canvasColumns (ADR-0116)", () => {
       ]),
     }
     const alone = draw(canvasFor([C]), view)[0]
-    expect(alone?.kind === "thread" && alone.column.foldAbove).toBe(
-      entryId("4-c"),
-    )
+    expect(alone?.kind === "thread" && alone.column.foldAbove).toBe(C)
     const both = draw(canvasFor([TRUNK, C]), view)
     expect(
       both.map(c => (c.kind === "thread" ? c.column.foldAbove : null)),

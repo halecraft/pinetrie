@@ -456,9 +456,18 @@ task's threads (`hereRail`). A task's signals are its threads', whatever roots t
   (`branchesAt`); shared as any card, so never closable (`isClosable`
   takes fresh columns alone).
 - **A thread whose parent thread is on no column of the canvas** carries
-  `foldAbove`, its first entry: `projectColumns` folds the path above it
-  into `ColumnView.above` when no column to its left shares any of it, and
-  the column draws "↑ N earlier messages" (`earlierWords`).
+  `foldAbove`, its own thread: `projectColumns` folds the path above the
+  first node in that thread into `ColumnView.above` when no column to its
+  left shares any of it, and the column draws "↑ N earlier messages"
+  (`earlierWords`). By thread, since each node carries its own
+  (`TranscriptMessage.thread`): the thread's first entry is often a
+  context entry, which is no node.
+- **Gotcha: a thread's first entry is not always a message** (ADR-0125). A
+  branch's first run writes its context entries (canvas, task cards,
+  pinned cards, base news) above its prompt, in its own thread, and no
+  column or rail row draws them. Read a thread's shape (its fork, whether
+  it started) from `firstOf`; read what a person sees first from
+  `firstMessageOf` (core), as `threadFace` and `taskRail`'s stubs do.
 - **A branch not yet sent in a thread someone else holds** is decided by
   `canvasColumns` from `holders` (`heldByOthers`): its `FreshMode.held`
   names that thread and who; `projectColumns` leaves the thread's entries
@@ -700,8 +709,10 @@ pending.
 
 A forest: one tree for each root a thread of the task is in, in canvas
 order, each cut to the rows on a path to a task thread's end (`ends`: its
-`threadAnchor`, a copy's fork). A child of a kept row that starts a thread
-not kept is a `RailStub` with its `ThreadLink` (`railStubWords`). Each
+`threadAnchor`, a copy's fork). A child of a kept row in another thread
+than the row's starts that thread (ADR-0125): not kept, it is a `RailStub`
+with its `ThreadLink` (`railStubWords`), opening at the thread's
+`firstMessageOf`. Each
 tree's tracks are shifted (`shiftOf`) so the page's seed draws each in its
 own root's palette (`trackSlot`; 7 is its own inverse in 12 slots): a
 column takes its rows' track, so its colour agrees with no change of its own.
@@ -741,8 +752,10 @@ else reads those rows (tab summaries, archive search, `branchColors`).
 - **Rows are depths, places are booked (`placeRail`, ADR-0068):** an item's
   slot is its parent item's `slot + span`, so a branch starts beside the
   older subtree, and each branch takes the leftmost `across` free from its
-  fork's row to its last. `track` is the branch's colour, by creation order
-  (`projectRail`), and never the place: `data-track` on a dot, a capsule,
+  fork's row to its last. A branch is a thread: a child in its parent row's
+  thread continues its track, any other begins one (ADR-0125). `track` is
+  the branch's colour, by creation order (`projectRail`), and never the
+  place: `data-track` on a dot, a capsule,
   an outline or a tick is the colour the column shares. Places come after
   compaction, so a ring that splits a capsule can move the rows and places
   below it; colours never move. Items stay in depth-first order, the DOM's

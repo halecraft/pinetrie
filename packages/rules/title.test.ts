@@ -13,6 +13,7 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
+import { FIXTURE_THREAD } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   decodeTitleConfig,
@@ -35,6 +36,7 @@ const at = (
 ): EntryLike => ({
   id: entryId(id),
   parentId: parentId === null ? null : entryId(parentId),
+  thread: FIXTURE_THREAD,
   type: "message",
   message,
 })

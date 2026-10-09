@@ -224,12 +224,12 @@ export const mutations: readonly Mutation[] = [
       "a base is a WIP by its prefix, else accepted work, whatever name accepted work's bookmark had",
   },
   {
-    name: "the youngest child continues the parent's track",
+    name: "every child continues its parent's track, whatever its thread",
     file: tree,
-    from: "      if (id !== undefined) stack.push({ id, parentId: v.id, head: i > 0 })",
-    to: "      if (id !== undefined) stack.push({ id, parentId: v.id, head: i < children.length - 1 })",
+    from: "        head: index.entries[id]?.thread !== thread,\n",
+    to: "        head: false,\n",
     command: unit,
-    expect: "the oldest child continues",
+    expect: "a child in its parent's thread continues its track",
   },
   {
     name: "a branch's track is its rank in depth-first order",
@@ -567,12 +567,31 @@ export const mutations: readonly Mutation[] = [
     expect: "a granted host path sits under /mnt/host",
   },
   {
-    name: "threadEnd steps into a branch",
+    name: "a child in another thread continues its parent's",
     file: "packages/core/tree.ts",
-    from: "      c => startsAt(index, c) === null,",
-    to: "      c => startsAt(index, c) !== null,",
+    from: "    if (parentEntry !== undefined && parentEntry.thread === entry.thread)\n",
+    to: "    if (parentEntry !== undefined)\n",
     command: unit,
-    expect: "threadEnd steps down the child that starts no thread",
+    expect:
+      "a branch's context entry, older than its parent thread's next entry, is the branch's",
+  },
+  {
+    name: "a thread's first message is its first entry, drawn or not",
+    file: "packages/core/tree.ts",
+    from: "    if (messageAt(index, id) !== null) return id\n",
+    to: "    return id\n",
+    command: unit,
+    expect:
+      "a branch's context entry, older than its parent thread's next entry, is the branch's",
+  },
+  {
+    name: "a thread's end is its oldest leaf",
+    file: "packages/core/tree.ts",
+    from: "    if (known === undefined || entry.id > known)\n      endOf.set",
+    to: "    if (known === undefined || entry.id < known)\n      endOf.set",
+    command: unit,
+    expect:
+      "a thread with two first entries keeps the older, and with two ends the newer",
   },
   {
     name: "messageImages admits a part with its bytes inline",
@@ -794,10 +813,11 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a thread's newer claimant is its first entry",
     file: "packages/core/tree.ts",
-    from: "      if (known === undefined || id < known) firstOf.set(starts, id)",
-    to: "      firstOf.set(starts, id)",
+    from: "      if (known === undefined || id < known) firstOf.set(entry.thread, id)",
+    to: "      firstOf.set(entry.thread, id)",
     command: unit,
-    expect: "an id two entries claim keeps the older",
+    expect:
+      "a thread with two first entries keeps the older, and with two ends the newer",
   },
   {
     name: "a stream starts at its id's first 32 bits",

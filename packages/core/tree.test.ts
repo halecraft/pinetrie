@@ -1,5 +1,12 @@
 import { describe, expect, test } from "vitest"
-import { cardIdFor, entriesOf, entry, fromParents } from "./fixtures.ts"
+import {
+  cardIdFor,
+  entriesOf,
+  entry,
+  FIXTURE_THREAD,
+  fromParents,
+  threadOfEntry,
+} from "./fixtures.ts"
 import {
   agentActivity,
   ancestry,
@@ -10,6 +17,7 @@ import {
   conflictAskedAt,
   type EntryLike,
   entryId,
+  firstMessageOf,
   indexTree,
   messageAt,
   messageImages,
@@ -122,7 +130,7 @@ describe("writersOf", () => {
 describe("projectRail", () => {
   const rows = projectRail(indexTree(forks), entryId("1-t1"))
   const trackOf = (id: string) => rows.find(r => r.id === id)?.track
-  test("the oldest child continues its parent's track; a younger one takes a new track", () => {
+  test("a child in its parent's thread continues its track; one in another thread takes a new track (ADR-0125)", () => {
     expect([trackOf("1-t1"), trackOf("2-t2"), trackOf("3-t3")]).toEqual([
       0, 0, 0,
     ])
@@ -176,10 +184,19 @@ describe("projectRail", () => {
     expect(ids(projectRail(i, entryId("1-t1")))).toEqual(ids(rows))
   })
   test("a non-message entry has no row; its child attaches to the message above", () => {
+    // Both in the trunk's thread, as the trunk's lane writes them.
+    const trunk = threadOfEntry("1-t1")
     const withCompaction = {
       ...forks,
-      "8-c": { id: "8-c", parentId: "3-t3", type: "compaction" },
-      ...tree({ "9-after": "8-c" }),
+      ...entriesOf([
+        entry("8-c", "3-t3", undefined, { type: "compaction", thread: trunk }),
+        entry(
+          "9-after",
+          "8-c",
+          { role: "chat", content: "9-after" },
+          { thread: trunk },
+        ),
+      ]),
     }
     const r = projectRail(indexTree(withCompaction), entryId("1-t1"))
     expect(r.some(x => x.id === "8-c")).toBe(false)
@@ -207,29 +224,32 @@ describe("agentActivity", () => {
 
 describe("threads: where each starts and ends, and where a send lands", () => {
   // 1-q is Wu's question, starting thread q; below it the agent's reply, a
-  // remark, and questions.
+  // remark, and questions. Every entry names its thread (ADR-0125), q unless
+  // said.
   const say = (
     id: string,
     parentId: string | null,
     extra: {
       readonly writer: string
       readonly compelled: boolean
-      readonly starts?: string
+      readonly thread?: string
     },
   ) =>
-    entry(id, parentId, {
-      role: "chat",
-      content: id,
-      writer: writerId(extra.writer),
-      compelled: extra.compelled,
-      ...(extra.starts === undefined
-        ? {}
-        : { starts: threadIdFor(extra.starts) }),
-    })
+    entry(
+      id,
+      parentId,
+      {
+        role: "chat",
+        content: id,
+        writer: writerId(extra.writer),
+        compelled: extra.compelled,
+      },
+      { thread: threadIdFor(extra.thread ?? "q") },
+    )
   const Q = threadIdFor("q")
   const entries = entriesOf([
-    say("1-q", null, { writer: "wu", compelled: true, starts: "q" }),
-    entry("2-r", "1-q", { role: "assistant", content: "r" }),
+    say("1-q", null, { writer: "wu", compelled: true }),
+    entry("2-r", "1-q", { role: "assistant", content: "r" }, { thread: Q }),
     say("3-plain", "2-r", { writer: "bo", compelled: false }),
     say("4-mine", "3-plain", { writer: "wu", compelled: true }),
   ])
@@ -257,36 +277,77 @@ describe("threads: where each starts and ends, and where a send lands", () => {
     task: taskIdFor("01a0ffd2-0000-7000-8000-00000000000c"),
   })
 
-  test("threadEnd steps down the child that starts no thread, past a newer branch", () => {
+  test("threadEnd: the thread's entry with no child in its own thread, past a newer branch", () => {
     const i = indexTree({
       ...entries,
       ...entriesOf([
         say("5-next", "4-mine", { writer: "wu", compelled: false }),
-        say("6-b", "4-mine", { writer: "bo", compelled: false, starts: "b" }),
-        say("7-b2", "6-b", { writer: "bo", compelled: false }),
+        say("6-b", "4-mine", { writer: "bo", compelled: false, thread: "b" }),
+        say("7-b2", "6-b", { writer: "bo", compelled: false, thread: "b" }),
       ]),
     })
     expect(threadEnd(i, Q)).toBe("5-next")
     expect(threadEnd(i, threadIdFor("b"))).toBe("7-b2")
+    expect(i.firstOf.get(threadIdFor("b"))).toBe("6-b")
     expect(threadEnd(i, threadIdFor("none"))).toBeNull()
   })
 
-  test("threadEnd ends on a cycle through its first entry", () => {
-    const i = indexTree(
-      entriesOf([
-        say("1-x", "2-y", { writer: "wu", compelled: false, starts: "c" }),
-        say("2-y", "1-x", { writer: "wu", compelled: false }),
-      ]),
-    )
-    expect(threadEnd(i, threadIdFor("c"))).toBe("2-y")
-  })
-
-  test("threadAt: the nearest entry at or above that starts a thread", () => {
+  test("a branch's context entry, older than its parent thread's next entry, is the branch's: the parent's end is its own (ADR-0125)", () => {
+    // Under 4-mine: b's first run wrote its canvas entry, then its prompt;
+    // later q's next run wrote its own canvas entry, then its prompt and
+    // reply. The canvas entries carry no message a column draws.
+    const B = threadIdFor("b")
+    const canvas = (id: string, parentId: string, thread: ThreadId) =>
+      entry(id, parentId, { role: "canvas", content: "<canvas>" }, { thread })
     const i = indexTree({
       ...entries,
       ...entriesOf([
-        say("6-b", "2-r", { writer: "bo", compelled: false, starts: "b" }),
-        say("7-b2", "6-b", { writer: "bo", compelled: false }),
+        canvas("5-cb", "4-mine", B),
+        say("6-b", "5-cb", { writer: "bo", compelled: true, thread: "b" }),
+        canvas("7-cq", "4-mine", Q),
+        say("8-next", "7-cq", { writer: "wu", compelled: true }),
+        entry(
+          "9-a",
+          "8-next",
+          { role: "assistant", content: "a" },
+          { thread: Q },
+        ),
+      ]),
+    })
+    expect(threadEnd(i, Q)).toBe("9-a")
+    expect(threadEnd(i, B)).toBe("6-b")
+    expect(threadAt(i, entryId("5-cb"))).toBe(B)
+    expect(i.firstOf.get(B)).toBe("5-cb")
+    expect(firstMessageOf(i, B)).toBe("6-b")
+    expect(firstMessageOf(i, Q)).toBe("1-q")
+    expect(firstMessageOf(i, threadIdFor("none"))).toBeNull()
+    // On the rail the trunk carries on in its own track, the branch in one
+    // of its own, though the branch's first entry is the older child.
+    const rail = projectRail(i, entryId("1-q"))
+    const trackOf = (id: string) => rail.find(r => r.id === id)?.track
+    expect([trackOf("4-mine"), trackOf("8-next"), trackOf("9-a")]).toEqual([
+      0, 0, 0,
+    ])
+    expect(trackOf("6-b")).toBe(1)
+  })
+
+  test("a cycle inside a thread gives it no first entry and no end", () => {
+    const i = indexTree(
+      entriesOf([
+        say("1-x", "2-y", { writer: "wu", compelled: false, thread: "c" }),
+        say("2-y", "1-x", { writer: "wu", compelled: false, thread: "c" }),
+      ]),
+    )
+    expect(threadEnd(i, threadIdFor("c"))).toBeNull()
+    expect(firstMessageOf(i, threadIdFor("c"))).toBeNull()
+  })
+
+  test("threadAt: the thread its row names; null for an entry the index lacks", () => {
+    const i = indexTree({
+      ...entries,
+      ...entriesOf([
+        say("6-b", "2-r", { writer: "bo", compelled: false, thread: "b" }),
+        say("7-b2", "6-b", { writer: "bo", compelled: false, thread: "b" }),
       ]),
     })
     expect(threadAt(i, entryId("4-mine"))).toBe(Q)
@@ -295,15 +356,16 @@ describe("threads: where each starts and ends, and where a send lands", () => {
     expect(threadAt(i, entryId("9-gone"))).toBeNull()
   })
 
-  test("an id two entries claim keeps the older as its first", () => {
+  test("a thread with two first entries keeps the older, and with two ends the newer, so replicas agree", () => {
     const i = indexTree({
       ...entries,
       ...entriesOf([
-        say("5-dup", "4-mine", { writer: "bo", compelled: false, starts: "q" }),
+        say("5-dup", null, { writer: "bo", compelled: false }),
+        say("6-also", "3-plain", { writer: "bo", compelled: false }),
       ]),
     })
     expect(i.firstOf.get(Q)).toBe("1-q")
-    expect(threadEnd(i, Q)).toBe("5-dup")
+    expect(threadEnd(i, Q)).toBe("6-also")
   })
 
   test("threadOfSend: an end send lands at its thread's end, in its lane; a branch starts at its fork", () => {
@@ -340,7 +402,7 @@ describe("threads: where each starts and ends, and where a send lands", () => {
     const i = indexTree({
       ...entries,
       ...entriesOf([
-        say("6-b", "2-r", { writer: "bo", compelled: false, starts: "b" }),
+        say("6-b", "2-r", { writer: "bo", compelled: false, thread: "b" }),
       ]),
     })
     expect(threadOfSend(i, [], { at: end("6-b"), me }).kind).toBe("unknown")
@@ -380,7 +442,7 @@ describe("threads: where each starts and ends, and where a send lands", () => {
     const forked = indexTree({
       ...entries,
       ...entriesOf([
-        say("5-fork", "2-r", { writer: "bo", compelled: true, starts: "b" }),
+        say("5-fork", "2-r", { writer: "bo", compelled: true, thread: "b" }),
         say("6-mine", "4-mine", { writer: "wu", compelled: false }),
       ]),
     })
@@ -856,6 +918,7 @@ test("messageAt: the host's own messages show as their line; other roles are non
   )
   expect(messageAt(index, entryId("2-c"))).toEqual({
     id: "2-c",
+    thread: FIXTURE_THREAD,
     role: "carry-on",
     text: "↻ resumed by Ada",
   })

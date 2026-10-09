@@ -728,4 +728,30 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect: "every kind is carried, the newest of each",
   },
+  // ── every entry names its thread (ADR-0125) ──
+  {
+    name: "a commit forgets the thread its context names",
+    file: "packages/pi/storage.ts",
+    from: "    const named = threadOfContext(context)\n",
+    to: "    const named = undefined\n",
+    command: unit,
+    expect:
+      "a branch's run, its context entry first, writes in the branch, and the trunk carrying on from the same fork writes in the trunk",
+  },
+  {
+    name: "a commit in one thread may move another lane's tip",
+    file: "packages/pi/commit.ts",
+    from: "      write.namespace === LANE_TIP &&\n",
+    to: '      write.namespace === "none" &&\n',
+    command: unit,
+    expect: "a tip of another lane in the commit is refused",
+  },
+  {
+    name: "the scribe appends in no thread",
+    file: "packages/pi/scribe.ts",
+    from: "      const ctx = threadContext(thread, CTX)\n",
+    to: "      const ctx = CTX\n",
+    command: unit,
+    expect: "the agent's harness is over the scribe's session",
+  },
 ]

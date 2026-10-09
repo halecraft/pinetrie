@@ -926,7 +926,7 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a new lane ignores the id planChat chose",
     file: "apps/pinetrie/host/commands/chat.ts",
-    from: "      const created = await agent.createThreadLane(\n        { root, at: planned.at },\n        planned.lane,\n      )",
+    from: "      const created = await agent.createThreadLane(\n        { root, at: planned.at },\n        planned.thread,\n      )",
     to: "      const created = await agent.createThreadLane(\n        { root, at: planned.at },\n        threadIdFor(newId()),\n      )",
     command: unit,
     expect: "a new lane is created under the column's reserved id",
@@ -1830,11 +1830,11 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a copy's first send writes a second card",
     file: "apps/pinetrie/host/commands/chat.ts",
-    from: "    starts === null || copied !== undefined\n",
-    to: "    starts === null\n",
+    from: "    begun === null || begun.starts === null || copied !== undefined\n",
+    to: "    begun === null || begun.starts === null\n",
     command: unit,
     expect:
-      "a copy's first send is a branch at its fork: its message names it, and its record and card stay as made (ADR-0117)",
+      "a copy's first send is a branch at its fork, appended in the copy's thread, and its record and card stay as made (ADR-0117)",
   },
   {
     name: "a branch names a copy anywhere",
@@ -1843,7 +1843,7 @@ export const mutations: readonly Mutation[] = [
     to: '    copied.origin.kind !== "copy"\n',
     command: unit,
     expect:
-      "a copy's first send is a branch at its fork: its message names it, and its record and card stay as made (ADR-0117)",
+      "a copy's first send is a branch at its fork, appended in the copy's thread, and its record and card stay as made (ADR-0117)",
   },
   {
     name: "the dispatcher lets a command run in a held thread",
@@ -1880,5 +1880,13 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "an undo that puts a running thread back in an inventory stops it too: the stop follows the places change, whatever wrote it",
+  },
+  {
+    name: "0008 leaves a branch's context entries in the thread it forks from",
+    file: "apps/pinetrie/host/migrations/0008-entry-thread.ts",
+    from: "!isContext(rows[id]) ? walked : (reached(id) ?? walked)\n",
+    to: "!isContext(rows[id]) ? walked : walked\n",
+    command: unit,
+    expect: "a branch's context entry is the branch's",
   },
 ]

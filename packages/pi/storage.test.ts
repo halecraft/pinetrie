@@ -3,7 +3,7 @@
 // not reach.
 import {
   appendList,
-  BACKGROUND_CONTEXT as ctx,
+  BACKGROUND_CONTEXT,
   deleteValue,
   insertEntry,
   insertUsage,
@@ -17,6 +17,10 @@ import { newRootDoc, writeLaneTip } from "@pinetrie/schema/fixtures"
 import { expect, test } from "vitest"
 import { emptyUsage } from "./deep.ts"
 import { KynetaStorage } from "./storage.ts"
+import { threadContext } from "./thread-context.ts"
+
+// Every commit here writes in one thread, as a lane's or the scribe's does.
+const ctx = threadContext(threadIdFor("a"), BACKGROUND_CONTEXT)
 
 const message = (id: string, parentId: string | null) =>
   insertEntry({
@@ -122,4 +126,21 @@ test("scanValues keeps to its namespace: a prefix of `a` is not one of `ab`", as
       v => v.address.namespace,
     ),
   ).toEqual(["a"])
+})
+
+test("a commit that writes an entry in no thread throws and writes nothing; one that moves only a tip needs no thread (ADR-0125)", async () => {
+  const doc = newRootDoc()
+  const storage = new KynetaStorage({ doc })
+  await expect(
+    storage.commit([message("e1", null)], BACKGROUND_CONTEXT),
+  ).rejects.toThrow(/in no thread/)
+  expect(doc.entries()).toEqual({})
+  const lane = threadIdFor("0123456789abcdef")
+  await storage.commit(
+    [setValue(value("pi.branch.tip", lane), null)],
+    BACKGROUND_CONTEXT,
+  )
+  expect(
+    (await storage.getValue(value("pi.branch.tip", lane), ctx))?.value,
+  ).toBe(null)
 })

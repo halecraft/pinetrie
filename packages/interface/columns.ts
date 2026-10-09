@@ -71,10 +71,11 @@ export interface Column {
   /** A Start Agent column: a message with no mention asks the agent. */
   readonly asksAgent?: true
   /**
-   * Its thread's first entry, when the thread it forks from is on no column
-   * of its canvas (ADR-0117): the path above it folds behind its fork row.
+   * Its own thread, when the thread it forks from is on no column of its
+   * canvas (ADR-0117): the path above the thread's first message folds
+   * behind its fork row.
    */
-  readonly foldAbove?: EntryId
+  readonly foldAbove?: ThreadId
   /**
    * How much of each ask is drawn (ADR-0106); absent is story. The reader's
    * choice, never the document's.

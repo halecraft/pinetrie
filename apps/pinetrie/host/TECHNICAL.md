@@ -232,8 +232,12 @@ until the next compaction (S120), and the host compacts at startup. So
   planned the same way next time.
 - **One file per migration**, deleted once Duane's store has passed it; a
   store still on its hash is then refused. A change that moves no data is a
-  migration with no `run`: registering it is the acknowledgement. None is
-  registered now: `0001-live-row`, `0002-records` (ADR-0095) and
+  migration with no `run`: registering it is the acknowledgement. A `run`
+  is given `log` for what it found. `0008-entry-thread` is registered: it
+  gives every root's rows the thread column (ADR-0125), labelling each as
+  the tree's walk did, a context entry in the thread of the prompt below
+  it, and logs its counts against S143's (3 moved, every lane's tip at its
+  thread's end). `0001-live-row`, `0002-records` (ADR-0095) and
   `0005-tasks`' places and sidebars (ADR-0116) ran, and were deleted.
 - **A change to a record's contents moves no hash**: records are JSON in a
   document's `records`, and so does a change to the values of the places'
@@ -410,7 +414,8 @@ rejects `shutdown()`.
   `sendChat` refuses a branch naming a recorded thread anywhere else, and
   writes no record or card for it.
 - **A thread's start is planned with its send** (ADR-0116, ADR-0117):
-  `planChat`'s decision names the thread a branch starts (`starts`), and
+  `planChat`'s decision names the thread it writes in (`thread`), and for a
+  branch what its card needs (`starts`), and
   `sendChat`, after its last await, plans what it writes
   (`planThreadStart`): the thread's record, its card at the end of its
   task's canvas, and for a new task its record and its board place, at the

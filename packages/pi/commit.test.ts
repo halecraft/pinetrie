@@ -10,11 +10,14 @@ import {
   setValue,
   value,
 } from "@earendil-works/pi-agent-core"
-import { physicalKey } from "@pinetrie/schema"
-import { expect, test } from "vitest"
+import { threadIdFor } from "@pinetrie/core"
+import { LANE_TIP, physicalKey } from "@pinetrie/schema"
+import { describe, expect, test } from "vitest"
 import { CHECKPOINT_NAMESPACE } from "./checkpoint.ts"
-import { planCommit } from "./commit.ts"
+import { commitThread, planCommit } from "./commit.ts"
 import { emptyUsage } from "./deep.ts"
+
+const THREAD = threadIdFor("a")
 
 const counting = () => {
   let n = 0
@@ -53,6 +56,8 @@ test("planCommit: one operation and one arrival per write, with pi's seqs", () =
   const { ops, batch } = planCommit(writes, {
     refOf: () => undefined,
     token: counting(),
+    named: THREAD,
+    fallback: undefined,
   })
 
   expect(ops.map(op => op.kind)).toEqual([
@@ -89,4 +94,64 @@ test("planCommit: one operation and one arrival per write, with pi's seqs", () =
   })
   expect(plain?.kind === "value" && "sealed" in plain.record).toBe(false)
   expect(checkpoint).toMatchObject({ text: "out", record: { sealed: true } })
+})
+
+describe("commitThread: a commit's entries are in the thread its context names (ADR-0125)", () => {
+  const OTHER = threadIdFor("b")
+  const commit = (lane?: string) =>
+    prepareStorageCommit(
+      [
+        insertEntry({
+          id: "e1",
+          parentId: null,
+          type: "message",
+          message: { role: "user", content: "hi", timestamp: 1 },
+        }),
+        ...(lane === undefined ? [] : [setValue(value(LANE_TIP, lane), "e1")]),
+      ],
+      1,
+      1000,
+    ).writes
+
+  test("the context's thread, with or without its lane's tip in the commit", () => {
+    expect(commitThread(commit(), THREAD, undefined)).toBe(THREAD)
+    expect(commitThread(commit(THREAD), THREAD, OTHER)).toBe(THREAD)
+  })
+
+  test("a tip of another lane in the commit is refused", () => {
+    expect(() => commitThread(commit(OTHER), THREAD, undefined)).toThrow(
+      /moves the tip of lane/,
+    )
+  })
+
+  test("no thread named takes the fallback, whatever tip moves; with none, it is refused", () => {
+    expect(commitThread(commit(), undefined, OTHER)).toBe(OTHER)
+    expect(commitThread(commit("main"), undefined, OTHER)).toBe(OTHER)
+    expect(() => commitThread(commit(), undefined, undefined)).toThrow(
+      /in no thread/,
+    )
+  })
+
+  test("every entry row carries the thread; a commit of no entry needs none", () => {
+    const { ops } = planCommit(commit(THREAD), {
+      refOf: () => undefined,
+      token: counting(),
+      named: THREAD,
+      fallback: undefined,
+    })
+    expect(ops[0]).toMatchObject({ kind: "entry", row: { thread: THREAD } })
+    const tipOnly = prepareStorageCommit(
+      [setValue(value(LANE_TIP, OTHER), null)],
+      1,
+      1000,
+    ).writes
+    expect(
+      planCommit(tipOnly, {
+        refOf: () => undefined,
+        token: counting(),
+        named: undefined,
+        fallback: undefined,
+      }).ops,
+    ).toHaveLength(1)
+  })
 })

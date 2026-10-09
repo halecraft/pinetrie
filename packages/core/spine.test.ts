@@ -42,9 +42,14 @@ describe("projectSpine", () => {
   test("the spine equals projectTranscript; branches are the extra", () => {
     // The two projections must never disagree about what is on the path.
     const { spine } = projectSpine(indexTree(forked), entryId("c1"))
-    expect(spine.map(n => ({ id: n.id, role: n.role, text: n.text }))).toEqual(
-      projectTranscript(indexTree(forked), entryId("c1")),
-    )
+    expect(
+      spine.map(n => ({
+        id: n.id,
+        thread: n.thread,
+        role: n.role,
+        text: n.text,
+      })),
+    ).toEqual(projectTranscript(indexTree(forked), entryId("c1")))
   })
 
   test("a fork appears as a branch on its parent, not on the spine", () => {

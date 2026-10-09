@@ -17,7 +17,8 @@ browser ──commands (Kyneta Line)──▶ host ──▶ pi agent core
   document. Clients read the document and send commands.
 - **A command** is decoded, planned by a pure function into a decision, and
   executed in one serial step.
-- **The tree** is entries linked by `parentId`. A branch is a new entry with an
+- **The tree** is entries linked by `parentId`, each naming the thread that
+  wrote it (ADR-0125). A branch is a new thread whose first entry has an
   earlier parent. What the model sees is the path to a tip.
 - **A lane** is a thread's line of agent work: a Linux container on its own
   disk, where pi's tools run. Every thread's agent works in one; none works

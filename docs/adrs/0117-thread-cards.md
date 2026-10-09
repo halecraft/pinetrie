@@ -16,6 +16,7 @@
 - **Amended by:**
   - ADR-0124: taking a running thread stops it, and the inventory previews a
     thread read only; a thread moved between tasks keeps running.
+  - ADR-0125: each entry of a thread names it, not only its first message.
 
 **Context.**
 

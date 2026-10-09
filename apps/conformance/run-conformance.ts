@@ -28,8 +28,13 @@ if (target === "memory") {
   }
 } else {
   const { KynetaStorage } = await import("@pinetrie/pi")
+  const { threadIdFor } = await import("@pinetrie/core")
   factory = async () => {
-    const storage = new KynetaStorage()
+    // pi's suite commits entries outside any thread; pine·trie's never do
+    // (ADR-0125), so only this storage is given a thread to fall back to.
+    const storage = new KynetaStorage({
+      fallbackThread: threadIdFor("c0f0a0ce"),
+    })
     return { storage, async [Symbol.asyncDispose]() {} }
   }
 }

@@ -9,6 +9,7 @@ import {
   type ArchivedTask,
   ancestry,
   type EntryId,
+  firstMessageOf,
   isBusy,
   type LaneRecord,
   type LaneView,
@@ -271,13 +272,20 @@ export function taskRail(input: {
     for (const row of projectRail(index, entry)) {
       if (!keep.has(row.id)) continue
       rows.push({ ...row, track: row.track + shift })
+      // A child in another thread starts it (ADR-0125); its stub opens at
+      // the thread's first message, which is often below a context entry.
+      const own = index.entries[row.id]?.thread
       for (const child of index.childrenOf.get(row.id) ?? []) {
-        if (keep.has(child)) continue
-        const thread = index.entries[child]?.message?.starts
-        if (thread === undefined) continue
+        const thread = index.entries[child]?.thread
+        if (keep.has(child) || thread === undefined || thread === own) continue
         const link = input.linkOf(thread)
         if (link.kind !== "gone")
-          stubs.push({ from: row.id, at: child, thread, link })
+          stubs.push({
+            from: row.id,
+            at: firstMessageOf(index, thread) ?? child,
+            thread,
+            link,
+          })
       }
     }
   }

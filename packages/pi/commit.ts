@@ -6,7 +6,9 @@ import type {
   prepareStorageCommit,
   UsageRow,
 } from "@earendil-works/pi-agent-core"
+import type { ThreadId } from "@pinetrie/core"
 import {
+  LANE_TIP,
   physicalKey,
   type StoredEntryRow,
   type StoredValueRecord,
@@ -50,20 +52,66 @@ export type DocOp =
     }
 
 /**
+ * The thread a commit's entries are written in (ADR-0125): the one its
+ * context names, else `fallback`, which only pi's conformance suite gives.
+ * Throws when neither names one, or when the commit moves the tip of a lane
+ * other than the thread its context names: a lane is named by its thread
+ * (ADR-0120), so its entries can be in no other. A fallback is no claim
+ * about lanes, so it is not checked against them. Asked only of a commit
+ * that writes entries. Pure.
+ */
+export function commitThread(
+  writes: readonly CommittedWrite[],
+  named: ThreadId | undefined,
+  fallback: ThreadId | undefined,
+): ThreadId {
+  if (named === undefined) {
+    if (fallback === undefined)
+      throw new Error("a commit writes entries in no thread")
+    return fallback
+  }
+  for (const write of writes)
+    if (
+      write.kind === "value" &&
+      write.namespace === LANE_TIP &&
+      write.key !== named
+    )
+      throw new Error(
+        `a commit in thread ${named} moves the tip of lane ${write.key}`,
+      )
+  return named
+}
+
+/**
  * The operations that store `writes`, and the arrivals that index them with
  * pi's seqs. `token` makes each value's `wid` and each element's `eid`.
+ * Entries are written in `commitThread`'s thread, from the thread the
+ * commit's context names (`named`), else `fallback`.
  */
 export function planCommit(
   writes: readonly CommittedWrite[],
-  deps: { readonly refOf: RefOf; readonly token: () => string },
+  deps: {
+    readonly refOf: RefOf
+    readonly token: () => string
+    readonly named: ThreadId | undefined
+    readonly fallback: ThreadId | undefined
+  },
 ): { readonly ops: readonly DocOp[]; readonly batch: Batch } {
   const ops: DocOp[] = []
   const arrivals: Arrival[] = []
+  const thread = writes.some(w => w.kind === "entry")
+    ? commitThread(writes, deps.named, deps.fallback)
+    : null
   for (const write of writes)
     switch (write.kind) {
       case "entry": {
         const { kind: _k, seq, ...entry } = write
-        ops.push({ kind: "entry", row: toStoredRow(entry, deps.refOf) })
+        // Set above whenever a write is an entry.
+        if (thread === null) throw new Error("an entry with no thread")
+        ops.push({
+          kind: "entry",
+          row: toStoredRow(entry, deps.refOf, thread),
+        })
         arrivals.push({
           kind: "entry",
           id: entry.id,

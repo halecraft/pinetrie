@@ -38,6 +38,7 @@ import {
   firstLineOf,
   indexTree,
   isTaskId,
+  isThreadId,
   type LaneRecord,
   type LaneView,
   type MarkRecord,
@@ -161,14 +162,23 @@ function carriedBy(row: StoredEntryRow): ContextInView | undefined {
   return Object.keys(carried).length === 0 ? undefined : carried
 }
 
-function renderableEntry(row: StoredEntryRow): EntryLike {
+/**
+ * A row's entry, or null for one whose thread is no thread's id. None is:
+ * every commit names its thread (ADR-0125), and a store from before is
+ * refused until migrated (ADR-0096). Left out, as a malformed lane name is
+ * (`readStoredLanes`), rather than read into some thread.
+ */
+function renderableEntry(row: StoredEntryRow): EntryLike | null {
   const known = entryOfRow.get(row)
   if (known !== undefined) return known
+  const { thread } = row
+  if (!isThreadId(thread)) return null
   const carried = carriedBy(row)
   const entry: EntryLike = Object.freeze({
     id: entryId(row.id),
     parentId: row.parentId === null ? null : entryId(row.parentId),
     type: row.type,
+    thread,
     message: renderableMessage(rowMessage(row)),
     ...(carried === undefined ? {} : { carried }),
   })
@@ -183,7 +193,7 @@ function renderableEntries(
   const out: Record<EntryId, EntryLike> = {}
   for (const row of Object.values(rows)) {
     const entry = renderableEntry(row)
-    out[entry.id] = entry
+    if (entry !== null) out[entry.id] = entry
   }
   return out
 }

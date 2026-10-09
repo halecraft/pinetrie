@@ -32,7 +32,6 @@ import {
   conflictTool,
   type LaneAccess,
   type LaneFacts,
-  laneContext,
   laneGuidelines,
   NO_CONFLICTS,
   systemPromptFor,
@@ -41,6 +40,7 @@ import {
 import { ONE_ROOT, oneRoot } from "./one-root.ts"
 import { scriptedModel } from "./scripted.ts"
 import { startPi } from "./start-pi.ts"
+import { threadContext } from "./thread-context.ts"
 import { assembleTools } from "./tools.ts"
 
 // ── what a lane of its own is told (ADR-0121) ────────────────────────────
@@ -139,7 +139,7 @@ describe("ask_about_conflict (ADR-0080)", () => {
       undefined,
       undefined,
       undefined,
-      laneContext(threadIdFor("0123456789abcdef"), BACKGROUND_CONTEXT),
+      threadContext(threadIdFor("0123456789abcdef"), BACKGROUND_CONTEXT),
     )
 
   test("with a conflict in the copy, it asks, and its details say so; with none, there is nothing to ask", async () => {

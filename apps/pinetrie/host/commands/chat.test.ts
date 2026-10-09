@@ -118,7 +118,7 @@ describe("executeChat", () => {
     const { pi, work, started, titles, deps, context } = setUp()
     const out = await executeChat(
       deps,
-      { kind: "createAndRun", at: ROOT, lane: LANE, details, starts: null },
+      { kind: "createAndRun", at: ROOT, thread: LANE, details, starts: null },
       context,
     )
     expect(out).toEqual({ kind: "started", runId: "r-1" })
@@ -144,7 +144,7 @@ describe("executeChat", () => {
     const pinned = [{ id: cardIdFor("c1"), seen: "v-1" }]
     await executeChat(
       deps,
-      { kind: "run", lane: LANE, details },
+      { kind: "run", thread: LANE, details },
       {
         ...context,
         pinned,
@@ -152,7 +152,7 @@ describe("executeChat", () => {
     )
     await executeChat(
       deps,
-      { kind: "createAndRun", at: ROOT, lane: LANE, details, starts: null },
+      { kind: "createAndRun", at: ROOT, thread: LANE, details, starts: null },
       { ...context, pinned },
     )
     expect(seen).toEqual([pinned, pinned])
@@ -162,7 +162,7 @@ describe("executeChat", () => {
     const { pi, started, deps, context } = setUp(ERR.BAD_BASE)
     const out = await executeChat(
       deps,
-      { kind: "createAndRun", at: ROOT, lane: LANE, details, starts: null },
+      { kind: "createAndRun", at: ROOT, thread: LANE, details, starts: null },
       { ...context, base: "wip/gone" },
     )
     expect(out).toMatchObject({ kind: "refused", code: ERR.BAD_BASE })
@@ -289,7 +289,7 @@ describe("sendChat", () => {
     ).toEqual([LANE, NEW])
   })
 
-  test("a branch's first message names its thread, and its record is written with it, then named; a reply's is not", async () => {
+  test("each message is appended in its thread (ADR-0125); a branch's record is written with its first, then named", async () => {
     const { pi, records, names, deps } = setUp()
     await sendChat(deps, ALICE, "s-1", {
       ...chat("aside"),
@@ -298,8 +298,8 @@ describe("sendChat", () => {
     await sendChat(deps, ALICE, "s-2", chat("on"))
     const appended = pi.calls
       .filter(c => c.method === "appendToTree")
-      .map(c => (c.args[0] as { details: ChatDetails }).details.starts)
-    expect(appended).toEqual([NEW, undefined])
+      .map(c => c.args[2])
+    expect(appended).toEqual([NEW, LANE])
     expect(records.calls.map(c => c.args[0])).toEqual([
       [
         setRecord(THREAD, {
@@ -342,7 +342,7 @@ describe("sendChat", () => {
     expect(pi.calls.filter(c => c.method === "appendToTree")).toEqual([])
   })
 
-  test("a copy's first send is a branch at its fork: its message names it, and its record and card stay as made (ADR-0117)", async () => {
+  test("a copy's first send is a branch at its fork, appended in the copy's thread, and its record and card stay as made (ADR-0117)", async () => {
     const { b, pi, records, deps } = setUp()
     const COPY = threadIdFor("copy")
     putValue(
@@ -363,7 +363,7 @@ describe("sendChat", () => {
     expect(sent.kind).toBe("appended")
     const appended = pi.calls
       .filter(c => c.method === "appendToTree")
-      .map(c => (c.args[0] as { details: ChatDetails }).details.starts)
+      .map(c => c.args[2])
     expect(appended).toEqual([COPY])
     expect(records.calls).toEqual([])
     expect(readPlaces(b.places)).toEqual(before)

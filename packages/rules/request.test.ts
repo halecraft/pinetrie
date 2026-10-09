@@ -1,4 +1,5 @@
 import { entryId, type TranscriptMessage } from "@pinetrie/core"
+import { FIXTURE_THREAD } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   describeRequest,
@@ -13,6 +14,7 @@ const message = (
   author?: string,
 ): TranscriptMessage => ({
   id: entryId(text),
+  thread: FIXTURE_THREAD,
   role,
   text,
   ...(author === undefined ? {} : { author }),

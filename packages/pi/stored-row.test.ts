@@ -10,7 +10,7 @@
 // either copy yields the same entry. Only the disjointness case sees that, so
 // it comes first.
 
-import { findSeqKeys } from "@pinetrie/core"
+import { findSeqKeys, threadIdFor } from "@pinetrie/core"
 import { describe, expect, test } from "vitest"
 import {
   type EntryWithoutSeq,
@@ -20,11 +20,11 @@ import {
 
 // An entry without images, stored where no blob is known.
 const toStoredRow = (entry: EntryWithoutSeq) =>
-  splitWith(entry, () => undefined)
+  splitWith(entry, () => undefined, threadIdFor("a"))
 const fromStoredRow = (row: ReturnType<typeof toStoredRow>, seq: number) =>
   rejoinWith(row, seq, () => undefined)
 
-const HOISTED = ["id", "parentId", "type", "timestamp", "fromId"]
+const HOISTED = ["id", "parentId", "type", "timestamp", "fromId", "thread"]
 
 const message: EntryWithoutSeq = {
   id: "e2",

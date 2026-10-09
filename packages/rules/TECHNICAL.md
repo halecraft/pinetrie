@@ -217,12 +217,12 @@ are the only code that builds or reads the shape.
   the thread the send continues, or the one a branch starts. No other name is
   chosen; pi makes none. A branch naming a thread that has an entry or a
   lane is `taken` (core), refused before planning.
-- **A thread's first message names it** (`ChatDetails.starts`, ADR-0117):
-  `planChat` sets it on a branch's message alone, so it is written in the
-  same commit as the entry, and `threadEnd` finds every thread's end from
-  the tree with no stored end and no second source. The host writes the
+- **Every entry names its thread** (ADR-0125), in its row's `thread`
+  column, from the commit that writes it. Every `ChatDecision` that writes
+  names its thread once, as `thread`: the one the send continues, or the
+  one a branch starts. A chat stores no `starts`. The host writes the
   thread's record (`THREAD`, `thread.ts`: its root, who started it, when,
-  and a copy's fork) just before the message, then names it.
+  and a copy's fork) just before a branch's first message, then names it.
 - **Each chat stores its send's id** (`sendId`, the command's id), so the
   column that sent it finds it exactly (`TreeIndex.bySend`).
   `detailsFromStored` is the one conversion of stored details.
@@ -644,7 +644,8 @@ by construction.
   just after the thread it forks from (`planThreadCard`, `branchAfter`,
   `rankAfter`), a new root's at the end, and for a task the session does not hold, the task's
   record and its board place (`placeStarted`). `planChat` decides that a
-  send starts one (`starts: ThreadStarts`); `sendChat` plans it with the
+  send starts one (`starts: ThreadStarts`: its card's task and board state;
+  the thread is the decision's `thread`); `sendChat` plans it with the
   send, and `executeChat` writes it before the message.
 - **`rootsHeld`**: the roots with a thread on the canvas of a task outside
   the archive, or in an inventory: what a starting host loads, and what

@@ -14,6 +14,7 @@ import {
   type TaskId,
   type ThreadId,
   taskIdFor,
+  threadIdFor,
   type ValueWrite,
   writerId,
 } from "@pinetrie/core"
@@ -131,24 +132,26 @@ export function fakeLane(
   return { lane: port, calls, finish: ran.resolve }
 }
 
+/** The thread a fixture's row is in when its test names none. */
+export const ROW_THREAD = threadIdFor("row")
+
 /** A stored entry row, as `packages/reads/index.test.ts` writes them. */
 export const row = (
   id: string,
   parentId: string | null,
   message: unknown = { role: "user", content: id },
+  thread: ThreadId = ROW_THREAD,
 ): StoredEntryRow => ({
   id,
   parentId,
   type: "message",
   timestamp: 0,
   fromId: null,
+  thread,
   payload: { message },
 })
 
-/**
- * A stored chat that starts `thread` (ADR-0117), as a branch's first message
- * does: what `threadEnd` finds a thread by.
- */
+/** A stored chat in `thread` (ADR-0125), as a person's message is written. */
 export const threadRow = (
   id: string,
   parentId: string | null,
@@ -164,10 +167,10 @@ export const threadRow = (
         text: id,
         compels: NOBODY,
         sendId: `send-${id}`,
-        starts: thread,
       },
       0,
     ),
+    thread,
   )
 
 const STARTER = writerId("starter@example.com")

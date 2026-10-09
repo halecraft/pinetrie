@@ -17,9 +17,9 @@ import type { BannerAnswer, BannerAsk, BannerConfig } from "@pinetrie/rules"
 import { Type } from "typebox"
 import type { ImagesSetup } from "./config.ts"
 import { prepareImage } from "./images.ts"
-import { laneOf } from "./lanes.ts"
+import { threadOfContext } from "./thread-context.ts"
 
-type Context = Parameters<typeof laneOf>[0]
+type Context = Parameters<typeof threadOfContext>[0]
 
 /** A pasted image as the agent passed it: `/blob/<sha256>`, or the hash alone. */
 const imageOf = (s: string): Sha256 | null =>
@@ -115,7 +115,7 @@ export function bannerTool(
       _invocation: unknown,
       context: Context,
     ) {
-      const lane = laneOf(context)
+      const lane = threadOfContext(context)
       const ask = parseBannerArgs(params)
       const text =
         "refused" in ask

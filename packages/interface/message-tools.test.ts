@@ -6,6 +6,7 @@ import {
   type TranscriptMessage,
   threadIdFor,
 } from "@pinetrie/core"
+import { FIXTURE_THREAD } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   branchPrefill,
@@ -28,6 +29,7 @@ const conversation: ThreadLane = { kind: "none" }
 
 const chat = (text: string, compelled: boolean): TranscriptMessage => ({
   id: entryId("5-m"),
+  thread: FIXTURE_THREAD,
   role: "chat",
   text,
   compelled,
@@ -103,7 +105,8 @@ describe("edit", () => {
   test("only a person's message", () => {
     for (const role of ["assistant", "land", "update", "stack"])
       expect(
-        tools({ id: entryId("5-m"), role, text: "x" }).edit,
+        tools({ id: entryId("5-m"), thread: FIXTURE_THREAD, role, text: "x" })
+          .edit,
         role,
       ).toBeUndefined()
   })
@@ -137,14 +140,20 @@ describe("copy", () => {
     expect(
       tools({
         id: entryId("5-m"),
+        thread: FIXTURE_THREAD,
         role: "assistant",
         text: "",
         toolCalls: [call],
       }).copy,
     ).toBe(true)
     expect(
-      tools({ id: entryId("5-m"), role: "assistant", text: "", toolCalls: [] })
-        .copy,
+      tools({
+        id: entryId("5-m"),
+        thread: FIXTURE_THREAD,
+        role: "assistant",
+        text: "",
+        toolCalls: [],
+      }).copy,
     ).toBe(false)
   })
 })
@@ -165,12 +174,18 @@ test("branchPrefill: @agent, blank, in agent work; nothing in a conversation", (
 
 test("showsText: a message that only called tools shows only its rows", () => {
   const call = { id: "c", name: "bash", label: "ls" } as never
-  expect(showsText({ id: entryId("m"), role: "assistant", text: "" })).toBe(
-    true,
-  )
   expect(
     showsText({
       id: entryId("m"),
+      thread: FIXTURE_THREAD,
+      role: "assistant",
+      text: "",
+    }),
+  ).toBe(true)
+  expect(
+    showsText({
+      id: entryId("m"),
+      thread: FIXTURE_THREAD,
       role: "assistant",
       text: "",
       toolCalls: [call],
@@ -179,6 +194,7 @@ test("showsText: a message that only called tools shows only its rows", () => {
   expect(
     showsText({
       id: entryId("m"),
+      thread: FIXTURE_THREAD,
       role: "assistant",
       text: "so",
       toolCalls: [call],

@@ -11,6 +11,7 @@
 import type { Exchange, Store } from "@kyneta/exchange"
 import { PRODUCT_NAME } from "@pinetrie/core"
 import { SCHEMA_OF, type StoredKind, storedKind } from "../policy.ts"
+import { entryThread } from "./0008-entry-thread.ts"
 
 /** What a migration reads with, and writes with once every read loaded. */
 export interface MigrationRun {
@@ -22,6 +23,8 @@ export interface MigrationRun {
    * that fails to load stops the migration before it writes.
    */
   readonly hydrated: (docId: string) => Promise<void>
+  /** What it found, for the host's log. */
+  readonly log: (line: string) => void
 }
 
 /** A change to one kind of document's schema, from one stored hash. */
@@ -39,12 +42,12 @@ export interface Migration {
 }
 
 /**
- * Every migration this build carries, oldest first. Empty: 0001-live-row,
- * 0002-records (ADR-0095) and 0005-tasks' places and sidebars (ADR-0116)
- * ran on Duane's store and were deleted; restore one from the revision
- * that deleted it for a store still on its hash.
+ * Every migration this build carries, oldest first: `0008-entry-thread`
+ * (ADR-0125). 0001-live-row, 0002-records (ADR-0095) and 0005-tasks' places
+ * and sidebars (ADR-0116) ran on Duane's store and were deleted; restore one
+ * from the revision that deleted it for a store still on its hash.
  */
-export const MIGRATIONS: readonly Migration[] = []
+export const MIGRATIONS: readonly Migration[] = [entryThread]
 
 /**
  * A one-time change to stored contents that keeps every schema's hash: a
@@ -216,13 +219,14 @@ export async function migrate(input: {
         writes.push({
           name: migration.name,
           docs: docIds.length,
-          write: await migration.run({ exchange, docIds, hydrated }),
+          write: await migration.run({ exchange, docIds, hydrated, log }),
         })
     for (const migration of input.records) {
       const write = await migration.run({
         exchange,
         docIds: input.storedIds,
         hydrated,
+        log,
       })
       if (write !== null)
         writes.push({ name: migration.name, docs: null, write })

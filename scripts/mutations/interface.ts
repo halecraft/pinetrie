@@ -3472,17 +3472,17 @@ export const mutations: readonly Mutation[] = [
   {
     name: "a thread with its parent elsewhere is drawn whole",
     file: "packages/interface/canvas-columns.ts",
-    from: "  return from === null || onCanvas.has(from) ? null : (first ?? null)\n",
+    from: "  return from === null || onCanvas.has(from) ? null : thread\n",
     to: "  return null\n",
     command: unit,
     expect:
-      "a thread whose parent thread is on no column of the canvas folds its path above its first entry; one whose parent is here does not (ADR-0117)",
+      "a thread whose parent thread is on no column of the canvas folds its path above its own thread; one whose parent is here does not (ADR-0117)",
   },
   {
     name: "a branch from a held thread shows its entries",
     file: "packages/interface/column-paths.ts",
-    from: "      .filter(n => hide === undefined || threadAt(index, n.id) !== hide)\n",
-    to: "",
+    from: "    const own = spine.slice(cut + 1).filter(n => n.thread !== hide)\n",
+    to: "    const own = spine.slice(cut + 1)\n",
     command: unit,
     expect:
       "a branch not yet sent from a held thread leaves that thread's entries out (ADR-0124)",
@@ -3535,8 +3535,8 @@ export const mutations: readonly Mutation[] = [
   {
     name: "the rail draws no stub",
     file: "packages/interface/app-view.ts",
-    from: '        if (link.kind !== "gone")\n          stubs.push({ from: row.id, at: child, thread, link })',
-    to: "        void link",
+    from: '        if (link.kind !== "gone")\n          stubs.push({',
+    to: '        if (link.kind === "gone")\n          stubs.push({',
     command: unit,
     expect:
       "a task's rail is a forest: a tree for each root of its threads, in order, each cut to the paths to its threads, a fork elsewhere a stub; nothing off a task (ADR-0116, ADR-0117)",
@@ -3549,5 +3549,32 @@ export const mutations: readonly Mutation[] = [
     command: unit,
     expect:
       "a task's rail is a forest: a tree for each root of its threads, in order, each cut to the paths to its threads, a fork elsewhere a stub; nothing off a task (ADR-0116, ADR-0117)",
+  },
+  // ── a thread's first entry is not always a message (ADR-0125) ──
+  {
+    name: "a column folds above its thread's first entry, by id",
+    file: "packages/interface/column-paths.ts",
+    from: "        ? own.findIndex(n => n.thread === foldAbove)\n",
+    to: "        ? own.findIndex(n => n.id === index.firstOf.get(foldAbove))\n",
+    command: unit,
+    expect:
+      "its column, its parent on no column, folds the path above its first message",
+  },
+  {
+    name: "a thread's face reads its first entry",
+    file: "packages/interface/thread-face.ts",
+    from: "  const firstId = firstMessageOf(index, thread)\n",
+    to: "  const firstId = index.firstOf.get(thread) ?? null\n",
+    command: unit,
+    expect: "a thread's face reads its first message",
+  },
+  {
+    name: "a rail stub opens at its thread's first entry",
+    file: "packages/interface/app-view.ts",
+    from: "            at: firstMessageOf(index, thread) ?? child,\n",
+    to: "            at: child,\n",
+    command: unit,
+    expect:
+      "a rail stub for a branch whose first run wrote a context entry above its prompt opens at its first message",
   },
 ]

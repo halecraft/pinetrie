@@ -80,7 +80,7 @@ describe("newTabReducer", () => {
       { "1-a": null, "2-t": "1-a", "3-lane": "2-t", "4-ours": "2-t" },
       { "4-ours": "s-1" },
     )
-    // `withThreads` gives 4-ours its own thread, as its send's `starts` would.
+    // `withThreads` gives 4-ours its own thread, as its send's commit would.
     const t4 = threadOfEntry("4-ours")
     expect(
       sync([{ ...fresh[0], thread: t4 } as Column], ours, [lane("4-ours", t4)]),
@@ -218,7 +218,8 @@ test("a copy's column waits at its fork, then follows its thread once its first 
       id: entryId("2-c"),
       parentId: entryId("1-a"),
       type: "message",
-      message: { role: "user", content: "go", starts: copy },
+      thread: copy,
+      message: { role: "user", content: "go" },
     },
   })
   expect(

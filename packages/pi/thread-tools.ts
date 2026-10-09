@@ -12,9 +12,9 @@ import {
 } from "@pinetrie/core"
 import type { ToolAnswer } from "@pinetrie/rules"
 import { Type } from "typebox"
-import { laneOf } from "./lanes.ts"
+import { threadOfContext } from "./thread-context.ts"
 
-type Context = Parameters<typeof laneOf>[0]
+type Context = Parameters<typeof threadOfContext>[0]
 
 /** `catch_up`'s `from` as the agent passed it: the base unless it named the parent. Pure. */
 export const parseCatchUpArgs = (args: {
@@ -67,7 +67,7 @@ export function catchUpTool(
       _invocation: unknown,
       context: Context,
     ) {
-      const lane = laneOf(context)
+      const lane = threadOfContext(context)
       const answer =
         lane === undefined
           ? NO_LANE
@@ -96,7 +96,7 @@ export function splitTool(askSplit: (lane: ThreadId) => Promise<ToolAnswer>) {
       _invocation: unknown,
       context: Context,
     ) {
-      const lane = laneOf(context)
+      const lane = threadOfContext(context)
       return resultOf(lane === undefined ? NO_LANE : await askSplit(lane))
     },
   }

@@ -138,8 +138,6 @@ export interface AgentMessageLike {
   readonly command?: string
   /** Role `chat` only: the `/blob/` images its text shows (ADR-0042). */
   readonly images?: readonly ImageRef[]
-  /** Role `chat` only: the thread this message starts (ADR-0117), on its first message alone. */
-  readonly starts?: ThreadId
   /** Role `toolResult` only: the call it answers, and whether it failed. */
   readonly toolCallId?: string
   readonly isError?: boolean
@@ -170,6 +168,8 @@ export interface EntryLike {
   readonly id: EntryId
   readonly parentId: EntryId | null
   readonly type: string
+  /** The thread whose commit wrote it (ADR-0125): the row's column. */
+  readonly thread: ThreadId
   /** Absent on entries that carry no message, e.g. a compaction. */
   readonly message?: AgentMessageLike
   /**
@@ -184,6 +184,8 @@ export interface EntryLike {
 
 export interface TranscriptMessage {
   readonly id: EntryId
+  /** The thread its entry is in (ADR-0125). */
+  readonly thread: ThreadId
   readonly role: string
   readonly text: string
   /** Role `chat` only: the speaker's display name as sent. */
@@ -313,6 +315,7 @@ function renderableMessage(entry: EntryLike): TranscriptMessage | null {
   if (role === "chat") {
     return {
       id: entry.id,
+      thread: entry.thread,
       role,
       text: messageText(entry.message),
       author: entry.message?.author ?? "",
@@ -338,7 +341,12 @@ function renderableMessage(entry: EntryLike): TranscriptMessage | null {
   // decodes it into its role with that line as its content.
   if (role !== "user" && role !== "assistant" && !LINE_ROLES.has(role))
     return null
-  const message = { id: entry.id, role, text: messageText(entry.message) }
+  const message = {
+    id: entry.id,
+    thread: entry.thread,
+    role,
+    text: messageText(entry.message),
+  }
   const merged = entry.message?.merged
   if ((role === "update" || role === "land") && merged !== undefined)
     return { ...message, merged }
@@ -624,10 +632,17 @@ export interface TreeIndex {
    */
   readonly bySend: ReadonlyMap<string, EntryId>
   /**
-   * Each thread's first entry, by the thread it `starts` (ADR-0117). An id
-   * two entries claim keeps the older: a thread has one first entry.
+   * Each thread's first entry (ADR-0125): its entry whose parent is in
+   * another thread, or absent. Its parent is the thread's fork. Often a
+   * context entry no column draws: what a person reads first is
+   * `firstMessageOf`'s. Two such entries keep the older.
    */
   readonly firstOf: ReadonlyMap<ThreadId, EntryId>
+  /**
+   * Each thread's end (ADR-0125): its entry with no child in its own thread.
+   * Two such entries keep the newer, as `latestTip` does.
+   */
+  readonly endOf: ReadonlyMap<ThreadId, EntryId>
 }
 
 const ascending = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0)
@@ -644,14 +659,19 @@ export function indexTree(
   const orphans: EntryId[] = []
   const bySend = new Map<string, EntryId>()
   const firstOf = new Map<ThreadId, EntryId>()
+  // Entries with a child in their own thread: every other entry ends one.
+  const continued = new Set<EntryId>()
   for (const entry of Object.values(entries)) {
     const id = entry.id
     const send = entry.message?.sendId
     if (send !== undefined) bySend.set(send, id)
-    const starts = entry.message?.starts
-    if (starts !== undefined) {
-      const known = firstOf.get(starts)
-      if (known === undefined || id < known) firstOf.set(starts, id)
+    const parentEntry =
+      entry.parentId === null ? undefined : entries[entry.parentId]
+    if (parentEntry !== undefined && parentEntry.thread === entry.thread)
+      continued.add(parentEntry.id)
+    else {
+      const known = firstOf.get(entry.thread)
+      if (known === undefined || id < known) firstOf.set(entry.thread, id)
     }
     const parent = entry.parentId
     if (parent === null || parent === undefined) roots.push(id)
@@ -663,6 +683,13 @@ export function indexTree(
     }
   }
   for (const siblings of childrenOf.values()) siblings.sort(ascending)
+  const endOf = new Map<ThreadId, EntryId>()
+  for (const entry of Object.values(entries)) {
+    if (continued.has(entry.id)) continue
+    const known = endOf.get(entry.thread)
+    if (known === undefined || entry.id > known)
+      endOf.set(entry.thread, entry.id)
+  }
   return {
     entries,
     childrenOf,
@@ -671,6 +698,7 @@ export function indexTree(
     orphans: orphans.sort(ascending),
     bySend,
     firstOf,
+    endOf,
   }
 }
 
@@ -861,7 +889,7 @@ export interface RailRow {
   readonly track: number
   /** The nearest ancestor with a row, or null at a root: the edge's other end. */
   readonly parentId: EntryId | null
-  /** It begins a branch: a start, or any child but its parent's oldest. */
+  /** It begins a branch: a start, or a child in another thread than its parent row's. */
   readonly head: boolean
 }
 
@@ -869,12 +897,13 @@ export interface RailRow {
  * One root's tree as rows: a row per message, depth-first from `root`,
  * children in id order. Tracks start at 0 in every tree.
  *
- * The oldest child continues its parent's track. A younger child, or a start
- * under a root that is no message, begins a branch, whose track is its first
- * message's rank by id among every branch's first message. Ids sort in
- * creation order (S9), so the trunk is 0 and a new branch takes the next
- * number without changing any other's. Non-message entries get no row; their
- * children attach to the nearest ancestor that has one.
+ * A branch is a thread (ADR-0125): a child in its parent row's thread
+ * continues its track, and any other child, or a start under a root that is
+ * no message, begins a branch, whose track is its first message's rank by id
+ * among every branch's first message. Ids sort in creation order (S9), so
+ * the trunk is 0 and a new branch takes the next number without changing any
+ * other's. Non-message entries get no row; their children attach to the
+ * nearest ancestor that has one.
  */
 export function projectRail(
   index: TreeIndex,
@@ -908,11 +937,15 @@ export function projectRail(
     if (seen.has(v.id)) continue
     seen.add(v.id)
     visits.push(v)
-    const children = visibleChildren(index.childrenOf.get(v.id) ?? [])
-    for (let i = children.length - 1; i >= 0; i -= 1) {
-      const id = children[i]
-      if (id !== undefined) stack.push({ id, parentId: v.id, head: i > 0 })
-    }
+    const thread = index.entries[v.id]?.thread
+    for (const id of visibleChildren(
+      index.childrenOf.get(v.id) ?? [],
+    ).toReversed())
+      stack.push({
+        id,
+        parentId: v.id,
+        head: index.entries[id]?.thread !== thread,
+      })
   }
   const rank = new Map(
     visits
@@ -974,47 +1007,42 @@ export const isBusy = (lane: LaneView): boolean =>
 export const sendWaits = (lane: LaneView): boolean =>
   isBusy(lane) || lane.heldBy !== null
 
-/** The thread an entry starts (ADR-0117), or null. */
-const startsAt = (index: TreeIndex, id: EntryId): ThreadId | null => {
-  const thread = index.entries[id]?.message?.starts
-  return thread !== undefined && index.firstOf.get(thread) === id
-    ? thread
-    : null
-}
+/**
+ * The thread `entry` is in (ADR-0125): its row's. Null only for an entry the
+ * index lacks. Pure.
+ */
+export const threadAt = (index: TreeIndex, entry: EntryId): ThreadId | null =>
+  index.entries[entry]?.thread ?? null
 
 /**
- * The thread `entry` is in: the nearest entry at or above it that starts one
- * (ADR-0117). Null for an entry not in the tree, or above every thread's
- * first entry. Pure.
+ * A thread's end (ADR-0125): its entry with no child in its own thread
+ * (`TreeIndex.endOf`). Null for a thread with no entry yet. Pure.
  */
-export function threadAt(index: TreeIndex, entry: EntryId): ThreadId | null {
-  for (const id of ancestry(index, entry).path) {
-    const thread = startsAt(index, id)
-    if (thread !== null) return thread
+export const threadEnd = (index: TreeIndex, thread: ThreadId): EntryId | null =>
+  index.endOf.get(thread) ?? null
+
+/**
+ * What a person reads first of `thread`: its first entry a column draws,
+ * down the thread from `firstOf`. A branch's first run writes its context
+ * entries above its prompt, so its first entry is often one no column draws.
+ * Null for a thread with no message yet. Pure.
+ */
+export function firstMessageOf(
+  index: TreeIndex,
+  thread: ThreadId,
+): EntryId | null {
+  const seen = new Set<EntryId>()
+  for (
+    let id = index.firstOf.get(thread);
+    id !== undefined && !seen.has(id);
+    id = (index.childrenOf.get(id) ?? []).find(
+      c => index.entries[c]?.thread === thread,
+    )
+  ) {
+    seen.add(id)
+    if (messageAt(index, id) !== null) return id
   }
   return null
-}
-
-/**
- * A thread's end (ADR-0117): from its first entry, down the child that starts
- * no thread, to an entry with none. Exact, since only a branch gives an entry
- * a second child, and a branch's first message names the thread it starts
- * (`ChatDetails.starts`), in the commit that writes it. Null for a thread
- * with no entry yet. Pure.
- */
-export function threadEnd(index: TreeIndex, thread: ThreadId): EntryId | null {
-  const first = index.firstOf.get(thread)
-  if (first === undefined) return null
-  // Each entry has one parent, so going down a cycle is reached only through
-  // the first entry, which starts the thread and so ends the walk.
-  let end = first
-  for (;;) {
-    const next = (index.childrenOf.get(end) ?? []).find(
-      c => startsAt(index, c) === null,
-    )
-    if (next === undefined) return end
-    end = next
-  }
 }
 
 /** A thread's lane: the one named by its id, if it has one (ADR-0120). */

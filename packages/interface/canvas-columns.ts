@@ -256,21 +256,21 @@ function cardColumn(
 }
 
 /**
- * `thread`'s first entry, when the thread it forks from is on no column of
- * this canvas (`onCanvas`), so its path above folds (ADR-0117); null for a
- * thread at its root, or whose parent is here.
+ * `thread`, when the thread it forks from is on no column of this canvas
+ * (`onCanvas`), so its path above folds (ADR-0117); null for a thread at its
+ * root, or whose parent is here.
  */
 function foldAboveOf(
   index: TreeIndex,
   thread: ThreadId,
   onCanvas: ReadonlySet<string>,
-): EntryId | null {
+): ThreadId | null {
   const first = index.firstOf.get(thread)
   const parent =
     first === undefined ? undefined : index.entries[first]?.parentId
   if (parent === undefined || parent === null) return null
   const from = threadAt(index, parent)
-  return from === null || onCanvas.has(from) ? null : (first ?? null)
+  return from === null || onCanvas.has(from) ? null : thread
 }
 
 /**

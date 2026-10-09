@@ -4,15 +4,12 @@
 //
 // One harness serves every lane, but pi resolves the tools' context from the
 // run's `Context` only: `toolContext` is a function of it. So every call that
-// drives a lane carries the lane's name in its `Context` (`laneContext`), and
-// the rest comes from the host's `access(lane)`: one source for where a lane
-// works (S36 item 18). pi's hooks see the lane's name directly.
+// drives a lane carries its thread in its `Context` (`threadContext`,
+// `thread-context.ts`), and the rest comes from the host's `access(lane)`:
+// one source for where a lane works (S36 item 18). pi's hooks see the lane's
+// name directly.
 
 import type { ExecutionEnv } from "@earendil-works/pi-agent-core"
-import {
-  createContextKey,
-  withContextValue,
-} from "@earendil-works/pi-agent-core/harness/context"
 import {
   CONFLICT_TOOL,
   type EntryId,
@@ -30,6 +27,9 @@ import { Type } from "typebox"
 import type { ModelSetup } from "./config.ts"
 import { buildSystemPrompt } from "./deep.ts"
 import { type LaneChannel, laneEnv, refusingEnv } from "./lane-env.ts"
+import { threadOfContext } from "./thread-context.ts"
+
+type Context = Parameters<typeof threadOfContext>[0]
 
 /**
  * How a lane's tools reach its files, as the host resolves it: in the lane's
@@ -152,18 +152,6 @@ export interface LaneHooks {
   /** `split_offer` was called (ADR-0080): the host's answer. */
   askSplit(lane: ThreadId): Promise<ToolAnswer>
 }
-
-type Context = Parameters<typeof withContextValue>[2]
-
-const LANE = createContextKey<ThreadId>("pinetrie.lane")
-
-/** `base` with the lane named: pass it to every call that drives the lane. */
-export const laneContext = (lane: ThreadId, base: Context): Context =>
-  withContextValue(LANE, lane, base)
-
-/** The lane a `Context` was given, if any. */
-export const laneOf = (context: Context): ThreadId | undefined =>
-  context.value(LANE)
 
 /**
  * What pi builds a request's tools and system prompt from. `lane` is null for
@@ -297,7 +285,7 @@ export function conflictTool(
       _invocation: unknown,
       context: Context,
     ) {
-      const lane = laneOf(context)
+      const lane = threadOfContext(context)
       const asked = lane !== undefined && (await onAsk(lane, params.question))
       return {
         content: [

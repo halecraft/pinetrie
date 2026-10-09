@@ -12,6 +12,7 @@ import {
   type ThreadName,
   threadIdFor,
 } from "@pinetrie/core"
+import { FIXTURE_THREAD } from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   acceptedActionState,
@@ -372,6 +373,7 @@ describe("parentNow and planParentUpdate: the thread a lane branched from (ADR-0
   ): EntryLike => ({
     id: entryId(id),
     parentId: parentId === null ? null : entryId(parentId),
+    thread: FIXTURE_THREAD,
     type: "message",
     message: { role, content: id, ...(merged === undefined ? {} : { merged }) },
   })

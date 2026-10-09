@@ -6,6 +6,7 @@
 - **Amended by:**
   - ADR-0051: a message's image parts in `payload` are references to the blob
     store.
+  - ADR-0125: the entry row has a sixth typed column, `thread`.
 
 Supersedes the unstated `Schema.any()` choice in `packages/schema/index.ts`.
 

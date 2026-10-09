@@ -1,9 +1,11 @@
 import { entryId, type TranscriptMessage } from "@pinetrie/core"
+import { FIXTURE_THREAD } from "@pinetrie/core/fixtures"
 import { expect, test } from "vitest"
 import { copyIntoInventoryText } from "./copy-into-inventory-text.ts"
 
 const message: TranscriptMessage = {
   id: entryId("5-m"),
+  thread: FIXTURE_THREAD,
   role: "assistant",
   text: "the whole message",
   toolCalls: [],

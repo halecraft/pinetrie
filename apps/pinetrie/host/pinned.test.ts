@@ -116,8 +116,8 @@ describe("readPinned: what a run reads of its pinned cards", () => {
       () => "Ada",
       1,
     )
-    writeEntry(b.root, row("e-2", "e-1", read))
-    writeEntry(b.root, row("e-3", "e-2", { role: "user", content: "go" }))
+    writeEntry(b.root, row("e-2", "e-1", read, LANE))
+    writeEntry(b.root, row("e-3", "e-2", { role: "user", content: "go" }, LANE))
     putLane(b, LANE, entryId("e-3"))
     // The card still resolves to the lane's tip, now e-3.
     expect(await readPinned(LANE, [], signal())).toBeNull()

@@ -7,7 +7,13 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor, fromParents, threadOfEntry } from "@pinetrie/core/fixtures"
+import {
+  cardIdFor,
+  entriesOf,
+  entry,
+  fromParents,
+  threadOfEntry,
+} from "@pinetrie/core/fixtures"
 import { NO_INTENTS, type Slots, settleSlots } from "@pinetrie/session"
 import { describe, expect, test } from "vitest"
 import { inventoryView, slotKey } from "./inventory-view.ts"
@@ -130,6 +136,38 @@ test("a thread's card is drawn by its face: its name, its first line, where it e
     threads: new Map([[T, { ...face, thread: T }]]),
   })
   expect(view.grid.cells[0]?.thread?.name).toBe("amber-fox")
+})
+
+test("a thread's face reads its first message, not the context entry its first run wrote above it (ADR-0125)", () => {
+  const T = threadIdFor("t")
+  const B = threadIdFor("b")
+  const index = indexTree(
+    entriesOf([
+      entry("1-r", null, { role: "chat", content: "plan" }, { thread: T }),
+      entry(
+        "2-cb",
+        "1-r",
+        { role: "canvas", content: "<canvas task>" },
+        { thread: B },
+      ),
+      entry(
+        "3-b",
+        "2-cb",
+        { role: "chat", content: "an aside" },
+        { thread: B },
+      ),
+      entry("4-a", "3-b", { role: "assistant", content: "ok" }, { thread: B }),
+    ]),
+  )
+  const face = threadFace({
+    thread: B,
+    index,
+    lanes: [],
+    names: new Map(),
+    banners: new Map(),
+    stops: new Map(),
+  })
+  expect([face.first, face.last]).toEqual(["an aside", "ok"])
 })
 
 test("a thread's preview is its path from its root, read only (ADR-0124)", () => {

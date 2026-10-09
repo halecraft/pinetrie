@@ -28,7 +28,12 @@ import {
   threadIdFor,
   writerId,
 } from "@pinetrie/core"
-import { cardIdFor, entriesOf, withThreads } from "@pinetrie/core/fixtures"
+import {
+  cardIdFor,
+  entriesOf,
+  FIXTURE_THREAD,
+  withThreads,
+} from "@pinetrie/core/fixtures"
 import { describe, expect, test } from "vitest"
 import {
   cardEnd,
@@ -79,6 +84,7 @@ const F1 = entryId("f1")
 const entry = (id: string, parentId: string | null): EntryLike => ({
   id: entryId(id),
   parentId: parentId === null ? null : entryId(parentId),
+  thread: FIXTURE_THREAD,
   type: "message",
   message: { role: "user", content: `text of ${id}` },
 })

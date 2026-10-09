@@ -41,11 +41,15 @@ describe("one session per document (S113)", () => {
         threadIdFor(newId()),
       ),
     ).toMatchObject({ kind: "created" })
-    const appended = await pi.scribe.appendToTree(chat("hello"), {
-      root: ONE_ROOT,
-      at: ROOT,
-    })
+    const talk = threadIdFor(newId())
+    const appended = await pi.scribe.appendToTree(
+      chat("hello"),
+      { root: ONE_ROOT, at: ROOT },
+      talk,
+    )
     if (appended.kind !== "appended") throw new Error("not appended")
+    // Its row is in the thread the append named (ADR-0125).
+    expect(doc.entries()[appended.id]?.thread).toBe(talk)
     const there = threadIdFor(newId())
     expect(
       await pi.agent.createThreadLane(
@@ -101,7 +105,11 @@ describe("one session per document (S113)", () => {
       kind: "ok",
     })
     await pi.scribe.release(ONE_ROOT)
-    await pi.scribe.appendToTree(chat("between"), { root: ONE_ROOT, at: ROOT })
+    await pi.scribe.appendToTree(
+      chat("between"),
+      { root: ONE_ROOT, at: ROOT },
+      threadIdFor(newId()),
+    )
     expect(await pi.agent.lane(made.lane).run(chat("two"), [])).toEqual({
       kind: "ok",
     })
@@ -113,6 +121,10 @@ test("a closed scribe refuses every append, in a root it never opened too", asyn
   const scribe = createScribe({ documents: oneRoot(), replicaId: "test" })
   await scribe.close()
   await expect(
-    scribe.appendToTree(chat("late"), { root: ONE_ROOT, at: ROOT }),
+    scribe.appendToTree(
+      chat("late"),
+      { root: ONE_ROOT, at: ROOT },
+      threadIdFor("late"),
+    ),
   ).rejects.toThrow("the scribe is closed")
 })

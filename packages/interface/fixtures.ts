@@ -33,7 +33,7 @@ import { type Tasks, tasksOf } from "./tasks.ts"
 
 /**
  * The index of `list`, keyed by each entry's own id as the reads key them,
- * each thread's first message marked (`withThreads`).
+ * in threads as a branch writes them (`withThreads`).
  */
 export const indexOf = (list: Iterable<EntryLike>): TreeIndex =>
   indexTree(withThreads(entriesOf(list)))
